@@ -200,6 +200,9 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		grantedMode = grant.Mode
 	}
 
+	if body.ResumeSessionID != "" && strings.TrimSpace(body.Model) == "" && strings.TrimSpace(body.Thinking) == "" { // a resume that names neither runs at what the conversation last ran at (#15293)
+		body.Model, body.Thinking = h.resumedRunWith(body.AgentType, body.ResumeSessionID, body.WorkingDir)
+	}
 	// Resolve model: request wins, else per-type default from settings.
 	takesSeat := h.launchTakesTheSeat(r.Context(), r, body.DisplayName, body.AgentType, body.BoardName, body.BoardServer)
 	effectiveModel := h.resolveModelFor(r.Context(), body.AgentType, body.Model, takesSeat)

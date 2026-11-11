@@ -10,7 +10,9 @@ import (
 	"github.com/subgentic/coral/internal/agent"
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/jsonl"
+	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/opencode"
+	"github.com/subgentic/coral/internal/ptymanager"
 )
 
 // OpencodeRuntime is what an opencode agent needs of the server Coral runs for it (opencode.Manager): the server started for the agent (Ensure), the state its event stream gave (AgentTurn), and the end of
@@ -82,7 +84,24 @@ func (h *SessionsHandler) launchCommand(ctx context.Context, ag agent.Agent, p a
 		p.OpencodeURL, p.OpencodePasswordFile, p.OpencodeMajor = srv.ServerURL(), file, srv.ServerMajor()
 		h.useResumedSession(p)
 	}
-	return launchCommand(ag, p)
+	cmd, err := launchCommand(ag, p)
+	if err == nil && p.ResumeSessionID != "" { // a wake or resume starts the CLI with the instructions again: Coral's own turn, not the person's (#15283)
+		noteStartMessage(ag.AgentType(), p)
+	}
+	return cmd, err
+}
+
+// noteStartMessage records the launch's first message as Coral's delivery to the session, under both its names, so the chat folds it (#15283).
+func noteStartMessage(agentType string, p agent.LaunchParams) {
+	msg := p.StartMessage()
+	if msg == "" {
+		return
+	}
+	for _, n := range []string{p.SessionName, naming.SessionName(agentType, p.SessionID)} {
+		if n != "" {
+			ptymanager.NoteDeliveredText(n, msg)
+		}
+	}
 }
 
 // opencodeTurn is an opencode agent's turn as applyTranscriptState reads it: "prompt_submit" while a turn is going on, "stop" once it ended, "permission_request" while it waits for the person.

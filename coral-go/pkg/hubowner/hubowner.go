@@ -49,7 +49,7 @@ const secretBytes = 32
 // RoutesVersion is the generation of the allowlist below: 1 is the first eight routes, 2 (#13694) adds every Operator click that writes an Activity row and the decisions that need a person, 3 (#13757) the Markdown editor's save and the model switch, 4 (#13802) Send to agent with the diff, 5 (#13834) the done-state of a "Goal looks done" row, 6 (#13910) the Operator's opened version of a file. A remote says in
 // its health answer which generation it accepts; a hub stamps a route only when the remote's generation is at least the route's (a stamp on a route an older remote does not list is refused 403, where an
 // unstamped call still goes through as a key caller). The remote still checks every stamp against its own list, so a wrong number gets a 403 and never more power.
-const RoutesVersion = 6
+const RoutesVersion = 7
 
 type route struct {
 	pattern string
@@ -130,6 +130,8 @@ var routes = []route{
 	{"POST /api/board/{project}/goals/{goalID}/done-state", 5},
 	// Generation 6 (#13910, Security: exactly one route): the Operator opened a version of a series (the row's "New version"). No body is read; the machine works the series and version out from its own records.
 	{"POST /api/artifacts/{id}/opened", 6},
+	// Generation 7 (#15380, Security: exactly one route, a read): a Hub reads each computer's Needs you (counts and cleaned lines) as the owner signed in at the Hub, for the real sign-in session only.
+	{"GET /api/needs-you", 7},
 }
 
 // MustBeSigned reports whether a request is one whose words are the person's own and become automation on the remote when no stamp goes with it: the owner's message to an agent (#13456) and, since

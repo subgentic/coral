@@ -24,6 +24,7 @@ const { coralReady } = require('./helpers/wait');
             const snap = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; await ev(`new Promise(r => setTimeout(r, 700))`); /* sleep-ok: a synthesized touch leaves its tap highlight on screen for a moment; the picture waits for it to fade */ fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/hub-dialog-${name}-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
             await setupHubWorld({ client, Page, Emulation, width: w, height: h, mobile, inbox: 'native', needs: true, hubPages: true });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
+            await ev(`localStorage.setItem('coral-alerts-offered', '1'); localStorage.setItem('coral-alerts-reoffered', '1'); true`); // the first question offers alerts (#15297): this suite is not about that banner
             await ev(`(() => { const original = window.fetch.bind(window), json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
                 window.__closes = [];
                 const ask = (id, board, text, buttons) => ({ board, kind: 'ask', id, asker: 'Head of Security Review', text, cut: false, at: new Date().toISOString(), buttons });

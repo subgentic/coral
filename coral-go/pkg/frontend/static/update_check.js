@@ -9,7 +9,7 @@ import { importOnce } from './import_once.js';
 
 /**
  * Fetch update info from the backend and show a toast if a new version is available.
- * Pass force=true to bypass dismissal (e.g. manual "Check for Updates" click).
+ * Pass force=true to bypass dismissal (e.g. manual "Check for updates" click).
  */
 export async function checkForUpdates(force = false) {
     // Respect opt-out (only for automatic checks)

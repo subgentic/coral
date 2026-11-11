@@ -28,13 +28,16 @@ export function reviewWords(tags, review, agent) {
     return has('reviewed') ? 'Reviewed' : '';
 }
 
-export function tagChip(tag) { return mk('span', 'chip artifact-tag', tag); }
+/** What a tag the system sets means, in a sentence (the chip's hover and screen-reader description; #15154: "superseded" said nothing about what replaced the file). */
+export const TAG_MEANING = { superseded: 'Superseded: a newer version of this file replaced it. Open the file to see the newest version.' };
+
+export function tagChip(tag) { const c = mk('span', 'chip artifact-tag', tag); const m = TAG_MEANING[String(tag).toLowerCase()]; if (m) { c.title = m; c.setAttribute('aria-description', m); } return c; }
 
 /** The tags of a table row: at most two chips, then +N; the whole list in the title. null when there are none. */
 export function rowTags(tags) {
     if (!Array.isArray(tags) || !tags.length) return null;
     const wrap = mk('span', 'artifact-tags-row');
-    wrap.title = `Tags: ${tags.join(', ')}`;
+    wrap.title = `Tags: ${tags.join(', ')}${tags.map(t => TAG_MEANING[String(t).toLowerCase()]).filter(Boolean).map(m => `. ${m}`).join('')}`;
     for (const t of tags.slice(0, 2)) wrap.append(tagChip(t));
     if (tags.length > 2) wrap.append(mk('span', 'chip chip-count artifact-tag artifact-tag-more', `+${tags.length - 2}`));
     return wrap;

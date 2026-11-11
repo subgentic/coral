@@ -1,4 +1,4 @@
-// New team trusts the folder (#11889, the Operator's decision, Security's conditions): a folder Coral makes says "Coral will start these agents in this folder and trust it for them."; an existing folder shows
+// New team trusts the folder (#11889, the Operator's decision, Security's conditions): a folder Coral makes says "Coral will start these agents in this folder and trust it for them. A Claude agent may still ask once."; an existing folder shows
 // a "Trust this folder" switch, off, that names the path, and only a ticked one sends trust_folder. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -18,7 +18,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 if (p.pathname === '/api/sessions/launch-team' && m === 'POST') { window.__teamLaunches.push(JSON.parse(o.body)); return json({ agents: [{ name: 'A', session_id: 's' }], ...(window.__trustAnswer ? { trust_folder: window.__trustAnswer } : {}) }); }
                 if (p.pathname === '/api/filesystem/trust-probe') {
                     window.__probePath = p.searchParams.get('path');
-                    const body = window.__probeMode === 'clean' ? { checked:true, files:{'.claude/settings.json':false,'.claude/settings.local.json':false,'.mcp.json':false,'.codex/config.toml':false} }
+                    const body = window.__probeMode === 'refused' ? { checked: false, refused: 'Coral does not trust a shared or shallow folder, or one that other people on this computer can write into, from here. Each agent will ask about the folder when it starts. To have Coral trust it for them, pick a project folder inside your home folder instead.' } : window.__probeMode === 'clean' ? { checked:true, files:{'.claude/settings.json':false,'.claude/settings.local.json':false,'.mcp.json':false,'.codex/config.toml':false} }
                         : window.__probeMode === 'config' ? { checked:true, files:{'.claude/settings.json':true,'.claude/settings.local.json':false,'.mcp.json':false,'.codex/config.toml':false} } : {checked:false};
                     if(window.__probeMode==='hold') return new Promise(resolve=>{window.__trustProbeRelease=()=>resolve(Response.json({checked:true,files:{'.claude/settings.json':false,'.claude/settings.local.json':false,'.mcp.json':false,'.codex/config.toml':false}}));});
                     return json(body);
@@ -54,7 +54,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         console.log('A folder Coral makes says it will trust it, and has no switch');
         await open(); await setDir('/home/p/Coral/proj', true);
         assert.equal(await visible('launch-team-trust-line'), true, 'the line shows');
-        assert.equal(await ev(`document.getElementById('launch-team-trust-line').textContent`), 'Coral will start these agents in this folder and trust it for them.');
+        assert.equal(await ev(`document.getElementById('launch-team-trust-line').textContent`), 'Coral will start these agents in this folder and trust it for them. A Claude agent may still ask once.');
         assert.equal(await visible('launch-team-trust'), false, 'no switch for a folder Coral makes');
         let sent = await go();
         assert.equal(sent.create_dir, true); assert.equal(sent.trust_folder, undefined, 'the made folder is trusted by the server, not asked for');
@@ -195,6 +195,21 @@ const { removeBoards } = require('./helpers/board_cleanup');
         assert.equal(await ev(`document.getElementById('launch-team-trust').checked`),false,'late safe-folder reply cannot trust a different folder');
         await ev(`window.hideLaunchModal();true`);
 
+
+        console.log('A folder Coral can never trust: the form says why before the launch (#15091)');
+        await open();
+        await ev(`window.__probeMode='refused';window.__probePath='';true`);
+        await setDir('/private/tmp/notes-app', false);
+        await ev(`{ const d = document.getElementById('launch-team-dir'); d.dataset.trustChosen = d.value; d.dispatchEvent(new Event('change', { bubbles: true })); true }`);
+        await waitFor(`/shared or shallow/.test(document.getElementById('launch-team-trust')?.closest('.sv-row')?.textContent || '')`, 'the refusal is said in the Trust row');
+        assert.equal(await ev(`window.__probePath`), '/private/tmp/notes-app', 'the folder was probed');
+        assert.equal(await ev(`document.getElementById('launch-team-trust').checked`), false, 'the switch stays off');
+        assert.match(await ev(`document.getElementById('launch-team-trust').closest('.sv-row').textContent`), /Coral does not trust a shared or shallow folder.*Each agent will ask about the folder when it starts.*inside your home folder/, 'the sentence says why and what to do');
+        sent = await go(); assert.equal(sent.trust_folder, undefined, 'a refused folder sends no trust opt-in');
+        await ev(`window.hideLaunchModal(); window.__probeMode='clean'; true`);
+        await open(); await setDir('/home/p/Code/app', false);
+        assert.doesNotMatch(await ev(`document.getElementById('launch-team-trust').closest('.sv-row').textContent`), /shared or shallow/, 'the refusal does not carry to the next folder');
+        await ev(`window.hideLaunchModal(); true`);
 
         console.log('A scripted or remembered folder never receives the default trust tick');
         await open();

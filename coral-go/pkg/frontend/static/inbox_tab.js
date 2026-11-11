@@ -36,12 +36,16 @@ export function waitingCount() {
     return (state.liveSessions || []).filter(needsYou).length + (unrecordedItem(state.liveSessions) ? 1 : 0); // the agents held until recorded are one item (#11415)
 }
 
+/** The ONE number of things that need the person: the tab's badge, the sidebar's Needs you count and the page header all read it, so they cannot disagree (#15380 D). Only what is live is counted: rows kept from a computer that is offline are shown, not counted (#15380 C). */
+export function needsCount(reviews = reviewAttentionCount().value) {
+    return waitingCount() + reviews + failedUnread().length + pendingProposals().length + operatorAsks().length + goalDoneCount() + skillCount();
+}
+
 /** Something has waited for the person 5 minutes with alerts still off: the offer comes back once (alerts_offer.js decides whether this browser may be offered again). */
+function oldestWaiting() { return Math.min(...[...(state.liveSessions || []).filter(needsYou).map(s => Date.parse(s.waiting_since)), ...operatorAsks().map(a => Date.parse(a.at)), ...unreadReviewItems().map(a => Date.parse(a.created_at))].filter(Number.isFinite)); } // Infinity when nothing waits
 function offerAlertsAgainIfWaited(n) {
     if (n <= 0 || document.hidden) return;
-    const at = [...(state.liveSessions || []).filter(needsYou).map(s => Date.parse(s.waiting_since)), ...operatorAsks().map(a => Date.parse(a.at)), ...unreadReviewItems().map(a => Date.parse(a.created_at))].filter(Number.isFinite);
-    if (!at.length) return;
-    const oldest = Math.min(...at);
+    const oldest = oldestWaiting();
     if (Date.now() - oldest >= 5 * 60 * 1000) importOnce('./alerts_offer.js').then(m => m.offerAlertsAgain(oldest));
 }
 /** The background tab's title carries the same number as the badge (#11837). attention.js loads as soon as something waits (a tab that goes to the background after an item arrived must show it), not before: a page with nothing waiting adds neither the module nor a listener at start. The listener for the tab coming back (the alerts offer, #11893) is registered the first time something waits. */
@@ -49,7 +53,7 @@ let attentionReady = false, comebackHooked = false;
 function tellAttention(n) {
     if (n > 0 && !comebackHooked) { comebackHooked = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) updateInboxTab(); }); }
     if (n <= 0 && !attentionReady) return;
-    importOnce('./attention.js').then(m => { attentionReady = true; m.setAttentionTotal(n); });
+    importOnce('./attention.js').then(m => { attentionReady = true; m.setAttentionTotal(n, oldestWaiting()); });
 }
 
 // The files waiting for the Operator are counted by each computer after the first paint, at idle (#13172): the badge shows them without the Inbox having been opened and without reading a page of any team. The module is loaded then, not at startup.
@@ -79,7 +83,7 @@ export function updateInboxTab() {
     refreshProposals(); // after the Inbox was first opened, and at most once in 20 seconds (proposals_state.js)
     if (!isCloud()) refreshRuns(); // the runs are read from this Coral only, and only once the Inbox or Automations has been shown
     const reviewCount = reviewAttentionCount();
-    const n = waitingCount() + reviewCount.value + failedUnread().length + pendingProposals().length + operatorAsks().length + goalDoneCount() + skillCount(); // a goal that looks done is one item (#11825); a review artifact the operator has read stays listed but is not counted (#9277); a failed run nobody has opened is (#9296)
+    const n = needsCount(reviewCount.value); // a goal that looks done is one item (#11825); a review artifact the operator has read stays listed but is not counted (#9277); a failed run nobody has opened is (#9296)
     const text = n > 9 ? '9+' : n > 0 ? String(n) : ''; // two characters at most: the pill fits the tabs' own 24 px gap, so the gap after Inbox is the same as the others (#9821); the exact count is in the tab's name
     // Only what changed is written: nav_tabs.js redraws the row on any change to it, and this runs for every message of the feed (setting hidden to
     // the value it has is still a change to a MutationObserver).

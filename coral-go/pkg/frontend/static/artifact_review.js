@@ -20,7 +20,14 @@ export async function reviewStateOf(team, hex) {
     const tags = row.tags || [];
     if (!['approved', 'for review', 'reviewed'].some(t => tags.includes(t))) return null;
     const state = tags.includes('approved') ? 'approved' : tags.includes('for review') ? (tags.includes('changes requested') ? 'changes' : 'pending') : 'reviewed';
-    return { row, state, at: row.review?.at || '' };
+    return { row, state, at: row.review?.at || '', newer: await (await importOnce('./artifact_version_list.js')).newerOf(team, hex) };
+}
+
+/** Ask the uploader to put an older version back as the newest (#15285): the words go to them as a change request on the newest version; the series keeps one entry per set of bytes, so the agent does the upload. */
+export async function askToRestore(team, row, version) {
+    const out = await decide(team, row, 'changes', undefined, undefined, false, `Please go back to v${version.n} of ${shown(row.name)} (coral://artifacts/${version.hex}) and send its content again as the next version.`);
+    importOnce('./inbox_reviews.js').then(m => { m.reviewsChangedOnServer(); return m.refreshReviews(true); }).catch(() => {});
+    return out;
 }
 
 const timeWords = at => { const t = Date.parse(at); return Number.isNaN(t) ? '' : new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); };
@@ -133,16 +140,16 @@ export function sayIgnored(team, row, out) {
 export function sayDenied(name, out) { showToast(`Denied ${shown(name)}. ${fromWords(out)}${earlierFailure(out)}`.trim()); }
 
 /** The Deny dialog: "Deny this?" with an optional reason (500 characters); the agent is told it was declined. Red text, never a red fill. onDone runs after the deny went through. */
-export function openDenyDialog(team, row, onDone) {
+export function openDenyDialog(team, row, onDone, { refuse = false } = {}) { // refuse: the viewer's Refuse button (#15284): the same final no, worded as a plan's refusal, and the toast says Sent to <agent>
     const dlg = document.createElement('dialog');
     dlg.className = 'modal-content dlg-form inbox-deny-dialog'; dlg.setAttribute('aria-labelledby', 'inbox-deny-title');
-    const title = document.createElement('h2'); title.id = 'inbox-deny-title'; title.textContent = `Deny ${shown(row.name)}?`;
-    const sub = document.createElement('p'); sub.textContent = 'This is a final no: the agent is told it was denied and should not send it again, in any wording. To ask for a new version, use Changes instead.';
+    const title = document.createElement('h2'); title.id = 'inbox-deny-title'; title.textContent = `${refuse ? 'Refuse' : 'Deny'} ${shown(row.name)}?`;
+    const sub = document.createElement('p'); sub.textContent = refuse ? 'This is a final no: the agent is told to stop this and not send it again, in any wording. To ask for a smaller or different one, use Request changes instead.' : 'This is a final no: the agent is told it was denied and should not send it again, in any wording. To ask for a new version, use Changes instead.';
     const label = document.createElement('label'); label.textContent = 'Reason (optional, the agent sees it)';
     const box = document.createElement('textarea'); box.className = 'field'; box.rows = 3; box.maxLength = 500; label.append(box);
     const err = document.createElement('p'); err.className = 'inbox-ask-error'; err.setAttribute('role', 'alert');
     const row2 = document.createElement('div'); row2.className = 'inbox-ask-buttons';
-    const go = document.createElement('button'); go.type = 'button'; go.className = 'btn inbox-deny-confirm'; go.textContent = 'Deny';
+    const go = document.createElement('button'); go.type = 'button'; go.className = 'btn inbox-deny-confirm'; go.textContent = refuse ? 'Refuse' : 'Deny';
     const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn'; cancel.textContent = 'Cancel';
     row2.append(go, cancel); dlg.append(title, sub, label, err, row2);
     const finish = () => { dlg.close(); dlg.remove(); };
@@ -150,7 +157,7 @@ export function openDenyDialog(team, row, onDone) {
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     go.addEventListener('click', async () => {
         err.textContent = ''; go.disabled = true;
-        try { const out = await denyRow(team, row, box.value.replace(/\s+/g, ' ').trim()); finish(); sayDenied(row.name, out); announceNotice(`Denied ${shown(row.name)}.`); onDone?.(); }
+        try { const out = await denyRow(team, row, box.value.replace(/\s+/g, ' ').trim()); finish(); if (refuse) { showToast(`Refused ${shown(row.name)}. ${out.delivered ? `Sent to ${out.to}.${out.asleep ? ' It is asleep: it will see this when it wakes.' : ''}` : fromWords(out)}`.trim()); announceNotice(`Refused ${shown(row.name)}.`); } else { sayDenied(row.name, out); announceNotice(`Denied ${shown(row.name)}.`); } onDone?.(); }
         catch (e) { err.textContent = e.message || 'Not saved.'; go.disabled = false; box.focus(); }
     });
     document.body.append(dlg); dlg.showModal(); box.focus();
@@ -206,10 +213,11 @@ export function attachReview(d, { reload }) {
             <button type="submit" class="btn btn-primary">Send request</button>
             <button type="button" class="btn artifact-review-cancel">Cancel</button>
         </form>`;
-    (d.querySelector('.artifact-viewer-from') || d.querySelector('.artifact-viewer-header')).after(bar); // the change-request form, after who sent it, which sits under the name (#11456)
+    d.querySelector('.artifact-viewer-header').after(bar); // the change-request form, under the header (not a box inside its row, which squeezed the name to 'RE…', walk 3 N21)
     // the review's controls are on the viewer's one header row (#12223): its status beside the version chip, Approve and Request changes at the right, Approve with a note in the ⋯ menu
     const mk = (tag, cls, text, attrs = {}) => { const e = document.createElement(tag); e.className = cls; if (text) e.textContent = text; for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (tag === 'button') e.type = 'button'; return e; };
-    const stateEl = mk('span', 'chip artifact-review-state', '', { role: 'status' }), approve = mk('button', 'btn btn-primary artifact-review-approve', 'Approve'), changes = mk('button', 'btn artifact-review-changes', 'Request changes', { 'aria-expanded': 'false' });
+    const stateEl = mk('span', 'chip artifact-review-state', '', { role: 'status' }), approve = mk('button', 'btn btn-primary artifact-review-approve', 'Approve'), changes = mk('button', 'btn artifact-review-changes', 'Request changes', { 'aria-expanded': 'false' }), refuse = mk('button', 'btn artifact-review-refuse', 'Refuse', { title: 'A final no: the agent is told to stop this and not send it again' });
+    const newest = mk('button', 'btn btn-small artifact-review-newest', ''); newest.hidden = true; let newerHex = ''; newest.addEventListener('click', () => { if (newerHex) reload(newerHex); }); // an older file opens the newest in one click (#15329)
     const approveNote = mk('button', 'menu-item artifact-review-note', 'Approve with a note', { role: 'menuitem' });
     // Send for review / Remove from review (#13152): the Operator's own way to put this file in Needs you, or take it out, in the ⋯ menu (artifact_send_review.js)
     const sendItem = mk('button', 'menu-item artifact-review-send', 'Send for review', { role: 'menuitem' }); sendItem.hidden = true;
@@ -217,8 +225,8 @@ export function attachReview(d, { reload }) {
     let sendCtx = null; // { team, hex, server, filename, inReview } of the open file
     const syncSendItem = () => { sendItem.hidden = !sendCtx || decisionNeedsPerson(sendCtx.server); if (sendCtx) sendItem.textContent = sendCtx.inReview ? 'Remove from review' : 'Send for review'; };
     const slotted = !!d.querySelector('.artifact-viewer-chips'); // the controls are on the header row; without it (a bare viewer) they stay in this bar
-    stateEl.hidden = approve.hidden = changes.hidden = approveNote.hidden = true;
-    (d.querySelector('.artifact-viewer-chips') || bar).append(stateEl); (d.querySelector('.artifact-viewer-actions') || bar).append(approve, changes); (d.querySelector('.artifact-viewer-menu') || bar).prepend(approveNote);
+    stateEl.hidden = approve.hidden = changes.hidden = approveNote.hidden = refuse.hidden = true;
+    (d.querySelector('.artifact-viewer-chips') || bar).append(stateEl, newest); (d.querySelector('.artifact-viewer-actions') || bar).append(approve, changes, refuse); (d.querySelector('.artifact-viewer-menu') || bar).prepend(approveNote);
     const $ = s => bar.querySelector(s);
     const form = $('.artifact-review-form'), text = $('#artifact-review-text'), error = $('.artifact-review-error');
     // Keep confirmed legacy writes while this form is open: an explicit delivery
@@ -226,6 +234,7 @@ export function attachReview(d, { reload }) {
     // Both are bound to THE FILE they were made for (#14263, QA Reviewer 2's surviving mutants on #14187): another file opened in this form never reuses this one's recorded decision or its comment, whatever else is or is not cleared on open.
     const fileKey = x => JSON.stringify([x.team, x.server || '', x.hex]);
     let legacyDecision = null, legacyComment = null;
+    let armed = false, armedAt = 0; // Approve on a series of several files, some never opened, asks once more (#15254)
     let cur = null, gen = 0, sending = false, done = false, inProgress = false, progressTimer = null;
     const progress = $('.artifact-review-pending');
     const clearProgress = () => { clearTimeout(progressTimer); progressTimer = null; inProgress = false; progress.hidden = true; };
@@ -233,20 +242,33 @@ export function attachReview(d, { reload }) {
     const tray = imgs.createImageTray({ upload: (blob, versionOf) => uploadCommentImage(cur.hex, cur.server, blob, versionOf, cur.name) });
     const syncSend = () => { submitBtn.disabled = sending || inProgress || tray.busy() || tray.failed(); }; // Send waits for a picture still going up, and for a failed one to be removed
     error.before(tray.picker(), tray.node, tray.hint()); tray.attach(form, text); tray.listen(syncSend);
+    const paintApprove = () => {
+        const n = d.dataset.shownVersion, newer = d.dataset.newerVersion, covers = d.dataset.coversFiles, unopened = d.dataset.unopenedFiles;
+        if (armed && covers && Number(unopened) > 0) { approve.textContent = `${unopened} of ${covers} files not opened: approve all?`; approve.title = 'Press again to approve every file in this review, or open the others first.'; return; }
+        armed = false;
+        approve.textContent = cur && cur.newer ? 'Approve this older version' : `${newer && n ? `Approve v${n}` : 'Approve'}${cur && cur.state === 'changes' ? ' anyway' : ''}${newer ? ` (v${newer} is newer)` : ''}${covers && !newer ? ` (covers ${covers} files)` : ''}`;
+        approve.title = covers ? `One decision covers the ${covers} files in this review: open each from the version list first.` : '';
+    };
+    d.addEventListener('av-version', () => { armed = false; if (cur) paintApprove(); }); // another version shown: the question is asked again
     const show = (s) => {
-        cur = s;
+        cur = s; armed = false;
+        form.querySelector('label').textContent = s && s.row.produced_by ? `What should change? ${shown(s.row.produced_by)}, who uploaded this file, will get it.` : 'What should change?'; // the box says who gets the request (walk 17 M13)
         const waiting = !!s && (s.state === 'pending' || s.state === 'changes');
         const pending = waiting && !decisionNeedsPerson(s.server); // a remote of a self-hosted hub: the decision is made on that machine's own dashboard (#11372)
         bar.hidden = !s;
-        approve.hidden = changes.hidden = approveNote.hidden = !pending;
-        approve.textContent = s && s.state === 'changes' ? 'Approve anyway' : 'Approve'; // changes were asked for: Approve is still the Operator's, and says it approves this version as it is
+        approve.hidden = changes.hidden = approveNote.hidden = refuse.hidden = !pending;
+        d.dataset.reviewPending = pending ? '1' : ''; // the comment box says where approving is (#15128)
+        for (const h of d.querySelectorAll('.ac-hint')) { h.hidden = !pending; const t = h.parentNode.querySelector('textarea'); if (t) { const how = t.dataset.sendhint || ''; if (pending || how) t.setAttribute('aria-describedby', pending ? `${h.id} ${how}`.trim() : how); else t.removeAttribute('aria-describedby'); } } // a box that is open follows the file's state, not the state it was drawn in
+        paintApprove(); // changes were asked for: Approve is still the Operator's, and says it approves this version as it is; with a newer version in the series it names the one it approves (#15197)
         if (!pending) form.hidden = true;
         bar.hidden = !s || (slotted && form.hidden); // on the header row the strip under it is the change-request form: there only while it is open
-        stateEl.textContent = !s ? '' : s.state === 'approved' ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}` : s.state === 'reviewed' ? 'Reviewed' : s.state === 'changes' ? `Changes requested${s.row.produced_by ? `: waiting for a new version from ${shown(s.row.produced_by)}` : ''}. Approving now approves this version as it is.` : waiting && !pending ? 'Waiting for your review. Approve it on that computer\'s own dashboard.' : 'Waiting for your review';
+        stateEl.textContent = !s ? '' : s.newer && s.state !== 'approved' ? `An older version: v${s.newer.n} is newer.${s.state === 'changes' ? ' Changes were asked for on this one.' : ''}` : s.state === 'approved' && s.newer ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}. An older version: v${s.newer.n} is newer.` : s.state === 'approved' ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}` : s.state === 'reviewed' ? 'Reviewed' : s.state === 'denied' ? 'Refused' : s.state === 'changes' ? `Changes requested${s.row.produced_by ? `: waiting for a new version from ${shown(s.row.produced_by)}` : ''}. Approving now approves this version as it is.` : waiting && !pending ? 'Waiting for your review. Approve it on that computer\'s own dashboard.' : 'Waiting for your review';
         stateEl.hidden = !stateEl.textContent; // no status, no chip
+        newerHex = s && s.newer ? s.newer.hex : ''; newest.hidden = !newerHex; if (newerHex) newest.textContent = `Open v${s.newer.n}`;
     };
     const openForm = (on) => { form.hidden = !on; bar.hidden = !cur || (slotted && !on); changes.setAttribute('aria-expanded', String(on)); if (on) { error.textContent = ''; text.focus(); } };
     changes.addEventListener('click', () => openForm(form.hidden));
+    refuse.addEventListener('click', () => { if (cur) openDenyDialog(cur.team, cur.row, () => show({ ...cur, state: 'denied', at: new Date().toISOString() }), { refuse: true }); });
     $('.artifact-review-cancel').addEventListener('click', () => { openForm(false); changes.focus(); });
     document.addEventListener('coral:review-approved', e => { if (cur && cur.team === e.detail.team && cur.row.id === e.detail.id && cur.state !== 'approved') show({ ...cur, state: 'approved', at: e.detail.at }); });
     // The file may be settled while its viewer is open (a link opens from the rows the Inbox has, up to a scan old; #13128): when the Inbox's list is read again and no longer holds the pending file, the file's own state
@@ -263,6 +285,9 @@ export function attachReview(d, { reload }) {
     });
     approve.addEventListener('click', async () => {
         if (!cur) return;
+        if (!armed && d.dataset.coversFiles && Number(d.dataset.unopenedFiles) > 0) { armed = true; armedAt = Date.now(); paintApprove(); return; } // covers several files and some were never opened: say so, and ask again
+        if (armed && Date.now() - armedAt < 600) return; // a double click is one press: it cannot answer the question it has not shown yet (Security's INFO on #15254)
+        armed = false;
         approve.disabled = true;
         try { const out = await approveRow(cur.team, cur.row); sayApproved(cur.row.name || 'the artifact', out); show({ ...cur, state: 'approved', at: out.review?.at || new Date().toISOString() }); }
         catch (e) { showToast(e.message, true); } finally { approve.disabled = false; }

@@ -34,7 +34,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
-        assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B })).status < 300);
+        assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator' })).status < 300);
         await root('PUT', '/api/settings', { goal_done_hidden: '[]', goal_done_read: '[]', goal_done_quiet_minutes: '' }); // the default quiet period (15 minutes, #12161) first; read and hidden cleared here, not left to whatever ran before (v2.0.35 gate)
         const mk = async (title, doneWhen) => { const g = await api('POST', '/goals', { subscriber_id: 'Operator', title, done_when: doneWhen }); assert.equal(g.status, 201); return g.json.id || g.json.goal.id; };
         const gid = await mk('Ship the pilot', 'it is shipped');
@@ -55,7 +55,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         assert.equal(rows.length, 1, 'one row: not the goal with an open task, nor the one with no tasks: ' + JSON.stringify(rows));
         assert.match(rows[0].text, new RegExp(`Goal #${gid} looks done: Ship the pilot`));
         assert.match(rows[0].text, /Done when: it is shipped/);
-        assert.deepEqual(rows[0].buttons.filter(b => /^(Close goal|Not yet|Dismiss)$/.test(b)), ['Close goal', 'Not yet', 'Dismiss']);
+        assert.deepEqual(rows[0].buttons.filter(b => /^(Mark done|Not yet|Dismiss)$/.test(b)), ['Mark done', 'Not yet', 'Dismiss']);
         // #13586 (the Operator: "buttons are somewhat offcenter. Dismiss is hard to see"): the actions are centred on the row, Close goal, Not yet, Dismiss and the three dots are on one line, and Dismiss is an outlined button with readable words, on both themes
         for (const theme of ['dark', 'light']) {
             await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: theme }] });
@@ -70,9 +70,9 @@ const B = 'goal-done-' + Date.now().toString(36);
                 d = btns.find(b => /^Dismiss$/.test(b.textContent.trim())), cs = d && getComputedStyle(d), bg = bgOf(td);
                 return { n: btns.length, names: btns.map(b => b.textContent.trim() || b.getAttribute('aria-label')), centres: btns.map(b => Math.round(c(b))), rowCentre: Math.round((tr_.top + tr_.bottom) / 2), tdAlign: getComputedStyle(td).verticalAlign,
                     border: cs && parseFloat(cs.borderTopWidth), text: cs && ratio(cs.color, bg), edge: cs && ratio(cs.borderTopColor, bg), rowH: Math.round(tr_.height), fits: box.scrollWidth <= box.clientWidth + 1 }; })()`);
-            assert.ok(g.n >= 3 && g.names.slice(0, 3).join() === 'Close goal,Not yet,Dismiss', `${theme}: the three buttons (an unread row has no three dots on a desktop: its menu is only Mark unread, for a row already read): ` + JSON.stringify(g));
+            assert.ok(g.n >= 3 && g.names.slice(0, 3).join() === 'Mark done,Not yet,Dismiss', `${theme}: the three buttons (an unread row has no three dots on a desktop: its menu is only Mark unread, for a row already read): ` + JSON.stringify(g));
             assert.ok(Math.max(...g.centres) - Math.min(...g.centres) <= 1, `${theme}: the buttons (and the three dots, when the row has them) are on one line (same centre): ` + JSON.stringify(g));
-            assert.ok(g.tdAlign === 'middle' && Math.abs(g.centres[0] - g.rowCentre) <= 2, `${theme}: the actions are centred on the row, not at its top: ` + JSON.stringify(g));
+            assert.ok(g.centres[0] > g.rowCentre && g.centres[0] < g.rowCentre + g.rowH / 2, `${theme}: the actions are on the row's bottom line, under its text (#15162): ` + JSON.stringify(g));
             assert.ok(g.border >= 1 && g.edge >= 3 && g.text >= 4.5, `${theme}: Dismiss has an outline (3:1) and words at 4.5:1: ` + JSON.stringify(g));
             assert.ok(g.fits, `${theme}: nothing is cut off in the actions cell: ` + JSON.stringify(g));
         }
@@ -147,7 +147,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'Undo brings it back', 8000);
 
         // Close goal: the goal's page with the Close dialog set to Done; closing it takes the item away
-        await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Close goal"]').click(); true`);
+        await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Mark goal"]').click(); true`);
         await waitFor(`!!document.querySelector('dialog.goals-close-dialog[open]')`, 'the Close dialog', 10000);
         assert.equal(await ev(`document.querySelector('dialog.goals-close-dialog input[name=goal-close-state]:checked')?.value`), 'done', 'set to Done');
         await ev(`[...document.querySelectorAll('dialog.goals-close-dialog button')].find(b => /^(Close goal|Close|Confirm)/.test(b.textContent.trim()) && b.type !== 'button' || /Close goal/.test(b.textContent)).click(); true`);
@@ -181,7 +181,7 @@ const B = 'goal-done-' + Date.now().toString(36);
             const act = label => (bar.actions || []).find(a => a.label === label);
             assert.ok(act('Dismiss') && !act('Dismiss').off, 'Dismiss is on the bar: ' + JSON.stringify(bar.actions));
             assert.ok(!act('Changes') && !act('Approve') && !act('Save for later'), 'a selected goal is not offered the file actions (Changes, Approve, Save for later) (#12401): ' + JSON.stringify(bar.actions.map(a => a.label)));
-            assert.ok(act('Close goal') && !act('Close goal').off, 'Close goal is in the bar menu of a selected goal that looks done, reachable on a phone (#12328): ' + JSON.stringify(bar.actions));
+            assert.ok(act('Mark done') && !act('Mark done').off, 'Close goal is in the bar menu of a selected goal that looks done, reachable on a phone (#12328): ' + JSON.stringify(bar.actions));
             await ev(`document.querySelector('.dt-bar [aria-label="More actions"]')?.click(); true`);
             await waitFor(`!![...document.querySelectorAll('.menu-item, [role=menuitem]')].find(b => /^Not yet$/.test(b.textContent.trim()))`, 'Not yet in the bar menu (#12328)', 5000);
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
@@ -201,7 +201,7 @@ const B = 'goal-done-' + Date.now().toString(36);
             const rowAt = i => ev(`(() => { const r = [...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent))[${i}]; r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { x: b.left + b.width * 0.35, y: b.top + b.height * 0.5 }; })()`);
             const holdRow = async i => { const p = await rowAt(i); await touch('touchStart', p); await new Promise(r => setTimeout(r, 700)); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 300)); }; // sleep-ok: a long press is a held finger
             await holdRow(0);
-            await menuItem('Close goal');
+            await menuItem('Mark done');
             assert.ok(await ev(`!![...document.querySelectorAll('dialog[open], .modal')].find(d => d.getClientRects().length && /Close goal/i.test(d.textContent) && /Done/.test(d.textContent))`), 'Close goal from the bar opens the Close dialog, set to Done');
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`); await require('./helpers/wait').settle(ev, 400, 200);
             await openNeeds();
@@ -209,7 +209,7 @@ const B = 'goal-done-' + Date.now().toString(36);
             await holdRow(0);
             { const p = await rowAt(1); await touch('touchStart', p); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 300)); } // sleep-ok: a tap adds a row to the selection
             assert.equal(await ev(`(document.querySelector('.dt-bar .dt-bar-count, .dt-bar') || {}).textContent.replace(/\\s+/g, ' ').match(/2 selected/) ? 2 : 0`), 2, 'two goals selected');
-            assert.equal(await ev(`[...document.querySelectorAll('.dt-bar button')].some(b => (b.getAttribute('aria-label') || b.textContent).trim() === 'Close goal')`), true, 'Close goal is in the bar');
+            assert.equal(await ev(`[...document.querySelectorAll('.dt-bar button')].some(b => (b.getAttribute('aria-label') || b.textContent).trim() === 'Mark done')`), true, 'Close goal is in the bar');
             await menuItem('Not yet');
             await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length === 0`, 'both goals hidden until a task is added', 10000);
             assert.equal(JSON.parse((await root('GET', '/api/settings')).json.settings.goal_done_hidden || '[]').length >= 2, true, 'both are hidden on the machine');

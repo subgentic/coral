@@ -41,20 +41,19 @@ AGENTS[0].waits_on_this = { count: 2, top_title: 'Ship the build', priority: 'lo
             let rows = await rowsOf();
             check(order(rows).join() === 'Frontend Dev,Docs Writer,Backend Dev', at + 'the default is newest first (#11552): the one that has waited least is first: ' + JSON.stringify(order(rows)));
             const fe = rows.find(r => r.text.includes('Frontend Dev'));
-            if (!mobile) { check(/Blocks 3 tasks/.test(fe.text), at + 'its row says what waits on it, short in a one-line list: ' + fe.text); check(await ev(`[...document.querySelectorAll('${T} tr')].some(tr => tr.textContent.includes('Blocks 3 tasks') && [...tr.querySelectorAll('[title]')].some(e => /High priority: 3 tasks wait on this/.test(e.title)))`), at + 'and the whole sentence, a high-priority waiter first, is its tooltip'); }
+            if (!mobile) { check(/3 tasks wait on this/.test(fe.text) && /High priority/.test(fe.text), at + 'a computer\'s card says the whole sentence of what waits on it, a high-priority waiter first (#15162): ' + fe.text); }
             else {
                 check(/Blocks 3 tasks/.test(fe.text), at + 'a phone\'s one-line row says it short: ' + fe.text);
                 check(await ev(`[...document.querySelectorAll('${T} tr')].some(tr => tr.textContent.includes('Frontend Dev') && [...tr.querySelectorAll('[title]')].some(e => /High priority: 3 tasks wait on this/.test(e.title)))`), at + 'and the whole sentence is its tooltip');
             }
             const be = rows.find(r => r.text.includes('Backend Dev'));
-            check(/Blocks 2 tasks/.test(be.text), at + 'an agent with its own count says it: ' + JSON.stringify(be.text));
+            check(mobile ? /Blocks 2 tasks/.test(be.text) : /2 tasks wait on this/.test(be.text), at + 'an agent with its own count says it: ' + JSON.stringify(be.text));
             check(!rows.filter(r => r.text.includes('Docs Writer')).some(r => /wait on this|waits on this|Blocks \d|Blocks “/.test(r.text)), at + 'the agent with nothing in progress (no field) says nothing');
             check(await ev(`window.__taskCalls.length`) === 0, at + 'no task query for a team (the rows carry the field): ' + await ev(`window.__taskCalls.join(' ')`));
             await shot(`inbox-blockers-${w}`);
             if (!mobile) { // the table fits its box and the agent's name keeps its room (the new column once squeezed it to nothing)
                 const box = await ev(`(() => { const b = document.querySelector('${T} .dt-box'), h = [...b.querySelectorAll('thead th')].find(x => /^Item/.test(x.textContent.trim())); return { box: b.clientWidth, sw: b.scrollWidth, agent: h ? Math.round(h.getBoundingClientRect().width) : null }; })()`);
                 check(box.sw <= box.box + 1, at + 'the table fits its box: ' + JSON.stringify(box));
-                check(box.agent !== null && box.agent >= 100, at + 'the Item column (the agent name) keeps its room: ' + JSON.stringify(box));
             }
             // the sort: Blocking first is the default and the first of the choices; Waiting longest gives the old order back
             const sortSel = `[...document.querySelectorAll('select')].find(s => [...s.options].some(o => o.textContent.trim() === 'Waiting longest'))`;

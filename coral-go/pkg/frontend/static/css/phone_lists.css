@@ -10,3 +10,4 @@
     .goals-table-page .goals-note-icon { font-size: var(--fs-lg, 1.1rem); }
     .phone-list-bar .goals-new { flex: none; width: 44px; min-width: 44px; padding: 0; }
 }
+.artifact-sheet-review { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px 8px; } /* Approve and Request changes under the review line (#15120, walk 3 N4) */

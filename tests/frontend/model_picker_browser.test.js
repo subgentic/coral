@@ -7,6 +7,7 @@
 //   - the real model is shown by its display name from the list, else from the id: in the agent's hover tip and in the agent page's Details disclosure (#apd-model, #9837: the header does not carry it), never in the row (a row is one line, #9686).
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');
+const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_notice');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
 
@@ -21,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
+        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, process.env.CORAL_TEST_URL + '/'); await install();
         await coralReady(ev);
         // Nothing cached by an earlier suite: the first scene seeds its own cache, the others must start from none.
         await ev(`(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-models:v1:')) localStorage.removeItem(k); return true; })()`);
@@ -69,6 +70,17 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await formModel(), 'my-private-model', 'typed text is the model'); assert.equal((await box()).value, '__other', 'the list stays on Other… while typing');
         await ev(`{ const s = document.querySelector('#acf-t .acf-model-select'); s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); true }`);
         assert.equal(await formModel(), '', 'Default sends no model');
+
+        console.log('2b. the CLI lists its own Default: one Default entry, not two (#15079)');
+        await ev(`window.__serve.claude = { models: [{ value: 'default', display_name: 'Default (recommended)' }, ${JSON.stringify(OPUS)}], refreshing: false }; localStorage.removeItem('coral-models:v1:local:claude'); window.__acf.setAgentConfig('acf-t', { agentType: 'codex', model: '' }); true`); await sleep(300); // sleep-ok: the form's async loads have no completion event
+        await ev(`window.__acf.setAgentConfig('acf-t', { agentType: 'claude', model: '' }); true`);
+        await waitFor(`[...document.querySelectorAll('#acf-t .acf-model-select option')].some(o => o.textContent === 'Default (recommended)')`, 'the CLI default names the blank entry', 4000);
+        b = await box();
+        assert.deepEqual(b.options, ['Default (recommended)', 'Opus 4.1', 'Other…', 'Add a model…'], 'one Default entry: ' + JSON.stringify(b.options));
+        assert.equal(b.value, '', 'and a blank model selects it');
+        await ev(`window.__acf.setAgentConfig('acf-t', { agentType: 'claude', model: 'default' }); true`); await sleep(300); // sleep-ok: the form's async loads have no completion event
+        assert.equal((await box()).value, '', 'a stored "default" selects that same entry');
+        await ev(`window.__serve.claude = { models: [${JSON.stringify(OPUS)}, ${JSON.stringify(SONNET)}], refreshing: false }; true`);
 
         console.log('3. values set from code');
         await ev(`window.__acf.setAgentConfig('acf-t', { agentType: 'claude', model: ${JSON.stringify(OPUS.value)} }); true`); await sleep(300); // sleep-ok: the form's async loads have no completion event
@@ -166,6 +178,7 @@ const { coralReady } = require('./helpers/wait');
         console.log('\nPASS model picker and model labels');
     } finally {
         await guard.restore().catch(e => console.error('settings restore: ' + (e && e.message)));
+        await restoreLaunchNotice(ev);
         await client.close();
     }
 })().catch(e => { console.error(e); process.exitCode = 1; });

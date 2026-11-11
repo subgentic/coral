@@ -34,3 +34,6 @@ dialog.dropbox-share-dialog .dropbox-share-choice > span, dialog.dropbox-share-d
 .dropbox-share-list li { margin: 4px 0; overflow-wrap: anywhere; }
 .dropbox-share-dialog .modal-footer { flex-wrap: wrap; }
 @media (max-width: 480px) { .dropbox-share-dialog .modal-footer .btn { min-height: 44px; } .dropbox-share-preview { max-height: 240px; } }
+.dropbox-share-dialog .modal-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; } /* the title and its x on one line (#15544: the x sat alone on a second row) */
+.dropbox-share-dialog .modal-header > h3 { margin: 0; min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; }
+.dropbox-share-dialog .modal-header > .modal-close { flex: none; margin-left: auto; }

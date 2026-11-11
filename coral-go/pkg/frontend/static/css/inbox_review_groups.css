@@ -1,6 +1,6 @@
 /* Loaded only with the Inbox. Group headings are not documents or tap actions. */
 .inbox-group-review-toggle { display: flex; align-items: center; justify-content: flex-start; gap: 8px; min-height: 44px; margin: 0; font-size: var(--fs-sm); color: var(--text-primary); cursor: pointer; } /* an option of the Filters panel (#14378) */
-.list-bar-menu .inbox-group-review-toggle { grid-column: 1 / -1; } /* one row of the panel's grid; the words sit beside the box (list-bar-kept) */
+.list-bar-menu .inbox-group-review-toggle { grid-column: 1 / -1; max-width: 22rem; } /* a row of the grid, but not 542 px of select at 1920 (#15339, M11) */ /* one row of the panel's grid; the words sit beside the box (list-bar-kept) */
 .inbox-group-review-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
 .inbox-group-review-toggle:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 .inbox-review-star-anchor { position: relative; min-width: 0; width: 100%; box-sizing: border-box; padding-inline-end: 52px; }
@@ -9,6 +9,30 @@
 .inbox-pinned-context { display: block; font-size: var(--fs-sm); color: var(--text-secondary); white-space: normal; overflow-wrap: anywhere; }
 .inbox-group-review-toggle[hidden] { display: none; }
 
-.inbox-group-mode { min-width: 0; max-width: 100%; } /* Group by (#14729): the choice after its label */
+.inbox-group-mode { min-width: 0; max-width: 100%; }  /* Group by (#14729): the choice after its label */
 @media (max-width: 760px), (pointer: coarse) { .inbox-group-mode { min-height: var(--control-touch-height, 44px); } }
-.inbox-needs-results .inbox-file-question { padding-inline-end: 52px; } /* the star has its own room at the end of the row: the question and the uploader under the name stop before it (#14968) */
+@media (max-width: 760px) { .inbox-needs-results .inbox-file-question { padding-inline-end: 52px; } } /* a phone: the question and the uploader under the name stop before the star (#14968) */
+@media (min-width: 761px) { /* a wider row: every line after the name line in the item's cell stops before the star, whatever the line is (#15084, the Operator: the star still sat on the text in the Mac app; #14968 padded one class of line, the file question, and a context line or an agent's question ran under the star). The name line has its own 52 px (the anchor's padding) */
+    .inbox-needs-results .inbox-review-star-anchor ~ :not(.inbox-kind-column) { padding-inline-end: 52px; box-sizing: border-box; }
+}
+
+/* A tablet's Needs you (#15259, walk 13): the chips wrap onto their own line under the title and search instead of running off the right edge cut mid-chip. */
+@media (min-width: 768px) and (max-width: 999px) {
+    .inbox-folder-toolbar .list-bar-search-row.gt-toolbar { flex-wrap: wrap; }
+    .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .team-tb-pills { flex: 0 1 auto; min-width: 0; flex-wrap: wrap; overflow: visible; } /* the chips go to their own line only when they do not fit beside the search (#15366: at 900 px a row that fits stays one line) */
+}
+
+/* Walk 15 M4 (#15259): the Filters panel opens over the list on a computer, it does not push the list down. The filter line sits under the toolbar. */
+.inbox-filter-note { display: flex; align-items: center; gap: 8px; margin: 0 0 var(--space-md); }
+@media (min-width: 768px) {
+    .inbox-folder-toolbar:has(#inbox-needs-team) { position: relative; }
+    .inbox-folder-toolbar:has(#inbox-needs-team) .inbox-filter-pop { position: absolute; top: 100%; right: 0; z-index: 5; width: min(34rem, 100%); box-sizing: border-box; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md, 6px); box-shadow: var(--shadow-md); }
+}
+/* Ticking a row does not move the list (#15339, walk 23 H3): the Needs toolbar keeps one line's height, and while rows are selected the bar takes that whole line (the filters, chips and sort wait behind it) instead of wrapping under them and pushing the rows down. */
+#group-table-view .gt-toolbar { min-height: 40px; }
+#group-table-view .gt-toolbar.team-toolbar-selecting > :not(.team-tb-selection) { display: none !important; }
+#group-table-view .gt-toolbar.team-toolbar-selecting > .team-tb-selection { flex: 1 1 100%; }
+
+#group-table-view .inbox-needs-results { max-width: 80rem; } /* a line of the table is not the width of a 1920 px screen: Time sat 1400 px from the title (#15339, walk 23 L17) */
+
+.inbox-wait-long { color: var(--warning-text); } /* a question waiting 5 minutes or more reads in amber (#15297) */

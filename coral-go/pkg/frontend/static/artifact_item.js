@@ -4,6 +4,7 @@ import { serverUrl, artifactPath, splitKey } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { renderMarkdownStrict, highlightCodeIn, escapeHtml } from './utils.js';
 import { visibleName } from './artifact_names.js';
+import { loadStyles } from './lazy_styles.js';
 const { inlineArtifactPath } = await importOnce('./artifact_paths.js');
 const { linkArtifactRefsIn } = await importOnce('./artifact_refs.js'); // a coral://artifacts/<hex> in rendered Markdown is a link (#12361)
 
@@ -54,7 +55,7 @@ export const taskText = (item) => { const title = visibleName(item.task_title); 
 /** The artifact's text: Markdown through the strict renderer (raw HTML shown as text, then the sanitizer), anything else as plain text. */
 export function renderText(host, content, path, server) {
     if (/\.(?:md|markdown|mdown)$/i.test(path || '')) { host.innerHTML = `<div class="prose prose-doc preview-pane-markdown artifact-viewer-markdown">${renderMarkdownStrict(content)}</div>`; highlightCodeIn(host); linkArtifactRefsIn(host, { asWritten: true, server }); }
-    else host.innerHTML = `<pre class="preview-pane-code artifact-viewer-text"><code>${escapeHtml(content)}</code></pre>`;
+    else { loadStyles('artifact_viewer_header.css'); host.innerHTML = `<pre class="preview-pane-code artifact-viewer-text"><code>${escapeHtml(content)}</code></pre>`; } // the wrap rule is in the viewer's sheet: a preview that never opens the viewer loads it too (UI/UX on #15267)
 }
 
 /** The group an item is in when a list is grouped by 'task' or 'goal': { key, label }; "#101 Task 2" or the goal's title, and "No task" / "No goal" for the files that have none. */

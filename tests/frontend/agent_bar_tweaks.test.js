@@ -484,7 +484,7 @@ async function run() {
         check('header uses board_job_title, not the path prompt', hdrG.name === 'Release Wrangler', hdrG.name);
         check('terminal label uses board_job_title', hdrG.term === 'Release Wrangler', hdrG.term);
         // Task #156: no session id anywhere in the selected-agent header except the
-        // Open Agent Tab navigation href. The header carries no branch chip or
+        // Open agent tab navigation href. The header carries no branch chip or
         // agent-type badge (removed to declutter it); the branch stays in the
         // session details and the row tooltip.
         await evalInPage(`window._coralHandleWsMessage({ type: 'coral_diff', changed: [ { name: 'coral-go', agent_type: 'claude', session_id: 'sid-g', repo_name: 'cdknorow/coral', branch: 'feature/agent-list-compact' } ] }); true`);

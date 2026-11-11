@@ -114,11 +114,11 @@ function renderModal() {
             <h3>Customize theme</h3>
             <div class="toolbar toolbar-pad-bare theme-toolbar">
                 <select id="theme-load-select" class="settings-select">
-                    <option value="">Load theme...</option>
+                    <option value="">Choose a theme...</option>
                     ${builtIn}
                     ${themeOptions}
                 </select>
-                <button class="btn" data-on-click="theme-load">Load</button>
+                <button class="btn" data-on-click="theme-load">Use theme</button>
                 <button class="btn btn-danger" data-on-click="theme-delete">Delete</button>
                 <span class="toolbar-spacer"></span>
                 ${isCloud() ? '' : '<button class="btn" data-on-click="theme-import">Import</button>'}
@@ -198,7 +198,8 @@ function resetThemeToDefaults() {
 (window.__coral ||= {}).saveAndApplyTheme = async function() {
     const name = document.getElementById('theme-save-name').value.trim();
     if (!name) {
-        showToast('Theme name is required', true);
+        showToast('Type a name in "Theme name" to save this as a new theme. A theme you chose above is already in use.', true);
+        const n = document.getElementById('theme-save-name'); if (n) n.focus();
         return;
     }
     const description = document.getElementById('theme-save-desc').value.trim();

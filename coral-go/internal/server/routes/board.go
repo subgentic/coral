@@ -133,6 +133,8 @@ type BoardHandler struct {
 	commentReadStamp func(ctx context.Context, project, readerSession string, messageIDs []int64)
 	// needsYouAgents lists the agents waiting on the Operator for GET /api/needs-you (SetNeedsYouAgents). Nil: none.
 	needsYouAgents func(r *http.Request) ([]NeedsYouItem, error)
+	// needsYouRemotes: on a self-hosted Hub, how GET /api/needs-you reads its computers too (SetNeedsYouRemotes, #15380). Nil: this Coral's own answer alone.
+	needsYouRemotes *NeedsYouRemotes
 	// needsYouSkills lists the skills waiting for approval for GET /api/needs-you (SetNeedsYouSkills). Nil: none.
 	needsYouSkills func(ctx context.Context) ([]NeedsYouItem, error)
 	// uploads caches per-session upload records for the artifact views.
@@ -150,6 +152,8 @@ type BoardHandler struct {
 	// completions of the same task close together (complete then cancel, or a retry) write one after the other, never
 	// interleaved. Each write is atomic already (a rename into place); this keeps a slower, older diff from landing last.
 	taskArtifactLocks sync.Map
+	// contextReset is the Context reset service's per-agent line (#15066).
+	contextReset func(sessionName string) (ContextResetLine, bool)
 }
 
 // SetHubOperatorAllowed tells the board whether a Coral Hub user may act as the
@@ -207,9 +211,13 @@ func (h *BoardHandler) subscriberArchived(ctx context.Context, project, subscrib
 	return h.isArchivedSession(ctx, sub.SessionName)
 }
 
-// refuseArchivedAssignee answers 409 when assignee is an archived agent and
+// refuseArchivedAssignee answers 409 when assignee is an archived agent, or an ended one (killed: assignee_ended, #15293), and
 // reports whether it did.
 func (h *BoardHandler) refuseArchivedAssignee(w http.ResponseWriter, ctx context.Context, project, assignee string) bool {
+	if h.memberRest != nil && assignee != "" && h.memberRest(ctx, project, assignee) == restStopped { // an ended agent never picks the task up and nothing says so (#15293, walk 17 H1)
+		writeError(w, http.StatusConflict, "assignee_ended", fmt.Sprintf("%s has ended (it was stopped, not put to sleep) and will not pick up a task: resume it (Inbox > All chats > Continue this chat), or assign the task to an agent that is running", assignee))
+		return true
+	}
 	if !h.subscriberArchived(ctx, project, assignee) {
 		return false
 	}

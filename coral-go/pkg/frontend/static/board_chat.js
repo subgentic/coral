@@ -1,6 +1,6 @@
 import { openTask } from './task_navigation.js';
 import { authorLabel } from './board_author.js';
-import { importOnce } from './import_once.js';
+import { importOnce, loadedModule } from './import_once.js';
 const { agentLinkHtml } = await importOnce('./agent_link.js'); // an agent's name is one shared helper everywhere (#12168)
 /* Moved out of render.js as it was (#3795): no behaviour change. */
 import { formatHourMinute } from './format.js';
@@ -125,7 +125,7 @@ export function showBoardChatTab(boardName, agent = null) {
             <div class="board-chat-input-pane" id="board-chat-input-pane">
                 <div class="command-pane-body">
                     <div class="command-editor board-chat-editor-wrap">
-                        <textarea class="board-chat-textarea" id="board-panel-input" rows="1" placeholder="Message the team... (@ to mention)" aria-label="Message the team"
+                        <textarea class="board-chat-textarea" id="board-panel-input" rows="1" placeholder="Message the team (the Orchestrator reads every post; @ to mention)" aria-label="Message the team"
                             role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-controls="board-mention-dropdown"
                             data-on-keydown="board-chat-key" data-on-input="board-chat-mention" data-board="${escapeAttr(boardName)}"></textarea>
                         <div class="board-mention-dropdown" id="board-mention-dropdown" role="listbox" aria-label="Mention an agent" style="display:none"></div>
@@ -144,6 +144,7 @@ export function showBoardChatTab(boardName, agent = null) {
         if (carried) document.getElementById('board-panel-msgs').replaceWith(carried);
 
         initGrowingTextarea(document.getElementById('board-panel-input'));
+        importOnce('./keep_gap.js').then(m => m.keepGap(document.getElementById('board-panel-msgs'), document.getElementById('board-panel-input')));
 
     panel.dataset.board = boardName;
     }
@@ -389,7 +390,7 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
                 ${checkbox}
                 <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${agentLinkHtml(agent, { board: _activeBoardChat || '', text: authorLabel(m, agent, _activeBoardChat || '') })}</span>
                 ${externalMessageBadge(m)}${hubUserBadge(m)}${askBadge(m)}
-                <span class="mb-message-time">${_formatTime(m.created_at)}</span>
+                <span class="mb-message-time">${_formatTime(m.created_at)}</span>${loadedModule('./team_pause.js')?.queuedBadge(m, _activeBoardChat) || ''}
             </div>
             ${parts.tagsOpen}
             <div class="mb-message-body" id="${escapeAttr(parts.bodyId)}">${renderBoardMessageBody(m, _activeBoardChat || '')}</div>
@@ -542,7 +543,7 @@ function _dockMoreItems() {
             const bottom = box && box.scrollTop >= box.scrollHeight - box.clientHeight - 20;
             if (box) { applyView(box, v); if (bottom) box.scrollTop = box.scrollHeight; }
         } },
-        { label: _boardChatPaused ? 'Resume board' : 'Pause board', run: () => boardName && _toggleBoardChatPause(boardName) },
+        { label: _boardChatPaused ? 'Resume team' : 'Pause team', run: () => boardName && _toggleBoardChatPause(boardName) },
         { label: _boardChatSelectMode ? 'Stop exporting' : 'Export', run: () => _toggleBoardChatSelect() },
         { label: 'Open full board', run: () => { const s = state.currentSession; if (boardName) window.selectBoardProject(boardName, null, s && s.type === 'live' ? { backTo: s } : {}); } },
     ];
@@ -657,6 +658,7 @@ export function _setBoardChatPaused(paused, say = true) {
     _boardChatPaused = !!paused;
     const banner = document.getElementById('board-chat-paused-banner');
     if (banner) banner.style.display = _boardChatPaused ? '' : 'none';
+    if (changed && _boardChatLoaded) _renderBoardPanelMessages(document.getElementById('board-panel-msgs'), false); // the rows say Queued, or stop saying it (#15378)
     const live = document.getElementById('board-chat-pause-status');
     if (live && say && changed) live.textContent = _boardChatPaused ? 'Board paused: agents stop receiving new messages.' : 'Board resumed: agents receive messages again.'; // a polite live region, as the pause icon's name used to change under the reader
 }
@@ -668,6 +670,8 @@ export async function _toggleBoardChatPause(boardName) {
     try {
         await boardFetch(boardName, `/${endpoint}`, { method: 'POST' });
         _setBoardChatPaused(!wasPaused);
+        await _checkBoardPauseState(boardName); // the pause time too, so the chat's rows say Queued (#15378)
+        if (boardName === state.boardPageProject) importOnce('./team_pause.js').then(m => m.readTeamPause(boardName)); // the team page on screen says it too (#15331)
     } catch { /* ignore */ }
 }
 
@@ -676,6 +680,8 @@ async function _checkBoardPauseState(boardName) {
         const resp = await boardFetch(boardName, `/paused`);
         const data = await resp.json();
         _setBoardChatPaused(!!data.paused, false); // the state on arrival is read, not announced
+        const tp = data.paused ? await importOnce('./team_pause.js') : loadedModule('./team_pause.js'); // lazy: a team never paused loads nothing
+        if (tp) { tp.noteDockPause(boardName, data); if (_boardChatLoaded && boardName === _activeBoardChat) _renderBoardPanelMessages(document.getElementById('board-panel-msgs'), false); }
     } catch { /* ignore */ }
 }
 

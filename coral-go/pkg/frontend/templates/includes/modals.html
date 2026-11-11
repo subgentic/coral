@@ -202,7 +202,7 @@
                     <input type="text" id="launch-terminal-name" placeholder="e.g. build server, test runner">
                 </div>
                 <div class="form-row">
-                    <label class="form-label" for="launch-terminal-dir">Working Directory</label>
+                    <label class="form-label" for="launch-terminal-dir">Working directory</label>
                     <div class="dir-input-row">
                         <input type="text" id="launch-terminal-dir" placeholder="/path/to/project" data-coral-root="{{ .CoralRoot }}" value="{{ .CoralRoot }}">
                         <button class="btn" id="btn-browse-terminal" data-on-click="m-toggle-browser" data-browser="launch-terminal-dir dir-browser-terminal browser-list-terminal browser-current-path-terminal">Browse</button>
@@ -296,6 +296,7 @@
                                 <option value="codex">Codex</option>
                                 <option value="pi">Pi</option>
                             </select>
+                            <select id="team-set-all-model" aria-label="Set all workers' model" data-on-change="team-set-all-model" data-on-mousedown="team-set-all-models" hidden></select>
                         </div>
                         <p class="team-agents-count" id="team-agents-count" aria-live="polite"></p>
                         <p class="sr-only" id="team-agents-live" role="status"></p>
@@ -523,11 +524,12 @@
             <div class="modal-body">
                 <div id="resume-launch-form">
                     <div class="form-row">
-                        <label class="form-label" for="resume-dir">Working Directory</label>
+                        <label class="form-label" for="resume-dir">Working directory</label>
                         <div class="dir-input-row">
                             <input type="text" id="resume-dir" placeholder="/path/to/project" data-coral-root="{{ .CoralRoot }}" value="{{ .CoralRoot }}">
                             <button class="btn" data-on-click="m-toggle-browser" data-browser="resume-dir resume-dir-browser resume-browser-list resume-browser-current-path">Browse</button>
                         </div>
+                        <p class="settings-hint">It continues the same chat. Its saved changes stay in the folder.</p>
                         <p id="resume-dir-note" class="settings-hint" hidden></p>
                         <p id="resume-mode-note" class="settings-hint" hidden></p>
                         <div class="form-row" id="resume-mode-row" hidden><label class="form-label" for="resume-mode">Resume in</label><select id="resume-mode" class="settings-select" data-on-change="resume-mode-changed"></select></div><!-- the mode the chat ran in, which it resumes in (resume_dialog.js, #10487) --><!-- where the session ran, and a warning when the folder is changed or gone (resume_dialog.js, #10291) -->
@@ -544,7 +546,7 @@
                     </div>
                     <div id="resume-board-row" style="display:none;margin-top:8px">
                         <label class="form-check">
-                            <input type="checkbox" id="resume-board-check" checked>
+                            <input type="checkbox" class="check" id="resume-board-check" checked>
                             Rejoin board: <span id="resume-board-name" class="chip chip-caps board-badge" style="font-size:var(--fs-base)"></span>
                         </label>
                     </div>
@@ -577,7 +579,6 @@
                         <h4 class="settings-pane-title">General</h4>
                         <div id="settings-general-rows"></div>
 
-                        <div id="tier-branding-label" class="tier-branding" style="display:none"></div>
                     </section>
                     <section class="settings-pane" id="settings-pane-updates" data-group="updates" data-flag="updates" data-icon="system_update" data-title="Updates" role="tabpanel" aria-labelledby="settings-tab-updates" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Updates</h4>

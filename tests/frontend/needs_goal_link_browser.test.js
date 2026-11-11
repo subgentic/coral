@@ -26,7 +26,7 @@ const B = 'goal-link-' + Date.now().toString(36);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
-        assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B })).status < 300);
+        assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator' })).status < 300);
         await ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal_done_hidden: '[]', goal_done_read: '[]', goal_done_quiet_minutes: '0' }) }).then(r => r.status)`);
         const done = await mk('Ship the pilot'); await task(done, true);
         const open = await mk('Still going'); await task(open, true); await task(open, false);

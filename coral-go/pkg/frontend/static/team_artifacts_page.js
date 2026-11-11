@@ -408,6 +408,13 @@ export function createArtifactsList({ inbox = false } = {}) {
         const status = el('p', counting ? 'sr-only team-count-line' : `goals-note team-count-line${model.error ? ' team-artifacts-error' : !model.loading && !model.items.length ? ' empty-state-line' : ''}`, statusLine());
         status.setAttribute('role', model.error ? 'alert' : 'status');
         body.append(status);
+        if (!inbox && !model.scope && !model.error && !model.loading && model.items.length) { // where the team's files are and one zip of them (#15154): a newcomer can run the app the team built
+            const strip = el('div', 'team-files-strip-host team-files-strip-reserve'); body.append(strip);
+            // the strip's space is held before its module and the folder answer arrive: the same three parts, drawn but not seen, so the table under it does not move (#15618)
+            strip.setAttribute('aria-hidden', 'true'); strip.append(el('div', 'team-files-strip-ghost', ''));
+            strip.firstChild.append(el('p', 'goals-note', 'The team works in the folder . The app runs from there: open index.html in that folder.'), el('button', 'btn btn-small', 'Copy path'), el('button', 'btn btn-small', 'Download all (zip)'));
+            importOnce('./artifact_team_files.js').then(m => m.fillStrip(strip, { project: model.project, hasMore: () => model.hasMore, files: () => model.items.map(it => ({ it, link: linkOf(it) })).filter(x => x.link?.preview).map(x => ({ url: x.link.url, name: readableName(x.it) })) })).catch(() => {});
+        }
         if (inbox && !model.error && (model.partial || (model.versionless && model.versionless.length))) body.append(partialLine());
         if (!model.error && !model.loading && !model.items.length && !F.isFiltered(model.filters) && !model.scope) status.append(el('span', 'empty-state-hint', 'An agent shares a file when it finishes a task with one; you can ask an agent to share a file as an artifact.')); // inside the line's own element: one block, the family's gap
         if (model.error && !model.notFound) body.append(btn('btn btn-small team-artifacts-retry', 'Retry', () => {
@@ -438,7 +445,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                 details: model.scope ? detailsLink : null,
                 star: item => { const hex = managedHex(item); return hex ? starControl(item, { hex, name: readableName(item) }) : null; },
                 nameBadge: item => {
-                    const origin = originBadge(item), n = item.earlier_versions, badge = item.new_comments > 0 ? 'New comments' : origin || (n > 0 ? `${n} earlier version${n > 1 ? 's' : ''}` : ''); if (!badge) return null; // agents replied in the Operator's thread on this file and it is not opened (#12026)
+                    const origin = originBadge(item), n = Math.max(item.earlier_versions || 0, (item.version || 1) - 1), badge = item.new_comments > 0 ? 'New comments' : origin || (n > 0 ? `v${item.version || n + 1}, ${n} earlier version${n > 1 ? 's' : ''}` : ''); if (!badge) return null; // agents replied in the Operator's thread on this file and it is not opened (#12026)
                     const note = DT.tag(badge); note.classList.add('dt-note', 'team-artifact-badge');
                     if (origin) note.classList.add(`team-artifact-badge-${isUnverified(item) ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`);
                     if (isUnverified(item)) note.classList.add('dt-warning'); return note;
@@ -557,6 +564,11 @@ export function createArtifactsList({ inbox = false } = {}) {
             ['Source', item.source], ['References', item.reference_count],
         ];
         const actions = [];
+        // Approve from the panel, whichever of its two buttons is pressed (the header's, #15120 walk 3 N4, and the actions bar's, #15338): one routine that sends the decision, retags the row and opens the sheet again, so the other button goes too (#15601: the header's Approve left the bar's Approve on an approved file)
+        const approveHere = () => importOnce('./artifact_review.js').then(async m => {
+            const out = await m.approveRow(inbox ? item.board_id : model.project, { id: hex, hex, name, team: inbox ? item.board_id : model.project, series_id: item.series_id, version: item.version });
+            m.sayApproved(name, out); const tags = (item.tags || []).filter(t => t !== REVIEW && t !== 'changes requested' && t !== 'read').concat('approved'); retag(hex, tags); openArtifactSheet({ ...item, tags, review: { state: 'approved', at: out.review?.at || new Date().toISOString() } }, opener, { focus: false }); // the panel says Approved at once
+        });
         if (link) {
             if (link.inline) actions.push({ label: 'Open', primary: true, run: () => importOnce('./preview_pane.js').then(m => m.openArtifactTab(item.uri || '', { server: link.server, board: splitKey(inbox ? item.board_id : model.project).name, contentURL: item.content_url, mediaType: item.media_type, filename: name, phoneFull: true })) });
             else if (hex) actions.push({ label: 'Open', primary: true, run: () => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hex, { server: link.server, filename: name, mediaType: item.media_type, fileId: item.file_id, versionLine: item.version_line, board: splitKey(inbox ? item.board_id : model.project).name, ...(item.produced_by ? { uploader: { role: String(item.produced_by), hex, server: link.server, board: splitKey(inbox ? item.board_id : model.project).name, seriesId: String(item.series_id || '') } } : {}), ...(item.goal_id && item.goal_title ? { goal: String(item.goal_title), goalId: String(item.goal_id), goalTeam: inbox ? item.board_id : model.project } : {}) }), () => window.open(link.url, '_blank', 'noopener,noreferrer')) });
@@ -564,12 +576,18 @@ export function createArtifactsList({ inbox = false } = {}) {
             else actions.push({ label: 'Open link', primary: true, href: link.url });
             actions.push({ label: 'Copy link', menu: 2, run: () => { navigator.clipboard?.writeText(hex ? `coral://artifacts/${hex}` : new URL(link.url, location.href).href).then(() => showToast('Link copied'), () => showToast('The link could not be copied', true)); } });
             if (fileIdOf(item)) actions.push({ label: 'Copy file ID', menu: 3, title: 'The file\'s stable id: pass it to --new-version-of (add @<version> for one version)', run: () => copyFileId(item, showToast) });
+            if (hex && item.earlier_versions > 0) actions.push({ label: `${item.earlier_versions + 1} versions`, menu: 3, title: 'List every version of this file, newest last', run: () => importOnce('./artifact_version_list.js').then(m => { const server = link.server, board = splitKey(inbox ? item.board_id : model.project).name; return m.openVersionList({ hex, server, board, name, current: { hex, created_at: item.created_at, produced_by: item.produced_by }, earlier: [], open: v => importOnce('./artifact_viewer.js').then(a => a.openArtifactViewer(v.hex, { server, filename: name, board })) }); }).catch(() => showToast('The versions could not be listed', true)) });
             if (hex) actions.push({ label: 'Star', menu: 4, description: 'Adds it to your Starred list', title: item.starred ? 'Starred (click to remove the star)' : 'Star: add it to your Starred list (it can still be cleaned up)', pressed: !!item.starred, run: b => toggleStar(hex, name, b, item) });
             if (hex && (item.tags || []).includes(IGNORED)) actions.push({ label: 'Unignore', title: 'Put it back in Needs you', run: () => importOnce('./artifact_review.js').then(async m => { const out = await m.unignoreRow(inbox ? item.board_id : model.project, { id: hex }); retag(hex, out.tags || (item.tags || []).filter(t => t !== IGNORED).concat(REVIEW)); showToast(`Back in Needs you: ${name}`); }).catch(e => showToast(e.message, true)) });
             if (hex && !isUnverified(item)) { // the Operator's own way to put a file in Needs you, and to take it out (#13152)
                 const inReview = (item.tags || []).includes(REVIEW);
+                // (the panel's Approve is the primary button below, #15338: #15329 had added a second one, so a file waiting for review showed two)
                 actions.push(inReview ? { label: 'Remove from review', menu: 1, description: 'Takes it out of Needs you', title: 'Take it out of Needs you', run: () => changeReview(reviewFiles([item]), true, name).then(r => { if (r) showToast(r.failed ? `Could not remove it from review: ${r.why}` : 'Removed from review', !!r.failed); }) }
                     : { label: 'Send for review', menu: 1, description: 'Puts it in Needs you to approve or ask for changes', title: 'Put it in Needs you to approve or ask for changes', run: () => changeReview(reviewFiles([item]), false, name).then(r => { if (r) showToast(r.failed ? `Could not send it for review: ${r.why}` : 'Sent for review: it is in Needs you', !!r.failed); }) });
+            }
+            if (hex && !isUnverified(item) && (item.tags || []).includes(REVIEW)) { // the panel says 'Waiting for your review': the decision is here too, not only in the viewer and Needs you (#15338, walk 23)
+                const asked = (item.tags || []).includes('changes requested');
+                actions.push({ label: asked ? 'Approve anyway' : 'Approve', primary: true, title: asked ? 'Approve this version as it is' : 'Approve it: it leaves Needs you and the agent is told', run: () => approveHere().catch(e => showToast(e.message, true)) });
             }
             if (hex && local()) {
                 const on = model.kept.has(hex);
@@ -585,6 +603,14 @@ export function createArtifactsList({ inbox = false } = {}) {
             head = document.createElement('div'); head.className = 'artifact-sheet-head';
             const line = document.createElement('span'); line.className = 'artifact-review-line'; line.setAttribute('role', 'status'); line.textContent = reviewText;
             head.append(line, editor);
+            if (reviewText === 'Waiting for your review' && local()) { // review from the list, in two clicks (walk 3 N4): Approve here; Request changes opens the viewer's form
+                const team = inbox ? item.board_id : model.project, row = { ...item, id: hex, hex, team, name }, acts = document.createElement('div'); acts.className = 'artifact-sheet-review'; acts.setAttribute('role', 'group'); acts.setAttribute('aria-label', 'Review this file');
+                const approve = document.createElement('button'); approve.type = 'button'; approve.className = 'btn btn-primary'; approve.textContent = 'Approve';
+                approve.addEventListener('click', async () => { approve.disabled = true; try { await approveHere(); } catch (e) { showToast(e.message, true); approve.disabled = false; } });
+                const changes = document.createElement('button'); changes.type = 'button'; changes.className = 'btn'; changes.textContent = 'Request changes';
+                changes.addEventListener('click', () => { const open = actions.find(x => x.label === 'Open'); open?.run(); const t0 = Date.now(), tick = () => { const b = document.querySelector('#artifact-viewer .artifact-review-changes:not([hidden])'); if (b) b.click(); else if (Date.now() - t0 < 4000) setTimeout(tick, 100); }; tick(); }); // sleep-ok: waits for the viewer to draw its own button
+                acts.append(approve, changes); head.append(acts);
+            }
         }
         const dropped = ['team', 'goal'].filter(k => { const th = root?.querySelector(`th[data-key="${k}"]`); return !!th && getComputedStyle(th).display === 'none'; }).length; // a narrow box drops the row's Team and Task columns: their facts are behind Details, and the button says how many
         openDetailPane({
@@ -647,6 +673,8 @@ export function createArtifactsList({ inbox = false } = {}) {
         root = host.firstChild;
         if (scope && !scope.standalone && project && !external && !inbox) { // an agent with a team: files can be dropped on its list to share them with it (#11376)
             importOnce('./operator_share.js').then(m => m.mountOperatorShare(root, { project, session: scope.session, server: scope.server, name: scope.name, reload: () => loadArtifacts({ keep: true }) })).catch(() => {});
+        } else if (!scope && project && !external && !inbox) { // the team's own Artifacts tab (#15317): a visible Add files button shares files with the whole team
+            importOnce('./operator_share.js').then(m => m.mountOperatorShare(root, { project, session: '', name: '', reload: () => loadArtifacts({ keep: true }) })).catch(() => {});
         } else if (root._share) importOnce('./operator_share.js').then(m => m.unmountOperatorShare(root)).catch(() => {}); // an agent with no team: nothing to share with
         watch();
         draw();

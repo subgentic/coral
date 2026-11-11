@@ -51,18 +51,21 @@ type NeedsYouItem struct {
 	// StillWaiting: on an agent item, the Operator dismissed this request but the agent is still waiting in its terminal (#14203): Dismiss marks it ignored, it does not resolve it, so the row stays, flagged,
 	// until the agent's own evidence clears it.
 	StillWaiting bool `json:"still_waiting,omitempty"`
+	// Server: on an item a Hub read from one of its computers (#15380), the Hub's own id for that computer (never a name the computer chose); absent on this Coral's own items.
+	Server string `json:"server,omitempty"`
 }
 
 // needsYouAnswer is the whole answer. Count is every waiting thing. The order of items is (time, id). The first read (no ?after=) gives the newest few, newest first, and the cursor is "<time>|<id>" of the newest item. A poll with ?after=<cursor> gives the items strictly after that place, OLDEST first, up to the limit, and the cursor becomes the last item given: a burst bigger than the limit, and items in one instant, are read in several polls, none skipped and none given twice (a poller reads until a poll is shorter than the limit). A bare time as the cursor is still taken, and includes the items at that time.
 // instant are never lost).
 type needsYouAnswer struct {
-	Count       int            `json:"count"`
-	Counts      map[string]int `json:"counts"`
-	Cursor      string         `json:"cursor"`
-	Items       []NeedsYouItem `json:"items"`
-	NotIncluded []string       `json:"not_included"`
-	Muted       map[string]int `json:"muted,omitempty"`          // files the Operator's settings keep out of the count, by kind (#12144): never in Count, Counts or Items, never pushed
-	Unread      []string       `json:"unread_sources,omitempty"` // a source that could not be read this time: its things are missing from the count, not zero
+	Count       int               `json:"count"`
+	Counts      map[string]int    `json:"counts"`
+	Cursor      string            `json:"cursor"`
+	Items       []NeedsYouItem    `json:"items"`
+	NotIncluded []string          `json:"not_included"`
+	Muted       map[string]int    `json:"muted,omitempty"`          // files the Operator's settings keep out of the count, by kind (#12144): never in Count, Counts or Items, never pushed
+	Machines    []NeedsYouMachine `json:"machines,omitempty"`       // a Hub's merged read: the computers it covers and whether each was read (#15380)
+	Unread      []string          `json:"unread_sources,omitempty"` // a source that could not be read this time: its things are missing from the count, not zero
 }
 
 // SetNeedsYouSkills tells the board how to list the skills that wait for the Operator (the Skills Store owns them). Nil: none.
@@ -194,6 +197,18 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		items = kept
+	}
+	if h.needsYouRemotes != nil && !cur.set && realSession(r) { // a Hub's first page, for the owner's real sign-in session only (#15380)
+		m := h.needsYouRemotes.mergedNeeds(r, kind)
+		ans.Machines = m.Machines
+		for k, v := range m.Counts {
+			ans.Counts[k] += v
+			ans.Count += v
+		}
+		items = append(items, m.Items...)
+		if m.Failed {
+			ans.NotIncluded = append(ans.NotIncluded, "unreachable_machines")
+		}
 	}
 	// the order is (time, id): items recorded to the same second are told apart by id, so a cursor is a place in a total order
 	sort.SliceStable(items, func(i, j int) bool { return needsYouBefore(items[i], items[j]) })

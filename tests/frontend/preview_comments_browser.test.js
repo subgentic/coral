@@ -60,7 +60,7 @@ const IMG = 'f'.repeat(64);
             let s = await state();
             const sheet = s.w < 720;
             check(`${tag}: the toolbar counts two open threads; a phone and a pane too narrow for the column (a sheet over the file) start on the document (#14846)`, s.toggle === 'Comments (2)' && s.sheetOpen === (!mobile && !sheet) && s.panelInert === !s.sheetOpen && (sheet ? s.panelPos === 'absolute' : s.panelPos !== 'absolute'), JSON.stringify(s).slice(0,300));
-            check(`${tag}: the two open comments are highlighted in the document and the document is a named region`, s.highlights === 2 && s.bodyRegion === 'region', JSON.stringify({ h: s.highlights, r: s.bodyRegion }));
+            check(`${tag}: the two open comments are highlighted in the document and the document is a named region or, while it can be commented on, a labelled group (#15173)`, s.highlights === 2 && ['region', 'group'].includes(s.bodyRegion), JSON.stringify({ h: s.highlights, r: s.bodyRegion }));
             if (sheet) {
                 await ev(`document.querySelector('#preview-toolbar .ac-toggle').click();true`);
                 await settle(500); // a sheet opens on demand, on a phone and in a narrow docked pane alike

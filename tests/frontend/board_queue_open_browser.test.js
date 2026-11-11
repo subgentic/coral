@@ -20,7 +20,7 @@ const { coralReady } = require('./helpers/wait');
             const at = `${width} px: `, a = `queue-open-a-${width}-` + Date.now().toString(36), b = `queue-open-b-${width}-` + Date.now().toString(36); boards.push(a, b);
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
-            for (const bd of [a, b]) assert.equal((await api('POST', `/api/board/${bd}/subscribe`, { subscriber_id: 'Orchestrator', job_title: 'Orchestrator', session_name: bd })).status, 200);
+            for (const bd of [a, b]) assert.equal((await api('POST', `/api/board/${bd}/subscribe`, { subscriber_id: 'Orchestrator', job_title: 'Orchestrator' })).status, 200);
             await mk(a, 'First task'); await mk(b, 'Other board task');
             await go(a);
             const first = await open(); assert.ok(first.open && first.visible && first.lines >= 1, at + 'a run is open by default with its lines showing: ' + JSON.stringify(first));

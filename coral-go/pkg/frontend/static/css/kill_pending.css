@@ -1,0 +1,3 @@
+/* A row whose agent is being stopped (#15370): dimmed, its actions off, one word on it. */
+.agent-stopping { opacity: 0.55; pointer-events: none; }
+.agent-stopping-note { margin-left: 8px; font-size: var(--fs-sm); color: var(--text-secondary); white-space: nowrap; }

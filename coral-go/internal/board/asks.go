@@ -182,6 +182,7 @@ type AskSubject struct {
 	GoalID           int64
 	TaskID           int64
 	MayNoLongerApply string
+	TaskInReview     bool // the linked task is waiting in review (#15078): the Inbox offers Approve and Request changes
 }
 
 // RecordAskSubject keeps the goal and the task a question (a message recorded with RecordAsk) is about. The caller has checked that both are of the board; nothing is kept for a message that is not a question of
@@ -254,11 +255,13 @@ func (s *Store) AskSubjectsOf(ctx context.Context, project string, ids []int64) 
 		GoalID           int64  `db:"goal_id"`
 		TaskID           int64  `db:"task_id"`
 		MayNoLongerApply string `db:"may_no_longer_apply"`
+		InReview         bool   `db:"in_review"`
 	}
 	if err := s.reader().SelectContext(ctx, &rows, `SELECT a.message_id, a.goal_id, a.task_id,
         CASE WHEN t.status IN ('completed','skipped','cancelled') THEN 'task_completed'
         WHEN t.id IS NOT NULL AND snap.message_id IS NOT NULL AND LOWER(TRIM(snap.assignee))<>LOWER(TRIM(COALESCE(t.assigned_to,''))) THEN 'task_reassigned'
-        ELSE '' END AS may_no_longer_apply
+        ELSE '' END AS may_no_longer_apply,
+        COALESCE(t.status = 'review_pending', 0) AS in_review
         FROM board_ask_subjects a
         LEFT JOIN board_tasks t ON t.board_id=a.project AND t.id=a.task_id
         LEFT JOIN board_ask_task_snapshots snap ON snap.project=a.project AND snap.message_id=a.message_id AND snap.task_id=a.task_id
@@ -266,7 +269,7 @@ func (s *Store) AskSubjectsOf(ctx context.Context, project string, ids []int64) 
 		return nil, err
 	}
 	for _, r := range rows {
-		out[r.MessageID] = AskSubject{GoalID: r.GoalID, TaskID: r.TaskID, MayNoLongerApply: r.MayNoLongerApply}
+		out[r.MessageID] = AskSubject{GoalID: r.GoalID, TaskID: r.TaskID, MayNoLongerApply: r.MayNoLongerApply, TaskInReview: r.InReview}
 	}
 	return out, nil
 }

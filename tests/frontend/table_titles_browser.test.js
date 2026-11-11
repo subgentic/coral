@@ -17,8 +17,8 @@ const { coralReady } = require('./helpers/wait');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
-        assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: 'o-s' })).status < 300);
-        assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'be', job_title: 'Backend Dev', session_name: 'b-s' })).status < 300);
+        assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator' })).status < 300);
+        assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'be', job_title: 'Backend Dev' })).status < 300);
         for (const t of ['Write the release notes', 'Fix the flaky test']) assert.ok((await api('POST', `/api/board/${B}/tasks`, { title: t, body: 'x', created_by: 'orch', priority: 'medium', assigned_to: 'be' })).status < 300);
         for (const t of ['Approve the release', 'Answer the rollback question']) assert.ok((await api('POST', `/api/board/${B}/tasks`, { title: t, body: 'x', created_by: 'orch', priority: 'medium', assigned_to: 'Operator' })).status < 300); // the Inbox lists what is waiting on the operator
         const d = await api('POST', `/api/board/${B}/tasks`, { title: 'Ship the report', body: 'x', assigned_to: 'be', created_by: 'orch', priority: 'medium' }); const id = d.body.id || d.body.task.id;

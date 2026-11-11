@@ -1,5 +1,5 @@
-// Stopping a team from its page (Beta Tester's pass and Mobile tester's, #10008): the team's page header has a Stop menu with the sidebar row's own words and actions (Sleep Team or Wake Team, then Reset Team and Kill All apart, each asking first),
-// a phone's More has the same items, and Pause Board says in words what it does. At 1280 and 390 px; the isolated dev server, a board made through the API, the team's live rows put in the list.
+// Stopping a team from its page (Beta Tester's pass and Mobile tester's, #10008): the team's page header has a Stop menu with the sidebar row's own words and actions (Sleep team or Wake team, then Reset team and Kill all apart, each asking first),
+// a phone's More has the same items, and Pause board says in words what it does. At 1280 and 390 px; the isolated dev server, a board made through the API, the team's live rows put in the list.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -41,14 +41,14 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             await ev(`document.getElementById('${mobile ? 'team-page-more' : 'team-page-stop'}').click(); true`);
             await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu opens
             let it = await items(host);
-            check(JSON.stringify(it.map(i => i.text)) === JSON.stringify(['Sleep Team', 'Reset Team', 'Kill All']), `the items are the sidebar row's own words: ${JSON.stringify(it)}`);
-            check(/^Stops every agent for now; Wake Team starts them again$/.test(it[0].hint) && /^Each agent starts again from its first instructions, in a new chat$/.test(it[1].hint) && /^Ends every agent now; their chats stay in History$/.test(it[2].hint), `each item says in one line what it does (#10357): ${JSON.stringify(it.map(i => i.hint))}`);
+            check(JSON.stringify(it.map(i => i.text)) === JSON.stringify(['Sleep team', 'Reset team (clear context)', 'Kill all']), `the items are the sidebar row's own words: ${JSON.stringify(it)}`);
+            check(/^Stops every agent for now; Wake team starts them again$/.test(it[0].hint) && /^Clears every agent's context; each starts in a new chat$/.test(it[1].hint) && /^Ends every agent now; their chats stay in History$/.test(it[2].hint), `each item says in one line what it does (#10357): ${JSON.stringify(it.map(i => i.hint))}`);
             check(it.every(i => i.shown) && (!mobile || it.every(i => i.h >= 44)), `shown (44 px on a phone): ${JSON.stringify(it)}`);
-            check(it[0] && !it[0].danger && it[1].danger && it[2].danger, 'Reset Team and Kill All are the danger items, Sleep Team is not');
+            check(it[0] && !it[0].danger && !it[1].danger && it[2].danger, 'Kill all is the danger item; Sleep team and Reset team (clear context) are not red at rest (#15373)');
             check(await ev(`document.querySelectorAll('${host} hr.overflow-menu-divider').length >= 1`), 'the danger items are set apart by a rule');
             await shot(`team-stop-menu-${w}`);
             const separation=await ev(`(()=>{const host=document.querySelector('${host}'),reset=host.querySelector('[data-stop="reset"]'),kill=host.querySelector('[data-stop="kill"]');return{gap:kill.getBoundingClientRect().top-reset.getBoundingClientRect().bottom,resetRule:parseFloat(getComputedStyle(reset).borderTopWidth),killRule:parseFloat(getComputedStyle(kill).borderTopWidth)}})()`);
-            check(separation.gap>=8&&separation.resetRule>=1&&separation.killRule>=1,`destructive actions have space and a visible boundary: ${JSON.stringify(separation)}`);
+            check(separation.gap>=8&&separation.killRule>=1,`destructive actions have space and a visible boundary: ${JSON.stringify(separation)}`);
             if(mobile){
                 const deletion=await ev(`(()=>{const b=document.querySelector('#team-page-more-menu #mb-delete-btn');return{margin:parseFloat(getComputedStyle(b).marginTop),rule:parseFloat(getComputedStyle(b).borderTopWidth),height:b.getBoundingClientRect().height}})()`);
                 check(deletion.margin>=8&&deletion.rule>=1&&deletion.height>=44,`Delete team is separated and retains its phone target: ${JSON.stringify(deletion)}`);
@@ -59,23 +59,24 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             // each asks first
             await ev(`document.querySelector('${host} [data-stop="reset"]').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the dialog opens
             let d = await dialogText();
-            check(/Reset team/.test(d) && /Reset all agents in/.test(d), `Reset Team asks first: ${d.slice(0, 120)}`);
-            check(/starts again from its first instructions, in a new chat\. The old chats stay in History and your files are not touched\./.test(d) && !/context|original prompts/i.test(d), `Reset Team says what happens to chats and files, in plain words (#10371): ${d.slice(0, 300)}`);
+            check(/Reset team/.test(d) && /Reset all agents in/.test(d), `Reset team asks first: ${d.slice(0, 120)}`);
+            check(/starts again from its first instructions, in a new chat\. The old chats stay in History and your files are not touched\./.test(d) && !/context|original prompts/i.test(d), `Reset team says what happens to chats and files, in plain words (#10371): ${d.slice(0, 300)}`);
             await closeDialog(); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the dialog closes
             await ev(`document.getElementById('${mobile ? 'team-page-more' : 'team-page-stop'}').click(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu opens
             await ev(`document.querySelector('${host} [data-stop="kill"]').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the dialog opens
             d = await dialogText();
-            check(/Kill team/i.test(d) && /Kill (all \d+ agents|the 1 agent) in "/.test(d) && /stop now\. (Their chats|Its chat) stays? in History\./.test(d) && !/terminate|on board/i.test(d), `Kill All asks first, in plain words, and says what stays (#10371): ${d.slice(0, 300)}`);
+            check(/Kill team/i.test(d) && /Kill (all \d+ agents|the 1 agent) in "/.test(d) && /stop now\. (Their chats|Its chat) stays? in History\./.test(d) && !/terminate|on board/i.test(d), `Kill all asks first, in plain words, and says what stays (#10371): ${d.slice(0, 300)}`);
             await closeDialog(); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the dialog closes
-            // a sleeping team says Wake Team
+            // a sleeping team says Wake team
             await ev(`T.state.liveSessions = ${JSON.stringify([mk('s1', 'Boss', true), mk('s2', 'Worker', true)])}; T.render.renderLiveSessions(T.state.liveSessions); document.getElementById('${mobile ? 'team-page-more' : 'team-page-stop'}').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the menu follows the team
             it = await items(host);
-            check(it[0] && it[0].text === 'Wake Team' && /^Starts the sleeping agents again$/.test(it[0].hint), `a sleeping team offers Wake Team, and says what it does: ${JSON.stringify(it)}`);
+            check(it[0] && it[0].text === 'Wake team' && /^Starts the sleeping agents again$/.test(it[0].hint), `a sleeping team offers Wake team, and says what it does: ${JSON.stringify(it)}`);
+            if (!mobile) check(await ev(`document.getElementById('team-page-stop').textContent.trim()`) === 'Wake agents', 'a sleeping team is already stopped: its button says Wake agents, not Stop agents (walk 13 M9)');
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
-            // Pause Board says what it does (the board's actions are in More)
+            // Pause board says what it does (the board's actions are in More)
             await ev(`document.getElementById('team-page-more').click(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu opens
             const pause = await ev(`(() => { const b = document.getElementById('mb-pause-btn'), n = document.getElementById('mb-pause-note'); return { btn: b && b.textContent.trim(), note: n && n.textContent.trim(), shown: !!n && n.getClientRects().length > 0, described: b && b.getAttribute('aria-describedby') }; })()`);
-            check(pause.btn === 'Pause Board' && /stop receiving new messages/.test(pause.note || '') && pause.shown && pause.described === 'mb-pause-note', `Pause Board says what it does: ${JSON.stringify(pause)}`);
+            check(pause.btn === 'Pause team' && /stop receiving new messages/.test(pause.note || '') && pause.shown && pause.described === 'mb-pause-note', `Pause team says what it does: ${JSON.stringify(pause)}`);
             if (!mobile) check(await ev(`[...document.querySelectorAll('#team-page-more-menu hr')].every(r => r.getClientRects().length === 0)`), 'a wide More menu has no stray rule (the Stop items are phone-only in it)');
             await shot(`team-more-pause-${w}`);
             await closeDialog();
@@ -83,11 +84,11 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             const trigger=mobile?'#mobile-session-list .group-kebab-btn':'#live-sessions-list .group-kebab-btn';
             await waitFor(`!!document.querySelector('${trigger}')?.getClientRects().length`,'team sidebar menu trigger');
             await ev(`document.querySelector('${trigger}').click();true`);
-            const sidebar=await ev(`(()=>{const host=document.querySelector('${trigger}').nextElementSibling;host.scrollTop=host.scrollHeight;const buttons=[...host.querySelectorAll('[data-on-click="team-reset"],[data-on-click="team-kill"],[data-on-click="team-delete"]')];return{n:buttons.length,heights:buttons.map(b=>b.getBoundingClientRect().height),gaps:buttons.slice(1).map((b,i)=>b.getBoundingClientRect().top-buttons[i].getBoundingClientRect().bottom)}})()`);
+            const sidebar=await ev(`(()=>{const host=document.querySelector('${trigger}').nextElementSibling;host.scrollTop=host.scrollHeight;const buttons=[...host.querySelectorAll('[data-on-click="team-kill"],[data-on-click="team-delete"]')];return{n:buttons.length,heights:buttons.map(b=>b.getBoundingClientRect().height),gaps:buttons.slice(1).map((b,i)=>b.getBoundingClientRect().top-buttons[i].getBoundingClientRect().bottom)}})()`);
             await shot(`team-sidebar-destructive-${w}`);
             check(sidebar.n>=2&&sidebar.gaps.every(g=>g>=8)&&(!mobile||sidebar.heights.every(h=>h>=44)),`sidebar destructive actions are separated with phone targets: ${JSON.stringify(sidebar)}`);
         }
     } finally { await removeBoards(ev, [BOARD]).catch(() => {}); await client.close(); }
     assert.deepEqual(problems, [], 'the team page Stop menu:\n  ' + problems.join('\n  '));
-    console.log('PASS the team page Stop menu and Pause Board words');
+    console.log('PASS the team page Stop menu and Pause board words');
 })().catch(e => { console.error(e); process.exit(1); });

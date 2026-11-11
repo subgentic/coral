@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
-const { H1, H2, H3, STUB, FILE, lineOf } = require('./helpers/artifact_versions_stub');
+const { H1, H2, H3, STUB, FILE, lineOf, headOf } = require('./helpers/artifact_versions_stub');
 const { coralReady } = require('./helpers/wait');
 const { removeBoards } = require('./helpers/board_cleanup');
 
@@ -36,14 +36,14 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'the one review row', 15000);
             const from = await ev(`(([...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.querySelector('.inbox-review-name')) || {}).textContent || '')`); // the data row, not the agent's group head
-            check(from.includes(lineOf(3)), at + `the row says the line: ${JSON.stringify(from)}`);
+            check(from.includes(headOf(3)) && !from.includes('(file '), at + `the row says the line: ${JSON.stringify(from)}`);
             await ev(`document.querySelector('#group-table-view .inbox-review-name').click(); true`);
             await waitFor(`!!document.getElementById('artifact-viewer') && !document.getElementById('artifact-viewer').hidden && !!document.querySelector('#artifact-viewer .av-current')`, at + 'the viewer opens with its versions', 10000);
-            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(lineOf(3))}`, at + 'the header says v3', 6000);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(headOf(3))}`, at + 'the header says v3', 6000);
             await ev(`document.querySelector('#artifact-viewer .av-current').click(); true`);
             await waitFor(vis('#artifact-viewer .av-list'), at + 'the version list', 3000);
             await ev(`document.querySelector('#artifact-viewer .av-option[data-version="2"]').click(); true`);
-            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(lineOf(2))}`, at + 'choosing v2 replaces the line', 8000);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(headOf(2))}`, at + 'choosing v2 replaces the line', 8000);
             check(!(await head()).includes('version 3'), at + 'a v2 is never labelled v3');
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
             await removeBoards(ev, [team]).catch(() => {});
@@ -67,7 +67,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             try { await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 2`, at + 'the two rows', 15000); }
             catch (e) { const d = await ev(`JSON.stringify({ rows: document.querySelectorAll('tbody tr').length, text: (document.getElementById('group-table-view') || document.body).innerText.slice(0, 300) })`).catch(x => String(x)); throw new Error(e.message + ' | page: ' + d); }
             const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.textContent)`);
-            check(rows.some(t => t.includes('release-plan.md') && t.includes(lineOf(3))), at + `the row with a file id says its line: ${JSON.stringify(rows)}`);
+            check(rows.some(t => t.includes('release-plan.md') && t.includes(headOf(3))), at + `the row with a file id says its line: ${JSON.stringify(rows)}`);
             check(rows.filter(t => t.includes('plain-notes.md')).every(t => !/version \d+ of/.test(t)), at + `a row with no id says none: ${JSON.stringify(rows)}`);
             await removeBoards(ev, [team]).catch(() => {});
         }
@@ -99,7 +99,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`(${rowOf('release-plan.md')}).querySelector('.artifact-details').click(); true`);
             await waitFor(`!document.getElementById('agentic-detail-pane').hidden && document.querySelector('#agentic-detail-pane .detail-title').textContent === 'release-plan.md'`, at + 'the sheet opens', 6000);
             const facts = await ev(`[...document.querySelectorAll('#agentic-detail-pane .detail-facts > *')].map(c => c.textContent)`);
-            check(facts.some(f => f.includes(lineOf(3))), at + `the sheet says the line as a fact: ${JSON.stringify(facts)}`);
+            check(facts.some(f => f.includes(headOf(3))), at + `the sheet says the line as a fact: ${JSON.stringify(facts)}`);
             await ev(`(${rowOf('notes.md')}).querySelector('.artifact-details').click(); true`);
             await waitFor(`document.querySelector('#agentic-detail-pane .detail-title').textContent === 'notes.md'`, at + 'the other sheet', 6000);
             const none = await ev(`[...document.querySelectorAll('#agentic-detail-pane .detail-facts > *')].map(c => c.textContent).join(' | ')`);
@@ -108,11 +108,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await waitFor(`document.querySelector('#agentic-detail-pane .detail-title').textContent === 'release-plan.md'`, at + 'its sheet again', 6000);
             await ev(`[...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].find(b => b.textContent === 'Open').click(); true`); // the sheet's own Open: the Team Artifacts path into the viewer
             await waitFor(`!!document.getElementById('artifact-viewer') && !document.getElementById('artifact-viewer').hidden`, at + 'Open shows the viewer', 8000);
-            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(lineOf(3))}`, at + 'the header says the line', 8000);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(headOf(3))}`, at + 'the header says the line', 8000);
             await ev(`document.querySelector('#artifact-viewer .av-current').click(); true`);
             await waitFor(vis('#artifact-viewer .av-list'), at + 'the version list', 4000);
             await ev(`document.querySelector('#artifact-viewer .av-option[data-version="1"]').click(); true`);
-            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(lineOf(1))}`, at + 'choosing v1 replaces the line', 8000);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(headOf(1))}`, at + 'choosing v1 replaces the line', 8000);
             check(!(await head()).includes('version 3'), at + 'v1 is never labelled v3');
         }
     } finally { try { client.close(); } catch { /* closed */ } }

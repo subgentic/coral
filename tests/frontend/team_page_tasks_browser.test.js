@@ -39,7 +39,7 @@ const TEAM = `qa-tasks-${Date.now() % 100000}`;
         });
         await S.run('the tab counts read the two totals alone (counts=1), never a page of tasks to count them (#9100)', async () => {
             const reads = await ev(`window.__taskReads || []`);
-            assert.ok(reads.includes('?counts=1'), 'the team page asks ?counts=1: ' + JSON.stringify(reads));
+            assert.ok(reads.some(r => /^\?counts=1(&since=[^&]+)?$/.test(r)), 'the team page asks ?counts=1: ' + JSON.stringify(reads));
             assert.ok(!reads.includes('?limit=1'), 'and no longer ?limit=1, which returned every open task: ' + JSON.stringify(reads));
         });
         await S.run('the search bar is there and a search asks the task query (q), paged with a total and Load more', async () => {

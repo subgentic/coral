@@ -4,7 +4,7 @@ const { artifactThumbnail, thumbnailPath } = await importOnce('./artifact_thumbn
  * every version (a listbox, newest first), and "Compare with v2". Compare draws the text's lines that were added and removed since the version before (Changes) or the two versions side by side. All
  * text is set with textContent. The server's list is GET /api/artifacts/{digest}/versions (an artifact in no series is a 404: no bar). A switch and a compare are said once in a polite line. */
 import { serverUrl, artifactPath } from './server_base.js';
-import { fetchSkewed, VERSIONS_KEYS } from './query_skew.js';
+const { readVersions } = await importOnce('./versions_read.js');
 import { el } from './dom_el.js';
 import { pollEvery } from './overload.js';
 
@@ -88,7 +88,7 @@ export function attachVersions(dialog, hooks) {
         try {
             // The version bar asks for its own team's series: bytes two teams hold are two series, and the route will not guess between them (#13999, #14015). A direct link with no team asks without one.
             // A computer on an older release refuses ?board= (its versions route takes no query): there is no bar then. Asked again without the team, its answer would be that computer's guess at a series, and a hidden bar is honest where a guess is not (#14317, Security's INFO 4).
-            const { response: r, dropped } = await fetchSkewed(server, `/api/artifacts/${hex}/versions`, board ? { board } : {}, { kind: 'versions', keys: VERSIONS_KEYS, retry: false });
+            const { response: r, dropped } = await readVersions(server, hex, board);
             if (dropped.length) return { rows: null, ambiguous: false };
             if (r.status === 409) { const d = await r.json().catch(() => ({})); return { rows: null, ambiguous: !!(d && d.code === 'ambiguous_series') }; } // no bar, a quiet note
             if (!r.ok) return { rows: null, ambiguous: false };
@@ -126,12 +126,21 @@ export function attachVersions(dialog, hooks) {
         bar.replaceChildren();
         const i = cur();
         bar.hidden = !st.rows || i < 0;
+        if (bar.hidden) { dialog.dataset.shownVersion = dialog.dataset.newerVersion = ''; dialog.dispatchEvent(new CustomEvent('av-version')); }
         note.hidden = !st.ambiguous || !bar.hidden; note.textContent = note.hidden ? '' : 'Held by more than one team: open it from a team to see its versions.';
         hooks.version?.(bar.hidden ? 0 : st.rows[i].version);
         hooks.line?.(bar.hidden ? null : st.rows[i]); // the file id and line of the version SHOWN, from the server's list (#14178): a switch or a save never keeps another version's
         dialog.classList.toggle('av-has-versions', !bar.hidden);
         if (bar.hidden) return;
         const rows = st.rows, row = rows[i], total = rows.length, latest = i === total - 1;
+        const wantLatest = hooks.wantLatest?.(); // asked once, for the first version drawn, so an open that already shows the newest uses it up (#15601: left set, it sent the person's next pick of v2 back to v3)
+        if (!latest && wantLatest) { choose(rows[total - 1]); return; } // opened from Needs you: the newest version, not the one the row was made for
+        const files = new Set(rows.map(r => r.name).filter(Boolean)).size; // one series can hold several files (a task's chain, #12144): a decision on the newest covers them all (#15233)
+        dialog.dataset.coversFiles = files > 1 ? String(files) : '';
+        if (st.seenOf !== rows[0].digest) { st.seenOf = rows[0].digest; st.seen = new Set(); } // the versions shown since this series opened: a file none of whose versions was shown has not been opened (#15254)
+        st.seen.add(row.digest);
+        dialog.dataset.unopenedFiles = files > 1 ? String([...new Set(rows.map(r => r.name).filter(Boolean))].filter(n => !rows.some(r => r.name === n && st.seen.has(r.digest))).length) : '';
+        dialog.dataset.shownVersion = String(row.version); dialog.dataset.newerVersion = latest ? '' : String(rows[total - 1].version); dialog.dispatchEvent(new CustomEvent('av-version')); // the review bar names the version it approves (#15197)
         const prev = btn('av-prev av-icon', '◀', 'Previous version'); prev.setAttribute('aria-disabled', String(i === 0));
         prev.addEventListener('click', () => stepTo(-1));
         const next = btn('av-next av-icon', '▶', 'Next version'); next.setAttribute('aria-disabled', String(latest));
@@ -141,6 +150,8 @@ export function attachVersions(dialog, hooks) {
         current.addEventListener('click', () => { setList(!st.listOpen); if (st.listOpen) focusOption(); });
         current.addEventListener('keydown', (e) => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (!st.listOpen) setList(true); focusOption(); } else if (e.key === 'Escape' && st.listOpen) { e.preventDefault(); e.stopPropagation(); closeList(true); } });
         bar.append(prev, current, next);
+        if (i > 0 && latest && !st.comparing) { const since = btn('av-since', 'Changes', `Changes since v${rows[i - 1].version}`); since.title = `Changes since v${rows[i - 1].version}`; since.addEventListener('click', () => startCompare()); bar.append(since); } // a new version after a round of changes: the reviewer sees what changed without opening the list (walk 8 H2)
+        if (!latest) { const newer = btn('av-link av-newer', `v${rows[total - 1].version} is ready: open it`); newer.addEventListener('click', () => choose(rows[total - 1])); bar.append(newer); } // said in the bar, not only inside the closed list (#15217, walk 6: the viewer stayed on 'version 1' with no word that a newer one is ready)
         const pop = el('div', 'av-pop'); pop.hidden = !st.listOpen; // Compare, the newer-version line and the list: opened by the chip
         if (i > 0) {
             const cmp = btn('av-compare', st.comparing ? `Back to v${row.version}` : `Compare with v${rows[i - 1].version}`);
@@ -149,7 +160,7 @@ export function attachVersions(dialog, hooks) {
             pop.append(cmp);
         }
         if (!latest) {
-            const note = el('p', 'av-notice notice notice-info'); note.append(`v${rows[total - 1].version} is newer. `);
+            const note = el('p', 'av-notice notice notice-info'); note.append(files > 1 ? `${rows[total - 1].name || 'The newest file'} (v${rows[total - 1].version}) is newer, and one decision on it covers all ${files} files. ` : `v${rows[total - 1].version} is newer. `);
             const open = el('button', 'av-link', 'Open the latest'); open.type = 'button'; open.addEventListener('click', () => choose(rows[total - 1]));
             note.append(open); pop.append(note);
         }
@@ -159,7 +170,7 @@ export function attachVersions(dialog, hooks) {
             // the shown version is the list's one Tab stop; the arrow keys move between the rest (a roving tabindex)
             const li = el('li', 'av-option'); li.setAttribute('role', 'option'); li.id = `av-opt-${r.version}`; li.tabIndex = r.digest === st.hex ? 0 : -1; li.dataset.version = String(r.version);
             li.setAttribute('aria-selected', String(r.digest === st.hex)); li.title = w.full;
-            li.append(artifactThumbnail(r, { url: thumbnailPath(r) ? serverUrl(thumbnailPath(r), st.server) : '' }), el('span', 'av-vname', `v${r.version}${r.is_latest ? ' (latest)' : ''}`), el('span', 'av-who', r.edited_in_dropbox ? `Edited in Dropbox · ${w.label}` : [w.label, r.role || r.uploader].filter(Boolean).join(' · ')), el('span', 'av-size', sizeOf(r.size || 0)));
+            li.append(artifactThumbnail(r, { url: thumbnailPath(r) ? serverUrl(thumbnailPath(r), st.server) : '' }), el('span', 'av-vname', `v${r.version}${files > 1 && r.name ? ' ' + r.name : ''}${r.is_latest ? ' (latest)' : ''}`), el('span', 'av-who', r.edited_in_dropbox ? `Edited in Dropbox · ${w.label}` : [w.label, r.role === 'operator' ? 'You' : (r.uploader || r.role) ? `${r.uploader || r.role}, an agent` : ''].filter(Boolean).join(' · ')), el('span', 'av-size', sizeOf(r.size || 0)));
             li.addEventListener('click', () => choose(r));
             li.addEventListener('focus', () => { for (const o of options()) o.tabIndex = o === li ? 0 : -1; });
             list.append(li);

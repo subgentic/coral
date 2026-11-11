@@ -1,0 +1,7 @@
+/* A phone's team bar says what waits for the person: the Needs you count beside the title, a tap opens that tab (#15185). Lazy: loaded by team_page.js (page_weight, not at start). A desktop draws none. */
+.team-bar-needs { display: none; }
+@media (max-width: 600px) {
+    .team-bar-needs { display: inline-flex; align-items: center; justify-content: center; grid-column: 3; grid-row: 1 / span 2; min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); padding: 0 12px; border: 0; border-radius: 22px; background: none; color: var(--accent); font: inherit; font-weight: var(--fw-strong); cursor: pointer; } /* the count is the accent's number at a 44 px target, beside the dots */
+    .team-page-head.has-needs { grid-template-columns: 44px minmax(0, 1fr) auto 44px; }
+    .team-page-head.has-needs .team-page-actions { grid-column: 4; }
+}

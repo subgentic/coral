@@ -19,14 +19,14 @@ const mib = n => `${Math.round(n / (1024 * 1024))} MiB`;
 const asHeader = s => String.fromCharCode(...new TextEncoder().encode(s));
 
 /** What a refused upload says, in words: the status and the server's code. */
-export function refusalWords(status, code) {
+export function refusalWords(status, code, team = false) {
     if (code === 'artifact_too_large' || status === 413 && code !== 'artifact_quota') return `it is over ${mib(MAX_BYTES)}`;
     if (code === 'artifact_quota') return 'the artifact store is full: delete old artifacts in Settings, Storage and cleanup';
     if (code === 'board_paused') return 'the team is paused, so nothing reaches its agents: resume it first';
     if (code === 'rate_limited' || status === 429) return 'too many files in a minute: wait a moment and try again';
     if (code === 'owner_only' || status === 403) return 'only the person at this computer can share a file with an agent';
     if (code === 'sign_in_link') return 'its name carries a sign-in link';
-    if (status === 404) return 'this agent is no longer on the team';
+    if (status === 404) return team ? 'this team has no agent to keep it with, or the goal is gone' : 'this agent is no longer on the team';
     if (status === 400) return 'its name or type is not one Coral can keep';
     if (status === 507) return 'this computer\'s disk is almost full';
     return 'something went wrong';
@@ -42,14 +42,17 @@ export function checkFile(file) {
     return '';
 }
 
-/** Mounts the drop target and the button on the agent's Artifacts page `root`. ctx: { project, session, server, name, reload }. Called again with the same root, it only updates ctx. */
+/** Mounts the drop target and the button on the agent's Artifacts page `root`. ctx: { project, session, server, name, reload }.
+ * With no `session` the files are the TEAM's (#15317): a visible "Add files" button, no agent named, the whole board told; `goalId` says the files are for that goal of the team. Called again with the same root, it only updates ctx. */
 export function mountOperatorShare(root, ctx) {
     if (root._share) { const S = root._share; S.ctx = ctx; S.attach(); S.sync(); return; }
     const S = root._share = { ctx, busy: false, live: true };
-    const row = el('div', 'share-drop');
+    const row = el('div', `share-drop${ctx.session ? '' : ' share-drop-team'}`);
     // One small + beside the search box (the operator, #13584): its tip carries the explanation, the More menu offers the same action, and a drop on the tab still works.
-    const pick = el('button', 'btn btn-quiet btn-icon sidebar-collapse-btn share-drop-pick'); pick.type = 'button'; pick.setAttribute('aria-label', 'Upload a file');
-    const plus = el('span', 'material-icons', 'add'); plus.setAttribute('aria-hidden', 'true'); pick.append(plus);
+    const teamMode = !ctx.session; // a team's files (#15317): one visible, labelled button at the top of the page, since a small + beside a search box is not found
+    const pick = teamMode ? el('button', 'btn btn-small share-drop-add') : el('button', 'btn btn-quiet btn-icon sidebar-collapse-btn share-drop-pick'); pick.type = 'button';
+    if (teamMode) { const plus = el('span', 'material-icons', 'add'); plus.setAttribute('aria-hidden', 'true'); pick.append(plus, document.createTextNode(' Add files')); }
+    else { pick.setAttribute('aria-label', 'Upload a file'); const plus = el('span', 'material-icons', 'add'); plus.setAttribute('aria-hidden', 'true'); pick.append(plus); }
     // who can read the files and who is told: for a keyboard or screen-reader user too, not only a pointer's tip (UI Accessibility, #13584)
     const desc = el('span', 'sr-only'); desc.id = `share-drop-desc-${++descSeq}`; pick.setAttribute('aria-describedby', desc.id);
     const input = el('input'); input.type = 'file'; input.multiple = true; input.hidden = true; input.tabIndex = -1; input.setAttribute('aria-hidden', 'true');
@@ -59,8 +62,11 @@ export function mountOperatorShare(root, ctx) {
     S.choose = () => { if (S.live && !S.busy) input.click(); }; // the More menu's "Upload a file"
     S.attach = () => { // the + beside the search box, the status row above the list and the target over it (again, for an agent that has a team after one that had none, and after the bar is drawn)
         S.live = true;
-        const search = root.querySelector('.list-bar-search-row .list-bar-search-wrap');
-        if (search && pick.previousElementSibling !== search) { search.after(pick); pick.after(desc); }
+        if (teamMode) { if (!pick.isConnected) { row.prepend(pick, desc); } }
+        else {
+            const search = root.querySelector('.list-bar-search-row .list-bar-search-wrap');
+            if (search && pick.previousElementSibling !== search) { search.after(pick); pick.after(desc); }
+        }
         if (!row.isConnected) { const body = root.querySelector('.team-artifacts-body'); if (body) root.insertBefore(row, body); else root.prepend(row); }
         if (!target.isConnected) root.append(target);
     };
@@ -68,6 +74,13 @@ export function mountOperatorShare(root, ctx) {
     let depth = 0;
     S.attach();
     S.sync = () => {
+        if (teamMode) {
+            const g = S.ctx.goalId ? ' They are added to this goal.' : '';
+            desc.textContent = `Every agent on this team can read the files, and the team is told.${g}`;
+            pick.title = `Add files for the team: any type, up to ${mib(MAX_BYTES)} each. You can also drop files here.${g}`;
+            target.textContent = 'Drop to share with the team';
+            return;
+        }
         const n = visibleName(S.ctx.name || 'this agent');
         desc.textContent = `Every agent on this team can read the files; only ${n} is told.`;
         pick.title = `Upload a file. You can also drop files here. Every agent on this team can read them; only ${n} is told.`;
@@ -91,26 +104,27 @@ export function mountOperatorShare(root, ctx) {
                 if (why) { problems.push(`${shown}: ${why}`); continue; }
                 say(`Uploading ${i + 1} of ${list.length}: ${shown} (${f.size < 1024 * 1024 ? `${Math.max(1, Math.round(f.size / 1024))} KiB` : mib(f.size)})`);
                 try {
-                    const r = await boardFetch(c.project, `/operator-artifacts?session_id=${encodeURIComponent(c.session)}`, {
+                    const r = await boardFetch(c.project, teamMode ? `/operator-artifacts${c.goalId ? `?goal_id=${encodeURIComponent(c.goalId)}` : ''}` : `/operator-artifacts?session_id=${encodeURIComponent(c.session)}`, {
                         method: 'POST', body: f,
                         headers: { 'Content-Type': 'application/octet-stream', 'X-Artifact-Name': asHeader(f.name), 'X-Artifact-Media-Type': f.type && f.type.length <= 127 ? asHeader(f.type) : '' },
                     });
                     const out = await r.json().catch(() => ({}));
                     if (r.ok && out.id) stored.push(out.id);
-                    else problems.push(`${shown}: ${refusalWords(r.status, out.code)}`);
+                    else problems.push(`${shown}: ${refusalWords(r.status, out.code, teamMode)}`);
                 } catch { problems.push(`${shown}: it could not be sent (the connection failed)`); }
             }
             let told = '';
             if (stored.length) {
-                say(`Telling ${visibleName(c.name || 'the agent')}…`);
+                const who = teamMode ? 'the team' : visibleName(c.name || 'the agent');
+                say(`Telling ${who}…`);
                 try {
-                    const r = await boardFetch(c.project, '/operator-artifacts/message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: c.session, digests: stored }) });
+                    const r = await boardFetch(c.project, '/operator-artifacts/message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(teamMode ? { digests: stored, ...(c.goalId ? { goal_id: Number(c.goalId) } : {}) } : { session_id: c.session, digests: stored }) });
                     const out = await r.json().catch(() => ({}));
                     if (r.ok && out.delivered) told = out.asleep ? ' The agent is asleep: it will find the message when it wakes.' : '';
-                    else told = r.status === 409 ? ` ${visibleName(c.name || 'The agent')} was not told: ${refusalWords(r.status, out.code)}.` : out.reason === 'no_agent' ? ' Nobody on the team was told: the agent has left.' : ' The files are saved, but the agent could not be told. Try again, or tell it yourself.';
-                } catch { told = ' The files are saved, but the agent could not be told (the connection failed).'; }
+                    else told = r.status === 409 ? ` ${teamMode ? 'The team' : visibleName(c.name || 'The agent')} was not told: ${refusalWords(r.status, out.code, teamMode)}.` : out.reason === 'no_agent' ? (teamMode ? ' Nobody on the team was told: no agent is on it.' : ' Nobody on the team was told: the agent has left.') : (teamMode ? ' The files are saved, but the team could not be told. Try again, or tell them yourself.' : ' The files are saved, but the agent could not be told. Try again, or tell it yourself.');
+                } catch { told = ` The files are saved, but ${teamMode ? 'the team' : 'the agent'} could not be told (the connection failed).`; }
             }
-            const done = stored.length ? `Shared ${stored.length === 1 ? 'a file' : `${stored.length} files`} with ${visibleName(c.name || 'the agent')}.` : 'Nothing was shared.';
+            const done = stored.length ? `Shared ${stored.length === 1 ? 'a file' : `${stored.length} files`} with ${teamMode ? 'the team' : visibleName(c.name || 'the agent')}.` : 'Nothing was shared.';
             say([done + told, ...problems.map(p => `Not shared, ${p}.`)].join(' '), problems.length > 0 || told.includes('could not') || told.includes('not told'));
             if (stored.length) showToast(done, false, 4000);
         } finally {

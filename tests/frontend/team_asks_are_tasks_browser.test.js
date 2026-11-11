@@ -28,7 +28,7 @@ const TEAM = 'asks-' + Date.now().toString(36);
         await open();
         const first = await ev(`(() => { const r = document.querySelector(${JSON.stringify(row)}); const i = r && r.querySelector('input[type=checkbox]'); return r ? { label: r.querySelector('.sv-label').textContent, help: r.querySelector('.sv-help-text').textContent, on: i.checked, named: i.getAttribute('aria-labelledby') === r.querySelector('.sv-label').id, workflow: !!r.closest('.settings-pane[data-section=workflow]') } : null; })()`);
         assert.ok(first, 'a row for asks_are_tasks');
-        assert.equal(first.label, 'Requests for work are tasks'); assert.match(first.help, /When an agent needs another agent to do something, it creates a task/); assert.equal(first.on, false, 'off for a team that never set it'); assert.ok(first.named && first.workflow, 'named by its label, in the Workflow group');
+        assert.equal(first.label, 'Turn requests for work into tasks'); assert.match(first.help, /When an agent needs another agent to do something, it creates a task/); assert.equal(first.on, false, 'off for a team that never set it'); assert.ok(first.named && first.workflow, 'named by its label, in the Workflow group');
         assert.equal((await api('GET', '/working-mode')).body.asks_are_tasks, false);
 
         console.log('2. on and Save: one PUT with the switch, the instructions hold the rule');

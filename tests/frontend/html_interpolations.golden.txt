@@ -34,6 +34,7 @@
 1	board_chat.js	count
 1	board_chat.js	externalMessageBadge(m)
 1	board_chat.js	hubUserBadge(m)
+1	board_chat.js	loadedModule('./team_pause.js')?.queuedBadge(m, _activeBoardChat) || ''
 1	board_chat.js	messageAttachmentAttrs(m)
 1	board_chat.js	messageAttachmentsHtml(m)
 1	board_chat.js	parts.actions
@@ -73,6 +74,7 @@
 1	board_window.js	checkbox
 1	board_window.js	externalMessageBadge(m)
 1	board_window.js	hubUserBadge(m)
+1	board_window.js	loadedModule('./team_pause.js')?.queuedBadge(m) || ''
 1	board_window.js	messageAttachmentAttrs(m)
 1	board_window.js	messageAttachmentsHtml(m)
 1	board_window.js	messageTimeHtml(m.created_at)
@@ -363,7 +365,7 @@
 1	session_rows.js	dirChip
 1	session_rows.js	dotClass
 1	session_rows.js	hooksMissingChip(s)
-1	session_rows.js	isGoneAsleep(s) ? `<button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escap
+1	session_rows.js	isGoneAsleep(s) || isExitedAsleep(s) ? `<button class="menu-item overflow-menu-item" data-on-click="agent-slee
 2	session_rows.js	label
 1	session_rows.js	nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typ
 1	session_rows.js	piHooksChip(s)

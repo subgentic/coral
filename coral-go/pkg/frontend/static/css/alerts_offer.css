@@ -1,0 +1,12 @@
+/* The alerts offer (#10248): a strip in the page's flow; its sentence wraps and the buttons go under it when the line is short. Lazy: loaded by alerts_offer.js. */
+.alerts-offer-banner { flex: none; flex-wrap: wrap; gap: 8px 12px; }
+.alerts-offer-banner[hidden] { display: none; }
+.alerts-offer-text { flex: 1 1 14rem; min-width: 0; overflow-wrap: anywhere; }
+.alerts-offer-banner .btn-icon { margin-left: auto; } /* the x stays at the right edge, on the buttons' row */
+/* A phone (#15164, walk 6 M9): ONE row of 44 px, not a quarter of the screen: a shorter sentence, the button and a 44 px x beside it. */
+@media (max-width: 600px) {
+    .alerts-offer-banner { gap: 8px; padding-block: 0; align-items: center; min-height: 52px; }
+    .alerts-offer-text { flex: 1 1 8rem; line-height: var(--lh-ui); } /* at normal text the sentence, the button and the x share one row; at large text the 8rem no longer fits beside them, so the buttons go under the sentence instead of squeezing it into a column of its own (200% text: 365 px tall, #15533) */
+    .alerts-offer-banner .btn { flex: none; min-height: var(--control-touch-height, 44px); }
+    .alerts-offer-banner .btn-icon { min-width: var(--control-touch-height, 44px); font-size: var(--fs-2xl); line-height: 1; margin-left: 0; }
+}

@@ -138,7 +138,7 @@ function _drawAgentHeader(name, agentType, sessionId, srv, agentData, displayNam
         badge.textContent = agentType || "claude";
         badge.className = `chip chip-caps ${(agentType || "claude").toLowerCase()}`;
     }
-    // Dashboard: "Open Agent Tab" link for this exact session. Popout mode
+    // Dashboard: "Open agent tab" link for this exact session. Popout mode
     // hides this control and never carries the id in it.
     const openWin = document.getElementById("terminal-open-window-link");
     if (openWin && !isPopout()) {

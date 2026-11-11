@@ -350,6 +350,10 @@ func (p *restartPlan) restartSettings() {
 			p.displayName = p.subscription.JobTitle
 		}
 	}
+	if p.model == "" && p.req.Model == nil && p.stored != nil {
+		p.model = modelOfFlags(storedFlags) // an agent started with its model on the command line (no model column) keeps it (#15114)
+		p.contextWindow = max(p.contextWindow, proxy.LookupContextWindow(p.model))
+	}
 	// Request body overrides stored values (user edited in modal)
 	if p.req.Prompt != "" {
 		p.prompt = p.req.Prompt
@@ -463,7 +467,7 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 	} else if p.stored != nil && !p.pickedMode { // a mode picked in the restart dialog is the person asking for something else: it ends the choice (below)
 		keepFull = h.keepFullAccessForRelaunch(ctx, p.agentType, p.stored.SessionID, "restart", p.stored.Capabilities, p.capsJSON)
 	}
-	cmd, err := h.launchCommand(ctx, agent.GetAgent(p.agentType), agent.LaunchParams{
+	restartParams := agent.LaunchParams{
 		KeepFullAccess: keepFull,
 		SessionID:      p.newSessionID,
 		SessionName:    p.newSessionName,
@@ -484,10 +488,12 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 		CoralHost:       h.cfg.AgentHost(),
 		CoralPort:       h.cfg.Port,
 		RunTag:          h.runTagFor(ctx, p.newSessionID, storedSessionID(p.stored), ""),
-	})
+	}
+	cmd, err := h.launchCommand(ctx, agent.GetAgent(p.agentType), restartParams)
 	if err != nil {
 		return "", func(w http.ResponseWriter) { errInternalServer(w, fmt.Sprintf("launch command failed: %v", err)) }
 	}
+	noteStartMessage(p.agentType, restartParams) // the restart's first message is the instructions again: Coral's turn in the chat, not the person's (#15283)
 	if !p.req.KeepFullAccess && p.stored != nil && p.pickedMode && keepFullAccessType(p.agentType) {
 		h.clearKeepFullAccess(ctx, p.stored.SessionID, "the restart picked a permission mode")
 	}
@@ -710,4 +716,26 @@ func (h *SessionsHandler) restartRecord(ctx context.Context, p *restartPlan) {
 	if p.subscription == nil && p.board != "" {
 		h.setupBoardAndPrompt(p.newSessionID, p.newSessionName, p.agentType, p.board, p.displayName)
 	}
+}
+
+// modelOfFlags is the model a stored command line was started with (--model X, -m X, --model=X, -m=X), "" when it names none or the value is not a model id. The last one wins, as it does for the CLI.
+func modelOfFlags(flags []string) string {
+	model := ""
+	for i := 0; i < len(flags); i++ {
+		f := flags[i]
+		switch {
+		case (f == "--model" || f == "-m") && i+1 < len(flags):
+			i++
+			model = flags[i]
+		case strings.HasPrefix(f, "--model="):
+			model = strings.TrimPrefix(f, "--model=")
+		case strings.HasPrefix(f, "-m="):
+			model = strings.TrimPrefix(f, "-m=")
+		}
+	}
+	model = strings.TrimSpace(model)
+	if !agentmodels.ValidModelValue(model) {
+		return ""
+	}
+	return model
 }

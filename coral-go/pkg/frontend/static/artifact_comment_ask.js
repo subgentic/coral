@@ -7,6 +7,7 @@ import { state } from './state.js';
 const api = await importOnce('./artifact_comments_api.js');
 const askUi = await importOnce('./artifact_comment_send.js');
 const { agentLink } = await importOnce('./agent_link.js');
+const { liveAgentOf } = await importOnce('./agent_live.js');
 
 /** The ask state and actions of one comments panel: `st` is the panel's state (`st.ask` is the open picker), the rest are its draw and announce hooks. */
 export function createAsk({ st, panel, render, announce, refresh, ownHex, uploaderHint, ago = () => '' }) {
@@ -39,24 +40,42 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
         const c = st.data && st.data.comments.find(x => x.id === id);
         for (const k of (c && c.asks) || []) if (k.open && k.agent) { m.set(k.agent.toLowerCase(), { k, words: askUi.askedWords(k) }); names.set(k.agent.toLowerCase(), k.agent); }
         for (const [role, words] of askedOf(id)) { const cur = m.get(role); if (!cur || askUi.askState(cur.k) === 'sent') m.set(role, { k: cur ? cur.k : null, words }); }
+        if (!m.size) for (const k of (c && c.asks) || []) if (k.agent) { m.set(k.agent.toLowerCase(), { k, words: askUi.askedWords(k) }); names.set(k.agent.toLowerCase(), k.agent); } // nobody has it open: asks that ran out (the thread was resolved and reopened, or the window passed) still say it was sent, never "Not sent to an agent yet" for a comment that was (#15239, walk 10 M9)
         return m;
     }
     /** The line under a comment that says where an agent has it (#14129): Sent to A, then Read by A (with the time the server saw its own read call return the comment), then A replied; at rest, and again as soon as a send answers (#12112: it kept saying "Not sent to an agent yet" beside "Asked just now"). Each name as written, a button to the agent's chat (#12168). */
     const fillStatus = (p, id) => {
         const rows = [...statusNow(id)]; p.replaceChildren();
         if (!rows.length) { p.textContent = st.undelivered && st.undelivered.get(id) ? `Not delivered: ${st.undelivered.get(id)}` : 'Not sent to an agent yet'; return; } // why it went nowhere (#15034)
+        const all = (st.data && st.data.comments) || [], top = all.find(x => x.id === id);
+        const newest = [top, ...all.filter(x => x.parentId === id && !x.deleted)].filter(Boolean).reduce((a, x) => (!a || Date.parse(x.createdAt) >= Date.parse(a.createdAt) ? x : a), null); // the newest message of the thread (#15119): a read mark says whether THIS was read, not an older one
         rows.forEach(([role, s], i) => {
             if (i) p.append('; ');
-            const link = agentLink(names.get(role) || role, { board: boardTeamKey(st.server, st.board) }), state = s.k ? askUi.askState(s.k) : 'sent';
+            const link = agentLink(names.get(role) || role, { board: boardTeamKey(st.server, st.board) });
+            let state = s.k ? askUi.askState(s.k) : 'sent';
+            if (link.tagName === 'BUTTON' && s.k && s.k.replies > 0) link.tabIndex = -1; // its reply in this thread has the one Tab stop for the agent; this one stays a click (#15174: Open Orchestrator twice in a row)
+            const newestMine = !!newest && newest.mine, readNewest = !!s.k && !!s.k.readAt && (!newest || !(Date.parse(newest.createdAt) > Date.parse(s.k.readAt)));
+            if (s.k && newestMine && newest !== top && state !== 'sent') state = readNewest ? 'read' : 'unread'; // the newest message is yours: replied or read earlier says nothing of it until the agent has read it
             if (state === 'replied') p.append(link, ` replied${s.k.replies > 1 ? ` (${s.k.replies} times)` : ''}`);
             else if (state === 'read') {
                 p.append('Read by ', link);
                 if (s.k.readAt) { const t = document.createElement('span'); t.textContent = `, ${ago(s.k.readAt)}`; t.title = s.k.readAt; p.append(t); }
-            } else p.append('Sent to ', link, ` (${s.words.replace(/^./, c => c.toLowerCase())})`);
+            } else if (state === 'unread') p.append('Sent to ', link, `, not read yet${s.k.replies > 0 ? ` (it replied ${s.k.replies === 1 ? 'once' : `${s.k.replies} times`} before)` : ''}`);
+            else {
+                const who = names.get(role) || role, asleep = !!(liveAgentOf(who, { board: boardTeamKey(st.server, st.board) }) || {}).sleeping; // an agent asleep has it, unread, until it wakes (#15155)
+                p.append('Sent to ', link, asleep ? ' (asleep: delivered when it wakes)' : sentWords(s.words));
+                if (asleep) {
+                    const wake = document.createElement('button'); wake.type = 'button'; wake.className = 'dt-link ac-wake'; wake.textContent = 'Wake'; wake.setAttribute('aria-label', `Wake ${who}`);
+                    wake.addEventListener('click', async () => { wake.disabled = true; try { await (await importOnce('./operator_asks.js')).wakeMember({ server: st.server, board: st.board }, who); announce(`Waking ${who}`); } catch (e) { announce(String((e && e.message) || e)); } wake.disabled = false; redrawStatus(id); });
+                    p.append(' ', wake);
+                }
+            }
             if (s.k && s.k.nudged && state !== 'sent') p.append(', reminded');
             if (s.k && s.k.limitReached) p.append('. The agent has reached its reply limit here'); // until the Operator writes again (#15034)
         });
     };
+    /** The words after "Sent to A": a first ask says nothing more; one that was asked before says so plainly, not "(already asked)" (#15119). */
+    const sentWords = words => { const w = String(words || '').replace(/^./, c => c.toLowerCase()); return !w ? '' : w.startsWith('already asked') ? ` (asked about this thread before${w.slice('already asked'.length)})` : ` (${w})`; };
     const statusWords = id => { const p = document.createElement('p'); fillStatus(p, id); return p.textContent; };
     const redrawStatus = id => { const p = panel.querySelector(`.ac-card[data-id="${id}"] .ac-ask-status`); if (p) fillStatus(p, id); };
     function askBlock() {

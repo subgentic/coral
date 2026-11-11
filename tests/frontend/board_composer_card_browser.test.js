@@ -51,7 +51,7 @@ const { coralReady } = require('./helpers/wait');
     })()`);
     const check = async where => {
         const m = await measure();
-        assert.equal(m.placeholder, 'Message the team... (@ to mention)', `${where}: placeholder`);
+        assert.equal(m.placeholder, 'Message the team (the Orchestrator reads every post; @ to mention)', `${where}: placeholder`);
         assert.ok(m.radius >= 12, `${where}: one rounded box (radius ${m.radius})`);
         assert.equal(m.taBorder, '0px', `${where}: the text has no box of its own inside the card`);
         assert.equal(m.taBg, 'rgba(0, 0, 0, 0)', `${where}: the text sits on the card`);

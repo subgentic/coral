@@ -366,8 +366,8 @@ func TestReviewVerdictAndPlainTaskNeedNoClaimWhileBusy(t *testing.T) {
 	assert.Equal(t, "completed", final.Status)
 }
 
-// #5191: a review task is not reassigned (the round would still name the old reviewer and the new one would be refused 'no open review'); the refusal says how reviewers change, which works.
-func TestReviewTaskIsNotReassignedItsReviewersChangeOnTheTask(t *testing.T) {
+// #14866 (it was refused in #5191): a review task is reassigned, and the round follows, so the new reviewer's verdict counts and the old reviewer has no open review.
+func TestReviewTaskReassignedTheRoundFollowsAndTheNewReviewerGivesTheVerdict(t *testing.T) {
 	base, h, task := reviewTeam(t, "swap", true)
 	ctx := context.Background()
 	submit(t, base, task.ID)
@@ -378,15 +378,12 @@ func TestReviewTaskIsNotReassignedItsReviewersChangeOnTheTask(t *testing.T) {
 	qaReview := got.Workflow.ReviewRounds[0].Reviewers[0].ReviewTaskID
 
 	code, out = postCode(t, base(qaReview, "reassign"), map[string]any{"subscriber_id": "lead", "assignee": "Security Reviewer"})
-	assert.Equal(t, http.StatusBadRequest, code, "%v", out)
-	assert.Contains(t, fmt.Sprint(out["error"]), fmt.Sprintf("coral-board task review %d --to", task.ID), "it says how to change the reviewer")
+	require.Equal(t, http.StatusOK, code, "%v", out)
 	rt, err := h.bs.GetTask(ctx, "swap", qaReview)
 	require.NoError(t, err)
-	assert.Equal(t, "QA Engineer", *rt.AssignedTo, "the review task stays with its reviewer")
+	assert.Equal(t, "Security Reviewer", *rt.AssignedTo, "the review task is the new reviewer's")
 
-	// the way it says works: the new reviewer gives the verdict
-	code, out = postCode(t, base(task.ID, "review"), map[string]any{"subscriber_id": "lead", "reviewers": []string{"Security Reviewer"}})
-	require.Equal(t, http.StatusOK, code, "%v", out)
+	// the new reviewer gives the verdict
 	code, out = postCode(t, base(task.ID, "approve"), map[string]any{"subscriber_id": "Security Reviewer"})
 	assert.Equal(t, http.StatusOK, code, "the new reviewer can approve: %v", out)
 	code, _ = postCode(t, base(task.ID, "approve"), map[string]any{"subscriber_id": "QA Engineer"})

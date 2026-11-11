@@ -47,11 +47,11 @@ func TestCodingTeamTemplateHasTheSixRolesAndStartsInTaskQueue(t *testing.T) {
 
 func TestChoosingATemplateSetsTheLaunchFormsWorkingMode(t *testing.T) {
 	dialogs := frontendSource(t, "team_dialogs.js")
-	require.Contains(t, dialogs, "setTeamLaunchMode(tmpl.mode || 'none')", "loading a template applies the mode it names, or None: a Coding Team picked first does not leave Task queue on another template")
+	require.Contains(t, dialogs, "setTeamLaunchMode(tmpl.mode || tmpl.working_mode?.mode || 'none', tmpl.working_mode)", "loading a template applies the mode it names, or None: a Coding Team picked first does not leave Task queue on another template")
 	require.Contains(t, dialogs, "applyTeamBoardSettings, setTeamLaunchMode }", "and the dialog imports the setter")
 
 	settings := frontendSource(t, "team_launch_settings.js")
-	require.Contains(t, settings, "export function setTeamLaunchMode(mode)")
+	require.Contains(t, settings, "export function setTeamLaunchMode(mode, wm)")
 	require.Contains(t, settings, "mode: _defaultMode,", "a step that is still loading starts with the template's mode")
 	require.Contains(t, settings, "if (_view) _view.destroy();\n    _defaultMode = 'none';", "and mounting the step for a new dialog starts every team at None again")
 	require.Contains(t, settings, "{ value: 'task_queue', label: 'Task queue' }", "the Working mode select offers it")

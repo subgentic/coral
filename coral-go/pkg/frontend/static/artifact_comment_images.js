@@ -83,7 +83,7 @@ export function createImageTray({ upload, onChange = () => {} }) {
     function picker() {
         const wrap = el('span', 'ac-picker');
         const input = el('input'); input.type = 'file'; input.accept = api.COMMENT_IMAGE_TYPES.join(','); input.multiple = true; input.hidden = true; input.tabIndex = -1; input.setAttribute('aria-hidden', 'true');
-        const b = el('button', 'btn btn-small ac-add-image', 'Add image'); b.type = 'button'; b.setAttribute('aria-label', 'Add an image to this comment');
+        const b = el('button', 'btn btn-small ac-add-image', 'Add image'); b.type = 'button'; b.setAttribute('aria-label', 'Add an image to this comment'); b.title = 'Pictures only: PNG, JPEG or WebP. To give the team any other file, use Add files on the Artifacts tab.'; // said before a file is picked (#15317), not only after a refusal
         b.addEventListener('click', () => input.click());
         input.addEventListener('change', () => { add(input.files); input.value = ''; });
         wrap.append(b, input);

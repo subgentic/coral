@@ -1,6 +1,7 @@
 import { onArtifactsRev } from './artifacts_feed.js';
 import { readInboxArtifacts, artifactsOwnerOnlyEverywhere, inboxArtifactsUnchanged } from './inbox_servers.js';
 import { teamLabel } from './server_status.js';
+import { pollEvery } from './overload.js';
 /* The Inbox's Artifacts folder (Goal #62): every file the agents of every team made, in one list, as the team page's Artifacts tab draws it (team_artifacts_page.js, its search, Filters and
  * table) with a Team filter and column, and the document in a pane on the page's right: a click on a row opens it there and the list stays. The server merges the teams (GET /api/team-artifacts);
  * this file is the folder: its count for the sidebar, its page, and the search the sidebar's box feeds. Lazy: inbox_sidebar.js imports it. */
@@ -27,7 +28,7 @@ export const artifactsOwnerOnly = () => artifactsOwnerOnlyEverywhere();
 /** Read the count without drawing the page (the Inbox was opened): a request for one row, at most one in 30 seconds and one at a time. The Artifacts list tells the
  *  folder its own count whenever it reads (hooks below), which is the "refreshed on change". */
 let countSnapshot = null;
-onArtifactsRev(() => { countAt = 0; });
+onArtifactsRev(() => { countAt = 0; if (count !== null) refreshArtifactCount(); }); // a file arrived or changed: the sidebar's count is read again now, not at the next screen switch (#15176: 'Artifacts 0' with a README in review)
 export function refreshArtifactCount(done) {
     if (done) onCount = done;
     if (count !== null && Date.now() - countAt < COUNT_FRESH_MS) return counting || Promise.resolve();
@@ -48,6 +49,9 @@ export function refreshArtifactCount(done) {
     })().finally(() => { counting = null; });
     return counting;
 }
+
+// A slow safety read of the count, while the page is shown: the revision feed does not always carry a file an agent just shared (#15176: 'Artifacts 0' with a README in review); one /status per computer when nothing moved.
+pollEvery(() => { if (count === null) return; countAt = 0; refreshArtifactCount(); }, 20000);
 
 /** The search of the sidebar's box: it is the folder's search too (the page's own search box shows the same text). */
 export function setArtifactSearch(text) {

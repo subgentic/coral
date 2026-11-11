@@ -34,7 +34,7 @@ export function artifactTable(cfg) {
         { key: 'name', label: 'Name', primary: true, width: 'grow', sort: true, sortValue: readableName, cell: item => {
             const b = DT.primaryButton(readableName(item)); b.dataset.artifactId = (cfg.rowKey || itemKey)(item);
             if (cfg.nameTitle) b.title = cfg.nameTitle(item);
-            const badge = cfg.nameBadge?.(item);
+            const badge = cfg.nameBadge?.(item) || (Tags.reviewWords(item.tags, item.review, item.produced_by) === 'Waiting for your review' ? DT.tag('For review') : null); // the mark stays when the Tags column drops at a narrow width (walk 9 H1)
             const wrap = DT.el('span', 'dt-title-cell');
             // Browse owns the filename mapping and decorative SVG markup.
             const icon = artifactThumbnail({ ...item, name: readableName(item) }, { url: cfg.thumbnailURL?.(item) });

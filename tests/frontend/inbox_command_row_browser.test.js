@@ -25,7 +25,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.__answers = []; window.__status = 200; window.__po = ${JSON.stringify(MENU())}; window.__ws = 1; window.__waiting = true;
                 const real = window.fetch; window.fetch = (u, o = {}) => { const url = String(u), m = (o.method || 'GET').toUpperCase();
                     if (m === 'POST' && /\\/answer-prompt$/.test(url)) { window.__answers.push(JSON.parse(o.body)); return Promise.resolve(new Response(JSON.stringify(window.__status === 200 ? { ok: true } : { code: 'trust_changed', error: 'The folder to trust changed.' }), { status: window.__status, headers: { 'content-type': 'application/json' } })); }
-                    if (m === 'GET' && /\\/api\\/sessions\\/live\\/[^/]+\\/chat\\?/.test(url)) return Promise.resolve(new Response(JSON.stringify({ messages: [], total: 0, prompt_options: window.__po }), { headers: { 'content-type': 'application/json' } }));
+                    if (m === 'GET' && /\\/api\\/sessions\\/live\\/[^/]+\\/chat\\?/.test(url)) return new Promise(r => setTimeout(() => r(new Response(JSON.stringify({ messages: [], total: 0, prompt_options: window.__po }), { headers: { 'content-type': 'application/json' } })), window.__chatDelay || 0));
                     return real(u, o); };
                 const entry = window.__m.entry.bind(window.__m); window.__m.entry = a => ({ ...entry(a), board_job_title: 'QA Engineer', waiting_for_input: window.__waiting, waiting_kind: 'permission', waiting_summary: window.__sum || 'Notification: Claude needs your permission', waiting_since: 'w' + window.__ws });
                 window.__m.add('qa', 'A', 4, { sleeping: false, board_project: 'team-a', session_id: 'qa-id' }); true`);
@@ -51,6 +51,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             };
             // a new ask in the row: the agent stops waiting (the row goes) and waits again on this menu
             const show = async (po, expect) => {
+                await Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 }); // the pointer is off the list: a pointer resting on it holds new rows back (walk 23 M9)
                 await ev(`window.__waiting = false; window.__answers = []; window.__status = 200; true`); await refresh();
                 await waitFor(`document.querySelectorAll('#group-table-view tbody .dt-primary').length === 0`, `${at}the row leaves`, 8000);
                 await ev(`window.__po = ${JSON.stringify(po)}; window.__ws += 1; window.__waiting = true; true`); await refresh();
@@ -132,6 +133,17 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             await show(MENU({ target: ONE }), 2);
             for (let i = 0; i < 5; i++) await redraw();
             check((await ev(`window.__roLive.size`)) <= 2, `${at}after five real redraws at most the row's own command-block observers are live (not ${await ev('window.__roLive.size')})`);
+            // #15309: a row drawn again for a new reading of the same question keeps its Yes while the new reading is on its way (it was gone for the length of the read: a person could see it flicker, and a test that looked then failed 4 to 7% of runs at CPU x6)
+            await show(MENU({ target: ONE }), 2);
+            await ev(`window.__chatDelay = 700; window.__answers = []; window.__ws += 1; window.__noYes = 0; window.__seen = 0; (function tick() { const y = [...document.querySelectorAll('#group-table-view .inbox-answers button')].some(b => b.textContent === 'Yes' && !b.hidden); if (y) window.__seen++; else if (window.__seen) window.__noYes++; if (window.__tick !== false) requestAnimationFrame(tick); })(); true`); // raf-ok: the check counts the frames the person sees (a hidden page draws none; the count must be above 3)
+            await refresh();
+            await new Promise(r => setTimeout(r, 300)); // sleep-ok: the old choices are on the row, the delayed reading (700 ms) is still on its way
+            await ev(`window.__yes0 = [...document.querySelectorAll('#group-table-view .inbox-answers button')].find(b => b.textContent === 'Yes'); true`);
+            await new Promise(r => setTimeout(r, 800)); // sleep-ok: the delayed reading comes in and the frames are counted meanwhile
+            await ev(`window.__tick = false; window.__chatDelay = 0; true`);
+            check((await ev(`window.__seen`)) > 3 && (await ev(`window.__noYes`)) === 0, `${at}a row drawn again for a new reading keeps its Yes on every frame (frames with Yes ${await ev('window.__seen')}, without ${await ev('window.__noYes')})`);
+            check(await ev(`!!window.__yes0 && window.__yes0.isConnected`), `${at}and the reading that comes in leaves that same Yes in place (it is not drawn again: a press on it still ends as a click)`);
+            await ev(`window.__tick = undefined; true`);
             if (!mobile) { // the pointer leaves the Yes and enters it again: armed at once
                 await show(MENU({ target: ONE }), 2);
                 await ev(`window.__answers = []; window.__ws += 1; true`); await refresh();
@@ -142,7 +154,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 await Input.dispatchMouseEvent({ type: 'mouseMoved', x: yp.x, y: yp.y });
                 check(!(await ev(`!!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`)), `${at}the pointer leaving and entering the Yes arms it at once`);
                 await Input.dispatchMouseEvent({ type: 'mousePressed', x: yp.x, y: yp.y, button: 'left', clickCount: 1 }); await Input.dispatchMouseEvent({ type: 'mouseReleased', x: yp.x, y: yp.y, button: 'left', clickCount: 1 });
-                await waitFor(`window.__answers.length === 1`, `${at}a click right after the pointer came back answers`, 5000);
+                await waitFor(`window.__answers.length === 1`, `${at}a click right after the pointer came back answers`, 5000).catch(async e => { throw new Error(e.message + ' DIAG ' + await ev(`JSON.stringify({ yes: [...document.querySelectorAll('#group-table-view .inbox-answers button')].filter(b => b.textContent === 'Yes').map(b => ({ hidden: b.hidden, arming: b.classList.contains('inbox-arming'), hover: b.matches(':hover'), conn: b.isConnected })), held: !!document.querySelector('.group-table-held'), answers: window.__answers.length })`)); });
                 // the deliberate return stays armed across a real redraw: a new Yes, a click at once, answers
                 await show(MENU({ target: ONE }), 2);
                 await ev(`window.__answers = []; window.__ws += 1; true`); await refresh();
@@ -209,33 +221,32 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             }
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             // a request that can only be rejected shows its command too, and no Yes
-            await show(MENU({ only_reject: true, target: ONE }), 1);
+            await show(MENU({ only_reject: true, target: ONE, auto_block_at: new Date(Date.now() + 42000).toISOString() }), 2); // No and Open agent (#15140)
             st = await rowState();
             check(st && st.yes === 0 && st.no === 1 && st.text === ONE, `${at}a reject-only request shows its command and offers no Yes: ` + JSON.stringify(st));
+            const rej = await ev(`(() => { const c = document.querySelector('#group-table-view .inbox-answers'); const n = c.querySelector('.inbox-only-reject'), o = c.querySelector('.inbox-open-agent'); return { note: n && n.textContent, open: o && o.textContent }; })()`);
+            check(rej.open === 'Open agent' && /It can only be rejected here\. Open the agent to read it; Claude Code blocks it on its own at \d/.test(rej.note || ''), `${at}a reject-only row says when Claude Code blocks it itself and is one tap from the agent (#15140): ` + JSON.stringify(rej));
 
             if (!mobile) { // 3) a pointer resting over the list holds the rows
                 await show(MENU({ target: ONE }), 2);
                 const top0 = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr'); r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { top: Math.round(b.top), x: Math.round(b.left + 120), y: Math.round(b.top + b.height / 2), rows: document.querySelectorAll('#group-table-view tbody tr').length }; })()`);
                 await Input.dispatchMouseEvent({ type: 'mouseMoved', x: top0.x, y: top0.y });
                 await new Promise(r => setTimeout(r, 300)); // sleep-ok: the pointer events reach the page
+                // the note is read in the task that draws the waiting agent's row: a later refresh while the pointer still rests is held again and shows the note again (60 to 130 ms after the draw under load, #15180), which a read after the wait sees
+                await ev(`window.__heldAtDraw = null; new MutationObserver(() => { if (window.__heldAtDraw === null && document.querySelectorAll('#group-table-view tbody tr').length === ${top0.rows + 1}) window.__heldAtDraw = !!document.querySelector('#group-table-view .group-table-held'); }).observe(document.getElementById('group-table-view'), { childList: true, subtree: true }); true`);
                 await ev(`window.__m.add('qa2', 'B', 5, { sleeping: false, board_project: 'team-a', session_id: 'qa2-id' }); window.__ws += 1; true`);
                 await ev(`window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); true`);
                 await refresh();
                 await new Promise(r => setTimeout(r, 900)); // sleep-ok: the table would have redrawn by now
                 const held = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr').getBoundingClientRect(); return { top: Math.round(r.top), rows: document.querySelectorAll('#group-table-view tbody tr').length, note: (document.querySelector('#group-table-view .group-table-held') || {}).textContent || '' }; })()`);
-                check(held.top === top0.top && held.rows === top0.rows && /New items are waiting/.test(held.note), `${at}with the pointer on the list the rows did not move and the table says new items wait: before ` + JSON.stringify(top0) + ' after ' + JSON.stringify(held));
+                check(held.top === top0.top && held.rows === top0.rows && /^1 new waiting\./.test(held.note), `${at}with the pointer on the list the rows did not move and the line says 1 new waits: before ` + JSON.stringify(top0) + ' after ' + JSON.stringify(held));
                 await shot(`hover-held-${w}`);
-                // a WAITING AGENT is a row that needs the person: held about 2 s at most, so it is drawn with the pointer still where it was (QA Reviewer 2's MUST on #14173)
-                const t0 = Date.now();
-                await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === ${top0.rows + 1}`, `${at}the waiting agent's row is drawn although the pointer still rests on the list`, 8000);
-                const took = Date.now() - t0 + 900;
-                check(took <= 3600, `${at}a row that needs the person waits about 2 s at most under a resting pointer (took ${took} ms)`);
-                check(!(await ev(`!!document.querySelector('#group-table-view .group-table-held')`)), `${at}the 'new items wait' line goes when the row is drawn`);
-                // QA's #14173 SHOULD: a change that is NOT a new waiting agent keeps the longer hold: still held at 3 s (the urgent cap is 2 s), drawn by about 10 s
-                await ev(`window.__sum = 'Notification: Claude needs a different permission'; true`); await refresh();
-                await new Promise(r => setTimeout(r, 3200)); // sleep-ok: past the 2 s cap of a waiting agent
-                check(!(await ev(`document.querySelector('#group-table-view tbody').textContent.includes('a different permission')`)) && /New items are waiting/.test(await ev(`(document.querySelector('#group-table-view .group-table-held') || {}).textContent || ''`)), `${at}a change that is not a waiting agent is still held at 3 s`);
-                await waitFor(`document.querySelector('#group-table-view tbody').textContent.includes('a different permission')`, `${at}and drawn by about 10 s`, 12000);
+                // a WAITING AGENT too is held while the pointer rests (walk 23 M9): the line says it is there, so it is not hidden, and the rows do not reorder under a click; much longer than the old 2 s cap
+                await new Promise(r => setTimeout(r, 3500)); // sleep-ok: past the old 2 s cap of a waiting agent
+                check(await ev(`document.querySelectorAll('#group-table-view tbody tr').length`) === top0.rows && /new waiting/.test(await ev(`(document.querySelector('#group-table-view .group-table-held') || {}).textContent || ''`)), `${at}still held at 4 s, the line still there`);
+                // Show draws it at once, with the pointer still on the list
+                await ev(`document.querySelector('#group-table-view .group-table-held button').click(); true`);
+                await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === ${top0.rows + 1} && !document.querySelector('#group-table-view .group-table-held')`, `${at}Show draws the new row and the line goes`, 8000);
                 await ev(`window.__sum = undefined; true`);
                 await ev(`window.__sum = undefined; true`);
                 await Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 });

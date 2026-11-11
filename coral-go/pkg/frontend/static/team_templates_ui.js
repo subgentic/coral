@@ -1,4 +1,4 @@
-/* The Agent Team form's templates (moved out of team_dialogs.js as it was, #5174; no behaviour change): the built-in templates, the template selector and Save as Template. */
+/* The Agent Team form's templates (moved out of team_dialogs.js as it was, #5174; no behaviour change): the built-in templates, the template selector and Save as template. */
 import { importOnce } from './import_once.js';
 import { showToast } from './utils.js';
 const { _getSavedTeamTemplates, _upsertSavedTeamTemplates } = await importOnce('./persona_store.js');
@@ -12,7 +12,7 @@ const BUILTIN_TEAM_TEMPLATES = [
         agents: [
             { name: "Orchestrator", prompt: "You are the orchestrator. Break down the task, assign work to the team via the message board, and track progress. Do not write code yourself — delegate to the other agents. Discuss your plan with the operator before posting assignments.", capabilities: { allow: ['file_read', 'file_write', 'shell', 'git_write', 'agent_spawn', 'web_access', 'notebook'] } },
             { name: "Lead Developer", prompt: "You are the lead developer. Implement features, write code, and coordinate with the team via the message board. Wait for instructions from the Orchestrator before starting.", capabilities: { allow: ['file_read', 'file_write', 'shell', 'git_write', 'agent_spawn', 'web_access'] } },
-            { name: "QA Engineer", prompt: "You are a QA engineer. Review code, write tests, and verify the work of other agents. Wait for instructions from the Orchestrator before starting.", capabilities: { allow: ['file_read', 'file_write', 'shell', 'git_write', 'agent_spawn', 'web_access'] } },
+            { name: "QA Engineer", prompt: "You are a QA engineer. Review code, write tests, and verify the work of other agents. For a web page, open it in a browser and upload a screenshot of the running page next to its HTML. Wait for instructions from the Orchestrator before starting.", capabilities: { allow: ['file_read', 'file_write', 'shell', 'git_write', 'agent_spawn', 'web_access'] } },
             { name: "DevOps Engineer", prompt: "You are a DevOps engineer. Own the build, the tests that run on every change, releases and the deployment tooling. Wait for instructions from the Orchestrator before starting.", capabilities: { allow: ['file_read', 'file_write', 'shell', 'git_write', 'agent_spawn', 'web_access'] } },
             { name: "Frontend Dev", prompt: "You are a frontend developer. Build UI components, style pages, and ensure a great user experience. Wait for instructions from the Orchestrator before starting.", capabilities: { allow: ['file_read', 'file_write', 'shell', 'git_write', 'agent_spawn', 'web_access'] } },
             { name: "Backend Dev", prompt: "You are a backend developer. Build services, APIs and data storage, write their tests, and keep them secure and fast. Wait for instructions from the Orchestrator before starting.", capabilities: { allow: ['file_read', 'file_write', 'shell', 'git_write', 'agent_spawn', 'web_access'] } },
@@ -73,7 +73,7 @@ for (const template of BUILTIN_TEAM_TEMPLATES) for (const member of template.age
     member.capabilities = { allow: [...SHIPPED_CAPABILITIES], deny: [] };
 }
 
-function _allTemplates() { return [...BUILTIN_TEAM_TEMPLATES, ..._getSavedTeamTemplates()]; }
+function _allTemplates() { return [..._getSavedTeamTemplates(), ...BUILTIN_TEAM_TEMPLATES]; }
 
 /** The choice the dialog opens on (#9906): the default members it fills in (the Orchestrator, the Lead Developer, the QA Engineer). Not a template of its own: team_dialogs.js loads it. */
 const DEFAULT_TEAM_KEY = '__default';
@@ -133,6 +133,7 @@ function resetTeamTemplatePicker() {
 
 let _pendingSaveTemplateAgents = null;
 let _pendingSaveTemplateFlags = '';
+let _pendingSaveTemplateWorking = null;
 
 async function _saveTeamTemplate() {
     // Collect current agents
@@ -149,6 +150,7 @@ async function _saveTeamTemplate() {
             if (config.agentType) entry.agent_type = config.agentType;
             if (config.model) entry.model = config.model;
             if (config.thinking) entry.thinking = config.thinking; // #4969
+            if (config.permissionMode) entry.permission_mode = config.permissionMode;
             if (config.flags) entry.flags = config.flags;
             agents.push(entry);
         }
@@ -157,6 +159,8 @@ async function _saveTeamTemplate() {
 
     _pendingSaveTemplateAgents = agents;
     _pendingSaveTemplateFlags = document.getElementById("team-flags")?.value.trim() || '';
+    try { _pendingSaveTemplateWorking = (await importOnce('./team_launch_settings.js')).readTeamLaunchSettings().working_mode || null; } catch { _pendingSaveTemplateWorking = null; }
+    const kept = document.getElementById('save-template-kept'); if (kept) kept.textContent = 'Saves: members, roles, instructions, models, thinking levels, permission modes, working mode, Additional instructions. Not saved: skills, goal, tasks, notes, chats.';
 
     // Show custom modal instead of prompt()
     const modal = document.getElementById('save-template-modal');
@@ -188,6 +192,7 @@ async function _confirmSaveTemplate() {
     if (!_pendingSaveTemplateAgents) return;
 
     const entry = { name: templateName, agents: _pendingSaveTemplateAgents, flags: _pendingSaveTemplateFlags };
+    if (_pendingSaveTemplateWorking) entry.working_mode = _pendingSaveTemplateWorking;
     try { await _upsertSavedTeamTemplates([entry]); } catch { showToast("Could not save the template", true); return; }
     showToast(`Saved template "${templateName}"`);
     _renderTeamTemplateSelector();

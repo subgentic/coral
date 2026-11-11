@@ -104,6 +104,8 @@ type Goal struct {
 	UpdatedAt    string  `db:"updated_at" json:"updated_at"`
 	ClosedAt     *string `db:"closed_at" json:"closed_at,omitempty"`
 	ClosedReason string  `db:"closed_reason" json:"closed_reason,omitempty"`
+	// ClosedBy is who closed the goal (a subscriber name, "Operator" for the person; "" for a goal closed before it was kept, #15244): the goal page and Needs you say "closed as done by <agent>". A reopened goal has none.
+	ClosedBy string `db:"closed_by" json:"closed_by,omitempty"`
 	// OrchestratorToldAt is when the team's Orchestrator was told this goal was made (#11866), once; nil when it was not (the Orchestrator made it, or the team has none).
 	OrchestratorToldAt *string `db:"orchestrator_told_at" json:"orchestrator_told_at,omitempty"`
 	// MadeByOrchestrator is set on the way out (never stored) when the team's Orchestrator wrote this goal itself (#11887): the goal page says so instead of "nobody was told".
@@ -128,7 +130,7 @@ type Goal struct {
 func (g Goal) Closed() bool { return g.State == GoalDone || g.State == GoalDropped }
 
 // goalColumns are the columns of a Goal.
-const goalColumns = `id, goal_uid, board_id, title, outcome, done_when, state, blocked_on, driver, created_by, created_at, updated_at, closed_at, closed_reason, orchestrator_told_at`
+const goalColumns = `id, goal_uid, board_id, title, outcome, done_when, state, blocked_on, driver, created_by, created_at, updated_at, closed_at, closed_reason, closed_by, orchestrator_told_at`
 
 // goalLine cleans one line of goal text (no control, bidi or zero-width character, white space as one space) and refuses one longer than max characters.
 func goalLine(field, s string, max int) (string, error) {
@@ -371,8 +373,8 @@ func (s *Store) UpdateGoal(ctx context.Context, board string, id int64, u GoalUp
 	}
 	// A write that changes nothing (the same title, an empty body) is not a change: no new updated_at, and the board's change counter does not move (#7239).
 	if !sameGoalText(before, g) {
-		if _, err := tx.ExecContext(ctx, `UPDATE board_goals SET title = ?, outcome = ?, done_when = ?, state = ?, blocked_on = ?, driver = ?, closed_at = ?, closed_reason = ?, updated_at = ? WHERE id = ? AND board_id = ?`,
-			g.Title, g.Outcome, g.DoneWhen, g.State, g.BlockedOn, g.Driver, g.ClosedAt, g.ClosedReason, nowUTC(), id, board); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE board_goals SET title = ?, outcome = ?, done_when = ?, state = ?, blocked_on = ?, driver = ?, closed_at = ?, closed_reason = ?, closed_by = ?, updated_at = ? WHERE id = ? AND board_id = ?`,
+			g.Title, g.Outcome, g.DoneWhen, g.State, g.BlockedOn, g.Driver, g.ClosedAt, g.ClosedReason, closedByOf(g), nowUTC(), id, board); err != nil {
 			return nil, err
 		}
 	}
@@ -401,6 +403,19 @@ var openTaskStatuses = []string{"pending", "in_progress", "blocked", "draft", "r
 // the caller can warn, as coral-hub's defaults ask; the tasks stay as they are. The close is one UPDATE that only an open goal matches, so of two concurrent closes one wins and the other is
 // told the goal is already closed (it overwrote the first's reason and time before).
 func (s *Store) CloseGoal(ctx context.Context, board string, id int64, reason, state string) (g *Goal, openTasks int, err error) {
+	return s.CloseGoalBy(ctx, board, id, reason, state, "")
+}
+
+// closedByOf is the closer a goal keeps on an update: its own while it stays closed, none once it is open again (#15244).
+func closedByOf(g Goal) string {
+	if g.ClosedAt == nil {
+		return ""
+	}
+	return g.ClosedBy
+}
+
+// CloseGoalBy is CloseGoal that keeps who closed the goal (by, "" when unknown), so the person can tell a goal an agent closed from one they closed (#15244).
+func (s *Store) CloseGoalBy(ctx context.Context, board string, id int64, reason, state, by string) (g *Goal, openTasks int, err error) {
 	if state == "" {
 		state = GoalDone
 	}
@@ -420,8 +435,8 @@ func (s *Store) CloseGoal(ctx context.Context, board string, id int64, reason, s
 	}
 	defer tx.Rollback()
 	now := nowUTC()
-	res, err := tx.ExecContext(ctx, `UPDATE board_goals SET state = ?, blocked_on = '', closed_at = ?, closed_reason = ?, updated_at = ?
-		WHERE id = ? AND board_id = ? AND state NOT IN ('done', 'dropped')`, state, now, reason, now, id, board)
+	res, err := tx.ExecContext(ctx, `UPDATE board_goals SET state = ?, blocked_on = '', closed_at = ?, closed_reason = ?, closed_by = ?, updated_at = ?
+		WHERE id = ? AND board_id = ? AND state NOT IN ('done', 'dropped')`, state, now, reason, strings.TrimSpace(by), now, id, board)
 	if err != nil {
 		return nil, 0, err
 	}

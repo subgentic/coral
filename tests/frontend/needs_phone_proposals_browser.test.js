@@ -41,6 +41,7 @@ const STUB = `(() => {
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(INBOX_WORLD); await ev(STUB);
+        await ev(`localStorage.setItem('coral-alerts-offered', '1'); localStorage.setItem('coral-alerts-reoffered', '1'); true`); // alerts were offered and re-offered: no banner moves the rows (#15297, #11893); this suite is not about it
         await ev(`window.__asks = [{ board: 'team-a', kind: 'ask', id: 41, asker: 'Lead Developer', text: 'Which port should the test server use for the integration run, and should it be the same one the dashboard is on?', at: new Date(Date.now() - 300000).toISOString() }]; true`);
         await ev(`(() => { const original = window.fetch; window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin); if (u.pathname === '/api/operator-asks') return Promise.resolve(new Response(JSON.stringify(window.__asks), { status: 200, headers: { 'Content-Type': 'application/json' } })); return original(url, opts); }; return true; })()`);
         await ev(`(async () => { const { state } = await import(${S} + 'state.js'); const m = await import(${S} + 'inbox_tab.js'); state.liveSessions = []; m.updateInboxTab(); return true; })()`);
@@ -73,7 +74,7 @@ const STUB = `(() => {
         const sel = await ev(`({ dialog: !!document.querySelector('dialog[open]'), selected: ${rowOf('/Ship the beta/')}.classList.contains('dt-selected'), bar: !!document.querySelector('.dt-select-bar, .dt-bar [class*=selected], .gt-toolbar .dt-bar') })`);
         check(!sel.dialog && sel.selected, 'a long press selects the goal row and opens no card: ' + JSON.stringify(sel));
         const bar = await ev(`[...document.querySelectorAll('.gt-toolbar button, .dt-bar button')].filter(b => b.getClientRects().length).map(b => ({ name: (b.getAttribute('aria-label') || b.title || b.textContent).trim(), off: b.disabled || b.getAttribute('aria-disabled') === 'true' }))`);
-        check(bar.some(b => /^Approve/.test(b.name) && b.off) && bar.some(b => /^Dismiss/.test(b.name) && b.off), 'with a proposal selected the bar cannot Approve or Dismiss it (they are for files and questions): ' + JSON.stringify(bar));
+        check(!bar.some(b => /^Approve/.test(b.name)) && bar.some(b => /^Dismiss/.test(b.name) && b.off), 'with a proposal selected the bar offers no Approve (a file action, #15120) and cannot Dismiss it (proposals are approved or rejected): ' + JSON.stringify(bar));
         await shot('needs-phone-proposals'); 
     } finally { await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }

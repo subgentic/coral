@@ -1,8 +1,10 @@
 import { fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat, fetchProjects } from './board_fetch.js';
 import { emptyState } from './dom_write.js';
 import { escapeAttr, escapeHtml, showView, OPERATOR_ID, showToast } from './utils.js';
-import { keyLabel, splitKey, hasBoardLabel, boardFetch, noteBoardLabel, inTeam } from './server_base.js';
 import { importOnce } from './import_once.js';
+import { killLiveTeam, dropKilledRows } from './kill_live.js';
+import { keyLabel, splitKey, hasBoardLabel, boardFetch, noteBoardLabel, inTeam } from './server_base.js';
+import { loadStyles } from './lazy_styles.js';
 import { agentWords, deleteTeamWords } from './agent_words.js';
 import { state } from './state.js';
 import { initGrowingTextarea } from './growing_textarea.js';
@@ -14,7 +16,9 @@ import { registerActions, textOf, withId } from './actions.js';
 import { bs } from './board_state.js';
 import './goals_adapter.js'; // the Goals view (goals_view.js) is lazy and imports only what loads at startup (import_hygiene): its two small helpers load here (#7113)
 import './goal_words.js';
+loadStyles('short_screen.css'); // what a short window needs (200% zoom), once
 // The board page's group (bundle_lazy.go): these load with it, and the page's other files import only what loads at startup
+const { keepGap } = await importOnce('./keep_gap.js'); // the box pushes the messages up as it grows (#15401)
 const BX = await importOnce('./board_export.js'); // a part of the board page's group: loaded with it
 const { doExportBoard, toggleMessageSelect, selectAllMessages, selectNoneMessages, cancelSelectMode, exportSelectedAsMarkdown, resetSelection, connectBoard, hideExportBoardModal } = BX;
 const { attachMentionList, loadBoardSubscribers, subscribeDashboard } = await importOnce('./board_members.js');
@@ -79,6 +83,7 @@ export function showBoardInPage(project, host, messageId = null) {
     state.currentBoardServer = splitKey(project).server;
     board.style.display = 'flex'; // display-ok: #mb-board is shown and hidden this way everywhere else in this file
     initGrowingTextarea(document.getElementById('mb-post-input'));
+    keepGap(document.querySelector('.mb-messages-scroll'), document.getElementById('mb-post-input')); // the box pushes the messages up as it grows (#15401)
     attachMentionList();
     if (!hasBoardLabel(project)) {
         boardFetch(project, '').then(r => (r.ok ? r.json() : null)).then(d => {
@@ -112,6 +117,11 @@ export function showBoardInPage(project, host, messageId = null) {
 /** On the team page the composer is "Message the team" and its button "Send" (UI/UX's design); they are put back when the column goes home (the hidden holder in the board view). */
 function nameComposerForPage(on) {
     const box = document.getElementById('mb-post-input'), send = document.querySelector('#mb-board .mb-post-send-btn');
+    const board = document.getElementById('mb-board'), had = document.getElementById('mb-skip-composer');
+    if (on && board && box && !had) { // the first stop after the tabs: 50 Tabs of messages stood between a keyboard and the box (walk 17 M10). It shows only when it has the focus.
+        const skip = document.createElement('button'); skip.type = 'button'; skip.id = 'mb-skip-composer'; skip.className = 'skip-link'; skip.textContent = 'Skip to Message the team'; skip.style.minHeight = '44px'; skip.style.fontSize = 'var(--fs-base)'; // a 44 px target that grows with the text (#15522); lazy, so no start CSS
+        skip.addEventListener('click', () => box.focus()); board.prepend(skip);
+    } else if (!on && had) had.remove();
     for (const [e, name] of [[box, 'Message the team'], [send, 'Send']]) {
         if (!e) continue;
         if (on) { if (e.dataset.boardLabel === undefined) e.dataset.boardLabel = e.getAttribute('aria-label') || ''; e.setAttribute('aria-label', name); }
@@ -231,7 +241,7 @@ function syncBoardDeleteButton(project) {
     btn.disabled = !!blocked;
     btn.setAttribute('aria-disabled', blocked ? 'true' : 'false');
     btn.title = blocked || '';
-    btn.textContent = blocked ? 'Delete (needs Launch)' : 'Delete';
+    btn.textContent = blocked ? 'Remove team (needs Launch)' : 'Remove team';
 }
 document.addEventListener('coral:server-access-loaded', () => syncBoardDeleteButton(bs.currentProject));
 
@@ -240,36 +250,37 @@ function runningAgentsOn(project) {
     return (state.liveSessions || []).filter(a => inTeam(a, project) && !a.sleeping && !a.archived).map(a => agentWords(a, a.display_name || a.name).role);
 }
 
-export function deleteMessageBoardProject() { deleteTeam(bs.currentProject); }
+export function deleteMessageBoardProject() { deleteTeam(state.selectedTeam || bs.currentProject); } // the team on the page, not the last board the Messages tab loaded (#15277: on any other tab that was none, or another team)
 
-/** Delete team: the in-page dialog (which agents still run, or the words that say what goes), then the DELETE. From the team page's More menu and from the sidebar's team menu (#10318). */
+/** Remove team: the in-page dialog (what goes, what stays, which agents run), then the DELETE; with agents running its button is "Stop agents and remove", which stops them and then removes the team. A toast says it is done. From the team page's More menu and from the sidebar's team menu (#10318, #15277). */
 export function deleteTeam(project) {
     const blocked = project ? launchBlockedReason(splitKey(project).server) : '';
     if (blocked) { showToast(blocked, true); return; }
     if (!project) return;
-    // A board with agents running is not deleted (#5043): they would stay live in a group named with the raw board id. Said here, before asking; the server
-    // says it again for an agent this page's list does not show yet.
     const running = runningAgentsOn(project);
-    if (running.length) { // a real dialog, not a toast that is gone before it is read (#10139): which agents, and the way out; the server says it again for one this list does not show yet
-        window.showConfirmModal('Delete team', deleteTeamWords(keyLabel(project), running), () => { window.openTeamPage?.(project); }, undefined, { label: 'Show its agents', cancelLabel: 'Close', danger: false });
-        return;
-    }
-    window.showConfirmModal('Delete team', deleteTeamWords(keyLabel(project)), async () => {
+    const label = keyLabel(project);
+    window.showConfirmModal('Remove team', deleteTeamWords(label, running), async () => {
         try {
+            if (running.length) { // a board with agents running is not deleted (#5043): they are stopped first, here, so the team is not left half there
+                const { ok, answer } = await killLiveTeam(project);
+                if (!ok) { showToast((answer && answer.error) || 'Could not stop the agents, so the team was not removed.', true); return; }
+                dropKilledRows((state.liveSessions || []).filter(a => inTeam(a, project)));
+            }
             const resp = await boardFetch(project, ``, { method: 'DELETE' });
             if (!resp.ok) {
                 const out = await resp.json().catch(() => ({}));
-                showToast(out.error || 'The board was not deleted.', true);
+                showToast(out.error || 'The team was not removed.', true);
                 return;
             }
-            if (document.getElementById('team-page-view')?.getClientRects().length) { window.exitTeamPage?.({ force: true }); window.switchNavTab?.('agents'); } // deleted from its team page: back to Agents, not the board list
+            showToast(`Removed team "${label}". Its agents' chats stay in History and its folder is untouched.`);
+            if (document.getElementById('team-page-view')?.getClientRects().length) { window.exitTeamPage?.({ force: true }); window.switchNavTab?.('agents'); } // removed from its team page: back to Agents, not the board list
             else if (document.getElementById('messageboard-view')?.getClientRects().length) showMessageBoardProjects();
-            // deleted from the sidebar's team menu: the page stays where it is; the live feed takes the group away
+            // removed from the sidebar's team menu: the page stays where it is; the live feed takes the group away
         } catch (e) {
-            console.error('Failed to delete project:', e);
-            showToast('Could not reach Coral to delete the board.', true);
+            console.error('Failed to remove team:', e);
+            showToast('Could not reach Coral to remove the team.', true);
         }
-    }, undefined, { label: 'Delete team', danger: true });
+    }, undefined, { label: running.length ? 'Stop agents and remove' : 'Remove team', danger: true });
 }
 
 // ── Polling ──────────────────────────────────────────────────────────────

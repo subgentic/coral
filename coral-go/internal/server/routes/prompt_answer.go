@@ -112,6 +112,9 @@ type promptScreen struct {
 	Target     string `json:"target,omitempty"`
 	OnlyReject bool   `json:"only_reject,omitempty"`
 	Note       string `json:"note,omitempty"`
+	// AutoBlockAt: when Claude Code's own timer on this dialog ends and it blocks the request by itself (RFC 3339, from the time left on the screen when it was read; "" when the screen shows none). Display only: it is not
+	// part of the ask's identity, so it never changes what an answer is checked against (#15140).
+	AutoBlockAt string `json:"auto_block_at,omitempty"`
 	// AskID names this ask: a short digest of its title, question, the lines above it and its option labels (not the selection). An answer that carries the id it was drawn for is refused
 	// when the screen now shows another ask (#10400): a row or card drawn for one command cannot answer the next one.
 	AskID string `json:"ask_id,omitempty"`
@@ -183,10 +186,12 @@ func parsePromptScreenFor(agentType, capture string) (promptScreen, bool) {
 	}
 	if agentType != at.Claude {
 		s.command, s.TargetNote, s.commandOpenMissing = "", "", false
+	} else if left, ok := claudeTimerLeft(capture); ok {
+		s.AutoBlockAt = time.Now().Add(left).UTC().Format(time.RFC3339)
 	}
 	// Judged on the raw text, before cleanPromptScreen drops what hides: the terminal still holds it.
 	rv := permreview.Merge(permreview.Of(s.context), permreview.Of(s.command), permreview.Of(s.Question), permreview.Of(s.Title))
-	target := permreview.Of(s.context).Shown
+	target := dropRuleLines(permreview.Of(s.context).Shown) // the three lines above the question can be Claude's dashed rule: a card never shows rows of dashes as the request (#15140)
 	if s.command != "" {
 		target = permreview.Of(s.command).Shown // the whole block between the rules, not its last three lines (#14173)
 	}
@@ -546,6 +551,36 @@ const commandMaxLines = 400
 // run 3). Here the time is replaced by fixed words, in the one place every reader of a screen goes through (the card, the row, the answer, auto-accept); the terminal still shows the real countdown. It is Claude's WHOLE line, and
 // is looked for only BELOW the last dashed rule (Claude's own lines under the request, then the question): the command block above it is never touched, so a command that contains the phrase is shown as it is (Security's SHOULD).
 var claudeTimerRe = regexp.MustCompile(`^(\s*[⚠│|]?\s*Claude Code will automatically block this request )in \d{1,2}:\d{2}(, to avoid holding up an unattended session\s*)$`)
+
+var claudeTimeLeftRe = regexp.MustCompile(`Claude Code will automatically block this request in (\d{1,2}):(\d{2})\b`)
+
+// claudeTimerLeft is the time Claude Code's own auto-block timer showed when the screen was read (ok false when the screen shows none): from its line below the last dashed rule, like steadyClaudeTimer.
+func claudeTimerLeft(capture string) (time.Duration, bool) {
+	lines := strings.Split(strings.ReplaceAll(capture, "\r", ""), "\n")
+	for i := len(lines) - 1; i >= 0 && i >= len(lines)-40; i-- {
+		if dashedRuleRe.MatchString(lines[i]) {
+			return 0, false // the rule comes before the timer line: nothing below it
+		}
+		if m := claudeTimeLeftRe.FindStringSubmatch(lines[i]); m != nil && claudeTimerRe.MatchString(lines[i]) {
+			mins, _ := strconv.Atoi(m[1])
+			secs, _ := strconv.Atoi(m[2])
+			return time.Duration(mins*60+secs) * time.Second, true
+		}
+	}
+	return 0, false
+}
+
+// dropRuleLines is text without its lines of only rule characters (Claude's dashed and solid rules): they are the dialog's frame, not what it asks.
+func dropRuleLines(text string) string {
+	var keep []string
+	for _, l := range strings.Split(text, "\n") {
+		if separatorRe.MatchString(l) {
+			continue
+		}
+		keep = append(keep, l)
+	}
+	return strings.Trim(strings.Join(keep, "\n"), "\n")
+}
 
 // steadyClaudeTimer replaces the time in Claude's auto-block line, below the last dashed rule only.
 func steadyClaudeTimer(lines []string) {

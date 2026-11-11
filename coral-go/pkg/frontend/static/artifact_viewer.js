@@ -23,6 +23,8 @@ import { state } from './state.js';
 import { showToast } from './notifications.js';
 const { resolveArtifactSource, loadArtifactInventory } = await importOnce('./artifact_source.js');
 
+await loadStyles('artifact-comments.css'); // the comments panel's, the review form's and the header's from-line rules load with the viewer, not at start (page_weight)
+await loadStyles('detail_more.css'); // the Details menu's rules load with the viewer (#15273)
 await loadStyles('artifact_viewer_header.css'); // the one-row header's rules load with the viewer, not at start (page_weight)
 const { readersAllowed, readersBlock } = await importOnce('./artifact_readers.js'); // lazy: its failure is retried
 const { privateBlock } = await importOnce('./artifact_private.js'); // the owner's Private switch, beside it (#11457)
@@ -115,8 +117,10 @@ function _build() {
                 <div class="menu artifact-viewer-menu" id="artifact-viewer-menu" role="menu" aria-label="More actions" hidden>
                     <button type="button" class="menu-item artifact-viewer-edit-item" role="menuitem" hidden>Edit text</button>
                     <button type="button" class="menu-item artifact-viewer-markup-item" role="menuitem" hidden>Mark up</button>
+                    <button type="button" class="menu-item artifact-viewer-details-item" role="menuitem">Details</button>
                     <button type="button" class="menu-item artifact-viewer-copyid-item" role="menuitem" title="The id that stays the same across versions" hidden>Copy file ID</button>
                     <button type="button" class="menu-item artifact-viewer-copy-id" role="menuitem" title="The id of this version only">Copy version ID</button>
+                    <button type="button" class="menu-item artifact-viewer-agent-item" role="menuitem" title="Copies a line to paste to an agent: this file and where in the docs to read">Copy for an agent</button>
                     <button type="button" class="menu-item artifact-viewer-scripts-item" role="menuitem" hidden>Run scripts…</button>
                     <a class="menu-item artifact-viewer-newtab" role="menuitem" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
                     <button type="button" class="menu-item artifact-viewer-dropbox-share" role="menuitem" hidden>Share via Dropbox…</button>
@@ -132,6 +136,8 @@ function _build() {
         <div class="modal-actions modal-footer artifact-viewer-foot"><button type="button" class="btn btn-primary artifact-edit-send-action" hidden>Send to agent</button><button type="button" class="btn artifact-viewer-close">Close</button></div>
     </div>`;
     _details = makeDetails({ panel: d.querySelector('.artifact-viewer-readers'), remember: false, hide: true }); // closed on every open of the viewer: one open Details no longer fills the next file's screen (#12725)
+    d.querySelector('.artifact-viewer-details-item').addEventListener('click', () => _details.button.click());
+    { const toggleFocus = _details.button.focus.bind(_details.button); _details.button.focus = o => { toggleFocus(o); if (document.activeElement !== _details.button) d.querySelector('.artifact-viewer-more')?.focus(o); }; } // closed on a phone the button is out of the header: Hide details hands the keyboard to ⋯, where Details is (#15033) // a phone's Details is an item of the ⋯ menu (the header has no room for the button, #15033)
     _details.button.classList.add('artifact-viewer-details'); d.querySelector('.artifact-viewer-morewrap').before(_details.button); // Details is a button in the header row, beside ⋯: where a person looks to close it (#12725) header row (#12223)
     // the HTML preview's banner is said once; after that a "Sandboxed" chip in the header says it, and a tap shows or hides the banner (#12224)
     d.querySelector('.artifact-viewer-dropbox-share').addEventListener('click', e => { const b = e.currentTarget; importOnce('./dropbox_share.js').then(m => m.openShareDialog({ hex: b.dataset.hex, filename: b.dataset.name, opener: d.querySelector('.artifact-viewer-more') })).catch(() => {}); }); // Share via Dropbox (#14944): the dialog loads on the press
@@ -150,6 +156,7 @@ function _build() {
     d.querySelector('.artifact-viewer-fullscreen').addEventListener('click', () => setFullScreen(d, !d.classList.contains('av-fullscreen'), true));
     const more = d.querySelector('.artifact-viewer-more'), menu = d.querySelector('.artifact-viewer-menu');
     more.addEventListener('click', async (e) => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(more); });
+    d.querySelector('.artifact-viewer-agent-item').addEventListener('click', () => { const hex = _hex, name = d.querySelector('.artifact-viewer-title')?.firstChild?.textContent || ''; importOnce('./agent_doc_map.js').then(m => navigator.clipboard.writeText(m.agentCopyText('artifact', `Artifact${name ? ` \u201c${name.trim()}\u201d` : ''}: coral://artifacts/${hex}`))).then(() => showToast('Copied: paste it to an agent'), () => showToast('Could not copy', true)); }); // the robot's line (#15063): the viewer's header has no room for one more icon, so it is in the menu
     d.querySelector('.artifact-viewer-copy-id').addEventListener('click', () => { const hex = _hex; importOnce('./artifact_clipboard.js').then(m => m.copyArtifactId(hex)).catch(() => showToast('Could not copy the version ID', true)); });
     menu.addEventListener('click', async () => { (await importOnce('./menu_button.js')).closeMenus(); }); // a choice closes the menu
     // Mark up (#12367, the operator: "I don't see any way to markup the image in the window"): for a picture, the comment composer's drawing tool opens on the file's own image, and Done starts a comment on the file with the marked copy attached; the file itself is not changed
@@ -197,17 +204,18 @@ function _build() {
     let _isPicture = false, _canWrite = false;
     const syncMarkUp = () => { d.querySelector('.artifact-viewer-markup').hidden = d.querySelector('.artifact-viewer-markup-item').hidden = !(_isPicture && _canWrite); };
     d._markUp = { picture: on => { _isPicture = on; syncMarkUp(); }, write: on => { _canWrite = on; syncMarkUp(); } };
-    _comments = attachComments(d, d.querySelector('.artifact-viewer-body'), d.querySelector('.artifact-viewer-main'), { shown: () => !d.hidden && !_editor, readOnly: () => _lastOpts.sourceNamed === false, uploader: () => _lastOpts.uploader, onCanWrite: ok => d._markUp.write(ok), preferenceKey: () => _layoutType ? 'coral-artifact-comments:' + _layoutType : null });
+    _comments = attachComments(d, d.querySelector('.artifact-viewer-body'), d.querySelector('.artifact-viewer-main'), { shown: () => !d.hidden && !_editor, hint: () => 'To approve, use Approve on the file: writing here does not approve it.', hintOn: () => !!d.dataset.reviewPending, readOnly: () => _lastOpts.sourceNamed === false, uploader: () => _lastOpts.uploader, onCanWrite: ok => d._markUp.write(ok), preferenceKey: () => _layoutType ? 'coral-artifact-comments:' + _layoutType : null });
     _versions = attachVersions(d, {
         version: n => { const t = d.querySelector('.artifact-viewer-title'); t.querySelector('.artifact-viewer-version')?.remove(); if (n > 1) t.append(Object.assign(document.createElement('span'), { className: 'artifact-viewer-version', textContent: ` · version ${n}` })); }, // Coral numbers the versions: the name is the agent's (#11865)
         body: () => d.querySelector('.artifact-viewer-body'),
         show: (row) => openArtifactViewer(row.digest, { ..._lastOpts, filename: row.name || _lastOpts.filename, mediaType: row.media_type, switched: true }),
         reload: () => openArtifactViewer(_hex, { ..._lastOpts, switched: false }),
+        wantLatest: () => { const w = !!_lastOpts.openLatest; if (w) _lastOpts = { ..._lastOpts, openLatest: false }; return w; }, // a Needs you row opens the NEWEST version of its file, once (#15197: a row opened v1 though v2 existed)
         line: (row) => { _barLine = row && row.file_id && row.version_line ? { hex: row.digest, fileId: row.file_id, versionLine: row.version_line } : null; if (_dialog) paintLine(_dialog); },
         sheetOpen: () => _comments.sheetOpen(),
         setSheet: (open) => _comments.setSheet(open),
     });
-    _review = attachReview(d, { reload: () => openArtifactViewer(_hex, { ..._lastOpts, switched: true }) });
+    _review = attachReview(d, { reload: hex => openArtifactViewer(hex || _hex, { ..._lastOpts, switched: true }) });
     // On a phone Approve and Request changes sit in the bottom bar with Close, and Comments sits by the ⋯ button (two thin rows above the file, #12226); on a computer they are on the header row
     const phone = matchMedia('(max-width: 768px)'), dock = () => {
         const q = x => d.querySelector(x), foot = q('.artifact-viewer-foot'), actions = q('.artifact-viewer-actions'), chips = q('.artifact-viewer-chips');
@@ -336,7 +344,7 @@ function paintLine(d) {
     const L = shownLine();
     const text = L ? versionLineOf({ file_id: L.fileId, version_line: L.versionLine }) : ''; // hidden characters of the name are written out by versionLineOf
     const head = d.querySelector('.artifact-viewer-versionline');
-    head.textContent = text; head.hidden = !text; // the full line is in Details too; no tooltip repeating the text (title_repeats_census)
+    head.textContent = text; head.hidden = !text; // the file id is in Details, not here (#15142); no tooltip repeating the text (title_repeats_census)
     const copyItem = d.querySelector('.artifact-viewer-copyid-item'); // Copy file ID is always reachable from the ⋯ menu: a file id and line never add a Details button of their own (#14178: it joined row one on a phone)
     copyItem.hidden = !text; copyItem.dataset.fileId = text ? L.fileId : '';
     if (!text) { if (_lineChip) _lineChip.hidden = true; return; }
@@ -351,7 +359,7 @@ function paintLine(d) {
         else _details.add(wrap);
         _lineChip = chip;
     }
-    _lineChip.dataset.fileId = L.fileId; _lineChip.firstChild.textContent = text; _lineChip.hidden = false;
+    _lineChip.dataset.fileId = L.fileId; _lineChip.firstChild.textContent = markHidden(L.versionLine.slice(0, 300), { strict: true }); _lineChip.hidden = false;
 }
 /** Open the artifact `hex` (64 lowercase hex). opts: { server, filename, mediaType }. */
 /** The viewer's name when it is cut: a button that opens it whole, only while it is cut or open (#13979). */

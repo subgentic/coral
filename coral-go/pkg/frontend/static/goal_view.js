@@ -9,11 +9,21 @@ import { toTaskPage, toGoal, errorOf } from './goals_adapter.js';
 import { importOnce } from './import_once.js';
 import { isPhoneLayout } from './phone_layout.js';
 const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is one shared helper (#12182)
+const { agentCopyButton } = await importOnce('./agent_copy_button.js'); // the robot button (#15063)
+const { agentCopyText } = await importOnce('./agent_doc_map.js');
 import { foldWayBack } from './way_back.js';
 import * as W from './goal_words.js';
+const C = await importOnce('./goal_closed_words.js'); // who closed a goal, and what Close and Reopen do (#15244): loads with the goal page
+const { shortTitle } = await importOnce('./goal_short.js');
 import { onGoalsSeq } from './goals_feed.js';
-import { looksDone, hiddenList, hideGoalDone } from './goal_done.js';
+import { looksDone, hiddenList, hideGoalDone, quietEndsAt } from './goal_done.js';
 import { pollEvery } from './overload.js';
+/** What an active goal with every task done says on its page (#15166, walk 6): that it is, and when it reaches Needs you, after the quiet period (#12161). '' for any other goal. */
+const doneNote = g => {
+    if (!looksDone(g)) return '';
+    const min = Math.ceil((quietEndsAt(g) - Date.now()) / 60000);
+    return min > 0 ? `All tasks are done. It reaches Needs you in about ${min} min.` : 'All tasks are done.';
+};
 const { linkedText } = await importOnce('./artifact_refs.js');
 const { renderGoalText } = await importOnce('./goal_text.js'); // the description is Markdown-lite (#12724)
 const CHECKLIST = /^\s*[-*+]\s+\[[ xX]\]\s/m;
@@ -30,6 +40,8 @@ const DT = await importOnce('./data_table.js');
 const { el } = DT;
 const TV = await importOnce('./tasks_view.js');
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
+await loadStyles('goal_close.css'); // the Close dialog's phone card (not at start: page_weight, #15163)
+await loadStyles('goal_page.css'); // the page's own few rules (#15166)
 const PAGE = 50;
 
 /** Mount one goal; each mount owns its task pages, search and phone screen. */
@@ -166,36 +178,41 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
                 } catch (e) { if (ny) ny.disabled = false; showToast(`Not saved: ${e && e.message ? e.message : 'try again'}`, true); }
             } });
         }
+        if (W.isOpenGoal(g) && offersOperatorChanges(sp.server)) act.push({ key: 'edit', cls: 'btn goals-edit', label: 'Edit goal', aria: `Edit goal: ${g.title}`, title: 'Change the title, the description or the done-when; the team reads the change on its board', run: () => importOnce('./goal_editor.js').then(m => m.openGoalEditor({ project: model.project, edit: g, onClose: () => backToAction('.goals-edit'), onSaved: () => loadGoals() })) });
         if (W.isOpenGoal(g) && offersOperatorChanges(sp.server)) { // the Operator's own two changes (#12693): on this computer, and through a Hub (coral-hub's or our own) on a goal's computer that reports a Coral with the routes (#13517; hidden through a Hub before that, #13515)
             act.push({ key: 'driver', cls: 'btn goals-change-driver', label: 'Change driver', aria: `Change driver: ${g.title}`, run: () => importOnce('./goal_operator_dialogs.js').then(m => m.openChangeDriver({ project: model.project, goal: g, onClose: () => backToAction('.goals-change-driver'),
                 onDone: async driver => { say(driver ? `Driver changed to ${driver}` : 'Driver cleared'); showToast(driver ? `Driver changed to ${driver}` : 'Driver cleared'); await loadGoals(); } })) });
             act.push({ key: 'move', cls: 'btn goals-move', label: 'Move to another team', aria: `Move to another team: ${g.title}`, run: () => importOnce('./goal_operator_dialogs.js').then(m => m.openMoveGoal({ project: model.project, goal: g, openTasks: W.openTasksOf(g.rollup), onClose: () => backToAction('.goals-move'),
                 onMoved: async (out, label) => { showToast(`Goal given to ${label} as goal #${out.goal.id}`); closeGoal(); await loadGoals(); } })) });
         }
-        if (W.isOpenGoal(g)) act.push({ key: 'close', cls: 'btn btn-primary goals-close', label: 'Close goal', aria: `Close goal: ${g.title}`, run: () => openClose(g) }); // named for its goal: the Close dialog's own button is just Close goal
+        if (W.isOpenGoal(g)) act.push({ key: 'close', cls: 'btn btn-primary goals-close', label: 'Mark done', aria: `Mark done: ${g.title}`, run: () => openClose(g) }); // named for its goal (#15166: the button says Mark done, as the task asks; its dialog is still the Close dialog)
         else if (W.isClosedGoal(g)) act.push({ key: 'reopen', cls: 'btn goals-reopen', label: 'Reopen', run: () => reopenGoal(g) });
         const makeBtn = a => { const b = btn(a.cls, a.label, a.run); if (a.aria) b.setAttribute('aria-label', a.aria); if (a.title) b.title = a.title; return b; };
-        if (!phone) { for (const k of ['add', 'notyet', 'driver', 'move', 'close', 'reopen']) { const a = act.find(x => x.key === k); if (a) acts.append(makeBtn(a)); } }
+        if (!phone) { for (const k of ['add', 'notyet', 'edit', 'driver', 'move', 'close', 'reopen']) { const a = act.find(x => x.key === k); if (a) acts.append(makeBtn(a)); } }
         else {
             const primaryKey = act.some(a => a.key === 'reopen') ? 'reopen' : (act.some(a => a.key === 'notyet') ? 'close' : 'add'); // a goal that looks done: Close goal; otherwise the commonest, Add task
             const primary = act.find(a => a.key === primaryKey); if (primary.key === 'add') primary.cls = 'btn btn-primary goals-add-task';
             acts.append(makeBtn(primary));
-            const menuItems = [...act.filter(a => a !== primary && a.key !== 'close'), { key: 'copy', cls: 'goal-copy-agent', label: 'Copy for an agent', title: 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal', run: () => { copyText(W.agentBriefLine(g)).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok)); } }];
+            const menuItems = [...act.filter(a => a !== primary && a.key !== 'close'), { key: 'copy', cls: 'goal-copy-agent', label: 'Copy for an agent', title: 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal', run: () => { copyText(agentCopyText('goal', W.agentBriefLine(g))).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok)); } }];
             const closeItem = act.find(a => a.key === 'close' && a !== primary); if (closeItem) menuItems.push(closeItem);
             acts.append(moreMenu(`goal-more-${g.id}`, menuItems.map(a => ({ label: a.label, title: a.title, ariaLabel: a.aria, className: a.cls.replace(/^btn( btn-primary)? ?/, ''), run: a.run })), { label: 'More goal actions' }));
         }
         row.append(acts); main.append(row);
         if (W.isOpenGoal(g) && operatorChangesNeedNewer(sp.server)) { const note = el('p', 'goals-note goals-ops-note', operatorChangesNote()); note.setAttribute('role', 'note'); main.append(note); } // an older computer behind a Hub: the two buttons are hidden, and the page says why (#13517)
-        const h = el('h2', 'goals-detail-title', g.title); h.tabIndex = -1; if (phone) { h.title = g.title; row.classList.add('goal-head-phone'); } h.id = 'goals-detail-title';
-        row.append(h); // the title is in the header row: a phone puts the back beside it and the link and actions under (team_page.css), as on the task page
+        const h = el('h2', 'goals-detail-title', shortTitle(g.title)); h.dataset.goalId = String(g.id); h.tabIndex = -1; if (phone) { row.classList.add('goal-head-phone'); } h.id = 'goals-detail-title';
+        row.append(h); if (g.title && shortTitle(g.title) !== g.title.trim()) { const full = el('p', 'goals-note', g.title); row.after(full); } // the heading is the short name; the whole title is the line under it (#15245)
+        // the title is in the header row: a phone puts the back beside it and the link and actions under (team_page.css), as on the task page
         foldWayBack(main, '.goals-back', '.goals-detail-title');
         const line = el('div', 'goals-detail-line'); line.append(stateChip(g));
         const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) { const m = el('span', 'goal-card-meta'); const d = String(g.driver || '').trim(); if (d) { m.append('Driver: ', agentLink(d, { board: model.project }), meta.slice(`Driver: ${d}`.length)); } else m.textContent = meta; line.append(m); } // the driver opens its chat (#12182)
-        // A small quiet button at the end of the detail line (#11004, Goal #153): copies one line to paste to an agent, which then runs `coral-board goal brief` to read the goal's open tasks and artifacts
-        const copyBtn = btn('btn btn-small goal-copy-agent', 'Copy for an agent', () => { copyText(W.agentBriefLine(g)).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok)); });
-        copyBtn.title = 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal';
+        // A small robot button at the end of the detail line (#11004, #15063): copies a line to paste to an agent, which then runs `coral-board goal brief` to read the goal's open tasks and artifacts, and the docs section to read
+        const copyBtn = agentCopyButton('goal', () => W.agentBriefLine(g), { className: 'goal-copy-agent' }); // the robot: copies the goal's line and where in the docs to read (#15063)
         if (!phone) line.append(copyBtn); // on a phone it is in the header's More menu (#13119)
         main.append(line);
+        const closedLine = C.closedByLine(g); // who closed it, so a goal an agent closed is not mistaken for one the person closed (#15244)
+        if (closedLine) { const c = el('p', `goals-note goals-closed-by${g.closedBy && g.closedBy !== 'Operator' ? ' goals-closed-by-agent' : ''}`, closedLine); c.setAttribute('role', 'note'); main.append(c); }
+        if (looksDone(g) && !W.isClosedGoal(g)) main.append(el('p', 'goals-note goals-looks-done', C.looksDoneText));
+        const doneWords = doneNote(g); if (doneWords) main.append(el('p', 'goals-note goal-done-note', doneWords)); // an active goal with every task done says so, and when it reaches Needs you (#15166)
         if (g.movedOpen) main.append(el('p', 'goals-note', `${g.movedOpen} moved task${g.movedOpen === 1 ? ' is' : 's are'} unfinished or cannot be checked here. Check “Done when” before closing this goal.`));
         const waitNote = el('p', 'goals-note goal-reviews-waiting'); waitNote.hidden = true; main.append(waitNote); // files for review on this goal that were never answered (Beta #11837 G): said while any wait, whatever the goal's state
         paintWaiting(g, waitNote);
@@ -339,8 +356,10 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     function artifactsList(list, g) {
         if (artifacts.id !== g.id) {
             artifacts.api?.destroy(); artifacts.api = null; artifacts.total = null;
-            const host = artifacts.host = el('div', 'goal-artifacts-host'); artifacts.id = g.id;
-            importOnce('./goal_artifacts.js').then(m => { if (!disposed && artifacts.host === host) artifacts.api = m.mountGoalArtifactsList(host, { team: model.project, goalId: g.id, onOpen: openPreviewArtifact, onCount: n => { artifacts.total = n; const c = root.querySelector('#goal-tab-artifacts .goal-tab-count'); if (c) c.textContent = ` ${n}`; } }); }).catch(() => {});
+            const outer = artifacts.host = el('div', 'goal-artifacts-host'); artifacts.id = g.id;
+            const host = el('div', 'goal-artifacts-list'); outer.append(host); // the list redraws its own host: the Add files button (#15317) lives beside it, in the outer one
+            importOnce('./operator_share.js').then(m => { if (!disposed && artifacts.host === outer) m.mountOperatorShare(outer, { project: model.project, goalId: g.id, reload: async () => { artifacts.api?.refresh(); } }); }).catch(() => {});
+            importOnce('./goal_artifacts.js').then(m => { if (!disposed && artifacts.host === outer) artifacts.api = m.mountGoalArtifactsList(host, { team: model.project, goalId: g.id, onOpen: openPreviewArtifact, onCount: n => { artifacts.total = n; const c = root.querySelector('#goal-tab-artifacts .goal-tab-count'); if (c) c.textContent = ` ${n}`; } }); }).catch(() => {});
         }
         list.append(artifacts.host);
     }
@@ -467,7 +486,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         try {
             const r = await goalWrite(model.project, 'goal_update', g.id, `/goals/${g.id}`, 'PATCH', { subscriber_id: OPERATOR_ID, state: 'active' });
             if (!r.ok) throw await failure(r);
-            say(W.reopenedText);
+            say(C.reopenedText); showToast(C.reopenedText);
             await loadGoals();
         } catch (ex) { say(`Not reopened: ${W.errorWords(ex && ex.code, ex && ex.message)}`); }
         focusDetail();
@@ -487,6 +506,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             const w = W.closeWarning(g.rollup); warn.append(el('strong', null, w.head), document.createTextNode(w.text));
             dlg.setAttribute('aria-describedby', warn.id); parts.push(warn);
         }
+        parts.push(el('p', 'goals-note goals-close-effect', C.closeEffectText));
         const choose = preset || (open === 0 && total > 0 ? 'done' : ''); // with tasks open nothing is chosen for the person: one Enter must not drop the goal (#10717)
         const fs = el('fieldset', 'goals-radios'); fs.append(el('legend', null, 'Close it as'));
         const radio = (value, label) => { const l = el('label', 'goals-radio'); const r = el('input'); r.type = 'radio'; r.name = 'goal-close-state'; r.value = value; r.checked = choose === value; l.append(r, el('span', null, label)); return l; };

@@ -14,7 +14,7 @@ import (
 
 // The relaunch test seam (#5452) is a compile-time difference only: the relaunchfixture build tag turns the relaunch routes on and puts a fake updater behind them. These tests
 // hold, in the default build, that nothing of it can be compiled into a build without the tag: every file that reads CORAL_RELAUNCH_FIXTURE_DIR or names the fixture types
-// carries the tag, and no tier of a release build (default, dev, beta, dropboxers) compiles a fixture file into any of the programs the seam touches.
+// carries the tag, and no tier of a release build (default, dev, staging) compiles a fixture file into any of the programs the seam touches.
 
 var fixtureMarkers = []string{"CORAL_RELAUNCH_FIXTURE_DIR", "fixtureUpdater", "CheckRelaunchFixture", "\"+relaunchfixture\""}
 
@@ -67,7 +67,7 @@ func TestNoTierOfAReleaseBuildCompilesTheRelaunchSeam(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("no go tool")
 	}
-	for _, tags := range []string{"", "dev", "beta", "dropboxers", "dev,fts5", "sqlcipher,fts5"} {
+	for _, tags := range []string{"", "dev", "staging", "dev,fts5", "sqlcipher,fts5"} {
 		cmd := exec.Command("go", "list", "-tags", tags, "-f", "{{.ImportPath}} {{join .GoFiles \" \"}} {{join .TestGoFiles \" \"}}", "./cmd/coral", "./internal/config", "./internal/server/routes")
 		cmd.Dir = filepath.Join("..", "..")
 		out, err := cmd.Output()

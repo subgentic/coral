@@ -16,7 +16,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await load('/');
-        for (const [sid, jt] of [['orch', 'Orchestrator'], ['be', 'Backend Dev']]) assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: sid, job_title: jt, session_name: sid + '-s' })).status < 300);
+        for (const [sid, jt] of [['orch', 'Orchestrator'], ['be', 'Backend Dev']]) assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: sid, job_title: jt })).status < 300);
         const goal = async title => { const g = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title, outcome: 'o', done_when: 'd' }); assert.equal(g.status, 201, JSON.stringify(g)); assert.equal((await api('PATCH', `/api/board/${B}/goals/${g.body.id}`, { subscriber_id: 'Operator', state: 'active' })).status, 200); return g.body.id; };
         const done = async (title, names, goalId) => {
             const t = await api('POST', `/api/board/${B}/tasks`, { title, body: 'x', assigned_to: 'be', created_by: 'orch', priority: 'medium', goal_id: goalId }); assert.ok(t.status < 300, JSON.stringify(t)); const id = t.body.id || t.body.task.id;
@@ -71,7 +71,9 @@ const { coralReady } = require('./helpers/wait');
         const empty = await goal('Nothing yet');
         await mount(empty);
         await waitFor(`/No artifacts yet/.test(document.getElementById('ga-host').textContent)`, 'the empty line', 10000);
-        assert.equal(await ev(`document.querySelector('#ga-host .goals-note').textContent`), 'No artifacts yet. An agent shares a file when it finishes a task with one.');
+        const emptyLine = await ev(`document.querySelector('#ga-host .goals-note').textContent`);
+        assert.ok(emptyLine.startsWith('No artifacts yet. An agent shares a file when it finishes a task with one.'), emptyLine);
+        assert.match(emptyLine, /This team has 1 file in all\. Open all Artifacts$/, 'the team holds the file of another goal, and the line says so (#15244)');
         console.log('   ✓');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

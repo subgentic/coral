@@ -130,10 +130,6 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
   .code { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--bg-primary); border: 1px solid var(--border-light); border-radius: 8px; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.875rem; margin: 0 0 16px; }
   ol.steps { margin: 0 0 18px 18px; padding: 0; font-size: 0.875rem; line-height: 1.6; }
   ol.steps li { margin-bottom: 8px; }
-  .howin { background: var(--bg-primary); border: 1px solid var(--border-light); border-radius: 8px; padding: 12px; margin: 0 0 20px; font-size: 0.8125rem; line-height: 1.5; color: var(--text-secondary); }
-  .howin b { color: var(--text-primary); }
-  .howin summary { cursor: pointer; font-weight: 600; color: var(--text-primary); }
-  .howin p { margin: 6px 0 0; }
   .note { font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; margin: 14px 0 0; }
   .panel[hidden], .err[hidden], .lock[hidden], .warn[hidden] { display: none; }
   .or { display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 0.75rem; margin: 18px 0; }
@@ -149,6 +145,8 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
   .otherways { margin: 18px 0 0; font-size: 0.8125rem; color: var(--text-secondary); }
   .otherways > summary { cursor: pointer; font-weight: 500; color: var(--text-secondary); padding: 4px 0; }
   .otherways[open] > summary { margin-bottom: 8px; }
+  .otherways .how { margin: 0 0 12px; line-height: 1.5; }
+  .otherways .how b { color: var(--text-primary); }
   .otherways .local-open { margin: 0 0 12px; }
   .otherways .btn.wide { flex: none; width: 100%; }
   .pw-strength .pw-meter { height: 4px; margin: 0 0 4px; }
@@ -182,7 +180,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
     <div id="lock" class="lock" role="status" hidden><span>&#9202;</span><span><b>Sign-in is paused.</b> Too many wrong passwords. It opens again in <span class="count" id="count">0:00</span>.</span></div>
     <form id="signin-form" autocomplete="on">
       <input type="text" name="username" value="coral" autocomplete="username" hidden aria-hidden="true" readonly tabindex="-1">
-      <label class="pw-field"><span class="pw-label">Password</span><span class="pw-input-row"><input class="pw-input" id="password" name="password" type="password" autocomplete="current-password" spellcheck="false" autocapitalize="off" autofocus><button type="button" class="pw-toggle" data-toggle="password" aria-pressed="false" aria-label="Show password">Show</button></span></label>
+      <label class="pw-field" for="password"><span class="pw-label">Password</span><span class="pw-input-row"><input class="pw-input" id="password" name="password" type="password" autocomplete="current-password" spellcheck="false" autocapitalize="off" autofocus><button type="button" class="pw-toggle" data-toggle="password" aria-pressed="false" aria-label="Show password">Show</button></span></label>
       <label class="check"><input type="checkbox" id="keep"><span>Keep me signed in on this browser<small>For 30 days. Leave it off on a shared computer.</small></span></label>
       <div class="btnrow"><button type="submit" disabled data-needs-script id="submit" class="btn btn-primary wide">Sign in</button></div>
     </form>
@@ -207,30 +205,25 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
     <form id="create-form" autocomplete="on">
       <input type="text" name="username" value="coral" autocomplete="username" hidden aria-hidden="true" readonly tabindex="-1">
 {{if not .Local}}
-      <label class="pw-field"><span class="pw-label">Setup code</span><span class="pw-input-row"><input class="pw-input setup-input" id="setup-code" name="setup-code" type="text" autocomplete="off" spellcheck="false" autocapitalize="characters" inputmode="text" maxlength="16" autofocus></span></label>
+      <label class="pw-field" for="setup-code"><span class="pw-label">Setup code</span><span class="pw-input-row"><input class="pw-input setup-input" id="setup-code" name="setup-code" type="text" autocomplete="off" spellcheck="false" autocapitalize="characters" inputmode="text" maxlength="16" autofocus></span></label>
       <p class="note" style="margin:-4px 0 14px">In Coral on that computer, open <b>Settings &rsaquo; Network and Hub</b> (or the tray menu), or run <b>coral setup-code</b> there.</p>
 {{end}}
-      <label class="pw-field"><span class="pw-label">Password</span><span class="pw-input-row"><input class="pw-input" id="password" name="new-password" type="password" autocomplete="new-password" spellcheck="false" autocapitalize="off"{{if .Local}} autofocus{{end}} aria-describedby="strength"><button type="button" class="pw-toggle" data-toggle="password" aria-pressed="false" aria-label="Show password">Show</button></span></label>
+      <label class="pw-field" for="password"><span class="pw-label">Password</span><span class="pw-input-row"><input class="pw-input" id="password" name="new-password" type="password" autocomplete="new-password" spellcheck="false" autocapitalize="off"{{if .Local}} autofocus{{end}} aria-describedby="strength"><button type="button" class="pw-toggle" data-toggle="password" aria-pressed="false" aria-label="Show password">Show</button></span></label>
       <div class="pw-strength" id="meter" data-level="empty"><div class="pw-meter" role="img" aria-label="Strength"><i></i></div><p class="pw-hint" id="strength" aria-live="polite"></p></div>
-      <label class="pw-field"><span class="pw-label">Confirm password</span><span class="pw-input-row"><input class="pw-input" id="confirm" name="confirm-password" type="password" autocomplete="new-password" spellcheck="false" autocapitalize="off"><button type="button" class="pw-toggle" data-toggle="confirm" aria-pressed="false" aria-label="Show confirm password">Show</button></span></label>
+      <label class="pw-field" for="confirm"><span class="pw-label">Confirm password</span><span class="pw-input-row"><input class="pw-input" id="confirm" name="confirm-password" type="password" autocomplete="new-password" spellcheck="false" autocapitalize="off"><button type="button" class="pw-toggle" data-toggle="confirm" aria-pressed="false" aria-label="Show confirm password">Show</button></span></label>
       <label class="check"><input type="checkbox" id="keep"><span>Keep me signed in on this browser<small>For 30 days. Leave it off on a shared computer.</small></span></label>
       <div class="btnrow"><button type="submit" disabled data-needs-script id="submit" class="btn btn-primary wide">Create password and open Coral</button></div>
     </form>
     <p class="note">{{if not .Local}}A password keeps other people and other devices out of Coral when it is opened in a web browser. {{end}}Your password manager can save it. Forgot it later? Run coral reset-password in a terminal on this computer.</p>
-{{if or .Locked (not .Local)}}
-    <details class="howin" id="how-in">
-      <summary>Other ways to sign in</summary>
-{{if .Local}}
-      <p><b>Sign in from this computer.</b> Open the Coral app on this computer, or, in a terminal there, run <b>coral open</b>: either opens Coral signed in. Coral then asks you to create a password.</p>
-      <p><b>Or create a password below</b> to open Coral in this browser.</p>
-{{else}}
-      <p><b>Sign in on the computer.</b> On the computer that runs Coral, run <b>coral open</b>: it opens Coral there, signed in. To sign in on this device instead, run <b>coral open --print</b>, put the computer's network address in place of <b>127.0.0.1</b> in the link (Coral Mobile shows it) and open the link here: it works once, for 10 minutes, so do not post it where others can read it.</p>
-      <p><b>Or create a password here.</b> Enter the setup code (run <b>coral setup-code</b> on that computer), then choose a password.</p>
-{{end}}
-    </details>
-{{end}}
     <details class="otherways" id="other-ways">
       <summary>Other ways in</summary>
+{{if or .Locked (not .Local)}}
+{{if .Local}}
+      <p class="how"><b>Sign in from this computer.</b> Open the Coral app on this computer, or, in a terminal there, run <b>coral open</b>: either opens Coral signed in. Coral then asks you to create a password.</p>
+{{else}}
+      <p class="how"><b>Sign in on the computer.</b> On the computer that runs Coral, run <b>coral open</b>: it opens Coral there, signed in. To sign in on this device instead, run <b>coral open --print</b>, put the computer's network address in place of <b>127.0.0.1</b> in the link (Coral Mobile shows it) and open the link here: it works once, for 10 minutes, so do not post it where others can read it.</p>
+{{end}}
+{{end}}
 {{template "localopen" .}}{{template "hubquiet" .}}
       <div class="linkrow linkcol">{{if eq .HubSignin "unpaired"}}<button type="button" class="link" id="hub-link-open">Link this computer to Coral Hub and sign in</button>{{end}}<button type="button" class="link" id="show-key">Use an API key instead</button></div>
     </details>
@@ -242,7 +235,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
     <p class="sub">Link it once, then sign in here with your Coral Hub account instead of a password. You will finish in Coral Hub and come back here.</p>
     <div id="hub-link-err" class="err" role="alert" hidden></div>
     <form id="hub-link-form" autocomplete="off">
-      <label class="pw-field" id="hub-setup-field"{{if .Local}} hidden{{end}}><span class="pw-label">Setup code</span><span class="pw-input-row"><input class="pw-input setup-input" id="hub-setup-code" name="setup-code" type="text" autocomplete="off" spellcheck="false" autocapitalize="characters" maxlength="16"></span>
+      <label class="pw-field" for="hub-setup-code" id="hub-setup-field"{{if .Local}} hidden{{end}}><span class="pw-label">Setup code</span><span class="pw-input-row"><input class="pw-input setup-input" id="hub-setup-code" name="setup-code" type="text" autocomplete="off" spellcheck="false" autocapitalize="characters" maxlength="16"></span>
       <span class="note" style="display:block;margin:6px 0 14px">In Coral on that computer, open <b>Settings &rsaquo; Network and Hub</b> (or the tray menu), or run <b>coral setup-code</b> there.</span></label>
       <div class="warn"><span style="font-size:1rem">&#9888;</span><span><b>Coral Hub can then sign you in here with full control of this computer.</b> A Coral Hub account that is signed in can run commands on this computer, like your password can.</span></div>
       <label class="check" style="margin-top:0"><input type="checkbox" id="hub-enable"><span>Let Coral Hub sign me in here<small>Off unless you tick it. You can change it later in Settings, Browser sign-in.</small></span></label>
@@ -265,7 +258,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
     <p class="sub">Paste the key from Settings in the Coral app, or from the file ~/.coral/api_key on the computer that runs Coral.</p>
     <div id="key-err" class="err" role="alert" hidden></div>
     <form id="key-form" autocomplete="off">
-      <label class="pw-field"><span class="pw-label">API key</span><span class="pw-input-row"><input class="pw-input" id="api-key" name="api-key" type="password" autocomplete="off" spellcheck="false" style="padding-right:11px"></span></label>
+      <label class="pw-field" for="api-key"><span class="pw-label">API key</span><span class="pw-input-row"><input class="pw-input" id="api-key" name="api-key" type="password" autocomplete="off" spellcheck="false" style="padding-right:11px"></span></label>
       <div class="btnrow"><button type="submit" disabled data-needs-script id="key-submit" class="btn btn-primary wide">Connect</button></div>
     </form>
     <div class="linkrow"><button type="button" class="link" data-back="main">Back</button></div>

@@ -1,4 +1,4 @@
-// The board's own controls, pinned as they were before message_board.js was split (#8399): Pause Board / Resume Board (the button's words and the server's paused flag), Sleep (Wake Team, the
+// The board's own controls, pinned as they were before message_board.js was split (#8399): Pause board / Resume board (the button's words and the server's paused flag), Sleep (Wake team, the
 // composer disabled with its words, and the Sleep banner above the list: it stays when messages are drawn, #8453), and a message's delete (asks first, names the sender and the start of the text; deleting removes the row).
 // A real board on the isolated dev server (removed again); the sleep state is answered by a stand-in (no agents here to sleep).
 const assert = require('node:assert/strict');
@@ -28,14 +28,14 @@ const { coralReady } = require('./helpers/wait');
         await openBoardPage(ev, waitFor, B);
         await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length >= 2`, 'the two messages', 15000);
 
-        console.log('1. Pause Board and Resume Board');
-        assert.equal(await ev(`document.getElementById('mb-pause-btn').textContent`), 'Pause Board');
+        console.log('1. Pause team and Resume team');
+        assert.equal(await ev(`document.getElementById('mb-pause-btn').textContent`), 'Pause team');
         await ev(`import(${S} + 'message_board.js').then(m => m.toggleBoardPause()).then(() => true)`);
-        await waitFor(`document.getElementById('mb-pause-btn').textContent === 'Resume Board'`, 'the button says Resume Board', 8000);
+        await waitFor(`document.getElementById('mb-pause-btn').textContent === 'Resume team'`, 'the button says Resume team', 8000);
         assert.equal(await ev(`document.getElementById('mb-pause-btn').classList.contains('mb-action-danger')`), true, 'a paused board marks its button');
         assert.equal((await api('GET', `/api/board/${B}/paused`)).body.paused, true, 'the server holds the board paused');
         await ev(`import(${S} + 'message_board.js').then(m => m.toggleBoardPause()).then(() => true)`);
-        await waitFor(`document.getElementById('mb-pause-btn').textContent === 'Pause Board'`, 'the button says Pause Board again', 8000);
+        await waitFor(`document.getElementById('mb-pause-btn').textContent === 'Pause team'`, 'the button says Pause team again', 8000);
         assert.equal(await ev(`document.getElementById('mb-pause-btn').classList.contains('mb-action-danger')`), false);
         assert.equal((await api('GET', `/api/board/${B}/paused`)).body.paused, false);
         console.log('   ✓');
@@ -48,22 +48,22 @@ const { coralReady } = require('./helpers/wait');
         const asleepNote = 'Starts every agent again; the board takes messages again.';
         await sleep(true);
         const asleep = await ev(`({ btn: document.getElementById('mb-sleep-btn')?.textContent ?? null, input: document.getElementById('mb-post-input').disabled, placeholder: document.getElementById('mb-post-input').placeholder, send: document.querySelector('#mb-board .btn-primary').disabled, opacity: document.querySelector('#mb-board .btn-primary').style.opacity })`);
-        assert.deepEqual(asleep, { btn: asleep.btn, input: true, placeholder: 'Team is sleeping. Wake Team to send messages', send: true, opacity: '0.4' });
-        // One name for the way out (#12335): the Actions item says Wake Team, with its note, and wakes the team; it does not pause or resume the board
-        assert.deepEqual(await ev(`({ item: document.getElementById('mb-pause-btn').textContent, note: (document.getElementById('mb-pause-note') || {}).textContent ?? null })`), { item: 'Wake Team', note: asleepNote }, 'a sleeping team: the Actions item says Wake Team, with its note');
+        assert.deepEqual(asleep, { btn: asleep.btn, input: true, placeholder: 'Team is sleeping. Wake team to send messages', send: true, opacity: '0.4' });
+        // One name for the way out (#12335): the Actions item says Wake team, with its note, and wakes the team; it does not pause or resume the board
+        assert.deepEqual(await ev(`({ item: document.getElementById('mb-pause-btn').textContent, note: (document.getElementById('mb-pause-note') || {}).textContent ?? null })`), { item: 'Wake team', note: asleepNote }, 'a sleeping team: the Actions item says Wake team, with its note');
         await ev(`(() => { window.__calls = []; const real = window.fetch; window.__realFetch = real; window.fetch = (u, o) => { const url = String(u && u.url || u); if (/\\/(wake|pause|resume)$/.test(url)) { window.__calls.push((o && o.method || 'GET') + ' ' + url.replace(/^.*\\//, '')); return Promise.resolve(new Response(JSON.stringify({ sleeping: false, paused: false }), { headers: { 'content-type': 'application/json' } })); } return real(u, o); }; return true; })()`);
         await ev(`document.getElementById('mb-pause-btn').click(); true`);
-        await waitFor(`window.__calls.length >= 1`, 'the Wake Team item calls the server', 8000);
-        assert.deepEqual(await ev(`window.__calls`), ['POST wake'], 'Wake Team wakes the team: it is not a pause or a resume of the board');
+        await waitFor(`window.__calls.length >= 1`, 'the Wake team item calls the server', 8000);
+        assert.deepEqual(await ev(`window.__calls`), ['POST wake'], 'Wake team wakes the team: it is not a pause or a resume of the board');
         await ev(`window.__ssState = false; true`); // the mocked wake worked: the computer is awake from here, for any read the page makes next
         // a Sleep or a Wake made from elsewhere reaches the board (the coral:team-sleep-changed listener)
         await ev(`window.fetch = (u, o) => /\\/sleep-status$/.test(String(u && u.url || u)) ? Promise.resolve(new Response(JSON.stringify({ sleeping: false }), { headers: { 'content-type': 'application/json' } })) : window.__realFetch(u, o); document.dispatchEvent(new CustomEvent('coral:team-sleep-changed', { detail: { team: ${JSON.stringify(B)} } })); true`);
-        await waitFor(`document.getElementById('mb-post-input').disabled === false && document.getElementById('mb-pause-btn').textContent === 'Pause Board'`, 'the board follows a Wake made elsewhere', 8000);
+        await waitFor(`document.getElementById('mb-post-input').disabled === false && document.getElementById('mb-pause-btn').textContent === 'Pause team'`, 'the board follows a Wake made elsewhere', 8000);
         await ev(`window.fetch = window.__realFetch; true`);
         await sleep(true);
         await waitFor(`(() => { const e = document.getElementById('mb-sleep-banner'); return !!e && e.checkVisibility(); })()`, 'the sleeping banner is drawn', 15000).catch(async err => { throw new Error(err.message + ' | state: ' + JSON.stringify(await ev(`(() => { const e = document.getElementById('mb-sleep-banner'); const i = document.getElementById('mb-post-input'); return { banner: !!e, display: e && e.style.display, input_disabled: i && i.disabled, placeholder: i && i.placeholder }; })()`))); }); // the state says whether the page read 'not sleeping' (a stale or real answer) or never drew it // #13510: sleep() waits a fixed 600 ms; on the Windows runner the banner was not there yet (shown false, gap 0)
         const banner = () => ev(`(() => { const e = document.getElementById('mb-sleep-banner'); return e ? { shown: e.checkVisibility(), outsideList: !document.getElementById('mb-messages').contains(e), text: e.querySelector('.mb-sleep-text').textContent, icon: e.querySelector('.material-icons').textContent, gap: Math.round(e.querySelector('.mb-sleep-text').getBoundingClientRect().left - e.querySelector('.material-icons').getBoundingClientRect().right) } : null; })()`);
-        assert.deepEqual(await banner(), { shown: true, outsideList: true, text: 'This team is sleeping. Messages are paused until you use Wake Team (Actions menu or the Sleep button).', icon: 'bedtime', gap: 8 }, 'a sleeping board shows its banner, above the list: the moon is the bedtime icon with a gap before the words');
+        assert.deepEqual(await banner(), { shown: true, outsideList: true, text: 'This team is sleeping. Messages are paused until you use Wake team (Actions menu or the Sleep button).', icon: 'bedtime', gap: 8 }, 'a sleeping board shows its banner, above the list: the moon is the bedtime icon with a gap before the words');
         assert.equal((await api('POST', `/api/board/${B}/messages`, { subscriber_id: 'orch', content: 'a message drawn while it sleeps' })).status, 200);
         await sleep(true); // the board is drawn again, still sleeping, with the new message
         await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length === 3`, 'the new message is drawn', 15000);
@@ -76,7 +76,7 @@ const { coralReady } = require('./helpers/wait');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await sleep(false);
         const awake = await ev(`({ input: document.getElementById('mb-post-input').disabled, placeholder: document.getElementById('mb-post-input').placeholder, send: document.querySelector('#mb-board .btn-primary').disabled, opacity: document.querySelector('#mb-board .btn-primary').style.opacity })`);
-        assert.deepEqual(awake, { input: false, placeholder: 'Message the team...', send: false, opacity: '' });
+        assert.deepEqual(awake, { input: false, placeholder: 'Message the team (the Orchestrator reads every post)', send: false, opacity: '' });
         await ev(`window.__ssState = null; true`); // the stand-in passes everything through again
         console.log('   ✓');
 

@@ -5,6 +5,7 @@ package ptymanager
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"github.com/subgentic/coral/internal/procguard"
 	"log/slog"
 	"os"
 	"strings"
@@ -169,7 +170,7 @@ var killSeamsP atomic.Pointer[killSeams] // nil until a test sets its own
 // defaultKillSeams is what runs in a program. It is a package variable and not set in an init(): the guardian's own init (guardian_unix.go) runs before main, and before the init of a file that sorts after
 // it, and it ends a tree with these.
 var defaultKillSeams = &killSeams{
-	sendSignal: func(pid int, sig syscall.Signal) { logSignal(pid, sig); _ = syscall.Kill(pid, sig) },
+	sendSignal: func(pid int, sig syscall.Signal) { logSignal(pid, sig); _ = procguard.Kill(pid, sig) },
 	sweepTree:  treeMembers,
 	memberLive: func(m member) bool { return m.current() },
 	stopRounds: 5,
@@ -206,7 +207,27 @@ func killTree(known []member, root member, tag string) []member {
 // anyAlive reports whether any of ms is still the process it was.
 func anyAlive(ms []member) bool {
 	for _, m := range ms {
-		if err := syscall.Kill(m.pid, 0); (err == nil || err == syscall.EPERM) && m.current() {
+		if err := syscall.Kill(m.pid, 0); (err == nil || err == syscall.EPERM) && m.current() && !m.zombie() {
+			return true
+		}
+	}
+	return false
+}
+
+// zombie reports whether m has ended and only waits for its parent to collect it. kill(pid, 0) still succeeds for such a process, so it was taken for alive: the kill of a terminal then waited out its whole
+// grace for a process that was already gone when whatever adopted it (init, a runner with no init at all) did not collect it at once: "an interactive shell ends within a second of Kill, took 5.09 s" in go-race,
+// and a second or more under load (#14881).
+func (m member) zombie() bool {
+	p, err := process.NewProcess(int32(m.pid))
+	if err != nil {
+		return false
+	}
+	status, err := p.Status()
+	if err != nil {
+		return false
+	}
+	for _, s := range status {
+		if s == process.Zombie {
 			return true
 		}
 	}

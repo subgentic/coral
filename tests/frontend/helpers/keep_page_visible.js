@@ -24,11 +24,15 @@ const LATE_MS = 1000;
 // not known). A ceiling, not a sleep: a load that comes sooner answers at once. A suite whose page takes longer gives its own limit, with the reason, through loadLimit(ms, why); the default is not
 // raised for everyone. CDP_KEEP_VISIBLE=0 (this preload off) turns the limit off too.
 const LOAD_LIMIT_MS = 30000;
-let loadLimitMs = LOAD_LIMIT_MS;
+// A throttled page (--stress --cpu-throttle K sets CDP_CPU_THROTTLE=K, #352) loads slower, and the machine it shares with other runs stretches the tail: at x6 on 3 shards the page's
+// scripts took 23 s to reach DOMContentLoaded (the server answered the navigation in 0.2 s, median load 0.2 s) and a run hit the 30 s ceiling (#15409). The ceiling grows with the throttle, half
+// a ceiling per step, to three times the default (90 s, inside the runner's 180 s per suite); unthrottled it is 30 s, as at the gate.
+function loadLimitFor(rate) { const r = Number(rate); return LOAD_LIMIT_MS * (r >= 1 ? Math.min(3, Math.max(1, r / 2)) : 1); }
+let loadLimitMs = loadLimitFor(process.env.CDP_CPU_THROTTLE);
 /** This suite's limit for a page load: loadLimit(60000, 'the page builds 5,000 rows before it loads'). The reason is required, and printed. */
 function loadLimit(ms, why) {
     if (!(ms > 0) || typeof why !== 'string' || !why.trim()) throw new Error('loadLimit(ms, why): a positive limit and the reason for it');
-    console.error(`[cdp] this suite's page-load limit is ${ms} ms (default ${LOAD_LIMIT_MS}): ${why}`);
+    console.error(`[cdp] this suite's page-load limit is ${ms} ms (default ${loadLimitFor(process.env.CDP_CPU_THROTTLE)}): ${why}`);
     loadLimitMs = ms;
 }
 
@@ -129,4 +133,4 @@ if (process.env.CDP_KEEP_VISIBLE !== '0') {
     };
 }
 
-module.exports = { loadLimit };
+module.exports = { loadLimit, loadLimitFor };

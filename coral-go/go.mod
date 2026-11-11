@@ -1,6 +1,6 @@
 module github.com/subgentic/coral
 
-go 1.26.10
+go 1.26.11
 
 require (
 	fyne.io/systray v1.12.0

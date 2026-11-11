@@ -18,9 +18,9 @@ func TestCloudURLSetting(t *testing.T) {
 
 func TestTierDefaultCloudURL(t *testing.T) {
 	switch TierName {
-	case "prod", "staging", "beta":
+	case "prod", "staging":
 		assert.Equal(t, "https://app.coralhub.dev", TierDefaultCloudURL)
-	case "dev", "dropboxers":
+	case "dev":
 		assert.Equal(t, "", TierDefaultCloudURL)
 	}
 }

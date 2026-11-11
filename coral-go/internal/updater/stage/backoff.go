@@ -8,6 +8,7 @@ import "time"
 const (
 	KindNetwork   = "network"
 	KindVerify    = "verify"
+	KindTooLarge  = "too_large"  // GitHub answered with more than the check reads (the list of promotions, a manifest): not an outage, and not a refusal of a release; it waits like a verification failure (#15080)
 	KindRateLimit = "rate_limit" // GitHub's limit on anonymous requests (#9704): the wait is the time it says it is over, not a doubling
 )
 

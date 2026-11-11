@@ -10,6 +10,13 @@ Each answer names the button as it reads on screen. The topics after this one go
 2. Click **Add agent** (top right of the team's page). The same item is in the **⋯** menu beside the team's name, as **Add Agent**.
 3. The dialog already knows the team and its folder. Pick a persona (or skip it), choose the agent, then press **Launch**. The new agent joins the team's message board.
 
+## Give the team a second goal
+
+1. In the **Agents** list, click the team's name to open its page, then open its **Goals** tab.
+2. Click **New goal**.
+3. Name the goal, say what should be true when it is done, and add a **Done when** line (one thing you can check). Choose the agent who looks after it under **Driver**.
+4. Press **Create goal**. The team works on both goals; each goal page shows its own tasks and files.
+
 ## Change the default model
 
 1. Click the gear at the top right to open **Settings**, then **Agents**.
@@ -41,7 +48,7 @@ New agents use it unless you choose a model when you launch them.
 
 1. Open the **Inbox**, then **All chats**, and find the chat (the answer above, Find an old chat, says how).
 2. Press **Continue this chat**: the round play button at the end of the chat's row, or the **Continue this chat** button on the chat's own page. The chat opens first.
-3. The **Resume session** dialog asks which **Working Directory** to start in. It fills in the folder the chat ran in, and says so under the box. Keep it, or press **Browse** to pick another folder and **Use this folder**: the dialog warns that the files the chat was using may not be found there. **Resume in** picks how much the agent may do without asking (the last answer on this page lists each one): the chat keeps what it ran with, the note under the folder says which, and you can pick another or the saved default. If the chat belonged to a team, **Rejoin board** puts the agent back on its message board.
+3. The **Resume session** dialog asks which **Working directory** to start in. It fills in the folder the chat ran in, and says so under the box. Keep it, or press **Browse** to pick another folder and **Use this folder**: the dialog warns that the files the chat was using may not be found there. **Resume in** picks how much the agent may do without asking (the last answer on this page lists each one): the chat keeps what it ran with, the note under the folder says which, and you can pick another or the saved default. If the chat belonged to a team, **Rejoin board** puts the agent back on its message board.
 4. Press **Resume**. A live agent starts in that folder and picks the conversation up where it stopped; the old chat stays as it was.
 
 ## Get an agent to put something in front of you
@@ -67,7 +74,7 @@ Agents put what needs you (a decision, an approval, a file to look at) in your *
 - **When an agent starts an agent:** it cannot start one that can do more without asking than itself. Coral refuses with a 403 whose message says so ("an agent cannot start a ... agent that can do more without asking than itself ... ask the Operator to start it"), and a member it starts without a mode starts in the default mode capped to the starting agent's own. The Operator, from the dashboard, the command line or an API key, keeps every choice.
 - **A launch that names no mode:** from the dashboard, the command line or an automation it starts in the default: Auto for Claude, Codex, Antigravity and Gemini, no prompts for Hermes and opencode (Bypass: Hermes by the Operator's decision, with no sandbox of any kind; opencode asks nothing inside its folder), and Pi never asks; from an agent it starts at that agent's own level; through Coral Hub it starts in Default. A team launch through Coral Hub that would start a member in Auto is refused with a 403 unless the owner has turned on Coral Hub's auto-accept switch and set the Launch mode (code `hub_mode_too_low`, or `no_dashboard_provenance` for a request that did not really come from the Hub).
 
-**The first-launch notice.** Until you have read it, the dashboard on this computer shows a notice under the top bar: *Agents default to auto mode.* Open it to read the rest (*Agents default to auto mode. Choose a different permission mode when you launch an agent or set a default in Settings.*) and press **I've read this**, or press **Dismiss** without opening it: both count as read. **Settings > Agents** keeps the same words under **Permissions notice**, next to the default mode. If you launch from the New agent dialog in a mode that skips prompts before you have read it, Coral stops with *Before starting with full permissions* and the notice: **Continue launch** records it as read and goes on, and **Cancel** starts nothing. A launch that names its mode, and one from the command line or the API, goes on, and its answer carries the notice and a sentence on how to lower the mode. Only you can read or answer the notice: an agent is refused with a 403. Coral Hub's dashboard does not show it.
+**The first-launch notice.** Until you have read it, the dashboard on this computer shows a notice under the top bar: *Agents default to auto mode: they can act without asking you; protections vary by agent.* Open it to read the rest (*Agents default to auto mode. Choose a different permission mode when you launch an agent or set a default in Settings.*) and press **I've read this**, or press **Dismiss** without opening it: both count as read. **Settings > Agents** keeps the same words under **Permissions notice**, next to the default mode. If you launch from the New agent dialog in a mode that skips prompts before you have read it, Coral stops with *Before starting in auto mode* and the notice: **Continue launch** records it as read and goes on, and **Cancel** starts nothing. A launch that names its mode, and one from the command line or the API, goes on, and its answer carries the notice and a sentence on how to lower the mode. Only you can read or answer the notice: an agent is refused with a 403. Coral Hub's dashboard does not show it.
 
 **opencode** needs `lsof` or `ss` (`netstat` on Windows) on the machine: Coral uses it to check that the program on the server's port is the one it started before it sends the server its password. A machine without them cannot start an opencode agent.
 
@@ -85,7 +92,7 @@ Agents put what needs you (a decision, an approval, a file to look at) in your *
 - **Sleep a whole team:** open the **⋯** menu beside the team's name and choose **Sleep Team**. Its agents stop running; their chats stay. **Wake Team** (the same place) starts them again.
 - **Pause one agent:** open the **⋯** menu on its row and choose **Sleep**. It stops running and its chat stays; **Wake** (the same place) starts it again.
 - **Put one away:** choose **Archive**. It leaves the list and its chat is kept; **Unarchive** brings it back.
-- **Stop one for good:** choose **Kill Session**. The agent ends now and its running work is lost.
+- **Stop one for good:** choose **Kill session**. The agent ends now and its running work is lost.
 - **Stop a reply that is still running:** while the agent is working and the message box is empty, the **Esc** button beside the box turns red and says **Stop**: press it, or press **Escape** in the empty message box. On a phone the round Send button becomes a red square named **Stop the agent**. The agent stops what it is doing and its chat stays.
 
 ## Next

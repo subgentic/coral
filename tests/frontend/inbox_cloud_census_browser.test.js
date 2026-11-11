@@ -34,7 +34,7 @@ const BASELINE = Object.fromEntries(Object.entries({
     '/api/needs-you': ['kind'], // the skills that wait for approval, read at each computer through the Hub (#14046: needs_skills.js loadPendingSkills, ?kind=skill)
     '/api/pinned-folders': [], // #14524: computer-owned pins, loaded only after inventory
     '/api/board/projects': [], '/api/board/{team}': [], '/api/board/{team}/artifacts': ['limit'], '/api/board/{team}/goals': ['limit', 'state'], '/api/board/{team}/messages/all': ['format', 'limit', 'offset'], '/api/board/{team}/paused': [],
-    '/api/board/{team}/status': [], '/api/board/{team}/subscribers': [], '/api/board/{team}/tasks': ['counts'], '/api/sessions/live/team/{team}/sleep-status': [], '/api/teams/detail/{team}/knowledge': [],
+    '/api/board/{team}/status': [], '/api/board/{team}/subscribers': [], '/api/board/{team}/tasks': ['counts', 'since'], '/api/sessions/live/team/{team}/sleep-status': [], '/api/teams/detail/{team}/knowledge': [],
 }).map(([k, v]) => [`GET ${k}`, v]));
 // What the dashboard itself asks the Hub (not through a computer) at boot and while a tab is open: counted and pinned too, so a new one from the Inbox shows. Keys are none but the ones listed.
 const CHROME = {

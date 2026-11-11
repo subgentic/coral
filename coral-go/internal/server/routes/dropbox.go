@@ -26,10 +26,8 @@ import (
 	"github.com/subgentic/coral/internal/store"
 )
 
-// DropboxDefaultAppKey is the app key a build ships with: the release workflow sets it by -ldflags -X from the DROPBOX_APP_KEY repo secret
-// (#15065: v2.0.63 shipped without it and said Dropbox was not available). Empty in a build without it (a fork, a pull request, a local build),
-// which then says so. CORAL_DROPBOX_APP_KEY overrides it.
-var DropboxDefaultAppKey = ""
+// Coral ships no Dropbox app key (#15641, the Operator: open-source Coral carries none). The only key is one a person supplies in the environment
+// (CORAL_DROPBOX_APP_KEY); a later release adds a field for it in Settings. It is a public client id, but it is never logged.
 
 // DropboxCallbackPort is the port the one-shot listener uses; the app's registered redirect names it.
 const DropboxCallbackPort = 53682
@@ -63,12 +61,7 @@ const dropboxSwitchTTL = 5 * time.Minute
 func (h *CloudHandler) SetDropbox(ds *store.DropboxStore, dataDir string) {
 	h.dbx = &dropboxRoutes{
 		store: ds, flows: dropbox.NewFlows(), dataDir: dataDir, port: DropboxCallbackPort,
-		appKey: func() string {
-			if k := os.Getenv("CORAL_DROPBOX_APP_KEY"); k != "" {
-				return k
-			}
-			return DropboxDefaultAppKey
-		},
+		appKey:    func() string { return os.Getenv("CORAL_DROPBOX_APP_KEY") },
 		client:    dropbox.NewClient,
 		machineID: dropbox.MachineID,
 		save:      ds.Save,
@@ -110,6 +103,7 @@ func (h *CloudHandler) DropboxStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	out := map[string]any{
 		"app_key_set": d.appKey() != "", "connected": c.Connected, "account_id": c.AccountID, "state": c.State,
+		"paused_no_key":  c.Connected && d.appKey() == "", // signed in (with the key an earlier build shipped) and no key now: the backup is paused, not broken (#15641)
 		"signin_pending": d.flows.Pending(), "looks_like_copy": c.Connected && d.looksLikeCopy(r.Context()),
 	}
 	d.mu.Lock()
@@ -385,6 +379,9 @@ func (d *dropboxRoutes) storedRefresh(ctx context.Context) string {
 // revokeRefresh ends the sign-in whose refresh token is refresh at Dropbox, and reports whether Dropbox no longer accepts it (revoked now, or
 // refused already). It never fails a caller: a revoke that cannot be done is reported as false.
 func (d *dropboxRoutes) revokeRefresh(ctx context.Context, refresh string) bool {
+	if d.appKey() == "" {
+		return false // the key this sign-in was made with is not here (an earlier build's): there is nothing to ask Dropbox with
+	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	cl := d.client(d.appKey())

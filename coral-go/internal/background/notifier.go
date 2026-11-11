@@ -24,6 +24,7 @@ type BoardNotifier struct {
 	interval     time.Duration
 	logger       *slog.Logger
 	discoverFn   func(ctx context.Context) ([]AgentInfo, error)
+	holdFn       func(sessionName string) bool // whether this agent's nudge is held a moment so a context compaction goes in first (#15066); nil: none is
 	isPausedFn   func(project string) bool
 	autoWakeFn   func(ctx context.Context, sessionID string) bool // wakes an auto-asleep agent a directed message or task is waiting for (#12111)
 	autoWakes    map[string][]time.Time                           // per board, when it woke agents: at most autoWakeBoardCap an hour
@@ -88,6 +89,9 @@ func NewBoardNotifier(boardStore *board.Store, runtime AgentRuntime, interval ti
 }
 
 // SetDiscoverFn sets a custom agent discovery function.
+// SetNudgeHoldFn sets the check that holds an agent's nudge for a moment so a context compaction goes in first (#15066). Set before Run.
+func (n *BoardNotifier) SetNudgeHoldFn(fn func(sessionName string) bool) { n.holdFn = fn }
+
 func (n *BoardNotifier) SetDiscoverFn(fn func(ctx context.Context) ([]AgentInfo, error)) {
 	n.discoverFn = fn
 }
@@ -510,6 +514,10 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 		return
 	}
 
+	if n.holdFn != nil && n.holdFn(sessName) { // a due compaction goes in first: a nudge typed now would start a turn (#15066); the hold ends after two minutes at most
+		n.logger.Debug("nudge held for a context compaction", "subscriber_id", subscriberID, "session", sessName)
+		return
+	}
 	health, send := n.nudgeKind(ctx, sub, subscriberID, sessName)
 	if !send {
 		return

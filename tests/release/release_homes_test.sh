@@ -46,4 +46,7 @@ eq "the home survives a cd after sourcing by a relative path" "$(cd "$RH_REL" &&
 # the stable-name copies are expected from 1.4.130 on only (#5333)
 for v in v1.4.129 1.4.9 v1.3.200 v0.9.0; do if release_has_stable_names "$v"; then eq "no stable names expected for $v" yes no; else eq "no stable names expected for $v" no no; fi; done
 for v in v1.4.130 1.4.131 v1.4.130-rc1 v1.5.0 v2.0.0 1.10.0; do if release_has_stable_names "$v"; then eq "stable names expected for $v" yes yes; else eq "stable names expected for $v" no yes; fi; done
+# install.sh is a release asset from 2.0.65 on (#14097)
+for v in v2.0.64 2.0.9 v1.4.200 v2.0.64-rc1; do if release_has_install_sh "$v"; then eq "no install.sh expected for $v" yes no; else eq "no install.sh expected for $v" no no; fi; done
+for v in v2.0.65 2.0.66 v2.0.65-rc1 v2.1.0 2.0.100; do if release_has_install_sh "$v"; then eq "install.sh expected for $v" yes yes; else eq "install.sh expected for $v" no yes; fi; done
 exit "$fail"

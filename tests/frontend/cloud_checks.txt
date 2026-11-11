@@ -254,6 +254,8 @@ node card_census.test.mjs
 node form_row_census.test.mjs
 node toolbar_census.test.mjs
 node menu_census.test.mjs
+node kill_action_name.test.mjs
+node goal_short_title.test.mjs
 node font_literal_census.test.mjs
 node team_link_dialog_unit.test.mjs
 node team_link_dialog_calls.test.mjs
@@ -324,12 +326,14 @@ node no_ignore_word.test.mjs
 node agent_list_starting.test.mjs
 node bare_api_fetch_census.test.mjs
 node inbox_servers_read.test.mjs
+node inbox_activity_computers.test.mjs
 node proposals_state_hub.test.mjs
 node proposals_actions_hub.test.mjs
 node inbox_artifacts_loading.test.mjs
 node files_refresh_403_other_agent.test.mjs
 node skill_filter.test.mjs
 node goal_guide.test.mjs
+node guide_theme_caption.test.mjs
 node inbox_teams_checked.test.mjs
 node launch_cards_goal_desc.test.js
 node cloud_signin_leaving.test.js
@@ -412,3 +416,7 @@ node version_skew_reads.test.mjs
 
 node remove_wait_remote_policy.test.mjs
 node history_label_codex.test.mjs
+node agent_doc_map.test.mjs
+node queued_mark.test.mjs
+node inbox_needs_count.test.mjs
+node inbox_last_seen.test.mjs

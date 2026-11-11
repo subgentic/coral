@@ -10,8 +10,8 @@
     <div id="mb-more-menu" hidden>
     <button class="mb-action-btn" id="mb-select-btn" style="display:none" data-on-click="mb-select-mode" title="Select messages to export">Select</button>
     <button class="mb-action-btn" id="mb-export-btn" style="display:none" data-on-click="mb-export" title="Download this board's messages as Markdown">Export the board's messages</button>
-    <button class="mb-action-btn" id="mb-pause-btn" style="display:none" data-on-click="mb-pause" title="Pause Board — stops agents from receiving new messages until resumed">Pause Board</button>
-    <button class="mb-action-btn mb-action-danger" id="mb-delete-btn" style="display:none" data-on-click="mb-delete-board">Delete</button>
+    <button class="mb-action-btn" id="mb-pause-btn" style="display:none" data-on-click="mb-pause" title="Pause team — stops agents from receiving new messages until resumed">Pause team</button>
+    <button class="mb-action-btn mb-action-danger" id="mb-delete-btn" style="display:none" data-on-click="mb-delete-board">Remove team</button>
     </div>
 
     <div class="view-body mb-view-body">
@@ -47,7 +47,7 @@
             <!-- Post form -->
             <div class="mb-post-form">
                 <div class="mb-post-card">
-                    <textarea id="mb-post-input" class="mb-post-input" placeholder="Message the team..." aria-label="Post message to board"
+                    <textarea id="mb-post-input" class="mb-post-input" placeholder="Message the team (the Orchestrator reads every post)" aria-label="Post message to board"
                            rows="1"
                            data-on-keydown="mb-post-key"></textarea>
                     <button type="button" class="btn btn-primary btn-icon mb-post-send-btn" data-on-click="mb-post" aria-label="Send message" title="Send message (Enter)">

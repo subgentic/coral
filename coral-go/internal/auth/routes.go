@@ -29,7 +29,9 @@ type Routes struct {
 	// the server rotates its command-line token, since a reset means "don't trust what was
 	// out there").
 	afterReset func()
-	peerUser   func(*http.Request) (same, supported bool)
+	// onSignOut runs after a sign-out (POST /auth/logout): what the server kept for that person (a Hub's merged Needs you, #15404) is dropped.
+	onSignOut func()
+	peerUser  func(*http.Request) (same, supported bool)
 	// hub is Sign in with Coral Hub (#3966), nil when the server has none.
 	hub *HubSignin
 	// isOperator: the identity layer decided this request is the Operator's (the dashboard
@@ -78,6 +80,14 @@ func (ar *Routes) AuthPage(w http.ResponseWriter, r *http.Request) {
 	h.Set("X-Frame-Options", "DENY")
 	h.Set("Referrer-Policy", "no-referrer")
 	set, local, strict := ar.PageState(r)
+	if !set && ar.signedIn(r) { // a browser that is signed in and has no password yet is asked for one by the dashboard's own box, never by this page as well (#15237, Security's design on #15227); it goes where it was going
+		to := SafeReturnTo(r.URL.Query().Get("return_to"))
+		if to == "/auth" || strings.HasPrefix(to, "/auth/") || strings.HasPrefix(to, "/auth?") {
+			to = "/" // never back to this page: that would loop
+		}
+		http.Redirect(w, r, to, http.StatusSeeOther)
+		return
+	}
 	signedOut := set && ar.ks.wasSignedOutByOthers(ar.ks.extractSessionCookie(r)) && !ar.signedIn(r) // told why only to the browser whose session another browser ended (#10431)
 	if !ar.signedIn(r) {                                                                             // the funnel (#7455): which page a browser with no session reached; nothing of the request is sent
 		tracking.TrackSigninPageShown(signinPageKind(set, local))
@@ -150,6 +160,9 @@ func (ar *Routes) Logout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	ar.ks.signOut(w, r)
+	if ar.onSignOut != nil {
+		ar.onSignOut()
+	}
 	httputil.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
@@ -208,3 +221,6 @@ func (ar *Routes) AuthStatus(w http.ResponseWriter, r *http.Request) {
 		"strict_local_auth": ar.strictLocal,
 	})
 }
+
+// SetOnSignOut sets what runs after a sign-out (#15404).
+func (ar *Routes) SetOnSignOut(f func()) { ar.onSignOut = f }

@@ -42,8 +42,8 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        console.log('1280x800');
-        await open(1280, 800, false);
+        console.log('1600x800'); // the pane is beside the page from 1500 px; below that it is a sheet (#15287), with no handle
+        await open(1600, 800, false);
         await S.run('an entry is drawn as Markdown: headings, a list, code and a table, with no "#" or "---" text', async () => {
             await openRow('/^Index$/'); await waitFor(`!!window.__tp.pane() && !!window.__tp.pane().querySelector('.knowledge-md')`, 'the rendered entry', 8000);
             const d = await ev(`(() => { const p = window.__tp.pane(), md = p.querySelector('.knowledge-md'); return { text: md.innerText, heads: [...md.querySelectorAll('.md-h')].map(h => h.textContent), li: md.querySelectorAll('li').length, code: !!md.querySelector('pre code'), th: [...md.querySelectorAll('th')].map(h => h.textContent), pre: !!p.querySelector('pre.knowledge-text') }; })()`);

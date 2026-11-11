@@ -28,7 +28,8 @@ const STUB = `(() => {
                 c(10, '${H3}', 3, 0, '', 'Revoke moves into a More menu', 'Good, ship it.'),
                 c(1, '${H2}', 2, 2, 'found', 'The first step is the folder', 'Say what the folder is for.', { by: 'Security Reviewer' }),
                 c(2, '${H2}', 2, 2, 'ambiguous', 'the team behind it', 'Name who is on the team.', { by: 'QA Engineer' }),
-                c(3, '${H1}', 1, 1, 'gone', 'Ship on Thursday.', 'Why Thursday?', { by: 'Frontend Dev' })] : [];
+                c(3, '${H1}', 1, 1, 'gone', 'Ship on Thursday.', 'Why Thursday?', { by: 'Frontend Dev' }),
+                c(4, '${H1}', 1, 1, 'gone', 'An old line.', 'Is this old line needed?', { by: 'Frontend Dev', resolved_at: at(0) })] : [];
             return json({ comments: list, locked: false, you: { kind: 'owner', can_comment: true, can_lock: true }, limits: {} });
         }
         m = /\\/api\\/artifacts\\/([0-9a-f]{64})(\\?v=\\d+)?$/.exec(url);
@@ -37,4 +38,6 @@ const STUB = `(() => {
     };
     return true; })()`;
 
-module.exports = { H1, H2, H3, T, STUB, FILE, lineOf };
+// the header says the version and the name only (#15142): the file id is in Details and Copy file ID
+const headOf = n => `version ${n} of release-plan.md`;
+module.exports = { H1, H2, H3, T, STUB, FILE, lineOf, headOf };

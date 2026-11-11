@@ -434,6 +434,10 @@
 .dt-box.dt-wrap-mail .dt-mail-title { max-width: 100%; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; } /* wrapMail: the title and the second line are whole (#14423) */
 .dt-box.dt-wrap-mail .dt-mail-ask { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 .dt-mail-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.dt-mail-open[data-goal-id] { flex-direction: column; align-items: stretch; gap: 2px; } /* a goal's row on a phone (#15343, the operator): the title has the whole row (two lines), the outcome two lines, and the state and task count sit under them, not in a column that left the title 15 characters */
+.dt-mail-open[data-goal-id] .dt-mail-text { flex: none; }
+.dt-mail-open[data-goal-id] :is(.dt-mail-title, .dt-mail-ask) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; max-width: 100%; overflow: hidden; white-space: normal; overflow-wrap: anywhere; }
+.dt-mail-open[data-goal-id] .dt-mail-side { align-items: flex-start; }
 .dt-mail-time { font-size: var(--fs-base); color: var(--table-tertiary-color); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dt-mail-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .dt-mail-dot.dt-mail-attention { background: var(--warning); }
@@ -744,3 +748,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
     .inbox-needs-results tr:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-item.inbox-agent-first .inbox-review-version { grid-area: pill; align-self: baseline; margin-inline-end: 48px; } /* the pill stops short of the dots' corner */
     .inbox-needs-results tr:has(.inbox-kind-icon:is([data-kind=review], [data-kind=ask])) .inbox-review-version { border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; font-size: var(--fs-sm); line-height: 18px; color: var(--text-secondary); }
 }
+.dt-box.dt-fold-always.dt-folded .dt-check { display: block; flex: none; width: var(--table-touch, 44px); } /* a card list on a computer keeps its select boxes (#15162): a mouse has no long press */
+.dt-box.dt-fold-column.dt-folded td.dt-line-3 { order: 4; flex: 1 1 100%; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; padding-top: 8px; } /* the row's buttons along its bottom (#15120, the Operator's bottom-row layout): after both lines */
+
+:is(.dt-primary, .dt-link, .dt-mail-open)[data-goal-id]::before { content: '#' attr(data-goal-id) ' '; color: var(--text-secondary); } /* the number agents write in 'goal #3' (#15245): drawn from the element's data-goal-id, so the name's own text is unchanged */

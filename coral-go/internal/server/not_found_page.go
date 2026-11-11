@@ -9,8 +9,9 @@ import (
 // It names no part of the request (a path in a page is how a link becomes a script), and it carries a policy of its own: nothing loads, only its own style applies.
 const notFoundPageHTML = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark light"><title>Page not found - Coral</title>
-<style>body{font:16px/1.5 system-ui,sans-serif;margin:0;padding:24px;max-width:32rem}h1{font-size:1.4rem;margin:0 0 8px}p{margin:0 0 20px}a{display:inline-flex;align-items:center;min-height:44px;padding:0 18px;border-radius:8px;background:#2563eb;color:#fff;text-decoration:none;font-weight:600}</style></head>
-<body><h1>Page not found</h1><p>There is no page at this address.</p><a href="/agents">Back to Agents</a></body></html>
+<style>:root{color-scheme:light dark;--bg:#fff;--fg:#1a1d23;--mut:#4b5563;--line:#d1d5db;--accent:#2563eb}@media (prefers-color-scheme:dark){:root{--bg:#14161a;--fg:#e8eaed;--mut:#a0a7b4;--line:#2d323b;--accent:#3b82f6}}body{font:16px/1.5 system-ui,sans-serif;margin:0;background:var(--bg);color:var(--fg)}nav{display:flex;gap:16px;padding:12px 24px;border-bottom:1px solid var(--line);font-weight:600}nav a{color:var(--fg);text-decoration:none}main{padding:24px;max-width:32rem}h1{font-size:1.4rem;margin:0 0 8px}p{margin:0 0 20px;color:var(--mut)}main a{display:inline-flex;align-items:center;min-height:44px;padding:0 18px;border-radius:8px;background:var(--accent);color:#fff;text-decoration:none;font-weight:600}</style></head>
+<body><nav aria-label="Coral"><a href="/agents">Coral</a><a href="/agents">Agents</a><a href="/inbox">Inbox</a></nav><main><h1>Page not found</h1><p>There is no page at this address. It may be mistyped, or what it named was removed.</p><a href="/agents">Back to Agents</a></main></body>
+</html>
 `
 
 // notFoundPage answers a miss. A browser asking for a page (GET, accepting HTML, outside the API, the sockets, auth and the static files) gets the page above with its 404; everything else keeps the plain 404 that is not HTML.

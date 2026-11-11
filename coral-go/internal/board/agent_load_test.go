@@ -46,8 +46,8 @@ func TestAgentLoadsAreCountedByWaitingTasksAndSortedFewestFirst(t *testing.T) {
 	}
 }
 
-func TestTheAssignmentLimitIsATeamSettingOf2ByDefault(t *testing.T) {
-	assert.Equal(t, 2, DefaultHealthSettings().AssignLimit)
+func TestTheAssignmentLimitIsATeamSettingOf3ByDefault(t *testing.T) {
+	assert.Equal(t, 3, DefaultHealthSettings().AssignLimit)
 	h := DefaultHealthSettings()
 	h.AssignLimit = 500
 	assert.Equal(t, 50, h.Clamp().AssignLimit)

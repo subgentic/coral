@@ -53,6 +53,8 @@ var startsCoral = regexp.MustCompile(`coral-tray|coral-board|coral-agent|launch-
 // must carry the opt-out. If one of these starts sending, remove it here and it will be required to set
 // the flag.
 var notAStarter = map[string]string{
+	"tests/frontend/agent_doc_map.test.mjs": "checks the agent_doc_map.js pointers against agent_docs headings; the text names coral-agent (it matches startsCoral); starts no Coral",
+	"tests/release/availability_check.py":   "reads the smoke's availability list from a Coral that is already running (curl against its address); it starts no Coral",
 	// The installed-Coral guard (#5293, #234): it lists the machine's processes with powershell and compares the lists; neither file runs a Coral.
 	"tests/frontend/installed_tray_guard.mjs":      "lists the coral-tray.exe processes under Program Files before and after a run and compares them; it starts no Coral",
 	"tests/frontend/installed_tray_guard.test.mjs": "feeds the guard's functions made-up process lists; it starts nothing",

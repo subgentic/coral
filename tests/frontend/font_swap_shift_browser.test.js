@@ -6,6 +6,7 @@ const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
 const { coralReady, framesJs } = require('./helpers/wait');
+const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_notice');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const Network = client.Network, team = 'fs-' + Date.now().toString(36), out = [];
@@ -14,7 +15,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         for (const [w, h, mobile] of [[420, 800, true], [1280, 800, false]]) for (const block of [false, true]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Network.setBlockedURLs({ urls: block ? ['*.woff2'] : [] });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await ev(`localStorage.clear(); sessionStorage.clear(); true`); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, BASE + '/'); /* an unseen first-run notice wraps by font (53 vs 57 px with the fonts blocked on Windows) and pushes the table: it is acked on the test server (#15617) */ await ev(`localStorage.clear(); sessionStorage.clear(); true`); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`fetch('/api/board/${team}/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'Writer',job_title:'Writer'})}).then(r => r.status)`);
             await ev(`(() => { const mk = n => ({ id: n.toString(16).padStart(64, '0'), name: 'A review file with a fairly long name number ' + n + ' for the whole company.md', media_type: 'text/markdown', size: 3000, created_at: new Date(Date.now() - n * 600000).toISOString(), tags: ['for review'], available: true, produced_by: 'Review Writer', uri: 'coral://artifacts/' + n.toString(16).padStart(64, '0') }); const items = [1,2,3,4,5,6,7,8,9].map(mk), base = window.fetch;
                 window.fetch = (u, o = {}) => { const page = window.__reviewFixturePage(u, location.origin, { ['${team}']: items }); if (page) return Promise.resolve(new Response(JSON.stringify(page), { status: 200, headers: { 'Content-Type': 'application/json' } })); /* the shared review-page helper (#13958): the Inbox reads the protected /api/team-artifacts, not the per-board list this suite used to stand in for */ const url = new URL(String(u), location.origin); if (url.pathname === '/api/board/${team}/artifacts') return Promise.resolve(new Response(JSON.stringify({ project: '${team}', artifacts: items.filter(a => !url.searchParams.has('tag') || a.tags.includes(url.searchParams.get('tag'))), has_more: false }), { status: 200, headers: { 'Content-Type': 'application/json' } })); return base(u, o); }; return true; })()`);
@@ -24,6 +25,6 @@ const { coralReady, framesJs } = require('./helpers/wait');
         }
         for (const w of [420, 1280]) { const a = out.find(o => o[0] === w && !o[1])[2], b = out.find(o => o[0] === w && o[1])[2];
             assert.deepEqual([b.page, b.box, b.heights], [a.page, a.box, a.heights], `${w}: the page with the web fonts blocked is laid out as the page with them loaded (page ${b.page} vs ${a.page}, table ${b.box} vs ${a.box}); an icon's name is not allowed to take room before its font arrives`); }
-    } finally { await Network.setBlockedURLs({ urls: [] }).catch(() => {}); await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
+    } finally { await Network.setBlockedURLs({ urls: [] }).catch(() => {}); await removeBoards(ev, [team]).catch(() => {}); await restoreLaunchNotice(ev); await client.close(); }
     console.log('font_swap_shift_browser: ok');
 })().catch(e => { console.error(e && e.message || e); process.exit(1); });

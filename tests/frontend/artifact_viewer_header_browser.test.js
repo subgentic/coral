@@ -16,7 +16,7 @@ const { coralReady } = require('./helpers/wait');
     const heights = {};
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
+        for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true], [360, 780, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(STUB);
@@ -37,37 +37,43 @@ const { coralReady } = require('./helpers/wait');
             heights[w] = g.above; console.log(`   ${w}: controls above the file ${g.above} px (header ${g.headH} px, ${g.headRows} line(s))`);
             await shot('viewer-header-' + w);
             assert.ok(await ev(`(() => { const d = document.querySelector('.artifact-viewer-content').getBoundingClientRect(); return [...document.querySelectorAll('.artifact-viewer-header .btn, .artifact-viewer-header .chip')].filter(e => e.getClientRects().length).every(e => { const r = e.getBoundingClientRect(); return r.left >= d.left - 1 && r.right <= d.right + 1; }); })()`), `${w}: every control of the header is inside the viewer (none is cut off at the edge)`);
-            assert.ok(g.inHead.chip && g.inHead.state && (w === 390 || (g.inHead.approve && g.inHead.changes)) && g.inHead.more, // on a phone Approve and Request changes are in the bottom bar (#12226, artifact_viewer_phone_browser)
+            assert.ok(g.inHead.chip && g.inHead.state && (w <= 390 || (g.inHead.approve && g.inHead.changes)) && g.inHead.more, // on a phone Approve and Request changes are in the bottom bar (#12226, artifact_viewer_phone_browser)
                  `${w}: the version chip, the status, Approve, Request changes and the ⋯ button are all in the header row: ` + JSON.stringify(g.inHead));
+            if (w <= 390) { // a phone's header (#15033): Details is in the ⋯ menu, the version is one button with no Previous and Next, the statuses are one muted line, and the header is two lines
+                const ph = await ev(`(() => { const q = s => document.querySelector('#artifact-viewer ' + s), vis = e => !!e && !!e.getClientRects().length; const bar = q('.av-bar'), cur = q('.av-current'), st = q('.artifact-review-state'), chips = q('.artifact-viewer-chips');
+                    const r = e => e && e.getBoundingClientRect(); return { detailsButton: vis(q('.artifact-viewer-details')), detailsItem: !!q('.artifact-viewer-details-item') && getComputedStyle(q('.artifact-viewer-details-item')).display !== 'none', prev: vis(q('.av-prev')), next: vis(q('.av-next')), curBeforeStatus: !!cur && !!st && r(cur).left < r(st).left && Math.abs(r(cur).top - r(st).top) < 20, statusBg: st ? getComputedStyle(st).backgroundColor : '', curH: cur ? Math.round(r(cur).height) : 0, wide: document.documentElement.scrollWidth > innerWidth + 1 }; })()`);
+                assert.ok(!ph.detailsButton && ph.detailsItem && !ph.prev && !ph.next && ph.curBeforeStatus && ph.statusBg === 'rgba(0, 0, 0, 0)' && ph.curH >= 43.5 && !ph.wide, `${w}: Details is in the menu, no Previous or Next, the version button then the status on one line, a 44 px version button: ` + JSON.stringify(ph));
+                assert.ok(g.headRows <= 3, `${w}: the header is the name with Comments and ⋯, then the version and status, then the from line (it was four): ${g.headRows}`);
+            }
             assert.ok(!g.rows.versionBar && !g.rows.reviewBar, `${w}: no separate version bar or review bar row: ` + JSON.stringify(g.rows));
             assert.ok(!g.visibleAtRest.newtab && !g.visibleAtRest.download && !g.visibleAtRest.note && !g.visibleAtRest.compare, `${w}: Open in new tab, Download, Approve with a note and Compare are in menus, not on the row: ` + JSON.stringify(g.visibleAtRest));
-            assert.ok(w === 390 ? g.headRows <= 4 : g.headRows === 1, `${w}: the controls are on ${w === 390 ? 'at most four short lines (slice d makes the phone two plus a bottom bar)' : 'one line'}: ${g.headRows}`);
-            assert.ok(g.above <= (w === 390 ? 230 : 110), `${w}: the controls above the file take at most ${w === 390 ? 230 : 110} px (they take ${g.above}; before: 168 at 1280 and 379 at 390): the from line and the header`);
+            assert.ok(w <= 390 ? g.headRows <= 4 : g.headRows === 1, `${w}: the controls are on ${w <= 390 ? 'at most four short lines (slice d makes the phone two plus a bottom bar)' : 'one line'}: ${g.headRows}`);
+            assert.ok(g.above <= (w <= 390 ? 230 : 110), `${w}: the controls above the file take at most ${w <= 390 ? 230 : 110} px (they take ${g.above}; before: 168 at 1280 and 379 at 390): the from line and the header`);
             // opening Details hides none of the header's other buttons, and the open box has its own Hide details at its top right (#12786)
             const names = () => ev(`[...document.querySelectorAll('.artifact-viewer-header .btn, .artifact-viewer-header button, .artifact-viewer-header .chip')].filter(e => e.getClientRects().length).map(e => (e.className.toString().split(' ').slice(0, 2).join('.') + ':' + (e.textContent || '').trim().slice(0, 10)))`);
             const rest = await names();
             await ev(`document.querySelector('#artifact-viewer .details-toggle').click(); true`);
             await waitFor(`!document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden`, `${w}: Details opens`, 5000);
             const open = await names();
-            assert.deepEqual(open, rest, `${w}: opening Details hides none of the other header buttons: ` + JSON.stringify([rest, open]));
+            assert.deepEqual(w <= 390 ? open.filter(n => !/^details-toggle\./.test(n)) : open, rest, `${w}: opening Details hides none of the other header buttons (on a phone its own button comes back, to close it): ` + JSON.stringify([rest, open]));
             const hb = await ev(`(() => { const p = document.querySelector('#artifact-viewer .artifact-viewer-readers'), b = p.querySelector('.details-hide'), pr = p.getBoundingClientRect(), r = b.getBoundingClientRect(); return { text: b.textContent, right: Math.round(pr.right - r.right), top: Math.round(r.top - pr.top), shown: b.getClientRects().length > 0 }; })()`);
             assert.ok(hb.shown && hb.text === 'Hide details' && hb.right <= 24 && hb.top <= 12, `${w}: Hide details is at the top right of the box: ` + JSON.stringify(hb));
             await ev(`document.querySelector('#artifact-viewer .details-hide').click(); true`);
-            const closedAgain = await ev(`({ hidden: document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden, focus: document.activeElement && document.activeElement.classList.contains('details-toggle') })`);
+            const closedAgain = await ev(`({ hidden: document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden, focus: document.activeElement && document.activeElement.classList.contains(window.innerWidth <= 768 ? 'artifact-viewer-more' : 'details-toggle') })`); // a phone: Details is in the ⋯ menu, the keyboard goes back to ⋯
             assert.deepEqual([closedAgain.hidden, closedAgain.focus], [true, true], `${w}: Hide details closes it and the keyboard goes back to Details`);
             assert.deepEqual(await names(), rest, `${w}: and the header is as it was`);
             // the ⋯ menu
             await ev(`document.querySelector('.artifact-viewer-more').click(); true`);
             await waitFor(`!!document.querySelector('.artifact-viewer-menu:not([hidden])')`, `${w}: the ⋯ menu opens`, 4000);
             const items = await ev(`[...document.querySelectorAll('.artifact-viewer-menu [role=menuitem]')].filter(e => e.getClientRects().length).map(e => e.textContent.trim())`);
-            assert.deepEqual(items.filter(t => t !== 'Details'), ['Approve with a note', 'Remove from review', 'Copy file ID', 'Copy version ID', 'Open in new tab', 'Download'], `${w}: the ⋯ menu holds the less used, and Remove from review for a file that is in review (#13152; Details when the file has facts to show): ` + JSON.stringify(items));
+            assert.deepEqual(items.filter(t => t !== 'Details'), ['Approve with a note', 'Remove from review', 'Copy file ID', 'Copy version ID', 'Copy for an agent', 'Open in new tab', 'Download'], `${w}: the ⋯ menu holds the less used, and Remove from review for a file that is in review (#13152; Details when the file has facts to show): ` + JSON.stringify(items));
             await ev(`document.querySelector('.artifact-viewer-more').click(); true`);
             // the version list holds Compare
             await ev(`document.querySelector('.av-current').click(); true`);
             await waitFor(`!!document.querySelector('.av-list:not([hidden])')`, `${w}: the version list opens`, 4000);
             const pop = await ev(`(() => { const p = document.querySelector('.av-pop').getBoundingClientRect(), d = document.querySelector('.artifact-viewer-content').getBoundingClientRect(), hit = document.elementFromPoint(p.right - 4, p.top + 12); return { left: Math.round(p.left - d.left), right: Math.round(d.right - p.right), width: Math.round(p.width), hitInside: !!hit && !!hit.closest('.av-pop'), hit: hit ? hit.tagName + '.' + hit.className : null, toasts: [...document.querySelectorAll('#toast-host .toast')].map(t => t.textContent.trim()).join(' | ') }; })()`);
             assert.ok(pop.left >= 0 && pop.right >= 0 && pop.hitInside, `${w}: the version list is inside the dialog (its right edge is not cut off, with a long file name): ` + JSON.stringify(pop));
-            if (w === 390) assert.ok(pop.width > 300, `${w}: on a phone the version list is as wide as the dialog allows: ` + JSON.stringify(pop));
+            if (w <= 390) assert.ok(pop.width > (w <= 360 ? 280 : 300), `${w}: on a phone the version list is as wide as the dialog allows: ` + JSON.stringify(pop));
             assert.ok(await ev(`!!document.querySelector('.av-compare') && document.querySelector('.av-compare').getClientRects().length > 0 && document.querySelector('.av-compare').textContent.includes('Compare with v2')`), `${w}: Compare with v2 is in the version list`);
             await ev(`document.querySelector('.av-current').click(); true`);
             // Approve: the status chip says Approved at once, and the two buttons go (#12112's leftover: it kept saying "Waiting for your review")

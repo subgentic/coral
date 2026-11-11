@@ -1,4 +1,4 @@
-// The terminal view's controls on a phone are 44 x 44 targets whatever the pointer says (#6689, the phone terminal audit #6669 finding 4): the header's Fit width, Open Agent Tab and side-panel buttons and the composer's
+// The terminal view's controls on a phone are 44 x 44 targets whatever the pointer says (#6689, the phone terminal audit #6669 finding 4): the header's Fit width, Open agent tab and side-panel buttons and the composer's
 // Add image and Send were 22 to 36 px unless the browser reported a coarse pointer (a phone-width window with a mouse, or a phone browser that does not say so), the same width rule the rest of the phone layout follows
 // (max-width: 767px). Here the pointer is fine and the window is 390 or 360 px wide; with a coarse pointer the sizes were already 44 (touch.css). The header does not crowd: nothing overlaps and nothing scrolls sideways.
 const assert = require('node:assert/strict');
@@ -29,7 +29,7 @@ const { coralReady } = require('./helpers/wait');
             assert.deepEqual(missing, [], at + 'every control is on the screen: ' + JSON.stringify(boxes));
             const small = boxes.filter(x => x.w < 44 || x.h < 44).map(x => `${x.s} ${x.w}x${x.h}`);
             assert.deepEqual(small, [], at + 'every control is a 44 px target: ' + JSON.stringify(boxes));
-            assert.equal(await ev(`getComputedStyle(document.getElementById('terminal-open-window-link')).display`), 'none', at + 'Open Agent Tab is not in a phone\'s header (#6756)');
+            assert.equal(await ev(`getComputedStyle(document.getElementById('terminal-open-window-link')).display`), 'none', at + 'Open agent tab is not in a phone\'s header (#6756)');
             // the header does not crowd: its buttons do not overlap each other and nothing scrolls sideways
             const hdr = boxes.slice(0, 2);
             for (let i = 0; i < hdr.length; i++) for (let j = i + 1; j < hdr.length; j++) assert.ok(hdr[i].r <= hdr[j].l || hdr[j].r <= hdr[i].l || hdr[i].b <= hdr[j].t || hdr[j].b <= hdr[i].t, at + `${hdr[i].s} and ${hdr[j].s} overlap: ` + JSON.stringify([hdr[i], hdr[j]]));

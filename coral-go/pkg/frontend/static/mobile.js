@@ -117,7 +117,7 @@ function _listHeader(agentList) {
     let header = agentList.querySelector(':scope > .mobile-list-header');
     if (header) return header;
     header = document.createElement('div');
-    header.className = 'mobile-list-header';
+    header.className = 'mobile-list-header'; header.setAttribute('data-on-keydown', 'display-panel-key');
     header.innerHTML = `
             <span class="phone-break" aria-hidden="true"></span>
             <h2 class="mobile-list-title">Agents</h2>
@@ -134,7 +134,7 @@ function _listHeader(agentList) {
             </button>
             <button class="btn btn-small btn-primary" data-on-click="launch-show">New</button>
             <span class="sr-only" role="status" aria-live="polite" data-agent-list-live></span>
-            <div class="list-display-panel" id="mobile-display-panel" data-display-panel role="group" aria-label="Display options" data-on-keydown="display-panel-key" hidden>
+            <div class="list-display-panel" id="mobile-display-panel" data-display-panel role="group" aria-label="Display options" hidden>
                 <div class="agent-list-bar" id="mobile-agent-list-bar" hidden></div>
                 <div class="list-display-options">
                     ${['summary', 'model'].map(k => switchRow({ label: `Show ${k}`, labelClass: 'list-display-option', labelAttrs: ` data-display-row="${escapeAttr(k)}"`, attrs: ` data-display-input="${escapeAttr(k)}" data-on-change="toggle-row-line"` })).join('')}

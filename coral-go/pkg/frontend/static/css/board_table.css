@@ -32,6 +32,7 @@
 .mb-row-avatar { width: 1.25rem; height: 1.25rem; border-radius: 50%; display: grid; place-items: center; background: var(--mb-avatar); color: var(--on-avatar); font-size: var(--fs-sm); font-weight: var(--fw-strong); line-height: 1; }
 .mb-row-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); font-weight: var(--fw-medium); } /* the sender 13/500, nothing bolder (#9686, UI/UX #9358) */
 .mb-row-snippet { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); color: var(--text-secondary); }
+@media (max-width: 1100px) { .mb-table:not(.mb-fold) .mb-row-snippet { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; white-space: normal; overflow-wrap: anywhere; } } /* on a half screen a message may take two lines before it is cut: one line cut every message at about 60 characters at 960 px (#15324, walk 21 L5) */
 .mb-open > .mb-row-toggle .mb-row-snippet { visibility: hidden; } /* the whole message is under it */
 .mb-row-tags { display: flex; align-items: center; justify-content: flex-end; gap: 0.375rem; min-width: 0; max-width: 22rem; overflow: hidden; }
 /* The row says one thing besides the sender, the words and the time: an OPEN question (#9686). The mentions, the task, the reply mark, the "+N" and an answered question are with the open message (.mb-row-tags-open). */

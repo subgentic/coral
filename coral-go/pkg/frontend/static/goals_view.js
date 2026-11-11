@@ -17,9 +17,12 @@ const { el } = DT;
 const GC = await importOnce('./goal_columns.js');
 
 import * as W from './goal_words.js';
+import { looksDone } from './goal_done.js';
+const { shortTitle } = await importOnce('./goal_short.js');
 const { mountGoal } = await importOnce('./goal_view.js');
 await loadStyles('phone_lists.css'); // the phone form of a team list: edge-to-edge rows, a one-line toolbar (#12230); not at start (page_weight)
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
+loadStyles('short_screen.css'); // what a short window needs (200% zoom, #15303)
 let detail = null, detailHost = null, detailId = 0;
 function clearDetail() { detail?.dispose(); detail = null; detailHost = null; detailId = 0; }
 
@@ -64,9 +67,9 @@ export async function loadGoals() {
         if (project !== model.project) return;
         const sig = JSON.stringify([list.goals, list.requireGoal, list.noGoalOpen]);
         same = !model.failed && !!model.goals.length && sig === model.sig; // nothing changed: the page is left as it is (a redraw would take the keyboard's place)
-        if (layout === 'page') hooks.onCount?.(list.goals.length, list.goals.filter(x => W.isOpenGoal(x)).length);
+        if (layout === 'page') hooks.onCount?.(list.goals.filter(x => x.state === 'active' || x.state === 'done').length, list.goals.filter(x => W.isOpenGoal(x)).length); // the tab's number is what the default list shows: the active goals and the finished ones under them (#15305)
         model.sig = sig; model.goals = list.goals; model.requireGoal = list.requireGoal; model.noGoalOpen = list.noGoalOpen; model.failed = ''; model.asOf = clock();
-        if (model.wantOpen) { const want = model.wantOpen; model.wantOpen = 0; if (model.goals.some(g => g.id === want)) { model.openId = want; same = false; focusOpened = true; } }
+        if (model.wantOpen) { const want = model.wantOpen; model.wantOpen = 0; if (model.goals.some(g => g.id === want)) { model.openId = want; same = false; focusOpened = true; } else hooks.onMissing?.(want); }
         if (model.openId && !model.goals.some(g => g.id === model.openId)) { model.openId = 0; same = false; }
     } catch (e) {
         if (project !== model.project) return;
@@ -79,6 +82,8 @@ export async function loadGoals() {
 }
 
 const goalById = (id) => model.goals.find(g => g.id === id);
+/** The default view (Active) keeps the goals that finished under the active ones, as their own group, so a finished goal does not vanish when the next one starts (#15305). */
+const doneBelow = () => model.filter !== DEFAULT_FILTER ? [] : model.goals.filter(g => g.state === 'done' && (!model.goalSearch.trim() || String(g.title || '').toLowerCase().includes(model.goalSearch.trim().toLowerCase())));
 const visible = () => model.goals.filter(g => W.keepsGoal(model.filter, g) && (!model.goalSearch.trim() || String(g.title || '').toLowerCase().includes(model.goalSearch.trim().toLowerCase())));
 
 // ── drawing ──────────────────────────────────────────────────────────────
@@ -152,8 +157,8 @@ function drawTableRaw(col) {
     }
     if (model.loading) { col.append(el('p', 'goals-note', 'Loading goals…')); return; }
     if (!model.goals.length) { if (!model.failed) { const e = el('div', 'empty-state empty-state-tight'); e.append(el('p', 'empty-state-line', W.noGoalsText)); col.append(e); } return; }
-    const shown = visible();
-    if (!shown.length && !goalsTableState.selected.size) {
+    const shown = visible(), finished = doneBelow();
+    if (!shown.length && !finished.length && !goalsTableState.selected.size) {
         const fe = W.filteredEmpty(model.filter, model.goals.length);
         const e = el('div', 'empty-state empty-state-tight'); e.append(el('p', 'empty-state-line', fe.text), btn('btn empty-state-action', fe.action, () => { model.filter = 'all'; say(W.filterAnnouncement('all', model.goals.length)); drawList(); }));
         col.append(e);
@@ -162,14 +167,16 @@ function drawTableRaw(col) {
     const sort = goalsTableState.sort;
     const sortValue = g => sort.key === 'goal' ? g.title : sort.key === 'state' ? W.stateWord(g) : sort.key === 'progress' ? (totalOf(g.rollup) ? doneOf(g.rollup) / totalOf(g.rollup) : 0) : g.updatedAt;
     if (sort) shown.sort((a, b) => { const x = sortValue(a), y = sortValue(b); return (sort.dir === 'desc' ? -1 : 1) * (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true })); });
-    const rows = shown.concat(model.noGoalOpen > 0 && (model.filter === 'all' || model.filter === DEFAULT_FILTER) ? [{ id: 'no-goal', title: W.noGoalRowText(model.noGoalOpen), noGoal: true }] : []);
+    if (sort) finished.sort((a, b) => { const x = sortValue(a), y = sortValue(b); return (sort.dir === 'desc' ? -1 : 1) * (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true })); });
+    const rows = shown.concat(model.noGoalOpen > 0 && (model.filter === 'all' || model.filter === DEFAULT_FILTER) ? [{ id: 'no-goal', title: W.noGoalRowText(model.noGoalOpen), noGoal: true }] : [], finished); // the finished goals stay under the active ones, in their own group (#15305, walk 18 M7)
     const table = DT.dataTable({
         label: `Goals, ${shown.length}`, rows, rowKey: g => g.id, state: goalsTableState, rowName: g => g.title,
         selectable: { contextKey: model.project, canSelect: g => !g.noGoal && W.isOpenGoal(g), actions: goalBulkActions(), onChange: keys => Toolbar.mountSelection(toolbar, keys.size ? table.bar : null), ...(PHONE.matches ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) }, // a phone: a long press selects, as in Needs you; no checkboxes and no Select button (#12230)
         onSort: () => drawList(), // keep the no-goal navigation row last in either direction
+        ...(finished.length ? { groupBy: g => ({ key: g.state === 'done' ? 'done' : 'open', label: g.state === 'done' ? `Done (${finished.length})` : 'Active' }), groupSorted: true } : {}),
         open: g => g.noGoal ? window.openTeamPage?.(model.project, { tab: 'tasks', noGoal: true }) : openGoal(g.id, true),
         columns: GC.goalColumns({ progressLabel: 'Tasks' }, ['goal', 'state', 'progress', 'updated']), oneLine: true, resize: true, sortBar: false, bare: PHONE.matches, // a phone: no card around the rows (#12230)
-        ...(PHONE.matches ? { mail: g => (g.noGoal ? { lead: { icon: 'checklist', square: true, name: 'Tasks with no goal' }, title: g.title, snippet: '', state: '', time: '' } : { lead: { icon: 'flag', square: true, name: W.stateWord(g) }, title: g.title, ask: g.outcome || '', state: W.stateWord(g), time: `${W.stateWord(g)}${totalOf(g.rollup) ? ` \u00b7 ${doneOf(g.rollup)}/${totalOf(g.rollup)}` : ''}` }) } : {}), // a phone's row, like the Inbox's Goals: a flag, the goal, its outcome, when it moved
+        ...(PHONE.matches ? { mail: g => (g.noGoal ? { lead: { icon: 'checklist', square: true, name: 'Tasks with no goal' }, title: g.title, snippet: '', state: '', time: '' } : { lead: { icon: 'flag', square: true, name: W.stateWord(g) }, title: shortTitle(g.title), data: { goalId: String(g.id) }, ask: g.outcome || '', state: W.stateWord(g), time: `${W.stateWord(g)}${looksDone(g) ? ', all tasks done' : ''}${totalOf(g.rollup) ? ` \u00b7 ${doneOf(g.rollup)}/${totalOf(g.rollup)}` : ''}` }) } : {}), // a phone's row, like the Inbox's Goals: a flag, the goal, its outcome, when it moved
     });
     if (PHONE.matches) { const bleed = el('div', 'goals-bleed'); bleed.append(table.el); col.append(bleed); } else col.append(table.el); // a phone: the rows run to the screen's edges (goals_phone.css)
     Toolbar.mountSelection(toolbar, goalsTableState.selected.size ? table.bar : null);

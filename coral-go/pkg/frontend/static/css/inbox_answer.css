@@ -18,7 +18,7 @@
 @media (max-width: 768px) { .inbox-cmd-block { --cmd-lines: 4; } .inbox-answers > .inbox-cmd-block, .inbox-answers > .inbox-cmd-note, .inbox-answers > .inbox-yes-note { margin-inline: 20px; max-width: calc(100% - 40px); } }
 
 /* The line that says new items wait while a pointer holds the Needs you rows still (#14173): under the table, stuck to the bottom of the view, so it never moves a row. */
-.group-table-held { position: sticky; bottom: 0; margin: 0; padding: 6px 12px; background: var(--bg-secondary); border-top: 1px solid var(--border); text-align: center; }
+.group-table-held { position: sticky; bottom: 8px; width: fit-content; max-width: calc(100% - 24px); margin: 0 auto 8px 12px; padding: 4px 12px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 999px; text-align: start; box-shadow: var(--shadow-md); pointer-events: none; } /* a pill at the bottom LEFT, over nothing that can be clicked (#15142): the full-width bar covered the last rows' More, Download and Open, which sit on the right, and a click goes through it */
 
 /* A Yes that has just been drawn waits 400 ms for a click (#14302): it shows it is not ready yet. */
 .inbox-answer.inbox-arming { opacity: .6; cursor: progress; }

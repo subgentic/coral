@@ -127,16 +127,41 @@ if [ "$run_ok" = 1 ]; then
   page=$(curl -sL -m 10 -o "$work/page.html" -w '%{http_code}' "http://127.0.0.1:$PORT/")   # / redirects to /agents
   live=$(curl -s -o /dev/null -w '%{http_code}' -m 10 -H "Authorization: Bearer $KEY" "http://127.0.0.1:$PORT/api/sessions/live")
   noauth=$(curl -s -o /dev/null -w '%{http_code}' -m 10 "http://127.0.0.1:$PORT/api/sessions/live")
-  # SMOKE_EXPECT_DROPBOX_KEY=1 (release.yml only; a rehearsal builds without the key): the build's own Dropbox app key reached the server (#15065)
-  dbx=skipped
-  if [ "${SMOKE_EXPECT_DROPBOX_KEY:-}" = 1 ]; then
-    # GET /api/dropbox/status is a dashboard route: it refuses a Bearer header (local_dashboard_required). Ask it the way the dashboard does: sign in with the
-    # login link the server printed (a cookie), then a same-origin request with no Authorization header.
-    tok=$(grep -o 'login_token=[0-9a-f]*' "$work/server.log" | head -1 | cut -d= -f2)
-    jar="$work/dbx.jar"
-    curl -s -m 10 -c "$jar" -o /dev/null "http://127.0.0.1:$PORT/?login_token=$tok"
-    dbx=$(curl -s -m 10 -b "$jar" -H "Origin: http://127.0.0.1:$PORT" -H "Sec-Fetch-Site: same-origin" "http://127.0.0.1:$PORT/api/dropbox/status" | python3 -c 'import sys,json; print("ok" if json.load(sys.stdin).get("app_key_set") is True else "app_key_set not true")' 2>/dev/null || echo "no answer")
-  fi
+  # The availability list (#15071): every feature tests/release/availability.txt names answers what a release must report. Asked the way the dashboard asks
+  # (the routes are dashboard routes: they refuse a Bearer header): sign in with the login link the server printed (a cookie), then a same-origin request.
+  tok=$(grep -o 'login_token=[0-9a-f]*' "$work/server.log" | head -1 | cut -d= -f2)
+  jar="$work/avail.jar"
+  curl -s -m 10 -c "$jar" -o /dev/null "http://127.0.0.1:$PORT/?login_token=$tok"
+  dbx=$(python3 - "$here/availability.txt" "http://127.0.0.1:$PORT" "$jar" <<'PY'
+import json, os, shlex, subprocess, sys
+lst, base, jar = sys.argv[1:4]
+def get(path):
+    out = subprocess.run(["curl", "-s", "-m", "10", "-b", jar, "-H", "Origin: " + base, "-H", "Sec-Fetch-Site: same-origin", base + path], capture_output=True, text=True).stdout
+    return json.loads(out)
+tier = ""
+try: tier = get("/api/system/status").get("tier_name", "")
+except Exception: pass
+bad, checked, dropbox_line = [], 0, False
+for line in open(lst):
+    line = line.split("#", 1)[0].strip()
+    if not line: continue
+    w = shlex.split(line)
+    ep, field, want = w[0], w[1], json.loads(w[2])
+    opts = dict(x.split("=", 1) for x in w[3:])
+    if "env" in opts and os.environ.get(opts["env"]) != "1": continue
+    if "tier" in opts:
+        if not tier: bad.append("%s %s has tier=%s but /api/system/status gave no tier_name: not checked" % (ep, field, opts["tier"])); continue
+        if tier != opts["tier"]: continue
+    checked += 1
+    if ep == "/api/dropbox/status": dropbox_line = True
+    try: got = get(ep).get(field, "<missing>")
+    except Exception as e: got = "no answer (%s)" % type(e).__name__
+    if got != want: bad.append("%s %s is %s, a release reports %s" % (ep, field, json.dumps(got), json.dumps(want)))
+if checked == 0: bad.append("no line of the list was checked")
+if not dropbox_line: bad.append("no /api/dropbox/status line was checked: a release says in availability.txt that it ships no Dropbox app key")
+print("ok %d checked (tier %s)" % (checked, tier or "unknown") if not bad else "; ".join(bad))
+PY
+)
   listen=$(python3 - "$PORT" <<'PY'
 import sys
 port = int(sys.argv[1]); out = set()
@@ -151,10 +176,10 @@ for f, loop in (("/proc/net/tcp", {"0100007F"}), ("/proc/net/tcp6", {"0000000000
 print(" ".join(sorted(out)) or "none")
 PY
 )
-  if [ "$health" = 200 ] && [ "$page" = 200 ] && grep -qi "<title>[^<]*coral" "$work/page.html" && [ "$live" = 200 ] && [ "$noauth" = 401 ] && [ "$listen" = loopback ] && { [ "$dbx" = ok ] || [ "$dbx" = skipped ]; }; then
-    result "3 serve" PASS "health 200, the dashboard page 200 (Coral), the live list 200 with the key and 401 without, listening on loopback only (Dropbox app key: $dbx)"
+  if [ "$health" = 200 ] && [ "$page" = 200 ] && grep -qi "<title>[^<]*coral" "$work/page.html" && [ "$live" = 200 ] && [ "$noauth" = 401 ] && [ "$listen" = loopback ] && [ "${dbx#ok }" != "$dbx" ]; then
+    result "3 serve" PASS "health 200, the dashboard page 200 (Coral), the live list 200 with the key and 401 without, listening on loopback only (availability list: $dbx)"
   else
-    result "3 serve" FAIL "health=$health page=$page (title Coral: $(grep -ci '<title>[^<]*coral' "$work/page.html")) live=$live without a credential=$noauth listening=[$listen] dropbox=[$dbx]; server log tail: $(tail -3 "$work/server.log" | tr '\n' '|' | cut -c1-300)"
+    result "3 serve" FAIL "health=$health page=$page (title Coral: $(grep -ci '<title>[^<]*coral' "$work/page.html")) live=$live without a credential=$noauth listening=[$listen] availability=[$dbx]; server log tail: $(tail -3 "$work/server.log" | tr '\n' '|' | cut -c1-300)"
   fi
 else result "3 serve" FAIL "no package to run (item 1)"; fi
 served=0; [ -n "$srv" ] && [ "${STATES[2]:-}" = PASS ] && served=1

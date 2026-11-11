@@ -12,6 +12,7 @@ const markBidi = bidi ? bidi.markBidi : el => el, bidiWritten = bidi ? bidi.bidi
 const nameOf = c => c.authorName || c.authorId || 'unknown', nameSaid = c => bidiWritten(nameOf(c)); // nameSaid: for a label or a tooltip, where a mark cannot be drawn
 const { linkArtifactRefsIn } = await importOnce('./artifact_refs.js'); // a coral://artifacts/<hex> in a comment is a link (#11416)
 const { createAsk } = await importOnce('./artifact_comment_ask.js');
+await loadStyles('artifact_passage.css'); // the focus of the document and of a passage chosen by keyboard (#15173): not in the start CSS (page_weight)
 const { createComposer } = await importOnce('./artifact_comment_composer.js');
 const { createHighlights } = await importOnce('./artifact_comment_highlights.js');
 import { showToast } from './utils.js';
@@ -25,6 +26,7 @@ import { storeKey } from './local_store.js';
 import { boardOfPage } from './dock_page.js';
 import { el } from './dom_el.js';
 import { pollEvery } from './overload.js';
+await loadStyles('artifact-comments.css'); // the panel's rules: not at start (page_weight)
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 
 const EARLIER_KEY = 'coral-artifact-comments-earlier'; // 'show' or 'hide' the comments made on older versions while the latest is open (#13606): hidden by default, kept per account
@@ -73,11 +75,12 @@ let panelSeq = 0; // one id per panel (the viewer's and the docked pane's)
 export function attachComments(dialog, body, host, opts = {}) {
     const sourcePolicy = data => opts.readOnly?.() ? { ...data, canComment: false, canLock: false, reason: 'Open this file from its original team to write comments.', comments: data.comments.map(c => ({ ...c, can: { reply: false, edit: false, delete: false, resolve: false } })) } : data;
     const st = { undelivered: new Map(), lifetime: 0, video: null, videoTime: null, groupOpen: {}, series: false, hex: null, server: undefined, board: undefined, source: '', text: false, whole: false, data: null, showResolved: false, active: null, composing: null, busy: false, error: '', ranges: new Map(), orphan: new Set(), gone: false };
+    st.hintOn = opts.hintOn; st.hint = opts.hint; // a line under the writing box (the viewer's: where Approve is, for a file waiting for review, #15128)
     const panel = el('aside', 'pane pane-aside ac-panel'); panel.setAttribute('aria-label', 'Comments'); panel.hidden = true;
     panel.id = `ac-panel-${++panelSeq}`; // the toggle names it (aria-controls): where the opened comments are
     const toggle = btn('ac-toggle', 'Comments', 'Comments: show the comments'); toggle.hidden = true; toggle.setAttribute('aria-expanded', 'false');
     toggle.setAttribute('aria-controls', panel.id);
-    const selBtn = btn('ac-selbtn', 'Add comment', 'Add comment on the selected text'); selBtn.hidden = true;
+    const selBtn = btn('ac-selbtn', 'Add comment', 'Add comment on the selected text'); selBtn.hidden = true; Object.assign(selBtn.style, { width: 'max-content', whiteSpace: 'nowrap' }); // its width does not depend on where it is put, so it is kept whole inside the dialog (#15231)
     // The width of the comments column, kept per viewer: a separator between the document and the panel, dragged with the pointer or moved with the arrow keys (#15030).
     loadStyles('artifact-comments-resize.css');
     const resizer = el('div', 'ac-resizer'); resizer.setAttribute('role', 'separator'); resizer.setAttribute('aria-orientation', 'vertical'); resizer.tabIndex = 0;
@@ -111,10 +114,11 @@ export function attachComments(dialog, body, host, opts = {}) {
     const phone = window.matchMedia(PHONE_QUERY);
     const sheet = opts.sheet || (() => phone.matches); // the panel is a bottom sheet over the document
     const isOpen = () => panel.classList.contains('ac-sheet-open');
+    const focusInput = () => { const i = panel.querySelector('.ac-input'); i?.focus(); i?.scrollIntoView({ block: 'nearest' }); }; // the box that opened is where the person looks: a long thread no longer leaves it below the fold (#15119)
     const preferenceKey = () => opts.preferenceKey ? opts.preferenceKey() : OPEN_KEY;
     const remember = (open) => { const key = preferenceKey(); if (key) browserLocal.set(key, open ? 'open' : 'closed'); };
     const remembered = () => { const key = preferenceKey(), choice = key ? browserLocal.get(key) : null; return choice === 'open' ? true : choice === 'closed' ? false : null; };
-    const syncOn = () => dialog.classList.toggle('ac-on', !!st.shownNow && (phone.matches || isOpen()));
+    const syncOn = () => dialog.classList.toggle('ac-on', !!st.shownNow && (phone.matches || isOpen() || !!st.data?.comments?.length)); // the width the dialog has WITH the column, open or shut: opening the comments no longer widens it under the pointer (#15119)
     const shown = opts.shown || (() => !dialog.hidden);
     // Available on both the side column and the bottom sheet; never reserve a
     // column the person cannot hide.
@@ -134,12 +138,15 @@ export function attachComments(dialog, body, host, opts = {}) {
     // the list, the marks on the text and the marks on a video's timeline all come from threads(). A toggle in the head says how many are hidden and how many of those are unresolved.
     const isEarlier = c => c.fromVersion != null;
     const earlierShown = () => browserLocal.get(storeKey(EARLIER_KEY)) === 'show';
-    const threads = () => allThreads().filter(t => earlierShown() || !isEarlier(t.c));
+    const hiddenEarlier = c => isEarlier(c) && (c.resolved || !!st.video); // only the RESOLVED comments of earlier versions are folded away: one that still needs an answer is carried onto the latest version, marked 'from vN', until it is resolved (#15188, walk 8)
+    const threads = () => allThreads().filter(t => earlierShown() || !hiddenEarlier(t.c));
     // A comment of an EARLIER version of the series (read with series=1) is `found` in this one (pinned on its text like any), `ambiguous` (the text is here more than once: never pinned to a guess) or gone
     // (`gone`, `unchecked`): the last two are listed apart and are about the older version's text, so nothing on this one's text marks them (#6472).
     const stampRange = c => `${st.videoTime?.(c.atS) || ''}${c.endS != null ? '–' + st.videoTime?.(c.endS) : ''}`;
-    const groupOf = (c) => (c.fromVersion == null || c.carried === 'found') ? 'main' : c.carried === 'ambiguous' ? 'look' : 'earlier';
+    const groupOf = (c) => (c.fromVersion == null || c.carried === 'found') ? 'main' : c.carried === 'ambiguous' ? 'look' : c.resolved || st.video ? 'earlier' : 'main';
     const ownHex = (c) => c.artifactId || st.hex; // a carried comment's replies, resolving and edits go to the version it was written on
+    // the box takes focus and is shown whole, Save/Cancel (or Comment/Reply) with it: it was cut at the bottom of the panel (#15239, walk 10 M12)
+    const focusComposer = () => { const ta = panel.querySelector('.ac-input'); if (!ta) return; ta.focus({ preventScroll: true }); (ta.closest('.ac-composer') || ta).scrollIntoView({ block: 'nearest' }); };
     const openCount = () => threads().filter(t => !t.c.deleted && !t.c.resolved && groupOf(t.c) !== 'earlier').length;
     async function refresh() {
         if (!st.hex || (!st.text && !st.whole)) return;
@@ -150,7 +157,7 @@ export function attachComments(dialog, body, host, opts = {}) {
             st.data = data; st.gone = false;
             if (!st.visibilitySet) {
                 st.visibilitySet = true;
-                setSheet(opts.initialOpen ?? remembered() ?? (st.video ? true : opts.toggleHost ? !phone.matches && !sheet() && openCount() > 0 : false)); // a docked pane too narrow for the column (it would be a sheet over the document) starts closed too (#14846: it opened over the file and froze it); the viewer: closed until the person opens it, and then as they left it, so the file has the whole width (#12225); the docked preview keeps opening when there are comments
+                setSheet(opts.initialOpen ?? remembered() ?? (st.video ? true : false)); /* no remembered choice: shut, whatever the file has (it opened for one file and not the next, #15119) */ // a docked pane too narrow for the column (it would be a sheet over the document) starts closed too (#14846: it opened over the file and froze it); the viewer: closed until the person opens it, and then as they left it, so the file has the whole width (#12225); the docked preview keeps opening when there are comments
             }
         } catch (e) {
             if (hex !== st.hex || gen !== ctxGen) return;
@@ -204,6 +211,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (target) { if (!target.matches('button, textarea, a')) target.tabIndex = -1; target.focus({ preventScroll: true }); }
     }
     function render() {
+        syncPassageStop();
         const kept = focusKey();
         panel.replaceChildren();
         const show = (st.text || st.whole) && !st.gone && !!st.data;
@@ -214,16 +222,16 @@ export function attachComments(dialog, body, host, opts = {}) {
         const list = threads();
         st.video?.update(list.map(t => t.c).filter(c => st.showResolved || !c.resolved), st.active, !!st.data?.canComment && !st.data?.locked);
         const head = el('div', 'ac-head');
-        const h = el('h3', 'ac-title', 'Comments'); h.append(el('span', 'ac-count', String(openCount())));
+        const h = el('h3', 'ac-title', 'Comments'); h.append(el('span', 'ac-count', `${openCount()} open`));
         opts.onCanWrite?.(!!(st.data && st.data.canComment && !st.data.locked)); // the viewer shows Mark up only to someone who can comment (#12394)
         opts.onCount?.(openCount()); // a goal's Comments tab says how many are open (#11955)
         opts.onState?.({ composing: !!(st.composing && st.composing.anchor), count: openCount() }); // a file's diff (#13528): its icon says the count, and closes an empty thread whose composer was cancelled
         head.append(h);
         // Comments of earlier versions: hidden unless chosen, with how many (and how many of those still need an answer) so they stay findable (#13606).
-        const earlierAll = allThreads().filter(t => isEarlier(t.c) && !t.c.deleted);
+        const earlierAll = allThreads().filter(t => hiddenEarlier(t.c) && !t.c.deleted);
         if (earlierAll.length) {
-            const open = earlierAll.filter(t => !t.c.resolved).length, on = earlierShown();
-            const words = `${earlierAll.length} from earlier versions${open ? ` (${open} unresolved)` : ''}`;
+            const open = earlierAll.filter(t => !t.c.resolved).length, on = earlierShown(); // only a video still folds away unresolved ones too
+            const words = open ? `${earlierAll.length} from earlier versions (${open} unresolved)` : `${earlierAll.length} resolved from earlier versions`;
             const eb = btn('ac-showearlier', on ? 'Hide earlier versions' : `Show ${words}`); eb.setAttribute('aria-pressed', String(on)); eb.dataset.focusId = 'showearlier';
             eb.title = on ? `Hide the ${words}` : `${words} are hidden while the latest version is open`;
             eb.addEventListener('click', () => { browserLocal.set(storeKey(EARLIER_KEY), on ? 'hide' : 'show'); render(); paint(); });
@@ -277,13 +285,13 @@ export function attachComments(dialog, body, host, opts = {}) {
             d.addEventListener('toggle', () => { st.groupOpen[g] = d.open; });
             li.append(d); wrap.append(li);
         }
-        if (!shownAll.length && !opts.compact) wrap.append(el('p', 'empty-state empty-state-tight', !d.canComment ? 'No open comments.' : st.text ? 'No open comments. Select some text to add one.' : opts.words?.empty || 'No open comments. Use the button below to comment on the whole document.'));
+        if (!shownAll.length && !opts.compact) wrap.append(el('p', 'empty-state empty-state-tight', !d.canComment ? 'No open comments.' : st.text ? 'No open comments. Select some text to add one, or Tab to the document and press Enter to choose a passage.' : opts.words?.empty || 'No open comments. Use the button below to comment on the whole document.'));
         panel.append(wrap);
         const sendable = list.map(t => t.c).filter(c => canAsk(c) && !d.locked);
         if (st.video && sendable.length) { const sendAll = btn('ac-send-open', `Send ${plural(sendable.length, 'open comment')} to an agent`); sendAll.addEventListener('click', () => openMany(sendable)); panel.append(sendAll); }
         if (st.composing && st.composing.anchor) panel.append(composer());
         else if (d.canComment && !d.locked && !opts.compact) {
-            const whole = btn('ac-whole', st.video ? 'Comment at playhead' : opts.words?.whole || 'Comment on the whole document'); whole.addEventListener('click', () => { const time = st.video?.current(); st.composing = { anchor: opts.wholeAnchor ? opts.wholeAnchor() : { whole: true }, ...time, ...(time ? { timeLabel: stampRange(time) } : {}) }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); });
+            const whole = btn('ac-whole', st.video ? 'Comment at playhead' : opts.words?.whole || 'Comment on the whole document'); whole.addEventListener('click', () => { const time = st.video?.current(); st.composing = { anchor: opts.wholeAnchor ? opts.wholeAnchor() : { whole: true }, ...time, ...(time ? { timeLabel: stampRange(time) } : {}) }; st.error = ''; render(); focusComposer(); });
             panel.append(whole);
         }
         const act = panel.querySelector('.ac-card.ac-active'); if (act && st.scrollCard) { st.scrollCard = false; act.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() }); }
@@ -303,12 +311,12 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (KIND[c.authorKind]) m.append(el('span', 'ac-kind', KIND[c.authorKind]));
         const dot = el('span', 'ac-dot', '·'); dot.setAttribute('aria-hidden', 'true'); m.append(dot);
         const time = el('span', 'ac-time', ago(c.createdAt)); time.title = c.createdAt; m.append(time);
-        if (c.editedAt) m.append(el('span', 'chip ac-pill', 'edited'));
+        if (c.editedAt && !c.deleted) m.append(el('span', 'chip ac-pill', 'edited')); // a deleted comment's words are gone: it is not 'edited' any more (#15239, walk 10 M10)
         let resolveBtn = null;
         if (top) {
             const a = c.anchor || {};
             if (st.video && c.atS != null) { const seek = btn('ac-video-time', stampRange(c), `Seek to ${stampRange(c)}`); seek.addEventListener('click', () => { st.video.seek(c.atS); activate(c.id, true); }); m.append(seek); }
-            if (a.start_line) m.append(el('span', 'ac-lines', a.end_line && a.end_line !== a.start_line ? `lines ${a.start_line}-${a.end_line}` : `line ${a.start_line}`));
+            if (a.start_line) m.append(el('span', 'ac-lines', a.end_line && a.end_line !== a.start_line ? `In the file, lines ${a.start_line} to ${a.end_line}` : `In the file, line ${a.start_line}`));
             if (c.resolved) m.append(el('span', 'chip ac-pill ac-pill-resolved', 'resolved'));
             if (c.fromVersion != null) {
                 const g = groupOf(c);
@@ -326,7 +334,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         else main.append(m);
         main.append(editing(c) || (c.deleted ? el('p', 'ac-body ac-deleted', 'Comment deleted') : markBidi(linkArtifactRefsIn(el('p', 'ac-body', c.body), { server: st.server })))); // another person's words: their bidirectional controls are shown, not applied, and the text is its own isolate (#14113)
         if (!c.deleted && c.images && c.images.length && !editing(c)) main.append(pictures(c));
-        if (top && c.fromVersion != null && groupOf(c) !== 'main') main.append(el('p', 'ac-from ac-from-note', groupOf(c) === 'look' ? `From v${c.fromVersion}. The quote is in this version more than once, so it is not pinned to either.` : `On v${c.fromVersion}. Its text is not in this version.`));
+        if (top && c.fromVersion != null && c.carried !== 'found') main.append(el('p', 'ac-from ac-from-note', groupOf(c) === 'look' ? `From v${c.fromVersion}. The quote is in this version more than once, so it is not pinned to either.` : `On v${c.fromVersion}. Its text is not in this version.`));
         main.append(actions(c, top));
         if (top && canAsk(c)) { const sp = el('p', 'ac-note ac-ask-status'); fillStatus(sp, c.id); main.append(sp); } // does the agent have it? said at rest, under the comment: the actions row is hidden until hover
         e.append(main);
@@ -351,10 +359,11 @@ export function attachComments(dialog, body, host, opts = {}) {
         li.append(entry(c, true));
         for (const r of replies) li.append(entry(r, false));
         if (st.ask && st.ask.id === c.id) li.append(askBlock());
+        if (c.fromVersion != null && !c.deleted && c.can.reply) li.append(el('p', 'ac-note ac-from-note ac-old-thread', `This thread is on v${c.fromVersion}, an earlier version. A reply goes to it there, not to the latest version.`)); // a reply on an old version's thread is said, not silent (#15188, walk 8)
         // The reply box at the foot of the card, where Docs has it; it opens the composer in place.
         if (!c.deleted && c.can.reply && !(st.composing && st.composing.parentId === c.id)) {
             const rb = btn('ac-replybox', 'Reply…', `Reply to the comment by ${nameSaid(c)}`);
-            rb.addEventListener('click', () => { st.composing = { parentId: c.id, hex: ownHex(c) }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); });
+            rb.addEventListener('click', () => { st.composing = { parentId: c.id, hex: ownHex(c) }; st.error = ''; render(); focusComposer(); });
             li.append(rb);
         }
         if (st.composing && st.composing.parentId === c.id) li.append(composer());
@@ -367,8 +376,8 @@ export function attachComments(dialog, body, host, opts = {}) {
         const row = el('div', 'ac-actions');
         if (c.deleted) return row;
         const who = nameSaid(c);
-        if (c.can.edit) row.append(act('Edit', `Edit the comment by ${who}`, () => { st.composing = { editId: c.id }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); }));
-        if (c.can.delete) row.append(act('Delete', `Delete the comment by ${who}`, () => confirmThen('Delete this comment?', () => run(() => api.deleteComment(ownHex(c), st.server, c.id), 'Comment deleted'))));
+        if (c.can.edit) row.append(act('Edit', `Edit the comment by ${who}`, () => { st.composing = { editId: c.id }; st.error = ''; render(); focusComposer(); }));
+        if (c.can.delete) row.append(act('Delete', `Delete the comment by ${who}`, () => confirmThen(`Delete this comment?${(() => { const read = [...new Set((c.asks || []).filter(k => k.agent && (k.seen || k.readAt || k.replies)).map(k => k.agent))]; return read.length ? ` ${read.join(' and ')} already read it, and keeps what it read.` : ''; })()}`, () => run(() => api.deleteComment(ownHex(c), st.server, c.id), 'Comment deleted'))));
         // Send to agent (#6357, #6456): the owner, on this computer, for a thread of this board that is open; never through Coral Hub
         if (top && canAsk(c)) { const b = act('Send to agent', () => openAsk(c)); b.classList.add('ac-ask-open'); b.setAttribute('aria-label', `Send the comment by ${nameSaid(c)} to an agent`); b.setAttribute('aria-expanded', String(!!st.ask && st.ask.id === c.id)); row.append(b); }
         // not an .ac-act: it writes nothing, so a read-only viewer has it too
@@ -382,7 +391,8 @@ export function attachComments(dialog, body, host, opts = {}) {
     async function run(fn, said) {
         if (st.busy) return;
         st.busy = true;
-        try { const sentTo = await fn(); st.error = ''; st.composing = null; await refresh(); if (said) announce(said + (typeof sentTo === 'string' && sentTo ? `. Sent to ${sentTo}` : '')); if (typeof sentTo === 'string' && sentTo) showToast(`Sent to ${sentTo}`, false); } // the owner's comment reaches the agent on its own (#12203): the person sees who got it
+        const hadKeys = panel.contains(document.activeElement); // the keyboard was in the comment box: it must not be dropped on the page when the box goes (#15174)
+        try { const sentTo = await fn(); st.error = ''; st.composing = null; await refresh(); if (hadKeys && (!document.activeElement || document.activeElement === document.body || !document.activeElement.isConnected)) (panel.querySelector(`.ac-card[data-id="${st.active}"] .ac-replybox`) || panel.querySelector('.ac-card .ac-replybox') || toggle).focus(); if (said) announce(said + (typeof sentTo === 'string' && sentTo ? `. Sent to ${sentTo}` : '')); if (typeof sentTo === 'string' && sentTo) showToast(`Sent to ${sentTo}`, false); } // the owner's comment reaches the agent on its own (#12203): the person sees who got it
         catch (e) { st.error = e.message || 'The change was refused.'; showToast(st.error, true); render(); }
         finally { st.busy = false; }
     }
@@ -409,7 +419,11 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (e.key === ']') { e.preventDefault(); step(1); } else if (e.key === '[') { e.preventDefault(); step(-1); }
     });
     // A hidden panel is out of reach at every width; an open sheet also removes the document behind it from Tab and screen readers.
+    const footEl = dialog.querySelector('.artifact-viewer-foot'); // the viewer's footer (Approve, Request changes, Close): a phone's sheet ends above it, never over it (#15165)
+    const footRoom = () => { panel.style.bottom = footEl && phone.matches && sheet() && panel.classList.contains('ac-sheet-open') ? `${Math.max(0, Math.round((panel.offsetParent || dialog).getBoundingClientRect().bottom - footEl.getBoundingClientRect().top))}px` : ''; panel.style.setProperty('--ac-foot', panel.style.bottom || '0px'); }; // the sheet's height limit leaves the same room (--ac-foot: with the keyboard up the sheet was as tall as the viewer and its header went above the screen); an inline bottom (from the footer's top to the viewer's bottom: its padding and the safe area count): the start CSS has no room for a rule
+    if (footEl && typeof ResizeObserver === 'function') new ResizeObserver(footRoom).observe(footEl); // the review buttons arrive after the viewer opens
     function syncInert() {
+        footRoom();
         const open = panel.classList.contains('ac-sheet-open');
         panel.inert = !st.shownNow || !open;
         body.inert = !!st.shownNow && sheet() && open && !st.video && phone.matches; // only a phone's sheet is modal: a docked pane's open sheet leaves the file above it to scroll (#14846)
@@ -450,7 +464,9 @@ export function attachComments(dialog, body, host, opts = {}) {
     function selectionAnchor() {
         const sel = window.getSelection();
         if (!st.text || !st.data || !st.data.canComment || st.data.locked || !sel || sel.isCollapsed || !sel.rangeCount) return null; // a document that is not text takes whole-document comments only
-        const r = sel.getRangeAt(0);
+        return anchorOf(sel.getRangeAt(0));
+    }
+    function anchorOf(r) { // the anchor of a range of the document: a selection's, or a passage chosen by keyboard (#15173)
         if (!body.contains(r.commonAncestorContainer)) return null;
         const before = document.createRange(); before.setStart(body, 0); before.setEnd(r.startContainer, r.startOffset);
         const after = document.createRange(); after.setStart(r.endContainer, r.endOffset); after.setEnd(body, body.childNodes.length);
@@ -462,7 +478,11 @@ export function attachComments(dialog, body, host, opts = {}) {
         const s = selectionAnchor();
         selBtn.hidden = !s;
         if (!s) return;
-        const x = Math.min(Math.max(8, s.rect.right - 40), window.innerWidth - 120), y = Math.max(8, Math.min(s.rect.bottom + 6, window.innerHeight - 60));
+        // the button's own width, kept inside the dialog (it was cut at the dialog's right edge, #15231), and below the selection, or above it when there is no room below
+        const box = (dialog.querySelector('.artifact-viewer-content') || dialog).getBoundingClientRect(), wide = selBtn.offsetWidth || 120, tall = selBtn.offsetHeight || 36, lo = Math.max(8, box.left + 8), hi = Math.min(window.innerWidth - 8, box.right - 8) - wide;
+        let x = Math.max(lo, Math.min(s.rect.right - 40, hi)), below = s.rect.bottom + 6, y = below + tall <= Math.min(window.innerHeight, box.bottom) - 8 ? below : Math.max(8, s.rect.top - tall - 6);
+        const foot = window.matchMedia?.('(pointer: coarse)').matches && dialog.querySelector('.artifact-viewer-foot'); // a touch screen (walk 11 M3): not over the lines under the selection, but above the bar, on the right
+        if (foot) { const h = selBtn.offsetHeight || 44, w = selBtn.offsetWidth || 110, t = foot.getBoundingClientRect().top - h - 8; x = window.innerWidth - w - 12; y = s.rect.bottom + 6 > t - 4 ? Math.max(8, s.rect.top - h - 6) : t; }
         selBtn.style.left = x + 'px'; selBtn.style.top = y + 'px';
     }
     document.addEventListener('selectionchange', () => { if (!shown()) return; clearTimeout(selTimer); selTimer = setTimeout(syncSelButton, 120); });
@@ -473,8 +493,45 @@ export function attachComments(dialog, body, host, opts = {}) {
         st.composing = { anchor: s.anchor }; st.error = ''; selBtn.hidden = true;
         window.getSelection().removeAllRanges();
         userSet(true); render(); // the new comment opens the panel
-        panel.querySelector('.ac-input')?.focus();
+        focusComposer();
     });
+
+    // ── a passage by keyboard (#15173, Beta walk 7 H1: a document cannot be selected from the keyboard, so there was no way to comment on a passage)
+    // Tab reaches the document; Enter or C there starts choosing a passage (a paragraph, list item, heading, quote, code block or table row); Up and Down move, Enter or C comments on it, Escape goes back to the document.
+    const PASSAGES = 'p, li, h1, h2, h3, h4, h5, h6, pre, blockquote, tr, dt, dd';
+    const passages = () => [...body.querySelectorAll(PASSAGES)].filter(b => !b.querySelector(PASSAGES) && b.textContent.trim() && b.getClientRects().length);
+    const canPassage = () => shown() && st.text && st.data && st.data.canComment && !st.data.locked && !st.composing;
+    body.addEventListener('keydown', (e) => {
+        if (e.altKey || e.ctrlKey || e.metaKey || !canPassage()) return;
+        const onBody = e.target === body, at = onBody ? -1 : passages().indexOf(e.target.closest(PASSAGES));
+        if (!onBody && at < 0) return;
+        const key = e.key === 'c' || e.key === 'C' ? 'c' : e.key;
+        if (onBody && (key === 'Enter' || key === 'c')) {
+            const list = passages(), top = body.getBoundingClientRect().top, first = list.find(b => b.getBoundingClientRect().bottom > top) || list[0];
+            if (!first) return;
+            e.preventDefault(); list.forEach(b => { b.tabIndex = -1; }); first.focus();
+            announce('Choosing a passage to comment on. Up and Down move, Enter comments on it, Escape leaves.');
+            return;
+        }
+        if (onBody) return;
+        const list = passages();
+        if (key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End') {
+            e.preventDefault();
+            const to = key === 'Home' ? 0 : key === 'End' ? list.length - 1 : Math.min(list.length - 1, Math.max(0, at + (key === 'ArrowDown' ? 1 : -1)));
+            list[to].tabIndex = -1; list[to].focus(); list[to].scrollIntoView({ block: 'nearest' });
+        } else if (key === 'Escape') { e.preventDefault(); e.stopPropagation(); body.focus(); }
+        else if (key === 'Enter' || key === 'c') {
+            const r = document.createRange(); r.selectNodeContents(list[at]);
+            const s = anchorOf(r); if (!s) return;
+            e.preventDefault(); st.composing = { anchor: s.anchor }; st.error = ''; userSet(true); render();
+            panel.querySelector('.ac-input')?.focus();
+        }
+    });
+    function syncPassageStop() { // the document is a tab stop while a person can comment on a text in it
+        const on = !!(st.text && st.data && st.data.canComment && !st.data.locked);
+        if (on) { body.tabIndex = 0; body.setAttribute('role', 'group'); body.setAttribute('aria-label', 'Document: press Enter to choose a passage to comment on'); }
+        else if (body.getAttribute('aria-label') === 'Document: press Enter to choose a passage to comment on') { body.removeAttribute('tabindex'); body.removeAttribute('role'); body.removeAttribute('aria-label'); }
+    }
 
     // ── the phone's sheet
     let sheetOverlay = 0; // the sheet's entry in overlay_history.js while it is open on a phone (#5219)
@@ -526,7 +583,7 @@ export function attachComments(dialog, body, host, opts = {}) {
             if (!st.hex || !st.data || !st.data.canComment || st.data.locked) return false;
             if (!st.composing || st.composing.editId) st.composing = { anchor: { whole: true } }; // a comment already being written keeps its words and takes the picture too
             st.error = ''; setSheet(true); render();
-            const cm = st.composing; panel.querySelector('.ac-input')?.focus();
+            const cm = st.composing; focusComposer();
             if (cm.tray) cm.tray.add([new File([blob], name || 'marked-picture.png', { type: blob.type })]);
             return true;
         },
@@ -535,7 +592,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         /** A comment on an anchor the caller made (the lines selected in an agent's diff, #12536): the composer opens on it, in the panel. Resolves false when this person cannot comment here. */
         composeOn(anchor) {
             if (!st.hex || !st.data || !st.data.canComment || st.data.locked) return false;
-            st.composing = { anchor }; st.error = ''; setSheet(true); render(); panel.querySelector('.ac-input')?.focus();
+            st.composing = { anchor }; st.error = ''; setSheet(true); render(); focusComposer();
             return true;
         },
         async docWhole() {
@@ -547,7 +604,7 @@ export function attachComments(dialog, body, host, opts = {}) {
                     if (lifetime !== st.lifetime || hex !== st.hex || !video.isConnected || st.video) return;
                     st.videoTime = m.videoTime;
                     st.video = m.attachVideoComments(video, {
-                        onComment: time => { if (!st.data?.canComment || st.data.locked) return; st.composing = { anchor: { whole: true }, ...time, timeLabel: stampRange(time) }; st.error = ''; setSheet(true); render(); panel.querySelector('.ac-input')?.focus(); },
+                        onComment: time => { if (!st.data?.canComment || st.data.locked) return; st.composing = { anchor: { whole: true }, ...time, timeLabel: stampRange(time) }; st.error = ''; setSheet(true); render(); focusComposer(); },
                         onActivate: id => { activate(id, false); setSheet(true); },
                     });
                     dialog.classList.add('avc-video'); region(true); setSheet(true);

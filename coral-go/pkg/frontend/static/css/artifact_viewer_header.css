@@ -25,13 +25,16 @@
 .artifact-viewer-header { position: relative; } /* the version list hangs from the header row, so it is as wide as the dialog allows and never past its edge (#12223 review) */
 .artifact-viewer-chips .av-pop { left: 0; right: auto; max-width: 100%; }
 @media (max-width: 768px) {
-    .artifact-viewer-chips .av-bar { flex-wrap: wrap; max-width: 100%; } /* at 200% text the version buttons wrap instead of running off the screen */
+    .artifact-viewer-chips .av-bar { flex-wrap: wrap; max-width: 100%; order: -1; } /* at 200% text the version buttons wrap instead of running off the screen */
     .artifact-viewer-chips .av-pop { left: 8px; right: 8px; min-width: 0; max-width: none; }
     /* two thin rows: the name and the ⋯ button, then the chips (version, status, Comments); Approve and Request changes are in the bar at the bottom (#12226) */
     .artifact-viewer-header { flex-wrap: wrap; align-items: center; row-gap: 2px; }
-    .artifact-viewer-title { order: 0; flex: 1 1 0; min-width: 120px; padding-bottom: 0; } /* the name keeps room to read: at 320 px Comments wraps to the next row (#12226 review) */
+    .artifact-viewer-title { order: 0; flex: 1 1 0; min-width: 88px; padding-bottom: 0; } /* the name, Comments and ⋯ are one row at 360 px (#15033, the Operator); an opened name takes the whole width below */
     .artifact-viewer-header:has(.artifact-viewer-title.is-open) > .artifact-viewer-title { flex: 1 0 100%; } /* an opened name takes the whole header width: the buttons wrap to the next row instead of leaving it a narrow column (#13989) */
     .artifact-viewer-header > .ac-toggle { order: 1; flex: none; }
+    .artifact-viewer-header:has(> .artifact-viewer-details:not([hidden])) > .artifact-viewer-morewrap { order: 1; } /* Details shows (a goal, a task, who can read): row one is the name and the ⋯ button, row two Details and Comments side by side, then the chips; no orphan button on a row of its own (walk 11 M1) */
+    .artifact-viewer-header:has(> .artifact-viewer-details:not([hidden])) > :is(.artifact-viewer-details, .ac-toggle) { order: 2; flex: 1 1 40%; min-width: 120px; }
+    .artifact-viewer-header:has(> .artifact-viewer-details:not([hidden])) > .artifact-viewer-title:not(.is-open) { flex: 1 1 calc(100% - 52px); } /* the name fills row one beside the ⋯ button, so the two buttons below it cannot slip in beside it */
     .artifact-viewer-morewrap { order: 2; }
     .artifact-viewer-chips { order: 3; flex: 1 0 100%; max-width: 100%; gap: 4px; flex-wrap: wrap; }
     .artifact-viewer-actions { display: none; }
@@ -40,6 +43,15 @@
     .artifact-viewer-foot .artifact-review-approve, .artifact-viewer-foot .artifact-review-changes { flex: 1 1 0; min-height: 44px; }
     .artifact-review { flex: 0 1 auto; min-height: 0; max-height: max(120px, calc(var(--visual-viewport-height, 100dvh) - 260px)); overflow-y: auto; } /* the change-request form scrolls inside what the keyboard leaves, so Send is reachable (#12226 review) */
     .artifact-viewer-foot .artifact-review-approve[hidden], .artifact-viewer-foot .artifact-review-changes[hidden] { display: none; }
+}
+/* A phone's header (#15033, the Operator: it was squished): the name, Comments and ⋯ on one row; Details is an item of ⋯ (the button comes back only while Details is open, to close it); the version is one button, 'v1 of 4', with no Previous and Next; Sandboxed, Waiting for review and Scripts on read as one muted line beside it. */
+.artifact-viewer-details-item { display: none; }
+@media (max-width: 768px) {
+    .artifact-viewer-details-item { display: flex; }
+    .artifact-viewer-header .artifact-viewer-details[aria-expanded="false"] { display: none; }
+    .artifact-viewer-chips .av-bar .av-prev, .artifact-viewer-chips .av-bar .av-next { display: none; }
+    .artifact-viewer-chips > :is(.artifact-viewer-sandbox, .artifact-review-state, .artifact-viewer-scriptson):not([hidden]) { background: none; padding: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .artifact-viewer-chips > :is(.artifact-viewer-sandbox, .artifact-review-state, .artifact-viewer-scriptson):not([hidden]) + :is(.artifact-viewer-sandbox, .artifact-review-state, .artifact-viewer-scriptson):not([hidden])::before { content: "\00b7"; margin-inline-end: 6px; }
 }
 /* the version bar, its list and the compare view (moved from the start CSS: only the viewer draws them, #12223) */
 /* Versions of an artifact (#6472, layout A): the bar under the title, its list, the compare view; and the comment groups of a later version. */
@@ -68,6 +80,7 @@
 .av-count { margin: 0; flex: 1 1 auto; color: var(--text-secondary); font-size: var(--fs-md); }
 .av-seg { flex-wrap: wrap; }
 .av-seg .btn { white-space: normal; }
+.artifact-viewer-text { white-space: pre-wrap; overflow-wrap: anywhere; } /* a code line wraps, a long name or path in it too: it was cut at the right edge on a phone (walk 11 M2) */
 .av-line { padding: 2px 8px 2px 11px; margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .av-line ins, .av-line del { text-decoration: none; }
 .av-add { background: color-mix(in srgb, var(--success) 18%, transparent); border-left: 3px solid var(--success); padding-left: 8px; }
@@ -113,3 +126,15 @@
 /* A long name is cut with an ellipsis; a tap or click on it shows the whole name (#13979) */
 .artifact-viewer-header .artifact-viewer-title.is-open { white-space: normal; overflow-wrap: anywhere; }
 .artifact-viewer-chips .av-note { color: var(--text-muted); font-size: var(--fs-sm); } /* a file two teams hold has no version bar from a direct link: said quietly (#14015) */
+/* A computer (#15190, walk 8 M2): the change-request form takes a row of its own under the header's controls, as wide as the dialog, with Send request and Cancel side by side: it was a column squeezed between the name and the version chip, which crushed the name and grew the header to 340 px at 1024 x 700. */
+@media (min-width: 769px) {
+    .artifact-viewer-header:has(> .artifact-review:not([hidden])) { flex-wrap: wrap; }
+    .artifact-viewer-header > .artifact-review { order: 9; flex: 1 1 100%; min-width: 0; padding-inline: 0; border-bottom: 0; }
+    .artifact-review-form { flex-direction: row; flex-wrap: wrap; align-items: center; }
+    .artifact-review-form > label, .artifact-review-form > textarea, .artifact-review-form > .ac-picker, .artifact-review-form > .ac-thumbs, .artifact-review-form > .artifact-review-error, .artifact-review-form > .artifact-review-pending, .artifact-review-form > .ac-note { flex: 1 1 100%; }
+    .artifact-review-form > .btn { flex: none; }
+}
+@media (min-width: 769px) and (max-width: 1100px) { /* a narrow computer window: the name gets the first line to itself, the controls wrap under it (#15190) */
+    .artifact-viewer-header { flex-wrap: wrap; row-gap: 6px; }
+    .artifact-viewer-header > .artifact-viewer-title { flex: 1 0 100%; }
+}

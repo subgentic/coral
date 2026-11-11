@@ -191,7 +191,7 @@ func TestAllowedIsTheListedDecisionsAndNothingElse(t *testing.T) {
 			t.Errorf("%v allowed", bad)
 		}
 	}
-	if n := len(Routes()); n != 63 { // 63 since generation 7 (#14730, the owner turns scripts on and off for one version of an HTML file); 61 since generation 6 (#13910, the opened version of a file); 60 since generation 5 (#13834, the done-state of a goal)
+	if n := len(Routes()); n != 64 { // 64 since generation 7 (#15380, the Hub's read of a computer's Needs you); 63 before it (#14730, the owner turns scripts on and off for one version of an HTML file); 61 since generation 6 (#13910, the opened version of a file); 60 since generation 5 (#13834, the done-state of a goal)
 		t.Errorf("the allowlist has %d routes: a new one needs a reason and a review (Security's tiers, #13694)", n)
 	}
 	first := 0
@@ -239,6 +239,10 @@ func TestARouteIsStampedOnlyForARemoteThatListsIt(t *testing.T) {
 		{"POST", "/api/board/t/goals/12/done-state", 5, true, true},
 		{"POST", "/api/artifacts/abc/opened", 5, false, true}, // the opened version of a file (#13910) is generation 6: a generation 5 remote gets it unstamped
 		{"POST", "/api/artifacts/abc/opened", 6, true, true},
+		{"GET", "/api/needs-you", 6, false, true}, // #15380: the Hub reads a computer's Needs you as the signed-in owner (generation 7): a generation 6 remote gets it unstamped
+		{"GET", "/api/needs-you", 7, true, true},
+		{"POST", "/api/needs-you", 7, false, false}, // a read only
+		{"GET", "/api/needs-you/x", 7, false, false},
 		{"GET", "/api/artifacts/abc/opened", 6, false, false},
 		{"POST", "/api/board/t/asks/9/buttons/b/settle", 2, true, true},
 		{"POST", "/api/sessions/live/x/send", 1, true, true},
@@ -253,7 +257,7 @@ func TestARouteIsStampedOnlyForARemoteThatListsIt(t *testing.T) {
 			t.Errorf("MustBeSigned(%s %s) = %v, want %v", c.m, c.p, got, c.must)
 		}
 	}
-	if RoutesVersion != 6 {
+	if RoutesVersion != 7 {
 		t.Errorf("RoutesVersion = %d: it moves with a widening, and the remote's health answer reports it", RoutesVersion)
 	}
 }

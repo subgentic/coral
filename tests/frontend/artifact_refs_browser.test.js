@@ -35,7 +35,7 @@ const HOSTILE = (n) => `Read coral://artifacts/${H1}): then <img src=x onerror="
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             if (view.w === 1280) {
-                for (const [id, jt] of [['orch', 'Orchestrator'], ['dev', 'Developer']]) assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: jt, session_name: id + '-s' })).status, 200);
+                for (const [id, jt] of [['orch', 'Orchestrator'], ['dev', 'Developer']]) assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: jt })).status, 200);
                 const g = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: 'Links in words', outcome: HOSTILE('outcome'), done_when: `Done when coral://artifacts/${H1}): <b>bold</b> (not coral://artifacts/${H3}0)` }); // a done-when is at most 300 characters: one link
                 assert.equal(g.status, 201, JSON.stringify(g)); var goal = g.body.id;
                 var task = (await api('POST', `/api/board/${B}/tasks`, { title: 'A task with links', body: HOSTILE('body'), created_by: 'orch', priority: 'medium', goal_id: goal, assigned_to: 'dev' })).body.id;

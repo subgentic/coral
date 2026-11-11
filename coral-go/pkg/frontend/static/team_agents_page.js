@@ -5,7 +5,7 @@
 import { importOnce } from './import_once.js';
 import { foldWayBack } from './way_back.js';
 import { state } from './state.js';
-import { boardFetch, inTeam, keyLabel, isCloud } from './server_base.js';
+import { boardFetch, inTeam, keyLabel, isCloud, splitKey } from './server_base.js';
 import { pollEvery } from './overload.js';
 import { OPERATOR_ID } from './utils.js';
 import { refreshTeamAvailability, remindAgent, stopAgentReminder } from './team_availability.js';
@@ -18,7 +18,7 @@ const DT = await importOnce('./data_table.js');
 const { mountAgentReviewSettings } = await importOnce('./agent_review_settings.js');
 let agentsTableState = DT.tableState();
 
-const WORD = { available: 'Free', busy: 'Busy', task_idle: 'Task assigned, idle', queued: 'Queued', waiting: 'Waiting', needs_input: 'Needs input', sleeping: 'Sleeping', archived: 'Archived', offline: 'Ended', unknown: 'No signal yet', unavailable: 'Unavailable' };
+const WORD = { available: 'Free', busy: 'Busy', task_idle: 'Task assigned, idle', queued: 'Queued', waiting: 'Waiting for work', needs_input: 'Needs input', sleeping: 'Sleeping', archived: 'Archived', offline: 'Ended', unknown: 'Not reported', unavailable: 'Unavailable' };
 // The chips: the statuses people look for first; any other status that has agents gets its own chip after them.
 const FIRST = ['available', 'busy', 'queued', 'sleeping', 'offline'];
 const CHIP_WORD = { available: 'Free', task_idle: 'Has a task' }; // an idle agent with a task, started or not: its row says which ("Working on #1" or "Task assigned, idle"), so the filter does not repeat one of the two
@@ -34,10 +34,10 @@ const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type 
 
 // One status per agent (#10603, the Beta tester): an agent that is idle with a task already in progress is working on it, not "Task assigned, idle" beside "#1 in progress".
 const startedTask = (a) => (a.tasks || []).find(t => t.status === 'in_progress');
-const statusWord = (a) => (a.availability === 'task_idle' && startedTask(a) ? `Working on #${Number(startedTask(a).id)}` : WORD[a.availability] || 'No signal yet');
+const statusWord = (a) => (a.availability === 'task_idle' && startedTask(a) ? `Working on #${Number(startedTask(a).id)}` : WORD[a.availability] || 'Not reported');
 // dropAt is one of the steps data_table.css has (62, 52, 36, 28, 20, 16): 32 and 33 had no rule, so those two columns never gave way and a phone's Status chip and row broke (#14903). Open tasks and Time on current task (#14861, the Operator): the tasks assigned to the agent that are pending, in progress or in review (a link to the Tasks tab filtered to the agent), and how long it has had its task in progress (since the claim; a dash with none).
 const openTasksOf = (a) => Number(a.open_tasks) || 0;
-const claimedAt = (a) => { const t = a.task_since ? Date.parse(a.task_since) : NaN; return Number.isFinite(t) ? t : null; };
+const claimedAt = (a) => { const t = a.task_since && a.availability !== 'sleeping' ? Date.parse(a.task_since) : NaN; return Number.isFinite(t) ? t : null; }; // a sleeping agent shows no running clock: a dash, not a time that keeps counting (walk 16 M10)
 /** "1 h 12 m", "5 m", "2 d 3 h": the time the agent has had its current task, from the claim; '' when it has none. */
 export function onTaskWords(a, now = Date.now()) {
     const at = claimedAt(a);
@@ -69,6 +69,7 @@ function chipCounts(agents) {
 
 // ── the tab ──────────────────────────────────────────────────────────────
 
+window.addEventListener('kill', () => { if (model.team) load(); }); // a kill from the sidebar or an agent's own page: the rows read the change at once
 async function load() {
     const team = model.team; if (!team) return;
     if (!model.data) { model.loading = true; draw(); }
@@ -135,7 +136,26 @@ function removeSeatButton(agent, ctx) {
     return b;
 }
 
+/** Resume an ended agent from its earlier chat: the same action as Continue this chat, Resume session in All chats (resume_ended.js), on its own row (#15294). Null when the server named no session to resume. */
+function resumeButton(agent, cls = 'btn btn-small dt-action dt-action-roomy team-resume') {
+    const e = agent.ended_session; if (!e || agent.availability !== 'offline') return null;
+    const b = btn(cls, 'Resume', null);
+    b.setAttribute('aria-label', `Resume ${agent.name}`);
+    b.addEventListener('click', async (ev) => {
+        ev.stopPropagation(); b.disabled = true;
+        const { showToast } = await importOnce('./utils.js');
+        try {
+            const { resumeEndedAgent } = await importOnce('./resume_ended.js');
+            await resumeEndedAgent(splitKey(model.team).server, { agentType: e.agent_type, sid: e.session_id, name: agent.name }, splitKey(model.team).name);
+            showToast(`${agent.name} is back in "${keyLabel(model.team)}".`);
+            await load();
+        } catch (err) { showToast(err.message || `Could not resume ${agent.name}.`, true); b.disabled = false; }
+    });
+    return b;
+}
+
 function chatButton(agent) {
+    const resume = resumeButton(agent); if (resume) return resume;
     const session = agent.availability !== 'offline' && agent.agent_type !== 'terminal' ? sessionOf(agent) : null;
     if (!session) return '';
     const b = btn('btn btn-small dt-action dt-action-roomy team-open-chat', 'Open chat');
@@ -219,7 +239,7 @@ function watch() {
     pollEvery(refresh, 15000);
     window.addEventListener('focus', refresh);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
-    // Sleep Team or Wake Team: the rows say so now, not at the next poll (#12335).
+    // Sleep team or Wake team: the rows say so now, not at the next poll (#12335).
     document.addEventListener('coral:team-sleep-changed', e => { if (e.detail && e.detail.team === model.team && root && root.isConnected) load(); });
 }
 
@@ -284,6 +304,7 @@ export function renderAgentPage(host, agent, ctx) {
     const session = sessionOf(agent), reach = model.levels.get(agent.name);
     if (reach) { const c = searchChip(reach.level); if (c) line.append(c); const b = btn('btn', 'Search access\u2026', null); b.setAttribute('aria-label', `Search access for ${agent.name}`); b.addEventListener('click', () => openSearchAccess({ name: agent.name, team: model.team, ...reach }, { opener: b, onChanged: () => load().then(() => renderAgentPage(host, agent, ctx)) })); bar.append(b); }
     if (!isCloud() && !String(model.team).startsWith('@') && agent.subscriber_id) bar.append(removeSeatButton(agent, ctx)); // the Operator takes a seat off the board (#11112): on this computer only, never through the Hub
+    const resume = resumeButton(agent, 'btn btn-primary'); if (resume) bar.append(resume);
     if (session) bar.append(btn('btn', 'Open chat', () => openChat(session)));
     if (agent.reminder) {
         const id = agent.subscriber_id || agent.name;

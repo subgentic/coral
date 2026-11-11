@@ -22,14 +22,14 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`(() => { const original = window.fetch, json = (b, st = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: st, headers: { 'Content-Type': 'application/json' } }));
                 const hex = n => n.toString(16).padStart(64, '0');
                 const item = (i, name, q) => ({ id: hex(i), name, media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - (9 - i) * 60000).toISOString(), source: 'upload', available: true, tags: ['for review', 'internal'], uri: 'coral://artifacts/' + hex(i), produced_by: 'Writer', session_id: 's' + i, ...(q ? { review_question: q } : {}) });
-                window.__items = [item(1, 'plan-a.md', 'Which port should the test server use?'), item(2, 'plan-b.md', 'Ship the second\\u202e design?'), item(3, 'plan-c.md', '')];
+                window.__items = [item(1, 'plan-a.md', 'Which port should the test server use?'), item(2, 'plan-b.md', 'Ship the second\\u202e design?'), item(3, 'plan-c.md', ''), item(4, 'plan-d.md', 'Read coral://artifacts/' + hex(9) + ' first')];
                 window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'qn': window.__items}) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin);
                     if (u.pathname.startsWith('/api/artifacts/')) return Promise.resolve(new Response('Review preview text', { headers: { 'Content-Type': 'text/plain' } }));
                     if (!/^\\/api\\/board\\/qn\\/artifacts$/.test(u.pathname)) return original(url, opts);
                     return json({ project: 'qn', artifacts: window.__items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false }); }; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 3`, at + 'three review rows', 15000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 4`, at + 'four review rows', 15000);
             const rowText = n => ev(`(() => { const r = [...document.querySelectorAll('${T} tbody tr')].find(x => x.textContent.includes(${JSON.stringify(n)})); const sub = r.querySelector('.dt-subtitle'), meta = r.querySelector('.inbox-review-metadata'); return { all: r.textContent.replace(/\\s+/g, ' '), sub: sub ? sub.textContent : '', meta: meta ? meta.textContent : '', ask: (r.querySelector('.inbox-review-question') || {}).textContent || '', shown: [r.querySelector('.inbox-review-from'), sub].filter(x => x && getComputedStyle(x).display !== 'none' && x.getBoundingClientRect().width > 1 && x.getBoundingClientRect().height > 1).map(x => x.textContent).join(' | ') }; })()`);
             const a = await rowText('plan-a.md'), b = await rowText('plan-b.md'), c = await rowText('plan-c.md');
             if (mobile) {
@@ -41,6 +41,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
             }
             check(/<U\+202E>/.test(b.all) && !b.all.includes('\u202e'), at + 'a hidden character in a question is written out, never drawn raw: ' + JSON.stringify(b.all.slice(0, 160)));
 
+            if (!mobile) { // a coral://artifacts link in a question is a link that opens that file (#15338, walk 23)
+                const link = await ev(`(() => { const r = [...document.querySelectorAll('${T} tbody tr')].find(x => x.textContent.includes('plan-d.md')), l = r.querySelector('.dt-subtitle .inbox-question-link'); return l ? { text: l.textContent, tag: l.tagName, title: l.title, sub: r.querySelector('.dt-subtitle').textContent } : null; })()`);
+                check(!!link && link.tag === 'BUTTON' && link.title === 'coral://artifacts/' + '0'.repeat(63) + '9' && /^Read file 0{8} first$/.test(link.sub), at + 'the question\'s coral://artifacts reference is a link: ' + JSON.stringify(link));
+                await ev(`[...document.querySelectorAll('${T} tbody tr')].find(x => x.textContent.includes('plan-d.md')).querySelector('.inbox-question-link').click(); true`);
+                await waitFor(`!!document.querySelector('.artifact-viewer-close')`, at + 'the link opens the file in the viewer', 8000);
+                await ev(`document.querySelector('.artifact-viewer-close')?.click(); true`);
+            }
             // the viewer says it too
             await ev(`[...document.querySelectorAll('${T} tbody tr')].find(x => x.textContent.includes('plan-a.md')).querySelector('.inbox-review-name').click(); true`);
             await waitFor(`!!document.querySelector('.artifact-viewer-from') && !document.querySelector('.artifact-viewer-from').hidden`, at + 'the viewer opens with its from line', 8000);

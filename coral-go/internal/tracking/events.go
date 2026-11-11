@@ -33,7 +33,7 @@ type EventDoc struct {
 // StandardProperties are attached to every event without exception.
 var StandardProperties = []string{
 	"version — the Coral version you are running",
-	"edition — the build tier (prod, beta, staging, dev, dropboxers)",
+	"edition — the build tier (prod, staging, dev)",
 	"os — your operating system (darwin, linux, windows)",
 	"arch — your CPU architecture (amd64, arm64)",
 	"platform — your client platform (darwin, linux, windows, wsl2)",

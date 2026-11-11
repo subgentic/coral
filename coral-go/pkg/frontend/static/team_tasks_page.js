@@ -9,6 +9,7 @@ import { importOnce } from './import_once.js';
 const { rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); // lazy: its failure is retried
 const DT = await importOnce('./data_table.js'); // the one table (#7743)
 const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is one shared helper (#12182)
+const { agentCopyButton } = await importOnce('./agent_copy_button.js'); // the robot (#15063)
 const TV = await importOnce('./tasks_view.js'); // the one Tasks view: a task list is drawn by tasksTable
 const TB = await importOnce('./task_bulk.js'); // what the selection bar does to the selected tasks
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
@@ -259,7 +260,10 @@ function draw() {
         } else {
             const row = bar.node.querySelector('.list-bar-search-row');
             const phone = PHONE.matches;
-            const t = TV.tasksTable('team', shown, { ctx: rowCtx(), label: `Tasks, ${shown.length}`, open: (task) => hooks.openTask?.(task), state: model.dt,
+            const goalKey = t => String(t.goal_id || 0), byGoal = new Set(shown.map(goalKey)).size > 1; // tasks of more than one goal: a group per goal, so goal 1's finished tasks are not mixed with goal 2's new one (#15305, walk 18 M8)
+            if (byGoal && !model.dt.sort) shown.sort((a, b) => (Number(a.goal_id || 1e12) - Number(b.goal_id || 1e12)));
+            const t = TV.tasksTable('team', shown, { ctx: rowCtx(), label: `Tasks, ${shown.length}`, tweak: cols => cols.map(c => c.key === 'goal' ? { ...c, cell: task => { const l = c.cell(task); if (l.dataset) l.textContent = `#${task.goal_id} ${l.textContent}`; return l; } } : c), // the number first: goals named alike differ when the name is cut (walk 18 M8, #15364)
+                ...(byGoal ? { groupBy: task => ({ key: goalKey(task), label: task.goal_id ? goalTitle(model.project, task.goal_id) || `Goal ${task.goal_id}` : noGoalLabel }) } : {}), open: (task) => hooks.openTask?.(task), state: model.dt,
                 ...(phone ? { bare: true, sortBar: false, mail: task => ({ lead: { icon: 'checklist', square: true, name: bucket(task) }, title: task.title, ask: [task.assigned_to, task.goal_id ? goalTitle(model.project, task.goal_id) : ''].filter(Boolean).join(' \u00b7 '), state: taskStatusWord(task.status, task.review_requested, isParked(task)), time: taskStatusWord(task.status, task.review_requested, isParked(task)), data: { taskId: String(task.id) } }) } : {}), // a phone: the shared form, edge-to-edge two-line rows (#12230)
                 selectable: { contextKey: model.project, actions: TB.taskBulkActions(model.project, () => { model.dt.selected.clear(); loadTasks(); }), onChange: (keys) => Toolbar.mountSelection(row, keys.size ? t.bar : null), ...(phone ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) } }); // the selection bar takes the toolbar's line while tasks are selected
             Toolbar.mountSelection(row, model.dt.selected.size ? t.bar : null);
@@ -326,7 +330,7 @@ export function showTasks(host, project, h = {}) {
 export function focusTaskRow(id) { const b = root && rowFocusTarget(root, `t${id}`); if (b) { b.focus(); return true; } return false; }
 
 /** A task by id: the list's item when it is read, else the route's. */
-export async function readTask(project, id) {
+export async function readTask(project, id, onMissing) {
     const have = model.project === project ? model.rows.find(t => t.id === Number(id)) : null;
     try {
         const r = await boardFetch(project, `/tasks/${pathId(id)}`);
@@ -339,6 +343,7 @@ export async function readTask(project, id) {
             }
             return task;
         }
+        if (r.status === 404) onMissing?.(); // the task is not on this team (the address named one that is not there, #15295)
     } catch { /* the list's item below */ }
     return have || null;
 }
@@ -377,6 +382,16 @@ function followUpOfLine(parentId, ctx) {
     return p;
 }
 
+/** A task that cannot be read (deleted, or not this team's, #15198): the page says so and has its way back, not a blank panel. */
+export function renderTaskGone(host, task, ctx) {
+    host.replaceChildren(); host.setAttribute('aria-label', `Task ${task.id}`);
+    const back = el('button', 'back-link goals-back'); back.type = 'button'; back.addEventListener('click', () => ctx.onBack());
+    const arrow = el('span', 'goals-back-arrow', '←'); arrow.setAttribute('aria-hidden', 'true'); back.append(arrow, el('span', null, ` ${ctx.backLabel}`));
+    const h = el('h2', 'goals-detail-title', `Task #${task.id} cannot be shown`); h.tabIndex = -1;
+    host.append(el('div', 'goals-page team-task-page', ''));
+    host.firstChild.append(back, h, el('p', 'goals-note', 'It may have been deleted, or it belongs to another team.')); h.focus();
+}
+
 export function renderTaskPage(host, task, ctx, mode = 'view') {
     host._taskConversation?.destroy({ keepDrafts: true });
     host._taskConversation = null;
@@ -396,6 +411,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     const openBlockers = (Array.isArray(task.blocked_by) ? task.blocked_by : []).filter(d => d && d.satisfied === false).map(d => (d.board_id && ctx.project && d.board_id !== ctx.project ? `${keyLabel(String(d.board_id))} #${Number(d.task_id)}` : `#${Number(d.task_id)}`)); // a blocker on another board names it (#10287)
     if ((task.status === 'pending' || task.status === 'blocked') && openBlockers.length) line.append(el('span', 'text-muted-sm', ` Waiting on ${openBlockers.join(', ')}.`));
     else if (task.status === 'pending' && task.assigned_to) { const w = el('span', 'text-muted-sm', ' Waiting for '); w.append(agentLink(task.assigned_to, { board: task.board_id || task.project || '' }), ' to pick it up.'); line.append(w); } // the assignee opens its chat (#12182)
+    line.append(agentCopyButton('task', () => `Task #${task.id} (${String(task.title || '').replace(/\s+/g, ' ').trim().slice(0, 80)}): run coral-board task detail ${task.id}`));
     if (ctx.teamLink) {
         const links = el('div', 'goal-back-row'), teamLink = el('a', 'goal-team-link inbox-team-link', 'Open on team page');
         teamLink.href = ctx.teamLink; teamLink.setAttribute('data-route', '');

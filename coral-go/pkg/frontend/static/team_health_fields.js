@@ -33,6 +33,8 @@ export function healthToValues(h) {
     const v = { on: !!h.on, interval_min: h.interval_min, heartbeat_min: h.heartbeat_min ?? 0, recipient: h.recipient || '', all_clear: !!h.all_clear, default_reviewers: (h.default_reviewers || []).join(', '), auto_delegate_on: !!(h.auto_delegate && h.auto_delegate.on) };
     for (const k of RULES) if (h[k]) for (const [p, val] of Object.entries(h[k])) v[`${k}_${p}`] = val;
     if (h.assign_limit !== undefined) v.assign_limit = h.assign_limit;
+    if (h.stale_sweep_hours !== undefined) v.stale_sweep_hours = h.stale_sweep_hours;
+    if (h.park_limit !== undefined) v.park_limit = h.park_limit;
     return v;
 }
 
@@ -47,6 +49,8 @@ export function valuesToHealth(v, base) {
     h.default_reviewers = String(v.default_reviewers || '').split(',').map(s => s.trim()).filter((s, i, a) => s && a.indexOf(s) === i);
     h.auto_delegate = { ...h.auto_delegate, on: !!v.auto_delegate_on };
     if (h.assign_limit !== undefined && v.assign_limit !== undefined) h.assign_limit = Number.isInteger(v.assign_limit) ? v.assign_limit : h.assign_limit;
+    if (h.stale_sweep_hours !== undefined && v.stale_sweep_hours !== undefined) h.stale_sweep_hours = Number.isInteger(v.stale_sweep_hours) ? v.stale_sweep_hours : h.stale_sweep_hours;
+    if (h.park_limit !== undefined && v.park_limit !== undefined) h.park_limit = Number.isInteger(v.park_limit) ? v.park_limit : h.park_limit;
     h.claim_nudge = { ...h.claim_nudge, on: !!v.claim_nudge_on, after_min: v.claim_nudge_after_min, nudges: v.claim_nudge_nudges };
     h.status_nudge = { ...h.status_nudge, on: !!v.status_nudge_on, after_min: v.status_nudge_after_min, escalate_after_min: v.status_nudge_escalate_after_min };
     h.mention_renudge = { ...h.mention_renudge, on: !!v.mention_renudge_on, after_min: v.mention_renudge_after_min };
@@ -70,11 +74,11 @@ export const HEALTH_KEYS = Object.keys(healthToValues({ ...HEALTH_DEFAULTS, held
 
 /** The fields of the Health check group. ctx: { members: () => Promise<[{ subscriber_id, job_title }]>, hasHeld: () => bool, hasRecommend: () => bool, monitorOff: () => bool, onReset(view), openSettings() }. */
 export function healthFields(ctx) {
-    const alsoTell = (rule) => ({ type: 'select', label: 'Also tell', help: 'One member who also gets it as a message of their own when it is new.', disabledWhen: v => !v[`${rule}_on`], options: async () => {
+    const alsoTell = (rule) => ({ under: `${rule}_on`, type: 'select', label: 'Also tell', help: 'One member who also gets it as a message of their own when it is new.', disabledWhen: v => !v[`${rule}_on`], options: async () => {
         const members = await ctx.members();
         return [{ value: '', label: 'Only the orchestrator' }, ...members.map(m => ({ value: m.subscriber_id, label: `${m.subscriber_id}${m.job_title ? ` (${m.job_title})` : ''}` }))];
     } });
-    const minutes = (key, label, unit, ruleOn) => ({ key, type: 'number', label, unit, min: LO, max: HI, integer: true, compact: true, disabledWhen: v => !v[ruleOn] });
+    const minutes = (key, label, unit, ruleOn) => ({ under: ruleOn, key, type: 'number', label, unit, min: LO, max: HI, integer: true, compact: true, disabledWhen: v => !v[ruleOn] });
     const fields = [
         { key: 'health_global_off', type: 'notice', visibleWhen: () => ctx.monitorOff(), render: slot => {
             const note = document.createElement('p'); note.className = 'sv-help health-global-off'; note.setAttribute('role', 'status');
@@ -83,23 +87,28 @@ export function healthFields(ctx) {
             link.addEventListener('click', () => ctx.openSettings());
             note.append(link, '. It takes effect after Coral restarts.'); slot.append(note);
         } },
+        { key: 'hb_check', type: 'heading', level: 1, label: 'The health check', help: 'When it goes out, and to whom.' },
         { key: 'on', type: 'toggle', label: 'Send health check', help: 'Checks on stuck or idle agents. Uses tokens each time.' },
-        { key: 'interval_min', type: 'number', label: 'Look every', unit: 'minutes', min: LO, max: HI, integer: true, compact: true, disabledWhen: v => !v.on },
-        { key: 'heartbeat_min', type: 'number', label: 'Say all is well at least every', unit: 'minutes', min: 0, max: HI, integer: true, compact: true, help: '0 = never (the default): the check goes out only when something changed.', disabledWhen: v => !v.on },
-        { key: 'recipient', type: 'select', label: 'Send it to', disabledWhen: v => !v.on, options: async () => {
+        { key: 'interval_min', type: 'number', label: 'Look every', unit: 'minutes', min: LO, max: HI, integer: true, compact: true, under: 'on', disabledWhen: v => !v.on },
+        { key: 'heartbeat_min', type: 'number', label: 'Say all is well at least every', unit: 'minutes', min: 0, max: HI, integer: true, compact: true, help: '0 = never (the default): the check goes out only when something changed.', under: 'on', disabledWhen: v => !v.on },
+        { key: 'recipient', type: 'select', label: 'Send it to', under: 'on', disabledWhen: v => !v.on, options: async () => {
             const members = await ctx.members();
             return [{ value: '', label: 'The orchestrator (default)' }, ...members.map(m => ({ value: m.subscriber_id, label: `${m.subscriber_id}${m.job_title ? ` (${m.job_title})` : ''}` }))];
         } },
-        { key: 'all_clear', type: 'toggle', label: 'Post when all is well', help: 'The one-line check at each heartbeat, so a quiet team is not mistaken for a stopped check.', disabledWhen: v => !v.on },
-        { key: 'health_reviews', type: 'heading', label: 'Reviews' },
+        { key: 'all_clear', type: 'toggle', label: 'Post when all is well', help: 'The one-line check at each heartbeat, so a quiet team is not mistaken for a stopped check.', under: 'on', disabledWhen: v => !v.on },
+        { key: 'health_reviews', type: 'heading', level: 1, label: 'Reviews and assignment' },
         { key: 'auto_delegate_on', type: 'toggle', label: 'Hand reviews to the default reviewers', help: 'When a task is submitted for review and nobody is assigned, Coral delegates it to the default reviewers; with none named, reviews wait for the orchestrator. Works whether or not the health check is on.' },
         { key: 'default_reviewers', type: 'text', label: 'Default reviewers', wide: true, help: `Names of agents on this team, up to ${HEALTH_LIMITS.reviewers}, separated by commas.`, placeholder: `Agent names (up to ${HEALTH_LIMITS.reviewers})`,
             validate: v => (new Set(String(v).split(',').map(s => s.trim()).filter(Boolean)).size > HEALTH_LIMITS.reviewers ? `at most ${HEALTH_LIMITS.reviewers} names.` : '') },
-        { key: 'assign_limit', type: 'number', label: 'Most waiting tasks per agent', unit: 'tasks (0: no limit)', help: 'Assigning a task to an agent that already has more than this many waiting is refused, and the answer names the less loaded agents; the person assigning can use --force.', min: 0, max: 50, integer: true, compact: true, visibleWhen: v => v.assign_limit !== undefined },
-        { key: 'health_rules', type: 'heading', label: 'Automatic rules', help: 'Run only while the health check is on.' },
+        { key: 'stale_sweep_hours', type: 'number', label: 'Stale task sweep every', unit: 'hours (0: off)', help: 'The orchestrator gets one message that lists stale tasks (pending over 3 days, in progress over a day with no post, in review over a day, owner asleep or gone, goal closed) and the commands to deal with them. Coral changes nothing itself.', min: 0, max: 720, integer: true, compact: true, visibleWhen: v => v.stale_sweep_hours !== undefined },
+        { key: 'assign_limit', type: 'number', label: 'Most waiting tasks per agent', unit: 'tasks (0: no limit)', help: 'Assigning a task to an agent that already has this many waiting is refused, and the answer names the less loaded agents; the person assigning can use --force.', min: 0, max: 50, integer: true, compact: true, visibleWhen: v => v.assign_limit !== undefined },
+        { key: 'park_limit', type: 'number', label: 'Most parked tasks per agent', unit: 'tasks', help: 'Parking is for a wait outside the team. Parking another task past this is refused; the person parking can use --force.', min: 1, max: 20, integer: true, compact: true, visibleWhen: v => v.park_limit !== undefined },
+        { key: 'hb_agents', type: 'heading', level: 1, label: 'Watching the agents', help: 'Run only while the health check is on, except where a heading says otherwise.' },
+        { key: 'health_rules', type: 'heading', label: 'Idle agents', help: 'Run only while the health check is on.' },
         { key: 'claim_nudge_on', type: 'toggle', label: 'Nudge an idle agent to claim its work', help: 'An agent that is idle with ready work gets a reminder; past the count, the orchestrator is told.' },
         minutes('claim_nudge_after_min', 'After', 'minutes idle', 'claim_nudge_on'),
-        { key: 'claim_nudge_nudges', type: 'number', label: 'Nudges before telling the orchestrator', unit: 'nudges', min: N_LO, max: N_HI, integer: true, compact: true, disabledWhen: v => !v.claim_nudge_on },
+        { key: 'claim_nudge_nudges', type: 'number', label: 'Nudges before telling the orchestrator', unit: 'nudges', min: N_LO, max: N_HI, integer: true, compact: true, under: 'claim_nudge_on', disabledWhen: v => !v.claim_nudge_on },
+        { key: 'health_quiet', type: 'heading', label: 'Quiet agents' },
         { key: 'status_nudge_on', type: 'toggle', label: 'Ask a quiet agent for a status', help: 'An agent that has done nothing for a while is asked where it stands; if it stays quiet, the orchestrator is told.' },
         minutes('status_nudge_after_min', 'Ask after', 'minutes quiet', 'status_nudge_on'),
         minutes('status_nudge_escalate_after_min', 'Tell the orchestrator', 'minutes later', 'status_nudge_on'),
@@ -109,7 +118,8 @@ export function healthFields(ctx) {
         { key: 'health_dialogs', type: 'heading', label: 'Dialogs nobody answers', help: 'Works whether or not the health check is on.', visibleWhen: v => v.dialog_timeout_on !== undefined },
         { key: 'dialog_timeout_on', type: 'toggle', label: 'Close a dialog nobody answered', visibleWhen: v => v.dialog_timeout_on !== undefined,
             help: 'When an agent’s permission, plan or question dialog has waited past the limit, and nobody is at its terminal, Coral closes it the safe way (No, or Esc; never Yes) and tells the agent to ask the Operator on the board, so its other work goes on. A person typing in their own terminal window, outside Coral, is not seen as present. Off by default.' },
-        { key: 'dialog_timeout_after_min', type: 'number', label: 'After', unit: 'minutes waiting', help: '10 minutes to 1 day', min: D_LO, max: D_HI, integer: true, compact: true, disabledWhen: v => !v.dialog_timeout_on, visibleWhen: v => v.dialog_timeout_on !== undefined },
+        { key: 'dialog_timeout_after_min', type: 'number', label: 'After', unit: 'minutes waiting', help: '10 minutes to 1 day', min: D_LO, max: D_HI, integer: true, compact: true, under: 'dialog_timeout_on', disabledWhen: v => !v.dialog_timeout_on, visibleWhen: v => v.dialog_timeout_on !== undefined },
+        { key: 'health_mentions', type: 'heading', label: 'Mentions' },
         { key: 'mention_renudge_on', type: 'toggle', label: 'Remind the orchestrator of an unanswered mention', help: 'A message that @mentions the orchestrator and has had no reply gets a reminder.' },
         minutes('mention_renudge_after_min', 'Remind the orchestrator after', 'minutes', 'mention_renudge_on'),
         { key: 'health_offbooks', type: 'heading', label: 'Work done off the books', help: 'Named to the orchestrator in the next health check, once each.' },
@@ -118,45 +128,46 @@ export function healthFields(ctx) {
         { key: 'post_no_task_on', type: 'toggle', label: 'Tell the orchestrator about a commit posted with no task', help: 'A commit, SHA or patch posted on the board with no task number, by an agent with no task in progress, is named in the next health check, once.' },
         { key: 'upload_no_task_on', type: 'toggle', label: 'Tell the orchestrator about an artifact uploaded with no task', help: 'An artifact uploaded by an agent with no task in progress (and not marked as having no task) is named in the next health check, once.' },
         { key: 'goal_size_on', type: 'toggle', label: 'Tell the orchestrator when a goal has too many tasks', help: 'A goal that is not closed and has more tasks than the limit (open and done together) is named in the next health check, and again at each further limit.' },
-        { key: 'goal_size_limit', type: 'number', label: 'More than', unit: 'tasks in a goal', min: G_LO, max: G_HI, integer: true, compact: true, disabledWhen: v => !v.goal_size_on },
+        { key: 'goal_size_limit', type: 'number', label: 'More than', unit: 'tasks in a goal', min: G_LO, max: G_HI, integer: true, compact: true, under: 'goal_size_on', disabledWhen: v => !v.goal_size_on },
         { key: 'health_compact', type: 'heading', label: 'Context size', help: 'Works whether or not the health check is on. Claude agents only.', visibleWhen: v => v.compact_context_on !== undefined },
         { key: 'compact_context_on', type: 'toggle', label: 'Compact an idle agent’s large context', visibleWhen: v => v.compact_context_on !== undefined,
-            help: 'An agent that is idle at its prompt, with no unread board messages and no dialog open, and whose context is past the size below, is sent the CLI’s own /compact once. It is never interrupted mid-turn. Off unless you turn it on.' },
-        { key: 'compact_context_threshold_k', type: 'number', label: 'Past', unit: 'thousand tokens', help: '50 to 900', min: 50, max: 900, integer: true, compact: true, visibleWhen: v => v.compact_context_on !== undefined, disabledWhen: v => !v.compact_context_on },
-        { key: 'compact_context_trigger', type: 'select', label: 'When', visibleWhen: v => v.compact_context_on !== undefined, disabledWhen: v => !v.compact_context_on,
+            help: 'An agent that is idle at its prompt, with no unread board messages and no dialog open, and whose context is past the size below, is sent the CLI’s own /compact once. It is never interrupted mid-turn. On for a team that has not chosen; turn it off here and it stays off.' },
+        { key: 'compact_context_threshold_k', type: 'number', label: 'Past', unit: 'thousand tokens', help: '50 to 900', min: 50, max: 900, integer: true, compact: true, visibleWhen: v => v.compact_context_on !== undefined, under: 'compact_context_on', disabledWhen: v => !v.compact_context_on },
+        { key: 'compact_context_trigger', type: 'select', label: 'When', visibleWhen: v => v.compact_context_on !== undefined, under: 'compact_context_on', disabledWhen: v => !v.compact_context_on,
             help: 'Past the size above, after an agent finishes a task and has none in progress (and its context is at least 50 thousand tokens), or either.',
             options: async () => [{ value: 'threshold', label: 'When the context is large' }, { value: 'task', label: 'After a finished task' }, { value: 'both', label: 'Either' }] },
-        { key: 'compact_context_method', type: 'select', label: 'What it does', visibleWhen: v => v.compact_context_on !== undefined, disabledWhen: v => !v.compact_context_on,
+        { key: 'compact_context_method', type: 'select', label: 'What it does', visibleWhen: v => v.compact_context_on !== undefined, under: 'compact_context_on', disabledWhen: v => !v.compact_context_on,
             help: 'Compact keeps a summary of the work. The two Clear options end the whole conversation of an agent that is idle and has no task in progress, including a conversation you are having with it: it starts empty and is told to read its board (and its next task, or the note it wrote for itself). The handoff notes are kept as artifacts of the agent (an internal file named handoff.md).',
             options: async () => [{ value: 'compact', label: 'Compact (keep a summary)' }, { value: 'clear_next', label: 'Clear, then the next task' }, { value: 'clear_handoff', label: 'Ask for a handoff note, clear, then the note' }] },
-        { key: 'compact_context_orchestrator', type: 'toggle', label: 'Compact the orchestrator too', visibleWhen: v => v.compact_context_on !== undefined, disabledWhen: v => !v.compact_context_on,
-            help: 'The orchestrator holds the most state, so it is left alone unless you say so.' },
+        { key: 'compact_context_orchestrator', type: 'toggle', label: 'Compact the orchestrator too', visibleWhen: v => v.compact_context_on !== undefined, under: 'compact_context_on', disabledWhen: v => !v.compact_context_on,
+            help: 'The orchestrator holds the most state and is compacted too by default; turn this off to leave it alone.' },
+        { key: 'hb_work', type: 'heading', level: 1, label: 'Watching the work' },
         { key: 'health_landing', type: 'heading', label: 'Landing', help: 'Finished work that has not landed. Reads the local branch only, never CI or GitHub.' },
         { key: 'landing_on', type: 'toggle', label: 'Landing alert', help: 'When tasks were finished since the branch last moved and it has stood still for the wait, the next health check says so, again after each further wait.' },
-        { key: 'landing_branch', type: 'text', label: 'Branch', placeholder: 'main', help: 'The branch finished work lands on.', disabledWhen: v => !v.landing_on, validate: branchProblem },
-        { key: 'landing_wait_min', type: 'number', label: 'Wait', unit: 'minutes', help: '15 minutes to 7 days', min: L_LO, max: L_HI, integer: true, compact: true, disabledWhen: v => !v.landing_on },
+        { key: 'landing_branch', type: 'text', label: 'Branch', placeholder: 'main', help: 'The branch finished work lands on.', under: 'landing_on', disabledWhen: v => !v.landing_on, validate: branchProblem },
+        { key: 'landing_wait_min', type: 'number', label: 'Wait', unit: 'minutes', help: '15 minutes to 7 days', min: L_LO, max: L_HI, integer: true, compact: true, under: 'landing_on', disabledWhen: v => !v.landing_on },
         { key: 'landing_nudge', ...alsoTell('landing') },
         { key: 'health_ready', type: 'heading', label: 'Goals and open tasks', help: 'Two more lines of the check, on unless a team turns them off.' },
         { key: 'goals_ready_on', type: 'toggle', label: 'Goals ready to close', help: 'A goal whose tasks are all done or cancelled, with at least one done, for the wait is named in the next health check, once.' },
-        { key: 'goals_ready_wait_min', type: 'number', label: 'Wait', unit: 'minutes', help: '5 minutes to 7 days', min: C_LO, max: C_HI, integer: true, compact: true, disabledWhen: v => !v.goals_ready_on },
+        { key: 'goals_ready_wait_min', type: 'number', label: 'Wait', unit: 'minutes', help: '5 minutes to 7 days', min: C_LO, max: C_HI, integer: true, compact: true, under: 'goals_ready_on', disabledWhen: v => !v.goals_ready_on },
         { key: 'goals_ready_nudge', ...alsoTell('goals_ready') },
         { key: 'unowned_tasks_on', type: 'toggle', label: 'Open tasks with no goal or no assignee', help: 'Open tasks that have had no goal or no assignee for the wait are named by number in the next health check, once for each set.' },
-        { key: 'unowned_tasks_wait_min', type: 'number', label: 'Wait', unit: 'minutes', help: '5 minutes to 7 days', min: C_LO, max: C_HI, integer: true, compact: true, disabledWhen: v => !v.unowned_tasks_on },
+        { key: 'unowned_tasks_wait_min', type: 'number', label: 'Wait', unit: 'minutes', help: '5 minutes to 7 days', min: C_LO, max: C_HI, integer: true, compact: true, under: 'unowned_tasks_on', disabledWhen: v => !v.unowned_tasks_on },
         { key: 'unowned_tasks_nudge', ...alsoTell('unowned_tasks') },
         { key: 'health_release', type: 'heading', label: 'Release', help: 'A branch that is past its newest release tag. Reads the local tags only, never CI or GitHub.' },
         { key: 'release_on', type: 'toggle', label: 'Release alert', help: 'When the branch has commits after the newest release tag for the wait, the next health check says so, again after each further wait.' },
-        { key: 'release_branch', type: 'text', label: 'Branch', placeholder: 'main', help: 'The branch releases are cut from.', disabledWhen: v => !v.release_on, validate: branchProblem },
-        { key: 'release_tag_pattern', type: 'text', label: 'Tag pattern', placeholder: 'v*', help: 'v* also matches prereleases, such as v2.0.1-beta.', disabledWhen: v => !v.release_on, validate: tagPatternProblem },
-        { key: 'release_wait_min', type: 'number', label: 'Wait', unit: 'minutes', help: '1 hour to 30 days', min: R_LO, max: R_HI, integer: true, compact: true, disabledWhen: v => !v.release_on },
-        { key: 'release_nudge', type: 'select', label: 'Also tell', help: 'One member who also gets it as a message of their own when it is new.', disabledWhen: v => !v.release_on, options: async () => {
+        { key: 'release_branch', type: 'text', label: 'Branch', placeholder: 'main', help: 'The branch releases are cut from.', under: 'release_on', disabledWhen: v => !v.release_on, validate: branchProblem },
+        { key: 'release_tag_pattern', type: 'text', label: 'Tag pattern', placeholder: 'v*', help: 'v* also matches prereleases, such as v2.0.1-beta.', under: 'release_on', disabledWhen: v => !v.release_on, validate: tagPatternProblem },
+        { key: 'release_wait_min', type: 'number', label: 'Wait', unit: 'minutes', help: '1 hour to 30 days', min: R_LO, max: R_HI, integer: true, compact: true, under: 'release_on', disabledWhen: v => !v.release_on },
+        { key: 'release_nudge', type: 'select', label: 'Also tell', help: 'One member who also gets it as a message of their own when it is new.', under: 'release_on', disabledWhen: v => !v.release_on, options: async () => {
             const members = await ctx.members();
             return [{ value: '', label: 'Only the orchestrator' }, ...members.map(m => ({ value: m.subscriber_id, label: `${m.subscriber_id}${m.job_title ? ` (${m.job_title})` : ''}` }))];
         } },
-        { key: 'health_questions', type: 'heading', label: 'Questions', help: 'Works whether or not the health check is on.' },
+        { key: 'health_questions', type: 'heading', level: 1, label: 'Questions', help: 'Works whether or not the health check is on.' },
         { key: 'ask_reminder_on', type: 'toggle', label: 'Remind about unanswered questions', help: 'When an agent asks a question and the member it asks has not answered, remind that member once.' },
         minutes('ask_reminder_after_min', 'Remind the member after', 'minutes', 'ask_reminder_on'),
         { key: 'auto_recommend_on', type: 'toggle', visibleWhen: () => ctx.hasRecommend(), label: 'Answer a question with its Recommended option', help: `When an agent's single-choice question has waited the grace period, nobody is at its terminal, and exactly one option is marked "(Recommended)", Coral picks that option and tells the agent the operator did not review the question. Off unless you turn it on. The agent writes that label, so this is the agent answering its own question. Questions that mention deleting, forcing, pushing, publishing, paying, secrets and the like are left for you: that is a brake, not a boundary, because re-wording gets past it. With auto-accept permissions set to allow everything, or an agent in a bypass permission mode, an agent can approve its own decisions.` },
-        { key: 'auto_recommend_grace_min', type: 'number', label: 'Wait first', unit: 'minutes', help: '1 to 9 minutes', min: HEALTH_LIMITS.recommendGrace[0], max: HEALTH_LIMITS.recommendGrace[1], integer: true, compact: true, visibleWhen: () => ctx.hasRecommend(), disabledWhen: v => !v.auto_recommend_on },
+        { key: 'auto_recommend_grace_min', type: 'number', label: 'Wait first', unit: 'minutes', help: '1 to 9 minutes', min: HEALTH_LIMITS.recommendGrace[0], max: HEALTH_LIMITS.recommendGrace[1], integer: true, compact: true, visibleWhen: () => ctx.hasRecommend(), under: 'auto_recommend_on', disabledWhen: v => !v.auto_recommend_on },
         { key: 'health_defaults', type: 'custom', label: 'Defaults', help: 'Put every health setting back to the defaults. Save to apply them.', action: { label: 'Reset to defaults', run: view => ctx.onReset(view) } },
     ];
     // The alert rules repeat the words Branch, Wait and Also tell under their own headings: each rule is a group named by its legend (a fieldset), so a screen reader's forms list says which rule a "Wait" belongs to; the screen looks the same (#9173)

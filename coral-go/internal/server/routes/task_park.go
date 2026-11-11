@@ -110,6 +110,7 @@ func (h *BoardHandler) ParkTask(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Reason string `json:"reason"`
 		Until  string `json:"until"`
+		Force  bool   `json:"force"`  // park past the team's limit (#15362)
 		AskID  int64  `json:"ask_id"` // the open question to the Operator that a park waiting on the Operator carries (#11660)
 	}
 	if err := decodeJSON(r, &body); err != nil {
@@ -149,7 +150,7 @@ func (h *BoardHandler) ParkTask(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	task, err := h.bs.ParkTask(r.Context(), project, taskID, reason, until)
+	task, forcedPast, err := h.bs.ParkTaskForce(r.Context(), project, taskID, reason, until, body.Force)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		errNotFound(w, "Task not found")
@@ -170,7 +171,11 @@ func (h *BoardHandler) ParkTask(w http.ResponseWriter, r *http.Request) {
 	if !until.IsZero() {
 		end = " until " + until.Local().Format("2006-01-02 15:04")
 	}
-	h.bs.PostSystemMessage(r.Context(), project, "Coral Task Queue", fmt.Sprintf("[Task #%d parked by %s%s] no reminders or nudges for it until then", taskID, teamhealth.Name(who), end), nil)
+	pastLimit := ""
+	if forcedPast > 0 {
+		pastLimit = fmt.Sprintf(" (forced past the limit: %d already parked)", forcedPast)
+	}
+	h.bs.PostSystemMessage(r.Context(), project, "Coral Task Queue", fmt.Sprintf("[Task #%d parked by %s%s%s] no reminders or nudges for it until then", taskID, teamhealth.Name(who), end, pastLimit), nil)
 	writeJSON(w, http.StatusOK, task)
 }
 

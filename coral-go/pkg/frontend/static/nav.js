@@ -9,6 +9,7 @@ import { isPhoneLayout } from './phone_layout.js';
 import { browserLocal } from './safe_storage.js';
 import { parse, build, fromLegacyHash, normalize, chatsQuery } from './routes.js';
 import { isCloud } from './server_base.js';
+import { importOnce } from './import_once.js';
 
 const handlers = new Map();
 const LAST_PLACE = 'coral-last-place'; // the team, agent or chat the person had open (#10057): the page at "/" reopens it after a restart; kept in this browser only, as the route's address
@@ -97,7 +98,7 @@ export function startRoute(loc = location) {
     if ((loc.pathname === '/' || loc.pathname === '') && chatsQuery(loc.search)) {
         return normalize({ view: 'chats', query: chatsQuery(loc.search) }) || { view: 'agents' };
     }
-    return parse(loc.pathname, loc.search) || { view: 'agents' };
+    return parse(loc.pathname, loc.search) || { view: 'agents', bad: loc.pathname };
 }
 
 const START_TAB = { analytics: 'tokens', automations: 'automations', workflows: 'automations', docs: 'docs', skills: 'skills', chats: '', board: '', servers: '' }; // '' = the tab it ends on depends on the Coral (Chats is the Inbox's folders locally, a board or a missing computer ends on Agents): none is marked until switchNavTab knows
@@ -139,6 +140,6 @@ export function startNav() {
         current = r;
         show(r, { fromHistory: true }).finally(routeChanged);
     });
-    show(route, { fromHistory: true, startup: true, restored });
+    show(route, { fromHistory: true, startup: true, restored }).then(() => route.bad && importOnce('./np.js').then(m => m.lost(route.bad)));
     return route;
 }

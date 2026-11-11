@@ -45,7 +45,7 @@ func (h *BoardHandler) assignOverLimit(r *http.Request, project, assignee, taskA
 		}
 		options = append(options, l)
 	}
-	if !found || waiting <= limit {
+	if !found || waiting < limit { // at most `limit` waiting: the next one past it is refused (#15398, the Orchestrator: "can have 3 waiting" means at most 3)
 		return 0, limit, nil
 	}
 	if len(options) > assignOptionsShown {

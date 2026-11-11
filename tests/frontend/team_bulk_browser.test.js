@@ -53,7 +53,8 @@ const { coralReady } = require('./helpers/wait');
         const P='#team-panel-artifacts';
         await waitFor(`${q(P+' tbody')}?.children.length===3`,'artifact rows',15000);
         // a phone selects by a long press (#12230: the shared phone form has no Select button and no checkboxes); a key then adds the second file
-        { const at1 = await ev(`(()=>{const r=document.querySelector('${P} tbody tr .dt-mail-title, ${P} tbody tr .dt-primary').getBoundingClientRect();return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};})()`);
+        // the page is still settling when the rows first appear (the files strip and the search row finish loading and move the table): press only once the row has held still for 400 ms and the point is on the row, or the finger lands on whatever moved into that spot
+        { const at1 = await ev(`new Promise((res,rej)=>{const sel='${P} tbody tr .dt-mail-title, ${P} tbody tr .dt-primary';let last='',n=0,t0=performance.now();const tick=()=>{const el=document.querySelector(sel);const r=el&&el.getBoundingClientRect();const x=r?Math.round(r.left+r.width/2):0,y=r?Math.round(r.top+r.height/2):0;const on=r&&r.width>0&&el.closest('tr').contains(document.elementFromPoint(x,y));const k=on?x+','+y:'';n=k&&k===last?n+1:0;last=k;if(n>=8)return res({x,y});if(performance.now()-t0>10000)return rej(new Error('the first row never held still under its point'));setTimeout(tick,50);};tick();})`);
           const tt = type => client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x: at1.x, y: at1.y, id: 1 }] });
           await tt('touchStart'); await new Promise(r => setTimeout(r, 700)); await tt('touchEnd'); } // sleep-ok: a long press is a held finger
         await waitFor(`/1 selected/.test(((document.querySelector('${P} .dt-bar'))||{}).textContent||'')`,'a long press selects the first file',5000);

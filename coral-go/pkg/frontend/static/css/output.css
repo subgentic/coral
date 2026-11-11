@@ -451,7 +451,8 @@ body.panel-dragging .xterm-container {
 .terminal-statusbar {
     display: flex;
     align-items: center;
-    gap: 14px;
+    flex-wrap: wrap; /* a narrow pane or large text wraps the readouts to a second line instead of cutting them (#15526) */
+    gap: 2px 14px;
     flex: 0 0 auto;
     min-height: 26px;
     padding: 0 12px;

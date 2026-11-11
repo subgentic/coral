@@ -143,3 +143,9 @@ func TestAllowedEnvKeepsTheHubUpdateLaunchSwitch(t *testing.T) {
 	got := AllowedEnv([]string{"CORAL_ALLOW_HUB_UPDATE=1", "CORAL_SESSION_TOKEN=secret"})
 	assert.Equal(t, []string{"CORAL_ALLOW_HUB_UPDATE=1"}, got)
 }
+
+// #15072: the user's telemetry opt-out survives a restart by the updater (it was dropped, and the restarted Coral sent what had been switched off).
+func TestTheTelemetryOptOutIsKeptAcrossAnUpdateRestart(t *testing.T) {
+	got := AllowedEnv([]string{"CORAL_TELEMETRY_DISABLED=1", "CORAL_NO_LOGIN_PATH=1", "CORAL_TELEMETRY_KEY=secret"})
+	assert.Equal(t, []string{"CORAL_TELEMETRY_DISABLED=1", "CORAL_NO_LOGIN_PATH=1"}, got)
+}

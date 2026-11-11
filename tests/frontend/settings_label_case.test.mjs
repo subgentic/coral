@@ -1,4 +1,4 @@
-// Settings labels are sentence case (#5423): "Show scrollbars", not "Show Scrollbars". The panes had both ("Group agents by board or team" beside "Show Scrollbars" and "Check for Updates"), so a
+// Settings labels are sentence case (#5423): "Show scrollbars", not "Show Scrollbars". The panes had both ("Group agents by board or team" beside "Show Scrollbars" and "Check for updates"), so a
 // label is checked here: a row title (<dt>) or a settings switch label (<label for="settings-...">) of two or more words may not start every word with a capital. Names (Coral, Hub, Claude, Codex,
 // Antigravity, Git, API, CLI, tmux...) are allowed to be capitalised. Run on its own: node settings_label_case.test.mjs
 import fs from 'node:fs';

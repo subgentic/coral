@@ -19,7 +19,7 @@ const { coralReady } = require('./helpers/wait');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
-        for (const [id, jt] of [['orch', 'Orchestrator'], ['dev', 'Developer']]) assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: jt, session_name: id + '-s' })).status, 200);
+        for (const [id, jt] of [['orch', 'Orchestrator'], ['dev', 'Developer']]) assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: jt })).status, 200);
         const goal = (await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: 'Follow-ups stay visible', outcome: 'A goal says what is left of its follow-ups.', done_when: 'Nothing is open.' })).body.id;
         const mk = async (title, extra = {}) => (await api('POST', `/api/board/${B}/tasks`, { title, body: 'Text of ' + title, created_by: 'orch', priority: 'medium', goal_id: goal, ...extra })).body.id;
         const parent = await mk('Build the thing'), lonely = await mk('A task nobody followed up'), f1 = await mk('Fix what the review found', { assigned_to: 'dev' }), f2 = await mk('Add the missing test');

@@ -32,12 +32,18 @@ const { guardSettings } = require('./helpers/settings_guard');
             // a failed write: an error toast (what showToast(error.message, true) draws), and a second one
             await ev(`import(${S} + 'notifications.js').then(m => { m.showToast('Could not save that: the server did not answer.', true); m.showToast('Could not save that either.', true); return true; })`);
             await waitFor(`document.querySelectorAll('#toast-host > .toast').length >= 1`, `${at}the error toast`, 5000);
+            await ev(`(() => { const n = document.getElementById('launch-disclosure-banner'); n.scrollTop = n.scrollHeight; return true; })()`); // the notice scrolls inside its box: read to its end, so the button is where a person scrolls it to
             await ev(framesJs(6));
             const g = await ev(`(() => { const r = e => { const b = e.getBoundingClientRect(); return { l: Math.round(b.left), r: Math.round(b.right), t: Math.round(b.top), b: Math.round(b.bottom) }; };
                 const notice = document.getElementById('launch-disclosure-banner');
                 return { buttons: [...notice.querySelectorAll('button')].filter(b => b.getClientRects().length).map(b => ({ name: (b.getAttribute('aria-label') || b.textContent).trim(), ...r(b) })), toasts: [...document.querySelectorAll('#toast-host > .toast')].filter(t => t.getClientRects().length).map(r), notice: r(notice) }; })()`);
             check(g.buttons.length >= 1 && g.toasts.length >= 1, `${at}the notice's buttons and a toast are on screen: ${JSON.stringify(g)}`);
-            const covered = g.buttons.filter(b => g.toasts.some(t => t.l < b.r && t.r > b.l && t.t < b.b && t.b > b.t));
+            // the notice is capped at 25dvh and scrolls inside itself (layout.css), so at 200% text the longer headline (#15079) leaves a button partly or wholly below the notice's own box: only the part inside that box is on screen, and a toast under the box covers none of it
+            const shown = g.buttons.map(b => ({ ...b, t: Math.max(b.t, g.notice.t), b: Math.min(b.b, g.notice.b) })).filter(b => b.b > b.t);
+            const covered = shown.filter(b => g.toasts.some(t => t.l < b.r && t.r > b.l && t.t < b.b && t.b > b.t));
+            // and none sits over the notice's box at all: the notice scrolls, so the place a button is scrolled to is inside that box, and the column starts below it (placeNotices)
+            const overNotice = g.toasts.filter(t => t.l < g.notice.r && t.r > g.notice.l && t.t < g.notice.b && t.b > g.notice.t);
+            check(overNotice.length === 0, `${at}no toast sits over the notice's box: ${JSON.stringify(overNotice)} over ${JSON.stringify(g.notice)}`);
             check(covered.length === 0, `${at}no toast covers the notice's buttons: ${JSON.stringify(covered)} under ${JSON.stringify(g.toasts)}`);
             await shot(`launch-notice-toast-${w}${big ? '-200' : ''}${view ? '-' + view : ''}`);
             await ev(`document.documentElement.style.fontSize = ''; document.querySelectorAll('#toast-host > .toast').forEach(t => t.remove()); true`);

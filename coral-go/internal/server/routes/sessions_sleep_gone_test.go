@@ -16,7 +16,7 @@ import (
 )
 
 // #13171 (the Operator): an agent whose terminal is gone can be put to Sleep, not only woken. It is asleep already, so Sleep files it under plain sleeping: the reason "terminal_gone" is cleared (no more "Terminal gone"
-// badge), its row and resume info stay, and a later wake resumes it like any sleeper. Sleep all terminal-gone does it for the agents named, or for every one; an archived agent, one whose CLI exited and an awake one are left alone.
+// badge), its row and resume info stay, and a later wake resumes it like any sleeper. Sleep all terminal-gone does it for the agents named, or for every one; an archived agent and an awake one are left alone, and one whose CLI ended is filed too (#15068).
 func TestAnAgentWhoseTerminalIsGoneIsFiledUnderSleepingOneByOneOrInBulk(t *testing.T) {
 	srv, _, _, ss := setupSessionsTestServer(t)
 	ctx := context.Background()
@@ -71,10 +71,12 @@ func TestAnAgentWhoseTerminalIsGoneIsFiledUnderSleepingOneByOneOrInBulk(t *testi
 	// in bulk, naming agents: only the terminal-gone ones among them move
 	code, out = post("/api/sessions/live/sleep-gone", `{"session_ids":["`+b+`","`+c+`","`+d+`","`+e+`","`+f+`"]}`)
 	require.Equal(t, http.StatusOK, code, "%v", out)
-	assert.EqualValues(t, 1, out["sessions_affected"], "B moved; the awake, the plain sleeper, the archived and the exited were left")
+	assert.EqualValues(t, 2, out["sessions_affected"], "B and the ended F moved; the awake, the plain sleeper and the archived were left")
 	_, reason, _, _ = state(b)
 	assert.Equal(t, "", reason)
-	for id, want := range map[string]string{e: store.SleepReasonTerminalGone, f: store.SleepReasonAgentExited, g: store.SleepReasonTerminalGone} { // G is terminal-gone but was not named
+	_, reason, _, _ = state(f)
+	assert.Equal(t, "", reason, "an ended agent is filed under sleeping too (#15068)")
+	for id, want := range map[string]string{e: store.SleepReasonTerminalGone, g: store.SleepReasonTerminalGone} { // G is terminal-gone but was not named
 		_, got, _, _ := state(id)
 		assert.Equal(t, want, got, id)
 	}

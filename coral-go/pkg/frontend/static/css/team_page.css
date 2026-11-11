@@ -17,10 +17,10 @@
 .team-page-status.unknown .team-status-dot { background: var(--text-secondary); } /* no signal yet: neither green nor amber (#10006) */
 .team-page-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; position: relative; }
 .team-page-actions .btn { min-height: 36px; }
-.team-more-menu .menu-note { display: block; padding: 0 12px 8px; margin-top: -4px; color: var(--text-secondary); font-size: var(--fs-sm); max-width: 16rem; } /* what Pause Board does, under it (#10008) */
+.team-more-menu .menu-note { display: block; padding: 0 12px 8px; margin-top: -4px; color: var(--text-secondary); font-size: var(--fs-sm); max-width: 16rem; } /* what Pause board does, under it (#10008) */
 .team-more-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; } /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
 .team-more-menu > :is(button, hr).team-more-add { display: none !important; }
-.team-more-menu > .mb-action-btn { width: 100%; padding: 6px 12px; border: 0; background: none; text-align: left; justify-content: flex-start; } .team-more-menu > .mb-action-btn:hover { background: var(--bg-hover); } .team-more-menu > .mb-action-btn.mb-action-danger { color: var(--error-text); background: none; } /* the board's actions in this menu are plain rows like Add agent and Sleep Team, not boxed buttons (#11015) */
+.team-more-menu > .mb-action-btn { width: 100%; padding: 6px 12px; border: 0; background: none; text-align: left; justify-content: flex-start; } .team-more-menu > .mb-action-btn:hover { background: var(--bg-hover); } .team-more-menu > .mb-action-btn.mb-action-danger { color: var(--error-text); background: none; } /* the board's actions in this menu are plain rows like Add agent and Sleep team, not boxed buttons (#11015) */
 @media (max-width: 767px), (pointer: coarse) { .team-more-menu { max-height: 60vh; overflow-y: auto; } .menu-item[data-stop][aria-disabled="true"] { flex-wrap: wrap; white-space: normal; } .menu-item[data-stop] .overflow-menu-note { flex: 1 1 100%; margin-left: 0; } } /* a Stop item that says why it is off ("No agent of this team is running") puts the words under its label on a phone: at 200% text one line was cut by the screen, and three such rows are taller than the page under the header: the menu scrolls inside 60% of the screen rather than being cut by the stage (#10328) */
 
 .tabs.team-tabs { flex: none; padding: 6px 24px 0; scroll-padding-inline: 2rem; } /* one row that never changes height: when the tabs are wider than the window the strip scrolls sideways, the selected tab is scrolled into view, and a fade at the edge says there is more */
@@ -46,6 +46,7 @@
 /* the tables of the tabs and the pages that hold them (the goals engine's classes, now a table and a page) */
 .goals-page.goals-table-page { max-width: none; margin-inline: 0; } /* the team page's tabs fill the page area at every width: the board's 1100 px and 1440 px caps (goals.css .goals-page) are not theirs (#7729) */
 .goals-table-page { padding: var(--team-page-padding, 16px 24px 0); width: 100%; box-sizing: border-box; flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
+@media (min-width: 761px) { .team-needs-list { padding: var(--team-page-padding, 16px 24px 0); box-sizing: border-box; } } /* the Needs you tab keeps the same gutter as the other tabs: its table touched both screen edges at 960 (#15324, walk 21 M3) */
 .agentic-panel { --team-page-padding: 0; } /* dock tables fill the panel; their toolbar and cells supply the inner spacing */
 .goals-body, .team-tasks-body, .team-artifacts-body, .team-knowledge-body { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
 /* The one toolbar line of every list tab (#7717, team_toolbar.js; Messages, Tasks and Artifacts are list bars, Goals, Agents and Knowledge build a row of the same make): the search field, the state pills, the Filters and More icons, the tab's action at the right, 32 px high on a desktop.
@@ -503,7 +504,10 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
 .team-task-page .task-jump-role { color: var(--text-secondary); }
 @media (pointer: coarse), (max-width: 767px) { .team-task-page .task-jump-btn { min-height: var(--control-touch-height, 44px); } }
 /* Give each destructive team action its own boundary; the menu still scrolls on phones. */
-:is(#team-page-stop-menu, #team-page-more-menu) > :is([data-stop="reset"], [data-stop="kill"], #mb-delete-btn) {
+:is(#team-page-stop-menu, #team-page-more-menu) > :is([data-stop="kill"], #mb-delete-btn) {
     margin-top: 12px;
     border-top: 1px solid var(--border);
 }
+
+/* The Artifacts tab's files strip: its space is held, unseen, until the real strip replaces it, so the table does not jump down (#15618). */
+.team-files-strip-reserve { visibility: hidden; }

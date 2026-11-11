@@ -71,6 +71,10 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`[...document.querySelectorAll('#team-panel-artifacts .artifact-tags-row')].some(r => r.textContent === 'for review')`, 'the row chip', 8000);
         await waitFor(`!!document.querySelector('#team-panel-artifacts .team-tb-pills') && /For review 1/.test(document.querySelector('#team-panel-artifacts .team-tb-pills').textContent)`, 'the pill', 8000);
         await shot('artifact-tags-row-and-pill');
+        // the review mark stays when the Tags column drops at a narrower width (walk 9 H1): the name cell carries a For review chip
+        await Emulation.setDeviceMetricsOverride({ width: 820, height: 900, deviceScaleFactor: 1, mobile: false });
+        await waitFor(`![...document.querySelectorAll('#team-panel-artifacts .artifact-tags-row')].some(r => r.getClientRects().length) && [...document.querySelectorAll('#team-panel-artifacts .dt-title-cell .dt-tag')].some(t => t.textContent === 'For review' && t.getClientRects().length)`, 'a For review mark on the name when the Tags column is gone', 8000);
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         // The review's state in words in the sheet (Mobile Beta Tester, live: an approved artifact showed only its tag chip): the sheet of the file tagged for review says so, above its tags
         await ev(`document.querySelector('.detail-head .detail-close, .detail-head [aria-label^="Close"]')?.click(); [...document.querySelectorAll('#team-panel-artifacts [data-artifact-id]')].find(b => b.textContent === 'plan.txt').click(); true`);
         await waitFor(`document.querySelector('.detail-head .artifact-review-line')?.textContent === 'Waiting for your review'`, 'the review line in the sheet of a file tagged for review', 10000);
@@ -113,7 +117,7 @@ const { coralReady } = require('./helpers/wait');
 
         // ── the edges (#8594 review): set the tags through the route, then read the page ──────────────────────────────────
         const put = async (hex, tags) => assert.equal((await api('PUT', `/api/board/${B}/artifacts/${hex}/tags`, { tags })).status, 200);
-        const reload = async () => { await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks' }); true`); await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`); await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length === 3`, 'the list again', 15000); };
+        const reload = async () => { await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks' }); true`); await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`); await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length >= 3`, 'the list again', 15000); };
         const sheet = async name => { await ev(`[...document.querySelectorAll('#team-panel-artifacts [data-artifact-id]')].find(b => b.textContent === ${JSON.stringify(name)} || (b.querySelector('.dt-mail-title') || {}).textContent === ${JSON.stringify(name)}).click(); true`); await waitFor(`document.querySelector('.detail-head h2')?.textContent === ${JSON.stringify(name)}`, `the sheet of ${name}`, 10000); };
         const rowOf = name => `[...document.querySelectorAll('#team-panel-artifacts tbody tr')].find(r => r.querySelector('[data-artifact-id]')?.textContent === ${JSON.stringify(name)})`;
         const select = async names => { await ev(`(() => { ${JSON.stringify(names)}.forEach(n => { const r = [...document.querySelectorAll('#team-panel-artifacts tbody tr')].find(x => x.querySelector('[data-artifact-id]')?.textContent === n); const c = r.querySelector('input[type=checkbox]'); if (!c.checked) c.click(); }); return true; })()`); };
@@ -234,12 +238,33 @@ const { coralReady } = require('./helpers/wait');
         await ev(`[...document.querySelectorAll('.detail-actions button, .detail-pane button')].find(b => b.textContent.trim() === 'Open')?.click(); true`);
         await waitFor(`/^Approved .+/.test(document.querySelector('.artifact-review-state')?.textContent || '')`, 'the viewer opened by the sheet\'s Open button says Approved with its time', 10000);
         await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
+        // review from the list (#15120, walk 3 N4): a file waiting for review has Approve and Request changes in its sheet; Approve there is the same decision as the viewer's
+        await put(files[2], ['for review']); await reload(); await sheet('log.txt');
+        await waitFor(`document.querySelectorAll('.detail-head .artifact-sheet-review button').length === 2`, 'Approve and Request changes in the sheet of a file waiting for review', 10000);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('.detail-head .artifact-sheet-review button')].map(b => b.textContent)`), ['Approve', 'Request changes']);
+        await ev(`window.__decisions = []; const f0 = window.fetch; window.fetch = (u, o = {}) => { if (/\\/review$/.test(String(u)) && o.body) window.__decisions.push({ path: String(u), body: JSON.parse(o.body) }); return f0(u, o); }; document.querySelector('.detail-head .artifact-sheet-review button.btn-primary').click(); true`);
+        await waitFor(`/^Approved/.test(document.querySelector('.detail-head .artifact-review-line')?.textContent || '') && !document.querySelector('.detail-head .artifact-sheet-review')`, 'the sheet says Approved and drops its buttons', 10000);
+        assert.ok(await ev(`window.__decisions.some(d => d.path.endsWith('/artifacts/${files[2]}/review') && d.body.decision === 'approve')`), 'Approve in the sheet sent the approve decision for that file: ' + await ev(`JSON.stringify(window.__decisions)`));
         const v1 = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review&question=Approve+the+series%3F`, 'version one of the series ' + Date.now(), { 'X-Artifact-Name': 'spec.md', 'X-Artifact-Media-Type': 'text/markdown' });
         assert.equal(v1.status, 201, JSON.stringify(v1)); const h1 = /[a-f0-9]{64}/.exec(v1.body.uri)[0];
         const v2 = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review&question=Approve+the+series%3F`, 'version two of the series ' + Date.now(), { 'X-Artifact-Name': 'spec.md', 'X-Artifact-Media-Type': 'text/markdown', 'X-Artifact-New-Version-Of': 'coral://artifacts/' + h1 });
         assert.equal(v2.status, 201, JSON.stringify(v2)); const h2 = /[a-f0-9]{64}/.exec(v2.body.uri)[0];
         assert.equal((await api('POST', `/api/board/${B}/artifacts/${h2}/review`, { decision: 'approve' })).status, 200);
         await viewerLine(h2);
+        console.log('   ✓');
+
+        console.log('9. The side panel that says Waiting for your review has Approve (#15338, walk 23)');
+        const wait = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review&question=Is+it+right%3F`, 'a file waiting ' + Date.now(), { 'X-Artifact-Name': 'waiting.md', 'X-Artifact-Media-Type': 'text/markdown' });
+        assert.equal(wait.status, 201, JSON.stringify(wait)); const hw = /[a-f0-9]{64}/.exec(wait.body.uri)[0];
+        await reload();
+        await sheet('waiting.md');
+        await waitFor(`document.querySelector('.detail-head .artifact-review-line')?.textContent === 'Waiting for your review'`, 'the panel says it is waiting', 10000);
+        const approveBtn = `[...document.querySelectorAll('.detail-actions button, .detail-pane button')].find(b => b.textContent.trim() === 'Approve')`;
+        assert.equal(await ev(`!!${approveBtn}`), true, 'a file waiting for review has Approve in its side panel');
+        await ev(`${approveBtn}.click(); true`);
+        await waitFor(`/^Approved/.test(document.querySelector('.detail-head .artifact-review-line')?.textContent || '')`, 'the panel says Approved after the click', 10000);
+        assert.ok((await tagsOf(hw)).includes('approved') && !(await tagsOf(hw)).includes('for review'), 'the server has it approved');
+        assert.equal(await ev(`!!${approveBtn}`), false, 'an approved file offers no Approve');
         console.log('   ✓');
 
         console.log('PASS artifact tags: chips and Add tag in the sheet, row chips, the For review pill and Tag filter, Tag and Untag in the selection bar');

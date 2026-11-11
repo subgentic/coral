@@ -172,7 +172,13 @@ const keep = flag('--keep');
 // Strict local auth (#3527, Security's #3509 item 6): --strict runs STRICT_SUITES on shards whose Coral has
 // --strict-local-auth, each suite starting in a tab signed in through 'coral open --print'. A full run (no
 // --only, no --stress) adds one such shard at the end; --no-strict leaves it out.
-const strictOnly = flag('--strict');
+// --prod-tier (#15407, audit item 3 of #15067): the strict phase against the binary users get: built WITHOUT the dev tag (tags fts5 only), started without CORAL_TEST_HOOKS, the Terms
+// accepted by a marker in the shard's throwaway home, telemetry off. It runs STRICT_SUITES plus PROD_TIER_EXTRA, only what needs neither a test hook nor seeded data.
+const prodTier = flag('--prod-tier');
+const strictOnly = flag('--strict') || prodTier;
+const PROD_TIER_EXTRA = ['settings_dialog_save_flow_browser.test.js'];
+// Left out of the prod-tier shard, each with its reason (printed at the start of the shard): they need what a default build does not have.
+const PROD_TIER_SKIPPED = { 'agent_state.test.js': 'drives the list through window._coralSetLiveSessions, a test hook the default build does not expose (trial 42922281825)' };
 const STRICT_SUITES = [
   'phone_landscape_fold_browser.test.js', // folding must preserve the real authenticated disclosure gate
   'permissions_default_browser.test.js', // the real disclosure gate requires a dashboard sign-in cookie
@@ -201,7 +207,7 @@ const MAIN_BACKEND = process.env.CORAL_BACKEND || 'default';
 // strict phase, sequences and end-of-run checks. There a full run adds no tmux phase, --sequences runs on the default backend, and --tmux is refused.
 const NO_TMUX_HERE = process.platform === 'win32';
 if (tmuxOnly && NO_TMUX_HERE) { console.error('--tmux: Coral has no tmux backend on Windows, so there is nothing to run'); process.exit(2); }
-const tmuxShard = !NO_TMUX_HERE && (tmuxOnly || (!flag('--no-tmux') && !only && !stress && !flag('--sequences') && !part));
+const tmuxShard = !NO_TMUX_HERE && !prodTier && (tmuxOnly || (!flag('--no-tmux') && !only && !stress && !flag('--sequences') && !part));
 const strictShard = strictOnly || (!flag('--no-strict') && !tmuxOnly && !only && !stress && !flag('--sequences') && !part);
 // The live Coral's default ports: 8450 on Windows, 8420 elsewhere. Both are refused, the same list as Go's testguard (defaultPorts).
 const PROD_PORTS = [8420, 8450];
@@ -432,7 +438,7 @@ if (process.env.CORAL_STRIP_STATIC === '1') {
   console.log(`  [runner] the dashboard is built stripped (overlay ${path.basename(path.dirname(overlay))})`);
   process.on('exit', () => { spawnSync('go', ['run', './tools/strip-static', '-clean', overlay], { cwd: goDir, stdio: 'ignore' }); });
 }
-const goBuildArgs = ['build', ...overlayArgs, '-tags', 'dev fts5', '-o', tmp + path.sep, ...toolPackages];
+const goBuildArgs = ['build', ...overlayArgs, '-tags', prodTier ? 'fts5' : 'dev fts5', '-o', tmp + path.sep, ...toolPackages];
 const b = spawnSync('go', goBuildArgs, { cwd: goDir, stdio: 'inherit' });
 if (b.status !== 0) process.exit(2);
 
@@ -531,7 +537,7 @@ async function startShard(n, gen = 0, strict = false, backend = MAIN_BACKEND) {
   ownerOnlyOnWindows(pwFile, false);
   // profileEnv (#375): HOME and, on Windows, USERPROFILE, HOMEDRIVE/HOMEPATH, APPDATA and LOCALAPPDATA are the shard's home, so the
   // server, its agents and their PowerShell never read or write the operator's profile (run.sh sets USERPROFILE too).
-  const serverEnv = { ...testEnv, CORAL_TEST_HOOKS: '1', CORAL_DATA_DIR: data, ...profileEnv(hostHome), CORAL_INITIAL_PASSWORD_FILE: pwFile,
+  const serverEnv = { ...testEnv, ...(prodTier ? {} : { CORAL_TEST_HOOKS: '1' }), CORAL_DATA_DIR: data, ...profileEnv(hostHome), CORAL_INITIAL_PASSWORD_FILE: pwFile,
     PATH: stubBin + path.delimiter + (testEnv.PATH || process.env.PATH || '') };  // #4354: this shard's stub CLI first on PATH
   for (const k of HOST_DATA_VARS) delete serverEnv[k];
   // CDP_EVIDENCE_DIR (a Windows CI run sets it): at a suite's timeout the runner captures what was stuck before it kills it (captureTimeoutEvidence), including the test
@@ -556,6 +562,8 @@ async function startShard(n, gen = 0, strict = false, backend = MAIN_BACKEND) {
       throw new Error(`#4354: could not seed cli_path into ${path.join(data, 'sessions.db')}: ${e.stderr || e.message}`);
     }
   }
+  // A prod-tier binary asks for the Terms (a dev one skips them): the same bare marker the release smoke writes, in this shard's own home, never a real install's.
+  if (prodTier) { fs.mkdirSync(path.join(hostHome, '.coral'), { recursive: true }); fs.writeFileSync(path.join(hostHome, '.coral', '.eula-accepted'), 'accepted\n'); }
   const coral = spawn(bin, ['--home', data, '--host', '127.0.0.1', '--port', String(port), '--no-browser', '--cloud-url', 'off',
     ...(strict ? ['--strict-local-auth'] : ['--strict-local-auth=false']), ...(backend && backend !== 'default' ? ['--backend', backend] : [])],
     { env: serverEnv, stdio: ['ignore', fs.openSync(log, 'w'), fs.openSync(log, 'a')], detached: DETACH });
@@ -654,12 +662,12 @@ try {
 } catch (e) { console.error(e.message); process.exit(2); }
 console.log('');
 
-for (const t of STRICT_SUITES) if (!suites.cdp.includes(t)) { console.error(`STRICT_SUITES names ${t}, which is not a CDP suite`); process.exit(2); }
+for (const t of [...STRICT_SUITES, ...PROD_TIER_EXTRA]) if (!suites.cdp.includes(t)) { console.error(`STRICT_SUITES names ${t}, which is not a CDP suite`); process.exit(2); }
 for (const t of TMUX_SUITES) if (!suites.cdp.includes(t)) { console.error(`TMUX_SUITES names ${t}, which is not a CDP suite`); process.exit(2); }
 // Longest first, from the durations of a previous run (suite_durations.json; update_suite_durations.mjs writes it): shards take the next
 // suite from one queue, and a long suite left to the end of an alphabetical queue would leave the other shards idle (#3916).
 const suiteDurations = loadDurations(path.join(here, 'suite_durations.json'));
-let tests = sequencesOnly ? [] : (strictOnly ? STRICT_SUITES : tmuxOnly ? TMUX_SUITES : [...suites.cdp, ...suites.server].filter(f => MAIN_BACKEND !== 'default' || !TMUX_ONLY_SUITES.includes(f)))
+let tests = sequencesOnly ? [] : (strictOnly ? (prodTier ? [...STRICT_SUITES, ...PROD_TIER_EXTRA].filter(f => !(f in PROD_TIER_SKIPPED)) : STRICT_SUITES) : tmuxOnly ? TMUX_SUITES : [...suites.cdp, ...suites.server].filter(f => MAIN_BACKEND !== 'default' || !TMUX_ONLY_SUITES.includes(f)))
   .filter(f => !only || only.split(',').some(o => f.includes(o))).sort();
 // Suites known to fail on Windows only (windows_known_reds.json, each with its reason) are left out there; every entry must still be a CDP suite.
 const windowsReds = JSON.parse(fs.readFileSync(path.join(here, 'windows_known_reds.json'), 'utf8'));
@@ -679,6 +687,7 @@ if (shuffleSeed) { // mulberry32: the same seed gives the same order, so a failu
 }
 if (Object.keys(suiteDurations).length) console.log(`queue: longest first (${tests.filter(t => typeof suiteDurations[t] === 'number').length} of ${tests.length} suites have a recorded duration in suite_durations.json)`);
 // The strict phase's results are named 'strict: <suite>' (the default-mode run of a suite is separate).
+if (prodTier) for (const [n, why] of Object.entries(PROD_TIER_SKIPPED)) console.log(`skipped in the prod-tier shard: ${n}: ${why}`);
 let phase = strictOnly ? 'strict: ' : tmuxOnly ? 'tmux: ' : '';
 const sequences = stress || strictOnly || tmuxOnly || part || (only && !sequencesOnly) ? [] : SEQUENCES;
 for (const t of sequences.flat()) if (!suites.cdp.includes(t)) { console.error(`SEQUENCES names ${t}, which is not a CDP suite`); process.exit(2); }
@@ -935,6 +944,7 @@ const ALLOWED_SETTING_ROWS = {
   'goal_comments_real_browser.test.js': ['artifact_comments_owner_id'], // the install's comment identity, made by the first comment anyone writes on this computer
   'goal_new_comments_browser.test.js': ['goal_done_hidden', 'goal_done_read'], // the Operator's read and hidden lists of finished goals, saved for the first time by this suite and put back to empty at its end (#12073)
   'theme_configurator_light_browser.test.js': ['custom_theme'], // it saves a theme and applies it: the setting row is first written there
+  'needs_one_number_browser.test.js': ['inbox_welcome_done'], // it puts the welcome tile away (Got it, and the bulk Dismiss) and the first save of that setting makes the row; the runner puts the value back
   'chief_setup_browser.test.js': ['chief_actions', 'chief_avatar', 'chief_avatar_letter', 'chief_fronts', 'chief_name', 'chief_page', 'chief_session', 'chief_team'],
 };
 const allowedSettingLeak = (test, l) => { const m = /^setting (\S+) added /.exec(l); return !!m && (ALLOWED_SETTING_ROWS[test] || []).includes(m[1]); };
@@ -1112,8 +1122,14 @@ try {
     console.error('FAIL (#4354): a real CLI on PATH was invoked (a mock cli_path was bypassed):\n' + fs.readFileSync(STUB_MARKER, 'utf8').replace(/^/gm, '    '));
     sandboxOk = false;
   }
+  // ~/.claude/projects is shared by every Claude session on the machine, so a new entry is not by itself this run's: another agent starting in a new folder makes one (#15105). Claude names an entry after its
+  // working folder (every character that is not a letter or digit becomes '-'), and everything this run starts works under its own folder (tmp), so only a new entry named for tmp is this run's leak.
+  const encode = p => p.replace(/[^A-Za-z0-9]/g, '-');
+  const mine = [...new Set([tmp, (() => { try { return fs.realpathSync(tmp); } catch { return tmp; } })()].map(encode))];
   const added = (() => { try { return fs.readdirSync(REAL_CLAUDE_PROJECTS).filter(n => !claudeBaseline.has(n)); } catch { return []; } })();
-  if (added.length) { console.error('FAIL (#4354): new entries under the real ~/.claude/projects:\n    ' + added.join('\n    ')); sandboxOk = false; }
+  const leaked = added.filter(n => mine.some(m => n.includes(m)));
+  if (leaked.length) { console.error('FAIL (#4354): new entries under the real ~/.claude/projects, named for this run\'s folder:\n    ' + leaked.join('\n    ')); sandboxOk = false; }
+  else if (added.length) console.log(`note (#4354): ${added.length} new entr${added.length === 1 ? 'y' : 'ies'} under ~/.claude/projects, none named for this run's folder (another Claude session on this machine)`);
   const reached = profileLeaks(path.basename(tmp), runStart);
   if (reached.length) { console.error('FAIL (#375): the operator\'s profile names this run\'s folder:\n    ' + reached.join('\n    ')); sandboxOk = false; }
 } catch (e) { console.error(`#4354 sandbox check error: ${e.message}`); sandboxOk = false; }

@@ -12,7 +12,7 @@
 # flags, toolchain) but a cached output is not re-checked on reuse: like the tmux payload, it is
 # trusted because only main's warm workflow writes it.
 name: Install Go (go.dev, checksum-pinned, macOS)
-description: Installs Go 1.26.10 for this runner's architecture and puts it on PATH.
+description: Installs Go 1.26.11 for this runner's architecture and puts it on PATH.
 inputs:
   cache:
     description: '"off" (default) or "restore": restore the build and module caches a main run saved'
@@ -31,13 +31,13 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Install Go 1.26.10 (go.dev, checksum-pinned)
+    - name: Install Go 1.26.11 (go.dev, checksum-pinned)
       shell: bash
       run: |
         set -euo pipefail
         case "$(uname -m)" in
-          arm64) f=go1.26.10.darwin-arm64.tar.gz; sum=0b5183492292ada170f9b561a834863808dd02edba599e4ad0e89899330020b3 ;;
-          x86_64) f=go1.26.10.darwin-amd64.tar.gz; sum=e820ab780c273ae4a340b79d0f3c4313b74ee029aa3874792145d44b9f4f91da ;;
+          arm64) f=go1.26.11.darwin-arm64.tar.gz; sum=e3a42e67a7a8acf450ebada2b074c7ca863000ca514907b7185b45e8f5cdff57 ;;
+          x86_64) f=go1.26.11.darwin-amd64.tar.gz; sum=394baae971332f2bc783d6e2004ae57101479bd3b06ed8209a3fe3570d4ce498 ;;
           *) echo "::error::unexpected architecture $(uname -m)"; exit 1 ;;
         esac
         curl -fsSL --retry 3 -o "$RUNNER_TEMP/$f" "https://go.dev/dl/$f"

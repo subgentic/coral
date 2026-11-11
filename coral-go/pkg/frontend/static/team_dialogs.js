@@ -522,21 +522,23 @@ function _loadTeamTemplate(name) {
     for (const agent of tmpl.agents) {
         const agentName = agent.name || agent.role || '';
         const agentPrompt = agent.prompt || agent.description || '';
-        const row = _addTeamAgent(agentName, agentPrompt, agent.capabilities, agent.agent_type, agent.model, agent.flags);
+        const row = _addTeamAgent(agentName, agentPrompt, agent.capabilities, agent.agent_type, agent.model, agent.flags, { thinking: agent.thinking });
         if (!tmpl.builtin) row.dataset.permissionExplicit = '1'; // existing saved templates retain their confirm-mode meaning
+        const modeSel = agent.permission_mode && document.getElementById(row.dataset.acfId)?.querySelector('.acf-permission-mode');
+        if (modeSel && [...modeSel.options].some(o => o.value === agent.permission_mode)) { modeSel.value = agent.permission_mode; modeSel.dataset.pickedByPerson = '1'; }
     }
     if (tmpl.flags) {
         const tfEl = document.getElementById("team-flags");
         if (tfEl) { tfEl.value = tmpl.flags; _syncFlagButtons("team-flags"); }
     }
-    setTeamLaunchMode(tmpl.mode || 'none'); // the template's working mode, None when it names none (the built-in Coding Team starts with Task queue, #8919)
+    setTeamLaunchMode(tmpl.mode || tmpl.working_mode?.mode || 'none', tmpl.working_mode); // the template's working mode, None when it names none (the built-in Coding Team starts with Task queue, #8919)
     markTeamTemplate(name);
     _syncTeamMembers();
 }
 
 // reveal: scroll the new row into view. Only for a member the person added; the default members and a template's are added while the dialog opens or fills, and scrolling to the last of them
 // left the Members step opened past its heading and the template picker (#4950). top: put the row first (Add Orchestrator).
-function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultAgentType, defaultModel, defaultFlags, { reveal = false, top = false } = {}) {
+function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultAgentType, defaultModel, defaultFlags, { reveal = false, top = false, thinking = '' } = {}) {
     launch.teamAgentCounter++;
     const idx = launch.teamAgentCounter;
     const acfId = `team-agent-acf-${idx}`;
@@ -570,6 +572,7 @@ function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultA
         model: defaultModel || '',
         capabilities: caps,
     };
+    if (thinking) acfValue.thinking = thinking;
     acfValue.flags = defaultFlags || ''; // a member with no mode of its own starts at Default and follows the saved default Mode (#6397)
     renderAgentConfigForm(acfId, {
         showPreset: false,
@@ -712,7 +715,29 @@ function _setAllWorkers(type) {
     const label = [...(document.getElementById('team-agent-type')?.options || [])].find(o => o.value === type)?.textContent.replace(/ \(.*\)$/, '') || type;
     _clearTeamUndo();
     const line = document.getElementById('team-undo');
-    if (line) line.textContent = `Set ${n} ${n === 1 ? 'worker' : 'workers'} to ${label}.`;
+    if (line) line.textContent = `Set ${n} ${n === 1 ? 'worker' : 'workers'} to ${label}. Pick a model for them below.`;
+    document.getElementById('team-set-all-model')?.setAttribute('hidden', ''); setTimeout(_fillAllModels, 800); // the new provider's list arrives a moment after the change
+    _syncTeamMembers();
+}
+
+/** Set all workers' model (#15079): after a provider is chosen, a second list offers that provider's models; choosing one sets it on every worker (the Orchestrator keeps its own), as the provider list does for the provider. */
+const _workerBoxes = () => teamRows().filter(r => !isOrchestrator(rowRole(r))).map(r => document.getElementById(r.dataset.acfId)).filter(Boolean);
+function _fillAllModels() {
+    const sel = document.getElementById('team-set-all-model'), box = _workerBoxes().find(b => b.querySelector('.acf-model-select'));
+    if (!sel || !box) return;
+    const keep = sel.value;
+    sel.replaceChildren(new Option('Model: each worker\'s default', ''), ...[...box.querySelector('.acf-model-select').options].filter(o => o.value && !o.dataset.unlisted && !o.value.startsWith('__')).map(o => new Option(o.textContent, o.value)));
+    sel.value = [...sel.options].some(o => o.value === keep) ? keep : '';
+    sel.hidden = false;
+}
+function _setAllModel(value) {
+    let n = 0;
+    for (const box of _workerBoxes()) {
+        const s = box.querySelector('.acf-model-select');
+        if (!s || ![...s.options].some(o => o.value === value)) continue;
+        s.value = value; s.dispatchEvent(new Event('change', { bubbles: true })); n++;
+    }
+    _clearTeamUndo(); const line = document.getElementById('team-undo'); if (line) line.textContent = n ? `Set the model of ${n} ${n === 1 ? 'worker' : 'workers'}.` : 'No worker offers that model.';
     _syncTeamMembers();
 }
 
@@ -937,4 +962,4 @@ async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSet
 }
 window.launchTeam = launchTeam;
 
-export { _openLaunchedTeam, _addTeamAgent, _applyACFPresetFor, _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards, _moveTeamAgent, _removeMemberFromDialog, _moveMemberFromDialog, _renderTeamTemplateSelector, _syncTemplateMenu, _removeTeamAgent, _undoTeamAgentRemoval, _syncTeamMembers, _pickTeamTemplate, _setAllWorkers, _addOrchestrator, teamStepMove };
+export { _fillAllModels, _setAllModel, _openLaunchedTeam, _addTeamAgent, _applyACFPresetFor, _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards, _moveTeamAgent, _removeMemberFromDialog, _moveMemberFromDialog, _renderTeamTemplateSelector, _syncTemplateMenu, _removeTeamAgent, _undoTeamAgentRemoval, _syncTeamMembers, _pickTeamTemplate, _setAllWorkers, _addOrchestrator, teamStepMove };

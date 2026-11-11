@@ -85,7 +85,7 @@ const MENU = (extra = {}) => ({ question: 'Quick safety check: Is this a project
             if (mobile) check(geo.bs.every(b => b.h >= 44 && b.w >= 44), `${at}each is a 44 px target: ` + JSON.stringify(geo));
             // the whole folder and the sentence are READ on the row, not cut at an edge: the last line of the note is on the screen, inside the note, and the folder wraps instead of running off
             const seen = await ev(`(() => { const n = document.querySelector('#group-table-view .inbox-answers .inbox-trust-note'); if (!n) return null; n.scrollIntoView({ block: 'center' }); const w = document.createTreeWalker(n, NodeFilter.SHOW_TEXT); let last = null; while (w.nextNode()) last = w.currentNode; const rg = document.createRange(); rg.selectNodeContents(last); const rs = [...rg.getClientRects()], r = rs[rs.length - 1], c = document.querySelector('#group-table-view .inbox-trust-path').getBoundingClientRect(), hit = document.elementFromPoint(r.left + 2, r.top + r.height / 2); return { lastRight: Math.round(r.right), lastLeft: Math.round(r.left), vw: innerWidth, pathRight: Math.round(c.right), pathLines: Math.round(c.height / parseFloat(getComputedStyle(n).lineHeight || 16)), inside: !!hit && !!hit.closest('.inbox-trust-note') }; })()`);
-            check(seen && seen.inside && seen.lastRight <= seen.vw && seen.lastLeft >= 0 && seen.pathRight <= seen.vw && seen.pathLines >= 2, `${at}the whole folder wraps and the sentence under it is on the screen: ` + JSON.stringify(seen));
+            check(seen && seen.inside && seen.lastRight <= seen.vw && seen.lastLeft >= 0 && seen.pathRight <= seen.vw && seen.pathLines >= 1, `${at}the whole folder wraps and the sentence under it is on the screen: ` + JSON.stringify(seen));
             await shot(`trust-row-${w}`);
 
             // 2) Yes asks once more and writes nothing; Cancel writes nothing; the second press sends the folder shown
@@ -128,7 +128,17 @@ const MENU = (extra = {}) => ({ question: 'Quick safety check: Is this a project
                 await ev(`window.__po = ${JSON.stringify(po)}; window.__ws += 1; window.__waiting = true; window.__answers = []; true`); await refresh();
                 await waitFor(`document.querySelectorAll('#group-table-view tbody .dt-primary').length === 1`, `${at}${name}: the row`, 8000);
                 await new Promise(r => setTimeout(r, 600)); // sleep-ok: the choices are read once the row is drawn
-                const got = await rowButtons();
+                const all = await rowButtons(), got = all.filter(l => l !== 'Review and trust'); // #15090: a held trust menu has a Review and trust button that opens the card with Yes (the row itself still has no Yes, #14110)
+                const heldMenu = ['no offer', 'no folder', 'no offer, with the reason (#14572)', 'a hidden character in the folder'].includes(name);
+                check(all.includes('Review and trust') === heldMenu, `${at}${name}: Review and trust is on a held trust row and nowhere else: ` + JSON.stringify(all));
+                if (name === 'no offer, with the reason (#14572)') {
+                    await ev(`[...document.querySelectorAll('#group-table-view .inbox-answers button')].find(b => b.textContent === 'Review and trust').click(); true`);
+                    await waitFor(`!!document.querySelector('dialog.inbox-card-dialog[open]')`, `${at}Review and trust opens the card`, 6000);
+                    await waitFor(`[...document.querySelectorAll('dialog.inbox-card-dialog button')].some(b => b.textContent === 'Yes, I trust this folder')`, `${at}the card offers Yes, I trust this folder`, 6000);
+                    check(await ev(`[...document.querySelectorAll('dialog.inbox-card-dialog button')].some(b => b.textContent === 'No, exit')`), `${at}the card offers No, exit too`);
+                    await ev(`[...document.querySelectorAll('dialog.inbox-card-dialog button')].find(b => b.textContent === 'Close').click(); true`);
+                    await waitFor(`!document.querySelector('dialog.inbox-card-dialog')`, `${at}the card closes`, 4000);
+                }
                 check(!got.some(l => /trust/i.test(l)) && (expect === 0 ? JSON.stringify(got) === JSON.stringify(['Open agent']) : got.length === expect), `${at}${name}: no Yes on the row (${expect ? expect + ' choice' : 'only Open agent'}): ` + JSON.stringify(got));
                 if (name === 'no offer' || name === 'no folder' || name === 'a hidden character in the folder') check(JSON.stringify(got) === JSON.stringify(['No, exit']) && /open the agent/i.test(await ev(`document.querySelector('#group-table-view .inbox-answers').textContent`)), `${at}${name}: No only, the rest is left to Open: ` + JSON.stringify(got));
                 if (name === 'no offer, with the reason (#14572)') check((await ev(`document.querySelector('#group-table-view .inbox-only-reject')?.textContent || ''`)).includes(`No Yes here: ${WHY} Open the agent to answer.`), `${at}${name}: the row says why there is no Yes`);

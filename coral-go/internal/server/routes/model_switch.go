@@ -42,9 +42,11 @@ type modelSwitch struct {
 	Thinking   *string `json:"thinking,omitempty"` // "" asks for the CLI's default
 	AfterReply bool    `json:"after_reply,omitempty"`
 	Message    string  `json:"message,omitempty"`
-	updated    time.Time
-	seq        int64              // which switch this is: a switch that was replaced no longer changes the state (#6219)
-	cancel     context.CancelFunc // ends this switch's goroutine when a newer choice replaces it
+	// Asking is what Claude Code is asking in its terminal while the switch waits (a dialog the transcript never records): the chat shows it as a card to answer, and the switch goes on when it is answered (#15410).
+	Asking  string `json:"asking,omitempty"`
+	updated time.Time
+	seq     int64              // which switch this is: a switch that was replaced no longer changes the state (#6219)
+	cancel  context.CancelFunc // ends this switch's goroutine when a newer choice replaces it
 }
 
 // modelSwitchTracker holds the newest switch of each session. A finished one is kept for switchKeep so every open dashboard sees
@@ -266,7 +268,7 @@ func (h *SessionsHandler) SwitchModel(w http.ResponseWriter, r *http.Request) {
 func (h *SessionsHandler) switchFail(sessionID string, seq int64, message string) {
 	h.modelSwitches.update(sessionID, seq, func(s *modelSwitch) {
 		if s.State == switchPending { // a switch ended with its own reason (Sleep, Kill, Restart) keeps it
-			s.State, s.Message = switchFailed, message
+			s.State, s.Message, s.Asking = switchFailed, message, ""
 		}
 	})
 }
@@ -276,7 +278,7 @@ var errorOutputR = regexp.MustCompile(`(?i)\b(unknown|invalid|not found|not avai
 // typeSwitchCommand types a switch's command into the agent and makes sure Claude took it (#6225). A command typed while Claude was still showing the output of the one before it (a quick second choice:
 // High, then Extra high) was lost with no trace: the text left the input box, which deliverHumanSend reads as "a CLI's own command ran", and nothing was ever written to the transcript. So the next
 // command waits settle after the last one was typed, and a command that is not in the transcript within landWait is typed once more; the confirm wait that follows says if it still did not take.
-func (h *SessionsHandler) typeSwitchCommand(ctx context.Context, tm *switchTimings, name, agentType, sessionID, workDir, command string) error {
+func (h *SessionsHandler) typeSwitchCommand(ctx context.Context, tm *switchTimings, ask *switchAsker, name, agentType, sessionID, workDir, command string) error {
 	if wait := tm.settle - time.Since(h.modelSwitches.lastTyped(sessionID)); wait > 0 {
 		if err := sleepCtx(ctx, wait); err != nil {
 			return err
@@ -288,7 +290,7 @@ func (h *SessionsHandler) typeSwitchCommand(ctx context.Context, tm *switchTimin
 			return err
 		}
 		h.modelSwitches.noteTyped(sessionID)
-		if h.jsonl == nil || h.commandLanded(ctx, sessionID, workDir, command, since, tm) {
+		if h.jsonl == nil || h.commandLanded(ctx, ask, sessionID, workDir, command, since, tm) {
 			return nil
 		}
 	}
@@ -296,7 +298,7 @@ func (h *SessionsHandler) typeSwitchCommand(ctx context.Context, tm *switchTimin
 }
 
 // commandLanded waits up to landWait for Claude's transcript to hold an entry for command (its name and argument) written since since; it reports false when there is none.
-func (h *SessionsHandler) commandLanded(ctx context.Context, sessionID, workDir, command string, since time.Time, tm *switchTimings) bool {
+func (h *SessionsHandler) commandLanded(ctx context.Context, ask *switchAsker, sessionID, workDir, command string, since time.Time, tm *switchTimings) bool {
 	name, args, _ := strings.Cut(strings.TrimSpace(command), " ")
 	deadline := time.Now().Add(tm.landWait)
 	for {
@@ -304,6 +306,9 @@ func (h *SessionsHandler) commandLanded(ctx context.Context, sessionID, workDir,
 			if c.Name == name && strings.EqualFold(c.Args, strings.TrimSpace(args)) {
 				return true
 			}
+		}
+		if ask.open(ctx) { // Claude is asking something: the command was taken, and typing it again would answer the dialog with text
+			return true
 		}
 		if time.Now().After(deadline) {
 			return false
@@ -377,12 +382,13 @@ func (h *SessionsHandler) runModelSwitch(ctx context.Context, seq int64, name, a
 		return
 	}
 	sent := time.Now().Add(-h.modelSwitches.clockAllowance()) // the transcript's own clock may differ a little
+	ask := &switchAsker{h: h, seq: seq, name: name, agentType: agentType, sessionID: sessionID, model: model, setModel: setModel}
 	if setModel {
-		if err := h.typeSwitchCommand(ctx, tm, name, agentType, sessionID, workDir, "/model "+model); err != nil {
+		if err := h.typeSwitchCommand(ctx, tm, ask, name, agentType, sessionID, workDir, "/model "+model); err != nil {
 			h.switchFail(sessionID, seq, "Could not type /model into the agent: "+err.Error())
 			return
 		}
-		if msg := h.confirmModel(ctx, sessionID, workDir, model, sent); msg != "" {
+		if msg := h.confirmModel(ctx, ask, sessionID, workDir, model, sent); msg != "" {
 			h.switchFail(sessionID, seq, msg)
 			return
 		}
@@ -399,11 +405,11 @@ func (h *SessionsHandler) runModelSwitch(ctx context.Context, seq int64, name, a
 			return
 		}
 		sent = time.Now().Add(-h.modelSwitches.clockAllowance())
-		if err := h.typeSwitchCommand(ctx, tm, name, agentType, sessionID, workDir, cmd); err != nil {
+		if err := h.typeSwitchCommand(ctx, tm, ask, name, agentType, sessionID, workDir, cmd); err != nil {
 			h.switchFail(sessionID, seq, "Could not type /effort into the agent: "+err.Error())
 			return
 		}
-		if msg := h.confirmLevel(ctx, sessionID, workDir, level, sent); msg != "" {
+		if msg := h.confirmLevel(ctx, ask, sessionID, workDir, level, sent); msg != "" {
 			h.switchFail(sessionID, seq, msg)
 			return
 		}
@@ -415,7 +421,7 @@ func (h *SessionsHandler) runModelSwitch(ctx context.Context, seq int64, name, a
 			}
 		}
 	}
-	h.modelSwitches.update(sessionID, seq, func(s *modelSwitch) { s.State = switchDone })
+	h.modelSwitches.update(sessionID, seq, func(s *modelSwitch) { s.State, s.Asking = switchDone, "" })
 	h.kickWS() // the feed shows the result now, not on the next tick
 }
 
@@ -424,7 +430,7 @@ func (h *SessionsHandler) runModelSwitch(ctx context.Context, seq int64, name, a
 // arguments are the model) and its output says it was set ("Set model to ..."). "Kept model as ...", the entry of another model
 // (a picker choice, a command the operator typed meanwhile) and any other output are a failed switch, with that text, so the stored
 // model never changes to one the agent is not running. It returns "" on success, else the reason.
-func (h *SessionsHandler) confirmModel(ctx context.Context, sessionID, workDir, model string, since time.Time) string {
+func (h *SessionsHandler) confirmModel(ctx context.Context, ask *switchAsker, sessionID, workDir, model string, since time.Time) string {
 	tm := switchTiming.Load()
 	deadline := time.Now().Add(tm.modelConfirm)
 	other := ""
@@ -449,6 +455,9 @@ func (h *SessionsHandler) confirmModel(ctx context.Context, sessionID, workDir, 
 		}
 		if msg := h.switchGone(ctx, sessionID); msg != "" {
 			return msg
+		}
+		if ask.open(ctx) {
+			deadline = time.Now().Add(tm.modelConfirm) // the dialog waits for a person: the clock starts again when it is answered
 		}
 		if time.Now().After(deadline) {
 			if other != "" {
@@ -480,7 +489,7 @@ var effortSetR = regexp.MustCompile(`(?i)(?:set effort level to|effort level set
 // at once, and a level other than the one asked for is a failure with what Claude Code did. The next reply's recorded level still confirms it, for a transcript that has
 // no /effort entry. "" (the CLI's own default) has no level to compare, so any /effort entry that is no refusal confirms it. With neither after levelConfirm the switch fails
 // with a message, instead of staying pending.
-func (h *SessionsHandler) confirmLevel(ctx context.Context, sessionID, workDir, level string, since time.Time) string {
+func (h *SessionsHandler) confirmLevel(ctx context.Context, ask *switchAsker, sessionID, workDir, level string, since time.Time) string {
 	tm := switchTiming.Load()
 	deadline := time.Now().Add(tm.levelConfirm)
 	for {
@@ -513,6 +522,9 @@ func (h *SessionsHandler) confirmLevel(ctx context.Context, sessionID, workDir, 
 		}
 		if msg := h.switchGone(ctx, sessionID); msg != "" {
 			return msg
+		}
+		if ask.open(ctx) {
+			deadline = time.Now().Add(tm.levelConfirm)
 		}
 		if time.Now().After(deadline) {
 			return "Claude Code did not confirm the level change."

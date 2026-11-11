@@ -98,7 +98,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             // Without a remembered choice, three open threads start collapsed; resolved threads and replies do not count. The header toggle opens and closes the side column.
             const shut = await ev(`(() => { const t = document.querySelector('.ac-toggle'), p = document.querySelector('.ac-panel'), v = document.getElementById('artifact-viewer'); return { toggle: t && !t.hidden && t.getClientRects().length > 0, text: t && t.textContent, name: t && t.getAttribute('aria-label'), expanded: t && t.getAttribute('aria-expanded'), panelShown: p.getClientRects().length > 0, wide: v.classList.contains('ac-on'), width: Math.round(v.querySelector('.artifact-viewer-content').getBoundingClientRect().width) }; })()`);
             check(`${at}: the button names the panel it opens (aria-controls)`, await ev(`(() => { const t = document.querySelector('.ac-toggle'), id = t.getAttribute('aria-controls'); return !!id && document.getElementById(id) === document.querySelector('.ac-panel'); })()`));
-            check(`${at}: first visit with no saved choice: closed by default with 3 open threads (#12225): a "Comments (3)" button (aria-expanded false), no panel, the file has the whole width`, shut.toggle && shut.text === 'Comments (3)' && shut.name === 'Comments (3)' && shut.expanded === 'false' && !shut.panelShown && !shut.wide, JSON.stringify(shut));
+            check(`${at}: first visit with no saved choice: closed by default with 3 open threads (#12225): a "Comments (3)" button (aria-expanded false), no panel, the dialog already has the width it has with the column (it does not widen under the pointer, #15119)`, shut.toggle && shut.text === 'Comments (3)' && shut.name === 'Comments (3)' && shut.expanded === 'false' && !shut.panelShown && shut.wide, JSON.stringify(shut));
             await click('.ac-toggle'); await waitFor(`document.querySelector('.ac-panel').getClientRects().length > 0`, 'the panel opening first', 3000); // the rest of the scene starts from the panel open
             await click('.ac-toggle');
             await shot(`comments-desktop-closed-${theme}`);
@@ -113,7 +113,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             await waitFor(`document.querySelectorAll('.ac-card').length >= 3`, 'the threads again', 5000);
             check(`${at}: reopened, the panel is open as the person left it (remembered)`, await ev(`document.querySelector('.ac-panel').getClientRects().length > 0 && document.querySelector('.ac-toggle').getAttribute('aria-expanded') === 'true'`));
             await click('.ac-toggle');
-            check(`${at}: closed with the button, the panel and the widening go`, await ev(`document.querySelector('.ac-panel').getClientRects().length === 0 && !document.getElementById('artifact-viewer').classList.contains('ac-on') && document.querySelector('.ac-toggle').getAttribute('aria-expanded') === 'false'`));
+            check(`${at}: closed with the button, the panel goes and the width stays`, await ev(`document.querySelector('.ac-panel').getClientRects().length === 0 && document.getElementById('artifact-viewer').classList.contains('ac-on') && document.querySelector('.ac-toggle').getAttribute('aria-expanded') === 'false'`));
             // a selection offers Comment, and using it opens the panel at the new comment
             await select('Run the backfill'.slice(0, 6) === 'Run th' ? 'backfill' : 'backfill');
             await waitFor(`!document.querySelector('.ac-selbtn').hidden`, 'the Comment button by a selection', 3000);
@@ -175,6 +175,21 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             await click('.ac-selbtn');
             await waitFor(`!!document.querySelector('.ac-composer .ac-input')`, 'the composer', 3000);
             check(`${at}: the composer shows the quote it will be made on`, /write lock on large databases/.test(await ev(`document.querySelector('.ac-composer .ac-quote').textContent`)));
+            // #15128: a file waiting for review: the box says where Approve is (a typed reply is delivered, it never approves); a file that is not, says nothing
+            check(`${at}: no Approve hint on a file that is not waiting for review`, !(await ev(`!!document.querySelector('.ac-composer .ac-hint:not([hidden])')`)));
+            for (const waiting of [true, false]) {
+                await click('.ac-composer .ac-cancel');
+                await ev(`document.getElementById('artifact-viewer').dataset.reviewPending = ${waiting ? "'1'" : "''"}; true`);
+                check(`${at}: the text is selected again (${waiting ? 'waiting' : 'not waiting'})`, await select('write lock on large databases'));
+                await waitFor(`!document.querySelector('.ac-selbtn').hidden`, 'the Comment button', 3000);
+                await click('.ac-selbtn');
+                await waitFor(`!!document.querySelector('.ac-composer .ac-input')`, 'the composer', 3000);
+                const hint = await ev(`(document.querySelector('.ac-composer .ac-hint:not([hidden])') || {}).textContent || ''`);
+                check(`${at}: ${waiting ? 'a file waiting for review says only what is always true: writing here does not approve it' : 'after Approve there is no hint'}`, waiting ? hint === 'To approve, use Approve on the file: writing here does not approve it.' : hint === '', hint);
+                const described = await ev(`(() => { const t = document.querySelector('.ac-composer .ac-input'), h = document.querySelector('.ac-composer .ac-hint'); return { by: t.getAttribute('aria-describedby'), id: h && h.id }; })()`);
+                check(`${at}: the box is described by the hint only while it shows (${waiting ? 'waiting' : 'not waiting'})`, waiting ? !!described.id && (described.by || '').split(' ').includes(described.id) : !/ac-hint-/.test(described.by || ''), // the send hint (Ctrl+Enter) always describes the box too (#15231)
+                        JSON.stringify(described));
+            }
             await ev(`(() => { const t = document.querySelector('.ac-composer .ac-input'); t.value = 'Is the lock per table or per database?'; t.dispatchEvent(new Event('input')); document.querySelector('.ac-composer').requestSubmit(); return true; })()`);
             await waitFor(`[...document.querySelectorAll('.ac-card')].some(c => /per table or per database/.test(c.textContent))`, 'the new card', 5000);
             let call = await ev(`window.__calls.filter(c => c.method === 'POST')[0]`);
@@ -347,6 +362,8 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             await shot(`comments-390-open-${theme}`);
             const p1 = await rect('.ac-panel');
             check(`${at}: the sheet opens inside the screen (${p1.t}..${p1.b} of 844), its content scrolls, nothing sideways`, p1.b <= 844 + 1 && p1.t > 100 && (await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`)) === 0, JSON.stringify(p1));
+            const foot = await rect('.artifact-viewer-foot'); // #15165: the footer holds Approve and Request changes (and Close): the open sheet ends above it, never over it
+            check(`${at}: the open sheet does not cover the viewer's footer (sheet bottom ${p1.b}, footer top ${foot && foot.t})`, !!foot && foot.h > 0 && p1.b <= foot.t + 1, JSON.stringify({ p1, foot }));
             const tiny = await ev(`[...document.querySelectorAll('.ac-panel button')].filter(b => b.getClientRects().length).map(b => { const r = b.getBoundingClientRect(); return [b.textContent, Math.round(r.height)]; }).filter(x => x[1] < 44)`);
             check(`${at}: every button in the sheet is 44 px tall`, tiny.length === 0, JSON.stringify(tiny));
             await ev(`document.querySelector('.ac-sheet-close').click(); true`);

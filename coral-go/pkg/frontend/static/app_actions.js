@@ -77,7 +77,7 @@ registerActions({
     'mb-jump-latest': () => boardPage()?.jumpToLatest(), // the board's own buttons are in the page's markup but their code loads with the board (a lazy group), so the action is here
     'mb-select-mode': () => boardPage()?.toggleSelectMode(),
     'mb-export': () => boardPage()?.showExportBoardModal(),
-    'mb-pause': () => boardPage()?.toggleBoardPause(),
+    'mb-pause': () => importOnce('./board_controls.js').then(m => m.toggleBoardPause()), // from any tab (#15331): the Board's own toggle did nothing until the Board tab had been opened (it had no team yet), so a first click was lost
     'mb-delete-board': () => boardPage()?.deleteMessageBoardProject(),
     'team-delete': el => { const b = el.dataset.board; if (b) importOnce('./message_board.js', 'the board').then(mod => mod.deleteTeam(b)).catch(() => {}); }, // the sidebar's team menu (#10318): the board's code loads here, the board's page may not be open; a failed load says so with importOnce's toast (the label), not silently
     'mb-post': () => boardPage()?.postBoardMessage(),
@@ -429,14 +429,6 @@ document.addEventListener('keydown', e => {
     open.parentElement.querySelector('[data-on-click="cmd-send-menu"]')?.focus();
 });
 
-document.addEventListener('keydown', e => {
-    const menu = e.target.closest?.('.sidebar-kebab-menu');
-    if (!menu) return;
-    const items = [...menu.querySelectorAll('.overflow-menu-item')].filter(i => i.getClientRects().length > 0); // the items that are shown: a team menu's More group is hidden until it is opened, and a hidden item cannot take the focus (End and Down stopped on it)
-    const at = items.indexOf(document.activeElement);
-    const to = menuMove(e.key, items.length, at);
-    if (to >= 0) { e.preventDefault(); items[to].focus(); }
-}, true);
 
 document.addEventListener('focusout', e => {
     const wrap = e.target.closest?.('.sidebar-kebab-wrapper');

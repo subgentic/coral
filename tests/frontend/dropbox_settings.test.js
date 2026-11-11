@@ -57,6 +57,11 @@ const { JSDOM } = require('jsdom');
     assert.match($('settings-dropbox-status').textContent, /isn't available in this build/);
     assert.ok(!shown('settings-dropbox-connect') && !shown('settings-dropbox-disconnect'));
 
+    // Signed in with the key an earlier build shipped, none in this build (#15641): paused, said once, with Disconnect and no Connect.
+    await status({ app_key_set: false, connected: true, state: 'connected', account_id: 'dbid:AAA', paused_no_key: true });
+    assert.match($('settings-dropbox-status').textContent, /Dropbox backup is paused: this build has no Dropbox app key/);
+    assert.ok(shown('settings-dropbox-disconnect') && !shown('settings-dropbox-connect'));
+
     // Not connected: Connect.
     await status({ app_key_set: true, connected: false, state: 'disconnected' });
     assert.match($('settings-dropbox-status').textContent, /Not connected/);
@@ -489,7 +494,7 @@ const { JSDOM } = require('jsdom');
     assert.ok(document.getElementById(field.getAttribute('aria-describedby')).textContent.includes('Type the last 4 characters'));
     // The held ones: Remove them / Keep them in Dropbox.
     answers['/api/dropbox/removals/confirm'] = { status: 200, body: { confirmed: 1 } };
-    rmBtn('Remove them from Dropbox').click(); await tick(); await tick();
+    rmBtn('Remove them after 24 hours').click(); await tick(); await tick();
     let c = calls.filter(x => x.url === '/api/dropbox/removals/confirm').pop();
     assert.deepStrictEqual(JSON.parse(c.body), { confirm: true });
     // The typed confirm, trimmed.
@@ -554,6 +559,20 @@ const { JSDOM } = require('jsdom');
     $('settings-dropbox-offload-for').value = '10';
     await m.saveOffload();
     assert.match($('settings-dropbox-note').textContent, /0 \(off\) or 30 to 3650/, 'a value out of range sends nothing');
+    // UI Accessibility's 3 to 5 on cee349ca6 (#14886): the rows' buttons say which file; a list action gives the keyboard back to the list; Resume
+    // gives it to the switch.
+    answers['/api/dropbox/removals'] = { status: 200, body: { removals: [{ digest: 'c'.repeat(64), name: 'notes.md', state: 'edited', edited: [{ path: '/v1/x', rev: 'r2' }] }, { digest: 'f'.repeat(64), name: 'plan.md', state: 'kept', reason: 'markers_unreadable' }] } };
+    await m.loadRemovals();
+    const rmb = $('settings-dropbox-removals');
+    const rmLabels = Array.from(rmb.querySelectorAll('button')).map(x => x.getAttribute('aria-label'));
+    assert.ok(rmLabels.includes('Remove anyway: notes.md') && rmLabels.includes('Keep it in Dropbox: notes.md') && rmLabels.includes('Try again: plan.md'), JSON.stringify(rmLabels));
+    answers['/api/dropbox/removals/cancel'] = { status: 200, body: { kept: 1 } };
+    Array.from(rmb.querySelectorAll('button')).find(x => x.getAttribute('aria-label') === 'Keep it in Dropbox: notes.md').click(); await tick(); await tick(); await tick();
+    assert.ok(document.activeElement && (rmb.contains(document.activeElement) || document.activeElement.id === 'settings-dropbox-note'), 'the keyboard is back on the list or the status line, not the page');
+    answers['/api/dropbox/autosync'] = { status: 200, body: { on: true, paused: '' } };
+    $('settings-dropbox-autosync-resume').hidden = false;
+    $('settings-dropbox-autosync-resume').click(); await tick(); await tick(); await tick();
+    assert.strictEqual(document.activeElement && document.activeElement.id, 'settings-dropbox-autosync', 'Resume hides itself: the keyboard is on the switch');
 
     // Not connected: nothing about removals.
     await status({ app_key_set: true, connected: false, state: 'disconnected' });

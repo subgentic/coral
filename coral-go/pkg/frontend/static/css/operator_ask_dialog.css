@@ -18,7 +18,7 @@
 @media (max-width: 999px) {
     dialog.inbox-ask-dialog { width: var(--dlg-w-form); }
 }
-@media (min-width: 1000px) {
+@media (min-width: 1000px), (min-width: 600px) and (max-height: 520px) { /* a short window (200% zoom on a laptop, 720 x 450) is the side-by-side layout too: the question and the reply each scroll, the title and the buttons stay (#15303) */
     dialog.inbox-ask-dialog[open] { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows: auto auto auto minmax(0, 1fr) auto; column-gap: 24px; height: 85dvh; max-height: 85dvh; overflow: hidden; }
     .inbox-ask-dialog > :is(h2, .inbox-ask-sub, .inbox-ask-subjects, .inbox-ask-foot) { grid-column: 1 / -1; }
     .inbox-ask-dialog h2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
@@ -43,9 +43,9 @@
 .inbox-ask-reading .inbox-ask-offers { margin-top: 16px; }
 
 /* Binary decisions sit below the draft, directly beside Send reply. */
-.inbox-ask-sendrow:has(.inbox-ask-yes-no) { gap: 6px; flex-wrap: wrap; justify-content: flex-end; } /* Add image, Yes, No and Send reply: in one row when they fit, else Send reply goes to a row of its own, never clipped (#14419, the reviewer: No was cut off in the narrow compose column at 1280) */
-.inbox-ask-sendrow:has(.inbox-ask-yes-no) .inbox-ask-pick { margin-right: auto; }
-.inbox-ask-sendrow .inbox-ask-yes-no { display: flex; flex: none; margin: 0; }
+.inbox-ask-sendrow:has(.inbox-ask-yes-no, .inbox-ask-review) { gap: 6px; flex-wrap: wrap; justify-content: flex-end; } /* Add image, Yes, No and Send reply: in one row when they fit, else Send reply goes to a row of its own, never clipped (#14419, the reviewer: No was cut off in the narrow compose column at 1280) */
+.inbox-ask-sendrow:has(.inbox-ask-yes-no, .inbox-ask-review) .inbox-ask-pick { margin-right: auto; }
+.inbox-ask-sendrow .inbox-ask-yes-no, .inbox-ask-sendrow .inbox-ask-review { display: flex; gap: 6px; flex: none; margin: 0; } /* Approve and Request changes of a question about a task in review (#15078) */
 .inbox-ask-yes-no .inbox-ask-offers-list { display: flex; flex-wrap: nowrap; gap: 6px; }
 .inbox-ask-yes-no .inbox-ask-offer { flex: none; width: auto; min-width: 44px; }
 .inbox-ask-yes-no .inbox-ask-offer .btn { width: auto; display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 44px; min-height: 44px; padding: 0 12px; } /* the icon and the word it sends: Yes, No (#14419) */

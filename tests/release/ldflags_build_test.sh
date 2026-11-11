@@ -13,7 +13,6 @@ trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/home" "$work/data"
 fail=0
 VER=9.9.9-ldtest; KEY=phc_ldtest_key_0123456789; BASE=v9.9.8-ldtest
-DBX=ldtest-dropbox-app-id
 
 run_version() { env -i PATH="$PATH" HOME="$work/home" CORAL_DATA_DIR="$work/data" CORAL_TELEMETRY_DISABLED=1 "$1" --version; }
 build() { (cd "$root/coral-go" && CGO_ENABLED=0 go build -tags fts5 -ldflags "$1" -o "$2" ./cmd/coral); }
@@ -27,7 +26,6 @@ flags_of() {
       Version) out="$out -X $w=$VER" ;;
       PostHogKey) out="$out -X $w=$KEY" ;;
       DevBase) out="$out -X $w=$BASE" ;;
-      DropboxDefaultAppKey) out="$out -X $w=$DBX" ;;
       # this function runs in a command substitution: a variable set here is lost with its subshell, so the failure is a file the end of the script reads
       *) echo "FAIL: $f: -X $w sets an unknown variable" >&2; : > "$work/unknown-variable" ;;
     esac
@@ -35,7 +33,7 @@ flags_of() {
   echo "$out"
 }
 
-# initialised "go tool nm" type of <package>.<var> (config.Version, server/routes.DropboxDefaultAppKey) in a binary built without -s: D when a flag set it, B when none did
+# initialised "go tool nm" type of <package>.<var> (config.Version) in a binary built without -s: D when a flag set it, B when none did
 nm_type() { go tool nm "$1" | awk -v v="/internal/$2" 'index($3, v) && substr($3, length($3) - length(v) + 1) == v {print $2}'; }
 
 check() {
@@ -58,8 +56,8 @@ check() {
 # Intentional live build-contract checks: fixture flags could pass while the
 # actual release silently drops its version or telemetry stamp.
 check .github/workflows/release.yml key
-# the Dropbox app key (#15065) must be stamped on every release build: Linux, Windows, macOS arm64 and macOS amd64
-[ "$(grep -c 'routes.DropboxDefaultAppKey' "$root/.github/workflows/release.yml")" = 4 ] && echo "ok: release.yml stamps DropboxDefaultAppKey at its 4 build sites" || { echo "FAIL: release.yml does not stamp DropboxDefaultAppKey at exactly 4 build sites"; fail=1; }
+# no release build stamps a Dropbox app key (#15641, the Operator): each person adds their own in Settings
+! grep -q 'DropboxDefaultAppKey\|DROPBOX_APP_KEY' "$root/.github/workflows/release.yml" && echo "ok: release.yml stamps no Dropbox app key" || { echo "FAIL: release.yml still names a Dropbox app key"; fail=1; }
 check .github/workflows/linux-runner-dryrun.yml nokey
 check installers/build-macos.sh key
 check installers/build-linux.sh nokey

@@ -27,6 +27,7 @@ import (
 	"github.com/subgentic/coral/internal/executil"
 	"github.com/subgentic/coral/internal/license"
 	"github.com/subgentic/coral/internal/logexit"
+	"github.com/subgentic/coral/internal/loginpath"
 	"github.com/subgentic/coral/internal/logrotate"
 	"github.com/subgentic/coral/internal/logsafe"
 	"github.com/subgentic/coral/internal/safego"
@@ -399,6 +400,8 @@ func main() {
 
 	// Only now, with the flags valid and the server really starting: --help, a bad flag
 	// and the self-test print nothing of a server's (#3506).
+	// A Coral not started from a shell (Finder, a launcher, a login item) has the system's bare PATH: it gets the folders its user's login shell has, behind its own, before the PATH is logged (#15072).
+	loginpath.Widen()
 	// The PATH is logged here once, with the home folder as "~" (logsafe); no other line carries it.
 	log.Printf("[STARTUP] coral server starting%s pid=%d go=%s os=%s arch=%s exe=%q %s",
 		config.FlavorNote(), os.Getpid(), runtime.Version(), runtime.GOOS, runtime.GOARCH, logsafe.Path(mustExecutable()), logsafe.PathSummary())

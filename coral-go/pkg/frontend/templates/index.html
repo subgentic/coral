@@ -26,7 +26,6 @@
     <link rel="stylesheet" href="{{ $base }}css/base.css">
     <link rel="stylesheet" href="{{ $base }}css/layout.css">
     <link rel="stylesheet" href="{{ $base }}css/components.css">
-    <link rel="stylesheet" href="{{ $base }}css/artifact-comments.css">
     <link rel="stylesheet" href="{{ $base }}css/updates.css">
     <link rel="stylesheet" href="{{ $base }}css/session.css">
     <link rel="stylesheet" href="{{ $base }}css/output.css">
@@ -73,7 +72,7 @@
             <span class="top-bar-title"></span>
         </div>
         <!-- #3816: on a phone this replaces the tab row: it names the current view and opens the list of all (nav_tabs.js) -->
-        <button type="button" id="nav-select" class="nav-select" data-on-click="m-nav-more" data-nav-all="1" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Current view"><span id="nav-select-label" class="nav-select-label"></span><span class="material-icons" aria-hidden="true">expand_more</span></button>
+        <button type="button" id="nav-select" class="nav-select" data-on-click="m-nav-more" data-nav-all="1" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu"><span id="nav-select-label" class="nav-select-label"></span><span class="material-icons" aria-hidden="true">expand_more</span></button>
         <!-- #9021: under 640 px the top row is this one button (nav_tabs.js): it names the view and opens the views, Home, Saved, Settings and the account -->
         <button type="button" id="top-menu-btn" class="btn top-menu-btn" data-on-click="m-top-menu" aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Menu"><span class="material-icons" aria-hidden="true">menu</span><span id="top-menu-label" class="top-menu-label"></span></button>
         <nav class="tabs top-nav-tabs" aria-label="Main navigation" data-coral-hook="top-nav-tabs">
@@ -115,8 +114,7 @@
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5"/></svg>
                         Stop all auto-accept
                     </button>
-                    <div id="tier-badge" class="overflow-menu-tier" style="display:none"></div>
-                    <hr class="overflow-menu-divider">
+                    <hr class="overflow-menu-divider" hidden>
                     <button class="menu-item overflow-menu-item" data-on-click="m-close-top-bar-settings-then-show-theme-configurator">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 1.5v13M1.5 8h13"/><path d="M3 3l10 10M13 3L3 13"/></svg>
                         Themes
@@ -147,7 +145,7 @@
                     </a>
                     <button class="menu-item overflow-menu-item" data-local-only data-on-click="m-close-top-bar-settings-then-check-for-updates">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 4v4l2.5 2.5"/><path d="M5 1.5A6.5 6.5 0 0 1 14.5 8"/><path d="M14.5 4v4h-4"/></svg>
-                        Check for Updates
+                        Check for updates
                     </button>
                     <!-- The running Coral's version (#4589 follow-up): plain text, not a menu item; filled from the server's status (version_line.js). -->
                     <div id="coral-version-row" hidden>
@@ -330,18 +328,11 @@
                                 <span class="editions-home-copy"><strong>Coral Hub</strong><span>Open your agents in any browser, including your phone. Invite-only beta.</span></span>
                                 <span class="editions-home-arrow material-icons" aria-hidden="true">arrow_forward</span>
                             </button>
-                            <div class="editions-home-item editions-home-own" id="editions-home-own">
+                            <button type="button" class="editions-home-item editions-home-own" id="editions-home-own" data-editions="home-own">
                                 <span class="editions-home-icon material-icons" aria-hidden="true">device_hub</span>
-                                <span class="editions-home-copy"><strong>Run your own hub</strong><span>Or host it yourself: connect your own computers with <code>coral --hub</code>. Free and self-hosted.</span>
-                                    <span class="editions-home-own-state" id="editions-home-own-state" role="status" aria-live="polite"></span>
-                                    <span class="editions-actions editions-home-own-actions">
-                                        <button type="button" class="btn btn-primary" data-editions="enable-hub">Enable on this computer</button>
-                                        <button type="button" class="btn" data-editions="restart-hub" hidden>Restart Coral</button>
-                                        <button type="button" class="btn" data-editions="disable-hub" hidden>Turn off</button>
-                                        <button type="button" class="btn" data-editions="manage-hub" hidden>Manage in Settings</button>
-                                        <button type="button" class="btn btn-link" data-editions="home-own">How it works</button>
-                                    </span></span>
-                            </div>
+                                <span class="editions-home-copy"><strong id="editions-home-own-title">Run your own hub</strong><span>Turn this Coral into a hub and connect remote computers running Coral, for one unified view of all your agents. Self-hosted.</span></span>
+                                <span class="editions-home-arrow material-icons" aria-hidden="true">arrow_forward</span>
+                            </button>
                         </div>
                     </section>
                     <nav class="welcome-links" aria-label="Learn more">

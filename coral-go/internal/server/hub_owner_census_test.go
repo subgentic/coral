@@ -70,6 +70,10 @@ func servedRoutes(t *testing.T) (chi.Routes, map[string]string) {
 			switch method {
 			case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
 				served[method+" "+routeShape(route)] = method + " " + route
+			case http.MethodGet: // a read is in the census only when it is on the stamp list (the one is the Hub's read of a computer's Needs you, #15380)
+				if hubowner.Allowed(method, paramRe.ReplaceAllString(route, "1")) {
+					served[method+" "+routeShape(route)] = method + " " + route
+				}
 			}
 			return nil
 		}))

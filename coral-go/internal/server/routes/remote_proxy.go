@@ -16,17 +16,11 @@ import (
 // if it also implements proxy.StatusReporter, proxy failures update the
 // server's status. The route must be registered behind the hub's normal auth
 // middleware.
-func MountRemoteProxy(r chi.Router, resolver proxy.Resolver) {
+func MountRemoteProxy(r chi.Router, resolver proxy.Resolver) http.Handler {
 	h := proxy.New(resolver)
 	r.Handle("/api/remote/{server}/*", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		// The person signed in at THIS hub (the identity layer's humanInputCaller: a dashboard session or this computer's own same-origin browser, never an API key or an agent token) may have the decisions that
-		// need a person signed (#11378). The proxy signs only the two allowlisted routes and only for a target that holds a secret.
-		if humanInputCaller(req) {
-			req = req.WithContext(proxy.WithSignedInOwner(req.Context()))
-			if kind, _ := req.Context().Value(callerKindKey{}).(string); kind == callerDashCookie {
-				req = req.WithContext(proxy.WithSessionSignedIn(req.Context())) // a real sign-in session: the widened routes (#13694) are signed only for it (#13725)
-			}
-		}
+		req = proxyContext(req) // the person signed in at THIS hub may have the decisions that need a person signed (#11378); the widened routes only for a real sign-in session (#13694, #13725)
 		h.ServeHTTP(w, req)
 	}))
+	return h
 }

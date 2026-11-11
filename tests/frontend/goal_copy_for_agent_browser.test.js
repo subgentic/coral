@@ -19,7 +19,7 @@ const { coralReady } = require('./helpers/wait');
         const g = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: TITLE, outcome: 'o', done_when: 'd' }); assert.equal(g.status, 201);
         const G = g.body.id;
         assert.equal((await api('PATCH', `/api/board/${B}/goals/${G}`, { subscriber_id: 'Operator', state: 'active' })).status, 200);
-        const goalUrl = `/team/${B}/goals/${G}`, want = `Goal #${G} (${TITLE}): run coral-board goal brief ${G}`;
+        const goalUrl = `/team/${B}/goals/${G}`, want = `Goal #${G} (${TITLE}): run coral-board goal brief ${G}\nDocs: coral-agent docs board, section \u201cGoals\u201d`; // the goal's line, then where in the docs to read (#15063)
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
@@ -29,9 +29,10 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`document.querySelector('#team-panel-goals #goals-detail-title')?.textContent === ${JSON.stringify(TITLE)}`, 'the goal', 15000);
             await ev(`window.__copied = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: t => { window.__copied.push(t); return Promise.resolve(); } }, configurable: true }); true`);
             if (mobile) { await ev(`document.querySelector('#team-panel-goals .goal-head-actions .task-more-btn').click(); true`); await waitFor(`!document.querySelector('#team-panel-goals .task-more-menu').hidden`, at + 'More opens', 4000); } // a phone: it is in the header's More menu (#13119)
-            const info = await ev(`(() => { const b = document.querySelector('#team-panel-goals .goal-copy-agent'); if (!b) return null; const r = b.getBoundingClientRect(), line = b.closest('.goals-detail-line'); return { text: b.textContent.trim(), inLine: !!line, inMenu: !!b.closest('.task-more-menu'), inPinbar: !!b.closest('.goals-pinbar'), visible: r.width > 0 && r.height > 0, within: r.right <= innerWidth + 1 && r.left >= 0, tall: r.height }; })()`);
+            const info = await ev(`(() => { const b = document.querySelector('#team-panel-goals .goal-copy-agent'); if (!b) return null; const r = b.getBoundingClientRect(), line = b.closest('.goals-detail-line'); return { text: b.getAttribute('aria-label') || b.textContent.trim(), robot: !!b.querySelector('.material-icons') && !!b.classList.contains('agent-copy'), inLine: !!line, inMenu: !!b.closest('.task-more-menu'), inPinbar: !!b.closest('.goals-pinbar'), visible: r.width > 0 && r.height > 0, within: r.right <= innerWidth + 1 && r.left >= 0, tall: r.height }; })()`);
             assert.ok(info, at + 'the button is on the goal page');
             assert.equal(info.text, 'Copy for an agent', at + 'its words');
+            if (!mobile) assert.ok(info.robot, at + 'on the page it is the robot icon button, not text');
             assert.ok(mobile ? (info.inMenu && !info.inLine) : (info.inLine && !info.inPinbar), at + (mobile ? 'in the header\'s More menu, not the line: ' : 'in the detail line, not the pinned bar: ') + JSON.stringify(info));
             assert.ok(info.visible && info.within, at + 'visible and inside the screen: ' + JSON.stringify(info));
             if (mobile) assert.ok(info.tall >= 36, at + 'a touch-sized target: ' + info.tall);

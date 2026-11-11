@@ -4,6 +4,10 @@ import { importOnce } from './import_once.js';
 import { escapeHtml, copyText, showToast } from './utils.js';
 import { splitKey, serverUrl, isCloud, boardFetch } from './server_base.js';
 import { rebaseChanges } from './settings_diff.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('team_settings_groups.css'); // the headings, the rail and the search box of this page: not in the start's stylesheet (#15058)
+const { searchBox, groupRows } = await importOnce('./settings_search.js');
+const { agentCopyButton } = await importOnce('./agent_copy_button.js'); // the robot on each section (#15063)
 const { mountSettingsView } = await importOnce('./settings_view.js');
 const { boardRenameControl } = await importOnce('./board_rename.js');
 const { bindInfo } = await importOnce('./info_toggle.js');
@@ -34,13 +38,30 @@ const PRESET_EDITOR = `<details class="disclosure team-settings-section workflow
 /** Draws the team's Settings tab into options.page. */
 export async function showTeamSettingsPage(team, options = {}) {
     const st = openSettingsState(team, options);
-    st.view = mountSettingsView(st.page, settingsViewOptions(st));
+    const opts = settingsViewOptions(st);
+    st.view = mountSettingsView(st.page, opts);
+    groupRows(st.page, opts.groups); // the large headings and the rails (#15058)
+    st.page.querySelector('.sv-shell')?.before(searchBox(st.page, { label: 'Search team settings', placeholder: 'Search team settings' }));
     wirePage(st);
     wireModeRow(st);
     wireApproval(st.view, st.host);
     wirePresetEditor(st);
     wirePromptPreview(st);
+    wireAgentCopy(st);
     return st.view;
+}
+
+/** The robot on each section's heading: copies the team and the section, and where in the docs to read (#15063). */
+function wireAgentCopy(st) {
+    const SECTIONS = { workflow: ['Workflow', 'settings_workflow'], health: ['Health check', 'settings_health'], messaging: ['Messaging', 'settings_messaging'], orchestrator: ['Orchestrator access', 'settings_orchestrator'], guides: ['Guides', 'settings_guides'] };
+    for (const pane of st.page.querySelectorAll('.settings-pane[data-section]')) {
+        const [label, key] = SECTIONS[pane.dataset.section] || [];
+        const title = pane.querySelector(':scope > .settings-pane-title');
+        if (!key || !title || pane.querySelector('.agent-copy')) continue;
+        const b = agentCopyButton(key, () => `Team \u201c${splitKey(st.team).name}\u201d, settings: ${label}.`);
+        const row = document.createElement('div'); row.className = 'agent-copy-hrow'; // the heading and its robot share a line, centred on each other
+        title.replaceWith(row); row.append(title, b);
+    }
 }
 
 function openSettingsState(team, options) {
@@ -76,7 +97,7 @@ function openSettingsState(team, options) {
 
 function settingsViewOptions(st) {
     return {
-        mode: 'settings',
+        mode: 'settings', 
         label: 'Team settings sections', groupLabel: 'Team settings group',
         lead: 'Only the Operator on this computer can change these.',
         group: st.options.section || _lastSection,
@@ -105,20 +126,24 @@ function settingsGroups(st) {
     }
     return [
         { id: 'workflow', label: 'Workflow', icon: 'account_tree', hint: 'How agents work on this team.', fields: [
+            { key: 'wf_board', type: 'heading', level: 1, label: 'The board' },
             { key: 'board_name', type: 'custom', label: 'Board name', help: 'Only the label changes: its agents, tasks and history stay.',
                 render: slot => { slot.append(boardRenameControl(st.team, { onRenamed: () => { document.getElementById('team-page-title') && importOnce('./team_page.js').then(m => m.refreshTeamHeader?.()).catch(() => {}); importOnce('./render.js').then(m => m.scheduleLiveSessionsRender()); } })); } },
             { key: 'home_folder', type: 'custom', label: 'Home folder', help: 'Where the team\'s agents start. Only the Operator on this computer can change it.',
                 render: slot => { importOnce('./team_home_folder.js').then(m => slot.append(m.teamHomeFolderControl(st.team, { canChange: answeredLocally(st.team) }))).catch(() => { slot.textContent = 'The home folder could not be shown.'; }); } },
+            { key: 'wf_mode', type: 'heading', level: 1, label: 'How agents work' },
             { key: 'mode', type: 'select', label: 'Working mode', id: 'tsr-mode',
                 help: { text: 'Instructions are saved with each task when it is first claimed.', about: 'working modes', more: 'Tasks already claimed keep their instructions. This setting gives guidance; it does not create worktrees by itself.' },
                 options: async () => { await st.dataReady.catch(() => {}); return st.modeOptions(); } },
-            { key: 'dependency_guidance', type: 'toggle', label: 'Guidance for dependent tasks', help: 'Tells agents how to work when a task waits on another.' },
-            { key: 'asks_are_tasks', type: 'toggle', label: 'Requests for work are tasks', help: 'When an agent needs another agent to do something, it creates a task. Plain posts are for questions and status.' },
+            { key: 'dependency_guidance', type: 'toggle', label: 'Help with tasks that wait on others', help: 'Tells agents how to work when a task waits on another.' },
+            { key: 'asks_are_tasks', type: 'toggle', label: 'Turn requests for work into tasks', help: 'When an agent needs another agent to do something, it creates a task. Plain posts are for questions and status.' },
+            { key: 'wf_goals', type: 'heading', level: 1, label: 'Goals, tasks and approval' },
             approvalField({ id: 'tsr-approval' }),
             { key: 'require_goal', type: 'toggle', label: 'Require a goal', help: requireGoalSentence },
             { key: 'max_open_goals', type: 'number', id: 'tsr-max-goals', label: 'Open goals', unit: 'at most (0 is no limit)', min: 0, max: 1000, step: 1, compact: true, attrs: { inputmode: 'numeric' }, help: 'A goal past the limit is refused. Goals waiting for your approval count.' },
             { key: 'goals_need_approval', type: 'toggle', label: 'New goals need my approval', help: 'An agent\'s new goal waits in Needs you until you approve it. Yours are never held.' },
             { key: 'tasks_need_approval', type: 'toggle', label: 'New tasks need my approval', help: 'An agent\'s new task waits in Needs you until you approve it. Yours are never held.' },
+            { key: 'wf_instr', type: 'heading', level: 1, label: 'Instructions and presets' },
             { key: 'custom_instructions', type: 'textarea', label: 'Additional instructions', help: 'Team-specific conventions, given to agents with each task.', wide: true, rows: 4, placeholder: 'Team-specific conventions' },
             { key: 'presets', type: 'custom', label: 'Presets', help: 'A preset saves with Save preset, not Save settings.', wide: true, render: slot => { slot.innerHTML = PRESET_EDITOR; } },
         ] },

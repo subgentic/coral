@@ -31,7 +31,7 @@ const { coralReady } = require('./helpers/wait');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
-        for (const [id, jt] of [['orch', 'Orchestrator'], ['fe', 'Frontend Dev'], ['qa', 'QA Engineer'], ['be', 'Backend Dev']]) await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: jt, session_name: id + '-s' });
+        for (const [id, jt] of [['orch', 'Orchestrator'], ['fe', 'Frontend Dev'], ['qa', 'QA Engineer'], ['be', 'Backend Dev']]) await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: jt });
         const mk = async (extra) => { const r = await api('POST', `/api/board/${B}/tasks`, { body: 'Details', created_by: 'orch', priority: 'medium', ...extra }); assert.ok(r.status < 300, JSON.stringify(r)); return r.body.id || r.body.task.id; };
         const open1 = await mk({ title: 'Build the page', assigned_to: 'fe' });
         const dep = await mk({ title: 'The step before' });

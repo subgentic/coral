@@ -50,6 +50,7 @@ type BoardHealthMonitor struct {
 
 	mu         sync.Mutex
 	lastCheck  map[string]time.Time       // per board: when a check last went out
+	lastSweep  map[string]time.Time       // per board: when the stale-task sweep was last looked at (board_health_stale.go)
 	lastEval   map[string]time.Time       // per board: when the check was last looked at (it goes out only when something changed or the heartbeat is due, #11431)
 	lastPrint  map[string]map[string]bool // per board: the facts the last look found, so the same findings are not said again until the heartbeat
 	landing    *LandingWatch              // the landing alert's view of the repositories (git_poller.go feeds it); nil: the alert has nothing to read
@@ -62,7 +63,7 @@ func NewBoardHealthMonitor(store *board.Store, interval time.Duration) *BoardHea
 		interval = 10 * time.Minute
 	}
 	reader := jsonl.NewSessionReader()
-	return &BoardHealthMonitor{store: store, interval: interval, idleAfter: 30 * time.Minute, logger: slog.Default(), now: time.Now, lastMessage: reader.LastMessage, lastCheck: map[string]time.Time{}, lastEval: map[string]time.Time{}, lastPrint: map[string]map[string]bool{}}
+	return &BoardHealthMonitor{store: store, interval: interval, idleAfter: 30 * time.Minute, logger: slog.Default(), now: time.Now, lastMessage: reader.LastMessage, lastCheck: map[string]time.Time{}, lastSweep: map[string]time.Time{}, lastEval: map[string]time.Time{}, lastPrint: map[string]map[string]bool{}}
 }
 
 // SetAgents gives the check its view of the agents (hook events, discovery) and the gate to type
@@ -115,6 +116,7 @@ func (m *BoardHealthMonitor) scan(ctx context.Context) {
 	}
 	for _, p := range projects {
 		m.checkProject(ctx, p.Project, bySession, tick)
+		m.sweepProject(ctx, p.Project, bySession, tick) // the stale-task sweep, on its own period (#14863)
 	}
 }
 
@@ -635,7 +637,7 @@ func healthFacts(items []teamhealth.Item, questions []teamhealth.Question, roste
 // parkStale is how long a park may last before the check names the agent that holds it (#11660): a park is for a wait outside the team, and a day on one is work that is not getting done.
 const parkStale = 24 * time.Hour
 
-// parkItems names each agent that holds a park older than parkStale, or more parks than board.MaxParkedPerAgent (parks made before the cap are reported, never touched). A park made before the time was
+// parkItems names each agent that holds a park older than parkStale, or more parks than the team's park limit (parks made before the cap are reported, never touched). A park made before the time was
 // recorded counts from the task's last change.
 func (m *BoardHealthMonitor) parkItems(ctx context.Context, project string, all []board.Task, now time.Time) []teamhealth.Item {
 	since, err := m.store.ParkedSince(ctx, project)
@@ -668,21 +670,22 @@ func (m *BoardHealthMonitor) parkItems(ctx context.Context, project string, all 
 			h.stale = append(h.stale, t.ID)
 		}
 	}
+	limit := m.store.GetHealthSettings(ctx, project).ParkLimit
 	var items []teamhealth.Item
 	for _, agent := range order {
 		h := byAgent[agent]
-		over := len(h.ids) > board.MaxParkedPerAgent
+		over := len(h.ids) > limit
 		if len(h.stale) == 0 && !over {
 			continue
 		}
 		var problem string
 		switch {
 		case len(h.stale) > 0 && over:
-			problem = fmt.Sprintf("holds %d parked tasks (at most %d), %s parked over 24 h", len(h.ids), board.MaxParkedPerAgent, taskNumbers(h.stale))
+			problem = fmt.Sprintf("holds %d parked tasks (at most %d), %s parked over 24 h", len(h.ids), limit, taskNumbers(h.stale))
 		case len(h.stale) > 0:
 			problem = fmt.Sprintf("has %s parked over 24 h", taskNumbers(h.stale))
 		default:
-			problem = fmt.Sprintf("holds %d parked tasks (at most %d): %s", len(h.ids), board.MaxParkedPerAgent, taskNumbers(h.ids))
+			problem = fmt.Sprintf("holds %d parked tasks (at most %d): %s", len(h.ids), limit, taskNumbers(h.ids))
 		}
 		items = append(items, teamhealth.Item{Rank: 3, Agent: teamhealth.Name(agent), Problem: problem,
 			Suggest: "a park is for a wait outside the team: release what is not for now (coral-board task release <id>), hand in what waits on a reviewer, finish the rest",

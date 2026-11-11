@@ -1,0 +1,2 @@
+/* The goal's own page (#15166, walk 6: 'Done is not stated'): its state says its word on a phone too; the lists keep the dot alone (goals.css). */
+@media (max-width: 600px) { .goals-detail-line .state-word { position: static; width: auto; height: auto; overflow: visible; clip-path: none; } }

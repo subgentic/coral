@@ -367,6 +367,38 @@ func refusedURL(t *testing.T) string {
 	return u
 }
 
+// slowNoSuchHost points the resolver at a loopback DNS server that answers every question "no such host" after delay (#15353): the real lookup of a .invalid name takes as long as the network's
+// resolver takes, which on a loaded or slow machine is longer than a short probe timeout, and the probe then said "timed out" instead of "could not be resolved". Restored when the test ends.
+func slowNoSuchHost(t *testing.T, delay time.Duration) {
+	t.Helper()
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	require.NoError(t, err)
+	go func() {
+		buf := make([]byte, 512)
+		for {
+			n, addr, err := pc.ReadFrom(buf)
+			if err != nil {
+				return
+			}
+			if n < 12 {
+				continue
+			}
+			q := append([]byte(nil), buf[:n]...)
+			go func() {
+				time.Sleep(delay)
+				q[2], q[3] = 0x81, 0x83                                 // a response, recursion wanted and available, name error
+				q[6], q[7], q[8], q[9], q[10], q[11] = 0, 0, 0, 0, 0, 0 // no answers: the question is echoed
+				pc.WriteTo(q, addr)
+			}()
+		}
+	}()
+	old := net.DefaultResolver
+	net.DefaultResolver = &net.Resolver{PreferGo: true, Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, "udp", pc.LocalAddr().String())
+	}}
+	t.Cleanup(func() { net.DefaultResolver = old; pc.Close() })
+}
+
 // TestCheckRemoteHealth_NamesTheCause: Test says why a server is unreachable, one sentence per
 // cause, and never the URL, the host or the key.
 func TestCheckRemoteHealth_NamesTheCause(t *testing.T) {
@@ -386,23 +418,29 @@ func TestCheckRemoteHealth_NamesTheCause(t *testing.T) {
 	t.Cleanup(tlsSrv.Close)
 	plain := httptest.NewServer(http.NotFoundHandler()) // speaks http, asked over https
 	t.Cleanup(plain.Close)
+	slowNoSuchHost(t, 700*time.Millisecond) // a resolver slower than the short timeout the hang case needs (#15353)
 
 	cases := []struct {
 		name, url string
 		private   bool
 		want      string
+		short     bool // only a probe that is meant to time out gets a short timeout
 	}{
-		{"refused", refusedURL(t), true, "refused the connection"},
-		{"no such host", "http://no-such-host.invalid:8420", true, "could not be resolved"},
-		{"no such host, private not allowed", "http://no-such-host.invalid:8420", false, "could not be resolved"},
-		{"private address blocked", refusedURL(t), false, "private or reserved"},
-		{"bad certificate", tlsSrv.URL, true, "TLS certificate was not accepted"},
-		{"http server asked over https", "https://" + plain.Listener.Addr().String(), true, "TLS"},
-		{"hang", "http://" + hang.Addr().String(), true, "timed out"},
+		{"refused", refusedURL(t), true, "refused the connection", false},
+		{"no such host", "http://no-such-host.invalid:8420", true, "could not be resolved", false},
+		{"no such host, private not allowed", "http://no-such-host.invalid:8420", false, "could not be resolved", false},
+		{"private address blocked", refusedURL(t), false, "private or reserved", false},
+		{"bad certificate", tlsSrv.URL, true, "TLS certificate was not accepted", false},
+		{"http server asked over https", "https://" + plain.Listener.Addr().String(), true, "TLS", false},
+		{"hang", "http://" + hang.Addr().String(), true, "timed out", true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			h := CheckRemoteHealth(context.Background(), c.url, routeSecret, c.private, 300*time.Millisecond)
+			timeout := 30 * time.Second // the cause under test is named by the error, not raced against a clock
+			if c.short {
+				timeout = 300 * time.Millisecond
+			}
+			h := CheckRemoteHealth(context.Background(), c.url, routeSecret, c.private, timeout)
 			assert.Equal(t, store.RemoteStatusUnreachable, h.Status)
 			assert.Contains(t, h.Err, c.want)
 			assert.NotContains(t, h.Err, routeSecret)

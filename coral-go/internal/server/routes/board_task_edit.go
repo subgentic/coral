@@ -324,10 +324,6 @@ func (h *BoardHandler) ReassignTask(w http.ResponseWriter, r *http.Request) {
 	}
 	task, err := h.bs.ReassignTask(r.Context(), project, taskID, body.Assignee)
 	if err != nil {
-		if errors.Is(err, board.ErrReviewTaskReassign) {
-			errBadRequest(w, err.Error())
-			return
-		}
 		if errors.Is(err, board.ErrTaskReassignRefused) {
 			errConflict(w, err.Error()) // a state that cannot move this way: the reason says what does (#12869)
 			return
@@ -340,10 +336,14 @@ func (h *BoardHandler) ReassignTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.noteForcedAssignment(r, project, task.ID, body.Assignee, body.SubscriberID, forcedPast)
+	movedReview := task.Workflow.ReviewOf > 0 // a review moved to another reviewer (#14866)
 	h.goBG(func() {
 		ctx := context.Background()
 		notification := h.buildAssignmentNotification(ctx, project, task, body.Assignee, true)
 		h.postNotice(ctx, project, notification)
+		if movedReview && current != "" && !strings.EqualFold(current, body.Assignee) {
+			h.postNotice(ctx, project, fmt.Sprintf("@%s Review task #%d (the review of #%d) moved to %s: you are off that review, and your verdict on it is no longer asked for.", current, task.ID, task.Workflow.ReviewOf, body.Assignee))
+		}
 		if body.Assignee != "" && task.Status == "pending" && !task.Parked(time.Now()) {
 			if hasActive, _ := h.bs.HasActiveTaskForAssignee(ctx, project, body.Assignee, task.ID); !hasActive {
 				h.sendTaskNudge(ctx, project, body.Assignee, taskClaimNudge(task.ID))
@@ -364,6 +364,17 @@ func (h *BoardHandler) ReassignTask(w http.ResponseWriter, r *http.Request) {
 			h.postNotice(ctx, t.BoardID, msg)
 		}
 	})
+	if movedReview && h.memberRest != nil {
+		// A reviewer whose CLI has ended or whose terminal is gone gets the review when it is restarted: the person moving it is told, as a post to such an agent is (#14866).
+		if state := h.memberRest(r.Context(), project, body.Assignee); state != "" {
+			raw, _ := json.Marshal(task)
+			out := map[string]any{}
+			_ = json.Unmarshal(raw, &out)
+			out["warning"] = restSentence(body.Assignee, state, false)
+			writeJSON(w, http.StatusOK, out)
+			return
+		}
+	}
 	writeJSON(w, http.StatusOK, task)
 }
 

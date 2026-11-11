@@ -283,6 +283,49 @@ try {
         }
     }
 
+    # ── The availability list (#15071): what tests/release/availability.txt says a release must report ──
+    # Asked the way the dashboard asks (these are dashboard routes: they refuse an API key): sign in with the login link the server printed, then a same-origin request.
+    $avail = Join-Path $PSScriptRoot 'availability.txt'
+    $logText = if (Test-Path -LiteralPath $logOut) { Get-Content -Raw -LiteralPath $logOut } else { '' }
+    $tokM = [regex]::Match($logText, 'login_token=([0-9a-f]+)')
+    if (-not $tokM.Success -and (Test-Path -LiteralPath (Join-Path $dataDir 'login_token'))) { $tokM = [regex]::Match('login_token=' + (Get-Content -Raw -LiteralPath (Join-Path $dataDir 'login_token')).Trim(), 'login_token=([0-9a-f]+)') }
+    if (-not $tokM.Success) { Fail "the availability list: the server log shows no login link to sign in with" }
+    elseif (-not (Test-Path -LiteralPath $avail)) { Fail "the availability list: tests/release/availability.txt is missing" }
+    else {
+        $sess = $null
+        $null = Invoke-WebRequest -Uri "$base/?login_token=$($tokM.Groups[1].Value)" -SessionVariable sess -UseBasicParsing -TimeoutSec 10 -SkipHttpErrorCheck
+        $same = @{ 'Origin' = $base; 'Sec-Fetch-Site' = 'same-origin' }
+        $asked = { param($path)
+            try { $r = Invoke-WebRequest -Uri "$base$path" -WebSession $sess -Headers $same -SkipHeaderValidation -UseBasicParsing -TimeoutSec 10 -SkipHttpErrorCheck; return ($r.Content | ConvertFrom-Json) }
+            catch { return $null } }
+        $tier = ''
+        $st = & $asked '/api/system/status'
+        if ($st -and $st.PSObject.Properties['tier_name']) { $tier = [string]$st.tier_name }
+        $bad = @(); $checked = 0; $dropboxLine = $false
+        foreach ($line in (Get-Content -LiteralPath $avail)) {
+            $line = ($line -replace '#.*$', '').Trim()
+            if (-not $line) { continue }
+            $w = $line -split '\s+'
+            $opts = @{}
+            foreach ($o in ($w | Select-Object -Skip 3)) { $kv = $o -split '=', 2; $opts[$kv[0]] = $kv[1] }
+            if ($opts.ContainsKey('env') -and [Environment]::GetEnvironmentVariable($opts['env']) -ne '1') { continue }
+            if ($opts.ContainsKey('tier')) {
+                if (-not $tier) { $bad += "$($w[0]) $($w[1]) has tier=$($opts['tier']) but /api/system/status gave no tier_name: not checked"; continue }
+                if ($tier -ne $opts['tier']) { continue }
+            }
+            $checked++
+            if ($w[0] -eq '/api/dropbox/status') { $dropboxLine = $true }
+            $want = $w[2] | ConvertFrom-Json
+            $answer = & $asked $w[0]
+            $got = if ($answer -and $answer.PSObject.Properties[$w[1]]) { $answer.($w[1]) } else { '<missing or no answer>' }
+            if ($got -ne $want) { $bad += "$($w[0]) $($w[1]) is $got, a release reports $want" }
+        }
+        if ($checked -eq 0) { $bad += 'no line of the list was checked' }
+        if (-not $dropboxLine) { $bad += 'no /api/dropbox/status line was checked: a release says in availability.txt that it ships no Dropbox app key' }
+        if ($bad.Count -eq 0) { Pass "the availability list: $checked checked (tier $tier)" }
+        else { Fail "the availability list: $($bad -join '; ')" }
+    }
+
     # ── coral-board as a person (the command-line token from the data dir) ───
     $joined = (& $board join windows-smoke --as Tester 2>&1 | Out-String)
     if ($LASTEXITCODE -eq 0) { Pass "coral-board join (as a person, command-line token)" }

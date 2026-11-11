@@ -1,7 +1,7 @@
 /* What the sidebar's menus do to a team or a folder's agents: kill all, share, save as a template, sleep (moved out of render.js, #4996; no behaviour change). */
 import { state } from './state.js';
 import { registerDialog } from './modal_chrome.js';
-import { sessionFolderKey, keyLabel, splitKey, inTeam, teamFetch, boardFetch } from './server_base.js';
+import { sessionFolderKey, keyLabel, splitKey, inTeam, teamFetch } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
 import { redrawLiveList } from './list_hooks.js';
 import { showConfirmModal } from './confirm_dialog.js';
@@ -39,13 +39,18 @@ export async function killGroup(groupName) {
         "Kill all agents",
         `Kill ${killCount(groupSessions.length).agents} in "${groupName.startsWith('wf:') ? groupName.slice(3) : keyLabel(groupName)}"? ${groupSessions.length === 1 ? 'It' : 'They'} stop${groupSessions.length === 1 ? 's' : ''} now. ${whatStaysKill(groupSessions)} ${killCount(groupSessions.length).note}`,
         async () => {
+            const release = await importOnce('./kill_pending.js').then(m => m.markStopping(groupSessions)); // every row says Stopping... from the click, not only the one being killed now (#15431)
+            const failed = [];
             for (const s of groupSessions) {
                 try {
-                    await killLiveSession(s);
+                    const answer = await killLiveSession(s);
+                    if (!answer || answer.error) failed.push(s.session_id);
                 } catch (e) {
+                    failed.push(s.session_id);
                     console.error(`Failed to kill ${s.name}:`, e);
                 }
             }
+            release(failed);
             dropKilledRows(groupSessions);
         }, undefined, { label: 'Kill all', danger: true }
     );
@@ -72,9 +77,10 @@ export async function killBoard(boardName) {
             // The whole team through the team route, so the team is marked stopped as an API kill does (its worktree is then not "in use" in the kept-worktrees list); its one answer carries the worktree.
             let worktree = null;
             try {
-                const { ok, answer } = await killLiveTeam(boardName);
+                const { ok, answer } = await killLiveTeam(boardName, boardSessions);
                 if (!ok) showToast((answer && answer.error) || 'Could not stop the team', true);
                 else if (answer && answer.worktree && answer.worktree.state && answer.worktree.state !== 'none') worktree = answer.worktree;
+                if (ok) showToast(`Stopped ${killCount(boardSessions.length).agents} in "${keyLabel(boardName)}". The team stays; Remove team is on its page.`);
             } catch (e) {
                 console.error(`Failed to kill team ${boardName}:`, e);
                 showToast('Could not stop the team', true);
@@ -85,87 +91,12 @@ export async function killBoard(boardName) {
     );
 }
 
-function _buildTeamTemplateFromBoard(boardName) {
-    const boardSessions = (state.liveSessions || []).filter(s => inTeam(s, boardName));
-    if (!boardSessions.length) return null;
-
-    const agents = [];
-    for (const s of boardSessions) {
-        const agent = {
-            name: s.display_name || s.board_job_title || s.name,
-            prompt: s.prompt || '',
-        };
-        if (s.agent_type) agent.agent_type = s.agent_type;
-        if (s.model) agent.model = s.model;
-        if (s.capabilities) agent.capabilities = s.capabilities;
-        agents.push(agent);
-    }
-    return { name: keyLabel(boardName), agents, flags: '' };
-}
-
-async function _attachKnowledgeToTemplate(boardName, tmpl) {
-    try {
-        const resp = await teamFetch(boardName, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge`);
-        if (!resp.ok) return tmpl;
-        const data = await resp.json();
-        if (!data.exists || !data.agents) return tmpl;
-        const knowledgeMap = {};
-        for (const a of data.agents) {
-            knowledgeMap[a.name.toLowerCase()] = a.content;
-        }
-        for (const agent of tmpl.agents) {
-            const slug = agent.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, '');
-            if (knowledgeMap[slug]) {
-                agent.knowledge = knowledgeMap[slug];
-            }
-        }
-        if (data.index) tmpl.team_knowledge_index = data.index;
-    } catch { /* knowledge is optional */ }
-    return tmpl;
-}
-
-async function _attachWorkingModeToTemplate(boardName, tmpl) {
-    try {
-        const [modeResp, presetsResp] = await Promise.all([
-            boardFetch(boardName, `/working-mode`),
-            boardFetch(boardName, `/working-mode/presets`),
-        ]);
-        if (modeResp.ok) {
-            const mode = await modeResp.json();
-            if (mode.mode && mode.mode !== 'none') {
-                tmpl.working_mode = {
-                    mode: mode.mode,
-                    dependency_guidance: mode.dependency_guidance || false,
-                    asks_are_tasks: mode.asks_are_tasks || false,
-                    custom_instructions: mode.custom_instructions || '',
-                };
-            }
-        }
-        if (presetsResp.ok) {
-            const data = await presetsResp.json();
-            const customPresets = (data.presets || []).filter(p => !p.builtin || p.overridden);
-            if (customPresets.length > 0) {
-                tmpl.workflow_presets = customPresets.map(p => ({
-                    id: p.id,
-                    name: p.name,
-                    instructions: p.instructions || '',
-                    builtin: p.builtin || false,
-                }));
-            }
-        }
-    } catch { /* working mode is optional */ }
-    return tmpl;
-}
-
 export async function shareAgentTeam(boardName) {
-    let tmpl = _buildTeamTemplateFromBoard(boardName);
+    const tmpl = await (await importOnce('./team_template_build.js')).templateFromBoard(boardName);
     if (!tmpl) {
         showToast("No agents found on this board", "error");
         return;
     }
-
-    tmpl = await _attachKnowledgeToTemplate(boardName, tmpl);
-    tmpl = await _attachWorkingModeToTemplate(boardName, tmpl);
 
     const template = {
         version: 1,
@@ -217,18 +148,15 @@ export async function shareAgentTeam(boardName) {
 }
 
 export function saveTeamFromSidebar(boardName) {
-    showPromptModal('Save Team Template', 'Template name', keyLabel(boardName), async (templateName) => {
-        let tmpl = _buildTeamTemplateFromBoard(boardName);
+    showPromptModal('Save team template', 'Name. Saves: members, models, thinking, modes, instructions. Not skills.', keyLabel(boardName), async (templateName) => {
+        const tmpl = await (await importOnce('./team_template_build.js')).templateFromBoard(boardName);
         if (!tmpl) {
             showToast("No agents found on this board", "error");
             return;
         }
-        tmpl = await _attachKnowledgeToTemplate(boardName, tmpl);
-        tmpl = await _attachWorkingModeToTemplate(boardName, tmpl);
         tmpl.name = templateName;
 
-        // Save to user_settings via the settings API: into the list the server has now (#4423), so a template another
-        // tab saved meanwhile is kept.
+        // into the list the server has now (#4423)
         try {
             const { raw } = await updateSettingList("saved_team_templates", list => upsertByName(list, [tmpl]),
                 { local: parseList(state.settings.saved_team_templates, []) });
@@ -241,7 +169,7 @@ export function saveTeamFromSidebar(boardName) {
     });
 }
 
-/** Wake Team found members that were ended (Kill All, or their own exit) and says so: ask once to resume them all, each in its own folder with its earlier chat, on the team's own computer. */
+/** Wake team found members that were ended (Kill all, or their own exit) and says so: ask once to resume them all, each in its own folder with its earlier chat, on the team's own computer. */
 async function offerResumeEnded(boardName, ended) {
     if (!Array.isArray(ended) || !ended.length) return;
     const { endedSessionOf, resumeEndedAgents, resumeEndedWords, resumeEndedQuestion } = await importOnce('./resume_ended.js');
@@ -267,10 +195,10 @@ export function toggleTeamSleep(boardName, action) {
         try {
             const resp = await teamFetch(boardName, n => `/api/sessions/live/team/${encodeURIComponent(n)}/${action}`, { method: 'POST' });
             const data = await resp.json().catch(() => ({}));
-            // The route answers 200 with ok: false when it did nothing (no sessions on that board): that is a refusal to say, not a team that is awake (#12417: Sleep Team "did nothing" and said nothing).
+            // The route answers 200 with ok: false when it did nothing (no sessions on that board): that is a refusal to say, not a team that is awake (#12417: Sleep team "did nothing" and said nothing).
             if (!resp.ok || data.ok === false) {
                 showToast(data.error || data.message || `Could not ${action} the team (HTTP ${resp.status})`, true);
-                if (action === 'wake') offerResumeEnded(boardName, data.ended); // members Kill All ended: one click brings them back (#14208)
+                if (action === 'wake') offerResumeEnded(boardName, data.ended); // members Kill all ended: one click brings them back (#14208)
                 return;
             }
             const sleeping = !!data.sleeping;
@@ -289,7 +217,7 @@ export function toggleTeamSleep(boardName, action) {
         }
     };
     if (action === 'sleep') {
-        showConfirmModal('Sleep team', `Put all agents on "${keyLabel(boardName)}" to sleep? Their chats stay, and Wake Team starts them again.`, doIt, undefined, { danger: false, label: 'Sleep team' });
+        showConfirmModal('Sleep team', `Put all agents on "${keyLabel(boardName)}" to sleep? Their chats stay, and Wake team starts them again.`, doIt, undefined, { danger: false, label: 'Sleep team' });
     } else {
         doIt();
     }

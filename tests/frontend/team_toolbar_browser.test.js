@@ -70,7 +70,7 @@ const TABS = [['Goals', { pills: true, filters: false, action: 'New goal' }], ['
                 const shown = await ev(`(() => { const p = document.querySelector('[role=tabpanel]:not([hidden])'); return { chip: p.querySelector('.team-tb-chip').textContent, rows: [...p.querySelectorAll('tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ').trim()) }; })()`);
                 assert.match(shown.chip, /^No goal/, 'the chip names the filter'); assert.equal(shown.rows.length, 1, `exactly the one task that serves no goal: ${JSON.stringify(shown.rows)}`); assert.match(shown.rows[0], /Fix the focus ring/);
                 await ev(`document.querySelector('[role=tabpanel]:not([hidden]) .team-tb-chip').click(); true`);
-                await waitFor(`!document.querySelector('[role=tabpanel]:not([hidden]) .team-tb-chip') && document.querySelectorAll('[role=tabpanel]:not([hidden]) tbody tr').length === 5`, 'the chip removed: every open task again', 6000);
+                await waitFor(`!document.querySelector('[role=tabpanel]:not([hidden]) .team-tb-chip') && document.querySelectorAll('[role=tabpanel]:not([hidden]) tbody tr:not(.dt-group)').length === 5`, 'the chip removed: every open task again (the group heading rows are not tasks, since #15305)', 6000);
             });
             await S.run(`${label}: the toolbar has a place for a selection bar: it replaces the pills, icons and action, the field stays, and taking it away restores the line`, async () => {
                 await goTab(ev, settle, 'Tasks'); await settle(500);

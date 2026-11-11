@@ -4,7 +4,9 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -51,16 +53,9 @@ func TestHubTermsFirstLeavesALocalAcceptanceAlone(t *testing.T) {
 	assert.Zero(t, code)
 }
 
-// #9936: a start that left its Terms to the Hub enrolls BEFORE anything listens or starts, so a prod build serves nothing while the terms are unconfirmed. With no Hub to confirm them it ends,
-// non-zero, with no listener bound.
-func TestStartLeavingTheTermsToTheHubServesNothingWhenTheyAreNotConfirmed(t *testing.T) {
-	oldExit, oldAccepted, oldPrompt := exitProcess, eulaAcceptedHere, promptTerms
-	t.Cleanup(func() { exitProcess, eulaAcceptedHere, promptTerms = oldExit, oldAccepted, oldPrompt })
-	var exits []int
-	exitProcess = func(code int) { exits = append(exits, code) }
-	eulaAcceptedHere = func() bool { return false }
-	promptTerms = func() bool { return false } // nobody at a terminal
-
+// isolatedNoHubTermsStart is the isolated folder, environment and configuration of a start that leaves its Terms to a Hub that is not there.
+func isolatedNoHubTermsStart(t *testing.T) *config.Config {
+	t.Helper()
 	iso := t.TempDir()
 	for _, k := range []string{"TMPDIR", "TMP", "TEMP"} {
 		t.Setenv(k, iso)
@@ -81,6 +76,20 @@ func TestStartLeavingTheTermsToTheHubServesNothingWhenTheyAreNotConfirmed(t *tes
 	cfg.Port = 0      // port 0: the system picks one, Start reports it in cfg.Port (no number is picked first, closed and hoped to stay free)
 	cfg.CloudURL = "" // no Hub to confirm anything
 	cfg.TermsViaHub = true
+	return cfg
+}
+
+// #9936: a start that left its Terms to the Hub enrolls BEFORE anything listens or starts, so a prod build serves nothing while the terms are unconfirmed. With no Hub to confirm them it ends,
+// non-zero, with no listener bound.
+func TestStartLeavingTheTermsToTheHubServesNothingWhenTheyAreNotConfirmed(t *testing.T) {
+	oldExit, oldAccepted, oldPrompt := exitProcess, eulaAcceptedHere, promptTerms
+	t.Cleanup(func() { exitProcess, eulaAcceptedHere, promptTerms = oldExit, oldAccepted, oldPrompt })
+	var exits []int
+	exitProcess = func(code int) { exits = append(exits, code) }
+	eulaAcceptedHere = func() bool { return false }
+	promptTerms = func() bool { return false } // nobody at a terminal
+
+	cfg := isolatedNoHubTermsStart(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	rs, err := Start(ctx, cfg, Options{BackendType: "pty"})
@@ -114,4 +123,32 @@ func TestAPersonAtATerminalCanAcceptWhenTheHubDoesNot(t *testing.T) {
 	code, ok = hubTermsFirst(context.Background(), db, cfg)
 	assert.False(t, ok, "they declined, or there is no terminal")
 	assert.Equal(t, 2, code)
+}
+
+// A start that stops at the Terms leaves nothing running in the data folder (#15536): the startup sweeps run in the background on the databases and the folders, and the stop closes the
+// databases and returns, so a caller that removed the folder at once (a test's TempDir) raced a sweep still reading or removing in it ("directory not empty" under load). The start waits for them.
+func TestAStartThatStopsAtTheTermsWaitsForItsBackgroundSweeps(t *testing.T) {
+	oldExit, oldAccepted, oldPrompt, oldGuard := exitProcess, eulaAcceptedHere, promptTerms, launchSweepGuard
+	t.Cleanup(func() {
+		exitProcess, eulaAcceptedHere, promptTerms, launchSweepGuard = oldExit, oldAccepted, oldPrompt, oldGuard
+	})
+	exitProcess = func(int) {}
+	eulaAcceptedHere = func() bool { return false }
+	promptTerms = func() bool { return false }
+	var entered, left atomic.Int32
+	launchSweepGuard = func(dir string) { // a slow sweep: what a loaded machine makes of any of them
+		if oldGuard != nil {
+			oldGuard(dir)
+		}
+		entered.Add(1)
+		time.Sleep(300 * time.Millisecond)
+		left.Add(1)
+	}
+	cfg := isolatedNoHubTermsStart(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	_, err := Start(ctx, cfg, Options{BackendType: "pty"})
+	assert.ErrorIs(t, err, errTermsNotConfirmed)
+	assert.NotZero(t, entered.Load(), "the launch temp sweep began")
+	assert.Equal(t, entered.Load(), left.Load(), "and it was over when Start returned: nothing writes in the folder once the start is refused")
 }

@@ -50,6 +50,8 @@ type exitWatch struct {
 	pending map[string][]string // team ("" = no board) -> the burst's session IDs
 	// lastRecover is when the terminal server's loss was last recovered from (#12592).
 	lastRecover time.Time
+	// seen is what each session's last notice said (#15062).
+	seen map[string]exitSeen
 	// after runs f once d has passed (tests replace it).
 	after func(d time.Duration, f func())
 }
@@ -143,6 +145,13 @@ func (h *SessionsHandler) flushExits(ctx context.Context, team string) {
 			text, failed, _ = h.ts.LatestStopFailure(ctx, sid)
 		}
 		a := exitedAgent{ls: *ls, name: h.noticeName(ctx, *ls), label: exitLabel(text, failed), plan: "Wake resumes it"}
+		if !failed {
+			label, repeat := h.exitPhrase(*ls, h.exitReason(ctx, *ls), time.Now())
+			if repeat {
+				continue // the same stop, said before (#15062)
+			}
+			a.label = label
+		}
 		if failed && resumeOn {
 			if n := attempts[sid]; n < len(autoResumeDelays) {
 				d := ptymanager.JitterAround(autoResumeDelays[n], fmt.Sprintf("%s/%d", sid, n))

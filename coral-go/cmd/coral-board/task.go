@@ -158,12 +158,13 @@ Subcommands:
   release-review <id> --reason "slot released pending review" (orchestrator only; for a candidate submitted before v1.4.56)
   complete <id> [--revision N] [--message "note"] [--outcome success|failed] [--candidate-revision REVISION] [--artifacts manifest.json]
   cancel <id> [--message "reason"]
-  reassign <id> [--to "Agent Name"] [--force]   An agent with more waiting tasks than the team's limit (2) is refused, with the less loaded agents named; --force assigns anyway and is recorded
+  reassign <id> [--to "Agent Name"] [--force]   An agent that already has the team's limit of waiting tasks (3 by default) is refused, with the less loaded agents named; --force assigns anyway and is recorded
+                                   A review task moves to another reviewer the same way: the round follows, the old reviewer is told, the others' verdicts stay
   unblock <id> (--blocker ID | --all) Remove one or all prerequisites (orchestrator only)
   release <id> [--keep]            Put work that is not for now back in the queue (unassigned; --keep leaves it yours): use it, not park
-  park <id> --reason "why" [--until DATE] [--ask MESSAGE_ID]  Set a task aside for a wait OUTSIDE the team (the Operator, another team):
+  park <id> --reason "why" [--until DATE] [--ask MESSAGE_ID] [--force]  Set a task aside for a wait OUTSIDE the team (the Operator, another team):
                                    no reminders, nudges or check items for it until it is unparked or DATE passes
-                                   (orchestrator or Operator only). At most 2 parked per agent; a reviewer wait is submit-review;
+                                   (orchestrator or Operator only). At most the team's limit (3 by default) parked per agent, --force parks past it; a reviewer wait is submit-review;
                                    a wait on the Operator needs the Inbox question: post it with --ask "@Operator ..." and pass its id
   unpark <id>                      Bring a parked task back
   amend <id> --revision N --reason "..." [--body "..." --workflow-instructions "..." --completion-gates JSON (experimental, disabled by default; "[]" clears)]

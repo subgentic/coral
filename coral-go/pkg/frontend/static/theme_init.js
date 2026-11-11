@@ -1,11 +1,11 @@
 /* Apply the saved theme before first paint (classic script, runs in <head>). Only dark, light and system are themes here: anything else (a name a hub stored, an old value) is not one, and a page with no saved choice
-   starts dark on this computer and follows the system on the Cloud Hub, its sign-in and connect pages included (#6087: a phone through the hub has no saved choice, and must never be left with no theme tokens). */
+   follows the system's light or dark (a phone set to light opens light, #15234), on this computer and on the Cloud Hub, its sign-in and connect pages included (#6087: a phone through the hub has no saved choice, and must never be left with no theme tokens). */
 (function () {
     var mode = document.documentElement.hasAttribute('data-hub-page') ? 'cloud' : 'local'; // the hub's own pages (sign-in, connect a machine) say so on <html>: they follow the system too (#6094); this computer's own pages (the dashboard, its sign-in and password pages) do not
     try { var boot = document.getElementById('coral-boot'); if (boot) mode = JSON.parse(boot.textContent).mode || 'local'; } catch (_) {}
     var t = null;
     try { t = localStorage.getItem('coral-theme'); } catch (_) {}
-    if (t !== 'dark' && t !== 'light' && t !== 'system') t = mode === 'cloud' ? 'system' : 'dark';
+    if (t !== 'dark' && t !== 'light' && t !== 'system') t = 'system';
     if (t === 'system') t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', t);
     // The browser's own bar follows the page's light or dark (#10095): the colour is the theme's page colour, set again whenever the theme changes.
@@ -23,9 +23,9 @@
     try {
         var hint = /^([pd])\|(\d{1,3})$/.exec(localStorage.getItem('coral-launch-notice') || ''), phoneScreen = window.innerWidth <= 600 || screen.width <= 600, room_px = '';
         if (hint && (hint[1] === 'p') === phoneScreen) room_px = hint[2];
-        else { // no hint for this kind of screen (a new profile, a phone after a wide window): when the server says the notice is unseen, a typical height is reserved (#14935; the notice's real height is kept as the hint once it is shown)
+        else { // no hint for this kind of screen (a new profile, a phone after a wide window): when the server says the notice is unseen, a typical height is reserved (#14935, 57 px on a phone since the longer headline of #15079; the notice's real height is kept as the hint once it is shown)
             var unseen = false; try { unseen = JSON.parse(document.getElementById('coral-boot').textContent).launch_unseen === true; } catch (_) {}
-            if (unseen) room_px = phoneScreen ? '53' : '73';
+            if (unseen) room_px = phoneScreen ? '57' : '73';
         }
         if (room_px && mode !== 'cloud' && location.pathname.indexOf('/agent/') !== 0 && document.head) {
             var room = document.createElement('style'); room.id = 'launch-notice-room';

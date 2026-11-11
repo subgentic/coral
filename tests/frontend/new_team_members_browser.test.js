@@ -100,6 +100,11 @@ const BASE = require('./test_base').BASE;
             for (const w of r0.slice(1)) { const txt = await rowText(w); assert.match(txt, /Codex/, `${w}: provider is Codex now`); assert.ok(!/small/.test(txt) && !/High/.test(txt), `${w}: model and thinking are back to their defaults (${txt})`); }
             assert.match(await rowText(r0[1]), /Plan/i, 'the worker\'s mode is left alone');
             assert.deepEqual(await roles(), r0, 'roles are left alone');
+            // #15079: the provider choice is followed by a model list that sets the model of every worker at once
+            await waitFor(`(() => { const m = document.getElementById('team-set-all-model'); return !!m && !m.hidden && [...m.options].some(o => o.value === 'codex-small'); })()`, 'a model list for the workers after the provider is picked', 6000);
+            await ev(`(() => { const m = document.getElementById('team-set-all-model'); m.value = 'codex-small'; m.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(400);
+            assert.equal(await rowText('Orchestrator'), orchBefore, 'the Orchestrator keeps its own model when the workers are set');
+            for (const w of r0.slice(1)) assert.match(await rowText(w), /small/i, `${w}: the model is the one picked for all`);
         });
         await S.run('Edit member is a dialog named "Edit member": it opens on the member\'s settings (the sections Agent, Permissions, Advanced), the persona page (Role) is one Back away; Cancel is leftmost and Save member the rightmost; it is the same size as New team', async () => {
             const roles0 = await roles(); const tt = await t.rect(); await openRow(roles0[1]);

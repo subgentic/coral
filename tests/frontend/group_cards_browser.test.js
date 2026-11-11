@@ -44,20 +44,20 @@ const SESSIONS = [
         await run('a team card: its name, the team menu in its order, the Orchestrator first among its agents', async () => {
             const c = await ev(`(${CARD})(document.querySelector('li.session-team-group'))`);
             assert.equal(c.head.replace(/\s*\d+$/, ''), 'alpha', JSON.stringify(c));
-            assert.deepEqual(c.actions.map(a => a.split(':')[0]), ['team-working-mode', 'team-add-agent', 'team-sleep', 'team-save', 'team-menu-more', 'team-availability', 'team-add-terminal', 'team-distill', 'team-share', 'team-accent', 'team-tokens', 'group-move', 'group-move', 'team-reset', 'team-kill', 'team-delete'], JSON.stringify(c.actions));
+            assert.deepEqual(c.actions.map(a => a.split(':')[0]), ['team-working-mode', 'team-add-agent', 'team-sleep', 'team-reset', 'team-save', 'team-menu-more', 'team-availability', 'team-add-terminal', 'team-distill', 'team-share', 'team-accent', 'team-tokens', 'group-move', 'group-move', 'team-kill', 'team-delete'], JSON.stringify(c.actions));
             assert.ok(c.actions.includes('team-add-agent:alpha:/tmp/alpha') && c.actions.includes('team-sleep:alpha:sleep') && c.actions.includes('group-move:alpha:up') && c.actions.includes('group-move:alpha:down'), 'each action names the team it acts on: ' + JSON.stringify(c.actions));
-            assert.ok(c.labels.includes('Sleep Team') && !c.labels.includes('Wake Team'), 'an awake team offers Sleep Team: ' + c.labels);
+            assert.ok(c.labels.includes('Sleep team') && !c.labels.includes('Wake team'), 'an awake team offers Sleep team: ' + c.labels);
             const names = await ev(`[...document.querySelector('li.session-team-group').querySelectorAll('.board-card-agents > li.session-group-item')].map(li => li.getAttribute('aria-label'))`);
             assert.deepEqual(names, ['Orchestrator, Idle', 'Frontend Dev, Idle'], 'the Orchestrator is the first row: ' + JSON.stringify(names));
             assert.equal(await ev(`(() => { const h = document.querySelector('li.session-team-group .board-card-header'); return [h.dataset.onClick, h.dataset.board, h.getAttribute('aria-label')].join('|'); })()`), 'team-name-open|alpha|Open team alpha', "the team's name opens the team");
         });
         await run('a sleeping team: wakes instead of sleeps, is marked sleeping, and says so on its header', async () => {
             const c = await ev(`(${CARD})(document.querySelectorAll('li.session-team-group')[1])`);
-            assert.match(c.cls, /team-sleeping/); assert.ok(c.labels.includes('Wake Team') && c.actions.includes('team-sleep:abacus:wake'), JSON.stringify([c.labels, c.actions]));
+            assert.match(c.cls, /team-sleeping/); assert.ok(c.labels.includes('Wake team') && c.actions.includes('team-sleep:abacus:wake'), JSON.stringify([c.labels, c.actions]));
             assert.equal(await ev(`!!document.querySelectorAll('li.session-team-group')[1].querySelector('.board-card-header .agent-icon[title="Team is sleeping"]')`), true, 'the moon on the header');
             assert.equal(await ev(`!!document.querySelectorAll('li.session-team-group')[0].querySelector('.board-card-header .agent-icon[title="Team is sleeping"]')`), false, 'and not on an awake team');
         });
-        await run('a workflow card: its own look, View Run only when it has a run, Kill All for its group', async () => {
+        await run('a workflow card: its own look, View Run only when it has a run, Kill all for its group', async () => {
             const [a, b] = await ev(`[...document.querySelectorAll('li.session-wf-card')].map(li => (${CARD})(li))`);
             assert.ok(a.actions.includes('wf-run-open:7') && a.actions.includes('group-kill:wf:Nightly'), JSON.stringify(a.actions));
             assert.deepEqual(b.actions, ['group-kill:wf:Weekly'], 'a workflow with no run has no View Run: ' + JSON.stringify(b.actions));
@@ -94,11 +94,11 @@ const SESSIONS = [
             assert.equal(await ev(`document.querySelector('li.session-team-group .group-chevron').getAttribute('aria-expanded')`), 'true', 'the card stayed open');
             await ev(`document.body.click(); true`);
         });
-        await run('the team menu shows the six a person uses and keeps the rest under More (#10549): Team settings, Add Agent, Sleep Team, Save as Template, Reset Team, Kill All (the danger group is last, after More, #10282), and Delete team (#10318); More opens the rest and the menu stays open', async () => {
+        await run('the team menu shows the six a person uses and keeps the rest under More (#10549): Team settings, Add Agent, Sleep team, Reset team (clear context, near the top: #15373), Save as template, Kill all (the danger group is last, after More, #10282), and Delete team (#10318); More opens the rest and the menu stays open', async () => {
             const btn = `document.querySelector('li.session-team-group .group-kebab-btn')`;
             await ev(`${btn}.click(); true`); await waitFor(`${btn}.getAttribute('aria-expanded') === 'true'`, 'the menu open');
             const shown = () => ev(`[...document.getElementById(${btn}.getAttribute('aria-controls')).querySelectorAll('.overflow-menu-item')].filter(b => b.getClientRects().length).map(b => { const c = b.cloneNode(true); c.querySelectorAll('.material-icons, svg').forEach(i => i.remove()); return c.textContent.replace(/\\s+/g, ' ').trim(); })`);
-            const six = ['Team settings', 'Add Agent', 'Sleep Team', 'Save as Template', 'More', 'Reset Team', 'Kill All', 'Delete team']; // the six, More, then the danger group last (#10282) with Delete team (#10318)
+            const six = ['Team settings', 'Add Agent', 'Sleep team', 'Reset team (clear context)', 'Save as template', 'More', 'Kill all', 'Remove team']; // the six, More, then the danger group last (#10282) with Remove team (#10318, #15378)
             assert.deepEqual(await shown(), six, 'six and More: ' + JSON.stringify(await shown()));
             const more = `document.querySelector('li.session-team-group [data-on-click="team-menu-more"]')`;
             assert.equal(await ev(`${more}.getAttribute('aria-expanded')`), 'false', 'More starts closed');

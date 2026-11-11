@@ -588,7 +588,7 @@ export async function killSession() {
                 if (result.changes_artifact_error) {
                     showToast(`Killed, but changes.diff could not be saved: ${result.changes_artifact_error}`, true);
                 } else {
-                    showToast(`Killed and saved changes.diff: ${agentWords(killed, resolveSessionIdentity(killed)).label}`);
+                    showToast(agentWords(killed, resolveSessionIdentity(killed)).label + ' ended');
                 }
                 showWorktreeNotice(result.worktree, 'agent'); // what became of its worktree, if it had one (#6707); a kept one stays on screen with its path (#6818)
                 // The row goes at once; the agent's chat stays in History.

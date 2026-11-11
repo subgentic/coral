@@ -1,5 +1,5 @@
 // Killing an agent removes its row at once (#4946): no crossed-out row waits to be dismissed, there is no Dismiss
-// item in an agent's or a team's menu, and Kill All on a team takes every member. The kill is the only request: nothing
+// item in an agent's or a team's menu, and Kill all on a team takes every member. The kill is the only request: nothing
 // of the agent's history is deleted. Driven through the real menus and the confirm dialog, with the kill endpoint and the
 // live list answered in the page. Run against an isolated dev server; set KILL_SHOT_DIR to save screenshots.
 const assert = require('node:assert/strict');
@@ -61,7 +61,7 @@ const SESSIONS = [
             assert.deepEqual(await rows(), ['sid-1', 'sid-2', 'sid-3', 'sid-4'], `${w}: all four agents listed`);
 
             await shot(`before-${w}`);
-            // One agent: its menu's Kill Session, then the dialog's confirm.
+            // One agent: its menu's Kill session, then the dialog's confirm.
             await ev(`document.querySelector('.session-group-item[data-session-id="sid-1"] .sidebar-kebab-btn').click()`);
             await waitFor(`!!document.querySelector('.session-group-item[data-session-id="sid-1"] [data-on-click="agent-kill"]')`, `${w}: the agent's menu`);
             assert.equal(await ev(`!!document.querySelector('.session-group-item[data-session-id="sid-1"] [data-on-click="agent-dismiss"], .session-group-item[data-session-id="sid-1"] [data-on-click="agent-history"]')`), false, `${w}: the menu has no Dismiss or History item`);
@@ -75,7 +75,7 @@ const SESSIONS = [
             await redraw();
             assert.deepEqual(await rows(), ['sid-2', 'sid-3', 'sid-4'], `${w}: still gone after a redraw`);
 
-            // A team: Kill All takes every member and the team's card.
+            // A team: Kill all takes every member and the team's card.
             await ev(`document.querySelector('.session-board-card .group-kebab-btn').click()`);
             await waitFor(`!!document.querySelector('[data-on-click="team-kill"]')`, `${w}: the team's menu`);
             assert.equal(await ev(`!!document.querySelector('[data-on-click="team-dismiss"]')`), false, `${w}: no Dismiss All in the team menu`);

@@ -13,7 +13,7 @@ const { coralReady } = require('./helpers/wait');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        for (const [id, jt] of [['orch', 'Orchestrator'], ['dev', 'Developer']]) assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: jt, session_name: id + '-s' })).status, 200);
+        for (const [id, jt] of [['orch', 'Orchestrator'], ['dev', 'Developer']]) assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: jt })).status, 200);
         const g = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: 'Distributed teams: one team agents across several Corals via the Hub', outcome: 'x', done_when: 'y' }); assert.equal(g.status, 201);
         for (const t of ['Build the column sizing for every list so no name is cut while a column sits empty', 'Review the patch', 'Fourth task']) assert.ok((await api('POST', `/api/board/${B}/tasks`, { title: t, body: 'x', created_by: 'orch', priority: 'low', goal_id: g.body.id, assigned_to: 'dev' })).status < 300);
         for (const w of [1280, 1024, 800]) {

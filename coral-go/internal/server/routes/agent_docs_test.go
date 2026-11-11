@@ -227,18 +227,18 @@ func TestNewcomerPagesHaveNoSourcePathsOrAgentFlags(t *testing.T) {
 	}
 }
 
-// #10093 v2 (Beta tester): the steps name the real controls. The row menu has Sleep, Archive and Kill Session (no "Remove Agent"), and the phone dialog is "Use on your phone" with Enable, a QR once it is on, and Use Coral Hub instead.
+// #10093 v2 (Beta tester): the steps name the real controls. The row menu has Sleep, Archive and Kill session (no "Remove Agent"), and the phone dialog is "Use on your phone" with Enable, a QR once it is on, and Use Coral Hub instead.
 func TestHowDoIStepsNameTheRealControls(t *testing.T) {
 	b, err := os.ReadFile(filepath.Join("..", "..", "..", "agent_docs", "how-do-i.md"))
 	require.NoError(t, err)
 	text := strings.ReplaceAll(string(b), "\r\n", "\n")
 	assert.NotContains(t, text, "Remove Agent", "the row menu has no Remove Agent")
-	for _, want := range []string{"**Sleep**", "**Archive**", "**Kill Session**", "**Use on your phone**", "**Enable**", "**Use Coral Hub instead**"} {
+	for _, want := range []string{"**Sleep**", "**Archive**", "**Kill session**", "**Use on your phone**", "**Enable**", "**Use Coral Hub instead**"} {
 		assert.Contains(t, text, want)
 	}
 	rows, err := os.ReadFile(filepath.Join("..", "..", "..", "pkg", "frontend", "static", "session_rows.js"))
 	require.NoError(t, err)
-	for _, item := range []string{"Sleep", "Archive", "Kill Session"} {
+	for _, item := range []string{"Sleep", "Archive", "Kill session"} {
 		assert.Contains(t, string(rows), "\n                "+item+"\n", "the row menu really has "+item)
 	}
 }
@@ -316,7 +316,7 @@ func TestHowDoIAnswersContinueAFileAndThePermissionModes(t *testing.T) {
 	chats, composer, modals, history, fields, modes := read("static", "mailbox_chats.js"), read("templates", "includes", "views", "live_session.html"), read("templates", "includes", "modals.html"), read("templates", "includes", "views", "history_session.html"), read("static", "settings_fields.js"), read("static", "permission_flags.js")
 	for want, src := range map[string]string{
 		"Continue this chat": chats, ">Continue this chat</button>": history, // the row's play button and the chat page's button
-		"Resume session": modals, "Working Directory": modals, "Use this folder": modals, "Rejoin board": modals, "Resume in": modals, // the dialog the button opens
+		"Resume session": modals, "Working directory": modals, "Use this folder": modals, "Rejoin board": modals, "Resume in": modals, // the dialog the button opens
 		"type @ for a file in this folder": composer, "Attach an image": composer, // the message box's corner button
 		"Not set (Auto)": fields, "Bypass permissions": fields, "Don't ask": fields, // the Settings select the answer is about
 		"Pi has no permission prompts": modes, "Workspace sandbox": modes, // the per-CLI facts of Auto

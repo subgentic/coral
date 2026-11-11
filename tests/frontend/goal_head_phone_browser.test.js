@@ -44,7 +44,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`!!document.querySelector('${M} #goals-detail-title') && !!document.querySelector('${M} .goal-head-actions button')`, `${tag}: the goal page`, 15000);
             let p = await head();
             if (!phone) {
-                assert.deepEqual(p.btns.map(b => b.t), ['Add task', 'Change driver', 'Move to another team', 'Close goal'], `${tag}: desktop keeps its four buttons ${JSON.stringify(p)}`);
+                assert.deepEqual(p.btns.map(b => b.t), ['Add task', 'Edit goal', 'Change driver', 'Move to another team', 'Mark done'], `${tag}: desktop keeps its five buttons ${JSON.stringify(p)}`);
                 assert.equal(await ev(`!!document.querySelector('${M} .goals-detail-line .goal-copy-agent')`), true, `${tag}: Copy for an agent stays in the line on a desktop`);
                 continue;
             }
@@ -59,19 +59,19 @@ const { coralReady } = require('./helpers/wait');
             await key('Enter', 'Enter', 13);
             await waitFor(`!document.querySelector('${M} .goal-head-actions .task-more-menu').hidden`, `${tag}: More opens on Enter`, 4000);
             const open = await items();
-            assert.deepEqual(open.map(i => i.t), ['Change driver', 'Move to another team', 'Copy for an agent', 'Close goal'], `${tag}: the menu holds the rest: ${JSON.stringify(open)}`);
+            assert.deepEqual(open.map(i => i.t), ['Edit goal', 'Change driver', 'Move to another team', 'Copy for an agent', 'Mark done'], `${tag}: the menu holds the rest: ${JSON.stringify(open)}`);
             assert.ok(open.every(i => i.vis && i.h >= 43.5), `${tag}: menu items are 44 px: ${JSON.stringify(open)}`);
-            assert.equal(await ev(`document.activeElement.textContent.trim()`), 'Change driver', `${tag}: the first item has focus`);
+            assert.equal(await ev(`document.activeElement.textContent.trim()`), 'Edit goal', `${tag}: the first item has focus`);
             await key('ArrowDown', 'ArrowDown', 40);
-            assert.equal(await ev(`document.activeElement.textContent.trim()`), 'Move to another team', `${tag}: ArrowDown moves`);
+            assert.equal(await ev(`document.activeElement.textContent.trim()`), 'Change driver', `${tag}: ArrowDown moves`);
             if (w === 390 && fs16 === 16 && theme === 'light') await shot('goal-phone-menu-390');
             await ev(require('./helpers/wait').framesJs(4)); // a scroll that the keyboard's own move caused is reported a frame later: it must not close the menu (a short window, landscape at 200% text)
-            assert.equal(await ev(`!document.querySelector('${M} .goal-head-actions .task-more-menu').hidden && document.activeElement.textContent.trim() === 'Move to another team'`), true, `${tag}: the menu is still open, with the keyboard on the item, a few frames after ArrowDown`);
+            assert.equal(await ev(`!document.querySelector('${M} .goal-head-actions .task-more-menu').hidden && document.activeElement.textContent.trim() === 'Change driver'`), true, `${tag}: the menu is still open, with the keyboard on the item, a few frames after ArrowDown`);
             await key('Escape', 'Escape', 27);
             assert.equal(await ev(`document.activeElement.classList.contains('task-more-btn')`), true, `${tag}: Escape gives the focus back to More`);
             if (w === 390 && fs16 === 16 && theme === 'light') {
                 // a dialog opened from the menu gives the focus back to the visible More toggle, whether it is closed with Escape or Cancel (#13119, UI Reviewer M1)
-                for (const [first, downs, how] of [['Change driver', 0, 'Escape'], ['Change driver', 0, 'Cancel'], ['Move to another team', 1, 'Escape'], ['Move to another team', 1, 'Cancel']]) {
+                for (const [first, downs, how] of [['Change driver', 1, 'Escape'], ['Change driver', 1, 'Cancel'], ['Move to another team', 2, 'Escape'], ['Move to another team', 2, 'Cancel']]) {
                     await ev(`document.querySelector('${M} .goal-head-actions .task-more-btn').focus(); true`);
                     await key('Enter', 'Enter', 13);
                     await waitFor(`!document.querySelector('${M} .goal-head-actions .task-more-menu').hidden`, `${tag}: More opens for ${first}`, 4000);
@@ -92,7 +92,7 @@ const { coralReady } = require('./helpers/wait');
         await load(`/inbox/goals/${board}/${doneId}`, 16, 'light');
         await waitFor(`!!document.querySelector('${M} .goal-head-actions button')`, 'the done goal page', 15000);
         const pd = await head();
-        assert.deepEqual(pd.btns.map(b => b.t), ['Close goal', 'More'], 'a goal that looks done: Close goal is the one button: ' + JSON.stringify(pd));
+        assert.deepEqual(pd.btns.map(b => b.t), ['Mark done', 'More'], 'a goal that looks done: Mark done is the one button: ' + JSON.stringify(pd));
         // the page is drawn again when its data lands (a slow machine: after the first look): a More pressed just before that is pressed on a button that is then replaced. Press it once the page has held still for 600 ms.
         for (let i = 0; ; i++) {
             await ev(`document.querySelector('${M} .goal-head-actions .task-more-btn').__still = true; true`);
@@ -102,7 +102,7 @@ const { coralReady } = require('./helpers/wait');
         }
         await ev(`document.querySelector('${M} .goal-head-actions .task-more-btn').click(); true`);
         await waitFor(`!document.querySelector('${M} .goal-head-actions .task-more-menu').hidden`, 'More opens', 4000);
-        assert.deepEqual((await items()).map(i => i.t), ['Add task', 'Not yet', 'Change driver', 'Move to another team', 'Copy for an agent'], 'and the rest are in More');
+        assert.deepEqual((await items()).map(i => i.t), ['Add task', 'Not yet', 'Edit goal', 'Change driver', 'Move to another team', 'Copy for an agent'], 'and the rest are in More');
         console.log('PASS goal page on a phone: one button and More, no button in the driver line, title two lines, 44 px, keyboard, 390 (100%, 200%, both themes), landscape; 1280 unchanged');
     } finally { await removeBoards(ev, [board]).catch(() => { }); await client.close(); }
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

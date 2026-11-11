@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -72,8 +73,9 @@ type fakeRelease struct {
 	hits     map[string]int
 	status   map[string]int // a path suffix -> a status to answer
 	redirect map[string]string
-	extra    int    // bytes appended to the package body past its declared length (chunked)
-	list     string // when set, the list of releases the API answers instead of the real one
+	extra    int            // bytes appended to the package body past its declared length (chunked)
+	list     string         // when set, the list of releases the API answers instead of the real one
+	pages    map[int]string // when set, the list answered for each ?page=N (an empty page past the last), instead of list (#15476)
 }
 
 func asset(version string) string { return "coral-linux-amd64-" + version + ".tar.gz" }
@@ -132,6 +134,12 @@ func (r *fakeRelease) serve(w http.ResponseWriter, req *http.Request) {
 			`{"tag_name":"v` + r.version + `","draft":false,"prerelease":false,"assets":[{"name":"SHA256SUMS.txt"}]}]`
 		if r.list != "" {
 			list = r.list
+		}
+		if r.pages != nil {
+			n, _ := strconv.Atoi(req.URL.Query().Get("page"))
+			if list = r.pages[n]; list == "" {
+				list = "[]"
+			}
 		}
 		w.Write([]byte(list))
 	case strings.HasPrefix(req.URL.Path, "/latest/download/"):

@@ -124,6 +124,7 @@ type teamArtifact struct {
 	index      int
 	managed    string // 64-hex Coral object id for coral-managed artifacts
 	fromRecord bool   // an upload row whose record holds the name, the type and the digest: the list needs no read of the sidecar for it (#13552)
+	uploadGoal int64  // the goal an Operator's file was added for (#15317): shown only once the board says the goal is the team's (linkUploadTasks)
 	uploadTask int64  // the task an upload's record says it is linked to (#7739): shown only once the board says the task is the team's (linkUploadTasks)
 }
 
@@ -383,7 +384,24 @@ func (h *BoardHandler) buildProjectArtifactItems(r *http.Request, project, sessi
 			items = h.uploads.merge(items, h.coralDir, map[string]string{sessionFilter: ""})
 		}
 	} else {
-		items = h.uploads.merge(items, h.coralDir, teamUploadSessions(tasks, subscribers))
+		sessions := teamUploadSessions(tasks, subscribers)
+		holderOnly := map[string]bool{}
+		for _, sid := range readTeamFileHolders(h.coralDir, project) { // a session that holds the team's own files stays read whoever is subscribed now (#15356)
+			if _, ok := sessions[sid]; !ok {
+				sessions[sid] = ""
+				holderOnly[sid] = true
+			}
+		}
+		items = h.uploads.merge(items, h.coralDir, sessions)
+		for i := range items { // a row from such a session names who made the file, or says the agent was removed (#15463)
+			if it := &items[i]; it.SessionID != nil && holderOnly[*it.SessionID] && it.ProducedBy == nil {
+				name := removedAgentName
+				if it.Uploader != "" {
+					name = it.Uploader
+				}
+				it.ProducedBy = &name
+			}
+		}
 		items = h.mergeCrossTeamRows(items, project)
 	}
 	h.linkUploadTasks(r.Context(), project, items)
@@ -883,7 +901,7 @@ func (c *uploadDirCache) merge(items []teamArtifact, coralDir string, sessions m
 				Uploader: u.rec.Uploader, Role: u.rec.Role, UploadedBy: u.rec.UploadedBy,
 				ID: u.id, Name: u.rec.Name, MediaType: u.rec.MediaType, CreatedAt: u.rec.CreatedAt, Size: sizeOfRecord(u.rec.Size),
 				Source: "upload", URI: "coral://artifacts/" + u.id, Digest: u.rec.Digest,
-				ReferenceCount: 1, SessionID: &sid, managed: u.id, uploadTask: u.rec.TaskID,
+				ReferenceCount: 1, SessionID: &sid, managed: u.id, uploadTask: u.rec.TaskID, uploadGoal: u.rec.GoalID,
 				fromRecord: u.rec.Name != "" && !digestLikeName.MatchString(u.rec.Name) && u.rec.MediaType != "" && u.rec.Digest != "",
 			}
 			if producer != "" {
@@ -973,6 +991,7 @@ func (h *BoardHandler) ListSessionArtifacts(w http.ResponseWriter, r *http.Reque
 // linkUploadTasks gives an upload row the task its record says it is linked to (#7739): its number and title, but only when that task is on this team's board (a record's number is the
 // uploader's own claim at the time, so it is checked here, where the title is read). A row that already has a task (a task result's reference) keeps it.
 func (h *BoardHandler) linkUploadTasks(ctx context.Context, project string, items []teamArtifact) {
+	h.linkUploadGoals(ctx, project, items)
 	var ids []int64
 	seen := map[int64]bool{}
 	for _, it := range items {
@@ -1132,3 +1151,25 @@ func (h *BoardHandler) attachSeriesVersions(rows []teamArtifact, project string)
 
 // WarmUploads reads every session's upload records into the board handler's cache (called once after a start, in the background).
 func (h *BoardHandler) WarmUploads() { h.uploads.warm(h.coralDir) }
+
+// linkUploadGoals gives a file the Operator added for a goal (#15317) that goal's number and title, but only when the goal is on this team's board (the record's number is a claim, checked where the title is read).
+func (h *BoardHandler) linkUploadGoals(ctx context.Context, project string, items []teamArtifact) {
+	known := map[int64]*board.Goal{}
+	for i := range items {
+		id := items[i].uploadGoal
+		if id <= 0 || items[i].GoalID != nil {
+			continue
+		}
+		g, seen := known[id]
+		if !seen {
+			if got, err := h.bs.GetGoal(ctx, project, id); err == nil {
+				g = got
+			}
+			known[id] = g
+		}
+		if g != nil {
+			gid := g.ID
+			items[i].GoalID, items[i].GoalTitle = &gid, g.Title
+		}
+	}
+}

@@ -189,6 +189,7 @@ var guardedHelpers = []string{"startOnBackend", "startOnTmux", "restartTerminal"
 
 // pinnedCallers are the callers of the guarded helpers that are neither handlers nor pinned above: each is reached only from the handler or background entry named.
 var pinnedCallers = map[string]string{
+	"orchestrator_restart.go SessionsHandler.restartAsSeat":    "the Orchestrator restart handler (a signed agent call under its grant and caps, #15112) and queueRestart, started from that handler",
 	"scheduler.go JobScheduler.KillRun":                        "the run-kill handler (tasks.go) and the workflow run handlers",
 	"scheduler.go JobScheduler.finishRun":                      "only reached from the scheduler's ticks and watchers or a run a person started",
 	"scheduler_reap.go JobScheduler.reapStaleRuns":             "only reached from JobScheduler.Run",

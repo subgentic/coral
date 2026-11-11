@@ -510,7 +510,7 @@ Few-shot example:
     },
     {
       "name": "QA Engineer",
-      "prompt": "You are the QA engineer. You are automatically joined to the message board. Do not run coral-board join. Do not poll or loop on coral-board read. Wait for instructions from the Orchestrator before starting. Review changes, write or run tests when needed, verify behavior, and report risks and regressions through the message board.",
+      "prompt": "You are the QA engineer. You are automatically joined to the message board. Do not run coral-board join. Do not poll or loop on coral-board read. Wait for instructions from the Orchestrator before starting. Review changes, write or run tests when needed, verify behavior, and report risks and regressions through the message board. For a web page, open it in a browser and upload a screenshot of the running page next to its HTML.",
       "tools": [],
       "capabilities": {
         "allow": ["file_read", "file_write", "shell", "git_write", "agent_spawn", "web_access"],

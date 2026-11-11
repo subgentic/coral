@@ -1,7 +1,7 @@
 // A worktree a stop kept stays on screen as one compact bar (#6818, #6859, #6943: the desktop's floating toast was 422 px tall at 200% text and covered the top bar and Settings' Save and Cancel, so the
 // notice is the bar of worktree_dock.js on every layout): "Worktree kept" with Copy path, Details and a x on one line, the words behind Details, announced once (a status; an alert when the worktree could not
 // be removed), focus to its first button after the person's own Kill and back to the Agents list on dismiss, several as one "N worktrees kept" whose x says "Dismiss all N worktree notices"; a removal is a short
-// toast. The real Kill Team and Kill Session flows on a desktop window at 100% and 200% text; the bar never overlaps the top bar or Settings' Save and Cancel. The kill answers are the page's fetch (Backend's
+// toast. The real Kill Team and Kill session flows on a desktop window at 100% and 200% text; the bar never overlaps the top bar or Settings' Save and Cancel. The kill answers are the page's fetch (Backend's
 // #6701 shape). The phone's layout is worktree_dock_browser. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -42,7 +42,7 @@ const { coralReady } = require('./helpers/wait');
             const dock = () => ev(`(() => { const d = document.getElementById('worktree-dock'); if (!d || d.hidden) return null; const q = s => d.querySelector(s);
                 return { title: (q('.worktree-dock-title') || {}).textContent, buttons: [...d.querySelectorAll('.worktree-dock-line button')].map(b => b.classList.contains('ic-close') ? '×' : b.textContent), x: (q('.worktree-dock-dismiss') || {}).getAttribute && q('.worktree-dock-dismiss').getAttribute('aria-label'), error: d.classList.contains('error'),
                     items: [...d.querySelectorAll('.worktree-dock-item')].map(i => ({ text: i.querySelector('.worktree-dock-text').textContent, copy: !!i.querySelector('.worktree-dock-copy') })), focus: document.activeElement && document.activeElement.textContent,
-                    live: ((document.getElementById('notice-live') || {}).textContent || '').trim(), alert: ((document.getElementById('notice-alert') || {}).textContent || '').trim(), toasts: [...document.querySelectorAll('.toast')].map(t => t.textContent) }; })()`);
+                    live: ((document.getElementById('notice-live') || {}).textContent || '').trim(), alert: ((document.getElementById('notice-alert') || {}).textContent || '').trim(), toasts: [...document.querySelectorAll('.toast')].map(t => t.textContent).filter(t => !/^Stopped /.test(t)) }; })()`); // 'no toast' is about the worktree: the team's own stop confirmation (#15277: 'Stopped the 1 agent in ...') is its own line and is not counted here
             const DOCK_UP = `!!document.querySelector('#worktree-dock:not([hidden])')`;
 
             console.log(`${tag}: a kept worktree`);
@@ -85,7 +85,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`localStorage.clear(); T.state.liveSessions = []; window.__m.agents = {};
                 window.__m.add('solo', 'K', 3, { sleeping: false, session_id: 'o1' }); T.state.liveSessions.forEach(s => { s.branch = 'coral-team/solo'; s.git_state = { is_worktree: true }; });
                 T.render.renderLiveSessions(T.state.liveSessions); window.__answer = ${JSON.stringify({ ok: true, worktree: { state: 'kept', path: '/tmp/wt/solo', branch: 'coral-team/solo', reason: 'it has uncommitted changes' } })}; T.render.killSessionDirect('solo', 'claude', 'o1'); true`);
-            await waitFor(open, 'the Kill Session confirmation', 8000); await ev(`document.getElementById('confirm-modal-yes').click(); true`);
+            await waitFor(open, 'the Kill session confirmation', 8000); await ev(`document.getElementById('confirm-modal-yes').click(); true`);
             await waitFor(DOCK_UP, "the single kill's bar", 6000);
             await ev(`document.querySelector('#worktree-dock .worktree-dock-details').click(); true`);
             b = await dock();

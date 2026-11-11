@@ -11,6 +11,7 @@ import { registerGroupSource, openGroupTable, refreshGroupTable } from './sideba
 import { setHidden } from './dom_write.js';
 import { announceNotice } from './notifications.js';
 import { importOnce } from './import_once.js';
+const { agentCopyButton } = await importOnce('./agent_copy_button.js'); // the robot at the toolbar's end (#15063)
 import { jobList, onJobsChanged, refreshJobs, selectScheduledJob, openJobId, scheduleOf, nextOf, offWord } from './scheduler.js';
 import { lastWords, lastChip, atWords, whenWords, failureWords, isExample } from './job_words.js';
 import { liveRuns, onLiveRuns, selectLiveJobRun } from './live_jobs.js';
@@ -155,6 +156,7 @@ function toolbarOf(key) {
             onPick: pick => { setFilters(key, { ...filtersOf(key), state: pick === 'all' ? '' : pick }); renderNav(true); } },
         action: createAction(key),
     });
+    if (!node.querySelector('.agent-copy')) node.append(agentCopyButton(f.resources ? 'resources' : 'jobs', () => (f.resources ? 'The resource queue: run coral-board resource list.' : `Coral\u2019s scheduled ${f.noun[1]} (the Automations tab).`))); // where in the docs to read (#15063)
     return { node, signature: JSON.stringify([filt, counts, rows.length]) };
 }
 

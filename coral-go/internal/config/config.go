@@ -20,8 +20,9 @@ var PostHogKey string
 // Version is set at build time via ldflags.
 var Version string
 
-// Build tier variables are set in tier_dev.go, tier_beta.go, or tier_prod.go
-// based on compile-time build tags (-tags dev, -tags beta, or default).
+// Build tier variables are set in tier_dev.go, tier_staging.go, or tier_prod.go
+// based on compile-time build tags (-tags dev, -tags staging, or default). The beta and dropboxers tiers are gone (#15075): a stale
+// -tags beta or -tags dropboxers builds PROD, the safe tier (the terms are required, the update check is on).
 // See those files for the values per tier.
 
 // Config holds all server configuration values.

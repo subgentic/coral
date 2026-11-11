@@ -51,6 +51,7 @@ function chipView(s, server) {
         if (toModel || !toLevel) view.model = { text: `Switching to ${toModel || 'the new setting'}…`, state: 'pending' };
         if (toLevel) view.thinking = { text: `Switching to ${toLevel}…`, state: 'pending' };
         view.note = sw.after_reply ? 'Switches after this reply.' : (sw.thinking ? 'The level shows once the agent has replied.' : '');
+        if (sw.asking) view.note = `Claude asks: ${sw.asking}`;
         return view;
     }
     if (_local && Date.now() < _local.until && !(sw && sw.state !== 'pending')) { view[_local.kind] = { text: _local.text, state: 'pending' }; return view; }

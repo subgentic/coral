@@ -50,6 +50,7 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 	boardHandler.SetChangeWords(sessHandler.ChangeRequestWords)
 	boardHandler.SetMemberRestLookup(routes.MemberRestLookup(s.boardStore, store.NewSessionStore(s.db))) // a post to an agent that will not read it now says so (#13189)
 	boardHandler.SetNeedsYouAgents(sessHandler.NeedsYouAgents)
+	boardHandler.SetNeedsYouRemotes(s.hubNeedsRemotes)
 	boardHandler.SetCommentReadStamp(sessHandler.StampCommentReads)                    // the Operator's comment says when the asked agent read it (#14130)
 	boardHandler.SetIdleWaker(sessHandler.WakeIdleForDelivery)                         // any typed delivery to an auto-asleep agent wakes it first (#12111)
 	boardHandler.SetNeedsYouSkills(routes.NewSkillsHandler(s.db, s.cfg).NeedsYouItems) // the skills that wait for the Operator are items of Needs you (#12139)
@@ -172,6 +173,7 @@ func (s *Server) registerBoardAPI(r *chi.Mux, boardHandler *routes.BoardHandler,
 		r.With(routes.RefuseSignInLink).Put("/api/board/{project}/guide-roster", boardHandler.GuideRoster)
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/wake", sessHandler.OrchestratorWake)
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/sleep", sessHandler.OrchestratorSleep)
+		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/restart", sessHandler.OrchestratorRestart)
 	})
 
 	// These work without an open board, so they stay outside the board group (#4924): team
@@ -326,6 +328,7 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.Delete("/api/board/{project}/tasks/{taskID}/park", boardHandler.ParkTask)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/release", boardHandler.ReleaseTaskByID) // "not now" work back to the queue (#11660)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/health/ack", boardHandler.AckHealthItem)
+	r.Get("/api/board/{project}/context-reset-status", boardHandler.GetContextResetStatus) // each agent's last compaction or skip reason, for Team settings (#15066)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/reminder", boardHandler.RemindTask)
 	r.Delete("/api/board/{project}/tasks/{taskID}/reminder", boardHandler.RemindTask)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/reminder", boardHandler.RemindSubscriber)

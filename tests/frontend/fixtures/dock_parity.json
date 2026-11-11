@@ -275,7 +275,7 @@
       "action": "board-chat-pause",
       "source": "static/board_chat.js:80",
       "status": "moved",
-      "newHome": "team page: Messages tab (the board's own column, message_board.js): Pause/Resume Board: POST /pause or /resume, the same requests",
+      "newHome": "team page: Messages tab (the board's own column, message_board.js): Pause/Resume board: POST /pause or /resume, the same requests",
       "proof": {
         "file": "static/message_board.js",
         "needle": "boardFetch(currentProject, `/${action}`"
@@ -288,7 +288,7 @@
       "what": "names a control: \"Pause board\"",
       "source": "static/board_chat.js:80",
       "status": "moved",
-      "newHome": "team page: Messages tab (the board's own column, message_board.js): Pause/Resume Board: POST /pause or /resume, the same requests",
+      "newHome": "team page: Messages tab (the board's own column, message_board.js): Pause/Resume board: POST /pause or /resume, the same requests",
       "proof": {
         "file": "static/message_board.js",
         "needle": "boardFetch(currentProject, `/${action}`"
@@ -301,7 +301,7 @@
       "what": "names a control: \"Pause board: stops agents from receiving new messages until resumed\"",
       "source": "static/board_chat.js:80",
       "status": "moved",
-      "newHome": "team page: Messages tab (the board's own column, message_board.js): Pause/Resume Board: POST /pause or /resume, the same requests",
+      "newHome": "team page: Messages tab (the board's own column, message_board.js): Pause/Resume board: POST /pause or /resume, the same requests",
       "proof": {
         "file": "static/message_board.js",
         "needle": "boardFetch(currentProject, `/${action}`"

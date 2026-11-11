@@ -1,5 +1,53 @@
 # Release Notes
 
+## v2.0.65 — Review versions you can follow, Needs you rows as cards, goals with names and numbers, safer teams, and an updater that finds releases by tag
+
+Task numbers in brackets. Built on lead-v2065 from main 7ef282679.
+
+### Changes
+
+#### What you will notice first
+
+- **Needs you rows are cards on a computer,** with their buttons on a bottom line; the star never sits on a row's text; a question waiting 5 minutes or more reads in amber and shows in the tab title; alerts are offered at the first question (#15120, #15084, #15297).
+- **Needs you is calmer to use:** rows hold still while the pointer is over them (new arrivals wait for "Show"), ticking a row does not move the list, a bulk Dismiss names what it could not put away, the counts agree everywhere, and a team filter you set last time says so with a Clear button (#15339, #15118, #15340, #15259).
+- **Files and versions:** a list of a file's versions numbered across rounds with Open and Restore; an older version says a newer one exists and opens it in one click; the review bar names the version it approves; review rounds show what changed; a comment that still needs an answer follows the file to its newest version (#15285, #15329, #15197, #15189, #15188).
+- **Goals have a short name and a visible number,** a finished goal stays in a Done group, goals an agent closed say so, and the Goals count follows a close at once (#15245, #15305, #15244, #15229).
+- **Add files for the team:** a visible button on the team's and a goal's Artifacts tab; the tab says where the team's folder is and has Download all as a zip (#15317, #15154).
+- **A killed agent no longer leaves the team stuck silently:** assigning a task to an ended agent is refused, a post to one says so, ended agents can be resumed from the Agents tab, and Kill shows "Stopping…" at once (#15293, #15294, #15370, #15431).
+- **"Remove team" is one thing,** its dialog says what goes; "Reset team (clear context)" sits near the top of the team menus; one name, Kill Session, for ending an agent (#15277, #15373, #15371).
+- **New teams and newcomers:** "New team" is in the sidebar, plain words in team Settings, a folder Coral can never trust is said before launch, the launch dialog says auto mode (#15312, #15091, #15210, #15079).
+- **Stale tasks:** every N hours the Orchestrator gets one message listing stale tasks and the commands to act on them; the parked-task cap is a team setting (default 3); `assign_limit` is literal (#14863, #15362, #15398).
+- **Teams can be created with their launch settings saved and applied** from templates (#15311).
+- **Phone:** a compact file-viewer header, a Needs you count beside the team name, a Goals row that gives the title the whole row, and a comments sheet that ends above Approve (#15033, #15185, #15343, #15165).
+- **Update a Coral with no internet:** `coral-update push` sends a release to a remote Coral, which receives and relaunches (#15379).
+- **Updater client finds the promotion in the `promote-` tag refs** instead of reading a releases list (#15081; #15414 and #15416 are superseded by it); versions older than 2.0.57 may need to install once by hand.
+- **The beta and dropboxers build tiers are removed;** dev, prod and staging remain (#15075).
+- **install.sh is a release asset** listed in the signed SHA256SUMS.txt; verify-release checks it from 2.0.65 (#14097).
+- **Coral no longer ships a built-in Dropbox app key.** A connected Dropbox backup pauses, with a note in Settings. Adding your own key in Settings comes in the next release (#15641).
+
+#### Fixed
+
+- The Agent Tasks tab loads at once when the agent's subscriber id arrives (#15375).
+- The agent card's context % no longer outlives a /compact or /clear (#15055).
+- A restart keeps the model on the stored command line when the model column is empty (#15114).
+- A team's own files stay listed when the agent holding them is replaced (#15356).
+- A comment to a sleeping agent says so; review notices are Coral's, not the person's (#15155, #15172).
+- A permission request that can only be rejected shows no rows of dashes (#15140).
+- Tablet and 200% zoom layouts: sidebar menus inside the drawer, chips wrap only when they do not fit, the Board's toolbar on one row (#15258, #15366, #15303).
+- Keyboard: skip link to Message the team, focus back to the Answer button, Escape closes Display options, passage comments by keyboard (#15296, #15174, #15173).
+- Forced-colours comment cards and danger menu items under keyboard focus (#15162, #15286).
+- A web page is shown as it looks: docs tell agents to upload a screenshot of the running page, and the screenshot check names personal or secret data (#15318).
+- The Create a password page has one fold, "Other ways in" (#15355).
+- Security: a knowledge status error never carries a key (#15272); the exit notice redacts the terminal's last line (#15062); a second click within 600 ms cannot approve all of a series (#15254); a bad `return_to` no longer loops (#15237); a refused group still signals the child (#15011).
+- A Coral started from Finder or a login item gets its login shell's folders on PATH, on macOS only (#15072).
+- Hub: the phone hamburger opens when no tab is left in it (#15479).
+
+#### Known issues
+
+- Carried from v2.0.64 and v2.0.63: see v2.0.64's list.
+- Left out of this release: #15414 (the updater's release streaming; #15081 replaces it).
+- Hand-run only, not in any gate: tests/stress/restart_context_real.py (#15464).
+
 ## v2.0.64 — Context reset that can clear an agent, planning defaults for new teams, multi-select in Needs you, and a Which computer? step on a Hub
 
 ### Changes

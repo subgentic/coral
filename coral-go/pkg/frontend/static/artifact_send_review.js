@@ -50,13 +50,16 @@ export function askReviewQuestion({ count = 1, name = '' } = {}) {
         const hint = el('p', 'inbox-ask-sub', `One line, up to ${QUESTION_MAX} characters. It shows above the file in Needs you.`); hint.id = 'send-review-hint'; box.setAttribute('aria-describedby', 'send-review-hint');
         const row = el('div', 'inbox-ask-buttons');
         const cancel = el('button', 'btn', 'Cancel'), go = el('button', 'btn btn-primary send-review-go', 'Send for review'); cancel.type = go.type = 'button';
-        row.append(cancel, go); dlg.append(title, sub, label, box, hint, row);
+        const note = el('p', 'inbox-ask-sub send-review-note'); note.setAttribute('role', 'status'); // said when Enter finds the box empty
+        row.append(go, cancel); dlg.append(title, sub, label, box, hint, note, row); // Send first, then Cancel: the Tab order of the other dialogs
         let settled = false;
         const finish = value => { if (settled) return; settled = true; dlg.close(); dlg.remove(); resolve(value); };
         cancel.addEventListener('click', () => finish(null));
         dlg.addEventListener('cancel', e => { e.preventDefault(); finish(null); });
         go.addEventListener('click', () => finish(box.value.replace(/\s+/g, ' ').trim()));
-        box.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go.click(); } });
+        // Enter sends the question typed; with nothing typed it does not close the dialog and say nothing (the question is optional: the button sends without one)
+        box.addEventListener('keydown', e => { if (e.key !== 'Enter') return; e.preventDefault(); if (box.value.trim()) go.click(); else note.textContent = 'Type the question to send it with the file, or choose Send for review to send it without one.'; });
+        box.addEventListener('input', () => { note.textContent = ''; });
         document.body.append(dlg); dlg.showModal(); box.focus();
     });
 }

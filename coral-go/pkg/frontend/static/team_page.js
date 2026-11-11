@@ -5,11 +5,12 @@ import { openTask } from './task_navigation.js';
  * and Agents, Knowledge and Settings are today's panels of the right dock moved in, until their own builds (stage 3 of #7453). Lazy: loaded by openTeamPage (lazy_panels.js). */
 import { state } from './state.js';
 import { needsYou } from './asked_before_restart.js';
-import { keyLabel, splitKey, boardFetch, teamFetch, isCloud, teamWorkDir, inTeam } from './server_base.js';
+import { keyLabel, splitKey, boardFetch, teamFetch, isCloud, teamWorkDir, inTeam, hasBoardLabel } from './server_base.js';
 const { wakingSince, stopWaking } = await importOnce('./team_waking.js'); // lazy like this file (the Wake action loads it too)
 import { showView } from './utils.js';
+import { loadStyles } from './lazy_styles.js';
 import { note, go } from './nav.js';
-import { keyRoute, TEAM_TABS } from './routes.js';
+import { keyRoute, parse, TEAM_TABS } from './routes.js';
 import { importOnce } from './import_once.js';
 import { refreshTeamAvailability } from './team_availability.js';
 import { pollEvery } from './overload.js';
@@ -21,6 +22,7 @@ import { isPhoneLayout } from './phone_layout.js';
 const { revealInStrip } = await importOnce('./strip_reveal.js'); // a part of the team page's group: loaded with it
 const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 const { el } = await importOnce('./team_table.js');
+const { agentCopyButton } = await importOnce('./agent_copy_button.js'); // the robot beside the team's name (#15063)
 const { quietFocus } = await importOnce('./quiet_focus.js');
 
 const PHONE_MORE = ['knowledge', 'messages', 'branches']; // (the last three of TEAM_TABS: the row is the others, in the operator's order, #8791) // the tabs a phone puts behind its More menu (CSS hides their tabs under 761 px)
@@ -77,7 +79,7 @@ function buildOnce() {
     $('team-page-health').addEventListener('click', () => { goTab('needs', { user: true }); });
     $('team-page-missing-back')?.addEventListener('click', () => { go({ view: 'agents' }); });
     $('team-page-back-agent')?.addEventListener('click', backToAgent);
-    $('team-page-bar-back')?.addEventListener('click', () => { if (backTo) backToAgent(); else go({ view: 'agents' }); }); // a phone's bar arrow: back to the agent it came from, else to the agent list (#11239)
+    $('team-page-bar-back')?.addEventListener('click', () => { if (backTo) backToAgent(); else go(cameFrom ? (u => parse(u.pathname, u.search))(new URL(cameFrom, location.origin)) : { view: 'agents' }); }); // a phone's bar arrow: back to the agent it came from, else to the agent list (#11239)
     $('team-page-add-agent').addEventListener('click', () => { window.showAddAgentToBoard?.(S.team, teamDir()); });
     $('team-page-settings').addEventListener('click', () => { openSettings(); });
     buildMore();
@@ -131,22 +133,23 @@ let moreOpen = false;
 /** The team's settings, in a popout over the page (#8853): the header's Settings button and its phone More item. */
 function openSettings() { importOnce('./team_settings_modal.js').then(m => m.openTeamSettings(S.team)).catch(e => console.error('team settings', e)); }
 
-/** Stopping a team: one menu, the same words and the same actions as the team's row in the sidebar (Sleep Team or Wake Team, Reset Team, Kill All; the last two apart, each asks first). A wide header has the Stop button; a phone's has the same items in More (#10008, Beta Tester and Mobile tester). */
+/** Stopping a team: one menu, the same words and the same actions as the team's row in the sidebar (Sleep team or Wake team, Reset team, Kill all; the last two apart, each asks first). A wide header has the Stop button; a phone's has the same items in More (#10008, Beta Tester and Mobile tester). */
 const teamAsleep = () => { const m = (state.liveSessions || []).filter(s => inTeam(s, S.team)); return m.length > 0 && m.every(s => s.sleeping); };
 function stopItems() {
     const asleep = teamAsleep();
     const none = !(state.liveSessions || []).some(s => inTeam(s, S.team)); // a team with no live agent has nothing to put to sleep, reset or kill: say so, do not offer a button that does nothing (#10187)
     const why = none ? 'No agent of this team is running' : '';
     return [
-        { key: 'sleep', label: asleep ? 'Wake Team' : 'Sleep Team', hint: asleep ? 'Starts the sleeping agents again' : 'Stops every agent for now; Wake Team starts them again', why, run: () => window.toggleTeamSleep?.(S.team, asleep ? 'wake' : 'sleep') },
-        { key: 'reset', label: 'Reset Team', hint: 'Each agent starts again from its first instructions, in a new chat', danger: true, why, run: () => window.resetTeam?.(S.team) },
-        { key: 'kill', label: 'Kill All', hint: 'Ends every agent now; their chats stay in History', danger: true, why, run: () => window.killBoard?.(S.team) },
+        { key: 'sleep', label: asleep ? 'Wake team' : 'Sleep team', hint: asleep ? 'Starts the sleeping agents again' : 'Stops every agent for now; Wake team starts them again', why, run: () => window.toggleTeamSleep?.(S.team, asleep ? 'wake' : 'sleep') },
+        { key: 'reset', label: 'Reset team (clear context)', hint: 'Clears every agent\'s context; each starts in a new chat', why, run: () => window.resetTeam?.(S.team) },
+        { key: 'kill', label: 'Kill all', hint: 'Ends every agent now; their chats stay in History', danger: true, why, run: () => window.killBoard?.(S.team) },
     ];
 }
 /** The items in the Stop menu and in a phone's More (labels follow the team: asleep or not). */
 function syncStop() {
     const menu = $('team-page-stop-menu'); if (!menu) return;
     const moreMenu = $('team-page-more-menu');
+    $('team-page-stop').textContent = teamAsleep() ? 'Wake agents' : 'Stop agents'; // a sleeping team is already stopped (walk 13 M9)
     for (const [host, cls] of [[menu, 'menu-item'], [moreMenu, 'menu-item team-more-add team-more-stop']]) {
         if (!host) continue;
         for (const old of host.querySelectorAll('[data-stop], .team-more-stop-sep')) old.remove();
@@ -174,7 +177,8 @@ function buildMore() {
     add.addEventListener('click', () => { window.showAddAgentToBoard?.(S.team, teamDir()); });
     const settings = el('button', 'menu-item team-more-add team-more-settings', 'Settings'); settings.type = 'button'; settings.id = 'team-page-more-settings';
     settings.addEventListener('click', () => { openSettings(); });
-    menu.append(add, settings);
+    const tpl = Object.assign(el('button', 'menu-item', 'Save as template'), { type: 'button', id: 'team-page-more-template', onclick: () => window.saveTeamFromSidebar?.(S.team) });
+    menu.append(add, settings, tpl);
     host.append(b, menu);
     const set = (open, { focus = false } = {}) => { moreOpen = open; menu.hidden = !open; b.setAttribute('aria-expanded', String(open)); if (open) menu.querySelector('button:not([hidden])')?.focus(); else if (focus) b.focus(); };
     b.addEventListener('click', () => { syncStop(); set(!moreOpen); }); // the Stop items in it follow the team (asleep or not) each time it opens
@@ -186,7 +190,7 @@ const BOARD_ACTIONS = ['mb-select-btn', 'mb-export-btn', 'mb-pause-btn', 'mb-del
 function adoptBoardActions() {
     const menu = $('team-page-more-menu'); if (!menu) return;
     for (const id of BOARD_ACTIONS) { const b = $(id); if (b && b.parentElement !== menu) { b.dataset.home = b.parentElement ? b.parentElement.id : ''; menu.append(b); } }
-    const pause = $('mb-pause-btn'); // what Pause Board does, in words under it (Mobile tester, #10008): a title is no help on a phone
+    const pause = $('mb-pause-btn'); // what Pause board does, in words under it (Mobile tester, #10008): a title is no help on a phone
     if (pause && !$('mb-pause-note')) { const n = el('span', 'menu-note', /^Resume/.test(pause.textContent) ? 'Agents get messages again when you resume.' : 'Agents stop receiving new messages until you resume.'); n.id = 'mb-pause-note'; pause.after(n); pause.setAttribute('aria-describedby', 'mb-pause-note'); }
     for (const id of BOARD_ACTIONS) { const b = $(id); if (b) b.style.display = ''; } // display-ok: the holder's markup hides these with an inline display:none, which message_board.js clears the same way
     const sel = $('mb-select-btn'); if (sel) sel.hidden = S.tab !== 'messages'; // selecting messages is the Messages tab's
@@ -202,6 +206,7 @@ function releaseBoardActions() {
 export const refreshTeamHeader = () => { if (S.team) drawHeader(); };
 
 let backTo = null; // the agent whose dock's Board tab opened this page (#10703)
+let cameFrom = ''; // the address the person came into this team from, for the phone bar's arrow (#15163)
 async function backToAgent() {
     const to = backTo; backTo = null; $('team-page-back-agent').hidden = true;
     await window.selectLiveSession(to.name, to.agent_type, to.session_id || '', to.server);
@@ -218,6 +223,8 @@ function drawHeader() {
         if (computer) h.append(el('span', 'team-page-machine', ` on ${computer.label || computer.id}`));
     }
     document.title = `${keyLabel(S.team)} · Coral`;
+    document.getElementById('team-page-agent-copy')?.remove(); // the team may have changed: its line is drawn again
+    const robot = agentCopyButton('board', () => `Team \u201c${keyLabel(S.team)}\u201d, its board: run coral-board read`, { className: 'team-page-agent-copy' }); robot.id = 'team-page-agent-copy'; h.after(robot);
 }
 
 function drawStatus(data) {
@@ -225,12 +232,16 @@ function drawStatus(data) {
     syncStop();
     S.statusData = data;
     const live = (state.liveSessions || []).filter(row => inTeam(row, S.team));
-    const n = live.filter(needsYou).length;
+    const n = live.filter(needsYou).length + (data?.agents || []).filter(a => a.availability === 'offline' && a.open_tasks).length; // an ended agent that holds a task is not "All well" (#15293)
     if (live.length && (!data || !data.agents?.length)) data = { agents: live.map(row => ({ availability: row.sleeping ? 'sleeping' : 'unknown' })) };
     if (!data || !Array.isArray(data.agents)) { s.textContent = 'Status unavailable'; s.className = 'team-page-status unknown'; const health = $('team-page-health'); if (health) health.hidden = true; return; } // kept in the page and empty: a live region that is shown and filled in one turn is not announced
     // a team with no agent has nothing to be well: a name no board has (a mistyped /team/<name>) said All well in green (#8839 c); say nothing
     if (!data.agents.length) { s.textContent = ''; s.className = 'team-page-status'; const hb = $('team-page-health'); if (hb) hb.hidden = true; return; }
-    const uncertainAttention = data.agents.filter(agent => ['needs_input', 'waiting'].includes(agent.availability) && !live.some(row => row.session_id === agent.session_id && row.wait_removed)).length > n;
+    const owed = Math.max(0, data.agents.filter(agent => ['needs_input', 'waiting'].includes(agent.availability) && !live.some(row => row.session_id === agent.session_id && row.wait_removed)).length - n); // agents the board says wait, that no live row here agrees with
+    if (!owed) S.disagreeSince = 0; else if (!S.disagreeSince) S.disagreeSince = Date.now();
+    const settled = owed > 0 && Date.now() - S.disagreeSince > (Number(globalThis.__coralAttentionGraceMs) >= 0 ? Number(globalThis.__coralAttentionGraceMs) : 30000); // #15151: 'Checking attention status' is for a moment (the rows catch up); when the two still disagree after 30 s the board's word counts, it never stays
+    const uncertainAttention = owed > 0 && !settled;
+    const shown = n + (settled ? owed : 0);
     const waking = wakingSince(S.team) > 0;
     // no signal yet, or (right after Wake, while the read still says so) still asleep: nothing says they are well (#10006), and a just-woken team is counted as it reports (#10052, #10359)
     const notYet = a => a.availability === 'unknown' || (waking && a.availability === 'sleeping');
@@ -240,17 +251,29 @@ function drawStatus(data) {
     // Just woken from here: how many have reported so far, until all have (or two minutes pass), not only "waiting" (#10052).
     const wakingNow = unknown > 0 && !n && waking;
     if (!unknown) stopWaking(S.team);
-    const text = uncertainAttention ? 'Checking attention status' : asleep ? 'Asleep' : wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : n ? `${n} ${n === 1 ? 'needs' : 'need'} attention` : unknown ? `${unknown === data.agents.length ? 'Waiting for first signal' : `${unknown} of ${data.agents.length} waiting for first signal`}. A signal is an agent's first message.` : 'All well';
+    const tp = state.teamPause, paused = tp?.paused && tp.team === S.team; // the person's Pause (#15331): the header says so, with the way out in the line under it (team_pause.js)
+    // every task done, none open, nobody working and nothing needs the person: not the same as "All well" while the team is still at it (walk 21 H2, #15304)
+    const finished = !shown && !unknown && S.counts.tasks === 0 && S.tasksDone > 0 && data.agents.every(a => a.availability !== 'busy' && a.availability !== 'needs_input' && a.availability !== 'waiting');
+    const text = paused ? 'Paused' : uncertainAttention ? 'Checking attention status' : asleep ? 'Asleep' : wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : shown ? `${shown} ${shown === 1 ? 'needs' : 'need'} attention` : unknown ? (unknown === data.agents.length ? 'No agent has sent a first message yet' : `${unknown} of ${data.agents.length} agents have not sent a first message yet`) : finished ? 'Finished: your turn' : 'All well';
     // When agents need attention the visible status is a button to the Agents tab (beside the live region, which keeps saying it and is then only for a screen reader: the button's name is not announced twice); "All well" is plain text.
     const b = $('team-page-health');
     if (b) {
-        b.hidden = !n || uncertainAttention;
-        if (n && !uncertainAttention) { b.replaceChildren(Object.assign(el('span', 'team-status-dot'), {}), document.createTextNode(text)); b.firstChild.setAttribute('aria-hidden', 'true'); b.setAttribute('aria-label', `Team health: ${text}`); }
+        b.hidden = !shown || uncertainAttention;
+        if (shown && !uncertainAttention) { b.replaceChildren(Object.assign(el('span', 'team-status-dot'), {}), document.createTextNode(text)); b.firstChild.setAttribute('aria-hidden', 'true'); b.setAttribute('aria-label', `Team health: ${text}`); }
     }
     if (s.textContent === text) return; // the same words are not said again
-    s.className = `team-page-status ${uncertainAttention || asleep ? 'unknown' : n ? 'needs sr-only' : unknown ? 'unknown' : 'well'}`; // Asleep takes the neutral dot, as waiting does
+    s.className = `team-page-status ${paused || uncertainAttention || asleep ? 'unknown' : shown ? 'needs sr-only' : unknown ? 'unknown' : 'well'}`; // Asleep takes the neutral dot, as waiting does
     const dot = el('span', 'team-status-dot'); dot.setAttribute('aria-hidden', 'true');
     s.replaceChildren(dot, document.createTextNode(text));
+}
+
+/** A phone's bar says what waits for the person: the team's Needs you count beside the title (the strip scrolls so the Needs you tab may be off the left edge, #8149 keeps the open tab whole), and a tap opens that tab (#15185). Drawn only for a number; a desktop's CSS hides it. */
+function syncBarNeeds() {
+    const head = $('team-page-head'), n = String(S.counts.needs ?? ''), shown = /^[1-9]/.test(n); let b = $('team-page-bar-needs');
+    if (!head || (!shown && !b)) return;
+    if (!shown) { b.remove(); head.classList.remove('has-needs'); return; }
+    if (!b) { loadStyles('team_bar_needs.css'); b = el('button', 'team-bar-needs'); b.id = 'team-page-bar-needs'; b.type = 'button'; b.addEventListener('click', () => goTab('needs', { user: true, focus: true })); head.append(b); head.classList.add('has-needs'); }
+    b.textContent = n; b.setAttribute('aria-label', `Needs you: ${n} waiting. Open the Needs you tab`); b.title = `Needs you: ${n}`;
 }
 
 function drawCounts() {
@@ -265,6 +288,7 @@ function drawCounts() {
         // a space between the word and its count, so the tab is read "Goals 2"
         label.textContent = text ? `${LABEL[t]} ` : LABEL[t];
     }
+    syncBarNeeds();
     // the counts widen the tabs: when one changed, the selected tab is brought wholly into view again (its own count arrives after it was scrolled to, #8149), then the edges are drawn
     // a count arrives on a poll: the strip moves sideways, a page scrolled down stays (#12357)
     queueMicrotask(() => { if (widened) revealInStrip($('team-tabs'), $(`team-tab-${S.tab}`)); drawTabEdges(); });
@@ -281,17 +305,19 @@ async function readCounts() {
         S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts();
     }).catch(() => { if (seq === S.countSeq && team === S.team) { S.counts.needs = '…'; drawCounts(); } });
     const knowledge = S.knowledgeFor === team ? null : (S.knowledgeFor = team, teamFetch(team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge`).then(async r => { const data = await r.json(); return r.ok ? data : null; }).catch(() => null)); // the Knowledge tab's count once per team, with the others (the notes are read again when the tab opens)
+    importOnce('./team_pause.js').then(m => m.readTeamPause(team)); // the pause is read on every poll, so a pause made elsewhere (another tab, a restart) shows here too
     const [goals, tasks, avail, kn] = await Promise.allSettled([
         boardFetch(team, '/goals?state=proposed,active,blocked,done,dropped&limit=200').then(async r => { const data = await r.json(); return r.ok ? data : null; }),
-        boardFetch(team, '/tasks?counts=1').then(async r => { const data = await r.json(); return r.ok ? data : null; }),
+        boardFetch(team, `/tasks?counts=1&since=${encodeURIComponent(new Date(new Date().setHours(0, 0, 0, 0)).toISOString().replace(/\.\d+Z$/, 'Z'))}`).then(async r => { const data = await r.json(); return r.ok ? data : null; }),
         refreshTeamAvailability(team, true),
         knowledge,
     ]);
     if (seq !== S.countSeq || team !== S.team) return;
     const g = goals.value;
-    if (g) S.counts.goals = (Array.isArray(g) ? g : g.goals || []).length;
+    if (g) S.counts.goals = (Array.isArray(g) ? g : g.goals || []).filter(x => !['done', 'dropped'].includes(String(x.state).toLowerCase())).length; // open goals, as the sidebar's Goals counts them (#15340)
     const t = tasks.value;
-    if (t && Number.isFinite(t.total_open)) S.counts.tasks = (state.teamTasksOpen && state.teamTasksOpen.team === String(team) && Number.isFinite(state.teamTasksOpen.n) ? state.teamTasksOpen.n : t.total_open); // the list's own Open count when it has been read, so the tab and the list agree (#12248)
+    if (t && Number.isFinite(t.total_completed)) S.tasksDone = t.total_completed; // for the header's Finished state (#15304)
+    if (t && Number.isFinite(t.total_open)) S.counts.tasks = (state.teamTasksOpen && state.teamTasksOpen.team === String(team) && Number.isFinite(state.teamTasksOpen.n) ? state.teamTasksOpen.n : t.total_open + (t.completed_since || 0)); // the list's own Open count when it has been read, so the tab and the list agree (#12248)
     if (avail.value && Array.isArray(avail.value.agents)) S.counts.agents = avail.value.agents.filter(a => a.availability !== 'archived').length; // as the sidebar group counts them (#10164)
     const k = kn.value;
     if (k && k.exists) S.counts.knowledge = ((k.index ? 1 : 0) + (Array.isArray(k.agents) ? k.agents.length : 0)) || null;
@@ -306,6 +332,7 @@ function syncNeedsCount() {
 }
 document.addEventListener('coral:needs-updated', () => { if (S.team && currentTeamPage()) drawStatus(S.statusData); syncNeedsCount(); });
 document.addEventListener('coral:team-needs-count', e => { if (e.detail?.team === S.team) syncNeedsCount(); });
+document.addEventListener('coral:team-pause-changed', e => { if (e.detail?.team === S.team) drawStatus(S.statusData); });
 document.addEventListener('coral:team-sleep-changed', e => { if (S.team && e.detail && e.detail.team === S.team) readCounts(); });
 function startCounts() {
     readCounts();
@@ -367,7 +394,14 @@ const teamHooks = () => ({
     openGoal: (id) => openGoalPage(id),
     onItem: (id) => { if (S.tab === 'goals' && !S.quiet) note(keyRoute('team', S.team, 'goals', id || null)); },
     onCount: (n) => { },
+    onMissing: (id) => itemNotFound('goal', id, 'goals'),
 });
+
+/** A goal or task the address names is not on this team: say so by name, with the way back to the list (#15295). */
+function itemNotFound(what, id, tab) {
+    const team = S.team;
+    importOnce('./np.js').then(m => m.showNotFound({ what, id: `#${id}`, back: { view: 'team', id: splitKey(team).name, server: splitKey(team).server, sub: tab }, backLabel: `Back to ${what === 'goal' ? 'Goals' : 'Tasks'}` })).catch(() => {});
+}
 
 async function fillTab(tab, item = 0) {
     const team = S.team, host = panel(tab), seq = S.navSeq;
@@ -376,7 +410,7 @@ async function fillTab(tab, item = 0) {
         if (tab === 'goals') {
             const m = await importOnce('./goals_view.js');
             if (stale()) return;
-            m.showGoals(host, team, { page: true, hooks: { ...teamHooks(), onCount: (n) => { S.counts.goals = n; drawCounts(); } } });
+            m.showGoals(host, team, { page: true, hooks: { ...teamHooks(), onCount: (n, open) => { S.counts.goals = open; drawCounts(); } } });
             if (item) m.openGoalWhenKnown(item); else if (m.openGoalId()) { S.quiet = true; m.closeGoal(); S.quiet = false; }
         } else if (tab === 'needs') {
             const m = await importOnce('./inbox_sidebar.js');
@@ -428,7 +462,9 @@ async function openTaskById(id) {
     const team = S.team, seq = S.navSeq;
     const m = await importOnce('./team_tasks_page.js');
     const host = $('team-panel-item');
-    const full = await m.readTask(team, id);
+    let missing = false;
+    const full = await m.readTask(team, id, () => { missing = true; });
+    if (missing && seq === S.navSeq && team === S.team && S.tab === 'tasks') { itemNotFound('task', id, 'tasks'); return; }
     if (!full || seq !== S.navSeq || team !== S.team || S.tab !== 'tasks') return;
     const origin = panel('tasks');
     S.item = { kind: 'task', id, origin };
@@ -438,7 +474,7 @@ async function openTaskById(id) {
     const backLabel = fromGoal ? (shortLabel(history.state?.from) || 'Goal') : 'Tasks';
     origin.hidden = true;
     host.hidden = false;
-    m.renderTaskPage(host, full, {
+    (full ? m.renderTaskPage : m.renderTaskGone)(host, full || { id }, {
         project: S.team, backLabel,
         openGoal: (id) => { closeItem(false); openGoalPage(id); },
         openTask: (t) => openTask(S.team, t.id), // a follow-up listed on the task's page
@@ -510,7 +546,12 @@ export async function openTeamPage(team, opts = {}) {
     S.noGoal = tab === 'tasks' && !!opts.noGoal;
     S.tasksQuery = tab === 'tasks' ? opts.query || '' : '';
     const changed = S.team !== team;
-    if (changed) { S.team = team; S.counts = {}; S.item = null; S.knowledgeFor = ''; }
+    if (changed) { S.team = team; S.counts = {}; S.tasksDone = 0; S.item = null; S.knowledgeFor = ''; }
+    if (changed) { // where the person came from: the page before this one (this address when a click opens it, the one before it in history when the router did), for the phone bar's arrow (#15163)
+        const here = location.pathname + location.search, was = here.startsWith('/team/') ? history.state?.prev : here;
+        cameFrom = typeof was === 'string' && was.startsWith('/') && !was.startsWith('/team/') ? was : '';
+    }
+    if (!hasBoardLabel(team)) importOnce('./board_fetch.js').then(m => m.fetchProjects()).then(() => S.team === team && drawHeader(), () => {});
     state.selectedTeam = team; // the team on screen (the sidebar marks its row; the panels moved in read it)
     state.boardPageProject = team;
     state.currentBoardServer = splitKey(team).server;
@@ -519,6 +560,7 @@ export async function openTeamPage(team, opts = {}) {
     if (changed) { // another team: the tables of the last one go, the moved-in panels and the board's column are drawn again for this one
         for (const t of ['goals', 'tasks', 'artifacts', 'agents', 'knowledge']) { const p = panel(t); p.removeAttribute('data-built'); p.replaceChildren(); }
         drawCounts(); drawStatus(null);
+        $('team-pause-bar')?.toggleAttribute('hidden', true); // the last team's pause line
     }
     backTo = opts.backTo || (changed ? null : backTo);
     $('team-page-back-agent').hidden = !backTo;

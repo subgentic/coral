@@ -187,7 +187,7 @@ const FILE_ID = /^[0-9a-f]{32}$/;
 export const fileIdOf = it => (it && typeof it.file_id === 'string' && FILE_ID.test(it.file_id) ? it.file_id : '');
 
 /** The row's version line as the server told it ("version N of <name> (file <id>)"), or ''. The file's name is an agent's text, so every hidden or reordering character in it is written out (<U+202E>) on every surface that shows the line (#14178). */
-export const versionLineOf = it => (fileIdOf(it) && typeof it.version_line === 'string' ? markHidden(it.version_line.slice(0, 300), { strict: true }) : '');
+export const versionLineOf = it => (fileIdOf(it) && typeof it.version_line === 'string' ? markHidden(it.version_line.slice(0, 300), { strict: true }).replace(/ \(file [^)]*\)$/, '') : ''); // the version and the name; the file id is in Details and Copy file ID (#15142)
 
 /** Copy the file id: the id an agent passes to --new-version-of (add @<version> for one version). toast(text, isError) tells the person. */
 export function copyFileId(it, toast) {

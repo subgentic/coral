@@ -59,6 +59,7 @@ func newOrchRig(t *testing.T) *orchRig {
 	rt.Get("/api/board/{project}/lifecycle-log", h.LifecycleLog)
 	rt.Post("/api/board/{project}/agents/{subscriber}/wake", h.OrchestratorWake)
 	rt.Post("/api/board/{project}/agents/{subscriber}/sleep", h.OrchestratorSleep)
+	rt.Post("/api/board/{project}/agents/{subscriber}/restart", h.OrchestratorRestart)
 	rt.Post("/api/sessions/launch", h.Launch)
 	rt.Post("/api/sessions/launch-team", h.LaunchTeam)
 	own := httptest.NewServer(rt)

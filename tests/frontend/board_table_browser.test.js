@@ -117,10 +117,13 @@ const BASE = require('./test_base').BASE;
         const c = await ev(`({ value: document.getElementById('mb-post-input').value, focused: document.activeElement === document.getElementById('mb-post-input') })`);
         assert.deepEqual(c, { value: '@QA Engineer ', focused: true });
         await ev(`(() => { const i = document.getElementById('mb-post-input'); i.value += 'thanks, noted'; i.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#mb-board .mb-post-send-btn').click(); return true; })()`);
-        await waitFor(`document.querySelectorAll('#mb-messages > .mb-message').length >= 7`, 'the reply row', 10000);
-        const posted = await ev(`fetch('/api/board/${B}/messages/all?limit=20').then(r => r.json())`);
-        const list = Array.isArray(posted) ? posted : (posted.messages || []);
-        const mine = list.find(m => /thanks, noted/.test(m.content));
+        // 7 rows are on screen before the send, so a row count passes at once and the read below raced the post: wait for the message itself
+        let mine;
+        for (let i = 0; i < 100 && !mine; i++) {
+            const posted = await ev(`fetch('/api/board/${B}/messages/all?limit=20').then(r => r.json())`);
+            mine = (Array.isArray(posted) ? posted : (posted.messages || [])).find(m => /thanks, noted/.test(m.content));
+            if (!mine) await settle(100);
+        }
         assert.ok(mine && mine.reply_to, 'the post carries reply_to: ' + JSON.stringify(mine));
         assert.ok(await ev(`${ROWS}[0].classList.contains('mb-open')`), 'the open row stayed open when a message arrived');
 

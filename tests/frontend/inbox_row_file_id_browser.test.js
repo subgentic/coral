@@ -7,6 +7,7 @@ const { coralReady } = require('./helpers/wait');
 const { removeBoards } = require('./helpers/board_cleanup');
 
 const FILE = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
+const noId = l => l.replace(/ \(file [^()]*\)$/, ''); // a row says the version and the name; the id is in Details and Copy file ID (#15142)
 const LINE = `version 3 of release-plan.md (file ${FILE})`;
 const NASTY = `version 3 of rel\u202eease-plan.md (file ${FILE})`, MARKED = `version 3 of rel<U+202E>ease-plan.md (file ${FILE})`; // the name is an agent's text: the hidden character is written out on the row
 
@@ -37,9 +38,9 @@ const NASTY = `version 3 of rel\u202eease-plan.md (file ${FILE})`, MARKED = `ver
                 await waitFor(`document.querySelectorAll('${T} tbody tr').length === 1`, at + 'the one review row', 15000);
                 const from = await ev(`(([...document.querySelectorAll('${T} tbody tr')].find(r => r.querySelector('.inbox-review-name')) || {}).textContent || '')`); // the data row, not the agent's group head
                 if (expectLine === 'marked') {
-                    check(from.includes(MARKED) && !from.includes('\u202e'), at + `the hidden character is written out, never raw: ${JSON.stringify(from)}`);
+                    check(from.includes(noId(MARKED)) && !from.includes('(file ') && !from.includes('\u202e'), at + `the hidden character is written out, never raw: ${JSON.stringify(from)}`);
                 } else {
-                    check(from.includes(LINE) === expectLine, at + `the version line ${expectLine ? 'is' : 'is not'} on the row: ${JSON.stringify(from)}`);
+                    check(from.includes(noId(LINE)) === expectLine && !from.includes('(file '), at + `the version line ${expectLine ? 'is' : 'is not'} on the row: ${JSON.stringify(from)}`);
                 }
                 await removeBoards(ev, [team]).catch(() => {});
             }

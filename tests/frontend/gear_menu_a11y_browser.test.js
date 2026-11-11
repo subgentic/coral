@@ -1,4 +1,4 @@
-// The gear menu is a menu to a screen reader (Beta #10372, #10374): the "Settings menu" button said nothing of opening anything, and its items (Themes, Keyboard shortcuts, Settings, Documentation, GitHub, Check for Updates) were
+// The gear menu is a menu to a screen reader (Beta #10372, #10374): the "Settings menu" button said nothing of opening anything, and its items (Themes, Keyboard shortcuts, Settings, Documentation, GitHub, Check for updates) were
 // plain buttons and links. Read from the accessibility tree, the same one a screen reader reads: the button has a menu popup and says whether it is expanded (false closed, true open, false again after Escape, and the
 // keyboard goes back to it); the open menu is a menu whose items are menuitems; the arrow keys move among them. 1280 px. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');

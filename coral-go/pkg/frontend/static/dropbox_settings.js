@@ -307,6 +307,11 @@ function render(st) {
     hideAll();
     lastStatus = st;
     renderBackup(st);
+    if (st && st.paused_no_key) { // signed in with the key an earlier build shipped, and this build has none (#15641): paused, not broken; the files are safe here, Disconnect clears the sign-in
+        setStatus('Dropbox backup is paused: this build has no Dropbox app key. Your files are safe on this computer.');
+        show('settings-dropbox-disconnect', true);
+        return;
+    }
     if (!st || !st.app_key_set) {
         setStatus("Dropbox backup isn't available in this build.");
         return;
@@ -479,7 +484,7 @@ export async function disconnectDropbox(leaveShared = false) {
 const REMOVALS = '/api/dropbox/removals';
 let removalsSeq = 0;
 
-export async function loadRemovals() {
+export async function loadRemovals(refocus = false) {
     const box = $('settings-dropbox-removals');
     if (!box) return;
     show('settings-dropbox-delete-rule', true);
@@ -488,6 +493,12 @@ export async function loadRemovals() {
     try { const r = await fetch(REMOVALS, { cache: 'no-store' }); j = r.ok ? await r.json() : null; } catch { j = null; }
     if (seq !== removalsSeq) return; // a newer read is on its way
     renderRemovals(j && Array.isArray(j.removals) ? j.removals : []);
+    if (refocus) { // the list was drawn again under the person (UI Accessibility's 4 on cee349ca6): the keyboard goes to it, or to the status line
+        const first = box.querySelector('button, input');
+        const target = first || $('settings-dropbox-note');
+        if (target && !first) target.tabIndex = -1;
+        target?.focus?.();
+    }
 }
 
 const rmButton = (text, onClick) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-small'; b.textContent = text; b.addEventListener('click', onClick); return b; };
@@ -510,7 +521,7 @@ function renderRemovals(rows) {
     }
     if (held.length) {
         const acts = document.createElement('div'); acts.className = 'dropbox-inline';
-        acts.append(rmButton('Remove them from Dropbox', confirmHeld), rmButton('Keep them in Dropbox', () => cancelRemovals({ state: 'held' }, 'They stay in Dropbox.')));
+        acts.append(rmButton('Remove them after 24 hours', confirmHeld), rmButton('Keep them in Dropbox', () => cancelRemovals({ state: 'held' }, 'They stay in Dropbox.')));
         box.append(rmLine(`${held.length} deleted ${held.length === 1 ? 'file waits' : 'files wait'} for your OK before leaving Dropbox: many files were deleted at once.`), acts);
     }
     if (asked.length) {
@@ -549,11 +560,14 @@ function askedRemoval(r) {
         let res;
         try { res = await post(`/api/dropbox/remove/${encodeURIComponent(String(r.digest || ''))}`, 'POST', JSON.stringify(body)); } catch { res = { ok: false, status: 0, body: {} }; }
         go.disabled = false;
-        if (res.ok && !(Array.isArray(res.body.edited) && res.body.edited.length)) { note(res.body.in_progress ? 'Dropbox is still removing it.' : `${rmName(r)} was removed from Dropbox.`); loadRemovals(); return; }
-        if (res.ok) { note('It was edited in Dropbox again. Nothing more was removed.'); loadRemovals(); return; }
+        if (res.ok && !(Array.isArray(res.body.edited) && res.body.edited.length)) { note(res.body.in_progress ? 'Dropbox is still removing it.' : `${rmName(r)} was removed from Dropbox.`); loadRemovals(true); return; }
+        if (res.ok) { note('It was edited in Dropbox again. Nothing more was removed.'); loadRemovals(true); return; }
         note(res.body.code === 'others_offloaded' ? 'Those are not the right characters. Nothing was removed.' : String(res.body.error || 'Not removed: Coral could not reach Dropbox. Try again.'));
     });
     const keep = rmButton('Keep it in Dropbox', () => cancelRemovals({ digest: String(r.digest || '') }, `${rmName(r)} stays in Dropbox.`));
+    // Each row's buttons say which file (UI Accessibility's 3 on cee349ca6): a screen reader's list of buttons is not the same three names.
+    go.setAttribute('aria-label', `${go.textContent}: ${rmName(r)}`);
+    keep.setAttribute('aria-label', `Keep it in Dropbox: ${rmName(r)}`);
     acts.append(...(typed ? [typed] : []), go, keep);
     li.append(name, why, acts);
     return li;
@@ -563,14 +577,14 @@ async function cancelRemovals(what, said) {
     let res;
     try { res = await post(`${REMOVALS}/cancel`, 'POST', JSON.stringify(what)); } catch { res = { ok: false, body: {} }; }
     note(res.ok ? said : 'Not changed: Coral could not save it.');
-    loadRemovals();
+    loadRemovals(true);
 }
 
 async function confirmHeld() {
     let res;
     try { res = await post(`${REMOVALS}/confirm`, 'POST', JSON.stringify({ confirm: true })); } catch { res = { ok: false, body: {} }; }
     note(res.ok ? 'They will be removed from Dropbox once their 24 hours have passed.' : 'Not changed: Coral could not save it.');
-    loadRemovals();
+    loadRemovals(true);
 }
 
 // Disconnect and delete the backup (stage 6a, #14814): the server says what the confirm needs (the files not from this computer and the other
@@ -822,7 +836,7 @@ function wire() {
     on('settings-dropbox-retention-cancel', cancelRetention);
     const sync = $('settings-dropbox-autosync');
     if (sync) sync.addEventListener('change', () => setAutoSync(sync.checked));
-    on('settings-dropbox-autosync-resume', () => setAutoSync(true));
+    on('settings-dropbox-autosync-resume', async () => { await setAutoSync(true); focusEl('settings-dropbox-autosync'); }); // Resume hides itself: the keyboard goes to the switch (UI Accessibility's 5)
     on('settings-dropbox-offload-save', saveOffload);
     const field = $('settings-dropbox-keep-for');
     if (field) field.addEventListener('input', dropRetentionPreview); // a changed field takes the shown count and Turn on away

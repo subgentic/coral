@@ -13,9 +13,10 @@ async function teams() {
 /** Put the card's line right (no team, or the plain one); a failed read leaves it as it was. */
 export async function refreshGoalCard() { const list = await teams(); if (list) setNoTeam(list.length === 0); }
 
-/** The card was pressed. */
-export async function startGoalFromHome() {
-    const list = await teams();
+/** The card was pressed (or the Inbox's New goal: opts.project is the team its filter names, opts.fallback the teams the goals name, opts.onCreated what to do after). */
+export async function startGoalFromHome(opts = {}) {
+    let list = await teams();
+    if ((list === null || !list.length) && opts.fallback && opts.fallback.length) list = opts.fallback; // the read failed or found none but the goals name teams: the Inbox's old fallback
     if (list === null) { const { showToast } = await importOnce('./notifications.js'); showToast('Could not read your teams. Try again.', true); return; }
     setNoTeam(list.length === 0);
     if (!list.length) {
@@ -23,5 +24,5 @@ export async function startGoalFromHome() {
         return;
     }
     const GV = await importOnce('./goals_view.js');
-    GV.openCreate({ project: list[0].key, teams: list, onCreated: () => { document.dispatchEvent(new CustomEvent('coral:goal-created-from-home')); } });
+    GV.openCreate({ project: list.some(t => t.key === opts.project) ? opts.project : list[0].key, teams: list, onCreated: opts.onCreated || (() => { document.dispatchEvent(new CustomEvent('coral:goal-created-from-home')); }) });
 }

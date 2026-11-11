@@ -168,6 +168,13 @@ function draw() {
     if (running) d.setAttribute('aria-label', 'Distill knowledge, running');
     // The one toolbar line (#7717): the search field and Distill knowledge at the right (no count line: the table is the count).
     body.append(Toolbar.build({ id: 'team-knowledge-search', label: 'Search knowledge', placeholder: 'Search knowledge', value: model.search, onSearch: text => { model.search = text; draw(); }, action: d }));
+    // A run in progress says how long it has gone and what it is doing; a failed one keeps its error here (#15272).
+    const job = distillJob(model.team), pr = job.progress || {};
+    if (running) {
+        const m = Math.floor((Date.now() - Date.parse(job.started_at)) / 60000), at = Number.isFinite(m) ? (m < 1 ? 'Started just now' : `Started ${m} min ago`) : 'Distilling';
+        const what = { extracting: `reading ${pr.agent || 'an agent'} (${(pr.completed || 0) + 1} of ${pr.total || '?'})`, 'cross-referencing': 'comparing the agents', formatting: `writing ${pr.agent || 'an agent'} (${(pr.completed || 0) + 1} of ${pr.total || '?'})` }[pr.phase];
+        body.append(el('p', 'goals-note team-distill-note', `${at}${what ? `: ${what}` : ''}. It stops by itself after 10 minutes.`));
+    } else if (job.status === 'failed') { const f = el('div', 'goals-failed team-distill-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, `The last distilling failed${job.error ? `: ${job.error}` : ''}`)); body.append(f); }
     if (model.failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, model.failed), btn('btn btn-small', 'Retry', () => load())); body.append(f); }
     if (model.loading) body.append(el('p', 'goals-note', 'Loading knowledge…'));
     else if (model.refused) body.append(emptyLine('This team’s knowledge is too large to show through Coral Hub; open it on the computer.'));

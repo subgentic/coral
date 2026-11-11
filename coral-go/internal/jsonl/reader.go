@@ -19,13 +19,14 @@ import (
 
 // SessionReader incrementally reads JSONL session files for live chat display.
 type SessionReader struct {
-	mu           sync.Mutex
-	cache        map[string]*sessionCache
-	firstPrompts map[string]*firstPromptCache
-	lastMu       sync.Mutex
-	lastMessages map[string]*lastMessageEntry // each session's newest message, by session id (#11097)
-	curMu        sync.Mutex
-	curDirs      map[string]*curDirEntry // where each session's agent is now, by session id (#11704)
+	mu            sync.Mutex
+	cache         map[string]*sessionCache
+	firstPrompts  map[string]*firstPromptCache
+	lastMu        sync.Mutex
+	lastMessages  map[string]*lastMessageEntry // each session's newest message, by session id (#11097)
+	curMu         sync.Mutex
+	curDirs       map[string]*curDirEntry       // where each session's agent is now, by session id (#11704)
+	contextResets map[string]*contextResetEntry // whether a /compact or /clear came after the newest model turn (#15055)
 }
 
 type sessionCache struct {
