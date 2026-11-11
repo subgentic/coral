@@ -391,7 +391,14 @@ const teamHooks = () => ({
     openGoal: (id) => openGoalPage(id),
     onItem: (id) => { if (S.tab === 'goals' && !S.quiet) note(keyRoute('team', S.team, 'goals', id || null)); },
     onCount: (n) => { },
+    onMissing: (id) => itemNotFound('goal', id, 'goals'),
 });
+
+/** A goal or task the address names is not on this team: say so by name, with the way back to the list (#15295). */
+function itemNotFound(what, id, tab) {
+    const team = S.team;
+    importOnce('./np.js').then(m => m.showNotFound({ what, id: `#${id}`, back: { view: 'team', id: splitKey(team).name, server: splitKey(team).server, sub: tab }, backLabel: `Back to ${what === 'goal' ? 'Goals' : 'Tasks'}` })).catch(() => {});
+}
 
 async function fillTab(tab, item = 0) {
     const team = S.team, host = panel(tab), seq = S.navSeq;
@@ -452,7 +459,9 @@ async function openTaskById(id) {
     const team = S.team, seq = S.navSeq;
     const m = await importOnce('./team_tasks_page.js');
     const host = $('team-panel-item');
-    const full = await m.readTask(team, id);
+    let missing = false;
+    const full = await m.readTask(team, id, () => { missing = true; });
+    if (missing && seq === S.navSeq && team === S.team && S.tab === 'tasks') { itemNotFound('task', id, 'tasks'); return; }
     if (!full || seq !== S.navSeq || team !== S.team || S.tab !== 'tasks') return;
     const origin = panel('tasks');
     S.item = { kind: 'task', id, origin };

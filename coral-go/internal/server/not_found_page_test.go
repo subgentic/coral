@@ -30,6 +30,8 @@ func TestNotFoundPageHasTheWayBack(t *testing.T) {
 	assert.True(t, strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html"))
 	assert.Contains(t, body, `<a href="/agents">Back to Agents</a>`)
 	assert.NotContains(t, body, "random-10281", "the page names nothing of the request")
+	assert.Contains(t, body, "prefers-color-scheme:dark", "the page has a dark theme of its own (#15295)")
+	assert.Contains(t, body, `<a href="/inbox">Inbox</a>`, "and a way around the dashboard, not only Back to Agents")
 	assert.Contains(t, resp.Header.Get("Content-Security-Policy"), "default-src 'none'")
 
 	for _, p := range []string{"/api/nope-10281", "/ws/nope", "/auth/nope", "/static/missing-10281.js"} {

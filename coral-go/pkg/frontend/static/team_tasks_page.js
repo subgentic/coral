@@ -327,7 +327,7 @@ export function showTasks(host, project, h = {}) {
 export function focusTaskRow(id) { const b = root && rowFocusTarget(root, `t${id}`); if (b) { b.focus(); return true; } return false; }
 
 /** A task by id: the list's item when it is read, else the route's. */
-export async function readTask(project, id) {
+export async function readTask(project, id, onMissing) {
     const have = model.project === project ? model.rows.find(t => t.id === Number(id)) : null;
     try {
         const r = await boardFetch(project, `/tasks/${pathId(id)}`);
@@ -340,6 +340,7 @@ export async function readTask(project, id) {
             }
             return task;
         }
+        if (r.status === 404) onMissing?.(); // the task is not on this team (the address named one that is not there, #15295)
     } catch { /* the list's item below */ }
     return have || null;
 }
