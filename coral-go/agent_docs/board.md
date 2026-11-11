@@ -1119,7 +1119,7 @@ one; `review_requested` is true while a completion review is pending;
 `cost_usd`, `completed_by` and `completed_at` appear when known.
 `next_cursor` is `""` on the last page.
 
-`GET /api/board/{project}/tasks?counts=1` is the two totals alone (`total_open`, `total_completed`, and `"tasks": []`), for a client that only shows the counts (the team page's tab counts); it takes no `status`, `cursor` or `limit` (a 400). It answers `304` while unchanged, like the list (#9100).
+`GET /api/board/{project}/tasks?counts=1` is the two totals alone (`total_open`, `total_completed`, and `"tasks": []`), for a client that only shows the counts (the team page's tab counts); it takes no `status`, `cursor` or `limit` (a 400). It answers `304` while unchanged, like the list (#9100). With `since=<RFC3339>` it also says `completed_since`, how many tasks were completed at or after that time (the page's Open count is open plus completed today, so the tab can show the same number before the list is read, #15340); a bad `since` is a 400.
 
 ### Current Task
 

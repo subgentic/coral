@@ -99,6 +99,8 @@ type TaskListPage struct {
 	NextCursor     string `json:"next_cursor"`
 	TotalOpen      int    `json:"total_open"`
 	TotalCompleted int    `json:"total_completed"`
+	// CompletedSince: with counts=1 and a since, the tasks completed (done, not skipped) at or after it: the client's "finished today", which its Open count adds to the open tasks (#15340).
+	CompletedSince *int `json:"completed_since,omitempty"`
 }
 
 // TaskListQuery selects a page. Limit is clamped to [1, TaskListMaxLimit]; 0 means the default.
@@ -193,12 +195,20 @@ func (s *Store) taskListTotals(ctx context.Context, project string) (open, done 
 
 // TaskCounts is a page with no tasks and the board's two totals (GET /api/board/{project}/tasks?counts=1, #9100): the team page's tab
 // counts read only these, and the page they used to ask for held every open task of the board.
-func (s *Store) TaskCounts(ctx context.Context, project string) (*TaskListPage, error) {
+func (s *Store) TaskCounts(ctx context.Context, project, since string) (*TaskListPage, error) {
 	open, done, err := s.taskListTotals(ctx, project)
 	if err != nil {
 		return nil, err
 	}
-	return &TaskListPage{Tasks: []TaskListItem{}, TotalOpen: open, TotalCompleted: done}, nil
+	page := &TaskListPage{Tasks: []TaskListItem{}, TotalOpen: open, TotalCompleted: done}
+	if since != "" {
+		var n int
+		if err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM board_tasks WHERE board_id = ? AND status = 'completed' AND completed_at >= ?`, project, since); err != nil {
+			return nil, err
+		}
+		page.CompletedSince = &n
+	}
+	return page, nil
 }
 
 // openRankSQL orders the open tasks by priority (critical first); an unknown priority sorts last. It is the order the default list has always had.

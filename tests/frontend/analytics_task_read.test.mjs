@@ -24,5 +24,5 @@ for (const n of names) assert.ok(row.includes('`' + n + '`'), `${n} is a documen
 assert.match(docs, /\| `has_cost` \|/, 'has_cost is documented');
 for (const n of ['cost_usd', 'input_tokens', 'output_tokens', 'cache_read_tokens', 'cache_write_tokens', 'claimed_at', 'completed_at', 'assigned_to', 'priority', 'status', 'title', 'board_id', 'id']) assert.ok(names.includes(n), `the table draws ${n}`);
 assert.ok(!/fetch\('\/api\/board\/tasks'\)/.test(dashboard), 'no plain read of every task');
-assert.ok(team.includes("boardFetch(team, '/tasks?counts=1')") && !team.includes("'/tasks?limit=1'"), 'the team page counts read the totals alone');
+assert.ok(team.includes("boardFetch(team, `/tasks?counts=1&since=") && !team.includes("'/tasks?limit=1'"), 'the team page counts read the totals alone');
 console.log('analytics_task_read: ok');

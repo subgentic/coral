@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/subgentic/coral/internal/board"
@@ -83,7 +84,16 @@ func (h *BoardHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 			errBadRequest(w, "counts=1 is the totals alone: it takes no status, cursor or limit")
 			return
 		}
-		page, err := h.bs.TaskCounts(r.Context(), project)
+		since := ""
+		if v := q.Get("since"); v != "" { // the client's start of today: the tasks finished since then are part of its Open count (#15340)
+			t, err := time.Parse(time.RFC3339, v)
+			if err != nil {
+				errBadRequest(w, "since must be a time like 2026-11-10T00:00:00Z")
+				return
+			}
+			since = t.UTC().Format(time.RFC3339)
+		}
+		page, err := h.bs.TaskCounts(r.Context(), project, since)
 		if err != nil {
 			errInternalServer(w, err.Error())
 			return
