@@ -50,7 +50,7 @@ export function setLaunchStage(stage) {
     if (go) go.hidden = !!launch.member || !(stage === 'agent' || launchFlags.launchFromAnyStep); // a member is saved into the team form, not launched (#7861)
     if (save) save.hidden = !launch.member || stage !== 'agent';
     const rm = document.getElementById("launch-agent-remove");
-    if (rm) rm.hidden = !launch.member?.row || stage !== 'agent' || String(launch.member.value?.name || '').trim().toLowerCase() === 'orchestrator'; // Edit member only; the Orchestrator is not removed (#10836)
+    if (rm) { rm.hidden = !launch.member?.row || stage !== 'agent'; rm.style.visibility = String(launch.member?.value?.name || '').trim().toLowerCase() === 'orchestrator' ? 'hidden' : ''; } // Edit member only; the Orchestrator is not removed (#10836), but its slot stays (hidden, out of the Tab order) so Save member never changes places with Remove from team (walk 10 H4)
     for (const id of ['launch-agent-move-up', 'launch-agent-move-down']) { const mv = document.getElementById(id); if (mv) mv.hidden = !launch.member?.row || stage !== 'agent'; } // a single-pointer way to reorder besides dragging and Alt+Arrow, for touch (#10868)
     const recap = document.getElementById("launch-recap");
     if (recap) recap.hidden = stage === 'folder' || !!launch.member;
