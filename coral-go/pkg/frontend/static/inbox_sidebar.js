@@ -38,6 +38,7 @@ import { markReady } from './ready.js';
 import { browserLocal } from './safe_storage.js';
 import { resolveSessionIdentity, sessionStateInfo } from './session_state.js';
 import { pollEvery, isPaused } from './overload.js';
+import { onGoalsSeq } from './goals_feed.js';
 import { setHidden } from './dom_write.js';
 import { loadStyles } from './lazy_styles.js';
 import { syncDisplayPanels } from './display_panel.js';
@@ -790,6 +791,8 @@ function refreshGoals(force = true) {
     _goalsReading = readGoals().then(ok => { _goalsFails = ok ? 0 : Math.min(_goalsFails + 1, 8); }, () => { _goalsFails = Math.min(_goalsFails + 1, 8); }).finally(() => { _goalsReading = null; });
     return _goalsReading;
 }
+let _goalsSeqTimer = 0;
+onGoalsSeq(() => { clearTimeout(_goalsSeqTimer); _goalsSeqTimer = setTimeout(() => { if (!document.hidden && !isPaused()) refreshGoals(true); }, 300); }); // a goal write anywhere moves the change counter: the Goals count and list read again at once, not on the next poll (#15229)
 async function readGoals() {
     let ok = true, followWithDone = false;
     if (!isCloud() && Date.now() - closedReadAt > 60000) { // the goals an agent closed lately, for their row; its own read, before the main one so a failure here never marks that read failed
