@@ -222,7 +222,9 @@ export function openGoalEditor(opts = {}) {
         e.preventDefault();
         err.textContent = '';
         if (!t.value.trim()) { err.textContent = 'A goal needs a title.'; t.setAttribute('aria-invalid', 'true'); t.focus(); return; }
-        t.removeAttribute('aria-invalid'); go.disabled = true;
+        t.removeAttribute('aria-invalid');
+        if (!project) { err.textContent = 'Pick a team for this goal first. If you have none, start a team.'; (teams ? pick : t).focus(); return; } // never a silent no-op
+        go.disabled = true;
         try {
             const r = await goalWrite(project, 'goal_create', 0, '/goals', 'POST', createBody({ title: t.value, description: desc.value, doneWhen: d.value, driver: dr.value, images: tray ? tray.hexes() : [], by: OPERATOR_ID }));
             if (!r.ok) throw await failure(r);

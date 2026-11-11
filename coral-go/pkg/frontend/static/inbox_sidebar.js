@@ -705,12 +705,10 @@ const goalRows = () => GF.ordered(goals.filter(g => GF.matches(g, goalFilters, g
 /** New goal at the right of the Goals toolbar (#11593, the operator): the existing New goal form (goals_view.js, lazy), on the team the Team filter names, else the first; with more than one team the form asks which. */
 function newGoalAction() {
     const b = DT.el('button', 'btn btn-primary goals-new', 'New goal'); b.type = 'button';
-    b.addEventListener('click', async () => {
-        const [{ fetchProjects }, GV] = await Promise.all([importOnce('./board_fetch.js'), importOnce('./goals_view.js')]);
-        let list = []; try { list = (await fetchProjects()).map(p => ({ key: String(p.project), label: teamLabel(p.project, p.board_label || '') })).filter(t => t.key); } catch { /* the teams the goals name are the fallback */ }
-        if (!list.length) list = [...new Set(goals.map(g => g.board_id))].map(k => ({ key: k, label: goalTeam({ board_id: k }) }));
-        list.sort((x, y) => x.label.localeCompare(y.label));
-        GV.openCreate({ project: list.some(t => t.key === goalFilters.team) ? goalFilters.team : list[0]?.key, teams: list, onCreated: () => refreshGoals() });
+    b.addEventListener('click', async () => { // the same door as the home card: with no team it says so and offers Start a team (never a form that cannot create)
+        const { startGoalFromHome } = await importOnce('./home_goal.js');
+        const fallback = [...new Set(goals.map(g => g.board_id))].map(k => ({ key: k, label: goalTeam({ board_id: k }) })).sort((x, y) => x.label.localeCompare(y.label));
+        startGoalFromHome({ project: goalFilters.team, fallback, onCreated: () => refreshGoals() });
     });
     return b;
 }
