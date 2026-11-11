@@ -52,6 +52,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
             if (i) p.append('; ');
             const link = agentLink(names.get(role) || role, { board: boardTeamKey(st.server, st.board) });
             let state = s.k ? askUi.askState(s.k) : 'sent';
+            if (link.tagName === 'BUTTON' && s.k && s.k.replies > 0) link.tabIndex = -1; // its reply in this thread has the one Tab stop for the agent; this one stays a click (#15174: Open Orchestrator twice in a row)
             const newestMine = !!newest && newest.mine, readNewest = !!s.k && !!s.k.readAt && (!newest || !(Date.parse(newest.createdAt) > Date.parse(s.k.readAt)));
             if (s.k && newestMine && newest !== top && state !== 'sent') state = readNewest ? 'read' : 'unread'; // the newest message is yours: replied or read earlier says nothing of it until the agent has read it
             if (state === 'replied') p.append(link, ` replied${s.k.replies > 1 ? ` (${s.k.replies} times)` : ''}`);

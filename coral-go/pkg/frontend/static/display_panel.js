@@ -45,13 +45,12 @@ export function toggleDisplayPanel(button) {
     if (open) button?.closest('.sidebar-header, .mobile-list-header')?.querySelector('[data-display-panel] :is(select, input, button):not([hidden])')?.focus();
 }
 
-/** Escape inside the panel closes it and returns to its button. */
+/** Escape in the panel or on its button closes it and returns to the button. */
 export function displayPanelKey(event) {
     if (event.key !== 'Escape') return;
-    const panel = event.target.closest?.('[data-display-panel]');
+    const header = event.target.closest?.('.sidebar-header, .mobile-list-header'), panel = header?.querySelector('[data-display-panel]'); // from anywhere in the header, the Display button too (#15174: Escape on the button left it open)
     if (!panel || panel.hidden) return;
     event.preventDefault();
-    const header = panel.parentElement;
     browserLocal.set(KEY, '0');
     syncDisplayPanels();
     header.querySelector('[data-display-button]')?.focus();
