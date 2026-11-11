@@ -37,3 +37,13 @@ dialog.dropbox-share-dialog .dropbox-share-choice > span, dialog.dropbox-share-d
 .dropbox-share-dialog .modal-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; } /* the title and its x on one line (#15544: the x sat alone on a second row) */
 .dropbox-share-dialog .modal-header > h3 { margin: 0; min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; }
 .dropbox-share-dialog .modal-header > .modal-close { flex: none; margin-left: auto; }
+
+/* The app key form (#15638): in the page's own text sizes (13 px, not the browser's 16 px list text), and wrapping so a long step or the field cannot widen the pane at 200% text. */
+#settings-dropbox-key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 10px 0 0; font-size: var(--fs-base); min-width: 0; }
+#settings-dropbox-key > label { margin: 0; }
+#settings-dropbox-key > input { flex: 1 1 12em; min-width: 0; max-width: 100%; box-sizing: border-box; }
+#settings-dropbox-key > .btn { margin: 0; }
+#settings-dropbox-key > details, #settings-dropbox-key > .settings-hint, #settings-dropbox-key > #settings-dropbox-key-confirm { flex: 1 0 100%; min-width: 0; }
+#settings-dropbox-key ol { margin: 6px 0 0; padding-left: 20px; }
+#settings-dropbox-key li { margin: 2px 0; overflow-wrap: anywhere; }
+#settings-dropbox-key summary { cursor: pointer; }

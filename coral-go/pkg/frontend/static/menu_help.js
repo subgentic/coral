@@ -1,4 +1,4 @@
-/* What each item of a sidebar menu does and what it keeps or loses (#15466, the Operator's ask), written from the server code: Sleep, Wake, ResetTeam, KillTeam and the Delete team dialog. Lazy, loaded with the menu's keys (kebab_keys.js).
+/* What each item of a sidebar menu does and what it keeps or loses (#15466, the Operator's ask), written from the server code: Sleep, Wake, ResetTeam, KillTeam and the Remove team dialog. Lazy, loaded with the menu's keys (kebab_keys.js).
  * Every item gets its line as a description a screen reader reads on focus (aria-describedby). A mouse or the keyboard shows the line of the item under it in a footer of the menu; a touch screen or a phone shows every item's line under its
  * label, since neither hovers (css/menu_help.css). Restart and Wake say what #15465 says, word for word. */
 import { loadStyles } from './lazy_styles.js';
@@ -13,7 +13,7 @@ export const HELP = {
     'More': "Shows the team's other actions.",
     'Reset Team': 'Stops each agent and starts it again from its first instructions in a new chat, so its context is cleared. Old chats stay in History; the board, tasks, goals and files are kept.',
     'Kill All': "Stops every agent in the team now. Chats stay in History; the board, tasks and goals are kept. A Hermes agent's conversation is deleted with it.",
-    'Delete team': "Deletes the team for good: its messages, tasks, goals, members, reminders, settings and more; the dialog lists everything. Chats stay in History and files are not touched. Only when no agent is running.",
+    'Remove team': "Deletes the team for good: its messages, tasks, goals, members, reminders, settings and more; the dialog lists everything. Chats stay in History and files are not touched. Only when no agent is running.",
     'Restart, same settings': 'Starts a fresh conversation with the same settings; the instructions are sent again.',
     'Restart with changes': 'Starts a fresh conversation with the settings you choose; the instructions are sent again.',
     'Wake': 'Continues the conversation.',

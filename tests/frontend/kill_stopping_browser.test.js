@@ -33,7 +33,7 @@ const SESSIONS = [S(1, { working_directory: '/repo/solo', display_name: 'Solo' }
                 render.flushLiveSessionsRender(); render.renderLiveSessions(state.liveSessions); return true; })()`);
             const row = id => `.session-group-item[data-session-id="${id}"]`;
             const stateOf = id => ev(`(() => { const r = document.querySelector('${row(id)}'); return r ? { cls: r.classList.contains('agent-stopping'), busy: r.getAttribute('aria-busy'), note: r.querySelector('.agent-stopping-note')?.textContent || '', pe: getComputedStyle(r).pointerEvents } : null; })()`);
-            const kill = async id => { await ev(`document.querySelector('${row(id)} .sidebar-kebab-btn').click()`); await waitFor(`!!document.querySelector('${row(id)} [data-on-click="agent-kill"]')`, `${w}: the menu`); await ev(`document.querySelector('${row(id)} [data-on-click="agent-kill"]').click()`); await ev(`document.getElementById('confirm-modal-yes').click(); performance.now()`); };
+            const kill = async id => { await ev(`document.querySelector('${row(id)} .sidebar-kebab-btn').click()`); await waitFor(`!!document.querySelector('${row(id)} [data-on-click="agent-kill"]')`, `${w}: the menu`); await ev(`document.querySelector('${row(id)} [data-on-click="agent-kill"]').click()`); await waitFor(`document.getElementById('confirm-modal').style.display === 'flex'`, `${w}: the confirmation (its module loads on first use, #15585)`, 5000); await ev(`document.getElementById('confirm-modal-yes').click(); performance.now()`); };
 
             console.log(`${w}: the row says Stopping... within 100 ms and keeps saying it through a redraw`);
             await kill('sid-1');

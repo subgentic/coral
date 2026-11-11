@@ -11,9 +11,9 @@ const TEAM_WORDS = {
     'Sleep Team': "Stops every agent's terminal and pauses the board. Chats, files, tasks and goals stay; Wake Team continues each conversation.",
     'Save as Template': "Saves this team's agents, instructions and settings as a template to launch again. Chats, messages and goals are not saved.",
     'More': "Shows the team's other actions.",
-    'Reset Team': 'Stops each agent and starts it again from its first instructions in a new chat, so its context is cleared. Old chats stay in History; the board, tasks, goals and files are kept.',
+    'Reset team (clear context)': 'Stops each agent and starts it again from its first instructions in a new chat, so its context is cleared. Old chats stay in History; the board, tasks, goals and files are kept.',
     'Kill All': "Stops every agent in the team now. Chats stay in History; the board, tasks and goals are kept. A Hermes agent's conversation is deleted with it.",
-    'Delete team': 'Deletes the team for good: its messages, tasks, goals, members, reminders, settings and more; the dialog lists everything. Chats stay in History and files are not touched. Only when no agent is running.',
+    'Remove team': 'Deletes the team for good: its messages, tasks, goals, members, reminders, settings and more; the dialog lists everything. Chats stay in History and files are not touched. Only when no agent is running.',
 };
 const AGENT_WORDS = {
     'Restart, same settings': 'Starts a fresh conversation with the same settings; the instructions are sent again.',
