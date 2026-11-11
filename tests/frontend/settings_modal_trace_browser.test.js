@@ -86,6 +86,8 @@ const SCEN = [
                     Promise.resolve(pr).then(() => { window.__inflight--; }, () => { window.__inflight--; }); // count it done whether it answers or errors
                     return pr;
                 };
+                if (!window.__themeLogged) { window.__themeLogged = true; window.__themeLog = []; const d = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value'); Object.defineProperty(HTMLSelectElement.prototype, 'value', { get: d.get, set(v) { if (this.id === 'settings-theme') window.__themeLog.push([String(v), performance.now() | 0, (new Error().stack || '').split('\\n').slice(2, 5).join(' < ')]); return d.set.call(this, v); }, configurable: true }); }
+                window.__themeLog = [];
                 state.settings = ${JSON.stringify(settings)};
                 try { await modals.showSettingsModal(${JSON.stringify(group)}); await (async () => { const start = performance.now();
                     while (performance.now() - start < 1200 && window.__inflight > 0) { await ${framesJs(1)}; } // the data is in once no request is in flight
@@ -96,6 +98,7 @@ const SCEN = [
             })()`);
             void out;
             const snap = await ev(SNAP);
+            if (name === 'empty settings') console.error('DIAG15617 theme writes: ' + JSON.stringify(await ev(`window.__themeLog`)) + ' scheme dark=' + await ev(`matchMedia('(prefers-color-scheme: dark)').matches`) + ' data-theme=' + await ev(`document.documentElement.getAttribute('data-theme')`) + ' final=' + await ev(`document.getElementById('settings-theme').value`) + ' cloud=' + await ev(`document.body.classList.contains('cloud-mode')`) + ' boot=' + await ev(`(document.getElementById('coral-boot')||{}).textContent`));
             trace[name] = JSON.parse(JSON.stringify(snap).replace(/[^"\s|,]*coral-cdp-[A-Za-z0-9]+((?:\\\\|\/)shard\d+(-\d+)?)?/g, '<run folder>').replace(/<run folder>(?:\\\\|\/)mock-agent(?:\.exe)?/g, '<run folder>/mock-agent')); // the run's own temporary folder is in some placeholders, with the shard's folder under it (shard1, or shard1-1 once a shard was replaced) when a path runs through it
         };
         for (const [name, settings, answers, group, local] of SCEN) await run(name, settings, answers, group, local);

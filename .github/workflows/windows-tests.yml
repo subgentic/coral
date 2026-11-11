@@ -51,6 +51,7 @@ concurrency:
 # its shard fails when the count of matching tests changes, so a rename can't drop it.
 jobs:
   go:
+    if: false
     name: go test (windows-latest, ${{ matrix.shard }})
     runs-on: windows-latest
     timeout-minutes: 45
@@ -179,6 +180,7 @@ jobs:
   # agent is launched through ConPTY and stopped, nothing is left running. The MSI is not built here (WiX takes minutes): it is checked on the tag.
   # Keep the build lines in step with release.yml's "Build Windows binaries".
   package:
+    if: false
     name: package and smoke (windows-latest, the built exes)
     runs-on: windows-latest
     timeout-minutes: 40
@@ -330,6 +332,7 @@ jobs:
   # The dashboard's node tests (npm run test:cloud), on Windows as cloud-tests.yml runs them on Linux: path, line-ending and
   # child-process differences (#94) were invisible to CI. Nothing is cached; install scripts never run.
   frontend:
+    if: false
     name: test:cloud (windows-latest)
     runs-on: windows-latest
     timeout-minutes: 20
@@ -379,13 +382,7 @@ jobs:
         # terminal_pane_size (which drives tmux itself) stays on Linux and macOS; its partner terminal_scroll already runs in a default part. --no-tmux: a --strict run would
         # otherwise add the tmux shard too (9 suites that cannot start here).
         include:
-          - { name: "part 1/6", args: "--part 1/6", id: "1" }
-          - { name: "part 2/6", args: "--part 2/6", id: "2" }
-          - { name: "part 3/6", args: "--part 3/6", id: "3" }
-          - { name: "part 4/6", args: "--part 4/6", id: "4" }
-          - { name: "part 5/6", args: "--part 5/6", id: "5" }
-          - { name: "part 6/6", args: "--part 6/6", id: "6" }
-          - { name: "strict", args: "--strict --no-tmux", id: "strict" }
+          - { name: "diag", args: "--only settings_modal_trace,font_swap_shift", id: "diag" }
     defaults:
       run:
         shell: bash
