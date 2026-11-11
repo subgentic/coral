@@ -331,7 +331,6 @@
  "inbox_phone_edge_browser.test.js": 6.0,
  "info_tab_browser.test.js": 6,
  "settings_modal_trace_browser.test.js": 6,
- "table_edge_drag_browser.test.js": 6.0,
  "artifact_comments_browser.test.js": 5.9,
  "markup_draws_browser.test.js": 5.9,
  "subagent_tasks.test.js": 5.9,

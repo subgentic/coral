@@ -21,7 +21,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`new Promise(r => setTimeout(r, 2500))`); // sleep-ok: the tab reads its sources
             const t = await ev(`(() => { const p = document.querySelector('.team-needs-body') || document.getElementById('team-page-body'); return p ? p.innerText.replace(/\\s+/g, ' ').trim() : null; })()`);
             console.log(at + JSON.stringify(t));
-            assert.ok(t && /Nothing needs you/.test(t), at + 'an empty Needs you says "Nothing needs you": ' + JSON.stringify(t));
+            assert.ok(t && /You are all caught up/.test(t), at + 'an empty Needs you says "You are all caught up" (#15259): ' + JSON.stringify(t));
         }
     } finally {
         for (const b of boards) await api('DELETE', `/api/board/${b}`, {}).catch(() => {});
