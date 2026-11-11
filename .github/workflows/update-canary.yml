@@ -1,0 +1,95 @@
+name: update-canary
+
+# Does the auto-update still reach people (#15080)? Daily, an old release's OWN updater runs "coral-update check" against what GitHub serves today: it must find, verify
+# (Sigstore and SHA256SUMS, the updater's own) and stage the newest approved release. Nothing is built here, nothing is promoted, tagged, uploaded or signed, and no secret
+# is used: the token is read-only, reaches only the listing and the download, and the downloaded programs never see it.
+#   L = the newest approved release (a published release that is not a pre-release: the channel the updater follows)
+#   O = the approved release two before L, so the canary also covers a skip of one release
+# It fails unless O's updater says "staged" with version == L. A red run means installed Corals cannot update to L, or the release, its signature or the
+# channel changed in a way an old updater no longer accepts: tell DevOps and the Orchestrator before the next release is approved.
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+  push:
+    branches:
+      - devops-update-canary   # the proof run for this file (#15080): removed once it has been green on this branch
+
+concurrency:
+  group: update-canary
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CORAL_TELEMETRY_DISABLED: "1"   # no CI run sends real events
+
+jobs:
+  canary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Pick L and O, and download O's Linux package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/$GH_REPO/releases?per_page=100" > "$RUNNER_TEMP/releases.json"
+          python3 - "$RUNNER_TEMP/releases.json" > "$RUNNER_TEMP/pick.env" <<'PY'
+          import json, re, sys
+          # --paginate prints one JSON array per page: read them all
+          dec, text, i, rel = json.JSONDecoder(), open(sys.argv[1]).read(), 0, []
+          while i < len(text):
+              while i < len(text) and text[i].isspace():
+                  i += 1
+              if i >= len(text):
+                  break
+              page, i = dec.raw_decode(text, i)
+              rel += page
+          tag_re = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")   # a plain release tag: the suffixed builds are pre-releases
+          ok = sorted(((tuple(map(int, m.groups())), r["tag_name"]) for r in rel
+                       if not r["draft"] and not r["prerelease"] and (m := tag_re.match(r["tag_name"]))), reverse=True)
+          if len(ok) < 3:
+              sys.exit("fewer than three approved releases: nothing to compare")
+          print("L=" + ok[0][1])
+          print("O=" + ok[2][1])
+          PY
+          cat "$RUNNER_TEMP/pick.env"
+          . "$RUNNER_TEMP/pick.env"
+          for t in "$L" "$O"; do [[ "$t" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::not a release tag: refused"; exit 2; }; done
+          ov=${O#v}
+          mkdir -p "$RUNNER_TEMP/dl"
+          gh release download "$O" --dir "$RUNNER_TEMP/dl" --pattern "coral-linux-amd64-$ov.tar.gz" --pattern SHA256SUMS.txt
+          (cd "$RUNNER_TEMP/dl" && grep " coral-linux-amd64-$ov.tar.gz\$" SHA256SUMS.txt | sha256sum -c -)
+          mkdir -p "$RUNNER_TEMP/app"
+          tar -xzf "$RUNNER_TEMP/dl/coral-linux-amd64-$ov.tar.gz" -C "$RUNNER_TEMP/app"
+          echo "L=$L" >> "$GITHUB_ENV"
+          echo "O=$O" >> "$GITHUB_ENV"
+
+      # The token is not in this step's environment (it was set for the step above only), and the updater runs with a minimal one.
+      - name: Run O's own updater against today's GitHub
+        run: |
+          set -euo pipefail
+          upd=$(find "$RUNNER_TEMP/app" -type f -name coral-update | head -1)
+          [ -n "$upd" ] || { echo "::error::no coral-update in $O's package"; exit 1; }
+          chmod +x "$upd"
+          home="$RUNNER_TEMP/home"; data="$RUNNER_TEMP/data"; mkdir -p "$home" "$data"
+          out=$(env -i HOME="$home" PATH=/usr/bin:/bin CORAL_DATA_DIR="$data" CORAL_CLOUD_URL=off CORAL_TELEMETRY_DISABLED=1 "$upd" check) || { echo "::error::coral-update check exited non-zero"; exit 1; }
+          echo "$out"
+          printf '%s' "$out" | python3 -c '
+          import json, os, sys
+          o = json.load(sys.stdin)
+          want = os.environ["L"].lstrip("v")
+          have = (o.get("result"), o.get("version"), o.get("installed"))
+          print("canary: result=%s version=%s installed=%s want staged %s from %s" % (have + (want, os.environ["O"])))
+          sys.exit(0 if have[0] == "staged" and have[1] == want else 1)
+          ' || { echo "::error::$O's updater did not stage $L"; exit 1; }
+          {
+            echo "## Update canary"
+            echo
+            echo "$O's own updater staged $L from GitHub today."
+          } >> "$GITHUB_STEP_SUMMARY"
