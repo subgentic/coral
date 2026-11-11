@@ -16,7 +16,7 @@ const { coralReady } = require('./helpers/wait');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'settings');
-        await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); localStorage.removeItem('coral-agent-keys'); window.__m.add('coral-go', 'm', 3, { sleeping: false, session_id: 'o1' }); true`);
+        await ev(`localStorage.setItem('coral-alerts-offered', '1'); /* the alerts offer (#15120) announces itself in the same live region; this suite is about the question's own announcement */ localStorage.setItem('coral-live-view-mode', 'chat'); localStorage.removeItem('coral-agent-keys'); window.__m.add('coral-go', 'm', 3, { sleeping: false, session_id: 'o1' }); true`);
         await new Promise(r => setTimeout(r, 800)); // sleep-ok: the list renders from several answers
         await ev(`window.selectLiveSession('coral-go', 'claude', 'o1', 'local'); true`);
         await waitFor(`!!document.getElementById('live-history-messages') && !!document.getElementById('command-input')`, 'the chat', 10000);
