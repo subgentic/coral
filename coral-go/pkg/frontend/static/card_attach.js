@@ -4,7 +4,7 @@
 import { state } from './state.js';
 import { escapeAttr, showToast } from './utils.js';
 import { serverFetch, sessionServer } from './server_base.js';
-import { promptOptionsBySession, pendingToolBySession, syncNeedsInputCard, announcePrompt } from './needs_input_card.js';
+import { promptOptionsBySession, pendingToolBySession, setPrompt, syncNeedsInputCard, announcePrompt } from './needs_input_card.js';
 import { blockedReason } from './hub_access.js';
 import { prepareImage } from './image_attach.js';
 import { postImage } from './image_composer.js';
@@ -121,7 +121,7 @@ function checkAgain(card, sid) {
         try {
             const resp = await serverFetch(sessionServer(session), `/api/sessions/live/${encodeURIComponent(session.name)}/chat?${new URLSearchParams({ after: '0', limit: '1', session_id: sid, agent_type: session.agent_type || '' })}`);
             const po = resp.ok ? (await resp.json().catch(() => null) || {}).prompt_options : null;
-            if (po && (po.options || []).length) { found = true; promptOptionsBySession.set(sid, { title: po.title || '', question: po.question || '', kind: po.kind || '', target: po.target || '', po, note: po.note || '', options: po.options || [], review: po.review || [], multi: !!po.multi, submit: po.submit || null }); }
+            if (po && (po.options || []).length) { found = true; setPrompt(sid, po); }
         } catch { /* said below: nothing was read */ }
         syncNeedsInputCard(container, session);
         announcePrompt(found ? 'The question is shown again.' : 'Still nothing to answer here. Use the terminal.');

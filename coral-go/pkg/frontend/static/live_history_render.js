@@ -5,7 +5,7 @@ import { state } from './state.js';
 import { escapeHtml } from './utils.js';
 import { updateWorkGroupSummary } from './chat_content.js';
 import { makeBubble } from './chat_bubbles.js';
-import { loginBySession, pendingToolBySession, promptOptionsBySession, syncNeedsInputCard } from './needs_input_card.js';
+import { loginBySession, pendingToolBySession, promptOptionsBySession, setPrompt, syncNeedsInputCard } from './needs_input_card.js';
 import { syncPendingBubbles, syncWorkingIndicator } from './pending_messages.js';
 import { keptPages } from './chat_kept_pages.js';
 import { syncJumpToLatest } from './chat_jump_latest.js';
@@ -57,7 +57,7 @@ export function _noteReplyState(session, data) {
     // of a prompt that may be open on the terminal.
     pendingToolBySession.set(session.session_id, data.pending || null);
     const po = data.prompt_options;
-    if (po) promptOptionsBySession.set(session.session_id, { title: po.title || "", question: po.question || "", kind: po.kind || "", target: po.target || "", po, note: po.note || "", options: po.options || [], review: po.review || [], multi: !!po.multi, submit: po.submit || null });
+    if (po) setPrompt(session.session_id, po);
     else promptOptionsBySession.delete(session.session_id);
     // A sign-in the CLI waits on (#3830): the reply is fresher than the session row.
     if (typeof data.needs_login === "boolean") loginBySession.set(session.session_id, data.needs_login ? { reason: String(data.login_reason || "") } : null);
