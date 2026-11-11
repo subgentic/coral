@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -100,4 +101,32 @@ func TestProjectTrustProbeRelativePathInEligibleWorkingDirectory(t *testing.T) {
 	t.Chdir(parent)
 	require.Equal(t, true, probeProjectTrust(dir, home)["checked"], "positive control: this absolute project is eligible")
 	require.Equal(t, map[string]any{"checked": false}, probeProjectTrust("project", home), "an otherwise eligible project must not accept a relative request or silently normalize it")
+}
+
+// #15091 (Beta Tester's walk 2): a folder Coral can never trust showed the Trust switch, and only the launch said no, in a red toast. The probe says so up front: a refused folder answers
+// "refused" with the plain sentence (no path), an ordinary one has no such key.
+func TestProjectTrustProbeSaysWhyAFolderIsRefused(t *testing.T) {
+	home := t.TempDir()
+	proj := filepath.Join(home, "Code", "project")
+	hidden := filepath.Join(home, ".config", "x")
+	for _, d := range []string{proj, hidden} {
+		require.NoError(t, os.MkdirAll(d, 0700))
+	}
+	require.NotContains(t, probeProjectTrust(proj, home), "refused", "an ordinary project folder is not refused")
+	for name, dir := range map[string]string{"home itself": home, "a direct child of home": filepath.Join(home, "Code"), "a hidden folder": hidden} {
+		out := probeProjectTrust(dir, home)
+		require.Equal(t, false, out["checked"], name)
+		reason, _ := out["refused"].(string)
+		require.NotEmpty(t, reason, "%s: the answer says why", name)
+		require.NotContains(t, reason, home, "%s: the sentence names no path", name)
+	}
+	if shared := "/private/tmp"; runtime.GOOS == "darwin" {
+		if fi, err := os.Lstat(shared); err == nil && fi.IsDir() {
+			sub, err := os.MkdirTemp(shared, "trustprobe")
+			require.NoError(t, err)
+			defer os.RemoveAll(sub)
+			reason, _ := probeProjectTrust(sub, home)["refused"].(string)
+			require.Contains(t, reason, "shared", "a folder under the temp directory is refused as shared")
+		}
+	}
 }

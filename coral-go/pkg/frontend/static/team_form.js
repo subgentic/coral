@@ -46,6 +46,7 @@ export function scheduleFolderTrust(event) {
             if (response.ok) result = await response.json();
         } catch { /* unchecked stays off */ }
         if (generation !== _trustGeneration || d.value.trim() !== dir) return;
+        if (result?.refused) { _trustNote = result.refused; _view?.refresh(); return; }
         const names = ['.claude/settings.json', '.claude/settings.local.json', '.mcp.json', '.codex/config.toml'];
         const checked = result?.checked === true && result.files && names.every(name => typeof result.files[name] === 'boolean');
         const found = checked ? names.filter(name => result.files[name]) : [];
