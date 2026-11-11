@@ -85,11 +85,11 @@ func newCompactHarness(t *testing.T, on bool) *compactHarness {
 		h.typed = append(h.typed, a.DisplayName+": "+text)
 		return true, nil
 	}
-	if on {
-		s := board.DefaultHealthSettings()
-		s.CompactContext.On = true
-		require.NoError(t, bs.SetHealthSettings(context.Background(), "team", s))
-	}
+	// The team has saved the setting: on (the orchestrator left alone, as these tests were written) or off. A team that never saved it is on, with the orchestrator too (#15066): see TestTheSettingIsOnByDefault....
+	s := board.DefaultHealthSettings()
+	s.CompactContext.On = on
+	s.CompactContext.Orchestrator = false
+	require.NoError(t, bs.SetHealthSettings(context.Background(), "team", s))
 	return h
 }
 
@@ -103,6 +103,17 @@ func (h *compactHarness) agent(name, sid, agentType, title string, tokens int, i
 	h.sig[sid] = agentSignal{Since: h.now.Add(-idle), LastEvent: h.now.Add(-idle)}
 	h.tokens[sid] = tokens
 	return sn
+}
+
+// agent2 subscribes a live agent on another board store (a team that has saved nothing).
+func (h *compactHarness) agent2(bs *board.Store, name, sid, title string, tokens int) {
+	h.t.Helper()
+	sn := naming.SessionName("claude", sid)
+	_, err := bs.Subscribe(context.Background(), "team", name, title, sn, nil, "all", true)
+	require.NoError(h.t, err)
+	h.agents = []AgentInfo{{AgentType: "claude", SessionID: sid, DisplayName: name}}
+	h.sig[sid] = agentSignal{Since: h.now.Add(-time.Minute), LastEvent: h.now.Add(-time.Minute)}
+	h.tokens[sid] = tokens
 }
 
 func (h *compactHarness) run(after time.Duration) {
@@ -138,7 +149,7 @@ func TestABusyAgentOrOneAtADialogGetsNone(t *testing.T) {
 	h := newCompactHarness(t, true)
 	h.agent("Busy", "s1", "claude", "Dev", 400000, time.Minute)
 	h.agent("Asking", "s2", "claude", "Dev", 400000, time.Minute)
-	h.agent("Just", "s3", "claude", "Dev", 400000, 5*time.Second)
+	h.agent("Just", "s3", "claude", "Dev", 400000, 2*time.Second)
 	h.sig["s1"] = agentSignal{InTurn: true, Since: h.now.Add(-time.Hour)}
 	h.sig["s2"] = agentSignal{NeedsInput: true, Since: h.now.Add(-time.Hour)}
 	h.run(0)
@@ -179,13 +190,24 @@ func TestASkippedSendIsAskedAgainOnTheNextPass(t *testing.T) {
 	assert.Equal(t, []string{compactLine}, h.sent())
 }
 
-func TestTheSettingIsOffByDefaultAndEachTeamHasItsOwn(t *testing.T) {
+func TestTheSettingIsOnByDefaultAndATeamThatSavedItOffKeepsItOff(t *testing.T) {
 	h := newCompactHarness(t, false)
 	h.agent("Dev", "s1", "claude", "Dev", 900000, time.Hour)
 	h.run(0)
-	assert.Empty(t, h.sent(), "off unless the team turned it on")
-	assert.False(t, board.DefaultHealthSettings().CompactContext.On)
-	assert.Equal(t, 200, board.DefaultHealthSettings().CompactContext.ThresholdK)
+	assert.Empty(t, h.sent(), "a team that saved it off keeps it off")
+	assert.True(t, board.DefaultHealthSettings().CompactContext.On)
+	assert.Equal(t, 225, board.DefaultHealthSettings().CompactContext.ThresholdK)
+
+	// A team that never saved the setting is compacted, orchestrator included (#15066).
+	never := newCompactHarness(t, true)
+	never.bs.Close()
+	bs, err := board.NewStoreWithKey(filepath.Join(t.TempDir(), "fresh.db"), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { bs.Close() })
+	never.c.store = bs
+	never.agent2(bs, "Boss", "s1", "Orchestrator", 500000)
+	never.run(0)
+	assert.Len(t, never.sent(), 1, "on by default")
 }
 
 func TestTheOrchestratorAndOtherCLIsAreLeftAlone(t *testing.T) {

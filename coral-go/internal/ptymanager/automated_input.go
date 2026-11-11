@@ -67,6 +67,9 @@ type AutomatedInput struct {
 	// terminal or agent without bracketed paste. Ready, when set, runs just before (the caller's has-the-agent-exited check).
 	Paste bool
 	Ready func(ctx context.Context) error
+	// OnLeftoverSubmitted, when set, is told the text of Coral's earlier send whose Enter this call pressed (the box still held it): the text it was asked to send was not typed, but an earlier send of Coral's
+	// just took effect. A caller whose command is that earlier text (a /compact) knows it went in (#15066).
+	OnLeftoverSubmitted func(text string)
 	// force: a person's own Send now (DeliverNow): the screen being unreadable is not a reason to skip.
 	force bool
 }
@@ -169,3 +172,6 @@ func AutomatedInputInFlight() bool {
 	})
 	return busy
 }
+
+// SameTyped says two texts are the same words as the input box shows them (spacing and the box's border characters ignored), as the gate compares a box with what Coral last typed.
+func SameTyped(a, b string) bool { return squeeze(a) == squeeze(b) }

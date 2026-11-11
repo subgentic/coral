@@ -314,11 +314,63 @@ func (s *TokenUsageStore) GetLatestTurnContextBySessionIDs(ctx context.Context, 
 		return nil, err
 	}
 
+	resets := s.contextResetsFor(ctx, sessionIDs)
 	result := make(map[string]int, len(rows))
 	for _, r := range rows {
+		if at, ok := resets[r.SessionID]; ok {
+			if rec, ok := parseUsageStamp(r.RecordedAt); ok && !rec.After(at) {
+				continue // a /compact or /clear came after this turn: its context is not the agent's any more (#15066)
+			}
+		}
 		result[r.SessionID] = r.ContextTokens
 	}
 	return result, nil
+}
+
+// MarkContextReset records that Coral just sent the session a /compact or /clear (#15066): the reading of every turn recorded up to now is dropped from GetLatestTurnContextBySessionIDs until a newer turn arrives.
+func (s *TokenUsageStore) MarkContextReset(ctx context.Context, sessionID string) error {
+	if sessionID == "" {
+		return nil
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO context_resets (session_id, reset_at) VALUES (?, ?) ON CONFLICT(session_id) DO UPDATE SET reset_at = excluded.reset_at`, sessionID, NowUTC())
+	return err
+}
+
+// ContextResetsAt is when each of the sessions was last sent a /compact or /clear by Coral, by session id: the compaction's cooldown that outlives a restart.
+func (s *TokenUsageStore) ContextResetsAt(ctx context.Context, sessionIDs []string) map[string]time.Time {
+	return s.contextResetsFor(ctx, sessionIDs)
+}
+
+// contextResetsFor is when each of the sessions was last reset; a read that fails is no reset (the reading shows, as it did before).
+func (s *TokenUsageStore) contextResetsFor(ctx context.Context, sessionIDs []string) map[string]time.Time {
+	out := map[string]time.Time{}
+	ids, err := sessionIDsJSON(sessionIDs)
+	if err != nil {
+		return out
+	}
+	var rows []struct {
+		SessionID string `db:"session_id"`
+		ResetAt   string `db:"reset_at"`
+	}
+	if err := s.db.Reader().SelectContext(ctx, &rows, `SELECT session_id, reset_at FROM context_resets WHERE session_id IN (SELECT value FROM json_each(?))`, ids); err != nil {
+		return out
+	}
+	for _, r := range rows {
+		if t, ok := parseUsageStamp(r.ResetAt); ok {
+			out[r.SessionID] = t
+		}
+	}
+	return out
+}
+
+// parseUsageStamp reads the stamp forms the usage rows carry ("...Z", with fractions, "+00:00", or a space instead of the T); ok is false for any other.
+func parseUsageStamp(v string) (time.Time, bool) {
+	for _, layout := range []string{time.RFC3339Nano, "2006-01-02 15:04:05", "2006-01-02T15:04:05"} {
+		if t, err := time.Parse(layout, v); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
 }
 
 // tokenUsageNow stamps a usage report that has no timestamp of its own (a var for tests).

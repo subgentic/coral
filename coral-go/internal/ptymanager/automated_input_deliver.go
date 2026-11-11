@@ -84,7 +84,7 @@ func DeliverAutomated(ctx context.Context, in AutomatedInput) (Delivery, error) 
 		// Coral's own earlier text is still in the box (its Enter did not take): it is sent, and this one is not typed after it, which
 		// would join the two. The next send types into an empty box. Nothing was withheld from the person's view: no skip is recorded
 		// (what was sent is Coral's text, and a skip left from before is over).
-		in.submitLeftover(ctx)
+		in.submitLeftoverAndSay(ctx)
 		clearSkipped(in.Name)
 		return Skipped, nil
 	}
@@ -96,7 +96,7 @@ func DeliverAutomated(ctx context.Context, in AutomatedInput) (Delivery, error) 
 		// Safety net for a box that cannot be read: the last text of the same words may still be in the editor, and nothing can say it was not. It is not pasted again (they pile up there, #11165): only its
 		// Enter is pressed, once, and the next send pastes. At most one copy is ever waiting.
 		if memo, ok := gate.typedFor(in.Name); ok && memo.blind && memo.text == squeeze(in.Text) && gate.now().Sub(memo.at) <= pasteLeftoverWindow {
-			in.submitLeftover(ctx)
+			in.submitLeftoverAndSay(ctx)
 			clearSkipped(in.Name)
 			return Skipped, nil
 		}
@@ -229,17 +229,26 @@ func (in AutomatedInput) styledSuggestionOnly(ctx context.Context, agentType, se
 }
 
 // submitLeftover presses the Enter Coral's own earlier text is missing.
-func (in AutomatedInput) submitLeftover(ctx context.Context) {
+func (in AutomatedInput) submitLeftover(ctx context.Context) bool {
 	es, ok := in.Term.(EnterSender)
 	if !ok {
-		return
+		return false
 	}
 	agentType, sessionID := in.identity()
 	if err := es.SendEnter(ctx, in.Name, agentType, sessionID); err != nil {
 		slog.Warn("automated input: could not send the Enter of Coral's earlier text", "session", in.Name, "sender", in.What, "error", err)
-		return
+		return false
 	}
 	gate.forgetTyped(in.Name)
+	return true
+}
+
+// submitLeftoverAndSay presses the earlier text's Enter and tells OnLeftoverSubmitted which text it was.
+func (in AutomatedInput) submitLeftoverAndSay(ctx context.Context) {
+	memo, _ := gate.typedFor(in.Name)
+	if in.submitLeftover(ctx) && in.OnLeftoverSubmitted != nil {
+		in.OnLeftoverSubmitted(memo.text)
+	}
 }
 
 // typeNow types the text and its Enter in one write (a bracketed paste with its Enter where the terminal can, else the caller's Send),

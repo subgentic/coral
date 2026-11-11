@@ -150,6 +150,8 @@ type BoardHandler struct {
 	// completions of the same task close together (complete then cancel, or a retry) write one after the other, never
 	// interleaved. Each write is atomic already (a rename into place); this keeps a slower, older diff from landing last.
 	taskArtifactLocks sync.Map
+	// contextReset is the Context reset service's per-agent line (#15066).
+	contextReset func(sessionName string) (ContextResetLine, bool)
 }
 
 // SetHubOperatorAllowed tells the board whether a Coral Hub user may act as the
