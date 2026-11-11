@@ -39,13 +39,18 @@ export async function killGroup(groupName) {
         "Kill all agents",
         `Kill ${killCount(groupSessions.length).agents} in "${groupName.startsWith('wf:') ? groupName.slice(3) : keyLabel(groupName)}"? ${groupSessions.length === 1 ? 'It' : 'They'} stop${groupSessions.length === 1 ? 's' : ''} now. ${whatStaysKill(groupSessions)} ${killCount(groupSessions.length).note}`,
         async () => {
+            const release = await importOnce('./kill_pending.js').then(m => m.markStopping(groupSessions)); // every row says Stopping... from the click, not only the one being killed now (#15431)
+            const failed = [];
             for (const s of groupSessions) {
                 try {
-                    await killLiveSession(s);
+                    const answer = await killLiveSession(s);
+                    if (!answer || answer.error) failed.push(s.session_id);
                 } catch (e) {
+                    failed.push(s.session_id);
                     console.error(`Failed to kill ${s.name}:`, e);
                 }
             }
+            release(failed);
             dropKilledRows(groupSessions);
         }, undefined, { label: 'Kill all', danger: true }
     );
@@ -72,7 +77,7 @@ export async function killBoard(boardName) {
             // The whole team through the team route, so the team is marked stopped as an API kill does (its worktree is then not "in use" in the kept-worktrees list); its one answer carries the worktree.
             let worktree = null;
             try {
-                const { ok, answer } = await killLiveTeam(boardName);
+                const { ok, answer } = await killLiveTeam(boardName, boardSessions);
                 if (!ok) showToast((answer && answer.error) || 'Could not stop the team', true);
                 else if (answer && answer.worktree && answer.worktree.state && answer.worktree.state !== 'none') worktree = answer.worktree;
             } catch (e) {

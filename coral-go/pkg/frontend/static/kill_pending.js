@@ -44,6 +44,19 @@ export function killWithMark(row, server = sessionServer(row)) {
     return call;
 }
 
+/** Mark every row of a team or folder at once (Kill Team, Kill All: #15431), however long the call takes. Returns release(failedIds): the rows of agents whose kill failed lose the mark now (a team's call
+ *  answers once, so all of them when it fails); the others keep it for the dropped row to replace, and lose it a moment later if the list still has them. */
+export function markStopping(rows) {
+    const ids = rows.map(r => r.session_id).filter(Boolean);
+    for (const id of ids) pending.add(id);
+    apply();
+    if (ids.length && !watcher) { watcher = new MutationObserver(() => apply()); watcher.observe(document.body, { childList: true, subtree: true }); }
+    return (failed = []) => {
+        const bad = new Set(failed);
+        for (const id of ids) { if (bad.has(id)) clearStopping(id); else setTimeout(() => clearStopping(id), 3000); }
+    };
+}
+
 function clearStopping(sessionId) {
     pending.delete(sessionId);
     clearMarks(sessionId);

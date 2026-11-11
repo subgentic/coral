@@ -10,9 +10,15 @@ import { importOnce } from './import_once.js';
 export const killLiveSession = (row, server) => importOnce('./kill_pending.js').then(m => m.killWithMark(row, server)); // the call and the Stopping... mark on the row are kill_pending.js's (#15370)
 
 /** Stop a whole team through the team route, so the team is marked stopped as an API kill does (its worktree is then not "in use"): resolves to { ok, answer } (answer: { ok, sessions_killed, worktree? } or null). */
-export async function killLiveTeam(boardKey) {
-    const resp = await teamFetch(boardKey, n => `/api/sessions/live/team/${encodeURIComponent(n)}/kill`, { method: 'POST' });
-    return { ok: resp.ok, answer: await resp.json().catch(() => null) };
+export async function killLiveTeam(boardKey, rows = []) {
+    const release = rows.length ? await importOnce('./kill_pending.js').then(m => m.markStopping(rows)) : () => {}; // every row of the team says Stopping... until the one answer (#15431)
+    let out;
+    try {
+        const resp = await teamFetch(boardKey, n => `/api/sessions/live/team/${encodeURIComponent(n)}/kill`, { method: 'POST' });
+        out = { ok: resp.ok, answer: await resp.json().catch(() => null) };
+    } catch (e) { release(rows.map(r => r.session_id)); throw e; }
+    release(out.ok ? [] : rows.map(r => r.session_id));
+    return out;
 }
 
 /** The killed agents' rows go at once (their chats stay in History), by session id AND server (the same id on another server is another agent). When the open agent is one of them its capture refresh stops. The list is redrawn. */
