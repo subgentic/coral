@@ -8,11 +8,16 @@ import { showToast } from './utils.js';
 import { bs } from './board_state.js';
 import { importOnce, loadedModule } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
+const { isQueued } = await importOnce('./queued_mark.js'); // a pure helper in its own file so a node test can reach it
 await loadStyles('team_pause.css');
 
-let queuedSince = '';
-/** The mark on a message posted since the pause began (the Board's rows ask for it through loadedModule). */
-export const queuedBadge = m => (queuedSince && !m.is_system && m.created_at >= queuedSince ? '<span class="mb-queued">Queued: delivered on resume</span>' : '');
+const pausedSince = new Map(); // team -> when its pause began, while it is paused
+/** The mark on a message posted since the pause began (the Board's rows and the dock's chat ask for it through loadedModule). */
+export const queuedBadge = (m, team = state.boardPageProject) => (!m.is_system && isQueued(m.created_at, pausedSince.get(team)) ? '<span class="mb-queued">Queued: delivered on resume</span>' : '');
+/** The dock's chat read /paused for its team: it keeps the pause time so its rows say Queued too (a team asleep is not a pause). */
+export function noteDockPause(team, data) {
+    if (data && data.paused && !data.by_sleep && typeof data.since === 'string') pausedSince.set(team, data.since); else pausedSince.delete(team);
+}
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const clock = iso => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); };
@@ -21,8 +26,8 @@ const clock = iso => { const d = new Date(iso); return Number.isNaN(d.getTime())
 function remember(team, data, say = false) {
     state.teamPause = { team, paused: !!data.paused && !data.by_sleep, since: typeof data.since === 'string' ? data.since : '', bySleep: !!data.by_sleep };
     bs.isPaused = !!data.paused;
+    if (state.teamPause.paused) pausedSince.set(team, state.teamPause.since); else pausedSince.delete(team); // messages since the pause are marked Queued
     window.__coral?._setBoardChatPaused?.(!!data.paused, say); // the Board dock's menu and banner
-    queuedSince = state.teamPause.paused ? state.teamPause.since : ''; // messages since the pause are marked Queued
     syncButton();
     drawBar();
     try { loadedModule('./board_window.js')?.renderMessages?.(bs._allMessages); } catch { /* the Board is not on screen */ } // the Board's rows again, with or without the mark

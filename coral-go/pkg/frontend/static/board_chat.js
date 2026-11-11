@@ -389,7 +389,7 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
                 ${checkbox}
                 <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${agentLinkHtml(agent, { board: _activeBoardChat || '', text: authorLabel(m, agent, _activeBoardChat || '') })}</span>
                 ${externalMessageBadge(m)}${hubUserBadge(m)}${askBadge(m)}
-                <span class="mb-message-time">${_formatTime(m.created_at)}</span>${loadedModule('./team_pause.js')?.queuedBadge(m) || ''}
+                <span class="mb-message-time">${_formatTime(m.created_at)}</span>${loadedModule('./team_pause.js')?.queuedBadge(m, _activeBoardChat) || ''}
             </div>
             ${parts.tagsOpen}
             <div class="mb-message-body" id="${escapeAttr(parts.bodyId)}">${renderBoardMessageBody(m, _activeBoardChat || '')}</div>
@@ -657,6 +657,7 @@ export function _setBoardChatPaused(paused, say = true) {
     _boardChatPaused = !!paused;
     const banner = document.getElementById('board-chat-paused-banner');
     if (banner) banner.style.display = _boardChatPaused ? '' : 'none';
+    if (changed && _boardChatLoaded) _renderBoardPanelMessages(document.getElementById('board-panel-msgs'), false); // the rows say Queued, or stop saying it (#15378)
     const live = document.getElementById('board-chat-pause-status');
     if (live && say && changed) live.textContent = _boardChatPaused ? 'Board paused: agents stop receiving new messages.' : 'Board resumed: agents receive messages again.'; // a polite live region, as the pause icon's name used to change under the reader
 }
@@ -668,6 +669,7 @@ export async function _toggleBoardChatPause(boardName) {
     try {
         await boardFetch(boardName, `/${endpoint}`, { method: 'POST' });
         _setBoardChatPaused(!wasPaused);
+        await _checkBoardPauseState(boardName); // the pause time too, so the chat's rows say Queued (#15378)
         if (boardName === state.boardPageProject) importOnce('./team_pause.js').then(m => m.readTeamPause(boardName)); // the team page on screen says it too (#15331)
     } catch { /* ignore */ }
 }
@@ -677,6 +679,8 @@ async function _checkBoardPauseState(boardName) {
         const resp = await boardFetch(boardName, `/paused`);
         const data = await resp.json();
         _setBoardChatPaused(!!data.paused, false); // the state on arrival is read, not announced
+        const tp = data.paused ? await importOnce('./team_pause.js') : loadedModule('./team_pause.js'); // lazy: a team never paused loads nothing
+        if (tp) { tp.noteDockPause(boardName, data); if (_boardChatLoaded && boardName === _activeBoardChat) _renderBoardPanelMessages(document.getElementById('board-panel-msgs'), false); }
     } catch { /* ignore */ }
 }
 

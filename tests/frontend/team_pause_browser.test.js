@@ -48,12 +48,19 @@ const { coralReady } = require('./helpers/wait');
         assert.match(row.time, /\d{1,2}:\d{2}/, 'with the time it was sent');
         console.log('   ✓');
 
+        console.log('3b. The dock\'s Board chat marks it Queued too (#15378), and the mark goes on resume');
+        await ev(`import((window.__coralStatic || '/static/') + 'render.js').then(m => { m.showBoardChatTab(${JSON.stringify(B)}); return true; })`);
+        await waitFor(`/please read this later/.test(document.getElementById('board-panel-msgs')?.textContent || '')`, 'the dock chat shows the message', 15000);
+        await waitFor(`!![...document.querySelectorAll('#board-panel-msgs .mb-message')].find(x => /please read this later/.test(x.textContent) && x.querySelector('.mb-queued'))`, 'the dock row says Queued', 15000);
+        console.log('   ✓');
+
         console.log('4. Resume team from the line: a toast, the header and the mark go');
         await ev(`document.querySelector('#team-pause-bar .team-pause-resume').click(); true`);
         await waitFor(`/^Team resumed/.test([...document.querySelectorAll('.toast')].map(t => t.textContent).join(' ').trim())`, 'the resume toast', 10000);
         assert.equal((await api('GET', `/api/board/${B}/paused`)).body.paused, false);
         await waitFor(`document.getElementById('team-pause-bar').hidden && document.getElementById('team-page-status').textContent.trim() !== 'Paused'`, 'the header and the line are back to normal', 10000);
         await waitFor(`![...document.querySelectorAll('#mb-messages .mb-queued')].length`, 'the mark is gone', 10000);
+        await waitFor(`![...document.querySelectorAll('#board-panel-msgs .mb-queued')].length`, 'the dock mark is gone too', 10000);
         assert.equal(await menuItem(), 'Pause team');
         assert.match(await ev(`document.getElementById('mb-messages').textContent`), /please read this later/, 'the message is still there');
         console.log('   ✓');
