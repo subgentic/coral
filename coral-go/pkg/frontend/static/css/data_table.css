@@ -750,3 +750,5 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 }
 .dt-box.dt-fold-always.dt-folded .dt-check { display: block; flex: none; width: var(--table-touch, 44px); } /* a card list on a computer keeps its select boxes (#15162): a mouse has no long press */
 .dt-box.dt-fold-column.dt-folded td.dt-line-3 { order: 4; flex: 1 1 100%; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; padding-top: 8px; } /* the row's buttons along its bottom (#15120, the Operator's bottom-row layout): after both lines */
+
+:is(.dt-primary, .dt-link, .dt-mail-open)[data-goal-id]::before { content: '#' attr(data-goal-id) ' '; color: var(--text-secondary); } /* the number agents write in 'goal #3' (#15245): drawn from the element's data-goal-id, so the name's own text is unchanged */

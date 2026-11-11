@@ -7,6 +7,7 @@
  * The caller supplies rowKey/open/state to dataTable; team-scoped numeric ids must be qualified in the mailbox. */
 import { importOnce } from './import_once.js';
 import * as W from './goal_words.js';
+const { shortTitle } = await importOnce('./goal_short.js');
 const DT = await importOnce('./data_table.js');
 
 export function goalColumns(ctx = {}, keys = ['state', 'goal', 'team', 'progress', 'updated']) {
@@ -18,7 +19,7 @@ export function goalColumns(ctx = {}, keys = ['state', 'goal', 'team', 'progress
         state: { key: 'state', label: 'State', sort: true, sortValue: W.stateWord, line: 2, width: '6.5rem', dropAt: 16,
             cell: g => g.noGoal ? '' : DT.chip(W.stateWord(g), `goal-state-${g.state || 'unknown'}`) },
         goal: { key: 'goal', label: 'Goal', primary: true, width: 'grow', sort: true, sortValue: g => g.title, line: 1,
-            cell: g => { const b = DT.primaryButton(g.title || `Goal ${g.id}`); b.dataset.goalId = String(g.id); if (g.noGoal) b.classList.add('goals-no-goal');
+            cell: g => { const b = DT.primaryButton(g.noGoal ? g.title : g.title ? shortTitle(g.title) : `Goal ${g.id}`); if (!g.noGoal && g.title) b.title = g.title; b.dataset.goalId = String(g.id); if (g.noGoal) b.classList.add('goals-no-goal');
                 const n = total(g), left = W.openTasksOf(g.rollup || {}), news = Number(g.newComments || g.new_comments) > 0; if (g.noGoal || (!n && !news)) return b;
                 const w = DT.el('span', 'goals-title-cell'); if (news) w.append(DT.tag('New comments')); // agents replied in the Operator's thread on this goal (#12073); a phone's row: the title (two lines) and under it the tasks, '2 done \u00b7 1 left' (#11549); the Tasks column does this on a computer and the cell hides this line then
                 w.prepend(b); if (n) w.append(DT.el('span', 'goals-row-tasks', left ? `${done(g)} done \u00b7 ${left} left` : `${done(g)} done`)); return w; } }, // closing is on the goal's own page, not a button here (#11549, the operator)

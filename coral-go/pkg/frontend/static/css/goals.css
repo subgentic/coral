@@ -111,3 +111,5 @@
 
 .goals-facts dd .goal-md > :first-child { margin-top: 0; } /* the description is Markdown-lite (#12724): its first and last block sit flush in the line */
 .goals-facts dd .goal-md > :last-child { margin-bottom: 0; }
+
+.goals-detail-title[data-goal-id]::before { content: '#' attr(data-goal-id) ' '; color: var(--text-secondary); } /* the goal's number in front of its short name (#15245) */
