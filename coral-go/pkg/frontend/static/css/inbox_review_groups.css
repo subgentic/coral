@@ -36,3 +36,15 @@
 #group-table-view .inbox-needs-results { max-width: 80rem; } /* a line of the table is not the width of a 1920 px screen: Time sat 1400 px from the title (#15339, walk 23 L17) */
 
 .inbox-wait-long { color: var(--warning-text); } /* a question waiting 5 minutes or more reads in amber (#15297) */
+
+/* The collapsed Inbox rail: one icon per folder with its count, in place of the agents' avatars (#15347) */
+.sidebar-rail-inbox { display: none; }
+@media (min-width: 1024px) {
+    .layout[data-sidebar-pane="hub-inbox"] .sidebar-rail-list { display: none; }
+    .layout[data-sidebar-pane="hub-inbox"] .sidebar-rail-inbox:not([hidden]) { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; min-height: 0; width: 100%; overflow-y: auto; scrollbar-width: none; }
+    .sidebar-rail-folder { position: relative; }
+    .sidebar-rail-folder[aria-current="page"] { background: var(--bg-hover); box-shadow: inset 3px 0 0 var(--accent); }
+    .sidebar-rail-folder .view-list-icon { display: inline-flex; width: 18px; height: 18px; font-size: var(--fs-2xl); align-items: center; justify-content: center; }
+    .sidebar-rail-folder .view-list-icon svg { width: 16px; height: 16px; }
+    .sidebar-rail-badge { position: absolute; top: -2px; right: -2px; background: var(--rail-badge-unread); color: var(--rail-badge-text); }
+}

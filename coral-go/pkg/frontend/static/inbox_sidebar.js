@@ -973,6 +973,21 @@ function wireSaveDrop(list) {
     list.addEventListener('drop', e => { const t = target(e); if (!t || !dragging) return; e.preventDefault(); t.classList.remove('drop-over'); const row = dragging; dragging = null;
         importOnce('./artifact_review.js').then(async ({ saveRow, saySaved }) => { const out = await saveRow(row.team, row); saySaved(row.team, row, out); sayLive(`Saved ${markHidden(row.name, { strict: true })} for later.`); }).catch(error => sayLive(error.message)); });
 }
+/** The collapsed rail keeps one icon per folder with its count (#15347, the Operator: "Collapsing the inbox can still show the icons"): the same glyphs as the list, a tooltip and an accessible name; a click opens the folder and the rail stays collapsed. */
+function drawRail(sections, here) {
+    const rail = $('sidebar-rail-inbox'); if (!rail) return;
+    const items = sections.flatMap(sec => sec.items).filter(it => !String(it.key).startsWith(BOARD_ITEM));
+    rail.hidden = !items.length || !document.querySelector('.layout[data-sidebar-pane="hub-inbox"]'); // only while the Inbox's pane is the sidebar on screen (the layout's data-sidebar-pane)
+    rail.replaceChildren(...items.map(it => {
+        const b = DT.el('button', 'btn btn-quiet btn-icon btn-small sidebar-rail-btn sidebar-rail-folder'), n = Number(it.count) || 0, name = n ? `${it.label}, ${it.words || n}` : it.label;
+        b.type = 'button'; b.dataset.key = it.key; b.title = it.tip ? `${it.label}: ${it.tip}` : it.label; b.setAttribute('aria-label', name);
+        if (it.key === here) b.setAttribute('aria-current', 'page');
+        const glyph = _folders?.querySelector(`[data-key="${it.key}"] .view-list-icon`)?.cloneNode(true); if (glyph) b.append(glyph);
+        if (n) { const badge = DT.el('span', 'chip chip-count sidebar-rail-badge', n > 99 ? '99+' : n); badge.setAttribute('aria-hidden', 'true'); b.append(badge); }
+        b.addEventListener('click', () => pickFolder(it.key));
+        return b;
+    }));
+}
 function renderInboxNav(force = false) {
     syncReviewPagingControls();
     teamNeedsMount?.redraw();
@@ -992,6 +1007,7 @@ function renderInboxNav(force = false) {
     else { _folders = VL.build({ id: 'inbox-folders', label: 'Inbox views', sections, current: here, onPick: pickFolder }); list.replaceChildren(_folders); }
     const pageList = page && $('inbox-page')?.querySelector('[data-view-list="inbox-goal-folders"], [data-view-list="inbox-item-folders"]'); // an opened item's own folder list (a phone's select) follows the counts too: it was drawn once, with the counts of that moment (#8681)
     if (pageList) VL.update(pageList, { sections, current: here });
+    drawRail(sections, here);
     setHidden(document.querySelector('.sidebar-header[data-header="hub-inbox"] [data-group-toggle]'), true); // folders do not fold: the collapse-all button has nothing to fold
     syncLeadStrip(sections, here);
     refreshGroupTable('hub-inbox');
