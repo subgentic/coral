@@ -209,9 +209,13 @@ func (h *BoardHandler) subscriberArchived(ctx context.Context, project, subscrib
 	return h.isArchivedSession(ctx, sub.SessionName)
 }
 
-// refuseArchivedAssignee answers 409 when assignee is an archived agent and
+// refuseArchivedAssignee answers 409 when assignee is an archived agent, or an ended one (killed: assignee_ended, #15293), and
 // reports whether it did.
 func (h *BoardHandler) refuseArchivedAssignee(w http.ResponseWriter, ctx context.Context, project, assignee string) bool {
+	if h.memberRest != nil && assignee != "" && h.memberRest(ctx, project, assignee) == restStopped { // an ended agent never picks the task up and nothing says so (#15293, walk 17 H1)
+		writeError(w, http.StatusConflict, "assignee_ended", fmt.Sprintf("%s has ended (it was stopped, not put to sleep) and will not pick up a task: resume it (Inbox > All chats > Continue this chat), or assign the task to an agent that is running", assignee))
+		return true
+	}
 	if !h.subscriberArchived(ctx, project, assignee) {
 		return false
 	}

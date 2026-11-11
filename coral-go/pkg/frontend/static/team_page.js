@@ -231,7 +231,7 @@ function drawStatus(data) {
     syncStop();
     S.statusData = data;
     const live = (state.liveSessions || []).filter(row => inTeam(row, S.team));
-    const n = live.filter(needsYou).length;
+    const n = live.filter(needsYou).length + (data?.agents || []).filter(a => a.availability === 'offline' && a.open_tasks).length; // an ended agent that holds a task is not "All well" (#15293)
     if (live.length && (!data || !data.agents?.length)) data = { agents: live.map(row => ({ availability: row.sleeping ? 'sleeping' : 'unknown' })) };
     if (!data || !Array.isArray(data.agents)) { s.textContent = 'Status unavailable'; s.className = 'team-page-status unknown'; const health = $('team-page-health'); if (health) health.hidden = true; return; } // kept in the page and empty: a live region that is shown and filled in one turn is not announced
     // a team with no agent has nothing to be well: a name no board has (a mistyped /team/<name>) said All well in green (#8839 c); say nothing

@@ -18,6 +18,7 @@ const (
 	restAsleep       = "asleep"
 	restTerminalGone = "terminal_gone"
 	restEnded        = "ended"
+	restStopped      = "stopped" // killed: its subscription names a session that no longer exists here (#15293)
 	restArchived     = "archived"
 )
 
@@ -38,12 +39,17 @@ func MemberRestLookup(bs *board.Store, ss *store.SessionStore) func(ctx context.
 			return ""
 		}
 		ls, err := ss.GetLiveSession(ctx, sid)
+		if err == nil && ls == nil && (sub.OriginServer == nil || *sub.OriginServer == "") {
+			return restStopped // a killed agent has no session row left; its subscription stays (a remote agent's session is not here: unknown, not stopped)
+		}
 		if err != nil || ls == nil {
 			return ""
 		}
 		switch {
 		case ls.IsArchived != 0:
 			return restArchived
+		case ls.Status == "inactive" && ls.IsSleeping == 0 && (sub.OriginServer == nil || *sub.OriginServer == ""):
+			return restStopped // a kill leaves the row, marked inactive (#15293)
 		case ls.IsSleeping != 0:
 			switch sleepReason(*ls) {
 			case store.SleepReasonIdle:
@@ -67,6 +73,8 @@ func restSentence(name, state string, mayWake bool) string {
 		s = name + "'s terminal is gone; the message waits until it is restarted."
 	case restEnded:
 		s = name + " has ended (its CLI exited); the message waits until it is restarted."
+	case restStopped:
+		s = name + " has ended (it was stopped); the message waits until it is resumed (Inbox > All chats > Continue this chat)."
 	case restArchived:
 		s = name + " is archived; the message waits until it is unarchived and woken."
 	default:
