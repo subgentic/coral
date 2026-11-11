@@ -88,13 +88,22 @@ func TestParkRulesAndRelease(t *testing.T) {
 	code, out = park(t1, fmt.Sprintf(`{"reason":"waiting on the Operator's pick","ask_id":%d}`, q.ID))
 	require.Equal(t, http.StatusOK, code, "%v", out)
 
-	// Another team's wait needs no ask; the cap is two, and the refusal says what to do.
+	// Another team's wait needs no ask; the cap is the team's park limit (set to two here: the default is three), and the refusal says what to do, --force included.
+	hs := h.bs.GetHealthSettings(ctx, "team")
+	hs.ParkLimit = 2
+	require.NoError(t, h.bs.SetHealthSettings(ctx, "team", hs))
 	code, out = park(t2, `{"reason":"waiting on the billing team's API"}`)
 	require.Equal(t, http.StatusOK, code, "%v", out)
 	code, out = park(t3, `{"reason":"waiting on the billing team's other API"}`)
 	assert.Equal(t, http.StatusConflict, code)
 	assert.Equal(t, "park_cap", out["code"])
 	assert.Contains(t, fmt.Sprint(out["error"]), "release one to the queue or finish one")
+	assert.Contains(t, fmt.Sprint(out["error"]), "--force", "the way out is named")
+	assert.Contains(t, fmt.Sprint(out["error"]), "limit is 2")
+	code, out = park(t3, `{"reason":"waiting on the billing team's other API","force":true}`)
+	require.Equal(t, http.StatusOK, code, "force parks past the limit: %v", out)
+	_, err = h.bs.UnparkTask(ctx, "team", t3)
+	require.NoError(t, err)
 	code, _ = park(t2, `{"reason":"waiting on the billing team's API, still"}`)
 	assert.Equal(t, http.StatusOK, code, "a task that is parked already keeps working")
 

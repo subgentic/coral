@@ -34,6 +34,7 @@ export function healthToValues(h) {
     for (const k of RULES) if (h[k]) for (const [p, val] of Object.entries(h[k])) v[`${k}_${p}`] = val;
     if (h.assign_limit !== undefined) v.assign_limit = h.assign_limit;
     if (h.stale_sweep_hours !== undefined) v.stale_sweep_hours = h.stale_sweep_hours;
+    if (h.park_limit !== undefined) v.park_limit = h.park_limit;
     return v;
 }
 
@@ -49,6 +50,7 @@ export function valuesToHealth(v, base) {
     h.auto_delegate = { ...h.auto_delegate, on: !!v.auto_delegate_on };
     if (h.assign_limit !== undefined && v.assign_limit !== undefined) h.assign_limit = Number.isInteger(v.assign_limit) ? v.assign_limit : h.assign_limit;
     if (h.stale_sweep_hours !== undefined && v.stale_sweep_hours !== undefined) h.stale_sweep_hours = Number.isInteger(v.stale_sweep_hours) ? v.stale_sweep_hours : h.stale_sweep_hours;
+    if (h.park_limit !== undefined && v.park_limit !== undefined) h.park_limit = Number.isInteger(v.park_limit) ? v.park_limit : h.park_limit;
     h.claim_nudge = { ...h.claim_nudge, on: !!v.claim_nudge_on, after_min: v.claim_nudge_after_min, nudges: v.claim_nudge_nudges };
     h.status_nudge = { ...h.status_nudge, on: !!v.status_nudge_on, after_min: v.status_nudge_after_min, escalate_after_min: v.status_nudge_escalate_after_min };
     h.mention_renudge = { ...h.mention_renudge, on: !!v.mention_renudge_on, after_min: v.mention_renudge_after_min };
@@ -100,6 +102,7 @@ export function healthFields(ctx) {
             validate: v => (new Set(String(v).split(',').map(s => s.trim()).filter(Boolean)).size > HEALTH_LIMITS.reviewers ? `at most ${HEALTH_LIMITS.reviewers} names.` : '') },
         { key: 'stale_sweep_hours', type: 'number', label: 'Stale task sweep every', unit: 'hours (0: off)', help: 'The orchestrator gets one message that lists stale tasks (pending over 3 days, in progress over a day with no post, in review over a day, owner asleep or gone, goal closed) and the commands to deal with them. Coral changes nothing itself.', min: 0, max: 720, integer: true, compact: true, visibleWhen: v => v.stale_sweep_hours !== undefined },
         { key: 'assign_limit', type: 'number', label: 'Most waiting tasks per agent', unit: 'tasks (0: no limit)', help: 'Assigning a task to an agent that already has more than this many waiting is refused, and the answer names the less loaded agents; the person assigning can use --force.', min: 0, max: 50, integer: true, compact: true, visibleWhen: v => v.assign_limit !== undefined },
+        { key: 'park_limit', type: 'number', label: 'Most parked tasks per agent', unit: 'tasks', help: 'Parking is for a wait outside the team. Parking another task past this is refused; the person parking can use --force.', min: 1, max: 20, integer: true, compact: true, visibleWhen: v => v.park_limit !== undefined },
         { key: 'hb_agents', type: 'heading', level: 1, label: 'Watching the agents', help: 'Run only while the health check is on, except where a heading says otherwise.' },
         { key: 'health_rules', type: 'heading', label: 'Idle agents', help: 'Run only while the health check is on.' },
         { key: 'claim_nudge_on', type: 'toggle', label: 'Nudge an idle agent to claim its work', help: 'An agent that is idle with ready work gets a reminder; past the count, the orchestrator is told.' },

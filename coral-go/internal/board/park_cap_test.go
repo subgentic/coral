@@ -14,6 +14,7 @@ import (
 func TestALapsedParkDoesNotCountTowardTheCap(t *testing.T) {
 	ctx := context.Background()
 	s := testStore(t)
+	limitTo(t, s, 2)
 	mk := func(title string) int64 {
 		task, err := s.CreateTask(ctx, "team", title, "", "medium", "lead", "Dev")
 		require.NoError(t, err)
@@ -32,11 +33,12 @@ func TestALapsedParkDoesNotCountTowardTheCap(t *testing.T) {
 	assert.Error(t, err, "two live parks are the cap")
 }
 
-// An agent holds at most MaxParkedPerAgent parked tasks (#11660): a park is for a wait outside the team, and work that is not for now is released to the queue. Only a new park is refused; one that is
+// An agent holds at most the team's park limit of parked tasks (#11660): a park is for a wait outside the team, and work that is not for now is released to the queue. Only a new park is refused; one that is
 // parked already can change its reason, parks made over the cap before it are left alone, and another agent's or an unassigned task's parks do not count.
 func TestAnAgentHoldsAtMostTwoParkedTasks(t *testing.T) {
 	ctx := context.Background()
 	s := testStore(t)
+	limitTo(t, s, 2)
 	mk := func(title, who string) int64 {
 		var task *Task
 		var err error
@@ -126,4 +128,59 @@ func TestReleaseSendsNotNowWorkBackToTheQueue(t *testing.T) {
 	assert.True(t, errors.Is(err, ErrNotReleasable), "%v", err)
 	_, err = s.ReleaseTask(ctx, "team", 9999, false)
 	assert.Error(t, err)
+}
+
+// limitTo sets the team's park limit (#15362).
+func limitTo(t *testing.T, s *Store, n int) {
+	t.Helper()
+	hs := s.GetHealthSettings(context.Background(), "team")
+	hs.ParkLimit = n
+	require.NoError(t, s.SetHealthSettings(context.Background(), "team", hs))
+}
+
+// The park limit is a team setting that is 3 until the team changes it (#15362, the Operator): the fourth park is refused naming the agent, the count and the limit, --force parks it anyway, the setting persists and
+// is clamped, and parks already held are left alone.
+func TestTheParkLimitIsATeamSettingThatDefaultsToThree(t *testing.T) {
+	ctx := context.Background()
+	s := testStore(t)
+	assert.Equal(t, 3, s.GetHealthSettings(ctx, "team").ParkLimit, "the default")
+	ids := make([]int64, 6)
+	for i := range ids {
+		task, err := s.CreateTask(ctx, "team", "T", "", "medium", "lead", "Dev")
+		require.NoError(t, err)
+		ids[i] = task.ID
+	}
+	for _, id := range ids[:3] {
+		_, err := s.ParkTask(ctx, "team", id, "waiting on the other team", time.Time{})
+		require.NoError(t, err)
+	}
+	_, err := s.ParkTask(ctx, "team", ids[3], "one more", time.Time{})
+	var capErr *ErrParkCap
+	require.True(t, errors.As(err, &capErr), "%v", err)
+	assert.Equal(t, 3, capErr.Held)
+	assert.Equal(t, 3, capErr.Limit)
+	for _, want := range []string{"Dev", "holds 3", "limit is 3", "--force"} {
+		assert.Contains(t, err.Error(), want)
+	}
+	got, _ := s.GetTask(ctx, "team", ids[3])
+	assert.Nil(t, got.ParkedReason, "refused: nothing changed")
+
+	forced, err := s.ParkTaskForce(ctx, "team", ids[3], "the Operator asked", time.Time{}, true)
+	require.NoError(t, err, "--force parks past the limit")
+	assert.NotNil(t, forced.ParkedReason)
+	for _, id := range ids[:3] {
+		task, _ := s.GetTask(ctx, "team", id)
+		assert.True(t, task.Parked(time.Now()), "parks already held are left as they are")
+	}
+
+	limitTo(t, s, 5)
+	assert.Equal(t, 5, s.GetHealthSettings(ctx, "team").ParkLimit, "the setting persists")
+	_, err = s.ParkTask(ctx, "team", ids[4], "a fifth", time.Time{})
+	require.NoError(t, err, "four held, limit five")
+	_, err = s.ParkTask(ctx, "team", ids[5], "a sixth", time.Time{})
+	assert.Error(t, err, "five held, limit five")
+
+	assert.Equal(t, DefaultParkLimit, HealthSettings{}.Clamp().ParkLimit, "a body without it is the default")
+	assert.Equal(t, 1, HealthSettings{ParkLimit: -4}.Clamp().ParkLimit)
+	assert.Equal(t, ParkLimitMax, HealthSettings{ParkLimit: 500}.Clamp().ParkLimit)
 }

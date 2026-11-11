@@ -41,6 +41,8 @@ type HealthSettings struct {
 	AssignLimit int `json:"assign_limit"`
 	// StaleSweepHours: every this many hours the health monitor types one message to the orchestrator listing stale tasks and the commands to act on them (#14863, the Operator); 0 is off. Coral changes nothing itself.
 	StaleSweepHours int `json:"stale_sweep_hours"`
+	// ParkLimit is how many parked tasks an agent may hold before parking another is refused (#15362, the Operator: the number is a team setting, default 3); --force on task park overrides. A body without it (0) is the default.
+	ParkLimit int `json:"park_limit"`
 	// AskReminder reminds a member, once, of a question (post --ask, asks.go) that @mentions them and that they have not answered for AfterMin (#7794). It runs for a team whether or not the
 	// orchestrator's check is on: a reminder to one agent costs the team nothing.
 	AskReminder HealthMentionNudge `json:"ask_reminder"`
@@ -319,6 +321,12 @@ const (
 // DefaultAssignLimit is the waiting tasks an agent may have before a new assignment to it is refused (#14862).
 const DefaultAssignLimit = 2
 
+// DefaultParkLimit is the parked tasks one agent may hold before a new park is refused (#15362; it was a fixed 2, #11660). ParkLimitMax bounds the setting.
+const (
+	DefaultParkLimit = 3
+	ParkLimitMax     = 20
+)
+
 // DefaultStaleSweepHours is how often the stale-task sweep goes to the orchestrator (#14863).
 const DefaultStaleSweepHours = 12
 
@@ -340,6 +348,7 @@ func DefaultHealthSettings() HealthSettings {
 		CompactContext:  HealthCompact{On: true, ThresholdK: CompactThresholdDefaultK, Orchestrator: true, Trigger: CompactTriggerThreshold, Method: CompactMethodCompact}, // ON for a team that has not set it (the Operator, #15066): a team that stored it off keeps off
 		AssignLimit:     DefaultAssignLimit,
 		StaleSweepHours: DefaultStaleSweepHours,
+		ParkLimit:       DefaultParkLimit,
 		AskReminder:     HealthMentionNudge{On: true, AfterMin: 15},
 		Deviations:      HealthRuleOn{On: true},
 		ActionList:      HealthActionList{StuckWaitMin: 10, OverloadedTasks: 5, OverloadedSleeping: 1, StaleReviewHours: 24, MentionMin: 30},
@@ -381,6 +390,10 @@ func (h HealthSettings) Clamp() HealthSettings {
 	}
 	h.AssignLimit = min(max(h.AssignLimit, 0), 50)
 	h.StaleSweepHours = min(max(h.StaleSweepHours, 0), 720) // 0 is off
+	if h.ParkLimit == 0 {
+		h.ParkLimit = DefaultParkLimit // a body that does not carry the setting
+	}
+	h.ParkLimit = min(max(h.ParkLimit, 1), ParkLimitMax)
 	h.AskReminder.AfterMin = min(max(h.AskReminder.AfterMin, 5), 1440)
 	h.ActionList = h.ActionList.clamp()
 	h.Landing.Branch = strings.TrimSpace(h.Landing.Branch)
