@@ -1024,6 +1024,7 @@ jobs:
             artifacts/coral-windows-msi/*.msi
             artifacts/coral-windows-portable/*.zip
             SHA256SUMS.txt
+            install.sh
 
       # Publish last (#5522): every asset, the checksums and the Sigstore bundles are attached to the draft above; publishing makes the
       # release visible (and, where the repository setting is on, immutable). update-tap and the checks run after this.
