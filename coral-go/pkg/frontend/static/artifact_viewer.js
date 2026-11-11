@@ -115,6 +115,7 @@ function _build() {
                 <div class="menu artifact-viewer-menu" id="artifact-viewer-menu" role="menu" aria-label="More actions" hidden>
                     <button type="button" class="menu-item artifact-viewer-edit-item" role="menuitem" hidden>Edit text</button>
                     <button type="button" class="menu-item artifact-viewer-markup-item" role="menuitem" hidden>Mark up</button>
+                    <button type="button" class="menu-item artifact-viewer-details-item" role="menuitem">Details</button>
                     <button type="button" class="menu-item artifact-viewer-copyid-item" role="menuitem" title="The id that stays the same across versions" hidden>Copy file ID</button>
                     <button type="button" class="menu-item artifact-viewer-copy-id" role="menuitem" title="The id of this version only">Copy version ID</button>
                     <button type="button" class="menu-item artifact-viewer-scripts-item" role="menuitem" hidden>Run scripts…</button>
@@ -132,6 +133,8 @@ function _build() {
         <div class="modal-actions modal-footer artifact-viewer-foot"><button type="button" class="btn btn-primary artifact-edit-send-action" hidden>Send to agent</button><button type="button" class="btn artifact-viewer-close">Close</button></div>
     </div>`;
     _details = makeDetails({ panel: d.querySelector('.artifact-viewer-readers'), remember: false, hide: true }); // closed on every open of the viewer: one open Details no longer fills the next file's screen (#12725)
+    d.querySelector('.artifact-viewer-details-item').addEventListener('click', () => _details.button.click());
+    { const toggleFocus = _details.button.focus.bind(_details.button); _details.button.focus = o => { toggleFocus(o); if (document.activeElement !== _details.button) d.querySelector('.artifact-viewer-more')?.focus(o); }; } // closed on a phone the button is out of the header: Hide details hands the keyboard to ⋯, where Details is (#15033) // a phone's Details is an item of the ⋯ menu (the header has no room for the button, #15033)
     _details.button.classList.add('artifact-viewer-details'); d.querySelector('.artifact-viewer-morewrap').before(_details.button); // Details is a button in the header row, beside ⋯: where a person looks to close it (#12725) header row (#12223)
     // the HTML preview's banner is said once; after that a "Sandboxed" chip in the header says it, and a tap shows or hides the banner (#12224)
     d.querySelector('.artifact-viewer-dropbox-share').addEventListener('click', e => { const b = e.currentTarget; importOnce('./dropbox_share.js').then(m => m.openShareDialog({ hex: b.dataset.hex, filename: b.dataset.name, opener: d.querySelector('.artifact-viewer-more') })).catch(() => {}); }); // Share via Dropbox (#14944): the dialog loads on the press

@@ -30,8 +30,13 @@ const HEX = 'd'.repeat(64);
             await open();
             await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-body') && document.querySelector('#artifact-viewer .details-toggle') && !document.querySelector('#artifact-viewer .details-toggle').hidden`, `${tag}: the Details button`, 8000);
             let s = await state();
-            assert.ok(s.btnShown && s.inHeader && !s.inMenu, `${tag}: Details is a visible button in the header row, not in the menu: ${JSON.stringify(s)}`);
-            assert.ok(s.btnH >= (mobile ? 44 : 28), `${tag}: it is a target (${s.btnH} px)`);
+            if (!mobile) {
+                assert.ok(s.btnShown && s.inHeader && !s.inMenu, `${tag}: Details is a visible button in the header row, not in the menu: ${JSON.stringify(s)}`);
+                assert.ok(s.btnH >= 28, `${tag}: it is a target (${s.btnH} px)`);
+            } else { // a phone (#15033, the Operator): Details is an item of the ⋯ menu; its button is in the header only while Details is open, to close it
+                const item = await ev(`(() => { const i = document.querySelector('#artifact-viewer .artifact-viewer-details-item'); return !!i && !!i.closest('.artifact-viewer-menu') && getComputedStyle(i).display !== 'none'; })()`);
+                assert.ok(!s.btnShown && s.inHeader && item, `${tag}: Details is an item of the ⋯ menu, its button is out of the header while closed: ${JSON.stringify([s, item])}`);
+            }
             assert.equal(s.expanded, 'false', `${tag}: closed to begin with`);
             const closed = await ev(`(() => { const v = document.getElementById('artifact-viewer'), g = v.querySelector('.artifact-viewer-goal'); return { goalShown: !!g && g.getClientRects().length > 0, above: Math.round(v.querySelector('.artifact-viewer-body').getBoundingClientRect().top - v.querySelector('.artifact-viewer-content').getBoundingClientRect().top) }; })()`);
             const fromPos = await ev(`(() => { const v = document.getElementById('artifact-viewer'), f = v.querySelector('.artifact-viewer-from'), t = v.querySelector('.artifact-viewer-title'), h = v.querySelector('.artifact-viewer-header'), r = e => e.getBoundingClientRect(); return { inHeader: !!f && h.contains(f), shown: !!f && f.getClientRects().length > 0, sameRow: Math.abs(r(f).top - r(t).top) <= 20, text: f.textContent.slice(0, 20) }; })()`);
@@ -39,7 +44,7 @@ const HEX = 'd'.repeat(64);
             if (!mobile) assert.ok(fromPos.sameRow, `${tag}: and on the title's row: ` + JSON.stringify(fromPos));
             assert.ok(!closed.goalShown, `${tag}: closed, the goal is not in the header: ` + JSON.stringify(closed));
             assert.ok(closed.above <= (mobile ? 150 : 130), `${tag}: closed, the header is one title row and one line above the file (${closed.above} px)`);
-            await ev(`document.querySelector('#artifact-viewer .details-toggle').click(); true`);
+            await ev(mobile ? `document.querySelector('#artifact-viewer .artifact-viewer-details-item').click(); true` : `document.querySelector('#artifact-viewer .details-toggle').click(); true`); // a phone opens it from the ⋯ menu's item
             s = await state();
             assert.ok(s.panelShown && s.expanded === 'true', `${tag}: the button opens it: ${JSON.stringify(s)}`);
             assert.ok(s.panelH <= s.win * 0.25 + 2, `${tag}: open, it is at most a quarter of the window (${s.panelH} of ${s.win}): ${JSON.stringify(s)}`);
