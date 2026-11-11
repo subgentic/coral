@@ -480,7 +480,9 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (!s) return;
         // the button's own width, kept inside the dialog (it was cut at the dialog's right edge, #15231), and below the selection, or above it when there is no room below
         const box = (dialog.querySelector('.artifact-viewer-content') || dialog).getBoundingClientRect(), wide = selBtn.offsetWidth || 120, tall = selBtn.offsetHeight || 36, lo = Math.max(8, box.left + 8), hi = Math.min(window.innerWidth - 8, box.right - 8) - wide;
-        const x = Math.max(lo, Math.min(s.rect.right - 40, hi)), below = s.rect.bottom + 6, y = below + tall <= Math.min(window.innerHeight, box.bottom) - 8 ? below : Math.max(8, s.rect.top - tall - 6);
+        let x = Math.max(lo, Math.min(s.rect.right - 40, hi)), below = s.rect.bottom + 6, y = below + tall <= Math.min(window.innerHeight, box.bottom) - 8 ? below : Math.max(8, s.rect.top - tall - 6);
+        const foot = window.matchMedia?.('(pointer: coarse)').matches && dialog.querySelector('.artifact-viewer-foot'); // a touch screen (walk 11 M3): not over the lines under the selection, but above the bar, on the right
+        if (foot) { const h = selBtn.offsetHeight || 44, w = selBtn.offsetWidth || 110, t = foot.getBoundingClientRect().top - h - 8; x = window.innerWidth - w - 12; y = s.rect.bottom + 6 > t - 4 ? Math.max(8, s.rect.top - h - 6) : t; }
         selBtn.style.left = x + 'px'; selBtn.style.top = y + 'px';
     }
     document.addEventListener('selectionchange', () => { if (!shown()) return; clearTimeout(selTimer); selTimer = setTimeout(syncSelButton, 120); });

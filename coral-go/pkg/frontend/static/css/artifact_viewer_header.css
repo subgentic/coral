@@ -32,6 +32,9 @@
     .artifact-viewer-title { order: 0; flex: 1 1 0; min-width: 88px; padding-bottom: 0; } /* the name, Comments and ⋯ are one row at 360 px (#15033, the Operator); an opened name takes the whole width below */
     .artifact-viewer-header:has(.artifact-viewer-title.is-open) > .artifact-viewer-title { flex: 1 0 100%; } /* an opened name takes the whole header width: the buttons wrap to the next row instead of leaving it a narrow column (#13989) */
     .artifact-viewer-header > .ac-toggle { order: 1; flex: none; }
+    .artifact-viewer-header:has(> .artifact-viewer-details:not([hidden])) > .artifact-viewer-morewrap { order: 1; } /* Details shows (a goal, a task, who can read): row one is the name and the ⋯ button, row two Details and Comments side by side, then the chips; no orphan button on a row of its own (walk 11 M1) */
+    .artifact-viewer-header:has(> .artifact-viewer-details:not([hidden])) > :is(.artifact-viewer-details, .ac-toggle) { order: 2; flex: 1 1 40%; min-width: 120px; }
+    .artifact-viewer-header:has(> .artifact-viewer-details:not([hidden])) > .artifact-viewer-title:not(.is-open) { flex: 1 1 calc(100% - 52px); } /* the name fills row one beside the ⋯ button, so the two buttons below it cannot slip in beside it */
     .artifact-viewer-morewrap { order: 2; }
     .artifact-viewer-chips { order: 3; flex: 1 0 100%; max-width: 100%; gap: 4px; flex-wrap: wrap; }
     .artifact-viewer-actions { display: none; }
