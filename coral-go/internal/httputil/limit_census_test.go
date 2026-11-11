@@ -45,6 +45,8 @@ var tooManyRequestsSites = map[string]struct {
 	"pkg/tunnel/local_ws.go":                            {1, "client side: the connector reads the local server's 429 on an upgrade and refuses the hub's stream as busy (Stream.RejectBusy, with the Retry-After): no 429 is written to a dashboard (#5035)"},
 	"pkg/tunnel/relay_artifact.go":                      {1, "relay protocol, not HTTP to the dashboard: the hub's per-tunnel in-flight cap answer to a connector's file request (the artifact twin of inbound.go's), read by ClientSession.RelayArtifact and passed on marked by relayError (#4378)"},
 	"internal/server/routes/dropbox_share.go":           {3, "Share via Dropbox (#14944): the 20-shares-an-hour limit and Dropbox asking Coral to wait are per-action limits, returned as values; writeShareRefusal, the third mention, sends every 429 with WriteActionLimit (marked X-Coral-Limit: action, with Retry-After when Dropbox gave one)"},
+	"internal/server/routes/orchestrator_agents.go":     {1, "orchRefusal writes every 429 with WriteActionLimitBody (marked X-Coral-Limit: action): the orchestrator's per-hour lifecycle caps (#15112)"},
+	"internal/server/routes/orchestrator_restart.go":    {1, "a restart refused by the hourly cap is returned as a value; orchRefusal, the caller, sends every 429 marked with WriteActionLimitBody (#15112)"},
 	"internal/server/routes/cross_team_send.go":         {2, "a relayed send's per-sender limit, and Coral Hub's 429 passed on: relayError writes every 429 with WriteActionLimitBody (marked), the other mention is that check (#3489)"},
 }
 

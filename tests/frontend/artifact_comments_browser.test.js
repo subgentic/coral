@@ -187,7 +187,8 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
                 const hint = await ev(`(document.querySelector('.ac-composer .ac-hint:not([hidden])') || {}).textContent || ''`);
                 check(`${at}: ${waiting ? 'a file waiting for review says only what is always true: writing here does not approve it' : 'after Approve there is no hint'}`, waiting ? hint === 'To approve, use Approve on the file: writing here does not approve it.' : hint === '', hint);
                 const described = await ev(`(() => { const t = document.querySelector('.ac-composer .ac-input'), h = document.querySelector('.ac-composer .ac-hint'); return { by: t.getAttribute('aria-describedby'), id: h && h.id }; })()`);
-                check(`${at}: the box is described by the hint only while it shows (${waiting ? 'waiting' : 'not waiting'})`, waiting ? !!described.id && described.by === described.id : !described.by, JSON.stringify(described));
+                check(`${at}: the box is described by the hint only while it shows (${waiting ? 'waiting' : 'not waiting'})`, waiting ? !!described.id && (described.by || '').split(' ').includes(described.id) : !/ac-hint-/.test(described.by || ''), // the send hint (Ctrl+Enter) always describes the box too (#15231)
+                        JSON.stringify(described));
             }
             await ev(`(() => { const t = document.querySelector('.ac-composer .ac-input'); t.value = 'Is the lock per table or per database?'; t.dispatchEvent(new Event('input')); document.querySelector('.ac-composer').requestSubmit(); return true; })()`);
             await waitFor(`[...document.querySelectorAll('.ac-card')].some(c => /per table or per database/.test(c.textContent))`, 'the new card', 5000);

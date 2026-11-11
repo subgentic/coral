@@ -34,7 +34,7 @@ const STUB = `(() => { const real = window.fetch; window.__reqs = []; window.__a
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
-        for (const [sid, jt] of [['orch', 'Orchestrator'], ['be', 'Backend Dev']]) assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: sid, job_title: jt, session_name: sid + '-s' })).status < 300);
+        for (const [sid, jt] of [['orch', 'Orchestrator'], ['be', 'Backend Dev']]) assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: sid, job_title: jt, session_name: sid === 'be' ? '' : sid + '-s' })).status < 300);
         const made = await api('POST', `/api/board/${B}/tasks`, { title: 'Write the report', body: 'Details', assigned_to: 'be', created_by: 'orch', priority: 'high' });
         assert.ok(made.status < 300, JSON.stringify(made)); const id = made.body.id;
 

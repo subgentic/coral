@@ -20,7 +20,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`true`);
         assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: B })).status < 300);
-        await openNeeds(); await new Promise(r => setTimeout(r, 1500));
+        await openNeeds(); await new Promise(r => setTimeout(r, 1500)); // sleep-ok: lets the Needs-you count settle before it is read as the baseline; no event marks it
         const baseline = await needsCount(), baselineBadge = await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`); // the count before any goal is closed
         const mk = async title => { const g = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title, outcome: 'o', done_when: 'd' }); assert.equal(g.status, 201); assert.equal((await api('PATCH', `/api/board/${B}/goals/${g.body.id}`, { subscriber_id: 'Operator', state: 'active' })).status, 200); return g.body.id; };
         const a = await mk('Closed by the agent'), b = await mk('Closed by the person'), c = await mk('Closed by the agent too');

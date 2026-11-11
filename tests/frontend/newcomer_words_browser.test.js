@@ -36,7 +36,7 @@ const BASE = require('./test_base').BASE;
         await ev(`(async () => { await window.showSettingsModal('notifications'); return true; })()`);
         await waitFor(`!!document.getElementById('settings-alert-needs-input')`, 'the Notifications section', 8000);
         const sub = await ev(`['settings-alert-needs-input', 'settings-alert-reply', 'settings-alert-sound'].map(id => { const e = document.getElementById(id), row = e.closest('.sv-row'); return { id, help: [...row.querySelectorAll('.sv-help')].map(h => h.textContent).join(' '), disabled: e.disabled }; })`);
-        for (const s of sub) assert.match(s.help, /Needs Desktop alerts\./, `${s.id} says what it needs: ` + JSON.stringify(sub));
+        for (const s of sub) assert.match(s.help, /Needs Desktop alerts on\./, `${s.id} says what it needs: ` + JSON.stringify(sub));
         console.log('PASS newcomer words: New team in the sidebar, a model for all workers, plain Settings words, sub-alerts that say what they need');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

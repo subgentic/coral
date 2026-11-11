@@ -159,6 +159,10 @@ func (h *SessionsHandler) LifecycleLog(w http.ResponseWriter, r *http.Request) {
 
 // orchRefusal writes a refusal with a code a caller can match on.
 func orchRefusal(w http.ResponseWriter, status int, code, msg string) {
+	if status == http.StatusTooManyRequests { // a per-action cap (restarts an hour): marked, so the dashboard's pollers do not take it for an overloaded server
+		httputil.WriteActionLimitBody(w, 0, map[string]string{"error": msg, "message": msg, "code": code})
+		return
+	}
 	writeJSON(w, status, map[string]string{"error": msg, "message": msg, "code": code})
 }
 

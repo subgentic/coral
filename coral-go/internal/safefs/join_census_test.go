@@ -33,6 +33,7 @@ type joinEntry struct {
 
 // joinSites is "file<TAB>function" -> its joins, by file relative to coral-go.
 var joinSites = map[string]joinEntry{
+	"internal/server/routes/team_file_holders.go\tteamHoldersPath":                           {1, joinFixed, "the file is named by 32 hex characters of a SHA-256 of the team's name, so no name can reach a path (#15356)"},
 	"internal/server/routes/dropbox_autosync.go\tDropboxBackup.undoEdit":                     {2, joinID, "the digest is checked first (objectNameRe: 64 lower-case hex) and the uploads folder comes from uploadsDir with the session of the series' own member (#14714 Undo this edit)"},
 	"internal/server/routes/dropbox_backup.go\tDropboxBackup.Pass":                           {1, joinID, "the outbox row's digest is checked (objectNameRe) before it names the object (#14655)"},
 	"internal/server/routes/dropbox_backup.go\tDropboxBackup.readObject":                     {1, joinID, "the digest is checked first (objectNameRe); the object is then opened without following a link (#14655)"},

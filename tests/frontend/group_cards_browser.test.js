@@ -98,7 +98,7 @@ const SESSIONS = [
             const btn = `document.querySelector('li.session-team-group .group-kebab-btn')`;
             await ev(`${btn}.click(); true`); await waitFor(`${btn}.getAttribute('aria-expanded') === 'true'`, 'the menu open');
             const shown = () => ev(`[...document.getElementById(${btn}.getAttribute('aria-controls')).querySelectorAll('.overflow-menu-item')].filter(b => b.getClientRects().length).map(b => { const c = b.cloneNode(true); c.querySelectorAll('.material-icons, svg').forEach(i => i.remove()); return c.textContent.replace(/\\s+/g, ' ').trim(); })`);
-            const six = ['Team settings', 'Add Agent', 'Sleep team', 'Reset team (clear context)', 'Save as template', 'More', 'Kill all', 'Delete team']; // the six, More, then the danger group last (#10282) with Delete team (#10318)
+            const six = ['Team settings', 'Add Agent', 'Sleep team', 'Reset team (clear context)', 'Save as template', 'More', 'Kill all', 'Remove team']; // the six, More, then the danger group last (#10282) with Remove team (#10318, #15378)
             assert.deepEqual(await shown(), six, 'six and More: ' + JSON.stringify(await shown()));
             const more = `document.querySelector('li.session-team-group [data-on-click="team-menu-more"]')`;
             assert.equal(await ev(`${more}.getAttribute('aria-expanded')`), 'false', 'More starts closed');
