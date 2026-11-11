@@ -59,6 +59,21 @@ func bigBoardWalkRig(t *testing.T, tagged bool) (*BoardHandler, *httptest.Server
 	return h, srv, ids
 }
 
+// fastestWithin runs measure up to n times and returns the fastest duration it saw; a run within the budget ends it, so an unloaded machine takes one.
+func fastestWithin(n int, budget time.Duration, measure func(attempt int) time.Duration) time.Duration {
+	var best time.Duration
+	for i := 0; i < n; i++ {
+		d := measure(i)
+		if i == 0 || d < best {
+			best = d
+		}
+		if best <= budget {
+			break
+		}
+	}
+	return best
+}
+
 // walkForReview reads every page of the for-review list the way the dashboard does (a page of 200, the cursor of the page before) and returns how many files and pages it read.
 func walkForReview(t *testing.T, srv *httptest.Server) (files, pages int) {
 	t.Helper()
@@ -96,25 +111,34 @@ func TestNeedsYouWalkOfABigBoardIsUnderTheGoal(t *testing.T) {
 	if raceEnabled {
 		t.Skip("a time budget means nothing under the race detector (about 10 to 20 times slower); the normal run keeps it (#14280)")
 	}
-	_, srv, _ := bigBoardWalkRig(t, true)
 	scale := 1.0
 	if v := os.Getenv("CORAL_PERF_BUDGET_SCALE"); v != "" {
 		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
 			scale = f
 		}
 	}
-	var m0, m1 runtime.MemStats
-	runtime.GC()
-	runtime.ReadMemStats(&m0)
-	t0 := time.Now()
-	files, pages := walkForReview(t, srv)
-	elapsed := time.Since(t0)
-	runtime.ReadMemStats(&m1)
-	allocMB := float64(m1.TotalAlloc-m0.TotalAlloc) / (1 << 20)
+	ceiling := time.Duration(float64(needsYouWalkCeilingMs())*scale) * time.Millisecond
+	// The fastest of up to three cold walks (each on a fresh rig, so none is warmed by the one before): one wall-clock sample that a loaded machine stalls is not a slow walk, three over the goal are (#15480).
+	var files, pages int
+	var allocMB float64
+	elapsed := fastestWithin(3, ceiling, func(attempt int) time.Duration {
+		_, srv, _ := bigBoardWalkRig(t, true)
+		var m0, m1 runtime.MemStats
+		runtime.GC()
+		runtime.ReadMemStats(&m0)
+		t0 := time.Now()
+		files, pages = walkForReview(t, srv)
+		d := time.Since(t0)
+		runtime.ReadMemStats(&m1)
+		if a := float64(m1.TotalAlloc-m0.TotalAlloc) / (1 << 20); attempt == 0 || a > allocMB {
+			allocMB = a // the allocation bound reads the worst run: it is not a clock
+		}
+		return d
+	})
 	t.Logf("PERF the walk allocated %.0f MB (bound %d MB)", allocMB, walkAllocBoundMB)
-	t.Logf("PERF the cold walk of the for-review list: %d files in %d pages, %s (goal %s)", files, pages, elapsed.Round(time.Millisecond), time.Duration(float64(needsYouWalkCeilingMs())*scale)*time.Millisecond)
+	t.Logf("PERF the cold walk of the for-review list: %d files in %d pages, %s (goal %s)", files, pages, elapsed.Round(time.Millisecond), ceiling)
 	require.Equal(t, 20000, files, "every file for review is in the walk")
-	if elapsed > time.Duration(float64(needsYouWalkCeilingMs())*scale)*time.Millisecond {
+	if elapsed > ceiling {
 		t.Errorf("the cold walk of 20,000 for-review files took %s, over the goal's %d ms (#13522)", elapsed.Round(time.Millisecond), int(float64(needsYouWalkCeilingMs())*scale))
 	}
 	// An allocation bound, not a clock: the walk of a loaded or slow machine takes longer, but a page that copies the whole list (every matching row, for every page: #13614) allocates gigabytes wherever it runs.
@@ -122,4 +146,29 @@ func TestNeedsYouWalkOfABigBoardIsUnderTheGoal(t *testing.T) {
 		t.Errorf("the walk allocated %.0f MB, over the bound's %d MB: a page must not copy the list it is cut from (#13614)", allocMB, walkAllocBoundMB)
 	}
 	_ = fmt.Sprint
+}
+
+// #15480: a stall in one timed walk (a loaded machine) is not a slow walk; three walks over the goal are.
+func TestAStalledWalkIsNotASlowWalkButThreeSlowOnesAre(t *testing.T) {
+	const budget = 20 * time.Millisecond
+	calls := 0
+	d := fastestWithin(3, budget, func(int) time.Duration {
+		calls++
+		if calls == 1 {
+			return 3 * budget
+		}
+		return budget / 2
+	})
+	require.Less(t, d, budget)
+	require.Equal(t, 2, calls, "the second run was within the goal and ended it")
+
+	calls = 0
+	d = fastestWithin(3, budget, func(int) time.Duration { calls++; return time.Duration(5-calls) * budget })
+	require.Greater(t, d, budget, "three slow runs are a slow walk")
+	require.Equal(t, 3, calls)
+	require.Equal(t, 2*budget, d, "the fastest of the three")
+
+	calls = 0
+	fastestWithin(3, budget, func(int) time.Duration { calls++; return budget / 2 })
+	require.Equal(t, 1, calls, "an unloaded machine reads one")
 }
