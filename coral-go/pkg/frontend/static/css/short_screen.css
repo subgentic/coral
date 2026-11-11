@@ -1,0 +1,16 @@
+/* A short window (200% zoom on a laptop is 720 x 450 CSS px, #15303 / walk 18): what a screen this short needs, loaded with the views that use it (lazy_styles.js), so the start sheet is not heavier.
+ * The Board's search, chips and view switch are one row and its composer is tighter, so messages take the rest; the alerts offer is one line. */
+@media (max-height: 520px) {
+    #team-panel-messages { padding-top: 6px; }
+    #team-panel-messages .mb-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; }
+    #team-panel-messages .mb-tools .list-bar-bar { flex: 1 1 14rem; min-width: 0; padding-bottom: 0; }
+    #team-panel-messages .mb-tools .mb-table-tools { flex: 0 1 auto; padding: 0; }
+    .alerts-offer-banner { flex-wrap: nowrap; padding-block: 4px; }
+    .alerts-offer-banner > * { margin-block: 0; }
+    #team-panel-messages .mb-post-form { padding-block: 4px 6px; }
+    .alerts-offer-text { flex: 1 1 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+@media (max-height: 520px) {
+    .team-more-menu .menu-item { min-height: 36px; } .team-more-menu { max-height: 60vh; overflow-y: auto; } /* the team's Actions menu: more of it fits under the header, the rest scrolls */
+}
+@media (max-height: 520px) and (pointer: fine) { .alerts-offer-banner .btn { min-height: 28px; } } /* a mouse needs no 44 px target: the offer is one slim line */

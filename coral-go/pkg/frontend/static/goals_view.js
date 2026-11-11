@@ -21,6 +21,7 @@ import { looksDone } from './goal_done.js';
 const { mountGoal } = await importOnce('./goal_view.js');
 await loadStyles('phone_lists.css'); // the phone form of a team list: edge-to-edge rows, a one-line toolbar (#12230); not at start (page_weight)
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
+loadStyles('short_screen.css'); // what a short window needs (200% zoom, #15303)
 let detail = null, detailHost = null, detailId = 0;
 function clearDetail() { detail?.dispose(); detail = null; detailHost = null; detailId = 0; }
 

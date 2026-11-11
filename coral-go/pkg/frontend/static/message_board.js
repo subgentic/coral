@@ -4,6 +4,7 @@ import { escapeAttr, escapeHtml, showView, OPERATOR_ID, showToast } from './util
 import { importOnce } from './import_once.js';
 import { killLiveTeam, dropKilledRows } from './kill_live.js';
 import { keyLabel, splitKey, hasBoardLabel, boardFetch, noteBoardLabel, inTeam } from './server_base.js';
+import { loadStyles } from './lazy_styles.js';
 import { agentWords, deleteTeamWords } from './agent_words.js';
 import { state } from './state.js';
 import { initGrowingTextarea } from './growing_textarea.js';
@@ -15,6 +16,7 @@ import { registerActions, textOf, withId } from './actions.js';
 import { bs } from './board_state.js';
 import './goals_adapter.js'; // the Goals view (goals_view.js) is lazy and imports only what loads at startup (import_hygiene): its two small helpers load here (#7113)
 import './goal_words.js';
+loadStyles('short_screen.css'); // what a short window needs (200% zoom), once
 // The board page's group (bundle_lazy.go): these load with it, and the page's other files import only what loads at startup
 const BX = await importOnce('./board_export.js'); // a part of the board page's group: loaded with it
 const { doExportBoard, toggleMessageSelect, selectAllMessages, selectNoneMessages, cancelSelectMode, exportSelectedAsMarkdown, resetSelection, connectBoard, hideExportBoardModal } = BX;

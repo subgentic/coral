@@ -122,3 +122,10 @@
 .goal-preview-card p { margin: 0 0 10px; font-size: var(--fs-md); color: var(--text-secondary); }
 
 .goal-editor .goal-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-xs); } /* the standard ring, on top of the underline (#12966: the underline alone was the only mark) */
+/* A short window (200% zoom on a laptop, 720 x 450, #15303): the empty box is four lines (it grows with what is typed), the bar and the pinned actions take less, so Done when is above the actions without scrolling. */
+@media (max-height: 520px) {
+    .goal-editor .goal-outcome { min-height: 0; height: 4rem; }
+    .goal-editor .goals-form-head { min-height: 44px; }
+    .goal-editor .goals-form-body { padding-top: 8px; gap: 6px; }
+    .goal-editor .goals-form > .goals-actions { padding-block: 6px; }
+}
