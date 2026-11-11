@@ -408,6 +408,10 @@ export function createArtifactsList({ inbox = false } = {}) {
         const status = el('p', counting ? 'sr-only team-count-line' : `goals-note team-count-line${model.error ? ' team-artifacts-error' : !model.loading && !model.items.length ? ' empty-state-line' : ''}`, statusLine());
         status.setAttribute('role', model.error ? 'alert' : 'status');
         body.append(status);
+        if (!inbox && !model.scope && !model.error && !model.loading && model.items.length) { // where the team's files are and one zip of them (#15154): a newcomer can run the app the team built
+            const strip = el('div', 'team-files-strip-host'); body.append(strip);
+            importOnce('./artifact_team_files.js').then(m => m.fillStrip(strip, { project: model.project, hasMore: () => model.hasMore, files: () => model.items.map(it => ({ it, link: linkOf(it) })).filter(x => x.link?.preview).map(x => ({ url: x.link.url, name: readableName(x.it) })) })).catch(() => {});
+        }
         if (inbox && !model.error && (model.partial || (model.versionless && model.versionless.length))) body.append(partialLine());
         if (!model.error && !model.loading && !model.items.length && !F.isFiltered(model.filters) && !model.scope) status.append(el('span', 'empty-state-hint', 'An agent shares a file when it finishes a task with one; you can ask an agent to share a file as an artifact.')); // inside the line's own element: one block, the family's gap
         if (model.error && !model.notFound) body.append(btn('btn btn-small team-artifacts-retry', 'Retry', () => {
