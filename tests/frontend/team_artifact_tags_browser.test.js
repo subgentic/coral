@@ -117,7 +117,7 @@ const { coralReady } = require('./helpers/wait');
 
         // ── the edges (#8594 review): set the tags through the route, then read the page ──────────────────────────────────
         const put = async (hex, tags) => assert.equal((await api('PUT', `/api/board/${B}/artifacts/${hex}/tags`, { tags })).status, 200);
-        const reload = async () => { await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks' }); true`); await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`); await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length === 3`, 'the list again', 15000); };
+        const reload = async () => { await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks' }); true`); await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`); await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length >= 3`, 'the list again', 15000); };
         const sheet = async name => { await ev(`[...document.querySelectorAll('#team-panel-artifacts [data-artifact-id]')].find(b => b.textContent === ${JSON.stringify(name)} || (b.querySelector('.dt-mail-title') || {}).textContent === ${JSON.stringify(name)}).click(); true`); await waitFor(`document.querySelector('.detail-head h2')?.textContent === ${JSON.stringify(name)}`, `the sheet of ${name}`, 10000); };
         const rowOf = name => `[...document.querySelectorAll('#team-panel-artifacts tbody tr')].find(r => r.querySelector('[data-artifact-id]')?.textContent === ${JSON.stringify(name)})`;
         const select = async names => { await ev(`(() => { ${JSON.stringify(names)}.forEach(n => { const r = [...document.querySelectorAll('#team-panel-artifacts tbody tr')].find(x => x.querySelector('[data-artifact-id]')?.textContent === n); const c = r.querySelector('input[type=checkbox]'); if (!c.checked) c.click(); }); return true; })()`); };
@@ -251,6 +251,20 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(v2.status, 201, JSON.stringify(v2)); const h2 = /[a-f0-9]{64}/.exec(v2.body.uri)[0];
         assert.equal((await api('POST', `/api/board/${B}/artifacts/${h2}/review`, { decision: 'approve' })).status, 200);
         await viewerLine(h2);
+        console.log('   ✓');
+
+        console.log('9. The side panel that says Waiting for your review has Approve (#15338, walk 23)');
+        const wait = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review&question=Is+it+right%3F`, 'a file waiting ' + Date.now(), { 'X-Artifact-Name': 'waiting.md', 'X-Artifact-Media-Type': 'text/markdown' });
+        assert.equal(wait.status, 201, JSON.stringify(wait)); const hw = /[a-f0-9]{64}/.exec(wait.body.uri)[0];
+        await reload();
+        await sheet('waiting.md');
+        await waitFor(`document.querySelector('.detail-head .artifact-review-line')?.textContent === 'Waiting for your review'`, 'the panel says it is waiting', 10000);
+        const approveBtn = `[...document.querySelectorAll('.detail-actions button, .detail-pane button')].find(b => b.textContent.trim() === 'Approve')`;
+        assert.equal(await ev(`!!${approveBtn}`), true, 'a file waiting for review has Approve in its side panel');
+        await ev(`${approveBtn}.click(); true`);
+        await waitFor(`/^Approved/.test(document.querySelector('.detail-head .artifact-review-line')?.textContent || '')`, 'the panel says Approved after the click', 10000);
+        assert.ok((await tagsOf(hw)).includes('approved') && !(await tagsOf(hw)).includes('for review'), 'the server has it approved');
+        assert.equal(await ev(`!!${approveBtn}`), false, 'an approved file offers no Approve');
         console.log('   ✓');
 
         console.log('PASS artifact tags: chips and Add tag in the sheet, row chips, the For review pill and Tag filter, Tag and Untag in the selection bar');
