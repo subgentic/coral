@@ -49,7 +49,7 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
                     window.__urls.push(u);
                     if (${old} && u.includes('versions=')) return new Response(JSON.stringify({ error: 'unknown parameter versions' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
                     const sid = new URL(u, location.origin).searchParams.get('session_id') || undefined;
-                    const rows = [row('a', 'design.png', ${old} ? {} : { earlier_versions: 2 }), row('b', 'mockup.png', ${old} ? {} : { earlier_versions: 1 }), row('c', 'notes.png', {})];
+                    const rows = [row('a', 'design.png', ${old} ? {} : { earlier_versions: 2 }), row('b', 'mockup.png', ${old} ? {} : { earlier_versions: 1, version: 5, versions: 5 }), row('c', 'notes.png', {})];
                     return new Response(JSON.stringify({ session_id: sid, project: 'design-team', artifacts: rows, total: 3, all: 3, limit: 50, offset: 0, has_more: false }), { headers: { 'Content-Type': 'application/json' } });
                 }
                 if (u.includes('/api/')) return new Response(JSON.stringify({ files: [] }), { headers: { 'Content-Type': 'application/json' } });
