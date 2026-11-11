@@ -4,6 +4,7 @@ package ptymanager
 
 import (
 	"github.com/subgentic/coral/internal/agentprio"
+	"github.com/subgentic/coral/internal/procguard"
 	"github.com/subgentic/coral/internal/safego"
 	"os"
 	"os/exec"
@@ -109,12 +110,12 @@ func (p *unixPTY) Terminate() error {
 	pgid, err := syscall.Getpgid(p.cmd.Process.Pid)
 	if err == nil && pgid > 0 {
 		logSignal(-pgid, syscall.SIGHUP)
-		_ = syscall.Kill(-pgid, syscall.SIGHUP)
+		_ = procguard.KillGroupOrPid(pgid, p.cmd.Process.Pid, syscall.SIGHUP)
 		logSignal(-pgid, syscall.SIGTERM)
-		err = syscall.Kill(-pgid, syscall.SIGTERM)
+		err = procguard.KillGroupOrPid(pgid, p.cmd.Process.Pid, syscall.SIGTERM)
 	} else {
-		_ = p.cmd.Process.Signal(syscall.SIGHUP)
-		err = p.cmd.Process.Signal(syscall.SIGTERM)
+		_ = procguard.Kill(p.cmd.Process.Pid, syscall.SIGHUP)
+		err = procguard.Kill(p.cmd.Process.Pid, syscall.SIGTERM)
 	}
 	signalTree(tree, syscall.SIGHUP)
 	signalTree(tree, syscall.SIGTERM)
@@ -129,9 +130,9 @@ func (p *unixPTY) ForceKill() error {
 	pgid, err := syscall.Getpgid(p.cmd.Process.Pid)
 	if err == nil && pgid > 0 {
 		logSignal(-pgid, syscall.SIGKILL)
-		return syscall.Kill(-pgid, syscall.SIGKILL)
+		return procguard.KillGroupOrPid(pgid, p.cmd.Process.Pid, syscall.SIGKILL)
 	}
-	return p.cmd.Process.Kill()
+	return procguard.Kill(p.cmd.Process.Pid, syscall.SIGKILL)
 }
 
 // shellWrap wraps a command string for execution via the Unix shell.

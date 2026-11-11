@@ -5,6 +5,7 @@ package ptymanager
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"github.com/subgentic/coral/internal/procguard"
 	"log/slog"
 	"os"
 	"strings"
@@ -169,7 +170,7 @@ var killSeamsP atomic.Pointer[killSeams] // nil until a test sets its own
 // defaultKillSeams is what runs in a program. It is a package variable and not set in an init(): the guardian's own init (guardian_unix.go) runs before main, and before the init of a file that sorts after
 // it, and it ends a tree with these.
 var defaultKillSeams = &killSeams{
-	sendSignal: func(pid int, sig syscall.Signal) { logSignal(pid, sig); _ = syscall.Kill(pid, sig) },
+	sendSignal: func(pid int, sig syscall.Signal) { logSignal(pid, sig); _ = procguard.Kill(pid, sig) },
 	sweepTree:  treeMembers,
 	memberLive: func(m member) bool { return m.current() },
 	stopRounds: 5,
