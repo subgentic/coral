@@ -322,6 +322,7 @@ var putSettingsLiveKeys = map[string]bool{"telemetry_enabled": true, inputlog.Se
 var rfc3339Like = regexp.MustCompile(`^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$`)
 
 func TestPutSettingsAgreesWithBefore4599(t *testing.T) {
+	t.Parallel() // its own handler and store, no shared state: it ran alone among thousands, one after another (#15686)
 	// serial: 30000 random PUTs set process-wide state (auth.RequireAuthOnLoopback, agent priority, replay bytes), which every parallel test would see (#5667)
 	prio, loopback, replay := agentprio.Level(), auth.RequireAuthOnLoopback(), ptymanager.ReplayBytes()
 	t.Cleanup(func() {

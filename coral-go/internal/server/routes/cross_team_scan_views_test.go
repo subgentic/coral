@@ -224,6 +224,7 @@ func TestScanBudgetGrowsWithTheFile(t *testing.T) {
 // The whole file's passes together never take more than scanFileCap, however dense: a pass is given only what
 // is left, and no time left is unchecked.
 func TestScanFileCapHoldsAgainstADenseFile(t *testing.T) {
+	t.Parallel() // its own handler and store, no shared state: it ran alone among thousands, one after another (#15686)
 	// Views that are each as big as the file: reversed text and joined fragments, as a hostile file makes them.
 	data := bytes.Repeat([]byte("ghp_ab cd1234 "), 8<<20/14)
 	views, ok := scanViews(data)
