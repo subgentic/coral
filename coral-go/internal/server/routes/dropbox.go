@@ -68,17 +68,19 @@ const dropboxSwitchTTL = 5 * time.Minute
 func (h *CloudHandler) SetDropbox(ds *store.DropboxStore, dataDir string) {
 	h.dbx = &dropboxRoutes{
 		store: ds, flows: dropbox.NewFlows(), dataDir: dataDir, port: DropboxCallbackPort,
-		appKey: func() string {
-			if k := os.Getenv("CORAL_DROPBOX_APP_KEY"); k != "" {
-				return k
-			}
-			k, _ := ds.AppKey(context.Background()) // saved in Settings; unreadable counts as none
-			return k
-		},
 		client:    dropbox.NewClient,
 		machineID: dropbox.MachineID,
 		save:      ds.Save,
 	}
+	h.dbx.appKey = h.dbx.resolveAppKey
+}
+
+// resolveAppKey is the app key in use: CORAL_DROPBOX_APP_KEY when set, else the one saved in Settings, else none (the build carries no key, #15641).
+func (d *dropboxRoutes) resolveAppKey() string {
+	if k := os.Getenv("CORAL_DROPBOX_APP_KEY"); k != "" {
+		return k
+	}
+	return d.savedAppKey(context.Background()) // unreadable counts as none
 }
 
 func (d *dropboxRoutes) fingerprint(ctx context.Context) (string, error) {
@@ -183,10 +185,6 @@ func (h *CloudHandler) DropboxConnect(w http.ResponseWriter, r *http.Request) {
 	key := d.appKey()
 	if key == "" {
 		writeError(w, http.StatusConflict, "no_app_key", "Add your Dropbox app key to connect")
-		return
-	}
-	if !validAppKey(key) {
-		writeError(w, http.StatusBadRequest, "bad_app_key", "That does not look like a Dropbox app key: it is letters and digits only. Check it in your app's page at dropbox.com/developers")
 		return
 	}
 	// The flow cookie is the host's the dashboard was opened at, and the browser returns it only to that host: the callback is on 127.0.0.1, so the

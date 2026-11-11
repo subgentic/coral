@@ -160,6 +160,7 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/dropbox/disconnect":                   "disconnect Dropbox",
 	"POST /api/dropbox/switch":                       "switch the Dropbox account",
 	"POST /api/dropbox/takeover":                     "take over the Dropbox backup",
+	"PUT /api/dropbox/app-key":                       "save the Dropbox app key the backup signs in with",
 	"PUT /api/dropbox/filters":                       "choose what the Dropbox backup sends",
 	"POST /api/dropbox/edits/{doc}/promote":          "use an edit made in Dropbox as the next version",
 	"POST /api/dropbox/edits/{doc}/separate":         "keep an edit made in Dropbox as its own file",

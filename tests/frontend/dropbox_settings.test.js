@@ -54,13 +54,61 @@ const { JSDOM } = require('jsdom');
 
     // Not in this build (no app key): a plain sentence, no buttons.
     await status({ app_key_set: false, connected: false, state: 'disconnected' });
-    assert.match($('settings-dropbox-status').textContent, /isn't available in this build/);
+    assert.match($('settings-dropbox-status').textContent, /Add your Dropbox app key to connect/);
+    assert.ok(shown('settings-dropbox-key') && $('settings-dropbox-key-input'), 'no key: the key field is offered');
     assert.ok(!shown('settings-dropbox-connect') && !shown('settings-dropbox-disconnect'));
 
     // Signed in with the key an earlier build shipped, none in this build (#15641): paused, said once, with Disconnect and no Connect.
     await status({ app_key_set: false, connected: true, state: 'connected', account_id: 'dbid:AAA', paused_no_key: true });
-    assert.match($('settings-dropbox-status').textContent, /Dropbox backup is paused: this build has no Dropbox app key/);
+    assert.match($('settings-dropbox-status').textContent, /Dropbox now uses your own app key: add it and connect again/);
     assert.ok(shown('settings-dropbox-disconnect') && !shown('settings-dropbox-connect'));
+    assert.match($('settings-dropbox-note').textContent, /Disconnect without the key cannot end Coral.s sign-in at Dropbox/, 'Security INFO on #15641: Disconnect with no key cannot revoke');
+    assert.ok(shown('settings-dropbox-key'), 'paused: the key field is offered');
+
+    // The app key (#15638): a saved key fills the field; a key of the wrong shape is refused in the page, with no request.
+    await status({ app_key_set: true, connected: false, state: 'disconnected', app_key: 'abcd1234efgh567' });
+    assert.strictEqual($('settings-dropbox-key-input').value, 'abcd1234efgh567', 'the saved key fills the field');
+    assert.ok(shown('settings-dropbox-connect'), 'a key is saved: Connect is offered');
+    let keyBefore = calls.length;
+    $('settings-dropbox-key-input').value = 'not a key!';
+    await m.saveAppKey();
+    assert.strictEqual(calls.length, keyBefore, 'a malformed key sends nothing');
+    assert.match($('settings-dropbox-key-note').textContent, /does not look like a Dropbox app key/);
+
+    // A good key from a state with none: one PUT with the key, then the status is read again.
+    await status({ app_key_set: false, connected: false, state: 'disconnected' });
+    answers['/api/dropbox/app-key'] = { status: 200, body: { saved: true, disconnected: false } };
+    answers['/api/dropbox/status'] = { status: 200, body: { app_key_set: true, connected: false, state: 'disconnected', app_key: 'zyxw9876vuts543' } };
+    $('settings-dropbox-key-input').value = '  zyxw9876vuts543 ';
+    keyBefore = calls.length;
+    await m.saveAppKey();
+    const keyPut = calls.slice(keyBefore).find(c => c.url === '/api/dropbox/app-key');
+    assert.ok(keyPut && keyPut.method === 'PUT', 'the key goes to PUT /api/dropbox/app-key');
+    assert.deepStrictEqual(JSON.parse(keyPut.body), { app_key: 'zyxw9876vuts543' }, 'trimmed, and no confirm the first time');
+    assert.ok(shown('settings-dropbox-connect'), 'saved: Connect is offered');
+    assert.match($('settings-dropbox-key-note').textContent, /Key saved/);
+
+    // Changing the key while connected: the server asks first; nothing changes until the person confirms, then the old account is disconnected.
+    await status({ app_key_set: true, connected: true, state: 'connected', account_id: 'dbid:AAA', app_key: 'zyxw9876vuts543' });
+    answers['/api/dropbox/app-key'] = { status: 409, body: { code: 'confirm_disconnect', error: 'Changing the app key disconnects dbid:AAA: connect again with the new key.' } };
+    $('settings-dropbox-key-input').value = 'newkey1234567890';
+    await m.saveAppKey();
+    assert.ok(shown('settings-dropbox-key-confirm'), 'the confirm is shown');
+    assert.match($('settings-dropbox-key-confirm-text').textContent, /disconnects dbid:AAA/);
+    answers['/api/dropbox/app-key'] = { status: 200, body: { saved: true, disconnected: true } };
+    answers['/api/dropbox/status'] = { status: 200, body: { app_key_set: true, connected: false, state: 'disconnected', app_key: 'newkey1234567890' } };
+    keyBefore = calls.length;
+    await m.saveAppKey(true);
+    const keyPut2 = calls.slice(keyBefore).find(c => c.url === '/api/dropbox/app-key');
+    assert.deepStrictEqual(JSON.parse(keyPut2.body), { app_key: 'newkey1234567890', confirm: true }, 'the confirmed change');
+    assert.match($('settings-dropbox-key-note').textContent, /old account is disconnected/);
+    assert.ok(!shown('settings-dropbox-key-confirm'));
+
+    // A key from the environment: no field, one sentence.
+    await status({ app_key_set: true, connected: false, state: 'disconnected', app_key_from_env: true });
+    assert.ok(!$('settings-dropbox-key-input').offsetParent && $('settings-dropbox-key-input').hidden, 'the field is hidden');
+    assert.match($('settings-dropbox-key-note').textContent, /CORAL_DROPBOX_APP_KEY/);
+
 
     // Not connected: Connect.
     await status({ app_key_set: true, connected: false, state: 'disconnected' });

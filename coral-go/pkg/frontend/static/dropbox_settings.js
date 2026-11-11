@@ -283,6 +283,119 @@ export async function saveDropboxFilters() {
     note('Saved. Narrowing what is backed up never deletes what is already in Dropbox.');
 }
 
+// The app key (#15638): Coral ships no Dropbox app key, so each person makes their own Dropbox app and pastes its key here. The form is built on first use (this
+// module loads only when Settings is opened), so it adds nothing to the page at start. The key is a public client id, not a secret, but nothing logs it.
+const KEY_SHAPE = /^[A-Za-z0-9]{12,20}$/; // the server checks the same shape
+const KEY_SCOPES = 'files.content.write, files.content.read, files.metadata.read, files.metadata.write, account_info.read, sharing.write, sharing.read';
+let keyPending = null; // a changed key waiting for the confirm that disconnects the old account
+
+function keyForm() {
+    let f = $('settings-dropbox-key');
+    if (f) return f;
+    const anchor = $('settings-dropbox-status');
+    if (!anchor || !anchor.parentNode) return null;
+    f = document.createElement('div');
+    f.id = 'settings-dropbox-key';
+    f.hidden = true;
+    const label = document.createElement('label');
+    label.htmlFor = 'settings-dropbox-key-input';
+    label.textContent = 'Your Dropbox app key';
+    const input = document.createElement('input');
+    input.type = 'text'; input.id = 'settings-dropbox-key-input'; input.maxLength = 20;
+    input.autocomplete = 'off'; input.spellcheck = false;
+    input.setAttribute('aria-describedby', 'settings-dropbox-key-note');
+    const save = document.createElement('button');
+    save.type = 'button'; save.className = 'btn btn-small'; save.id = 'settings-dropbox-key-save'; save.textContent = 'Save key';
+    const steps = document.createElement('details');
+    steps.id = 'settings-dropbox-key-steps';
+    const sum = document.createElement('summary');
+    sum.textContent = 'How to get an app key';
+    const ol = document.createElement('ol');
+    for (const t of [
+        'Open dropbox.com/developers/apps and choose Create app.',
+        'Pick Scoped access and App folder, then name it anything.',
+        `On its Permissions tab turn on: ${KEY_SCOPES}. Then Submit.`,
+        'On its Settings tab add this Redirect URI: http://127.0.0.1:53682/dropbox/callback, then Add.',
+        'Copy the App key from the same tab and paste it above.',
+    ]) { const li = document.createElement('li'); li.textContent = t; ol.append(li); }
+    steps.append(sum, ol);
+    const knote = document.createElement('div');
+    knote.id = 'settings-dropbox-key-note'; knote.className = 'settings-hint'; knote.setAttribute('role', 'status');
+    const confirm = document.createElement('div');
+    confirm.id = 'settings-dropbox-key-confirm'; confirm.hidden = true;
+    const ctext = document.createElement('span');
+    ctext.id = 'settings-dropbox-key-confirm-text';
+    const yes = document.createElement('button');
+    yes.type = 'button'; yes.className = 'btn btn-small'; yes.id = 'settings-dropbox-key-yes'; yes.textContent = 'Change the key and disconnect';
+    const no = document.createElement('button');
+    no.type = 'button'; no.className = 'btn btn-small'; no.id = 'settings-dropbox-key-no'; no.textContent = 'Keep the current key';
+    confirm.append(ctext, ' ', yes, ' ', no);
+    f.append(label, ' ', input, ' ', save, steps, knote, confirm);
+    anchor.after(f);
+    save.addEventListener('click', () => { saveAppKey(); });
+    yes.addEventListener('click', () => { saveAppKey(true); });
+    no.addEventListener('click', () => { keyPending = null; confirm.hidden = true; knote.textContent = ''; input.value = lastStatus && lastStatus.app_key || ''; input.focus(); });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveAppKey(); } });
+    return f;
+}
+
+function keyNote(text) {
+    const el = $('settings-dropbox-key-note');
+    if (el) el.textContent = text;
+}
+
+// showKey shows the form (or not) for the status st: the saved key fills the field; a key set in the environment replaces the form with one sentence.
+function showKey(st) {
+    const f = keyForm();
+    if (!f) return;
+    const input = $('settings-dropbox-key-input');
+    keyPending = null;
+    const c = $('settings-dropbox-key-confirm');
+    if (c) c.hidden = true;
+    if (st && st.app_key_from_env) {
+        for (const el of f.children) if (el.id !== 'settings-dropbox-key-note') el.hidden = true;
+        keyNote('The app key comes from CORAL_DROPBOX_APP_KEY in this Coral’s environment.');
+        f.hidden = false;
+        return;
+    }
+    for (const el of f.children) if (el.id !== 'settings-dropbox-key-confirm') el.hidden = false;
+    if (c) c.hidden = true;
+    if (input && document.activeElement !== input) input.value = (st && st.app_key) || '';
+    f.hidden = !st;
+}
+
+const keyErrors = {
+    bad_app_key: 'That does not look like a Dropbox app key: it is letters and digits only. Copy the App key from your app’s Settings tab.',
+};
+
+// saveAppKey saves the field's key. A key changed while connected disconnects the old account: the server answers 409 first and the person confirms.
+export async function saveAppKey(confirm = false) {
+    const input = $('settings-dropbox-key-input');
+    if (!input) return;
+    const key = input.value.trim();
+    if (key && !KEY_SHAPE.test(key)) { keyNote(keyErrors.bad_app_key); return; }
+    keyNote('');
+    let res;
+    try { res = await post('/api/dropbox/app-key', 'PUT', JSON.stringify(confirm ? { app_key: key, confirm: true } : { app_key: key })); } catch { keyNote("Couldn't reach Coral. Try again."); return; }
+    if (res.status === 409 && res.body.code === 'confirm_disconnect') {
+        keyPending = key;
+        const c = $('settings-dropbox-key-confirm');
+        const t = $('settings-dropbox-key-confirm-text');
+        if (t) t.textContent = String(res.body.error || 'Changing the app key disconnects the current Dropbox account.');
+        if (c) c.hidden = false;
+        const yes = $('settings-dropbox-key-yes');
+        if (yes) yes.focus();
+        return;
+    }
+    if (res.status === 409 && res.body.code === 'still_shared') {
+        keyNote(String(res.body.error || 'Some files are still shared. Stop sharing them first.'));
+        return;
+    }
+    if (!res.ok) { keyNote(keyErrors[String(res.body.code || '')] || String(res.body.error || "Couldn't save the key. Try again.")); return; }
+    await loadDropbox();
+    keyNote(res.body.disconnected ? 'Key saved. The old account is disconnected: connect again.' : (key ? 'Key saved.' : 'Key removed.'));
+}
+
 let lastStatus = null; // the last status shown, so a saved filter updates the summary without another read
 
 // hideAll takes every button and the backup part (with its counts) off the screen: a refused or failed read shows none of a stale state (UI Reviewer's MUST 2 on #14693).
@@ -294,6 +407,8 @@ function hideAll() {
     const del = $('settings-dropbox-delete-confirm');
     if (del) { del.hidden = true; del.textContent = ''; }
     renderBackup(null);
+    const kf = $('settings-dropbox-key');
+    if (kf) kf.hidden = true;
     const counts = $('settings-dropbox-counts');
     if (counts) counts.textContent = '';
     show('settings-dropbox-delete-rule', false);
@@ -307,13 +422,15 @@ function render(st) {
     hideAll();
     lastStatus = st;
     renderBackup(st);
-    if (st && st.paused_no_key) { // signed in with the key an earlier build shipped, and this build has none (#15641): paused, not broken; the files are safe here, Disconnect clears the sign-in
-        setStatus('Dropbox backup is paused: this build has no Dropbox app key. Your files are safe on this computer.');
+    showKey(st);
+    if (st && st.paused_no_key) { // signed in with the key an earlier build shipped, and no key now (#15641, #15638): paused, not broken; the files are safe here
+        setStatus('Dropbox now uses your own app key: add it and connect again. Your files are safe on this computer.');
+        note('Disconnect without the key cannot end Coral\u2019s sign-in at Dropbox. After it, remove Coral under Connected apps in your Dropbox settings.');
         show('settings-dropbox-disconnect', true);
         return;
     }
     if (!st || !st.app_key_set) {
-        setStatus("Dropbox backup isn't available in this build.");
+        setStatus('Add your Dropbox app key to connect.');
         return;
     }
     if (st.switch_pending) {

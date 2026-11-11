@@ -456,14 +456,15 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 }
 
 type dropboxEnv struct {
-	t       *testing.T
-	h       *CloudHandler
-	dbx     *fakeDropbox
-	machine string
-	machMu  sync.Mutex // machine is read by the worker and may be changed by a hook in the fake Dropbox's handlers (#14980)
-	host    string     // the Host the dashboard was opened at
-	db      *store.DB
-	body    string // the next call's JSON body ('{}' when empty)
+	lastAuthorize string // the authorize URL of the last signIn (#15638: a test reads its client_id)
+	t             *testing.T
+	h             *CloudHandler
+	dbx           *fakeDropbox
+	machine       string
+	machMu        sync.Mutex // machine is read by the worker and may be changed by a hook in the fake Dropbox's handlers (#14980)
+	host          string     // the Host the dashboard was opened at
+	db            *store.DB
+	body          string // the next call's JSON body ('{}' when empty)
 }
 
 func newDropboxEnv(t *testing.T) *dropboxEnv {
@@ -521,6 +522,8 @@ func (e *dropboxEnv) call(method, path string, dashboard bool, hdr map[string]st
 		e.h.DropboxCheckAgain(rec, req)
 	case "/api/dropbox/retention":
 		e.h.DropboxSetRetention(rec, req)
+	case "/api/dropbox/app-key":
+		e.h.DropboxSetAppKey(rec, req)
 	}
 	return rec
 }
@@ -542,6 +545,7 @@ func (e *dropboxEnv) signIn(binding string) string {
 	require.Equal(e.t, http.StatusOK, rec.Code, rec.Body.String())
 	var out map[string]string
 	require.NoError(e.t, json.Unmarshal(rec.Body.Bytes(), &out))
+	e.lastAuthorize = out["authorize_url"]
 	u, err := url.Parse(out["authorize_url"])
 	require.NoError(e.t, err)
 	q := u.Query()
