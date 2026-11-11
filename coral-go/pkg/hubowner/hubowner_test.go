@@ -191,7 +191,7 @@ func TestAllowedIsTheListedDecisionsAndNothingElse(t *testing.T) {
 			t.Errorf("%v allowed", bad)
 		}
 	}
-	if n := len(Routes()); n != 66 { // 66 since generation 8 (#15697, pause and resume of an agent's notices); 64 since generation 7 (#15380, the Hub's read of a computer's Needs you); 63 before it (#14730, the owner turns scripts on and off for one version of an HTML file); 61 since generation 6 (#13910, the opened version of a file); 60 since generation 5 (#13834, the done-state of a goal)
+	if n := len(Routes()); n != 82 { // 82 since generation 9 (#15708, the person-only reads of audit group 4); 66 since generation 8 (#15697, pause and resume of an agent's notices); 64 since generation 7 (#15380, the Hub's read of a computer's Needs you); 63 before it (#14730, the owner turns scripts on and off for one version of an HTML file); 61 since generation 6 (#13910, the opened version of a file); 60 since generation 5 (#13834, the done-state of a goal)
 		t.Errorf("the allowlist has %d routes: a new one needs a reason and a review (Security's tiers, #13694)", n)
 	}
 	first := 0
@@ -245,6 +245,17 @@ func TestARouteIsStampedOnlyForARemoteThatListsIt(t *testing.T) {
 		{"POST", "/api/sessions/live/x/notices/pause", 8, true, true},
 		{"POST", "/api/sessions/live/x/notices/resume", 8, true, true},
 		{"GET", "/api/sessions/live/x/notices/pause", 8, false, false},
+		{"GET", "/api/system/terminal-logs", 8, false, true}, // #15708: the person-only reads of audit group 4 are generation 9: a generation 8 remote gets them unstamped
+		{"GET", "/api/system/terminal-logs", 9, true, true},
+		{"GET", "/api/sessions/live/x/loaded-skills", 9, true, true},
+		{"GET", "/api/sessions/live/x/mcp-servers", 9, true, true},
+		{"GET", "/api/artifacts/abc/readers", 9, true, true},
+		{"GET", "/api/threads", 9, true, true},
+		{"POST", "/api/system/terminal-logs", 9, false, false}, // reads only: no write of the group is on the list yet
+		{"POST", "/api/system/terminal-logs/delete-ended", 9, false, false},
+		{"PUT", "/api/artifacts/abc/private", 9, false, false},
+		{"POST", "/api/teams/import", 9, false, false},
+		{"PUT", "/api/teams/detail/t/daily-knowledge", 9, false, false},
 		{"POST", "/api/needs-you", 7, false, false}, // a read only
 		{"GET", "/api/needs-you/x", 7, false, false},
 		{"GET", "/api/artifacts/abc/opened", 6, false, false},
@@ -261,7 +272,7 @@ func TestARouteIsStampedOnlyForARemoteThatListsIt(t *testing.T) {
 			t.Errorf("MustBeSigned(%s %s) = %v, want %v", c.m, c.p, got, c.must)
 		}
 	}
-	if RoutesVersion != 8 {
+	if RoutesVersion != 9 {
 		t.Errorf("RoutesVersion = %d: it moves with a widening, and the remote's health answer reports it", RoutesVersion)
 	}
 }
