@@ -39,7 +39,7 @@ const { coralReady } = require('./helpers/wait');
                 if (!mobile) {
                     const b = await ev(`(() => { const t = document.getElementById('nav-tab-hub-inbox'), e = document.getElementById('nav-tab-hub-inbox-badge'), tr = t.getBoundingClientRect(), r = e.getBoundingClientRect(); return { pos: getComputedStyle(e).position, h: Math.round(r.height), dTop: Math.round(r.top - tr.top), dLeft: Math.round(r.left - tr.right), label: t.getAttribute('aria-label'), wide: document.documentElement.scrollWidth <= innerWidth }; })()`);
                     assert.equal(b.pos, 'absolute', at + 'the badge is out of the layout'); assert.equal(b.h, 16, at + 'a 16 px pill');
-                    assert.ok(b.dTop >= 0 && b.dTop <= 4, at + 'at the tab\'s top: ' + JSON.stringify(b)); assert.ok(b.dLeft >= -16 && b.dLeft <= -10, at + 'hanging on the word\'s top-right corner (the tab\'s box has 12 px after the word: the pill starts about 2 px inside it, #9821): ' + JSON.stringify(b));
+                    assert.ok(b.dTop >= 0 && b.dTop <= 4, at + 'at the tab\'s top: ' + JSON.stringify(b)); assert.ok(b.dLeft >= -12 && b.dLeft <= -10, at + 'hanging on the word\'s top-right corner, clear of its last letter (the tab\'s box has 12 px after the word: the pill starts after it, #15175 walk 7 M10): ' + JSON.stringify(b));
                     assert.equal(b.label, `Inbox, ${n} waiting for input`, at + 'the tab keeps its accessible name'); assert.ok(b.wide, at + 'no sideways scroll');
                 }
                 if (n === 3) await shot(`inbox-badge-${w}`);

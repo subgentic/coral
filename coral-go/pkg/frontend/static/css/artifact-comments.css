@@ -69,7 +69,7 @@
 .ac-composer { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .ac-input { width: 100%; resize: vertical; }
 .ac-composer-row { display: flex; align-items: center; gap: 8px; }
-.ac-counter { flex: 1; color: var(--text-muted); font-size: var(--fs-sm, 0.8125rem); }
+.ac-counter { flex: 1; white-space: nowrap; color: var(--text-muted); font-size: var(--fs-sm, 0.8125rem); }
 .ac-error { margin: 0; color: var(--error-text, var(--error)); font-size: var(--fs-sm, 0.8125rem); }
 .ac-error[hidden] { display: none; }
 .ac-selbtn { position: fixed; z-index: 120; }

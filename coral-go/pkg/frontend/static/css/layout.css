@@ -43,7 +43,7 @@
 .nav-tab-badge {
     position: absolute;
     top: 2px;
-    left: calc(100% - 14px); /* the tab's box has 12 px of its own after the word: this is 2 px inside the word's top-right corner (#9821: the pill of two characters then ends before the next word with the tabs' own 24 px gap). Before: just past the word's top-right corner: it covers the last letter by 2 px at most, and a pill of three or four characters stays in the tabs' 24 px gap */
+    left: calc(100% - 11px); /* the tab's box has 12 px of its own after the word: this is 1 px clear of the word's last letter (#15175, walk 7 M10: it sat 2 px over the x); was 2 px inside the word's top-right corner (#9821: the pill of two characters then ends before the next word with the tabs' own 24 px gap). Before: just past the word's top-right corner: it covers the last letter by 2 px at most, and a pill of three or four characters stays in the tabs' 24 px gap */
     /* 11px text: the unread red alone is 3.9:1 with white in the dark theme, so it is darkened here (5.5:1 dark, higher in light). Its size is the count chip's (#9329). */
     background: color-mix(in srgb, var(--rail-badge-unread) 82%, #000);
     box-shadow: 0 0 0 1px var(--topbar-bg); /* a ring in the bar's colour, so it reads on the active tab's underline */
