@@ -28,6 +28,7 @@ var columnMigrations = []struct {
 	{"dropbox_connection", "offload_days", "INTEGER NOT NULL DEFAULT 0"}, // Dropbox stage 6b (#14845)
 	{"dropbox_connection", "offload_since", "TEXT"},
 	{"dropbox_connection", "offload_last_pass", "TEXT"},
+	{"dropbox_connection", "app_key", "TEXT NOT NULL DEFAULT ''"}, // the person's own Dropbox app key (#15638): a public client id, not a secret
 	// Where a Keep Full access choice came from (#14193): 'local' (every choice before this column, made at this computer) or 'hub'. A database made by a dev or beta build already has the table without it, and
 	// CREATE TABLE IF NOT EXISTS leaves that table alone, so without this entry every restart and wake failed on the new queries.
 	{"keep_full_access", "source", "TEXT NOT NULL DEFAULT 'local'"},
