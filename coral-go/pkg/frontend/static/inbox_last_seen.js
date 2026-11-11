@@ -6,7 +6,7 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 const MAX_PER_COMPUTER = 50, LINE_MAX = 140;
 const kept = new Map(); // computer id -> { at, label, rows: [{ kind, line }] }
 
-const clean = s => String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩﻿]/g, ' ').replace(/\s+/g, ' ').trim();
+const clean = s => String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, ' ').replace(/\s+/g, ' ').trim();
 const cut = s => { const c = clean(s); return c.length > LINE_MAX ? `${c.slice(0, LINE_MAX - 1)}…` : c; };
 const kindOf = s => s.operatorAsk ? 'Question' : s.proposal ? 'Proposal' : s.review ? 'File' : s.goalDone ? 'Goal' : s.skillReview ? 'Skill' : s.autorun ? 'Run' : 'Agent';
 

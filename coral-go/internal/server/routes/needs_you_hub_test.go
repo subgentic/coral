@@ -62,12 +62,12 @@ func hubRig(t *testing.T, fleet *fakeFleet, machines ...store.RemoteServer) *Boa
 func TestHubNeedsYouMergesComputersQualifiesIdsAndSumsCounts(t *testing.T) {
 	fleet := &fakeFleet{asked: map[string]string{}, answers: map[string]func(http.ResponseWriter, *http.Request){
 		"lab": okJSON(`{"count":3,"counts":{"agent":2,"question":1,"bogus":9},"items":[
-		  {"kind":"agent","from":"Dev‮","line":"a\u0007b @all ` + strings.Repeat("x", 400) + `","team":"t","id":"agent:z","at":"2026-11-10T12:00:00Z","goal_title":"G‮1","extra":"dropped","link":"https://evil.example"},
+		  {"kind":"agent","from":"Dev\u202e","line":"a\u0007b @all ` + strings.Repeat("x", 400) + `","team":"t","id":"agent:z","at":"2026-11-10T12:00:00Z","goal_title":"G\u202e1","extra":"dropped","link":"https://evil.example"},
 		  {"kind":"nonsense","line":"x","id":"q:9"},
 		  {"kind":"question","from":"Lead","line":"ok?","team":"t","id":"ask:5","at":"2026-11-10T12:01:00Z","goal_id":-4,"task_id":7}]}`),
 	}}
 	h := hubRig(t, fleet,
-		store.RemoteServer{ID: "lab", Label: "Lab‮", Status: "online"},
+		store.RemoteServer{ID: "lab", Label: "Lab\u202e", Status: "online"},
 		store.RemoteServer{ID: "attic", Label: "Attic", Status: "offline"})
 	code, out := readNeedsYou(t, h, "", asDashSession)
 	require.Equal(t, http.StatusOK, code, out)
@@ -92,7 +92,7 @@ func TestHubNeedsYouMergesComputersQualifiesIdsAndSumsCounts(t *testing.T) {
 	assert.Equal(t, "lab/agent:z", lab["id"])
 	for _, f := range []string{"from", "line", "goal_title"} {
 		s, _ := lab[f].(string)
-		assert.NotContains(t, s, "‮", f)
+		assert.NotContains(t, s, "\u202e", f)
 		assert.NotContains(t, s, "\u0007", f)
 		assert.LessOrEqual(t, len([]rune(s)), needsYouLineMax, f)
 	}
@@ -107,7 +107,7 @@ func TestHubNeedsYouMergesComputersQualifiesIdsAndSumsCounts(t *testing.T) {
 	assert.Equal(t, map[string]any{"id": "attic", "label": "Attic", "status": "offline"}, machines[0])
 	lm := machines[1].(map[string]any)
 	assert.Equal(t, "ok", lm["status"])
-	assert.NotContains(t, lm["label"], "‮")
+	assert.NotContains(t, lm["label"], "\u202e")
 	assert.Contains(t, out["not_included"], "unreachable_machines", "an offline computer is named")
 	assert.Equal(t, "/api/remote/lab/api/needs-you?limit=50", fleet.asked["lab"])
 	assert.NotContains(t, fleet.asked, "attic", "an offline computer is not asked")
