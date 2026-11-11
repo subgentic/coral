@@ -35,9 +35,12 @@ const { coralReady } = require('./helpers/wait');
         assert.match(await ev(`document.querySelector('#artifact-viewer .artifact-review-state, .artifact-review-state')?.textContent || ''`), /v2 is newer/);
         await close();
 
+        // the newest version's content arrives late (a slow disk or link, as on the Windows runner, #15629): the title already says version 2 while the body is still the old one or empty
+        const h2 = /[a-f0-9]{64}/.exec(v2.body.uri)[0];
+        await ev(`(() => { const f = window.fetch.bind(window); window.fetch = (u, o) => { const url = String(u && u.url || u); return /${h2}/.test(url) && !/versions/.test(url) ? new Promise(r => setTimeout(r, 1500)).then(() => f(u, o)) : f(u, o); }; return true; })()`); // sleep-ok: a deliberate slow answer from the server is the condition under test
         await openV(h1, 'openLatest: true');
         await waitFor(`/version 2/.test(document.querySelector('.artifact-viewer-title')?.textContent || '')`, 'a row opened from Needs you shows the newest version', 12000);
-        assert.ok((await ev(`document.querySelector('.artifact-viewer-body').textContent`)).includes('version two'), 'the body is v2');
+        await waitFor(`document.querySelector('.artifact-viewer-body').textContent.includes('version two')`, 'the body is v2 (the title names the version before its content has arrived)', 12000);
         console.log('PASS the review bar names the version it approves and a Needs you row opens the newest');
     } finally {
         if (sid) await ev(`fetch('/api/sessions/live/${encodeURIComponent(sname || '')}/kill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_type: 'terminal', session_id: ${JSON.stringify(sid)} }) }).then(() => true)`).catch(() => {});
