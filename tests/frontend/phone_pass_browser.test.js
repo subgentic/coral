@@ -3,7 +3,7 @@
 // than the screen, every control 44 px, the viewer's title readable and its sheet header on one row, a comment composer not under the keyboard (the visual viewport shrinks; a fake one drives mobile.js), and the back
 // gesture closing the overlays from the top: the comments sheet, then the viewer, then the preview's full screen. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
-const { quietLaunchNotice } = require('./helpers/launch_notice');
+const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_notice');
 const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
@@ -178,7 +178,7 @@ const LONG = 'worktree-agent-a1b2c3d4e5f60718/feature/calm-the-dashboard-remove-
     } catch (e) {
         console.error(e && e.stack || e);
         results.push(false);
-    } finally { await removeBoards(ev, [TEAM]).catch(() => {}); try { await client.close(); } catch (_) {} }
+    } finally { await removeBoards(ev, [TEAM]).catch(() => {}); await restoreLaunchNotice(ev); try { await client.close(); } catch (_) {} }
     const failed = results.filter(r => !r).length;
     console.log(failed ? `${failed} FAILED` : `PASS phone pass: ${results.length} checks`);
     process.exitCode = failed ? 1 : 0;

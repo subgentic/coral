@@ -7,7 +7,7 @@
 //   - the real model is shown by its display name from the list, else from the id: in the agent's hover tip and in the agent page's Details disclosure (#apd-model, #9837: the header does not carry it), never in the row (a row is one line, #9686).
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');
-const { quietLaunchNotice } = require('./helpers/launch_notice');
+const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_notice');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
 
@@ -178,6 +178,7 @@ const { coralReady } = require('./helpers/wait');
         console.log('\nPASS model picker and model labels');
     } finally {
         await guard.restore().catch(e => console.error('settings restore: ' + (e && e.message)));
+        await restoreLaunchNotice(ev);
         await client.close();
     }
 })().catch(e => { console.error(e); process.exitCode = 1; });

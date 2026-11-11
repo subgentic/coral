@@ -24,9 +24,9 @@ const BASE = require('./test_base').BASE;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/agents' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`document.documentElement.style.fontSize = '${fs}px'; localStorage.clear(); true`);
-            // the first-run permissions notice (#15079) has its own Tab stops (the summary, Dismiss, "I've read this"): read it first, as a keyboard user does, so the stops counted are the page's
+            // the first-run permissions notice (#15079) has its own Tab stops (the summary, Dismiss, "I've read this"): it is off the page before the stops are counted, which are the page's own
             await waitFor(`!!document.querySelector('.launch-disclosure-dismiss') || !!document.querySelector('.skip-link')`, `${tag}: the notice or the page`, 8000); await pause(600); // sleep-ok: the notice is read after first paint; there is no event for "none coming"
-            await ev(`(() => { const d = document.querySelector('.launch-disclosure-dismiss'); if (d) d.click(); return true; })()`); await waitFor(`!document.getElementById('launch-disclosure-banner')`, `${tag}: the notice is read`, 5000);
+            await ev(`document.getElementById('launch-disclosure-banner')?.remove(); true`); // taken off the page, not acknowledged: that would write launch_disclosure_ack on the shared server (a leak, --fail-on-leak)
             // 1. no agent open: the link is not offered
             await ev(`window.__m.agents = {}; window.__m.add('kb-a', 'A', 3, { sleeping: false, session_id: 'kb-a-id' }); true`); await pause(500); // sleep-ok: a key press or a dialog opening has no event; the check after it reads what is on screen
             check(`${tag}: no open agent: the skip link is hidden`, (await ev(`document.querySelector('.skip-link').hidden`)) === true && (await ev(`document.querySelector('.skip-link').getClientRects().length`)) === 0);
