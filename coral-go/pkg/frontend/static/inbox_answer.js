@@ -104,8 +104,9 @@ async function readAsk(s) {
     const held = !permission && !onlyReject && picks.length < selectable.length;
     const target = permission && typeof po.target === 'string' ? po.target : ''; // what the permission wants to run, as the server read it whole (#14173)
     // The row draws ALL of it, wrapped, and a Yes is a button only while the drawn block is not clipped (measured after layout and on resize, in fill): a request the row cannot show whole is refused or opened in the agent, never allowed blind (#14173, UI Reviewer and Security).
+    const autoBlockAt = permission && typeof po.auto_block_at === 'string' ? po.auto_block_at : ''; // when Claude Code's own timer blocks the request by itself (#15140)
     const targetNote = permission && typeof po.target_note === 'string' ? stepClean(po.target_note).slice(0, 240) : '';
-    return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks, onlyReject, held, question: stepClean(po.question).slice(0, 120), target, targetNote } : { ...none, target, targetNote };
+    return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks, onlyReject, held, question: stepClean(po.question).slice(0, 120), target, targetNote, autoBlockAt } : { ...none, target, targetNote, autoBlockAt };
 }
 
 /** The agent's whole question for a row's Show all (#14637): what the chat card says, as one clean line, up to 4096 characters; '' when the read is refused or the agent asks nothing now. Read on the click only. */
@@ -228,7 +229,7 @@ const stillArming = b => !!b._armEntry && Date.now() < b._armEntry.at;
 function fill(s, cell, withDismiss = true) {
     const key = askKey(s);
     if (!read.has(key)) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false })));
-    return read.get(key).then(({ ask, picks, onlyReject, held, trustWhy, step, stepFull, question, later, lines, trust, rateLimit, browser, target, targetNote }) => {
+    return read.get(key).then(({ ask, picks, onlyReject, held, trustWhy, step, stepFull, question, later, lines, trust, rateLimit, browser, target, targetNote, autoBlockAt }) => {
         cell._cmdObserver?.disconnect(); cell._cmdObserver = null; // the earlier block's observer goes with the block (#14173)
         cell.replaceChildren();
         const said = norm => String(norm || '').replace(/[?\s]+$/, '');
@@ -283,11 +284,16 @@ function fill(s, cell, withDismiss = true) {
         }
         gate?.apply();
         if (held) { const more = document.createElement('span'); more.className = 'inbox-only-reject'; more.textContent = trustWhy ? `No Yes here: ${trustWhy} Open the agent to answer.` : 'More choices: open the agent.'; cell.append(more); } // some of the question's choices are left to Open: said, so these do not read as all of them
-        if (onlyReject) { // said in words, set as text: the full request is under Open
+        if (onlyReject) { // said in words, set as text: the full request is under Open; with the time Claude Code's own timer blocks it, and one tap to the agent
             const note = document.createElement('span');
             note.className = 'inbox-only-reject';
-            note.textContent = 'It can only be rejected here. Open the agent to read it.';
-            cell.append(note);
+            const t = autoBlockAt ? new Date(autoBlockAt) : null, at = t && !Number.isNaN(t.getTime()) ? t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : '';
+            note.textContent = `It can only be rejected here. Open the agent to read it${at ? `; Claude Code blocks it on its own at ${at}` : ''}.`;
+            const o = document.createElement('button'); o.type = 'button'; o.className = 'btn btn-small inbox-open-agent'; o.textContent = 'Open agent';
+            o.setAttribute('aria-label', `Open ${resolveSessionIdentity(s)} to read the request`);
+            o.addEventListener('click', e => { e.stopPropagation(); openAgent(s); });
+            o.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
+            cell.append(note, o);
         }
         if (!picks.length && !held && !onlyReject) { // nothing here can be answered (Claude's 'Is this a project you trust?' is such a prompt): the way on is the agent's own chat, one click away; nothing is typed for the person (#12346)
             const o = document.createElement('button'); o.type = 'button'; o.className = 'btn btn-small inbox-open-agent'; o.textContent = 'Open agent';
