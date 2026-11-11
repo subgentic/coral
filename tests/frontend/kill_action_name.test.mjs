@@ -17,7 +17,7 @@ for (const f of fs.readdirSync(STATIC).filter(n => n.endsWith('.js'))) {
         kills++;
         let body = m[1].replace(/\$\{(_mk\d+)\}/g, (_, k) => consts[k] || '');
         const label = body.replace(/<[^>]*>/g, ' ').replace(/\$\{[^}]*\}/g, ' ').replace(/\s+/g, ' ').trim();
-        if (!/(^|\s)Kill Session$/.test(label)) bad.push(`${f}: an agent-kill menu item is labelled "${label.slice(-40)}", not Kill Session`);
+        if (!/(^|\s)Kill [Ss]ession$/.test(label)) bad.push(`${f}: an agent-kill menu item is labelled "${label.slice(-40)}", not Kill session`); // menus are sentence case since #15286: 'Kill session' is the same name
     }
     if (/>\s*Remove Agent\s*</.test(src) || /\\n\s*Remove Agent\\n/.test(src)) bad.push(`${f}: a button is named Remove Agent`);
 }

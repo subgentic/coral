@@ -7,8 +7,6 @@
 import { state } from './state.js';
 import { updateTerminalTheme, applySettingsFont } from './xterm_renderer.js';
 import { browserLocal } from './safe_storage.js';
-import { isCloud } from './server_base.js';
-import { onBuilt } from './lazy_dom.js';
 // What Save sends: only the fields the person changed (here so the module is loaded at startup, import_hygiene).
 export { changedSettings } from './settings_diff.js';
 export { savedWords } from './settings_saved_words.js'; // the Save toast's words, here for the same reason
