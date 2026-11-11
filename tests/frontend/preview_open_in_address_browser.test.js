@@ -6,6 +6,7 @@ const BASE = require('./test_base').BASE;
 const { STUB, HEX } = require('./helpers/comments_scale');
 const { coralReady } = require('./helpers/wait');
 
+const AID = '00000000-0000-4000-8000-0000000015a1'; // a session id is a UUID: the address refuses any other
 const URI = `coral://artifacts/${HEX}`;
 const COMMENTS = [
     { id: 7, parent_id: null, anchor: { whole: true }, body: 'Please check the first line.', author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: '2026-10-22T00:00:00Z' },
@@ -21,7 +22,7 @@ const FIXTURE = { filename: 'release-notes.md', content: '# Release notes\n\nThe
     const q = () => ev(`(() => { const p = new URLSearchParams(location.search); return { path: location.pathname, open: p.get('open'), thread: p.get('thread') }; })()`);
     const drawn = () => waitFor(`/Release notes/.test((document.getElementById('preview-body') || {}).textContent || '')`, 'the artifact drawn', 10000);
     // The same mock agent on every document: the reload is a new page, and its preload script seeds the agent again before the dashboard starts.
-    const seedSource = `window.__qaSeed = [{ name: 'tb-agent', prefix: 'T', n: 3, sleeping: false }];`;
+    const seedSource = `window.__qaSeed = [{ name: 'tb-agent', prefix: 'T', n: 3, sleeping: false, session_id: '${AID}' }];`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.addScriptToEvaluateOnNewDocument({ source: seedSource });
@@ -30,8 +31,8 @@ const FIXTURE = { filename: 'release-notes.md', content: '# Release notes\n\nThe
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
-            await ev(`window.__m.seed(); true`);
-            await ev(`Promise.all([import(${S} + 'nav.js')]).then(([n]) => n.go({ view: 'agents', id: 'tb-agent-id', server: null, sub: null })).then(() => true)`);
+            await ev(`window.__m.seed(); true`); await sleep(600); // sleep-ok: the live list takes the seeded agent
+            await ev(`window.selectLiveSession('tb-agent', 'claude', ${JSON.stringify(AID)}, 'local'); true`);
             await waitFor(`location.pathname.startsWith('/agents/')`, 'the agent page', 8000);
             await ev(`import(${S} + 'state.js').then(m => { m.state.selectedTeam = 'tb-team'; return true; })`);
             await ev(STUB(FIXTURE));
@@ -54,24 +55,24 @@ const FIXTURE = { filename: 'release-notes.md', content: '# Release notes\n\nThe
 
             // a reload (the same address) opens the same artifact and the same thread
             const here = await ev(`location.pathname + location.search`);
+            const stubId = (await Page.addScriptToEvaluateOnNewDocument({ source: STUB(FIXTURE) })).identifier; // in place before the dashboard starts: it asks for the artifact at once
             await Page.navigate({ url: BASE + here }); await Page.loadEventFired(); await install();
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.__m.seed(); true`);
-            await ev(STUB(FIXTURE));
             await drawn();
             await waitFor(`!!document.querySelector('.ac-card.ac-active[data-id="9"]')`, 'the thread open again', 10000);
             v = await q();
             check(`${tag}: a reload shows the same artifact with the same thread open, and the address is the same`, v.open === URI && v.thread === '9', JSON.stringify(v));
 
             // closing the viewer takes the file and the thread out of the address
-            await ev(`(() => { const x = document.querySelector('#preview-tabs .preview-tab-close'); if (x) x.click(); return !!x; })()`);
+            await ev(`(() => { const x = document.querySelector('#preview-pane .preview-tab-close'); if (x) x.click(); return !!x; })()`);
             await waitFor(`new URLSearchParams(location.search).get('open') === null`, 'the address cleared', 6000);
             v = await q();
             check(`${tag}: closing the viewer clears open and thread`, v.open === null && v.thread === null && v.path.startsWith('/agents/'), JSON.stringify(v));
 
             // a link that names something else opens nothing
             for (const bad of ['?open=javascript:alert(1)', '?open=data:text/html,x', '?open=coral://artifacts/zz', `?open=${encodeURIComponent(URI)}&thread=abc`]) {
-                await Page.navigate({ url: BASE + '/agents/tb-agent-id' + bad }); await Page.loadEventFired(); await install();
+                await Page.navigate({ url: BASE + '/agents/' + AID + bad }); await Page.loadEventFired(); await install();
                 await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
                 await ev(`window.__m.seed(); true`);
                 await sleep(900); // sleep-ok: a negative: nothing may open, so there is nothing to wait for

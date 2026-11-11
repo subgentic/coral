@@ -37,6 +37,10 @@ function write(change) {
 export function keep(tab) {
     const on = tab && (tab.kind === 'file' || (tab.kind === 'artifact' && ARTIFACT.test(tab.filepath || ''))) && tab.filepath;
     write(p => { if (on) { if (p.get('open') !== on) p.delete('thread'); p.set('open', on); } else { p.delete('open'); p.delete('thread'); } });
+    if (!on) { // a phone's closed viewer gives its history entries back one Back later (overlay_history.js): the entry it lands on still names the file, so that landing is cleaned too
+        const clean = () => write(p => { p.delete('open'); p.delete('thread'); });
+        addEventListener('popstate', clean, { once: true }); setTimeout(() => removeEventListener('popstate', clean), 1500);
+    }
 }
 
 /** The comments panel's active thread (or none) is the address's `thread`, only beside an `open` artifact. */
@@ -49,6 +53,7 @@ export async function restore(search) {
     const want = parseOpen(search);
     const s = state.currentSession;
     if (!want || !s || s.type !== 'live') return;
+    write(p => { p.delete('open'); p.delete('thread'); }); // the entry the page loaded at is the page without the file: on a phone the viewer is an entry of its own on top of it, and Back (or closing the viewer) returns here
     if (want.thread != null) pending = { uri: want.path.toLowerCase(), id: want.thread };
     const { openFilePreview } = await importOnce('./changed_files.js');
     openFilePreview(want.path);
