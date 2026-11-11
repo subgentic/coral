@@ -136,6 +136,9 @@ export function attachVersions(dialog, hooks) {
         if (!latest && hooks.wantLatest?.()) { choose(rows[total - 1]); return; } // opened from Needs you: the newest version, not the one the row was made for
         const files = new Set(rows.map(r => r.name).filter(Boolean)).size; // one series can hold several files (a task's chain, #12144): a decision on the newest covers them all (#15233)
         dialog.dataset.coversFiles = files > 1 ? String(files) : '';
+        if (st.seenOf !== rows[0].digest) { st.seenOf = rows[0].digest; st.seen = new Set(); } // the versions shown since this series opened: a file none of whose versions was shown has not been opened (#15254)
+        st.seen.add(row.digest);
+        dialog.dataset.unopenedFiles = files > 1 ? String([...new Set(rows.map(r => r.name).filter(Boolean))].filter(n => !rows.some(r => r.name === n && st.seen.has(r.digest))).length) : '';
         dialog.dataset.shownVersion = String(row.version); dialog.dataset.newerVersion = latest ? '' : String(rows[total - 1].version); dialog.dispatchEvent(new CustomEvent('av-version')); // the review bar names the version it approves (#15197)
         const prev = btn('av-prev av-icon', '◀', 'Previous version'); prev.setAttribute('aria-disabled', String(i === 0));
         prev.addEventListener('click', () => stepTo(-1));
