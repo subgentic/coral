@@ -76,7 +76,7 @@ var (
 // knowledgeText makes an error or name safe to show: one line, no file paths, no secrets, bounded.
 func knowledgeText(s string, max int) string {
 	// a CLI's output can echo a key: the tab keeps the failure on screen, through the one set of rules (#15272, Security's INFO); if they cannot be applied, the text is not shown
-	if red, err := secrets.CredentialRedactor().Text([]byte(s)); err == nil {
+	if red, err := secrets.Redactor().Text([]byte(s)); err == nil {
 		s = string(red)
 	} else {
 		s = "<hidden>"

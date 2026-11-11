@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -66,7 +65,7 @@ func TestSaveKnowledgeSaysWhenItRedacted(t *testing.T) {
 
 // #15272 (Security's INFO): a failed run's error stays on the Knowledge tab, so a key a CLI echoed in it is replaced like the rest of what the status carries.
 func TestAKnowledgeStatusErrorNeverCarriesAKey(t *testing.T) {
-	token := "ghp_" + strings.Repeat("aB3", 12) // built at run time: no key-shaped literal in the repo
+	token := "ghp_" + "A1b2C3d4E5" + "A1b2C3d4E5A1b2C3d4E5F6g7H8" // built at run time: no key-shaped literal in the repo; entropy enough for the one set of rules (internal/secrets) to call it a key, which a repeated aB3 is not
 	j := knowledgeJob{TeamName: "t", Status: "failed", Error: "claude CLI failed: exit status 1: bad token " + token,
 		FailedAgents: []background.DistillFailure{{Agent: "Ada", Error: "denied for " + token}}}
 	out := j.status()

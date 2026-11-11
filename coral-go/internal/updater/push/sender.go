@@ -304,9 +304,9 @@ func Run(ctx context.Context, c Config) Result {
 	c.say("verified %s here; sending", staged.Version)
 	pr, pw := io.Pipe()
 	go func() {
+		defer safego.Recover("updater push: stream the release")
 		streamErr := errors.New("the release stream stopped before it ended") // what the reader sees if Write panics (Recover keeps the server up)
 		defer func() { pw.CloseWithError(streamErr) }()
-		defer safego.Recover("updater push: stream the release")
 		streamErr = Write(pw, asset, files)
 	}()
 	if _, err := c.Runner.Run(ctx, p.Bin+" receive --version "+staged.Version, pr); err != nil {
