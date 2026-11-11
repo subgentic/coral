@@ -236,3 +236,33 @@ func TestStartupEmptiesWhatAnEarlierRunLeft(t *testing.T) {
 	me.p.SetUploadDir(root)
 	assert.Empty(t, filesUnder(t, root))
 }
+
+// #15699 (Security's SHOULD on #15691): a cancel or an expiry that lands between the moment an upload is read and the moment it is recorded must not panic (the plan's table was emptied) or leave a file behind: the late upload is refused cleanly.
+func TestACancelLandingWhileAnUploadArrivesRefusesItCleanly(t *testing.T) {
+	me := newManageEnv(t)
+	plan, root := me.upgradeWithUploads(t)
+	p := me.p.plan(plan)
+	require.NotNil(t, p)
+	me.p.beforeUploadCommit = func(pp *provisionPlan) { pp.removeUploads() } // the cancel lands exactly here
+	code, v := me.upload(true, plan, "package", []byte("pkg"))
+	assert.Equal(t, 409, code, "%v", v)
+	assert.Empty(t, filesUnder(t, root), "the late upload left a file")
+	assert.Empty(t, p.uploadsViewLockedCopy(), "the plan holds nothing")
+}
+
+func TestAnUploadToAPlanWhoseFilesWereRemovedIsRefusedAndMakesNoFolder(t *testing.T) {
+	me := newManageEnv(t)
+	plan, root := me.upgradeWithUploads(t)
+	me.p.plan(plan).removeUploads() // cancelled or expired before any file arrived
+	code, v := me.upload(true, plan, "package", []byte("pkg"))
+	assert.Equal(t, 409, code, "%v", v)
+	entries, _ := os.ReadDir(root)
+	assert.Empty(t, entries, "a plan that is over made a folder for the file")
+}
+
+// uploadsViewLockedCopy is uploadsViewLocked taken under the plan's lock (for tests).
+func (p *provisionPlan) uploadsViewLockedCopy() map[string]any {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.uploadsViewLocked()
+}

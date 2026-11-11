@@ -29,7 +29,11 @@ const (
 type provisionUploads struct {
 	dir   string                  // the plan's 0700 folder, "" until the first upload
 	files map[string]uploadedFile // by kind: "package", "sums", "bundle"
+	// closed is set when the plan's files were removed (the run ended, the plan was cancelled or expired): a later upload is refused cleanly, never written to the emptied table (#15699, Security's SHOULD)
+	closed bool
 }
+
+var errUploadsClosed = errors.New("the plan's uploads are closed")
 
 type uploadedFile struct {
 	path   string
@@ -92,6 +96,10 @@ func (pr *Provisioner) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	dir, err := p.uploadDirLocked(root)
+	if errors.Is(err, errUploadsClosed) {
+		errConflict(w, "this setup was cancelled or has expired")
+		return
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "", "could not hold the uploaded file")
 		return
@@ -122,7 +130,15 @@ func (pr *Provisioner) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	final := filepath.Join(dir, kind)
+	if pr.beforeUploadCommit != nil { // test seam: lets a test land a cancel or an expiry exactly here
+		pr.beforeUploadCommit(p)
+	}
 	p.mu.Lock()
+	if p.uploads.closed || p.uploads.dir != dir || p.uploads.files == nil { // the plan's files were removed while this one arrived: refuse; the temporary file is removed by the defer above
+		p.mu.Unlock()
+		errConflict(w, "this setup was cancelled or has expired")
+		return
+	}
 	if p.phase == phaseRunning || p.phase == phaseTrusting || p.phase == phaseDone || p.phase == phaseFailed { // it started while the file arrived
 		p.mu.Unlock()
 		errConflict(w, "this setup has already started")
@@ -143,6 +159,9 @@ func (pr *Provisioner) Upload(w http.ResponseWriter, r *http.Request) {
 func (p *provisionPlan) uploadDirLocked(root string) (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if p.uploads.closed {
+		return "", errUploadsClosed
+	}
 	if p.uploads.dir != "" {
 		return p.uploads.dir, nil
 	}
@@ -168,7 +187,7 @@ func (p *provisionPlan) uploadDirLocked(root string) (string, error) {
 func (p *provisionPlan) removeUploads() {
 	p.mu.Lock()
 	d := p.uploads.dir
-	p.uploads.dir, p.uploads.files = "", nil
+	p.uploads.dir, p.uploads.files, p.uploads.closed = "", nil, true
 	p.mu.Unlock()
 	if d != "" {
 		_ = os.RemoveAll(d)

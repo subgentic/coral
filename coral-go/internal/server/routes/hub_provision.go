@@ -251,12 +251,13 @@ type Provisioner struct {
 	startRemote func(ctx context.Context, p *provisionPlan) (instanceID, key string, err error)
 	checkHealth func(ctx context.Context, rs *store.RemoteServer, key string) RemoteHealth
 	// installOwner puts the secret this hub signs the computer's owner stamps with on the computer (#11378), by the far Coral's own command, the secret on stdin; a variable for tests.
-	installOwner func(ctx context.Context, p *provisionPlan, secret string) error
-	version      string                  // the release this hub runs and the only one it installs (config.Version; a test sets its own)
-	onRemoved    func(id string)         // a remove took the server out of the registry
-	notify       func(id, status string) // tells the hub's remote workers a server was added (the same hook the registry's edits use)
-	startedAt    time.Time
-	uploadRoot   string // where uploaded packages are held (SetUploadDir); "" refuses uploads
+	installOwner       func(ctx context.Context, p *provisionPlan, secret string) error
+	version            string                  // the release this hub runs and the only one it installs (config.Version; a test sets its own)
+	onRemoved          func(id string)         // a remove took the server out of the registry
+	notify             func(id, status string) // tells the hub's remote workers a server was added (the same hook the registry's edits use)
+	startedAt          time.Time
+	beforeUploadCommit func(p *provisionPlan) // test seam (hub_provision_upload.go)
+	uploadRoot         string                 // where uploaded packages are held (SetUploadDir); "" refuses uploads
 	// eula says whether this tier asks for the terms and whether this hub's own EULA marker holds the current version and digest. A variable so a test does not read the real marker.
 	eula func() (required, accepted bool)
 }
