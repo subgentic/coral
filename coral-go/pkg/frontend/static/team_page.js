@@ -474,7 +474,7 @@ async function openTaskById(id) {
     const backLabel = fromGoal ? (shortLabel(history.state?.from) || 'Goal') : 'Tasks';
     origin.hidden = true;
     host.hidden = false;
-    m.renderTaskPage(host, full, {
+    (full ? m.renderTaskPage : m.renderTaskGone)(host, full || { id }, {
         project: S.team, backLabel,
         openGoal: (id) => { closeItem(false); openGoalPage(id); },
         openTask: (t) => openTask(S.team, t.id), // a follow-up listed on the task's page

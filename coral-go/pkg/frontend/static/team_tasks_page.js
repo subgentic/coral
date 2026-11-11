@@ -381,6 +381,16 @@ function followUpOfLine(parentId, ctx) {
     return p;
 }
 
+/** A task that cannot be read (deleted, or not this team's, #15198): the page says so and has its way back, not a blank panel. */
+export function renderTaskGone(host, task, ctx) {
+    host.replaceChildren(); host.setAttribute('aria-label', `Task ${task.id}`);
+    const back = el('button', 'back-link goals-back'); back.type = 'button'; back.addEventListener('click', () => ctx.onBack());
+    const arrow = el('span', 'goals-back-arrow', '←'); arrow.setAttribute('aria-hidden', 'true'); back.append(arrow, el('span', null, ` ${ctx.backLabel}`));
+    const h = el('h2', 'goals-detail-title', `Task #${task.id} cannot be shown`); h.tabIndex = -1;
+    host.append(el('div', 'goals-page team-task-page', ''));
+    host.firstChild.append(back, h, el('p', 'goals-note', 'It may have been deleted, or it belongs to another team.')); h.focus();
+}
+
 export function renderTaskPage(host, task, ctx, mode = 'view') {
     host._taskConversation?.destroy({ keepDrafts: true });
     host._taskConversation = null;
