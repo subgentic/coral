@@ -561,6 +561,11 @@ export function createArtifactsList({ inbox = false } = {}) {
             ['Source', item.source], ['References', item.reference_count],
         ];
         const actions = [];
+        // Approve from the panel, whichever of its two buttons is pressed (the header's, #15120 walk 3 N4, and the actions bar's, #15338): one routine that sends the decision, retags the row and opens the sheet again, so the other button goes too (#15601: the header's Approve left the bar's Approve on an approved file)
+        const approveHere = () => importOnce('./artifact_review.js').then(async m => {
+            const out = await m.approveRow(inbox ? item.board_id : model.project, { id: hex, hex, name, team: inbox ? item.board_id : model.project, series_id: item.series_id, version: item.version });
+            m.sayApproved(name, out); const tags = (item.tags || []).filter(t => t !== REVIEW && t !== 'changes requested' && t !== 'read').concat('approved'); retag(hex, tags); openArtifactSheet({ ...item, tags, review: { state: 'approved', at: out.review?.at || new Date().toISOString() } }, opener, { focus: false }); // the panel says Approved at once
+        });
         if (link) {
             if (link.inline) actions.push({ label: 'Open', primary: true, run: () => importOnce('./preview_pane.js').then(m => m.openArtifactTab(item.uri || '', { server: link.server, board: splitKey(inbox ? item.board_id : model.project).name, contentURL: item.content_url, mediaType: item.media_type, filename: name, phoneFull: true })) });
             else if (hex) actions.push({ label: 'Open', primary: true, run: () => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hex, { server: link.server, filename: name, mediaType: item.media_type, fileId: item.file_id, versionLine: item.version_line, board: splitKey(inbox ? item.board_id : model.project).name, ...(item.produced_by ? { uploader: { role: String(item.produced_by), hex, server: link.server, board: splitKey(inbox ? item.board_id : model.project).name, seriesId: String(item.series_id || '') } } : {}), ...(item.goal_id && item.goal_title ? { goal: String(item.goal_title), goalId: String(item.goal_id), goalTeam: inbox ? item.board_id : model.project } : {}) }), () => window.open(link.url, '_blank', 'noopener,noreferrer')) });
@@ -579,10 +584,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             }
             if (hex && !isUnverified(item) && (item.tags || []).includes(REVIEW)) { // the panel says 'Waiting for your review': the decision is here too, not only in the viewer and Needs you (#15338, walk 23)
                 const asked = (item.tags || []).includes('changes requested');
-                actions.push({ label: asked ? 'Approve anyway' : 'Approve', primary: true, title: asked ? 'Approve this version as it is' : 'Approve it: it leaves Needs you and the agent is told', run: () => importOnce('./artifact_review.js').then(async m => {
-                    const out = await m.approveRow(inbox ? item.board_id : model.project, { id: hex, hex, name, team: inbox ? item.board_id : model.project, series_id: item.series_id, version: item.version });
-                    m.sayApproved(name, out); const tags = (item.tags || []).filter(t => t !== REVIEW && t !== 'changes requested' && t !== 'read').concat('approved'); retag(hex, tags); openArtifactSheet({ ...item, tags, review: { state: 'approved', at: out.review?.at || new Date().toISOString() } }, opener, { focus: false }); // the panel says Approved at once
-                }).catch(e => showToast(e.message, true)) });
+                actions.push({ label: asked ? 'Approve anyway' : 'Approve', primary: true, title: asked ? 'Approve this version as it is' : 'Approve it: it leaves Needs you and the agent is told', run: () => approveHere().catch(e => showToast(e.message, true)) });
             }
             if (hex && local()) {
                 const on = model.kept.has(hex);
@@ -601,10 +603,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             if (reviewText === 'Waiting for your review' && local()) { // review from the list, in two clicks (walk 3 N4): Approve here; Request changes opens the viewer's form
                 const team = inbox ? item.board_id : model.project, row = { ...item, id: hex, hex, team, name }, acts = document.createElement('div'); acts.className = 'artifact-sheet-review'; acts.setAttribute('role', 'group'); acts.setAttribute('aria-label', 'Review this file');
                 const approve = document.createElement('button'); approve.type = 'button'; approve.className = 'btn btn-primary'; approve.textContent = 'Approve';
-                approve.addEventListener('click', async () => {
-                    approve.disabled = true;
-                    try { const R = await importOnce('./artifact_review.js'); R.sayApproved(name, await R.approveRow(team, row)); line.textContent = 'Approved just now'; acts.remove(); refreshQuiet(); } catch (e) { showToast(e.message, true); approve.disabled = false; }
-                });
+                approve.addEventListener('click', async () => { approve.disabled = true; try { await approveHere(); } catch (e) { showToast(e.message, true); approve.disabled = false; } });
                 const changes = document.createElement('button'); changes.type = 'button'; changes.className = 'btn'; changes.textContent = 'Request changes';
                 changes.addEventListener('click', () => { const open = actions.find(x => x.label === 'Open'); open?.run(); const t0 = Date.now(), tick = () => { const b = document.querySelector('#artifact-viewer .artifact-review-changes:not([hidden])'); if (b) b.click(); else if (Date.now() - t0 < 4000) setTimeout(tick, 100); }; tick(); }); // sleep-ok: waits for the viewer to draw its own button
                 acts.append(approve, changes); head.append(acts);
