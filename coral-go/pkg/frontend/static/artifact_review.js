@@ -244,6 +244,7 @@ export function attachReview(d, { reload }) {
     d.addEventListener('av-version', () => { armed = false; if (cur) paintApprove(); }); // another version shown: the question is asked again
     const show = (s) => {
         cur = s; armed = false;
+        form.querySelector('label').textContent = s && s.row.produced_by ? `What should change? ${shown(s.row.produced_by)}, who uploaded this file, will get it.` : 'What should change?'; // the box says who gets the request (walk 17 M13)
         const waiting = !!s && (s.state === 'pending' || s.state === 'changes');
         const pending = waiting && !decisionNeedsPerson(s.server); // a remote of a self-hosted hub: the decision is made on that machine's own dashboard (#11372)
         bar.hidden = !s;

@@ -10,6 +10,13 @@ Each answer names the button as it reads on screen. The topics after this one go
 2. Click **Add agent** (top right of the team's page). The same item is in the **⋯** menu beside the team's name, as **Add Agent**.
 3. The dialog already knows the team and its folder. Pick a persona (or skip it), choose the agent, then press **Launch**. The new agent joins the team's message board.
 
+## Give the team a second goal
+
+1. In the **Agents** list, click the team's name to open its page, then open its **Goals** tab.
+2. Click **New goal**.
+3. Name the goal, say what should be true when it is done, and add a **Done when** line (one thing you can check). Choose the agent who looks after it under **Driver**.
+4. Press **Create goal**. The team works on both goals; each goal page shows its own tasks and files.
+
 ## Change the default model
 
 1. Click the gear at the top right to open **Settings**, then **Agents**.
