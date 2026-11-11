@@ -274,7 +274,7 @@ const hovering = () => hoverOver && hoverHeldSince !== null ? Date.now() - hover
 function showHeldNote() {
     const host = document.getElementById('group-table-view');
     if (!host || host.querySelector('.group-table-held')) return;
-    const n = document.createElement('p'); n.className = 'item-meta group-table-held'; n.setAttribute('role', 'status'); n.textContent = 'New items are waiting. They appear in a moment, or when you move the pointer away.';
+    const n = document.createElement('p'); n.className = 'item-meta group-table-held'; n.setAttribute('role', 'status'); n.textContent = 'The list has changed. It updates in a moment, or when you move the pointer away.';
     host.append(n); // under the table, sticky at the bottom of the view: a line above it would itself move the rows it is meant to hold still
 }
 function leaveList() { hoverOver = false; const k = deferredKind, had = hoverHeldSince !== null; hoverHeldSince = null; document.querySelectorAll('.group-table-held').forEach(n => n.remove()); if (k && had && !holding()) { deferredKind = null; setTimeout(() => refreshGroupTable(k), 0); } }
