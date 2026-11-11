@@ -2,7 +2,7 @@
 //  1. "Skip to message box" is a Tab stop only while the message box is on screen (it was the second stop of every page, and Enter on it went nowhere without an open agent); with an agent open it is there and lands the focus in the box.
 //  2. (A pin, not a fix: the audit's finding was a false alarm. 'Updates' lives in the General tab, so the focus was on the selected tab all along; for every group the focus is on the selected tab, checked here for Terminal.)
 //  3. The New goal title shows the standard 2 px focus ring when a key reaches it (its 1 px underline was the only mark).
-// 1280 px and 200% text, isolated dev server, mock agents.
+// 1280 px at 100% and 1600 px at 200% text, isolated dev server, mock agents.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -19,11 +19,14 @@ const BASE = require('./test_base').BASE;
     const stops = async n => { await ev(`document.activeElement && document.activeElement.blur(); window.scrollTo(0, 0); (() => { const a = [...document.querySelectorAll('a')].find(x => /Skip to main content/.test(x.textContent)); if (a) a.focus(); })(); true`); const out = ['(start: skip to main content)']; for (let i = 0; i < n; i++) { await key('Tab'); await sleep(20); out.push(await ev(`(() => { const e = document.activeElement; return e && e !== document.body ? ((e.textContent || e.getAttribute('aria-label') || e.id || e.tagName).trim().replace(/\\s+/g, ' ').slice(0, 40)) : 'BODY'; })()`)); } return out; };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [w, h, mobile, fs] of [[1280, 900, false, 16], [1280, 900, false, 32]]) {
+        for (const [w, h, mobile, fs] of [[1280, 900, false, 16], [1600, 900, false, 32]]) { // 200% text at 1600 px: the sidebar is 18 rem there (cdfc3d8ea), so at 1280 it goes to its rail beside an open agent and its link is not on screen
             const tag = `${w} px ${fs === 32 ? '200% text' : '100%'}`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/agents' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`document.documentElement.style.fontSize = '${fs}px'; localStorage.clear(); true`);
+            // the first-run permissions notice (#15079) has its own Tab stops (the summary, Dismiss, "I've read this"): read it first, as a keyboard user does, so the stops counted are the page's
+            await waitFor(`!!document.querySelector('.launch-disclosure-dismiss') || !!document.querySelector('.skip-link')`, `${tag}: the notice or the page`, 8000); await pause(600); // sleep-ok: the notice is read after first paint; there is no event for "none coming"
+            await ev(`(() => { const d = document.querySelector('.launch-disclosure-dismiss'); if (d) d.click(); return true; })()`); await waitFor(`!document.getElementById('launch-disclosure-banner')`, `${tag}: the notice is read`, 5000);
             // 1. no agent open: the link is not offered
             await ev(`window.__m.agents = {}; window.__m.add('kb-a', 'A', 3, { sleeping: false, session_id: 'kb-a-id' }); true`); await pause(500); // sleep-ok: a key press or a dialog opening has no event; the check after it reads what is on screen
             check(`${tag}: no open agent: the skip link is hidden`, (await ev(`document.querySelector('.skip-link').hidden`)) === true && (await ev(`document.querySelector('.skip-link').getClientRects().length`)) === 0);

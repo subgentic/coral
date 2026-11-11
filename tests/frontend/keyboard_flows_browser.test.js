@@ -104,6 +104,7 @@ const { settle, coralReady } = require('./helpers/wait');
         await ev(`${BTN}.focus(); true`);
         await key('Enter', 13);
         await waitFor(`document.activeElement.closest('.sidebar-kebab-menu') !== null`, 'Enter moves the focus into the menu', 4000);
+        await ev(`import((window.__coralStatic || '/static/') + 'import_once.js').then(m => m.importOnce('./kebab_keys.js')).then(() => true)`); // the menu's keys are a lazy module (#15445), loaded as the menu first opens: Down is pressed once it is there
         let w = await where(); assert.ok(w.inMenu && w.expanded === 'true' && w.shown, JSON.stringify(w));
         const first = w.text;
         await key('ArrowDown', 40); w = await where(); assert.ok(w.inMenu && w.text !== first, 'Down moves to the next item: ' + JSON.stringify(w));
@@ -115,15 +116,16 @@ const { settle, coralReady } = require('./helpers/wait');
         await key(' ', 32); await waitFor(`document.activeElement.closest('.sidebar-kebab-menu') !== null`, 'Space opens it too', 4000);
         const ctl = await ev(`(() => { const b = ${BTN}; const id = b.getAttribute('aria-controls'); const m = document.getElementById(id); return { id, owns: !!m && m === b.nextElementSibling, unique: document.querySelectorAll('[id="' + id + '"]').length, allDistinct: new Set([...document.querySelectorAll('#live-sessions-list .sidebar-kebab-btn')].map(x => x.getAttribute('aria-controls'))).size === document.querySelectorAll('#live-sessions-list .sidebar-kebab-btn').length }; })()`);
         assert.ok(ctl.id && ctl.owns && ctl.unique === 1 && ctl.allDistinct, 'aria-controls names the button\'s own menu, by a unique id: ' + JSON.stringify(ctl));
-        // Tab out of the last item closes the menu; Shift+Tab from the first item goes back to the button.
+        // Tab out of the last item closes the menu; so does Shift+Tab from the first item (#15445).
         await key('End', 35); await key('Tab', 9);
         await waitFor(`${BTN}.getAttribute('aria-expanded') === 'false' && getComputedStyle(${BTN}.nextElementSibling).display === 'none'`, 'Tab out of the last item closes the menu', 4000);
         assert.equal(await ev(`!!document.activeElement.closest('.sidebar-kebab-menu')`), false, 'and the focus is not in a hidden menu');
         await ev(`${BTN}.focus(); true`); await key('Enter', 13);
         await waitFor(`document.activeElement.closest('.sidebar-kebab-menu') !== null`, 'Enter opens it again', 4000);
         await key('Tab', 9, true);
-        await waitFor(`document.activeElement === ${BTN}`, 'Shift+Tab from the first item goes back to the button (the menu stays open beside it)', 4000);
-        await key('Escape', 27); assert.equal(await ev(`${BTN}.getAttribute('aria-expanded')`), 'false', 'Escape on the button closes it');
+        // since #15445 Tab either way closes the menu and goes on from its button: Shift+Tab leaves it for the stop before the button
+        await waitFor(`${BTN}.getAttribute('aria-expanded') === 'false' && getComputedStyle(${BTN}.nextElementSibling).display === 'none'`, 'Shift+Tab from the first item closes the menu', 4000);
+        assert.equal(await ev(`!!document.activeElement.closest('.sidebar-kebab-menu')`), false, 'and the focus is not in a hidden menu');
         await ev(`${BTN}.focus(); true`); await key(' ', 32); await waitFor(`document.activeElement.closest('.sidebar-kebab-menu') !== null`, 'Space opens it for the redraw check', 4000);
         // A redraw of the list while it is open (the feed): the focus lands on the button, not the row.
         await ev(`(() => { const s = T.state.liveSessions[0]; s.summary = 'changed while the menu is open'; s.status = 'working'; s.staleness_seconds = 99; T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
