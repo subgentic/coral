@@ -8,6 +8,7 @@ import { state } from './state.js';
 import { updateTerminalTheme, applySettingsFont } from './xterm_renderer.js';
 import { browserLocal } from './safe_storage.js';
 import { isCloud } from './server_base.js';
+import { onBuilt } from './lazy_dom.js';
 // What Save sends: only the fields the person changed (here so the module is loaded at startup, import_hygiene).
 export { changedSettings } from './settings_diff.js';
 export { savedWords } from './settings_saved_words.js'; // the Save toast's words, here for the same reason
@@ -248,8 +249,8 @@ export async function loadSettings() {
     return theme;
 }
 
-/** What the theme control shows when no theme is stored: this computer starts dark, the Cloud Hub follows the system (theme_init.js). */
-export function defaultThemeChoice() { return isCloud() ? "system" : "dark"; }
+/** The control with no theme stored: the page follows the system (#15234). */
+export function defaultThemeChoice() { return "system"; }
 
 /** Apply a theme to the document */
 export function applyTheme(theme, { remember = true } = {}) {
@@ -320,6 +321,6 @@ export async function applyCustomThemeByName(name, { remember = true } = {}) {
 
 // Listen for OS theme changes when in "system" mode
 window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
-    const pref = (state.settings && state.settings.theme) || "dark";
-    if (pref === "system") applyTheme("system");
+    const own = browserLocal.get("coral-theme");
+    if (((state.settings && state.settings.theme) || (own !== "dark" && own !== "light" && "system")) === "system") applyTheme("system", { remember: false });
 });
