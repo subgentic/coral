@@ -1,4 +1,4 @@
-// New team trusts the folder (#11889, the Operator's decision, Security's conditions): a folder Coral makes says "Coral will start these agents in this folder and trust it for them."; an existing folder shows
+// New team trusts the folder (#11889, the Operator's decision, Security's conditions): a folder Coral makes says "Coral will start these agents in this folder and trust it for them. A Claude agent may still ask once."; an existing folder shows
 // a "Trust this folder" switch, off, that names the path, and only a ticked one sends trust_folder. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -54,7 +54,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         console.log('A folder Coral makes says it will trust it, and has no switch');
         await open(); await setDir('/home/p/Coral/proj', true);
         assert.equal(await visible('launch-team-trust-line'), true, 'the line shows');
-        assert.equal(await ev(`document.getElementById('launch-team-trust-line').textContent`), 'Coral will start these agents in this folder and trust it for them.');
+        assert.equal(await ev(`document.getElementById('launch-team-trust-line').textContent`), 'Coral will start these agents in this folder and trust it for them. A Claude agent may still ask once.');
         assert.equal(await visible('launch-team-trust'), false, 'no switch for a folder Coral makes');
         let sent = await go();
         assert.equal(sent.create_dir, true); assert.equal(sent.trust_folder, undefined, 'the made folder is trusted by the server, not asked for');
