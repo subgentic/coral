@@ -3,6 +3,7 @@ package background
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -213,10 +214,10 @@ func TestTheSettingIsOnByDefaultAndATeamThatSavedItOffKeepsItOff(t *testing.T) {
 func TestTheOrchestratorAndOtherCLIsAreLeftAlone(t *testing.T) {
 	h := newCompactHarness(t, true)
 	h.agent("Boss", "s1", "claude", "Orchestrator", 500000, time.Minute)
-	h.agent("Cx", "s2", "codex", "Dev", 500000, time.Minute)
+	h.agent("Hx", "s2", "hermes", "Dev", 500000, time.Minute)
 	h.agent("Dev", "s3", "claude", "Dev", 500000, time.Minute)
 	h.run(0)
-	assert.Equal(t, []string{compactLine}, h.sent(), "the orchestrator holds the most state and a CLI with no known command is never guessed at")
+	assert.Equal(t, []string{compactLine}, h.sent(), "the orchestrator holds the most state and a CLI with no known command (Hermes: Coral has no context size for it yet) is never guessed at")
 	s := board.DefaultHealthSettings()
 	s.CompactContext = board.HealthCompact{On: true, ThresholdK: 200, Orchestrator: true}
 	require.NoError(t, h.bs.SetHealthSettings(context.Background(), "team", s))
@@ -227,8 +228,14 @@ func TestTheOrchestratorAndOtherCLIsAreLeftAlone(t *testing.T) {
 
 func TestTheCompactLineIsFixedWhateverTheAgentWasDoing(t *testing.T) {
 	assert.Equal(t, "/compact keep: open tasks, team rules, recent decisions, and what I was last asked", compactCommand("claude"))
-	for _, other := range []string{"codex", "agy", "hermes", "pi", "opencode", "gemini", "terminal", ""} {
+	for _, bare := range []string{"codex", "agy", "antigravity", "pi"} {
+		assert.Equal(t, "/compact", compactCommand(bare), bare+": the CLI's own bare command, nothing of Coral's in it")
+	}
+	for _, other := range []string{"hermes", "opencode", "gemini", "terminal", ""} {
 		assert.Empty(t, compactCommand(other), other)
+	}
+	for _, other := range []string{"codex", "agy", "antigravity", "hermes", "pi", "opencode", "gemini", "terminal", ""} {
+		assert.Empty(t, clearCommand(other), other+": clear commands for the other CLIs are a follow-up (#15508): a clear starts a new session or chat there")
 	}
 }
 
@@ -480,4 +487,81 @@ func TestTheServiceIsSafeToReadWhileItRuns(t *testing.T) {
 		h.run(30 * time.Second)
 	}
 	<-done
+}
+
+// #15506: each harness is sent its own CLI's compaction command (read from that CLI's slash menu: Codex 0.166, Antigravity 1.5, Pi 1.4), through the same gates as Claude's. A Hermes agent is not: Coral
+// records no context size for it, so nothing would say when it is due.
+func TestEachHarnessWithAKnownCommandIsSentItsOwnCompact(t *testing.T) {
+	for _, tc := range []struct{ agentType, line string }{
+		{"claude", compactLine},
+		{"codex", "Dev: /compact"},
+		{"agy", "Dev: /compact"},
+		{"antigravity", "Dev: /compact"},
+		{"pi", "Dev: /compact"},
+	} {
+		t.Run(tc.agentType, func(t *testing.T) {
+			h := newCompactHarness(t, true)
+			marked := []string{}
+			h.c.markReset = func(_ context.Context, id string) error { marked = append(marked, id); return nil }
+			h.agent("Dev", "s1", tc.agentType, "Dev", 312000, time.Minute)
+			h.run(0)
+			assert.Equal(t, []string{tc.line}, h.sent())
+			assert.Equal(t, []string{"s1"}, marked, "the context reading is dropped until the agent's next turn, whatever its type")
+			h.run(time.Minute)
+			assert.Len(t, h.sent(), 1, "and never typed twice inside the cooldown")
+		})
+	}
+}
+
+func TestEachHarnessKeepsEveryGateClaudeHas(t *testing.T) {
+	for _, agentType := range []string{"codex", "agy", "pi"} {
+		t.Run(agentType, func(t *testing.T) {
+			h := newCompactHarness(t, true)
+			h.agent("Busy", "s1", agentType, "Dev", 400000, 0)
+			h.sig["s1"] = agentSignal{InTurn: true, Since: h.now.Add(-time.Hour)}
+			h.agent("Dialog", "s2", agentType, "Dev", 400000, time.Minute)
+			h.sig["s2"] = agentSignal{NeedsInput: true, Since: h.now.Add(-time.Hour)}
+			h.agent("Mail", "s3", agentType, "Dev", 400000, time.Minute)
+			h.unread[naming.SessionName(agentType, "s3")] = 2
+			h.agent("Small", "s4", agentType, "Dev", 100000, time.Minute)
+			h.agent("Draft", "s5", agentType, "Dev", 400000, time.Minute)
+			h.skip = true
+			h.run(0)
+			assert.Empty(t, h.sent(), "in a turn, at a dialog, with unread messages, under the size, or with a draft typed: nothing goes in")
+		})
+	}
+}
+
+// A team that chose a clear method asked for a clear: an agent whose CLI has no clear command wired is left alone, not compacted in its place.
+func TestATeamOnAClearMethodNeverCompactsAHarnessThatCannotBeCleared(t *testing.T) {
+	for _, method := range []string{"clear_next", "clear_handoff"} {
+		t.Run(method, func(t *testing.T) {
+			h := newCompactHarness(t, true)
+			h.setMethod("threshold", method)
+			for i, agentType := range []string{"codex", "agy", "pi"} {
+				h.agent("Dev"+agentType, "s"+agentType, agentType, "Dev", 400000, time.Minute)
+				_ = i
+			}
+			h.run(0)
+			assert.Empty(t, h.sent())
+		})
+	}
+}
+
+// #15506: an agent that is not a candidate says why in the log, once, so a real run that compacts nothing shows the gate (Antigravity's never did, and the log was silent).
+func TestAnAgentThatIsNotACandidateSaysWhyOnce(t *testing.T) {
+	for _, agentType := range []string{"agy", "pi", "codex"} {
+		t.Run(agentType, func(t *testing.T) {
+			h := newCompactHarness(t, true)
+			var buf strings.Builder
+			h.c.logger = slog.New(slog.NewTextHandler(&buf, nil))
+			h.agent("Dev", "s1", agentType, "Dev", 400000, time.Minute)
+			delete(h.sig, "s1") // no event yet says whether it is idle
+			h.run(0)
+			h.run(time.Minute)
+			assert.Empty(t, h.sent())
+			assert.Equal(t, 1, strings.Count(buf.String(), "no hook or transcript event says whether it is idle yet"), buf.String())
+			assert.Contains(t, buf.String(), "type="+agentType)
+		})
+	}
 }

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
@@ -67,7 +68,7 @@ func handoffText(digest string) string {
 
 // clearCommand is the command that clears an agent's context, "" for a type with none known to Coral.
 func clearCommand(agentType string) string {
-	if agentType == "claude" {
+	if agentType == at.Claude {
 		return "/clear"
 	}
 	return ""
@@ -81,12 +82,15 @@ func clearedText(next int64) string {
 	return "[Coral] Your context was cleared to save tokens. Read your board with 'coral-board read', then run 'coral-board wait' for your next task."
 }
 
-// compactCommand is the command that compacts an agent of this type, "" for a type with none known to Coral (never guessed: Codex, Antigravity, Hermes and Pi have commands of their own, measured
-// but not wired in this slice).
+// compactCommand is the command that compacts an agent of this type, "" for a type with none known to Coral (never guessed). Each is read from that CLI's own slash menu (#15506): Claude's /compact takes a
+// focus line; Codex 0.166, Antigravity 1.5 and Pi 1.4 each have a bare /compact. Hermes has /compress (alias /compact), but Coral records no context size for a Hermes agent (its poller keeps cumulative
+// totals only), so nothing would say when it is due: it stays unwired until it has one (#15508).
 func compactCommand(agentType string) string {
 	switch agentType {
-	case "claude":
+	case at.Claude:
 		return "/compact " + compactFocusClaude
+	case at.Codex, at.Agy, at.Antigravity, at.Pi:
+		return "/compact"
 	}
 	return ""
 }
@@ -237,6 +241,17 @@ func (c *ContextCompact) skip(project string, a AgentInfo, name, reason string) 
 	}
 }
 
+// skipOnce logs why an agent of a team with the setting on is not a candidate at all (before its context is read), once per reason: a real run that compacts nothing says why (#15506).
+func (c *ContextCompact) skipOnce(project string, a AgentInfo, name, reason string) {
+	c.mu.Lock()
+	same := c.skipSaid[name] == reason
+	c.skipSaid[name] = reason
+	c.mu.Unlock()
+	if !same {
+		c.logger.Info("an agent is not a compaction candidate", "project", project, "agent", a.DisplayName, "type", a.AgentType, "session", name, "reason", reason)
+	}
+}
+
 // skipIfDue is skip for the checks that come before the context is read: it speaks only for an agent that was due at the last pass.
 func (c *ContextCompact) skipIfDue(project string, a AgentInfo, name, reason string) {
 	c.mu.Lock()
@@ -330,14 +345,24 @@ func (c *ContextCompact) runProject(ctx context.Context, project string, hs boar
 	var names, ids, subIDs []string
 	for _, sub := range subs {
 		a, live := agents[sub.SessionName]
-		if !live || sub.SessionName == "" || compactCommand(a.AgentType) == "" {
+		if !live || sub.SessionName == "" {
+			continue // not a running agent of this Coral: nothing to say
+		}
+		if compactCommand(a.AgentType) == "" {
+			c.skipOnce(project, a, sub.SessionName, "this CLI ("+a.AgentType+") has no compact command wired")
+			continue
+		}
+		if (hs.Method == board.CompactMethodClearNext || hs.Method == board.CompactMethodClearHandoff) && clearCommand(a.AgentType) == "" {
+			c.skipOnce(project, a, sub.SessionName, "the team clears and this CLI has no clear command wired") // never compacted in its place (#15506)
 			continue
 		}
 		if !hs.Orchestrator && orch != "" && board.SameIdentity(sub.SubscriberID, orch) {
+			c.skipOnce(project, a, sub.SessionName, "it is the team's Orchestrator and the setting leaves the Orchestrator alone")
 			continue
 		}
 		sig, ok := c.signal(ctx, a.SessionID)
 		if !ok {
+			c.skipOnce(project, a, sub.SessionName, "no hook or transcript event says whether it is idle yet")
 			continue
 		}
 		c.confirm(project, a, sub.SessionName, sig, now)
@@ -354,6 +379,7 @@ func (c *ContextCompact) runProject(ctx context.Context, project string, hs boar
 			}
 		}
 		if did && now.Sub(prev.at) < compactCooldown {
+			c.skipOnce(project, a, sub.SessionName, "it was compacted a short while ago")
 			continue
 		}
 		if c.limit != nil {
