@@ -80,7 +80,7 @@ export function showBoardInPage(project, host, messageId = null) {
     state.currentBoardServer = splitKey(project).server;
     board.style.display = 'flex'; // display-ok: #mb-board is shown and hidden this way everywhere else in this file
     initGrowingTextarea(document.getElementById('mb-post-input'));
-    keepGap(document.querySelector('.mb-messages-scroll')); // the box pushes the messages up as it grows (#15401)
+    keepGap(document.querySelector('.mb-messages-scroll'), document.getElementById('mb-post-input')); // the box pushes the messages up as it grows (#15401)
     attachMentionList();
     if (!hasBoardLabel(project)) {
         boardFetch(project, '').then(r => (r.ok ? r.json() : null)).then(d => {

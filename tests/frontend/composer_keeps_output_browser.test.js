@@ -21,6 +21,7 @@ const { framesJs } = require('./helpers/wait');
             await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('jl', 'jl', 150, { sleeping: false }); true`);
             await ev(`window.selectLiveSession('jl', 'claude', 'jl-id', 'local'); true`);
             await waitFor(`${C}.scrollHeight > ${C}.clientHeight * 3 && ${C}.scrollHeight - ${C}.scrollTop - ${C}.clientHeight < 50`, at + 'the chat at the bottom', 8000);
+            await waitFor(`!!${C}._keepGap`, at + 'the chat keeps its gap (its module is loaded when the chat opens, before anyone types)', 8000);
             await ev(`(async () => { ${C}.scrollTop = ${C}.scrollHeight; ${C}.dispatchEvent(new Event('scroll')); await new Promise(r => setTimeout(r, 300)); return true; })()`); // sleep-ok: the scroll handlers run
             const before = await type(1), d0 = await dist();
             const grown = await type(10), d10 = await dist();
