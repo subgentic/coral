@@ -166,7 +166,7 @@ export function toggleAgentSleep(name, agentType, sessionId, action) {
             if (s) {
                 s.sleeping = sleeping;
                 if (!sleeping) s.archived = false; // waking unarchives (#3030)
-                if (sleeping && action === 'sleep') s.sleep_reason = null; // a terminal-gone agent put to sleep is plain sleeping now (#13171)
+                if (sleeping && action === 'sleep') s.sleep_reason = null; // plain sleeping now (#13171, #15068)
             }
             redrawLiveList();
             // The chat open on this agent follows now, not on a later feed tick that may not come: a Wake from the panel left "asleep" and its Wake in the chat until it was pressed there (#14323). The same as archive below.
@@ -184,7 +184,7 @@ export function toggleAgentSleep(name, agentType, sessionId, action) {
     };
     if (action === 'sleep') {
         const row = state.liveSessions.find(x => x.session_id === sessionId && sessionServer(x) === server);
-        if (row && row.sleeping && !row.archived && row.sleep_reason === 'terminal_gone') return doIt(); // already asleep, nothing runs to stop: it is only filed under sleeping (#13171)
+        if (row && row.sleeping && !row.archived && /^(terminal_gone|agent_exited)$/.test(row.sleep_reason)) return doIt(); // already asleep: only filed under sleeping (#13171, #15068)
         const who = agentWords(row, row ? resolveSessionIdentity(row) : name).label; // the agent's own name and team, not the folder it works in (#10785)
         showConfirmModal('Sleep agent', `Put ${who} to sleep? ${WHAT_STAYS_SLEEP}`, doIt, undefined, { danger: false, label: 'Sleep agent' });
         return Promise.resolve(false);
@@ -204,7 +204,7 @@ export function toggleAgentSleep(name, agentType, sessionId, action) {
 export async function sleepTerminalGone(ids) {
     const byServer = new Map();
     for (const id of ids) {
-        const row = state.liveSessions.find(x => x.session_id === id && x.sleeping && !x.archived && x.sleep_reason === 'terminal_gone');
+        const row = state.liveSessions.find(x => x.session_id === id && x.sleeping && !x.archived && /^(terminal_gone|agent_exited)$/.test(x.sleep_reason));
         if (!row) continue;
         const server = sessionServer(row);
         if (!byServer.has(server)) byServer.set(server, []);

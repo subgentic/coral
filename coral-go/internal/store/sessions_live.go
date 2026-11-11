@@ -642,11 +642,11 @@ const SleepReasonCoralStopped = "coral_stopped"
 // auto-wake, as an agent Coral stopped.
 const SleepReasonHooksUpdate = "hooks_update"
 
-// SleepTerminalGone files agents whose terminal is gone under plain sleeping (#13171): their rows stay asleep, with their resume info, and the reason "terminal_gone" is cleared, so the dashboard says "Sleeping"
+// SleepTerminalGone files agents whose terminal is gone, or whose CLI ended (#15068), under plain sleeping (#13171): their rows stay asleep, with their resume info, and the reason "terminal_gone" is cleared, so the dashboard says "Sleeping"
 // and not "Terminal gone", and a later wake resumes them like any sleeper. sessionIDs names the agents to move (an id that is not a terminal-gone sleeper is left as it is); none names every one. It reports how many moved.
 func (s *SessionStore) SleepTerminalGone(ctx context.Context, sessionIDs []string) (int, error) {
-	query := "UPDATE live_sessions SET sleep_reason = NULL WHERE status = 'active' AND is_sleeping = 1 AND is_archived = 0 AND sleep_reason = ?"
-	args := []any{SleepReasonTerminalGone}
+	query := "UPDATE live_sessions SET sleep_reason = NULL WHERE status = 'active' AND is_sleeping = 1 AND is_archived = 0 AND sleep_reason IN (?, ?)"
+	args := []any{SleepReasonTerminalGone, SleepReasonAgentExited}
 	if sessionIDs != nil {
 		if len(sessionIDs) == 0 {
 			return 0, nil
