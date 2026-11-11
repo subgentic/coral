@@ -70,6 +70,7 @@ const { mountInboxItem } = await importOnce('./inbox_item_page.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
 const GF = await importOnce('./goal_filters.js'); // the Goals folder's search, pills and Filters (#8596)
 const IT = await importOnce('./inbox_toolbar.js'); // the folders' toolbar on the shared list bar
+const { agentCopyButton } = await importOnce('./agent_copy_button.js'); // the robot at the end of a toolbar (#15152)
 const NF = await importOnce('./needs_filters.js'); // the Needs you folder's search, pills and Filters (#8604)
 const CF = await importOnce('./chat_filters.js'); // the chat folders' Filters (#8603)
 const AC = await importOnce('./inbox_activity.js'); // the Activity folder (#12070): what the Operator did in Needs you, from the server's record (this computer only)
@@ -363,6 +364,7 @@ function inboxNeedsToolbar() {
     const groupToggle = node.querySelector('.inbox-group-review-toggle');
     if (groupToggle) groupToggle.hidden = (!!needsFilters.kind && needsFilters.kind !== 'review') || (!reviewItems().length && needsFilters.kind !== 'review');
     const skip = DT.el('a', 'skip-link', 'Skip to the list'); skip.href = '#'; skip.addEventListener('click', e => { e.preventDefault(); document.querySelector('#group-table-view tbody tr:not(.dt-group) button, #group-table-view tbody tr:not(.dt-group) a')?.focus(); }); node.prepend(skip); // a keyboard user passes the search and filters (walk 7 M3)
+    if (!node.querySelector('.agent-copy')) node.append(agentCopyButton('needs_you', 'Coral\u2019s Needs you list: what agents and the board wait on the Operator for.'));
     return { node, signature: JSON.stringify([groupMode, needsFilters, teams, names, goalNames, counts, completeCount, listedReviews, listedComplete, rows.length, rows.filter(needsUnread).length]) };
 }
 
@@ -844,6 +846,7 @@ function inboxSavedToolbar() {
     const v = saved.savedView(), filters = saved.savedFiltersNow(), options = saved.savedPageOptions();
     const node = savedBar.draw({ filters, options,
         pills: { label: 'Show', current: v.tab, items: [{ key: 'open', label: 'Open', count: `${countSavedReviews().complete && savedKnown() ? '' : 'at least '}${v.totals.open + countSavedReviews().value}` }, { key: 'done', label: 'Done', count: v.totals.done }], onPick: key => saved.setSavedTab(key) } });
+    if (!node.querySelector('.agent-copy')) node.append(agentCopyButton('saved_messages', 'The Operator\u2019s Saved list (Inbox, Saved): messages kept for later.'));
     return { node, signature: JSON.stringify([filters, v.tab, v.totals, options, countSavedReviews()]) };
 }
 const savedCounts = () => saved.savedView().totals;

@@ -13,7 +13,7 @@ const { coralReady } = require('./helpers/wait');
     const vis = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); return !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden'; })()`;
     const state = () => ev(`(() => { const m = document.getElementById('settings-modal'), v = e => !!e && e.getClientRects().length > 0, tabs = [...m.querySelectorAll('.settings-tab')].filter(v);
         return { screen: m.dataset.screen || '', tabs: tabs.length, minH: tabs.length ? Math.round(Math.min(...tabs.map(t => t.getBoundingClientRect().height))) : 0, select: v(m.querySelector('.settings-group-pick select')), pane: v(m.querySelector('.settings-pane:not([hidden])')), back: v(m.querySelector('.settings-back')),
-            chevron: tabs.length ? getComputedStyle(tabs[0], '::after').content : '', title: (m.querySelector('.settings-pane:not([hidden]) .settings-pane-title') || {}).textContent || '' }; })()`);
+            chevron: tabs.length ? getComputedStyle(tabs[0], '::after').content : '', title: ((m.querySelector('.settings-pane:not([hidden]) .settings-pane-title') || {}).firstChild || {}).textContent || '' }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[390, 844, true], [1280, 800, false]]) {

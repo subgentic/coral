@@ -36,6 +36,7 @@ import { healthDot, healthCard, healthStatusText } from './machine_health.js';
 const { syncRelaunchReads, resetRelaunchReads, relaunchBadge } = await importOnce('./relaunch_badge.js'); // the "Updating" badge of a hub relaunch (#5355, behind the update flag)
 const { syncServersBar, serverVisible, serversFiltered } = await importOnce('./server_search.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7903)
+const { agentCopyIn } = await importOnce('./agent_copy_button.js'); // the robot at the corner of the Computers page (#15152)
 
 // The Servers tab (#3070) hosts this list; there is no separate dialog.
 let host = null;
@@ -404,6 +405,7 @@ function render() {
     const keepRow = active && active.closest('.dt-row, .cs-page');
     const keep = keepRow ? { row: keepRow.id, text: active.textContent, cls: active.className, tag: active.tagName } : null;
     syncServersBar(servers, 'machine', render); // the search box, from six machines up
+    agentCopyIn(document.querySelector('#servers-view > .servers-tab'), 'hub', 'Coral Hub, Computers: the computers this account reaches.', { className: 'agent-copy-corner', first: true });
     const page = openId ? servers.find(x => x.id === openId) : null;
     if (openId && !page && loaded) { openId = null; renaming = null; confirming = null; focusNext = 'row'; } // the machine is gone (revoked here or elsewhere): back to the list
     const title = document.getElementById('servers-tab-title'); if (title) title.hidden = !!(openId && page); // a machine's page has its back link, "← Servers", for the title
