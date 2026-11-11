@@ -20,7 +20,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const tasks = await import((window.__coralStatic||'/static/')+'tasks.js'); await (await import((window.__coralStatic||'/static/')+'lazy_panels.js')).loadTaskDetail(); /* the task dialog is a lazy module (#5364): loaded once, then its functions answer synchronously */ 
             window.testTasks = tasks;
             // #7833: this is a real board worker, so its dock creates and lists its own assigned tasks.
-            const subscribed = await fetch('/api/board/workflow-browser/subscribe', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'workflow-worker',job_title:'Developer',session_name:'workflow-browser'})});
+            const subscribed = await fetch('/api/board/workflow-browser/subscribe', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'workflow-worker',job_title:'Developer'})});
             if (!subscribed.ok) throw new Error('worker subscribe failed: ' + await subscribed.text());
             state.currentSession = {name:'workflow-browser', board_project:'workflow-browser', type:'live', board_is_orchestrator:false, board_subscriber_id:'workflow-worker'};
             await tasks.showCreateTaskModal();
