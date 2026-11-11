@@ -260,7 +260,7 @@ function drawCounts() {
         const n = S.counts[t];
         const text = n ? String(n) : ''; // no badge at zero or unknown: one rule for every tab
         if (c.textContent !== text) { c.textContent = text; widened = true; }
-        c.hidden = !text;
+        // the pill is never hidden: an empty one keeps the room of a one-digit count (css), so a count arriving moves no tab (#15494 M4)
         const label = $(`team-tab-${t}`).querySelector('.team-tab-label');
         // a space between the word and its count, so the tab is read "Goals 2"
         label.textContent = text ? `${LABEL[t]} ` : LABEL[t];
