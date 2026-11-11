@@ -232,6 +232,8 @@ const { coralReady } = require('./helpers/wait');
             assert.deepEqual(await ev(`({ disabled: document.getElementById('command-input').disabled, value: document.getElementById('command-input').value })`), { disabled: false, value: 'typed meanwhile' }, 'the composer is never held up');
             await feed('ch-a-id', { agent_type: 'claude', model: OPUS.value, thinking: 'low', model_switch: { state: 'pending', thinking: 'xhigh', after_reply: true } });
             await waitFor(`/Switches after this reply/.test(document.getElementById('model-chip-note').textContent)`, 'the after-reply note', 4000);
+            await feed('ch-a-id', { agent_type: 'claude', model: OPUS.value, thinking: 'low', model_switch: { state: 'pending', model: 'claude-sonnet-5-5', asking: 'Use extended context? Sonnet can take a 1M window.' } }); // #15410: Claude asks a follow-up in its terminal
+            await waitFor(`/Claude asks: Use extended context\\? Sonnet can take a 1M window\\./.test(document.getElementById('model-chip-note').textContent)`, 'the chip says what Claude asks', 4000);
             await feed('ch-a-id', { agent_type: 'claude', model: OPUS.value, thinking: 'xhigh', thinking_actual: 'xhigh', model_switch: { state: 'done', thinking: 'xhigh' } });
             await waitFor(`document.getElementById('thinking-chip-text').textContent === 'Extra high'`, 'the new level', 4000);
             assert.equal((await chip('thinking')).state, '');
