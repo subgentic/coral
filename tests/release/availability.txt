@@ -1,0 +1,13 @@
+# Features a built release package must report as available (#15071, the Tech Lead's audit #15067). Read by smoke_linux.sh (and smoke_windows.ps1) against the
+# running prod-tier server, the way the dashboard asks: signed in with the login link, a same-origin request, no Authorization header. A browser suite runs a dev
+# binary that supplies its own keys and switches, so only this file asks a BUILT package "is this feature on?". v2.0.63 shipped Dropbox with no app key and
+# nothing here failed.
+#
+# One line per answer: ENDPOINT FIELD VALUE [env=NAME] [tier=NAME]
+#   ENDPOINT  a GET route that answers JSON      FIELD  a top-level key of the answer      VALUE  the JSON value a release must report (true, false, "text", 3)
+#   env=NAME  the line is checked only when the environment variable NAME is 1 (release.yml sets SMOKE_EXPECT_DROPBOX_KEY; a rehearsal builds without the key)
+#   tier=NAME the line is checked only when /api/system/status says this build's tier_name is NAME (beta and dropboxers installs do not update)
+# A feature that is off ON PURPOSE is listed with the value it must report (false), so the choice is written down and a change to it fails the release.
+# Rule for reviewers: a new feature that can answer "not available" adds its line here in the same change.
+/api/dropbox/status  app_key_set  true  env=SMOKE_EXPECT_DROPBOX_KEY
+/api/system/update   enabled      true  tier=prod

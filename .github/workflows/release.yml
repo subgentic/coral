@@ -145,6 +145,8 @@ jobs:
           BUILD_TAGS: ${{ needs.resolve.outputs.build_tags }}
           COMMANDS: ${{ needs.resolve.outputs.commands }}
         run: |
+          # A prod-tier build (the tags are exactly fts5) with no analytics key would send no install events and the release would still be green (#15071).
+          [ "$BUILD_TAGS" != "fts5" ] || [ -n "$POSTHOG_PROJECT_KEY" ] || { echo "::error::vars.POSTHOG_PROJECT_KEY is empty: a prod-tier build would send no install events"; exit 1; }
           LDFLAGS="-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=${POSTHOG_PROJECT_KEY} -X github.com/subgentic/coral/internal/config.Version=${VERSION} -X github.com/subgentic/coral/internal/server/routes.DropboxDefaultAppKey=${DROPBOX_APP_KEY}"
           OVERLAY="$(go run ./tools/strip-static)" # the dashboard ships minified (#6208): a fresh owner-only folder; only this step's go build commands read it
           [ -n "$OVERLAY" ] || { echo "strip-static printed no overlay path" >&2; exit 1; }
@@ -256,6 +258,8 @@ jobs:
           $env:GOOS = "windows"
           $env:GOARCH = "amd64"
           $version = $env:VERSION
+          # A prod-tier build (the tags are exactly fts5) with no analytics key would send no install events and the release would still be green (#15071).
+          if ($env:BUILD_TAGS -eq 'fts5' -and -not $env:POSTHOG_PROJECT_KEY) { throw 'vars.POSTHOG_PROJECT_KEY is empty: a prod-tier build would send no install events' }
           $ldflags = "-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=$env:POSTHOG_PROJECT_KEY -X github.com/subgentic/coral/internal/config.Version=$version -X github.com/subgentic/coral/internal/server/routes.DropboxDefaultAppKey=$env:DROPBOX_APP_KEY"
           $buildTags = $env:BUILD_TAGS
           # The exes' version information (what the taskbar and Task Manager name the app by): this release's version and the tier's product name.
@@ -428,6 +432,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
           BUILD_TAGS: ${{ needs.resolve.outputs.build_tags }}
+          SMOKE_EXPECT_DROPBOX_KEY: "1" # the build's Dropbox app key must reach /api/dropbox/status (#15065, as in the Linux smoke)
         run: |
           Push-Location coral-go
           $standin = Join-Path $env:RUNNER_TEMP 'standin\claude.exe'
@@ -482,6 +487,8 @@ jobs:
           GUI_COMMANDS: ${{ needs.resolve.outputs.gui_commands }}
         run: |
           set -euo pipefail
+          # A prod-tier build (the tags are exactly fts5) with no analytics key would send no install events and the release would still be green (#15071).
+          [ "$BUILD_TAGS" != "fts5" ] || [ -n "$POSTHOG_PROJECT_KEY" ] || { echo "::error::vars.POSTHOG_PROJECT_KEY is empty: a prod-tier build would send no install events"; exit 1; }
           LDFLAGS="-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=${POSTHOG_PROJECT_KEY} -X github.com/subgentic/coral/internal/config.Version=${VERSION} -X github.com/subgentic/coral/internal/server/routes.DropboxDefaultAppKey=${DROPBOX_APP_KEY}"
           OVERLAY="$(go run ./tools/strip-static)" # the dashboard ships minified (#6208): a fresh owner-only folder; only this step's go build commands read it
           [ -n "$OVERLAY" ] || { echo "strip-static printed no overlay path" >&2; exit 1; }
@@ -549,6 +556,8 @@ jobs:
           GUI_COMMANDS: ${{ needs.resolve.outputs.gui_commands }}
         run: |
           set -euo pipefail
+          # A prod-tier build (the tags are exactly fts5) with no analytics key would send no install events and the release would still be green (#15071).
+          [ "$BUILD_TAGS" != "fts5" ] || [ -n "$POSTHOG_PROJECT_KEY" ] || { echo "::error::vars.POSTHOG_PROJECT_KEY is empty: a prod-tier build would send no install events"; exit 1; }
           LDFLAGS="-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=${POSTHOG_PROJECT_KEY} -X github.com/subgentic/coral/internal/config.Version=${VERSION} -X github.com/subgentic/coral/internal/server/routes.DropboxDefaultAppKey=${DROPBOX_APP_KEY}"
           OVERLAY="$(go run ./tools/strip-static)" # the dashboard ships minified (#6208): a fresh owner-only folder; only this step's go build commands read it
           [ -n "$OVERLAY" ] || { echo "strip-static printed no overlay path" >&2; exit 1; }
@@ -679,6 +688,8 @@ jobs:
           tests/release/verify_no_fake_identity.sh "$APP/Contents/MacOS"
 
       - name: Smoke test Coral.app
+        env:
+          SMOKE_EXPECT_DROPBOX_KEY: "1" # the build's Dropbox app key must reach /api/dropbox/status (#15065, #15071)
         run: |
           chmod +x tools/test-macos-app.sh
           CI=true tools/test-macos-app.sh dist/Coral.app
@@ -733,6 +744,8 @@ jobs:
       # binary that needed an exception (JIT, unsigned memory, library loading) would crash here.
       # The webview is forced on: coral-app is the one most likely to need one (#3659).
       - name: Smoke test the signed Coral.app (hardened runtime, minimal entitlements)
+        env:
+          SMOKE_EXPECT_DROPBOX_KEY: "1" # the build's Dropbox app key must reach /api/dropbox/status (#15065, #15071)
         run: |
           # No signed binary carries a hardened-runtime exception (the tray and the app included).
           for bin in dist/Coral.app/Contents/MacOS/*; do
