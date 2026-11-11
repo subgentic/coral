@@ -24,9 +24,16 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await waitFor(`!!document.querySelector('.view-list-item[data-key="artifacts"]')`, 'the Artifacts folder', 10000);
         const before = Number(/(\d+)\s*$/.exec((await folderText()).trim())?.[1] || 0);
+        // What the page asked for after the upload, kept for the failure message: the count follows the revision feed or, for a team the page is not showing, the 20 s safety read (artifact count poll in inbox_artifacts.js), so a miss needs to say which of them did not run (#15630: it timed out once at 60 s on Windows and passed on a fresh browser)
+        await ev(`window.__rq = []; window.__t0 = Date.now(); { const f = window.fetch; window.fetch = function (u, o) { const s = String((u && u.url) || u); if (/artifact|\\/status/.test(s)) window.__rq.push(((Date.now() - window.__t0) / 1000).toFixed(1) + 's ' + ((o && o.method) || 'GET') + ' ' + s.slice(0, 90)); return f.apply(this, arguments); }; } true`);
         const up = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review&question=Approve+the+README%3F`, '# Flashcards\nOpen index.html', { 'X-Artifact-Name': 'README.md', 'X-Artifact-Media-Type': 'text/markdown' });
         assert.equal(up.status, 201, JSON.stringify(up));
-        await waitFor(`(() => { const t = (document.querySelector('.view-list-item[data-key="artifacts"]') || {}).textContent || ''; const m = /(\\d+)\\s*$/.exec(t.trim()); return m && Number(m[1]) === ${before + 1}; })()`, `the folder counts the README in review (it was ${before})`, 60000);
+        try {
+            await waitFor(`(() => { const t = (document.querySelector('.view-list-item[data-key="artifacts"]') || {}).textContent || ''; const m = /(\\d+)\\s*$/.exec(t.trim()); return m && Number(m[1]) === ${before + 1}; })()`, `the folder counts the README in review (it was ${before})`, 60000);
+        } catch (e) {
+            const seen = await ev(`JSON.stringify({ visible: document.visibilityState, hidden: document.hidden, folder: ((document.querySelector('.view-list-item[data-key="artifacts"]') || {}).textContent || '').trim(), requests: window.__rq })`).catch(x => 'unreadable: ' + x.message);
+            throw new Error(e.message + ' | the page after the upload: ' + seen);
+        }
         console.log('PASS the Artifacts folder counts a file that is waiting for review');
     } finally {
         if (sid) await ev(`fetch('/api/sessions/live/${encodeURIComponent(sname || '')}/kill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_type: 'terminal', session_id: ${JSON.stringify(sid)} }) }).then(() => true)`).catch(() => {});

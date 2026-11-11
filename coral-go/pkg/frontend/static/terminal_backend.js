@@ -256,12 +256,15 @@ async function autoWakeStatus() {
     return resp.json();
 }
 
-function showAutoWakeBanner(st) {
+export function showAutoWakeBanner(st) {
     const banner = $('auto-wake-banner');
     if (!banner) return;
     const n = (st && st.state === 'pending') ? st.pending.length : 0;
-    banner.hidden = n === 0;
-    if (n) $('auto-wake-count').textContent = `${n} agents were running when Coral stopped.`;
+    // Write only what changed: the status is read again every 5 s while the pass runs, and a same-value write is still a DOM write (an attribute record), a
+    // redraw nobody can see. The perf budget (a quiet feed message writes nothing) caught it as a late write on a slow machine (#15630).
+    if (banner.hidden !== (n === 0)) banner.hidden = n === 0;
+    const count = n ? $('auto-wake-count') : null, text = `${n} agents were running when Coral stopped.`;
+    if (count && count.textContent !== text) count.textContent = text;
 }
 
 /** After a start, look for the over-the-cap question (the pass runs a few seconds in). */
