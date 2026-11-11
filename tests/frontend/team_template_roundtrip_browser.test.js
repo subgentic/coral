@@ -50,6 +50,8 @@ const { coralReady } = require('./helpers/wait');
         assert.ok(mine > 0 && (shipped < 0 || mine < shipped), 'your own template comes before the shipped ones: ' + JSON.stringify(order));
         await ev(`(() => { const s = document.getElementById('team-template-select'); s.value = 'rt-template'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
         await waitFor(`document.querySelectorAll('#team-agents-list .team-agent-row').length === 2`, 'the two members');
+        // The rows exist before the model and thinking pickers have applied the template's values (they load their lists first): wait for the level, then read it (a read right at the row count saw thinking null once in about 7 runs).
+        await waitFor(`(async () => { const m = await import(${S} + 'agent_config_form.js'); const r = document.querySelector('#team-agents-list .team-agent-row'); return !!r && m.getAgentConfig(r.dataset.acfId).thinking === 'high'; })()`, 'the first member shows the template thinking level');
         const got = await ev(`(async () => { const m = await import(${S} + 'agent_config_form.js'); const rows = [...document.querySelectorAll('#team-agents-list .team-agent-row')].map(r => { const c = m.getAgentConfig(r.dataset.acfId); return [c.name, c.model, c.thinking, c.permissionMode]; });
             const ls = await import(${S} + 'team_launch_settings.js'); return { rows, wm: ls.readTeamLaunchSettings().working_mode }; })()`);
         assert.deepEqual(got.rows[0], ['Lead Dev', 'opus', 'high', 'acceptEdits'], 'a member comes back with its model, thinking and mode: ' + JSON.stringify(got.rows));
