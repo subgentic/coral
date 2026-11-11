@@ -25,7 +25,7 @@ const STUB = `(() => { const real = window.fetch; window.__reqs = []; window.__a
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.__artifacts = ${JSON.stringify(reply)}; true`);
         await openBoardTasksTab({ ev, waitFor }, B);
-        await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item:not(.board-task-header)').length === 1`, 'the task', 45000); // the agent's list stays empty until its subscriber id arrives (a poll tick, 10 s each, on a loaded run)
+        await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item:not(.board-task-header)').length === 1`, 'the task', 4000); // loaded at once when the agent's subscriber id arrives, not on the next 10 s poll tick (#15375)
         await ev(`document.querySelector('#agentic-panel-tasks .board-task-item:not(.board-task-header)').click(); true`);
         await waitFor(`!!document.querySelector('#preview-pane #team-task-title') && /Write the report/.test(document.querySelector('#team-task-title').textContent)`, 'the task page', 12000);
     };
@@ -57,6 +57,15 @@ const STUB = `(() => { const real = window.fetch; window.__reqs = []; window.__a
         assert.ok(await ev(`document.querySelector('#preview-pane .dt-primary').getBoundingClientRect().height >= 44`), 'a 44 px target');
         assert.equal(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), true, 'nothing runs sideways');
 
+        console.log('the agent\'s subscriber id arrives after its Tasks tab is open (#15375): its tasks load at once, not on the next 10 s poll');
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+        await ev(`import((window.__coralStatic || '/static/') + 'task_list.js').then(m => { m.boardTaskPollHooks.intervalMs = 600000; })`); // no poll tick can rescue the load: only the id's arrival can
+        await openBoardTasksTab({ ev, waitFor }, B, 'late-agent');
+        const setId = id => ev(`(async () => { const st = await import((window.__coralStatic || '/static/') + 'state.js'); st.state.liveSessions = st.state.liveSessions.map(x => x.name === 'late-agent' ? { ...x, board_subscriber_id: ${JSON.stringify(id)} } : x); document.dispatchEvent(new CustomEvent('coral:display-hint-expired')); })()`);
+        await setId(''); // the mock agent starts with an id; a real one has none until the board knows it
+        await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item:not(.board-task-header)').length === 0`, 'no tasks without an id', 4000);
+        await setId('be');
+        await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item:not(.board-task-header)').length === 1`, 'the task right after the id arrived', 4000);
         console.log('nothing to show, or a list that cannot be read: no section, no error');
         for (const reply of [{ total: 0, artifacts: [] }, 'refused']) {
             await open(reply, false);
