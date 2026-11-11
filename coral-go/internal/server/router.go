@@ -518,6 +518,7 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Post("/api/dropbox/disconnect", s.cloudHandler.DropboxDisconnect)
 	r.Post("/api/dropbox/switch", s.cloudHandler.DropboxConfirmSwitch)
 	r.Post("/api/dropbox/takeover", s.cloudHandler.DropboxTakeOver)
+	r.Put("/api/dropbox/app-key", s.cloudHandler.DropboxSetAppKey)                              // #15638: the person's own Dropbox app key
 	r.Put("/api/dropbox/filters", s.cloudHandler.DropboxSetFilters)                             // stage 4 (#14655): what to back up
 	r.Post("/api/dropbox/check", s.cloudHandler.DropboxCheckAgain)                              // stage 4c (#14693): Check again after freeing space
 	r.Put("/api/dropbox/retention", s.cloudHandler.DropboxSetRetention)                         // stage 4b (#14703): Keep in Dropbox for N days

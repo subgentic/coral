@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -26,8 +27,14 @@ import (
 	"github.com/subgentic/coral/internal/store"
 )
 
-// Coral ships no Dropbox app key (#15641, the Operator: open-source Coral carries none). The only key is one a person supplies in the environment
-// (CORAL_DROPBOX_APP_KEY); a later release adds a field for it in Settings. It is a public client id, but it is never logged.
+// There is no app key built into Coral (#15638, the Operator: open-source Coral ships none): each person makes their own Dropbox app and saves its key
+// in Settings. The key is a public client id (PKCE), not a secret, but it is never logged. CORAL_DROPBOX_APP_KEY overrides the saved key.
+
+// appKeyShape is what a Dropbox app key looks like: letters and digits (Dropbox makes them 15 characters long; a little room is left either side).
+var appKeyShape = regexp.MustCompile(`^[A-Za-z0-9]{12,20}$`)
+
+// validAppKey says whether key has the shape of a Dropbox app key.
+func validAppKey(key string) bool { return appKeyShape.MatchString(key) }
 
 // DropboxCallbackPort is the port the one-shot listener uses; the app's registered redirect names it.
 const DropboxCallbackPort = 53682
@@ -61,7 +68,13 @@ const dropboxSwitchTTL = 5 * time.Minute
 func (h *CloudHandler) SetDropbox(ds *store.DropboxStore, dataDir string) {
 	h.dbx = &dropboxRoutes{
 		store: ds, flows: dropbox.NewFlows(), dataDir: dataDir, port: DropboxCallbackPort,
-		appKey:    func() string { return os.Getenv("CORAL_DROPBOX_APP_KEY") },
+		appKey: func() string {
+			if k := os.Getenv("CORAL_DROPBOX_APP_KEY"); k != "" {
+				return k
+			}
+			k, _ := ds.AppKey(context.Background()) // saved in Settings; unreadable counts as none
+			return k
+		},
 		client:    dropbox.NewClient,
 		machineID: dropbox.MachineID,
 		save:      ds.Save,
@@ -103,6 +116,7 @@ func (h *CloudHandler) DropboxStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	out := map[string]any{
 		"app_key_set": d.appKey() != "", "connected": c.Connected, "account_id": c.AccountID, "state": c.State,
+		"app_key": d.savedAppKey(r.Context()), "app_key_from_env": os.Getenv("CORAL_DROPBOX_APP_KEY") != "", // the saved key (a public client id) fills Settings' field; the environment's is not shown
 		"paused_no_key":  c.Connected && d.appKey() == "", // signed in (with the key an earlier build shipped) and no key now: the backup is paused, not broken (#15641)
 		"signin_pending": d.flows.Pending(), "looks_like_copy": c.Connected && d.looksLikeCopy(r.Context()),
 	}
@@ -168,7 +182,11 @@ func (h *CloudHandler) DropboxConnect(w http.ResponseWriter, r *http.Request) {
 	}
 	key := d.appKey()
 	if key == "" {
-		writeError(w, http.StatusConflict, "no_app_key", "This build has no Dropbox app key")
+		writeError(w, http.StatusConflict, "no_app_key", "Add your Dropbox app key to connect")
+		return
+	}
+	if !validAppKey(key) {
+		writeError(w, http.StatusBadRequest, "bad_app_key", "That does not look like a Dropbox app key: it is letters and digits only. Check it in your app's page at dropbox.com/developers")
 		return
 	}
 	// The flow cookie is the host's the dashboard was opened at, and the browser returns it only to that host: the callback is on 127.0.0.1, so the
@@ -393,6 +411,85 @@ func (d *dropboxRoutes) revokeRefresh(ctx context.Context, refresh string) bool 
 		return false
 	}
 	return cl.Revoke(ctx, access) == nil
+}
+
+// savedAppKey is the key saved in Settings (” when none or unreadable): a public client id, shown in Settings' field.
+func (d *dropboxRoutes) savedAppKey(ctx context.Context) string {
+	k, err := d.store.AppKey(ctx)
+	if err != nil {
+		return ""
+	}
+	return k
+}
+
+// DropboxSetAppKey answers PUT /api/dropbox/app-key {"app_key": "...", "confirm": bool, "leave_shared": bool} (#15638): the person's own Dropbox app key, saved in Settings
+// ("" removes it). A sign-in belongs to the app it was made with, so changing the key while connected disconnects the old account, and says so first: without "confirm" the
+// answer is 409 confirm_disconnect and nothing changes. The key is never logged.
+func (h *CloudHandler) DropboxSetAppKey(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard) || !requireJSON(w, r) {
+		return
+	}
+	d := h.dbx
+	if d == nil {
+		writeError(w, http.StatusNotFound, "not_available", "Dropbox backup is not available in this build")
+		return
+	}
+	var in struct {
+		AppKey      string `json:"app_key"`
+		Confirm     bool   `json:"confirm"`
+		LeaveShared bool   `json:"leave_shared"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+	if err := decodeJSONStrict(r, &in); err != nil {
+		errBadRequest(w, `send {"app_key": "..."}`)
+		return
+	}
+	key := strings.TrimSpace(in.AppKey)
+	if key != "" && !validAppKey(key) {
+		writeError(w, http.StatusBadRequest, "bad_app_key", "That does not look like a Dropbox app key: it is letters and digits only. Copy the App key from your app's page at dropbox.com/developers")
+		return
+	}
+	ctx := r.Context()
+	if key == d.savedAppKey(ctx) {
+		writeJSON(w, http.StatusOK, map[string]any{"saved": true, "disconnected": false})
+		return
+	}
+	c, err := d.store.Get(ctx)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "", "could not read the Dropbox connection")
+		return
+	}
+	disconnected := false
+	if c.Connected {
+		if !in.Confirm {
+			writeError(w, http.StatusConflict, "confirm_disconnect", "A Dropbox sign-in belongs to the app it was made with. Changing the app key disconnects "+c.AccountID+": connect again with the new key. Files already in Dropbox stay there.")
+			return
+		}
+		if h.refuseWhileOffloaded(w, r) { // never strand files kept only in Dropbox
+			return
+		}
+		if !d.sharesGuard(ctx, w, in.LeaveShared, "after the key changes, Coral can no longer stop sharing them, but you can in Dropbox") {
+			return
+		}
+		if old := d.storedRefresh(ctx); old != "" {
+			d.revokeRefresh(ctx, old) // with the key it was made with: the old one is still the effective key here
+		}
+		d.mu.Lock()
+		d.pending = nil
+		d.mu.Unlock()
+		if err := d.store.Disconnect(ctx); err != nil {
+			writeError(w, http.StatusInternalServerError, "", "could not forget the Dropbox connection")
+			return
+		}
+		d.forgetShares(ctx)
+		disconnected = true
+	}
+	if err := d.store.SetAppKey(ctx, key); err != nil {
+		writeError(w, http.StatusInternalServerError, "", "could not save the Dropbox app key")
+		return
+	}
+	slog.Info("[dropbox] the app key was changed in Settings", "removed", key == "", "disconnected", disconnected) // never the key itself
+	writeJSON(w, http.StatusOK, map[string]any{"saved": true, "disconnected": disconnected})
 }
 
 // DropboxSetFilters answers PUT /api/dropbox/filters {"types": [...], "max_age_days": n}: the Operator's choice of what to back up (stage 4, #14655).
