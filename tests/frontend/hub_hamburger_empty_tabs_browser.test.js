@@ -40,6 +40,25 @@ const BASE = require('./test_base').BASE;
         const problems = [];
         if (!got.open || got.expanded !== 'true') problems.push(`the hamburger did nothing: open ${got.open}, aria-expanded ${got.expanded} (${JSON.stringify(shape)})`);
         else for (const want of ['Settings', 'GitHub', 'Sign out']) if (!got.items.some(x => x.endsWith(want))) problems.push(`the menu has no ${want}: ${JSON.stringify(got.items)}`);
+        // #15487: the same with the phone's bottom bar on (phone-nav-on: Agents and Inbox are its tabs, Home is one tap away) and with the account section not drawn yet (the menu is never empty or short of its fixed rows)
+        const open = async () => {
+            await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
+            await ev(`(document.querySelector('button.phone-menu-btn[data-hamburger]') || document.getElementById('top-menu-btn')).click(); true`);
+            await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'the hamburger opens', 6000);
+            return ev(`[...document.getElementById('nav-more-menu').querySelectorAll('.nav-more-item')].map(x => x.textContent.trim().replace(/\\s+/g, ' ').replace(/^[a-z_]+(?=[A-Z])/, ''))`);
+        };
+        const once = (items, what, label) => { const n = items.filter(x => x.endsWith(label)).length; if (n !== 1) problems.push(`${what}: "${label}" appears ${n} times: ${JSON.stringify(items)}`); };
+        await ev(`document.body.classList.add('phone-nav-on'); true`);
+        let items = await open().catch(e => { problems.push('with the bottom bar on: ' + e.message); return []; });
+        for (const l of ['Settings', 'Docs', 'Computers', 'GitHub', 'Sign out']) once(items, 'with the bottom bar on', l);
+        const at = l => items.findIndex(x => x.endsWith(l)), order = ['Settings', 'Docs', 'Computers', 'GitHub', 'Sign out'].map(at);
+        if (order.some((v, i) => v < 0 || (i && v < order[i - 1]))) problems.push(`with the bottom bar on: Docs and Computers are in the account section's order (Settings, Docs, Computers, GitHub, Sign out; #14785), not up with the tabs: ${JSON.stringify(items)}`);
+        for (const l of ['Home', 'Inbox', 'Automations', 'Analytics']) if (items.some(x => x.endsWith(l))) problems.push(`with the bottom bar on: "${l}" is in the menu though the bar has it: ${JSON.stringify(items)}`);
+        await ev(`(() => { const a = document.getElementById('cloud-account-menu'); window.__acct = a; a.remove(); return true; })()`);
+        items = await open().catch(e => { problems.push('with the account section not drawn: ' + e.message); return []; });
+        if (!items.length) problems.push('with the account section not drawn: the hamburger opened empty');
+        for (const l of ['Settings', 'GitHub']) once(items, 'with the account section not drawn', l);
+        await ev(`document.body.appendChild(window.__acct); true`);
         if (problems.length) { console.error('FAIL\n  ' + problems.join('\n  ')); process.exit(1); }
         console.log('hub_hamburger_empty_tabs_browser: ok');
     } finally { await client.close(); }
