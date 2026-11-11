@@ -24,13 +24,15 @@ const clock = iso => { const d = new Date(iso); return Number.isNaN(d.getTime())
 
 /** What the page knows of the team's pause: { team, paused, since, bySleep } (the team page reads state.teamPause for its header). */
 function remember(team, data, say = false) {
+    const wasSince = pausedSince.has(team) ? pausedSince.get(team) : null; // what the Board's rows were last drawn with
     state.teamPause = { team, paused: !!data.paused && !data.by_sleep, since: typeof data.since === 'string' ? data.since : '', bySleep: !!data.by_sleep };
     bs.isPaused = !!data.paused;
     if (state.teamPause.paused) pausedSince.set(team, state.teamPause.since); else pausedSince.delete(team); // messages since the pause are marked Queued
     window.__coral?._setBoardChatPaused?.(!!data.paused, say); // the Board dock's menu and banner
     syncButton();
     drawBar();
-    try { loadedModule('./board_window.js')?.renderMessages?.(bs._allMessages); } catch { /* the Board is not on screen */ } // the Board's rows again, with or without the mark
+    // the Board's rows again, with or without the mark, only when the mark's answer changed: this runs on every poll, and drawing the rows again replaces them, so a message a link has just jumped to loses its mark (#15566: Open board from the Inbox)
+    if ((pausedSince.has(team) ? pausedSince.get(team) : null) !== wasSince) { try { loadedModule('./board_window.js')?.renderMessages?.(bs._allMessages); } catch { /* the Board is not on screen */ } }
     document.dispatchEvent(new CustomEvent('coral:team-pause-changed', { detail: { team, paused: state.teamPause.paused } }));
 }
 
