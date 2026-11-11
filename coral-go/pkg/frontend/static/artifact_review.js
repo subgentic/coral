@@ -32,6 +32,7 @@ export async function askToRestore(team, row, version) {
 
 const timeWords = at => { const t = Date.parse(at); return Number.isNaN(t) ? '' : new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); };
 
+const NOTE_MAX = 500; // characters of the comment that goes with Approve (#11888)
 const CHANGE_WORDS_MAX = 500; // runes of the words sent with Request changes
 async function decide(team, row, decision, reason, note, quiet = false, words = '') {
     const r = await boardFetch(team, `/artifacts/${encodeURIComponent(row.id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, ...(reason ? { reason } : {}), ...(note ? { note } : {}), ...(quiet ? { quiet: true } : {}), ...(words ? { text: words } : {}) }) });
@@ -207,11 +208,12 @@ export function attachReview(d, { reload }) {
     bar.className = 'artifact-review'; bar.hidden = true;
     bar.innerHTML = `<form class="artifact-review-form" hidden>
             <label for="artifact-review-text">What should change?</label>
-            <textarea id="artifact-review-text" rows="3" maxlength="2000" placeholder="This goes to the agent that uploaded it, as a change request in the comments."></textarea>
+            <textarea id="artifact-review-text" rows="3" maxlength="2000" placeholder="A change request, or a comment with your approval. It goes to the agent that uploaded it."></textarea>
             <span class="artifact-review-error" role="alert"></span>
             <p class="artifact-review-pending" role="status" hidden></p>
-            <button type="submit" class="btn btn-primary">Send request</button>
             <button type="button" class="btn artifact-review-cancel">Cancel</button>
+            <button type="submit" class="btn">Send request</button>
+            <button type="button" class="btn btn-primary artifact-review-approve-note">Approve with comment</button>
         </form>`;
     d.querySelector('.artifact-viewer-header').after(bar); // the change-request form, under the header (not a box inside its row, which squeezed the name to 'RE…', walk 3 N21)
     // the review's controls are on the viewer's one header row (#12223): its status beside the version chip, Approve and Request changes at the right, Approve with a note in the ⋯ menu
@@ -239,8 +241,9 @@ export function attachReview(d, { reload }) {
     const progress = $('.artifact-review-pending');
     const clearProgress = () => { clearTimeout(progressTimer); progressTimer = null; inProgress = false; progress.hidden = true; };
     const submitBtn = form.querySelector('button[type=submit]');
+    const approveWith = form.querySelector('.artifact-review-approve-note');
     const tray = imgs.createImageTray({ upload: (blob, versionOf) => uploadCommentImage(cur.hex, cur.server, blob, versionOf, cur.name) });
-    const syncSend = () => { submitBtn.disabled = sending || inProgress || tray.busy() || tray.failed(); }; // Send waits for a picture still going up, and for a failed one to be removed
+    const syncSend = () => { submitBtn.disabled = approveWith.disabled = sending || inProgress || tray.busy() || tray.failed(); }; // Send waits for a picture still going up, and for a failed one to be removed
     error.before(tray.picker(), tray.node, tray.hint()); tray.attach(form, text); tray.listen(syncSend);
     const paintApprove = () => {
         const n = d.dataset.shownVersion, newer = d.dataset.newerVersion, covers = d.dataset.coversFiles, unopened = d.dataset.unopenedFiles;
@@ -302,10 +305,18 @@ export function attachReview(d, { reload }) {
             reload();
         } catch (e) { showToast(e.message, true); }
     });
-    approveNote.addEventListener('click', () => {
-        if (!cur) return;
-        const was = cur;
-        openApproveNoteDialog(was.team, was.row, out => show({ ...was, state: 'approved', at: out?.review?.at || new Date().toISOString() }));
+    approveNote.addEventListener('click', () => { if (cur) openForm(true); }); // the ⋯ item opens the same one place: the comment box with Approve beside Request changes (#15545)
+    approveWith.addEventListener('click', async () => {
+        if (!cur || sending || inProgress) return;
+        const note = text.value.replace(/\s+/g, ' ').trim(), was = cur;
+        if ([...note].length > NOTE_MAX) { error.textContent = `Keep the comment to ${NOTE_MAX} characters: it is ${[...note].length}. Your words are still here.`; return; }
+        if (tray.hexes().length) { error.textContent = 'Pictures go with Request changes. Remove them to approve with a comment.'; return; }
+        sending = true; syncSend(); error.textContent = '';
+        try {
+            const out = await approveRow(was.team, was.row, note);
+            sayApproved(was.row.name || 'the artifact', out); announceNotice(`Approved ${shown(was.row.name || 'the artifact')}.`);
+            text.value = ''; tray.clear(); openForm(false); show({ ...was, state: 'approved', at: out.review?.at || new Date().toISOString() });
+        } catch (e) { error.textContent = e.message || 'Not saved.'; } finally { sending = false; syncSend(); }
     });
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
