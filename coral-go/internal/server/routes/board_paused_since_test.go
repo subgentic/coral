@@ -49,7 +49,13 @@ func TestAPausedBoardSaysSinceWhenItWasPausedAndAResumedOneNothing(t *testing.T)
 	assert.Equal(t, false, got["by_sleep"], "a person's pause")
 
 	h.PauseForSleep("other")
-	assert.Equal(t, true, func() any { resp, _ := http.Get(srv.URL + "/api/board/other/paused"); var o map[string]any; _ = json.NewDecoder(resp.Body).Decode(&o); resp.Body.Close(); return o["by_sleep"] }(), "a team's sleep pause says so")
+	assert.Equal(t, true, func() any {
+		resp, _ := http.Get(srv.URL + "/api/board/other/paused")
+		var o map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&o)
+		resp.Body.Close()
+		return o["by_sleep"]
+	}(), "a team's sleep pause says so")
 
 	post("/api/board/team/resume")
 	got = get()
