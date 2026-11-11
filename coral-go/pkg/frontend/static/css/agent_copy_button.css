@@ -7,3 +7,9 @@
 .agent-copy-hrow > .settings-pane-title { flex: 1 1 auto; min-width: 0; }
 .docs-hrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; } /* a document's heading with its robot (docs_agent_copy.js) */
 .docs-hrow > :is(h1, h2, h3) { flex: 1 1 auto; min-width: 0; }
+/* The team page's robot in the two-column head (601-760 px): its own column beside Actions, spanning the title and status rows. Auto-placed it took Actions' cell and added a row of 44 px to the head (#15547, short_window_200). */
+@media (min-width: 601px) and (max-width: 760px) {
+    .team-page-head:has(> .team-page-agent-copy) { grid-template-columns: minmax(0, 1fr) auto auto; }
+    .team-page-head > .team-page-agent-copy { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+    .team-page-head:has(> .team-page-agent-copy) .team-page-actions { grid-column: 3; }
+}
