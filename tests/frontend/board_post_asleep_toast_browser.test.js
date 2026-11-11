@@ -69,13 +69,13 @@ const POSTS = `(() => {
         assert.ok(five.endsWith('(and 2 more)'), five);
         console.log('   ✓ three named and "(and 2 more)"');
 
-        console.log('4. Nobody asleep (no field, an empty list, a note that is not text): no toast');
+        console.log('4. Nobody asleep (no field, an empty list, a note that is not text): only Sent (#15287), never an asleep note');
         for (const asleep of [null, [], [{ name: 'X', state: 'asleep', note: 42 }]]) {
             await post('@Dev ping', asleep);
-            await ev(`new Promise(r => setTimeout(r, 400))`); // sleep-ok: nothing should appear: wait out the toast's own draw before reading none
-            assert.deepEqual(await ev(toasts), [], `no toast for ${JSON.stringify(asleep)}`);
+            await waitFor(`${toasts}.length >= 1`, 'the Sent toast', 3000);
+            assert.deepEqual(await ev(toasts), ['Sent'], `a send is answered with Sent and nothing else for ${JSON.stringify(asleep)}`);
         }
-        console.log('   ✓ no toast');
+        console.log('   ✓ Sent only');
         console.log('PASS board_post_asleep_toast_browser');
     } finally {
         await removeBoards(ev, [BOARD]);
