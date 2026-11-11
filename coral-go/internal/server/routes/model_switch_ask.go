@@ -4,7 +4,9 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
+	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/terminalinput"
 )
 
@@ -43,14 +45,25 @@ func (a *switchAsker) open(ctx context.Context) bool {
 			return true
 		}
 	}
-	question := strings.TrimSpace(strings.Join(strings.Fields(ps.Title+" "+ps.Question), " "))
-	if len(question) > 240 {
-		question = question[:240] + "…"
-	}
+	question := askingText(ps.Title, ps.Question)
 	a.h.modelSwitches.update(a.sessionID, a.seq, func(s *modelSwitch) { s.Asking = question })
 	a.h.hints.noteSlash(a.sessionID) // the chat reads the screen for the card while it is open
 	a.h.kickWS()
 	return true
+}
+
+// askingText is the dialog's title and question as one line for the chat: terminal control codes and invisible characters out (the screen is another program's text), cut to 240 bytes on a character boundary so a
+// multi-byte character is never split into invalid UTF-8 (#15451).
+func askingText(title, question string) string {
+	text := clitext.CleanName(title + " " + question)
+	if len(text) <= 240 {
+		return text
+	}
+	cut := 240
+	for cut > 0 && !utf8.RuneStart(text[cut]) {
+		cut--
+	}
+	return text[:cut] + "…"
 }
 
 // impliedYes is the number of the option that says Yes to the cache dialog of "/model <name>" when the dialog is that one and the switch asked for a model; 0 for any other dialog. The person chose this model; the dialog only warns that the next
