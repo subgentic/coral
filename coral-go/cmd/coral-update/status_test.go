@@ -105,7 +105,7 @@ func TestStatusSaysWhatTheUpdaterKnows(t *testing.T) {
 	applyEnabled = false
 	m := statusJSON(t, nil)
 	wantFeature := "on"
-	if !config.TierChecksForUpdates { // a dev, beta or dropboxers build says it is off, and still says everything else
+	if !config.TierChecksForUpdates { // a dev build says it is off, and still says everything else
 		wantFeature = "off"
 	}
 	assert.Equal(t, wantFeature, m["feature"])
@@ -145,7 +145,7 @@ func TestStatusBackoffThatEndedIsSaidToHaveEnded(t *testing.T) {
 // It answers with the feature off, and says why, for each way of being off.
 func TestStatusAnswersWhenTheFeatureIsOff(t *testing.T) {
 	withVersion(t, "1.4.130")
-	// The build's tier is checked first: a dev, beta or dropboxers build is off for that reason whatever else is set.
+	// The build's tier is checked first: a dev build is off for that reason whatever else is set.
 	reason := func(other string) string {
 		if !config.TierChecksForUpdates {
 			return "build_tier"

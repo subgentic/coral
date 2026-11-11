@@ -5,10 +5,8 @@
  * opens. */
 
 import { state } from './state.js';
-import { fetchSystemStatus } from './system_status.js';
 import { updateTerminalTheme, applySettingsFont } from './xterm_renderer.js';
 import { browserLocal } from './safe_storage.js';
-import { onBuilt } from './lazy_dom.js';
 import { isCloud } from './server_base.js';
 // What Save sends: only the fields the person changed (here so the module is loaded at startup, import_hygiene).
 export { changedSettings } from './settings_diff.js';
@@ -236,31 +234,11 @@ export async function loadSettings() {
             clearCustomThemeVars();
             applyTheme(s.theme, { remember: false });
         }
-        // A partner build names itself in the settings menu
-        _loadTierBadge();
     } catch (e) {
         console.error("Failed to load settings:", e);
     }
 }
 
-/** A partner build's name in the settings menu (Coral for Dropbox); nothing otherwise. The menu is built on first open
- *  (#4500); until then this has nothing to fill. Coral has no paid licence (#3221). */
- async function _loadTierBadge() {
-    const badge = document.getElementById('tier-badge');
-    if (!badge) return;
-    try {
-        const resp = await fetchSystemStatus();
-        if (!resp.ok) return;
-        const data = await resp.json();
-        if (data.tier_name === 'dropboxers') {
-            badge.innerHTML = '<span class="tier-label tier-pro">Coral For Dropbox</span>';
-            badge.style.display = '';
-        } else {
-            badge.style.display = 'none';
-        }
-    } catch { /* silent — non-critical */ }
-}
-onBuilt('top-bar-settings-menu', () => { _loadTierBadge(); });
 
 /** Resolve "system" to the actual dark/light value */
  function resolveTheme(theme) {

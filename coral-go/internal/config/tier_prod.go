@@ -1,4 +1,4 @@
-//go:build !dev && !beta && !dropboxers && !staging
+//go:build !dev && !staging
 
 package config
 

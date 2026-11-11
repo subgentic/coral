@@ -248,7 +248,7 @@ type Provisioner struct {
 	eula func() (required, accepted bool)
 }
 
-// hubEULAState is this hub's own acceptance: the tier (dev and dropboxers skip the EULA and install their own build, which skips it too) and the marker the person's own acceptance wrote.
+// hubEULAState is this hub's own acceptance: the tier (a dev build skips the EULA and installs its own build, which skips it too) and the marker the person's own acceptance wrote.
 func hubEULAState() (required, accepted bool) { return config.EULARequired(), license.IsEULAAccepted() }
 
 // portInUseSentence is the answer when 8420 on the far computer is held by something that is not this user's Coral (usually another user's: every Coral set up from here listens on 8420).
@@ -557,7 +557,7 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// A setup and an upgrade put Coral on the computer and record this hub's acceptance of the terms there. Stop and remove do not touch the terms. On a tier that requires the EULA the marker must hold the
-	// current version and digest, else nothing is done; on a tier that skips it (dev, dropboxers) the build on the far computer skips it too, so nothing is recorded and nothing is refused.
+	// current version and digest, else nothing is done; on a tier that skips it (dev) the build on the far computer skips it too, so nothing is recorded and nothing is refused.
 	var acceptance []byte
 	if k := p.kind(); k == kindSetup || k == kindUpgrade {
 		required, accepted := pr.eula()

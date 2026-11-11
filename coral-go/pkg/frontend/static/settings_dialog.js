@@ -53,9 +53,6 @@ export async function showSettingsModal(group) {
 
     _fillFilesAndGit(s);
 
-    // A partner build's name (Coral has no paid licence, #3221)
-    if (!isCloud()) _loadTierBranding();
-
     // App version
     fetch('/api/system/status').then(r => r.json()).then(d => {
         const el = document.getElementById('app-version-label');
@@ -78,15 +75,3 @@ export async function showSettingsModal(group) {
     document.getElementById("settings-modal").style.display = "flex";
 }
 
-async function _loadTierBranding() {
-    try {
-        const resp = await fetch('/api/system/status');
-        if (!resp.ok) return;
-        const data = await resp.json();
-        const branding = document.getElementById('tier-branding-label');
-        if (branding && data.tier_name === 'dropboxers') {
-            branding.textContent = 'Coral For Dropbox';
-            branding.style.display = '';
-        }
-    } catch { /* non-critical */ }
-}
