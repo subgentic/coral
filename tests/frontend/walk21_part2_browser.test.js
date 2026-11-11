@@ -14,6 +14,7 @@ const BASE = require('./test_base').BASE;
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const B = 'w21-' + Date.now().toString(36);
+    let launched = null; // the agent M4 starts: the finally stops it, or its row and its board's subscriber outlive the suite (--fail-on-leak, v2.0.66 #15678)
     const api = (method, path, body, headers) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: ${JSON.stringify(headers || { 'Content-Type': 'application/json' })}, body: ${body === undefined ? 'undefined' : typeof body === 'string' ? JSON.stringify(body) : JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -61,7 +62,7 @@ const BASE = require('./test_base').BASE;
         await section('M4', async () => {
         console.log('M4. The team page tabs do not move when a count arrives');
         const launch = await api('POST', '/api/sessions/launch', { working_dir: os.tmpdir(), agent_type: 'terminal', display_name: 'W21 QA' });
-        const sid = launch.body.session_id, sname = launch.body.session_name || launch.body.name; assert.ok(sid, JSON.stringify(launch));
+        const sid = launch.body.session_id, sname = launch.body.session_name || launch.body.name; assert.ok(sid, JSON.stringify(launch)); launched = { sid, sname };
         assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'W21 QA', job_title: 'Backend Dev', session_name: sname })).status < 300);
         const up = await api('POST', `/api/agent/artifacts?session_id=${sid}`, '<h1>hi</h1>', { 'X-Artifact-Name': 'index.html', 'X-Artifact-Media-Type': 'text/html' });
         assert.equal(up.status, 201, JSON.stringify(up)); hex = /[a-f0-9]{64}/.exec(up.body.uri)[0];
@@ -89,5 +90,7 @@ const BASE = require('./test_base').BASE;
         });
         assert.deepEqual(fails, [], 'Walk 21 part 2 findings');
         console.log('PASS Walk 21 part 2: M4 tabs stay put, M7 Thinking select, L2 viewer title, L3 light terminal surface');
-    } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close().catch(() => {}); }
+    } finally {
+        if (launched) { try { await ev(`fetch('/api/sessions/live/' + encodeURIComponent(${JSON.stringify(launched.sname)}) + '/kill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_type: 'terminal', session_id: ${JSON.stringify(launched.sid)} }) }).then(() => true)`); } catch { /* best effort */ } }
+        await removeBoards(ev, [B]).catch(() => {}); await client.close().catch(() => {}); }
 })().catch(e => { console.error(e); process.exit(1); });
