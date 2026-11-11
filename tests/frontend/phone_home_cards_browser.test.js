@@ -42,7 +42,8 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`document.getElementById('group-table-view')?.dataset.group === 'hub-inbox:chats'`, `${tag}: All chats opens`, 5000);
                 const landed = await ev(`({ group: document.getElementById('group-table-view')?.dataset.group, path: location.pathname, box: document.getElementById('inbox-search')?.value })`);
                 assert.ok(landed.group === 'hub-inbox:chats' && landed.box === 'build' && !/needs/.test(landed.path), `${tag}: the tap opens All chats with the words, not Needs you: ` + JSON.stringify(landed));
-                await ev(`window.switchNavTab('agents'); true`).catch(() => {});
+                await ev(`window.switchNavTab('agents'); true`);
+                await waitFor(`(() => { const l = document.getElementById('mobile-agent-list'), g = document.getElementById('group-table-view'); return !!l && l.getBoundingClientRect().height > 0 && (!g || g.getBoundingClientRect().height === 0 || getComputedStyle(g).display === 'none'); })()`, `${tag}: the Agents page is back after All chats`, 6000);
                 await ev(`(() => { const i = document.querySelector('#mobile-agent-list .mobile-search-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
                 await waitFor(`document.getElementById('agent-search-all-chats').hidden`, `${tag}: the line goes with the words`, 4000);
             }
@@ -51,7 +52,8 @@ const { coralReady } = require('./helpers/wait');
                 const k = await ev(`(() => { const T = ${require('./helpers/touch_area').TOUCH_AREA}; return [...document.querySelectorAll('#mobile-session-list .session-group-item')].map(li => { const a = T(li.querySelector('.sidebar-kebab-btn')), c = li.getBoundingClientRect(); return { area: [Math.round(a.l - c.left), Math.round(c.right - a.r)], w: Math.round(a.w), inside: a.l >= c.left - 0.5 && a.r <= c.right + 0.5 && a.t >= c.top - 0.5 && a.b <= c.bottom + 0.5, over: Math.round(a.r - c.right) }; }); })()`);
                 assert.ok(k.length >= 3 && k.every(x => x.w >= 44 && x.inside), `${tag}: every card's kebab hit area (44 px) is inside the card: ` + JSON.stringify(k));
             }
-            const menu = await ev(box(`document.querySelector('#mobile-agent-list .phone-menu-btn')`)), pill = await ev(box(`document.querySelector('#mobile-agent-list .mobile-search-input')`)), acct = await ev(box(`document.querySelector('#mobile-agent-list .phone-account-btn')`));
+            // one read for the three boxes: separate reads can straddle a layout change (the Linux gate saw the menu 59 px above the pill, #15594)
+            const { menu, pill, acct } = await ev(`(() => { const b = s => { const r = document.querySelector('#mobile-agent-list ' + s).getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), b: Math.round(r.bottom), w: Math.round(r.width), h: Math.round(r.height) }; }; return { menu: b('.phone-menu-btn'), pill: b('.mobile-search-input'), acct: b('.phone-account-btn') }; })()`);
             assert.ok(menu.w >= 44 && menu.h >= 44 && acct.w >= 44 && acct.h >= 44 && pill.h >= 44, `${tag}: menu, search pill and account are 44 px targets: ` + JSON.stringify({ menu, pill, acct }));
             assert.ok(Math.abs((menu.t + menu.b) / 2 - (pill.t + pill.b) / 2) <= 3 && Math.abs((acct.t + acct.b) / 2 - (pill.t + pill.b) / 2) <= 3, `${tag}: one row: ` + JSON.stringify({ menu, pill, acct }));
             assert.ok(menu.r <= pill.l && pill.r <= acct.l && acct.r <= 390, `${tag}: menu, pill and account side by side, inside the screen`);
