@@ -63,7 +63,8 @@ run_case() {
   local dir="$WORK/case-$name"
   mkdir -p "$dir"
   ( cd "$dir"
-    for f in "$@"; do mkdir -p "$(dirname "$f")"; : > "$f"; done )
+    for f in "$@"; do mkdir -p "$(dirname "$f")"; : > "$f"; done
+    [ -n "${NO_INSTALL_SH:-}" ] || echo '#!/usr/bin/env bash' > install.sh )  # the checkout's install.sh (#14097)
   export GH_LOG="$dir/gh.log"; : > "$GH_LOG"
   export COSIGN_LOG="$dir/cosign.log"; : > "$COSIGN_LOG"
   local rc=0
@@ -117,6 +118,11 @@ NO_RELEASE=1 run_case new-release 0 8 3 "${ALL[@]}"
 NO_RELEASE=1 PRERELEASE=true run_case new-prerelease 0 8 3 "${ALL[@]}"
 grep -q -- '^gh release create .*--prerelease --latest=false' "$WORK/case-new-prerelease/gh.log" || { echo "FAIL new-prerelease: created without --prerelease --latest=false" >&2; failures=$((failures + 1)); }
 NO_RELEASE=1 FAIL_CREATE=1 run_case create-fails nonzero 0 0 "${ALL[@]}"
+
+# install.sh is a release asset (#14097): listed in SHA256SUMS.txt under its own name and uploaded with the stable-name copies; a checkout without it stops the step before any upload.
+grep -q '  install.sh$' "$WORK/case-all-present/SHA256SUMS.txt" || { echo "FAIL all-present: SHA256SUMS.txt does not list install.sh" >&2; failures=$((failures + 1)); }
+grep -q '^gh release upload .*stable/install.sh' "$WORK/case-all-present/gh.log" || { echo "FAIL all-present: install.sh was not uploaded" >&2; failures=$((failures + 1)); }
+NO_INSTALL_SH=1 run_case install-sh-missing nonzero 0 0 "${ALL[@]}"
 
 # The Coral For Dropbox tier ships no MSI (operator decision, 2026-10-21): with no MSI in the artifacts the step still succeeds
 # (4 packages + 1 stable-name call + SHA256SUMS.txt + 1 bundle call = 7 uploads, 3 signatures), and its checksums name no MSI. The

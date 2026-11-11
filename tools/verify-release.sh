@@ -156,6 +156,8 @@ if [ -n "$meta" ]; then
     need+=("coral-linux-amd64.tar.gz" "coral-linux-arm64.tar.gz" "coral-linux-amd64.tar.gz.sigstore.json" "coral-linux-arm64.tar.gz.sigstore.json"
            "Coral.dmg" "Coral-x64.msi" "Coral-x64-portable.zip")
   fi
+  # install.sh (#14097), from 2.0.65 on: an asset of the release, so the public install line is the file this release built from
+  if release_has_install_sh "$want_ver"; then need+=("install.sh"); fi
   missing=""
   for n in "${need[@]}"; do has "$n" || missing="$missing $n"; done
   dmg="$(grep -E '^Coral\.v.*\.dmg$' <<<"$names" | head -1)"
@@ -274,6 +276,9 @@ if [ -f SHA256SUMS.txt ]; then
   for p in "${packages[@]+"${packages[@]}"}"; do
     case " $listed " in *" $p "*) ;; *) fail sha256 "$p" "not listed in SHA256SUMS.txt: nothing checked it" ;; esac
   done
+  if release_has_install_sh "$want_ver"; then
+    case " $listed " in *" install.sh "*) ;; *) fail sha256 "install.sh" "not listed in SHA256SUMS.txt: the signed checksums do not cover the install script" ;; esac
+  fi
 else
   fail sha256 "SHA256SUMS.txt" "missing"
 fi
