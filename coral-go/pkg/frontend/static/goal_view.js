@@ -11,6 +11,7 @@ import { isPhoneLayout } from './phone_layout.js';
 const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is one shared helper (#12182)
 import { foldWayBack } from './way_back.js';
 import * as W from './goal_words.js';
+const { shortTitle } = await importOnce('./goal_short.js');
 import { onGoalsSeq } from './goals_feed.js';
 import { looksDone, hiddenList, hideGoalDone } from './goal_done.js';
 import { pollEvery } from './overload.js';
@@ -186,8 +187,9 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         }
         row.append(acts); main.append(row);
         if (W.isOpenGoal(g) && operatorChangesNeedNewer(sp.server)) { const note = el('p', 'goals-note goals-ops-note', operatorChangesNote()); note.setAttribute('role', 'note'); main.append(note); } // an older computer behind a Hub: the two buttons are hidden, and the page says why (#13517)
-        const h = el('h2', 'goals-detail-title', g.title); h.tabIndex = -1; if (phone) { h.title = g.title; row.classList.add('goal-head-phone'); } h.id = 'goals-detail-title';
-        row.append(h); // the title is in the header row: a phone puts the back beside it and the link and actions under (team_page.css), as on the task page
+        const h = el('h2', 'goals-detail-title', shortTitle(g.title)); h.dataset.goalId = String(g.id); h.tabIndex = -1; if (phone) { row.classList.add('goal-head-phone'); } h.id = 'goals-detail-title';
+        row.append(h); if (g.title && shortTitle(g.title) !== g.title.trim()) { const full = el('p', 'goals-note', g.title); row.after(full); } // the heading is the short name; the whole title is the line under it (#15245)
+        // the title is in the header row: a phone puts the back beside it and the link and actions under (team_page.css), as on the task page
         foldWayBack(main, '.goals-back', '.goals-detail-title');
         const line = el('div', 'goals-detail-line'); line.append(stateChip(g));
         const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) { const m = el('span', 'goal-card-meta'); const d = String(g.driver || '').trim(); if (d) { m.append('Driver: ', agentLink(d, { board: model.project }), meta.slice(`Driver: ${d}`.length)); } else m.textContent = meta; line.append(m); } // the driver opens its chat (#12182)
