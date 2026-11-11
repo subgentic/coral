@@ -27,7 +27,7 @@ func shortOf(t *testing.T, p string) string {
 }
 
 // #350 (Orchestrator, Security): a folder has two spellings on Windows, the long name and the 8.3 short one (C:\Users\LONGUS~1\AppData\Local\Temp), and a checked binary
-// must be refused in a temporary folder whichever spelling reaches it, and whichever spelling the temp folder is given in. Run with the Go the release ships (1.26.10) and the
+// must be refused in a temporary folder whichever spelling reaches it, and whichever spelling the temp folder is given in. Run with the Go the release ships (1.26.11) and the
 // newest: the comparison is of strings after EvalSymlinks, which expands short names on 1.27.3.
 func TestCLICheckRefusesABinaryInATempFolderBySpellingOfEitherPath(t *testing.T) {
 	h := newSystemHandlerForTest(t)
