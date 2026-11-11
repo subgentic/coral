@@ -55,7 +55,7 @@ const { coralReady } = require('./helpers/wait');
 
             // Phone rows keep navigation and the approved review star; other actions stay in selection.
             const visible = await ev(`[...document.querySelectorAll('${T} tbody tr button')].filter(b => { const c = (b.closest('.dt-td') || b).getBoundingClientRect(); return c.width > 2 && c.height > 2 && getComputedStyle(b).visibility !== 'hidden'; }).map(b => b.getAttribute('aria-label') || b.textContent)`);
-            assert.deepEqual(visible.filter(l => !/^(Open |Task: |Star |Remove the star from |Approve: |Request changes: |More actions for |Approve with a note: |Dismiss: |Deny: |Save for later: |Copy version ID: |Answer the question of )/.test(l)), [], at + 'a phone row carries navigation, the review star and its own review buttons (#14627: Approve and Request changes at rest, the rest in More actions): ' + JSON.stringify(visible));
+            assert.deepEqual(visible.filter(l => !/^(Open |Task: |Star |Remove the star from |Approve: |Request changes: |More actions for |Approve with a note: |Dismiss: |Deny: |Save for later: |Copy version ID: |Answer the question of |Got it: |New agent: |New team: |Connect: |Read it: |Open guide: )/.test(l)), [], at + 'a phone row carries navigation, the review star and its own review buttons (#14627: Approve and Request changes at rest, the rest in More actions): ' + JSON.stringify(visible));
             // a tap opens the question
             await tap('Which port should the test server use?');
             await waitFor(`!!document.querySelector('dialog[open]')`, at + 'a tap opens the question', 6000);

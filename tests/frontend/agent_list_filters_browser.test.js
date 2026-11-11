@@ -228,8 +228,8 @@ const stateOf = s => s.waiting_for_input ? 'needs_input' : s.sleeping ? 'asleep'
         assert.equal(big.name, 'Display options, 2 filters on', 'the button names how many filters are on');
         await toggleBtn();
         const stacked = await ev(`(() => [...document.querySelectorAll('#agent-list-bar .list-bar-field')].filter(f => f.getClientRects().length).map(f => { const l = f.querySelector('.list-bar-field-label').getBoundingClientRect(), s = f.querySelector('select').getBoundingClientRect(), p = document.querySelector('.sidebar-header [data-display-panel]').getBoundingClientRect();
-            return { under: s.top >= l.bottom - 1, wide: s.width, inside: s.left >= p.left - 1 && s.right <= p.right + 1 }; }))()`);
-        assert.ok(stacked.length >= 3 && stacked.every(x => x.under && x.inside && x.wide >= 150), 'each select is under its label, whole and wide enough to read: ' + JSON.stringify(stacked));
+            return { under: s.top >= l.bottom - 1 || s.left >= l.right - 1, wide: s.width, inside: s.left >= p.left - 1 && s.right <= p.right + 1 }; }))()`);
+        assert.ok(stacked.length >= 3 && stacked.every(x => x.under && x.inside && x.wide >= 150), 'each select is under (or, in a panel wide enough for both, beside: #15271) its label, whole and wide enough to read: ' + JSON.stringify(stacked));
         await shot('agent-list-filters-open-200');
         await toggleBtn(); await shot('agent-list-filters-closed-200');
         console.log('PASS agent list filters');

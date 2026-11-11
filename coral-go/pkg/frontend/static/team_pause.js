@@ -26,11 +26,12 @@ const clock = iso => { const d = new Date(iso); return Number.isNaN(d.getTime())
 function remember(team, data, say = false) {
     state.teamPause = { team, paused: !!data.paused && !data.by_sleep, since: typeof data.since === 'string' ? data.since : '', bySleep: !!data.by_sleep };
     bs.isPaused = !!data.paused;
+    const markBefore = pausedSince.get(team);
     if (state.teamPause.paused) pausedSince.set(team, state.teamPause.since); else pausedSince.delete(team); // messages since the pause are marked Queued
     window.__coral?._setBoardChatPaused?.(!!data.paused, say); // the Board dock's menu and banner
     syncButton();
     drawBar();
-    try { loadedModule('./board_window.js')?.renderMessages?.(bs._allMessages); } catch { /* the Board is not on screen */ } // the Board's rows again, with or without the mark
+    if (pausedSince.get(team) !== markBefore) { try { loadedModule('./board_window.js')?.renderMessages?.(bs._allMessages); } catch { /* the Board is not on screen */ } } // the Board's rows again, with or without the mark: only when the mark changed (a read of an unchanged pause redrew every row and dropped a jump's target, #15578)
     document.dispatchEvent(new CustomEvent('coral:team-pause-changed', { detail: { team, paused: state.teamPause.paused } }));
 }
 

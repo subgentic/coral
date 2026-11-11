@@ -1,7 +1,7 @@
 /* The list of a file's versions (#15285): "3 earlier versions" opens it. One row per version, oldest first, numbered v1, v2, v3 across the rounds, with when, who made it and Open; the newest is marked.
  * Restore (given by the caller when someone can be asked) asks the uploader to put that version back as the next one, after asking the person first. Loaded only when the list is opened. All text is set with textContent. */
 import { importOnce } from './import_once.js';
-import { fetchSkewed, VERSIONS_KEYS } from './query_skew.js';
+const { readVersions } = await importOnce('./versions_read.js');
 import { markHidden } from './visible_marks.js';
 import { splitKey } from './server_base.js';
 const { loadStyles } = await importOnce('./lazy_styles.js');
@@ -12,7 +12,7 @@ const when = iso => { const t = new Date(iso); return Number.isNaN(t.getTime()) 
 /** The versions of the file the row stands for, oldest first: [{ n, hex, at, who, current }]. The server's series when it has one, else the older uploads of the same file the row already holds (`earlier`) and itself. */
 export async function versionsOf({ hex, server, board, current, earlier }) {
     try {
-        const { response: r, dropped } = await fetchSkewed(server, `/api/artifacts/${hex}/versions`, board ? { board } : {}, { kind: 'versions', keys: VERSIONS_KEYS, retry: false });
+        const { response: r, dropped } = await readVersions(server, hex, board, { reuse: true });
         if (!dropped.length && r.ok) {
             const d = await r.json();
             if (Array.isArray(d) && d.length > 1) {
@@ -78,7 +78,7 @@ export async function newerOf(team, hex) {
     if (top) return { n: Number(top.version) > 1 ? Number(top.version) : (top.earlier || []).length + 1, hex: top.hex };
     try {
         const k = splitKey(team);
-        const { response, dropped } = await fetchSkewed(k.server, `/api/artifacts/${hex}/versions`, k.name ? { board: k.name } : {}, { kind: 'versions', keys: VERSIONS_KEYS, retry: false });
+        const { response, dropped } = await readVersions(k.server, hex, k.name, { reuse: true });
         if (!dropped.length && response.ok) {
             const list = await response.json();
             if (Array.isArray(list) && list.length > 1) { const last = list.reduce((a, b) => (b.version > a.version ? b : a)); if (last.digest !== hex) return { n: last.version, hex: last.digest }; }
