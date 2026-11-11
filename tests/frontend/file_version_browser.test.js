@@ -3,13 +3,14 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
-const { H1, H2, H3, STUB, FILE, lineOf } = require('./helpers/artifact_versions_stub');
+const { H1, H2, H3, STUB, FILE, lineOf, headOf } = require('./helpers/artifact_versions_stub');
 const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const S = `(window.__coralStatic || '/static/')`;
     const vis = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); return !!e && !e.hidden && e.getClientRects().length > 0; })()`;
+    const noId = l => l.replace(/ \(file [^)]*\)$/, ''); // the header drops the id (#15142)
     const head = () => ev(`(document.querySelector('#artifact-viewer .artifact-viewer-versionline') || {}).textContent || ''`);
     const headShown = () => ev(vis('#artifact-viewer .artifact-viewer-versionline'));
     const chip = () => ev(`(document.querySelector('#artifact-viewer .artifact-viewer-fileid:not([hidden]) .artifact-viewer-fileid-text') || {}).textContent || ''`);
@@ -30,7 +31,7 @@ const { coralReady } = require('./helpers/wait');
             console.log(`${at}: v3 opened with its line: the header and Details say it`);
             await open(H3, { fileId: FILE, versionLine: lineOf(3) });
             await waitFor(vis('#artifact-viewer .av-current'), `${at}: the bar`, 6000);
-            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(lineOf(3))}`, `${at}: the header line of v3`, 6000);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(headOf(3))}`, `${at}: the header line of v3`, 6000);
             assert.equal(await headShown(), true, `${at}: the header line is visible`);
             assert.equal(await detailsShown(), false, `${at}: a file id and line add no Details button of their own (row one on a phone stays the name, Comments and the menu)`);
 
@@ -39,18 +40,20 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(vis('#artifact-viewer .av-list'), `${at}: the list`, 3000);
             await ev(`document.querySelector('#artifact-viewer .av-option[data-version="2"]').click(); true`);
             await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-body').textContent.includes('Revoke sits beside Rename')`, `${at}: v2's text`, 6000);
-            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(lineOf(2))}`, `${at}: the header line of v2`, 4000);
-            assert.equal(await head(), lineOf(2), `${at}: the header says v2`);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(headOf(2))}`, `${at}: the header line of v2`, 4000);
+            assert.equal(await head(), headOf(2), `${at}: the header says v2`);
             assert.ok(!(await head()).includes('version 3'));
+            assert.ok(!(await head()).includes(FILE) && !/\(file /.test(await head()), `${at}: the header does not carry the file id (#15142)`);
+            assert.ok((await ev(`(document.querySelector('#artifact-viewer .artifact-viewer-fileid-text')||{}).textContent||''`)).includes(FILE), `${at}: Details keeps the file id`);
 
             console.log(`${at}: a save-style reopen (the previous version's opts spread onto the new hex) takes the new version's line`);
             await open(H1, { fileId: FILE, versionLine: lineOf(3), switched: false }); // what onSaved and a discarded edit do: the caller's line is v3's, the hex shown is v1
-            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(lineOf(1))}`, `${at}: v1's own line, not the v3 line the opts carried`, 6000);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(headOf(1))}`, `${at}: v1's own line, not the v3 line the opts carried`, 6000);
             await closeViewer();
 
             console.log(`${at}: Copy file ID copies the id alone; no clipboard and a refused copy are failures`);
             await open(H3, { fileId: FILE, versionLine: lineOf(3) });
-            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(lineOf(3))}`, `${at}: the line, for the menu item`, 6000);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(headOf(3))}`, `${at}: the line, for the menu item`, 6000);
             await ev(`window.__copied = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: t => { window.__copied.push(t); return Promise.resolve(); } }, configurable: true }); true`);
             await copyClick();
             await waitFor(`window.__copied.length === 1`, `${at}: copied`, 3000);
@@ -71,7 +74,7 @@ const { coralReady } = require('./helpers/wait');
             const X = '8'.repeat(64); // a hex the stub lists no versions for: only the caller's opts could give it a line
             const L_A = `version 2 of notes.md (file ${FILE})`, FILE_B = 'b1b2b3b4b5b6b7b8b9babbbcbdbebf00', L_B = `version 5 of notes.md (file ${FILE_B})`;
             await open(X, { fileId: FILE, versionLine: L_A, board: 'team-a', server: undefined });
-            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(L_A)}`, `${at}: team A's row says its line`, 6000);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(noId(L_A))}`, `${at}: team A's row says its line`, 6000);
             await closeViewer();
             await open(X, { board: 'team-a' }); // the same digest again from a caller with no metadata (an older server, a plain link)
             await waitFor(`!!document.getElementById('artifact-viewer') && !document.getElementById('artifact-viewer').hidden && !!document.querySelector('#artifact-viewer .artifact-viewer-body')?.textContent`, `${at}: reopened`, 6000);
@@ -79,9 +82,9 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await chip(), '', `${at}: and no Copy chip`);
             await closeViewer();
             await open(X, { fileId: FILE, versionLine: L_A, board: 'team-a' });
-            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(L_A)}`, `${at}: A again`, 6000);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(noId(L_A))}`, `${at}: A again`, 6000);
             await open(X, { fileId: FILE_B, versionLine: L_B, board: 'team-b' }); // the same digest from another team, with that team's own id and line
-            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(L_B)}`, `${at}: team B's own line replaces A's`, 6000);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(noId(L_B))}`, `${at}: team B's own line replaces A's`, 6000);
             assert.equal(await chip(), L_B, `${at}: Details says B's too, never A's`);
             await open(X, { board: 'team-b' }); // and without metadata from team B: none, not B's, not A's
             await waitFor(`!document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent`, `${at}: cleared`, 6000);
@@ -89,7 +92,7 @@ const { coralReady } = require('./helpers/wait');
 
             console.log(`${at}: an older computer (the bar has no line for the digest): team A's line is never shown for the same digest opened from team B with none`);
             await open(X, { fileId: FILE, versionLine: L_A, board: 'team-a' });
-            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(L_A)}`, `${at}: A's line`, 6000);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(noId(L_A))}`, `${at}: A's line`, 6000);
             await closeViewer();
             await open(X, { board: 'team-b' }); // QA Reviewer 2's case: the same digest, another team, no metadata
             await waitFor(`!!document.getElementById('artifact-viewer') && !document.getElementById('artifact-viewer').hidden && !!document.querySelector('#artifact-viewer .artifact-viewer-body')?.textContent`, `${at}: opened for team B`, 6000);
@@ -100,7 +103,7 @@ const { coralReady } = require('./helpers/wait');
             console.log(`${at}: a line stays with the digest it was given for (the options a switch or a save spreads onto another hex), with no bar to say otherwise`);
             const X2 = '7'.repeat(64);
             await open(X, { fileId: FILE, versionLine: L_A, board: 'team-a' });
-            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(L_A)}`, `${at}: the first digest's line`, 6000);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(noId(L_A))}`, `${at}: the first digest's line`, 6000);
             await open(X2, { fileId: FILE, versionLine: L_A, lineHex: X, board: 'team-a' }); // what a switch spreads: the first digest's id and line, its lineHex, another hex
             await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-body')?.textContent`, `${at}: the other digest drawn`, 6000);
             assert.equal(await headShown(), false, `${at}: the line belongs to the first digest, not to the one shown`);
@@ -109,7 +112,7 @@ const { coralReady } = require('./helpers/wait');
             console.log(`${at}: a hidden or reordering character in the file's name is written out, in the header and in Details`);
             const NASTY = `version 2 of pl\u202ean.md (file ${FILE})`, MARKED = `version 2 of pl<U+202E>an.md (file ${FILE})`;
             await open(X, { fileId: FILE, versionLine: NASTY, board: 'team-a' });
-            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(MARKED)}`, `${at}: the header writes the hidden character out`, 6000);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(noId(MARKED))}`, `${at}: the header writes the hidden character out`, 6000);
             assert.ok(!(await head()).includes('\u202e'), `${at}: no raw reordering character in the header`);
             assert.equal(await chip(), MARKED, `${at}: nor in the Details chip`);
             await closeViewer();
@@ -119,7 +122,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`(() => { const f = window.fetch; window.fetch = (u, o) => f(u, o).then(r => /\\/versions/.test(String(u)) ? r.json().then(rows => new Response(JSON.stringify(rows.map(({ file_id, version_line, ...rest }) => rest)), { status: 200, headers: { 'Content-Type': 'application/json' } })) : r); return true; })()`); // the same list, each row without file_id and version_line
             await open(H3, { fileId: FILE, versionLine: lineOf(3) });
             await waitFor(vis('#artifact-viewer .av-current'), `${at}: the bar (a list with no lines)`, 6000);
-            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(lineOf(3))}`, `${at}: the bar has no line, so the caller's line shows (removing the caller's fallback must fail here)`, 6000);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(headOf(3))}`, `${at}: the bar has no line, so the caller's line shows (removing the caller's fallback must fail here)`, 6000);
             assert.equal(await chip(), lineOf(3), `${at}: and Details says it too`);
             await ev(`document.querySelector('#artifact-viewer .av-current').click(); true`);
             await waitFor(vis('#artifact-viewer .av-list'), `${at}: the list`, 3000);
@@ -130,7 +133,7 @@ const { coralReady } = require('./helpers/wait');
 
             console.log(`${at}: older computer, reopened with no metadata: the first open's line does not stay`);
             await open(H3, { fileId: FILE, versionLine: lineOf(3) });
-            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(lineOf(3))}`, `${at}: the caller's line, first open`, 6000);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(headOf(3))}`, `${at}: the caller's line, first open`, 6000);
             await closeViewer();
             await open(H3, {}); // the same digest, no metadata, a list with no lines
             await waitFor(vis('#artifact-viewer .av-current'), `${at}: reopened, the bar`, 6000);
@@ -141,7 +144,7 @@ const { coralReady } = require('./helpers/wait');
 
             console.log(`${at}: Copy file ID is in the menu only when the file has a line`);
             await open(H3, { fileId: FILE, versionLine: lineOf(3) });
-            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(lineOf(3))}`, `${at}: a line for the positive case`, 6000);
+            await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(headOf(3))}`, `${at}: a line for the positive case`, 6000);
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-more').click(); true`);
             await waitFor(vis('#artifact-viewer .artifact-viewer-copyid-item'), `${at}: with a line the item is there`, 3000);
             await closeViewer();
