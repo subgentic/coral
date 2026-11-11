@@ -127,7 +127,7 @@ func TestTeamArtifactsListNeverOutlivesItsTTL(t *testing.T) {
 // The kept list is the team's own: what depends on the caller is applied to a copy for each request. An agent, a Hub guest and the owner each read the list from the one kept build, in either order, and no one
 // gets another's view: an agent only what it may read, a guest nothing private or from another board, and the private marks only on the owner's copy.
 func TestKeptListIsNeverAnotherCallersView(t *testing.T) {
-	t.Parallel() // its own handler and store, no shared state: it ran alone among thousands, one after another (#15686)
+	// serial: SetArtifactCircle swaps a package global that the artifact upload tests read (a -race run caught it, #15704)
 	ids := func(in []teamArtifact) map[string]bool {
 		out := map[string]bool{}
 		for _, it := range in {
