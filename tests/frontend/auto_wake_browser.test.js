@@ -57,6 +57,25 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await until(`!document.getElementById('auto-wake-banner').hidden`, 'the banner (the pass runs 5 s after a start)');
         const banner = await ev(`document.getElementById('auto-wake-banner').textContent.replace(/\\s+/g, ' ').trim()`);
         check('more agents than the cap: a banner asks', /3 agents were running when Coral stopped\. Wake them\?/.test(banner), banner);
+        // #15630: the status is read again every 5 s while the pass runs; the same answer must not write to the page (a same-value write is an attribute record, and
+        // the perf budget "a quiet feed message writes nothing" saw it land inside its window on a slow Windows machine). A different count writes once.
+        const rec = await ev(`(async () => {
+            const m = await import((window.__coralStatic || '/static/') + 'terminal_backend.js');
+            const b = document.getElementById('auto-wake-banner'); const seen = [];
+            const mo = new MutationObserver(rs => seen.push(...rs.map(r => r.type + ':' + (r.attributeName || ''))));
+            const st = n => ({ state: n ? 'pending' : 'done', pending: Array.from({ length: n }, (_, i) => ({ session_id: 'x' + i })) });
+            const tick = () => new Promise(r => setTimeout(r, 50)); // sleep-ok: a mutation record is delivered in a microtask; this is a margin
+            // the hidden banner is the one the perf budget saw (hidden = true on a hidden banner is an attribute record); the shown one writes the count text
+            m.showAutoWakeBanner(st(0)); await tick();
+            mo.observe(b, { subtree: true, childList: true, attributes: true, characterData: true });
+            m.showAutoWakeBanner(st(0)); m.showAutoWakeBanner(st(0)); await tick(); const hiddenAgain = seen.splice(0).length;
+            m.showAutoWakeBanner(st(3)); await tick(); seen.splice(0);
+            m.showAutoWakeBanner(st(3)); m.showAutoWakeBanner(st(3)); await tick(); const shownAgain = seen.splice(0).length;
+            m.showAutoWakeBanner(st(2)); await tick(); const changed = seen.splice(0).length;
+            m.showAutoWakeBanner(st(3)); mo.disconnect();
+            return { hiddenAgain, shownAgain, changed };
+        })()`);
+        check('the same status again writes nothing to the banner, hidden or shown; a different count writes', rec.hiddenAgain === 0 && rec.shownAgain === 0 && rec.changed > 0, JSON.stringify(rec));
         await ev(`document.getElementById('auto-wake-go').click(); true`);
         await until(`window.__aw.wakes.length === 3 && document.getElementById('auto-wake-banner').hidden`, 'all three woken', 20000);
         const wakes = await ev(`window.__aw.wakes`);
