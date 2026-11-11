@@ -354,8 +354,10 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     function artifactsList(list, g) {
         if (artifacts.id !== g.id) {
             artifacts.api?.destroy(); artifacts.api = null; artifacts.total = null;
-            const host = artifacts.host = el('div', 'goal-artifacts-host'); artifacts.id = g.id;
-            importOnce('./goal_artifacts.js').then(m => { if (!disposed && artifacts.host === host) artifacts.api = m.mountGoalArtifactsList(host, { team: model.project, goalId: g.id, onOpen: openPreviewArtifact, onCount: n => { artifacts.total = n; const c = root.querySelector('#goal-tab-artifacts .goal-tab-count'); if (c) c.textContent = ` ${n}`; } }); }).catch(() => {});
+            const outer = artifacts.host = el('div', 'goal-artifacts-host'); artifacts.id = g.id;
+            const host = el('div', 'goal-artifacts-list'); outer.append(host); // the list redraws its own host: the Add files button (#15317) lives beside it, in the outer one
+            importOnce('./operator_share.js').then(m => { if (!disposed && artifacts.host === outer) m.mountOperatorShare(outer, { project: model.project, goalId: g.id, reload: async () => { artifacts.api?.refresh(); } }); }).catch(() => {});
+            importOnce('./goal_artifacts.js').then(m => { if (!disposed && artifacts.host === outer) artifacts.api = m.mountGoalArtifactsList(host, { team: model.project, goalId: g.id, onOpen: openPreviewArtifact, onCount: n => { artifacts.total = n; const c = root.querySelector('#goal-tab-artifacts .goal-tab-count'); if (c) c.textContent = ` ${n}`; } }); }).catch(() => {});
         }
         list.append(artifacts.host);
     }

@@ -68,6 +68,8 @@ type agentUploadRecord struct {
 	// explicit exception to the series' own-uploader rule is this one decision, recorded, never a loosening of the rule.
 	// "auto_sync" when the Operator's auto-sync switch promoted it (#14714): UploadedBy is then "dropbox", never the owner.
 	PromotedBy string `json:"promoted_by,omitempty"`
+	// GoalID is the goal of the team's board a file the Operator added for it belongs to (#15317). It is the uploader's claim at the time, checked against the board's goals when the list is made.
+	GoalID int64 `json:"goal_id,omitempty"`
 }
 
 // sourcePaste marks an upload record made from an image pasted or attached in the dashboard.

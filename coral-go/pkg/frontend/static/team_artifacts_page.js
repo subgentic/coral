@@ -663,6 +663,8 @@ export function createArtifactsList({ inbox = false } = {}) {
         root = host.firstChild;
         if (scope && !scope.standalone && project && !external && !inbox) { // an agent with a team: files can be dropped on its list to share them with it (#11376)
             importOnce('./operator_share.js').then(m => m.mountOperatorShare(root, { project, session: scope.session, server: scope.server, name: scope.name, reload: () => loadArtifacts({ keep: true }) })).catch(() => {});
+        } else if (!scope && project && !external && !inbox) { // the team's own Artifacts tab (#15317): a visible Add files button shares files with the whole team
+            importOnce('./operator_share.js').then(m => m.mountOperatorShare(root, { project, session: '', name: '', reload: () => loadArtifacts({ keep: true }) })).catch(() => {});
         } else if (root._share) importOnce('./operator_share.js').then(m => m.unmountOperatorShare(root)).catch(() => {}); // an agent with no team: nothing to share with
         watch();
         draw();

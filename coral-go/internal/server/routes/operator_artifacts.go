@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -170,12 +171,26 @@ func (h *BoardHandler) UploadOperatorArtifact(w http.ResponseWriter, r *http.Req
 	}
 	project := urlParam(r, "project")
 	sessionID := r.URL.Query().Get("session_id")
-	if !safefs.IsSafeID(sessionID) || !sessionIDLike.MatchString(sessionID) {
-		errBadRequest(w, "session_id names the agent the file is for")
-		return
+	team := sessionID == "" // no agent named: the file is the TEAM's (#15317), kept with the team's first agent and told to the whole board
+	if team {
+		var ok bool
+		if sessionID, ok = h.teamShareSession(r, project); !ok {
+			errNotFound(w, "this team has no agent to keep the file with")
+			return
+		}
+	} else {
+		if !safefs.IsSafeID(sessionID) || !sessionIDLike.MatchString(sessionID) {
+			errBadRequest(w, "session_id names the agent the file is for")
+			return
+		}
+		if _, _, ok := h.operatorShareTarget(r, project, sessionID); !ok {
+			errNotFound(w, "this team has no such agent")
+			return
+		}
 	}
-	if _, _, ok := h.operatorShareTarget(r, project, sessionID); !ok {
-		errNotFound(w, "this team has no such agent")
+	goalID, goalOK := h.shareGoal(r, project, r.URL.Query().Get("goal_id"))
+	if !goalOK {
+		errNotFound(w, "this team has no such goal")
 		return
 	}
 	if ct := strings.ToLower(strings.TrimSpace(strings.SplitN(r.Header.Get("Content-Type"), ";", 2)[0])); ct != "application/octet-stream" { // a cross-site form cannot send this, nor the custom headers
@@ -279,6 +294,7 @@ func (h *BoardHandler) UploadOperatorArtifact(w http.ResponseWriter, r *http.Req
 	meta, _, err := storeArtifactFileAs(coralDir, sessionID, name, mediaType, tmpPath, hexID, size, nil, 0, func(rec *agentUploadRecord) {
 		rec.Uploader, rec.Role = board.OperatorName, "operator"
 		rec.UploadedBy, rec.Source = "owner", sourceOperatorShare
+		rec.GoalID = goalID
 	})
 	if errors.Is(err, errStoreFull) {
 		artifactRefusal(w, http.StatusRequestEntityTooLarge, "artifact_quota", "store", "the artifact store is full: delete old artifacts or raise the limit (Settings > Storage and cleanup)")
@@ -289,7 +305,11 @@ func (h *BoardHandler) UploadOperatorArtifact(w http.ResponseWriter, r *http.Req
 		return
 	}
 	h.bs.NoteArtifactsChanged(project)
-	rememberOperatorShare(project, sessionID, hexID, name, time.Now())
+	if team {
+		rememberOperatorShare(project, teamShareKey, hexID, name, time.Now())
+	} else {
+		rememberOperatorShare(project, sessionID, hexID, name, time.Now())
+	}
 	slog.Info("[operator share] stored", "surface", "local", "board", project, "digest", hexID) // who and which, never a name or a byte of the file
 	noteActivity(r, board.ActFileShare, "file", hexID, project, meta.Name, "")                  // the Activity row names the file and its id: the route has no {id}, so the table's row alone said neither (#14478)
 	writeJSON(w, http.StatusCreated, map[string]any{"uri": "coral://artifacts/" + hexID, "id": hexID, "name": meta.Name, "media_type": meta.MediaType, "size": meta.Size, "digest": meta.Digest})
@@ -321,6 +341,7 @@ func (h *BoardHandler) ShareOperatorArtifacts(w http.ResponseWriter, r *http.Req
 	var body struct {
 		SessionID string   `json:"session_id"`
 		Digests   []string `json:"digests"`
+		GoalID    int64    `json:"goal_id"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -330,9 +351,22 @@ func (h *BoardHandler) ShareOperatorArtifacts(w http.ResponseWriter, r *http.Req
 		commentRefuse(w, http.StatusConflict, "board_paused", "the board is paused: nothing is sent to its agents until it is resumed")
 		return
 	}
-	if !safefs.IsSafeID(body.SessionID) || !sessionIDLike.MatchString(body.SessionID) || len(body.Digests) == 0 || len(body.Digests) > maxShareFiles {
-		errBadRequest(w, fmt.Sprintf("session_id and 1 to %d digests", maxShareFiles))
+	team := body.SessionID == "" // the team's file (#15317): told to the whole board
+	if (!team && (!safefs.IsSafeID(body.SessionID) || !sessionIDLike.MatchString(body.SessionID))) || len(body.Digests) == 0 || len(body.Digests) > maxShareFiles {
+		errBadRequest(w, fmt.Sprintf("a team's files need no session_id; an agent's need its own; 1 to %d digests", maxShareFiles))
 		return
+	}
+	goalID := int64(0)
+	if body.GoalID != 0 {
+		var ok bool
+		if goalID, ok = h.shareGoal(r, project, strconv.FormatInt(body.GoalID, 10)); !ok {
+			errNotFound(w, "this team has no such goal")
+			return
+		}
+	}
+	keySession := body.SessionID
+	if team {
+		keySession = teamShareKey
 	}
 	now := time.Now()
 	var hexes, fileNames []string
@@ -347,7 +381,7 @@ func (h *BoardHandler) ShareOperatorArtifacts(w http.ResponseWriter, r *http.Req
 			continue
 		}
 		seen[d] = true
-		name, ok := recentOperatorShare(project, body.SessionID, d, now)
+		name, ok := recentOperatorShare(project, keySession, d, now)
 		if !ok {
 			errNotFound(w, "that file was not shared from here a moment ago")
 			return
@@ -355,6 +389,10 @@ func (h *BoardHandler) ShareOperatorArtifacts(w http.ResponseWriter, r *http.Req
 		hexes, fileNames = append(hexes, d), append(fileNames, name)
 	}
 	out := map[string]any{"delivered": false, "files": len(hexes)}
+	if team {
+		h.tellTeamOfShare(w, r, project, hexes, fileNames, goalID, out)
+		return
+	}
 	title, names, ok := h.operatorShareTarget(r, project, body.SessionID)
 	if !ok {
 		out["reason"] = "no_agent" // the files are stored; nobody is on the team to tell
