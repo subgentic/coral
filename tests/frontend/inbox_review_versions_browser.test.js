@@ -61,7 +61,7 @@ const YES = "(()=>{const m=document.getElementById('confirm-modal');if(m&&getCom
                 await waitFor(`!!document.querySelector('.version-list-dialog[open] .version-list-entry')`, at + 'the version list opens', 10000);
                 const items = await ev(`[...document.querySelectorAll('.version-list-dialog[open] .version-list-entry')].map(li => ({ n: li.dataset.version, name: li.querySelector('.version-list-name').textContent, current: li.getAttribute('aria-current') === 'true', who: li.querySelector('.version-list-who').textContent, open: !!li.querySelector('.version-list-open'), restore: !!li.querySelector('.version-list-restore') }))`);
                 check(items.length === 4 && items.map(i => i.n).join() === '1,2,3,4' && items[3].current && /newest/.test(items[3].name) && !items[0].current, at + 'v1 to v4, oldest first, the newest marked: ' + JSON.stringify(items));
-                check(items.every(i => i.open && /Security Reviewer/.test(i.who)) && items.slice(0, 3).every(i => i.restore) && !items[3].restore, at + 'each has Open and who made it; Restore on the older ones only: ' + JSON.stringify(items));
+                check(items.every(i => i.open && /Security Reviewer, an agent/.test(i.who)) && items.slice(0, 3).every(i => i.restore) && !items[3].restore, at + 'each has Open and who made it; Restore on the older ones only: ' + JSON.stringify(items));
                 await ev(`document.querySelector('.version-list-dialog[open] [data-version="2"] .version-list-restore').click(); true`);
                 await waitFor(`!!document.querySelector('.version-list-restore-confirm')`, at + 'Restore asks first', 5000);
                 check((await ev(`window.__rv.calls.filter(c => c.route === 'review')`)).length === 0, at + 'nothing is sent before the person says yes');
@@ -80,6 +80,14 @@ const YES = "(()=>{const m=document.getElementById('confirm-modal');if(m&&getCom
                 await waitFor(`/older version/.test((document.querySelector('.artifact-review-state') || {}).textContent || '')`, at + 'an older version says so', 10000);
                 const old = await ev(`({ state: document.querySelector('.artifact-review-state').textContent, approve: (document.querySelector('.artifact-review-approve') || {}).textContent })`);
                 check(/An older version: v4 is newer\. Changes were asked for on this one\./.test(old.state) && old.approve === 'Approve this older version' && !/waiting for a new version/.test(old.state), at + 'its own state, not round 2\'s header: ' + JSON.stringify(old));
+                await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
+                // the note shows whenever a newer version exists, even when the newest is not in Needs you, and Open vN opens it (#15329)
+                await ev(`(() => { const R = window.fetch; window.__openedHex = ''; window.fetch = (u, o) => { const p = new URL(String(u), location.origin).pathname; if (p === '/api/artifacts/${hex(5)}/versions') return Promise.resolve(new Response(JSON.stringify([{ version: 1, digest: '${hex(5)}', at: new Date().toISOString(), role: 'operator' }, { version: 2, digest: '${hex(99)}', at: new Date().toISOString(), uploader: 'Security Reviewer' }]), { status: 200, headers: { 'Content-Type': 'application/json' } })); if (p.includes('${hex(99)}')) window.__openedHex = '${hex(99)}'; return R(u, o); }; return import(${S} + 'artifact_viewer.js').then(v => { v.openArtifactViewer('${hex(5)}', { server: '', filename: 'notes.md', board: '${team}' }); return true; }); })()`);
+                await waitFor(`/An older version: v2 is newer/.test((document.querySelector('.artifact-review-state') || {}).textContent || '')`, at + 'an older file whose newest is not in Needs you still says so', 10000);
+                check(await ev(`(document.querySelector('.artifact-review-newest:not([hidden])') || {}).textContent`) === 'Open v2', at + 'with an Open v2 button');
+                await ev(`document.querySelector('.artifact-review-newest').click(); true`);
+                await waitFor(`window.__openedHex === '${hex(99)}'`, at + 'Open v2 opens the newest', 8000);
+                await ev(`window.__rv.calls = []; window.__rv.items[4].tags = ['for review', 'internal']; true`); // opening a file marks it read: not part of the approve below
                 await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
             }
             // Approve the newest version of design.md: one review, for the newest; the three before it are settled by the tags route, with the other tags kept

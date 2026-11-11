@@ -18,11 +18,12 @@ const LONG_GOAL = 'Build a small reading list web app that works offline and can
     const stub = () => ev(`(() => { const R = window.fetch.bind(window); const j = (b) => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
         const base = { media_type: 'text/css', size: 900, task_id: 4, task_title: ${JSON.stringify(LONG_TASK)}, goal_id: 1, goal_title: ${JSON.stringify(LONG_GOAL)}, available: true, source: 'completion', provenance: 'uploaded', produced_by: 'Lead Developer' };
         const items = [
-            { ...base, id: ${JSON.stringify(HEX1)}, name: 'style.css', created_at: new Date(Date.now() - 60000).toISOString(), uri: 'coral://artifacts/${HEX1}', file_id: 'f1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', version: 2, versions: 2, earlier_versions: 1, version_line: 'version 2 of style.css (file f1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)' },
+            { ...base, tags: ['for review'], id: ${JSON.stringify(HEX1)}, name: 'style.css', created_at: new Date(Date.now() - 60000).toISOString(), uri: 'coral://artifacts/${HEX1}', file_id: 'f1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', version: 2, versions: 2, earlier_versions: 1, version_line: 'version 2 of style.css (file f1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)' },
             { ...base, id: ${JSON.stringify(HEX2)}, name: 'style.css', created_at: new Date(Date.now() - 180000).toISOString(), uri: 'coral://artifacts/${HEX2}', file_id: 'f2bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', version_line: 'version 1 of style.css (file f2bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)' }];
         window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); const m = String((o && o.method) || 'GET').toUpperCase();
             if (m === 'GET' && /^\\/api\\/board\\/[^/]+\\/artifacts$/.test(url.pathname)) return j({ project: ${JSON.stringify(TEAM)}, artifacts: items, has_more: false, total: 2 });
             if (m === 'GET' && url.pathname === '/api/artifacts/${HEX1}/versions') return j([{ version: 1, digest: ${JSON.stringify(HEX2)}, at: new Date(Date.now() - 180000).toISOString(), uploader: 'Lead Developer', name: 'style.css', media_type: 'text/css' }, { version: 2, digest: ${JSON.stringify(HEX1)}, at: new Date(Date.now() - 60000).toISOString(), uploader: 'Lead Developer', name: 'style.css', media_type: 'text/css', is_latest: true }]);
+            if (m === 'POST' && /^\\/api\\/board\\/[^/]+\\/artifacts\\/[0-9a-f]{64}\\/review$/.test(url.pathname)) { (window.__reviews = window.__reviews || []).push({ path: url.pathname, body: JSON.parse(o.body || '{}') }); return j({ state: 'approved', changed: true, tags: ['approved'], delivered: true, to: 'Lead Developer', review: { state: 'approved', at: new Date().toISOString() } }); }
             return R(u, o); };
         return true; })()`);
     try {
@@ -54,6 +55,12 @@ const LONG_GOAL = 'Build a small reading list web app that works offline and can
         const names = await ev(`[...document.querySelectorAll('.version-list-dialog[open] .version-list-name')].map(n => n.textContent)`);
         assert.deepEqual(names, ['v1', 'v2 (newest)'], 'oldest first, the newest marked: ' + JSON.stringify(names));
         await ev(`document.querySelector('.version-list-dialog[open] .inbox-ask-buttons button').click(); true`);
+        // the file view has its own Approve for a file waiting for review, on the version shown (walk 22 M7, #15329)
+        const approve = await ev(`(() => { const b = [...document.querySelectorAll('#detail-pane button, #detail-pane [role=menuitem]')].find(x => /^Approve$/.test(x.textContent.trim())); if (!b) return false; b.click(); return true; })()`);
+        assert.ok(approve, 'Details has Approve for a file that waits for review');
+        await waitFor(`!!window.__reviews && window.__reviews.length >= 1`, 'Approve sends the decision', 8000);
+        const sent = await ev(`window.__reviews[0]`);
+        assert.ok(sent.path.endsWith('/artifacts/' + HEX1 + '/review') && sent.body.decision === 'approve', 'it approves the version shown: ' + JSON.stringify(sent));
         console.log('PASS two style.css rows: v2 on the newest, names whole, Task, Goal and Version whole in Details at 125%');
     } finally { await removeBoards(ev, [TEAM]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
