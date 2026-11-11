@@ -25,7 +25,12 @@ import (
 func TestTheOwnerAtTheHubImportsATeamFromAFolderOnARemoteWithinTheSameBoundsAndNobodyElseCan(t *testing.T) {
 	h := newSystemHandlerForTest(t)
 	dir := newTeamDir(t)
-	home, _ := os.UserHomeDir()
+	home := t.TempDir() // a home of its own: the sensitive folder below really exists, so its 400 is the refusal and not a missing folder (Security INFO #15716)
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	sensitive := filepath.Join(home, ".ssh")
+	require.NoError(t, os.MkdirAll(sensitive, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(sensitive, "SKILL.md"), []byte("---\nname: Not Imported\n---\nsecret"), 0o644))
 	mount := func(rr chi.Router) {
 		rr.Get("/api/health", func(w http.ResponseWriter, _ *http.Request) {
 			writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "hub_owner_routes": hubowner.RoutesVersion})
@@ -54,11 +59,11 @@ func TestTheOwnerAtTheHubImportsATeamFromAFolderOnARemoteWithinTheSameBoundsAndN
 
 	// the remote's bounds hold for the owner as for anyone: no stamp widens them
 	for name, path := range map[string]string{
-		"a relative path":      "my-team",
-		"the home folder":      home,
-		"a sensitive folder":   filepath.Join(home, ".ssh"),
-		"a folder that is not": filepath.Join(dir, "nope"),
-		"a network-style path": `\\host\share\team`,
+		"a relative path":                "my-team",
+		"the home folder":                home,
+		"a sensitive folder that exists": sensitive,
+		"a folder that is not":           filepath.Join(dir, "nope"),
+		"a network-style path":           `\\host\share\team`,
 	} {
 		code, out = imp(w, path, func(*http.Request) {})
 		assert.Equal(t, http.StatusBadRequest, code, "%s: %v", name, out)

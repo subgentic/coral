@@ -46,10 +46,10 @@ const Skew = 30 * time.Second
 // secretBytes is the length of a secret, hex-encoded in its file and on the wire between the hub and the human act.
 const secretBytes = 32
 
-// RoutesVersion is the generation of the allowlist below: 1 is the first eight routes, 2 (#13694) adds every Operator click that writes an Activity row and the decisions that need a person, 3 (#13757) the Markdown editor's save and the model switch, 4 (#13802) Send to agent with the diff, 5 (#13834) the done-state of a "Goal looks done" row, 6 (#13910) the Operator's opened version of a file, 7 (#15380) the Hub's read of a computer's Needs you, 8 (#15697) pause and resume of an agent's notices, 9 (#15708) the person-only reads of audit group 4, 10 (#15713) the manager's private mark on an artifact, 11 (#15715) a team import from a folder on the computer. A remote says in
+// RoutesVersion is the generation of the allowlist below: 1 is the first eight routes, 2 (#13694) adds every Operator click that writes an Activity row and the decisions that need a person, 3 (#13757) the Markdown editor's save and the model switch, 4 (#13802) Send to agent with the diff, 5 (#13834) the done-state of a "Goal looks done" row, 6 (#13910) the Operator's opened version of a file, 7 (#15380) the Hub's read of a computer's Needs you, 8 (#15697) pause and resume of an agent's notices, 9 (#15708) the person-only reads of audit group 4, 10 (#15713) the manager's private mark on an artifact, 11 (#15715) a team import from a folder on the computer, 12 (#15717) a team's daily-knowledge writes. A remote says in
 // its health answer which generation it accepts; a hub stamps a route only when the remote's generation is at least the route's (a stamp on a route an older remote does not list is refused 403, where an
 // unstamped call still goes through as a key caller). The remote still checks every stamp against its own list, so a wrong number gets a 403 and never more power.
-const RoutesVersion = 11
+const RoutesVersion = 12
 
 type route struct {
 	pattern string
@@ -156,6 +156,11 @@ var routes = []route{
 	{"PUT /api/artifacts/{id}/private", 10},
 	// Generation 11 (#15715, Security: exactly one route, the second write of audit group 4): the owner imports a team definition from a folder on the remote computer, from the Hub's Teams page. It only READS: it returns the parsed team and writes nothing. The folder is named by the owner in the body (the stamp binds it, 64 KB cap) and the REMOTE bounds it exactly as for a person at that computer: an absolute local path, not the root, the home folder or a parent of it, not a dot-folder or a sensitive one (.ssh, .aws, credentials), no symlink followed, files of 256 KiB at most, agents/ at 50. No stamp changes those bounds.
 	{"POST /api/teams/import", 11},
+	// Generation 12 (#15717, Security: one route family, the third write tier of audit group 4): the owner runs a team's daily knowledge from the Hub: the switch, whether a daily update applies by itself, and accepting or taking back the waiting update. Bodies: {enabled}, {enabled}, {candidate, confirm_held}, {previous}: ids and booleans only, so a Hub request names no text and no path; the remote writes the team's own knowledge files only from the candidate it distilled itself (a candidate a newer run replaced is 409, nothing written; a held one needs confirm_held). The remote's own gate is unchanged: a person (the stamp) only, never an agent.
+	{"PUT /api/teams/detail/{name}/daily-knowledge", 12},
+	{"PUT /api/teams/detail/{name}/daily-knowledge/auto-apply", 12},
+	{"POST /api/teams/detail/{name}/daily-knowledge/accept", 12},
+	{"POST /api/teams/detail/{name}/daily-knowledge/revert", 12},
 }
 
 // MustBeSigned reports whether a request is one whose words are the person's own and become automation on the remote when no stamp goes with it: the owner's message to an agent (#13456) and, since
