@@ -93,7 +93,7 @@ export async function restartDirect(name, agentType, sessionId) {
 export async function restartSameDirect(name, agentType, sessionId) {
     const { selectLiveSession } = await importOnce('./sessions.js');
     if (!_isSelected(sessionId)) await selectLiveSession(name, agentType, sessionId, serverForSession(name, sessionId)); // selecting the agent already on screen would empty its chat
-    const { restartSameSettings } = await importOnce('./restart_flow.js');
+    const { restartSameSettings } = await importOnce('./restart_same.js');
     restartSameSettings();
 }
 

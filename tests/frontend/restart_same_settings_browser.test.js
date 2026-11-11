@@ -72,7 +72,17 @@ const BASE = require('./test_base').BASE;
         assert.ok(items.some(i => i[0] === 'agent-restart-same' && i[1] === 'Restart, same settings'), 'Restart, same settings is in the menu: ' + JSON.stringify(items));
         assert.ok(items.some(i => i[0] === 'agent-restart' && /^Restart with changes/.test(i[1])), 'the dialog stays behind Restart with changes: ' + JSON.stringify(items));
 
+        // An agent in the middle of a turn is asked first (#15442): Cancel sends nothing, Restart sends it. The ones below are at rest and stay one tap.
+        await ev(`T.state.liveSessions.find(s => s.session_id === ${JSON.stringify(id0)}).working = true`);
         await ev(`document.querySelector('[data-on-click="agent-restart-same"][data-session-id="${id0}"]').click()`);
+        await waitFor(`document.getElementById('confirm-modal').style.display === 'flex'`, 'a working agent is asked before it restarts', 5000);
+        const ask = await ev(`({ title: document.getElementById('confirm-modal-title').textContent, text: document.getElementById('confirm-modal-message').textContent, yes: document.getElementById('confirm-modal-yes').textContent.trim() })`);
+        assert.equal(ask.title, 'Restart agent'); assert.match(ask.text, /is working right now/); assert.equal(ask.yes, 'Restart');
+        await ev(`document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)').click()`);
+        assert.equal(await ev(`window.__srv.restarts`), 0, 'Cancel restarts nothing');
+        await ev(`document.querySelector('[data-on-click="agent-restart-same"][data-session-id="${id0}"]').click()`);
+        await waitFor(`document.getElementById('confirm-modal').style.display === 'flex'`, 'asked again', 5000);
+        await ev(`document.getElementById('confirm-modal-yes').click()`);
         await waitFor(`window.__srv.restarts === 1`, 'the restart to be asked', 5000);
         const body = await ev(`window.__srv.bodies[0]`);
         assert.equal(body.session_id, id0);
