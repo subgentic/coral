@@ -67,6 +67,7 @@ const { coralReady } = require('./helpers/wait');
             assert.match(await q('#artifact-viewer .av-live'), /^Showing v2 of 3, .*, Frontend Dev/, `${at}: said once`);
             assert.equal(await ev(`document.querySelector('#artifact-viewer .av-current').getAttribute('aria-label')`), 'Version: v2 of 3');
             assert.match(await q('#artifact-viewer .av-notice'), /^v3 is newer\./);
+            assert.equal(await ev(`(document.querySelector('#artifact-viewer .av-bar .av-newer') || {}).textContent || ''`), 'v3 is ready: open it', `${at}: the bar says a newer version is ready without opening the list (#15217)`);
             assert.equal(await ev(`document.activeElement.classList.contains('av-current')`), true, `${at}: the keyboard stays on the bar`);
             await ev(`document.querySelector('#artifact-viewer .av-notice .av-link').click(); true`);
             await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-body').textContent.includes('More menu')`, `${at}: Open the latest`, 6000);
