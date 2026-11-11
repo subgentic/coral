@@ -585,7 +585,9 @@ export function createArtifactsList({ inbox = false } = {}) {
                 actions.push(inReview ? { label: 'Remove from review', menu: 1, description: 'Takes it out of Needs you', title: 'Take it out of Needs you', run: () => changeReview(reviewFiles([item]), true, name).then(r => { if (r) showToast(r.failed ? `Could not remove it from review: ${r.why}` : 'Removed from review', !!r.failed); }) }
                     : { label: 'Send for review', menu: 1, description: 'Puts it in Needs you to approve or ask for changes', title: 'Put it in Needs you to approve or ask for changes', run: () => changeReview(reviewFiles([item]), false, name).then(r => { if (r) showToast(r.failed ? `Could not send it for review: ${r.why}` : 'Sent for review: it is in Needs you', !!r.failed); }) });
             }
-            if (hex && !isUnverified(item) && (item.tags || []).includes(REVIEW)) { // the panel says 'Waiting for your review': the decision is here too, not only in the viewer and Needs you (#15338, walk 23)
+            // while the file waits for review the header already has Approve beside Request changes (#15120): the bar keeps one only for 'Approve anyway' after changes were asked, or where the header has none (#15627)
+            const headerApproves = Tags.reviewWords(item.tags, item.review, item.produced_by) === 'Waiting for your review' && local();
+            if (hex && !isUnverified(item) && (item.tags || []).includes(REVIEW) && !headerApproves) { // the panel says 'Waiting for your review': the decision is here too, not only in the viewer and Needs you (#15338, walk 23)
                 const asked = (item.tags || []).includes('changes requested');
                 actions.push({ label: asked ? 'Approve anyway' : 'Approve', primary: true, title: asked ? 'Approve this version as it is' : 'Approve it: it leaves Needs you and the agent is told', run: () => approveHere().catch(e => showToast(e.message, true)) });
             }
