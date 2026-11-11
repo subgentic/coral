@@ -243,7 +243,8 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 await shot(`hover-held-${w}`);
                 // a WAITING AGENT too is held while the pointer rests (walk 23 M9): the line says it is there, so it is not hidden, and the rows do not reorder under a click; much longer than the old 2 s cap
                 await new Promise(r => setTimeout(r, 3500)); // sleep-ok: past the old 2 s cap of a waiting agent
-                check(await ev(`document.querySelectorAll('#group-table-view tbody tr').length`) === top0.rows && /new waiting/.test(await ev(`(document.querySelector('#group-table-view .group-table-held') || {}).textContent || ''`)), `${at}still held at 4 s, the line still there`);
+                await ev(`import((window.__coralStatic || '/static/') + 'sidebar_groups.js').then(m => { m.refreshGroupTable('hub-inbox'); return true; })`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: a redraw the refresh wrongly allowed would have happened by now; the cap is read when the table is refreshed, so a sleep alone proves nothing (#15382)
+                check(await ev(`document.querySelectorAll('#group-table-view tbody tr').length`) === top0.rows && /new waiting/.test(await ev(`(document.querySelector('#group-table-view .group-table-held') || {}).textContent || ''`)), `${at}refreshed again at 4 s: still held, the line still there`);
                 // Show draws it at once, with the pointer still on the list
                 await ev(`document.querySelector('#group-table-view .group-table-held button').click(); true`);
                 await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === ${top0.rows + 1} && !document.querySelector('#group-table-view .group-table-held')`, `${at}Show draws the new row and the line goes`, 8000);
