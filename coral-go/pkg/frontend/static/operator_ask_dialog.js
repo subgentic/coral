@@ -50,7 +50,8 @@ export function openAskDialog(a, onDone, runners = {}) {
     const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-quiet'; dismiss.textContent = 'Dismiss'; dismiss.title = 'Take it out of Needs you; nobody is told'; dismiss.hidden = missingCloudSource || a.kind !== 'ask' || (fromAnotherComputer(a) && decisionNeedsPerson(a.server)); // the close route is served for this computer's question and, through the Hub, for the computer's owner (coral-hub batch-125): a phone's rows have no Dismiss of their own (#14419), so the dialog must
     row.append(...(a.superseded && !dismiss.hidden ? [dismiss, close] : [close, ...(dismiss.hidden ? [] : [dismiss])])); // an older question the agent asked again since: Dismiss comes first (#15078) // Close and Dismiss stay in the footer; Send reply is on the row right under the reply box (#13148, the Operator: 'The send reply is too far away from text input')
     let tray = null;
-    const finish = () => { if (tray) tray.destroy(); dlg.close(); dlg.remove(); if (onDone) onDone(); };
+    const opener = document.activeElement; // the button that opened this: the keyboard goes back to it, as the settings menu and the member editor do (walk 17 L20)
+    const finish = () => { if (tray) tray.destroy(); dlg.close(); dlg.remove(); if (onDone) onDone(); if (opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true }); };
     let sending = false; const choices = [];
     const picturesBlocked = () => !!tray && (tray.busy() || tray.failed());
     const replyText = () => [box.value.trim(), tray ? tray.hexes().map(h => `coral://artifacts/${h}`).join('\n') : ''].filter(Boolean).join('\n\n');
