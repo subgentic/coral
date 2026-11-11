@@ -3,6 +3,7 @@
  * controls (#10248: a toast over the top of the page hid the Inbox's folder picker); its sentence wraps, it is not cut. The permission box is asked only from that click (a browser ignores one that is not). The switch in Settings >
  * Notifications is always there afterwards. */
 import { browserLocal } from './safe_storage.js';
+import { loadStyles } from './lazy_styles.js';
 import { showToast, announceNotice } from './notifications.js';
 import { desktopNotifySupported, desktopNotifyEnabled, desktopNotifyBlocked, enableDesktopNotify } from './desktop_notify.js';
 
@@ -35,13 +36,15 @@ export function offerAlertsAgain(oldestMs, now = Date.now()) {
 }
 
 const OFFER = 'Get an alert when an agent needs you or finishes a reply while you are in another tab?';
+const OFFER_SHORT = 'Get an alert when an agent needs you?'; // a phone's one line (#15164, walk 6 M9)
 
 /** The offer as a strip in the page's flow, after the sign-in banner and before the views: it takes its own height, so nothing under it is covered. Gone for good on either button. */
 function showOfferBanner() {
     document.getElementById('alerts-offer-banner')?.remove();
+    loadStyles('alerts_offer.css'); // the strip's rules load with it, not at start (page_weight)
     const banner = document.createElement('div');
     banner.id = 'alerts-offer-banner'; banner.className = 'notice notice-info notice-bar alerts-offer-banner'; banner.setAttribute('role', 'status');
-    const text = document.createElement('div'); text.className = 'alerts-offer-text'; text.textContent = OFFER;
+    const text = document.createElement('div'); text.className = 'alerts-offer-text'; text.textContent = window.matchMedia?.('(max-width: 600px)').matches ? OFFER_SHORT : OFFER;
     const on = document.createElement('button'); on.type = 'button'; on.className = 'btn btn-small'; on.textContent = 'Turn on alerts';
     const off = document.createElement('button'); off.type = 'button'; off.className = 'btn btn-quiet btn-icon btn-small'; off.setAttribute('aria-label', 'Not now'); off.title = 'Not now'; off.textContent = '\u00d7';
     off.addEventListener('click', () => banner.remove());

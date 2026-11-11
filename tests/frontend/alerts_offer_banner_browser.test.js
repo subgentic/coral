@@ -27,14 +27,14 @@ const BASE = require('./test_base').BASE;
                 const covered = [...document.querySelectorAll('button, input, select, textarea, a[href], [role=button], h1, h2')].filter(e => e.getClientRects().length && !offer.contains(e) && !(bar && bar.contains(e)))
                     .map(e => { const b = e.getBoundingClientRect(); return { b, name: (e.id || e.className || e.tagName) + '' }; }).filter(x => x.b.width > 0 && x.b.height > 0 && x.b.left < box.right && box.left < x.b.right && x.b.top < box.bottom && box.top < x.b.bottom).map(x => x.name);
                 const cs = text ? getComputedStyle(text) : null;
-                return { inFlow: getComputedStyle(offer).position !== 'fixed' && getComputedStyle(offer).position !== 'absolute', covered, cut: !!text && (text.scrollWidth > text.clientWidth + 1 || cs.textOverflow === 'ellipsis' || cs.whiteSpace === 'nowrap'), lines: text ? Math.round(text.getBoundingClientRect().height / (parseFloat(cs.lineHeight) || 20)) : 0, off: box.right > innerWidth + 1 };
+                return { inFlow: getComputedStyle(offer).position !== 'fixed' && getComputedStyle(offer).position !== 'absolute', covered, cut: !!text && (text.scrollWidth > text.clientWidth + 1 || cs.textOverflow === 'ellipsis' || cs.whiteSpace === 'nowrap'), lines: text ? Math.round(text.getBoundingClientRect().height / (parseFloat(cs.lineHeight) || 20)) : 0, off: box.right > innerWidth + 1, h: Math.round(box.height), xw: Math.round((offer.querySelector('.btn-icon') || { getBoundingClientRect: () => ({ width: 0, height: 0 }) }).getBoundingClientRect().width), xh: Math.round((offer.querySelector('.btn-icon') || { getBoundingClientRect: () => ({ height: 0 }) }).getBoundingClientRect().height) };
             })()`);
             assert.deepEqual(r.covered, [], `${w}: the offer covers nothing on the page: ${JSON.stringify(r)}`);
             assert.equal(r.inFlow, true, `${w}: the offer is in the page's flow, so the page starts below it: ${JSON.stringify(r)}`);
             assert.equal(r.cut, false, `${w}: its sentence is not cut: ${JSON.stringify(r)}`);
             await waitFor(`/Get an alert when an agent/.test((document.getElementById('notice-live') || {}).textContent || '')`, 'the offer said once through the notices live region', { timeout: 4000 }); // a strip drawn with its words is not reliably read out: the notices' own region says it (Security Reviewer, #10248)
             assert.equal(r.off, false, `${w}: it fits the width`);
-            if (mobile) assert.ok(r.lines >= 2, `${w}: at 390 px the sentence wraps over lines: ${JSON.stringify(r)}`);
+            if (mobile) assert.ok(r.h <= 72 && r.xw >= 44 && r.xh >= 44, `${w}: at 390 px the offer is one short row (not a quarter of the screen) with a 44 px x (#15164): ${JSON.stringify(r)}`);
             if (process.env.CORAL_SCREENSHOT_DIR) { require('node:fs').mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); require('node:fs').writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/alerts-offer-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
             console.log(`ok ${w}`);
         }

@@ -314,3 +314,20 @@ func TestCreatePasswordPageIsOneClearPath(t *testing.T) {
 	// the sign-in page keeps its primary same-computer button: this is the create page's change only
 	assert.Contains(t, AuthPage(PageState{PasswordSet: true, Local: true, LocalOpen: true}), `btn btn-primary wide" id="local-open"`)
 }
+
+// #15241 (walk 11 L1): a tool that looks a field up by its label found none, because the label only wrapped its input.
+// Each field label also names its input with for=, so "Password" finds the password field.
+func TestAuthPageLabelsNameTheirFields(t *testing.T) {
+	re := regexp.MustCompile(`<label class="pw-field"([^>]*)>`)
+	for _, s := range []PageState{{PasswordSet: true, Local: true, Strict: true}, {}, {Local: true, LocalOpen: true}, {PasswordSet: true, Local: true, HubSignin: "ready", HubURL: "https://app.coralhub.dev"}} {
+		p := AuthPage(s)
+		labels := re.FindAllStringSubmatch(p, -1)
+		assert.NotEmpty(t, labels)
+		for _, m := range labels {
+			f := regexp.MustCompile(`for="([^"]+)"`).FindStringSubmatch(m[1])
+			if assert.NotNil(t, f, "a field label has for=: "+m[0]) {
+				assert.Contains(t, p, `id="`+f[1]+`"`, "for= names an input on the page")
+			}
+		}
+	}
+}
