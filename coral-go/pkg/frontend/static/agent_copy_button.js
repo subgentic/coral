@@ -20,3 +20,19 @@ export function agentCopyButton(key, subject = '', opts = {}) {
     });
     return b;
 }
+
+/** The robot beside a heading, in one line with it (the heading-row layout, #15527): `title` goes into an `.agent-copy-hrow` with the button, once. Returns the button, or null if the heading already has one or is missing. */
+export function agentCopyBeside(title, key, subject, opts = {}) {
+    if (!title || title.parentElement?.classList.contains('agent-copy-hrow')) return null;
+    const b = agentCopyButton(key, subject, opts), row = document.createElement('div'); row.className = 'agent-copy-hrow';
+    title.replaceWith(row); row.append(title, b);
+    return b;
+}
+
+/** The robot inside `host` once: a screen that redraws calls this each time and gets one button (#15152). `at`: 'append' (the default), 'prepend' or 'after-title' (after the host's heading). */
+export function agentCopyIn(host, key, subject, opts = {}) {
+    if (!host || host.querySelector(':scope > .agent-copy')) return null;
+    const b = agentCopyButton(key, subject, opts);
+    if (opts.inside) host.querySelector(opts.inside)?.append(b); else if (opts.before) host.querySelector(opts.before)?.before(b); else if (opts.after) host.querySelector(opts.after)?.after(b); else if (opts.first) host.prepend(b); else host.append(b);
+    return b;
+}
