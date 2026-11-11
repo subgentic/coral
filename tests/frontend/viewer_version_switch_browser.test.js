@@ -34,11 +34,13 @@ const { coralReady } = require('./helpers/wait');
         await ev(`(() => { const f = window.fetch.bind(window); window.fetch = (u, o) => { const url = String(u && u.url || u); return /${h2}/.test(url) && !/versions/.test(url) ? new Promise(r => setTimeout(r, 1500)).then(() => f(u, o)) : f(u, o); }; return true; })()`); // sleep-ok: a deliberate slow answer from the server is the condition under test
         await ev(`document.querySelector('.av-next').click(); true`);
         await waitFor(`/version 2/.test(document.querySelector('.artifact-viewer-title')?.textContent || '')`, 'the title names version 2', 8000);
-        const mid = await ev(`(() => { const a = document.querySelector('.artifact-review-approve'), b = document.querySelector('.artifact-viewer-body'); return { text: b.textContent, approveDisabled: a.disabled, pending: document.querySelector('dialog.artifact-viewer, .artifact-viewer')?.dataset.contentPending || '' }; })()`);
+        const mid = await ev(`(() => { const a = document.querySelector('.artifact-review-approve'), b = document.querySelector('.artifact-viewer-body'); return { text: b.textContent, approveDisabled: a.disabled, withNoteDisabled: document.querySelector('.artifact-review-approve-note').disabled, pending: document.querySelector('dialog.artifact-viewer, .artifact-viewer')?.dataset.contentPending || '' }; })()`);
         assert.ok(!mid.text.includes('version one'), 'the old text is gone while v2 loads: ' + JSON.stringify(mid));
         assert.ok(/Loading/.test(mid.text), 'the body says it is loading: ' + JSON.stringify(mid));
         assert.equal(mid.approveDisabled, true, 'Approve is held until v2 has rendered: ' + JSON.stringify(mid));
+        assert.equal(mid.withNoteDisabled, true, "the comment form's Approve (approveWith, #15545) is held too: " + JSON.stringify(mid));
         await waitFor(`(document.querySelector('.artifact-viewer-body')?.textContent || '').includes('version two')`, 'v2 renders', 12000);
+        await waitFor(`!document.querySelector('.artifact-review-approve-note').disabled`, "the form's Approve is ready once v2 is on screen", 5000);
         await waitFor(`!document.querySelector('.artifact-review-approve').disabled`, 'Approve is ready once v2 is on screen', 5000);
         console.log('PASS a version switch clears the old text and holds Approve until the new content has rendered');
     } finally {

@@ -243,7 +243,7 @@ export function attachReview(d, { reload }) {
     const submitBtn = form.querySelector('button[type=submit]');
     const approveWith = form.querySelector('.artifact-review-approve-note');
     const tray = imgs.createImageTray({ upload: (blob, versionOf) => uploadCommentImage(cur.hex, cur.server, blob, versionOf, cur.name) });
-    const syncSend = () => { submitBtn.disabled = approveWith.disabled = sending || inProgress || tray.busy() || tray.failed(); }; // Send waits for a picture still going up, and for a failed one to be removed
+    const syncSend = () => { submitBtn.disabled = approveWith.disabled = sending || inProgress || tray.busy() || tray.failed(); approveWith.disabled = approveWith.disabled || !!d.dataset.contentPending; }; // Send waits for a picture still going up, and for a failed one to be removed
     error.before(tray.picker(), tray.node, tray.hint()); tray.attach(form, text); tray.listen(syncSend);
     const paintApprove = () => {
         const n = d.dataset.shownVersion, newer = d.dataset.newerVersion, covers = d.dataset.coversFiles, unopened = d.dataset.unopenedFiles;
@@ -255,7 +255,7 @@ export function attachReview(d, { reload }) {
     d.addEventListener('av-version', () => { armed = false; if (cur) paintApprove(); }); // another version shown: the question is asked again
     let deciding = false;
     const syncHold = () => { approve.disabled = approveNote.disabled = deciding || !!d.dataset.contentPending; }; // the new version's content has not rendered: the old text must not sit under 'Approve v2' (#15636)
-    d.addEventListener('av-content', syncHold);
+    d.addEventListener('av-content', () => { syncHold(); syncSend(); }); // the form's own Approve (approveWith, #15545) waits for the new content too
     const show = (s) => {
         cur = s; armed = false;
         form.querySelector('label').textContent = s && s.row.produced_by ? `What should change? ${shown(s.row.produced_by)}, who uploaded this file, will get it.` : 'What should change?'; // the box says who gets the request (walk 17 M13)
