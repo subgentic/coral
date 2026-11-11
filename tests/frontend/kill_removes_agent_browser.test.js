@@ -46,7 +46,7 @@ const SESSIONS = [
     };
     const rows = () => ev(`[...document.querySelectorAll('.session-group-item[data-session-id]')].filter(r => r.offsetParent !== null || true).map(r => r.dataset.sessionId).sort()`);
     const redraw = () => ev(`import(${MOD} + 'render.js').then(async r => { const { state } = await import(${MOD} + 'state.js'); r.renderLiveSessions(state.liveSessions); return true; })`);
-    const confirm = () => ev(`(() => { document.getElementById('confirm-modal-yes').click(); return true; })()`);
+    const confirm = async () => { await waitFor(`document.getElementById('confirm-modal').style.display === 'flex'`, 'the confirmation (its module loads on first use, #15585)', 5000); return ev(`(() => { document.getElementById('confirm-modal-yes').click(); return true; })()`); };
     const killReqs = () => ev(`window.__reqs.filter(r => /\\/kill$/.test(r))`);
     const noKilledUi = async w => {
         const left = await ev(`({ done: document.querySelectorAll('.session-done').length, dismiss: [...document.querySelectorAll('[data-on-click="agent-dismiss"], [data-on-click="team-dismiss"]')].length,

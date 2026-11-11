@@ -1,16 +1,13 @@
 /* What the sidebar's menus do to one agent: kill, info, attach, restart, sleep and archive (moved out of render.js, #4996; no behaviour change). */
 import { relaunchNarrowing, wakeQuestion, permissionNarrowing, useFullAccessQuestion } from './codex_mode.js';
 import { state } from './state.js';
-import { worktreeConfirmWords } from './worktree_words.js';
-import { showWorktreeNotice } from './worktree_notice.js';
 import { serverFetch, serverForSession, sessionServer, normServer } from './server_base.js';
-import { killLiveSession, dropKilledRows } from './kill_live.js';
-import { showToast, showView } from './utils.js';
+import { showToast } from './utils.js';
 import { redrawLiveList } from './list_hooks.js';
 import { showConfirmModal } from './confirm_dialog.js';
 import { importOnce } from './import_once.js';
 import { resolveSessionIdentity } from './session_state.js';
-import { agentWords, whatStaysKill, WHAT_STAYS_ARCHIVE, WHAT_STAYS_SLEEP } from './agent_words.js';
+import { agentWords, WHAT_STAYS_ARCHIVE, WHAT_STAYS_SLEEP } from './agent_words.js';
 import { applySleepingView } from './sleeping_view.js';
 import { isHomeFolderAsk, askHomeFolder } from './home_folder_ask.js';
 
@@ -30,30 +27,8 @@ export function killCount(n) {
     return n === 1 ? { agents: 'the 1 agent', note: KILL_LOG_NOTE } : { agents: `all ${n} agents`, note: KILL_LOG_NOTE_MANY };
 }
 
-export function killSessionDirect(name, agentType, sessionId) {
-    const server = serverForSession(name, sessionId);
-    const row = (state.liveSessions || []).find(s => s.session_id === sessionId);
-    const who = agentWords(row, row ? resolveSessionIdentity(row) : name).label; // the agent by its role and team, not the folder it works in (#10139)
-    showConfirmModal('Kill session', `Kill ${who}? This will terminate the agent. ${whatStaysKill([row || { agent_type: agentType }])} ${row && row.git_state && row.git_state.is_worktree ? worktreeConfirmWords(row.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => { try {
-        const result = await killLiveSession({ name, agent_type: agentType, session_id: sessionId }, server);
-        if (!result) throw new Error('the kill answer was not JSON');
-        if (result.error) { showToast(result.error, true); return; }
-        if (result.changes_artifact_error) {
-            showToast(`Killed, but changes.diff could not be saved: ${result.changes_artifact_error}`, true);
-        } else {
-            showToast(`Killed and saved changes.diff: ${who}`);
-        }
-        showWorktreeNotice(result.worktree, 'agent'); // what became of its worktree, if it had one (#6707); a kept one stays on screen with its path (#6818)
-        // The row goes at once: the agent's chat stays in History. A killed agent is not listed again.
-        dropKilledRows([{ session_id: sessionId, server }]);
-        if (state.currentSession && state.currentSession.session_id === sessionId) {
-            state.currentSession = null;
-            showView("welcome-screen");
-        }
-    } catch (e) {
-        showToast("Failed to kill session", true);
-    } }, undefined, { label: 'Kill session', danger: true });
-}
+/** Lazy (kill_session.js, #15585): the start path only names it. */
+export const killSessionDirect = (...args) => importOnce('./kill_session.js').then(m => m.killSessionDirect(...args));
 
 export async function showInfoDirect(name, agentType, sessionId) {
     const { selectLiveSession } = await importOnce('./sessions.js');
