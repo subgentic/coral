@@ -1,0 +1,9 @@
+/* The robot "Copy for an agent" button (#15063): one square, 32 px (44 px on a phone), the same on every screen. Loaded by agent_copy_button.js. */
+.agent-copy { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-md); background: none; color: var(--text-secondary); cursor: pointer; }
+.agent-copy:hover, .agent-copy:focus-visible { color: var(--text-primary); background: var(--bg-hover); border-color: var(--border-light); }
+.agent-copy .material-icons { font-size: var(--icon-size); }
+@media (pointer: coarse), (max-width: 1024px) { .agent-copy { width: 44px; height: 44px; } }
+.settings-pane:has(> .agent-copy-corner) { position: relative; }
+.agent-copy-corner { position: absolute; top: 0; right: 0; } /* a section's robot: at the corner of its heading */
+.docs-hrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; } /* a document's heading with its robot (docs_agent_copy.js) */
+.docs-hrow > :is(h1, h2, h3) { flex: 1 1 auto; min-width: 0; }

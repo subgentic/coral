@@ -9,6 +9,8 @@ import { toTaskPage, toGoal, errorOf } from './goals_adapter.js';
 import { importOnce } from './import_once.js';
 import { isPhoneLayout } from './phone_layout.js';
 const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is one shared helper (#12182)
+const { agentCopyButton } = await importOnce('./agent_copy_button.js'); // the robot button (#15063)
+const { agentCopyText } = await importOnce('./agent_doc_map.js');
 import { foldWayBack } from './way_back.js';
 import * as W from './goal_words.js';
 import { onGoalsSeq } from './goals_feed.js';
@@ -180,7 +182,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             const primaryKey = act.some(a => a.key === 'reopen') ? 'reopen' : (act.some(a => a.key === 'notyet') ? 'close' : 'add'); // a goal that looks done: Close goal; otherwise the commonest, Add task
             const primary = act.find(a => a.key === primaryKey); if (primary.key === 'add') primary.cls = 'btn btn-primary goals-add-task';
             acts.append(makeBtn(primary));
-            const menuItems = [...act.filter(a => a !== primary && a.key !== 'close'), { key: 'copy', cls: 'goal-copy-agent', label: 'Copy for an agent', title: 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal', run: () => { copyText(W.agentBriefLine(g)).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok)); } }];
+            const menuItems = [...act.filter(a => a !== primary && a.key !== 'close'), { key: 'copy', cls: 'goal-copy-agent', label: 'Copy for an agent', title: 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal', run: () => { copyText(agentCopyText('goal', W.agentBriefLine(g))).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok)); } }];
             const closeItem = act.find(a => a.key === 'close' && a !== primary); if (closeItem) menuItems.push(closeItem);
             acts.append(moreMenu(`goal-more-${g.id}`, menuItems.map(a => ({ label: a.label, title: a.title, ariaLabel: a.aria, className: a.cls.replace(/^btn( btn-primary)? ?/, ''), run: a.run })), { label: 'More goal actions' }));
         }
@@ -191,9 +193,8 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         foldWayBack(main, '.goals-back', '.goals-detail-title');
         const line = el('div', 'goals-detail-line'); line.append(stateChip(g));
         const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) { const m = el('span', 'goal-card-meta'); const d = String(g.driver || '').trim(); if (d) { m.append('Driver: ', agentLink(d, { board: model.project }), meta.slice(`Driver: ${d}`.length)); } else m.textContent = meta; line.append(m); } // the driver opens its chat (#12182)
-        // A small quiet button at the end of the detail line (#11004, Goal #153): copies one line to paste to an agent, which then runs `coral-board goal brief` to read the goal's open tasks and artifacts
-        const copyBtn = btn('btn btn-small goal-copy-agent', 'Copy for an agent', () => { copyText(W.agentBriefLine(g)).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok)); });
-        copyBtn.title = 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal';
+        // A small robot button at the end of the detail line (#11004, #15063): copies a line to paste to an agent, which then runs `coral-board goal brief` to read the goal's open tasks and artifacts, and the docs section to read
+        const copyBtn = agentCopyButton('goal', () => W.agentBriefLine(g), { className: 'goal-copy-agent' }); // the robot: copies the goal's line and where in the docs to read (#15063)
         if (!phone) line.append(copyBtn); // on a phone it is in the header's More menu (#13119)
         main.append(line);
         if (g.movedOpen) main.append(el('p', 'goals-note', `${g.movedOpen} moved task${g.movedOpen === 1 ? ' is' : 's are'} unfinished or cannot be checked here. Check “Done when” before closing this goal.`));

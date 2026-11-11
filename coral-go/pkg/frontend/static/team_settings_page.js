@@ -7,6 +7,7 @@ import { rebaseChanges } from './settings_diff.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('team_settings_groups.css'); // the headings, the rail and the search box of this page: not in the start's stylesheet (#15058)
 const { searchBox, groupRows } = await importOnce('./settings_search.js');
+const { agentCopyButton } = await importOnce('./agent_copy_button.js'); // the robot on each section (#15063)
 const { mountSettingsView } = await importOnce('./settings_view.js');
 const { boardRenameControl } = await importOnce('./board_rename.js');
 const { bindInfo } = await importOnce('./info_toggle.js');
@@ -46,7 +47,19 @@ export async function showTeamSettingsPage(team, options = {}) {
     wireApproval(st.view, st.host);
     wirePresetEditor(st);
     wirePromptPreview(st);
+    wireAgentCopy(st);
     return st.view;
+}
+
+/** The robot on each section's heading: copies the team and the section, and where in the docs to read (#15063). */
+function wireAgentCopy(st) {
+    const SECTIONS = { workflow: ['Workflow', 'settings_workflow'], health: ['Health check', 'settings_health'], messaging: ['Messaging', 'settings_messaging'], orchestrator: ['Orchestrator access', 'settings_orchestrator'], guides: ['Guides', 'settings_guides'] };
+    for (const pane of st.page.querySelectorAll('.settings-pane[data-section]')) {
+        const [label, key] = SECTIONS[pane.dataset.section] || [];
+        if (!key || pane.querySelector(':scope > .agent-copy')) continue;
+        const b = agentCopyButton(key, () => `Team \u201c${splitKey(st.team).name}\u201d, settings: ${label}.`, { className: 'agent-copy-corner' });
+        pane.querySelector(':scope > .settings-pane-title')?.after(b);
+    }
 }
 
 function openSettingsState(team, options) {

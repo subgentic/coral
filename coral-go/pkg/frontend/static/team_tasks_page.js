@@ -9,6 +9,7 @@ import { importOnce } from './import_once.js';
 const { rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); // lazy: its failure is retried
 const DT = await importOnce('./data_table.js'); // the one table (#7743)
 const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is one shared helper (#12182)
+const { agentCopyButton } = await importOnce('./agent_copy_button.js'); // the robot (#15063)
 const TV = await importOnce('./tasks_view.js'); // the one Tasks view: a task list is drawn by tasksTable
 const TB = await importOnce('./task_bulk.js'); // what the selection bar does to the selected tasks
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
@@ -396,6 +397,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     const openBlockers = (Array.isArray(task.blocked_by) ? task.blocked_by : []).filter(d => d && d.satisfied === false).map(d => (d.board_id && ctx.project && d.board_id !== ctx.project ? `${keyLabel(String(d.board_id))} #${Number(d.task_id)}` : `#${Number(d.task_id)}`)); // a blocker on another board names it (#10287)
     if ((task.status === 'pending' || task.status === 'blocked') && openBlockers.length) line.append(el('span', 'text-muted-sm', ` Waiting on ${openBlockers.join(', ')}.`));
     else if (task.status === 'pending' && task.assigned_to) { const w = el('span', 'text-muted-sm', ' Waiting for '); w.append(agentLink(task.assigned_to, { board: task.board_id || task.project || '' }), ' to pick it up.'); line.append(w); } // the assignee opens its chat (#12182)
+    line.append(agentCopyButton('task', () => `Task #${task.id} (${String(task.title || '').replace(/\s+/g, ' ').trim().slice(0, 80)}): run coral-board task detail ${task.id}`));
     if (ctx.teamLink) {
         const links = el('div', 'goal-back-row'), teamLink = el('a', 'goal-team-link inbox-team-link', 'Open on team page');
         teamLink.href = ctx.teamLink; teamLink.setAttribute('data-route', '');
