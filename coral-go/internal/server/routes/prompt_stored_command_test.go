@@ -108,3 +108,24 @@ func TestAStoredCallThatIsTooLongOrHidesCharactersStaysRejectOnly(t *testing.T) 
 	s2 := readOperator(t, storedRig(operatorScreen(long, 12), strings.Join(long, "\n"), "Bash"), at.Claude)
 	assert.True(t, s2.OnlyReject, "a request over the byte limit is Reject only")
 }
+
+// Security's MUST on #15492: the pending call is the session's LATEST, not the dialog's. Two Bash calls in flight (A asks, then B's PreToolUse takes the slot) that end alike must not let B's command stand for A's request.
+func TestTwoBashCallsInFlightKeepTheRequestRejectOnly(t *testing.T) {
+	cmd := operatorCommand(40)
+	other := append([]string{"  rm -rf /Users/someone/important"}, cmd[1:]...) // another head, the same tail
+	h := storedRig(operatorScreen(cmd, 12), strings.Join(cmd, "\n"), "Bash")
+	h.pending.set("sid", newPendingTool("toolu_2", "Bash", map[string]any{"command": strings.Join(other, "\n")}, time.Now()))
+	s := readOperator(t, h, at.Claude)
+	assert.True(t, s.OnlyReject, "which of the two the dialog is for is not known: Reject only")
+	assert.Contains(t, s.Note, "top of this request")
+	assert.NotContains(t, s.Target, "rm -rf /Users/someone/important", "the other call's head is never shown as the request")
+}
+
+func TestOneBashCallInFlightAfterAnotherFinishedIsStillTheDialogs(t *testing.T) {
+	cmd := operatorCommand(40)
+	h := storedRig(operatorScreen(cmd, 12), strings.Join(cmd, "\n"), "Bash")
+	h.pending.set("sid", newPendingTool("toolu_0", "Bash", map[string]any{"command": "ls"}, time.Now().Add(-time.Minute)))
+	h.pending.callDone("sid", "toolu_0")
+	h.pending.set("sid", newPendingTool("toolu_1", "Bash", map[string]any{"command": strings.Join(cmd, "\n")}, time.Now()))
+	assert.False(t, readOperator(t, h, at.Claude).OnlyReject, "the earlier call finished: one call is in flight and it is this one")
+}

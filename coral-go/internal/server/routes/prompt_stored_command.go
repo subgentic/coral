@@ -13,7 +13,7 @@ const minStoredTail = 24
 
 // screenWithStoredRequest is the screen as the dialog would have drawn it with its top, when the top is on no read (#15492: the Operator's phone showed only No for a 40-line `rm -rf $(cat ...)`): Claude reports a
 // Bash call's command to PreToolUse before it asks, and the pending call holds it whole (the same text the chat shows, hidden characters written out, and an over-long or hiding request marked only_reject, which is
-// refused here). It is used ONLY when what the screen shows above the closing dashed rule, up to its first row, is the END of that command (whitespace and the dialog's side bar aside, so a wrapped line matches): that
+// refused here). It is used ONLY when the call is the one Bash call in flight and what the screen shows above the closing dashed rule, up to its first row, is the END of that command (whitespace and the dialog's side bar aside, so a wrapped line matches): that
 // ties the dialog on the screen to that call, and the part the screen never showed is the call's own text, which the agent cannot have drawn differently. Anything else (no pending Bash call, another tool, a tail that
 // differs, a short one) gives nothing, and the request stays Reject only. The caller parses the result with the same parser and the same checks as any screen.
 func (h *SessionsHandler) screenWithStoredRequest(sessionID, text string) (string, bool) {
@@ -22,6 +22,11 @@ func (h *SessionsHandler) screenWithStoredRequest(sessionID, text string) (strin
 	}
 	t, ok := h.pending.get(sessionID, time.Now())
 	if !ok || t.ToolName != "Bash" {
+		return "", false
+	}
+	// The pending slot holds the session's LATEST call, and agents run calls in parallel: the dialog on screen is for it only when it is the one Bash call in flight (Security's MUST, #15492). With two, which one asks is
+	// not known, and a shared tail would let one's command stand for the other's request.
+	if ids := h.pending.callsFor(sessionID, "Bash", time.Now(), pendingToolTTL, ""); len(ids) != 1 || ids[0] != t.ToolUseID {
 		return "", false
 	}
 	if only, _ := t.Input["only_reject"].(bool); only {
