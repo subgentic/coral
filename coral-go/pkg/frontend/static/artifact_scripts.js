@@ -118,7 +118,7 @@ function scriptFrame(html, name, { onNavigated }) {
 
 /** Draw the file with its scripts running, under a bar OUTSIDE the frame that says so and holds Turn off. `turnOff()` is called when the person turns it off (after the record is deleted). */
 export function drawScripted(wrapper, { html, name, turnOff, line }) {
-    const strip = bar('artifact-scripts-bar', 'Scripts are on for this version of the file. Coral limits what they can reach: no web requests, no cookies, no files. ');
+    const strip = bar('artifact-scripts-bar', 'Scripts are on for this version of the file. Coral limits what they can reach: no web requests, no cookies, no files. Preview only: styles and scripts from the folder are not loaded. ');
     strip.setAttribute('role', 'status');
     const off = button('Turn off', 'artifact-scripts-off', () => { off.disabled = true; turnOff(); });
     strip.append(off);
@@ -137,6 +137,8 @@ export function drawOffer(wrapper, { hex, server, onTrusted, fetchFn = serverFet
     row.className = 'artifact-scripts-offer';
     const ask = button('Run scripts…', 'btn-small artifact-scripts-ask', () => {
         ask.hidden = true;
+        const notice = wrapper.querySelector('.artifact-linked-notice'); // while the question is open the banner no longer says scripts are disabled above it (#15324, walk 21 M2)
+        if (notice && notice.firstChild && notice.firstChild.nodeType === 3) { notice.dataset.was = notice.firstChild.nodeValue; notice.firstChild.nodeValue = 'Scripts are off for this file.'; }
         const box = document.createElement('div');
         box.className = 'artifact-scripts-sure'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Run scripts in this file');
         const words = document.createElement('p');
@@ -148,7 +150,7 @@ export function drawOffer(wrapper, { hex, server, onTrusted, fetchFn = serverFet
             if (on === true) onTrusted();
             else { go.disabled = false; msg.textContent = 'Could not turn scripts on. Nothing was changed.'; }
         });
-        const cancel = button('Cancel', 'artifact-scripts-cancel', () => { box.remove(); if (!row.contains(ask)) row.remove(); ask.hidden = false; ask.focus(); });
+        const cancel = button('Cancel', 'artifact-scripts-cancel', () => { if (notice && notice.dataset.was) notice.firstChild.nodeValue = notice.dataset.was; box.remove(); if (!row.contains(ask)) row.remove(); ask.hidden = false; ask.focus(); });
         const actions = document.createElement('div'); actions.className = 'artifact-scripts-actions'; actions.append(go, cancel);
         box.append(words, actions, msg);
         if (!row.isConnected) (wrapper.querySelector('.artifact-linked-notice') || wrapper).after(row); // the row exists only while the confirmation is open (#14916)

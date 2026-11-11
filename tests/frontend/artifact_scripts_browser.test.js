@@ -80,6 +80,7 @@ const OTHER = 'cd'.repeat(32);
             // 2. the confirmation: the words, Cancel changes nothing
             await click('.artifact-scripts-ask');
             assert.ok(await q('.artifact-scripts-sure'), `${w}: the confirmation opens in place`);
+            assert.ok(!/disabled/.test(await text('.artifact-linked-notice')), `${w}: the banner does not say scripts are disabled above the question (#15324)`);
             assert.equal((await text('.artifact-scripts-sure p')).trim(), 'This file can run scripts. They can draw and animate. Coral limits what they can reach: no web requests, no cookies, no files. Do not trust a file you would not open.', `${w}: the confirmation says what the design says`);
             await shot('scripts-confirm-' + w);
             await click('.artifact-scripts-cancel');
@@ -89,6 +90,7 @@ const OTHER = 'cd'.repeat(32);
             // 3. Run scripts: this digest is trusted, the host runs the file, the bar is outside the frame
             await click('.artifact-scripts-ask'); await click('.artifact-scripts-go');
             await waitFor(`!!document.querySelector('#artifact-viewer .artifact-scripts-bar')`, `${w}: the Scripts are on bar`, 10000);
+            assert.ok(/Preview only: styles and scripts from the folder are not loaded\./.test(await text('.artifact-scripts-bar')), `${w}: the bar says the preview is only a preview (#15324)`);
             assert.deepEqual(await ev('window.__trustCalls.filter(c => !c.startsWith("GET"))'), ['PUT ' + HEX], `${w}: exactly this digest was trusted`);
             const f = await ev(`(() => { const fr = document.querySelector('#artifact-viewer .artifact-linked-preview iframe'), bar = document.querySelector('#artifact-viewer .artifact-scripts-bar');
                 return { sandbox: fr.getAttribute('sandbox'), allow: fr.getAttribute('allow'), ref: fr.getAttribute('referrerpolicy'), src: fr.getAttribute('src'), barOutside: !fr.contains(bar) && bar.parentElement === fr.parentElement, bar: bar.textContent,
