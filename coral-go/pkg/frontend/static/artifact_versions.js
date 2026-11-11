@@ -134,6 +134,8 @@ export function attachVersions(dialog, hooks) {
         if (bar.hidden) return;
         const rows = st.rows, row = rows[i], total = rows.length, latest = i === total - 1;
         if (!latest && hooks.wantLatest?.()) { choose(rows[total - 1]); return; } // opened from Needs you: the newest version, not the one the row was made for
+        const files = new Set(rows.map(r => r.name).filter(Boolean)).size; // one series can hold several files (a task's chain, #12144): a decision on the newest covers them all (#15233)
+        dialog.dataset.coversFiles = files > 1 ? String(files) : '';
         dialog.dataset.shownVersion = String(row.version); dialog.dataset.newerVersion = latest ? '' : String(rows[total - 1].version); dialog.dispatchEvent(new CustomEvent('av-version')); // the review bar names the version it approves (#15197)
         const prev = btn('av-prev av-icon', '◀', 'Previous version'); prev.setAttribute('aria-disabled', String(i === 0));
         prev.addEventListener('click', () => stepTo(-1));
@@ -153,7 +155,7 @@ export function attachVersions(dialog, hooks) {
             pop.append(cmp);
         }
         if (!latest) {
-            const note = el('p', 'av-notice notice notice-info'); note.append(`v${rows[total - 1].version} is newer. `);
+            const note = el('p', 'av-notice notice notice-info'); note.append(files > 1 ? `${rows[total - 1].name || 'The newest file'} (v${rows[total - 1].version}) is newer, and one decision on it covers all ${files} files. ` : `v${rows[total - 1].version} is newer. `);
             const open = el('button', 'av-link', 'Open the latest'); open.type = 'button'; open.addEventListener('click', () => choose(rows[total - 1]));
             note.append(open); pop.append(note);
         }
@@ -163,7 +165,7 @@ export function attachVersions(dialog, hooks) {
             // the shown version is the list's one Tab stop; the arrow keys move between the rest (a roving tabindex)
             const li = el('li', 'av-option'); li.setAttribute('role', 'option'); li.id = `av-opt-${r.version}`; li.tabIndex = r.digest === st.hex ? 0 : -1; li.dataset.version = String(r.version);
             li.setAttribute('aria-selected', String(r.digest === st.hex)); li.title = w.full;
-            li.append(artifactThumbnail(r, { url: thumbnailPath(r) ? serverUrl(thumbnailPath(r), st.server) : '' }), el('span', 'av-vname', `v${r.version}${r.is_latest ? ' (latest)' : ''}`), el('span', 'av-who', r.edited_in_dropbox ? `Edited in Dropbox · ${w.label}` : [w.label, r.role || r.uploader].filter(Boolean).join(' · ')), el('span', 'av-size', sizeOf(r.size || 0)));
+            li.append(artifactThumbnail(r, { url: thumbnailPath(r) ? serverUrl(thumbnailPath(r), st.server) : '' }), el('span', 'av-vname', `v${r.version}${files > 1 && r.name ? ' ' + r.name : ''}${r.is_latest ? ' (latest)' : ''}`), el('span', 'av-who', r.edited_in_dropbox ? `Edited in Dropbox · ${w.label}` : [w.label, r.role || r.uploader].filter(Boolean).join(' · ')), el('span', 'av-size', sizeOf(r.size || 0)));
             li.addEventListener('click', () => choose(r));
             li.addEventListener('focus', () => { for (const o of options()) o.tabIndex = o === li ? 0 : -1; });
             list.append(li);
