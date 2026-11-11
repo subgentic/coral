@@ -26,10 +26,11 @@ const ALWAYS = 'Allow always: do not ask again for ls *, git status* and 2 more 
                 const row = { session_id: sid, name: 'work', agent_type: ${JSON.stringify(agentType)}, waiting_for_input: true, waiting_summary: 'Wants to use bash' }; st.liveSessions = [row];
                 NI.pendingToolBySession.clear(); NI.promptOptionsBySession.clear(); NI.loginBySession.clear();
                 if (${JSON.stringify(input)}) NI.pendingToolBySession.set(sid, { tool_use_id: 'perm_1', tool_name: 'Bash', input: ${JSON.stringify(input)} });
-                NI.promptOptionsBySession.set(sid, { ...${JSON.stringify(extra || {})}, question: 'Do you want to proceed?', options: ${JSON.stringify(labels)}.map((o, i) => ({ n: i + 1, ...(typeof o === 'string' ? { label: o } : o), action: 'select', selected: i === 0 })), ask_id: 'perm_1' });
+                NI.promptOptionsBySession.set(sid, { po: ${JSON.stringify(extra || {})}, ...${JSON.stringify(extra || {})}, question: 'Do you want to proceed?', options: ${JSON.stringify(labels)}.map((o, i) => ({ n: i + 1, ...(typeof o === 'string' ? { label: o } : o), action: 'select', selected: i === 0 })), ask_id: 'perm_1' });
                 document.getElementById('q-box')?.remove(); const box = document.body.appendChild(Object.assign(document.createElement('div'), { id: 'q-box', className: 'chat-messages chat-prose' }));
                 box.style.cssText = 'position:fixed;left:0;top:0;width:' + Math.min(innerWidth, 560) + 'px;max-height:100vh;overflow:auto;z-index:99999;background:var(--bg-primary);padding:12px;box-sizing:border-box';
-                NI.syncNeedsInputCard(box, row);
+                await import(${S} + 'card_attach.js'); // the unreadable card is finished by the lazy module (#15665)
+                NI.syncNeedsInputCard(box, row); await new Promise(r => setTimeout(r, 30));
                 const c = box.querySelector('.chat-needs-input'), t = c.querySelector('.cni-target');
                 const cs = t && getComputedStyle(t), code = t && t.querySelector('code');
                 return { text: c.textContent, target: t ? t.textContent : null, wrapsX: t ? t.scrollWidth <= t.clientWidth + 1 : null, h: t ? Math.round(t.getBoundingClientRect().height) : null, scrolls: t ? t.scrollHeight > t.clientHeight + 1 : null,

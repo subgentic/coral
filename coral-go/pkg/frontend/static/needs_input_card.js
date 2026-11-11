@@ -218,9 +218,8 @@ function needsInputHtml(info, session) {
     // A request the server says can only be rejected here (longer than a card shows, or holding characters that hide what it does) offers the refusing answers alone, for every agent: the pending tool the hook
     // reported (Claude, Pi, opencode: input.only_reject) or the prompt read from the screen (Codex, agy, Gemini: screen.only_reject). The server refuses an Allow for it as well (#11399).
     const refuses = o => o.kind === "reject" || (o.kind !== "allow_once" && o.kind !== "allow_always" && REFUSAL_WORDS.test(String(o.label || ""))); // the server's parsed kind decides; the words only where it has none
-    const onlyReject = info.kind === "permission" && (inp.only_reject === true || (info.screen && info.screen.only_reject === true));
-    const unreadable = onlyReject && (inp.unreadable === true || !!(info.screen && info.screen.unreadable === true)); // #15501
-    if (onlyReject && info.screen) info = { ...info, screen: { ...info.screen, options: unreadable ? [] : (info.screen.options || []).filter(refuses) } };
+    const onlyReject = info.kind === "permission" && (inp.only_reject === true || info.screen?.po?.only_reject === true);
+    if (onlyReject && info.screen) info = { ...info, screen: { ...info.screen, options: (info.screen.options || []).filter(refuses) } };
     const onlyRejectNote = typeof inp.note === "string" && inp.note ? inp.note : (info.screen && typeof info.screen.note === "string" ? info.screen.note : "");
     const screen = info.screen || {};
     const onScreen = (screen.options || []).length > 0;
@@ -273,13 +272,12 @@ function needsInputHtml(info, session) {
         const more = typeof inp.more_patterns === "string" ? inp.more_patterns : ""; // "and 2 more patterns": the count of the ones the server did not list (opencode, #11395)
         const screenTarget = info.screen && typeof info.screen.target === "string" ? info.screen.target : ""; // the lines above the screen's question, where the CLI shows what it asks (Codex, agy, Gemini send no tool input)
         const target = markHidden(inp.command || inp.file_path || inp.path || inp.url || inp.query || inp.pattern || patterns.join("\n") || screenTarget || "", { strict: true });
-        if (unreadable) question = "Coral could not read this request in full";
         if (onlyReject && onlyRejectNote) context += `<div class="cni-context-text cni-note" role="note">${escapeHtml(onlyRejectNote)}</div>`; // why only Reject is offered, in the server's words
-        if (!unreadable && inp.description && inp.command) context += `<div class="cni-context-text">${escapeHtml(inp.description)}</div>`;
+        if (inp.description && inp.command) context += `<div class="cni-context-text">${escapeHtml(inp.description)}</div>`;
         // The whole request, as text, wrapped, in a box that scrolls (a keyboard can scroll it once it is long enough to): a command cut short or hidden off to the side is one the person cannot judge (#11395).
-        if (target && !unreadable) context += `<pre class="cni-target"${target.length > 160 ? ` tabindex="0" role="region" aria-label="The whole request, scrollable"` : ""}><code>${escapeHtml(target)}</code></pre>`;
-        if (!unreadable && patterns.length && target !== patterns.join("\n")) context += `<div class="cni-context-text cni-patterns">Covers: ${escapeHtml(patterns.join(", "))}${more ? " " + escapeHtml(more) : ""}</div>`;
-        else if (more && !unreadable) context += `<div class="cni-context-text cni-patterns">${escapeHtml(more)}</div>`;
+        if (target) context += `<pre class="cni-target"${target.length > 160 ? ` tabindex="0" role="region" aria-label="The whole request, scrollable"` : ""}><code>${escapeHtml(target)}</code></pre>`;
+        if (patterns.length && target !== patterns.join("\n")) context += `<div class="cni-context-text cni-patterns">Covers: ${escapeHtml(patterns.join(", "))}${more ? " " + escapeHtml(more) : ""}</div>`;
+        else if (more) context += `<div class="cni-context-text cni-patterns">${escapeHtml(more)}</div>`;
         else if (info.summary && info.summary !== question) context += `<div class="cni-context-text cni-ask">${escapeHtml(info.summary)}</div>`; // what is asked, from the event, as the Inbox row says it (#10141)
     } else if (info.kind === "prompt") {
         question = screenQuestion || "The agent is waiting for you";
@@ -505,7 +503,7 @@ export function syncNeedsInputCard(container, session) {
             if (typing.focused) input.focus();
         }
     }
-    if (el.querySelector(".cni-attach,.cni-hint")) { // a card that takes an answer in words has the image strip: its code loads with the first one, not at start (#11403)
+    if (el.querySelector(".cni-attach,.cni-hint,.cni-note")) { // a card that takes an answer in words has the image strip: its code loads with the first one, not at start (#11403)
         if (cardAttach) cardAttach.drawCardImages(el, session.session_id); // images added to the answer stay when the card is drawn again
         else importOnce('./card_attach.js').then(m => { cardAttach = m; if (el.isConnected) m.drawCardImages(el, session.session_id); }).catch(() => {});
     }
