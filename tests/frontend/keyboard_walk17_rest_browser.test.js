@@ -52,6 +52,7 @@ const TEAM = `kbdrest-${Date.now() % 100000}`;
             await ev(`window.closeSidebarKebabs(); document.querySelector(${JSON.stringify(toggleSel)}).focus(); true`); // a menu an earlier step left open does not hide the next step
             await key('Enter', 'Enter', 13);
             await waitFor(`(() => { const m = ${MENU}; return m.style.display !== 'none' && m.contains(document.activeElement); })()`, name + ': the menu is open with the focus on an item', 4000);
+            await ev(`import((window.__coralStatic || '/static/') + 'import_once.js').then(m => m.importOnce('./kebab_keys.js')).then(() => true)`); // the menu's keys load on its first opening: wait for them before pressing any
             const expected = await ev(`(() => { const t = document.querySelector(${JSON.stringify(toggleSel)}), menu = ${MENU};
                 const tab = [...document.querySelectorAll('a[href], button, input, select, textarea, [tabindex]')].filter(e => !e.disabled && e.tabIndex >= 0 && e.getClientRects().length && !menu.contains(e));
                 const n = tab[tab.indexOf(t) + ${modifiers ? -1 : 1}]; return n ? (n.id || n.getAttribute('aria-label') || n.textContent.trim().slice(0, 40)) : null; })()`);

@@ -4,6 +4,7 @@ import { MENU_KEYS, menuMove } from './menu_keys.js';
 import { openRowMenu } from './session_rows.js';
 import { browserLocal } from './safe_storage.js';
 import { ensureBuilt, onBuilt } from './lazy_dom.js';
+import { importOnce } from './import_once.js';
 
 // ── Sidebar kebab menu helpers ───────────────────────────────────────────
 // With restoreFocus (Escape) the focus goes back to the button of the menu that was open, when it was inside it (#4621).
@@ -29,6 +30,7 @@ export function toggleSidebarKebab(btn, event) {
             markBlockedControls(menu);
         }
         btn.setAttribute('aria-expanded', 'true');
+        importOnce('./kebab_keys.js').catch(() => {}); // the menu's keys, loaded on its first opening
         // Measured hidden; the tablet drawer (#15258) transforms and clips, so its box is the window
         menu.style.visibility = 'hidden';
         menu.style.display = 'block';
