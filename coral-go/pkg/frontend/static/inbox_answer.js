@@ -122,6 +122,7 @@ export async function readWholeQuestion(s) {
 const askKey = s => `${sessionServer(s)}:${s.session_id}:${s.waiting_since || ''}`;
 
 async function answer(s, o, ask, cell, step = '', trustFolder = '', rateLimitModel = '') { // step: the whole review text the row was drawn for ('' for a step with no review)
+    cell._sig = null; lastRead.delete(`${sessionServer(s)}:${s.session_id}`); // the choices drawn again after this click come from a new reading, never the old one
     const buttons = [...cell.querySelectorAll('button')];
     const had = cell.contains(document.activeElement); // the keyboard is on a choice: it must still be on something when the cell is drawn again or says Answered (#10560)
     const keep = () => { if (had) (cell.querySelector(`.inbox-answer[data-n="${Number(o.n)}"]`) || cell.querySelector('.inbox-answer') || cell.closest('tr')?.querySelector('.dt-primary'))?.focus({ preventScroll: true }); };
@@ -225,11 +226,15 @@ function armYes(b, reshown = false) {
 }
 const stillArming = b => !!b._armEntry && Date.now() < b._armEntry.at;
 
+const lastRead = new Map(); // `server:session` -> the last question read for that agent: a row drawn again for a new reading shows these choices until the new one is in, so its Yes is never gone in between (#15309)
 /** Draws the choices into the cell once they are read (again after a question changed). */
 function fill(s, cell, withDismiss = true) {
-    const key = askKey(s);
-    if (!read.has(key)) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false })));
-    return read.get(key).then(({ ask, picks, onlyReject, held, trustWhy, step, stepFull, question, later, lines, trust, rateLimit, browser, target, targetNote, autoBlockAt }) => {
+    const key = askKey(s), who = `${sessionServer(s)}:${s.session_id}`;
+    const fresh = read.has(key);
+    if (!fresh) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false })).then(r => { lastRead.set(who, r); return r; }));
+    const stale = fresh ? null : lastRead.get(who);
+    const paint = r => { const sig = key + JSON.stringify(r); if (cell._sig === sig && cell._sigEl?.parentNode === cell) return; draw(r); cell._sig = sig; cell._sigEl = cell.firstChild; }; // the same reading for the same card leaves the choices as they are: a press on a Yes is not lost to a drawing under it (#15309)
+    const draw = ({ ask, picks, onlyReject, held, trustWhy, step, stepFull, question, later, lines, trust, rateLimit, browser, target, targetNote, autoBlockAt }) => {
         cell._cmdObserver?.disconnect(); cell._cmdObserver = null; // the earlier block's observer goes with the block (#14173)
         cell.replaceChildren();
         const said = norm => String(norm || '').replace(/[?\s]+$/, '');
@@ -312,7 +317,9 @@ function fill(s, cell, withDismiss = true) {
             d.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
             cell.append(d);
         }
-    });
+    };
+    if (stale && stale.picks.length) Promise.resolve(stale).then(paint); // the earlier choices stand until the new reading is in
+    return read.get(key).then(paint);
 }
 
 /** Whether a Needs you row offers its agent's answers at all: not a review or a run, not a viewer through the Hub, not a sign-in. */

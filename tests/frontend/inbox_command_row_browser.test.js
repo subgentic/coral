@@ -25,7 +25,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.__answers = []; window.__status = 200; window.__po = ${JSON.stringify(MENU())}; window.__ws = 1; window.__waiting = true;
                 const real = window.fetch; window.fetch = (u, o = {}) => { const url = String(u), m = (o.method || 'GET').toUpperCase();
                     if (m === 'POST' && /\\/answer-prompt$/.test(url)) { window.__answers.push(JSON.parse(o.body)); return Promise.resolve(new Response(JSON.stringify(window.__status === 200 ? { ok: true } : { code: 'trust_changed', error: 'The folder to trust changed.' }), { status: window.__status, headers: { 'content-type': 'application/json' } })); }
-                    if (m === 'GET' && /\\/api\\/sessions\\/live\\/[^/]+\\/chat\\?/.test(url)) return Promise.resolve(new Response(JSON.stringify({ messages: [], total: 0, prompt_options: window.__po }), { headers: { 'content-type': 'application/json' } }));
+                    if (m === 'GET' && /\\/api\\/sessions\\/live\\/[^/]+\\/chat\\?/.test(url)) return new Promise(r => setTimeout(() => r(new Response(JSON.stringify({ messages: [], total: 0, prompt_options: window.__po }), { headers: { 'content-type': 'application/json' } })), window.__chatDelay || 0));
                     return real(u, o); };
                 const entry = window.__m.entry.bind(window.__m); window.__m.entry = a => ({ ...entry(a), board_job_title: 'QA Engineer', waiting_for_input: window.__waiting, waiting_kind: 'permission', waiting_summary: window.__sum || 'Notification: Claude needs your permission', waiting_since: 'w' + window.__ws });
                 window.__m.add('qa', 'A', 4, { sleeping: false, board_project: 'team-a', session_id: 'qa-id' }); true`);
@@ -132,6 +132,17 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             await show(MENU({ target: ONE }), 2);
             for (let i = 0; i < 5; i++) await redraw();
             check((await ev(`window.__roLive.size`)) <= 2, `${at}after five real redraws at most the row's own command-block observers are live (not ${await ev('window.__roLive.size')})`);
+            // #15309: a row drawn again for a new reading of the same question keeps its Yes while the new reading is on its way (it was gone for the length of the read: a person could see it flicker, and a test that looked then failed 4 to 7% of runs at CPU x6)
+            await show(MENU({ target: ONE }), 2);
+            await ev(`window.__chatDelay = 700; window.__answers = []; window.__ws += 1; window.__noYes = 0; window.__seen = 0; (function tick() { const y = [...document.querySelectorAll('#group-table-view .inbox-answers button')].some(b => b.textContent === 'Yes' && !b.hidden); if (y) window.__seen++; else if (window.__seen) window.__noYes++; if (window.__tick !== false) requestAnimationFrame(tick); })(); true`); // raf-ok: the check counts the frames the person sees (a hidden page draws none; the count must be above 3)
+            await refresh();
+            await new Promise(r => setTimeout(r, 300)); // sleep-ok: the old choices are on the row, the delayed reading (700 ms) is still on its way
+            await ev(`window.__yes0 = [...document.querySelectorAll('#group-table-view .inbox-answers button')].find(b => b.textContent === 'Yes'); true`);
+            await new Promise(r => setTimeout(r, 800)); // sleep-ok: the delayed reading comes in and the frames are counted meanwhile
+            await ev(`window.__tick = false; window.__chatDelay = 0; true`);
+            check((await ev(`window.__seen`)) > 3 && (await ev(`window.__noYes`)) === 0, `${at}a row drawn again for a new reading keeps its Yes on every frame (frames with Yes ${await ev('window.__seen')}, without ${await ev('window.__noYes')})`);
+            check(await ev(`!!window.__yes0 && window.__yes0.isConnected`), `${at}and the reading that comes in leaves that same Yes in place (it is not drawn again: a press on it still ends as a click)`);
+            await ev(`window.__tick = undefined; true`);
             if (!mobile) { // the pointer leaves the Yes and enters it again: armed at once
                 await show(MENU({ target: ONE }), 2);
                 await ev(`window.__answers = []; window.__ws += 1; true`); await refresh();
@@ -142,7 +153,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 await Input.dispatchMouseEvent({ type: 'mouseMoved', x: yp.x, y: yp.y });
                 check(!(await ev(`!!document.querySelector('#group-table-view .inbox-answers button.inbox-arming')`)), `${at}the pointer leaving and entering the Yes arms it at once`);
                 await Input.dispatchMouseEvent({ type: 'mousePressed', x: yp.x, y: yp.y, button: 'left', clickCount: 1 }); await Input.dispatchMouseEvent({ type: 'mouseReleased', x: yp.x, y: yp.y, button: 'left', clickCount: 1 });
-                await waitFor(`window.__answers.length === 1`, `${at}a click right after the pointer came back answers`, 5000);
+                await waitFor(`window.__answers.length === 1`, `${at}a click right after the pointer came back answers`, 5000).catch(async e => { throw new Error(e.message + ' DIAG ' + await ev(`JSON.stringify({ yes: [...document.querySelectorAll('#group-table-view .inbox-answers button')].filter(b => b.textContent === 'Yes').map(b => ({ hidden: b.hidden, arming: b.classList.contains('inbox-arming'), hover: b.matches(':hover'), conn: b.isConnected })), held: !!document.querySelector('.group-table-held'), answers: window.__answers.length })`)); });
                 // the deliberate return stays armed across a real redraw: a new Yes, a click at once, answers
                 await show(MENU({ target: ONE }), 2);
                 await ev(`window.__answers = []; window.__ws += 1; true`); await refresh();
