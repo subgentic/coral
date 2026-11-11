@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/store"
 	proxy "github.com/subgentic/coral/pkg/hubproxy"
 )
@@ -244,6 +245,7 @@ func (nr *NeedsYouRemotes) merge(r *http.Request, kind string) hubNeedsMerged {
 		wg.Add(1)
 		sem <- struct{}{}
 		go func() {
+			defer safego.Recover("needs-you-hub: read a machine")
 			defer wg.Done()
 			defer func() { <-sem }()
 			it, c, ok := nr.readMachine(r, m.ID, kind)

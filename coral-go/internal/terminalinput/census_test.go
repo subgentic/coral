@@ -355,6 +355,7 @@ var reviewedOrigins = map[string]bool{
 	"internal/server/routes/auto_recommend.go	AutoRecommender.pick	SendRawInput	Internal":                            true, // the operator's opt-in answer to a question with its Recommended option (inside AutoAcceptSend)
 	"internal/server/routes/human_send.go	SessionsHandler.deliverHumanSend	SendInput	Person":                         true,
 	"internal/server/routes/prompt_answer.go	SessionsHandler.AnswerPrompt	SendInput	Person":                          true, // the text typed into a prompt's field (#5715)
+	"internal/server/routes/model_switch_ask.go	switchAsker.answer	SendRawInput	Unclassified":                        true, // the option digit of the dialog a model switch implies the answer to (#15410): a choice, not text; logged as it is
 	"internal/server/routes/prompt_answer.go	SessionsHandler.AnswerPrompt	SendRawInput	Unclassified":                 true, // the option digits of the answer cards: choices, not text a person typed; logged as they are
 	"internal/server/routes/prompt_answer.go	SessionsHandler.toggleMulti	SendRawInput	Unclassified":                  true, // the option digits of the answer cards: choices, not text a person typed; logged as they are
 	"internal/server/routes/sessions_input.go	SessionsHandler.Keys	SendRawInput	o":                                   true,

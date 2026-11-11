@@ -35,10 +35,11 @@ var mkdirTempBases = map[string]string{
 
 // per file: the one-off bases that are variables of the test itself (a folder the test made under the temp folder).
 var mkdirTempFileBases = map[string]map[string]string{
-	"internal/foldertrust/foldertrust_test.go":      {"real": "a folder the test made under the temp folder"},
-	"internal/server/strict_local_auth_e2e_test.go": {"dir": "the test's own data folder"},
-	"internal/testtemp/socket_room_test.go":         {"tmp": "the test's temp folder"},
-	"internal/testtemp/owner_windows_test.go":       {"parent": "the test's own folder"},
+	"internal/foldertrust/foldertrust_test.go":          {"real": "a folder the test made under the temp folder"},
+	"internal/server/strict_local_auth_e2e_test.go":     {"dir": "the test's own data folder"},
+	"internal/testtemp/socket_room_test.go":             {"tmp": "the test's temp folder"},
+	"internal/testtemp/owner_windows_test.go":           {"parent": "the test's own folder"},
+	"internal/server/routes/system_trust_probe_test.go": {"shared": "/private/tmp, the shared temp folder on macOS, on purpose: the probe must refuse a folder there (the test removes what it made)"},
 }
 
 // os.Mkdir and os.MkdirAll with a RELATIVE folder (a literal that is not absolute, or one built from filepath.Abs(".")) make it inside the package's source folder too (QA Reviewer 2's SHOULD on

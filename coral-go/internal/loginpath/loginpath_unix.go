@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"golang.org/x/term"
+
+	"github.com/subgentic/coral/internal/logsafe"
 )
 
 // Off is the environment variable that turns the widening off.
@@ -43,7 +45,7 @@ func Widen() int {
 	merged, added := Merge(os.Getenv("PATH"), login, string(os.PathListSeparator))
 	if added > 0 {
 		_ = os.Setenv("PATH", merged)
-		log.Printf("[startup] this Coral was not started from a shell: %d folder(s) of the login shell's PATH were added to its own", added)
+		log.Printf("[startup] this Coral was not started from a shell: the login shell's folders were added to its search path (%d folders now)", logsafe.Count())
 	}
 	return added
 }

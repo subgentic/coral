@@ -8,12 +8,13 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/subgentic/coral/internal/executil"
+	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/updater/status"
 )
 
@@ -89,7 +90,7 @@ func (s SSH) Run(ctx context.Context, remote string, stdin io.Reader) ([]byte, e
 	if bin == "" {
 		bin = "ssh"
 	}
-	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd := executil.Command(ctx, bin, args...)
 	cmd.Stdin = stdin
 	out := &capWriter{max: MaxOutput}
 	cmd.Stdout = out
@@ -302,7 +303,12 @@ func Run(ctx context.Context, c Config) Result {
 	}
 	c.say("verified %s here; sending", staged.Version)
 	pr, pw := io.Pipe()
-	go func() { pw.CloseWithError(Write(pw, asset, files)) }()
+	go func() {
+		streamErr := errors.New("the release stream stopped before it ended") // what the reader sees if Write panics (Recover keeps the server up)
+		defer func() { pw.CloseWithError(streamErr) }()
+		defer safego.Recover("updater push: stream the release")
+		streamErr = Write(pw, asset, files)
+	}()
 	if _, err := c.Runner.Run(ctx, p.Bin+" receive --version "+staged.Version, pr); err != nil {
 		pr.Close()
 		res.Result, res.Reason = "failed", "send"

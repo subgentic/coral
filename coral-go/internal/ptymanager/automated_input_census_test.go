@@ -77,6 +77,7 @@ var allowedSenders = map[string]sender{
 	"internal/server/routes/auto_recommend.go\tAutoRecommender.pick\tSendRawInput":   {guardAutoAccept, "inside AutoAcceptSend", ""},
 	// A person's input. /send and /keys gate any caller that isn't a person.
 	"internal/server/routes/websocket.go\tterminalStream.handleFrame\tSendInput":           {guardHuman, "human: terminal typing", ""},
+	"internal/server/routes/model_switch_ask.go\tswitchAsker.answer\tSendRawInput":         {guardScreen, "Coral answers the one dialog a model switch implies (#15410): the digit goes only if the screen still shows the same dialog, under the agent's lock", "TestAnyOtherSwitchDialogIsAskedInTheChatAndTheWaitDoesNotRunOut"},
 	"internal/server/routes/prompt_answer.go\tSessionsHandler.AnswerPrompt\tSendInput":     {guardScreen, "human: picks an option", "TestAnswerPrompt_ClaudeStillOpen"},
 	"internal/server/routes/prompt_answer.go\tSessionsHandler.AnswerPrompt\tSendRawInput":  {guardScreen, "human: picks an option", "TestAnswerPromptSendsNoKeyOverADraft"},
 	"internal/server/routes/prompt_answer.go\tSessionsHandler.selectUnnumbered\tSendArrow": {guardScreen, "human: picks an option (a menu without numbers, #4543)", "TestAnswerPrompt_AgyNavigatesWithArrows"},

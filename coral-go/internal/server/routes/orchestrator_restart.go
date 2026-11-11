@@ -11,6 +11,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptr"
+	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -162,6 +163,7 @@ func (h *SessionsHandler) queueRestart(project, sessionID, member, who, actor st
 		return false
 	}
 	go func() {
+		defer safego.Recover("orchestrator restart: wait for idle")
 		defer h.restartQueued.Delete(sessionID)
 		ctx, cancel := context.WithTimeout(context.Background(), restartWhenIdleFor)
 		defer cancel()
