@@ -23,7 +23,7 @@ import { syncDisplayPanels } from './display_panel.js';
 import { setChecked, setHidden } from './dom_write.js';
 import { SVGO } from './svg_open.js';
 const _mk0 = "<path d=\"M3 3h10M3 6.5h10M3 10h6\"/><path d=\"M11.5 11.5l2 2\"/></svg>\n                Edit instructions\n            </button>";
-const _mk1 = "<line x1=\"4\" y1=\"4\" x2=\"12\" y2=\"12\"/><line x1=\"12\" y1=\"4\" x2=\"4\" y2=\"12\"/></svg>\n                Kill Session\n            </button>";
+const _mk1 = "<line x1=\"4\" y1=\"4\" x2=\"12\" y2=\"12\"/><line x1=\"12\" y1=\"4\" x2=\"4\" y2=\"12\"/></svg>\n                Remove Agent\n            </button>";
 
 // ── Archived section (#3030) ─────────────────────────────────────────────
 // One global collapsed section at the bottom of the list. The grouping is all
