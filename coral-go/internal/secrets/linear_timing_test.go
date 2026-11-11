@@ -17,16 +17,22 @@ import (
 // slow pass. So each size is timed with the collector off and swept first, the fastest of three, and a ratio over the limit is measured once more before it fails: a
 // pass that really is quadratic fails twice, a noisy sample does not.
 
-// bestOfThree is the fastest of three runs of f over text, with garbage collection paused (and run beforehand) so a collection cannot land in the timing.
+// bestOfThree is the fastest of three runs of f over text, with garbage collection paused (and run beforehand) so a collection cannot land in the timing. A pass is timed by the CPU time it used where the
+// system tells it (#15536: on a machine loaded by other work the wall clock of the 1 MB run read 9 times the 250 KB one, the time the scheduler kept the pass waiting, not the pass).
 func bestOfThree(f func(string), text string) time.Duration {
 	old := debug.SetGCPercent(-1)
 	defer debug.SetGCPercent(old)
 	best := time.Hour
 	for i := 0; i < 3; i++ {
 		runtime.GC()
-		start := time.Now()
+		start, c0, haveCPU := time.Now(), time.Duration(0), false
+		c0, haveCPU = cpuTime()
 		f(text)
-		if d := time.Since(start); d < best {
+		d := time.Since(start)
+		if c1, ok := cpuTime(); haveCPU && ok { // the work the pass did: a loaded machine that kept it waiting is not a slow pass (#15536)
+			d = c1 - c0
+		}
+		if d < best {
 			best = d
 		}
 	}

@@ -253,13 +253,15 @@ func Start(ctx context.Context, cfg *config.Config, opts Options) (*RunningServe
 	if err != nil {
 		return nil, err
 	}
-	stopFirewall := func() {} // ends the firewall re-checks (started below), whatever ctx the caller passed
+	stopFirewall := func() {}    // ends the firewall re-checks (started below), whatever ctx the caller passed
+	var sweeps []<-chan struct{} // the startup sweeps run in the background on the databases and the data folder
 	closeDB := func(err error) (*RunningServer, error) {
 		stopFirewall()
+		waitSweeps(sweeps) // a start that stops leaves nothing running in the folder: a caller that removes it (a test's TempDir) raced a sweep (#15536)
 		db.Close()
 		return nil, err
 	}
-	if err := prepareWithDatabase(ctx, db, cfg, opts); err != nil {
+	if err := prepareWithDatabase(ctx, db, cfg, opts, &sweeps); err != nil {
 		return closeDB(err)
 	}
 	settleDataOwner(ctx, db, cfg.CoralDir())
@@ -409,4 +411,16 @@ func logStartup(opts Options) {
 		filepath.Base(os.Getenv("SHELL")),
 		os.Getenv("CORAL_TMUX_BIN") != "",
 	)
+}
+
+// waitSweeps waits for the startup sweeps to end, each of which stops by itself within a minute; a stuck one does not hold a failed start for more than ten seconds.
+func waitSweeps(sweeps []<-chan struct{}) {
+	limit := time.After(10 * time.Second)
+	for _, done := range sweeps {
+		select {
+		case <-done:
+		case <-limit:
+			return
+		}
+	}
 }
