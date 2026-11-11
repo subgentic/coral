@@ -13,7 +13,7 @@ const TEAM_WORDS = {
     'More': "Shows the team's other actions.",
     'Reset Team': 'Stops each agent and starts it again from its first instructions in a new chat, so its context is cleared. Old chats stay in History; the board, tasks, goals and files are kept.',
     'Kill All': "Stops every agent in the team now. Chats stay in History; the board, tasks and goals are kept. A Hermes agent's conversation is deleted with it.",
-    'Delete team': 'Deletes the team for good: its messages, tasks, goals, members, reminders and settings. Chats stay in History and files are not touched. Only when no agent is running.',
+    'Delete team': 'Deletes the team for good: its messages, tasks, goals, members, reminders, settings and more; the dialog lists everything. Chats stay in History and files are not touched. Only when no agent is running.',
 };
 const AGENT_WORDS = {
     'Restart, same settings': 'Starts a fresh conversation with the same settings; the instructions are sent again.',
