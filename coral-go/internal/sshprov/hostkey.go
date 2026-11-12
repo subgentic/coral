@@ -139,7 +139,12 @@ func DefaultKnownHostsPath() string {
 
 // HopKeyError is a scan that stopped because a jump host's key is not in the owner's known_hosts (or no longer matches it): the scan never accepts a hop's key, the owner connects through it once
 // with ssh in a terminal. Hops are the jump hosts of the alias, as the owner wrote them in their config, and Unknown the ones whose key is not found (all of them when that cannot be told).
-type HopKeyError struct{ Hops, Unknown []string }
+//
+// LookupFailed says an ssh -G that names the hops was killed (past the Runner's HopTimeout) or failed, so Hops may be empty because Coral could not tell, not because the alias has no jump host (#15812).
+type HopKeyError struct {
+	Hops, Unknown []string
+	LookupFailed  bool
+}
 
 func (e *HopKeyError) Error() string        { return "sshprov: a jump host's key is not in known_hosts" }
 func (e *HopKeyError) Is(target error) bool { return target == ErrHostKeyScan }
@@ -320,7 +325,7 @@ func (r Runner) ScanAlias(ctx context.Context, t Target) ([]HostKey, error) {
 func (r Runner) hopKeyError(ctx context.Context, sshBin, cfgPath string, t Target) error {
 	e := &HopKeyError{}
 	g := func(dest string, port ...string) map[string]string {
-		cctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		cctx, cancel := context.WithTimeout(ctx, r.hopTimeout())
 		defer cancel()
 		argv := []string{"-G", "-F", cfgPath}
 		for _, p := range port {
@@ -329,7 +334,9 @@ func (r Runner) hopKeyError(ctx context.Context, sshBin, cfgPath string, t Targe
 		cmd := executil.Command(cctx, sshBin, append(argv, "--", dest)...)
 		var out capped
 		cmd.Stdout, cmd.Stderr, cmd.Env = &out, io.Discard, minimalEnv()
-		_ = cmd.Run()
+		if err := cmd.Run(); err != nil || out.b.Len() == 0 {
+			e.LookupFailed = true
+		}
 		got := map[string]string{}
 		for _, l := range strings.Split(out.b.String(), "\n") {
 			if k, v, ok := strings.Cut(l, " "); ok {
@@ -451,7 +458,7 @@ func (r Runner) HostKeyName(ctx context.Context, t Target) string {
 	if userCfg == "" || !aliasRe.MatchString(t.Alias) {
 		return ""
 	}
-	cctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	cctx, cancel := context.WithTimeout(ctx, r.hopTimeout())
 	defer cancel()
 	cmd := executil.Command(cctx, sshBin, "-G", "-F", userCfg, "--", t.Alias)
 	var out capped

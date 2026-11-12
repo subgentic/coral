@@ -834,6 +834,12 @@ func TestScanSentenceNamesTheJumpHostsTheOwnerHasNotPinned(t *testing.T) {
 	assert.Contains(t, scanSentence(&sshprov.HopKeyError{Hops: []string{"a", "b"}}), "(a, b) is not in your known_hosts", "when it cannot be told which, the whole chain is named")
 	assert.Contains(t, scanSentence(&sshprov.HopKeyError{}), "A jump host on the way is not in your known_hosts")
 	assert.Equal(t, "Could not read the host's key.", scanSentence(sshprov.ErrHostKeyScan))
+	// #15812: a lookup of the jump hosts that was killed or failed says so, and does not read as a plain unknown key
+	lost := scanSentence(&sshprov.HopKeyError{LookupFailed: true})
+	assert.Contains(t, lost, "could not look up which jump host")
+	assert.Contains(t, lost, "Try again")
+	assert.NotContains(t, lost, "is not in your known_hosts")
+	assert.Contains(t, scanSentence(&sshprov.HopKeyError{Hops: []string{"a"}, Unknown: []string{"a"}, LookupFailed: true}), "(a) is not in your known_hosts", "hops that were named keep the named sentence")
 }
 
 // #12056: a setup that stopped on a changed host key offers Forget this host key: only a person, only for that failure, it removes the hub's own saved key for that computer (and no other), puts the setup back at the

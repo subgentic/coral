@@ -9,9 +9,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 // blobFor is a well formed key blob: the type string, then some key bytes.
@@ -324,7 +326,9 @@ func TestHopKeyErrorNamesTheHopsTheOwnerHasNotPinned(t *testing.T) {
 		t.Fatal(err)
 	}
 	tg, _ := FromAlias("inner")
-	he, ok := (Runner{}).hopKeyError(context.Background(), sshBin, cfg, tg).(*HopKeyError)
+	// Not bound by the wall clock (windows-tests 43160933813: a starved runner's ssh -G took over the 10 s the product allows, the lookup came back empty and this failed with hops [] unknown []): the
+	// product's limit is what the next test pins, this one asks what ssh says about the config.
+	he, ok := (Runner{HopTimeout: 5 * time.Minute}).hopKeyError(context.Background(), sshBin, cfg, tg).(*HopKeyError)
 	if !ok {
 		t.Fatal("not a HopKeyError")
 	}
@@ -536,5 +540,54 @@ func TestSavedHostKeysCarryTheFingerprintSshPrints(t *testing.T) {
 	}
 	if none, err := SavedHostKeys(context.Background(), filepath.Join(dir, "missing"), "box.example.com"); err != nil || len(none) != 0 {
 		t.Errorf("a file that is not there has none: %+v %v", none, err)
+	}
+}
+
+// #15809: the hop lookup runs ssh -G under a limit, and what it does with a slow ssh is pinned with a wrapper that waits before it runs the real one, so it does not depend on how loaded the computer is:
+// inside the limit the hops are named; past it there are none (the sentence then names no hop), which is what windows-tests 43160933813 showed with the real ssh on a starved runner.
+func TestHopKeyErrorLookupLimitIsTheRunnersAndASlowSshIsNamedWithinIt(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the slow ssh is a shell script")
+	}
+	sshBin, err := exec.LookPath("ssh")
+	if err != nil {
+		t.Skip("no ssh on this computer")
+	}
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "config")
+	if err := os.WriteFile(cfg, []byte("Host inner\n  HostName inner.example.com\n  ProxyJump ops@jump1.example.com:2200\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	slow := filepath.Join(dir, "slow-ssh")
+	if err := os.WriteFile(slow, []byte("#!/bin/sh\nsleep 1\nexec "+shQuote(sshBin)+" \"$@\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	tg, _ := FromAlias("inner")
+	hops := func(limit time.Duration) string {
+		he, ok := (Runner{HopTimeout: limit}).hopKeyError(context.Background(), slow, cfg, tg).(*HopKeyError)
+		if !ok {
+			t.Fatal("not a HopKeyError")
+		}
+		return strings.Join(he.Hops, ",")
+	}
+	if got := hops(time.Minute); got != "ops@jump1.example.com:2200" {
+		t.Errorf("a slow ssh within the limit: hops %q", got)
+	}
+	if got := hops(100 * time.Millisecond); got != "" {
+		t.Errorf("a slow ssh past the limit: hops %q, want none", got)
+	}
+	// #15812: the lookup that was killed says so, and one that answered does not
+	lookup := func(limit time.Duration) *HopKeyError {
+		he, _ := (Runner{HopTimeout: limit}).hopKeyError(context.Background(), slow, cfg, tg).(*HopKeyError)
+		return he
+	}
+	if he := lookup(100 * time.Millisecond); he == nil || !he.LookupFailed {
+		t.Errorf("a killed ssh -G: %+v, want LookupFailed", he)
+	}
+	if he := lookup(time.Minute); he == nil || he.LookupFailed {
+		t.Errorf("an ssh -G that answered: %+v, want not LookupFailed", he)
+	}
+	if (Runner{}).hopTimeout() != 10*time.Second {
+		t.Errorf("the default limit is %v", (Runner{}).hopTimeout())
 	}
 }
