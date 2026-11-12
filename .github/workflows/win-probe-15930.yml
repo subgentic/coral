@@ -45,4 +45,4 @@ jobs:
           TMP: ${{ runner.temp }}
           CDP_FULL: "1"
         run: |
-          for i in 1 2 3; do node run_cdp_suites.mjs --timeout 180 --only inbox_approve_then_open_real 2>&1 | tail -60; done
+          for i in 1 2 3 4 5 6; do node run_cdp_suites.mjs --timeout 180 --retries 0 --only inbox_approve_then_open_real 2>&1 | tail -60; done
