@@ -81,7 +81,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 for (let a = 0; a < 5 && !p; a++) {
                     const q = await where(n, part); if (!q) break;
                     await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: q.x, y: q.y, button: 'none', buttons: 0, clickCount: 0 });
-                    await ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))`);
+                    await ev(`(async () => { await ${framesJs(2)}; return true; })()`);
                     const still = await ev(`(() => { const e = document.elementFromPoint(${q.x}, ${q.y}), tr = e && e.closest('${T} tbody tr'); return !!(tr && tr.querySelector('button[aria-label="Approve: ${n}"]')); })()`);
                     if (still) p = q;
                 }
