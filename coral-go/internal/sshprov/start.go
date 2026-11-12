@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/secrets"
+	"github.com/subgentic/coral/internal/semverorder"
 )
 
 // Starting the installed Coral on the far computer and reading what the hub needs to register it (#11370). The remote listens on its own loopback only (--host 127.0.0.1); the hub reaches it
@@ -225,6 +226,34 @@ func (e *StartError) Error() string {
 	return "sshprov: could not start Coral (exit code " + strconv.Itoa(e.ExitCode) + ")"
 }
 func (e *StartError) Is(target error) bool { return target == ErrStartFailed }
+
+// ErrNothingInstalled is a computer with no runnable release under the install folder: there is nothing to start (an upgrade installs one).
+var ErrNothingInstalled = errors.New("sshprov: no release is installed on that computer")
+
+// LatestInstalled is the newest release installed under the install folder (CmdListInstalled): the one a Start Coral starts. A folder name that is not a release version the hub can read is ignored.
+func (r Runner) LatestInstalled(ctx context.Context, t Target) (string, error) {
+	res, err := r.Run(ctx, t, CmdListInstalled)
+	if err != nil {
+		return "", err
+	}
+	best, bestV := "", semverorder.Version{}
+	for _, f := range strings.Fields(res.Stdout) {
+		if !versionRe.MatchString(f) {
+			continue
+		}
+		v, ok := semverorder.Parse(f)
+		if !ok {
+			continue
+		}
+		if best == "" || semverorder.Compare(v, bestV) > 0 {
+			best, bestV = f, v
+		}
+	}
+	if best == "" {
+		return "", ErrNothingInstalled
+	}
+	return best, nil
+}
 
 // StopWait is how long StopAndConfirm gives a stopped Coral to be gone.
 func StopWait() time.Duration { return stopWait }

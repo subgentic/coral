@@ -129,6 +129,8 @@ const (
 	kindRemove  = "remove"
 	// kindApprovals sets up Approve and Request changes through this hub for a computer set up over SSH that has no secret (#13230): it installs one by the far Coral's own command.
 	kindApprovals = "approvals"
+	// kindStart starts the installed release of a computer set up over SSH whose Coral is not running (#15998): its kept data folder, backend and port, then it waits for the Coral to answer.
+	kindStart = "start"
 )
 
 func (p *provisionPlan) kind() string {
