@@ -17,22 +17,14 @@ func LaunchPermissionArgs(agentType string, params LaunchParams) ([]string, erro
 	if agentType == at.Pi || agentType == at.Terminal {
 		return nil, nil // Pi has no permission system; a plain shell has no agent
 	}
-	// The launch route takes a mode as the CLI's own flags (only "default" is a mode there, #10362): the line is built from the same flags the dashboard sends for the mode.
-	if own, _ := SplitPermissionFlags(params.Flags); len(own) == 0 && params.PermissionMode != "" && params.PermissionMode != "default" {
-		params.Flags = append(append([]string{}, params.Flags...), PermissionFlagsForAgent(agentType, params.PermissionMode)...)
-		params.PermissionMode = "default"
-	}
+	params = previewParams(agentType, params)
 	// Hermes builds its command by preparing a home folder under the data dir and writing its first message there: a preview writes nothing, and what Hermes adds for permissions is only the
 	// --yolo its Flags carry, so that is read straight off the flags (the same ones the launch is given).
 	if agentType == at.Hermes {
 		return permissionArgsOf(params.Flags), nil
 	}
 	id := newPreviewSessionID() // its own id per call: two previews at once never delete each other's files
-	params.SessionID, params.PermissionPreview = id, true
-	params.ResumeSessionID = ""
-	if params.WorkingDir == "" {
-		params.WorkingDir = os.TempDir()
-	}
+	params.SessionID = id
 	defer removePreviewFiles(id)
 	cmd, err := GetAgent(agentType).LaunchCommand(params)
 	if err != nil {
