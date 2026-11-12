@@ -5,6 +5,7 @@ import { registerActions, textOf } from './actions.js';
 import { serverFetch, LOCAL_SERVER, normServer, isCloud } from './server_base.js';
 import { recentDirsKey, machineBlock } from './launch_server.js';
 import { browserLocal } from './safe_storage.js';
+import { importOnce } from './import_once.js';
 
 /* Multi-server hub: a directory input may belong to a remote server. The
  * launch modals register a resolver (input id -> server id) so listing,
@@ -129,7 +130,7 @@ export function toggleBrowser(dirInputId, browserId, listId, pathId) {
     const isVisible = browser.style.display !== "none";
     browser.style.display = isVisible ? "none" : "";
     if (!isVisible) {
-        import('./lazy_styles.js').then(m => m.loadStyles('launch_folder.css')).catch(() => {});
+        importOnce('./lazy_styles.js').then(m => m.loadStyles('launch_folder.css')).catch(() => {});
         const inputPath = document.getElementById(_activeDirInputId).value;
         browserCurrentPath = browseStartPath(inputPath, activeServer() !== LOCAL_SERVER, getCoralRoot());
         renderRecentDirs();
