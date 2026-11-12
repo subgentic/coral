@@ -111,7 +111,7 @@ func TestApprovalFeed8040NewRequestStillSettles(t *testing.T) {
 	h.terminal = term
 	term.show(displayFixture(t, "approved-working.txt"))
 	sid := uuid.NewString()
-	older := displayRequest(time.Now().Add(-displayHintSettle + 200*time.Millisecond))[0]
+	older := displayRequest(time.Now().Add(-displayHintSettle + 2*time.Second))[0] // its deferred read is due in about 2 s: the answer below has that long to arrive before the timer would be skipped as already due (200 ms was not enough on a slow machine, #15748)
 	older.SessionID = &sid
 	_, err := h.ts.InsertAgentEvent(context.Background(), &older)
 	require.NoError(t, err)
@@ -125,7 +125,7 @@ func TestApprovalFeed8040NewRequestStillSettles(t *testing.T) {
 	require.NoError(t, err)
 	select {
 	case <-kicks:
-	case <-time.After(time.Second):
+	case <-time.After(displayHintSettle + 2*time.Second):
 		t.Fatal("no deferred read attempt")
 	}
 	events := append([]store.AgentEvent{older}, newer...)

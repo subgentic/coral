@@ -95,6 +95,14 @@ type relayAttachEnv struct {
 	wire *hubWire
 }
 
+// slowScans gives the secret scan the time a 6 MiB file takes on a slow machine (-race on epoch refused all three files of the 16 MiB tests: every pass ran out of its 27 s, #15748); the tests are about the size limits, not the scan's speed. They are serial.
+func slowScans(t *testing.T) {
+	t.Helper()
+	perMiB, fileCap := scanPerMiB, scanFileCap
+	scanPerMiB, scanFileCap = time.Minute, 20*time.Minute
+	t.Cleanup(func() { scanPerMiB, scanFileCap = perMiB, fileCap })
+}
+
 func newRelayAttachEnv(t *testing.T, artifactsOn bool) *relayAttachEnv {
 	t.Helper()
 	bs, err := boardtest.Open(t.TempDir() + "/board.db")

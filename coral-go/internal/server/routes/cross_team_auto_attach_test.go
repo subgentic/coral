@@ -103,6 +103,7 @@ func TestRelaySendAutoAttachStopsAtTheFileLimit(t *testing.T) {
 
 // 8 MiB per file and 16 MiB per send: a file over the first, or one that would pass the second, is only warned about.
 func TestRelaySendAutoAttachKeepsTheSizeLimits(t *testing.T) {
+	slowScans(t)
 	e := newRelayAttachEnv(t, true)
 	big := e.upload(alphaOrchSID, "# big\n"+strings.Repeat("x", 9<<20))
 	s1 := e.upload(alphaOrchSID, "# six one\n"+strings.Repeat("a", 6<<20))

@@ -76,6 +76,10 @@ func TestSharedWSTick_ConcurrentClientsShareOneBuild(t *testing.T) {
 	h, term := newSharedListHandler(t)
 	term.hold = make(chan struct{})
 	req := httptest.NewRequest("GET", "/ws/coral", nil)
+	// A client that starts later than the freshness window after the build ended builds again and gets its own tick: on a slow machine (-race on a loaded box) one of the 20 can. The window is held open for the test (#15748).
+	wasAge := wsListMaxAge()
+	wsListMaxAgeNs.Store(int64(time.Minute))
+	t.Cleanup(func() { wsListMaxAgeNs.Store(int64(wasAge)) })
 
 	const clients = 20
 	ticks := make([]*wsTick, clients)

@@ -108,6 +108,7 @@ func TestLinkAutoAttachOneFileOverEightMiBIsNotAttachedAndIsWarned(t *testing.T)
 }
 
 func TestLinkAutoAttachSixteenMiBPerSend(t *testing.T) {
+	slowScans(t)
 	e := newRelayAttachEnv(t, true)
 	six := func(c string) string { return e.upload(alphaOrchSID, strings.Repeat(c, 6<<20)) }
 	a, b, c := six("c"), six("d"), six("e")
