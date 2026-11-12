@@ -14,12 +14,6 @@ export function agentForm() { return _view; }
 /** The form of the persona step (the agent's name, or a team member's role), once the dialog is built. */
 export function agentNameForm() { return _nameView; }
 
-/** The one red line above the buttons (what is missing on this step); '' clears it. */
-export function agentStatus(text) {
-    const el = document.getElementById('launch-agent-status');
-    if (el) el.textContent = text || '';
-}
-
 /** Word the name field for what the dialog is doing: a new agent's optional name, or a team member's role (Add member and Edit member save a role, so it is Required). */
 export function setAgentNameMode(member) {
     _nameView?.clearErrors();
@@ -36,7 +30,6 @@ function mount(modal) {
         ] });
     }
     const nameInput = document.getElementById('launch-agent-name-input');
-    if (nameInput) nameInput.addEventListener('input', () => { if (nameInput.value.trim()) agentStatus(''); }); // a role typed: the line that asked for it goes
     const host = modal.querySelector('#agent-form-host');
     if (!host || _view) return;
     const root = host.dataset.coralRoot || '';

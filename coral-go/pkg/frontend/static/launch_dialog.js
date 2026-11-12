@@ -18,6 +18,7 @@ import { checkTmuxForLaunch } from './prerequisites.js';
 import { reportLaunchDialogOpened } from './dashboard_analytics.js';
 import { sectionFocus } from './section_dialog.js';
 import { loadStyles } from './lazy_styles.js';
+await loadStyles('launch_folder.css'); // the folder list's 32 px rows and the one Primary while it is open: not at start (#15891)
 import { showTeamAddress } from './team_form.js';
 import { agentForm as folderForm, setAgentNameMode } from './agent_form.js';
 const { _syncACFModelField, getAgentConfig, renderAgentConfigForm, cliWarningOf } = await importOnce('./agent_config_form.js');
@@ -38,7 +39,7 @@ function _launchStage(arg) {
     const input = document.getElementById('launch-dir');
     if (to !== 'folder' && !launch.member && (!input || !input.value.trim())) { // a folder is the one thing a launch needs (a team member is not launched: it has none, #7861): said where it is, on the folder's own step
         setLaunchStage('folder');
-        _folderPressed = true; folderForm()?.validate({ focus: true }); _syncLaunchBlock(); // the folder is flagged under it, and one red line above the buttons says it
+        folderForm()?.validate({ focus: true }); _syncLaunchBlock(); // the folder is flagged under its field, and only there (#15891: not said again above the buttons)
         return;
     }
     const list = document.getElementById('dir-browser'); if (list) list.style.display = 'none'; // display-ok: the folder list is shown and hidden by style.display where it is opened (browser.js)
@@ -120,7 +121,7 @@ function _selectLaunchType(type) {
         importOnce('./launch_signin_notice.js').then(m => m.mountLaunchSigninNotice({ slot: document.getElementById('launch-cli-slot'), before: document.getElementById('launch-agent-pick-label')?.parentElement, form: document.getElementById('launch-agent-acf'), server: _effectiveServer(launch.server) })).catch(e => console.error('sign-in notice', e)); // Claude not signed in is said here, with how (#11336)
         // The agent is chosen in this step, not only under More options (#6199): a radio group that follows the form's own select, the installed agents first.
         importOnce('./launch_provider_cards.js').then(m => m.buildProviderCards({ group: document.getElementById('launch-agent-pick'), form: document.getElementById('launch-agent-acf'), server: _effectiveServer(launch.server), implicitDefault: !_settingsFor(_effectiveServer(launch.server)).default_agent_type })).catch(() => {});
-        _folderPressed = false; folderForm()?.clearErrors();
+        folderForm()?.clearErrors();
         _wireDirNote(); _syncDirNote(); _syncLaunchBlock(); _renderDirRecents();
         if (!launch.member && !launch.addTo && !_settingsFor(_effectiveServer(launch.server)).default_working_dir) offerSuggestion(document.getElementById('launch-dir'), document.getElementById('launch-dir-suggest'), 'first-agent'); // a first agent has a folder to say yes to (#11258)
         wireRecap(); syncRecap(); _syncLaunchBlock();
@@ -367,17 +368,13 @@ function _syncLaunchAccess() {
 document.addEventListener('coral:server-access-loaded', () => { if (document.getElementById('launch-modal')?.style.display === 'flex') _syncLaunchAccess(); });
 
 // A missing CLI is said once, under the folder, and Launch stays off until it is there (#5990); the message is the button's reason.
-let _folderPressed = false; // Next was pressed with no folder: only then is it said above the buttons (nothing before the first press)
 const _cliBlock = () => document.querySelector('#launch-step-agent [data-blocks-launch]');
 function _syncLaunchBlock() {
     const go = document.getElementById('launch-agent-go'), next = document.getElementById('launch-agent-next');
     if (!go) return;
     const why = _cliBlock();
     go.disabled = !!why;
-    // The reason Launch is off is its description (#7391): the missing CLI's line. A missing folder never turns a button off: pressing Next says it where the folder is (one red line above the buttons, the error under the field).
-    const noDir = !launch.member && !(document.getElementById('launch-dir')?.value || '').trim();
-    const status = document.getElementById('launch-agent-status');
-    if (status && (_folderPressed || status.textContent === 'Choose a folder')) status.textContent = _folderPressed && noDir ? 'Choose a folder' : ''; // the folder's line only: a member's role line is said by the member's own save
+    // The reason Launch is off is its description (#7391): the missing CLI's line. A missing folder never turns a button off: pressing Next says it under the folder field.
     for (const b of [go, next]) {
         if (!b) continue;
         b.removeAttribute('aria-disabled');
@@ -523,7 +520,7 @@ export async function launchSession() {
     if (!dir) {
         const agentForm = launch.mode !== "terminal";
         if (agentForm) setLaunchMore(false); // the folder is step 1: back to it, so the flagged field can take the focus
-        if (agentForm) { _folderPressed = true; folderForm().validate({ focus: true }); _syncLaunchBlock(); } else markFieldInvalid(document.getElementById("launch-terminal-dir"), "Working directory is required");
+        if (agentForm) { folderForm().validate({ focus: true }); _syncLaunchBlock(); } else markFieldInvalid(document.getElementById("launch-terminal-dir"), "Working directory is required");
         return;
     }
 
