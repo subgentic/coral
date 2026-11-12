@@ -78,7 +78,7 @@ type relayStep struct {
 // sends in lockstep: the old handler and the new one answer the same, send Coral Hub the same files and message,
 // store the same mirror and shared records, and spend the same quota.
 func TestPostRelayMessageAgreesWithBefore4756(t *testing.T) {
-	t.Parallel() // its own handler and store, no shared state: it ran alone among thousands, one after another (#15686)
+	// serial: the secret-scan queue (attach_busy) is process-wide, so parallel with other attaching tests it refuses a send; a -race run caught it (#15704)
 	prevEnforced := identityActorEnforced()
 	t.Cleanup(func() { setIdentityActorEnforced(prevEnforced) })
 	counts := map[string]int{}

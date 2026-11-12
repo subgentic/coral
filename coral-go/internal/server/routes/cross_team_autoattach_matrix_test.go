@@ -108,7 +108,7 @@ func TestLinkAutoAttachOneFileOverEightMiBIsNotAttachedAndIsWarned(t *testing.T)
 }
 
 func TestLinkAutoAttachSixteenMiBPerSend(t *testing.T) {
-	t.Parallel() // its own handler and store, no shared state: it ran alone among thousands, one after another (#15686)
+	// serial: the secret-scan queue (attach_busy) is process-wide, so parallel with other attaching tests it refuses a send; a -race run caught it (#15704)
 	e := newRelayAttachEnv(t, true)
 	six := func(c string) string { return e.upload(alphaOrchSID, strings.Repeat(c, 6<<20)) }
 	a, b, c := six("c"), six("d"), six("e")
