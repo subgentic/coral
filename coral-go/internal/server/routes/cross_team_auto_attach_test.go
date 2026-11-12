@@ -103,11 +103,7 @@ func TestRelaySendAutoAttachStopsAtTheFileLimit(t *testing.T) {
 
 // 8 MiB per file and 16 MiB per send: a file over the first, or one that would pass the second, is only warned about.
 func TestRelaySendAutoAttachKeepsTheSizeLimits(t *testing.T) {
-<<<<<<< ours
-	// serial: the secret-scan queue (attach_busy) is process-wide, so parallel with other attaching tests it refuses a send; a -race run caught it (#15704)
-=======
 	slowScans(t)
->>>>>>> theirs
 	e := newRelayAttachEnv(t, true)
 	big := e.upload(alphaOrchSID, "# big\n"+strings.Repeat("x", 9<<20))
 	s1 := e.upload(alphaOrchSID, "# six one\n"+strings.Repeat("a", 6<<20))
