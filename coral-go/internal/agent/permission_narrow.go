@@ -170,3 +170,47 @@ func CodexLaunchPermissions(flags []string, caps *Capabilities, mode string, kee
 	}
 	return sandbox, approval
 }
+
+// CodexModeNote says, in the person's words, when what Codex is started with is not what the chosen mode stands for, and why: Full access kept for the agent, a capability set that narrows
+// the mode (#6425), or capabilities that set the flags because the pick is Default (#6422). "" when the mode's own flags are what runs (and for a pick Codex has no flags for). The flags
+// themselves come from LaunchCommand: this is the reason beside them (#15727, for New agent's flags line).
+func CodexModeNote(caps *Capabilities, mode string, keepFull bool) string {
+	if keepFull {
+		return "Full access is kept for this agent, so it starts with no sandbox and no approvals whatever its mode and capabilities say."
+	}
+	perms := TranslateToCodexPermissions(caps)
+	if perms == nil {
+		return ""
+	}
+	capPair := codexPairOf(perms)
+	if perms.FullAuto {
+		capPair = codexPair{"workspace-write", "never"}
+	}
+	m, explicit := codexPairForMode(mode)
+	if !explicit {
+		return "Default has no flags of its own, so the agent's capabilities set them: " + codexPairWords(capPair) + "."
+	}
+	if perms.FullAuto {
+		return "" // against an explicit mode, Shell with no limits restricts nothing: the mode stands as chosen
+	}
+	if narrowCodexPair(m, capPair) == m {
+		return ""
+	}
+	return "The agent's capabilities narrow this mode to " + codexPairWords(narrowCodexPair(m, capPair)) + "."
+}
+
+func codexPairWords(p codexPair) string {
+	approval := "asks first"
+	if p.approval == "never" {
+		approval = "never asks"
+	}
+	switch p.sandbox {
+	case "read-only":
+		return "read-only, " + approval
+	case "workspace-write", "":
+		return "workspace writes, " + approval
+	case codexSandboxNone:
+		return "no sandbox, " + approval
+	}
+	return p.sandbox + ", " + approval
+}

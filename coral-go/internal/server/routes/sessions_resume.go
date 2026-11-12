@@ -219,10 +219,17 @@ func (h *SessionsHandler) resumeCommand(ctx context.Context, p *restartPlan, age
 		refuse, _ := cliPathRefusal(ctx, cerr)
 		return "", refuse
 	}
+	// The Operator's Keep Full access (#14061, #14085) applies to a resume as it does to a restart and a wake: the command is built from the stored flags and mode, and without this a Full access
+	// agent resumed in the mode it was started in, or in what its capabilities narrow it to (#15727: the row still said Full access).
+	keepFull := false
+	if p.stored != nil {
+		keepFull = h.keepFullAccessForRelaunch(ctx, p.agentType, p.stored.SessionID, "resume", p.stored.Capabilities, p.capsJSON)
+	}
 	cmd, err := h.launchCommand(ctx, agentImpl, agent.LaunchParams{
-		SessionID:    p.newSessionID,
-		SessionName:  p.newSessionName,
-		ProtocolPath: h.protocolPath(), EmbeddedProtocol: true,
+		KeepFullAccess: keepFull,
+		SessionID:      p.newSessionID,
+		SessionName:    p.newSessionName,
+		ProtocolPath:   h.protocolPath(), EmbeddedProtocol: true,
 		ResumeSessionID: resumeID,
 		Flags:           p.flags,
 		WorkingDir:      p.workdir,
