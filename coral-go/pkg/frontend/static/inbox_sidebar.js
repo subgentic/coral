@@ -979,7 +979,7 @@ function wireSaveDrop(list) {
     list.addEventListener('drop', e => { const t = target(e); if (!t || !dragging) return; e.preventDefault(); t.classList.remove('drop-over'); const row = dragging; dragging = null;
         importOnce('./artifact_review.js').then(async ({ saveRow, saySaved }) => { const out = await saveRow(row.team, row); saySaved(row.team, row, out); sayLive(`Saved ${markHidden(row.name, { strict: true })} for later.`); }).catch(error => sayLive(error.message)); });
 }
-/** The collapsed rail keeps one icon per folder with its count (#15347, the Operator: "Collapsing the inbox can still show the icons"): the same glyphs as the list, a tooltip and an accessible name; a click opens the folder and the rail stays collapsed. */
+/** The collapsed rail keeps one icon per folder (#15347, the Operator: "Collapsing the inbox can still show the icons"): the same glyphs as the list, a tooltip and an accessible name; a click opens the folder and the rail stays collapsed. */
 function drawRail(sections, here) {
     const rail = $('sidebar-rail-inbox'); if (!rail) return;
     const items = sections.flatMap(sec => sec.items).filter(it => !String(it.key).startsWith(BOARD_ITEM));
@@ -989,7 +989,7 @@ function drawRail(sections, here) {
         b.type = 'button'; b.dataset.key = it.key; b.title = it.tip ? `${it.label}: ${it.tip}` : it.label; b.setAttribute('aria-label', name);
         if (it.key === here) b.setAttribute('aria-current', 'page');
         const glyph = _folders?.querySelector(`[data-key="${it.key}"] .view-list-icon`)?.cloneNode(true); if (glyph) b.append(glyph);
-        if (n) { const badge = DT.el('span', 'chip chip-count sidebar-rail-badge', n > 99 ? '99+' : n); badge.setAttribute('aria-hidden', 'true'); b.append(badge); }
+        if (n && it.key === 'needs') { const badge = DT.el('span', 'chip chip-count sidebar-rail-badge', n > 99 ? '99+' : n); badge.setAttribute('aria-hidden', 'true'); b.append(badge); } // a red badge is a notification: only Needs you has one (#15797); the other folders' counts are items, said in the name and the tooltip
         b.addEventListener('click', () => pickFolder(it.key));
         return b;
     }));
