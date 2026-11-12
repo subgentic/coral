@@ -29,7 +29,9 @@ var launchSites = map[string]struct {
 	// launch-coral (a shipped entry point, #6799): its agents have no live row when they start, so no run tag can be looked up at Kill; the other four it passes.
 	"cmd/launch-coral/main.go.launchParamsFor": {"launch-coral's agents", []string{"SessionName", "CoralHost", "CoralPort", "CoralDir"}},
 	// A workflow step does not start an agent session: this literal only builds the step's settings file (PrintArgs); its process environment is buildStepEnv's, checked below.
-	"background/workflow_steps.go.executeAgentPrint": {"a workflow step's settings (PrintArgs), not a launch", nil},
+	// The New agent dialog's permission preview (#15719): the LaunchParams only feeds agent.LaunchPermissionArgs to name the flags a pick would use; nothing is started and no process environment is built.
+	"server/routes/launch_permission_args.go.PostLaunchPermissionArgs": {"the permission preview, not a launch", nil},
+	"background/workflow_steps.go.executeAgentPrint":                   {"a workflow step's settings (PrintArgs), not a launch", nil},
 }
 
 func TestEveryLaunchPathPassesCoralsAddress(t *testing.T) {
