@@ -17,7 +17,7 @@ const SAVED = { theme: 'light', default_agent_type: 'codex', default_working_dir
     const open = (group) => ev(`window.SD.showSettingsModal(${group ? JSON.stringify(group) : ''}).then(() => true)`);
     const shown = () => ev(`getComputedStyle(document.getElementById('settings-modal')).display`);
     const group = () => ev(`[...document.querySelectorAll('#settings-modal .settings-pane')].filter(p => !p.hidden).map(p => p.dataset.group).join()`);
-    const noteShown = () => ev(`!document.getElementById('settings-unsaved').hidden`);
+    const noteShown = () => ev(`!!document.getElementById('settings-unsaved')`);
     const type = (id, v) => ev(`(() => { const e = document.getElementById(${JSON.stringify(id)}); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -49,22 +49,16 @@ const SAVED = { theme: 'light', default_agent_type: 'codex', default_working_dir
             assert.equal(await shown(), 'none', 'closed'); assert.equal((await ev(`window.__puts.length`)), 0, 'nothing sent');
             await waitFor(`document.activeElement && document.activeElement.id === 'opener'`, 'focus back on the opener', 5000);
         });
-        await run('the unsaved note follows the form and is tied to Save while it shows', async () => {
-            await open('general'); assert.equal(await noteShown(), false, 'hidden at open');
-            assert.equal(await ev(`document.getElementById('settings-cancel-btn').textContent`), 'Close', 'nothing changed: the way out is Close, there is nothing to cancel (#9955)');
-            assert.equal(await ev(`document.getElementById('settings-save-btn').hasAttribute('aria-describedby')`), false);
-            await type('settings-working-dir', '/work/other'); await waitFor(`!document.getElementById('settings-unsaved').hidden`, 'the note after an edit', 5000);
-            assert.equal(await ev(`document.getElementById('settings-cancel-btn').textContent`), 'Cancel', 'after an edit it is Cancel');
-            assert.equal(await ev(`document.getElementById('settings-save-btn').getAttribute('aria-describedby')`), 'settings-unsaved');
-            await type('settings-working-dir', '/work/saved'); await waitFor(`document.getElementById('settings-unsaved').hidden`, 'the note gone when the edit is undone', 5000);
-            assert.equal(await ev(`document.getElementById('settings-cancel-btn').textContent`), 'Close', 'and Close again when the edit is undone');
-            assert.equal(await ev(`document.getElementById('settings-save-btn').hasAttribute('aria-describedby')`), false);
-        });
-        await run('cancelled edits are gone on the next open', async () => {
-            await type('settings-working-dir', '/work/typed-and-cancelled'); await ev(`document.getElementById('settings-fit-pane-width').click(); true`);
-            await ev(`window.hideSettingsModal(); true`); await open('general');
-            assert.equal(await ev(`document.getElementById('settings-working-dir').value`), '/work/saved'); assert.equal(await ev(`document.getElementById('settings-fit-pane-width').checked`), true);
-            assert.equal(await noteShown(), false, 'and no unsaved note'); assert.equal((await ev(`window.__puts.length`)), 0, 'nothing was ever sent');
+        await run('Close stays Close while text is being typed; blur saves it without a footer action', async () => {
+            await open('agents');
+            await ev(`document.getElementById('settings-working-dir').focus();true`);
+            await type('settings-working-dir','/work/other');
+            assert.equal(await ev(`document.getElementById('settings-cancel-btn').textContent`),'Close');
+            assert.equal(await noteShown(),false);
+            await ev(`document.getElementById('settings-working-dir').blur();true`);
+            await waitFor(`window.ST.settings.default_working_dir==='/work/other'`,'saved on blur');
+            await ev(`window.hideSettingsModal();true`);await open('agents');
+            assert.equal(await ev(`document.getElementById('settings-working-dir').value`),'/work/other');
         });
     } finally { await client.close(); }
     const failed = results.filter(([, e]) => e);

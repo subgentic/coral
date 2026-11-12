@@ -43,27 +43,13 @@ const { coralReady } = require('./helpers/wait');
             await shot('chooser-cancel', w);
             await ev(`window.hideLaunchModal(); true`);
 
-            console.log(`3. (${w}) Unsaved changes`);
+            console.log(`3. (${w}) Saved row feedback`);
             await open('general');
-            const note = () => ev(`!document.getElementById('settings-unsaved').hidden`);
-            assert.equal(await note(), false, 'nothing changed: no note');
-            const was = await ev(`document.getElementById('settings-show-scrollbars').checked`);
-            await ev(`(() => { const c = document.getElementById('settings-show-scrollbars'); c.checked = !c.checked; c.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            await waitFor(`!document.getElementById('settings-unsaved').hidden`, 'the note after a change', 5000);
-            assert.equal(await ev(`document.getElementById('settings-unsaved').textContent`), 'Unsaved changes');
-            assert.deepEqual(await ev(`(() => { const n = document.getElementById('settings-unsaved'); return { live: n.getAttribute('role') || n.getAttribute('aria-live'), saveDescribedBy: document.getElementById('settings-save-btn').getAttribute('aria-describedby') }; })()`), { live: null, saveDescribedBy: 'settings-unsaved' }, 'the note is not a live region: the Save button is described by it while there are changes (#6656)');
-            await shot('unsaved', w);
-            await ev(`(() => { const c = document.getElementById('settings-show-scrollbars'); c.checked = ${was}; c.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            await waitFor(`document.getElementById('settings-unsaved').hidden`, 'the note goes when the change is undone', 5000);
-            assert.equal(await ev(`document.getElementById('settings-save-btn').hasAttribute('aria-describedby')`), false, 'and Save is described by nothing again');
-            await ev(`(() => { const c = document.getElementById('settings-show-scrollbars'); c.checked = !c.checked; c.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            await waitFor(`!document.getElementById('settings-unsaved').hidden`, 'the note again');
-            await ev(`document.querySelector('#settings-modal [data-on-click=m-apply-settings]').click(); true`);
-            await waitFor(`document.getElementById('settings-unsaved').hidden`, 'the note goes after Save', 10000);
-            await ev(`(() => { const c = document.getElementById('settings-show-scrollbars'); c.checked = ${was}; c.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            await ev(`document.querySelector('#settings-modal [data-on-click=m-apply-settings]').click(); true`); // put the setting back
-            await waitFor(`document.getElementById('settings-unsaved').hidden`, 'and after the put-back', 10000);
-            await ev(`window.hideSettingsModal(); true`);
+            assert.equal(await ev(`!!document.getElementById('settings-save-btn')`),false);
+            await ev(`document.getElementById('settings-show-scrollbars').click();true`);
+            await waitFor(`document.getElementById('settings-show-scrollbars').closest('.sv-row').querySelector('.settings-save-status')?.textContent==='Saved'`,'saved feedback');
+            assert.equal(await ev(`document.getElementById('settings-show-scrollbars').closest('.sv-row').querySelector('.settings-save-status').getAttribute('role')`),'status');
+            await shot('saved',w);
 
             console.log(`4. (${w}) Agents: the CLI paths are behind one line; an icon, not an emoji`);
             await open('agents');

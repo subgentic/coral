@@ -8,9 +8,10 @@ import { openSettingsGroup } from './settings_nav.js';
 import { settingsRowsReady } from './settings_rows_boot.js';
 const { loadTelemetryInstallID } = await importOnce('./settings_machine.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
 const { CLI_PATH_FIELDS, _fillMachineSettings, _fillThemeSelect, _fillDefaults, _fillApiKey, _fillCliAndModels, _fillTerminalAndBrowserPrefs, _fillFilesAndGit } = await importOnce('./settings_fill.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
-const { formKey, payloadNow, refreshUnsavedNote } = await importOnce('./settings_form.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
+const { payloadNow } = await importOnce('./settings_form.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 const { hideSettingsModal, applySettings } = await importOnce('./settings_save.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
-const { setSettingsAtOpen, setFormAtOpen, setPayloadAtOpen } = await importOnce('./settings_snapshots.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
+const { wireSettingsAutosave } = await importOnce('./settings_autosave.js');
+const { setSettingsAtOpen, setPayloadAtOpen } = await importOnce('./settings_snapshots.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 
 export { hideSettingsModal, applySettings }; // the dialog's public surface stays here; closing and Save live in settings_save.js (#8383)
 
@@ -68,10 +69,8 @@ export async function showSettingsModal(group) {
 
     openSettingsGroup(typeof group === 'string' ? group : undefined); // the group last used here, or the one asked for
     const modalEl = document.getElementById('settings-modal');
-    if (!modalEl._unsavedWired) { modalEl._unsavedWired = true; for (const type of ['input', 'change']) modalEl.addEventListener(type, () => { refreshUnsavedNote(); }); }
-    setFormAtOpen(formKey()); // the form as it finished opening
+    wireSettingsAutosave(modalEl);
     setPayloadAtOpen(payloadNow());
-    refreshUnsavedNote();
     document.getElementById("settings-modal").style.display = "flex";
 }
 

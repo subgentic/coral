@@ -177,7 +177,7 @@ const keep = flag('--keep');
 // accepted by a marker in the shard's throwaway home, telemetry off. It runs STRICT_SUITES plus PROD_TIER_EXTRA, only what needs neither a test hook nor seeded data.
 const prodTier = flag('--prod-tier');
 const strictOnly = flag('--strict') || prodTier;
-const PROD_TIER_EXTRA = ['settings_dialog_save_flow_browser.test.js'];
+const PROD_TIER_EXTRA = ['settings_autosave_browser.test.js'];
 // Left out of the prod-tier shard, each with its reason (printed at the start of the shard): they need what a default build does not have.
 const PROD_TIER_SKIPPED = { 'agent_state.test.js': 'drives the list through window._coralSetLiveSessions, a test hook the default build does not expose (trial 42922281825)' };
 const STRICT_SUITES = [
