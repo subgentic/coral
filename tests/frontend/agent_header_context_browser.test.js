@@ -52,8 +52,11 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         await ev(`window.selectLiveSession(${JSON.stringify(agent.session_name)}, 'terminal', ${JSON.stringify(agent.session_id)}); true`);
         await until(`!document.getElementById('terminal-header-context').hidden`, 'the context line');
 
+        check('phone context is behind More at rest', !(await ev(measure)).team.shown);
+        await ev(`document.getElementById('agent-bar-more').click(); true`);
+        await until(`document.getElementById('terminal-header-context').getBoundingClientRect().width > 0`, 'More reveals the context');
         let m = await ev(measure);
-        check('at 390x844 the header shows the team under the name', m.team.shown && m.team.text === agent.label, JSON.stringify(m.team));
+        check('at 390x844 More shows the team under the name', m.team.shown && m.team.text === agent.label, JSON.stringify(m.team));
         check('the team label is whole and inside the header', m.team.whole && m.team.inside, JSON.stringify(m.team));
         check('no server on a Coral that is not a hub', !m.server.shown && m.server.text === '', JSON.stringify(m.server));
 

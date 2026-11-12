@@ -24,7 +24,7 @@ function availableTabs() {
     const cloud = document.body.classList.contains('cloud-mode'), nativeInbox = document.body.classList.contains('native-inbox');
     return [...document.querySelectorAll('.top-nav-tabs > .top-nav-tab[data-arg]')]
         .filter(el => !el.hidden && el.style.display !== 'none' && !(cloud && el.hasAttribute('data-local-only')) && !(nativeInbox && el.hasAttribute('data-native-inbox-hides')) && !(!cloud && el.hasAttribute('data-cloud-only')))
-        .map(el => ({ id: el.id, arg: el.dataset.arg, label: (el.dataset.label || el.textContent).trim(), active: el.classList.contains('active'), el }));
+        .map(el => ({ id: el.id, arg: el.dataset.arg, label: (el.dataset.label || [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('')).trim(), active: el.classList.contains('active'), el }));
 }
 
 // Built with the DOM, so no text from a tab is ever read as markup.
