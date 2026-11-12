@@ -8,11 +8,22 @@
  *  The second pass is for a write that was still in flight when the first ran (a settings toggle's PUT of the board's working mode makes the board's row again, #11000: `board asks-... added (0 messages, 0 tasks, 0 subscribers)` in CI,
  *  never on a fast machine); deleting a board that is gone is harmless. */
 const AGAIN_MS = 350;
-async function removeBoards(ev, names) {
+/** The board's DELETE from Node, with the server's API key (CORAL_TEST_DATA_DIR/api_key, CORAL_TEST_URL: what the runner gives a suite), for a page that is gone: a suite whose CDP socket closed or that was killed at its limit
+ *  reaches its finally with no page to ask through, and left its board (the runner then named it, and --fail-on-leak failed it, #15947). Never throws; with no key or address it does nothing. */
+async function deleteViaKey(name) {
+    try {
+        const base = process.env.CORAL_TEST_URL, dir = process.env.CORAL_TEST_DATA_DIR;
+        if (!base || !dir) return;
+        const key = require('node:fs').readFileSync(require('node:path').join(dir, 'api_key'), 'utf8').trim();
+        await fetch(base + '/api/board/' + encodeURIComponent(String(name)), { method: 'DELETE', headers: { authorization: 'Bearer ' + key }, signal: AbortSignal.timeout(10000) });
+    } catch { /* the end-check reports what is left */ }
+}
+
+async function removeBoards(ev, names, via = deleteViaKey) {
     const real = names.filter(Boolean);
     const pass = async () => {
         for (const name of real) {
-            try { await ev(`(async () => (await fetch('/api/board/' + encodeURIComponent(${JSON.stringify(String(name))}), { method: 'DELETE' })).status)()`); } catch { /* the end-check reports what is left */ }
+            try { await ev(`(async () => (await fetch('/api/board/' + encodeURIComponent(${JSON.stringify(String(name))}), { method: 'DELETE' })).status)()`); } catch { await via(name); } // no page to ask through: from Node, with the key
         }
     };
     await pass();
