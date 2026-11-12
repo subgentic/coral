@@ -74,6 +74,21 @@ const interleave = texts => texts.flatMap(t => [{ type: 'user', content: OPERATO
         assert.equal(c.pills, 2, 'a streamed pasted notice and a streamed flagged turn are both notices');
         assert.equal(c.bubbles.length, quotes.length + 2, 'only the two operator turns were added as bubbles');
         console.log('   ✓ live append');
+        // Launch instructions are their own closed disclosure, never attributed to You.
+        const setup = 'You are a frontend developer.\n\nYou were automatically joined to message board "test".\n' + 'Long setup text. '.repeat(100);
+        for (const text of [setup, wrap(setup), '## Your Institutional Knowledge\n\nThe following is distilled knowledge from your previous sessions.\nSaved notes']) {
+            await fresh();
+            await render([{ type: 'user', content: text }, { type: 'assistant', text: 'Ready.' }]);
+            assert.deepEqual(await ev(`(() => { const d = document.querySelector('#nt-box details.chat-team-instructions'); return { exists: !!d, open: d?.open, label: d?.querySelector('summary').textContent, human: document.querySelectorAll('#nt-box .human').length, reply: document.querySelector('#nt-box .assistant .message-text')?.textContent.trim() }; })()`),
+                { exists: true, open: false, label: 'Coral team instructions', human: 0, reply: 'Ready.' });
+            await ev(`document.querySelector('#nt-box .chat-team-instructions summary').click()`);
+            assert.equal(await ev(`document.querySelector('#nt-box .chat-team-instructions').open`), true);
+            assert.equal(await ev(`document.querySelector('#nt-box .chat-team-instructions-text').textContent`), text === wrap(setup) ? setup : text);
+        }
+        await fresh();
+        await render([{ type: 'user', content: setup, coral_notice: false }]);
+        assert.equal((await count()).bubbles.length, 1, 'a known Operator send stays theirs even if it quotes setup');
+        console.log('   ✓ team instructions fold independently and preserve Operator provenance');
         console.log('\nPASS Coral notices are never the operator\'s bubbles');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

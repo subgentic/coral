@@ -44,6 +44,15 @@ function isCoralDelivery(msg) {
     return isCoralNudge(unwrapPastedContent(msg.content));
 }
 
+// Match the launch markers used by agent.IsLaunchPromptText; recorded Operator
+// provenance wins even when a person quotes the entire setup prompt.
+function isTeamInstructions(msg) {
+    if (msg.coral_notice === false) return false;
+    const text = unwrapPastedContent(msg.content);
+    return text.includes('You were automatically joined to message board') ||
+        text.includes('## Your Institutional Knowledge\n\nThe following is distilled knowledge from your previous sessions.');
+}
+
 // A pasted image in a user turn (Codex records it as a name like "[Image #1]" and the saved file's base name): a chip with
 // the name, and the file name when there is one. The chip is not a link; the image is shown as a thumbnail from its reference in the session's transcript, or
 // from an upload by the file's name (chat_thumbs.js, #5028, #5032).
@@ -57,6 +66,16 @@ function renderOneMessage(msg, container, agentType) {
     const adapter = chatAgentAdapter(agentType);
     if (msg.type === "user" && INTERRUPT_RE.test(String(msg.content || "").trim())) {
         appendContent(container, makeBubble("chat-note", "Interrupted"));
+    } else if (msg.type === "user" && isTeamInstructions(msg)) {
+        const details = document.createElement('details');
+        details.className = 'chat-team-instructions';
+        const summary = document.createElement('summary');
+        summary.textContent = 'Coral team instructions';
+        const body = document.createElement('div');
+        body.className = 'chat-team-instructions-text';
+        body.textContent = markHidden(unwrapPastedContent(msg.content));
+        details.append(summary, body);
+        appendContent(container, details);
     } else if (msg.type === "user" && msg.local_command === true) {
         // A slash command the CLI ran by itself ("/model sonnet"): a small note of what was typed, not a bubble (#5488). Seeing it here is how the message the person sent is known to be taken.
         appendContent(container, makeBubble("chat-note chat-local-command", escapeHtml(markHidden(msg.content || ""))));
