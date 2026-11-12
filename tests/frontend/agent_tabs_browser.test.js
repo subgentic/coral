@@ -37,7 +37,7 @@ const { install: installNA, stubModels } = require('./helpers/new_agent');
             await open(w, h, mobile, theme, ['opencode'], false);
             const G = '#launch-agent-pick';
             const geo = () => ev(`(() => { const g = document.querySelector('${G}'), r = e => e && e.getBoundingClientRect(), vis = e => e && e.getClientRects().length > 0;
-                const tabs = [...g.querySelectorAll('.provider-tabs .provider-card-head')], on = g.querySelector('.provider-card-head.is-open'), body = g.querySelector('.provider-card-body:not([hidden])');
+                const tabs = [...g.querySelectorAll('.provider-strip .provider-card-head')], on = g.querySelector('.provider-card-head.is-open'), body = g.querySelector('.provider-card-body:not([hidden])');
                 const rows = [...body.querySelectorAll('.sv-row')].filter(vis), label = row => row.querySelector('label, .sv-label, .sv-row-label'), ctl = row => row.querySelector('select, input:not([type=radio]):not([type=checkbox])');
                 const model = rows.find(x => x.dataset.key === 'model'), think = rows.find(x => x.dataset.key === 'thinking');
                 const thinkSel = think && think.querySelector('select.acf-thinking'), seg = think && think.querySelector('.seg-group');
@@ -49,8 +49,8 @@ const { install: installNA, stubModels } = require('./helpers/new_agent');
                     chev: (() => { const c = g.querySelector('.provider-strip-edge'); return c ? { shown: !c.hidden && vis(c), w: Math.round(r(c).width), h: Math.round(r(c).height) } : null; })() }; })()`);
             let d = await geo();
             assert.ok(d.tabs.length >= 3 && d.onName, at + 'one tab per agent this computer has: ' + JSON.stringify(d));
-            assert.ok(new Set(d.tabsTop).size === 1 && d.tabH >= 40 && d.joined, at + 'the tabs are one row, 40 px or more, and the open one joins its panel: ' + JSON.stringify(d));
-            assert.ok(d.missingCards === 1 && d.missingLines <= 96, at + 'a missing agent is one row of the list (its heading and one 44 px row), not a card: ' + JSON.stringify({ c: d.missingCards, h: d.missingLines }));
+            assert.ok(d.tabH >= (mobile ? 44 : 36), at + 'a segment of the strip is 36 px (44 on a phone) or more: ' + JSON.stringify(d));
+            assert.ok(d.missingCards === 0 && d.missingLines === 0, at + 'a missing agent is not in the dialog (#15887: Settings holds it): ' + JSON.stringify({ c: d.missingCards, h: d.missingLines }));
             // every tab in turn: Thinking is a select, never a strip of buttons; Model and Thinking are aligned
             for (const type of ['claude', 'pi']) {
                 await ev(`document.querySelector('${G} input[value="${type}"]').click(); true`); await settle(500);
@@ -70,15 +70,8 @@ const { install: installNA, stubModels } = require('./helpers/new_agent');
             const claude = await ev(`(() => { const b = document.querySelector('${G} .provider-card-body:not([hidden])'), s = b.querySelector('select.acf-model-select'); return { select: !!s && s.getClientRects().length > 0, add: s ? [...s.options].some(o => /Add a model/.test(o.textContent)) : false, refresh: !!b.querySelector('.acf-model-refresh') }; })()`);
             assert.ok(claude.select && claude.add && claude.refresh, at + 'Claude: the model dropdown, its refresh, and "Add a model...": ' + JSON.stringify(claude));
             await shot(`${w}-${theme}`);
-            if (mobile) {
-                const c = (await geo()).chev;
-                assert.ok(c && c.shown && c.w >= 44 && c.h >= 44, at + 'the strip scrolls and its chevron is a 44 px button: ' + JSON.stringify(c));
-                const before = await ev(`document.querySelector('${G} .provider-tabs').scrollLeft`);
-                await ev(`document.querySelector('${G} .provider-strip-edge').click(); true`); await settle(600);
-                const after = await ev(`({ left: document.querySelector('${G} .provider-tabs').scrollLeft, on: document.querySelector('${G} .provider-card-head.is-open .provider-name').textContent })`);
-                assert.ok(after.left > before && after.on === 'Claude', at + 'a tap on the chevron scrolls and chooses nothing: ' + JSON.stringify({ before, after }));
-            }
+            if (mobile) { const o = await geo(); assert.ok(!o.sideways && o.tabs.length >= 3, at + 'the strip wraps in rows, nothing scrolls sideways (#15887: no chevron any more): ' + JSON.stringify(o)); }
         }
-        console.log('\nPASS the Agent step as folder tabs');
+        console.log('\nPASS the Agent step as a segmented strip');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
