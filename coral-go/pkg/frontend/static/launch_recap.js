@@ -2,14 +2,10 @@
  * fields (the fields stay the one place that sets anything), so it can never say one thing and the launch another. */
 import { modelName } from './model_labels.js';
 import { importOnce } from './import_once.js';
-import { loadStyles } from './lazy_styles.js';
-import { serverFetch } from './server_base.js';
+const { TYPE, fetchFlags, flagsNodes } = await importOnce('./permission_flags_line.js'); // the flags line is shared with Restart and Resume (#15761)
 const { permissionDescription, PI_NO_PERMISSIONS } = await importOnce('./permission_flags.js'); // lazy like launch_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 
-await loadStyles('launch_recap_flags.css'); // the flags line's rules: not at start
-
 const container = () => document.getElementById('launch-agent-acf');
-const TYPE = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', antigravity: 'Antigravity', gemini: 'Antigravity', pi: 'Pi' };
 
 /** What a permission mode allows for this CLI, in the words Settings and the Permissions tab use for it (Codex's Auto is its workspace sandbox with the network on; Antigravity's and Gemini's skip every prompt and check; Pi has no permissions at all): the footer says it, so 'Auto mode' is not left unexplained (Desktop tester, #10000). */
 function modeNote(type, value) { return permissionDescription(type, value).replace(/\.$/, ''); }
@@ -53,16 +49,7 @@ function paintFlags(answer, type) {
     const el = document.getElementById('launch-recap');
     if (!el) return;
     el.querySelectorAll('.launch-recap-flags').forEach(n => n.remove());
-    if (!answer) return;
-    const line = document.createElement('span'); line.className = 'launch-recap-note launch-recap-flags';
-    const text = answer.text || '';
-    if (type === 'pi') line.textContent = 'Adds no permission flags: Pi has none.';
-    else if (!text) line.textContent = `Adds no permission flags: ${TYPE[type] || type} starts in its own default.`;
-    else { const code = document.createElement('code'); code.textContent = text; line.append('Adds ', code, ' to the command.'); }
-    el.append(line);
-    if (answer.note) { // why what is added is not what the pick stands for (#15735): a role's rule, kept Full access, or Codex's own settings; the server says it
-        const why = document.createElement('span'); why.className = 'launch-recap-note launch-recap-flags launch-recap-why'; why.textContent = String(answer.note); el.append(why);
-    }
+    el.append(...flagsNodes(answer, type)); // why what is added is not what the pick stands for (#15735): a role's rule, kept Full access, or Codex's own settings; the server says it
 }
 function syncFlags() {
     const body = flagsBody();
@@ -73,15 +60,11 @@ function syncFlags() {
     clearTimeout(flagsTimer);
     const seq = ++flagsSeq;
     flagsTimer = setTimeout(async () => {
-        try {
-            const server = (await importOnce('./launch_models.js'))._acfServer(container());
-            const r = await serverFetch(server, '/api/launch/permission-args', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: key });
-            if (!r.ok) return;
-            const answer = await r.json();
-            if (!Array.isArray(answer.args)) return;
-            flagsCache.set(key, answer);
-            if (seq === flagsSeq) { flagsShown = key; paintFlags(answer, body.agent_type); }
-        } catch { /* no line: the recap above still says the mode */ }
+        const server = (await importOnce('./launch_models.js'))._acfServer(container());
+        const answer = await fetchFlags(server, body);
+        if (!answer) return; // no line: the recap above still says the mode
+        flagsCache.set(key, answer);
+        if (seq === flagsSeq) { flagsShown = key; paintFlags(answer, body.agent_type); }
     }, 120);
 }
 

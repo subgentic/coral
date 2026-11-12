@@ -2,7 +2,7 @@
 import { state } from './state.js';
 import { isSignedOut } from './overload.js';
 import { showToast } from './utils.js';
-import { keyLabel, isCloud, serverFetch } from './server_base.js';
+import { keyLabel, isCloud, serverFetch, currentServer } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { recordRecentDir } from './browser.js';
 import { loadLiveSessions } from './api.js';
@@ -123,6 +123,21 @@ function syncResumeModeNote() {
     else words = `This chat started in ${name(ran)}; it resumes in your saved default (${MODE_WORDS[saved] || saved}). Choose the mode below to change it.`;
     if (note.textContent !== words) note.textContent = words;
     note.hidden = false;
+    syncResumeFlags();
+}
+
+/** Under the mode note: the flags the chosen mode adds to the resumed command, and why they are not the pick's own (#15761; the preview call New agent uses). The saved default sends nothing, so it has no line. */
+let resumeFlagsSync = null;
+async function syncResumeFlags() {
+    const el = document.getElementById("resume-flags");
+    if (!el) return;
+    const [{ flagsLine }, { _getPermissionFlagsForAgentMode }] = await Promise.all([importOnce("./permission_flags_line.js"), importOnce("./permission_flags.js")]);
+    if (!resumeFlagsSync) resumeFlagsSync = flagsLine(el, () => {
+        const modal = document.getElementById("resume-modal"), pick = (document.getElementById("resume-mode") || {}).value || "", agentType = modal && modal.dataset.agentType;
+        if (!agentType || !pick || agentType === "terminal") return null;
+        return { agent_type: agentType, permission_mode: pick === "default" ? "default" : "", flags: pick === "default" ? [] : _getPermissionFlagsForAgentMode(agentType, pick).split(/\s+/).filter(Boolean), keep_full_access: false }; // what resumeLaunchNew sends for the pick
+    }, () => currentServer());
+    resumeFlagsSync();
 }
 
 export { syncResumeModeNote };
