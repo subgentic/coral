@@ -328,7 +328,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     @media (pointer: coarse) {
         :is(#command-pane, #board-chat-input-pane) .btn-send, :is(#command-pane, #board-chat-input-pane) .toolbar-send-split .btn-send-dropdown { min-width: var(--control-touch-height); min-height: var(--control-touch-height); height: var(--control-touch-height); }
         :is(#command-pane, #board-chat-input-pane) .btn-send, :is(#command-pane, #board-chat-input-pane) .toolbar-send-split:has(.btn-send-dropdown) .btn-send { width: var(--control-touch-height); min-width: var(--control-touch-height); }
-        :is(#command-pane, #board-chat-input-pane) .toolbar-send-split:has(.btn-send-dropdown) .btn-send { border-radius: 0 22px 22px 0; }
+        :is(#command-pane, #board-chat-input-pane) .toolbar-send-split:has(.btn-send-dropdown) .btn-send { min-height: var(--control-touch-height); border-radius: 0 22px 22px 0; } /* the split's Send is 32 px with min-height (it grows with the text at 200%), so the touch 44 needs its own line at the same weight (#15821) */
         :is(#command-pane, #board-chat-input-pane) .toolbar-send-split .btn-send-dropdown { border-radius: 22px 0 0 22px; }
     }
     :is(#command-pane, #board-chat-input-pane) .command-pane-toolbar .btn-send-dropdown { order: -1; }
