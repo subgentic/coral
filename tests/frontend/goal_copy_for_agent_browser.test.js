@@ -28,12 +28,12 @@ const { coralReady } = require('./helpers/wait');
             await load(goalUrl);
             await waitFor(`document.querySelector('#team-panel-goals #goals-detail-title')?.textContent === ${JSON.stringify(TITLE)}`, 'the goal', 15000);
             await ev(`window.__copied = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: t => { window.__copied.push(t); return Promise.resolve(); } }, configurable: true }); true`);
-            if (mobile) { await ev(`document.querySelector('#team-panel-goals .goal-head-actions .task-more-btn').click(); true`); await waitFor(`!document.querySelector('#team-panel-goals .task-more-menu').hidden`, at + 'More opens', 4000); } // a phone: it is in the header's More menu (#13119)
+            await ev(`document.querySelector('#team-panel-goals .goal-head-actions .task-more-btn').click(); true`); await waitFor(`!document.querySelector('#team-panel-goals .task-more-menu').hidden`, at + 'More opens', 4000); // at every width it is in the header's More menu (#13119, #15817)
             const info = await ev(`(() => { const b = document.querySelector('#team-panel-goals .goal-copy-agent'); if (!b) return null; const r = b.getBoundingClientRect(), line = b.closest('.goals-detail-line'); return { text: b.getAttribute('aria-label') || b.textContent.trim(), robot: !!b.querySelector('.material-icons') && !!b.classList.contains('agent-copy'), inLine: !!line, inMenu: !!b.closest('.task-more-menu'), inPinbar: !!b.closest('.goals-pinbar'), visible: r.width > 0 && r.height > 0, within: r.right <= innerWidth + 1 && r.left >= 0, tall: r.height }; })()`);
             assert.ok(info, at + 'the button is on the goal page');
             assert.equal(info.text, 'Copy for an agent', at + 'its words');
-            if (!mobile) assert.ok(info.robot, at + 'on the page it is the robot icon button, not text');
-            assert.ok(mobile ? (info.inMenu && !info.inLine) : (info.inLine && !info.inPinbar), at + (mobile ? 'in the header\'s More menu, not the line: ' : 'in the detail line, not the pinned bar: ') + JSON.stringify(info));
+            assert.ok(!info.robot, at + 'a menu item with its words, not a robot icon');
+            assert.ok(info.inMenu && !info.inLine, at + 'in the header\'s More menu, not the line: ' + JSON.stringify(info));
             assert.ok(info.visible && info.within, at + 'visible and inside the screen: ' + JSON.stringify(info));
             if (mobile) assert.ok(info.tall >= 36, at + 'a touch-sized target: ' + info.tall);
             await ev(`document.querySelector('#team-panel-goals .goal-copy-agent').click(); true`);

@@ -11,7 +11,6 @@ import { registerGroupSource, openGroupTable, refreshGroupTable } from './sideba
 import { setHidden } from './dom_write.js';
 import { announceNotice } from './notifications.js';
 import { importOnce } from './import_once.js';
-const { agentCopyButton } = await importOnce('./agent_copy_button.js'); // the robot at the toolbar's end (#15063)
 const PH = await importOnce('./page_header.js'); // the shared page header: title, More and the Primary, then the search row (#15814)
 import { jobList, onJobsChanged, refreshJobs, selectScheduledJob, openJobId, scheduleOf, nextOf, offWord } from './scheduler.js';
 import { lastWords, lastChip, atWords, whenWords, failureWords, isExample } from './job_words.js';
@@ -159,8 +158,8 @@ function toolbarOf(key) {
         action: createAction(key),
     });
     const copySubject = () => (f.resources ? 'The resource queue: run coral-board resource list.' : `Coral\u2019s scheduled ${f.noun[1]} (the Automations tab).`); // where in the docs to read (#15063)
-    if (key === 'jobs') PH.pageHeader(node.querySelector('.list-bar-search-row'), { idp: 'automations-jobs', agentCopy: { key: 'jobs', subject: copySubject } }); // Jobs is on the page header (guidelines 4.2): Copy for an agent is in More, not a robot of its own (#15814)
-    else if (!node.querySelector('.agent-copy')) node.append(agentCopyButton(f.resources ? 'resources' : 'jobs', copySubject));
+    // Every folder is on the page header (guidelines 4.2): Copy for an agent is in More, not a robot with a row of its own (#15814, #15817)
+    PH.pageHeader(node.querySelector('.list-bar-search-row'), { idp: `automations-${key}`, agentCopy: { key: f.resources ? 'resources' : 'jobs', subject: copySubject } });
     return { node, signature: JSON.stringify([filt, counts, rows.length]) };
 }
 

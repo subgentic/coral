@@ -9,7 +9,6 @@ import { toTaskPage, toGoal, errorOf } from './goals_adapter.js';
 import { importOnce } from './import_once.js';
 import { isPhoneLayout } from './phone_layout.js';
 const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is one shared helper (#12182)
-const { agentCopyButton } = await importOnce('./agent_copy_button.js'); // the robot button (#15063)
 const { agentCopyText } = await importOnce('./agent_doc_map.js');
 import { foldWayBack } from './way_back.js';
 import * as W from './goal_words.js';
@@ -188,12 +187,13 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         if (W.isOpenGoal(g)) act.push({ key: 'close', cls: 'btn btn-primary goals-close', label: 'Mark done', aria: `Mark done: ${g.title}`, run: () => openClose(g) }); // named for its goal (#15166: the button says Mark done, as the task asks; its dialog is still the Close dialog)
         else if (W.isClosedGoal(g)) act.push({ key: 'reopen', cls: 'btn goals-reopen', label: 'Reopen', run: () => reopenGoal(g) });
         const makeBtn = a => { const b = btn(a.cls, a.label, a.run); if (a.aria) b.setAttribute('aria-label', a.aria); if (a.title) b.title = a.title; return b; };
-        if (!phone) { for (const k of ['add', 'notyet', 'edit', 'driver', 'move', 'close', 'reopen']) { const a = act.find(x => x.key === k); if (a) acts.append(makeBtn(a)); } }
+        const copyItem = { key: 'copy', cls: 'goal-copy-agent', label: 'Copy for an agent', title: 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal', run: () => { copyText(agentCopyText('goal', W.agentBriefLine(g))).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok)); } }; // Copy for an agent is in the header's More menu at every width (guidelines: no robot of its own, #15817)
+        if (!phone) { for (const k of ['add', 'notyet', 'edit', 'driver', 'move', 'close', 'reopen']) { const a = act.find(x => x.key === k); if (a) acts.append(makeBtn(a)); } acts.append(moreMenu(`goal-more-${g.id}`, [{ label: copyItem.label, title: copyItem.title, className: copyItem.cls, run: copyItem.run }], { label: 'More goal actions' })); }
         else {
             const primaryKey = act.some(a => a.key === 'reopen') ? 'reopen' : (act.some(a => a.key === 'notyet') ? 'close' : 'add'); // a goal that looks done: Close goal; otherwise the commonest, Add task
             const primary = act.find(a => a.key === primaryKey); if (primary.key === 'add') primary.cls = 'btn btn-primary goals-add-task';
             acts.append(makeBtn(primary));
-            const menuItems = [...act.filter(a => a !== primary && a.key !== 'close'), { key: 'copy', cls: 'goal-copy-agent', label: 'Copy for an agent', title: 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal', run: () => { copyText(agentCopyText('goal', W.agentBriefLine(g))).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok)); } }];
+            const menuItems = [...act.filter(a => a !== primary && a.key !== 'close'), copyItem];
             const closeItem = act.find(a => a.key === 'close' && a !== primary); if (closeItem) menuItems.push(closeItem);
             acts.append(moreMenu(`goal-more-${g.id}`, menuItems.map(a => ({ label: a.label, title: a.title, ariaLabel: a.aria, className: a.cls.replace(/^btn( btn-primary)? ?/, ''), run: a.run })), { label: 'More goal actions' }));
         }
@@ -205,9 +205,6 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         foldWayBack(main, '.goals-back', '.goals-detail-title');
         const line = el('div', 'goals-detail-line'); line.append(stateChip(g));
         const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) { const m = el('span', 'goal-card-meta'); const d = String(g.driver || '').trim(); if (d) { m.append('Driver: ', agentLink(d, { board: model.project }), meta.slice(`Driver: ${d}`.length)); } else m.textContent = meta; line.append(m); } // the driver opens its chat (#12182)
-        // A small robot button at the end of the detail line (#11004, #15063): copies a line to paste to an agent, which then runs `coral-board goal brief` to read the goal's open tasks and artifacts, and the docs section to read
-        const copyBtn = agentCopyButton('goal', () => W.agentBriefLine(g), { className: 'goal-copy-agent' }); // the robot: copies the goal's line and where in the docs to read (#15063)
-        if (!phone) line.append(copyBtn); // on a phone it is in the header's More menu (#13119)
         main.append(line);
         const closedLine = C.closedByLine(g); // who closed it, so a goal an agent closed is not mistaken for one the person closed (#15244)
         if (closedLine) { const c = el('p', `goals-note goals-closed-by${g.closedBy && g.closedBy !== 'Operator' ? ' goals-closed-by-agent' : ''}`, closedLine); c.setAttribute('role', 'note'); main.append(c); }

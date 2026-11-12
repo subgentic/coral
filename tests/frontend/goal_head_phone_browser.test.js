@@ -44,8 +44,8 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`!!document.querySelector('${M} #goals-detail-title') && !!document.querySelector('${M} .goal-head-actions button')`, `${tag}: the goal page`, 15000);
             let p = await head();
             if (!phone) {
-                assert.deepEqual(p.btns.map(b => b.t), ['Add task', 'Edit goal', 'Change driver', 'Move to another team', 'Mark done'], `${tag}: desktop keeps its five buttons ${JSON.stringify(p)}`);
-                assert.equal(await ev(`!!document.querySelector('${M} .goals-detail-line .goal-copy-agent')`), true, `${tag}: Copy for an agent stays in the line on a desktop`);
+                assert.deepEqual(p.btns.map(b => b.t), ['Add task', 'Edit goal', 'Change driver', 'Move to another team', 'Mark done', 'More'], `${tag}: desktop keeps its five buttons and More ${JSON.stringify(p)}`);
+                assert.equal(await ev(`!!document.querySelector('${M} .goal-head-actions .task-more-menu .goal-copy-agent') && !document.querySelector('${M} .goals-detail-line .goal-copy-agent')`), true, `${tag}: Copy for an agent is in More on a desktop, not a robot in the line`);
                 continue;
             }
             assert.deepEqual(p.btns.map(b => b.t), ['Add task', 'More'], `${tag}: one button and More: ${JSON.stringify(p)}`);

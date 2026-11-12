@@ -20,7 +20,7 @@ const { coralReady } = require('./helpers/wait');
         const r = e => e && e.getBoundingClientRect();
         return { head: !!head, add: !!add, close: !!close, bar: !!(root && root.querySelector('.goals-pinbar')), order: add && close ? !!(add.compareDocumentPosition(close) & Node.DOCUMENT_POSITION_FOLLOWING) : null,
             primary: !!(close && close.classList.contains('btn-primary')), label: close && close.getAttribute('aria-label') || close && close.textContent.trim(),
-            addH: add && Math.round(r(add).height), closeH: close && Math.round(r(close).height), closeRight: close && Math.round(r(close).right), addLeft: add && Math.round(r(add).left),
+            addH: add && Math.round(r(add).height), closeH: close && Math.round(r(close).height), closeRight: close && Math.round(r(close).right), moreRight: root && root.querySelector('.goal-head-actions .task-more-btn') ? Math.round(r(root.querySelector('.goal-head-actions .task-more-btn')).right) : 0, addLeft: add && Math.round(r(add).left),
             headRight: head && Math.round(r(head).right), headBottom: head && Math.round(r(head).bottom), listTop: tabs && Math.round(r(tabs).top), titleTop: title && Math.round(r(title).top), vw: innerWidth,
             sideways: document.documentElement.scrollWidth > innerWidth + 1, clipped: [add, close].some(b => b && (r(b).left < 0 || r(b).right > innerWidth + 0.5)) };
     })()`);
@@ -44,7 +44,7 @@ const { coralReady } = require('./helpers/wait');
                 assert.equal(await ev(`!!document.querySelector('${mount} .goal-head-actions .goals-not-yet')`), false, at + 'a goal with an open task has no Not yet: its item is not in Needs you (#12248)');
                 if (!mobile) assert.ok(p.order && p.primary, at + 'Add task first, Close goal the primary after it: ' + JSON.stringify(p)); // a phone keeps one button, Add task, and Close goal is in More (#13119, goal_head_phone_browser)
                 assert.equal(p.label, `Mark done: ${TITLE}`, at + 'Mark done is still named for its goal');
-                if (!mobile) assert.ok(p.closeRight >= p.headRight - 2 && p.closeRight <= p.vw, at + 'the buttons end at the right edge of the header: ' + JSON.stringify(p));
+                if (!mobile) assert.ok(p.moreRight >= p.headRight - 2 && p.moreRight <= p.vw && p.closeRight <= p.moreRight, at + 'the buttons, then More, end at the right edge of the header: ' + JSON.stringify(p));
                 assert.ok(!p.clipped && !p.sideways, at + 'nothing is clipped or scrolls sideways: ' + JSON.stringify(p));
                 assert.ok(p.headBottom <= p.listTop, at + 'the header is above the goal\'s tasks: ' + JSON.stringify(p));
                 if (mobile) assert.ok(p.addH >= 43.5, at + 'the buttons are 44 px targets: ' + JSON.stringify(p));
