@@ -3,6 +3,7 @@
 // and the live poll re-rendering messages cannot strip the marks.
 import { chatHasOlder, loadMoreHistory } from './live_chat.js';
 import { revealRolledGroup } from './chat_content.js';
+import { platform } from './platform/detect.js';
 
 const MAX_MATCHES = 2000;
 const MAX_OLDER_PAGES = 100;
@@ -216,7 +217,7 @@ export function initChatFind() {
     window.addEventListener('coral:launch-disclosure-shown', watchLaunchDisclosure);
     watchLaunchDisclosure();
     document.addEventListener('keydown', e => {
-        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f' && chatVisible()) {
+        if ((platform.isMacOS ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f' && chatVisible()) {
             // Leave the terminal's own shortcuts alone.
             if (e.target.closest && e.target.closest('#xterm-container')) return;
             if (openFind()) e.preventDefault();
