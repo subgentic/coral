@@ -12,6 +12,7 @@ const { initSectionDialog } = await importOnce('./section_dialog.js');
 const { segmentSelect } = await importOnce('./segmented.js');
 const { launchFlags } = await importOnce('./launch_flags.js');
 await loadStyles('acf_full_access.css'); // the Full access box's layout: not at start (#15719)
+await loadStyles('acf_sizes.css'); // the control heights of the New agent dialog: not at start (#15889)
 import { escapeHtml, escapeAttr } from './utils.js';
 import { loadStyles } from './lazy_styles.js';
 import { restartHint } from './codex_mode.js';
