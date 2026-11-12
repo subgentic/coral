@@ -49,13 +49,21 @@ func (h *SessionsHandler) artifactPrivateRoute(w http.ResponseWriter, r *http.Re
 		errBadRequest(w, `send {"private": true} or {"private": false}`)
 		return
 	}
-	by := "Operator"
-	if cloud.Tunneled(r) {
-		by = "owner through Coral Hub"
-	}
+	by := privateMarkBy(r)
 	if err := h.bs.SetArtifactPrivate(r.Context(), id, *in.Private, by); err != nil {
 		errInternalServer(w, "could not save the mark")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "private": *in.Private})
+}
+
+// privateMarkBy is who the mark says set it: the owner through Coral Hub, the self-hosted Hub's signed-in owner (a stamped request, #15713; Security's INFO on #15714), or the Operator at this computer.
+func privateMarkBy(r *http.Request) string {
+	if cloud.Tunneled(r) {
+		return "owner through Coral Hub"
+	}
+	if kind, _ := r.Context().Value(callerKindKey{}).(string); kind == callerHubOwner {
+		return "Operator via Hub"
+	}
+	return "Operator"
 }

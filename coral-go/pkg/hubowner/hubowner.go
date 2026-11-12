@@ -46,10 +46,10 @@ const Skew = 30 * time.Second
 // secretBytes is the length of a secret, hex-encoded in its file and on the wire between the hub and the human act.
 const secretBytes = 32
 
-// RoutesVersion is the generation of the allowlist below: 1 is the first eight routes, 2 (#13694) adds every Operator click that writes an Activity row and the decisions that need a person, 3 (#13757) the Markdown editor's save and the model switch, 4 (#13802) Send to agent with the diff, 5 (#13834) the done-state of a "Goal looks done" row, 6 (#13910) the Operator's opened version of a file. A remote says in
+// RoutesVersion is the generation of the allowlist below: 1 is the first eight routes, 2 (#13694) adds every Operator click that writes an Activity row and the decisions that need a person, 3 (#13757) the Markdown editor's save and the model switch, 4 (#13802) Send to agent with the diff, 5 (#13834) the done-state of a "Goal looks done" row, 6 (#13910) the Operator's opened version of a file, 7 (#15380) the Hub's read of a computer's Needs you, 8 (#15697) pause and resume of an agent's notices, 9 (#15708) the person-only reads of audit group 4, 10 (#15713) the manager's private mark on an artifact, 11 (#15715) a team import from a folder on the computer, 12 (#15717) a team's daily-knowledge writes, 13 (#15720) the delete of ended agents' terminal logs, 14 (#15729) the acknowledgement of artifact retention, 15 (#15729) the delete of unlisted received files. A remote says in
 // its health answer which generation it accepts; a hub stamps a route only when the remote's generation is at least the route's (a stamp on a route an older remote does not list is refused 403, where an
 // unstamped call still goes through as a key caller). The remote still checks every stamp against its own list, so a wrong number gets a 403 and never more power.
-const RoutesVersion = 7
+const RoutesVersion = 15
 
 type route struct {
 	pattern string
@@ -132,6 +132,41 @@ var routes = []route{
 	{"POST /api/artifacts/{id}/opened", 6},
 	// Generation 7 (#15380, Security: exactly one route, a read): a Hub reads each computer's Needs you (counts and cleaned lines) as the owner signed in at the Hub, for the real sign-in session only.
 	{"GET /api/needs-you", 7},
+	// Generation 8 (#15697, Security: exactly two routes): the Operator pauses and resumes Coral's notices to one agent from the Hub. A small body (the agent's name, a session id and a length), nothing that runs or changes code or settings; the remote names the target itself.
+	{"POST /api/sessions/live/{name}/notices/pause", 8},
+	{"POST /api/sessions/live/{name}/notices/resume", 8},
+	// Generation 9 (#15708, the Operator's choice of audit group 4, #205666; reads only, one tier at a time): what the Operator reads at a remote computer from the Hub's dashboard and the remote refuses a key for (person-only reads). No body, nothing that changes the computer; the writes of the group are later generations, each with its own review.
+	{"GET /api/activity", 9},
+	{"GET /api/analytics/inbox-vs-chat", 9},
+	{"GET /api/analytics/resource-queue", 9},
+	{"GET /api/artifacts", 9},
+	{"GET /api/artifacts/resolve", 9},
+	{"GET /api/artifacts/{id}/private", 9},
+	{"GET /api/artifacts/{id}/readers", 9},
+	{"GET /api/artifacts/{id}/trust-preview", 9},
+	{"GET /api/board/{project}/reminder", 9},
+	{"GET /api/filesystem/trust-probe", 9},
+	{"GET /api/operator-asks", 9},
+	{"GET /api/sessions/live/{name}/loaded-skills", 9},
+	{"GET /api/sessions/live/{name}/mcp-servers", 9},
+	{"GET /api/system/terminal-logs", 9},
+	{"GET /api/thread", 9},
+	{"GET /api/threads", 9},
+	// Generation 10 (#15713, Security: exactly one route, the first write of audit group 4): the owner marks an artifact private to the manager, or clears the mark, from the Hub. Reason: the owner manages who reads their files (a guide never reads a private one) and has no other way to do it on a remote computer. A body of one boolean (capped at 1 KB by the route); the remote checks the artifact itself.
+	{"PUT /api/artifacts/{id}/private", 10},
+	// Generation 11 (#15715, Security: exactly one route, the second write of audit group 4): the owner imports a team definition from a folder on the remote computer, from the Hub's Teams page. It only READS: it returns the parsed team and writes nothing. The folder is named by the owner in the body (the stamp binds it, 64 KB cap) and the REMOTE bounds it exactly as for a person at that computer: an absolute local path, not the root, the home folder or a parent of it, not a dot-folder or a sensitive one (.ssh, .aws, credentials), no symlink followed, files of 256 KiB at most, agents/ at 50. No stamp changes those bounds.
+	{"POST /api/teams/import", 11},
+	// Generation 12 (#15717, Security: one route family, the third write tier of audit group 4): the owner runs a team's daily knowledge from the Hub: the switch, whether a daily update applies by itself, and accepting or taking back the waiting update. Bodies: {enabled}, {enabled}, {candidate, confirm_held}, {previous}: ids and booleans only, so a Hub request names no text and no path; the remote writes the team's own knowledge files only from the candidate it distilled itself (a candidate a newer run replaced is 409, nothing written; a held one needs confirm_held). The remote's own gate is unchanged: a person (the stamp) only, never an agent.
+	{"PUT /api/teams/detail/{name}/daily-knowledge", 12},
+	{"PUT /api/teams/detail/{name}/daily-knowledge/auto-apply", 12},
+	{"POST /api/teams/detail/{name}/daily-knowledge/accept", 12},
+	{"POST /api/teams/detail/{name}/daily-knowledge/revert", 12},
+	// Generation 13 (#15720, Security: exactly one route, the fourth write tier of audit group 4): the owner deletes the terminal logs of ended agents on the computer, from the Hub's Settings. Body: the count and size the owner was shown (4 KB cap), nothing else. It deletes only what the remote itself finds: a file named exactly <agent type>_coral_<session id>.log in the logs folder whose session the database says is stopped, not asleep and not archived, removed by exact name inside that folder and asked again just before each removal; if the count or size differ from what was shown nothing is deleted (409). Nothing in a Hub request names a file, so it cannot reach a live session's log or any other file.
+	{"POST /api/system/terminal-logs/delete-ended", 13},
+	// Generation 14 (#15729, exactly one route, the fifth write tier of audit group 4): the owner acknowledges the dry run Settings showed for artifact retention, from the Hub, so the job may start. No body is read; the remote stamps its own clock into its own setting, and answers 400 if retention is off. Nothing a Hub request carries can change what retention removes: the number of days and the kinds are separate settings, written by other routes this list does not cover.
+	{"POST /api/artifacts/retention/ack", 14},
+	// Generation 15 (#15729, exactly one route, the last write tier of audit group 4): the owner deletes received files no board lists, from the Hub. Body: up to 100 ids, each a 64-digit hex digest (64 KB cap); no path is read. A file goes only if the remote finds, under the digest's lock, that it is still a received file waiting for a message whose every receipt has expired, no board lists it, nothing durable links it, no agent uploaded the same bytes and the Operator did not keep it; anything else is skipped with the reason and left alone. A file an agent or a board still uses cannot be reached by naming it.
+	{"POST /api/artifacts/received/unlisted/delete", 15},
 }
 
 // MustBeSigned reports whether a request is one whose words are the person's own and become automation on the remote when no stamp goes with it: the owner's message to an agent (#13456) and, since

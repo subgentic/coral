@@ -191,7 +191,7 @@ func TestAllowedIsTheListedDecisionsAndNothingElse(t *testing.T) {
 			t.Errorf("%v allowed", bad)
 		}
 	}
-	if n := len(Routes()); n != 64 { // 64 since generation 7 (#15380, the Hub's read of a computer's Needs you); 63 before it (#14730, the owner turns scripts on and off for one version of an HTML file); 61 since generation 6 (#13910, the opened version of a file); 60 since generation 5 (#13834, the done-state of a goal)
+	if n := len(Routes()); n != 91 { // 91 since generation 15 (#15729, the delete of unlisted received files); 90 since generation 14 (#15729, the acknowledgement of artifact retention); 89 since generation 13 (#15720, the delete of ended agents' terminal logs); 88 since generation 12 (#15717, a team's daily-knowledge writes); 84 since generation 11 (#15715, the team import from a folder); 83 since generation 10 (#15713, the private mark of an artifact); 82 since generation 9 (#15708, the person-only reads of audit group 4); 66 since generation 8 (#15697, pause and resume of an agent's notices); 64 since generation 7 (#15380, the Hub's read of a computer's Needs you); 63 before it (#14730, the owner turns scripts on and off for one version of an HTML file); 61 since generation 6 (#13910, the opened version of a file); 60 since generation 5 (#13834, the done-state of a goal)
 		t.Errorf("the allowlist has %d routes: a new one needs a reason and a review (Security's tiers, #13694)", n)
 	}
 	first := 0
@@ -200,7 +200,7 @@ func TestAllowedIsTheListedDecisionsAndNothingElse(t *testing.T) {
 			first++
 		}
 	}
-	for gen, want := range map[int]int{3: 2, 4: 1, 5: 1} { // a released generation never gains a route (Security, #13834)
+	for gen, want := range map[int]int{3: 2, 4: 1, 5: 1, 10: 1, 11: 1, 12: 4, 13: 1, 14: 1, 15: 1} { // a released generation never gains a route (Security, #13834)
 		n := 0
 		for _, r := range routes {
 			if r.since == gen {
@@ -241,7 +241,38 @@ func TestARouteIsStampedOnlyForARemoteThatListsIt(t *testing.T) {
 		{"POST", "/api/artifacts/abc/opened", 6, true, true},
 		{"GET", "/api/needs-you", 6, false, true}, // #15380: the Hub reads a computer's Needs you as the signed-in owner (generation 7): a generation 6 remote gets it unstamped
 		{"GET", "/api/needs-you", 7, true, true},
-		{"POST", "/api/needs-you", 7, false, false}, // a read only
+		{"POST", "/api/sessions/live/x/notices/pause", 7, false, true}, // #15697: pause and resume are generation 8: a generation 7 remote gets them unstamped
+		{"POST", "/api/sessions/live/x/notices/pause", 8, true, true},
+		{"POST", "/api/sessions/live/x/notices/resume", 8, true, true},
+		{"GET", "/api/sessions/live/x/notices/pause", 8, false, false},
+		{"GET", "/api/system/terminal-logs", 8, false, true}, // #15708: the person-only reads of audit group 4 are generation 9: a generation 8 remote gets them unstamped
+		{"GET", "/api/system/terminal-logs", 9, true, true},
+		{"GET", "/api/sessions/live/x/loaded-skills", 9, true, true},
+		{"GET", "/api/sessions/live/x/mcp-servers", 9, true, true},
+		{"GET", "/api/artifacts/abc/readers", 9, true, true},
+		{"GET", "/api/threads", 9, true, true},
+		{"POST", "/api/system/terminal-logs", 9, false, false},              // reads only: no write of the group is on the list yet
+		{"POST", "/api/system/terminal-logs/delete-ended", 12, false, true}, // #15720: the delete of ended agents' logs is generation 13: a generation 12 remote gets it unstamped
+		{"POST", "/api/system/terminal-logs/delete-ended", 13, true, true},
+		{"GET", "/api/system/terminal-logs/delete-ended", 13, false, false},
+		{"DELETE", "/api/system/terminal-logs", 13, false, false},
+		{"PUT", "/api/artifacts/abc/private", 9, false, true}, // #15713: the private mark is generation 10: a generation 9 remote gets it unstamped
+		{"PUT", "/api/artifacts/abc/private", 10, true, true},
+		{"POST", "/api/artifacts/abc/private", 10, false, false},
+		{"DELETE", "/api/artifacts/abc/private", 10, false, false},
+		{"POST", "/api/teams/import", 10, false, true}, // #15715: the team import is generation 11: a generation 10 remote gets it unstamped
+		{"POST", "/api/teams/import", 11, true, true},
+		{"GET", "/api/teams/import", 11, false, false},
+		{"POST", "/api/teams/generate", 11, false, false},               // the sibling that runs an agent CLI is not on the list
+		{"PUT", "/api/teams/detail/t/daily-knowledge", 11, false, true}, // #15717: the daily-knowledge writes are generation 12: a generation 11 remote gets them unstamped
+		{"PUT", "/api/teams/detail/t/daily-knowledge", 12, true, true},
+		{"PUT", "/api/teams/detail/t/daily-knowledge/auto-apply", 12, true, true},
+		{"POST", "/api/teams/detail/t/daily-knowledge/accept", 12, true, true},
+		{"POST", "/api/teams/detail/t/daily-knowledge/revert", 12, true, true},
+		{"GET", "/api/teams/detail/t/daily-knowledge", 12, false, false},
+		{"DELETE", "/api/teams/detail/t/daily-knowledge", 12, false, false},
+		{"PUT", "/api/teams/detail/t/knowledge/Lead", 12, false, false}, // one agent knowledge file is not on the list
+		{"POST", "/api/needs-you", 7, false, false},                     // a read only
 		{"GET", "/api/needs-you/x", 7, false, false},
 		{"GET", "/api/artifacts/abc/opened", 6, false, false},
 		{"POST", "/api/board/t/asks/9/buttons/b/settle", 2, true, true},
@@ -257,7 +288,7 @@ func TestARouteIsStampedOnlyForARemoteThatListsIt(t *testing.T) {
 			t.Errorf("MustBeSigned(%s %s) = %v, want %v", c.m, c.p, got, c.must)
 		}
 	}
-	if RoutesVersion != 7 {
+	if RoutesVersion != 15 {
 		t.Errorf("RoutesVersion = %d: it moves with a widening, and the remote's health answer reports it", RoutesVersion)
 	}
 }

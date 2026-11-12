@@ -40,6 +40,12 @@ type stampWorld struct {
 
 func newStampWorld(t *testing.T, hubSecret, remoteSecret string) *stampWorld {
 	t.Helper()
+	return newStampWorldMount(t, hubSecret, remoteSecret, nil)
+}
+
+// newStampWorldMount is newStampWorld with a different route on the remote: mount registers it behind the remote's identity layer (nil: the review handler).
+func newStampWorldMount(t *testing.T, hubSecret, remoteSecret string, mount func(rr chi.Router)) *stampWorld {
+	t.Helper()
 	fakeSSHOnPath(t)
 
 	// the remote: the review handler behind its real identity layer, with the owner secret a human act installed
@@ -57,7 +63,11 @@ func newStampWorld(t *testing.T, hubSecret, remoteSecret string) *stampWorld {
 	}
 	rr := chi.NewRouter()
 	rr.Use(ro.Middleware)
-	rr.Post("/api/board/{project}/artifacts/{id}/review", env.h.ReviewArtifact)
+	if mount != nil {
+		mount(rr)
+	} else {
+		rr.Post("/api/board/{project}/artifacts/{id}/review", env.h.ReviewArtifact)
+	}
 	remote := httptest.NewServer(rr)
 	t.Cleanup(remote.Close)
 	_, portStr, _ := net.SplitHostPort(remote.Listener.Addr().String())
