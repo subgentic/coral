@@ -29,4 +29,11 @@ func TestLaunchPermissionArgsRouteAnswersFromTheLaunchBuilders(t *testing.T) {
 	assert.JSONEq(t, `{"args":[],"text":""}`, out)
 	code, _ = ask(`not json`)
 	assert.Equal(t, http.StatusBadRequest, code)
+	// Security's #15726: the body and each flag are capped.
+	code, _ = ask(`{"agent_type":"codex","flags":["` + strings.Repeat("x", 201) + `"]}`)
+	assert.Equal(t, http.StatusBadRequest, code, "a flag over 200 bytes")
+	code, _ = ask(`{"agent_type":"codex","pad":"` + strings.Repeat("x", 17<<10) + `"}`)
+	assert.Equal(t, http.StatusBadRequest, code, "a body over 16 KB")
+	code, _ = ask(`{"agent_type":"codex","flags":[` + strings.TrimSuffix(strings.Repeat(`"-a",`, 41), ",") + `]}`)
+	assert.Equal(t, http.StatusBadRequest, code, "more than 40 flags")
 }

@@ -429,6 +429,7 @@ POST /api/history-import never
 POST /api/hub-auto-accept launch
 POST /api/indexer/refresh never
 POST /api/launch-disclosure/ack never
+POST /api/launch/permission-args never
 POST /api/notifications never
 POST /api/pinned-folders launch
 POST /api/resources/entries/{id}/move never

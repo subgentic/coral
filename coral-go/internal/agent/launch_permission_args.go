@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"crypto/rand"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,12 +22,18 @@ func LaunchPermissionArgs(agentType string, params LaunchParams) ([]string, erro
 		params.Flags = append(append([]string{}, params.Flags...), PermissionFlagsForAgent(agentType, params.PermissionMode)...)
 		params.PermissionMode = "default"
 	}
-	params.SessionID, params.PermissionPreview = previewSessionID, true
+	// Hermes builds its command by preparing a home folder under the data dir and writing its first message there: a preview writes nothing, and what Hermes adds for permissions is only the
+	// --yolo its Flags carry, so that is read straight off the flags (the same ones the launch is given).
+	if agentType == at.Hermes {
+		return permissionArgsOf(params.Flags), nil
+	}
+	id := newPreviewSessionID() // its own id per call: two previews at once never delete each other's files
+	params.SessionID, params.PermissionPreview = id, true
 	params.ResumeSessionID = ""
 	if params.WorkingDir == "" {
 		params.WorkingDir = os.TempDir()
 	}
-	defer removePreviewFiles()
+	defer removePreviewFiles(id)
 	cmd, err := GetAgent(agentType).LaunchCommand(params)
 	if err != nil {
 		return nil, err
@@ -33,13 +41,19 @@ func LaunchPermissionArgs(agentType string, params LaunchParams) ([]string, erro
 	return permissionArgsOf(splitShellWords(cmd)), nil
 }
 
-const previewSessionID = "00000000-0000-4000-8000-000000000000"
+// newPreviewSessionID is a random version-4 id for one preview.
+func newPreviewSessionID() string {
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	b[6], b[8] = b[6]&0x0f|0x40, b[8]&0x3f|0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+}
 
-// removePreviewFiles deletes what LaunchCommand wrote for previewSessionID.
-func removePreviewFiles() {
-	found, _ := filepath.Glob(filepath.Join(LaunchTempDir(), "coral_*_"+previewSessionID+"_*"))
+// removePreviewFiles deletes what LaunchCommand wrote for this preview's id: files, and agy's hooks folder with what is in it.
+func removePreviewFiles(id string) {
+	found, _ := filepath.Glob(filepath.Join(LaunchTempDir(), "coral_*_"+id+"_*"))
 	for _, f := range found {
-		_ = os.Remove(f)
+		_ = os.RemoveAll(f)
 	}
 }
 

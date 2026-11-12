@@ -17,13 +17,19 @@ func (h *SessionsHandler) PostLaunchPermissionArgs(w http.ResponseWriter, r *htt
 		KeepFullAccess bool                `json:"keep_full_access"`
 		Capabilities   *agent.Capabilities `json:"capabilities"`
 	}
-	if err := decodeJSON(r, &body); err != nil {
+	if err := decodeJSONLimit(r, &body, 16<<10); err != nil { // 16 KB: a choice of permissions is a few hundred bytes
 		errBadRequest(w, "send agent_type, permission_mode, keep_full_access and capabilities as JSON")
 		return
 	}
 	if len(body.AgentType) > 40 || len(body.PermissionMode) > 40 || len(body.Flags) > 40 {
 		errBadRequest(w, "agent_type or permission_mode is too long")
 		return
+	}
+	for _, f := range body.Flags {
+		if len(f) > 200 {
+			errBadRequest(w, "a flag is too long")
+			return
+		}
 	}
 	args, err := agent.LaunchPermissionArgs(body.AgentType, agent.LaunchParams{PermissionMode: body.PermissionMode, Flags: body.Flags, KeepFullAccess: body.KeepFullAccess, Capabilities: body.Capabilities})
 	if err != nil {
