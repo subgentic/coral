@@ -15,14 +15,13 @@ const { setupHubWorld } = require('./helpers/hub_world');
             await setupHubWorld({ client, Page, Emulation, width: w, height: h, mobile, inbox: 'native', needs: true, hubPages: true });
             await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { window.__chiefReqs = []; const f = window.fetch.bind(window); window.fetch = (u, o) => { try { const p = new URL(String(u && u.url || u), location.href).pathname; if (/\\/api\\/chief(\\/|$)/.test(p)) window.__chiefReqs.push(p); } catch { /* not a URL */ } return f(u, o); }; })();` });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
-            // Goals and Agents with no team selected: the pages that paint Chief's entry (the sidebar slot, the menu)
+            // Goals and Agents with no team selected: no page asks for Chief any more (#15793)
             for (const tab of ['hub-inbox', 'agents']) { await ev(`window.switchNavTab(${JSON.stringify(tab)}); true`); await new Promise(r => setTimeout(r, 700)); } // sleep-ok: the page paints and asks what it asks
-            const st = await ev(`import((window.__coralStatic || '/static/') + 'chief_entry.js').then(async m => ({ state: await m.chiefState(), known: m.chiefStateKnown() === null }))`);
             const look = await ev(`import((window.__coralStatic || '/static/') + 'chief_look.js').then(async m => (await m.readChief()) === null)`);
             const reqs = await ev(`window.__chiefReqs`);
             check(`${at}no team selected: no bare /api/chief request leaves the page`, reqs.length === 0, JSON.stringify(reqs));
-            check(`${at}the Chief entry has nothing to show (state null) and the look read answers null`, st.state === null && st.known && look === true, JSON.stringify([st, look]));
-            check(`${at}no Chief entry is drawn in the sidebar`, await ev(`!document.querySelector('#sidebar-chief-slot a, #sidebar-chief-slot button')`));
+            check(`${at}the look read answers null`, look === true, JSON.stringify(look));
+            check(`${at}no Chief entry is drawn in the sidebar`, await ev(`!document.getElementById('sidebar-chief-slot')`));
         }
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
