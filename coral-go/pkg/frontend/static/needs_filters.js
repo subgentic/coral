@@ -53,6 +53,7 @@ export function decorateKindRow(tr) {
     const icon = tr.querySelector('.inbox-kind-icon');
     if (!icon || tr.classList.contains('dt-mailed')) return;
     tr.classList.add('inbox-kind-row');
+    if (tr.querySelector('.inbox-bookmark')) tr.classList.add('inbox-file-row'); // not a :has() in css (#15953)
     const words = tr.querySelector('.dt-subtitle'); if (words) words.classList.add('inbox-row-words'); /* the row's own class for it: the lazy card CSS styles this, not the table's (data_table_census) */ const wrap = tr.querySelector('.inbox-agent-first'), kindWord = words && /^(For review|Needs your answer)$/.test(words.textContent.trim());
     const phone = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 760px)').matches, holds = phone && wrap && tr.querySelector('.inbox-blocks'); // what a file or an agent holds up goes on the description's own lines, after it, never as a line of its own (#13911: three lines at most)
     if (holds && holds.textContent.trim()) { wrap.classList.add('has-holds'); holds.classList.add('inbox-holds-inline'); wrap.append(holds); const news = wrap.querySelector('.inbox-new-comments'); if (news) holds.prepend(news, ' '); } // the row's third line: the file's name takes one line, what it holds up the next; the file's question gives way to it
