@@ -6,6 +6,7 @@ package windowmark
 import (
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/subgentic/coral/internal/secfile"
 )
@@ -69,4 +70,44 @@ func Present(dataDir string) bool {
 	}
 	fi, err := os.Lstat(filepath.Join(dataDir, FileName))
 	return err == nil && fi.Mode().IsRegular()
+}
+
+// RaiseFileName is the name of the record that the person's own click started the relaunch after an update (#15772): the new tray brings its window forward once, and only for that. An automatic
+// install, or one the Hub's owner asked for, leaves none.
+const RaiseFileName = "window_raise"
+
+// NoteRaise records that the person asked for this relaunch. Created without following a link, as Set does.
+func NoteRaise(dataDir string) {
+	if dataDir == "" {
+		return
+	}
+	f, err := secfile.OpenNoFollow(filepath.Join(dataDir, RaiseFileName), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err == nil {
+		_ = f.Close()
+	}
+}
+
+// ClearRaise takes the record away (a relaunch that did not start).
+func ClearRaise(dataDir string) {
+	if dataDir == "" {
+		return
+	}
+	if fi, err := os.Lstat(filepath.Join(dataDir, RaiseFileName)); err == nil && fi.Mode().IsRegular() {
+		_ = os.Remove(filepath.Join(dataDir, RaiseFileName))
+	}
+}
+
+// TakeRaise reports whether the person's click started the relaunch that is starting this tray, and removes the record either way: once, never again. A record older than maxAge is a leftover
+// of an update that never came up, not of this start, and says no. A link or a folder at that name is not a record.
+func TakeRaise(dataDir string, now time.Time, maxAge time.Duration) bool {
+	if dataDir == "" {
+		return false
+	}
+	path := filepath.Join(dataDir, RaiseFileName)
+	fi, err := os.Lstat(path)
+	if err != nil || !fi.Mode().IsRegular() {
+		return false
+	}
+	_ = os.Remove(path)
+	return now.Sub(fi.ModTime()) <= maxAge
 }

@@ -13,6 +13,8 @@ const { RESUME_KEY, idleInstallWords, RELEASES_REPO, RELEASES_URL, ACT_INSTALL, 
 
 // After the confirm the dialog is a spinner and one line (the Operator, #11152): none of the per-install details. Windows alone adds what it will be asked, the one thing that is not Coral's doing.
 const INSTALLING = 'Coral is installing the update and will restart.';
+// How long it takes and the step it is on (#15772; the Operator's own run took 43 seconds): installing while this Coral still answers, restarting once it does not answer any more.
+const stepWords = (step) => `About a minute. Now: ${step === 'restarting' ? 'restarting Coral' : 'installing the update'}.`;
 const INSTALLING_WIN = 'Windows will ask for your permission (the usual admin prompt).';
 const STATE_WORDS = { working: 'working', idle: 'idle', waiting: 'waiting for you' };
 
@@ -124,8 +126,9 @@ async function sendRelaunch(go, later) {
         const spin = mk('span', 'task-spinner'); spin.setAttribute('aria-hidden', 'true');
         const text = mk('div', 'update-installing-text'); text.append(mk('p', 'update-note update-updating', INSTALLING));
         if (win) text.append(mk('p', 'update-note update-uac', INSTALLING_WIN));
+        const step = mk('p', 'update-note update-step', stepWords('installing')); text.append(step);
         box.append(spin, text); body.append(box);
-        watchUpdate(to, () => installStalled(body, to)); later.textContent = 'Close'; later.disabled = false; go.hidden = true;
+        watchUpdate(to, () => installStalled(body, to), s => { step.textContent = stepWords(s); }); later.textContent = 'Close'; later.disabled = false; go.hidden = true;
         return;
     }
     if (res.status === 409 && res.code === 'stale_ack' && res.relaunch) {
@@ -172,12 +175,12 @@ function installStalled(body, to) {
 
 /** Waits for the new Coral (#10834): the server is down while it installs; when it answers as the new version the page reloads and update_ui.js says "Coral is now X" there. Gives up after four minutes (the note above says what to do). */
 const bare = v => String(v).replace(/^v/, '');
-function watchUpdate(to, onGiveUp) {
+function watchUpdate(to, onGiveUp, onStep) {
     browserSession.set(UPDATED_KEY, to);
     const until = Date.now() + 240000;
     const t = pollEvery(async () => {
         if (Date.now() > until) { clearInterval(t); onGiveUp?.(); return; }
-        try { const r = await fetch('/api/system/update', { cache: 'no-store' }); if (r.ok && bare((await r.json()).installed) === bare(to)) { clearInterval(t); location.reload(); } } catch { /* down while it installs */ }
+        try { const r = await fetch('/api/system/update', { cache: 'no-store' }); if (r.ok && bare((await r.json()).installed) === bare(to)) { clearInterval(t); location.reload(); } else onStep?.('installing'); } catch { onStep?.('restarting'); /* down while it installs */ }
     }, 3000, { whenHidden: true });
 }
 

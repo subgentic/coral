@@ -22,8 +22,13 @@ const { coralReady } = require('./helpers/wait');
         const t = await ev(`document.querySelector('#update-confirm-modal .update-updating').textContent`);
         assert.equal(t, 'Coral is installing the update and will restart.', t);
         const first = await ev(`(() => { const m = document.getElementById('update-confirm-modal'), b = m.querySelector('.modal-body'); return { spin: !!b.querySelector('.task-spinner'), spinPx: Math.round(b.querySelector('.task-spinner').getBoundingClientRect().width), text: b.innerText.replace(/\\s+/g, ' ').trim(), links: b.querySelectorAll('a').length, warn: b.querySelectorAll('.update-warn,.update-later-note').length }; })()`);
-        assert.ok(first.spin && first.spinPx >= 24 && first.text === 'Coral is installing the update and will restart.' && !first.links && !first.warn, 'the dialog is a spinner and one line, nothing else: ' + JSON.stringify(first));
+        assert.ok(first.spin && first.spinPx >= 24 && first.text === 'Coral is installing the update and will restart. About a minute. Now: installing the update.' && !first.links && !first.warn, 'the dialog is a spinner, the line, how long and the step, nothing else: ' + JSON.stringify(first));
         assert.equal(await ev(`sessionStorage.getItem('coral-updated-to')`), '9.9.9', 'the version it goes to is kept for the page that comes back');
+        // how long, and the step it is on (#15772): installing while this Coral answers, restarting once it does not
+        assert.equal(await ev(`document.querySelector('#update-confirm-modal .update-step').textContent`), 'About a minute. Now: installing the update.');
+        await ev(`window.__down = true; const R0 = window.fetch; window.fetch = (u, o) => window.__down && /\\/api\\/system\\/update$/.test(String(u)) ? Promise.reject(new Error('down')) : R0(u, o); true`);
+        await waitFor(`document.querySelector('#update-confirm-modal .update-step').textContent === 'About a minute. Now: restarting Coral.'`, 'the step moves on when Coral stops answering', 8000);
+        await ev(`window.__down = false; true`);
         // the page that comes back: the new Coral answers as 9.9.9
         await ev(`window.__st = { ...window.__st, installed: '9.9.9', state: 'none', staged: null }; document.querySelectorAll('.toast').forEach(e => e.remove()); import(${S} + 'update_ui.js').then(m => m.refreshUpdateStatus()).then(() => true)`);
         await waitFor(`/Coral is now 9\\.9\\.9/.test(document.body.innerText)`, 'the Coral is now line', 6000);
@@ -37,7 +42,7 @@ const { coralReady } = require('./helpers/wait');
             const u = await ev(`document.querySelector('#update-confirm-modal .update-updating').textContent`);
             assert.equal(u, 'Coral is installing the update and will restart.', `${kind}: the one line, no promise about disk images or a stopped Coral: ${u}`);
             const all = await ev(`document.querySelector('#update-confirm-modal .modal-body').innerText.replace(/\\s+/g, ' ').trim()`);
-            assert.equal(all, kind === 'msi' ? 'Coral is installing the update and will restart. Windows will ask for your permission (the usual admin prompt).' : 'Coral is installing the update and will restart.', `${kind}: nothing else in the body: ${all}`);
+            assert.equal(all, kind === 'msi' ? 'Coral is installing the update and will restart. Windows will ask for your permission (the usual admin prompt). About a minute. Now: installing the update.' : 'Coral is installing the update and will restart. About a minute. Now: installing the update.', `${kind}: nothing else in the body: ${all}`);
         }
         // a refused install ends with something to do: the button is back and a download link says so
         await ev(`window.__st = ${JSON.stringify(READY)}; (() => { const R = window.fetch; window.fetch = (u, o) => String(u).endsWith('/relaunch-local') ? Promise.resolve(new Response(JSON.stringify({ code: 'updater_not_started' }), { status: 500, headers: { 'Content-Type': 'application/json' } })) : R(u, o); })(); import(${S} + 'update_ui.js').then(async m => { await m.refreshUpdateStatus(); const d = await import(${S} + 'update_dialog.js'); d.openUpdateDialog(m.getUpdateStatus()); return true; })`);
