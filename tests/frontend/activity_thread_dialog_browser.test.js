@@ -24,7 +24,7 @@ const BASE = require('./test_base').BASE;
             window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
                 if (u.pathname === '/api/activity') return json({ actions: window.__activityRows, check: { intact: true, rows: window.__activityRows.length } });
                 if (u.pathname === '/api/board/tm/messages/all') return json({ messages: window.__noThread ? [] : window.__messages, total: 4, limit: 200, offset: 0 });
-                if (u.pathname === '/api/upload') { window.__uploads = (window.__uploads || 0) + 1; return json({ path: '/tmp/up/pic.png', filename: 'pic.png' }); }
+                if (u.pathname === '/api/upload') { window.__uploads = (window.__uploads || 0) + 1; window.__uploadFor = (window.__uploadFor || []); window.__uploadFor.push(opts.body && opts.body.get ? opts.body.get('session_id') : ''); return json({ path: '/tmp/up/pic.png', filename: 'pic.png' }); }
                 if (u.pathname === '/api/board/tm/messages' && opts.method === 'POST') { const b = JSON.parse(opts.body); window.__posts.push(b); return json({ id: 11 }); }
                 return original(url, opts); };
             localStorage.removeItem('coral-inbox-activity-filters');
@@ -59,10 +59,17 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`window.__uploads`), 0, 'no agent running: nothing is uploaded');
         assert.equal(await ev(`document.querySelectorAll('dialog.activity-thread-dialog .image-attachment').length`), 0, 'and no picture is attached');
         assert.equal(await ev(`window.__posts.length`), 0, 'and nothing is sent');
-        await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.liveSessions = [...(m.state.liveSessions || []), { name: 'Ada', display_name: 'Ada', session_id: 'sid-ada', agent_type: 'claude', type: 'live' }]; return true; })`);
+        // another team's agent with the same name is not the one asked (#15801): no upload goes to it
+        await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.liveSessions = [...(m.state.liveSessions || []), { name: 'Ada', display_name: 'Ada', session_id: 'sid-other-team', agent_type: 'claude', type: 'live', board_project: 'other' }]; return true; })`);
+        await pickImage();
+        await new Promise(r => setTimeout(r, 600)); // sleep-ok: a refusal draws nothing to wait for
+        assert.equal(await ev(`window.__uploads`), 0, 'only another team has an Ada: nothing is uploaded');
+        assert.equal(await ev(`document.querySelectorAll('dialog.activity-thread-dialog .image-attachment').length`), 0);
+        await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.liveSessions = [...(m.state.liveSessions || []), { name: 'Ada', display_name: 'Ada', session_id: 'sid-ada', agent_type: 'claude', type: 'live', board_project: 'tm' }]; return true; })`);
         await pickImage();
         await waitFor(`document.querySelectorAll('dialog.activity-thread-dialog .image-attachment').length === 1`, 'the agent is running: the picture is attached', 8000);
         assert.equal(await ev(`window.__uploads`), 1, 'it was uploaded once');
+        assert.deepEqual(await ev(`window.__uploadFor`), ['sid-ada'], "and for this team's agent");
         await ev(`document.querySelector('.activity-thread-send').click(); true`);
         await waitFor(`window.__posts.length === 1`, 'the reply with the picture is sent', 8000);
         assert.match(await ev(`window.__posts[0].content`), /^@Ada .*\/tmp\/up\/pic\.png/s, 'the picture\'s path leads the reply, to the agent');

@@ -1,7 +1,7 @@
 /* An answered question in Activity opens as a thread (#15724, the Operator's pick: design B's timeline, one block per message with a name and a time): the agent's question, the Operator's answer and every later reply
  * in order, then a box to reply into the same thread and the way to the Board. Lazy: loaded by the Activity folder when a question's row is opened. A message's words are the agent's, so they are written as text
  * (renderMarkdownStrict writes raw HTML out as text), never inserted as markup. */
-import { boardFetch, splitKey } from './server_base.js';
+import { boardFetch, splitKey, sessionTeamKey } from './server_base.js';
 import { fetchMessages } from './board_fetch.js';
 import { OPERATOR_ID, renderMarkdownStrict, showToast } from './utils.js';
 import { markHidden } from './visible_marks.js';
@@ -50,7 +50,7 @@ export async function openThread(row, { onDone, openBoard, openTask } = {}) {
     const pics = []; let uploading = 0; // { path, filename, artifact, previewUrl }
     const strip = el('div', 'activity-thread-pics'); strip.hidden = true;
     // 'image/' + '*' is written in two parts: a slash-star in a string reads as the start of a comment to the page's lint
-    const picker = el('input'); picker.type = 'file'; picker.accept = 'image/' + '*'; picker.multiple = true; picker.hidden = true;;
+    const picker = el('input'); picker.type = 'file'; picker.accept = 'image/' + '*'; picker.multiple = true; picker.hidden = true;
     const attach = el('button', 'btn btn-small', 'Attach image'); attach.type = 'button';
     const hint = el('span', 'activity-thread-hint', 'Paste or drop an image here too');
     const attachRow = el('div', 'activity-thread-attach'); attachRow.append(attach, hint, picker);
@@ -63,7 +63,7 @@ export async function openThread(row, { onDone, openBoard, openTask } = {}) {
     const canSend = () => (box.value.trim() || pics.length) && !uploading;
     const drawPics = () => { strip.hidden = !pics.length && !uploading; strip.replaceChildren(...pics.map((a, i) => { const w = el('div', 'image-attachment'); const im = el('img'); im.src = a.previewUrl; im.alt = `Image ${i + 1}`; const x = el('button', 'image-attachment-remove', '\u00d7'); x.type = 'button'; x.setAttribute('aria-label', `Remove image ${i + 1}`); x.addEventListener('click', () => { URL.revokeObjectURL(a.previewUrl); pics.splice(i, 1); drawPics(); }); w.append(im, x); return w; }), ...(uploading ? [Object.assign(el('div', 'image-uploading', `Uploading ${uploading === 1 ? 'image' : uploading + ' images'}\u2026`), {})] : [])); send.disabled = !canSend(); };
     // An image goes up to the asking agent's own computer the way the message box's does (one uploader, postImage): it needs that agent to be running.
-    const agentSession = () => (state.liveSessions || []).find(x => [x.display_name, x.name].includes(asker) && (!x.board_id || x.board_id === splitKey(team).name || true)) || null;
+    const agentSession = () => (state.liveSessions || []).find(x => [x.display_name, x.name].includes(asker) && sessionTeamKey(x) === team) || null; // the agent of THIS team on THIS computer: another team's agent of the same name is not the one asked
     const addImages = async files => {
         const session = agentSession();
         if (!session) { showToast(`${asker} is not running, so an image cannot be sent to it now.`, true); return; }
