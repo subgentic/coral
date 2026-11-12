@@ -6,7 +6,7 @@ const BASE = require('./test_base').BASE;
 const { framesJs, coralReady } = require('./helpers/wait');
 
 // family, size px, weight: the dialog title, pane title, section heading, nav tab and its selected one, row label, control and button, hint, badge
-const SCALE = new Set(['16/700', '17/700', '14/600', '14/400', '13/500', '13/400', '12/400', '11/600']);
+const SCALE = new Set(['16/700', '17/700', '14/600', '14/400', '13/500', '13/400', '12/400', '11/400', '11/600']);
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
