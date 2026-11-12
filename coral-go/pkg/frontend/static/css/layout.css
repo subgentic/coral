@@ -164,7 +164,7 @@
     overflow-y: auto;
     scrollbar-gutter: stable; /* a list that scrolls does not move the header's parts left of where a short one has them (#7443) */
     /* The pinned New Agent footer covers the bottom of the scroll area: a row the keyboard focuses at that edge is scrolled clear of it (#6159). */
-    scroll-padding-bottom: 8rem; /* the footer with Chief's reserved row (44 px more than the 5rem it needed before) */
+    scroll-padding-bottom: 5rem;
     display: flex;
     flex-direction: column;
     flex: none;
@@ -185,16 +185,13 @@ body.panel-dragging .sidebar {
     /* The header row is 57 px from the top of the column to its rule (10 + 36 + 10 + the 1 px rule) on every tab: one component, one height (UI/UX's spec said 53; #7443). A tab without Display options is the same height, its search is wider. */
 }
 
-/* Chief's slot above New agent (#13167): room kept from the first paint, so its late answer moves nothing; here, not in chief.css (it loads with the answer) */
-.sidebar-footer:has(> .sidebar-chief-slot:not([hidden])) { flex-wrap: wrap; row-gap: 8px; }
-.sidebar-chief-slot { flex: 1 0 100%; min-height: 36px; }
-.sidebar-chief-slot[data-pending] { visibility: hidden; }
 .sidebar-footer {
     padding: 12px 12px 20px;
     border-top: 1px solid var(--border);
     flex-shrink: 0;
     margin-top: auto;
     display: flex;
+    gap: var(--space-md); /* New agent and New team do not touch (#15793) */
     /* Pinned to the bottom of the sidebar while the agent list scrolls under it (#6159): with 20+ agents the button was below the fold. It still takes its own space at the end, so the last agent is not covered. */
     position: sticky;
     bottom: 0;

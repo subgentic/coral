@@ -77,6 +77,7 @@ export async function mountChiefSetup(host) {
         api.set('1');
         return api;
     };
+    const openLink = el('a', 'chief-open-link', 'Open Chief'); openLink.href = '/chief'; openLink.hidden = true;
     view = mountSettingsView(form, {
         mode: 'settings',
         saveBar: { save: 'Save Chief', cancel: 'Cancel' },
@@ -91,6 +92,7 @@ export async function mountChiefSetup(host) {
             { key: 'chief_actions', type: 'select', label: "Chief's actions", default: 'ask_first', options: ACTIONS, help: 'Ask first: Chief asks before each action. Act: Chief edits without asking, and a shell command still asks. Applies when Chief restarts.' },
             { key: 'chief_fronts', type: 'select', label: 'Team it fronts', default: '', options: [{ value: '', label: 'No team chosen' }, ...teams], help: 'The team whose agents Chief takes your requests to. It must be a team other than the one Chief is on.' },
             { key: 'chief_page', type: 'toggle', label: 'Serve the Chief page', default: false, help: 'Turns on /chief, the page for your phone.', helpOf: () => (view && view.values().chief_page ? 'Turns on /chief, the page for your phone.' : 'Off: Chief stays off, whatever else you save here, until this is on and saved. Turn it on to use /chief.') },
+            { key: 'chief_open', type: 'custom', label: 'Chief page', render: slot => { slot.append(openLink); } }, // a plain link to /chief, the one way in to Chief besides its URL (#15793: no sidebar card, no menu entry); shown while the page is on
         ],
         load: async () => {
             const again = await json('/api/settings'), st = again && again.settings ? again.settings : settings;
@@ -104,11 +106,10 @@ export async function mountChiefSetup(host) {
             const r = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
             if (!r.ok) { let m = ''; try { m = (await r.json()).error || ''; } catch { /* no reason given */ } throw new Error(m || `Chief could not be saved (HTTP ${r.status}).`); }
             if (Object.hasOwn(body, 'chief_name') || Object.hasOwn(body, 'chief_avatar') || Object.hasOwn(body, 'chief_avatar_letter')) showToast('Chief’s look is saved.', false, 3000);
-            document.dispatchEvent(new Event('coral-chief-changed')); // the menus' Set up Chief becomes Chief (chief_entry.js, #13167)
             return {};
         },
     });
-    const redraw = () => { drawPreview(); drawModel(); view.refresh?.(); }; // refresh re-reads a help sentence that follows the choice (the page toggle's)
+    const redraw = () => { drawPreview(); drawModel(); openLink.hidden = !(view && view.values().chief_page); view.refresh?.(); }; // refresh re-reads a help sentence that follows the choice (the page toggle's)
     form.addEventListener('input', redraw); form.addEventListener('change', redraw); form.addEventListener('sv-saved', redraw);
     host.dataset.ready = '';
     view.ready.then(() => { redraw(); host.dataset.ready = '1'; }, () => { redraw(); host.dataset.ready = '1'; });
