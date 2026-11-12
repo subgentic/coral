@@ -151,6 +151,7 @@ func recordFrom(out status.Out, st relaunchState, now time.Time) UpdaterRecord {
 		State:           updNone,
 		HubRelaunched:   st.HubRelaunched,
 		LastHubRelaunch: st.LastHubRelaunch,
+		Checking:        out.Checking,
 	}
 	if out.Accepted != nil {
 		rec.Trust.ManifestSequence = out.Accepted.Sequence

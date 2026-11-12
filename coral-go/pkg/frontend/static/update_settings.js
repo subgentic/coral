@@ -8,7 +8,7 @@ import { copyText, showToast } from './utils.js';
 import { isCloud } from './server_base.js';
 import { mountSettingsView } from './settings_view.js';
 import { el as mk } from './dom_el.js'; // the pane's rows (a startup module: the Settings rows draw from it)
-const { actName, releaseNotesUrl, RELEASES_REPO, ageTier, canStart, installsLocally, notAvailable, reasonText, notReadyText, foundText, fetchHubRelaunch, hubRelaunchSetAtLaunch, requestCheckNow, savePrefs, saveChannel, saveAutoInstall, serverHas } = await importOnce('./update_api.js');
+const { actName, releaseNotesUrl, RELEASES_REPO, ageTier, canStart, installsLocally, notAvailable, reasonText, notReadyText, foundText, fetchHubRelaunch, hubRelaunchSetAtLaunch, requestCheckNow, checkingWords, checkAnswerToast, savePrefs, saveChannel, saveAutoInstall, serverHas } = await importOnce('./update_api.js');
 const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS, HUB_RELAUNCH_AT_LAUNCH, HUB_RELAUNCH_OFF_AT_LAUNCH } = await importOnce('./update_words.js');
 const { failureNotice, getUpdateStatus, refreshUpdateStatus, relaunchOffered } = await importOnce('./update_ui.js');
 
@@ -34,6 +34,10 @@ function card(s) {
     const notice = failureNotice(s);
     if (s.relaunch.reason === 'applying' || s.state === 'applying') {
         title.textContent = 'Updating Coral…'; sub.textContent = 'The update is being installed. Coral restarts when it is done.'; dot.dataset.k = 'warm'; c.dataset.k = 'warm';
+    } else if (s.checking) {
+        const w = checkingWords(s); // a check is running: said, and no second press (#15770)
+        title.textContent = w.title; sub.textContent = w.sub; dot.dataset.k = 'ok'; c.dataset.k = 'ok';
+        if (serverHas.check) { act = mk('button', 'btn update-act', 'Check now'); act.type = 'button'; act.disabled = true; }
     } else if (notice) {
         title.textContent = notice.lead; sub.textContent = notice.rest.trim(); dot.dataset.k = 'bad'; c.dataset.k = 'bad';
         if (serverHas.check) act = mk('button', 'btn update-act', 'Retry'); // no server route to check now, no button
@@ -62,7 +66,7 @@ function card(s) {
         if (s.notReady === 'up_to_date') { dot.dataset.k = 'ok'; c.dataset.k = 'ok'; } else if (s.notReady === 'check_failed' || s.notReady === 'rate_limited') { dot.dataset.k = 'warm'; c.dataset.k = 'warm'; }
         if (serverHas.check) act = mk('button', 'btn update-act', 'Check now');
         if (act) act.type = 'button';
-        if (act) act.addEventListener('click', async () => { act.disabled = true; const ok = await requestCheckNow(); await refreshUpdateStatus(); showUpdatesPane(); if (!ok) showToast('Could not check for updates.', true); });
+        if (act) act.addEventListener('click', async () => { act.disabled = true; const answer = await requestCheckNow(); await refreshUpdateStatus(); showUpdatesPane(); const say = checkAnswerToast(answer, getUpdateStatus()); if (say) showToast(say.text, say.error, undefined, { group: { key: 'update-check', text: () => say.text } }); });
     }
     c.append(dot, text); if (act) c.append(act);
     return c;
