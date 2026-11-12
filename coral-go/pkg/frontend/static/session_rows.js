@@ -285,7 +285,9 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     const skipped = s.sleeping || !(Number(s.board_unread) > 0) ? null : skippedOf(s);
     const heldChip = !waitingBadge && skipped ? ` <span class="chip chip-caps session-state-pill neutral session-held-chip" title="${escapeAttr(skipped.why)}">Message held</span>` : '';
     // Terminal-gone sleepers already have their restart chip. A sleeping agent is a row like any other (#10062): its one quiet chip says Sleeping (when no other chip owns the row; titled when Coral stopped it), and Wake is on the row at a hover or the keyboard, named for the agent
-    const sleepChip = s.sleeping && !isGoneAsleep(s) && !waitingBadge && !heldChip ? ` <span class="chip chip-caps session-state-pill neutral"${s.sleep_reason === 'coral_stopped' ? ' title="Asleep since Coral restarted"' : ''}>Sleeping</span>` : '';
+    const sleepChip = s.sleeping && !isGoneAsleep(s) && !isExitedAsleep(s) && !waitingBadge && !heldChip ? ` <span class="chip chip-caps session-state-pill neutral"${s.sleep_reason === 'coral_stopped' ? ' title="Asleep since Coral restarted"' : ''}>Sleeping</span>` : '';
+    // An ended agent (its CLI exited, #15777) has one word, Ended (no moon, no Sleeping pill); at a hover it offers Restart, Wake and Sleep in the chip's place
+    const restartBtn = isExitedAsleep(s) && !isStaleSession(s) ? ` <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-restart-same" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(s.session_id || '')}" data-mode="restart" title="Its program exited; Restart starts it again" aria-label="Restart ${escapeAttr(resolveSessionIdentity(s))}">Restart</button>` : '';
     const wakeBtn = s.sleeping && !isStaleSession(s) ? ` <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(s.session_id || '')}" data-mode="wake" aria-label="Wake ${escapeAttr(resolveSessionIdentity(s))}">Wake</button>` : '';
     // A terminal-gone or ended (#15068) agent is asleep already: Sleep files it under sleeping (no "Terminal gone" chip; a later Wake resumes it like any sleeper, #13171)
     const sleepBtn = (isGoneAsleep(s) || isExitedAsleep(s)) && !isStaleSession(s) ? ` <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(s.session_id || '')}" data-mode="sleep" aria-label="Put ${escapeAttr(resolveSessionIdentity(s))} to sleep">Sleep</button>` : '';
@@ -345,11 +347,11 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
         <span class="session-avatar" aria-hidden="true" style="--avatar:${escapeAttr(avatar.color)}">${escapeHtml(avatar.initial)}</span>
         <div class="session-info">
             <div class="session-name-row">
-                <span class="session-dot ${dotClass}${ctxHigh ? ' ctx-high' : ''}" aria-hidden="true"></span>
+                <span class="session-dot ${dotClass}${isExitedAsleep(s) ? ' ended' : ''}${ctxHigh ? ' ctx-high' : ''}" aria-hidden="true"></span>
                 <span class="session-label list-row-title${nameTail ? ' session-label-split' : ''}"><span class="session-label-name${s.agent_type === 'terminal' ? ' is-terminal' : ''}"${agentNameColor(s) ? ` style="--agent-name-color:${agentNameColor(s)}"` : ''}>${nameTail ? `<span class="sln-head">${escapeHtml(nameHead)}</span><span class="sln-tail">${escapeHtml(nameTail)}</span>` : escapeHtml(displayLabel)}</span>${nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typeTag}${dirChip}`}</span>${autoAcceptChip(s)}${terminalGoneChip(s)}${hooksMissingChip(s)}${piHooksChip(s)}
                 <span class="session-name-spacer"></span>
                 <span class="session-time" aria-hidden="true">${escapeHtml(_shortAgo(s.staleness_seconds))}</span>
-                ${stale ? '' : waitingBadge + heldChip + sleepChip + wakeBtn + sleepBtn}
+                ${stale ? '' : waitingBadge + heldChip + sleepChip + restartBtn + wakeBtn + sleepBtn}
                 ${stale ? '' : kebabMenu}
             </div>
             <span class="session-status-line">${escapeHtml(stateInfo.short || stateInfo.label)}</span>

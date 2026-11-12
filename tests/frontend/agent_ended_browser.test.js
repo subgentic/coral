@@ -19,7 +19,7 @@ const BASE = require('./test_base').BASE;
             const info = id => { const e = r(id); return e ? { chip: (e.querySelector('.terminal-gone-chip') || {}).textContent || '', aria: (e.querySelector('.terminal-gone-chip') || document.body).getAttribute('aria-label'), title: (e.querySelector('.terminal-gone-chip') || {}).title || '' } : null; };
             return { ended: info('ended-a-id'), nap: info('nap-b-id'), arch: info('arch-c-id') }; })()`);
         assert.ok(rows.ended, 'the ended agent is in view, not folded into the sleeping row: ' + JSON.stringify(rows));
-        assert.equal(rows.ended.chip, 'Ended'); assert.equal(rows.ended.aria, 'Ended. Restart', 'the chip is named for what it does'); assert.match(rows.ended.title, /CLI exited.*restart/i);
+        assert.equal(rows.ended.chip, 'Ended'); assert.equal(rows.ended.aria, 'Ended. Restart', 'the chip is named for what it does'); assert.match(rows.ended.title, /program exited.*Restart starts it again/);
         assert.ok(rows.nap && rows.nap.chip === '', 'a plain sleeping agent is a normal row since #10062, with no Ended or Terminal gone chip: ' + JSON.stringify(rows.nap));
         assert.equal(!!(rows.arch && rows.arch.chip), false, 'an archived agent is just archived');
         const label = await ev(`(async () => { const r = await import((window.__coralStatic||'/static/') + 'render.js'); const s = id => window.T.state.liveSessions.find(x => x.session_id === id);
