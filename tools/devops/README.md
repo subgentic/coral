@@ -146,6 +146,14 @@ gh run view <id> --log | grep -E '^(GO|NO-GO|FAIL)'   # poll the run, then read 
 Post `GO` (with the run id and the commit) or the failing lines on the board before the release approval is asked for. To try a change to the workflow itself, push a
 branch named `dryrun/<anything>`: the same job runs on a push there.
 
+### Release-only steps (#13015)
+
+Some steps run only in the tag's release run (the macOS and Windows smokes, the notices and bundle checks): a green gate and a green dry run have not run them, and v2.0.12 and v2.0.40 failed
+in one. `tests/release/pre_tag_steps.txt` lists every test, smoke and check script `release.yml` runs, and whether the dry run runs it (`dryrun`) or only the release does (`release-only`);
+`tests/release/pre_tag_census_test.py` fails when the workflow and the list disagree. Before the tag, run `tools/devops/pre-tag-steps.sh LAST_TAG HEAD`: it prints each release-only step
+with CHANGED or unchanged since the last release. The pre-tag post names every release-only step, says which I read against the diff (every CHANGED one, plus the smoke's
+expectations for any CLI or route change) and what I found. A step I did not read is named as not read.
+
 ## Release provenance (#5550)
 
 - **At every tag**: the first step of `release.yml`'s resolve job runs `tests/release/release_provenance.py`. It writes into the run's

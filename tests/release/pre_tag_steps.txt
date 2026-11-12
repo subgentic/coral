@@ -1,0 +1,45 @@
+# Every test, smoke and check script release.yml runs, and when it can be run before a tag (#13015, Part A).
+# tests/release/pre_tag_census_test.py holds this file and release.yml together: a step added, renamed or removed without a line here fails it.
+#
+# item | stage | what it proves
+#
+# stage dryrun: release-dryrun.yml runs it on the notes commit (push dryrun/<anything>), so a green dry run has run it.
+# stage release-only: only the tag's release run runs it. Before the tag DevOps reads the step against the diff since the last release and names it in the pre-tag post.
+go test ./internal/tmux ^TestBundledPayloadSmoke$ | release-only | the macOS payload's bundled tmux starts the staged copy and its bytes equal the bundled payload (v2.0.40 failed here)
+go test ./internal/updater/apply TestSignedMSIMatchesTheUpdatersPins | release-only | the signed MSI's certificate matches the pins the updater verifies
+tests/release/approve_release_test.sh | dryrun | the Approve release workflow's script, with a stand-in gh
+tests/release/download_section_test.sh | dryrun | the Download section of the notes
+tests/release/go_mod_download_retry_test.sh | dryrun | the module download retries a dropped stream, never a checksum mismatch
+tests/release/install_cli_tools_test.sh | dryrun | installers/install-cli.sh links exactly the programs the app ships (tests/release/commands.txt)
+tests/release/ldflags_build_test.sh | dryrun | every build script's -X flags take effect
+tests/release/notes_commit_test.sh | dryrun | the notes commit's trailers are what the release reads
+tests/release/promote_copy_check_test.sh | dryrun | the pinned copy of promote.yml and main's are byte-identical when it changes
+tests/release/promote_workflow_test.py | dryrun | promote.yml's order of steps, permissions and pinned actions
+tests/release/release_cadence_test.sh | dryrun | the release cadence table
+tests/release/release_code_test.py | dryrun | the release code's TOTP check
+tests/release/release_homes_test.sh | dryrun | a tag is checked against the repository that built it (tools/release-homes.sh)
+tests/release/release_notes_edits_test.sh | dryrun | lines removed from a published body on purpose
+tests/release/release_provenance.py | dryrun | the gates were green on this exact code (the dry run prints the provenance line)
+tests/release/release_provenance_test.py | dryrun | the provenance reader itself
+tests/release/require_cosign_test.sh | dryrun | the release checks need the pinned cosign: a missing or unpinned one stops after-release.sh and finish-release.sh
+tests/release/resolve_release.sh | release-only | the tier, version and program lists of this tag (its table is checked by resolve_release_test.sh, which the dry run runs)
+tests/release/resolve_release_test.sh | dryrun | resolve_release.sh's table of tags
+tests/release/signature_required_check.sh | release-only | a required Windows signature never meets an unsigned build
+tests/release/signature_required_check_test.sh | dryrun | the signature check's own cases
+tests/release/smoke_linux.sh | release-only | the Linux tarball starts, answers its checks and stops cleanly (the /api/dropbox/status line is required)
+tests/release/smoke_standard_linux.py | release-only | the shipped Linux binaries run on their native architecture in scratch, with no shared libs
+tests/release/smoke_windows.ps1 | release-only | the Windows portable package and the MSI install and start (the /api/dropbox/status line is required)
+tests/release/staple_retry.sh | release-only | the macOS notarization staple retries and its guards
+tests/release/staple_retry_test.sh | dryrun | staple_retry.sh's cases, with a stand-in xcrun
+tests/release/test_release_upload_loop.sh | dryrun | the upload step, with a stand-in gh and cosign
+tests/release/trimpath_census_test.py | dryrun | every release and installer go build has -trimpath
+tests/release/update_tap_test.sh | dryrun | the cask move, in a local bare repository
+tests/release/verify_buildinfo_test.py | dryrun | verify-release reads a -trimpath build by its vcs.revision
+tests/release/verify_no_fake_identity.sh | release-only | no shipped program holds the updater rehearsal's fake identity
+tests/release/verify_notices.sh | release-only | each package's third-party notices match the binaries it ships (every module has its license file and a row)
+tests/release/verify_release_fake_identity_test.sh | dryrun | verify-release refuses a program holding the fake identity
+tests/release/verify_release_strip_test.sh | dryrun | verify-release's strip check
+tests/release/verify_standard_bundle.sh | release-only | the default package has no SQLCipher/OpenSSL payload or host crypto ABI
+tests/release/windows_build_census_test.py | dryrun | windows-tests' package build is release.yml's Windows build
+tools/sync-agent-docs.sh | release-only | the agent docs are synced (gzipped) into the embedded static directory before the build
+tools/test-macos-app.sh | release-only | the Coral.app bundle starts and answers (the macOS smoke)
