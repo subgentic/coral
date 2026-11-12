@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/internal/custommodes"
 	"github.com/subgentic/coral/internal/logsafe"
 	"log/slog"
 	"net/http"
@@ -58,8 +59,14 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "invalid JSON")
 		return
 	}
-	if body.PermissionMode != "" && body.PermissionMode != "default" {
-		errBadRequest(w, `permission_mode can only be "default"; any other mode is sent as the CLI's own flags`)
+	// A custom permission mode (#15950) is the one other value: "custom:<id>", resolved to its flags when the launch is built. An agent never starts another agent in one (it may not start a less-restricted agent, #4032).
+	_, customPick := custommodes.IDOf(body.PermissionMode)
+	if customPick && agentCaller(r) {
+		errBadRequest(w, "an agent cannot start another agent in a custom permission mode")
+		return
+	}
+	if body.PermissionMode != "" && body.PermissionMode != "default" && !customPick {
+		errBadRequest(w, `permission_mode can only be "default" or a custom mode's "custom:<id>"; any other mode is sent as the CLI's own flags`)
 		return
 	}
 	if mcpGiven(body.MCPServers) {
@@ -117,16 +124,23 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, err.Error())
 		return
 	}
+	// The gates below see what the launch will run: a custom mode's flags are added to the ones the form sent (launchSession adds them again from the stored mode, for the argv alone).
+	gateFlags := body.Flags
+	if customPick {
+		if extra, _ := h.customModeFlags(r.Context(), body.AgentType, body.PermissionMode); extra != nil {
+			gateFlags = append(append([]string{}, body.Flags...), extra...)
+		}
+	}
 	// A launch from the dashboard's own dialog that would use the new default waits for the owner's acknowledgement of the notice first (#14353); nothing is started.
-	if body.ResumeSessionID == "" && !body.KeepFullAccess {
+	if body.ResumeSessionID == "" && !body.KeepFullAccess && !customPick { // a custom mode is a mode the person named: no notice about the default
 		settings, _ := h.ss.GetSettings(r.Context())
-		if h.refuseUnseenDisclosure(w, r, launchDefaultSkips(body.AgentType, body.Flags, body.PermissionMode, settings)) {
+		if h.refuseUnseenDisclosure(w, r, launchDefaultSkips(body.AgentType, gateFlags, body.PermissionMode, settings)) {
 			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
 			return
 		}
 	}
 	// Through the Coral Hub, an agent that skips permission prompts needs the owner's local switch (#126 F4).
-	if refuseHubSkip(w, r, h.ss, hubAsksToSkip(body.AgentType, body.Flags, body.Capabilities, body.Tools, body.Hooks) || body.KeepFullAccess) { // Full access is the widest skip: through the Hub it meets the owner's switch like any other (#14193)
+	if refuseHubSkip(w, r, h.ss, hubAsksToSkip(body.AgentType, gateFlags, body.Capabilities, body.Tools, body.Hooks) || body.KeepFullAccess) { // Full access is the widest skip: through the Hub it meets the owner's switch like any other (#14193)
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
 		return
 	}
@@ -378,13 +392,14 @@ func defaultThinkingForRole(settings map[string]string, agentType, requested str
 
 // explicitDefaultMode is "default" when the request asked for it and its flags carry no permission flag of their own (the person's flags win over every mode, as ever), else "" (the launch decides as before).
 func explicitDefaultMode(requested string, flags []string) string {
-	if requested != "default" {
+	_, custom := custommodes.IDOf(requested) // a custom mode (#15950) is named the same way: "custom:<id>", resolved when the argv is built
+	if requested != "default" && !custom {
 		return ""
 	}
 	if own, _ := agent.SplitPermissionFlags(flags); len(own) > 0 {
 		return ""
 	}
-	return "default"
+	return requested
 }
 
 // launchModeOf is the mode a launch starts in explicitly: for an agent caller the one the cap granted (#14336), else the request's own explicit Default.

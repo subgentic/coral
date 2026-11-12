@@ -101,8 +101,10 @@ async function fillResumeModes(agentType) {
     const modal = document.getElementById("resume-modal"), row = document.getElementById("resume-mode-row"), sel = document.getElementById("resume-mode");
     if (!modal || !row || !sel) return;
     const { modeOffered } = await importOnce("./permission_flags.js");
+    const { syncCustomModeOptions } = await importOnce("./custom_modes.js");
     const saved = savedMode();
     sel.replaceChildren(new Option(`Saved default (${MODE_WORDS[saved] || saved})`, ""), ...Object.keys(MODE_WORDS).filter(m => modeOffered(agentType, m)).map(m => new Option(MODE_WORDS[m], m)));
+    syncCustomModeOptions(sel, agentType); // the operator's own modes for this CLI (#15950)
     sel.value = startingMode(modal.dataset.ranMode || "", modal.dataset.ranModeFrom || "");
     modal.dataset.startMode = sel.value;
     row.hidden = false;
@@ -202,7 +204,7 @@ export async function resumeLaunchNew() {
         };
         // The mode picked (the mode the chat ran in, unless the person chose another, or it is a transcript's wider one): Default is the one mode a launch names (permission_mode), the others are the CLI's own flags for it; the saved default sends nothing (#10487).
         const pick = (document.getElementById("resume-mode") || {}).value || "";
-        if (pick === "default") payload.permission_mode = "default";
+        if (pick === "default" || pick.startsWith("custom:")) payload.permission_mode = pick; // Default and a custom mode (#15950) are named; the others are the CLI's own flags
         else if (pick) { const { _getPermissionFlagsForAgentMode } = await importOnce("./permission_flags.js"); const flags = _getPermissionFlagsForAgentMode(agentType, pick).split(/\s+/).filter(Boolean); if (flags.length) payload.flags = flags; }
         if (displayName) payload.display_name = displayName;
         if (boardName) payload.board_id = payload.board_name = boardName; // rejoins that board (#3536)

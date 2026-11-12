@@ -1,6 +1,10 @@
 package settings
 
-import "math"
+import (
+	"math"
+
+	"github.com/subgentic/coral/internal/custommodes"
+)
 
 // Key names that other packages refer to by constant. They are declared here so there is one spelling.
 const (
@@ -122,7 +126,7 @@ func init() {
 	text("custom_theme", ApplyClient, "The custom theme's colours.")
 	text("default_renderer", ApplyClient, "The renderer a new terminal uses.")
 	register(Spec{Key: DefaultAgentType, Kind: KindEnum, Values: AgentTypes, Apply: ApplyLive, Doc: "The agent type a launch without one uses."})
-	register(Spec{Key: "default_permission_mode", Kind: KindEnum, Values: permissionModes, Apply: ApplyClient, Doc: "The permission mode the launch form starts with."})
+	register(Spec{Key: "default_permission_mode", Kind: KindEnum, Values: permissionModes, AlsoValid: func(v string) bool { _, ok := custommodes.IDOf(v); return ok }, Apply: ApplyClient, Doc: "The permission mode the launch form starts with."})
 	text("default_working_dir", ApplyClient, "The folder the launch form starts in.")
 	boolOff("fit_pane_width", ApplyClient, "Fit the terminal to the pane's width.")
 	boolOff("notify_needs_input", ApplyClient, "Notify when an agent needs input.")

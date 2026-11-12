@@ -13,7 +13,7 @@ import { serverFetch, boardFetch, identityKey, LOCAL_SERVER, isHub } from './ser
 const { launch } = await importOnce('./launch_state.js');
 const { goalWrite } = await importOnce('./goal_write.js');
 const { _acfServer, _effectiveServer, _settingsFor } = await importOnce('./launch_models.js');
-const { defaultPermissionMode, trackPermissionPick, _getPermissionFlagsForAgentMode, _normalizePermFlagsForAgent, _updatePermModeDescription, _hasPermFlag } = await importOnce('./permission_flags.js');
+const { customModeById, defaultPermissionMode, trackPermissionPick, _getPermissionFlagsForAgentMode, _normalizePermFlagsForAgent, _updatePermModeDescription, _hasPermFlag } = await importOnce('./permission_flags.js');
 const { _findPersona, _getSavedTeamTemplates, _upsertSavedTeamTemplates } = await importOnce('./persona_store.js');
 const { getAgentConfig, renderAgentConfigForm, setAgentConfig, resetProviderChoices } = await importOnce('./agent_config_form.js');
 const { markFieldInvalid, _launchBlocked, _launchOn, _onServerSuffix, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, hideLaunchModal, showTeamLaunchFailures } = await importOnce('./launch_core.js');
@@ -817,6 +817,13 @@ async function launchTeam() {
         // A member whose mode is Default says so (#10362): its form sends no flag for Default, the same request as "nothing chosen", which starts in the saved default or Auto.
         const modeWasPicked = row.dataset.permissionExplicit === '1' || document.getElementById(acfId)?.querySelector('.acf-permission-mode')?.dataset.pickedByPerson === '1';
         if (config.permissionMode === 'default' && (modeWasPicked || teamPermMode === 'default') && !(config.flags && _hasPermFlag(config.flags))) agent.permission_mode = 'default';
+        // A custom mode (#15950): the member's own pick, else the team's when it is for this member's CLI; named, and the server adds its flags.
+        else if (!(config.flags && _hasPermFlag(config.flags))) {
+            const own = String(config.permissionMode || '').startsWith('custom:') && modeWasPicked ? config.permissionMode : '';
+            const team = !own && teamPermMode.startsWith('custom:') && !modeWasPicked ? teamPermMode : '';
+            const pick = own || team, m = pick && customModeById(pick), type = config.agentType || agentType;
+            if (m && String(m.agent_type).replace(/^(antigravity|gemini)$/, 'agy') === String(type).replace(/^(antigravity|gemini)$/, 'agy')) agent.permission_mode = pick;
+        }
         agents.push(agent);
     }
 

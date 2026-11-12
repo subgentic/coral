@@ -140,6 +140,7 @@ GET /api/chief/triggers never
 GET /api/cloud/owner-label never
 GET /api/cloud/status never
 GET /api/custom-models view
+GET /api/custom-modes view
 GET /api/dropbox/artifact/{digest} never
 GET /api/dropbox/removals never
 GET /api/dropbox/share/{digest} never
@@ -553,6 +554,7 @@ PUT /api/cloud/hub-relaunch never
 PUT /api/cloud/max-mode never
 PUT /api/cloud/redact-tokens never
 PUT /api/custom-models launch
+PUT /api/custom-modes launch
 PUT /api/dropbox/app-key never
 PUT /api/dropbox/autosync never
 PUT /api/dropbox/filters never

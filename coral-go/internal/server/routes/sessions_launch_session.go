@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/internal/custommodes"
 	"log"
 	"log/slog"
 	"os"
@@ -170,6 +171,19 @@ func (h *SessionsHandler) launchSession(ctx context.Context, spec launchSpec) (_
 		CoralPort:      h.cfg.Port,
 		RunTag:         h.runTagFor(ctx, sessionID, "", spec.ResumeSessionID),
 	}
+	// A custom permission mode (#15950): its flags are added in place of a built-in mode's, checked again here; the mode is recorded under its own name so a restart and a wake keep it, and one that is gone
+	// launches as Default with a note, never a failed launch.
+	recordedMode, customNote := launchMode, ""
+	if _, isCustom := custommodes.IDOf(launchMode); isCustom {
+		var extra []string
+		extra, customNote = h.customModeFlags(ctx, agentType, launchMode)
+		launchMode, launchParams.PermissionMode = "default", "default"
+		if extra != nil {
+			launchParams.Flags = append(append([]string{}, launchParams.Flags...), extra...)
+		} else {
+			recordedMode = "default"
+		}
+	}
 	if agentType == at.Hermes && launchMode == "bypassPermissions" { // Hermes's adapter does not read the mode: Bypass is its --yolo flag, unless the flags already carry a permission flag of their own (#14336)
 		if carried, _ := agent.SplitPermissionFlags(launchParams.Flags); len(carried) == 0 {
 			launchParams.Flags = append(append([]string{}, launchParams.Flags...), agent.PermissionFlagsForAgent(at.Hermes, launchMode)...)
@@ -235,8 +249,8 @@ func (h *SessionsHandler) launchSession(ctx context.Context, spec launchSpec) (_
 		Tools:         store.MarshalCapabilities(spec.Tools),
 		PID:           shellPID,
 		PermissionMode: func() *string {
-			if launchParams.PermissionMode != "" && agent.ValidPermissionMode(launchParams.PermissionMode) {
-				return &launchParams.PermissionMode
+			if recordedMode != "" && agent.ValidPermissionMode(recordedMode) {
+				return &recordedMode
 			}
 			return nil
 		}(),
@@ -254,16 +268,20 @@ func (h *SessionsHandler) launchSession(ctx context.Context, spec launchSpec) (_
 	if displayName != "" {
 		h.ss.SetDisplayName(ctx, sessionID, displayName)
 	}
-	return map[string]any{
+	reply := map[string]any{
 		"ok": true, "session_id": sessionID, "session_name": sessionName,
 		"agent_type": agentType, "working_dir": absDir,
-		"display_name":    displayName,                         // numbered when the role was taken on the board (#3543)
-		"permission_mode": effectivePermissionMode(launchMode), // the mode the agent started in (#14353)
+		"display_name":    displayName,                           // numbered when the role was taken on the board (#3543)
+		"permission_mode": effectivePermissionMode(recordedMode), // the mode the agent started in (#14353); a custom mode's own name
 		"log_file":        logFile, "launch_path": backend,
 		// launch_path names the launch path (the stored label, live sessions' launch_path) and reads as "pty" even for a tmux session: it means "through the
 		// TerminalBackend". terminal names what the session actually runs on. It was called "backend" until #6146, which read as the terminal.
 		"terminal": terminalKind(h.backend),
-	}, nil
+	}
+	if customNote != "" {
+		reply["custom_mode_note"] = customNote // shown to the person: the mode they picked is gone
+	}
+	return reply, nil
 }
 
 // signInProbed holds the Claude CLIs (by path) whose sign-in was asked about after a launch in this process.

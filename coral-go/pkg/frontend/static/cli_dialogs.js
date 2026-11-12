@@ -130,6 +130,7 @@ async function _recheckCLI(button, modal, agentType, server, close, retry) {
 // Claude's Default asks before it acts, which is not the saved default's launch: that one keeps its question.
 function _checkPermissionFlag(flagsStr, agentType, server = LOCAL_SERVER, picked = '') {
     if (picked === 'default' && agentType === 'codex') return Promise.resolve('skip');
+    if (String(picked).startsWith('custom:')) return Promise.resolve('skip'); // a custom mode (#15950) is a mode the person named: the server adds its flags, and nothing here asks to widen it
     const mode = defaultPermissionMode(_settingsFor(server), agentType);
     const permFlag = _getPermissionFlagsForAgentMode(agentType, mode);
     if (!permFlag) return Promise.resolve('skip');
