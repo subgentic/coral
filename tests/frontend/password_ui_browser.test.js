@@ -173,7 +173,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(out.laterButton, false, 'no Not now button'); assert.deepEqual(out.buttons, ['Set password'], 'the one action is the only button');
         assert.equal(out.openAfterEscape, true, 'Escape does not close it: a password is always created'); assert.ok(out.askedDespiteFlags, 'an old Not now flag does not keep the prompt away'); assert.ok(out.remoteAsked, 'another computer is asked too');
         assert.match(out.fail.err, /disk full/, 'the server\'s words'); assert.equal(out.fail.btn, 'Retry', 'a button to try again (the census: a button that retries says Retry)'); assert.ok(out.fail.enabled);
-        assert.equal(out.fail.note, 'If this keeps failing, run coral reset-password in a terminal on this computer.', 'and where to go if it keeps failing');
+        assert.equal(out.fail.note, 'If this keeps failing, see the password recovery documentation below.', 'and where to go if it keeps failing');
         assert.deepEqual(out.fail.buttons, ['Retry'], 'no way out beside it'); assert.ok(out.fail.stillOpen, 'Escape does not close it');
         assert.deepEqual(out.optionalButtons, ['Cancel', 'Set password'], 'opened on purpose it has a Cancel'); assert.ok(out.optionalEscape && out.optionalCancel, 'and Escape and Cancel close it');
         assert.ok(out.closedOn409);
