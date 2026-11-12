@@ -83,7 +83,7 @@ func chooseUpdateItem(a updateAnswer, askErr error, st updaterStatus, stErr erro
 	}
 	title := fmt.Sprintf("Update to v%s available", a.Latest)
 	if st.NotPromoted { // approved, but no promotion yet: the item says so, and does not offer what cannot be installed (#15768)
-		title = fmt.Sprintf("v%s is approved but not promoted yet: run Promote release", a.Latest)
+		title = fmt.Sprintf("v%s is out; Coral can install it once it is signed for updates", a.Latest)
 	}
 	return updateChoice{Show: true, Title: title, Pane: st.Enabled, Page: a.pageURL(), Version: a.Latest, Channel: string(a.channelOf())}
 }

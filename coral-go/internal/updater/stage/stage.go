@@ -307,7 +307,8 @@ func (c *checker) run(ctx context.Context) Result {
 		c.save()
 		c.res.Result = ResultUpToDate
 		if cerr == nil && c.newerReleaseIsOut() {
-			c.res.Result = ResultNotPromoted // the newest promotion is no newer than this install, but a newer release is out and has none: it is not "up to date" (#15768: v2.0.66 Latest, newest promotion v2.0.64, installed 2.0.65)
+			log.Printf("[update] v%s is out and not promoted: run Promote release", c.newest) // the release owner's line; the person sees the plain words
+			c.res.Result = ResultNotPromoted                                                  // the newest promotion is no newer than this install, but a newer release is out and has none: it is not "up to date" (#15768: v2.0.66 Latest, newest promotion v2.0.64, installed 2.0.65)
 		}
 		return c.res
 	}

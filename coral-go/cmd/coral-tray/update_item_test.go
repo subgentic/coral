@@ -49,7 +49,7 @@ func TestTheItemSaysWhatTheTwoAnswersSayAndNothingElse(t *testing.T) {
 		"the update check cannot be asked":                {aerr: errors.New("connection refused"), st: updaterStatus{FeatureOn: true, Enabled: true}},
 		"the status cannot be asked":                      {a: approvedAnswer("1.4.157"), sterr: errors.New("connection refused")},
 		"an Agentic release that is not approved":         {a: unapproved, st: updaterStatus{FeatureOn: true, Enabled: true}},
-		"approved but the check found no promotion of it": {a: approvedAnswer("2.0.66"), st: updaterStatus{FeatureOn: true, Enabled: true, NotPromoted: true}, show: true, pane: true, title: "v2.0.66 is approved but not promoted yet: run Promote release", page: "https://github.com/subgentic/coral/releases"},
+		"approved but the check found no promotion of it": {a: approvedAnswer("2.0.66"), st: updaterStatus{FeatureOn: true, Enabled: true, NotPromoted: true}, show: true, pane: true, title: "v2.0.66 is out; Coral can install it once it is signed for updates", page: "https://github.com/subgentic/coral/releases"},
 		"an approved release on the Agentic channel":      {a: agentic, st: updaterStatus{FeatureOn: true}, show: true, title: "Update to v1.4.158 available", page: "https://github.com/subgentic/coral/releases/tag/v1.4.158", agentc: true},
 	} {
 		c := chooseUpdateItem(tc.a, tc.aerr, tc.st, tc.sterr)
