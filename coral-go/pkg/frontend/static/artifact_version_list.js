@@ -9,6 +9,8 @@ const { loadStyles } = await importOnce('./lazy_styles.js');
 const shown = t => markHidden(String(t || ''), { strict: true }).trim();
 const when = iso => { const t = new Date(iso); return Number.isNaN(t.getTime()) ? '' : t.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }); };
 
+const madeByYou = v => v.role === 'operator' || v.source === 'edit'; // the person's own: an upload as the Operator or an edit in the dashboard (#15329, #15369); one test for the series and the fallback list
+
 /** The versions of the file the row stands for, oldest first: [{ n, hex, at, who, current }]. The server's series when it has one, else the older uploads of the same file the row already holds (`earlier`) and itself. */
 export async function versionsOf({ hex, server, board, current, earlier }) {
     try {
@@ -17,12 +19,12 @@ export async function versionsOf({ hex, server, board, current, earlier }) {
             const d = await r.json();
             if (Array.isArray(d) && d.length > 1) {
                 const rows = d.slice().sort((a, b) => a.version - b.version);
-                return rows.map((v, i) => ({ n: v.version, hex: v.digest, at: v.at, who: v.edited_in_dropbox ? 'Edited in Dropbox' : v.role || v.uploader || '', you: v.role === 'operator' || v.source === 'edit', current: i === rows.length - 1 }));
+                return rows.map((v, i) => ({ n: v.version, hex: v.digest, at: v.at, who: v.edited_in_dropbox ? 'Edited in Dropbox' : v.role || v.uploader || '', you: madeByYou(v), current: i === rows.length - 1 }));
             }
         }
     } catch { /* no series: the row's own older uploads below */ }
     const all = [...(earlier || []), current].filter(Boolean).sort((a, b) => String(a.created_at || a.at || '').localeCompare(String(b.created_at || b.at || '')));
-    return all.map((v, i) => ({ n: i + 1, hex: v.hex, at: v.created_at || v.at || '', who: v.produced_by || v.role || '', you: v.role === 'operator', current: i === all.length - 1 }));
+    return all.map((v, i) => ({ n: i + 1, hex: v.hex, at: v.created_at || v.at || '', who: v.produced_by || v.role || '', you: madeByYou(v), current: i === all.length - 1 }));
 }
 
 /** Open the list. opts: { hex, server, board, name, current, earlier, open(version), restore?(version) } where restore resolves when the uploader was asked. */
