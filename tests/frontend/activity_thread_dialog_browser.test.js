@@ -24,6 +24,7 @@ const BASE = require('./test_base').BASE;
             window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
                 if (u.pathname === '/api/activity') return json({ actions: window.__activityRows, check: { intact: true, rows: window.__activityRows.length } });
                 if (u.pathname === '/api/board/tm/messages/all') return json({ messages: window.__noThread ? [] : window.__messages, total: 4, limit: 200, offset: 0 });
+                if (u.pathname === '/api/upload') { window.__uploads = (window.__uploads || 0) + 1; return json({ path: '/tmp/up/pic.png', filename: 'pic.png' }); }
                 if (u.pathname === '/api/board/tm/messages' && opts.method === 'POST') { const b = JSON.parse(opts.body); window.__posts.push(b); return json({ id: 11 }); }
                 return original(url, opts); };
             localStorage.removeItem('coral-inbox-activity-filters');
@@ -50,9 +51,25 @@ const BASE = require('./test_base').BASE;
         assert.ok(v3.attach && v3.hint && v3.reply && v3.mineRight, JSON.stringify(v3));
         assert.equal(v3.buttons[v3.buttons.length - 1], 'Send reply', 'Send reply is the last, right-most button: ' + JSON.stringify(v3.buttons));
         await shot('activity-thread-1280');
+        // images in the reply (#15774): with the asking agent running the picture goes up and its path leads the reply; with it not running, a toast says so and nothing is uploaded or sent
+        const pickImage = () => ev(`(async () => { const c = document.createElement('canvas'); c.width = 8; c.height = 8; c.getContext('2d').fillRect(0, 0, 8, 8); const blob = await new Promise(r => c.toBlob(r, 'image/png')); const dt = new DataTransfer(); dt.items.add(new File([blob], 'pic.png', { type: 'image/png' })); const i = document.querySelector('dialog.activity-thread-dialog input[type=file]'); i.files = dt.files; i.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+        await ev(`window.__uploads = 0; true`);
+        await pickImage();
+        await new Promise(r => setTimeout(r, 600)); // sleep-ok: a refusal draws nothing to wait for
+        assert.equal(await ev(`window.__uploads`), 0, 'no agent running: nothing is uploaded');
+        assert.equal(await ev(`document.querySelectorAll('dialog.activity-thread-dialog .image-attachment').length`), 0, 'and no picture is attached');
+        assert.equal(await ev(`window.__posts.length`), 0, 'and nothing is sent');
+        await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.liveSessions = [...(m.state.liveSessions || []), { name: 'Ada', display_name: 'Ada', session_id: 'sid-ada', agent_type: 'claude', type: 'live' }]; return true; })`);
+        await pickImage();
+        await waitFor(`document.querySelectorAll('dialog.activity-thread-dialog .image-attachment').length === 1`, 'the agent is running: the picture is attached', 8000);
+        assert.equal(await ev(`window.__uploads`), 1, 'it was uploaded once');
+        await ev(`document.querySelector('.activity-thread-send').click(); true`);
+        await waitFor(`window.__posts.length === 1`, 'the reply with the picture is sent', 8000);
+        assert.match(await ev(`window.__posts[0].content`), /^@Ada .*\/tmp\/up\/pic\.png/s, 'the picture\'s path leads the reply, to the agent');
+        await ev(`window.__posts.length = 0; true`);
         await ev(`(() => { const t = document.querySelector('.activity-thread-box'); t.value = 'Yes, and tag it v2.'; t.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('.activity-thread-send').click(); return true; })()`);
-        await waitFor(`window.__posts.length === 1 && document.querySelectorAll('.activity-thread-msg').length === 4`, 'the reply is sent and joins the thread', 8000);
-        assert.deepEqual(await ev(`window.__posts`), [{ subscriber_id: 'Operator', as: 'Operator', content: '@Ada Yes, and tag it v2.', reply_to: 9 }], 'sent into the same thread, to the last message');
+        await waitFor(`window.__posts.length === 1 && document.querySelectorAll('.activity-thread-msg').length === 5`, 'the reply is sent and joins the thread', 8000);
+        assert.deepEqual(await ev(`window.__posts`), [{ subscriber_id: 'Operator', as: 'Operator', content: '@Ada Yes, and tag it v2.', reply_to: 11 }], 'sent into the same thread, to the last message (the picture reply before it)');
         assert.equal(await ev(`document.querySelector('.activity-thread-box').value`), '', 'the box is empty again');
         await ev(`[...document.querySelectorAll('.activity-thread-actions .btn')].find(b => b.textContent.trim() === 'Close').click(); true`);
         await waitFor(`!document.querySelector('dialog.activity-thread-dialog')`, 'Close shuts it');
