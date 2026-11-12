@@ -138,7 +138,7 @@ func (h *ResourceQueueAnalyticsHandler) Read(w http.ResponseWriter, r *http.Requ
 		commentRefuse(w, http.StatusForbidden, "not_through_hub", "the resource queue's analytics are on this computer only")
 		return
 	}
-	if !operatorOnly(w, r) {
+	if !operatorOnlyRead(w, r) {
 		return
 	}
 	days := 7

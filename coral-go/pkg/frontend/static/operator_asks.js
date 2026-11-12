@@ -74,7 +74,7 @@ export function refreshOperatorAsks(force = false) {
     const readAsks = async server => {
         try {
             const r = await serverFetch(server === LOCAL_SERVER ? undefined : server, '/api/operator-asks');
-            if (!r.ok) { readOutcome('questions', server, false); return r.status === 401 || r.status === 403 ? [] : null; } // access taken away (401, 403): none drawn, and the note says so; anything else keeps the rows
+            if (!r.ok) { readOutcome('questions', server, false, r.status === 401 || r.status === 403); return r.status === 401 || r.status === 403 ? [] : null; } // access taken away (401, 403): none drawn, and the note says so; anything else keeps the rows
             const rows = await r.json();
             if (!Array.isArray(rows)) { readOutcome('questions', server, false); return null; }
             readOutcome('questions', server, true);

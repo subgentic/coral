@@ -327,6 +327,7 @@ node agent_list_starting.test.mjs
 node bare_api_fetch_census.test.mjs
 node inbox_servers_read.test.mjs
 node inbox_activity_computers.test.mjs
+node needs_questions_refused.test.mjs
 node proposals_state_hub.test.mjs
 node proposals_actions_hub.test.mjs
 node inbox_artifacts_loading.test.mjs

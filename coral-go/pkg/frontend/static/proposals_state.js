@@ -35,7 +35,7 @@ export function refreshProposals(force = false) {
             const settled = await Promise.all(sources.map(async server => {
                 try {
                     const r = await serverFetch(server, '/api/proposals?state=pending,approving,expired');
-                    if (!r.ok) { readOutcome('proposals', server, false); return r.status === 401 || r.status === 403 ? { server, rows: [], refused: true } : { server, keep: true }; } // access was taken away (401, 403): no rows, and the note says so (#13454, #13841); a missing route (404), a server error, a failure or a bad body keeps the rows
+                    if (!r.ok) { readOutcome('proposals', server, false, r.status === 401 || r.status === 403); return r.status === 401 || r.status === 403 ? { server, rows: [], refused: true } : { server, keep: true }; } // access was taken away (401, 403): no rows, and the note says so (#13454, #13841); a missing route (404), a server error, a failure or a bad body keeps the rows
                     const got = (await r.json()).proposals;
                     if (!Array.isArray(got)) { readOutcome('proposals', server, false); return { server, keep: true }; }
                     readOutcome('proposals', server, true);

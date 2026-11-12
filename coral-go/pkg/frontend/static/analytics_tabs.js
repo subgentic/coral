@@ -14,6 +14,7 @@ import { importOnce } from './import_once.js';
 await loadStyles('analytics_tabs.css');
 const V = await importOnce('./analytics_viz.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 const D = await importOnce('./analytics_tabs_data.js');
+const { machineChoices, machineLabel, machineNow, machineOnline, pickMachine, MACHINE_EVENT } = await importOnce('./analytics_machine.js'); // which computer these tabs read (#15730)
 const Q = await importOnce('./analytics_queue.js'); // the Resource queue view (#13671) // not in the start's stylesheet: it arrives before the page is drawn (#10706)
 const { el } = V;
 const TEAM_KEY = 'coral-activity-team';
@@ -29,6 +30,7 @@ const tabs = {
     [RQ]: { range: '7d', data: null, status: 'loading', seq: 0 }, // the resource queue (#13671): this computer's, no team
 };
 const hosts = {};
+const MACHINE_TABS = new Set(['usage', IVC, RQ]); // the tabs that read one computer's numbers; Operator interaction and Team communication follow the team, which names its computer
 let boards = { keys: [], at: 0 };
 
 /** The teams the person can look at on this computer (and, through a Hub, on its computers): the agents' teams and every team with a board. */
@@ -62,26 +64,29 @@ export async function showTab(key, host, force = false) {
 }
 
 async function load(key) {
-    const m = tabs[key], seq = ++m.seq;
+    const m = tabs[key], seq = ++m.seq, server = machineNow(); // the computer picked on a Hub-served dashboard (this one otherwise, #15730)
     m.status = m.data ? 'ok' : 'loading'; m.stale = false;
     try {
         if (key === 'usage') {
             const days = D.daysOf(m.range), since = new Date(Date.parse(todayUTC() + 'T00:00:00Z') - (2 * days - 1) * 86400000).toISOString();
-            const r = await serverFetch('local', `/api/token-usage/timeseries?since=${encodeURIComponent(since)}&interval=1d&group_by=${encodeURIComponent(m.group)}`);
+            if (!machineOnline(server)) { m.status = 'offline'; m.data = null; draw(key); return; }
+            const r = await serverFetch(server, `/api/token-usage/timeseries?since=${encodeURIComponent(since)}&interval=1d&group_by=${encodeURIComponent(m.group)}`);
             if (seq !== m.seq) return;
             if (!r.ok) throw new Error(String(r.status));
             m.data = (await r.json()).buckets || []; m.status = 'ok'; m.day = -1; m.turns = null;
         } else if (key === RQ) {
-            const r = await serverFetch('local', `/api/analytics/resource-queue?days=${D.daysOf(m.range)}`);
+            if (!machineOnline(server)) { m.status = 'offline'; m.data = null; draw(key); return; }
+            const r = await serverFetch(server, `/api/analytics/resource-queue?days=${D.daysOf(m.range)}`);
             if (seq !== m.seq) return;
-            if (r.status === 401 || r.status === 403 || r.status === 404) { m.status = 'guest'; m.data = null; draw(key); return; }
+            if (r.status === 401 || r.status === 403 || r.status === 404) { m.status = server === 'local' ? 'guest' : 'refused'; m.data = null; draw(key); return; }
             if (!r.ok) throw new Error(String(r.status));
             m.data = await r.json(); m.status = 'ok';
         } else if (key === IVC) {
             const team = m.team ? splitKey(m.team).name : '';
-            const r = await serverFetch('local', `/api/analytics/inbox-vs-chat?days=${D.daysOf(m.range)}${team ? `&team=${encodeURIComponent(team)}` : ''}`);
+            if (!machineOnline(server)) { m.status = 'offline'; m.data = null; draw(key); return; }
+            const r = await serverFetch(server, `/api/analytics/inbox-vs-chat?days=${D.daysOf(m.range)}${team ? `&team=${encodeURIComponent(team)}` : ''}`);
             if (seq !== m.seq) return;
-            if (r.status === 401 || r.status === 403) { m.status = 'guest'; m.data = null; draw(key); return; }
+            if (r.status === 401 || r.status === 403 || (r.status === 404 && server !== 'local')) { m.status = server === 'local' ? 'guest' : 'refused'; m.data = null; draw(key); return; }
             if (!r.ok) throw new Error(String(r.status));
             m.data = await r.json(); m.status = 'ok';
         } else {
@@ -102,6 +107,7 @@ const reload = (key) => { const m = tabs[key]; m.data = null; m.status = 'loadin
 
 function filterBar(key) {
     const m = tabs[key], bar = el('div', 'atab-filters');
+    if (MACHINE_TABS.has(key) && machineChoices().length > 1) bar.append(V.selectField('Computer', machineChoices().map(id => [id, machineLabel(id) + (machineOnline(id) ? '' : ' (offline)')]), machineNow(), v => pickMachine(v)));
     bar.append(V.selectField('Period', D.RANGES, m.range, v => { m.range = v; reload(key); }));
     if (key === RQ) {
         // the period alone: the queue is this computer's, not a team's
@@ -122,9 +128,11 @@ function draw(key) {
     const host = hosts[key]; if (!host || !host.isConnected) return;
     const m = tabs[key], root = el('div', 'atab' + (phone() ? ' atab-phone' : ''));
     root.append(filterBar(key));
-    if (m.status === 'guest') root.append(say(key === IVC ? INBOX_GUEST_LINE : key === RQ ? Q.QUEUE_GUEST_LINE : GUEST_LINE));
+    if (m.status === 'offline') root.append(say(`${machineLabel(machineNow())} is offline, so its numbers cannot be read.`));
+    else if (m.status === 'refused') root.append(say(`${machineLabel(machineNow())} would not give these numbers. It may be an older Coral that needs an update, or you may only be a guest there.`));
+    else if (m.status === 'guest') root.append(say(key === IVC ? INBOX_GUEST_LINE : key === RQ ? Q.QUEUE_GUEST_LINE : GUEST_LINE));
     else if (m.status === 'noteam') root.append(say('No team has a board yet. Start a team and its numbers appear here.'));
-    else if (m.status === 'error') { const p = say('This could not be read.'); const b = el('button', 'btn btn-small', 'Retry'); b.type = 'button'; b.addEventListener('click', () => reload(key)); p.append(' ', b); root.append(p); }
+    else if (m.status === 'error') { const p = say(machineNow() === 'local' ? 'This could not be read.' : `${machineLabel(machineNow())} could not be read.`); const b = el('button', 'btn btn-small', 'Retry'); b.type = 'button'; b.addEventListener('click', () => reload(key)); p.append(' ', b); root.append(p); }
     else if (!m.data) root.append(say('Loading…'));
     else root.append(...({ usage: drawUsage, operator: drawOperator, [IVC]: drawInbox, comm: drawComm, [RQ]: mm => Q.drawQueue(mm.data, phone()) }[key])(m));
     const focus = host.contains(document.activeElement) ? document.activeElement.getAttribute('aria-label') : null;
@@ -173,7 +181,7 @@ async function loadTurns(agent, day) {
     const m = tabs.usage;
     m.turns = { agent, day, rows: null }; draw('usage');
     try {
-        const r = await serverFetch('local', `/api/token-usage/turns?agent=${encodeURIComponent(agent)}&since=${encodeURIComponent(day + 'T00:00:00.000Z')}&until=${encodeURIComponent(new Date(Date.parse(day + 'T00:00:00Z') + 86400000).toISOString())}&order=cost&limit=8`);
+        const r = await serverFetch(machineNow(), `/api/token-usage/turns?agent=${encodeURIComponent(agent)}&since=${encodeURIComponent(day + 'T00:00:00.000Z')}&until=${encodeURIComponent(new Date(Date.parse(day + 'T00:00:00Z') + 86400000).toISOString())}&order=cost&limit=8`);
         if (!r.ok) throw new Error(String(r.status));
         const rows = (await r.json()).turns || [];
         if (m.turns && m.turns.agent === agent && m.turns.day === day) m.turns.rows = rows;
@@ -284,3 +292,6 @@ function drawComm(m) {
 // A new team, a changed range or a refresh of the page reads again.
 document.addEventListener('cost-view-change', () => { for (const k of Object.keys(tabs)) tabs[k].stale = true; });
 window.addEventListener('resize', () => { for (const k of Object.keys(tabs)) if (hosts[k] && hosts[k].isConnected && hosts[k].offsetParent) draw(k); });
+
+// A different computer was picked: what the three tabs hold belongs to the other one, so it is dropped and the open tabs read again (#15730).
+document.addEventListener(MACHINE_EVENT, () => { for (const key of MACHINE_TABS) { const m = tabs[key]; m.data = null; m.status = 'loading'; m.day = -1; m.turns = null; if (hosts[key]?.isConnected) { draw(key); load(key); } } });

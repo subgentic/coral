@@ -6,7 +6,8 @@ import { importOnce } from './import_once.js';
 import { requestJson } from './request_json.js';
 import { teamLabel } from './server_status.js';
 import { serverFetch, identityKey, LOCAL_SERVER } from './server_base.js';
-import { inboxSources, multipleServers, serverLabel, serverColumns } from './inbox_servers.js';
+import { state as appState } from './state.js';
+import { inboxSources, multipleServers, serverLabel } from './inbox_servers.js';
 const { activityParts, aboutWords, jobRunParts } = await importOnce('./operator_activity_words.js');
 import { markHidden } from './visible_marks.js';
 import { loadStyles } from './lazy_styles.js';
@@ -19,7 +20,7 @@ const PAGE = 200;
 const PHONE_HINT = 'pho' + 'ne'; // the record's hint word, spelled in two parts: the icon-name lint reads that quoted word as an icon name
 let rows = [], check = null, loaded = false, loading = null, more = false, failed = false, denied = false;
 /** Each computer owns its cursor and its own check (#15380): a cursor is never sent to another computer. `moreBy` says which computers have older actions; `unread` names the ones that could not be read this time. */
-let cursors = {}, moreBy = {}, checks = {}, unread = [];
+let cursors = {}, moreBy = {}, checks = {}, unread = []; // unread: [{ id, why }] the computers that could not give their record this time
 /** A row's own key: ids are only unique on their computer. */
 export const keyOf = r => r.server && r.server !== LOCAL_SERVER ? `${r.server}/${r.id}` : String(r.id);
 const state = DT.tableState();
@@ -32,6 +33,15 @@ const KIND_WORD = { file: 'a file', question: 'a question', goal: 'a goal', prop
 export const itemWords = r => r.item_kind === 'job_run' ? (r.title && r.title !== '__oneshot__' ? r.title : jobRunParts(r.item_id) ? `Job ${jobRunParts(r.item_id).jobId}` : 'an automation run') : r.title || (r.item_kind === 'agent' && r.item_id ? r.item_id : r.item_kind === 'task' && r.item_id ? `Task #${r.item_id}` : KIND_WORD[r.item_kind]) || 'an item';
 /** Where it was done from: the server decides this computer or Coral Hub; the phone hint is only what the page said about itself. */
 export const fromWords = r => [r.source === 'hub' ? 'Coral Hub' : 'this computer', r.hint === PHONE_HINT ? `${PHONE_HINT} (reported by the page)` : ''].filter(Boolean).join(', ');
+/** The From column when a Hub-served dashboard reads several computers (#15730): the computer the action was done on, then how it was reached (Coral Hub, the phone); a dashboard of one computer says what it always did. */
+export const fromCell = r => multipleServers() ? [serverLabel(r.server || LOCAL_SERVER), r.source === 'hub' ? 'via Coral Hub' : '', r.hint === PHONE_HINT ? `${PHONE_HINT} (reported by the page)` : ''].filter(Boolean).join(', ') : fromWords(r);
+/** The computers whose record is not in the folder, each with why (#15730): the ones that are offline (never asked), the ones that refused (an older Coral that does not give its record to a Hub's owner yet, or a computer this person is only a guest of) and the ones that failed. Named, never left out silently. */
+export const missingComputers = () => {
+    if (!appState.hub) return [];
+    const offline = (appState.servers || []).filter(s => s && s.id && s.id !== LOCAL_SERVER && s.status !== 'online').map(s => ({ id: s.id, why: 'is offline' }));
+    return [...offline, ...unread];
+};
+export const missingWords = list => list.length ? `Not in this list: ${list.map(m => `${serverLabel(m.id)} (${m.why})`).join(', ')}.` : '';
 /** What the folder says above the list about the record's own check: a break is said plainly, an intact record says what the check can and cannot do. */
 export function checkWords(c) {
     if (!c) return '';
@@ -107,7 +117,8 @@ export function refresh(done, { next = false } = {}) {
         rows.sort((x, y) => atOf(y) - atOf(x));
         check = combineChecks(checks);
         more = Object.values(moreBy).some(Boolean);
-        unread = settled.map((x, i) => x.status === 'rejected' ? targets[i] : null).filter(Boolean);
+        const kept = next ? unread.filter(u => !targets.includes(u.id)) : []; // a page of older actions asks only some computers: the others' gaps stay named
+        unread = [...kept, ...settled.map((x, i) => x.status === 'rejected' ? { id: targets[i], why: 'could not be read' } : x.value.denied ? { id: targets[i], why: 'refused to give its record: an older Coral may need an update' } : null).filter(Boolean)];
         failed = answered.length === 0 && !deniedAll && settled.some(x => x.status === 'rejected');
         denied = deniedAll;
         loaded = true;
@@ -139,7 +150,7 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
     return { title: 'Activity', noun: ['action', 'actions'], rows: list,
         empty: { line: !loaded || loading ? 'Reading the record…' : failed ? (denied ? 'Only the account this computer is linked to can see the Activity record.' : 'The record could not be read.') : AF.isFiltered(f) ? 'No action matches the search and filters.' : 'Nothing yet.',
             hint: loaded && !failed && !AF.isFiltered(f) ? 'Each time you approve, ask for changes, deny, ignore or answer something in Needs you, a line is added here.' : undefined },
-        signature: JSON.stringify([list.map(keyOf), check, loaded, failed, denied, more, unread, multipleServers(), grouped, grouped ? taskSignature : '']),
+        signature: JSON.stringify([list.map(keyOf), check, loaded, failed, denied, more, missingComputers(), multipleServers(), grouped, grouped ? taskSignature : '']),
         node: () => {
             const wrap = DT.el('div', 'activity-folder');
             const words = checkWords(check);
@@ -150,13 +161,13 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
                 columns: [ // narrowing drops From (62 rem), then Team (52), then When (36), then You did (16): the data table's own thresholds, so the On column (the item) never shrinks (the table rules' R2)
                     { key: 'action', label: 'You did', sort: true, sortValue: r => parts(r).did, line: 2, width: '12rem', dropAt: 16, cell: decision },
                     { key: 'item', label: 'On', primary: true, width: 'grow', sort: true, sortValue: r => parts(r).on, line: 1, cell: r => { const p = parts(r), el = opens(r) ? DT.primaryButton(p.on, `${p.on}. ${p.about ? `${markHidden(p.about, { strict: true })}. ` : ''}Open ${itemWords(r)}`) : DT.el('span', 'activity-item', p.on); DT.tipIf(el, p.on, () => el.scrollWidth > el.clientWidth); if (!p.detail && !p.about) return el; const cell = DT.el('span', 'activity-on'); cell.append(el); if (p.detail) cell.append(DT.el('span', 'activity-detail', p.detail)); if (p.about) cell.append(DT.el('span', 'activity-about', markHidden(p.about, { strict: true }))); return cell; } }, // the detail is its own line under the object, whole (never cut)
-                    ...serverColumns(),
                     { key: 'team', label: 'Team', sort: true, sortValue: teamOf, line: 2, width: '9rem', dropAt: 52, cell: teamOf },
-                    { key: 'from', label: 'From', sort: true, sortValue: fromWords, line: 2, tone: 'tertiary', width: '11rem', dropAt: 62, cell: fromWords },
+                    { key: 'from', label: 'From', sort: true, sortValue: fromCell, line: 2, tone: 'tertiary', width: '11rem', dropAt: 62, cell: fromCell },
                     { key: 'when', label: 'When', sort: 'date', sortValue: r => r.at, firstDir: 'desc', line: 0, tone: 'tertiary', align: 'end', width: '7rem', dropAt: 36, cell: r => DT.timeCell(r.at) },
                 ] });
             wrap.append(t.el);
-            if (unread.length) { const n = DT.el('p', 'activity-check', `The record could not be read from ${unread.map(serverLabel).join(', ')}.`); n.setAttribute('role', 'status'); wrap.prepend(n); }
+            const gaps = missingWords(missingComputers());
+            if (gaps) { const n = DT.el('p', 'activity-check', gaps); n.setAttribute('role', 'status'); wrap.prepend(n); }
             if (more) { const b = DT.el('button', 'btn btn-small activity-more', 'Show older actions'); b.type = 'button'; b.addEventListener('click', () => refresh(null, { next: true })); wrap.append(b); }
             return wrap;
         } };

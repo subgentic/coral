@@ -1,4 +1,4 @@
-import { multipleServers, serverColumns, serverMatches, syncServerField, serverLabel as pagingServerLabel, serverOf, inboxSources } from './inbox_servers.js';
+import { multipleServers, serverColumns, serverMatches, syncServerField, serverLabel as pagingServerLabel, serverOf, inboxSources, serverChoices } from './inbox_servers.js';
 import { onAccountForgotten } from './local_store.js';
 import { keepMenuOnScreen } from './menu_fit.js';
 import { rememberFocus } from './dom_morph.js';
@@ -786,7 +786,7 @@ function inboxGoalsToolbar() {
     });
     return { node, signature: JSON.stringify([goalFilters, teams, drivers, counts, rows.length]) };
 }
-/** The Activity folder's toolbar (#12070): the search, Filters (Team, Action, Since) and the order, on the shared list bar. The Computer field is not offered: the record is this computer's alone. */
+/** The Activity folder's toolbar (#12070): the search, Filters (Team, Action, Since) and the order, on the shared list bar. The Computer field is offered only where a Hub-served dashboard reads several computers' records (#15730). */
 function inboxActivityToolbar() {
     if (!activityBar) {
         activityBar = IT.folderToolbar({
@@ -809,14 +809,15 @@ function inboxActivityToolbar() {
     }
     const teams = AC.teams();
     AF.setTeamNames(new Map(teams.map(t => [t, teamLabel(t)])));
+    AF.setServerNames(new Map(serverChoices().map(id => [id, pagingServerLabel(id)])));
     const node = activityBar.draw({ filters: activityFilters, options: { team: { values: teams, labels: Object.fromEntries(teams.map(t => [t, teamLabel(t)])) }, agent: { values: AC.agents(), labels: {} }, goal: { values: AC.goals(), labels: {} } } });
-    activityBar.bar.showField('server', false);
+    activityBar.bar.showField('server', multipleServers()); // the Computer filter, when a Hub-served dashboard reads several computers' records (#15730)
     const menu = node.querySelector('.list-bar-menu');
     if (menu && !menu.querySelector('.inbox-activity-group-toggle')) {
         const label = groupModeField('inbox-activity-group-mode', 'inbox-activity-group-toggle');
         menu.insertBefore(label, menu.querySelector(':scope > .list-bar-clear-all, :scope > .list-bar-done'));
     }
-    return { node, signature: JSON.stringify([activityFilters, teams, AC.total(), groupMode]) };
+    return { node, signature: JSON.stringify([activityFilters, teams, AC.total(), groupMode, serverChoices()]) };
 }
 function refreshGoals(force = true) {
     if (_goalsReading) return _goalsReading; // one in flight: whoever asks during it gets it

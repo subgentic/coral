@@ -92,6 +92,7 @@ func TestTheThreadReadsAreTheOperatorsAloneAndAnAgentOrAGranteeIsRefused(t *test
 		assert.Equal(t, http.StatusForbidden, code, "%s: %v", name, out)
 		assert.Nil(t, out["entries"], name)
 		assert.Nil(t, out["threads"], name)
+		assert.Equal(t, readRefusal, out["error"], "%s: a read says it is a read that was refused (#15740)", name)
 	}
 	// a Coral Hub sign-in that is not the owner of this computer's link is refused too; the owner is served
 	hub := func(headers map[string]string) func(*http.Request) *http.Request {

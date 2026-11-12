@@ -42,7 +42,7 @@ func (h *InboxVsChatHandler) Read(w http.ResponseWriter, r *http.Request) {
 		commentRefuse(w, http.StatusForbidden, "not_through_hub", "the Inbox-versus-chat counts are on this computer only")
 		return
 	}
-	if !operatorOnly(w, r) {
+	if !operatorOnlyRead(w, r) {
 		return
 	}
 	q := r.URL.Query()

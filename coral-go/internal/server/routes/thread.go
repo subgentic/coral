@@ -88,7 +88,7 @@ func threadErr(w http.ResponseWriter, err error) {
 
 // Thread is GET /api/thread: the entries of one goal or one task.
 func (h *BoardHandler) Thread(w http.ResponseWriter, r *http.Request) {
-	if !operatorOnly(w, r) {
+	if !operatorOnlyRead(w, r) {
 		return
 	}
 	q := r.URL.Query()
@@ -119,7 +119,7 @@ func (h *BoardHandler) Thread(w http.ResponseWriter, r *http.Request) {
 
 // Threads is GET /api/threads: one summary per task, for the list pages.
 func (h *BoardHandler) Threads(w http.ResponseWriter, r *http.Request) {
-	if !operatorOnly(w, r) {
+	if !operatorOnlyRead(w, r) {
 		return
 	}
 	q := r.URL.Query()

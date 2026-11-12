@@ -55,6 +55,22 @@ assert.deepEqual(rows.map(r => r.team).sort(), ['@srv1/team', '@srv1/team', '@sr
 reset(online(['srv1', 'srv2', 'srv3']), { local: { ids: [{ id: 1, at: at(5) }] }, srv1: { status: 500 }, srv2: { status: 403 }, srv3: { ids: [{ id: 7, at: at(2) }] } });
 await AC.refresh();
 assert.equal(AC.total(), 2);
+// #15730: the computers that are not in the folder are NAMED with why, never left out silently: the failed one, the refused one (an older Coral, or a guest) and one that is offline (never asked)
+assert.deepEqual(AC.missingComputers().map(m => m.id).sort(), ['srv1', 'srv2']);
+assert.match(AC.missingWords(AC.missingComputers()), /SRV1 \(could not be read\)/);
+assert.match(AC.missingWords(AC.missingComputers()), /SRV2 \(refused to give its record: an older Coral may need an update\)/);
+reset([...online(['srv1', 'srv2']), { id: 'srv3', label: 'SRV3', status: 'offline' }], { local: { ids: [{ id: 1, at: at(5) }] }, srv1: { ids: [{ id: 3, at: at(4) }] }, srv2: { ids: [{ id: 4, at: at(3) }] } });
+await AC.refresh();
+assert.deepEqual(asked.map(a => a.server).sort(), ['local', 'srv1', 'srv2'], 'an offline computer is not asked');
+assert.equal(AC.total(), 3);
+assert.deepEqual(AC.missingComputers(), [{ id: 'srv3', why: 'is offline' }], 'an offline computer is named as missing');
+assert.equal(AC.missingWords(AC.missingComputers()), 'Not in this list: SRV3 (is offline).');
+// each row's From names its computer, and the Computer filter keeps one computer's rows
+assert.deepEqual(filt().map(r => AC.fromCell(r)).sort(), ['SRV1', 'SRV2', 'This computer']);
+const AFm = await import(pathToFileURL(path.join(dir, 'operator_activity_filters.js')).href);
+assert.deepEqual(AC.filtered({ q: '', team: '', server: 'srv1', agent: '', goal: '', decision: '', action: '', from: '', order: 'newest' }).map(AC.keyOf), ['srv1/3'], 'the Computer filter keeps one computer');
+assert.deepEqual(AC.filtered({ q: '', team: '', server: 'local', agent: '', goal: '', decision: '', action: '', from: '', order: 'newest' }).map(AC.keyOf), ['1'], 'and this computer is its own');
+assert.equal(AFm.chips({ ...AFm.EMPTY, server: 'srv1' }).length, 1, 'a chip says which computer');
 
 // every computer refuses 403: denied, as one computer always was; every one failing: failed
 reset(online(['srv1']), { local: { status: 403 }, srv1: { status: 403 } });

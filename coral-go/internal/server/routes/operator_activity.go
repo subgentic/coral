@@ -90,7 +90,7 @@ func (h *BoardHandler) activityRows(ctx context.Context, rows []board.OperatorAc
 // GET /api/activity?team=&action=&goal=&task=&before=&limit= : the record, newest first, a page at a time, and whether its chain is whole (checked on the first page). Read only; the Operator's alone, at this computer or through
 // Coral Hub as the Hub OWNER (#12070: the tunnel's table lists it as an owner route; nobody else gets it).
 func (h *BoardHandler) ListActivity(w http.ResponseWriter, r *http.Request) {
-	if !operatorOnly(w, r) { // at this computer, the person; through Coral Hub, the account this computer is linked to and nobody else (refuseNonOwner): a guest, a grantee or a viewer is refused owner_only
+	if !operatorOnlyRead(w, r) { // at this computer, the person; through Coral Hub, the account this computer is linked to and nobody else (refuseNonOwner): a guest, a grantee or a viewer is refused owner_only
 		return
 	}
 	q := r.URL.Query()
