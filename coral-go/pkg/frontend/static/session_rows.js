@@ -126,7 +126,7 @@ function _rowMenuContent(s, sid) {
                 Archive
             </button>
 `;
-    const _sleepingMenu = `
+    const _sleepingMenu = `${isExitedAsleep(s) ? '<div class="overflow-menu-note" role="note">Its program exited.</div>' : isGoneAsleep(s) ? '<div class="overflow-menu-note" role="note">Its terminal is gone.</div>' : ''}
             <a class="menu-item overflow-menu-item overflow-menu-open-window" href="/agent/${escapeAttr(sid)}" target="_blank" rel="noopener noreferrer" aria-label="Open agent tab" data-on-click="kebab-close">
                 ${SVGO.o0}<path d="M9 2h5v5"/><path d="M14 2L7 9"/><path d="M12 9v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4"/></svg>
                 Open agent tab

@@ -1966,6 +1966,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     font-size: var(--fs-sm);
     color: var(--text-muted);
 }
+div.overflow-menu-note { margin: 0; padding: 6px 12px 2px; } /* a row menu's first line: why the agent is asleep (#15819) */
 
 .overflow-menu-divider {
     border: none;
@@ -3030,26 +3031,14 @@ button.auto-accept-header-off { display: inline-flex; align-items: center; margi
 button.auto-accept-header-off:hover { color: var(--text-primary); border-color: rgba(var(--warning-rgb), 0.6); }
 button.auto-accept-header-off:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-/* An agent whose terminal is gone (#3218): on its row and in the header; a click restarts it. */
-.terminal-gone-chip {
-    display: inline-flex;
-    align-items: center;
-    flex-shrink: 0;
-    margin-left: 4px;
-    padding: 0 5px;
-    border-radius: var(--radius-sm);
-    font: inherit;
-    font-size: var(--fs-sm);
-    font-weight: var(--fw-strong);
-    line-height: 16px;
-    color: var(--error);
-    background: rgba(var(--error-rgb), 0.12);
-    border: 1px solid rgba(var(--error-rgb), 0.45);
-    cursor: pointer;
-}
-.terminal-gone-chip:hover { background: rgba(var(--error-rgb), 0.22); }
+/* An agent whose terminal is gone or whose program ended (#3218, #15819): its row's status mark, a shape and a word (the moon for sleeping, the cross for a real error), no red chip; a click restarts it. The header badge keeps its red. */
+.terminal-gone-chip { display: inline-flex; align-items: center; flex-shrink: 0; gap: 4px; margin-left: 4px; padding: 0 2px; border: 0; border-radius: var(--radius-sm); background: none; font: inherit; font-size: var(--fs-sm); line-height: 16px; color: var(--text-primary); cursor: pointer; }
+.terminal-gone-chip:hover { background: var(--bg-hover); }
 .terminal-gone-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-height: 20px; padding: 0 8px; }
+.status-glyph { flex: none; width: 10px; height: 10px; border-radius: 50%; box-shadow: inset -3px -1px 0 0 currentColor; color: var(--text-muted); }
+.terminal-gone-chip[data-state="failed"] .status-glyph { border-radius: 0; box-shadow: none; color: var(--error); background: linear-gradient(45deg, transparent 43%, currentColor 43% 57%, transparent 57%), linear-gradient(-45deg, transparent 43%, currentColor 43% 57%, transparent 57%); }
+@media (forced-colors: active) { .status-glyph { forced-color-adjust: none; } }
+button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-height: 20px; padding: 0 8px; color: var(--error); background: rgba(var(--error-rgb), 0.12); border: 1px solid rgba(var(--error-rgb), 0.45); }
 
 /* Machine health (#3446): a status dot and a compact card. The dot is the only coloured part;
    every value is text in the normal text colours (contrast as in the accessibility pass). */

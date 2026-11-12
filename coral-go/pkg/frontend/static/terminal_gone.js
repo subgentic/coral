@@ -57,15 +57,16 @@ export function isExitedAsleep(s) {
     return !!s && !!s.sleeping && !s.archived && s.sleep_reason === 'agent_exited';
 }
 
-/** The "Terminal gone" chip for an agent's sidebar row, "Ended" for one whose CLI exited and "Failed to start" for one whose start was refused for its CLI (#353) ('' otherwise); a click restarts it. */
+/** An agent's sidebar row mark (#15819, design guidelines 4.5): a shape and a word, no red chip. "Ended" (its CLI exited) and "Terminal gone" (Coral put it to sleep) are the sleeping moon; only a real error is the red cross: "Failed to start"
+ *  (its start was refused for its CLI, #353) and a terminal that went while the agent was awake. '' otherwise; a click restarts it. The reason is its tooltip (and the row menu's first line). */
 export function terminalGoneChip(s) {
     const ended = isExitedAsleep(s);
     const failed = isStartFailed(s);
     if (!ended && !failed && !isTerminalGone(s)) return '';
     const word = failed ? 'Failed to start' : ended ? 'Ended' : 'Terminal gone';
     const title = failed ? "Its CLI is missing or can't be run. Click to restart once that is fixed." : ended ? "Its program exited; Restart starts it again" : "This agent's terminal is gone. Click to restart it.";
-    return `<button type="button" class="terminal-gone-chip" title="${escapeAttr(title)}"`
-        + `${ended || failed ? ` aria-label="${escapeAttr(word)}. Restart"` : ''} data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type || '')}" data-session-id="${escapeAttr(s.session_id)}">${word}</button>`;
+    return `<button type="button" class="terminal-gone-chip" data-state="${failed || !s.sleeping ? 'failed' : 'sleeping'}" title="${escapeAttr(title)}"`
+        + `${ended || failed ? ` aria-label="${escapeAttr(word)}. Restart"` : ''} data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type || '')}" data-session-id="${escapeAttr(s.session_id)}"><span class="status-glyph" aria-hidden="true"></span>${word}</button>`;
 }
 
 /** The header badge for the selected agent while its terminal is gone. */
