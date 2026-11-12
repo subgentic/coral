@@ -115,7 +115,8 @@ body.panel-dragging .agentic-state {
 
 /* ── Tabs ──────────────────────────────────────────────────── */
 
-.agentic-state-tabs { flex-shrink: 0; } /* the strip is the one tab strip's (.tabs .tabs-icons, components.css): the tabs share its width and wrap at large text (#4344) */
+.agentic-state-tabs { flex-shrink: 0; }
+.agentic-state-tabs > .agentic-tab { align-self: flex-start; } /* a tab is 36 px, not stretched to the strip's overlap (#15821) */ /* the strip is the one tab strip's (.tabs .tabs-icons, components.css): the tabs share its width and wrap at large text (#4344) */
 
 .agentic-tab .material-icons {
     font-size: var(--icon-size);
