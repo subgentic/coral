@@ -144,6 +144,27 @@ function waitingBlock(s) {
     return d;
 }
 
+/** What the card says depends on these: when any of them changes in a fresh status, the card is drawn again (#15771: the pane showed the status from up to ten minutes ago, "Coral is up to date", while 2.0.66 was staged). */
+const cardSig = s => s ? [s.enabled, s.state, s.staged && s.staged.version, s.staged && s.staged.verified, s.relaunch.reason, s.relaunch.available, s.notReady, s.checkedResult, s.latest, s.progress, s.autoInstall && s.autoInstall.state].join('|') : '';
+const PANE_POLL_MS = 5000;
+let paneWatch = 0;
+
+/** While the Updates pane is open, read the status again at once and then every few seconds, and draw the card again when what it says changed (a check that staged a release, a download's progress): the person never has to close the pane to see it. Stops when the pane is gone. */
+function watchPane(drawn) {
+    clearTimeout(paneWatch);
+    let last = cardSig(drawn);
+    const tick = async () => {
+        if (!body() || isSignedOut()) return;
+        const fresh = await refreshUpdateStatus();
+        const slot = body() && body().querySelector('.update-status');
+        if (!slot) return; // the pane was closed or redrawn meanwhile (a redraw starts its own watch)
+        const now = cardSig(fresh);
+        if (fresh && fresh.enabled && now !== last) { last = now; slot.replaceWith(isManaged(fresh) ? managed(fresh) : card(fresh)); }
+        paneWatch = setTimeout(tick, PANE_POLL_MS);
+    };
+    paneWatch = setTimeout(tick, 0);
+}
+
 /** Draw the pane from the last status (and ask for a fresh one): the card, the channel and the facts are parts this module draws; the switch, the hub line and the facts are rows of a settings_view (the pane is Settings like the rest). */
 export async function showUpdatesPane() {
     const host = body();
@@ -192,6 +213,7 @@ export async function showUpdatesPane() {
     if (s.last && s.last.result === 'relaunched' && /^hub:/.test(s.last.by) && stamp(s.last.at)) fact('last', 'Last update', `Relaunched from Coral Hub at ${stamp(s.last.at)}`); // the time, never the hub user's name
     fields.push({ key: 'privacy', type: 'notice', render: slot => slot.append(mk('p', 'update-calm update-privacy', 'Coral contacts GitHub only, to read the release list and download the package.')) });
     mountSettingsView(host, { mode: 'settings', saveBar: false, fields });
+    watchPane(s);
     // The waiting list is the operator's, and the client reads the release list only on Agentic: it shows while Agentic is the choice and the server sent releases (never through the Hub)
     const group = host.querySelector('#update-channel[role=radiogroup]');
     if (!group) return;

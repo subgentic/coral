@@ -13,6 +13,7 @@ import (
 	"github.com/subgentic/coral/internal/cliauth"
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/tracking"
+	"github.com/subgentic/coral/internal/updatecheck"
 )
 
 // The tray's "Update to vX available" menu item (updater D, #6006). It is shown when the local server reports a newer APPROVED release and the update feature is on; it opens the dashboard's
@@ -30,6 +31,7 @@ const (
 type updaterStatus struct {
 	FeatureOn bool
 	Enabled   bool
+	Staged    string // the version staged and verified, ready to install ("" when none): the item then says "Update and relaunch" (#15771)
 }
 
 // askServerForUpdaterStatus calls the server's updater status, signed with Coral's command-line token. A 404 is the feature being off (no error); anything else that is not a 200 is an error.
@@ -51,12 +53,21 @@ func askServerForUpdaterStatus(baseURL, dataDir string) (updaterStatus, error) {
 		return updaterStatus{}, fmt.Errorf("the server answered %d", resp.StatusCode)
 	}
 	var body struct {
-		Enabled bool `json:"enabled"` // anything but a JSON true is false
+		Enabled bool   `json:"enabled"` // anything but a JSON true is false
+		State   string `json:"state"`
+		Staged  *struct {
+			Version  string `json:"version"`
+			Verified bool   `json:"verified"`
+		} `json:"staged"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 256<<10)).Decode(&body); err != nil {
 		return updaterStatus{}, err
 	}
-	return updaterStatus{FeatureOn: true, Enabled: body.Enabled}, nil
+	staged := ""
+	if body.State == "staged" && body.Staged != nil && body.Staged.Verified && updatecheck.ValidVersion(body.Staged.Version) {
+		staged = body.Staged.Version
+	}
+	return updaterStatus{FeatureOn: true, Enabled: body.Enabled, Staged: staged}, nil
 }
 
 // updateChoice is what the item says and does.
@@ -79,7 +90,11 @@ func chooseUpdateItem(a updateAnswer, askErr error, st updaterStatus, stErr erro
 	case stErr != nil || !st.FeatureOn:
 		return updateChoice{} // the update feature is off (or the server could not say): nothing
 	}
-	return updateChoice{Show: true, Title: fmt.Sprintf("Update to v%s available", a.Latest), Pane: st.Enabled, Page: a.pageURL(), Version: a.Latest, Channel: string(a.channelOf())}
+	title := fmt.Sprintf("Update to v%s available", a.Latest)
+	if st.Staged != "" && st.Staged == a.Latest { // downloaded and verified: what a click does is install it (#15771)
+		title = fmt.Sprintf("Update and relaunch to v%s", a.Latest)
+	}
+	return updateChoice{Show: true, Title: title, Pane: st.Enabled, Page: a.pageURL(), Version: a.Latest, Channel: string(a.channelOf())}
 }
 
 // menuItem is the part of a systray item the loop needs.

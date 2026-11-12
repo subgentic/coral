@@ -42,14 +42,16 @@ func TestTheItemSaysWhatTheTwoAnswersSayAndNothingElse(t *testing.T) {
 		page   string
 		agentc bool
 	}{
-		"the updater is on: the dashboard's Updates pane": {a: approvedAnswer("1.4.157"), st: updaterStatus{FeatureOn: true, Enabled: true}, show: true, pane: true, title: "Update to v1.4.157 available", page: "https://github.com/subgentic/coral/releases"},
-		"the apply is off: the download page":             {a: approvedAnswer("1.4.157"), st: updaterStatus{FeatureOn: true}, show: true, pane: false, title: "Update to v1.4.157 available", page: "https://github.com/subgentic/coral/releases"},
-		"the feature is off (the status route is a 404)":  {a: approvedAnswer("1.4.157"), st: updaterStatus{}},
-		"no newer release":                                {a: updateAnswer{Available: false, Latest: "1.4.155"}, st: updaterStatus{FeatureOn: true, Enabled: true}},
-		"the update check cannot be asked":                {aerr: errors.New("connection refused"), st: updaterStatus{FeatureOn: true, Enabled: true}},
-		"the status cannot be asked":                      {a: approvedAnswer("1.4.157"), sterr: errors.New("connection refused")},
-		"an Agentic release that is not approved":         {a: unapproved, st: updaterStatus{FeatureOn: true, Enabled: true}},
-		"an approved release on the Agentic channel":      {a: agentic, st: updaterStatus{FeatureOn: true}, show: true, title: "Update to v1.4.158 available", page: "https://github.com/subgentic/coral/releases/tag/v1.4.158", agentc: true},
+		"the updater is on: the dashboard's Updates pane":          {a: approvedAnswer("1.4.157"), st: updaterStatus{FeatureOn: true, Enabled: true}, show: true, pane: true, title: "Update to v1.4.157 available", page: "https://github.com/subgentic/coral/releases"},
+		"the apply is off: the download page":                      {a: approvedAnswer("1.4.157"), st: updaterStatus{FeatureOn: true}, show: true, pane: false, title: "Update to v1.4.157 available", page: "https://github.com/subgentic/coral/releases"},
+		"the feature is off (the status route is a 404)":           {a: approvedAnswer("1.4.157"), st: updaterStatus{}},
+		"no newer release":                                         {a: updateAnswer{Available: false, Latest: "1.4.155"}, st: updaterStatus{FeatureOn: true, Enabled: true}},
+		"the update check cannot be asked":                         {aerr: errors.New("connection refused"), st: updaterStatus{FeatureOn: true, Enabled: true}},
+		"the status cannot be asked":                               {a: approvedAnswer("1.4.157"), sterr: errors.New("connection refused")},
+		"an Agentic release that is not approved":                  {a: unapproved, st: updaterStatus{FeatureOn: true, Enabled: true}},
+		"downloaded and verified: the item says what a click does": {a: approvedAnswer("2.0.66"), st: updaterStatus{FeatureOn: true, Enabled: true, Staged: "2.0.66"}, show: true, pane: true, title: "Update and relaunch to v2.0.66", page: "https://github.com/subgentic/coral/releases"},
+		"a different version is staged: still the offer":           {a: approvedAnswer("2.0.66"), st: updaterStatus{FeatureOn: true, Enabled: true, Staged: "2.0.65"}, show: true, pane: true, title: "Update to v2.0.66 available", page: "https://github.com/subgentic/coral/releases"},
+		"an approved release on the Agentic channel":               {a: agentic, st: updaterStatus{FeatureOn: true}, show: true, title: "Update to v1.4.158 available", page: "https://github.com/subgentic/coral/releases/tag/v1.4.158", agentc: true},
 	} {
 		c := chooseUpdateItem(tc.a, tc.aerr, tc.st, tc.sterr)
 		assert.Equal(t, tc.show, c.Show, name)
@@ -83,6 +85,12 @@ func TestTheUpdaterStatusIsReadFromTheLocalServerAndTheFeatureOffIsNotAnError(t 
 	assert.Equal(t, updaterStatus{FeatureOn: true, Enabled: true}, st)
 	assert.Equal(t, "/api/system/update", seen.Load())
 
+	st, err = askServerForUpdaterStatus(serve(200, `{"enabled":true,"state":"staged","staged":{"version":"2.0.66","verified":true}}`, nil), t.TempDir())
+	require.NoError(t, err)
+	assert.Equal(t, updaterStatus{FeatureOn: true, Enabled: true, Staged: "2.0.66"}, st, "a verified staged release is read")
+	st, err = askServerForUpdaterStatus(serve(200, `{"enabled":true,"state":"staged","staged":{"version":"2.0.66","verified":false}}`, nil), t.TempDir())
+	require.NoError(t, err)
+	assert.Equal(t, updaterStatus{FeatureOn: true, Enabled: true}, st, "an unverified one is not")
 	st, err = askServerForUpdaterStatus(serve(200, `{"enabled":false}`, nil), t.TempDir())
 	require.NoError(t, err)
 	assert.Equal(t, updaterStatus{FeatureOn: true}, st, "the feature is on and the updater is not")
