@@ -1,5 +1,46 @@
 # Release Notes
 
+## v2.0.66 — Safer permission cards, restart and context reset that say what they do, Dropbox app key, and a calmer Needs you
+
+Task numbers in brackets. Built on v2.0.65 and gated on lead-v2066 f9d68cd63.
+
+### Changes
+
+#### What you will notice first
+
+- **A permission request Coral could not read in full is shown as unreadable: you can answer neither Yes nor No on a guess.** A long Bash command that scrolled off the screen is read whole from the call the agent reported, and the card shows all of it, so a 40-line `rm -rf` is no longer a bare "No" (#15665, #15492, #15676).
+- **Restart says what it does:** "Restart (same settings)" says it starts a new conversation (the old chat stays above), asks first when the agent is in the middle of a turn, and a restart with new Instructions tells the agent its attached skills again (#15465, #15442, #15484).
+- **Context reset works for every agent type:** Codex, Antigravity, Pi and Hermes have their own compact commands, a large agent held by a gate says why it was not compacted, and Codex's context is no longer counted twice (#15506, #15508).
+- **Needs you rows:** the checkbox, the kind icon and the star share the top line, and the selection actions are one line under the title, search and filters; on a phone the selection line stays at the top while the list scrolls and the star stays at the end of the button row (#15540, #15632, #15658).
+- **Files for review:** one Approve while a file waits; switching versions holds Approve until the new version has drawn; "Request changes" is one comment box with Send request or Approve with comment (#15627, #15636, #15545).
+- **Copy for an agent:** a small robot button next to settings sections, Computers and other places copies a ready-made description for an agent to read (#15152, #15668, #15673).
+- **Hover help on every team and agent menu item:** each item in the sidebar "..." menus has a one-line description, shown on mouse and keyboard focus and under the label on a phone (#15466).
+- **Dropbox: add your own app key in Settings;** a key set in the environment wins, and the status stays closed (#15638, #15648, #15655).
+- **Skills page names the teams that use each skill,** with a Used by column and a line on the skill's page (#15383).
+- **Open links to a file or thread:** the open file and thread are in the address, so a link opens it (#15253).
+- **Codex's "Approaching rate limits" notice** now holds an idle agent and asks you in Needs you instead of being missed (#15485).
+
+#### Fixed
+
+- Sleeping and archived agents' menus say "Remove Agent", not "Kill Session"; Remove Agent's confirmation says Remove (#15399, #15585).
+- The Inbox Artifacts count follows another team's upload within a moment (#15645).
+- Delete team's hover help ends with "and more; the dialog lists everything" (#15524).
+- Approve and Request changes on a question check the task is still in review when pressed (#15111).
+- A team page marks no top-bar item current; the collapsed Inbox sidebar keeps one icon per section; tabs keep their place when counts arrive (#15449, #15347, #15494).
+- The "Skip to message box" link is hidden while its pane is not shown; a failed Files strip load removes its reserved room (#15626, #15624).
+- The Needs input card reads a prompt that can only be rejected from its top-level flag (#15676).
+- A completed-since task list compares times, not text, at the boundary (#15461).
+- The model-switch question in the chat is cleaned of terminal control codes and cut on a character boundary (#15451).
+- Light theme: the terminal background is lighter; the Thinking select is readable; a review's title is kept (#15494).
+- Copy-for-an-agent buttons keep a 3:1 border in both themes (#15690).
+- Security: the text Copy for an agent copies is cleaned of invisible characters (#15668, #15673); the stored Bash command for a tall dialog is used only when it is the one call in flight (#15492); a staged update is writable by no other user on Windows (#15572).
+- Release workflow: `install.sh` is attested too (v2.0.65's after-release step got a 404) (#14097).
+
+#### Known issues
+
+- Carried from v2.0.65: see its list.
+- Tests only (no change in the product): the gate's parts were rebalanced and several timing-sensitive suites were made steady (#15659, #15681, #15709, #15349, #15382).
+
 ## v2.0.65 — Review versions you can follow, Needs you rows as cards, goals with names and numbers, safer teams, and an updater that finds releases by tag
 
 Task numbers in brackets. Built on lead-v2065 from main 7ef282679.
