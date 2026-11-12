@@ -1,0 +1,48 @@
+name: win-probe-15953
+# A one-suite probe (#15953): heap_growth_browser at three commits, on a Windows runner, with the full failure text. Branch ci/probe-15953 only; never merged.
+on:
+  push:
+    branches: [ci/probe-15953]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CORAL_TELEMETRY_DISABLED: "1"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out LF line endings
+        working-directory: ${{ runner.temp }}
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: coral-go/go.mod
+          cache: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - name: install
+        working-directory: tests/frontend
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Chrome from the runner image
+        id: chrome
+        run: |
+          p='C:\Program Files\Google\Chrome\Application\chrome.exe'
+          [ -f "$p" ] || { echo "::error::no Chrome at $p"; exit 1; }
+          echo "path=$p" >> "$GITHUB_OUTPUT"
+      - name: heap_growth durations at three commits, same runner
+        working-directory: tests/frontend
+        env:
+          CHROME: ${{ steps.chrome.outputs.path }}
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: |
+          for i in 1 2 3; do node run_cdp_suites.mjs --timeout 400 --retries 0 --only heap_growth_browser 2>&1 | grep -E "^(PASS|FAIL|TIMEOUT)|HANG"; done
