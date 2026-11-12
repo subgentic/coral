@@ -3,7 +3,7 @@
    - First launch: after the EULA, the dashboard opens "Connect to Coral Hub" (app.coralhub.dev)
      with the real connect flow inline (cloud_connect.js, the same code as Settings > Coral
      Hub): Connect → link and code → live status → once connected, how much the hub may do
-     → Done. "Skip for now" keeps Coral local. "Run your own hub" (coral --hub) is the
+     → Done. "Skip for now" keeps Coral local. "Run your own hub" is the
      secondary option, with a short explainer. The server marks a new install
      welcome_pending; the answer is saved as welcome_choice, so another browser does not ask
      again. Settings > Network and Hub reopens it. It opens only when this build has a hub configured
@@ -17,7 +17,7 @@
 import { state } from './state.js';
 import { isCloud, isHub } from './server_base.js';
 import { isPopout } from './popout.js';
-import { escapeAttr, escapeHtml, showToast, copyText } from './utils.js';
+import { escapeAttr, escapeHtml, showToast } from './utils.js';
 import { switchRow } from './switch_row.js';
 import { importOnce } from './import_once.js';
 import { trapTab } from './dialog_focus.js';
@@ -181,20 +181,17 @@ function _connectHtml() {
     </div>`;
 }
 
-// The hub's command, to copy. The other machines are not given a command: listening on the network is Remote access in Settings, which says what it allows and that it is unencrypted unless TLS is set up (a bare --host 0.0.0.0 does not turn it on).
-const OWN_HUB_COMMANDS = 'coral --hub';
-
+// No command is shown: people do not start Coral from a terminal, so the switch below is the way. The other machines are not given a command either: listening on the network is Remote access in Settings, which says what it allows and that it is unencrypted unless TLS is set up.
 function _ownHubHtml() {
     return `<div class="modal-content dlg-form editions-content">
         <h2 id="editions-title" class="editions-title">Run your own hub</h2>
         <p class="editions-sub">Turn this Coral into a hub and connect remote computers running Coral, for one unified view of all your agents. Self-hosted.</p>
         <ol class="editions-steps">
-            <li>On the computer you'll use as the hub, turn on the switch below (or start Coral with <code>coral --hub</code>).</li>
+            <li>On the computer you'll use as the hub, turn on the switch below.</li>
             <li>On each other computer, start Coral, turn on <strong>Remote access</strong> in Settings &rsaquo; Network and Hub (it says what that allows, and that it is unencrypted unless TLS is set up), and copy its API key.</li>
             <li>In the hub's <strong>Computers</strong> tab, add each computer with its address and key.</li>
         </ol>
         <div id="editions-own-slot"></div>
-        <div class="cloud-command-row editions-commands"><code>${escapeHtml(OWN_HUB_COMMANDS)}</code><button type="button" class="btn btn-small" data-editions="copy-own" aria-label="Copy the hub command">Copy</button></div>
         <a class="editions-guide" href="${escapeAttr(OWN_HUB_GUIDE_URL)}" target="_blank" rel="noopener">Read the guide<span class="material-icons" aria-hidden="true">open_in_new</span></a>
         <div class="modal-actions editions-actions">
             <button type="button" class="btn" data-editions="back">Back</button>
@@ -296,7 +293,6 @@ document.addEventListener('click', e => {
     else if (action === 'own-hub') showHubSetup('own-hub');
     else if (action === 'back') showHubSetup('connect');
     else if (action === 'done-own') _dismiss('own-hub');
-    else if (action === 'copy-own') { copyText(OWN_HUB_COMMANDS).then(ok => { t.textContent = ok ? 'Copied' : 'Copy failed'; setTimeout(() => { t.textContent = 'Copy'; }, 1500); }); }
     else if (action === 'open') { window.hideSettingsModal?.(true); showHubSetup('connect'); }
     else if (action === 'home-hub') showHubSetup('connect');
     else if (action === 'home-own') showHubSetup('own-hub');

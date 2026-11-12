@@ -57,7 +57,7 @@ async function toggled(sw) {
 export async function mountOwnHubPanel() {
     const slot = panel(); if (!slot) return;
     await loadStyles('home_own_hub.css');
-    slot.innerHTML = `<div class="own-hub-row"><label class="own-hub-text" for="own-hub-switch"><strong>Run a hub on this computer</strong><span class="own-hub-state" role="status" aria-live="polite">Checking\u2026</span></label><span class="check-hit"><input class="switch own-hub-switch" type="checkbox" id="own-hub-switch" disabled></span></div>
+    slot.innerHTML = `<div class="own-hub-row"><label class="own-hub-text" for="own-hub-switch"><strong>Run a hub on this computer</strong> <span class="own-hub-state" role="status" aria-live="polite">Checking\u2026</span></label><span class="check-hit"><input class="switch own-hub-switch" type="checkbox" id="own-hub-switch" disabled></span></div>
         <div class="own-hub-actions"><button type="button" class="btn" data-own="restart" hidden>Restart Coral</button><button type="button" class="btn" data-own="manage" hidden>Manage in Settings</button></div>`;
     q('input.own-hub-switch').addEventListener('change', e => toggled(e.target));
     q('[data-own="manage"]').addEventListener('click', () => { document.getElementById('editions-modal')?.querySelector('[data-editions="done-own"]')?.click(); window.showSettingsModal?.('network'); });

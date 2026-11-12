@@ -9,7 +9,7 @@
 //     code → live status → connected → how much the hub may do → Done. The answer is stored
 //     on the server, so another load does not ask again.
 //   - "Skip for now" and Escape keep Coral local; "Run your own hub instead" shows the
-//     coral --hub explainer. A build with no hub configured never opens it.
+//     explainer (no command). A build with no hub configured never opens it.
 //   - From another computer (the cloud routes answer 403) it says to connect on the
 //     computer running Coral.
 //   - Settings > Network and Hub reopens it without changing the stored answer.
@@ -284,7 +284,7 @@ async function run() {
             await until(`!!document.querySelector('#editions-modal [data-editions="own-hub"]')`, 'the screen');
             await click('#editions-modal [data-editions="own-hub"]');
             const steps = await ev(`[...document.querySelectorAll('#editions-modal .editions-steps li')].map(l => l.textContent)`);
-            check(`${label}: Run your own hub shows the coral --hub explainer`, ((await screen()) || {}).title === 'Run your own hub' && steps.length === 3 && /coral --hub/.test(steps[0]), JSON.stringify(steps));
+            check(`${label}: Run your own hub shows the three steps, with no command`, ((await screen()) || {}).title === 'Run your own hub' && steps.length === 3 && !/coral --hub|terminal/.test(steps[0]) && /switch below/.test(steps[0]), JSON.stringify(steps));
             await click('#editions-modal [data-editions="back"]');
             check(`${label}: Back returns to Connect to Coral Hub`, ((await screen()) || {}).title === 'Connect to Coral Hub');
             await click('#editions-modal [data-editions="own-hub"]');
