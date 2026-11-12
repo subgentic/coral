@@ -1,0 +1,28 @@
+/* The thread of an answered question in Activity (#15724): a timeline, one block per message, no bubbles. Lazy: loaded with activity_dialog.js. */
+.activity-thread-dialog { margin: auto; max-height: calc(100vh - 2rem); overflow-y: auto; }
+.activity-thread-dialog[open] { display: flex; flex-direction: column; gap: var(--space-md, 8px); }
+.activity-thread-dialog:not([open]) { display: none; }
+.activity-thread-dialog h2 { margin: 0; font-size: var(--fs-lg); overflow-wrap: anywhere; }
+.activity-thread-sub, .activity-thread-status { margin: 0; color: var(--text-secondary); font-size: var(--fs-sm); }
+.activity-thread { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-md, 8px); max-height: 50vh; overflow-y: auto; }
+.activity-thread-msg { padding: 0; max-width: 85%; align-self: flex-start; }
+.activity-thread-mine { align-self: flex-end; }
+.activity-thread-head { display: flex; gap: 8px; align-items: baseline; }
+.activity-thread-time { color: var(--text-muted); font-size: var(--fs-sm); }
+.activity-thread-body { overflow-wrap: anywhere; padding: 6px 10px; border-radius: var(--radius-lg, 8px); background: var(--bg-tertiary); }
+.activity-thread-body > :first-child { margin-top: 2px; } .activity-thread-body > :last-child { margin-bottom: 0; }
+.activity-thread-label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--text-secondary); }
+.activity-thread-box { width: 100%; resize: vertical; }
+.activity-thread-error { margin: 0; color: var(--danger); min-height: 0; }
+.activity-thread-error:empty { display: none; }
+.activity-thread-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
+
+/* the mockup v3 (#15774): a header with the kind icon, a chat (the agent at the left, the Operator at the right in bubbles), one Reply box, Attach image, the buttons at the right */
+.activity-thread-headrow { display: flex; gap: var(--space-md, 8px); align-items: center; }
+.activity-thread-names { min-width: 0; }
+.activity-thread-state { font-size: var(--fs-lg); font-weight: var(--fw-strong); }
+.activity-thread-mine .activity-thread-head { justify-content: flex-end; }
+.activity-thread-mine .activity-thread-body { border: 1px solid var(--accent); }
+.activity-thread-attach { display: flex; flex-wrap: wrap; gap: var(--space-md, 8px); align-items: center; }
+.activity-thread-hint { color: var(--text-muted); font-size: var(--fs-sm); }
+.activity-thread-pics { display: flex; flex-wrap: wrap; gap: 8px; }
