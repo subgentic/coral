@@ -90,12 +90,15 @@ func TestTheInboxVsChatReadCutsDaysToNinetyAndRefusesWhatIsNotValid(t *testing.T
 	}
 }
 
+const readRefusal = "only the person at this computer, or its Hub owner, can read this"
+
 func TestTheInboxVsChatReadIsThePersonsAloneAndThisComputers(t *testing.T) {
 	withLabel(t, "hub-user-1234abcd", nil)
 	rig := newCmtRig(t)
 	notPerson := ivcServer(t, rig, false) // an agent token or a script
-	code, _ := getIVC(t, notPerson.URL, "", nil)
+	code, out := getIVC(t, notPerson.URL, "", nil)
 	assert.Equal(t, http.StatusForbidden, code)
+	assert.Equal(t, readRefusal, out["error"], "a read says it is a read that was refused, not a file share (#15740)")
 	srv := ivcServer(t, rig, true)
 	for name, hdr := range map[string]map[string]string{
 		"a Hub stamp":     {tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: "someone"},

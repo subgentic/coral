@@ -164,6 +164,18 @@ func operatorOnly(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
+// operatorOnlyRead is operatorOnly for a route that only READS (the Activity record, the analytics numbers, a thread): the same check, with a refusal that says what was refused (#15740). An agent's key never gets here; the Hub's owner does, with the Hub's stamp.
+func operatorOnlyRead(w http.ResponseWriter, r *http.Request) bool {
+	if refuseNonOwner(w, r) {
+		return false
+	}
+	if !humanInputCaller(r) {
+		commentRefuse(w, http.StatusForbidden, "owner_only", "only the person at this computer, or its Hub owner, can read this")
+		return false
+	}
+	return true
+}
+
 // UploadOperatorArtifact stores one file the Operator shares with an agent (the first route above).
 func (h *BoardHandler) UploadOperatorArtifact(w http.ResponseWriter, r *http.Request) {
 	if !operatorOnly(w, r) {

@@ -122,8 +122,9 @@ func TestTheResourceQueueReadCountsUseWaitsAndTheBeforeAfterWithoutAnyText(t *te
 func TestTheResourceQueueReadIsThePersonsAloneAndThisComputersAndCutsDays(t *testing.T) {
 	rig := newCmtRig(t)
 	notPerson, _, _ := rqServer(t, rig, false)
-	code, _ := getRQ(t, notPerson.URL, "", nil)
+	code, out := getRQ(t, notPerson.URL, "", nil)
 	assert.Equal(t, http.StatusForbidden, code)
+	assert.Equal(t, readRefusal, out["error"], "a read says it is a read that was refused (#15740)")
 	srv, _, _ := rqServer(t, rig, true)
 	for name, hdr := range map[string]map[string]string{
 		"a Hub stamp":     {tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: "someone"},
@@ -132,7 +133,7 @@ func TestTheResourceQueueReadIsThePersonsAloneAndThisComputersAndCutsDays(t *tes
 		code, _ := getRQ(t, srv.URL, "", hdr)
 		assert.Equal(t, http.StatusForbidden, code, name)
 	}
-	_, out := getRQ(t, srv.URL, "?days=5000", nil)
+	_, out = getRQ(t, srv.URL, "?days=5000", nil)
 	assert.EqualValues(t, 90, out["days_asked"])
 	for _, bad := range []string{"?days=0", "?days=x"} {
 		code, _ := getRQ(t, srv.URL, bad, nil)

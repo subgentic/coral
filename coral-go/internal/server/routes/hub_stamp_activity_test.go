@@ -59,6 +59,7 @@ func TestTheOwnerAtTheHubReadsTheActivityRecordOfEachOfTwoRemotes(t *testing.T) 
 		// not signed in: a script with the Hub's key is refused, and a forged stamp is no better
 		code, out := read(r, func(q *http.Request) { q.Header.Set("Authorization", "Bearer the-hubs-own-api-key") })
 		assert.Equal(t, http.StatusForbidden, code, out)
+		assert.Equal(t, readRefusal, out["error"], "the Activity read refuses in the words of a read (#15740)")
 		code, _ = read(r, func(q *http.Request) {
 			q.Header.Set("Authorization", "Bearer the-hubs-own-api-key")
 			q.Header.Set(hubowner.Header, "v1.1."+strings.Repeat("0", 32)+"."+strings.Repeat("0", 64))
