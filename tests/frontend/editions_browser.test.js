@@ -284,7 +284,7 @@ async function run() {
             await until(`!!document.querySelector('#editions-modal [data-editions="own-hub"]')`, 'the screen');
             await click('#editions-modal [data-editions="own-hub"]');
             const steps = await ev(`[...document.querySelectorAll('#editions-modal .editions-steps li')].map(l => l.textContent)`);
-            check(`${label}: Run your own hub shows the three steps, with no command`, ((await screen()) || {}).title === 'Run your own hub' && steps.length === 3 && !/coral --hub|terminal/.test(steps[0]) && /switch below/.test(steps[0]), JSON.stringify(steps));
+            check(`${label}: Run your own hub shows the two steps (the switch, then Set up over SSH), with no command`, ((await screen()) || {}).title === 'Run your own hub' && steps.length === 2 && !/coral --hub|terminal/.test(steps[0]) && /switch below/.test(steps[0]) && /Set up over SSH/.test(steps[1]), JSON.stringify(steps));
             await click('#editions-modal [data-editions="back"]');
             check(`${label}: Back returns to Connect to Coral Hub`, ((await screen()) || {}).title === 'Connect to Coral Hub');
             await click('#editions-modal [data-editions="own-hub"]');

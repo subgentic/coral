@@ -1,5 +1,5 @@
 // "Run your own hub" (#10572, #15787): the last button reads Close, and no command is shown: people do not start Coral from a terminal, so the switch is the way. No coral --hub text, no copy box, no Copy button;
-// the other machines are pointed to Remote access in Settings (never a bare --host 0.0.0.0 command, Security Reviewer); the switch row reads with a space between its title and its state. 1280 px, isolated dev
+// the other computers are set up over SSH (recommended, #15787), and nothing about Remote access or API keys (never a bare --host 0.0.0.0 command, Security Reviewer); the switch row reads with a space between its title and its state. 1280 px, isolated dev
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -20,7 +20,7 @@ const { coralReady } = require('./helpers/wait');
         const s = await ev(`(() => { const m = document.getElementById('editions-modal'); const last = [...m.querySelectorAll('.editions-actions button')].pop(); return { last: last.textContent.trim(), boxes: [...m.querySelectorAll('.editions-commands')].map(b => b.textContent.replace(/\\\\s+/g, ' ').trim()), copy: [...m.querySelectorAll('button')].filter(b => /^Copy/.test(b.textContent.trim())).length, all: m.textContent.replace(/\\s+/g, ' '), steps: [...m.querySelectorAll('.editions-steps li')].map(l => l.textContent.replace(/\\s+/g, ' ').trim()).join(' | ') }; })()`);
         if (s.last !== 'Close') problems.push(`the last button reads Close (it reads "${s.last}")`);
         if (s.boxes.length !== 0 || /coral --hub|0\.0\.0\.0|--host/.test(s.all)) problems.push('no command is shown anywhere in the dialog: ' + JSON.stringify(s.boxes) + ' ' + s.all);
-        if (!/Remote access/.test(s.steps) || !/Settings/.test(s.steps) || !/unencrypted/i.test(s.steps)) problems.push('the other machines are pointed to Remote access in Settings, which is unencrypted unless TLS is set up: ' + s.steps);
+        if (!/Computers.*Set up over SSH.*installs, verifies and starts Coral.*nothing is opened to the network/.test(s.steps) || /Remote access|API key|Add computer|unencrypted|TLS/.test(s.all)) problems.push('the steps are the switch, then Set up over SSH in the Computers tab, and the Remote access / API key way is not mentioned: ' + s.all);
         if (s.copy !== 0) problems.push(`no Copy button (${s.copy})`);
         if (/computerOff|computerOn|computerChecking/.test(s.all) || !/Run a hub on this computer\s+\S/.test(s.all)) problems.push('the switch title and its state are separated by a space: ' + s.all);
     } finally { await client.close(); }

@@ -181,15 +181,14 @@ function _connectHtml() {
     </div>`;
 }
 
-// No command is shown: people do not start Coral from a terminal, so the switch below is the way. The other machines are not given a command either: listening on the network is Remote access in Settings, which says what it allows and that it is unencrypted unless TLS is set up.
+// No command is shown: people do not start Coral from a terminal, so the switch below is the way. The other computers are set up over SSH from the Computers tab (#15787: nothing is opened to the network); the Remote access and API key route is not mentioned here, it is too difficult for this dialog.
 function _ownHubHtml() {
     return `<div class="modal-content dlg-form editions-content">
         <h2 id="editions-title" class="editions-title">Run your own hub</h2>
         <p class="editions-sub">Turn this Coral into a hub and connect remote computers running Coral, for one unified view of all your agents. Self-hosted.</p>
         <ol class="editions-steps">
             <li>On the computer you'll use as the hub, turn on the switch below.</li>
-            <li>On each other computer, start Coral, turn on <strong>Remote access</strong> in Settings &rsaquo; Network and Hub (it says what that allows, and that it is unencrypted unless TLS is set up), and copy its API key.</li>
-            <li>In the hub's <strong>Computers</strong> tab, add each computer with its address and key.</li>
+            <li>In the hub's <strong>Computers</strong> tab, choose <strong>Set up over SSH</strong>: the hub installs, verifies and starts Coral on that computer for you, and nothing is opened to the network.</li>
         </ol>
         <div id="editions-own-slot"></div>
         <a class="editions-guide" href="${escapeAttr(OWN_HUB_GUIDE_URL)}" target="_blank" rel="noopener">Read the guide<span class="material-icons" aria-hidden="true">open_in_new</span></a>
