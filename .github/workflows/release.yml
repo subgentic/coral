@@ -77,7 +77,7 @@ jobs:
           bash tests/release/verify_release_fake_identity_test.sh   # verify-release refuses a program holding the updater rehearsal's fake identity (#6290)
           bash tests/release/release_homes_test.sh
           bash tests/release/download_section_test.sh   # the Download section of the notes (#5467); no network
-          bash tests/release/test_release_upload_loop.sh # the upload step itself, with a stand-in gh and cosign, incl. the Dropbox tier with no MSI; no network
+          bash tests/release/test_release_upload_loop.sh # the upload step itself, with a stand-in gh and cosign, incl. a release with no MSI refused; no network
           bash tests/release/approve_release_test.sh    # the Approve release workflow's script (#5559); a stand-in gh, no network
           bash tests/release/update_tap_test.sh         # the cask move (#5559); a local bare repository, no network
           bash tests/release/release_cadence_test.sh    # the cadence table (#5559); a stand-in gh, no network
@@ -259,8 +259,8 @@ jobs:
           if ($env:BUILD_TAGS -eq 'fts5' -and -not $env:POSTHOG_PROJECT_KEY) { throw 'vars.POSTHOG_PROJECT_KEY is empty: a prod-tier build would send no install events' }
           $ldflags = "-s -w -X github.com/subgentic/coral/internal/config.PostHogKey=$env:POSTHOG_PROJECT_KEY -X github.com/subgentic/coral/internal/config.Version=$version"
           $buildTags = $env:BUILD_TAGS
-          # The exes' version information (what the taskbar and Task Manager name the app by): this release's version and the tier's product name.
-          $product = if (",$buildTags," -like "*,dropboxers,*") { "Coral For Dropbox" } else { "Coral" }
+          # The exes' version information (what the taskbar and Task Manager name the app by): this release's version and the product name.
+          $product = "Coral"
           # This rewrites the four TRACKED rsrc_windows_amd64.syso files (Go links a .syso only from the package's own folder), so the Windows programs' build info
           # says vcs.modified=true. That is true and stays true (#6184); tools/verify-release.sh accepts it for GOOS=windows only, with vcs.revision still equal
           # to the tag's commit, and Windows leans on the signature and the attestation for the rest.
@@ -354,7 +354,7 @@ jobs:
           }
           echo "SIGNTOOL=$signtool" >> $env:GITHUB_ENV
 
-      # The package version, for the portable ZIP's name too (the MSI step below is skipped for the Dropbox tier).
+      # The package version, for the portable ZIP's name too.
       - name: Resolve the Windows package version
         env:
           REF_NAME: ${{ github.ref_name }}
@@ -363,9 +363,7 @@ jobs:
           if (-not ($version -match "^\d+\.\d+\.\d+")) { $version = "0.0.0" }
           echo "VERSION=$version" >> $env:GITHUB_ENV
 
-      # The Coral For Dropbox tier ships no MSI (operator decision, 2026-10-21): only its portable ZIP. Every MSI step is skipped for it.
       - name: Install WiX and build MSI
-        if: ${{ !contains(format(',{0},', needs.resolve.outputs.build_tags), ',dropboxers,') }}
         env:
           # A tag name may hold $( ) and quotes: it reaches the script as data, never as script text.
           REF_NAME: ${{ github.ref_name }}
@@ -384,7 +382,7 @@ jobs:
           echo "VERSION=$version" >> $env:GITHUB_ENV
 
       - name: Sign MSI
-        if: ${{ vars.WINDOWS_SIGNING == 'true' && !contains(format(',{0},', needs.resolve.outputs.build_tags), ',dropboxers,') }}
+        if: ${{ vars.WINDOWS_SIGNING == 'true' }}
         uses: ./.github/actions/windows-sign   # a local action: its nested actions/cache@v4 is resolved only when this step runs
         with:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -397,13 +395,13 @@ jobs:
           files-folder-filter: msi
 
       - name: Verify signed MSI
-        if: ${{ vars.WINDOWS_SIGNING == 'true' && !contains(format(',{0},', needs.resolve.outputs.build_tags), ',dropboxers,') }}
+        if: ${{ vars.WINDOWS_SIGNING == 'true' }}
         run: |
           & $env:SIGNTOOL verify /pa /v $env:MSI_PATH
           if ($LASTEXITCODE -ne 0) { throw "signtool verify failed: MSI" }
 
       - name: Check the signed MSI against the updater's pins
-        if: ${{ vars.WINDOWS_SIGNING == 'true' && !contains(format(',{0},', needs.resolve.outputs.build_tags), ',dropboxers,') }}
+        if: ${{ vars.WINDOWS_SIGNING == 'true' }}
         working-directory: coral-go
         env:
           CORAL_SIGNED_MSI: ${{ env.MSI_PATH }}
@@ -439,7 +437,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "smoke_windows.ps1 failed" }
 
       - name: Upload MSI artifact
-        if: ${{ !contains(format(',{0},', needs.resolve.outputs.build_tags), ',dropboxers,') }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coral-windows-msi
@@ -896,17 +893,14 @@ jobs:
           BUILD_TAGS: ${{ needs.resolve.outputs.build_tags }}
         run: |
           TAG="${GITHUB_REF_NAME}"
-          # The Coral For Dropbox tier ships no MSI (operator decision, 2026-10-21): its portable ZIP is kept, the MSI is neither
-          # required nor uploaded, copied or checksummed.
           MSI=(artifacts/coral-windows-msi/*.msi)
           MSI_STABLE=(Coral-x64.msi)
-          case ",$BUILD_TAGS," in *,dropboxers,*) MSI=(); MSI_STABLE=() ;; esac
           MSI_SUM=("${MSI[@]#artifacts/}")
           # A DRAFT until every file is attached and the last step publishes it (#5522): an immutable release (a
           # repository setting) takes no new asset and no deletion once published, so nothing is uploaded after that;
           # its notes, title and prerelease flag stay editable (tools/devops/finish-release.sh sets the body).
-          # Create the release unless it exists (a re-run of a draft). Test tiers (-dev, -beta, -rc,
-          # -forDropbox) are prereleases and never "Latest": installed Corals offer the
+          # Create the release unless it exists (a re-run of a draft). Test tags (-dev, -rc and the retired
+          # -beta and -forDropbox) are prereleases and never "Latest": installed Corals offer the
           # latest release as an update (resolve_release.sh decides). A failed create fails
           # the step here, not as a misleading upload error later (#3855).
           # Release channels (#5551): EVERY release is published as a pre-release that is not "latest" (the AGENTIC channel);

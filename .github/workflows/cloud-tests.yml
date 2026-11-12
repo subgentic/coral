@@ -85,9 +85,9 @@ jobs:
       - name: reachable vulnerabilities (govulncheck, the whole module, every tier's tag set)
         working-directory: coral-go
         # A reachable finding fails the step (govulncheck exits non-zero). The tag sets are the
-        # release tiers' (prod, dev, dropboxers, beta), each with fts5 as the builds use (#3675).
+        # release tiers' (prod and dev; the beta and dropboxers tiers are gone, #15075), each with fts5 as the builds use (#3675).
         run: |
-          for tags in fts5 fts5,dev fts5,dropboxers fts5,beta; do
+          for tags in fts5 fts5,dev; do
             echo "== govulncheck -tags $tags"
             go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 -tags "$tags" ./...
           done

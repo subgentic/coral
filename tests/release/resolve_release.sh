@@ -3,8 +3,8 @@
 # The one place for the tier logic: the build tags each job passes to go build, whether the
 # GitHub release is a prerelease, the version, and the shipped program lists.
 #   version       the tag without its leading v, suffix included
-#   build_tags    fts5, plus the tier's tag: -forDropbox dropboxers, -beta beta, -dev dev
-#                 (checked in that order, as release.yml always did); prod has none
+#   build_tags    fts5, plus dev for a -dev tag; prod has none. The beta and dropboxers tiers are gone
+#                 (#15075): an old -beta or -forDropbox tag still parses, as a prerelease that builds prod
 #   prerelease    true for -dev, -beta, -rc and -forDropbox (never "Latest"), else false
 #   commands      tests/release/commands.txt, space separated
 #   gui_commands  tests/release/gui_commands.txt, space separated
@@ -14,8 +14,6 @@ here="$(cd "$(dirname "$0")" && pwd)"
 list() { grep -vE '^[[:space:]]*(#|$)' "$here/$1" | tr '\n' ' ' | sed 's/ *$//'; }
 build_tags=fts5
 case "$tag" in
-  *-forDropbox*) build_tags=fts5,dropboxers ;;
-  *-beta*) build_tags=fts5,beta ;;
   *-dev*) build_tags=fts5,dev ;;
 esac
 prerelease=false
