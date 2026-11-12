@@ -735,6 +735,9 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     margin-top: 16px;
 }
 
+/* One dialog footer (#15816, guideline 4.8): Cancel then the one Primary at the right; a destructive action is a Quiet button alone at the far left, whatever its place in the markup. */
+.modal-actions > .btn-quiet.btn-danger { order: -1; margin-inline-end: auto; border-color: transparent; background: transparent; } /* Quiet: no box (the later .btn-danger edge in theme-configurator.css would draw one) */
+
 .launch-modal-step {
     flex: 1;
     flex-direction: column;
