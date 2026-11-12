@@ -410,6 +410,15 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 		return ok
 	}
 	notifyTray := func(msg string) { _ = beeep.Notify("Coral", msg, "") }
+	// The window of the start that follows an update the person clicked is brought forward once (#15772): the record is taken at every start, so it is never used twice.
+	raiseAfterUpdate := windowmark.TakeRaise(dataDir, time.Now(), raiseAfterUpdateMaxAge)
+	showWindowAtStart := func() bool {
+		opened := showWindow()
+		afterWindowShown(opened, raiseAfterUpdate, func() bool {
+			return raiseOnce(raiseCoralAppNow, 10, 500*time.Millisecond, time.Sleep)
+		})
+		return opened
+	}
 	onShowWindowSignal(func() {
 		go func() {
 			defer safego.Recover("coral-tray/main:showWindowSignal")
@@ -418,7 +427,7 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 			}
 		}()
 	})
-	startWindowAtLaunch(noBrowser, loginItemLaunch(), windowmark.EverShown(dataDir), status.running, showWindow, notifyTray)
+	startWindowAtLaunch(noBrowser, loginItemLaunch(), windowmark.EverShown(dataDir), status.running, showWindowAtStart, notifyTray)
 
 	// Check for updates in background
 	go func() {
@@ -921,6 +930,21 @@ func raiseCoralApp() {
 		)
 		exec.Command("osascript", "-e", script).Run()
 	}
+}
+
+// raiseCoralAppNow brings the running coral-app window to the front and says whether it could: an error while the window's process is not up yet, so the caller tries again (#15772).
+func raiseCoralAppNow() error {
+	coralAppMu.Lock()
+	p := coralAppProcess
+	coralAppMu.Unlock()
+	if p == nil {
+		return fmt.Errorf("the window is not started")
+	}
+	if runtime.GOOS != "darwin" {
+		return nil // only macOS has a way to bring another process's window forward from here; the others open it in front
+	}
+	script := fmt.Sprintf(`tell application "System Events" to set frontmost of (first process whose unix id is %d) to true`, p.Pid)
+	return exec.Command("osascript", "-e", script).Run()
 }
 
 // isInsideAppBundle detects if the binary is running inside a macOS .app bundle

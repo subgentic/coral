@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,4 +41,24 @@ func TestNoteShownNeverWritesThroughALink(t *testing.T) {
 			assert.False(t, EverShown(dir), "a link is no record, and NoteShown did not turn it into one")
 		}
 	})
+}
+
+// #15772: the record that the person's click started the relaunch is taken once, only while it is fresh, and only a plain file counts.
+func TestTheRaiseRecordIsTakenOnceAndOnlyWhileFresh(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Now()
+	assert.False(t, TakeRaise(dir, now, 10*time.Minute), "no record: no raise")
+	NoteRaise(dir)
+	assert.True(t, TakeRaise(dir, now, 10*time.Minute), "a fresh record says yes")
+	assert.False(t, TakeRaise(dir, now, 10*time.Minute), "and only once")
+	NoteRaise(dir)
+	assert.False(t, TakeRaise(dir, now.Add(time.Hour), 10*time.Minute), "a leftover of an update that never came up says no")
+	_, err := os.Lstat(filepath.Join(dir, RaiseFileName))
+	assert.True(t, os.IsNotExist(err), "and is removed anyway")
+	NoteRaise(dir)
+	ClearRaise(dir)
+	assert.False(t, TakeRaise(dir, now, 10*time.Minute), "cleared")
+	require.NoError(t, os.Mkdir(filepath.Join(dir, RaiseFileName), 0o700))
+	assert.False(t, TakeRaise(dir, now, 10*time.Minute), "a folder at that name is not a record")
+	assert.False(t, TakeRaise("", now, time.Hour))
 }

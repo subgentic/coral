@@ -22,6 +22,7 @@ import (
 	"github.com/subgentic/coral/internal/updatecheck"
 	"github.com/subgentic/coral/internal/updater/runrecord"
 	"github.com/subgentic/coral/internal/updater/status"
+	"github.com/subgentic/coral/internal/windowmark"
 )
 
 // The real updater behind the relaunch routes (#5280, step 3 A): it runs nothing of its own. What the updater knows is read from "coral-update status --json" (a fixed argv, the program
@@ -83,10 +84,12 @@ type relaunchFailure struct {
 }
 
 type realUpdater struct {
-	dir  updatesDir
-	prog updaterProgram
-	quit func()
-	now  func() time.Time
+	dir updatesDir
+	// coralDir is the data folder: a relaunch the person clicked leaves a record there for the new tray to bring its window forward (#15772).
+	coralDir string
+	prog     updaterProgram
+	quit     func()
+	now      func() time.Time
 	// quitDelay is how long after the apply is ready quit is called (quitAfter unless a test says otherwise); readyWithin and readyPoll likewise.
 	quitDelay, readyWithin, readyPoll time.Duration
 
@@ -99,7 +102,7 @@ type realUpdater struct {
 // NewRealUpdater is the updater of a server whose data folder is coralDir: the program beside this one answers its questions, and quit ends this server (its graceful shutdown) after
 // a relaunch was started.
 func NewRealUpdater(coralDir string, quit func()) RelaunchUpdater {
-	return &realUpdater{dir: updatesDir{filepath.Join(coralDir, updatesDirName)}, prog: execProgram{}, quit: quit, now: time.Now}
+	return &realUpdater{coralDir: coralDir, dir: updatesDir{filepath.Join(coralDir, updatesDirName)}, prog: execProgram{}, quit: quit, now: time.Now}
 }
 
 var _ RelaunchUpdater = (*realUpdater)(nil)
@@ -332,8 +335,12 @@ func (u *realUpdater) Apply(ctx context.Context, by string) (string, error) {
 	u.mu.Unlock()
 
 	_ = u.dir.remove(status.ReadyFile) // a marker left by an earlier apply says nothing about this one
+	if st.Source == "local" {
+		windowmark.NoteRaise(u.coralDir) // the person's own click: the window that comes back is brought forward once (#15772); an automatic or Hub-asked install leaves none
+	}
 	run, err := u.prog.StartApply()
 	if err != nil {
+		windowmark.ClearRaise(u.coralDir)
 		u.mu.Lock()
 		_ = u.saveState(prev) // nothing started: the version may be tried again
 		u.cachedOK = false

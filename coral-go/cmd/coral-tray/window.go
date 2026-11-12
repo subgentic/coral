@@ -2,6 +2,7 @@ package main
 
 import (
 	"os/exec"
+	"time"
 
 	"github.com/subgentic/coral/internal/windowmark"
 )
@@ -58,4 +59,30 @@ func trackWindow(dataDir string, cmd *exec.Cmd, isCurrent func() bool) int {
 		return -1
 	}
 	return cmd.ProcessState.ExitCode()
+}
+
+// raiseAfterUpdateMaxAge is how old the record of a person's click may be for the tray that starts from that update to bring its window forward: the update takes about a minute, so ten is generous, and an
+// older record is a leftover of an update that never came up.
+const raiseAfterUpdateMaxAge = 10 * time.Minute
+
+// raiseOnce calls raise until it succeeds, at most tries times with wait between, and says whether it did: a window that has only just been started has no process to bring forward for a moment (#15772).
+func raiseOnce(raise func() error, tries int, wait time.Duration, sleep func(time.Duration)) bool {
+	for i := 0; i < tries; i++ {
+		if raise() == nil {
+			return true
+		}
+		if i < tries-1 {
+			sleep(wait)
+		}
+	}
+	return false
+}
+
+// afterWindowShown is what the tray does once its window opened at start: when the person's own click started the relaunch after an update, the window is brought forward, once (it came up behind
+// whatever they were using, #15772); any other start (a login item, an automatic install, the Hub's) leaves it where it is. The record is taken whether or not the window opened, so it is never used twice.
+func afterWindowShown(opened bool, taken bool, raise func() bool) bool {
+	if !opened || !taken {
+		return false
+	}
+	return raise()
 }

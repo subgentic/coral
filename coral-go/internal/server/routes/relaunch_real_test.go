@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/updater/status"
+	"github.com/subgentic/coral/internal/windowmark"
 )
 
 // Step 3 A: the real updater behind the relaunch routes. It reads "coral-update status --json", starts "coral-update apply" and ends the server; the routes still answer 404 until the
@@ -111,7 +112,7 @@ func newRealUpdater(t *testing.T, f *fakeProgram, quit func()) *realUpdater {
 	t.Helper()
 	var mu sync.Mutex
 	now := time.Date(2026, 10, 22, 6, 0, 0, 0, time.UTC)
-	u := &realUpdater{dir: updatesDir{filepath.Join(t.TempDir(), "updates")}, prog: f, quit: quit, quitDelay: time.Millisecond, readyPoll: 5 * time.Millisecond, readyWithin: 5 * time.Second,
+	u := &realUpdater{coralDir: t.TempDir(), dir: updatesDir{filepath.Join(t.TempDir(), "updates")}, prog: f, quit: quit, quitDelay: time.Millisecond, readyPoll: 5 * time.Millisecond, readyWithin: 5 * time.Second,
 		now: func() time.Time { mu.Lock(); defer mu.Unlock(); now = now.Add(time.Minute); return now }}
 	f.dir = &u.dir
 	if f.marker == nil {
@@ -658,4 +659,24 @@ func TestStateAndAuditRowsWithoutASourceStillDecode(t *testing.T) {
 	assert.Equal(t, "started", rows[0].Code)
 	assert.Empty(t, rows[0].Source, "an old row has none")
 	assert.Equal(t, "auto", rows[1].Source)
+}
+
+// #15772: the person's own click on Update and relaunch leaves a record in the data folder, so the tray that starts from the update brings its window forward once. An automatic install and the Hub's owner leave
+// none, and a relaunch that did not start takes it back.
+func TestOnlyThePersonsOwnRelaunchLeavesTheRaiseRecord(t *testing.T) {
+	for who, want := range map[string]bool{"local": true, "auto": false, "hub:hub-user-0a1b2c3d": false} {
+		f := &fakeProgram{out: readyStatus(), ready: make(chan struct{})}
+		u := newRealUpdater(t, f, func() {})
+		_, err := u.Apply(t.Context(), who)
+		require.NoError(t, err, who)
+		_, serr := os.Lstat(filepath.Join(u.coralDir, windowmark.RaiseFileName))
+		assert.Equal(t, want, serr == nil, who)
+		close(f.ready)
+	}
+	f := &fakeProgram{out: readyStatus(), startErr: errors.New("no updater")}
+	u := newRealUpdater(t, f, func() {})
+	_, err := u.Apply(t.Context(), "local")
+	require.Error(t, err)
+	_, serr := os.Lstat(filepath.Join(u.coralDir, windowmark.RaiseFileName))
+	assert.True(t, os.IsNotExist(serr), "an updater that did not start leaves no record")
 }
