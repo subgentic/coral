@@ -11,7 +11,9 @@ const { presetEnforcement, launchedMode } = await importOnce('./preset_enforceme
 const { initSectionDialog } = await importOnce('./section_dialog.js');
 const { segmentSelect } = await importOnce('./segmented.js');
 const { launchFlags } = await importOnce('./launch_flags.js');
+await loadStyles('acf_full_access.css'); // the Full access box's layout: not at start (#15719)
 import { escapeHtml, escapeAttr } from './utils.js';
+import { loadStyles } from './lazy_styles.js';
 import { restartHint } from './codex_mode.js';
 import { mountSettingsView } from './settings_view.js';
 const _mk0 = "<details class=\"acf-tools-details\"><summary title=\"Which tools this agent may use without asking, and which it may not.\">Tool permissions <span class=\"acf-perms-summary settings-hint\"></span></summary>";
@@ -320,7 +322,7 @@ function acfAutoPermissionsHtml(container, opts, { showAutoPermissions, agentTyp
                 ${liveNote}
                 ${codexNote}
             </label>
-            ${opts.offerUseFullAccess ? `<label class="acf-use-full-access" hidden><input type="checkbox" class="acf-use-full-access-input"> Use Full access for this agent
+            ${opts.offerUseFullAccess ? `<label class="acf-use-full-access" hidden><input type="checkbox" class="acf-use-full-access-input"> <span class="acf-use-full-access-name">Use Full access for this agent</span>
                 <span class="settings-hint">It runs with Full access whatever its role's capabilities say, and every time it restarts. Only you can set it.</span>
             </label>` : ''}`;
     }

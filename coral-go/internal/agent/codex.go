@@ -322,7 +322,7 @@ func (a *CodexAgent) LaunchCommand(params LaunchParams) (string, error) {
 		parts = append(parts, "-c", instructions)
 	}
 	version := ""
-	if CodexVersionProbe != nil {
+	if CodexVersionProbe != nil && !params.PermissionPreview { // the version only decides which hook events are installed: not a permission argument
 		version = CodexVersionProbe(params.CLIPath)
 	}
 	parts = append(parts, codexHookArgsFor(params.SessionID, codexHookEventsFor(version))...)

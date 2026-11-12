@@ -1,0 +1,2 @@
+/* The exact flags a launch adds for the chosen permissions (#15719): the New agent recap's last line. Lazy: loaded by launch_recap.js, not at start. */
+.launch-recap-flags code { font-family: var(--font-mono); font-size: var(--fs-base); color: var(--text-primary); overflow-wrap: anywhere; }

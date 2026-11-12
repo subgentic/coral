@@ -1,0 +1,6 @@
+/* The "Use Full access for this agent" box (#15719): the box beside its name, the sentence under the name (it stood alone above the text and the name ran into the sentence). Lazy: loaded by agent_config_form.js, not at start. */
+.acf-use-full-access { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--space-md); row-gap: 2px; align-items: start; margin-top: var(--space-lg, 12px); cursor: pointer; }
+.acf-use-full-access[hidden] { display: none; }
+.acf-use-full-access > input { grid-row: 1; grid-column: 1; margin: 2px 0 0; }
+.acf-use-full-access > .acf-use-full-access-name { grid-row: 1; grid-column: 2; font-weight: var(--fw-medium); }
+.acf-use-full-access > .settings-hint { grid-row: 2; grid-column: 2; display: block; margin: 0; }

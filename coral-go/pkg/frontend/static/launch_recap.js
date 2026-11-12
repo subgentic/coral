@@ -2,7 +2,11 @@
  * fields (the fields stay the one place that sets anything), so it can never say one thing and the launch another. */
 import { modelName } from './model_labels.js';
 import { importOnce } from './import_once.js';
+import { loadStyles } from './lazy_styles.js';
+import { serverFetch } from './server_base.js';
 const { permissionDescription, PI_NO_PERMISSIONS } = await importOnce('./permission_flags.js'); // lazy like launch_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
+
+await loadStyles('launch_recap_flags.css'); // the flags line's rules: not at start
 
 const container = () => document.getElementById('launch-agent-acf');
 const TYPE = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', antigravity: 'Antigravity', gemini: 'Antigravity', pi: 'Pi' };
@@ -33,6 +37,52 @@ const shortPath = p => (typeof window !== 'undefined' && window.matchMedia && wi
 
 /** Put the recap right for what the form holds now (the nodes are replaced only when the words changed). */
 export function syncRecap() {
+    paintRecap();
+    syncFlags();
+}
+
+// The exact flags Coral adds for the chosen permissions (#15719), as the server's launch builders give them (POST /api/launch/permission-args: one source of truth, never a second copy here), in the recap's last line.
+const flagsCache = new Map(); // request body -> the answer
+let flagsShown = '', flagsTimer = 0, flagsSeq = 0;
+function flagsBody() {
+    const acf = container(), cfg = acf && window.getAgentConfig?.('launch-agent-acf');
+    if (!cfg || !cfg.agentType || cfg.agentType === 'terminal') return null;
+    return { agent_type: cfg.agentType, permission_mode: cfg.permissionMode || '', flags: String(cfg.flags || '').split(/\s+/).filter(Boolean), keep_full_access: !!cfg.useFullAccess, ...(cfg.capabilities ? { capabilities: cfg.capabilities } : {}) };
+}
+function paintFlags(answer, type) {
+    const el = document.getElementById('launch-recap');
+    if (!el) return;
+    el.querySelector('.launch-recap-flags')?.remove();
+    if (!answer) return;
+    const line = document.createElement('span'); line.className = 'launch-recap-note launch-recap-flags';
+    const text = answer.text || '';
+    if (type === 'pi') line.textContent = 'Adds no permission flags: Pi has none.';
+    else if (!text) line.textContent = `Adds no permission flags: ${TYPE[type] || type} starts in its own default.`;
+    else { const code = document.createElement('code'); code.textContent = text; line.append('Adds ', code, ' to the command.'); }
+    el.append(line);
+}
+function syncFlags() {
+    const body = flagsBody();
+    if (!body) { flagsShown = ''; paintFlags(null); return; }
+    const key = JSON.stringify(body);
+    if (flagsCache.has(key)) { flagsShown = key; paintFlags(flagsCache.get(key), body.agent_type); return; }
+    if (flagsShown !== key) { flagsShown = ''; paintFlags(null); } // the old answer is not this choice's: no line until the new one arrives, never a stale one
+    clearTimeout(flagsTimer);
+    const seq = ++flagsSeq;
+    flagsTimer = setTimeout(async () => {
+        try {
+            const server = (await importOnce('./launch_models.js'))._acfServer(container());
+            const r = await serverFetch(server, '/api/launch/permission-args', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: key });
+            if (!r.ok) return;
+            const answer = await r.json();
+            if (!Array.isArray(answer.args)) return;
+            flagsCache.set(key, answer);
+            if (seq === flagsSeq) { flagsShown = key; paintFlags(answer, body.agent_type); }
+        } catch { /* no line: the recap above still says the mode */ }
+    }, 120);
+}
+
+function paintRecap() {
     const el = document.getElementById('launch-recap'), p = recapParts();
     if (!el || !p) return;
     const folder = shortPath(p.folder), text = `${p.name ? p.name + ': ' : ''}${p.provider}, ${folder}, ${p.model}${p.mode ? ', ' + p.mode + ' mode' : ''}`;
@@ -42,6 +92,7 @@ export function syncRecap() {
     const b = s => { const e = document.createElement('b'); e.textContent = s; return e; };
     const dash = /isolated/i.test(note) ? note.indexOf(' \u2014 ') : -1; // a mode that is only safe somewhere (Bypass: "...isolated containers and VMs only") keeps its warning in two words: the whole sentence is its hover
     const line = note ? [Object.assign(document.createElement('span'), { className: 'launch-recap-note', textContent: dash > 0 ? `\u26a0 ${note.slice(dash + 3).charAt(0).toUpperCase()}${note.slice(dash + 4)}` : note, title: dash > 0 ? note : '' })] : [];
+    flagsShown = ''; // the replaced nodes took the flags line with them: syncFlags draws it again
     el.replaceChildren(...(p.name ? [b(p.name), ': '] : []), b(p.provider), ', ', Object.assign(b(folder), { title: folder === p.folder ? '' : p.folder }), `, ${p.model}`, ...(p.mode ? [', ', b(p.mode), ' mode'] : []), ...line);
 }
 
