@@ -16,10 +16,10 @@ const BOARD = 'two-mores-' + Date.now().toString(36);
         await ev(`fetch('/api/board/${BOARD}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Boss', job_title: 'Orchestrator' }) }).then(r => r.status)`);
         await ev(`T.state.liveSessions = []; T.render.renderLiveSessions([]); window.openTeamPage(${JSON.stringify(BOARD)}).then(() => true)`);
         await waitFor(`!!document.getElementById('team-page-more') && document.getElementById('team-page-more').getClientRects().length > 0`, 'the header button', 15000);
-        const names = await ev(`[...document.querySelectorAll('button, a, [role=tab]')].filter(e => e.getClientRects().length).map(e => e.textContent.trim().replace(/\\s+/g, ' ')).filter(Boolean)`);
+        const names = await ev(`[...document.querySelectorAll('button, a, [role=tab]')].filter(e => e.getClientRects().length).map(e => (e.getAttribute('aria-label') || e.textContent).trim().replace(/\\s+/g, ' ')).filter(Boolean)`);
         const dup = names.filter((n, i) => names.indexOf(n) !== i && /^More\b/.test(n));
         assert.deepEqual(dup, [], 'no two controls on the team page read More: ' + JSON.stringify(names.filter(n => /More|Actions/.test(n))));
-        assert.equal(await ev(`document.getElementById('team-page-more').textContent.trim()`), 'Actions', 'the header button says Actions');
+        assert.equal(await ev(`document.getElementById('team-page-more').textContent.trim()`), 'More', 'the header button says More (#15856)');
         console.log('PASS');
     } finally { try { await removeBoards(ev, [BOARD]); } catch (e) {} try { await client.close(); } catch (e) {} }
 })().catch(e => { console.error(e); process.exit(1); });

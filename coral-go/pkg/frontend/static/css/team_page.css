@@ -139,7 +139,7 @@
     .team-page-title { font-size: var(--fs-2xl); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: var(--fw-title); } /* 17/700, one line: at 200% text the header and the tabs stay near a quarter of the screen */
     .team-page-status { grid-column: 1; }
     .team-page-actions { grid-column: 2; grid-row: 1 / span 2; }
-    #team-page-add-agent, #team-page-settings, #team-page-stop, #team-page-stop-menu { display: none; }
+    #team-page-add-agent { display: none; }
     .team-page-health { min-height: 44px; grid-column: 1; }
     .team-tab[data-tab="knowledge"], .team-tab[data-tab="messages"], .team-tab[data-tab="branches"] { display: none; } /* behind More: the row never scrolls sideways */
     .team-tabs-row > .team-tab-more { display: inline-flex; align-items: center; flex: none; margin: 6px 8px 0 0; padding: 0 8px; }
@@ -504,7 +504,7 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
 .team-task-page .task-jump-role { color: var(--text-secondary); }
 @media (pointer: coarse), (max-width: 767px) { .team-task-page .task-jump-btn { min-height: var(--control-touch-height, 44px); } }
 /* Give each destructive team action its own boundary; the menu still scrolls on phones. */
-:is(#team-page-stop-menu, #team-page-more-menu) > :is([data-stop="kill"], #mb-delete-btn) {
+:is(#team-page-more-menu) > :is([data-stop="kill"], #mb-delete-btn) {
     margin-top: 12px;
     border-top: 1px solid var(--border);
 }
