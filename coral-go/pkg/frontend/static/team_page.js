@@ -169,7 +169,7 @@ function buildMore() {
     const tpl = Object.assign(el('button', 'menu-item', 'Save as template'), { type: 'button', id: 'team-page-more-template', onclick: () => window.saveTeamFromSidebar?.(S.team) });
     menu.append(add, settings, tpl);
     host.append(b, menu);
-    const set = (open, { focus = false } = {}) => { moreOpen = open; menu.hidden = !open; b.setAttribute('aria-expanded', String(open)); if (open) menu.querySelector('button:not([hidden])')?.focus(); else if (focus) b.focus(); };
+    const set = (open, { focus = false } = {}) => { moreOpen = open; menu.hidden = !open; b.setAttribute('aria-expanded', String(open)); if (open) menu.style.setProperty('--more-max', `${Math.max(160, Math.floor(innerHeight - menu.getBoundingClientRect().top - 12))}px`); /* the room under the button: at 200% text the header is tall and the menu must scroll inside the window, not run off it (#15856) */ if (open) menu.querySelector('button:not([hidden])')?.focus(); else if (focus) b.focus(); };
     b.addEventListener('click', () => { syncStop(); set(!moreOpen); }); // the Stop items in it follow the team (asleep or not) each time it opens
     menu.addEventListener('click', (e) => { if (e.target.closest('button')) set(false); });
     document.addEventListener('keydown', (e) => { if (moreOpen && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); set(false, { focus: true }); } }, true);
