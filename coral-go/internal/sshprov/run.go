@@ -234,6 +234,16 @@ type Runner struct {
 	KnownHosts string
 	// Config is the owner's ssh config that the alias scan includes (ScanAlias); empty means DefaultConfigPath().
 	Config string
+	// HopTimeout bounds each ssh -G that names a jump host after a refused host key (default 10s). A slower ssh gives no names, and the sentence then says only that a jump host's key is unknown.
+	HopTimeout time.Duration
+}
+
+// hopTimeout is the limit of one ssh -G of the hop lookup.
+func (r Runner) hopTimeout() time.Duration {
+	if r.HopTimeout > 0 {
+		return r.HopTimeout
+	}
+	return 10 * time.Second
 }
 
 // Result is what a command printed and how it ended.
