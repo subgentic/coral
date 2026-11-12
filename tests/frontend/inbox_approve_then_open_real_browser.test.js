@@ -78,7 +78,9 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 const p = await where(n, part); check(!!p, at + `${label}: found ${n}'s ${part}`); if (!p) return;
                 await click(p.x, p.y);
                 const ok = await waitFor(`!!document.querySelector('#artifact-viewer:not([hidden])')`, at + `${label}: the viewer opens`, 6000).then(() => true, () => false);
-                check(ok, at + `${label}: a click on ${n}'s ${part} opens it (hit ${JSON.stringify(p)})`);
+                const seen = ok ? '' : await ev(`(() => { const e = document.elementFromPoint(${p.x}, ${p.y}), v = document.getElementById('artifact-viewer'), tr = e && e.closest('tr'); return JSON.stringify({ at: e && (e.tagName + '.' + String(e.className).slice(0, 60)), row: tr && tr.className.slice(0, 80), viewer: v ? { hidden: v.hidden, display: getComputedStyle(v).display } : null, folded: !!document.querySelector('${T} .dt-folded'), w: innerWidth, errors: ${JSON.stringify(pageErrors.slice(-3))} }); })()`);
+                check(ok, at + `${label}: a click on ${n}'s ${part} opens it (hit ${JSON.stringify(p)}; ${seen})`);
+                if (!ok) return; // nothing opened: there is no viewer to close (a null close button threw here)
                 await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
                 await waitFor(`document.getElementById('artifact-viewer').hidden`, at + `${label}: the viewer closes`, 4000).catch(() => {});
                 await new Promise(r => setTimeout(r, 400)); // sleep-ok: the viewer's close
