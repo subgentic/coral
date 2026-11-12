@@ -15,6 +15,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`import(${MOD} + 'state.js').then(async s => { const d = await fetch('/api/settings').then(r => r.json()); s.state.settings = d.settings; return import(${MOD} + 'modals.js'); }).then(m => m.showSettingsModal('agents')).then(() => true)`);
         await waitFor(`!!document.getElementById('settings-permission-mode') && (document.querySelector('#settings-permission-mode.seg-source + .seg-list') || document.getElementById('settings-permission-mode')).getClientRects().length > 0`, 'the permission row', 10000);
         await ev(`(() => { const s = document.getElementById('settings-permission-mode'); s.value = s.value === 'plan' ? 'default' : 'plan'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+        await waitFor(`document.getElementById('settings-permission-mode').dataset.saving !== '1'`, 'permission row saved');
         await ev(`document.getElementById('settings-permission-mode').closest('.sv-row').querySelector('a.sv-learn').click(); true`);
 
     };
@@ -22,7 +23,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await open();
-        await waitFor(`location.pathname === '/docs/settings-system' && getComputedStyle(document.getElementById('settings-modal')).display === 'none'`,'Docs opens directly after autosave');
+        await waitFor(`location.pathname === '/docs/how-do-i' && getComputedStyle(document.getElementById('settings-modal')).display === 'none'`,'Docs opens directly after autosave');
         assert.equal(await ev(`getComputedStyle(document.getElementById('confirm-modal')).display`),'none','no discarded-changes question');
         assert.equal(await ev(`!!document.getElementById('settings-save-btn')`),false);
 

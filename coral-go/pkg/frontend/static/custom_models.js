@@ -3,6 +3,7 @@
  * show them. The form edits a draft; Add model, Update model and Remove save that action immediately. The server checks every id and level again; the
  * id rule here only lets the form say what is wrong before the save. */
 import { requestJson } from './api.js';
+import { importOnce } from './import_once.js';
 import { mountSettingsView } from './settings_view.js';
 import { el as mk } from './dom_el.js'; // the add and edit form (a startup module)
 
@@ -16,6 +17,7 @@ export const MODEL_ID_RULE = VALID_ID;
 export const MODEL_ID_MISSING = 'Enter the model id the CLI takes after --model.';
 export const MODEL_ID_INVALID = 'Use letters, numbers and . _ : / @ [ ] + - only, starting with a letter or number, up to 128 characters.';
 
+let savedRevision = 0;
 let saved = {};           // what the server has, grouped by family: { family: [{ value, display_name, efforts }] }
 let draft = {};           // what the form shows
 let limits = { max_per_family: 50, efforts: {} };
@@ -94,7 +96,7 @@ function form(startProvider, index) {
             const entry = { value: String(values.value).trim(), display_name: String(values.display_name || '').trim().slice(0, MAX_NAME), efforts: [...(values[`efforts_${provider}`] || [])] };
             if (index >= 0) rows(provider)[index] = entry; else rows(provider).push(entry);
             try { await applyCustomModels(); feedback('Saved'); focusAfter(provider, index >= 0 ? index : rows(provider).length - 1); }
-            catch { draft=clone(saved); editing=null; render(); feedback('Not saved. Try again.'); }
+            catch (error) { draft=clone(saved); editing=null; render(); feedback(error.userMessage ? `Not saved. ${error.userMessage} Try again.` : 'Not saved. Try again.'); }
         },
         onCancel: () => { editing = null; render(); focusAdd(); },
     } });
@@ -120,7 +122,7 @@ function render() {
         const rm = mk('button', 'btn btn-small', 'Remove'); rm.type = 'button'; rm.setAttribute('aria-label', `Remove ${m.value}`);
         rm.addEventListener('click', async () => { rm.disabled=true; rows(provider).splice(i, 1); if (editing && editing.provider === provider) editing = null;
             try { await applyCustomModels(); feedback('Saved'); focusAdd(); }
-            catch { draft=clone(saved); render(); feedback('Not saved. Try again.'); }
+            catch (error) { draft=clone(saved); render(); feedback(error.userMessage ? `Not saved. ${error.userMessage} Try again.` : 'Not saved. Try again.'); }
         });
         li.append(text, chips(m), edit, rm); list.append(li);
     });
@@ -143,8 +145,10 @@ export async function initCustomModels() {
     host = document.getElementById('settings-custom-models');
     const row = host && host.closest('.sv-row');
     if (!host) return;
+    const revision = savedRevision;
     let data;
     try { data = await requestJson('GET', ROUTE); } catch { loaded = false; if (row) row.hidden = true; return; }
+    if (revision !== savedRevision) return; // a completed action is newer than this in-flight read
     // dirty is decided here, after the read and before `saved` is replaced: an edit made while the read was in flight, like one made before the refill, must not be thrown away (closing the dialog does)
     const kept = loaded && customModelsDirty();
     saved = group_by_family(data && data.models);
@@ -165,8 +169,11 @@ export async function applyCustomModels() {
         e.userMessage = typeof d.error === 'string' && d.error ? d.error : (typeof d.message === 'string' ? d.message : 'the custom models were not saved');
         throw e;
     }
+    savedRevision++;
     saved = data && Array.isArray(data.models) ? group_by_family(data.models) : clone(draft);
     draft = clone(saved); editing = null; render();
+    // Action saves need the same picker invalidation as the former combined Save.
+    try { const models = await importOnce('./launch_models.js'); models._invalidateAgentModels(); models._invalidateDefaultModels(); (await importOnce('./model_labels.js')).clearModelsCache(); } catch { /* persistence succeeded; a picker can refresh on its next read */ }
     return true;
 }
 

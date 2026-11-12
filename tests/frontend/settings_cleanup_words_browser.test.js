@@ -8,10 +8,12 @@ const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const guard = await require('./helpers/settings_guard').guardSettings();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
+            await fetch(BASE + '/api/settings', {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({artifact_retention_days:0})});
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev);
             await ev(`window.showSettingsModal('cleanup').then(() => true)`); // the dialog is shown at the end of this, after awaited requests: the retention field's loaded flag can come first, and its labels have no boxes until the dialog is shown (Windows CI, #7282)
@@ -36,5 +38,5 @@ const { coralReady } = require('./helpers/wait');
             }
         }
         console.log('PASS settings cleanup words');
-    } finally { await client.close(); }
+    } finally { await client.close(); await guard.restore(); }
 })().catch(e => { console.error(e); process.exit(1); });

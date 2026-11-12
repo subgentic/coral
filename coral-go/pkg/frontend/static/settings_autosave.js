@@ -54,11 +54,11 @@ async function persist(e) {
             await (await importOnce('./update_settings.js')).saveUpdateRow(e.id);
         } else await saveSettingsRow(payload);
         remember(e); say(row,'Saved');
-    } catch {
+    } catch (error) {
         write(e,before); remember(e);
         e.dispatchEvent(new Event('input', {bubbles:true}));
         e.dispatchEvent(new Event('change', {bubbles:true})); // repaint dependent help/rows while saving blocks another request
-        say(row,'Not saved. Try again.',true);
+        say(row,error?.userMessage ? `Not saved. ${error.userMessage} Try again.` : 'Not saved. Try again.',true);
         if (e.id === 'settings-theme') (await importOnce('./settings_core.js')).restoreSavedTheme().catch(() => {});
     } finally { group.forEach(i => { i.disabled = false; }); delete e.dataset.saving; }
 }

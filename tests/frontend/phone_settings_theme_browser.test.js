@@ -28,7 +28,6 @@ const { coralReady } = require('./helpers/wait');
         assert.deepEqual(t.options.slice(0, 3), ['Dark', 'Light', 'System'], 'Theme offers Dark, Light, System: ' + JSON.stringify(t));
         assert.ok(t.h >= 44 && t.top >= 0 && t.bottom <= t.vh && t.pane === 'General' && t.label === 'Theme', 'Theme is the General group\'s control, on the screen, 44 px: ' + JSON.stringify(t));
         await ev(`const s = document.getElementById('settings-theme'); s.value = 'light'; s.dispatchEvent(new Event('change', { bubbles: true })); true`);
-        await ev(`[...document.querySelectorAll('#settings-modal button, .settings-modal button')].find(b => /Save settings/.test(b.textContent)).click(); true`);
         await waitFor(`document.documentElement.getAttribute('data-theme') === 'light'`, 'the page goes light', 8000);
         assert.ok((await ev(`window.__saves`)).some(b => /"theme"\s*:\s*"light"/.test(b)), 'and Save sent theme light: ' + JSON.stringify(await ev(`window.__saves`)).slice(0, 200));
         console.log('PASS Theme: Light is findable and works on a phone');
