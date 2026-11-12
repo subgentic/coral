@@ -11,8 +11,9 @@ const BASE = require('./test_base').BASE;
     const client = await CDP({ port: Number(process.env.CDP_PORT || 9222) });
     const { Page, Runtime, Network, Fetch, Emulation } = client;
     const ev = async expression => { const r = await Runtime.evaluate({ expression, returnByValue: true, awaitPromise: true }); if (r.exceptionDetails) throw new Error(JSON.stringify(r.exceptionDetails).slice(0, 400)); return r.result.value; };
-    const { waitFor } = require('./helpers/wait').bind(ev);
+    const { waitFor, nextFrame } = require('./helpers/wait').bind(ev);
     let cloud = true;
+    let accountAnswered = 0; // GET /api/account answers given (the page reads it once per load); a slow answer is the point: the suite waits for it, it does not sleep for it (#15954)
     let account = { status: 200, body: { artifacts_tab: true, artifacts_frame: true } }; // what GET /api/account answers: {status, body} (body a string for an unreadable one)
     try {
         await Promise.all([Page.enable(), Runtime.enable(), Network.enable()]);
@@ -23,7 +24,7 @@ const BASE = require('./test_base').BASE;
         safePaused(client, async e => {
             const u = e.request.url;
             if (u.endsWith('/auth/session')) return reply(e.requestId, 200, { authenticated: true, email: 'tester@example.invalid', csrf: 'x' });
-            if (/\/api\/account(\?|$)/.test(u)) return reply(e.requestId, account.status, account.body);
+            if (/\/api\/account(\?|$)/.test(u)) { await new Promise(r => setTimeout(r, 900)); /* sleep-ok: a slow account answer, as a starved machine gives (longer than the old fixed 700 ms wait) */ const done = await reply(e.requestId, account.status, account.body); accountAnswered++; return done; }
             if (/\/api\/servers(\?|$)/.test(u)) return reply(e.requestId, 200, { servers: [] });
             if (/\/api\/sessions\/live(\?|$)/.test(u)) return reply(e.requestId, 200, cloud ? { sessions: [], servers: [] } : []);
             if (u === `${BASE}/artifacts`) return reply(e.requestId, 200, '<!doctype html><title>Artifacts (stand-in)</title><p>Artifacts</p>', 'text/html');
@@ -36,9 +37,14 @@ const BASE = require('./test_base').BASE;
         });
         const open = async (width = 1280, mobile = false) => {
             await Emulation.setDeviceMetricsOverride({ width, height: 800, deviceScaleFactor: 1, mobile });
+            const answered0 = accountAnswered;
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
             await waitFor(`document.body.classList.contains('cloud-mode') === ${cloud} && !!document.querySelector('.top-nav-tabs')`, 'the dashboard', { timeout: 15000 });
-            await new Promise(r => setTimeout(r, 700)); // sleep-ok: the account answer lands after the page starts
+            if (cloud) { // the account answer lands after the page starts: wait for it, then for the page to have read it (its read is the page's one, memoized), then a frame
+                for (const end = Date.now() + 15000; accountAnswered === answered0; await new Promise(r => setTimeout(r, 25))) if (Date.now() > end) throw new Error('GET /api/account was never asked');
+                await ev(`import((window.__coralStatic || '/static/') + 'account_info.js').then(m => m.readAccount()).then(() => true)`);
+                await nextFrame();
+            }
         };
         const tabShown = () => ev(`(() => { const t = document.getElementById('nav-tab-artifacts'); return !!t && !t.hidden && t.getClientRects().length > 0; })()`);
 
@@ -53,7 +59,7 @@ const BASE = require('./test_base').BASE;
         const f = await ev(`(() => { const x = document.getElementById('artifacts-frame'), v = document.getElementById('artifacts-view'), i = document.getElementById('inbox-frame'); return { src: x.getAttribute('src'), ref: x.getAttribute('referrerpolicy'), allow: x.getAttribute('allow'), title: x.getAttribute('aria-label') + '|' + x.title, cls: x.className, sandbox: x.getAttribute('sandbox'), parentOk: x.parentElement === v, shown: getComputedStyle(v).display !== 'none', region: v.getAttribute('role') + ':' + v.getAttribute('aria-label'), current: document.getElementById('nav-tab-artifacts').getAttribute('aria-current'), frames: document.querySelectorAll('iframe#artifacts-frame').length }; })()`);
         assert.deepEqual(f, { src: '/artifacts', ref: 'no-referrer', allow: '', title: 'Artifacts|', cls: 'inbox-frame', sandbox: null, parentOk: true, shown: true, region: 'region:Artifacts', current: 'page', frames: 1 });
         await ev(`document.getElementById('nav-tab-agents').click(); document.getElementById('nav-tab-artifacts').click(); true`);
-        await new Promise(r => setTimeout(r, 300)); // sleep-ok: the second visit settles
+        await nextFrame(); // the second visit settles (a frame is made in the click's own turn)
         assert.equal(await ev(`document.querySelectorAll('iframe#artifacts-frame').length`), 1, 'a second visit keeps the one frame');
 
         console.log('2. On a phone it is in the list of views, after Docs');
