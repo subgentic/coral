@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/sshprov"
 )
 
@@ -144,7 +145,7 @@ func (pr *Provisioner) Upload(w http.ResponseWriter, r *http.Request) {
 		errConflict(w, "this setup has already started")
 		return
 	}
-	if err := os.Rename(tmpName, final); err != nil {
+	if err := fsreplace.Rename(tmpName, final); err != nil { // a reader holding the destination fails os.Rename on Windows (#9738)
 		p.mu.Unlock()
 		writeError(w, http.StatusInternalServerError, "", "could not hold the uploaded file")
 		return

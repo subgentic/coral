@@ -333,7 +333,7 @@ func (pr *Provisioner) expireLocked() {
 			if p.cancel != nil {
 				p.cancel()
 			}
-			go p.removeUploads()
+			safego.Go("hub provision removes an expired plan's uploads", p.removeUploads)
 			delete(pr.plans, id)
 		}
 	}
