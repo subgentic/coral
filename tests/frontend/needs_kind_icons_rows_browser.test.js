@@ -58,7 +58,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const kinds = new Set(rows.map(r => r.kind).filter(Boolean));
             check(kinds.has('review') && kinds.has('other') || kinds.has('review') && rows.some(r => r.kind && r.kind !== 'review'), label + ': the list has a review row and a question row: ' + JSON.stringify(rows.map(r => [r.kind, r.text])));
             for (const r of rows.filter(x => x.kind)) {
-                check(Math.abs(r.withIcon - r.without) < 0.01, `${label}: a ${r.kind} row keeps its height (${r.withIcon} with the icon, ${r.without} without): ${r.text}`);
+                check(r.withIcon - r.without >= -0.01 && r.withIcon - r.without < (r.kind === 'ask' && /200%/.test(label) ? 40 : 0.01), /* #15722: a question's whole text now runs the row's width beside the icon's column, so at 200% text the icon's own column can push a long question onto one more line (the phone's allowance, below); every other row keeps its height exactly */ `${label}: a ${r.kind} row keeps its height (${r.withIcon} with the icon, ${r.without} without): ${r.text}`);
                 check(r.inRow && r.beforeWords, `${label}: a ${r.kind} row's icon is inside the row and in front of its words, not over them: ${JSON.stringify(r)}`);
             }
         }
