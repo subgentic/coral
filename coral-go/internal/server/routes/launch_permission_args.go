@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/subgentic/coral/internal/agent"
+	"github.com/subgentic/coral/internal/agentmodels"
 )
 
 // PostLaunchPermissionArgs is POST /api/launch/permission-args {agent_type, permission_mode, flags, keep_full_access, capabilities} (#15719): the permission arguments a launch with that choice would
@@ -16,6 +17,7 @@ func (h *SessionsHandler) PostLaunchPermissionArgs(w http.ResponseWriter, r *htt
 		Flags          []string            `json:"flags"`
 		KeepFullAccess bool                `json:"keep_full_access"`
 		Capabilities   *agent.Capabilities `json:"capabilities"`
+		Thinking       string              `json:"thinking"`
 	}
 	if err := decodeJSONLimit(r, &body, 16<<10); err != nil { // 16 KB: a choice of permissions is a few hundred bytes
 		errBadRequest(w, "send agent_type, permission_mode, keep_full_access and capabilities as JSON")
@@ -41,7 +43,16 @@ func (h *SessionsHandler) PostLaunchPermissionArgs(w http.ResponseWriter, r *htt
 			}
 		}
 	}
-	args, err := agent.LaunchPermissionArgs(body.AgentType, agent.LaunchParams{PermissionMode: body.PermissionMode, Flags: body.Flags, CLIPath: cliPath, KeepFullAccess: body.KeepFullAccess, Capabilities: body.Capabilities})
+	if !agentmodels.ValidThinking(body.AgentType, body.Thinking) {
+		errBadRequest(w, errInvalidThinking(body.AgentType))
+		return
+	}
+	if body.Thinking != "" { // the level is the CLI's one --effort, as the launch puts it
+		body.Flags = append(agentmodels.StripThinkingFlags(body.Flags), agentmodels.ThinkingArgs(body.AgentType, body.Thinking)...)
+	}
+	params := agent.LaunchParams{PermissionMode: body.PermissionMode, Flags: body.Flags, CLIPath: cliPath, KeepFullAccess: body.KeepFullAccess, Capabilities: body.Capabilities}
+	customNote := h.resolveCustomMode(r.Context(), body.AgentType, &params) // a custom mode adds its own flags, as every launch path does (#15950)
+	args, err := agent.LaunchPermissionArgs(body.AgentType, params)
 	if err != nil {
 		errBadRequest(w, "that choice cannot be launched: "+err.Error())
 		return
@@ -61,5 +72,13 @@ func (h *SessionsHandler) PostLaunchPermissionArgs(w http.ResponseWriter, r *htt
 			note = "No permission flags are added, so Codex's own settings (its config file) decide."
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"args": args, "text": strings.Join(args, " "), "note": note})
+	if note == "" {
+		note = customNote
+	}
+	// command: the agent's whole start command, read off the same builder (#15951), with what Coral makes up for the session as <placeholders>. "" when this agent has none to show.
+	command, cerr := agent.LaunchCommandPreview(body.AgentType, params)
+	if cerr != nil {
+		command = ""
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"args": args, "text": strings.Join(args, " "), "note": note, "command": command})
 }
