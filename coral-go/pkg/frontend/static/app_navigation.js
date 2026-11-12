@@ -111,6 +111,8 @@ export function switchNavTab(tab, opts = {}) {
         // Restore previously selected session or show welcome
         if (state.currentSession && state.currentSession.type === 'live') {
             showView('live-session-view');
+            // The tab's own click brings the agent back with the cursor in its message box (#15958); not on a phone (its branch is above), not in the Terminal view, and not when another page was in the middle of taking the keyboard.
+            if (opts.pointer && document.getElementById('capture-wrapper')?.classList.contains('chat-mode')) document.getElementById('command-input')?.focus({ preventScroll: true });
         } else {
             showView('welcome-screen');
         }

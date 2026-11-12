@@ -403,6 +403,8 @@ export async function selectLiveSession(name, agentType, sessionId, server, opts
 
     _loadAgentSecondary(name, sessionId, agentData, srv, generation, transcriptReady);
     // Open chat takes the keyboard to the chat (#9794): at a mouse into the composer, on a phone to the page's heading (no keyboard pops up). Last, after the view shows and the pane is built: nothing before it keeps focus. The sidebar's row keeps its own focus.
+    // A click on the row at a mouse (#15958): the early focus above does nothing while the agent's page is still hidden (from Home or another tab), so the box takes the cursor again once the chat shows. A phone, the Terminal view and a click that is not the row's own (a menu button) are left alone.
+    if (opts.pointer && !isPhoneLayout() && chatView && document.activeElement !== input) input.focus({ preventScroll: true });
     if (opts.focusChat) { if (isPhoneLayout()) { const h = document.getElementById('session-name'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } } else input.focus(); }
 }
 

@@ -184,7 +184,7 @@ registerActions({
     'm-new-goal-from-home': () => { importOnce('./home_goal.js').then(m => m.startGoalFromHome()).catch(() => {}); },
     'm-show-launch-modal-then-select-launch-type': el => { if (["agent", "team"].includes(el.dataset.arg)) { window.showLaunchModal(); window._selectLaunchType(el.dataset.arg); } },
     'm-switch-mobile-tab': el => { if (["agents", "board", "chat"].includes(el.dataset.arg)) { window.switchMobileTab(el.dataset.arg); } },
-    'm-switch-nav-tab': el => { if (["agents", "artifacts", "automations", "board", "docs", "history", "hub-inbox", "servers", "skills", "tokens"].includes(el.dataset.arg)) { window.switchNavTab(el.dataset.arg); } },
+    'm-switch-nav-tab': el => { if (["agents", "artifacts", "automations", "board", "docs", "history", "hub-inbox", "servers", "skills", "tokens"].includes(el.dataset.arg)) { window.switchNavTab(el.dataset.arg, el.dataset.arg === 'agents' ? { pointer: true } : {}); } }, // the Agents tab's own click or Enter brings the open agent back with the cursor in its box (#15958)
     'm-tmux-banner-close': () => { const b = document.getElementById('tmux-missing-banner'); if (b) b.style.display = 'none'; },
     'm-toggle-agentic-panel': () => { window.toggleAgenticPanel(); },
     'm-toggle-tablet-sidebar': () => { window.toggleTabletSidebar(); },
