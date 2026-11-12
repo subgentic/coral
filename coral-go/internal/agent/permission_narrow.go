@@ -199,6 +199,39 @@ func CodexModeNote(caps *Capabilities, mode string, keepFull bool) string {
 	return "The agent's capabilities narrow this mode to " + codexPairWords(narrowCodexPair(m, capPair)) + "."
 }
 
+// CodexAutoNote is the reason beside the flags line for an Auto pick (#15780): on a Codex that has it, Auto is Codex's own auto-review (--approve-for-me), said in words with what can still narrow
+// it; on an older one it keeps workspace writes that never ask, and says why. args are the permission flags the launch would type. "" for any other pick, and when the flags are not Auto's pair
+// (a role's Shell rule narrowed it: CodexModeNote says so).
+func CodexAutoNote(args, flags []string, mode string, keepFull bool) string {
+	if !codexAutoPick(LaunchParams{PermissionMode: mode, KeepFullAccess: keepFull}, flags) {
+		return ""
+	}
+	for _, a := range args {
+		if a == "--approve-for-me" {
+			return "Auto uses Codex's own auto-review (--approve-for-me): Codex's reviewer judges each approval request, and commands run in the workspace-write sandbox. A role's Shell rule that limits the agent still narrows it."
+		}
+	}
+	sandbox, approval := "", ""
+	for i := 0; i < len(args); i++ {
+		if kind, n := codexPermissionFlag(args, i); n > 0 {
+			v := args[i+n-1]
+			if n == 1 {
+				_, v, _ = strings.Cut(args[i], "=")
+			}
+			if kind == 's' {
+				sandbox = v
+			} else {
+				approval = v
+			}
+			i += n - 1
+		}
+	}
+	if sandbox == "workspace-write" && approval == "never" {
+		return "This Codex is older than " + codexApproveForMeMin + " (or its version is not known), which has Codex's own auto-review, so Auto keeps workspace writes with no approvals."
+	}
+	return ""
+}
+
 func codexPairWords(p codexPair) string {
 	approval := "asks first"
 	if p.approval == "never" {

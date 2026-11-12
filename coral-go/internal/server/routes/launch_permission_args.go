@@ -54,6 +54,9 @@ func (h *SessionsHandler) PostLaunchPermissionArgs(w http.ResponseWriter, r *htt
 	note := ""
 	if body.AgentType == "codex" {
 		note = agent.CodexModeNote(body.Capabilities, body.PermissionMode, body.KeepFullAccess)
+		if note == "" {
+			note = agent.CodexAutoNote(args, body.Flags, body.PermissionMode, body.KeepFullAccess)
+		}
 		if note == "" && len(args) == 0 {
 			note = "No permission flags are added, so Codex's own settings (its config file) decide."
 		}

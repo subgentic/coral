@@ -69,7 +69,7 @@ func permissionArgsOf(words []string) []string {
 				out = append(out, words[i+1])
 				i++
 			}
-		case "--dangerously-skip-permissions", "--dangerously-bypass-approvals-and-sandbox", "--yolo", "--full-auto":
+		case "--dangerously-skip-permissions", "--dangerously-bypass-approvals-and-sandbox", "--yolo", "--full-auto", "--approve-for-me":
 			out = append(out, w)
 		case "-c", "--config":
 			if i+1 < len(words) && strings.HasPrefix(words[i+1], "sandbox_workspace_write.") {

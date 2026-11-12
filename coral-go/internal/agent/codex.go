@@ -322,7 +322,7 @@ func (a *CodexAgent) LaunchCommand(params LaunchParams) (string, error) {
 		parts = append(parts, "-c", instructions)
 	}
 	version := ""
-	if CodexVersionProbe != nil && !params.PermissionPreview { // the version only decides which hook events are installed: not a permission argument
+	if CodexVersionProbe != nil { // the version decides which hook events are installed, and whether Auto is Codex's own auto-review (#15780: the flags line must show the same)
 		version = CodexVersionProbe(params.CLIPath)
 	}
 	parts = append(parts, codexHookArgsFor(params.SessionID, codexHookEventsFor(version))...)
@@ -347,6 +347,9 @@ func (a *CodexAgent) LaunchCommand(params LaunchParams) (string, error) {
 	}
 	parts = collapseCodexSandboxFlags(parts, presetApplied)
 	parts = codexCoralSandboxNetwork(parts, params)
+	if codexAutoPick(params, userFlags) && codexVersionAtLeast(version, codexApproveForMeMin) {
+		parts = useCodexAutoReview(parts)
+	}
 	if arg := codexActionPrompt(files, params); arg != "" {
 		raw = append(raw, arg)
 		// "--": a prompt that is only a flag ("--dangerously-skip-permissions") is the
@@ -426,6 +429,105 @@ var codexHookEvents = []string{"SessionStart", "UserPromptSubmit", "PreToolUse",
 // has the event (its hook input names hook_event_name PermissionRequest with tool_name and tool_input, its config key is permission_request); how far back it goes is not known, and a Codex
 // that does not know a hook key may refuse the launch's -c flag, so the hook is installed only for a Codex known to be at least this version, and for none whose version is not known.
 const codexPermissionRequestMin = "0.163.0"
+
+// codexApproveForMeMin is the first Codex known to have --approve-for-me (#15780): Codex's own auto-review, a guardian that judges each approval request inside the workspace-write sandbox. It was
+// seen on 0.163.0 (internal/agent/testdata/codex-0163-guardian.md); an earlier release that has it is not known, so an older or unreadable version keeps the --sandbox workspace-write -a never pair.
+const codexApproveForMeMin = "0.163.0"
+
+// codexAutoPick reports whether the launch is Codex's Auto pick, the one --approve-for-me stands in for: the Auto mode, or the flags the dashboard turns Auto into (--sandbox workspace-write -a never,
+// --full-auto). The same pair set only by an agent's capabilities (Shell with no deny, on a Default pick) is not: that agent was set up to run unattended, and nobody reviews for it.
+func codexAutoPick(params LaunchParams, userFlags []string) bool {
+	if params.KeepFullAccess {
+		return false
+	}
+	switch params.PermissionMode {
+	case "auto", "dontAsk":
+		return true
+	}
+	for i, f := range userFlags {
+		switch {
+		case f == "--full-auto":
+			return true
+		case f == "--permission-mode" && i+1 < len(userFlags):
+			if m := userFlags[i+1]; m == "auto" || m == "dontAsk" {
+				return true
+			}
+		case f == "--permission-mode=auto", f == "--permission-mode=dontAsk":
+			return true
+		}
+	}
+	sandbox, approval := "", ""
+	for i := 0; i < len(userFlags); i++ {
+		kind, n := codexPermissionFlag(userFlags, i)
+		if n == 0 {
+			continue
+		}
+		value := userFlags[i+n-1]
+		if n == 1 {
+			_, value, _ = strings.Cut(userFlags[i], "=")
+		}
+		if kind == 's' {
+			sandbox = value
+		} else {
+			approval = value
+		}
+		i += n - 1
+	}
+	return sandbox == "workspace-write" && approval == "never"
+}
+
+// useCodexAutoReview swaps the workspace-write sandbox and never-ask approval flags for --approve-for-me, which means the same sandbox with approval requests routed to the auto-review. Nothing
+// changes when the pair is anything else (a role's Shell rule narrowed it: it asks, or reads only), or a -c config set it.
+func useCodexAutoReview(parts []string) []string {
+	sandboxAt, approvalAt := -1, -1
+	for i := 0; i < len(parts); i++ {
+		if parts[i] == "--" {
+			break
+		}
+		if parts[i] == "-c" || parts[i] == "--config" {
+			i++
+			continue
+		}
+		kind, n := codexPermissionFlag(parts, i)
+		if n == 0 {
+			continue
+		}
+		value := parts[i+n-1]
+		if n == 1 {
+			_, value, _ = strings.Cut(parts[i], "=")
+		}
+		switch {
+		case kind == 's' && value == "workspace-write":
+			sandboxAt = i
+		case kind == 'a' && value == "never":
+			approvalAt = i
+		default:
+			return parts
+		}
+		i += n - 1
+	}
+	if sandboxAt < 0 || approvalAt < 0 {
+		return parts
+	}
+	out := make([]string, 0, len(parts))
+	for i := 0; i < len(parts); i++ {
+		switch i {
+		case sandboxAt:
+			out = append(out, "--approve-for-me")
+			i += lenOfCodexPermFlag(parts, i) - 1
+		case approvalAt:
+			i += lenOfCodexPermFlag(parts, i) - 1
+		default:
+			out = append(out, parts[i])
+		}
+	}
+	return out
+}
+
+func lenOfCodexPermFlag(parts []string, i int) int {
+	_, n := codexPermissionFlag(parts, i)
+	return n
+}
 
 // codexHookEventsFor are the hooks to install for a Codex of this version ("" when unknown).
 func codexHookEventsFor(version string) []string {
@@ -774,3 +876,6 @@ func codexCoralSandboxNetwork(parts []string, params LaunchParams) []string {
 	out = append(out, "-c", "sandbox_workspace_write.network_access=true")
 	return append(out, parts[insert:]...)
 }
+
+// CodexVersionAtLeast is codexVersionAtLeast for the tests of the packages that start Codex.
+func CodexVersionAtLeast(version, min string) bool { return codexVersionAtLeast(version, min) }

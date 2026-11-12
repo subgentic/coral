@@ -26,6 +26,9 @@ import (
 
 // codexPairOfCommand is what the typed command runs with: "bypass", or "<sandbox> <approval>" ("" for a part not typed: Codex's own config.toml then decides).
 func codexPairOfCommand(cmd string) string {
+	if strings.Contains(cmd, "--approve-for-me") {
+		return "approve-for-me"
+	}
 	if strings.Contains(cmd, "--dangerously-bypass-approvals-and-sandbox") {
 		return "bypass"
 	}
@@ -59,7 +62,20 @@ func (c codexMatrixCase) name() string {
 	return c.pick + k + cp
 }
 
-func TestCodexModeMatrix15727(t *testing.T) {
+func TestCodexModeMatrix15727(t *testing.T) { codexModeMatrix(t, "") }
+
+// #15780: on a Codex that has --approve-for-me (0.163.0 and later) Auto is Codex's own auto-review on every path that starts it again; every other pick, and Auto narrowed by a role's Shell rule, is as before.
+func TestCodexModeMatrixAutoReview15780(t *testing.T) { codexModeMatrix(t, "0.163.0") }
+
+// An older Codex keeps today's pair for Auto, on every path.
+func TestCodexModeMatrixOlderCodexKeepsAutoPair15780(t *testing.T) { codexModeMatrix(t, "0.162.4") }
+
+func codexModeMatrix(t *testing.T, version string) {
+	if version != "" {
+		old := agent.CodexVersionProbe
+		agent.CodexVersionProbe = func(string) string { return version }
+		t.Cleanup(func() { agent.CodexVersionProbe = old })
+	}
 	if runtime.GOOS == "windows" {
 		t.Skip("the fake CLI is a shell script")
 	}
@@ -84,7 +100,12 @@ func TestCodexModeMatrix15727(t *testing.T) {
 			return "(none: Codex's own config)"
 		case "default/narrow", "auto/narrow", "bypass/narrow":
 			return "workspace-write on-request"
-		case "default/wide", "auto/wide", "auto/":
+		case "auto/wide", "auto/":
+			if agent.CodexVersionAtLeast(version, "0.163.0") {
+				return "approve-for-me"
+			}
+			return "workspace-write never"
+		case "default/wide":
 			return "workspace-write never"
 		case "plan/", "plan/narrow", "plan/wide":
 			return "read-only on-request"

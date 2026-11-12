@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/agent"
 )
 
 // #15719: the dialog's line is the launch builders' answer for the chosen permissions.
@@ -57,4 +59,41 @@ func TestLaunchPermissionArgsRouteSaysWhyTheFlagsDifferFromThePick(t *testing.T)
 	assert.Contains(t, note(`{"agent_type":"codex","permission_mode":"default"}`), "Codex's own settings", "Default with no flags")
 	assert.Equal(t, "", note(`{"agent_type":"codex","permission_mode":"bypassPermissions"}`), "the pick's own flags run: no note")
 	assert.Equal(t, "", note(`{"agent_type":"claude","permission_mode":"default"}`), "no note for another agent")
+}
+
+// #15780: the flags line for Auto is Codex's own auto-review on a Codex that has it, with the reason beside it; an older Codex shows today's pair and says why; a role's Shell rule that narrows Auto shows the narrowed
+// pair and CodexModeNote's reason.
+func TestLaunchPermissionArgsRouteShowsCodexAutoReview(t *testing.T) {
+	old := agent.CodexVersionProbe
+	t.Cleanup(func() { agent.CodexVersionProbe = old })
+	h := &SessionsHandler{}
+	ask := func(version, body string) (string, string) {
+		agent.CodexVersionProbe = func(string) string { return version }
+		w := httptest.NewRecorder()
+		h.PostLaunchPermissionArgs(w, httptest.NewRequest(http.MethodPost, "/api/launch/permission-args", strings.NewReader(body)))
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var got struct {
+			Text string `json:"text"`
+			Note string `json:"note"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+		return got.Text, got.Note
+	}
+	const netOn = "-c sandbox_workspace_write.network_access=true " // Auto keeps the network on for Coral's own calls, either way
+	text, note := ask("0.163.0", `{"agent_type":"codex","permission_mode":"auto"}`)
+	assert.Equal(t, netOn+"--approve-for-me", text)
+	assert.Contains(t, note, "auto-review")
+	assert.Contains(t, note, "Shell rule")
+	text, note = ask("0.163.0", `{"agent_type":"codex","flags":["--sandbox","workspace-write","-a","never"]}`)
+	assert.Equal(t, netOn+"--approve-for-me", text, "the flags the dashboard sends for Auto")
+	assert.Contains(t, note, "auto-review")
+	text, note = ask("0.162.0", `{"agent_type":"codex","permission_mode":"auto"}`)
+	assert.Equal(t, netOn+"--sandbox workspace-write -a never", text)
+	assert.Contains(t, note, "older than 0.163.0")
+	text, note = ask("0.163.0", `{"agent_type":"codex","permission_mode":"auto","capabilities":{"allow":["shell"],"deny":["git_write"]}}`)
+	assert.Equal(t, "--sandbox workspace-write -a on-request", text, "a Shell rule narrows Auto")
+	assert.Contains(t, note, "narrow this mode")
+	text, note = ask("0.163.0", `{"agent_type":"codex","permission_mode":"plan"}`)
+	assert.Equal(t, "--sandbox read-only -a on-request", text)
+	assert.Equal(t, "", note)
 }
