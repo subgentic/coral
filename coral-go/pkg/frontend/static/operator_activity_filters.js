@@ -23,6 +23,18 @@ export const DECISION_LABEL = { approve: 'Approved', changes: 'Asked for changes
 export const DECISIONS = Object.keys(DECISION_LABEL);
 export const decisionOf = row => ({ ignore: 'dismiss', wait_dismiss: 'dismiss', inbox_hide: 'dismiss', prompt_answer: 'answer', prompt_allow: 'approve', prompt_reject: 'deny', skill_approve: 'approve', skill_reject: 'deny' }[row.action] || (DECISIONS.includes(row.action) ? row.action : ''));
 
+/** The kinds of action the folder's chips show (#15724, the Operator's pick of design B): the page opens on Everything, and a chip narrows the record to one kind. The full record stays one chip away. */
+export const KINDS = ['decisions', 'answers', 'permissions', 'files', 'words'];
+export const KIND_LABEL = { decisions: 'Decisions', answers: 'Answers', permissions: 'Permissions', files: 'Files and tasks', words: 'Words sent' };
+const KIND_TEST = {
+    decisions: r => !!DECISION_LABEL[decisionOf(r)] || ['goal_close', 'task_complete', 'task_cancel', 'goal_review'].includes(r.action), // Answered, Allowed, Denied, Approved, Closed, Completed and the like
+    answers: r => r.action === 'answer' || r.action === 'proposal',
+    permissions: r => /^prompt_/.test(r.action || ''),
+    files: r => ['file', 'task', 'goal'].includes(r.item_kind) && r.action !== 'chat_send',
+    words: r => ['message', 'chat_send', 'task_reply'].includes(r.action),
+};
+export const inKind = (r, k) => !k || !!(KIND_TEST[k] && KIND_TEST[k](r));
+
 export const NO_GOAL = 'No goal';
 /** The agent a row is about, when the record says (#14445): who asked, for an ask (an older answer kept the asker as its title), or the agent named by a prompt, wait or chat row; '' for a row about no agent. */
 export const agentOf = row => String(row.asker || ((row.item_kind === 'agent' || /^(prompt_|wait_)/.test(row.action || '') || (row.action === 'answer' && row.item_kind === 'question')) ? (row.title || (row.item_kind === 'agent' ? row.item_id : '')) : '') || '').trim();
@@ -42,6 +54,7 @@ const model = defineFilters({
     team: { type: 'custom', empty: '', clean: v => text(v, 200), filtered: v => !!v, chip: teamChip, clear: f => ({ ...f, team: '' }) },
     agent: { type: 'text', max: 80, chip: v => `Agent: ${v}` },
     goal: { type: 'text', max: 200, chip: v => `Goal: ${v}` }, // the goal a row served, or "No goal", as Needs you says it (#14445)
+    kind: { type: 'choice', values: KINDS, chip: v => `Kind: ${KIND_LABEL[v]}` },
     decision: { type: 'choice', values: DECISIONS, chip: v => `Decision: ${DECISION_LABEL[v]}` },
     action: { type: 'choice', values: ACTIONS, chip: v => `Action: ${ACTION_LABEL[v]}` },
     from: { type: 'day', chip: v => `Since ${v}` },
@@ -64,6 +77,7 @@ export function matches(r, f, teamOf = x => x.team || '') {
         const hay = [r.title, r.note, r.asker, r.goal_title, r.task_title, DECISION_LABEL[decisionOf(r)], teamOf(r), ACTION_LABEL[r.action] || r.action, r.item_kind].join(' ').toLowerCase();
         if (!hay.includes(c.q.toLowerCase())) return false;
     }
+    if (c.kind && !inKind(r, c.kind)) return false;
     if (c.decision && decisionOf(r) !== c.decision) return false;
     if (c.agent && agentOf(r) !== c.agent) return false;
     if (c.goal && goalOf(r) !== c.goal) return false;

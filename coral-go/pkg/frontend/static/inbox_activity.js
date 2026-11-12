@@ -127,6 +127,8 @@ export const goals = () => { const all = [...new Set(rows.map(AF.goalOf))]; retu
 export const teamOf = r => teamLabel(r.team);
 export const filtered = f => AF.ordered(rows.filter(r => AF.matches(r, f, teamOf)), f);
 export const total = () => rows.length;
+/** How many of the rows read are of a kind (the chips' counts); '' is all of them. */
+export const countKind = k => rows.filter(r => AF.inKind(r, k)).length;
 
 /** The page's table spec for the sidebar's group table. `open` has { file(row), goal(row), question(row) }: how a row's item opens (the sidebar knows the routes). */
 export function spec(f, open, { grouped = false, byTask = true, tasks, taskSignature = '' } = {}) {
