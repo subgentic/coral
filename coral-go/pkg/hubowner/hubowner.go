@@ -46,10 +46,10 @@ const Skew = 30 * time.Second
 // secretBytes is the length of a secret, hex-encoded in its file and on the wire between the hub and the human act.
 const secretBytes = 32
 
-// RoutesVersion is the generation of the allowlist below: 1 is the first eight routes, 2 (#13694) adds every Operator click that writes an Activity row and the decisions that need a person, 3 (#13757) the Markdown editor's save and the model switch, 4 (#13802) Send to agent with the diff, 5 (#13834) the done-state of a "Goal looks done" row, 6 (#13910) the Operator's opened version of a file, 7 (#15380) the Hub's read of a computer's Needs you, 8 (#15697) pause and resume of an agent's notices, 9 (#15708) the person-only reads of audit group 4, 10 (#15713) the manager's private mark on an artifact, 11 (#15715) a team import from a folder on the computer, 12 (#15717) a team's daily-knowledge writes, 13 (#15720) the delete of ended agents' terminal logs, 14 (#15729) the acknowledgement of artifact retention. A remote says in
+// RoutesVersion is the generation of the allowlist below: 1 is the first eight routes, 2 (#13694) adds every Operator click that writes an Activity row and the decisions that need a person, 3 (#13757) the Markdown editor's save and the model switch, 4 (#13802) Send to agent with the diff, 5 (#13834) the done-state of a "Goal looks done" row, 6 (#13910) the Operator's opened version of a file, 7 (#15380) the Hub's read of a computer's Needs you, 8 (#15697) pause and resume of an agent's notices, 9 (#15708) the person-only reads of audit group 4, 10 (#15713) the manager's private mark on an artifact, 11 (#15715) a team import from a folder on the computer, 12 (#15717) a team's daily-knowledge writes, 13 (#15720) the delete of ended agents' terminal logs, 14 (#15729) the acknowledgement of artifact retention, 15 (#15729) the delete of unlisted received files. A remote says in
 // its health answer which generation it accepts; a hub stamps a route only when the remote's generation is at least the route's (a stamp on a route an older remote does not list is refused 403, where an
 // unstamped call still goes through as a key caller). The remote still checks every stamp against its own list, so a wrong number gets a 403 and never more power.
-const RoutesVersion = 14
+const RoutesVersion = 15
 
 type route struct {
 	pattern string
@@ -165,6 +165,8 @@ var routes = []route{
 	{"POST /api/system/terminal-logs/delete-ended", 13},
 	// Generation 14 (#15729, exactly one route, the fifth write tier of audit group 4): the owner acknowledges the dry run Settings showed for artifact retention, from the Hub, so the job may start. No body is read; the remote stamps its own clock into its own setting, and answers 400 if retention is off. Nothing a Hub request carries can change what retention removes: the number of days and the kinds are separate settings, written by other routes this list does not cover.
 	{"POST /api/artifacts/retention/ack", 14},
+	// Generation 15 (#15729, exactly one route, the last write tier of audit group 4): the owner deletes received files no board lists, from the Hub. Body: up to 100 ids, each a 64-digit hex digest (64 KB cap); no path is read. A file goes only if the remote finds, under the digest's lock, that it is still a received file waiting for a message whose every receipt has expired, no board lists it, nothing durable links it, no agent uploaded the same bytes and the Operator did not keep it; anything else is skipped with the reason and left alone. A file an agent or a board still uses cannot be reached by naming it.
+	{"POST /api/artifacts/received/unlisted/delete", 15},
 }
 
 // MustBeSigned reports whether a request is one whose words are the person's own and become automation on the remote when no stamp goes with it: the owner's message to an agent (#13456) and, since
