@@ -36,10 +36,14 @@ export const SORT_LABEL = { newest: 'Newest first', oldest: 'Oldest first' };
 let teamNames = new Map();
 export function setTeamNames(map) { teamNames = map instanceof Map ? map : new Map(); }
 const teamChip = v => `Team: ${teamNames.get(v) || v}`;
+/** The computers' names by the Hub's own id for them, for the Computer chip (#15730); an id the page does not know is shown as it is. */
+let serverNames = new Map();
+export function setServerNames(map) { serverNames = map instanceof Map ? map : new Map(); }
 
 const model = defineFilters({
     q: { type: 'text', max: 200, chip: v => `Search: ${v}` },
     team: { type: 'custom', empty: '', clean: v => text(v, 200), filtered: v => !!v, chip: teamChip, clear: f => ({ ...f, team: '' }) },
+    server: { type: 'text', max: 200, chip: v => `Computer: ${serverNames.get(v) || v}` }, // which computer's record a row came from (a Hub-served dashboard reads several, #15730)
     agent: { type: 'text', max: 80, chip: v => `Agent: ${v}` },
     goal: { type: 'text', max: 200, chip: v => `Goal: ${v}` }, // the goal a row served, or "No goal", as Needs you says it (#14445)
     decision: { type: 'choice', values: DECISIONS, chip: v => `Decision: ${DECISION_LABEL[v]}` },
@@ -69,6 +73,7 @@ export function matches(r, f, teamOf = x => x.team || '') {
     if (c.goal && goalOf(r) !== c.goal) return false;
     if (c.action && r.action !== c.action) return false;
     if (c.team && r.team !== c.team) return false;
+    if (c.server && (r.server || 'local') !== c.server) return false;
     if (c.from && stamp(r) < Date.parse(localMidnight(c.from))) return false;
     return true;
 }

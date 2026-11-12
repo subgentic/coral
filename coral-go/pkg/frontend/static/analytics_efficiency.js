@@ -5,9 +5,11 @@
  * are written by agents. Lazy: cost_dashboard.js imports it. */
 import { importOnce } from './import_once.js';
 import { browserLocal } from './safe_storage.js';
+import { serverFetch } from './server_base.js';
 
 const { dataTable, el } = await importOnce('./data_table.js'); // the shared table
 const { fmtTokens, fmtDur } = await importOnce('./analytics_spend.js'); // a figure as a person reads it
+const { machineNow, machineLabel, machineOnline, MACHINE_EVENT } = await importOnce('./analytics_machine.js'); // which computer the comparison reads (#15730)
 
 const GROUPS = [['all', 'All'], ['provider', 'Provider'], ['model', 'Model'], ['thinking', 'Thinking level'], ['team', 'Team'], ['agent', 'Agent'], ['branch', 'Branch'], ['task', 'Task']];
 const PROVIDER_VAR = { claude: '--viz-2', codex: '--viz-1', pi: '--viz-3', agy: '--viz-7', gemini: '--viz-4' }; // a provider keeps its colour in every grouping that names it
@@ -72,8 +74,10 @@ function sync(key) {
 }
 
 async function read(cfg, group, signal) {
-    const r = await fetch(`/api/analytics/efficiency?metric=${cfg.metric}&group_by=${encodeURIComponent(group)}&range=${range}`, { signal });
-    if (!r.ok) throw new Error(`Could not load the comparison (${r.status}).`);
+    const server = machineNow(); // the computer picked on a Hub-served dashboard (this one otherwise, #15730)
+    if (!machineOnline(server)) throw new Error(`${machineLabel(server)} is offline, so its comparison cannot be read.`);
+    const r = server === 'local' ? await fetch(`/api/analytics/efficiency?metric=${cfg.metric}&group_by=${encodeURIComponent(group)}&range=${range}`, { signal }) : await serverFetch(server, `/api/analytics/efficiency?metric=${cfg.metric}&group_by=${encodeURIComponent(group)}&range=${range}`, { signal });
+    if (!r.ok) throw new Error(server === 'local' ? `Could not load the comparison (${r.status}).` : `${machineLabel(server)} would not give its comparison (${r.status}): it may be an older Coral that needs an update.`);
     const d = await r.json();
     if (!d || !Array.isArray(d.groups) || d.groups.some(g => !g || typeof g.label !== 'string')) throw new Error('Could not load the comparison: unexpected answer.');
     return d;
@@ -92,6 +96,7 @@ export function syncEfficiency(period) {
     const next = rangeOf(period), changed = next !== range; range = next;
     for (const key of Object.keys(SECTIONS)) { if (!build(key)) continue; const s = state[key]; if (changed) s.data = null; const sec = document.getElementById(SECTIONS[key].section); if (sec && !sec.hidden) refresh(key); }
 }
+document.addEventListener(MACHINE_EVENT, () => { for (const key of Object.keys(SECTIONS)) { const s = state[key]; if (!s) continue; s.data = null; const sec = document.getElementById(SECTIONS[key].section); if (sec && !sec.hidden) refresh(key); } }); // another computer was picked: the old numbers are not shown for it (#15730)
 document.addEventListener('cost-view-change', e => { const key = e.detail; if (SECTIONS[key]) { if (build(key)) refresh(key); } });
 
 function card(label, value, detail, tone) {
