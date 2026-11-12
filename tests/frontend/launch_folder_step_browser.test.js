@@ -27,6 +27,7 @@ const { coralReady } = require('./helpers/wait');
             { const b = await blue(); assert.deepEqual(b, ['launch-agent-next'], `${w}: Next is the one Primary, saw ${JSON.stringify(b)}`); }
             await ev(`document.getElementById('btn-browse').click(); true`);
             await waitFor(`document.querySelectorAll('#browser-list li:not(.empty-state)').length > 0`, 'the folder rows');
+            await waitFor(`[...document.querySelectorAll('#browser-list li:not(.empty-state)')].every(li => Math.round(li.getBoundingClientRect().height) === 32)`, 'the list rows at 32 px (their lazy sheet loaded with the list)').catch(() => {});
             const rows = await ev(`[...document.querySelectorAll('#browser-list li:not(.empty-state)')].map(li => ({ h: Math.round(li.getBoundingClientRect().height), icon: li.querySelector('.dir-icon').textContent.trim(), cls: li.querySelector('.dir-icon').className }))`);
             assert.ok(rows.every(r => r.h === 32), `${w}: folder rows are 32 px, saw ${JSON.stringify([...new Set(rows.map(r => r.h))])}`);
             assert.ok(rows.every(r => r.icon === 'folder' && /material-icons/.test(r.cls)), `${w}: the folder icon is the icon set's, not an emoji: ${JSON.stringify(rows[0])}`);
@@ -38,6 +39,13 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`getComputedStyle(document.getElementById('dir-browser')).display === 'none'`, 'the list closed');
             await waitFor(`getComputedStyle(document.getElementById('launch-agent-next')).backgroundColor !== getComputedStyle(document.getElementById('launch-agent-cancel')).backgroundColor`, `${w}: Next is the Primary again once the list is closed`);
         }
+        console.log('The Open folder list gets the 32 px rows with no New agent opened first (#15891)');
+        await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+        await coralReady(ev, 'startup', 'liveList', 'settings');
+        await ev(`(() => { const real = window.fetch; window.fetch = (u, o) => String(u).includes('/api/filesystem/list') ? Promise.resolve(new Response(JSON.stringify({ path: '/work', entries: ['alpha', 'beta'] }), { status: 200, headers: { 'content-type': 'application/json' } })) : real(u, o); })(); window.showOpenFolderModal(); window.toggleBrowser('open-folder-dir', 'open-folder-browser', 'open-folder-browser-list', 'open-folder-browser-path'); true`);
+        await waitFor(`document.querySelectorAll('#open-folder-browser-list li:not(.empty-state)').length > 0`, 'the Open folder rows');
+        await waitFor(`[...document.querySelectorAll('#open-folder-browser-list li:not(.empty-state)')].every(li => Math.round(li.getBoundingClientRect().height) === 32)`, 'the Open folder rows are 32 px: ' + await ev(`JSON.stringify({ h: [...document.querySelectorAll('#open-folder-browser-list li')].map(li => li.getBoundingClientRect().height), sheets: [...document.styleSheets].map(x => x.href).filter(h => /launch_folder/.test(h || '')), links: [...document.querySelectorAll('link')].map(l => l.href).filter(h => /folder/.test(h)) })`));
         console.log('PASS launch folder step');
     } finally {
         await guard.restore().catch(e => console.error('settings restore: ' + (e && e.message)));

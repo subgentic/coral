@@ -129,6 +129,7 @@ export function toggleBrowser(dirInputId, browserId, listId, pathId) {
     const isVisible = browser.style.display !== "none";
     browser.style.display = isVisible ? "none" : "";
     if (!isVisible) {
+        import('./lazy_styles.js').then(m => m.loadStyles('launch_folder.css')).catch(() => {});
         const inputPath = document.getElementById(_activeDirInputId).value;
         browserCurrentPath = browseStartPath(inputPath, activeServer() !== LOCAL_SERVER, getCoralRoot());
         renderRecentDirs();

@@ -18,7 +18,6 @@ import { checkTmuxForLaunch } from './prerequisites.js';
 import { reportLaunchDialogOpened } from './dashboard_analytics.js';
 import { sectionFocus } from './section_dialog.js';
 import { loadStyles } from './lazy_styles.js';
-await loadStyles('launch_folder.css'); // the folder list's 32 px rows and the one Primary while it is open: not at start (#15891)
 import { showTeamAddress } from './team_form.js';
 import { agentForm as folderForm, setAgentNameMode } from './agent_form.js';
 const { _syncACFModelField, getAgentConfig, renderAgentConfigForm, cliWarningOf } = await importOnce('./agent_config_form.js');
