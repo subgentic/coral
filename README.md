@@ -61,7 +61,7 @@
 
 ```bash
 curl -fsSL \
-  https://raw.githubusercontent.com/subgentic/coral/main/install.sh \
+  https://github.com/subgentic/coral/releases/latest/download/install.sh \
   | bash
 ```
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Coral installer for macOS and Linux (#11935).
 #
-#   curl -fsSL https://raw.githubusercontent.com/subgentic/coral/main/install.sh | bash
+#   curl -fsSL https://github.com/subgentic/coral/releases/latest/download/install.sh | bash
 #
 # Read it first: it is this file. To pass options through the pipe:  ... | bash -s -- --dry-run
 #
@@ -46,7 +46,7 @@ usage() {
     cat <<'USAGE'
 Coral installer for macOS and Linux.
 
-  curl -fsSL https://raw.githubusercontent.com/subgentic/coral/main/install.sh | bash
+  curl -fsSL https://github.com/subgentic/coral/releases/latest/download/install.sh | bash
   ... | bash -s -- --dry-run        (options go after --)
 
 Downloads the latest Coral release for this computer over https, checks it against the release's
