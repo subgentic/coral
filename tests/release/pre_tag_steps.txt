@@ -43,3 +43,5 @@ tests/release/verify_standard_bundle.sh | release-only | the default package has
 tests/release/windows_build_census_test.py | dryrun | windows-tests' package build is release.yml's Windows build
 tools/sync-agent-docs.sh | release-only | the agent docs are synced (gzipped) into the embedded static directory before the build
 tools/test-macos-app.sh | release-only | the Coral.app bundle starts and answers (the macOS smoke)
+tests/release/verify_standard_bundle.ps1 | release-only | the Windows package has no SQLCipher/OpenSSL payload or host crypto ABI (windows-tests runs it in the push gate, the dry run does not)
+tools/gen_windows_resources.sh | release-only | the Windows version resource and manifest are generated for the exes (windows-tests builds the package the same way in the push gate; the dry run does not)

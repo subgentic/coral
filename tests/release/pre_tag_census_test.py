@@ -45,7 +45,9 @@ def items(text):
     """{key} of what a workflow runs: a script path, or 'go test <package> <-run pattern>'."""
     keys = set()
     for line in commands(text):
-        for m in SCRIPT.finditer(line.replace("./tests/", "tests/").replace("./tools/", "tools/")):
+        # a Windows step writes ..\tests\x.ps1; a job in a subfolder writes ../tools/x.sh: both are the repo's tests/ or tools/ path
+        norm = re.sub(r"(?<![\w-])(?:\.{1,2}/)+(?=(?:tests|tools)/)", "", line.replace("\\", "/"))
+        for m in SCRIPT.finditer(norm):
             keys.add(m.group(1))
         g = GOTEST.search(line)
         if g and not line.lstrip().startswith(("-", "name:", "description")):
@@ -109,6 +111,8 @@ def main():
     first_rel = next(k for k, v in rows.items() if v[0] == "release-only")
     muts = {
         "a new test step in release.yml": (release + "\n      - name: New\n        run: bash tests/release/brand_new_smoke.sh\n", dryrun, lst),
+        "a new Windows step with backslashes": (release + "\n      - name: New\n        run: powershell -File ..\\tests\\release\\brand_new_win.ps1\n", dryrun, lst),
+        "a new step under ../tools": (release + "\n      - name: New\n        run: bash ../tools/brand_new.sh\n", dryrun, lst),
         "a new go test step in release.yml": (release + "\n      - name: New\n        run: go test ./internal/x -run '^TestNew$' -count=1\n", dryrun, lst),
         "a list line dropped": (release, dryrun, "\n".join(l for l in lst.splitlines() if not l.startswith(first_rel + " "))),
         "a list line for a step that is gone": (release, dryrun, lst + "tests/release/not_there.sh | release-only | proves nothing\n"),
