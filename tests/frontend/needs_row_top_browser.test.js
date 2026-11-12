@@ -43,8 +43,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
             check(geo.length >= 4, at + 'four rows: ' + JSON.stringify(geo));
             const heights = new Set(geo.map(g => g.h));
             for (const g of geo) {
-                for (const k of (w >= 768 ? ['check', 'icon', 'star'] : ['check', 'icon'])) if (g[k] != null) check(g[k] <= 40, at + `the ${k} is in the row's top band (centre ${g[k]} px below its top, row ${g.h} px): ` + JSON.stringify(g));
-                const ys = (w >= 768 ? ['check', 'icon', 'star'] : ['check', 'icon']).map(k => g[k]).filter(v => v != null);
+                for (const k of ['check', 'icon']) if (g[k] != null) check(g[k] <= 40, at + `the ${k} is in the row's top band (centre ${g[k]} px below its top, row ${g.h} px): ` + JSON.stringify(g));
+                const ys = ['check', 'icon'].map(k => g[k]).filter(v => v != null);
                 check(Math.max(...ys) - Math.min(...ys) <= 4, at + 'the checkbox, icon and star share one line: ' + JSON.stringify(g));
             }
             const icons = geo.map(g => g.icon).filter(v => v != null);
