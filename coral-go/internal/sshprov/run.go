@@ -86,6 +86,9 @@ const (
 	CmdPortHolder
 	// CmdKillStuck is the escalation after a stop that was not confirmed in time (#15997): SIGKILL for each process of THIS user that runs a Coral from the install folder (ourCoralPids), nothing else.
 	CmdKillStuck
+	// CmdListInstalled prints, one per line, the numbered folders under the install folder that hold a runnable release (<install>/<folder>/root/coral, an executable file, the folder itself no link). The hub picks the
+	// newest it can read (LatestInstalled): the release a Start Coral starts (#15998).
+	CmdListInstalled
 )
 
 // ourCoralPids lists, one per line, the PIDs of this user's processes that run a Coral from the install folder: the program is the first word of the command line and is exactly <install>/<version>/root/coral.
@@ -180,6 +183,7 @@ var specs = map[Command]spec{
 	CmdReadAPIKey:       {template: readDataDir + "\"$HOME/" + InstallDir + "/%s/root/coral\" api-key --home \"$HOME/$d\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
 	CmdAcceptTerms:      {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" accept-terms", args: []*regexp.Regexp{versionRe}},
 	CmdStopDaemon:       {template: aliveTest + " && kill \"$(cat \"$HOME/" + InstallDir + "/coral.pid\")\" 2>/dev/null; for p in $(" + ourCoralPids + "); do kill \"$p\" 2>/dev/null; done; true"},
+	CmdListInstalled:    {template: "cd \"$HOME/" + InstallDir + "\" 2>/dev/null && for d in [0-9]*; do if [ -d \"$d\" ] && [ ! -L \"$d\" ] && [ -f \"$d/root/coral\" ] && [ -x \"$d/root/coral\" ]; then printf '%%s\\n' \"$d\"; fi; done; true"},
 	CmdKillStuck:        {template: "for p in $(" + ourCoralPids + "); do kill -9 \"$p\" 2>/dev/null; done; true"},
 	CmdStopTmux:         {template: "tmux kill-session -t =coral-server 2>/dev/null; true"},
 	CmdRemoveInstalls:   {template: "cd \"$HOME/" + InstallDir + "\" 2>/dev/null && for d in [0-9]*; do [ -d \"$d\" ] && rm -rf -- \"$d\"; done; true"},

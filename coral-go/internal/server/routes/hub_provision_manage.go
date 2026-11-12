@@ -34,6 +34,8 @@ func manageSteps(kind string) []provisionStep {
 			s("install", "Download, verify and install this hub's release"), s("restart", "Restart Coral on the new release"), s("verify", "Check that it answers")}
 	case kindStop:
 		return []provisionStep{s("connect", "Connect over SSH and check the host key"), s("identity", "Check it is the computer that was set up"), s("stop", "Stop Coral")}
+	case kindStart:
+		return []provisionStep{s("connect", "Connect over SSH and check the host key"), s("identity", "Check it is the computer that was set up"), s("start", "Start Coral"), s("verify", "Check that it answers")}
 	case kindApprovals:
 		return []provisionStep{s("connect", "Connect over SSH and check the host key"), s("identity", "Check it is the computer that was set up"), s("approvals", "Set up Approve through this hub")}
 	}
@@ -47,8 +49,8 @@ func (pr *Provisioner) planManage(w http.ResponseWriter, r *http.Request, req pl
 		errBadRequest(w, "a server to manage is named by its id only")
 		return
 	}
-	if req.Action != kindUpgrade && req.Action != kindStop && req.Action != kindRemove && req.Action != kindApprovals {
-		errBadRequest(w, "the action is upgrade, stop, remove or approvals")
+	if req.Action != kindUpgrade && req.Action != kindStop && req.Action != kindRemove && req.Action != kindApprovals && req.Action != kindStart {
+		errBadRequest(w, "the action is upgrade, start, stop, remove or approvals")
 		return
 	}
 	if req.DeleteData && req.Action != kindRemove {
@@ -136,6 +138,8 @@ func (pr *Provisioner) runPlan(ctx context.Context, p *provisionPlan) {
 		pr.detectSteps(ctx, p)
 	case kindUpgrade:
 		pr.upgradeSteps(ctx, p)
+	case kindStart:
+		pr.startSteps(ctx, p)
 	case kindStop:
 		pr.stopSteps(ctx, p)
 	case kindApprovals:
@@ -269,6 +273,77 @@ func (pr *Provisioner) stopSteps(ctx context.Context, p *provisionPlan) {
 	if !pr.stopRemote(ctx, p) {
 		return
 	}
+	pr.done(p)
+}
+
+// startSteps starts the Coral of a computer whose Coral is not running (#15998): the newest release installed under its install folder, with the data folder and backend recorded at its last start and the port it
+// was set up on, then it waits for it to answer. A Coral that already answers is left alone. Nothing outside the install folder is touched and no release is installed or downloaded here.
+func (pr *Provisioner) startSteps(ctx context.Context, p *provisionPlan) {
+	row, err := pr.store.Get(ctx, p.ServerID)
+	if err != nil {
+		pr.fail(p, "identity", "That server is no longer registered.")
+		return
+	}
+	key, err := pr.store.DecryptedKey(ctx, p.ServerID)
+	if err != nil {
+		pr.fail(p, "identity", "This hub cannot read that server's key.")
+		return
+	}
+	if !pr.identity(ctx, p, row) {
+		return
+	}
+	if h := pr.checkHealth(ctx, row, key); h.Status == store.RemoteStatusOnline {
+		p.setStep("start", stepSkipped, "Coral is already running there.")
+		p.setStep("verify", stepSkipped, "")
+		pr.done(p)
+		return
+	}
+	farPort := row.RemotePort
+	if !sshprov.ValidPort(farPort) {
+		farPort = sshprov.DefaultPort
+	}
+	p.setStep("start", stepRunning, "")
+	version, err := pr.runner.LatestInstalled(ctx, p.Target)
+	if err != nil {
+		if errors.Is(err, sshprov.ErrNothingInstalled) {
+			pr.fail(p, "start", "No release of Coral is installed on that computer, so there is nothing to start. Use Upgrade to install this hub's release.")
+		} else if isConnectFailure(err) {
+			pr.failConnect(p, "start", err)
+		} else {
+			pr.fail(p, "start", "Could not look for the installed release on that computer.")
+		}
+		return
+	}
+	if err := pr.runner.StartOn(ctx, p.Target, version, sshprov.BackendKeep, "", farPort); err != nil {
+		var se *sshprov.StartError
+		note := restartNote{port: farPort}
+		switch {
+		case errors.Is(err, sshprov.ErrPortInUse):
+			var pe *sshprov.PortInUseError
+			if errors.As(err, &pe) {
+				note.holderPid = pe.Pid
+			}
+			pr.failRestart(ctx, p, "start", portInUseSentenceFor(err), err, note)
+		case errors.Is(err, sshprov.ErrNoTmux):
+			note.noTmux = true
+			pr.failRestart(ctx, p, "start", "Coral on that computer was set up to run its agents in tmux, but tmux is not installed there now, so Coral was not started. The last lines below start it without tmux.", err, note)
+		case errors.As(err, &se):
+			pr.failRestart(ctx, p, "start", fmt.Sprintf("Coral could not be started on that computer: its start command ended with code %d.", se.ExitCode), err, note)
+		case isConnectFailure(err):
+			pr.failRestart(ctx, p, "start", connectSentence(err), err, note)
+		default:
+			pr.failRestart(ctx, p, "start", "Coral could not be started on that computer.", err, note)
+		}
+		return
+	}
+	p.setStep("start", stepOK, "Started Coral "+version+".")
+	p.setStep("verify", stepRunning, "")
+	if h := pr.checkHealth(ctx, row, key); h.Status != store.RemoteStatusOnline {
+		slog.Info("[provision] the started Coral did not answer", "plan", p.ID)
+		pr.failRestart(ctx, p, "verify", "Coral was started, but it did not answer as expected.", errors.New("the started Coral did not answer"), restartNote{port: farPort, stoppedAgain: true})
+		return
+	}
+	p.setStep("verify", stepOK, "Coral is running.")
 	pr.done(p)
 }
 
