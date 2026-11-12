@@ -14,7 +14,11 @@ import { browserLocal } from './safe_storage.js';
 import { storeKey } from './local_store.js';
 
 const BASE_KEY = 'coral-agentic-tab-prefs'; // kept under storeKey(): on Coral Hub one browser serves several accounts
-const empty = () => ({ order: [], hidden: [] });
+// Default tabs (#15731): the page's own order is Files, Browse, Artifacts, Activity, Tasks; these stay in Customize tabs, unticked.
+const DEFAULT_HIDDEN = ['agent-ui', 'board', 'branches', 'info', 'notes', 'saved']; // sorted
+const empty = () => ({ order: [], hidden: DEFAULT_HIDDEN.slice() });
+const customized = () => prefs.agent.order.length > 0 || prefs.agent.hidden.slice().sort().join() !== DEFAULT_HIDDEN.join();
+const revealed = new Set(); // hidden tabs something opened: shown for this visit, not saved
 let prefs = { agent: empty() };
 let defaultOrder = null; // every customizable tab id in the page's own order: the ids a stored list may name
 let loadedKey = null;
@@ -35,24 +39,21 @@ function cleanIds(list) {
 
 /** Read the saved choice for the signed-in account (a different account, or the account arriving after start, reads its own). */
 function ensureLoaded() {
+    if (!defaultOrder) defaultOrder = tabButtons().map(b => b.dataset.tab);
     const key = storeKey(BASE_KEY);
     if (key === loadedKey) return;
     loadedKey = key;
     prefs = { agent: empty() };
     try {
-        const p = JSON.parse(browserLocal.get(key) || 'null');
-        for (const ctx of ['agent']) {
-            const c = p && typeof p === 'object' ? p[ctx] : null;
-            prefs[ctx] = { order: cleanIds(c?.order), hidden: cleanIds(c?.hidden) };
-        }
+        const a = JSON.parse(browserLocal.get(key) || 'null')?.agent;
+        if (a && typeof a === 'object') prefs.agent = { order: cleanIds(a.order), hidden: cleanIds(a.hidden) };
     } catch { /* unreadable: the defaults */ }
 }
 
 /** Keep the choice; with nothing chosen the key is removed, so Reset leaves nothing behind. */
 function save() {
     const key = storeKey(BASE_KEY);
-    const chosen = ['agent'].some(ctx => prefs[ctx].order.length || prefs[ctx].hidden.length);
-    if (chosen) browserLocal.set(key, JSON.stringify(prefs)); else browserLocal.remove(key);
+    if (customized()) browserLocal.set(key, JSON.stringify(prefs)); else browserLocal.remove(key);
 }
 
 /** The tabs the agent page shows, in the page's own order. */
@@ -64,6 +65,7 @@ function available(ctx) {
     });
 }
 
+const hiddenSet = ctx => new Set(prefs[ctx].hidden.filter(id => !revealed.has(id)));
 const byDefault = ids => ids.slice().sort((a, b) => defaultOrder.indexOf(a) - defaultOrder.indexOf(b));
 
 /** The saved order, followed by tabs the user has not placed. */
@@ -76,12 +78,11 @@ function orderedIds(ctx, ids) {
 export function applyTabPrefs() {
     const bar = strip();
     if (!bar) return;
-    if (!defaultOrder) defaultOrder = tabButtons().map(b => b.dataset.tab);
     ensureLoaded();
     const ctx = contextOf();
     const avail = available(ctx);
     const ids = avail.map(b => b.dataset.tab);
-    const hidden = new Set(prefs[ctx].hidden);
+    const hidden = hiddenSet(ctx);
     for (const b of tabButtons()) b.classList.toggle('tab-hidden', ids.includes(b.dataset.tab) && hidden.has(b.dataset.tab));
     const want = orderedIds(ctx, ids);
     // Moving a focused button would drop its focus, so only reorder when the order differs.
@@ -105,10 +106,20 @@ export function applyTabPrefs() {
     if (first) emptyPanel?.remove();
 }
 
+/** Show a tab for this visit; nothing is saved. */
+export function revealTab(id) {
+    ensureLoaded();
+    revealed.add(id);
+    applyTabPrefs();
+    document.getElementById(`agentic-tab-${id}`)?.classList.remove('tab-hidden');
+}
+
 /** A hidden tab opens the first visible tab, or the empty state. */
 export function openableTab(tabName) {
     const b = document.getElementById(`agentic-tab-${tabName}`);
     if (b && !b.classList.contains('tab-hidden')) return tabName;
+    ensureLoaded();
+    if (b && !customized() && DEFAULT_HIDDEN.includes(tabName)) { revealTab(tabName); return tabName; }
     return available(contextOf()).find(x => !x.classList.contains('tab-hidden'))?.dataset.tab || 'no-tabs';
 }
 
@@ -118,7 +129,7 @@ function rowsHTML(ctx) {
     ensureLoaded();
     const avail = available(ctx);
     const ids = orderedIds(ctx, avail.map(b => b.dataset.tab));
-    const hidden = new Set(prefs[ctx].hidden);
+    const hidden = hiddenSet(ctx);
     return ids.map((id, i) => {
         const b = document.getElementById(`agentic-tab-${id}`);
         const name = b.getAttribute('aria-label') || id;
@@ -181,6 +192,7 @@ function move(id, dir, refocus) {
 
 function setShown(id, shown) {
     const ctx = contextOf();
+    revealed.delete(id);
     const hidden = new Set(prefs[ctx].hidden);
     if (shown) hidden.delete(id); else hidden.add(id);
     prefs[ctx].hidden = [...hidden];
@@ -192,6 +204,7 @@ function setShown(id, shown) {
 
 function reset() {
     prefs[contextOf()] = empty();
+    revealed.clear();
     save();
     applyTabPrefs();
     render('.tc-reset');

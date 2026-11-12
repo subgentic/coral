@@ -1,14 +1,14 @@
 /* The agent's side panel tabs say their words (UI/UX's 170 list, item 1, #7621): at 1280 px and up each tab shows its word beside its icon when ALL the words fit the row on one line (a panel dragged narrow,
- * or text at 200%, falls back to icons alone, whose name is the title and the aria-label: no word is clipped and the row does not wrap), and the five rarely used tabs (Browse, Notes, Activity, Agent UI, Branches) sit behind one
+ * or text at 200%, falls back to icons alone, whose name is the title and the aria-label: no word is clipped and the row does not wrap), and the three rarely used tabs (Notes, Agent UI, Branches), once turned on, sit behind one
  * More menu. They stay the real tab buttons (their panels, counts and handlers are the old ones): in More they are only drawn out of the way (.tab-more) and out of the tab order, and the menu's items
- * open them through switchAgenticTab. When one of those is open it swaps into the row as a real tab and More stays, listing the rest (#15733): More never goes while a tab is still behind it. */
+ * open them through switchAgenticTab. The open one swaps into the row and More stays (#15733). */
 import { registerActions } from './actions.js';
 import { escapeHtml, escapeAttr } from './utils.js';
-import { setText, setHidden, setAttr, setTitle, setHtml } from './dom_write.js';
+import { setHidden, setAttr, setHtml } from './dom_write.js';
 import { menuMove } from './menu_keys.js';
 import { watchScrollCue } from './scroll_cue.js';
 
-const RARE = ['browse', 'notes', 'activity', 'agent-ui', 'branches'];
+const RARE = ['notes', 'agent-ui', 'branches'];
 const WIDE = window.matchMedia('(min-width: 1280px)');
 const $ = id => document.getElementById(id);
 const strip = () => document.querySelector('#agentic-block-top .agentic-state-tabs');
@@ -45,22 +45,19 @@ function syncMore() {
     const row = strip(), more = $('agentic-tab-more');
     if (!row || !more) return;
     const here = rareTabs().filter(shown);
-    const open = here.find(b => b.classList.contains('active')); // the open one swaps into the row (#15733): it is a real tab there, and More keeps the others
+    const open = here.find(b => b.classList.contains('active')); // the open one is a real tab of the row (#15733)
     const left = here.filter(b => b !== open);
+    const was = open?.classList.contains('tab-more');
     for (const b of rareTabs()) {
         const away = left.includes(b);
         if (b.classList.contains('tab-more') !== away) b.classList.toggle('tab-more', away);
         if (away) { if (b.tabIndex !== -1) b.tabIndex = -1; setAttr(b, 'aria-hidden', 'true'); }
         else { if (b.hasAttribute('tabindex')) b.removeAttribute('tabindex'); if (b.hasAttribute('aria-hidden')) b.removeAttribute('aria-hidden'); }
     }
-    setHidden(more, left.length === 0);
-    if (more.classList.contains('active')) more.classList.remove('active');
-    setText(more.querySelector('.agentic-tab-word'), 'More');
-    setAttr(more, 'aria-label', 'More tabs');
-    setTitle(more, 'More tabs');
-    setText(more.querySelector('.material-icons'), 'expand_more');
+    if (was) open.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    setHidden(more, !left.length);
     setHtml($('agentic-more-menu'), left.map(b => `<button type="button" role="menuitem" class="menu-item agentic-more-item" data-on-click="dock-more-pick" data-on-keydown="dock-more-key" data-tab="${escapeAttr(b.dataset.tab)}"><span class="material-icons" aria-hidden="true">${escapeHtml(iconOf(b))}</span><span>${escapeHtml(wordOf(b))}</span><span class="agentic-more-count">${escapeHtml(b.querySelector('.agentic-tab-count')?.textContent || '')}</span></button>`).join(''));
-    if (left.length === 0) closeMore(false);
+    if (!left.length) closeMore(false);
     const shape = left.map(b => b.id).join();
     if (shape !== lastShape) { lastShape = shape; fitWords(); } // the set of tabs in the row changed: the words are looked at again
 }

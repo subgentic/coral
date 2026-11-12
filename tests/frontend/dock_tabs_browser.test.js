@@ -6,7 +6,7 @@ const { connect } = require('./agent_view_harness');
 const { settle, coralReady } = require('./helpers/wait');
 
 (async () => {
-    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect({ tabLayout: '{"agent":{"order":[],"hidden":["board","info","saved"]}}' });
     const { Input } = client;
     const key = async k => { const vk = { ArrowDown: 40, ArrowUp: 38, Escape: 27, Enter: 13, Tab: 9 }[k]; for (const type of ['keyDown', 'keyUp']) await Input.dispatchKeyEvent({ type, key: k, code: k, windowsVirtualKeyCode: vk, ...(type === 'keyDown' && k === 'Enter' ? { text: '\r' } : {}) }); };
     const ok = name => console.log(`   ✓ ${name}`);
@@ -18,7 +18,7 @@ const { settle, coralReady } = require('./helpers/wait');
     const load = async (w, mobile) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
-        await ev(`localStorage.removeItem('coral-agentic-tab-prefs'); window.__m.add('dock-bot', 'A', 3, { sleeping: false }); true`);
+        await ev(`window.__m.add('dock-bot', 'A', 3, { sleeping: false }); true`);
         await settle(ev, 600); // sleep-ok: the first live list renders from several answers; no single completion event
         await ev(`window.selectLiveSession('dock-bot', 'claude', 'dock-bot-id', 'local'); true`);
         await ev(`(() => { const p = document.getElementById('agentic-state'); if (p.classList.contains('collapsed') || document.getElementById('agentic-tab-files').getBoundingClientRect().width === 0) window.toggleAgenticPanel(true); return true; })()`);
@@ -32,10 +32,10 @@ const { settle, coralReady } = require('./helpers/wait');
         await waitFor(`document.querySelector('${ROW}').hasAttribute('data-words')`, 'the words show at the default panel width', 4000);
         let r = await row();
         const named = r.shown.filter(([t]) => t !== 'customize'); // the Customize button at the row's end is an icon alone, as it was
-        assert.deepEqual(named.map(([t, w]) => [t, w]), [['files', 'Files'], ['artifacts', 'Artifacts'], ['tasks', 'Tasks'], ['info', 'Info'], ['saved', 'Saved'], ['more', 'More']], 'each shown tab says its word: ' + JSON.stringify(r.shown));
+        assert.deepEqual(named.map(([t, w]) => [t, w]), [['files', 'Files'], ['browse', 'Browse'], ['artifacts', 'Artifacts'], ['activity', 'Activity'], ['tasks', 'Tasks'], ['more', 'More']], 'each shown tab says its word: ' + JSON.stringify(r.shown));
         assert.deepEqual([r.tops.length, r.clipped], [1, false], 'one line, nothing clipped: ' + JSON.stringify(r));
-        assert.ok(!r.shown.some(([t]) => ['browse', 'notes', 'activity', 'agent-ui', 'branches'].includes(t)), 'the five rare tabs are not in the row: ' + JSON.stringify(r.shown));
-        assert.equal(r.more[0], 'More tabs'); ok('Files, Artifacts, Tasks, Info, Saved and More with their words, on one line');
+        assert.ok(!r.shown.some(([t]) => ['notes', 'agent-ui', 'branches'].includes(t)), 'the three rare tabs are not in the row: ' + JSON.stringify(r.shown));
+        assert.equal(r.more[0], 'More tabs'); ok('Files, Browse, Artifacts, Tasks, Activity and More with their words, on one line');
         await shot('dock-tabs-1280');
 
         // UI/UX's #7621 small points: the customizer icon is named, only the selected tab looks selected (a hovered one is not blue with an underline), and the files line is sentence case
@@ -53,14 +53,14 @@ const { settle, coralReady } = require('./helpers/wait');
         await key('ArrowDown');
         await waitFor(`!document.getElementById('agentic-more-menu').hidden && document.activeElement.getAttribute('role') === 'menuitem'`, 'the menu opens on ArrowDown with the focus in it', 4000);
         const items = await ev(`[...document.querySelectorAll('#agentic-more-menu [role=menuitem]')].map(i => i.dataset.tab + ':' + i.textContent.trim())`);
-        assert.deepEqual(items, ['browse:folder_openBrowse', 'notes:edit_noteNotes', 'activity:timelineActivity', 'agent-ui:widgetsAgent UI', 'branches:account_treeBranches'], JSON.stringify(items));
+        assert.deepEqual(items, ['notes:edit_noteNotes', 'agent-ui:widgetsAgent UI', 'branches:account_treeBranches'], JSON.stringify(items));
         await shot('dock-tabs-more-open');
-        await key('ArrowDown'); await key('ArrowDown'); await key('Enter'); // the menu opens on Browse: two steps down is Activity (Notes is the second item)
-        await waitFor(`document.getElementById('agentic-panel-activity').classList.contains('active')`, 'Enter opens Activity', 4000);
+        await key('ArrowDown'); await key('Enter'); // the menu opens on Notes: one step down is Agent UI
+        await waitFor(`document.getElementById('agentic-panel-agent-ui').classList.contains('active')`, 'Enter opens Agent UI', 4000);
         r = await row();
         assert.deepEqual(r.more, ['More tabs', false, 'false'], 'More stays More, with the others behind it (#15733): ' + JSON.stringify(r.more));
         assert.equal(await ev(`document.querySelector('#agentic-tab-more .agentic-tab-word').textContent`), 'More', 'and says More');
-        assert.deepEqual(r.shown.map(x => x[0]).filter(t => t === 'activity'), ['activity'], 'the open Activity is a tab of the row: ' + JSON.stringify(r.shown));
+        assert.deepEqual(r.shown.map(x => x[0]).filter(t => t === 'agent-ui'), ['agent-ui'], 'the open Agent UI is a tab of the row: ' + JSON.stringify(r.shown));
         assert.equal(await ev(`document.getElementById('agentic-menu') === null && document.getElementById('agentic-more-menu').hidden`), true, 'the menu closed');
         await ev(`document.getElementById('agentic-tab-more').focus(); true`); await key('ArrowDown'); await key('Escape');
         assert.equal(await ev(`document.activeElement.id`), 'agentic-tab-more', 'Escape closes the menu with the focus back on More');

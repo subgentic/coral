@@ -7,6 +7,7 @@ const { coralReady } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const problems = [];
+    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const base = { session_id: 'o1', name: 'coral-go', display_name: 'Worker', agent_type: 'claude', summary: 'x', model: 'claude-opus-5-5', branch: 'main', repo_name: 'coral', working_directory: '/work/p', status: 'idle', server: 'local' };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -21,6 +22,7 @@ const { coralReady } = require('./helpers/wait');
             const pick = async t => {
                 await ev(`document.getElementById('agentic-tab-more').click(); true`);
                 await waitFor(`!document.getElementById('agentic-more-menu').hidden`, `${w}: the More menu opens`, 5000);
+                await shot(`more-menu-open-${w}-${t}`);
                 await ev(`document.querySelector('#agentic-more-menu [data-tab="${t}"]').click(); true`);
                 await waitFor(`document.getElementById('agentic-panel-${t}').classList.contains('active')`, `${w}: ${t} opens`, 5000);
             };
@@ -29,6 +31,7 @@ const { coralReady } = require('./helpers/wait');
             const first = s.items[0], second = s.items[1];
             await pick(first);
             s = await state();
+            await shot(`after-pick-${w}`);
             check(s.more, `More stays after picking ${first}: ${JSON.stringify(s)}`);
             check(s.word === 'More', `More still says More, not ${s.word}`);
             check(s.inRow.includes(first), `${first} is in the row as its own tab: ${JSON.stringify(s)}`);

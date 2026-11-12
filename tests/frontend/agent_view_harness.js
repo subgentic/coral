@@ -55,6 +55,9 @@ async function connect(opts = {}) {
     // Installed before any app script runs, so the page's own first live-list load already sees
     // the mocked agents (a mock installed after load races it and loses).
     const PRELOAD = `(() => {
+        try { // the suites were written when every tab showed (#15731 made five the default): each starts with that layout saved, each time the page loads with none stored, unless it asks for the default (connect({ defaultTabs: true })) or removes it itself
+            if (!${opts.defaultTabs ? 'true' : 'false'}) { if (localStorage.getItem('coral-agentic-tab-prefs') === null) localStorage.setItem('coral-agentic-tab-prefs', ${JSON.stringify(opts.tabLayout || '{"agent":{"order":[],"hidden":[]}}')}); }
+        } catch { /* storage refused */ }
         window.__coralNoFetchShare = true; // the share of repeated reads (fetch_share.js, #9181) is off in a suite: a changed stub is read, whatever the page's age
         const filler = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua';
         const make = (prefix, i) => i % 2 === 0
