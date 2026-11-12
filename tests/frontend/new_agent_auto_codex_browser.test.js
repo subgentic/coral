@@ -12,7 +12,7 @@ const BASE = require('./test_base').BASE;
     const click = async (sel, rx) => { assert.ok(await ev(`(() => { const e = window.__na.find(${JSON.stringify(sel)}, ${rx}); if (!e) return false; e.click(); return true; })()`), `no visible ${sel} named ${rx}`); await settle(200); };
     const tab = async name => { await ev(`(() => { const t = [...window.__na.dialog().querySelectorAll('[role=tab]')].find(x => window.__na.name(x) === ${JSON.stringify(name)}); if (!t) return false; t.click(); return true; })()`); await settle(250); };
     const radio = async (group, label) => { assert.ok(await ev(`(() => { const g = [...window.__na.dialog().querySelectorAll('[role=radiogroup]')].filter(window.__na.vis).find(e => ${group}.test(window.__na.name(e))); if (!g) return false; const r = window.__na.radios(g).find(x => ${label}.test(window.__na.radioName(x))); if (!r) return false; r.click(); return true; })()`), `no ${label} in ${group}`); await settle(250); };
-    const line = () => ev(`(() => { const h = [...window.__na.dialog().querySelectorAll('.perm-mode-desc')].find(window.__na.vis); return h ? h.textContent.trim() : null; })()`);
+    const line = () => ev(`(() => { const d = window.__na.dialog(); const on = [...d.querySelectorAll('.seg-list [aria-checked="true"] .seg-desc')].find(window.__na.vis); if (on) return on.textContent.trim(); /* the mode list says it on every row (#15886): the chosen row's line */ const h = [...d.querySelectorAll('.perm-mode-desc')].find(window.__na.vis); return h ? h.textContent.trim() : null; })()`);
     const size = () => ev(`(() => { const b = window.__na.box(window.__na.panel()); return [b.w, b.h]; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });

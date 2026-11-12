@@ -16,7 +16,7 @@ const { coralReady } = require('./helpers/wait');
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`import(${MOD} + 'state.js').then(async s => { const d = await fetch('/api/settings').then(r => r.json()); s.state.settings = d.settings; return import(${MOD} + 'modals.js'); }).then(m => m.showSettingsModal('agents')).then(() => true)`);
-            await waitFor(`!!document.getElementById('settings-permission-mode') && document.getElementById('settings-permission-mode').getClientRects().length > 0`, `${w}: the permission row`, 10000);
+            await waitFor(`!!document.getElementById('settings-permission-mode') && (document.querySelector('#settings-permission-mode.seg-source + .seg-list') || document.getElementById('settings-permission-mode')).getClientRects().length > 0`, `${w}: the permission row`, 10000);
             const r = await ev(`(() => { const row = document.getElementById('settings-permission-mode').closest('.settings-row, .sv-row');
                 const vis = e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
                 const lines = [...row.querySelectorAll('.sv-help, .perm-mode-desc, .perm-mode-compare, .settings-hint')].filter(vis).map(e => e.textContent.trim()).filter(Boolean);

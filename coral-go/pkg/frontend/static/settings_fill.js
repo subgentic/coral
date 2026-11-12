@@ -193,6 +193,7 @@ export function _fillDefaults(s) {
         if (s.default_permission_mode) { notSet?.remove(); permModeSelect.value = s.default_permission_mode; }
         else { if (!notSet) permModeSelect.prepend(new Option('Not set (Auto)', '')); permModeSelect.value = ''; }
         _updatePermModeDescription(permModeSelect, !s.default_permission_mode);
+        importOnce('./permission_mode_list.js').then(m => m.modeList(permModeSelect)).catch(() => {}); // the same rows as New agent (#15886)
         // A pick is a choice even when it is the mode the field showed (nothing saved shows Auto): it is saved, so a person who picks Auto and saves has Auto saved (#7620)
         permModeSelect.dataset.edited = '';
         if (!permModeSelect.dataset.watched) { permModeSelect.dataset.watched = '1'; permModeSelect.addEventListener('change', () => { permModeSelect.dataset.edited = '1'; }); }
