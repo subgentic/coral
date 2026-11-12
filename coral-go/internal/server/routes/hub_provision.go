@@ -94,6 +94,9 @@ type provisionPlan struct {
 	// older release over a newer one (#12217).
 	remoteVersion  string
 	allowDowngrade bool
+	// pkgSource is where the package comes from (#15691): sshprov.SourceFar ("" is the same), SourceHub or SourceUpload; uploads holds the files the person uploaded for this plan.
+	pkgSource string
+	uploads   provisionUploads
 	// backend is the terminal backend the person chose for a set up ("pty" when they said nothing, or "tmux"), sent with the run (#12233); tmux is what the connect step found out about that computer:
 	// "yes", "no", or "" before it was asked. An upgrade keeps the backend the computer was started with.
 	backend string
@@ -153,6 +156,15 @@ func (p *provisionPlan) view() map[string]any {
 		v["port"] = p.portOrDefault()
 		if p.tmux != "" {
 			v["tmux"] = p.tmux == "yes" // whether that computer has tmux, so the page can say which choices are open
+		}
+	}
+	if k := p.kind(); k == kindSetup || k == kindUpgrade {
+		v["package_source"] = sshprov.SourceFar
+		if p.pkgSource != "" {
+			v["package_source"] = p.pkgSource
+		}
+		if len(p.uploads.files) > 0 {
+			v["uploads"] = p.uploadsViewLocked()
 		}
 	}
 	if p.Kind == kindUpgrade && p.agentsSurvive != "" {
@@ -239,11 +251,13 @@ type Provisioner struct {
 	startRemote func(ctx context.Context, p *provisionPlan) (instanceID, key string, err error)
 	checkHealth func(ctx context.Context, rs *store.RemoteServer, key string) RemoteHealth
 	// installOwner puts the secret this hub signs the computer's owner stamps with on the computer (#11378), by the far Coral's own command, the secret on stdin; a variable for tests.
-	installOwner func(ctx context.Context, p *provisionPlan, secret string) error
-	version      string                  // the release this hub runs and the only one it installs (config.Version; a test sets its own)
-	onRemoved    func(id string)         // a remove took the server out of the registry
-	notify       func(id, status string) // tells the hub's remote workers a server was added (the same hook the registry's edits use)
-	startedAt    time.Time
+	installOwner       func(ctx context.Context, p *provisionPlan, secret string) error
+	version            string                  // the release this hub runs and the only one it installs (config.Version; a test sets its own)
+	onRemoved          func(id string)         // a remove took the server out of the registry
+	notify             func(id, status string) // tells the hub's remote workers a server was added (the same hook the registry's edits use)
+	startedAt          time.Time
+	beforeUploadCommit func(p *provisionPlan) // test seam (hub_provision_upload.go)
+	uploadRoot         string                 // where uploaded packages are held (SetUploadDir); "" refuses uploads
 	// eula says whether this tier asks for the terms and whether this hub's own EULA marker holds the current version and digest. A variable so a test does not read the real marker.
 	eula func() (required, accepted bool)
 }
@@ -319,6 +333,7 @@ func (pr *Provisioner) expireLocked() {
 			if p.cancel != nil {
 				p.cancel()
 			}
+			go p.removeUploads()
 			delete(pr.plans, id)
 		}
 	}
@@ -524,6 +539,8 @@ type runRequest struct {
 	Port int `json:"port"`
 	// AllowDowngrade lets an upgrade install this hub's release over a NEWER one on that computer; without it that is refused before anything is changed (#12217).
 	AllowDowngrade bool `json:"allow_downgrade"`
+	// PackageSource is where the release package comes from (#15691): "far" (or empty: the other computer downloads it), "hub" (this hub downloads it and sends it) or "upload" (the one uploaded for this plan). Set up and upgrade only.
+	PackageSource string `json:"package_source"`
 }
 
 // Run handles POST /api/servers/provision/{plan}/run. A setup or an upgrade carries the acceptance this hub's own EULA marker holds (the person accepted when they opened Coral; the far computer records it as
@@ -555,6 +572,19 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 	if req.Port != 0 && !sshprov.ValidPort(req.Port) {
 		errBadRequest(w, "the port is a number from 1024 to 65535")
 		return
+	}
+	if !sshprov.ValidSource(req.PackageSource) {
+		errBadRequest(w, "the package comes from far, hub or upload")
+		return
+	}
+	if req.PackageSource == sshprov.SourceUpload {
+		p.mu.Lock()
+		_, have := p.uploads.files["package"]
+		p.mu.Unlock()
+		if !have {
+			errBadRequest(w, "upload the package first")
+			return
+		}
 	}
 	// A setup and an upgrade put Coral on the computer and record this hub's acceptance of the terms there. Stop and remove do not touch the terms. On a tier that requires the EULA the marker must hold the
 	// current version and digest, else nothing is done; on a tier that skips it (dev) the build on the far computer skips it too, so nothing is recorded and nothing is refused.
@@ -598,6 +628,9 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 	if p.Kind == kindUpgrade {
 		p.allowDowngrade = req.AllowDowngrade
 	}
+	if k := p.kind(); k == kindSetup || k == kindUpgrade {
+		p.pkgSource = req.PackageSource
+	}
 	if p.kind() == kindSetup && req.Backend == sshprov.BackendTmux {
 		p.backend = sshprov.BackendTmux
 	}
@@ -628,6 +661,7 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 	p.mu.Unlock()
 	safego.Go("provision run", func() {
 		defer cancel()
+		defer p.removeUploads() // the uploaded package is not kept once the run is over
 		// A panic in a step must not leave the plan "running" until it expires (15 minutes): the plan fails with one fixed sentence, then the panic goes on to safego, which logs it and keeps the server up.
 		defer func() {
 			if r := recover(); r != nil {
@@ -935,19 +969,31 @@ func (pr *Provisioner) Cancel(w http.ResponseWriter, r *http.Request) {
 		p.cancel()
 	}
 	p.mu.Unlock()
+	p.removeUploads()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
 }
 
 // realInstall installs the hub's own release: the version is the one this hub runs (never a request's), the verifier is coral-update next to this executable, and each step is a fixed sentence.
 func (pr *Provisioner) realInstall(ctx context.Context, p *provisionPlan, arch sshprov.Arch) error {
+	_, err := pr.installerFor(p).Install(ctx, p.Target, arch)
+	return err
+}
+
+// installerFor is the installer for a plan: the package source and the uploaded files are the plan's own (the person's choice at the run, the files this hub saved), never a path from a request.
+func (pr *Provisioner) installerFor(p *provisionPlan) sshprov.Installer {
 	in := sshprov.Installer{
 		Runner:   pr.runner,
 		Version:  pr.version,
 		Helper:   sshprov.HelperPath(),
 		Progress: func(_, state, detail string) { p.setStep("install", state, detail) },
 	}
-	_, err := in.Install(ctx, p.Target, arch)
-	return err
+	p.mu.Lock()
+	in.Source = p.pkgSource
+	p.mu.Unlock()
+	if in.Source == sshprov.SourceUpload {
+		in.Upload = p.uploadedFor()
+	}
+	return in
 }
 
 var labelUnsafe = regexp.MustCompile(`[^A-Za-z0-9._-]+`)

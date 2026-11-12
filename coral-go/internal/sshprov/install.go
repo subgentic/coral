@@ -4,6 +4,8 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -76,6 +78,29 @@ type Installer struct {
 	Progress func(step, state, detail string)
 	// TempDir is where the 0700 download folder is made; empty is the system's.
 	TempDir string
+	// Source is where the package comes from (#15691): SourceFar (or "") the far computer downloads it, SourceHub this hub downloads it and sends it over the SSH session, SourceUpload the person
+	// uploaded it (Upload). Whatever the source, the package is accepted only when its SHA-256 is the one the signed sums for this hub's own tag give.
+	Source string
+	// Upload holds the absolute paths of the files the person uploaded, saved by the hub (SourceUpload): the package, and optionally the signed sums and their bundle (both or neither; without them the
+	// hub fetches the sums from GitHub as it always does).
+	Upload Upload
+}
+
+// The package sources (#15691).
+const (
+	SourceFar    = "far"    // the far computer downloads the package from GitHub (the default, #12217)
+	SourceHub    = "hub"    // this hub downloads it, verifies it, and sends it over the SSH session
+	SourceUpload = "upload" // the person uploaded it in the browser; the hub verifies it and sends it
+)
+
+// ValidSource says whether s names a package source ("" is the default, SourceFar).
+func ValidSource(s string) bool {
+	return s == "" || s == SourceFar || s == SourceHub || s == SourceUpload
+}
+
+// Upload is the files the person uploaded for an install, as paths of files the hub saved (never a path from a request).
+type Upload struct {
+	Package, Sums, Bundle string
 }
 
 // ErrInstall is every refusal of the install: the sentence is for the owner, fixed, with no text from the far computer or the network in it.
@@ -123,10 +148,27 @@ func (in Installer) Install(ctx context.Context, t Target, arch Arch) (string, e
 	if dl == nil {
 		dl = downloadRelease
 	}
+	if !ValidSource(in.Source) {
+		return "", fail("install", "That package source is not one this hub offers.")
+	}
+	if in.Source == SourceUpload && in.Upload.Package == "" {
+		return "", fail("install", "Upload the package first, so nothing was installed.")
+	}
+	if (in.Upload.Sums == "") != (in.Upload.Bundle == "") {
+		return "", fail("install", "Upload both "+sumsName+" and "+sumsBundleName+", or neither, so nothing was installed.")
+	}
+	uploadedSums := in.Source == SourceUpload && in.Upload.Sums != ""
 	for _, f := range []struct {
-		name string
-		max  int64
-	}{{sumsName, maxSums}, {sumsBundleName, maxBundle}} { // the hub fetches only the signed sums: the far computer downloads the package itself (#12217)
+		name, up string
+		max      int64
+	}{{sumsName, in.Upload.Sums, maxSums}, {sumsBundleName, in.Upload.Bundle, maxBundle}} { // the hub fetches only the signed sums (or takes the ones uploaded): by default the far computer downloads the package itself (#12217)
+		if uploadedSums {
+			in.say("install", "running", "Using the uploaded "+f.name+".")
+			if err := copyCapped(f.up, filepath.Join(dir, f.name), f.max); err != nil {
+				return "", fail("install", "The uploaded "+f.name+" could not be used, so nothing was installed.")
+			}
+			continue
+		}
 		in.say("install", "running", "Downloading "+f.name+".")
 		if err := dl(ctx, releaseBase+tag+"/"+f.name, filepath.Join(dir, f.name), f.max); err != nil {
 			return "", fail("install", "Could not download "+f.name+" from GitHub.")
@@ -154,6 +196,40 @@ func (in Installer) Install(ctx context.Context, t Target, arch Arch) (string, e
 		return "", connectErr(err)
 	}
 
+	// A package the hub holds (it downloaded it, or the person uploaded it) is read once: hashed against the signed sum while it is read, refused unless it is the signed release, and walked for
+	// member names and links before it is sent. The far side then hashes what arrived and the hub compares again (d).
+	var local *os.File
+	if in.Source == SourceHub || in.Source == SourceUpload {
+		pkgPath := in.Upload.Package
+		if in.Source == SourceHub {
+			in.say("install", "running", "This computer is downloading "+asset+".")
+			pkgPath = filepath.Join(dir, asset)
+			if err := dl(ctx, releaseBase+tag+"/"+asset, pkgPath, maxPackage); err != nil {
+				return "", fail("install", "This computer could not download the release from GitHub, so nothing was installed.")
+			}
+		}
+		in.say("install", "running", "Checking the package against the signed SHA-256 on this computer.")
+		f, err := os.Open(pkgPath)
+		if err != nil {
+			return "", fail("install", "Could not read the package.")
+		}
+		defer f.Close()
+		got, _, err := hashCapped(f, maxPackage)
+		if err != nil {
+			return "", fail("install", "The package is too large or could not be read, so nothing was installed.")
+		}
+		if got != sum {
+			if in.Source == SourceUpload {
+				return "", fail("install", "The uploaded package is not the signed "+tag+" release for this computer's architecture, so nothing was installed.")
+			}
+			return "", fail("install", "The package this computer downloaded is not the one that was verified, so nothing was installed.")
+		}
+		if _, err := checkLocalPackage(pkgPath); err != nil {
+			return "", fail("install", "The package holds paths that are not allowed, so nothing was installed.")
+		}
+		local = f
+	}
+
 	// Room for the package and what it unpacks to, and a margin, before anything is copied.
 	need := int64(remoteNeedKB)
 	fr, err := in.Runner.Run(ctx, t, CmdFreeKB)
@@ -167,17 +243,29 @@ func (in Installer) Install(ctx context.Context, t Target, arch Arch) (string, e
 	if _, err := in.Runner.Run(ctx, t, CmdMkVersionDir, in.Version); err != nil {
 		return "", connectErr(err)
 	}
-	in.say("install", "running", "The other computer is downloading "+asset+" and checking its SHA-256 against the verified one.")
-	if r, err := in.Runner.Run(ctx, t, CmdDownload, in.Version, string(arch), sum); err != nil {
-		return "", connectErr(err)
-	} else if r.ExitCode != 0 {
-		switch r.ExitCode {
-		case dlNoCurl:
-			return "", fail("install", "The other computer has no curl, so it cannot download the release, and nothing was installed.")
-		case dlMismatch:
-			return "", fail("install", "The package the other computer downloaded is not the one that was verified, so nothing was unpacked.")
+	if local != nil {
+		if _, err := local.Seek(0, io.SeekStart); err != nil {
+			return "", fail("install", "Could not read the package.")
 		}
-		return "", fail("install", "The other computer could not download the release from GitHub, so nothing was installed.")
+		in.say("install", "running", "Sending "+asset+" to the other computer.")
+		if r, err := in.Runner.RunInput(ctx, t, local, CmdReceive, in.Version); err != nil {
+			return "", connectErr(err)
+		} else if r.ExitCode != 0 {
+			return "", fail("install", "Could not copy the package to the other computer, so nothing was installed.")
+		}
+	} else {
+		in.say("install", "running", "The other computer is downloading "+asset+" and checking its SHA-256 against the verified one.")
+		if r, err := in.Runner.Run(ctx, t, CmdDownload, in.Version, string(arch), sum); err != nil {
+			return "", connectErr(err)
+		} else if r.ExitCode != 0 {
+			switch r.ExitCode {
+			case dlNoCurl:
+				return "", fail("install", "The other computer has no curl, so it cannot download the release, and nothing was installed.")
+			case dlMismatch:
+				return "", fail("install", "The package the other computer downloaded is not the one that was verified, so nothing was unpacked.")
+			}
+			return "", fail("install", "The other computer could not download the release from GitHub, so nothing was installed.")
+		}
 	}
 
 	// (d) the far side hashes what it received with sha256sum, and the hub compares.
@@ -455,4 +543,38 @@ func HelperPath() string {
 		name += ".exe"
 	}
 	return filepath.Join(filepath.Dir(exe), name)
+}
+
+// copyCapped copies the file at src to a new file dst (0600), at most max bytes; a longer file is refused.
+func copyCapped(src, dst string, max int64) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	n, err := io.Copy(out, io.LimitReader(in, max+1))
+	if cerr := out.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil && n > max {
+		err = errors.New("too large")
+	}
+	return err
+}
+
+// hashCapped is the SHA-256 (lower-case hex) and the size of what r holds, refusing more than max bytes.
+func hashCapped(r io.Reader, max int64) (string, int64, error) {
+	h := sha256.New()
+	n, err := io.Copy(h, io.LimitReader(r, max+1))
+	if err != nil {
+		return "", n, err
+	}
+	if n > max {
+		return "", n, errors.New("too large")
+	}
+	return hex.EncodeToString(h.Sum(nil)), n, nil
 }

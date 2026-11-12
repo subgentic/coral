@@ -516,4 +516,103 @@ for (const field of ['dataDir', 'port']) {
     assert.deepEqual(runBody.key_fingerprints, ['SHA256:NEWKEY'], 'the new fingerprint is what is confirmed and sent');
 }
 
+// ── #15691: where the package comes from (set up and upgrade): built when the dialog opens; the hub's own choices; an upload gates Upgrade until it is complete ──
+{
+    hub({ extra: { remote_version: '2.0.1', hub_version: '2.0.2' } });
+    const base = globalThis.fetch;
+    const uploads = [];
+    let uploadFails = false;
+    globalThis.fetch = async (url, init = {}) => {
+        if (String(url).includes('/upload?')) {
+            uploads.push({ url: String(url), method: init.method, size: init.body && init.body.size });
+            if (uploadFails) return new Response(JSON.stringify({ error: 'That file is too big.' }), { status: 413, headers: { 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ kind: String(url).split('kind=')[1], bytes: init.body.size, sha256: 'ab'.repeat(32) }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        return base(url, init);
+    };
+    const pick = (host, sel, text) => { const inp = $(host, sel); Object.defineProperty(inp, 'files', { value: [Object.assign(new Blob([text]), { name: 'file-' + sel.slice(1) })], configurable: true }); inp.dispatchEvent(new dom.window.Event('change')); };
+
+    // nothing is drawn until the dialog is open at the connected step (zero start bytes)
+    const host = fresh();
+    mountSshSetup(host, { mode: 'manage', server: { id: 'ssh-box', label: 'Build box' }, action: 'upgrade', pollMs: 5 });
+    await until(() => btn(host, 'Connect'), 'the plan');
+    assert.equal($(host, '.ssh-source'), null, 'no source choice before the computer is connected');
+    btn(host, 'Connect').click();
+    await until(() => btn(host, 'Upgrade to v2.0.2'), 'the confirm');
+    assert.equal($(host, '#ssh-source-far').checked, true, 'the computer downloads it by default');
+    assert.equal(btn(host, 'Upgrade to v2.0.2').disabled, false);
+    assert.equal($(host, '#ssh-upload-package'), null, 'no file picker until Upload is chosen');
+
+    // the hub sends it: sent in the run body
+    $(host, '#ssh-source-hub').click();
+    await until(() => $(host, '#ssh-source-hub').checked, 'the hub choice');
+    runBody = null;
+    btn(host, 'Upgrade to v2.0.2').click();
+    await until(() => runBody, 'the run');
+    assert.equal(runBody.package_source, 'hub');
+
+    // upload: closed until a package is chosen, half of the sums is not enough, both open it
+    hub({ extra: { remote_version: '2.0.1', hub_version: '2.0.2' } });
+    const base2 = globalThis.fetch;
+    globalThis.fetch = async (url, init = {}) => String(url).includes('/upload?') ? (uploads.push({ url: String(url), size: init.body && init.body.size }), new Response(JSON.stringify(uploadFails ? { error: 'That file is too big.' } : { bytes: init.body.size, sha256: 'ab'.repeat(32) }), { status: uploadFails ? 413 : 200, headers: { 'Content-Type': 'application/json' } })) : base2(url, init);
+    const h2 = fresh();
+    mountSshSetup(h2, { mode: 'manage', server: { id: 'ssh-box', label: 'Build box' }, action: 'upgrade', pollMs: 5 });
+    await until(() => btn(h2, 'Connect'), 'the plan');
+    btn(h2, 'Connect').click();
+    await until(() => btn(h2, 'Upgrade to v2.0.2'), 'the confirm');
+    $(h2, '#ssh-source-upload').click();
+    await until(() => $(h2, '#ssh-upload-package'), 'the pickers');
+    assert.equal(btn(h2, 'Upgrade to v2.0.2').disabled, true, 'no package chosen: closed');
+    assert.match(h2.textContent, /Choose the release package/);
+    pick(h2, '#ssh-upload-package', 'pkg');
+    await until(() => $(h2, '.ssh-upload-got'), 'the package uploaded');
+    assert.match($(h2, '.ssh-upload-got').textContent, /3 bytes, SHA-256 (ab){32}/, 'the size and hash are shown');
+    assert.equal(btn(h2, 'Upgrade to v2.0.2').disabled, false, 'a package alone is enough');
+    pick(h2, '#ssh-upload-sums', 'sums');
+    await until(() => h2.querySelectorAll('.ssh-upload-got').length === 2, 'the sums uploaded');
+    assert.equal(btn(h2, 'Upgrade to v2.0.2').disabled, true, 'sums without their bundle: closed');
+    assert.match(h2.textContent, /both SHA256SUMS.txt and its .sigstore.json file, or neither/);
+    pick(h2, '#ssh-upload-bundle', 'bundle');
+    await until(() => h2.querySelectorAll('.ssh-upload-got').length === 3, 'the bundle uploaded');
+    assert.equal(btn(h2, 'Upgrade to v2.0.2').disabled, false);
+    assert.deepEqual(uploads.map(u => u.url.split('kind=')[1]).slice(-3), ['package', 'sums', 'bundle']);
+    runBody = null;
+    btn(h2, 'Upgrade to v2.0.2').click();
+    await until(() => runBody, 'the run');
+    assert.equal(runBody.package_source, 'upload');
+
+    // a refused upload says why and leaves the dialog closed
+    hub({ extra: { remote_version: '2.0.1', hub_version: '2.0.2' } });
+    uploadFails = true;
+    const base3 = globalThis.fetch;
+    globalThis.fetch = async (url, init = {}) => String(url).includes('/upload?') ? new Response(JSON.stringify({ error: 'That file is too big.' }), { status: 413, headers: { 'Content-Type': 'application/json' } }) : base3(url, init);
+    const h3 = fresh();
+    mountSshSetup(h3, { mode: 'manage', server: { id: 'ssh-box', label: 'Build box' }, action: 'upgrade', pollMs: 5 });
+    await until(() => btn(h3, 'Connect'), 'the plan');
+    btn(h3, 'Connect').click();
+    await until(() => btn(h3, 'Upgrade to v2.0.2'), 'the confirm');
+    $(h3, '#ssh-source-upload').click();
+    await until(() => $(h3, '#ssh-upload-package'), 'the pickers');
+    pick(h3, '#ssh-upload-package', 'pkg');
+    await until(() => /too big/.test(h3.textContent), 'the refusal');
+    assert.equal(btn(h3, 'Upgrade to v2.0.2').disabled, true);
+    assert.equal($(h3, '.ssh-upload-got'), null);
+
+    // set up has the same choice, and sends it
+    hub();
+    const h4 = fresh();
+    mountSshSetup(h4, { mode: 'setup', pollMs: 5 });
+    await until(() => $(h4, '#ssh-host'), 'the target form');
+    $(h4, '#ssh-host').value = 'user@box.example.com'; $(h4, '#ssh-host').dispatchEvent(new dom.window.Event('input'));
+    $(h4, 'form').dispatchEvent(new dom.window.Event('submit', { cancelable: true }));
+    await until(() => btn(h4, 'Connect'), 'the plan');
+    btn(h4, 'Connect').click();
+    await until(() => btn(h4, 'Set up'), 'the confirm');
+    $(h4, '#ssh-source-hub').click();
+    runBody = null;
+    btn(h4, 'Set up').click();
+    await until(() => runBody, 'the run');
+    assert.equal(runBody.package_source, 'hub');
+}
+
 console.log('server_ssh_setup: ok');

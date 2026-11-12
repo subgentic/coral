@@ -70,6 +70,7 @@ func farSide(t *testing.T, mode string) (ssh, home, log string) {
 }
 
 type installEnv struct {
+	t     *testing.T
 	in    Installer
 	pkg   []byte
 	steps []string
@@ -80,7 +81,7 @@ type installEnv struct {
 
 func newInstallEnv(t *testing.T, pkg []byte, mode string) (*installEnv, string, string) {
 	ssh, home, log := farSide(t, mode)
-	e := &installEnv{pkg: pkg}
+	e := &installEnv{t: t, pkg: pkg}
 	if err := os.WriteFile(filepath.Join(filepath.Dir(home), "pkg.bin"), pkg, 0o600); err != nil { // what the far computer's "download" gets
 		t.Fatal(err)
 	}
