@@ -226,7 +226,7 @@ const upToDate = { ...idle, not_ready_reason: 'up_to_date' }; // what the server
             for (const [what, st, expect] of [
                 ['up to date', upToDate, { title: 'Coral is up to date', act: 'Check now' }],
                 ['nothing known', idle, { title: 'Nothing is ready to install' }],
-                ['a newer one not promoted', { ...idle, not_ready_reason: 'not_promoted', latest: '1.4.130' }, { title: 'Coral 1.4.130 is out', sub: 'Coral will download and check it once it is ready. Installing it is up to you.' }],
+                ['a newer one not promoted', { ...idle, not_ready_reason: 'not_promoted', latest: '1.4.130' }, { title: 'v1.4.130 is approved but not promoted yet', sub: 'Run Promote release. Coral can download and check it once it is promoted. Installing it is up to you.' }],
                 ['backing off', { ...idle, not_ready_reason: 'backoff' }, { title: 'Nothing to install right now', sub: 'Coral will check again later.' }],
                 ['check failed', { ...idle, not_ready_reason: 'check_failed' }, { title: 'Coral could not check for updates', k: 'warm' }],
                 ['not checked yet', { ...idle, not_ready_reason: 'not_checked' }, { title: 'Coral has not checked for updates yet' }],
