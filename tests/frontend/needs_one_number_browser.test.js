@@ -4,10 +4,12 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
 const { coralReady } = require('./helpers/wait');
+const { guardSettings } = require('./helpers/settings_guard');
 const BASE = require('./test_base').BASE;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const guard = await guardSettings(); // the bulk Dismiss on the phone saves inbox_welcome_done to the server: put back at the end (#15755)
     const S = `(window.__coralStatic || '/static/')`, team = 'one-number-' + Date.now().toString(36), problems = [];
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -50,7 +52,7 @@ const BASE = require('./test_base').BASE;
             }
 
         }
-    } finally { await ev(`fetch('/api/board/${team}', { method: 'DELETE' })`).catch(() => {}); await client.close(); }
+    } finally { await ev(`fetch('/api/board/${team}', { method: 'DELETE' })`).catch(() => {}); await client.close(); await guard.restore(); }
     if (problems.length) { console.error('FAIL\n  ' + problems.join('\n  ')); process.exit(1); }
     console.log('needs_one_number_browser: ok');
 })().catch(e => { console.error(e); process.exit(1); });
