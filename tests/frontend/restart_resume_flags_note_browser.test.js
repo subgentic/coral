@@ -37,13 +37,6 @@ const BASE = require('./test_base').BASE;
         await waitFor(`(document.getElementById('resume-flags').textContent || '') !== ${JSON.stringify(b)} && !document.getElementById('resume-flags').hidden`, 'the line follows the pick', 8000);
         await pick('');
         await waitFor(`document.getElementById('resume-flags').hidden`, 'the saved default has no line', 4000);
-        // The Operator's original bug: the chat's agent keeps Full access, so the note says it is kept (the row's keep_full_access is what Resume sends).
-        await ev(`(() => { document.getElementById('resume-modal').dataset.resumeSessionId = 'sid-kept'; T.state.liveSessions = [...(T.state.liveSessions || []), { session_id: 'sid-kept', agent_type: 'codex', keep_full_access: true }]; return true; })()`);
-        await pick('default');
-        await waitFor(`(document.getElementById('resume-flags').textContent || '').includes('Full access is kept')`, 'the kept Full access is named on Resume', 8000);
-        await ev(`T.state.liveSessions = T.state.liveSessions.filter(x => x.session_id !== 'sid-kept'); document.getElementById('resume-modal').dataset.resumeSessionId = ''; true`);
-        await pick('bypassPermissions');
-        await waitFor(`!(document.getElementById('resume-flags').textContent || '').includes('Full access is kept')`, 'no kept note without the row', 8000);
         console.log('   ok Resume: ' + b.slice(0, 120));
         console.log('PASS Restart and Resume say what the flags are');
     } finally { await client.close(); }

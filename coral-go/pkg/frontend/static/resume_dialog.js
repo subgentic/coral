@@ -127,7 +127,6 @@ function syncResumeModeNote() {
 }
 
 /** Under the mode note: the flags the chosen mode adds to the resumed command, and why they are not the pick's own (#15761; the preview call New agent uses). The saved default sends nothing, so it has no line. */
-const keptFullAccess = modal => { const id = modal && (modal.dataset.resumeSessionId || ''); return !!id && (state.liveSessions || []).some(x => x.session_id === id && x.keep_full_access === true); }; // the chat's own agent row, when it has one (an ended agent resumed from the Agents tab)
 let resumeFlagsSync = null;
 async function syncResumeFlags() {
     const el = document.getElementById("resume-flags");
@@ -136,7 +135,7 @@ async function syncResumeFlags() {
     if (!resumeFlagsSync) resumeFlagsSync = flagsLine(el, () => {
         const modal = document.getElementById("resume-modal"), pick = (document.getElementById("resume-mode") || {}).value || "", agentType = modal && modal.dataset.agentType;
         if (!agentType || !pick || agentType === "terminal") return null;
-        return { agent_type: agentType, permission_mode: pick === "default" ? "default" : "", flags: pick === "default" ? [] : _getPermissionFlagsForAgentMode(agentType, pick).split(/\s+/).filter(Boolean), keep_full_access: keptFullAccess(modal) }; // what resumeLaunchNew sends for the pick; Keep Full access is the stored agent's own (the row's), which a resume keeps (#15727)
+        return { agent_type: agentType, permission_mode: pick === "default" ? "default" : "", flags: pick === "default" ? [] : _getPermissionFlagsForAgentMode(agentType, pick).split(/\s+/).filter(Boolean), keep_full_access: false }; // what resumeLaunchNew sends for the pick
     }, () => currentServer());
     resumeFlagsSync();
 }
