@@ -73,3 +73,16 @@ func TestAKnowledgeStatusErrorNeverCarriesAKey(t *testing.T) {
 	assert.Contains(t, out.Error, redact.Marker)
 	assert.NotContains(t, out.FailedAgents[0].Error, token)
 }
+
+// #15539 (Security's SHOULD on #15538): the plain redactor has no keyword rules, so a CLI error that echoes `api_key=<value>` would show on the Knowledge tab; the status uses the credential rules.
+func TestAKnowledgeStatusErrorHidesAKeywordedValue(t *testing.T) {
+	value := "mellow" + "harbor" + "tide" + "42" // built at run time: 18 characters, no known key shape and too little entropy for the plain rules; only the keyword rules (the name before it) call it a credential
+	for _, field := range []string{"api_key=", "password: ", `"secret":"`} {
+		j := knowledgeJob{TeamName: "t", Status: "failed", Error: "claude CLI failed: exit status 1: " + field + value,
+			FailedAgents: []background.DistillFailure{{Agent: "Ada", Error: "denied, " + field + value}}}
+		out := j.status()
+		assert.NotContains(t, out.Error, value, field)
+		assert.NotContains(t, out.FailedAgents[0].Error, value, field)
+		assert.Contains(t, out.Error, redact.Marker, field)
+	}
+}
