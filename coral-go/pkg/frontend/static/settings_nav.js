@@ -68,10 +68,11 @@ export function refreshSettingsGroups() {
 /** Legacy Network rows share the same help line and Docs anchor as schema rows. */
 const HINTS = {
     'Coral Hub': 'Limit what Coral Hub can do on this computer.',
+    'What may Coral Hub do on this computer?': 'Choose whether remote users can look, interact or launch agents.',
     'Let Coral Hub relaunch this Coral to install updates': 'Allow Coral Hub to install a version already downloaded and checked here.',
     'Coral Hub can turn on auto-accept': 'Allow Coral Hub to enable automatic permission approval.',
     'Let Coral Hub change cross-team settings': 'Allow Coral Hub to change how teams communicate.',
-    'Hide tokens from view-only hub users': 'Hide secrets from people with view-only access through Coral Hub.',
+    'Hide tokens from view-only hub users': 'Redacts recognised credentials before sharing output with read-only viewers.',
     'Let Coral Hub act as the Operator': 'Allow Coral Hub users to make Operator decisions here.',
 };
 function docsHint(holder, name, original = null) {
@@ -79,7 +80,7 @@ function docsHint(holder, name, original = null) {
     const sentence = document.createElement('span'); sentence.textContent = HINTS[name] || 'Permissions and limits for this computer.';
     if (p.id) { sentence.id = p.id; p.removeAttribute('id'); }
     p.replaceChildren(sentence, ' ');
-    const answer = name === 'Coral Hub' ? 'Coral Hub access limits' : HINTS[name] ? name : 'Settings help for Coral Hub access';
+    const answer = ['Coral Hub', 'What may Coral Hub do on this computer?'].includes(name) ? 'Coral Hub access limits' : HINTS[name] ? name : 'Settings help for Coral Hub access';
     const a = settingsDocsLink({ docs: { topic: 'hub', answer } }, { label: name });
     p.append(a); if (!original) holder.append(p);
 }
@@ -98,7 +99,7 @@ function buildInfoButtons(root) {
 }
 function buildCloudInfoButtons(root) {
     for (const row of root.querySelectorAll('.settings-cloud-switch-row, .settings-cloud-mode')) {
-        const label = row.querySelector('.settings-cloud-switch-label, :scope > label');
+        const label = row.matches('.settings-cloud-mode') ? row.querySelector(':scope > .net-level-row label, :scope > label') : row.querySelector('.settings-cloud-switch-label, :scope > label');
         const text = row.querySelector('.settings-cloud-switch-text > .settings-hint, [data-cloud="mode-full"]');
         if (!label || !text || row.dataset.hinted) continue;
         row.dataset.hinted = '1'; text.hidden = true;

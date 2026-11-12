@@ -49,3 +49,8 @@
 #settings-modal .sec-switch > input.switch { flex: none; }
 
 @media (max-width: 767px), (pointer: coarse) { #settings-modal .sec-switch { min-height: var(--control-touch-height, 44px); } }
+
+/* A real link box keeps its phone target out of the neighbouring control. */
+@media (max-width: 767px), (pointer: coarse) {
+    #settings-modal { --sv-learn-display: inline-flex; --sv-learn-height: var(--control-touch-height, 44px); --sv-learn-target-display: none; }
+}
