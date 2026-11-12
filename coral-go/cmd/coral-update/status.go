@@ -152,6 +152,7 @@ func collectStatus(getenv func(string) string, dataDir string, now time.Time) st
 		}
 	}
 
+	out.Checking = stage.CheckRunning(dir, now)
 	out.RunRecord = "missing"
 	p := filepath.Join(dir, runrecord.File)
 	if fi, err := os.Lstat(p); err == nil {

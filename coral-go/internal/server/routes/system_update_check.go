@@ -121,6 +121,10 @@ func (h *UpdateRelaunchHandler) startCheck(w http.ResponseWriter, r *http.Reques
 		writeJSON(w, http.StatusConflict, body)
 		return
 	}
+	if rec.Checking { // another program's check holds the updater's lock (the background one, or the command line): a second would only find it busy
+		writeJSON(w, http.StatusConflict, map[string]any{"code": reasonBusy, "error": "a check is already running"})
+		return
+	}
 	h.checkMu.Lock()
 	now := h.now()
 	if wait := manualCheckSpacing - now.Sub(h.lastManual); !h.lastManual.IsZero() && wait > 0 {

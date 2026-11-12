@@ -8,7 +8,7 @@ import { copyText, showToast } from './utils.js';
 import { isCloud } from './server_base.js';
 import { mountSettingsView } from './settings_view.js';
 import { el as mk } from './dom_el.js'; // the pane's rows (a startup module: the Settings rows draw from it)
-const { actName, releaseNotesUrl, RELEASES_REPO, ageTier, canStart, installsLocally, notAvailable, reasonText, notReadyText, foundText, fetchHubRelaunch, hubRelaunchSetAtLaunch, requestCheckNow, savePrefs, saveChannel, saveAutoInstall, serverHas } = await importOnce('./update_api.js');
+const { actName, releaseNotesUrl, RELEASES_REPO, ageTier, canStart, installsLocally, notAvailable, reasonText, notReadyText, foundText, fetchHubRelaunch, hubRelaunchSetAtLaunch, requestCheckNow, checkingWords, checkAnswerToast, savePrefs, saveChannel, saveAutoInstall, serverHas } = await importOnce('./update_api.js');
 const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS, HUB_RELAUNCH_AT_LAUNCH, HUB_RELAUNCH_OFF_AT_LAUNCH } = await importOnce('./update_words.js');
 const { failureNotice, getUpdateStatus, refreshUpdateStatus, relaunchOffered } = await importOnce('./update_ui.js');
 
@@ -34,6 +34,10 @@ function card(s) {
     const notice = failureNotice(s);
     if (s.relaunch.reason === 'applying' || s.state === 'applying') {
         title.textContent = 'Updating Coral…'; sub.textContent = 'The update is being installed. Coral restarts when it is done.'; dot.dataset.k = 'warm'; c.dataset.k = 'warm';
+    } else if (s.checking) {
+        const w = checkingWords(s); // a check is running: said, and no second press (#15770)
+        title.textContent = w.title; sub.textContent = w.sub; dot.dataset.k = 'ok'; c.dataset.k = 'ok';
+        if (serverHas.check) { act = mk('button', 'btn update-act', 'Check now'); act.type = 'button'; act.disabled = true; }
     } else if (notice) {
         title.textContent = notice.lead; sub.textContent = notice.rest.trim(); dot.dataset.k = 'bad'; c.dataset.k = 'bad';
         if (serverHas.check) act = mk('button', 'btn update-act', 'Retry'); // no server route to check now, no button
@@ -62,7 +66,7 @@ function card(s) {
         if (s.notReady === 'up_to_date') { dot.dataset.k = 'ok'; c.dataset.k = 'ok'; } else if (s.notReady === 'check_failed' || s.notReady === 'rate_limited') { dot.dataset.k = 'warm'; c.dataset.k = 'warm'; }
         if (serverHas.check) act = mk('button', 'btn update-act', 'Check now');
         if (act) act.type = 'button';
-        if (act) act.addEventListener('click', async () => { act.disabled = true; const ok = await requestCheckNow(); await refreshUpdateStatus(); showUpdatesPane(); if (!ok) showToast('Could not check for updates.', true); });
+        if (act) act.addEventListener('click', async () => { act.disabled = true; const answer = await requestCheckNow(); await refreshUpdateStatus(); showUpdatesPane(); const say = checkAnswerToast(answer, getUpdateStatus()); if (say) showToast(say.text, say.error, undefined, { group: { key: 'update-check', text: () => say.text } }); });
     }
     c.append(dot, text); if (act) c.append(act);
     return c;
@@ -144,6 +148,27 @@ function waitingBlock(s) {
     return d;
 }
 
+/** What the card says depends on these: when any of them changes in a fresh status, the card is drawn again (#15771: the pane showed the status from up to ten minutes ago, "Coral is up to date", while 2.0.66 was staged). */
+const cardSig = s => s ? [s.enabled, s.state, s.staged && s.staged.version, s.staged && s.staged.verified, s.relaunch.reason, s.relaunch.available, s.notReady, s.checkedResult, s.latest, s.progress, s.autoInstall && s.autoInstall.state].join('|') : '';
+const PANE_POLL_MS = 5000;
+let paneWatch = 0;
+
+/** While the Updates pane is open, read the status again at once and then every few seconds, and draw the card again when what it says changed (a check that staged a release, a download's progress): the person never has to close the pane to see it. Stops when the pane is gone. */
+function watchPane(drawn) {
+    clearTimeout(paneWatch);
+    let last = cardSig(drawn);
+    const tick = async () => {
+        if (!body() || isSignedOut()) return;
+        const fresh = await refreshUpdateStatus();
+        const slot = body() && body().querySelector('.update-status');
+        if (!slot) return; // the pane was closed or redrawn meanwhile (a redraw starts its own watch)
+        const now = cardSig(fresh);
+        if (fresh && fresh.enabled && now !== last) { last = now; slot.replaceWith(isManaged(fresh) ? managed(fresh) : card(fresh)); }
+        paneWatch = setTimeout(tick, PANE_POLL_MS);
+    };
+    paneWatch = setTimeout(tick, 0);
+}
+
 /** Draw the pane from the last status (and ask for a fresh one): the card, the channel and the facts are parts this module draws; the switch, the hub line and the facts are rows of a settings_view (the pane is Settings like the rest). */
 export async function showUpdatesPane() {
     const host = body();
@@ -192,6 +217,7 @@ export async function showUpdatesPane() {
     if (s.last && s.last.result === 'relaunched' && /^hub:/.test(s.last.by) && stamp(s.last.at)) fact('last', 'Last update', `Relaunched from Coral Hub at ${stamp(s.last.at)}`); // the time, never the hub user's name
     fields.push({ key: 'privacy', type: 'notice', render: slot => slot.append(mk('p', 'update-calm update-privacy', 'Coral contacts GitHub only, to read the release list and download the package.')) });
     mountSettingsView(host, { mode: 'settings', saveBar: false, fields });
+    watchPane(s);
     // The waiting list is the operator's, and the client reads the release list only on Agentic: it shows while Agentic is the choice and the server sent releases (never through the Hub)
     const group = host.querySelector('#update-channel[role=radiogroup]');
     if (!group) return;

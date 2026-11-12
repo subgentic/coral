@@ -276,3 +276,29 @@ func TestTheGenericSettingsWriteRefusesTheAutoSwitch(t *testing.T) {
 	s, _ := store.NewSessionStore(db).GetSettings(t.Context())
 	assert.Empty(t, s[UpdateAutoSetting])
 }
+
+// #15770: a check that another program started (the updater's check lock is held while it downloads) is a check running. The status says so, and Check now answers busy at once instead of starting a second one
+// that would only find the lock taken; the page words it ("Already checking") and offers no second press.
+func TestACheckThatAnotherProgramRunsIsSaidInTheStatusAndCheckNowIsBusy(t *testing.T) {
+	e := newRelaunchEnv(t)
+	code, out := e.status(nil)
+	require.Equal(t, 200, code, "%v", out)
+	assert.Nil(t, out["checking"], "nothing runs: the status does not say so")
+
+	e.up.mu.Lock()
+	e.up.rec.Checking = true
+	e.up.mu.Unlock()
+	code, out = e.status(nil)
+	require.Equal(t, 200, code, "%v", out)
+	assert.Equal(t, true, out["checking"], "a check holds the lock: the status says so")
+	code, out = e.checkNow(nil)
+	assert.Equal(t, 409, code, "%v", out)
+	assert.Equal(t, reasonBusy, out["code"])
+	assert.Equal(t, 0, e.up.checkCount(), "no second check was started")
+
+	e.up.mu.Lock()
+	e.up.rec.Checking = false
+	e.up.mu.Unlock()
+	code, _ = e.checkNow(nil)
+	assert.Equal(t, 202, code, "the lock is gone: a check starts")
+}

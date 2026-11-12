@@ -18,8 +18,9 @@ type Out struct {
 	Backoff      *Back     `json:"backoff,omitempty"`
 	LastApply    *Apply    `json:"last_apply,omitempty"`
 	LastRolled   *Apply    `json:"last_rollback,omitempty"`
-	RunRecord    string    `json:"run_record"`        // present, missing or unreadable (Linux: how Coral is started again after an update)
-	Install      *Install  `json:"install,omitempty"` // what this install is and whether the updater can replace it (the status command fills it; nil when it could not be told)
+	Checking     bool      `json:"checking,omitempty"` // a check holds the check lock now: downloading or verifying (#15770)
+	RunRecord    string    `json:"run_record"`         // present, missing or unreadable (Linux: how Coral is started again after an update)
+	Install      *Install  `json:"install,omitempty"`  // what this install is and whether the updater can replace it (the status command fills it; nil when it could not be told)
 }
 
 // Accepted is the last version that started and was accepted.

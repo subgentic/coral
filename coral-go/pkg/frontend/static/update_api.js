@@ -85,6 +85,7 @@ export function normalizeStatus(raw) {
         approved: raw.approved && typeof raw.approved === 'object' && VERSION_RE.test(str(raw.approved.version)) ? { version: raw.approved.version, approvedAt: Date.parse(str(raw.approved.approved_at)) ? str(raw.approved.approved_at) : '' } : null,
         pastApproved: raw.past_approved === true,
         waiting: Array.isArray(raw.waiting) ? raw.waiting.filter(w => w && typeof w === 'object' && VERSION_RE.test(str(w.version))).slice(0, 5).map(w => ({ version: w.version, publishedAt: Date.parse(str(w.published_at)) ? str(w.published_at) : '', notes: str(w.notes).slice(0, 2000) })) : [],
+        checking: raw.checking === true, // a check is running now (downloading or verifying), whoever started it (#15770)
         progress: Number.isFinite(Number(raw.progress)) ? Math.min(100, Math.max(0, Math.round(Number(raw.progress)))) : null, // provisional: percent of a download in progress
     };
 }
@@ -239,8 +240,28 @@ export const hubRelaunchSetAtLaunch = () => hubRelaunchAtLaunch;
 
 /** Ask the updater to look for a release now (false when the server has no such route). */
 export async function requestCheckNow() {
-    if (!serverHas.check) return false;
-    try { return (await fetch(ROUTES.check, { method: 'POST' })).ok; } catch { return false; }
+    if (!serverHas.check) return { ok: false, busy: false, tooSoon: false };
+    try {
+        const r = await fetch(ROUTES.check, { method: 'POST' });
+        let code = '';
+        if (!r.ok) { try { code = String((await r.json()).code || ''); } catch { /* not JSON */ } }
+        return { ok: r.ok, busy: r.status === 409 && code === 'busy', tooSoon: r.status === 429 }; // a check already running or one a moment ago is an answer, not a failure (#15770)
+    } catch { return { ok: false, busy: false, tooSoon: false }; }
+}
+
+/** What the card says while a check runs: the version it is getting when the status knows it, and the percent when the server sends one (#15770). */
+export function checkingWords(s) {
+    const v = (s.staged && s.staged.version) || s.latest || s.newest || '';
+    const pct = Number.isFinite(s.progress) ? ` (${s.progress} percent)` : '';
+    return { title: 'Checking for updates…', sub: v ? `Already checking: downloading Coral ${v}${pct}. It is not finished yet.` : `Already checking${pct}. It is not finished yet.` };
+}
+
+/** The one toast a Check now press gets, or null for none: a check already running or one a moment ago is said calmly, never as a failure (#15770). */
+export function checkAnswerToast(answer, s) {
+    if (answer.ok) return null;
+    if (answer.busy) return { text: checkingWords(s || {}).sub.replace(' It is not finished yet.', ''), error: false };
+    if (answer.tooSoon) return { text: 'A check just ran. Try again in a minute.', error: false };
+    return { text: 'Could not check for updates.', error: true };
 }
 
 /** Save "Check for updates automatically". */

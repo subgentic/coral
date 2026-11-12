@@ -166,6 +166,8 @@ type UpdaterRecord struct {
 	CheckResult  string
 	Newest       string
 	LastRollback *UpdateRollback
+	// Checking: a check is running now (it holds the updater's check lock), whoever started it (#15770).
+	Checking bool
 }
 
 // RestartAgent is one pty agent a relaunch would restart.
@@ -641,6 +643,9 @@ func (h *UpdateRelaunchHandler) statusJSON(id callerIdentity, v relaunchView, ke
 // addUpdateFacts adds the fields the screens and the docs need beyond the design's (#5388), each only when known and only in its fixed vocabulary:
 // no free text, path or URL from the updater's record reaches the reply.
 func (h *UpdateRelaunchHandler) addUpdateFacts(out map[string]any, rec UpdaterRecord) {
+	if rec.Checking || h.checking.Load() {
+		out["checking"] = true // a check is running (this server's own, or the updater's lock held by another); the page says so and does not offer a second one (#15770)
+	}
 	if !rec.CheckedAt.IsZero() {
 		out["checked_at"] = rec.CheckedAt.UTC().Format(time.RFC3339)
 	}
