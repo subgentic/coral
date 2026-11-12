@@ -19,13 +19,13 @@ const HEX = 'a'.repeat(64);
     const S = scenarios();
     const stub = () => ev(`(() => { const R = window.fetch.bind(window); const j = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } }));
         window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
-            if (/^\\/api\\/board\\/[^/]+\\/artifacts$/.test(url.pathname)) return j({ project: ${JSON.stringify(TEAM)}, artifacts: [{ id: ${JSON.stringify(HEX)}, name: ${JSON.stringify(ART)}, media_type: 'text/plain', size: 1200, task_id: 0, task_title: '', created_at: '2026-10-25T06:00:00Z', uri: 'coral://artifacts/${HEX}', available: true }], has_more: false });
+            if (/^\\/api\\/board\\/[^/]+\\/artifacts$/.test(url.pathname)) return new Promise(r => setTimeout(r, 700)) /* sleep-ok: a slow list answer is the point: the row is not there at first (Windows, #15987) */.then(() => j({ project: ${JSON.stringify(TEAM)}, artifacts: [{ id: ${JSON.stringify(HEX)}, name: ${JSON.stringify(ART)}, media_type: 'text/plain', size: 1200, task_id: 0, task_title: '', created_at: '2026-10-25T06:00:00Z', uri: 'coral://artifacts/${HEX}', available: true }], has_more: false }));
             if (url.pathname === '/api/artifacts/${HEX}') return Promise.resolve(new Response('The settings audit text.', { headers: { 'Content-Type': 'text/plain' } }));
             return R(u, o); };
         return true; })()`);
     const row = rx => `(() => { const e = window.__tp.find('button, a, [role=row], tr', ${rx}); return e; })()`;
     const paneBox = () => ev(`(() => { const p = window.__tp.pane(); return p ? window.__na.box(p) : null; })()`);
-    const openRow = async () => { assert.ok(await ev(`(() => { const e = ${row('/' + ART + '/')}; if (!e) return false; e.focus(); e.click(); return true; })()`), `no row named ${ART}`); await settle(400); };
+    const openRow = async () => { await waitFor(`!!${row('/' + ART + '/')}`, `the row named ${ART} is drawn (the list arrives after a slow answer)`, 15000); assert.ok(await ev(`(() => { const e = ${row('/' + ART + '/')}; if (!e) return false; e.focus(); e.click(); return true; })()`), `no row named ${ART}`); await settle(400); };
     const closeRow = async () => { await ev(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); true`); await settle(300); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
