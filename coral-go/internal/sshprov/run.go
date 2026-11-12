@@ -84,7 +84,14 @@ const (
 	CmdTailLog
 	// CmdPortHolder prints "<pid> <command name>" of what listens on port 8420 (lsof, else ss), or nothing; the hub only shows a pid and a name that match fixed patterns.
 	CmdPortHolder
+	// CmdKillStuck is the escalation after a stop that was not confirmed in time (#15997): SIGKILL for each process of THIS user that runs a Coral from the install folder (ourCoralPids), nothing else.
+	CmdKillStuck
 )
+
+// ourCoralPids lists, one per line, the PIDs of this user's processes that run a Coral from the install folder: the program is the first word of the command line and is exactly <install>/<version>/root/coral.
+// It is what the stop and the check mean by "this install's Coral", whatever coral.pid says: a Coral that restarted itself runs under a PID the file never learned (#15997, the Operator's upgrade to v2.0.67).
+// The program is read as a word of its own, so the shell that runs this very command (its text is in its arguments) is never taken for one.
+const ourCoralPids = "ps -u \"$(id -u)\" -o pid= -o args= 2>/dev/null | awk -v d=\"$HOME/" + InstallDir + "/\" 'index($2, d) == 1 && $2 ~ /\\/root\\/coral$/ { print $1 }'"
 
 // aliveTest is true (exit 0) when <install>/coral.pid names a live process of this user whose command line is a Coral from the install folder: the daemon a start left. A recycled PID of another program fails the
 // command-line test, so it is never taken for Coral (and never signalled).
@@ -172,7 +179,8 @@ var specs = map[Command]spec{
 	CmdEnsureInstanceID: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "\" && f=\"$HOME/" + InstallDir + "/instance-id\" && { [ -s \"$f\" ] || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \\n' > \"$f\"; } && cat \"$f\""},
 	CmdReadAPIKey:       {template: readDataDir + "\"$HOME/" + InstallDir + "/%s/root/coral\" api-key --home \"$HOME/$d\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
 	CmdAcceptTerms:      {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" accept-terms", args: []*regexp.Regexp{versionRe}},
-	CmdStopDaemon:       {template: aliveTest + " && kill \"$(cat \"$HOME/" + InstallDir + "/coral.pid\")\" 2>/dev/null; true"},
+	CmdStopDaemon:       {template: aliveTest + " && kill \"$(cat \"$HOME/" + InstallDir + "/coral.pid\")\" 2>/dev/null; for p in $(" + ourCoralPids + "); do kill \"$p\" 2>/dev/null; done; true"},
+	CmdKillStuck:        {template: "for p in $(" + ourCoralPids + "); do kill -9 \"$p\" 2>/dev/null; done; true"},
 	CmdStopTmux:         {template: "tmux kill-session -t =coral-server 2>/dev/null; true"},
 	CmdRemoveInstalls:   {template: "cd \"$HOME/" + InstallDir + "\" 2>/dev/null && for d in [0-9]*; do [ -d \"$d\" ] && rm -rf -- \"$d\"; done; true"},
 	// Never a link, never a folder that is not a Coral's (it has the instance id file this hub's setup made, and that file is no link): exit 7 for those, nothing deleted; exit 0 when there is nothing to delete (#12263).
