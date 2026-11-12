@@ -42,7 +42,6 @@
     "syncDisplayMenu"
   ],
   "privacy_verification_e2e.test.js": [
-    "applySettings",
     "showSettingsModal"
   ],
   "remote_browse.test.mjs": [
@@ -53,7 +52,6 @@
     "selectLiveSession"
   ],
   "settings_save_before_open_browser.test.js": [
-    "applySettings",
     "showSettingsModal"
   ],
   "task_links_browser.test.js": [

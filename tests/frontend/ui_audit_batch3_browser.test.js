@@ -63,8 +63,8 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`window.__copied.length === 1`, 'the copy'); assert.deepEqual(await ev(`window.__copied`), ['coral --cloud-url https://app.coralhub.dev\ncoral cloud connect']);
                 await shot('network-off', w);
             }
-            console.log(`4. (${w}) Settings footer says Save settings`);
-            assert.equal(await ev(`document.querySelector('#settings-modal [data-on-click=m-apply-settings]').textContent.trim()`), 'Save settings');
+            console.log(`4. (${w}) Settings footer has only Close`);
+            assert.equal(await ev(`document.getElementById('settings-cancel-btn').textContent.trim()`), 'Close');
             await ev(`window.hideSettingsModal(); true`);
 
             console.log(`5. (${w}) The launch chooser: the start page's robot, in the page's font`);
