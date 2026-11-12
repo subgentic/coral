@@ -612,7 +612,7 @@
                     <span class="toggle-desc">Where agents get coral-board and Coral's hooks.</span>
                 </dt>
                 <dd>
-                    <div id="settings-tools-folder-status" class="settings-hint" role="status" data-state="warn"></div>
+                    <div id="settings-tools-folder-status" class="settings-hint sv-help" role="status" data-state="warn"></div>
                 </dd>
                 </div>
                         </dl>
@@ -645,30 +645,30 @@
                         <h4 class="settings-pane-title">Storage and cleanup</h4>
                         <div id="settings-cleanup-rows"></div>
                         <div id="settings-cleanup-live" hidden>
-                            <div id="settings-artifact-store-size" class="settings-hint" role="status">Loading&hellip;</div>
-                            <details id="settings-storage-breakdown" class="disclosure settings-storage-breakdown"><summary>By age and board</summary><div id="settings-storage-detail" class="settings-hint"></div></details>
-                            <div id="settings-received-size" class="settings-hint" role="status">Loading&hellip;</div>
-                            <div id="settings-received-unlisted" class="settings-hint" hidden>
+                            <div id="settings-artifact-store-size" class="settings-hint sv-help" role="status">Loading&hellip;</div>
+                            <details id="settings-storage-breakdown" class="disclosure settings-storage-breakdown"><summary>By age and board</summary><div id="settings-storage-detail" class="settings-hint sv-help"></div></details>
+                            <div id="settings-received-size" class="settings-hint sv-help" role="status">Loading&hellip;</div>
+                            <div id="settings-received-unlisted" class="settings-hint sv-help" hidden>
                                 <button class="btn btn-small" type="button" id="settings-received-unlisted-delete">Delete unlisted files</button>
                             </div>
                             <div id="settings-storage-actions">
                                 <button class="btn" type="button" id="settings-storage-shrink">Shrink saved diffs&hellip;</button>
                                 <button class="btn btn-danger" type="button" id="settings-storage-prune">Prune&hellip;</button>
-                                <div id="settings-storage-result" class="settings-hint" role="status"></div>
+                                <div id="settings-storage-result" class="settings-hint sv-help" role="status"></div>
                             </div>
-                            <div id="settings-retention-status" class="settings-hint" role="status"></div>
+                            <div id="settings-retention-status" class="settings-hint sv-help" role="status"></div>
                             <button class="btn btn-small" type="button" id="settings-retention-review" hidden>Review and start&hellip;</button>
-                            <div id="settings-terminal-logs-status" class="settings-hint" role="status">Loading&hellip;</div>
+                            <div id="settings-terminal-logs-status" class="settings-hint sv-help" role="status">Loading&hellip;</div>
                             <button class="btn btn-small btn-danger" type="button" id="settings-terminal-logs-delete" hidden>Delete terminal logs of ended agents</button>
-                            <div id="settings-examples-status" class="settings-hint" hidden></div>
+                            <div id="settings-examples-status" class="settings-hint sv-help" hidden></div>
                             <button class="btn btn-small btn-danger" type="button" id="settings-examples-remove" hidden>Remove examples</button>
-                            <div id="settings-message-search-status" class="settings-hint" role="status">Loading&hellip;</div>
-                            <div id="settings-chat-import-status" class="settings-hint" hidden></div>
+                            <div id="settings-message-search-status" class="settings-hint sv-help" role="status">Loading&hellip;</div>
+                            <div id="settings-chat-import-status" class="settings-hint sv-help" hidden></div>
                             <button class="btn btn-small" type="button" id="settings-chat-import" hidden></button>
                             <section id="settings-dropbox" class="settings-dropbox" aria-labelledby="settings-dropbox-title">
                                 <!-- Dropbox backup (#14609): the Operator's, on this computer's dashboard only; dropbox_settings.js fills it -->
                                 <h5 id="settings-dropbox-title">Dropbox backup</h5>
-                                <div id="settings-dropbox-status" class="settings-hint" role="status" aria-live="polite">Loading&hellip;</div>
+                                <div id="settings-dropbox-status" class="settings-hint sv-help" role="status" aria-live="polite">Loading&hellip;</div>
                                 <div class="settings-dropbox-actions">
                                     <button type="button" class="btn btn-small" id="settings-dropbox-connect" hidden>Connect Dropbox&hellip;</button>
                                     <button type="button" class="btn btn-small" id="settings-dropbox-switch" hidden>Switch to the new account</button>
@@ -677,27 +677,27 @@
                                     <button type="button" class="btn btn-small" id="settings-dropbox-disconnect" hidden>Disconnect</button>
                                     <button type="button" class="btn btn-small" id="settings-dropbox-delete" hidden>Disconnect and delete the backup&hellip;</button>
                                 </div>
-                                <div id="settings-dropbox-note" class="settings-hint" role="status"></div>
+                                <div id="settings-dropbox-note" class="settings-hint sv-help" role="status"></div>
                                 <div id="settings-dropbox-delete-confirm" class="settings-dropbox-delete-confirm" hidden></div>
-                                <p id="settings-dropbox-delete-rule" class="settings-hint" hidden>Deleting a file in Coral removes its Dropbox copy 24 hours later.</p>
+                                <p id="settings-dropbox-delete-rule" class="settings-hint sv-help" hidden>Deleting a file in Coral removes its Dropbox copy 24 hours later.</p>
                                 <div id="settings-dropbox-removals" class="settings-dropbox-removals" role="group" aria-label="Files to remove from Dropbox" hidden></div>
                                 <div id="settings-dropbox-shares" class="settings-dropbox-removals" role="group" aria-label="Files shared through Dropbox" hidden></div>
                                 <div id="settings-dropbox-backup" class="settings-dropbox-backup" hidden>
-                                    <div id="settings-dropbox-counts" class="settings-hint"></div>
+                                    <div id="settings-dropbox-counts" class="settings-hint sv-help"></div>
                                     <div class="dropbox-inline">
-                                        <label for="settings-dropbox-autosync"><input type="checkbox" id="settings-dropbox-autosync"> Take edits made in Dropbox as new versions</label>
+                                        <label for="settings-dropbox-autosync" class="sec-switch"><span>Take edits made in Dropbox as new versions</span><input type="checkbox" class="switch" id="settings-dropbox-autosync"></label>
                                         <button type="button" class="btn btn-small" id="settings-dropbox-autosync-resume" hidden>Resume</button>
                                     </div>
-                                    <p id="settings-dropbox-autosync-note" class="settings-hint" role="status"></p>
+                                    <p id="settings-dropbox-autosync-note" class="settings-hint sv-help" role="status"></p>
                                     <ul id="settings-dropbox-edits" class="settings-dropbox-edits" aria-label="Files edited in Dropbox" hidden></ul>
                                     <fieldset class="settings-dropbox-filters">
                                         <legend>What to back up</legend>
                                         <div id="settings-dropbox-types" class="settings-dropbox-types"></div>
-                                        <p class="settings-hint">No box ticked backs up every type.</p>
+                                        <p class="settings-hint sv-help">No box ticked backs up every type.</p>
                                         <div class="dropbox-inline">
                                             <label for="settings-dropbox-age">Only artifacts from the last</label>
                                             <input type="number" id="settings-dropbox-age" min="0" max="3650" step="1" inputmode="numeric" class="settings-input settings-input-small">
-                                            <span class="settings-hint">days (0 for every age)</span>
+                                            <span class="settings-hint sv-help">days (0 for every age)</span>
                                             <button type="button" class="btn btn-small" id="settings-dropbox-filters-save">Save</button>
                                         </div>
                                     </fieldset>
@@ -706,31 +706,31 @@
                                         <div class="dropbox-inline">
                                             <label for="settings-dropbox-keep-for">Keep files in Dropbox for</label>
                                             <input type="number" id="settings-dropbox-keep-for" min="0" max="3650" step="1" inputmode="numeric" class="settings-input settings-input-small">
-                                            <span class="settings-hint">days (0 keeps them until you remove them)</span>
+                                            <span class="settings-hint sv-help">days (0 keeps them until you remove them)</span>
                                             <button type="button" class="btn btn-small" id="settings-dropbox-retention-save">Save</button>
                                             <button type="button" class="btn btn-small" id="settings-dropbox-retention-on" hidden>Turn on</button>
                                             <button type="button" class="btn btn-small" id="settings-dropbox-retention-cancel" hidden>Cancel</button>
                                         </div>
-                                        <p class="settings-hint">Older files are deleted from Dropbox for every Coral that uses this backup. Copies on this computer are not touched. Dropbox may keep deleted files for a while in its own deleted files and version history, where they can still be read.</p>
+                                        <p class="settings-hint sv-help">Older files are deleted from Dropbox for every Coral that uses this backup. Copies on this computer are not touched. Dropbox may keep deleted files for a while in its own deleted files and version history, where they can still be read.</p>
                                     </fieldset>
                                     <fieldset class="settings-dropbox-filters">
                                         <legend>Free up space</legend>
                                         <div class="dropbox-inline">
                                             <label for="settings-dropbox-offload-for">Keep files older than</label>
                                             <input type="number" id="settings-dropbox-offload-for" min="0" max="3650" step="1" inputmode="numeric" class="settings-input settings-input-small">
-                                            <span class="settings-hint">days only in Dropbox (0 is off)</span>
+                                            <span class="settings-hint sv-help">days only in Dropbox (0 is off)</span>
                                             <button type="button" class="btn btn-small" id="settings-dropbox-offload-save">Save</button>
                                         </div>
                                         <div id="settings-dropbox-offload-confirm" role="group" aria-label="Turn on Free up space" hidden></div>
-                                        <p id="settings-dropbox-offload-kept" class="settings-hint" role="status"></p>
+                                        <p id="settings-dropbox-offload-kept" class="settings-hint sv-help" role="status"></p>
                                     </fieldset>
                                 </div>
                             </section>
                             <div id="settings-worktrees-live">
-                                <div id="wt-status" class="settings-hint" role="status"></div>
-                                <p id="wt-empty" class="settings-hint" hidden></p>
+                                <div id="wt-status" class="settings-hint sv-help" role="status"></div>
+                                <p id="wt-empty" class="settings-hint sv-help" hidden></p>
                                 <ul id="wt-list" class="wt-list" aria-labelledby="wt-title"></ul>
-                                <p id="wt-hub-note" class="settings-hint" hidden>Remove is on this computer's own dashboard: through Coral Hub the list is for reading.</p>
+                                <p id="wt-hub-note" class="settings-hint sv-help" hidden>Remove is on this computer's own dashboard: through Coral Hub the list is for reading.</p>
                             </div>
                         </div>
                     </section>
@@ -738,8 +738,8 @@
                         <h4 class="settings-pane-title">Network and Hub</h4>
                         <div id="settings-network-rows"></div>
                         <div id="settings-network-live" hidden>
-                            <div id="settings-remote-access-status" class="settings-hint" role="status">Loading effective access status&hellip;</div>
-                            <div id="net-remote-note" class="settings-hint" role="status"></div>
+                            <div id="settings-remote-access-status" class="settings-hint sv-help" role="status">Loading effective access status&hellip;</div>
+                            <div id="net-remote-note" class="settings-hint sv-help" role="status"></div>
                 <section class="net-group" id="net-group-setup" aria-labelledby="net-setup-title" hidden>
                 <div class="net-body">
                     <button type="button" class="btn btn-small" id="settings-setup-code-reveal" aria-expanded="false" aria-controls="settings-setup-code-box">Show setup code</button>
@@ -747,14 +747,14 @@
                         <div id="settings-setup-code" class="settings-mono-input settings-cloud-usercode" aria-hidden="true"></div><span class="sr-only" id="settings-setup-code-spoken"></span>
                         <button type="button" class="btn btn-icon" id="settings-setup-code-copy" aria-label="Copy setup code" title="Copy setup code"><span class="material-icons" aria-hidden="true">content_copy</span></button>
                     </div>
-                    <div id="settings-setup-code-hint" class="settings-hint" role="status">To sign in from another device.</div>
+                    <div id="settings-setup-code-hint" class="settings-hint sv-help" role="status">To sign in from another device.</div>
                 </div>
                 </section>
                 <section class="net-group" id="about-section" aria-labelledby="net-status-title">
                 <!-- Status: the version (Coral has no paid licence, #3221) and this machine's health from the feed (#3446); a hub-served page has no machine of its own, so it hides the group (UI audit #5589, finding 19) -->
                 <div class="net-body">
                     <div id="app-version-label" class="settings-version-label"></div>
-                    <div id="peer-check-line" class="settings-hint" role="status" hidden></div>
+                    <div id="peer-check-line" class="settings-hint sv-help" role="status" hidden></div>
                     <div class="settings-machine-health" data-local-only>
                         <div id="machine-health-local"></div>
                     </div>
@@ -764,16 +764,16 @@
                 <section class="net-group" id="net-group-hub" data-learn-after="#settings-cloud-status" aria-labelledby="net-hub-title">
                 <div class="net-body" id="settings-cloud">
                     <div class="settings-cloud-head">
-                        <div id="settings-cloud-status" data-cloud="status" class="settings-hint" role="status" aria-live="polite">Loading…</div>
+                        <div id="settings-cloud-status" data-cloud="status" class="settings-hint sv-help" role="status" aria-live="polite">Loading…</div>
                         <div class="settings-cloud-actions">
                             <button type="button" id="settings-cloud-cancel" data-cloud="cancel" class="btn btn-small" aria-label="Cancel connecting to Coral Hub" hidden>Cancel</button>
                             <button type="button" id="settings-cloud-disconnect" data-cloud="disconnect" class="btn btn-small" hidden>Disconnect</button>
                         </div>
                     </div>
-                    <div id="settings-cloud-operator-line" class="settings-hint" data-cloud="operator-line" hidden></div>
+                    <div id="settings-cloud-operator-line" class="settings-hint sv-help" data-cloud="operator-line" hidden></div>
                     <span class="sr-only" role="status" data-cloud="usercode-spoken"></span>
-                    <div id="settings-cloud-saved" class="settings-hint settings-cloud-saved" data-cloud="saved" role="status"></div>
-                    <div id="settings-cloud-error" class="settings-hint settings-error" data-cloud="error" role="alert" hidden></div>
+                    <div id="settings-cloud-saved" class="settings-hint settings-cloud-saved sv-help" data-cloud="saved" role="status"></div>
+                    <div id="settings-cloud-error" class="settings-hint settings-error sv-help" data-cloud="error" role="alert" hidden></div>
                     <div id="settings-cloud-code" data-cloud="code" class="settings-cloud-code" hidden>
                         <div>Open <a id="settings-cloud-link" data-cloud="link" target="_blank" rel="noopener noreferrer"></a> — your code should already be filled in:</div>
                         <div class="settings-cloud-usercode-row">
@@ -784,21 +784,21 @@
                     </div>
                     <div class="cloud-command-row" data-cloud="command-row" hidden><code data-cloud="command"></code><button type="button" class="btn btn-small" data-cloud="copy">Copy</button></div>
                     <div class="settings-cloud-rekey" id="settings-cloud-rekey-row" data-cloud="rekey-row" hidden>
-                        <div id="settings-cloud-rekey-text" data-cloud="rekey-text" class="settings-hint settings-error" role="alert"></div>
+                        <div id="settings-cloud-rekey-text" data-cloud="rekey-text" class="settings-hint settings-error sv-help" role="alert"></div>
                         <button type="button" id="settings-cloud-rekey" data-cloud="rekey" class="btn btn-small">Replace the secret key</button>
                     </div>
                     <div class="settings-cloud-mode" id="settings-cloud-mode-row" data-cloud="mode-row" hidden>
                         <div id="settings-cloud-owner-row" class="notice notice-warn settings-cloud-owner-row settings-cloud-notice" data-cloud="owner-row" hidden>
-                            <div id="settings-cloud-owner-text" class="settings-hint" data-cloud="owner-text" role="status">Coral Hub can't confirm you own this computer yet: it was linked before Coral recorded who owns it, so artifacts, saved messages and custom models do not open through Coral Hub. Press Confirm owner, then open Artifacts or Saved through Coral Hub, as the owner, within a minute. Or link this computer again (Disconnect, then Connect).</div>
-                            <div id="settings-cloud-owner-candidate" class="settings-hint" data-cloud="owner-candidate" hidden></div>
+                            <div id="settings-cloud-owner-text" class="settings-hint sv-help" data-cloud="owner-text" role="status">Coral Hub can't confirm you own this computer yet: it was linked before Coral recorded who owns it, so artifacts, saved messages and custom models do not open through Coral Hub. Press Confirm owner, then open Artifacts or Saved through Coral Hub, as the owner, within a minute. Or link this computer again (Disconnect, then Connect).</div>
+                            <div id="settings-cloud-owner-candidate" class="settings-hint sv-help" data-cloud="owner-candidate" hidden></div>
                             <button type="button" id="settings-cloud-owner-record" class="btn" data-cloud="owner-record">Confirm owner</button>
-                            <div id="settings-cloud-owner-status" class="settings-hint" data-cloud="owner-status" role="status"></div>
+                            <div id="settings-cloud-owner-status" class="settings-hint sv-help" data-cloud="owner-status" role="status"></div>
                         </div>
-                        <div id="settings-cloud-owner-confirmed" class="settings-hint" data-cloud="owner-confirmed" hidden></div>
+                        <div id="settings-cloud-owner-confirmed" class="settings-hint sv-help" data-cloud="owner-confirmed" hidden></div>
                         <div class="net-level-row">
                             <div class="net-level-text">
                                 <label for="settings-cloud-max-mode">What may Coral Hub do on this computer?</label>
-                                <div id="settings-cloud-mode-levels" class="settings-hint">View: look only. Interact: send and answer. Launch: start agents.</div>
+                                <div id="settings-cloud-mode-levels" class="settings-hint sv-help">View: look only. Interact: send and answer. Launch: start agents.</div>
                             </div>
                             <select id="settings-cloud-max-mode" data-cloud="max-mode" class="settings-select" aria-describedby="settings-cloud-mode-levels settings-cloud-mode-desc">
                                 <option value="view">View</option>
@@ -806,25 +806,25 @@
                                 <option value="launch">Launch</option>
                             </select>
                         </div>
-                        <div id="settings-cloud-mode-desc" data-cloud="mode-desc" class="settings-hint"></div>
-                        <div id="settings-cloud-mode-full" data-cloud="mode-full" class="settings-hint"></div>
+                        <div id="settings-cloud-mode-desc" data-cloud="mode-desc" class="settings-hint sv-help"></div>
+                        <div id="settings-cloud-mode-full" data-cloud="mode-full" class="settings-hint sv-help"></div>
                         {{ template "includes/cloud_switch_row" (cloudSwitch "settings-cloud-auto-accept-row" "data-cloud=\"auto-accept-row\" hidden" "settings-cloud-allow-auto-accept" "Coral Hub can turn on auto-accept" "settings-cloud-auto-accept-desc" "While access is Launch, a hub user can let an agent's permission prompts be approved for it, for up to 8 hours (1 hour unless they choose otherwise). Turn this off to keep that on this computer only; it also stops any auto-accept the hub turned on and any Keep Full access choice the hub made. An agent that is running keeps the mode it has until its next restart." "data-cloud=\"allow-auto-accept\" aria-describedby=\"settings-cloud-auto-accept-desc settings-cloud-auto-accept-changed\"") }}
                         <div id="settings-cloud-auto-accept-changed" class="settings-cloud-changed" data-cloud="auto-accept-changed" hidden></div>
                         <details class="disclosure settings-cloud-more" id="settings-cloud-more" data-cloud="more-perms" hidden>
                             <summary id="settings-cloud-more-summary" data-cloud="more-perms-summary">More Coral Hub permissions</summary>
                         {{ template "includes/cloud_switch_row" (cloudSwitch "settings-cloud-hub-relaunch-row" "data-flag=\"updates\"" "settings-cloud-hub-relaunch" "Let Coral Hub relaunch this Coral to install updates" "settings-cloud-hub-relaunch-desc" "Coral Hub can ask for the relaunch of a version this computer has already downloaded and checked; it cannot choose a version or start one that is not ready, and it cannot change this switch. It only works at the Launch level above. Off until you turn it on: when it is on, the owner of the linked Hub account can update this computer without you being asked here. Changed on this computer only." "data-cloud=\"hub-relaunch\" aria-describedby=\"settings-cloud-hub-relaunch-desc\"") }}
-                        <p id="settings-cloud-hub-relaunch-state" class="settings-hint" data-cloud="hub-relaunch-state" data-flag="updates"></p>
+                        <p id="settings-cloud-hub-relaunch-state" class="settings-hint sv-help" data-cloud="hub-relaunch-state" data-flag="updates"></p>
                         {{ template "includes/cloud_switch_row" (cloudSwitch "settings-cloud-cross-team-row" "" "settings-cloud-hub-cross-team" "Let Coral Hub change cross-team settings" "settings-cloud-hub-cross-team-desc" "Coral Hub's owner can turn cross-team messaging and file sharing on or off for your teams. Turn this off to forbid it." "data-cloud=\"hub-cross-team\" aria-describedby=\"settings-cloud-hub-cross-team-desc\"") }}
                         {{ template "includes/cloud_switch_row" (cloudSwitch "settings-cloud-redact-row" "" "settings-cloud-redact-tokens" "Hide tokens from view-only hub users" "settings-cloud-redact-desc" "Coral Hub shows everything an agent printed or wrote. With this on, tokens and keys that the betterleaks rules recognise are replaced by \"[redacted token]\" before they leave this computer, for viewers who can only look (View). Viewers at Interact or Launch see everything: they can already run commands as you. The live terminal is never delayed, so a key typed one character at a time can show in part. On this computer nothing is hidden." "data-cloud=\"redact-tokens\" aria-describedby=\"settings-cloud-redact-desc\"") }}
                         <div class="settings-cloud-hub-operator settings-cloud-switch-row" id="settings-cloud-hub-operator-row" data-cloud="hub-operator-row" hidden>
                             <div class="settings-cloud-switch-text">
                                 <label for="settings-cloud-hub-operator" class="settings-cloud-switch-label">Let Coral Hub act as the Operator</label>
-                            <div id="settings-cloud-hub-operator-desc" class="settings-hint">At Interact or Launch a hub user can create, assign and complete tasks and post as the Operator here. Each action shows which hub user did it ("Operator via Coral Hub · hub-user-…"), agents are told it came through Coral Hub, and it is recorded below. Board settings can never be changed through Coral Hub. Turn this off to keep the Operator on this computer only.</div>
+                            <div id="settings-cloud-hub-operator-desc" class="settings-hint sv-help">At Interact or Launch a hub user can create, assign and complete tasks and post as the Operator here. Each action shows which hub user did it ("Operator via Coral Hub · hub-user-…"), agents are told it came through Coral Hub, and it is recorded below. Board settings can never be changed through Coral Hub. Turn this off to keep the Operator on this computer only.</div>
                             <details class="settings-cloud-hub-operator-actions" data-cloud="hub-operator-actions" hidden>
                                 <summary>Coral Hub actions</summary>
                                 <ol data-cloud="hub-operator-actions-list"></ol>
                             </details>
-                            <div id="settings-cloud-hub-operator-msg" data-cloud="hub-operator-msg" class="settings-hint settings-error" role="alert" hidden></div>
+                            <div id="settings-cloud-hub-operator-msg" data-cloud="hub-operator-msg" class="settings-hint settings-error sv-help" role="alert" hidden></div>
                             </div>
                             <label class="check-hit"><input type="checkbox" class="switch" id="settings-cloud-hub-operator" data-cloud="hub-operator" aria-describedby="settings-cloud-hub-operator-desc"></label>
                         </div>
@@ -833,10 +833,10 @@
                     <div class="settings-cloud-connect-row">
                         <button type="button" id="settings-cloud-connect" data-cloud="connect" class="btn btn-small btn-primary" hidden>Connect to Coral Hub</button>
                     </div>
-                    <div class="settings-hint" data-info>The hub can read everything you view through it. This is the most Coral Hub can ever do here: its owner can limit it further for each computer but never raise it, and only you can change it, here. Interact lets a hub user type into running agents, which can run commands; Launch also lets them start, stop, sleep, wake and restart agents. Disconnect removes the token from this computer; revoke the computer on the hub's Computers page to cut it off from there.</div>
+                    <div class="settings-hint sv-help" data-info>The hub can read everything you view through it. This is the most Coral Hub can ever do here: its owner can limit it further for each computer but never raise it, and only you can change it, here. Interact lets a hub user type into running agents, which can run commands; Launch also lets them start, stop, sleep, wake and restart agents. Disconnect removes the token from this computer; revoke the computer on the hub's Computers page to cut it off from there.</div>
                 </div>
                 </section>
-                            <div id="settings-hub-mode-status" class="settings-hint" role="status" aria-live="polite"></div>
+                            <div id="settings-hub-mode-status" class="settings-hint sv-help" role="status" aria-live="polite"></div>
                             <button type="button" class="btn btn-small" id="settings-hub-mode-restart" hidden>Restart Coral</button>
                         </div>
                     </section>
@@ -851,14 +851,14 @@
                         <div id="settings-security-live" hidden>
                             <!-- Settings > Browser sign-in (#3948): filled by security_settings.js; never shown through Coral Hub. -->
                             <div class="sec-row" id="settings-security" role="group" hidden></div>
-                            <div id="settings-database-encryption-status" class="settings-hint" role="status">Loading encryption status&hellip;</div>
+                            <div id="settings-database-encryption-status" class="settings-hint sv-help" role="status">Loading encryption status&hellip;</div>
                             <div class="telemetry-install-id" id="settings-telemetry-install-box">
                                 <code id="settings-telemetry-install-id" aria-describedby="settings-telemetry-install-hint">Loading&hellip;</code>
                                 <button type="button" class="btn" id="settings-telemetry-install-copy" aria-label="Copy install ID" disabled>Copy</button>
                             </div>
-                            <span id="settings-telemetry-install-hint" class="settings-hint">Send it with a deletion request.</span>
-                            <span id="settings-telemetry-install-status" class="settings-hint" role="status"></span>
-                            <div id="settings-debug-input-log-status" class="settings-hint" role="status"></div>
+                            <span id="settings-telemetry-install-hint" class="settings-hint sv-help">Send it with a deletion request.</span>
+                            <span id="settings-telemetry-install-status" class="settings-hint sv-help" role="status"></span>
+                            <div id="settings-debug-input-log-status" class="settings-hint sv-help" role="status"></div>
                             <button class="btn btn-small" type="button" id="settings-debug-input-log-delete" hidden>Delete the log</button>
                         </div>
                     </section>

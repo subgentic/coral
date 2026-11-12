@@ -58,7 +58,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
             fixed: vis('tb-fixed'), checked: document.getElementById('tb-choice').value || null,
             pending: document.getElementById('tb-pending').textContent, pendingHiddenAttr: document.getElementById('tb-pending').hasAttribute('hidden'),
             texts: [...document.querySelectorAll('#tb-choice option')].map(o => o.textContent.trim()), // #9490: the backend is a select, like every other row's choice
-            ptyText: (document.getElementById('tb-choice').closest('.sv-row').querySelector('.sv-more') || {}).textContent || '' }; })()`);
+            docs: document.getElementById('tb-choice').closest('.sv-row').querySelector('a.sv-learn')?.getAttribute('href') || '' }; })()`);
     const pick = v => ev(`(() => { const r = document.getElementById('tb-choice'); r.value = '${v}'; r.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
     const confirmState = () => ev(`({ shown: getComputedStyle(document.getElementById('confirm-modal')).display !== 'none', title: document.getElementById('confirm-modal-title').textContent,
         msg: document.getElementById('confirm-modal-message').textContent, yes: document.getElementById('confirm-modal-yes').textContent })`);
@@ -87,7 +87,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         let r = await row();
         check('Settings shows the backend row: running tmux, tmux picked, both options', !r.hidden && r.now === 'Running now: tmux' && r.choice && !r.fixed && r.checked === 'tmux'
             && r.texts[0] === 'Keep agents running when Coral restarts (tmux)' && r.texts[1] === 'Put agents to sleep when Coral restarts (pty, default)', JSON.stringify(r));
-        check("the pty text has Security's crash wording", /puts them to sleep first when it stops cleanly, and marks them asleep at the next start after a crash/.test(r.ptyText), r.ptyText);
+        check("the pty text keeps Security's crash wording in Docs", r.docs === '/docs/settings-system' && /puts them to sleep first when it stops cleanly, and marks them asleep at the next start after a crash/.test(await ev(`fetch('/api/agent-docs/settings-system').then(r=>r.text())`)), r.docs);
         check('nothing pending to start with', r.pending === '', r.pending);
         await pick('pty');
         r = await row();
