@@ -30,8 +30,8 @@
 .sv-required, .sv-optional { margin-left: .5rem; font-size: var(--sv-help-size); font-weight: var(--sv-label-weight); color: var(--sv-required-color); }
 .sv-help { margin: 2px 0 0; font-size: var(--sv-help-size); font-weight: var(--sv-help-weight); line-height: var(--lh-ui); color: var(--sv-help-color); }
 .sv-help-inline { margin: 0 0 0 .5rem; }
-.sv-learn { display: inline; position: relative; padding: 0; min-height: 0; border: 0; background: none; font: inherit; color: var(--link-text, var(--accent)); text-decoration: underline; cursor: pointer; }
-.sv-learn::after { content: ''; position: absolute; left: -8px; right: -8px; top: 50%; height: var(--sv-control-height-touch); transform: translateY(-50%); } /* its 44 px touch target is invisible, so a hint line keeps its height (UI/UX #7663) */
+.sv-learn { display: var(--sv-learn-display); align-items: center; position: relative; padding: 0; min-height: var(--sv-learn-height); border: 0; background: none; font: inherit; color: var(--link-text, var(--accent)); text-decoration: underline; cursor: pointer; }
+.sv-learn::after { display: var(--sv-learn-target-display); content: ''; position: absolute; left: -8px; right: -8px; top: 50%; height: var(--sv-control-height-touch); transform: translateY(-50%); } /* its 44 px touch target is invisible, so a hint line keeps its height (UI/UX #7663) */
 .sv-more { margin-top: 6px; font-size: var(--sv-help-size); line-height: var(--lh-body); color: var(--sv-help-color); }
 .sv-more[hidden] { display: none; }
 .sv-row > .sv-row-notice { grid-column: -2 / -1; margin: 0; } /* a line of the caller's under the control (the open column; the only one when folded) */
