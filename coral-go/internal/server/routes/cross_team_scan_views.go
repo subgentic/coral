@@ -55,9 +55,13 @@ const (
 // 64 KiB.
 const (
 	scanBaseBudget = 3 * time.Second
-	scanPerMiB     = 4 * time.Second
-	scanFileCap    = 100 * time.Second
 	textBudget     = 3 * time.Second
+)
+
+// The per-MiB budget and the file cap are variables only so a test of the size limits can give a slow machine (the race detector on a loaded box) the time its scans need (#15748); the server never changes them.
+var (
+	scanPerMiB  = 4 * time.Second
+	scanFileCap = 100 * time.Second
 )
 
 // One attachment scan at a time on this Coral (#4474, Security's #4464 INFO 1): the scan runs before the send

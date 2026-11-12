@@ -842,6 +842,7 @@ func TestHumanSendIsSubmittedOrSaysSo(t *testing.T) {
 		t.Run("an ordinary command is not waited for longer", func(t *testing.T) {
 			h := setup(t, "claude", false)
 			h.term.show(claudeUnnumbered(t, "ready.txt"))
+			h.gate.set(func(tm *humanSendTimings) { tm.SlowCommandWait = 5 * time.Second }) // far above the send's own overhead: only a send that waited the slow wait fails (a 400 ms one left 300 ms of room, which a slow machine used up, #15748)
 			start := time.Now()
 			rec := h.send("/status")
 			_ = rec

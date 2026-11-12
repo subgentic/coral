@@ -293,7 +293,7 @@ loop:
 	t.Logf("refresh of %d files took %s; %d probes, slowest %s", n, time.Since(started).Round(time.Millisecond), probes, worst.Round(time.Millisecond))
 	require.Equal(t, n, a.Total, "every changed file is counted")
 	require.Len(t, a.Files, refreshFilesCap, "and the list sent is the cap")
-	require.Less(t, worst, 200*time.Millisecond, "another route answers in under 200 ms while the refresh runs")
+	require.Less(t, worst, underRace(200*time.Millisecond), "another route answers in under 200 ms (1 s under -race) while the refresh runs")
 	require.Greater(t, probes, 2, "the refresh took long enough to be probed")
 }
 
