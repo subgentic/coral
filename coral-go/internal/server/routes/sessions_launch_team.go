@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/coralnames"
+	"github.com/subgentic/coral/internal/custommodes"
 	"github.com/subgentic/coral/internal/logsafe"
 	"log"
 	"net/http"
@@ -129,8 +130,11 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 			errBadRequest(w, fmt.Sprintf("agent %q: %s", a.Name, errMCPNotSupported))
 			return
 		}
-		if a.PermissionMode != "" && a.PermissionMode != "default" {
-			errBadRequest(w, fmt.Sprintf("agent %q: permission_mode can only be \"default\"; any other mode is sent as the CLI's own flags", a.Name))
+		if _, custom := custommodes.IDOf(a.PermissionMode); custom && agentCaller(r) { // #15950: only the Operator picks a custom mode; an agent may not start a less-restricted agent
+			errBadRequest(w, fmt.Sprintf("agent %q: an agent cannot start another agent in a custom permission mode", a.Name))
+			return
+		} else if a.PermissionMode != "" && a.PermissionMode != "default" && !custom {
+			errBadRequest(w, fmt.Sprintf("agent %q: permission_mode can only be \"default\" or a custom mode's \"custom:<id>\"; any other mode is sent as the CLI's own flags", a.Name))
 			return
 		}
 		if a.ReviewsOnly || len(a.ReviewAreas) > 0 {
@@ -486,7 +490,7 @@ func teamUsesNewDefault(body launchTeamRequest, settings map[string]string) bool
 			return true
 		}
 		// the form writes its shipped Auto as the CLI's own flags: judged by what they say, unless the member names Default, the owner saved a default, or it is a relaunch (#14353)
-		if !teamIsRelaunch(body) && def.PermissionMode != "default" && savedDefaultMode(settings) == "" && effectiveLaunchSkips(agentType, flags) {
+		if !teamIsRelaunch(body) && !modeNamed(def.PermissionMode) && savedDefaultMode(settings) == "" && effectiveLaunchSkips(agentType, flags) {
 			return true
 		}
 	}
@@ -522,7 +526,7 @@ func memberAsksToSkip(body launchTeamRequest, def launchTeamAgent, settings map[
 // hub_auto_accept_disabled, never started in Default and never in Auto. A member that names a mode (its own flags, the team's, or an explicit Default) is judged by what it names; the Operator's own
 // saved default is the owner's choice and is not counted, as before.
 func memberDefaultSkips(body launchTeamRequest, def launchTeamAgent, settings map[string]string, agentType string, flags []string) bool {
-	if teamIsRelaunch(body) || def.PermissionMode == "default" || savedDefaultMode(settings) != "" { // only "default" names a mode (the launch honours no other value)
+	if teamIsRelaunch(body) || modeNamed(def.PermissionMode) || savedDefaultMode(settings) != "" { // only "default" names a mode (the launch honours no other value)
 		return false
 	}
 	if carried, _ := agent.SplitPermissionFlags(flags); len(carried) > 0 || agent.PermissionModeFromFlags(flags) != "" {
@@ -864,7 +868,8 @@ const maxLaunchTeamAgents = 32
 // explicitDefaultMemberMode is the mode a member is launched with: the one its team's flags stand for, else "default" when the member asked for Default and has no permission flag of its own (those win, as
 // over every mode), else "" (the launch decides as before).
 func explicitDefaultMemberMode(requested, fromTeamFlags string, memberFlags []string) string {
-	if fromTeamFlags != "" || requested != "default" {
+	_, custom := custommodes.IDOf(requested) // a custom mode (#15950) is named like Default
+	if fromTeamFlags != "" || (requested != "default" && !custom) {
 		return fromTeamFlags
 	}
 	return explicitDefaultMode(requested, memberFlags)
@@ -885,4 +890,10 @@ func memberLaunchMode(def launchTeamAgent, fromTeamFlags string, memberFlags []s
 		return def.grantedMode
 	}
 	return explicitDefaultMemberMode(def.PermissionMode, fromTeamFlags, memberFlags)
+}
+
+// modeNamed is whether a member's request names a mode of its own: Default, or a custom mode (#15950). Either way the person chose, so the new-default notice is not owed.
+func modeNamed(m string) bool {
+	_, custom := custommodes.IDOf(m)
+	return m == "default" || custom
 }

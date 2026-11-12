@@ -119,6 +119,8 @@ const AGENTS_FIELDS = host => [
     { key: 'default_models_notice', type: 'notice', render: slot => { slot.innerHTML = '<span id="settings-default-models-notice" class="settings-hint" role="status"></span>'; } },
     { key: 'custom_models', type: 'custom', id: 'settings-custom-models', wide: true, label: 'Custom models', help: moreOnly('Model ids are passed to the CLI as they are written here.', "They appear in every model picker, including the one that switches a running agent's model."), // the list and its form: custom_models.js draws them and shows the row once the server has the route
         render: slot => slot.classList.add('settings-custom-models') },
+    { key: 'custom_modes', type: 'custom', id: 'settings-custom-modes', wide: true, label: 'Custom permission modes', help: moreOnly('A mode is the flags the CLI is started with, one per line.', 'Custom modes appear after the built-in ones wherever a permission mode is chosen. Coral only accepts the permission flags of each CLI, and checks them again at every launch.'), // the list and its form: custom_modes.js draws them and shows the row once the server has the route (#15950)
+        render: slot => slot.classList.add('settings-custom-models') },
     { key: 'agents_defaults', type: 'heading', id: 'settings-agents-defaults', label: 'Defaults' },
     { key: 'permission_mode', type: 'select', id: 'settings-permission-mode', wide: true, labelId: 'settings-permission-mode-label', label: 'Default permission mode', options: PERMISSION_OPTIONS,
         help: { text: 'Everything; safety checks on Claude only.', about: 'Default permission mode', docs: { topic: 'how-do-i', answer: 'What the permission modes allow' } }, helpTextClass: 'perm-mode-desc',
@@ -251,6 +253,6 @@ export function drawSettingsGroups(modal, mount) {
     for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-inbox-rows', INBOX_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-terminal-rows', TERMINAL_FIELDS], ['settings-agents-rows', AGENTS_FIELDS], ['settings-cleanup-rows', CLEANUP_FIELDS], ['settings-security-rows', SECURITY_FIELDS], ['settings-network-rows', NETWORK_FIELDS]]) {
         const host = modal.querySelector(`#${hostId}`);
         if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields: typeof fields === 'function' ? fields(host) : fields });
-        for (const id of hostId === 'settings-terminal-rows' ? TERMINAL_BACKEND_IDS : hostId === 'settings-agents-rows' ? ['settings-custom-models'] : []) host.querySelector(`#${id}`)?.closest('.sv-row')?.setAttribute('hidden', ''); // until the module that fills them has read its status
+        for (const id of hostId === 'settings-terminal-rows' ? TERMINAL_BACKEND_IDS : hostId === 'settings-agents-rows' ? ['settings-custom-models', 'settings-custom-modes'] : []) host.querySelector(`#${id}`)?.closest('.sv-row')?.setAttribute('hidden', ''); // until the module that fills them has read its status
     }
 }

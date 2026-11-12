@@ -555,6 +555,9 @@ var routeTable = cat(
 	// catalog (GET /api/agents/models).
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/custom-models")),
 	owner(OwnerRefuse, rules(http.MethodPut, TierLaunch, "/api/custom-models")),
+	// The custom permission modes (#15950): named sets of a CLI's own permission flags. Same classes as the custom models: View to read, Launch to replace, the owner's alone through the hub.
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/custom-modes")),
+	owner(OwnerRefuse, rules(http.MethodPut, TierLaunch, "/api/custom-modes")),
 	// Deleting an artifact from the hub's Artifacts tab (#5575): Launch, and the machine refuses anyone but the owner (the stamped marker, hubrole.go); each delete is
 	// recorded in the Operator actions with the hub user. Pasted images are artifacts too, so this removes them as well.
 	owner(OwnerRefuse, rules(http.MethodDelete, TierLaunch, "/api/artifacts/{hex64}")),

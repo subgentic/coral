@@ -27,6 +27,7 @@ export function hideSettingsModal(force, onClosed) {
     document.getElementById("settings-modal").style.display = "none";
     restoreSavedTheme().catch(() => {}); // a theme previewed in the dialog and not saved goes back to the saved one (#10481)
     if (!isCloud()) importOnce('./custom_models.js').then(m => m.discardCustomModels()).catch(() => {}); // unsaved custom models are dropped with the dialog (#5480)
+    if (!isCloud()) importOnce('./custom_modes.js').then(m => m.discardCustomModes()).catch(() => {}); // and unsaved custom permission modes (#15950)
     if (typeof onClosed === 'function') onClosed();
 }
 
@@ -148,8 +149,9 @@ export async function applySettings() {
         const updatesSaved = updatesUiOn() ? await importOnce('./update_settings.js').then(m => m.applyUpdatePrefs()) : false; // the update switch and channel (#5275, #5558)
         const modelsSaved = isCloud() ? false : await importOnce('./custom_models.js').then(m => m.applyCustomModels()); // the custom models (#5480)
         if (modelsSaved) { _invalidateAgentModels(); (await importOnce('./model_labels.js')).clearModelsCache(); }
+        const modesSaved = isCloud() ? false : await importOnce('./custom_modes.js').then(m => m.applyCustomModes()); // the custom permission modes (#15950)
         // the rows by name (#7041), not "Settings saved" for every change; what was saved apart (custom models, the update choices) is named too
-        const extra = [modelsSaved && 'Custom models', updatesSaved && 'Updates'].filter(Boolean);
+        const extra = [modelsSaved && 'Custom models', modesSaved && 'Custom permission modes', updatesSaved && 'Updates'].filter(Boolean);
         showToast(nothingToSave && !extra.length ? NOTHING_TO_SAVE : savedWords(changedSince(form.payload), { extra, restart: !!state.privacyStatus?.remote_access_restart_required }));
         setFormAtOpen(formKey()); setPayloadAtOpen(payloadNow()); refreshUnsavedNote();
     } catch (e) {

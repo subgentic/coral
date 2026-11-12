@@ -111,6 +111,8 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/board/{project}/settings/log":              "read a board's settings log",
 	"GET /api/custom-models":                             "read the custom models",
 	"PUT /api/custom-models":                             "change the custom models",
+	"GET /api/custom-modes":                              "read the custom permission modes",
+	"PUT /api/custom-modes":                              "change the custom permission modes",
 	// #4432 (Security's #4431 INFO 1): reading them too: the CLI paths, prompts and storage and access switches
 	// are the Operator's, and no agent tool reads them.
 	"GET /api/settings": "read Coral's settings",

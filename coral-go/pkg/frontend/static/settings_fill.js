@@ -190,7 +190,7 @@ export function _fillDefaults(s) {
     if (permModeSelect) {
         // Nothing saved: the first option, "Not set (Auto)", is chosen (Claude starts in Auto, #5836), and picking Auto is then a real change that is saved (#7620). Once a mode is saved that option is not offered: a saved mode is not cleared from here.
         const notSet = [...permModeSelect.options].find(o => o.value === '');
-        if (s.default_permission_mode) { notSet?.remove(); permModeSelect.value = s.default_permission_mode; }
+        if (s.default_permission_mode) { notSet?.remove(); permModeSelect.dataset.initial = s.default_permission_mode; permModeSelect.dataset.customSynced = ''; importOnce('./custom_modes.js').then(m => { m.syncCustomModeOptions(permModeSelect, ''); }).catch(() => {}); permModeSelect.value = s.default_permission_mode; } // a saved custom mode (#15950) is put back once the list is read
         else { if (!notSet) permModeSelect.prepend(new Option('Not set (Auto)', '')); permModeSelect.value = ''; }
         _updatePermModeDescription(permModeSelect, !s.default_permission_mode);
         importOnce('./permission_mode_list.js').then(m => m.modeList(permModeSelect)).catch(() => {}); // the same rows as New agent (#15886)
@@ -272,6 +272,7 @@ export function _fillCliAndModels(s) {
     picks();
     // On the hub the Default Models rows are hidden (machine settings), and the hub has no model catalog of its own to ask.
     if (!isCloud()) importOnce('./custom_models.js').then(m => m.initCustomModels()).catch(() => {}); // the custom models list (#5480): hidden when this server has no such route
+    if (!isCloud()) importOnce('./custom_modes.js').then(m => m.initCustomModes()).catch(() => {}); // the custom permission modes (#15950): hidden when this server has no such route
     if (!isCloud()) _getAgentModels().then(models => {
         // _getAgentModels swallows errors and resolves with {} on failure; on
         // success it returns the canonical map with an array for each agent type.

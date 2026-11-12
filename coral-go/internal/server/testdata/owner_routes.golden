@@ -33,6 +33,7 @@ GET /api/board/{project}/settings view owner-sees
 GET /api/board/{project}/tasks/{taskID}/artifact-content view owner-only
 GET /api/chief view owner-only
 GET /api/custom-models view owner-only
+GET /api/custom-modes view owner-only
 GET /api/goals view owner-sees
 GET /api/launch-disclosure view owner-only
 GET /api/needs-you view owner-only
@@ -101,5 +102,6 @@ PUT /api/board/{project}/orchestrator-grant launch owner-only
 PUT /api/board/{project}/settings launch owner-only
 PUT /api/board/{project}/working-mode interact owner-sees
 PUT /api/custom-models launch owner-only
+PUT /api/custom-modes launch owner-only
 PUT /api/teams/detail/{name}/daily-knowledge interact owner-only
 PUT /api/teams/detail/{name}/daily-knowledge/auto-apply interact owner-only

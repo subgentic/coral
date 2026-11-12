@@ -541,6 +541,7 @@ export async function launchSession() {
     if (launch.mode !== 'terminal' && usesSuggestion(document.getElementById('launch-dir'))) payload.create_dir = true; // the folder Coral suggested: it makes it now (#11258)
     // Default picked (and Keep Default in "Default mode waits for you") is Default: the form sends no flag for it, which the server cannot tell from "nothing chosen" (that starts in the saved default or Auto), so the request says it (#10362).
     if (launch.mode !== "terminal" && permPick === 'default' && !(flagsStr && _hasPermFlag(flagsStr))) payload.permission_mode = 'default';
+    else if (launch.mode !== "terminal" && String(permPick).startsWith('custom:') && !(flagsStr && _hasPermFlag(flagsStr))) payload.permission_mode = permPick; // a custom mode (#15950) is named; the server adds its flags
     if (agentName) payload.display_name = agentName;
     if (backend && !launch.addTo) payload.backend = backend; // Add agent sends what it always sent: the server's own default backend (#7778)
 
