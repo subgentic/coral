@@ -28,7 +28,7 @@ func TestARequestLongerThanTheLimitSaysSoAndCannotBeAllowed(t *testing.T) {
 	assert.False(t, r.Allowed())
 	assert.Len(t, r.Shown, MaxBytes)
 	assert.Contains(t, r.Note(), "longer than the 4000 bytes")
-	assert.Contains(t, r.Note(), "cannot be allowed from here")
+	assert.Contains(t, r.Note(), "Coral cannot answer it here")
 
 	// cut at a character boundary, never in the middle of one
 	r = Of(strings.Repeat("é", MaxBytes)) // 2 bytes each: 8000 bytes

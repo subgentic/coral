@@ -438,3 +438,30 @@ func TestSkillSearchMatchesThePrefixOfTheLastWord(t *testing.T) {
 	assert.Equal(t, `"cr" "deploy"*`, skillMatch("cr deploy"))
 	assert.Equal(t, "", skillMatch(`"*()`))
 }
+
+// Which teams use a skill (#15383): the live agents that have it attached or loaded, by their team, once each; no team, or a session that is gone, adds none.
+func TestSkillTeamsAreTheTeamsOfTheLiveAgentsUsingEachSkill(t *testing.T) {
+	ctx, ss, _ := skillStore(t)
+	team := func(n string) *string { return &n }
+	for _, ls := range []*LiveSession{
+		{SessionID: "11111111-1111-4111-8111-111111111111", AgentName: "A1", AgentType: "claude", WorkingDir: "/x", BoardName: team("beta")},
+		{SessionID: "22222222-2222-4222-8222-222222222222", AgentName: "A2", AgentType: "claude", WorkingDir: "/x", BoardName: team("alpha")},
+		{SessionID: "33333333-3333-4333-8333-333333333333", AgentName: "A3", AgentType: "claude", WorkingDir: "/x", BoardName: team("alpha")},
+		{SessionID: "44444444-4444-4444-8444-444444444444", AgentName: "A4", AgentType: "claude", WorkingDir: "/x"},
+	} {
+		require.NoError(t, ss.RegisterLiveSession(ctx, ls))
+	}
+	rn := SkillRow{ID: strings.Repeat("1", 32), Name: "release-notes", Version: 1, Digest: strings.Repeat("a", 64)}
+	require.NoError(t, ss.AttachSkills(ctx, "11111111-1111-4111-8111-111111111111", []SkillRow{rn}))
+	require.NoError(t, ss.AttachSkills(ctx, "22222222-2222-4222-8222-222222222222", []SkillRow{rn}))
+	require.NoError(t, ss.RecordSkillLoad(ctx, "33333333-3333-4333-8333-333333333333", rn))
+	require.NoError(t, ss.RecordSkillLoad(ctx, "22222222-2222-4222-8222-222222222222", rn), "attached and loaded by one team: once")
+	require.NoError(t, ss.RecordSkillLoad(ctx, "44444444-4444-4444-8444-444444444444", rn), "an agent on no team adds none")
+	require.NoError(t, ss.RecordSkillLoad(ctx, "99999999-9999-4999-8999-999999999999", rn), "a session that is gone adds none")
+	other := SkillRow{ID: strings.Repeat("2", 32), Name: "unused", Version: 1, Digest: strings.Repeat("b", 64)}
+	require.NoError(t, ss.RecordSkillLoad(ctx, "44444444-4444-4444-8444-444444444444", other))
+
+	got, err := ss.SkillTeams(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, map[string][]string{"release-notes": {"alpha", "beta"}}, got)
+}

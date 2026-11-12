@@ -570,3 +570,25 @@ func (s *SessionStore) LoadedSkills(ctx context.Context, sessionID string) ([]Lo
 	}
 	return rows, err
 }
+
+// SkillTeams maps a skill's name to the teams whose agents use it (#15383): a live agent that has it attached or has loaded it, by the team (board) the agent is on, sorted, each once. An agent on no
+// team, and a session that is gone, add none. Names only: a skill's versions are one skill to the Operator.
+func (s *SessionStore) SkillTeams(ctx context.Context) (map[string][]string, error) {
+	var rows []struct {
+		Name string `db:"name"`
+		Team string `db:"team"`
+	}
+	err := s.reader().SelectContext(ctx, &rows, `SELECT name, team FROM (
+		SELECT a.name AS name, ls.board_name AS team FROM skills_attached a JOIN live_sessions ls ON ls.session_id = a.session_id
+		UNION
+		SELECT l.name AS name, ls.board_name AS team FROM skills_loaded l JOIN live_sessions ls ON ls.session_id = l.session_id)
+		WHERE team IS NOT NULL AND team != '' ORDER BY name, team`)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string][]string{}
+	for _, r := range rows {
+		out[r.Name] = append(out[r.Name], r.Team)
+	}
+	return out, nil
+}

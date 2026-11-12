@@ -356,3 +356,24 @@ func (s *DropboxStore) SetListCursor(ctx context.Context, account, cursor string
 	_, err := s.db.ExecContext(ctx, "UPDATE dropbox_connection SET list_cursor = ? WHERE id = 1 AND account_id = ?", c, account)
 	return err
 }
+
+// AppKey is the Dropbox app key the person saved in Settings (” when none). It is a public client id (PKCE), not a secret, but it is still never logged (#15638).
+func (s *DropboxStore) AppKey(ctx context.Context) (string, error) {
+	var k string
+	if err := s.db.GetContext(ctx, &k, "SELECT app_key FROM dropbox_connection WHERE id = 1"); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil // no row yet: nothing was ever saved
+		}
+		return "", err
+	}
+	return k, nil
+}
+
+// SetAppKey saves the person's own app key (” removes it). It does not touch the sign-in: a caller that changes the key disconnects the old account first.
+func (s *DropboxStore) SetAppKey(ctx context.Context, key string) error {
+	if err := s.ensureRow(ctx); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, "UPDATE dropbox_connection SET app_key = ? WHERE id = 1", key)
+	return err
+}

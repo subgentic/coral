@@ -7,7 +7,7 @@ import { serverFetch, sessionServer } from './server_base.js';
 import { responseError } from './server_status.js';
 import { reportSendError, noteHooksAnswered } from './terminal_gone.js';
 import { isStartFailed, startFailedSentence } from './start_failed.js';
-import { announcePrompt, promptOptionsBySession, syncNeedsInputCard } from './needs_input_card.js';
+import { announcePrompt, promptOptionsBySession, setPrompt, syncNeedsInputCard } from './needs_input_card.js';
 import { importOnce } from './import_once.js';
 import { noteOwnAnswer, answeredElsewhere } from './held_sends.js';
 import { isPhoneLayout } from './phone_layout.js';
@@ -172,7 +172,7 @@ export async function sendPromptAnswer(card, n, label, action, text) {
             // A box of a multi-select question: nothing is answered. The card shows the screen the server
             // read after the toggle (the mark it confirmed), never a mark flipped here (#5232).
             const po = (await resp.json().catch(() => null) || {}).prompt_options;
-            if (po) promptOptionsBySession.set(session.session_id, { title: po.title || "", question: po.question || "", kind: po.kind || "", target: po.target || "", only_reject: po.only_reject === true, note: po.note || "", options: po.options || [], review: po.review || [], multi: !!po.multi, submit: po.submit || null });
+            if (po) setPrompt(session.session_id, po);
             const container = document.getElementById("live-history-messages");
             if (container) syncNeedsInputCard(container, session);
             controls.forEach(c => { c.disabled = false; });

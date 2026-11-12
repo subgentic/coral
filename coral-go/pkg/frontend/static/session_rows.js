@@ -23,7 +23,7 @@ import { syncDisplayPanels } from './display_panel.js';
 import { setChecked, setHidden } from './dom_write.js';
 import { SVGO } from './svg_open.js';
 const _mk0 = "<path d=\"M3 3h10M3 6.5h10M3 10h6\"/><path d=\"M11.5 11.5l2 2\"/></svg>\n                Edit instructions\n            </button>";
-const _mk1 = "<line x1=\"4\" y1=\"4\" x2=\"12\" y2=\"12\"/><line x1=\"12\" y1=\"4\" x2=\"4\" y2=\"12\"/></svg>\n                Kill Session\n            </button>";
+const _mk1 = "<line x1=\"4\" y1=\"4\" x2=\"12\" y2=\"12\"/><line x1=\"12\" y1=\"4\" x2=\"4\" y2=\"12\"/></svg>\n                Remove Agent\n            </button>";
 
 // ── Archived section (#3030) ─────────────────────────────────────────────
 // One global collapsed section at the bottom of the list. The grouping is all
@@ -131,7 +131,7 @@ function _rowMenuContent(s, sid) {
                 ${SVGO.o0}<path d="M9 2h5v5"/><path d="M14 2L7 9"/><path d="M12 9v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4"/></svg>
                 Open agent tab
             </a>
-            <button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="wake">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="wake" title="Continues the conversation">
                 ${SVGO.o0}<path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
                 Wake
             </button>
@@ -139,11 +139,11 @@ function _rowMenuContent(s, sid) {
                 ${SVGO.o0}<path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
                 Sleep
             </button>` : ''}
-${_archiveItem}            <button class="menu-item overflow-menu-item" data-on-click="agent-restart-same" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+${_archiveItem}            <button class="menu-item overflow-menu-item" data-on-click="agent-restart-same" title="Starts a fresh conversation; the instructions are sent again" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o0}<path d="M3.5 2v4h4"/><path d="M3.5 6A5.5 5.5 0 1 1 2.5 8"/></svg>
                 Restart, same settings
             </button>
-            <button class="menu-item overflow-menu-item" data-on-click="agent-restart" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-restart" title="Starts a fresh conversation; the instructions are sent again" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o0}<path d="M3.5 2v4h4"/><path d="M3.5 6A5.5 5.5 0 1 1 2.5 8"/></svg>
                 Restart with changes…
             </button>
@@ -196,11 +196,11 @@ ${['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access
             </button>
 `; })() : ''}${_archiveItem}
             <hr class="overflow-menu-divider">
-            <button class="menu-item overflow-menu-item" data-on-click="agent-restart-same" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-restart-same" title="Starts a fresh conversation; the instructions are sent again" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o0}<path d="M3.5 2v4h4"/><path d="M3.5 6A5.5 5.5 0 1 1 2.5 8"/></svg>
                 Restart, same settings
             </button>
-            <button class="menu-item overflow-menu-item" data-on-click="agent-restart" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-restart" title="Starts a fresh conversation; the instructions are sent again" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o0}<path d="M3.5 2v4h4"/><path d="M3.5 6A5.5 5.5 0 1 1 2.5 8"/></svg>
                 Restart with changes…
             </button>
@@ -246,7 +246,7 @@ ${['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access
                 ${SVGO.o0}<rect x="2" y="3" width="12" height="3" rx="0.5"/><path d="M3 6v7h10V6"/><path d="M8 12V8M6 10l2-2 2 2"/></svg>
                 Unarchive
             </button>
-            <button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="wake">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="wake" title="Continues the conversation">
                 ${SVGO.o0}<path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
                 Wake
             </button>

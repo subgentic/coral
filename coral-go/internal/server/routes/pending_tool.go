@@ -249,6 +249,9 @@ func trimPendingInput(in map[string]any) map[string]any {
 	if m := permreview.Merge(reviews...); !m.Allowed() {
 		out["only_reject"] = true
 		out["note"] = m.Note()
+		if m.Cut {
+			out["unreadable"] = true // longer than a card shows: not read in full, so no answer is drawn (#15501)
+		}
 	}
 	return out
 }

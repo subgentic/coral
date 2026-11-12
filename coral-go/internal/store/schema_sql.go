@@ -576,7 +576,8 @@ CREATE TABLE IF NOT EXISTS dropbox_connection (
     autosync_paused     TEXT NOT NULL DEFAULT '',   -- why auto-sync is paused ('' runs): signin (another account, a disconnect, a re-key) or breaker (too many in an hour)
     offload_days        INTEGER NOT NULL DEFAULT 0, -- stage 6b (#14845): keep artifacts older than this many days only in Dropbox; 0 is off (the default)
     offload_since       TEXT,                       -- when the Operator confirmed it
-    offload_last_pass   TEXT                        -- the last offload pass
+    offload_last_pass   TEXT,                       -- the last offload pass
+    app_key             TEXT NOT NULL DEFAULT ''    -- #15638: the person's own Dropbox app key (a public client id with PKCE); '' is none
 );
 
 -- Dropbox stage 4's outbox (#14655): one row per file to back up (an artifact version or its item_data sidecar), by its Dropbox path (ids only,

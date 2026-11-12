@@ -57,7 +57,7 @@ function wireAgentCopy(st) {
     for (const pane of st.page.querySelectorAll('.settings-pane[data-section]')) {
         const [label, key] = SECTIONS[pane.dataset.section] || [];
         const title = pane.querySelector(':scope > .settings-pane-title');
-        if (!key || !title || pane.querySelector('.agent-copy')) continue;
+        if (!key || !title || pane.querySelector(':scope > .agent-copy-hrow > .agent-copy')) continue; // only the heading's own robot counts: the Merge queue's robot deeper in Workflow must not hide it
         const b = agentCopyButton(key, () => `Team \u201c${splitKey(st.team).name}\u201d, settings: ${label}.`);
         const row = document.createElement('div'); row.className = 'agent-copy-hrow'; // the heading and its robot share a line, centred on each other
         title.replaceWith(row); row.append(title, b);
@@ -277,7 +277,10 @@ function wireModeRow(st) {
         const preset = st.presets.find(p => p.id === st.modeSelect().value);
         modeDesc.textContent = (preset && preset.id === 'none') ? 'No extra guidance.' : ((preset && preset.description) || '');
         modeDesc.hidden = !modeDesc.textContent;
+        mergeRobot.hidden = st.modeSelect().value !== 'merge_queue'; // the Merge queue mode: where in the docs an agent reads how it works (#15152)
     }
+    const mergeRobot = agentCopyButton('merge_queue', () => `Team \u201c${splitKey(st.team).name}\u201d, Working mode: Merge queue (run coral-board queue to see what is waiting to land).`);
+    modeDesc.after(mergeRobot); mergeRobot.hidden = true;
     st.modeSelect().addEventListener('change', syncModeDescription);
 
     st.syncModeDescription = syncModeDescription; // the load and the preset editor redraw the line

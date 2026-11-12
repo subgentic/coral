@@ -19,26 +19,35 @@ import (
 // publishes waits here, and only a person at the dashboard approves, rejects or removes.
 
 type skillRowView struct {
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	Version        int    `json:"version"`
-	Digest         string `json:"digest"`
-	Description    string `json:"description"`
-	Status         string `json:"status"`
-	HasScripts     bool   `json:"has_scripts"`
-	NotReviewable  bool   `json:"not_reviewable"`
-	ScriptsAcked   bool   `json:"scripts_acked"`
-	PublisherKind  string `json:"publisher_kind"`
-	PublisherAgent string `json:"publisher_agent"`
-	PublisherTeam  string `json:"publisher_team"`
-	FileCount      int    `json:"file_count"`
-	CreatedAt      string `json:"created_at"`
-	DecidedAt      string `json:"decided_at"`
+	ID             string   `json:"id"`
+	Name           string   `json:"name"`
+	Version        int      `json:"version"`
+	Digest         string   `json:"digest"`
+	Description    string   `json:"description"`
+	Status         string   `json:"status"`
+	HasScripts     bool     `json:"has_scripts"`
+	NotReviewable  bool     `json:"not_reviewable"`
+	ScriptsAcked   bool     `json:"scripts_acked"`
+	PublisherKind  string   `json:"publisher_kind"`
+	PublisherAgent string   `json:"publisher_agent"`
+	PublisherTeam  string   `json:"publisher_team"`
+	FileCount      int      `json:"file_count"`
+	CreatedAt      string   `json:"created_at"`
+	DecidedAt      string   `json:"decided_at"`
+	UsedBy         []string `json:"used_by"` // the teams whose live agents have this skill attached or loaded (#15383), by name; [] when none
 }
 
 func skillView(r store.SkillRow) skillRowView {
 	return skillRowView{ID: r.ID, Name: r.Name, Version: r.Version, Digest: r.Digest, Description: r.Description, Status: r.Status, HasScripts: r.HasScripts, NotReviewable: r.NotReviewable,
 		ScriptsAcked: r.ScriptsAcked, PublisherKind: r.PublisherKind, PublisherAgent: r.PublisherAgent, PublisherTeam: r.PublisherTeam, FileCount: len(r.Files()), CreatedAt: r.CreatedAt, DecidedAt: r.DecidedAt}
+}
+
+// usedByOf is the teams using the skill of this name, never nil (the page reads a list).
+func usedByOf(teams map[string][]string, name string) []string {
+	if t := teams[name]; t != nil {
+		return t
+	}
+	return []string{}
 }
 
 func validSkillID(id string) bool { return len(id) == 32 && strings.Trim(id, "0123456789abcdef") == "" }
@@ -60,9 +69,12 @@ func (h *SkillsHandler) ListSkillsOperator(w http.ResponseWriter, r *http.Reques
 		errInternalServer(w, "could not list the skills")
 		return
 	}
+	teams, _ := h.ss.SkillTeams(r.Context()) // the page reads fine without it: a failed read is no team named, not a failed list
 	out := make([]skillRowView, 0, len(rows))
 	for _, x := range rows {
-		out = append(out, skillView(x))
+		v := skillView(x)
+		v.UsedBy = usedByOf(teams, x.Name)
+		out = append(out, v)
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]any{"skills": out})
@@ -84,7 +96,11 @@ func (h *SkillsHandler) GetSkillOperator(w http.ResponseWriter, r *http.Request)
 		errNotFound(w, "no such skill")
 		return
 	}
-	out := map[string]any{"skill": skillView(*row)}
+	sv := skillView(*row)
+	if teams, err := h.ss.SkillTeams(r.Context()); err == nil {
+		sv.UsedBy = usedByOf(teams, row.Name)
+	}
+	out := map[string]any{"skill": sv}
 	w.Header().Set("Cache-Control", "no-store")
 	if row.Status == store.SkillRemoved {
 		writeJSON(w, http.StatusOK, out)

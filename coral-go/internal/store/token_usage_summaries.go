@@ -281,3 +281,12 @@ func (s *TokenUsageStore) GetUsageSummaryByBoard(ctx context.Context, since stri
 	err := s.db.Reader().SelectContext(ctx, &summaries, query, args...)
 	return summaries, err
 }
+
+// RecordedCalls is the model calls recorded for a session so far: the sum of its rows' num_turns (raw and rolled-up hourly rows alike). Hermes's poller records the growth of the session row's call count as a row's num_turns (#15508).
+func (s *TokenUsageStore) RecordedCalls(ctx context.Context, sessionID string) int {
+	var n int
+	if err := s.db.Reader().GetContext(ctx, &n, `SELECT COALESCE(SUM(num_turns), 0) FROM token_usage_all WHERE session_id = ?`, sessionID); err != nil {
+		return 0
+	}
+	return n
+}

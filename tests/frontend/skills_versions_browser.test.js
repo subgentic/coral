@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const {connect}=require('./agent_view_harness');
 const {coralReady}=require('./helpers/wait');
 const BASE=require('./test_base').BASE;
-const row=(version,status,publisher='Designer')=>({id:(publisher==='Designer'?String(version):'b').repeat(32),name:'testing-on-the-mac-mini',version,status,digest:String(version).repeat(64),description:`${publisher} description v${version}`,publisher_kind:'agent',publisher_agent:publisher,publisher_team:'alpha',has_scripts:false,not_reviewable:false,file_count:1,created_at:`2026-11-0${version}T10:00:00Z`,decided_at:status==='approved'?`2026-11-0${version}T11:00:00Z`:''});
+const row=(version,status,publisher='Designer')=>({id:(publisher==='Designer'?String(version):'b').repeat(32),name:'testing-on-the-mac-mini',version,status,digest:String(version).repeat(64),description:`${publisher} description v${version}`,publisher_kind:'agent',publisher_agent:publisher,publisher_team:'alpha',has_scripts:false,not_reviewable:false,file_count:1,used_by:publisher==='Designer'?['red','blue']:[],created_at:`2026-11-0${version}T10:00:00Z`,decided_at:status==='approved'?`2026-11-0${version}T11:00:00Z`:''});
 const ROWS=[row(5,'rejected'),row(4,'pending'),row(3,'approved'),row(2,'approved'),row(1,'approved'),row(2,'approved','Other publisher')];
 (async()=>{
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();
@@ -22,6 +22,8 @@ const ROWS=[row(5,'rejected'),row(4,'pending'),row(3,'approved'),row(2,'approved
   assert.equal((await list()).length,2,'one row per skill and publisher');
   const texts=await list();assert.ok(texts.some(t=>t.includes('Designer description v3')&&t.includes('v3')&&t.includes('Approved')&&t.includes('v4 waiting')),JSON.stringify(texts));
   assert.ok(texts.some(t=>t.includes('Other publisher description v2')), 'same name from another publisher stays separate');
+  assert.ok(texts.some(t=>t.includes('Designer description v3')&&t.includes('red, blue')),'the list names the teams that use the skill (#15383): '+JSON.stringify(texts));
+  assert.ok(texts.some(t=>t.includes('Other publisher description v2')&&!t.includes('red')),'a skill no team uses names none');
   await ev(`document.querySelector('#skills-view .dt-sort[data-key=version]').click();true`);
   assert.match((await list())[0],/Other publisher/,'version ascending sorts the displayed approved versions');
   await ev(`document.querySelector('#skills-view .dt-sort[data-key=version]').click();true`);
@@ -34,6 +36,7 @@ const ROWS=[row(5,'rejected'),row(4,'pending'),row(3,'approved'),row(2,'approved
   await ev(`[...document.querySelectorAll('#skills-view button')].find(b=>b.textContent==='v4 waiting').click();true`);
   await waitFor(`document.querySelector('#skills-view h2')?.textContent.includes('version 4')`,'pending version detail');
   assert.deepEqual(await ev(`window.__detailGets`),['4'.repeat(32)],'pending click opens only the pending version, not the row');
+  assert.match(await ev(`document.querySelector('#skills-view .skills-used-by').textContent`),/^Used by red, blue$/,'the skill\'s own page says which teams use it');
   assert.ok(await ev(`[...document.querySelectorAll('#skills-view button')].some(b=>b.textContent==='Approve')`),'pending approval remains actionable');
   await ev(`document.querySelector('#skills-view details').open=true;true`);
   const history=await ev(`[...document.querySelectorAll('#skills-view details button')].map(b=>b.textContent)`);

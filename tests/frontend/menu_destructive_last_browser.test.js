@@ -23,7 +23,7 @@ const { coralReady } = require('./helpers/wait');
             const check = async (what, open) => {
                 await ev(open);
                 const m = await ev(`(() => { const menu = [...document.querySelectorAll('.sidebar-kebab-menu, .overflow-menu, .menu')].filter(e => e.getClientRects().length && e.querySelector('.menu-item-danger')).pop(); if (!menu) return null;
-                    const kids = [...menu.children]; const hr = kids.findIndex(k => k.classList.contains('overflow-menu-divider-danger')); const after = hr < 0 ? [] : kids.slice(hr + 1);
+                    const kids = [...menu.children].filter(k => !k.classList.contains('menu-help-text') && !k.classList.contains('menu-help-foot')); /* the help lines and footer (#15466) are not items */ const hr = kids.findIndex(k => k.classList.contains('overflow-menu-divider-danger')); const after = hr < 0 ? [] : kids.slice(hr + 1);
                     return { hr, gap: hr < 0 ? 0 : parseFloat(getComputedStyle(kids[hr]).marginTop), onlyDanger: after.length > 0 && after.every(k => k.classList.contains('menu-item-danger')), n: kids.length, lastIsDanger: kids[kids.length - 1].classList.contains('menu-item-danger'), danger: kids.filter(k => k.classList.contains('menu-item-danger')).map(k => k.textContent.replace(/\\s+/g, ' ').trim()) }; })()`);
                 assert.ok(m, `${w}: ${what}: the menu is open`);
                 assert.ok(m.hr >= 0, `${w}: ${what}: a separated danger group: ${JSON.stringify(m)}`);

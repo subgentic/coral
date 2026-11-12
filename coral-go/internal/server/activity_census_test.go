@@ -169,6 +169,7 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/dropbox/switch":                                             "Dropbox backup settings (#14609): the Operator's, on this computer only",
 	"POST /api/dropbox/takeover":                                           "Dropbox backup settings (#14609): the Operator's, on this computer only",
 	"PUT /api/dropbox/filters":                                             "Dropbox backup settings (#14655): the Operator's, on this computer only",
+	"PUT /api/dropbox/app-key":                                             "Dropbox app key (#15638): the Operator's own key for Dropbox backup, on this computer only; it is a setting, not an Inbox action",
 	"POST /api/dropbox/edits/{doc}/promote":                                "Dropbox edit decision (#14714): the Operator's, on this computer only",
 	"POST /api/dropbox/edits/{doc}/separate":                               "Dropbox edit decision (#14714): the Operator's, on this computer only",
 	"POST /api/dropbox/remove/{digest}":                                    "Dropbox removal (#14814): the Operator's, on this computer only",

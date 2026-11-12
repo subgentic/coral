@@ -74,6 +74,7 @@ const { mountInboxItem } = await importOnce('./inbox_item_page.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
 const GF = await importOnce('./goal_filters.js'); // the Goals folder's search, pills and Filters (#8596)
 const IT = await importOnce('./inbox_toolbar.js'); // the folders' toolbar on the shared list bar
+const { agentCopyButton } = await importOnce('./agent_copy_button.js'); // the robot at the end of a toolbar (#15152)
 const NF = await importOnce('./needs_filters.js'); // the Needs you folder's search, pills and Filters (#8604)
 const CF = await importOnce('./chat_filters.js'); // the chat folders' Filters (#8603)
 const AC = await importOnce('./inbox_activity.js'); // the Activity folder (#12070): what the Operator did in Needs you, from the server's record (this computer only)
@@ -402,6 +403,7 @@ function inboxNeedsToolbar() {
     node.querySelectorAll('.skip-link, .inbox-filter-note').forEach(e => e.remove()); /* the bar is kept between draws: what was added to it last time goes first */
     const skip = DT.el('a', 'skip-link', 'Skip to the list'); skip.href = '#'; skip.addEventListener('click', e => { e.preventDefault(); document.querySelector('#group-table-view tbody tr:not(.dt-group) button, #group-table-view tbody tr:not(.dt-group) a')?.focus(); }); node.prepend(skip); // a keyboard user passes the search and filters (walk 7 M3)
     if (needsFilters.team && !activeNeedsTeam) { const n = DT.el('p', 'goals-note inbox-filter-note', `Filtered by team: ${needsFilters.team} `), c = DT.el('button', 'btn', 'Clear'); c.type = 'button'; c.setAttribute('aria-label', `Clear the team filter: ${needsFilters.team}`); c.addEventListener('click', () => { needsFilters = { ...needsFilters, team: '', server: '' }; persistNeedsFilters(); renderInboxNav(true); }); n.append(c); node.append(n); } /* a team filter kept from last time says so above the list (walk 15 M2, #15259) */
+    if (!node.querySelector('.agent-copy')) node.append(agentCopyButton('needs_you', 'Coral\u2019s Needs you list: what agents and the board wait on the Operator for.'));
     return { node, signature: JSON.stringify([groupMode, needsFilters, teams, names, goalNames, counts, completeCount, listedReviews, listedComplete, rows.length, rows.filter(needsUnread).length]) };
 }
 
@@ -888,6 +890,7 @@ function inboxSavedToolbar() {
     const v = saved.savedView(), filters = saved.savedFiltersNow(), options = saved.savedPageOptions();
     const node = savedBar.draw({ filters, options,
         pills: { label: 'Show', current: v.tab, items: [{ key: 'open', label: 'Open', count: `${countSavedReviews().complete && savedKnown() ? '' : 'at least '}${v.totals.open + countSavedReviews().value}` }, { key: 'done', label: 'Done', count: v.totals.done }], onPick: key => saved.setSavedTab(key) } });
+    if (!node.querySelector('.agent-copy')) node.append(agentCopyButton('saved_messages', 'The Operator\u2019s Saved list (Inbox, Saved): messages kept for later.'));
     return { node, signature: JSON.stringify([filters, v.tab, v.totals, options, countSavedReviews()]) };
 }
 const savedCounts = () => saved.savedView().totals;
@@ -973,6 +976,21 @@ function wireSaveDrop(list) {
     list.addEventListener('drop', e => { const t = target(e); if (!t || !dragging) return; e.preventDefault(); t.classList.remove('drop-over'); const row = dragging; dragging = null;
         importOnce('./artifact_review.js').then(async ({ saveRow, saySaved }) => { const out = await saveRow(row.team, row); saySaved(row.team, row, out); sayLive(`Saved ${markHidden(row.name, { strict: true })} for later.`); }).catch(error => sayLive(error.message)); });
 }
+/** The collapsed rail keeps one icon per folder with its count (#15347, the Operator: "Collapsing the inbox can still show the icons"): the same glyphs as the list, a tooltip and an accessible name; a click opens the folder and the rail stays collapsed. */
+function drawRail(sections, here) {
+    const rail = $('sidebar-rail-inbox'); if (!rail) return;
+    const items = sections.flatMap(sec => sec.items).filter(it => !String(it.key).startsWith(BOARD_ITEM));
+    rail.hidden = !items.length || !document.querySelector('.layout[data-sidebar-pane="hub-inbox"]'); // only while the Inbox's pane is the sidebar on screen (the layout's data-sidebar-pane)
+    rail.replaceChildren(...items.map(it => {
+        const b = DT.el('button', 'btn btn-quiet btn-icon btn-small sidebar-rail-btn sidebar-rail-folder'), n = Number(it.count) || 0, name = n ? `${it.label}, ${it.words || n}` : it.label;
+        b.type = 'button'; b.dataset.key = it.key; b.title = it.tip ? `${it.label}: ${it.tip}` : it.label; b.setAttribute('aria-label', name);
+        if (it.key === here) b.setAttribute('aria-current', 'page');
+        const glyph = _folders?.querySelector(`[data-key="${it.key}"] .view-list-icon`)?.cloneNode(true); if (glyph) b.append(glyph);
+        if (n) { const badge = DT.el('span', 'chip chip-count sidebar-rail-badge', n > 99 ? '99+' : n); badge.setAttribute('aria-hidden', 'true'); b.append(badge); }
+        b.addEventListener('click', () => pickFolder(it.key));
+        return b;
+    }));
+}
 function renderInboxNav(force = false) {
     syncReviewPagingControls();
     teamNeedsMount?.redraw();
@@ -992,6 +1010,7 @@ function renderInboxNav(force = false) {
     else { _folders = VL.build({ id: 'inbox-folders', label: 'Inbox views', sections, current: here, onPick: pickFolder }); list.replaceChildren(_folders); }
     const pageList = page && $('inbox-page')?.querySelector('[data-view-list="inbox-goal-folders"], [data-view-list="inbox-item-folders"]'); // an opened item's own folder list (a phone's select) follows the counts too: it was drawn once, with the counts of that moment (#8681)
     if (pageList) VL.update(pageList, { sections, current: here });
+    drawRail(sections, here);
     setHidden(document.querySelector('.sidebar-header[data-header="hub-inbox"] [data-group-toggle]'), true); // folders do not fold: the collapse-all button has nothing to fold
     syncLeadStrip(sections, here);
     refreshGroupTable('hub-inbox');

@@ -79,6 +79,9 @@ func (h *SessionsHandler) opencodeNeedsInput(reply map[string]any, sessionID str
 	if !p.Allowed() {
 		input["only_reject"] = true
 		input["note"] = permreview.Merge(permreview.Review{Cut: p.Cut, Hidden: p.Hidden}).Note()
+		if p.Cut {
+			input["unreadable"] = true // longer than a card shows: not read in full (#15501)
+		}
 	}
 	reply["pending"] = pendingTool{ToolUseID: p.ID, ToolName: p.Permission, Input: input, At: p.At}
 	choices := opencodeCardOptions(p)

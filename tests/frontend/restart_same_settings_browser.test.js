@@ -72,7 +72,17 @@ const BASE = require('./test_base').BASE;
         assert.ok(items.some(i => i[0] === 'agent-restart-same' && i[1] === 'Restart, same settings'), 'Restart, same settings is in the menu: ' + JSON.stringify(items));
         assert.ok(items.some(i => i[0] === 'agent-restart' && /^Restart with changes/.test(i[1])), 'the dialog stays behind Restart with changes: ' + JSON.stringify(items));
 
+        // An agent in the middle of a turn is asked first (#15442): Cancel sends nothing, Restart sends it. The ones below are at rest and stay one tap.
+        await ev(`T.state.liveSessions.find(s => s.session_id === ${JSON.stringify(id0)}).working = true`);
         await ev(`document.querySelector('[data-on-click="agent-restart-same"][data-session-id="${id0}"]').click()`);
+        await waitFor(`document.getElementById('confirm-modal').style.display === 'flex'`, 'a working agent is asked before it restarts', 5000);
+        const ask = await ev(`({ title: document.getElementById('confirm-modal-title').textContent, text: document.getElementById('confirm-modal-message').textContent, yes: document.getElementById('confirm-modal-yes').textContent.trim() })`);
+        assert.equal(ask.title, 'Restart agent'); assert.match(ask.text, /is working right now\. Restarting stops what it is doing and starts a new conversation; the old chat stays above\./); assert.equal(ask.yes, 'Restart');
+        await ev(`document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)').click()`);
+        assert.equal(await ev(`window.__srv.restarts`), 0, 'Cancel restarts nothing');
+        await ev(`document.querySelector('[data-on-click="agent-restart-same"][data-session-id="${id0}"]').click()`);
+        await waitFor(`document.getElementById('confirm-modal').style.display === 'flex'`, 'asked again', 5000);
+        await ev(`document.getElementById('confirm-modal-yes').click()`);
         await waitFor(`window.__srv.restarts === 1`, 'the restart to be asked', 5000);
         await waitFor(`/Writer/.test(document.getElementById('notices')?.textContent || '')`, 'the toast names the agent (Writer), not its folder or session id (walk 13 M5)', 5000);
         assert.ok(!/Restart(ing|ed):? (rs|claude-)/.test(await ev(`document.getElementById('notices').textContent`)), 'and not the folder or a session id');
@@ -86,7 +96,7 @@ const BASE = require('./test_base').BASE;
         const earlier = await ev(`(() => { const e = document.querySelector('#live-history-messages > .chat-earlier'); return e && { text: e.textContent, before: !!(e.compareDocumentPosition(document.querySelector('#live-history-messages .message-text:not(.chat-earlier *)')) & Node.DOCUMENT_POSITION_FOLLOWING) }; })()`);
         assert.ok(earlier, 'the earlier conversation is a block of its own');
         assert.match(earlier.text, /O0 lorem/);
-        assert.match(earlier.text, /Restarted: a new conversation starts here/);
+        assert.match(earlier.text, /New conversation: context cleared, instructions sent again/);
         assert.ok(earlier.before, 'it sits above the new conversation');
 
         // The draft is gone, from the box and from the saved drafts (the old session's and the new one's).

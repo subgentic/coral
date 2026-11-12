@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // The board task list (#3269). A long-lived board has thousands of finished tasks, and
@@ -202,13 +203,33 @@ func (s *Store) TaskCounts(ctx context.Context, project, since string) (*TaskLis
 	}
 	page := &TaskListPage{Tasks: []TaskListItem{}, TotalOpen: open, TotalCompleted: done}
 	if since != "" {
-		var n int
-		if err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM board_tasks WHERE board_id = ? AND status = 'completed' AND completed_at >= ?`, project, since); err != nil {
+		n, err := s.completedSince(ctx, project, since)
+		if err != nil {
 			return nil, err
 		}
 		page.CompletedSince = &n
 	}
 	return page, nil
+}
+
+// completedSince counts the completed tasks of a board finished at or after since, both read as times: stored completed_at texts are "...:05Z" or "...:05.5Z" and a text comparison puts "05.5Z" before "05Z", so a fraction of a
+// second at the boundary would count a task on the wrong side (#15461, Security on #15340). The text bound only narrows the rows (a second early, without its "Z"); each is then parsed and compared as an instant.
+func (s *Store) completedSince(ctx context.Context, project, since string) (int, error) {
+	from, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(since))
+	if err != nil {
+		return 0, err
+	}
+	var stored []string
+	if err := s.reader().SelectContext(ctx, &stored, `SELECT completed_at FROM board_tasks WHERE board_id = ? AND status = 'completed' AND completed_at >= ?`, project, windowBound(from.Add(-time.Second).UTC().Truncate(time.Second).Format(time.RFC3339))); err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, at := range stored {
+		if t, err := time.Parse(time.RFC3339Nano, at); err == nil && !t.Before(from) {
+			n++
+		}
+	}
+	return n, nil
 }
 
 // openRankSQL orders the open tasks by priority (critical first); an unknown priority sorts last. It is the order the default list has always had.

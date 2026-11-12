@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"time"
 )
 
@@ -302,17 +304,14 @@ func (s *TokenUsageStore) GetLatestTurnContextBySessionIDs(ctx context.Context, 
 	}
 	// With a single MAX() aggregate, SQLite takes the bare latest_context
 	// from the row holding the newest turn.
-	var rows []struct {
-		SessionID     string `db:"session_id"`
-		ContextTokens int    `db:"context_tokens"`
-		RecordedAt    string `db:"recorded_at"`
-	}
+	var rows []latestContextRow
 	// The read pool (#3461): the live list asks this on every refresh.
 	if err := s.db.Reader().SelectContext(ctx, &rows, latestUsageRollup+`
-		SELECT session_id, latest_context as context_tokens, MAX(recorded_at) as recorded_at
+		SELECT session_id, latest_context as context_tokens, MAX(recorded_at) as recorded_at, agent_type, max_id
 		FROM counted GROUP BY session_id`, ids); err != nil {
 		return nil, err
 	}
+	s.fixCachedInclusiveContext(ctx, rows)
 
 	resets := s.contextResetsFor(ctx, sessionIDs)
 	result := make(map[string]int, len(rows))
@@ -409,4 +408,60 @@ func sinceArgs(since string) []interface{} {
 		return nil
 	}
 	return []interface{}{windowBound(since)}
+}
+
+// cachedInclusiveTypes are the agent types whose recorded input_tokens already include the cached part (OpenAI's count; proxy.ModelPricing.CachedInputIncluded prices rows that way). The rollup's
+// latest_context adds the cache read to the input, which is right for Claude (its input is only the uncached part) and counts a Codex call's cached tokens twice (#15506).
+var cachedInclusiveTypes = map[string]bool{"codex": true}
+
+// perCallTypes are the agent types whose rows hold the growth of running totals over several calls (Hermes keeps no record per call, #15508): a row's num_turns is the calls it holds, and the size of one request is its tokens divided by them.
+var perCallTypes = map[string]bool{"hermes": true}
+
+// latestContextRow is a session's newest turn as the rollup holds it.
+type latestContextRow struct {
+	SessionID     string         `db:"session_id"`
+	ContextTokens int            `db:"context_tokens"`
+	RecordedAt    string         `db:"recorded_at"`
+	AgentType     sql.NullString `db:"agent_type"`
+	MaxID         sql.NullInt64  `db:"max_id"`
+}
+
+// fixCachedInclusiveContext replaces the context of each session of such a type with what its newest call really carried: its input plus any cache write (Codex), or its row's tokens over the calls the row holds (Hermes). It reads those few rows by id, in one query.
+func (s *TokenUsageStore) fixCachedInclusiveContext(ctx context.Context, rows []latestContextRow) {
+	byID := map[int64]int{}
+	var ids []int64
+	for i, r := range rows {
+		if r.MaxID.Valid && (cachedInclusiveTypes[r.AgentType.String] || perCallTypes[r.AgentType.String]) {
+			byID[r.MaxID.Int64] = i
+			ids = append(ids, r.MaxID.Int64)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	idsJSON, err := json.Marshal(ids)
+	if err != nil {
+		return
+	}
+	var got []struct {
+		ID         int64 `db:"id"`
+		Input      int   `db:"input_tokens"`
+		CacheRead  int   `db:"cache_read_tokens"`
+		CacheWrite int   `db:"cache_write_tokens"`
+		NumTurns   int   `db:"num_turns"`
+	}
+	if err := s.db.Reader().SelectContext(ctx, &got, `SELECT id, input_tokens, cache_read_tokens, cache_write_tokens, num_turns FROM token_usage WHERE id IN (SELECT value FROM json_each(?))`, string(idsJSON)); err != nil {
+		return // the sum stays (it overstates; it never hides a context)
+	}
+	for _, g := range got {
+		i, ok := byID[g.ID]
+		if !ok {
+			continue
+		}
+		if perCallTypes[rows[i].AgentType.String] {
+			rows[i].ContextTokens = (g.Input + g.CacheRead + g.CacheWrite) / max(1, g.NumTurns)
+		} else {
+			rows[i].ContextTokens = g.Input + g.CacheWrite
+		}
+	}
 }

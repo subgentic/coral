@@ -22,14 +22,15 @@ const ALWAYS = 'Allow always: do not ask again for ls *, git status* and 2 more 
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev);
-            const card = (agentType, input, labels, extra) => ev(`(async () => { const NI = await import(${S} + 'needs_input_card.js'), st = (await import(${S} + 'state.js')).state; const sid = 'oc-sid';
+            const card = (agentType, input, labels, extra, noPo) => ev(`(async () => { const NI = await import(${S} + 'needs_input_card.js'), st = (await import(${S} + 'state.js')).state; const sid = 'oc-sid';
                 const row = { session_id: sid, name: 'work', agent_type: ${JSON.stringify(agentType)}, waiting_for_input: true, waiting_summary: 'Wants to use bash' }; st.liveSessions = [row];
                 NI.pendingToolBySession.clear(); NI.promptOptionsBySession.clear(); NI.loginBySession.clear();
                 if (${JSON.stringify(input)}) NI.pendingToolBySession.set(sid, { tool_use_id: 'perm_1', tool_name: 'Bash', input: ${JSON.stringify(input)} });
-                NI.promptOptionsBySession.set(sid, { ...${JSON.stringify(extra || {})}, question: 'Do you want to proceed?', options: ${JSON.stringify(labels)}.map((o, i) => ({ n: i + 1, ...(typeof o === 'string' ? { label: o } : o), action: 'select', selected: i === 0 })), ask_id: 'perm_1' });
+                NI.promptOptionsBySession.set(sid, { ...(${noPo ? 'false' : 'true'} ? { po: ${JSON.stringify(extra || {})} } : {}), ...${JSON.stringify(extra || {})}, question: 'Do you want to proceed?', options: ${JSON.stringify(labels)}.map((o, i) => ({ n: i + 1, ...(typeof o === 'string' ? { label: o } : o), action: 'select', selected: i === 0 })), ask_id: 'perm_1' });
                 document.getElementById('q-box')?.remove(); const box = document.body.appendChild(Object.assign(document.createElement('div'), { id: 'q-box', className: 'chat-messages chat-prose' }));
                 box.style.cssText = 'position:fixed;left:0;top:0;width:' + Math.min(innerWidth, 560) + 'px;max-height:100vh;overflow:auto;z-index:99999;background:var(--bg-primary);padding:12px;box-sizing:border-box';
-                NI.syncNeedsInputCard(box, row);
+                await import(${S} + 'card_attach.js'); // the unreadable card is finished by the lazy module (#15665)
+                NI.syncNeedsInputCard(box, row); await new Promise(r => setTimeout(r, 30));
                 const c = box.querySelector('.chat-needs-input'), t = c.querySelector('.cni-target');
                 const cs = t && getComputedStyle(t), code = t && t.querySelector('code');
                 return { text: c.textContent, target: t ? t.textContent : null, wrapsX: t ? t.scrollWidth <= t.clientWidth + 1 : null, h: t ? Math.round(t.getBoundingClientRect().height) : null, scrolls: t ? t.scrollHeight > t.clientHeight + 1 : null,
@@ -39,6 +40,7 @@ const ALWAYS = 'Allow always: do not ask again for ls *, git status* and 2 more 
             const at = `${w}: `;
             const CLEAN = 'git status && ' + 'echo ok; '.repeat(40);              // ~400 clean bytes
             const NOTE = 'This request is longer than the 4000 bytes shown, so it cannot be allowed from here. Read it in the terminal, or reject it.';
+            const UNREAD = "This request is longer than the 4000 bytes shown, so Coral could not read it in full. Coral cannot answer it here: answer it in the agent's terminal.";
             const YNA = ['Yes', "Yes, and don't ask again for this command", 'No'];
             const names = r => r.buttons.map(b => b.label);
             // 1. Claude: a clean request keeps all its answers; only_reject keeps "No" alone (the first version kept only a label that starts "Reject": Claude's refusal is "No")
@@ -49,6 +51,16 @@ const ALWAYS = 'Allow always: do not ask again for ls *, git status* and 2 more 
             // 2. Pi: the same, with Reject
             r = await card('pi', { command: 'x'.repeat(4000), only_reject: true, note: NOTE }, ['Allow', 'Reject']);
             assert.deepEqual(names(r), ['Reject'], at + 'Pi: Reject alone');
+            // 2b. #15501: a request Coral did not read in full (unreadable) has no answer at all, not even No, no half of the request, and says so
+            for (const [agent, input, screen] of [['claude', { command: 'x'.repeat(4000), only_reject: true, unreadable: true, note: UNREAD }, undefined], ['pi', { command: 'x'.repeat(4000), only_reject: true, unreadable: true, note: UNREAD }, undefined], ['codex', null, { target: 'echo start', only_reject: true, unreadable: true, note: UNREAD }]]) {
+                r = await card(agent, input, agent === 'pi' ? ['Allow', 'Reject'] : YNA, screen);
+                assert.deepEqual(names(r), [], at + agent + ': unreadable: no answer, not even No or Reject: ' + JSON.stringify(names(r)));
+                assert.match(r.text, /could not read this request in full/, at + agent + ': the card says Coral could not read it'); assert.match(r.text, /agent.s terminal/, at + agent + ': and where to answer it');
+                assert.equal(r.target, null, at + agent + ': no half of the request is drawn');
+            }
+            // 2c. #15676: an entry written without the server's whole prompt (no po) still carries a top-level only_reject, and the card reads it first: a request that can only be rejected never draws a Yes
+            r = await card('codex', null, YNA, { target: 'echo start', only_reject: true, note: NOTE }, true);
+            assert.deepEqual(names(r), ['No'], at + 'an entry with no po: only the refusal, never a Yes: ' + JSON.stringify(names(r)));
             // 3. a hidden character that reaches the card (an older server, or a field the server did not review) is written out, never drawn raw
             r = await card('claude', { command: 'echo ok \u202e rm' }, YNA);
             assert.ok(!r.target.includes('\u202e') && r.target.includes('<U+202E>'), at + 'written out: ' + JSON.stringify(r.target));

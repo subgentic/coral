@@ -15,6 +15,25 @@ type artifactRevisions struct {
 	mu     sync.Mutex
 	epoch  uint64
 	boards map[string]uint64
+	onMove func() // told after any revision moved, outside the lock (see OnArtifactsChanged)
+}
+
+// OnArtifactsChanged sets what is called after an artifact revision moves (an upload, a tag, a send, a delete), so the live feed can carry the new
+// revisions now instead of at its next tick (#15645). fn must return at once and never call back into the store; one hook, the last set wins.
+func (s *Store) OnArtifactsChanged(fn func()) {
+	r := &s.artifactsRevision
+	r.mu.Lock()
+	r.onMove = fn
+	r.mu.Unlock()
+}
+
+func (r *artifactRevisions) moved() {
+	r.mu.Lock()
+	fn := r.onMove
+	r.mu.Unlock()
+	if fn != nil {
+		fn()
+	}
 }
 
 func (r *artifactRevisions) init() {
@@ -54,6 +73,7 @@ func (s *Store) ArtifactsRevision(board string) uint64 {
 // artifact list. It cannot fail after the business write has committed.
 func (s *Store) NoteArtifactsChanged(board string) {
 	r := &s.artifactsRevision
+	defer r.moved()
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.init()
@@ -88,6 +108,7 @@ func (s *Store) ArtifactRevisions() map[string]uint64 {
 // mutation (delete, comments or stars): the same digest can be on several teams.
 func (s *Store) NoteAllArtifactsChanged() {
 	r := &s.artifactsRevision
+	defer r.moved()
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.init()

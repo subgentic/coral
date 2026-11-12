@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,4 +68,20 @@ func TestAnyOtherSwitchDialogIsAskedInTheChatAndTheWaitDoesNotRunOut(t *testing.
 	r.localCommand(t, "/model", "claude-sonnet-5-5", "Set model to `Sonnet 5.5`")
 	sw = r.waitState(t, switchDone)
 	assert.Empty(t, sw.Asking)
+}
+
+// #15451 (Security on #15410): the line shown in the chat is valid UTF-8 however the cut falls, and carries no terminal control codes from the screen.
+func TestAskingTextIsCutOnACharacterAndCarriesNoControlCodes(t *testing.T) {
+	// "é" is two bytes: with 239 ASCII bytes before it, a byte cut at 240 lands inside it.
+	long := strings.Repeat("a", 239) + "é" + strings.Repeat("é", 50)
+	got := askingText("Switch model?", long)
+	assert.True(t, utf8.ValidString(got), "valid UTF-8: %q", got)
+	assert.True(t, strings.HasSuffix(got, "…"))
+	assert.LessOrEqual(t, len(got), 240+len("…"))
+	for n := 220; n <= 241; n++ { // every cut position, through 3-byte characters too
+		s := askingText("", strings.Repeat("a", n)+strings.Repeat("€", 20))
+		assert.True(t, utf8.ValidString(s), "n=%d: %q", n, s)
+	}
+	got = askingText("Sw\x1b]0;evil\x07itch\x1b[2J model?", "Is \x00this\u009b31m ok?")
+	assert.Equal(t, "Switch model? Is this ok?", got, "escape sequences and control bytes are gone")
 }

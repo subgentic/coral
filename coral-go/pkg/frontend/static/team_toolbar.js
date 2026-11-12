@@ -67,10 +67,14 @@ export function build({ id = '', label, placeholder, value = '', onSearch = null
  *  action (css) while something is selected, so the bar replaces the line instead of adding one. `mountSelection(row, null)` takes it away and the line is as it was. `adopt` leaves the span alone across redraws. The search field stays. */
 export function mountSelection(row, node) {
     if (!row) return;
+    if (row._selObserver) { row._selObserver.disconnect(); row._selObserver = null; } // one observer per row, never one per mount (#15656)
     for (const old of row.querySelectorAll(':scope > .team-tb-selection')) old.remove();
     row.classList.toggle('team-toolbar-selecting', !!node);
+    row.classList.toggle('tb-low', !!node && !!row.closest('.inbox-folder-toolbar')); // an Inbox folder keeps its title, search and filters and puts the actions on a line of their own under them (#15540)
     if (!node) return;
     const slot = el('span', 'team-tb-selection'); slot.append(node);
     const wrap = row.querySelector(':scope > .list-bar-search-wrap');
     if (wrap) wrap.after(slot); else row.prepend(slot);
+    const bar = row.classList.contains('tb-low') && row.parentElement;
+    if (bar) (row._selObserver = new ResizeObserver(() => bar.style.setProperty('--sel-up', Math.round(slot.getBoundingClientRect().top - bar.getBoundingClientRect().top) + 'px'))).observe(bar); // a phone keeps only this line stuck at the top while the list scrolls (#15632)
 }

@@ -413,7 +413,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             // the strip's space is held before its module and the folder answer arrive: the same three parts, drawn but not seen, so the table under it does not move (#15618)
             strip.setAttribute('aria-hidden', 'true'); strip.append(el('div', 'team-files-strip-ghost', ''));
             strip.firstChild.append(el('p', 'goals-note', 'The team works in the folder . The app runs from there: open index.html in that folder.'), el('button', 'btn btn-small', 'Copy path'), el('button', 'btn btn-small', 'Download all (zip)'));
-            importOnce('./artifact_team_files.js').then(m => m.fillStrip(strip, { project: model.project, hasMore: () => model.hasMore, files: () => model.items.map(it => ({ it, link: linkOf(it) })).filter(x => x.link?.preview).map(x => ({ url: x.link.url, name: readableName(x.it) })) })).catch(() => {});
+            importOnce('./artifact_team_files.js').then(m => m.fillStrip(strip, { project: model.project, hasMore: () => model.hasMore, files: () => model.items.map(it => ({ it, link: linkOf(it) })).filter(x => x.link?.preview).map(x => ({ url: x.link.url, name: readableName(x.it) })) })).catch(() => { strip.remove(); }); // a failed load takes its held space with it: the table moves up once, only on failure (#15624)
         }
         if (inbox && !model.error && (model.partial || (model.versionless && model.versionless.length))) body.append(partialLine());
         if (!model.error && !model.loading && !model.items.length && !F.isFiltered(model.filters) && !model.scope) status.append(el('span', 'empty-state-hint', 'An agent shares a file when it finishes a task with one; you can ask an agent to share a file as an artifact.')); // inside the line's own element: one block, the family's gap
@@ -585,7 +585,9 @@ export function createArtifactsList({ inbox = false } = {}) {
                 actions.push(inReview ? { label: 'Remove from review', menu: 1, description: 'Takes it out of Needs you', title: 'Take it out of Needs you', run: () => changeReview(reviewFiles([item]), true, name).then(r => { if (r) showToast(r.failed ? `Could not remove it from review: ${r.why}` : 'Removed from review', !!r.failed); }) }
                     : { label: 'Send for review', menu: 1, description: 'Puts it in Needs you to approve or ask for changes', title: 'Put it in Needs you to approve or ask for changes', run: () => changeReview(reviewFiles([item]), false, name).then(r => { if (r) showToast(r.failed ? `Could not send it for review: ${r.why}` : 'Sent for review: it is in Needs you', !!r.failed); }) });
             }
-            if (hex && !isUnverified(item) && (item.tags || []).includes(REVIEW)) { // the panel says 'Waiting for your review': the decision is here too, not only in the viewer and Needs you (#15338, walk 23)
+            // while the file waits for review the header already has Approve beside Request changes (#15120): the bar keeps one only for 'Approve anyway' after changes were asked, or where the header has none (#15627)
+            const headerApproves = Tags.reviewWords(item.tags, item.review, item.produced_by) === 'Waiting for your review' && local();
+            if (hex && !isUnverified(item) && (item.tags || []).includes(REVIEW) && !headerApproves) { // the panel says 'Waiting for your review': the decision is here too, not only in the viewer and Needs you (#15338, walk 23)
                 const asked = (item.tags || []).includes('changes requested');
                 actions.push({ label: asked ? 'Approve anyway' : 'Approve', primary: true, title: asked ? 'Approve this version as it is' : 'Approve it: it leaves Needs you and the agent is told', run: () => approveHere().catch(e => showToast(e.message, true)) });
             }

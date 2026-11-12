@@ -5,6 +5,7 @@
      /agents                              { view: 'agents' }
      /agents/[@<server>/]<session>[/<sub>]  { view: 'agents', server, id, sub }
      /agents/[@<server>/]<session>[/<sub>]?view=terminal  the same, plus terminal: true (the link opens the agent on its terminal; coral-hub, #6752)
+     /agents/[@<server>/]<session>[/<sub>]?open=<file or coral://artifacts/<hex>>[&thread=<id>]  the same; the viewer's open file or artifact and its comment thread (#15253). Not part of the route: open_link.js writes and reads them beside it, so the start path carries none of it
      /chats[/@<server>][?filters]         { view: 'chats', query }
      /chats/[@<server>/]<id>              { view: 'chats', id }
      /team/[@<server>/]<team>[/<tab>[/<n>]]  { view: 'team', server, id, sub, item }: the team page (#7453); <tab> is one of TEAM_TABS (none = Goals), <n> a goal or a task; the Board tab's path word is "board" (the old "messages" is read and written as board, #8652)

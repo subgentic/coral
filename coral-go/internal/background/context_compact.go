@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
@@ -67,7 +68,7 @@ func handoffText(digest string) string {
 
 // clearCommand is the command that clears an agent's context, "" for a type with none known to Coral.
 func clearCommand(agentType string) string {
-	if agentType == "claude" {
+	if agentType == at.Claude {
 		return "/clear"
 	}
 	return ""
@@ -81,12 +82,17 @@ func clearedText(next int64) string {
 	return "[Coral] Your context was cleared to save tokens. Read your board with 'coral-board read', then run 'coral-board wait' for your next task."
 }
 
-// compactCommand is the command that compacts an agent of this type, "" for a type with none known to Coral (never guessed: Codex, Antigravity, Hermes and Pi have commands of their own, measured
-// but not wired in this slice).
+// compactCommand is the command that compacts an agent of this type, "" for a type with none known to Coral (never guessed). Each is read from that CLI's own slash menu (#15506): Claude's /compact takes a
+// focus line; Codex 0.166, Antigravity 1.5 and Pi 1.4 each have a bare /compact; Hermes 0.22 has /compress (/compact is its alias). A Hermes agent's context size is its
+// session totals' growth over the calls it holds (the poller records it, #15508).
 func compactCommand(agentType string) string {
 	switch agentType {
-	case "claude":
+	case at.Claude:
 		return "/compact " + compactFocusClaude
+	case at.Codex, at.Agy, at.Antigravity, at.Pi:
+		return "/compact"
+	case at.Hermes:
+		return "/compress"
 	}
 	return ""
 }
@@ -237,13 +243,14 @@ func (c *ContextCompact) skip(project string, a AgentInfo, name, reason string) 
 	}
 }
 
-// skipIfDue is skip for the checks that come before the context is read: it speaks only for an agent that was due at the last pass.
-func (c *ContextCompact) skipIfDue(project string, a AgentInfo, name, reason string) {
+// skipOnce logs why an agent of a team with the setting on is not a candidate at all (before its context is read), once per reason: a real run that compacts nothing says why (#15506).
+func (c *ContextCompact) skipOnce(project string, a AgentInfo, name, reason string) {
 	c.mu.Lock()
-	_, due := c.dueSince[name]
+	same := c.skipSaid[name] == reason
+	c.skipSaid[name] = reason
 	c.mu.Unlock()
-	if due {
-		c.skip(project, a, name, reason)
+	if !same {
+		c.logger.Info("an agent is not a compaction candidate", "project", project, "agent", a.DisplayName, "type", a.AgentType, "session", name, "reason", reason)
 	}
 }
 
@@ -328,21 +335,36 @@ func (c *ContextCompact) runProject(ctx context.Context, project string, hs boar
 	}
 	var cands []AgentInfo
 	var names, ids, subIDs []string
+	type gated struct {
+		a            AgentInfo
+		name, reason string
+	}
+	var held []gated // agents stopped by a gate before their context was read: said in the log once their context turns out to be over the threshold
 	for _, sub := range subs {
 		a, live := agents[sub.SessionName]
-		if !live || sub.SessionName == "" || compactCommand(a.AgentType) == "" {
+		if !live || sub.SessionName == "" {
+			continue // not a running agent of this Coral: nothing to say
+		}
+		if compactCommand(a.AgentType) == "" {
+			c.skipOnce(project, a, sub.SessionName, "this CLI ("+a.AgentType+") has no compact command wired")
+			continue
+		}
+		if (hs.Method == board.CompactMethodClearNext || hs.Method == board.CompactMethodClearHandoff) && clearCommand(a.AgentType) == "" {
+			c.skipOnce(project, a, sub.SessionName, "the team clears and this CLI has no clear command wired") // never compacted in its place (#15506)
 			continue
 		}
 		if !hs.Orchestrator && orch != "" && board.SameIdentity(sub.SubscriberID, orch) {
+			c.skipOnce(project, a, sub.SessionName, "it is the team's Orchestrator and the setting leaves the Orchestrator alone")
 			continue
 		}
 		sig, ok := c.signal(ctx, a.SessionID)
 		if !ok {
+			c.skipOnce(project, a, sub.SessionName, "no hook or transcript event says whether it is idle yet")
 			continue
 		}
 		c.confirm(project, a, sub.SessionName, sig, now)
 		if sig.InTurn || sig.NeedsInput || now.Sub(sig.Since) < compactSettle {
-			c.skipIfDue(project, a, sub.SessionName, "the agent is busy or waiting for input")
+			held = append(held, gated{a, sub.SessionName, "the agent is busy or waiting for input"})
 			continue
 		}
 		c.mu.Lock()
@@ -354,11 +376,12 @@ func (c *ContextCompact) runProject(ctx context.Context, project string, hs boar
 			}
 		}
 		if did && now.Sub(prev.at) < compactCooldown {
+			c.skipOnce(project, a, sub.SessionName, "it was compacted a short while ago")
 			continue
 		}
 		if c.limit != nil {
 			if _, blocked := c.limit(ctx, a); blocked {
-				c.skipIfDue(project, a, sub.SessionName, "a usage limit stops the agent")
+				held = append(held, gated{a, sub.SessionName, "a usage limit stops the agent"})
 				continue
 			}
 		}
@@ -366,6 +389,19 @@ func (c *ContextCompact) runProject(ctx context.Context, project string, hs boar
 		names = append(names, sub.SessionName)
 		ids = append(ids, a.SessionID)
 		subIDs = append(subIDs, sub.SubscriberID)
+	}
+	if len(held) > 0 {
+		hid := make([]string, len(held))
+		for i, g := range held {
+			hid[i] = g.a.SessionID
+		}
+		if ht, err := c.tokens(ctx, hid); err == nil {
+			for _, g := range held {
+				if ht[g.a.SessionID] >= hs.ThresholdK*1000 {
+					c.skipOnce(project, g.a, g.name, g.reason+" (its context is over the threshold)")
+				}
+			}
+		}
 	}
 	if len(cands) == 0 {
 		return

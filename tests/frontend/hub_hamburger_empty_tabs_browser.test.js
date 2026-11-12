@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const CDP = require('chrome-remote-interface');
 const { safePaused } = require('./helpers/paused');
 const BASE = require('./test_base').BASE;
+const HB = "[...document.querySelectorAll('button.phone-menu-btn[data-hamburger]')].find(b => b.getClientRects().length)"; // the hamburger a person sees: the phone bar draws after the page's first paint (a slow runner taps before it exists), and the bars that are not on screen hold their own hidden ones (#15709)
 
 (async () => {
     const client = await CDP({ port: Number(process.env.CDP_PORT || 9222) });
@@ -30,20 +31,20 @@ const BASE = require('./test_base').BASE;
         });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 800, deviceScaleFactor: 2, mobile: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
-        await waitFor(`document.body.classList.contains('cloud-mode') && !!document.querySelector('button.phone-menu-btn[data-hamburger], #top-menu-btn')`, 'the Hub page', { timeout: 20000 });
+        await waitFor(`document.body.classList.contains('cloud-mode') && !!${HB}`, 'the Hub page', { timeout: 20000 });
         const KEEP = ['hub-inbox', 'agents', 'servers', 'docs'];
         await ev(`(() => { for (const t of document.querySelectorAll('.top-nav-tabs > .top-nav-tab[data-arg]')) { if (!${JSON.stringify(KEEP)}.includes(t.dataset.arg)) t.style.display = 'none'; } return true; })()`);
         const shape = await ev(`(() => ({ phoneNav: document.body.classList.contains('phone-nav-on'), shown: [...document.querySelectorAll('.top-nav-tabs > .top-nav-tab[data-arg]')].filter(t => !t.hidden && t.style.display !== 'none').map(t => t.dataset.arg).join(',') }))()`);
-        await ev(`(document.querySelector('button.phone-menu-btn[data-hamburger]') || document.getElementById('top-menu-btn')).click(); true`);
+        await ev(`${HB}.click(); true`);
         await new Promise(r => setTimeout(r, 700)); // sleep-ok: the drawer's code loads on the first tap, then the same tap's menu opens; the state below is read once settled
-        const got = await ev(`(() => { const m = document.getElementById('nav-more-menu'), b = document.querySelector('button.phone-menu-btn[data-hamburger]') || document.getElementById('top-menu-btn'); return { open: !m.hidden, expanded: b.getAttribute('aria-expanded'), items: [...m.querySelectorAll('.nav-more-item')].map(x => x.textContent.trim().replace(/\\s+/g, ' ')) }; })()`);
+        const got = await ev(`(() => { const m = document.getElementById('nav-more-menu'), b = ${HB}; return { open: !m.hidden, expanded: b.getAttribute('aria-expanded'), items: [...m.querySelectorAll('.nav-more-item')].map(x => x.textContent.trim().replace(/\\s+/g, ' ')) }; })()`);
         const problems = [];
         if (!got.open || got.expanded !== 'true') problems.push(`the hamburger did nothing: open ${got.open}, aria-expanded ${got.expanded} (${JSON.stringify(shape)})`);
         else for (const want of ['Settings', 'GitHub', 'Sign out']) if (!got.items.some(x => x.endsWith(want))) problems.push(`the menu has no ${want}: ${JSON.stringify(got.items)}`);
         // #15487: the same with the phone's bottom bar on (phone-nav-on: Agents and Inbox are its tabs, Home is one tap away) and with the account section not drawn yet (the menu is never empty or short of its fixed rows)
         const open = async () => {
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
-            await ev(`(document.querySelector('button.phone-menu-btn[data-hamburger]') || document.getElementById('top-menu-btn')).click(); true`);
+            await ev(`${HB}.click(); true`);
             await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'the hamburger opens', 6000);
             return ev(`[...document.getElementById('nav-more-menu').querySelectorAll('.nav-more-item')].map(x => x.textContent.trim().replace(/\\s+/g, ' ').replace(/^[a-z_]+(?=[A-Z])/, ''))`);
         };

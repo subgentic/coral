@@ -88,8 +88,9 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`!!document.querySelector('.artifact-review-approve:not([hidden])')`, `${w}: reopened, waiting for the review (${how})`, 8000);
                 if (how === 'note') {
                     await ev(`document.querySelector('.artifact-viewer-more').click(); document.querySelector('.artifact-review-note').click(); true`);
-                    await waitFor(`!!document.querySelector('.inbox-approve-note-confirm')`, `${w}: the note dialog opens`, 4000);
-                    await ev(`document.querySelector('.inbox-approve-note-confirm').click(); true`);
+                    // #15545: the menu item opens the review form (one comment box); Approve with comment sends it
+                    await waitFor(`!!document.querySelector('.artifact-review-form:not([hidden]) .artifact-review-approve-note')`, `${w}: the review form opens`, 4000);
+                    await ev(`(() => { const t = document.getElementById('artifact-review-text'); t.value = 'Fine, mind the date.'; t.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('.artifact-review-approve-note').click(); return true; })()`);
                 } else await ev(`import(${S} + 'artifact_review.js').then(r => import(${S} + 'server_base.js').then(b => r.approveRow(b.identityKey(undefined, 'team-a'), { id: '${H3}', name: 'release-plan.md', team: b.identityKey(undefined, 'team-a') }))).then(() => true)`);
                 await waitFor(`/^Approved/.test(document.querySelector('.artifact-review-state').textContent)`, `${w}: the status chip says Approved after Approve ${how === 'note' ? 'with a note' : 'from the Inbox row'}`, 4000);
                 await ev(`document.querySelector('.artifact-viewer-close').click(); true`);

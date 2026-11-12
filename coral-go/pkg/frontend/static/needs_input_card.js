@@ -22,6 +22,7 @@ export const pendingToolBySession = new Map(); // session_id -> pending tool or 
 // The prompt's options as the terminal shows them right now (numbered, with
 // the digit that answers each), read by the server from a pane capture.
 export const promptOptionsBySession = new Map(); // session_id -> { question, options: [{ n, label, action }], review }
+export const setPrompt = (sid, po) => promptOptionsBySession.set(sid, { title: po.title || "", question: po.question || "", kind: po.kind || "", target: po.target || "", note: po.note || "", options: po.options || [], review: po.review || [], multi: !!po.multi, submit: po.submit || null, only_reject: !!po.only_reject, po }); // the one writer: a top-level only_reject beside the server's whole prompt (po)
 export const loginBySession = new Map(); // session_id -> { reason } while the CLI waits for a sign-in, null when it doesn't (#3830)
 
 // Tools whose whole purpose is to wait for the user
@@ -218,9 +219,9 @@ function needsInputHtml(info, session) {
     // A request the server says can only be rejected here (longer than a card shows, or holding characters that hide what it does) offers the refusing answers alone, for every agent: the pending tool the hook
     // reported (Claude, Pi, opencode: input.only_reject) or the prompt read from the screen (Codex, agy, Gemini: screen.only_reject). The server refuses an Allow for it as well (#11399).
     const refuses = o => o.kind === "reject" || (o.kind !== "allow_once" && o.kind !== "allow_always" && REFUSAL_WORDS.test(String(o.label || ""))); // the server's parsed kind decides; the words only where it has none
-    const onlyReject = info.kind === "permission" && (inp.only_reject === true || (info.screen && info.screen.only_reject === true));
+    const onlyReject = info.kind === "permission" && (inp.only_reject === true || info.screen?.only_reject === true);
     if (onlyReject && info.screen) info = { ...info, screen: { ...info.screen, options: (info.screen.options || []).filter(refuses) } };
-    const onlyRejectNote = typeof inp.note === "string" && inp.note ? inp.note : (info.screen && typeof info.screen.note === "string" ? info.screen.note : "");
+    const onlyRejectNote = String(inp.note || info.screen?.note || "");
     const screen = info.screen || {};
     const onScreen = (screen.options || []).length > 0;
     const screenQuestion = onScreen ? (screen.question || "") : "";
@@ -503,7 +504,7 @@ export function syncNeedsInputCard(container, session) {
             if (typing.focused) input.focus();
         }
     }
-    if (el.querySelector(".cni-attach,.cni-hint")) { // a card that takes an answer in words has the image strip: its code loads with the first one, not at start (#11403)
+    if (el.querySelector(".cni-attach,.cni-hint,.cni-note")) { // a card that takes an answer in words has the image strip: its code loads with the first one, not at start (#11403)
         if (cardAttach) cardAttach.drawCardImages(el, session.session_id); // images added to the answer stay when the card is drawn again
         else importOnce('./card_attach.js').then(m => { cardAttach = m; if (el.isConnected) m.drawCardImages(el, session.session_id); }).catch(() => {});
     }

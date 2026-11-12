@@ -377,6 +377,9 @@ function syncTitleExpand(d) {
     else { n.removeAttribute('tabindex'); n.removeAttribute('role'); n.removeAttribute('aria-expanded'); n.removeAttribute('aria-label'); }
 }
 
+/** The body holds the version being opened, not the one before it (#15636): while its content is on the way the dialog says so (data-content-pending), the review bar holds Approve and the version bar does not count the file as opened. */
+function setContentPending(d, on) { d.dataset.contentPending = on ? '1' : ''; d.dispatchEvent(new CustomEvent('av-content')); }
+
 export function openArtifactViewer(hex, opts = {}) {
     const intent = ++_openIntent;
     hex = String(hex || '').toLowerCase();
@@ -431,6 +434,8 @@ export function openArtifactViewer(hex, opts = {}) {
     dl.onclick = isCloud() ? (e) => { e.preventDefault(); if (dl.getAttribute('aria-disabled') === 'true') return; downloadArtifact(url, sanitizeDownloadName(opts.filename || 'artifact')).catch(err => { title.textContent = err.message; }); } : null;
     const body = d.querySelector('.artifact-viewer-body');
     const wasOpen = !d.hidden;
+    body.replaceChildren(Object.assign(document.createElement('div'), { className: 'inline-preview-loading', textContent: 'Loading...' })); // the title, the version and the review target are the new version's: the old text does not stay under them while the new bytes arrive (#15636)
+    setContentPending(d, true);
     if (!d._sandboxWatch) { d._sandboxWatch = true; new MutationObserver(() => { if (body.querySelector('.artifact-linked-notice:not([data-sandbox-synced])')) syncSandbox(d, body); }).observe(body, { childList: true, subtree: true }); } // the banner and the header's Sandboxed chip appear together, not when the whole render ends: before, a slow render showed the banner (or flashed it for a viewer who had seen it) with no chip (#14988)
     if (!d._sandboxRedraw) { d._sandboxRedraw = true; body.addEventListener('coral-preview-redrawn', () => { syncSandbox(d, body); syncScripts(d, body); }); } // scripts turned on or off (#14730) change which banner is there
     if (typeof opts.onClose === 'function') _onClose = opts.onClose;
@@ -501,7 +506,7 @@ export function openArtifactViewer(hex, opts = {}) {
             dl.href = target.url; dl.setAttribute('download', target.name);
             dl.onclick = isCloud() ? (e) => { e.preventDefault(); if (dl.getAttribute('aria-disabled') === 'true') return; downloadArtifact(target.url, sanitizeDownloadName(target.name)).catch(err => { title.textContent = err.message; }); } : null;
         },
-    })).then(() => { if (gen !== _gen) return; syncSandbox(d, body); syncScripts(d, body); d.classList.toggle('is-image', !!body.querySelector('.image-panes')); d._markUp.picture(!!body.querySelector('.image-panes')); if (!textShown) _comments.docWhole(); }, () => {}); // a picture opens taller (css), not as a strip of its own height
+    })).then(() => { if (gen !== _gen) return; syncSandbox(d, body); syncScripts(d, body); d.classList.toggle('is-image', !!body.querySelector('.image-panes')); d._markUp.picture(!!body.querySelector('.image-panes')); if (!textShown) _comments.docWhole(); setContentPending(d, false); }, () => { if (gen === _gen) setContentPending(d, false); }); // the content is on screen (or could not be drawn): Approve and the opened count go on (#15636) // a picture opens taller (css), not as a strip of its own height
     return true;
 }
 
@@ -521,6 +526,7 @@ export async function openBundledDocument({ title, url, name, onOpened }) {
     _versions?.close(); _review?.close(); _comments?.close(); _details.clear();
     for (const sel of ['.artifact-edit-send-action', '.artifact-viewer-edit', '.artifact-viewer-edit-item', '.artifact-viewer-markup', '.artifact-viewer-markup-item', '.artifact-viewer-newtab', '.artifact-viewer-dropbox-share', '.artifact-viewer-source', '.artifact-viewer-from']) { const el = d.querySelector(sel); if (el) el.hidden = true; }
     d.querySelector('.artifact-edit-send-note').hidden = true;
+    setContentPending(d, false);
     d.classList.remove('is-image');
     paintLine(d);
     const titleEl = d.querySelector('.artifact-viewer-title'), nameEl = document.createElement('span');

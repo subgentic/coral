@@ -73,7 +73,11 @@ export function initPreviewPane() { layout.initPreviewPane(); }
 function _hidePane() {
     _comments?.close(); // no tab, no comments (#5311)
     _placePane();
+    _keepAddress();
 }
+
+/** The address names the open file or artifact (#15253): a reload or a copied link reopens it. The lazy open_link.js writes it. */
+function _keepAddress() { importOnce('./open_link.js').then(m => m.keep(_activeTab())).catch(() => {}); }
 
 function _activeTab() {
     return _tabs.find(t => t.id === _activeId) || null;
@@ -232,6 +236,7 @@ function _activate(tab) {
     _showPane();
     if (_isMobile()) _setPhoneFull(true); // a phone's viewer is a screen of its own with Back, not a third of the list's screen (#7652)
     _render(tab);
+    _keepAddress();
 }
 
 /**

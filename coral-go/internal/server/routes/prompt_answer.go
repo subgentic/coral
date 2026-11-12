@@ -112,6 +112,9 @@ type promptScreen struct {
 	Target     string `json:"target,omitempty"`
 	OnlyReject bool   `json:"only_reject,omitempty"`
 	Note       string `json:"note,omitempty"`
+	// Unreadable: Coral did not read the request in full (longer than a card shows, its opening rule not on the screen, or cut by the CLI on its screen). It implies OnlyReject for the server, which still refuses a Yes,
+	// but a card draws no answer at all for it, not even No: it says so and sends the person to the agent's terminal (#15501). A request that holds a hidden character but was read whole is only OnlyReject: No stays (#15140).
+	Unreadable bool `json:"unreadable,omitempty"`
 	// AutoBlockAt: when Claude Code's own timer on this dialog ends and it blocks the request by itself (RFC 3339, from the time left on the screen when it was read; "" when the screen shows none). Display only: it is not
 	// part of the ask's identity, so it never changes what an answer is checked against (#15140).
 	AutoBlockAt string `json:"auto_block_at,omitempty"`
@@ -201,9 +204,10 @@ func parsePromptScreenFor(agentType, capture string) (promptScreen, bool) {
 		s.Target = target
 	}
 	if !rv.Allowed() {
-		s.OnlyReject, s.Note = true, rv.Note()
+		s.OnlyReject, s.Note, s.Unreadable = true, rv.Note(), rv.Cut
 	} else if s.commandOpenMissing {
-		s.OnlyReject, s.Note = true, "The top of this request is not on the screen, so it cannot be read whole. It can only be rejected here: read it in the terminal."
+		s.OnlyReject, s.Unreadable = true, true
+		s.Note = "The top of this request is not on the screen, so Coral could not read it in full. Coral cannot answer it here: answer it in the agent's terminal."
 	}
 	return s, true
 }
@@ -896,6 +900,15 @@ func (h *SessionsHandler) readPromptScreenText(ctx context.Context, name, agentT
 			}
 		}
 	}
+	if ok && s.commandOpenMissing && agentType == at.Claude {
+		// No read shows the top of the request (the dialog is taller than the terminal and its top is in neither the pane's history nor the PTY's ring, #15492): the call the agent's hook reported before it asked may still be
+		// the whole request, when the screen's own part of it is that call's end.
+		if whole, wok := h.screenWithStoredRequest(sessionID, text); wok {
+			if ws, wsok := parseAgentScreen(agentType, whole); wsok && !ws.commandOpenMissing && sameQuestion(s, ws) {
+				s, text = ws, whole
+			}
+		}
+	}
 	if ok {
 		if agentType == at.Hermes && s.Kind == promptKindApproval {
 			applyHermesCommand(&s, h.hermesStoredCommand(ctx, sessionID)) // the screen drops a hidden character; Hermes's stored call has it (#12170)
@@ -1079,7 +1092,7 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	h.hints.forget(body.SessionID) // the prompt was answered: the next poll reads what replaced it
-	h.startupScreens.forget(promptReadKey(body.SessionID, name, body.AgentType))
+	h.forgetPromptReads(body.SessionID, name, body.AgentType)
 	cleared, err := h.confirmAnswer(r.Context(), name, body.AgentType, body.SessionID, screen, body.N, action)
 	if err != nil {
 		writeTerminalError(w, err)
@@ -1351,7 +1364,7 @@ func (h *SessionsHandler) submitMulti(w http.ResponseWriter, r *http.Request, na
 		writeTerminalError(w, err)
 		return
 	}
-	h.startupScreens.forget(promptReadKey(sessionID, name, agentType))
+	h.forgetPromptReads(sessionID, name, agentType)
 	cleared, err := h.confirmAnswer(r.Context(), name, agentType, sessionID, before, 0, "arrows")
 	if err != nil {
 		writeTerminalError(w, err)

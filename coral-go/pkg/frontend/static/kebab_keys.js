@@ -1,6 +1,9 @@
 /* The sidebar kebab menu's keys (#15445), loaded the first time a menu opens so none of it is in the start graph: Up, Down, Home and End move between the items, and Tab closes the menu and goes on from its button. */
 import { menuMove } from './menu_keys.js';
 import { closeSidebarKebabs } from './sidebar_menus.js';
+import { importOnce } from './import_once.js';
+
+importOnce('./menu_help.js').catch(() => {}); // what each item does (#15466): its own lazy module, so the keys below do not wait for its sheet
 
 document.addEventListener('keydown', e => {
     const menu = e.target.closest?.('.sidebar-kebab-menu');

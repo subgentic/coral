@@ -44,7 +44,7 @@ const RECORDER = `(() => {
             await ev(`try { localStorage.removeItem('coral-last-place'); } catch {} true`);
             const d = await open(1280, 800, false, path);
             if (path.startsWith('/board/')) { const made = await ev(`fetch('/api/board/' + ${JSON.stringify(GHOST)} + '/subscribers').then(r => r.ok ? r.json() : []).then(j => (Array.isArray(j) ? j : j.subscribers || []).length)`); assert.equal(made, 0, `${path}: a team that is not there is not made by opening its link (no subscriber was added): ${made}`); }
-            assert.equal(d.final.length, 1, `${path}: one current tab at the end: ${JSON.stringify(d)}`);
+            assert.equal(d.final.length, path.startsWith('/board/') ? 0 : 1, `${path}: ${path.startsWith('/board/') ? 'a team page marks no tab current (#15449), a missing team included' : 'one current tab at the end'}: ${JSON.stringify(d)}`);
             assert.deepEqual(d.seen, d.final, `${path}: only the tab it ends on was ever marked current: ${JSON.stringify(d)}`);
         }
         console.log('\nPASS the start tab is the only tab ever marked current');
