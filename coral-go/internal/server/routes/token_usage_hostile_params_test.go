@@ -87,6 +87,7 @@ func usageGet(t *testing.T, r http.Handler, route string, q url.Values, agent bo
 }
 
 func TestUsageRoutesNeverFiveHundredOnHostileParams(t *testing.T) {
+	t.Parallel() // its own handler and store, no shared state: it ran alone among thousands, one after another (#15686)
 	ts, r, _ := seriesRouter(t)
 	hostileSeed(t, ts)
 	rng := rand.New(rand.NewSource(95121))
@@ -154,6 +155,7 @@ func TestUsageRoutesNeverFiveHundredOnHostileParams(t *testing.T) {
 
 // On valid input the turns are the rows a plain SQL over the table gives, in the order asked, at the limit asked (the default 20, at most 200).
 func TestUsageTurnsRouteMatchesPlainSQL(t *testing.T) {
+	t.Parallel() // its own handler and store, no shared state: it ran alone among thousands, one after another (#15686)
 	ts, r, db := seriesRouter(t)
 	hostileSeed(t, ts)
 	type row struct {

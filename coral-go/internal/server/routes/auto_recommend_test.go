@@ -509,6 +509,7 @@ func TestAutoRecommendPicksNothingWhenTheNoticeWouldBeHeld(t *testing.T) {
 
 // A notice that is not typed after a pick is an agent event and the team line says so.
 func TestAutoRecommendSaysWhenTheAgentWasNotTold(t *testing.T) {
+	t.Parallel() // its own handler and store, no shared state: it ran alone among thousands, one after another (#15686)
 	r := newRecRig(t, "0012", recQuestion("Which color?", "Red (Recommended)", "Green"))
 	// the moment the pick is sent the terminal stops being the agent's foreground program, so the gate refuses the notice
 	r.term.onRaw = func(string) {

@@ -165,6 +165,7 @@ func corrGetJSON(t *testing.T, h http.HandlerFunc, target string, into any) {
 func near(a, b float64) bool { return math.Abs(a-b) <= 1e-6*math.Max(1, math.Abs(b)) }
 
 func TestAnalyticsRoutesMatchPlainSQL(t *testing.T) {
+	t.Parallel() // its own handler and store, no shared state: it ran alone among thousands, one after another (#15686)
 	now := time.Now().UTC().Truncate(time.Second)
 	db, th, eh, before := seedAnalytics(t, now)
 	t.Run("rolling raw rows up keeps every sum", func(t *testing.T) {

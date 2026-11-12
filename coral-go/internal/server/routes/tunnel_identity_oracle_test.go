@@ -55,6 +55,7 @@ func (erroringBody) Close() error             { return nil }
 // answer the same, call the handler the same (with the same hub user and body), record the same Operator action,
 // and ask operatorAllowed as often.
 func TestTunnelIdentityGuardAgreesWithBefore4756(t *testing.T) {
+	// serial: swaps the process-wide logger (parallel, two such tests could leave it silenced) (#15704)
 	_, handler := setupBoardTestServer(t)
 	bs := handler.bs
 	ctx := context.Background()
