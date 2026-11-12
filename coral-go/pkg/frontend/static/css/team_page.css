@@ -461,7 +461,7 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
 
 /* A phone's team page is a drill-down (#11236, #11239 slice B): ONE 56 px bar, the arrow at the left, the team's name with its status under it, ⋯ at the right (the More menu's actions), and a strip of every tab under it: no pill above, no
  * "Agents" for a title, no More tab. A desktop draws neither the arrow nor the dots. */
-.team-bar-back, .team-more-dots { display: none; }
+.team-bar-back, .team-more-dots, .team-phone-copy { display: none; }
 @media (max-width: 600px) {
     body.team-page-active header.top-bar { display: none; }
     .team-page-head { align-content: center; row-gap: 0; grid-template-columns: 44px minmax(0, 1fr) 44px; grid-template-rows: auto auto; align-items: center; padding: 0 4px; min-height: 56px; gap: 0 4px; border-bottom: 1px solid var(--border); }

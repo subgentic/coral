@@ -27,10 +27,18 @@ const { coralReady } = require('./helpers/wait');
             console.log(`${at}1. The team page has the robot beside its name`);
             await load(`/team/${B}`);
             await waitFor(`!!document.querySelector('#team-page-agent-copy')`, `${at}the robot on the team page`, 15000);
-            const t = await robotInfo('#team-page-agent-copy');
-            assert.ok(t.label === 'Copy for an agent' && t.title === 'Copy for an agent' && t.icon === 'smart_toy' && t.text === '' && t.within, at + 'an icon only, named: ' + JSON.stringify(t));
-            assert.ok(mobile ? t.w >= 44 && t.h >= 44 : t.w === 32 && t.h === 32, at + 'a 32 px square (44 on a phone): ' + JSON.stringify(t));
-            await clip(); await ev(`document.querySelector('#team-page-agent-copy').click(); true`);
+            await clip();
+            if (mobile) {
+                assert.equal(await ev(`document.getElementById('team-page-agent-copy').getClientRects().length`), 0, at + 'the phone header keeps one action; Copy is in More');
+                await ev(`document.getElementById('team-page-more').click(); true`);
+                await waitFor(`document.querySelector('.team-phone-copy').getClientRects().length > 0`, at + 'Copy in More');
+                await ev(`document.querySelector('.team-phone-copy').click(); true`);
+            } else {
+                const t = await robotInfo('#team-page-agent-copy');
+                assert.ok(t.label === 'Copy for an agent' && t.title === 'Copy for an agent' && t.icon === 'smart_toy' && t.text === '' && t.within, at + 'an icon only, named: ' + JSON.stringify(t));
+                assert.ok(t.w === 32 && t.h === 32, at + 'a 32 px square: ' + JSON.stringify(t));
+                await ev(`document.querySelector('#team-page-agent-copy').click(); true`);
+            }
             await waitFor(`window.__copied.length === 1`, `${at}the text copied`, 8000);
             const copied = (await ev(`window.__copied[0]`));
             assert.ok(copied.includes(B) && /coral-board read/.test(copied) && /\nDocs: coral-agent docs board, section “Messages”$/.test(copied), at + 'the team, its command, then the docs: ' + JSON.stringify(copied));

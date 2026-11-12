@@ -179,7 +179,9 @@ function buildMore() {
     const settings = el('button', 'menu-item team-more-add team-more-settings', 'Settings'); settings.type = 'button'; settings.id = 'team-page-more-settings';
     settings.addEventListener('click', () => { openSettings(); });
     const tpl = Object.assign(el('button', 'menu-item', 'Save as template'), { type: 'button', id: 'team-page-more-template', onclick: () => window.saveTeamFromSidebar?.(S.team) });
-    menu.append(add, settings, tpl);
+    const copy = el('button', 'menu-item team-phone-copy', 'Copy for an agent'); copy.type = 'button';
+    copy.addEventListener('click', () => $('team-page-agent-copy')?.click());
+    menu.append(add, settings, tpl, copy);
     host.append(b, menu);
     const set = (open, { focus = false } = {}) => { moreOpen = open; menu.hidden = !open; b.setAttribute('aria-expanded', String(open)); if (open) menu.querySelector('button:not([hidden])')?.focus(); else if (focus) b.focus(); };
     b.addEventListener('click', () => { syncStop(); set(!moreOpen); }); // the Stop items in it follow the team (asleep or not) each time it opens

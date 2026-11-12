@@ -1378,6 +1378,7 @@
     .nav-more-menu.nav-drawer .nav-drawer-folder.is-current { font-weight: var(--fw-strong, 600); box-shadow: inset 3px 0 0 var(--accent); background: var(--bg-hover, var(--bg-secondary)); } /* the open folder (#13596) */
     .list-bar-search-wrap.phone-searched { display: none; } /* the pill is this page's search field (#13591) */
     .list-bar-search-row:has(> .phone-searched) { justify-content: flex-end; } /* the Filters icon keeps the right end of the row, where it sat beside the box */
+    .phone-inbox-bar .phone-bar-search { padding-inline: 3px; } /* its text shares the Inbox cards' 12 px left edge */
     .phone-bar .phone-bar-search:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
     header.top-bar > .phone-bar { display: grid; }
     header.top-bar > :not(.phone-bar) { display: none !important; } /* the old pill, the views menu, Home and the gear: the one bar replaces them on a phone */
@@ -1515,7 +1516,9 @@
     .team-page #team-page-head .team-bar-back { grid-row: 1; }
     .team-page #team-page-head .team-page-actions { grid-row: 1; grid-column: 3; }
     .team-page-head .team-page-title { line-height: var(--lh-body); }
-    .team-page #team-page-head > .team-page-agent-copy { grid-row: 2; grid-column: 3; }
+    .team-page #team-page-head > .team-page-agent-copy { display: none; }
+    .team-page #team-page-head .team-phone-copy { display: flex; }
+    .team-page #team-page-head .team-page-status { align-self: start; }
     .team-page #team-page-head > .team-bar-needs { grid-row: 2; grid-column: 1; justify-self: center; }
     body.live-session-active:not(.popout-mode) .terminal-header:not([data-more]) :is(.live-view-switch, .notice-pause-btn, .terminal-session-context) { display: none !important; }
     body.live-session-active:not(.popout-mode) .terminal-back-btn { display: inline-flex; align-items: center; justify-content: center; height: 44px; padding: 0; line-height: 1; }

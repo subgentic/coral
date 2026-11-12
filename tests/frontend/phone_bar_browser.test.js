@@ -59,6 +59,13 @@ const TEAM = `header-${Date.now() % 100000}`;
             await ev(`window.switchNavTab('agents'); window.openTeamPage(${JSON.stringify(TEAM)}, { tab: 'agents' }); true`);
             await waitFor(`document.getElementById('team-page-title').textContent === ${JSON.stringify(TEAM)}`, 'team header'); await settle(200);
             await check(tag, 'Team', '#team-page-head', '.team-bar-back', '.team-page-title', '#team-page-more');
+            assert.equal(await ev(`document.getElementById('team-page-agent-copy').getClientRects().length`), 0, tag + ': the copy action is in More');
+            await ev(`window.__headerCopy = []; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: text => { window.__headerCopy.push(text); return Promise.resolve(); } } }); document.getElementById('team-page-more').click(); true`);
+            await waitFor(`document.querySelector('.team-phone-copy').getClientRects().length > 0`, 'Copy for an agent in More');
+            await ev(`document.querySelector('.team-phone-copy').click(); true`);
+            await waitFor(`window.__headerCopy.length === 1`, 'the team copy action still copies');
+            assert.match(await ev(`window.__headerCopy[0]`), /coral-board read/);
+
             await ev(`window.selectLiveSession('Orchestrator', 'claude', 'sid-1', 'local').then(() => true)`); await settle(200);
             await check(tag, 'Chat', '#live-session-view .terminal-header', '.terminal-back-btn', '.terminal-session-label', '.agent-bar-more');
             await ev(`document.getElementById('agent-bar-more').click(); true`);

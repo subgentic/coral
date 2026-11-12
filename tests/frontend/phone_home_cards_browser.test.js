@@ -55,8 +55,7 @@ const { coralReady } = require('./helpers/wait');
             // one read for the three boxes: separate reads can straddle a layout change (the Linux gate saw the menu 59 px above the pill, #15594)
             const { menu, pill, acct } = await ev(`(() => { const b = s => { const r = document.querySelector('#mobile-agent-list ' + s).getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), b: Math.round(r.bottom), w: Math.round(r.width), h: Math.round(r.height) }; }; return { menu: b('.phone-menu-btn'), pill: b('.mobile-search-input'), acct: b('.phone-account-btn') }; })()`);
             assert.ok(menu.w >= 44 && menu.h >= 44 && acct.w >= 44 && acct.h >= 44 && pill.h >= 44, `${tag}: menu, search pill and account are 44 px targets: ` + JSON.stringify({ menu, pill, acct }));
-            assert.ok(Math.abs((menu.t + menu.b) / 2 - (pill.t + pill.b) / 2) <= 3 && Math.abs((acct.t + acct.b) / 2 - (pill.t + pill.b) / 2) <= 3, `${tag}: one row: ` + JSON.stringify({ menu, pill, acct }));
-            assert.ok(menu.r <= pill.l && pill.r <= acct.l && acct.r <= 390, `${tag}: menu, pill and account side by side, inside the screen`);
+            assert.ok(Math.abs(menu.t - acct.t) <= 2 && pill.t >= menu.b && pill.l >= 0 && pill.r <= 390, `${tag}: navigation and account share the first row, search sits below inside the screen: ` + JSON.stringify({ menu, pill, acct }));
             assert.match(await ev(`document.querySelector('#mobile-agent-list .mobile-search-input').placeholder`), /Search agents and messages/, `${tag}: the pill says what it searches`);
             const chips = await ev(`[...document.querySelectorAll('#mobile-agent-list .phone-chip')].filter(c => !c.hidden).map(c => c.textContent.trim())`);
             assert.deepEqual(chips, ['1 need you', '1 working'], `${tag}: the chips count the feed`);
