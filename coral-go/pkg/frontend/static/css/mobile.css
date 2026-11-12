@@ -1337,7 +1337,7 @@
     body.live-session-active:not(.popout-mode) .agent-bar-more { display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 44px; min-height: 44px; }
     body.live-session-active:not(.popout-mode) .terminal-state-pill { display: none; } /* the header draws only the dot, named with the state (aria-label, title): no word (the operator, #9927; the Orchestrator, #11056) */
     body.live-session-active:not(.popout-mode) .terminal-identity { display: flex; flex-direction: column; justify-content: center; flex: 1 1 0; min-width: var(--control-touch-height, 44px); }
-    body.live-session-active:not(.popout-mode) .terminal-session-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 0; font-size: var(--fs-xl); line-height: 1.5; }
+    body.live-session-active:not(.popout-mode) .terminal-session-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 0; font-size: var(--fs-xl); line-height: var(--lh-body); }
     body.live-session-active:not(.popout-mode) .terminal-session-context { margin-left: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     body.live-session-active:not(.popout-mode) .terminal-header .live-view-toggle { display: none; } /* Chat and Terminal are one button here (#11187, the operator): it shows the view it goes to, and the dots' second line has it with its words */
     body.live-session-active:not(.popout-mode) .terminal-header .live-view-switch:not([hidden]) { display: inline-flex; order: 2; margin-left: 0; min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); align-items: center; justify-content: center; }
@@ -1371,7 +1371,7 @@
     .phone-bar .phone-menu-btn { grid-column: 1; grid-row: 1; }
     #mobile-agent-list .mobile-search-row { order: 1; flex: 1 1 0; min-width: 0; }
     .phone-bar, #mobile-agent-list .phone-bar { order: 0; display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; grid-template-rows: 48px; align-items: center; gap: 0 4px; flex: 1 0 100%; min-width: 0; }
-    .phone-bar .phone-bar-title { display: block; grid-column: 2; grid-row: 1; margin: 0; padding: 0; border: 0; background: none; color: var(--text-primary); font-size: var(--fs-xl); font-weight: var(--fw-strong); line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+    .phone-bar .phone-bar-title { display: block; grid-column: 2; grid-row: 1; margin: 0; padding: 0; border: 0; background: none; color: var(--text-primary); font-size: var(--fs-xl); font-weight: var(--fw-strong); line-height: var(--lh-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
     .phone-bar .phone-bar-title-text { display: block; overflow: hidden; text-overflow: ellipsis; }
     .phone-bar .phone-bar-search, #mobile-agent-list .phone-bar-search-row { grid-column: 1 / -1; grid-row: 2; width: 100%; min-width: 0; box-sizing: border-box; margin: 4px 0 0; }
     .phone-bar .phone-bar-search { min-height: 44px; padding: 8px 12px; border: 1px solid var(--control-border); border-radius: var(--radius-lg); background: var(--bg-primary); color: var(--text-primary); font: inherit; }
@@ -1514,7 +1514,7 @@
     .team-page #team-page-head { grid-template-columns: 44px minmax(0, 1fr) 44px; grid-template-rows: 48px auto; align-content: start; min-height: 48px; padding-inline: 8px; }
     .team-page #team-page-head .team-bar-back { grid-row: 1; }
     .team-page #team-page-head .team-page-actions { grid-row: 1; grid-column: 3; }
-    .team-page-head .team-page-title { line-height: 1.5; }
+    .team-page-head .team-page-title { line-height: var(--lh-body); }
     .team-page #team-page-head > .team-page-agent-copy { grid-row: 2; grid-column: 3; }
     .team-page #team-page-head > .team-bar-needs { grid-row: 2; grid-column: 1; justify-self: center; }
     body.live-session-active:not(.popout-mode) .terminal-header:not([data-more]) :is(.live-view-switch, .notice-pause-btn, .terminal-session-context) { display: none !important; }
