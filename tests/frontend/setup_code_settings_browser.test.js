@@ -8,6 +8,7 @@ const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
+    const guard = await require('./helpers/settings_guard').guardSettings();
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     try {
@@ -52,7 +53,8 @@ const { coralReady } = require('./helpers/wait');
                 check(`${tag}: ${what}: the group is not there`, !c.shown, JSON.stringify(c));
             }
         }
-    } finally { await client.close(); }
+    } finally { try { await waitFor(`!document.querySelector('#settings-modal [data-saving="1"]')`, 'pending row saves finish before restoring settings'); }
+        finally { await client.close(); await guard.restore(); } }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
     console.log(`\nAll ${results.length} setup code checks passed`);
 })().catch(e => { console.error(e); process.exit(1); });
