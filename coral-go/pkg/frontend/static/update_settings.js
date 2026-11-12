@@ -1,6 +1,6 @@
 import { plural } from './format.js';
 /* Settings > Updates (#5275, design #5270): one status card (a dot, a line, a sentence, the action), the two switches, when it last looked, the version, and where Coral reaches. The pane is
- * drawn from the status each time it is shown. The switches are saved with Apply like the rest of Settings (applyUpdatePrefs); the card's buttons act at once: "Update and relaunch" opens the
+ * drawn from the status each time it is shown. The switches and channel save on change; the card's buttons act at once: "Update and relaunch" opens the
  * confirmation (a dialog over this one), "Check now" asks the updater to look. A Homebrew or unsupported install says so and why, with the command to run. */
 import { importOnce } from './import_once.js';
 import { isSignedOut } from './overload.js';
@@ -106,7 +106,7 @@ const ago = (d) => (d === null ? '' : d < 1 ? 'earlier today' : `${plural(d, 'da
 function channelFields(s) {
     if (inHub()) return [{ key: 'channel', type: 'custom', id: 'update-channel', label: 'Update channel', render: slot => { slot.classList.add('update-fact'); slot.textContent = `${s.channel === 'agentic' ? 'Agentic' : 'Approved'} (set on this computer)`; } }];
     const out = [{
-        key: 'update-channel', type: 'radio', id: 'update-channel', wide: true, label: 'Update channel', help: 'Which releases Coral tells you about. Saved with Apply.', default: s.channel,
+        key: 'update-channel', type: 'radio', id: 'update-channel', wide: true, label: 'Update channel', help: 'Which releases Coral tells you about.', default: s.channel,
         options: [
             { value: 'approved', id: 'uc-approved', label: 'Approved (recommended)', help: 'Releases the team has approved.' },
             { value: 'agentic', id: 'uc-agentic', label: 'Agentic (every release)', help: 'Every release as soon as it is published, including ones not yet approved. These may change faster and be less tested.' },
@@ -204,7 +204,7 @@ export async function showUpdatesPane() {
     group.addEventListener('change', sync); sync();
 }
 
-/** Save what the pane changed, with Apply: "Check for updates automatically" and the update channel (each only when it changed; a no-op when the pane was not drawn). Returns true when something was saved. */
+/** Legacy combined-save probe: save what the pane changed: "Check for updates automatically" and the update channel (each only when it changed; a no-op when the pane was not drawn). Returns true when something was saved. */
 export async function applyUpdatePrefs() {
     const s = getUpdateStatus();
     if (isCloud() || !s) return false;
@@ -234,4 +234,15 @@ function redrawWhenFactsArrive(i) {
         if (body() && picked && picked.value === 'agentic') await showUpdatesPane();
         redrawWhenFactsArrive(i + 1);
     }, RETRY_MS[i]);
+}
+
+/** Save the edited preference without submitting other rows. */
+export async function saveUpdateRow(id) {
+    const s = getUpdateStatus();
+    if (!s || isCloud()) throw new Error('Updates unavailable');
+    if (id === 'settings-update-auto') { const v = document.getElementById(id).checked; await savePrefs({auto:v},{auto:s.auto}); s.auto=v; }
+    else if (id === 'settings-update-auto-install') { const v=document.getElementById(id).checked; await saveAutoInstall(v); s.autoInstall.on=v; }
+    else { const v=document.getElementById(id).value; await saveChannel(v); s.channel=v; }
+    // Update the facts without replacing the focused control or its row status.
+    refreshUpdateStatus().catch(() => {});
 }

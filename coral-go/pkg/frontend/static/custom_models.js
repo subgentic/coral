@@ -1,6 +1,6 @@
 /* Settings > Agents > Custom models (#5480): the model ids a person adds by hand for a provider, and the thinking levels each accepts. They are kept on this computer (GET and PUT /api/custom-models,
  * Operator only: the PUT replaces the whole list in one step) and the server adds them to the one catalog every model picker reads (GET /api/agent-models), so launch, team, workflow steps, the defaults and a running agent's model switcher all
- * show them. The form edits a draft and Apply saves it with the rest of Settings (applyCustomModels), the same way the update switches are saved. The server checks every id and level again; the
+ * show them. The form edits a draft; Add model, Update model and Remove save that action immediately. The server checks every id and level again; the
  * id rule here only lets the form say what is wrong before the save. */
 import { requestJson } from './api.js';
 import { mountSettingsView } from './settings_view.js';
@@ -57,7 +57,7 @@ function canonical(models) { const d = draft; draft = models; const p = customMo
 
 function status() {
     const s = host && host.querySelector('.cm-status');
-    if (s) s.textContent = customModelsDirty() ? 'Unsaved changes. Apply to save.' : '';
+    if (s) s.textContent = '';
 }
 
 function chips(m) {
@@ -89,11 +89,12 @@ function form(startProvider, index) {
     }
     const view = mountSettingsView(box, { mode: 'form', fields, form: {
         submit: index >= 0 ? 'Update model' : 'Add model', cancel: 'Cancel',
-        onSubmit: values => {
+        onSubmit: async values => {
             const provider = providerOf(values);
             const entry = { value: String(values.value).trim(), display_name: String(values.display_name || '').trim().slice(0, MAX_NAME), efforts: [...(values[`efforts_${provider}`] || [])] };
             if (index >= 0) rows(provider)[index] = entry; else rows(provider).push(entry);
-            editing = null; render(); focusAfter(provider, index >= 0 ? index : rows(provider).length - 1);
+            try { await applyCustomModels(); feedback('Saved'); focusAfter(provider, index >= 0 ? index : rows(provider).length - 1); }
+            catch { draft=clone(saved); editing=null; render(); feedback('Not saved. Try again.'); }
         },
         onCancel: () => { editing = null; render(); focusAdd(); },
     } });
@@ -117,7 +118,10 @@ function render() {
         const edit = mk('button', 'btn btn-small', 'Edit'); edit.type = 'button'; edit.dataset.cmEdit = `${provider}:${i}`; edit.setAttribute('aria-label', `Edit ${m.value}`);
         edit.addEventListener('click', () => { editing = { provider, index: i }; render(); });
         const rm = mk('button', 'btn btn-small', 'Remove'); rm.type = 'button'; rm.setAttribute('aria-label', `Remove ${m.value}`);
-        rm.addEventListener('click', () => { rows(provider).splice(i, 1); if (editing && editing.provider === provider) editing = null; render(); focusAdd(); });
+        rm.addEventListener('click', async () => { rm.disabled=true; rows(provider).splice(i, 1); if (editing && editing.provider === provider) editing = null;
+            try { await applyCustomModels(); feedback('Saved'); focusAdd(); }
+            catch { draft=clone(saved); render(); feedback('Not saved. Try again.'); }
+        });
         li.append(text, chips(m), edit, rm); list.append(li);
     });
     const adding = editing && editing.index === -1;
@@ -151,7 +155,7 @@ export async function initCustomModels() {
     render();
 }
 
-/** Saves the draft when it changed (Apply). Resolves true when something was saved; throws with the server's reason when it refuses. */
+/** Saves the draft when it changed. Resolves true when something was saved; throws with the server's reason when it refuses. */
 export async function applyCustomModels() {
     if (!customModelsDirty()) return false;
     let data;
@@ -170,4 +174,13 @@ export async function applyCustomModels() {
 export function discardCustomModels() {
     draft = clone(saved); editing = null;
     if (host) render();
+}
+
+let feedbackTimer;
+function feedback(words) {
+    clearTimeout(feedbackTimer);
+    const s=host?.querySelector('.cm-status');
+    if (!s) return;
+    s.textContent=words;
+    if (words === 'Saved') feedbackTimer=setTimeout(()=>{s.textContent='';},2000);
 }

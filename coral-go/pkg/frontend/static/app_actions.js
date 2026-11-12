@@ -37,7 +37,7 @@ import { _handleTeamFolderImport, _importTeamFromFolder } from './team_folder_im
 import { closeSidebarKebabs, closeTopBarSettings, toggleSidebarKebab, toggleTopBarSettings } from './sidebar_menus.js';
 import { loadHistoryPage } from './history_filters.js';
 import { switchNavTab } from './app_navigation.js';
-import { selectWorkflow, selectWorkflowRun, showWorkflowCreateModal, hideWorkflowCreateModal, launchWorkflowAgent, showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged, openTeamPage, exitTeamPage, showTeamWorkingModeWorkspace, showTeamLinkDialog, showDocsTab, selectDoc, showThemeConfigurator, hideThemeConfigurator, showLaunchModal, hideLaunchModal, launchSession, showSettingsModal, hideSettingsModal, applySettings, toggleFlag, showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal, exportPersonas, importPersonas, importTeamTemplates, exportTeamTemplate, showResumeModal, hideResumeModal, resumeLaunchNew, syncResumeModeNote, showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts } from './app_panels.js';
+import { selectWorkflow, selectWorkflowRun, showWorkflowCreateModal, hideWorkflowCreateModal, launchWorkflowAgent, showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged, openTeamPage, exitTeamPage, showTeamWorkingModeWorkspace, showTeamLinkDialog, showDocsTab, selectDoc, showThemeConfigurator, hideThemeConfigurator, showLaunchModal, hideLaunchModal, launchSession, showSettingsModal, hideSettingsModal, toggleFlag, showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal, exportPersonas, importPersonas, importTeamTemplates, exportTeamTemplate, showResumeModal, hideResumeModal, resumeLaunchNew, syncResumeModeNote, showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts } from './app_panels.js';
 import { MENU_KEYS, menuMove } from './menu_keys.js';
 
 // The New job form (job_form.js, about 28 KB) loads when a person first opens it, not at start (#10218): these are the same calls, answered once the file is in.
@@ -98,7 +98,6 @@ registerActions({
 });
 
 registerActions({
-    'm-apply-settings': el => { window.applySettings(); },
     'm-browser-navigate-up': el => { window.browserNavigateUp(); },
     'm-browser-use': el => { window.browserUse(); },
     'm-confirm-restart': el => { window.confirmRestart(); },
@@ -302,7 +301,7 @@ Object.assign(window, {
     editGoal, refreshGoal,
     hideRestartModal, confirmRestart, 
     // modals
-    showSettingsModal, hideSettingsModal, applySettings,
+    showSettingsModal, hideSettingsModal,
     showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts,
     showLaunchModal, hideLaunchModal, launchSession, toggleFlag,
     hideResumeModal, resumeLaunchNew, syncResumeModeNote,

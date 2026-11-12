@@ -54,11 +54,11 @@ const { coralReady } = require('./helpers/wait');
             check(`${tag}: the focus went to its first button when the answer came to the person's own Kill (it is last in Tab order)`, b.focus === (big ? 'Worktree kept' : 'Copy path'), String(b.focus));
             // layout: it overlaps neither the top bar nor Settings' Save and Cancel (Settings open, the bar in the page under its overlay)
             await ev(`window.showSettingsModal('general'); true`);
-            await waitFor(`!!document.getElementById('settings-save-btn') && document.getElementById('settings-save-btn').getClientRects().length > 0`, 'Settings', 8000);
+            await waitFor(`!!document.getElementById('settings-cancel-btn') && document.getElementById('settings-cancel-btn').getClientRects().length > 0`, 'Settings', 8000);
             await sleep(400); // sleep-ok: the dialog lays out
             const lay = await ev(`(() => { const r = s => { const e = document.querySelector(s); if (!e || !e.getClientRects().length) return null; const b = e.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, left: b.left, right: b.right }; }; const dk = r('#worktree-dock'); const hit = (a, c) => a && c && a.left < c.right - 0.5 && a.right > c.left + 0.5 && a.top < c.bottom - 0.5 && a.bottom > c.top + 0.5;
                 const cancel = [...document.querySelectorAll('#settings-modal button')].find(x => /^Cancel$/.test(x.textContent.trim())); const cr = cancel && cancel.getBoundingClientRect();
-                return { dock: dk, topbar: r('.top-bar'), save: r('#settings-save-btn'), overlapsTop: hit(dk, r('.top-bar')), overlapsSave: hit(dk, r('#settings-save-btn')), overlapsCancel: !!cr && hit(dk, { top: cr.top, bottom: cr.bottom, left: cr.left, right: cr.right }), height: dk ? Math.round(dk.bottom - dk.top) : null, vh: innerHeight }; })()`);
+                return { dock: dk, topbar: r('.top-bar'), save: r('#settings-cancel-btn'), overlapsTop: hit(dk, r('.top-bar')), overlapsSave: hit(dk, r('#settings-cancel-btn')), overlapsCancel: !!cr && hit(dk, { top: cr.top, bottom: cr.bottom, left: cr.left, right: cr.right }), height: dk ? Math.round(dk.bottom - dk.top) : null, vh: innerHeight }; })()`);
             check(`${tag}: the bar covers neither the top bar nor Settings' Save and Cancel, and is ${big ? 'at most 100' : 'at most 70'} px tall`, lay.dock && !lay.overlapsTop && !lay.overlapsSave && !lay.overlapsCancel && lay.height <= (big ? 100 : 70), JSON.stringify(lay));
             await shot(`worktree-bar-settings-${pct}`);
             await ev(`window.hideSettingsModal && window.hideSettingsModal(); true`);

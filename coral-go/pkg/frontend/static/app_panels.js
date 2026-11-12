@@ -29,7 +29,7 @@ export const {
 } = lazyFns(loadModals, [
     'showLaunchModal', 'hideLaunchModal', 'launchSession', 'toggleFlag', 'showAddAgentToBoard', 'launchTerminalToBoard', 'launchDefaultAgent', 'showAddStandaloneAgent', 'launchStandaloneTerminal', 'exportPersonas', 'importPersonas', 'importTeamTemplates', 'exportTeamTemplate']);
 
-export const { showSettingsModal, hideSettingsModal, applySettings } = lazyFns(loadSettingsDialog, ['showSettingsModal', 'hideSettingsModal', 'applySettings']);
+export const { showSettingsModal, hideSettingsModal } = lazyFns(loadSettingsDialog, ['showSettingsModal', 'hideSettingsModal']);
 
 export const { showResumeModal, hideResumeModal, resumeLaunchNew, syncResumeModeNote } = lazyFns(loadResumeDialog, ['showResumeModal', 'hideResumeModal', 'resumeLaunchNew', 'syncResumeModeNote']);
 

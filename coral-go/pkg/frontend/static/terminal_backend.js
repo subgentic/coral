@@ -52,7 +52,7 @@ function renderPending() {
     if (st.forced) {
         note.textContent = `This run was started with --backend ${st.running}, which wins over this setting.`;
     } else if (want && want !== st.running) {
-        note.textContent = `Switches to ${want} when Coral restarts. Apply asks first.`;
+        note.textContent = `Switches to ${want} when Coral restarts. Changing backend asks first.`;
     } else {
         note.textContent = ''; // always in the page, only its text changes: a status that appears with its words is often not read
     }
@@ -176,6 +176,24 @@ export async function applyTerminalBackendChange() {
     }
     // Going back to the backend this run already uses: just save it.
     return saveAndRestart(want);
+}
+
+/** Main Settings saves wake rows independently; a backend change keeps its existing confirmation. */
+export async function saveTerminalRow(id) {
+    if (id === 'tb-choice') {
+        const ok = await applyTerminalBackendChange();
+        if (ok && _status) { _status.saved = picked(); _status.next = picked(); }
+        renderPending(); return ok;
+    }
+    if (!_autoWakeShown) return false;
+    const key = id === 'tb-autowake-on' ? 'auto_wake_after_restart' : 'auto_wake_cap';
+    const value = key === 'auto_wake_cap' ? Number($('tb-autowake-cap').value) : $('tb-autowake-on').checked;
+    if (key === 'auto_wake_cap' && (!Number.isInteger(value) || value < 1 || value > 50)) return false;
+    const resp = await fetch('/api/settings', { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({[key]:value}) });
+    if (!resp.ok) throw new Error('Wake setting not saved');
+    state.settings = {...state.settings,[key]:String(value)};
+    if (key === 'auto_wake_cap') _autoWakeShown.cap=value; else _autoWakeShown.on=value;
+    return true;
 }
 
 // ── Agents left in Coral's old tmux server (under pty) ───────────────────
