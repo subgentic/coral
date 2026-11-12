@@ -103,4 +103,5 @@ const (
 func (h *SessionsHandler) forgetPromptReads(sessionID, name, agentType string) {
 	h.startupScreens.forget(promptReadKey(sessionID, name, agentType))
 	h.startupScreens.forget(promptReadKey(sessionID, name, agentType) + rateLimitReadSuffix)
+	h.startupScreens.forget(promptReadKey(sessionID, name, agentType) + startupReadySuffix)
 }
