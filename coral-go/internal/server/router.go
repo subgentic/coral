@@ -490,9 +490,10 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Post("/api/sessions/live/{name}/dismiss-wait", sessHandler.DismissWait)
 	r.Post("/api/sessions/live/{name}/auto-sleep", sessHandler.AutoSleepOpt)
 	r.Post("/api/sessions/live/{name}/keep-full-access", sessHandler.KeepFullAccessOpt)
-	r.Get("/api/launch-disclosure", sessHandler.GetLaunchDisclosure)          // #14353: the first-launch notice, owner only
-	r.Post("/api/launch-disclosure/ack", sessHandler.AckLaunchDisclosure)     // the owner has read it
-	r.Delete("/api/launch-disclosure/ack", sessHandler.ClearLaunchDisclosure) // only the owner takes that back
+	r.Get("/api/launch-disclosure", sessHandler.GetLaunchDisclosure)                                          // #14353: the first-launch notice, owner only
+	r.Post("/api/launch-disclosure/ack", sessHandler.AckLaunchDisclosure)                                     // the owner has read it
+	r.With(routes.RefuseSignInLink).Post("/api/launch/permission-args", sessHandler.PostLaunchPermissionArgs) // #15719: what a launch would add for the chosen permissions (the New agent dialog shows it)
+	r.Delete("/api/launch-disclosure/ack", sessHandler.ClearLaunchDisclosure)                                 // only the owner takes that back
 	r.Get("/api/sessions/live/{name}/events/counts", sessHandler.EventCounts)
 	r.Delete("/api/sessions/live/{name}/events", sessHandler.ClearEvents)
 	r.Post("/api/sessions/live/{name}/token-usage", sessHandler.RecordTokenUsage)

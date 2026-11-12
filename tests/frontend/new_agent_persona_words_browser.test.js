@@ -7,7 +7,7 @@ const { connect } = require('./agent_view_harness');
 const { install: installNA, N, openNewAgent, stubModels } = require('./helpers/new_agent');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
-const WORD_BUDGET = Number(process.env.PERSONA_WORD_BUDGET || 38);
+const WORD_BUDGET = Number(process.env.PERSONA_WORD_BUDGET || 42); // 38 before #15719's flags line ("Adds ... to the command.", four words) joined the step: that line is the Operator's ask, so the budget grew by exactly its words;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();

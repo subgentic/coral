@@ -332,6 +332,7 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/launch-disclosure":                                       "read the first-launch notice",
 	"POST /api/launch-disclosure/ack":                                  "acknowledge the first-launch notice",
 	"DELETE /api/launch-disclosure/ack":                                "take back the acknowledgement of the first-launch notice",
+	"POST /api/launch/permission-args":                                 "ask what a launch with a chosen permission mode would add to the command line (#15719)",
 	// #7554: Send now types the messages held for an agent at once (text into another agent's terminal, as keys does), and the list says who sent them: the Operator's.
 	"GET /api/sessions/live/{name}/waiting":                           "see what waits for an agent",
 	"POST /api/sessions/live/{name}/waiting/send":                     "type an agent's board nudge now",

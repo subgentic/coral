@@ -54,9 +54,26 @@ async function showRestartModal() {
         });
     }
 
+    wireRestartFlags();
     restartStage('persona'); // Restart always opens on step 1
     document.getElementById("restart-modal").style.display = "flex";
     document.querySelector('#restart-modal .acf-prompt')?.focus();
+}
+
+/** Settings step: the flags a restart adds for the chosen permissions, and why they are not the pick's own (#15761; the same preview call as New agent's, so the two never differ). Drawn on the settings step only, where the permissions are. */
+let restartFlagsSync = null;
+async function wireRestartFlags() {
+    const acf = document.getElementById('restart-acf'), el = document.getElementById('restart-flags');
+    if (!acf || !el) return;
+    const { flagsLine } = await importOnce('./permission_flags_line.js');
+    if (!restartFlagsSync) restartFlagsSync = flagsLine(el, () => {
+        if (document.getElementById('restart-wizard')?.dataset.stage !== 'agent') return null;
+        const cfg = window.getAgentConfig?.('restart-acf');
+        if (!cfg || !cfg.agentType || cfg.agentType === 'terminal') return null;
+        return { agent_type: cfg.agentType, permission_mode: cfg.permissionMode || '', flags: String(cfg.flags || '').split(/\s+/).filter(Boolean), keep_full_access: !!cfg.useFullAccess, ...(cfg.capabilities ? { capabilities: cfg.capabilities } : {}) };
+    }, () => sessionServer(state.currentSession));
+    if (!acf.dataset.flagsWired) { acf.dataset.flagsWired = '1'; for (const t of ['input', 'change', 'acf-synced']) acf.addEventListener(t, () => restartFlagsSync()); }
+    restartFlagsSync();
 }
 
 const RESTART_STAGES = ['persona', 'agent'];
@@ -80,6 +97,7 @@ export function restartStage(arg) {
     document.getElementById('restart-next').hidden = to === 'agent';
     document.getElementById('restart-go').hidden = to !== 'agent' && !launchFlags.launchFromAnyStep; // Restart is shown after Next, as New Agent's Launch is (#7779, the operator: "click next before showing the relaunch option")
     const live = document.getElementById('restart-stage-live'); if (live) live.textContent = sub;
+    restartFlagsSync?.(); // shown on the settings step, hidden on the persona step
     const modal = document.getElementById('restart-modal');
     if (to === 'agent') importOnce('./quiet_focus.js').then(m => m.quietFocus(modal), () => {}); // the selected tab takes the focus: no ring until a key is pressed (#7391)
     (to === 'persona' ? modal.querySelector('.acf-prompt') : sectionFocus(modal))?.focus();

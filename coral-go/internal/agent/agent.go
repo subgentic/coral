@@ -31,19 +31,20 @@ type LaunchParams struct {
 	Prompt           string
 	// NoStartPrompt: this launch resumes a conversation that already has its first prompt, and what woke it says what to do: the CLI is started without the first message (auto-wake, #12358). The role
 	// still reaches a Claude agent through its system prompt, and every agent through its board protocol.
-	NoStartPrompt   bool
-	OneShot         bool              // run once and exit: Pi's --print --no-session with Prompt as its argument (a scheduled job, #11293); other CLIs ignore it
-	PromptOverrides map[string]string // user overrides for orchestrator/worker prompts
-	BoardType       string
-	Capabilities    *Capabilities
-	Tools           []string               // allowed tools (e.g. ["TodoWrite", "Bash(npm *)"])
-	Hooks           map[string]interface{} // per-agent hooks to merge into settings (Claude-native) or fire via runner (Antigravity/Codex)
-	CLIPath         string                 // custom path to agent binary (empty = default from PATH)
-	PermissionMode  string                 // --permission-mode value (empty or "default" means omit the flag)
-	KeepFullAccess  bool                   // the Operator's "Keep Full access when this agent restarts" for a Codex agent (#14061): every launch is the bypass switch alone, whatever the capabilities, the mode and the stored flags say
-	CoralDir        string                 // path to coral data directory (~/.coral) for CA cert location
-	CoralHost       string                 // host this Coral server is bound to
-	CoralPort       int                    // port this Coral server is listening on
+	NoStartPrompt     bool
+	OneShot           bool              // run once and exit: Pi's --print --no-session with Prompt as its argument (a scheduled job, #11293); other CLIs ignore it
+	PromptOverrides   map[string]string // user overrides for orchestrator/worker prompts
+	BoardType         string
+	Capabilities      *Capabilities
+	Tools             []string               // allowed tools (e.g. ["TodoWrite", "Bash(npm *)"])
+	Hooks             map[string]interface{} // per-agent hooks to merge into settings (Claude-native) or fire via runner (Antigravity/Codex)
+	CLIPath           string                 // custom path to agent binary (empty = default from PATH)
+	PermissionMode    string                 // --permission-mode value (empty or "default" means omit the flag)
+	KeepFullAccess    bool                   // the Operator's "Keep Full access when this agent restarts" for a Codex agent (#14061): every launch is the bypass switch alone, whatever the capabilities, the mode and the stored flags say
+	PermissionPreview bool                   // LaunchPermissionArgs (#15719): only the permission arguments are wanted, so nothing is run to build the line (no CLI is asked its version)
+	CoralDir          string                 // path to coral data directory (~/.coral) for CA cert location
+	CoralHost         string                 // host this Coral server is bound to
+	CoralPort         int                    // port this Coral server is listening on
 	// RunTag is the CORAL_PTY_RUN value of an agent started on tmux (#6141): exported with the agent's other variables so everything the agent starts carries it, and Kill can find what detached. Empty on the built-in
 	// terminal, whose processes get a tag of their own when the terminal is made.
 	RunTag string

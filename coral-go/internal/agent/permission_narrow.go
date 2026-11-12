@@ -170,3 +170,80 @@ func CodexLaunchPermissions(flags []string, caps *Capabilities, mode string, kee
 	}
 	return sandbox, approval
 }
+
+// CodexModeNote says, in the person's words, when what Codex is started with is not what the chosen mode stands for, and why: Full access kept for the agent, a capability set that narrows
+// the mode (#6425), or capabilities that set the flags because the pick is Default (#6422). "" when the mode's own flags are what runs (and for a pick Codex has no flags for). The flags
+// themselves come from LaunchCommand: this is the reason beside them (#15727, for New agent's flags line).
+func CodexModeNote(caps *Capabilities, mode string, keepFull bool) string {
+	if keepFull {
+		return "Full access is kept for this agent, so it starts with no sandbox and no approvals whatever its mode and capabilities say."
+	}
+	perms := TranslateToCodexPermissions(caps)
+	if perms == nil {
+		return ""
+	}
+	capPair := codexPairOf(perms)
+	if perms.FullAuto {
+		capPair = codexPair{"workspace-write", "never"}
+	}
+	m, explicit := codexPairForMode(mode)
+	if !explicit {
+		return "Default has no flags of its own, so the agent's capabilities set them: " + codexPairWords(capPair) + "."
+	}
+	if perms.FullAuto {
+		return "" // against an explicit mode, Shell with no limits restricts nothing: the mode stands as chosen
+	}
+	if narrowCodexPair(m, capPair) == m {
+		return ""
+	}
+	return "The agent's capabilities narrow this mode to " + codexPairWords(narrowCodexPair(m, capPair)) + "."
+}
+
+// CodexAutoNote is the reason beside the flags line for an Auto pick (#15780): on a Codex that has it, Auto is Codex's own auto-review (--approve-for-me), said in words with what can still narrow
+// it; on an older one it keeps workspace writes that never ask, and says why. args are the permission flags the launch would type. "" for any other pick, and when the flags are not Auto's pair
+// (a role's Shell rule narrowed it: CodexModeNote says so).
+func CodexAutoNote(args, flags []string, mode string, keepFull bool) string {
+	if !codexAutoPick(LaunchParams{PermissionMode: mode, KeepFullAccess: keepFull}, flags) {
+		return ""
+	}
+	for _, a := range args {
+		if a == "--approve-for-me" {
+			return "Auto uses Codex's own auto-review (--approve-for-me): Codex's own reviewer judges each approval request, and it can approve actions outside the sandbox, such as writing outside the workspace, without asking you. A role's Shell rule that limits the agent still narrows it."
+		}
+	}
+	sandbox, approval := "", ""
+	for i := 0; i < len(args); i++ {
+		if kind, n := codexPermissionFlag(args, i); n > 0 {
+			v := args[i+n-1]
+			if n == 1 {
+				_, v, _ = strings.Cut(args[i], "=")
+			}
+			if kind == 's' {
+				sandbox = v
+			} else {
+				approval = v
+			}
+			i += n - 1
+		}
+	}
+	if sandbox == "workspace-write" && approval == "never" {
+		return "This Codex is older than " + codexApproveForMeMin + " (or its version is not known), which has Codex's own auto-review, so Auto keeps workspace writes with no approvals."
+	}
+	return ""
+}
+
+func codexPairWords(p codexPair) string {
+	approval := "asks first"
+	if p.approval == "never" {
+		approval = "never asks"
+	}
+	switch p.sandbox {
+	case "read-only":
+		return "read-only, " + approval
+	case "workspace-write", "":
+		return "workspace writes, " + approval
+	case codexSandboxNone:
+		return "no sandbox, " + approval
+	}
+	return p.sandbox + ", " + approval
+}

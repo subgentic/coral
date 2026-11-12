@@ -26,6 +26,10 @@ export function restartHint(narrowing) {
 
 /** The chip beside a Codex agent: {text, title, warn}, or null when the row has no live mode to show (not Codex, or no turn_context read yet). */
 export function modeChip(row) {
+    if (row && ['codex', 'agy'].includes(row.agent_type) && row.keep_full_access === true) { // Full access is kept (#15735, Security's INFO on #15734): every start gives it, whatever the stored mode and capabilities say, so that is what the chip says, before any turn too
+        const stored = words(row.permission_mode);
+        return { key: row.agent_type === 'agy' ? 'Started with: ' : 'Mode: ', text: 'Full access', warn: false, title: `Full access is kept for this agent: it starts with Full access on launch, Restart, Wake and Resume, whatever its stored mode${stored ? ` (${stored})` : ''} and capabilities say. Turn it off with the Off button.` };
+    }
     if (row && row.agent_type === 'agy') { // what Coral started it with (#14085): agy writes no mode Coral can read back, so this says what the launch gave it, and says so
         const pe = row.permission_effective, text = words(pe && pe.effective);
         if (!text) return null;
