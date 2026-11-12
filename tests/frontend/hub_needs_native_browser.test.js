@@ -17,8 +17,8 @@ const { coralReady } = require('./helpers/wait');
             const at = needs ? "needs: 'native': " : "inbox: 'native' alone: ";
             if (needs && !asksStubbed) {
                 asksStubbed = true;
-                await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const w = window.fetch, ask = (id, text) => ({ board: 'team-a', kind: 'ask', id, asker: 'Writer', text, at: new Date(Date.now() - 120000).toISOString() });
-                    window.__asks = [ask(7, 'May I rename the folder?'), ask(8, 'Which port should the test server use?')]; window.__closes = []; window.__closeStatus = 200;
+                await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const w = window.fetch, ask = (id, text, age) => ({ board: 'team-a', kind: 'ask', id, asker: 'Writer', text, at: new Date(Date.now() - age).toISOString() }); /* the table lists the newest question first: 7 is told newer than 8 by a whole minute, not by whichever millisecond the two calls land on (#15933) */
+                    window.__asks = [ask(7, 'May I rename the folder?', 120000), ask(8, 'Which port should the test server use?', 180000)]; window.__closes = []; window.__closeStatus = 200;
                     window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href), m = (o.method || 'GET').toUpperCase();
                         if (p.pathname === '/api/remote/m1/api/operator-asks') return Promise.resolve(new Response(JSON.stringify(window.__asks), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                         const c = p.pathname.match(/^\\/api\\/remote\\/m1\\/api\\/board\\/team-a\\/asks\\/(\\d+)\\/close$/);
