@@ -31,6 +31,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
         check(r.buttons.every(b => b.icon && b.name && b.title && b.w >= 28), 'each icon has a glyph, an accessible name, a tooltip and room to click: ' + JSON.stringify(r.buttons));
         const needs = r.buttons.find(b => b.key === 'needs');
         check(needs && needs.badge === '1' && /Needs you, 1/.test(needs.name), 'Needs you carries its count in the badge and in its name: ' + JSON.stringify(needs));
+        check(r.buttons.some(b => b.key !== 'needs' && /, \d/.test(b.name)), 'the world has a folder besides Needs you with a count in its name (else the next check proves nothing): ' + JSON.stringify(r.buttons.map(b => [b.key, b.name])));
+        check(r.buttons.filter(b => b.key !== 'needs').every(b => !b.badge), 'only Needs you has a red badge, the other folders have none (#15797): ' + JSON.stringify(r.buttons.map(b => [b.key, b.badge])));
         check(!r.agentsList, 'the agents list is not drawn over the Inbox folders: ' + JSON.stringify(r));
         await shot('inbox-rail-icons');
         await ev(`document.querySelector('#sidebar-rail-inbox [data-key="tasks"]').click(); true`); await ev(framesJs(8));
