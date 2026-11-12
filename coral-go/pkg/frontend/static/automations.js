@@ -21,6 +21,7 @@ const IT = await importOnce('./inbox_toolbar.js');
 const AF = await importOnce('./automation_filters.js');
 const W = await importOnce('./workflows.js');
 const AR = await importOnce('./automation_runs.js');
+const SM = await importOnce('./status_mark.js'); // the one status mark: shape and word (#15813)
 const AQ = await importOnce('./automations_queue.js'); // the Queue folder: this computer's resource queue (#13651)
 
 const $ = id => document.getElementById(id);
@@ -166,13 +167,12 @@ const openItem = i => {
     openRow(i.kind === 'workflow' ? 'workflows' : 'jobs', i, itemKey(i));
 };
 const openRow = (key, i, rowKey = i.id) => { const t = $('group-table-view'); opener = { key: rowKey, scroll: t ? t.scrollTop : 0 }; go(routeOf(key, i.id)); };
+const RUN_STATE = { Passed: 'done', Failed: 'failed', Running: 'working' }; // a run's chip word to the status mark's state; Stopped, Waiting to start and Result not seen are none of the three: the hollow dot (design guidelines 4.5)
 const lastRunCell = i => {
     const c = lastChip(i.run);
     if (!c) return 'Never run';
-    const chip = DT.chip(c.word, resultClass(i.run));
-    if (c.detail) chip.title = c.detail;
-    return chip;
-}; // one chip word, as the Runs table and the Workflows list say it (#9456); the reason a run failed to start is the tooltip
+    return SM.statusMark(RUN_STATE[c.word] || 'idle', c.word, { title: c.detail });
+}; // the same words as the Runs table and the Workflows list (#9456), now with the status mark's shape; the reason a run failed to start is the tooltip
 const workflowResult = i => W.lastResult(i.run);
 /** A row's name button: the name is the one line; what the item is or runs is its tooltip (the page has it in full). */
 const nameButton = (i, what) => {

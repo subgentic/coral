@@ -1,0 +1,11 @@
+/* The status mark (design guidelines 4.5, #15813; status_mark.js): a shape and a word. Loaded with the module, not at start. The shape takes the state's colour; the word is the text's own colour, never blue. */
+.status-mark { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; white-space: nowrap; }
+.status-shape { flex: none; display: block; width: .75rem; height: .75rem; } /* 12 px, and it grows with the text at 200% */
+.status-word { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
+.status-mark[data-state="working"] .status-shape { color: var(--success); }
+.status-mark[data-state="waiting"] .status-shape { color: var(--warning); }
+.status-mark[data-state="idle"] .status-shape,
+.status-mark[data-state="sleeping"] .status-shape,
+.status-mark[data-state="done"] .status-shape { color: var(--text-muted); }
+.status-mark[data-state="failed"] .status-shape { color: var(--error); }
+@media (forced-colors: active) { .status-mark[data-state] .status-shape, .status-word { color: CanvasText; } } /* colours off: the six shapes (dot, triangle, hollow dot, moon, check, cross) still differ */
