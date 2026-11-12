@@ -5,14 +5,14 @@ const { connect } = require('./agent_view_harness');
 const { settle, coralReady } = require('./helpers/wait');
 
 (async () => {
-    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect({ tabLayout: '{"agent":{"order":[],"hidden":["board","info","saved"]}}' });
     const ROW = '#agentic-block-top .agentic-state-tabs';
     const word = tab => ev(`(() => { const r = document.querySelector('${ROW}'), b = document.getElementById('agentic-tab-${tab}'), w = b.querySelector('.agentic-tab-word'); return { word: w && getComputedStyle(w).display !== 'none' ? w.textContent : null, clipped: r.scrollWidth > r.clientWidth || b.scrollWidth > b.clientWidth + 1, tops: [...new Set([...r.querySelectorAll('.agentic-tab')].filter(x => getComputedStyle(x).display !== 'none' && !x.classList.contains('tab-more')).map(x => x.offsetTop))].length }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
-        await ev(`localStorage.removeItem('coral-agentic-tab-prefs'); window.__m.add('dock-bot', 'A', 3, { sleeping: false }); true`);
+        await ev(`window.__m.add('dock-bot', 'A', 3, { sleeping: false }); true`);
         await settle(ev, 600); // sleep-ok: the first live list renders from several answers
         await ev(`window.selectLiveSession('dock-bot', 'claude', 'dock-bot-id', 'local'); true`);
         await ev(`(() => { const p = document.getElementById('agentic-state'); if (p.classList.contains('collapsed') || document.getElementById('agentic-tab-files').getBoundingClientRect().width === 0) window.toggleAgenticPanel(true); return true; })()`);

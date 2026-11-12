@@ -17,6 +17,7 @@ import { effectiveLiveViewMode, setLiveViewMode, jumpToLiveMessage } from './liv
 import { buildListBar } from './list_bar.js';
 import { importOnce } from './import_once.js';
 import { selectInboxTab, rememberInboxGroup } from './inbox_tab.js';
+import { revealTab } from './tab_customize.js';
 const _mk0 = ", and Chats shows only this computer's, so the message cannot be opened from here. The saved text above is kept.";
 // This module is loaded lazily, so its own parts are loaded the same way (a static import of a module not loaded at startup could not be retried: import_hygiene).
 const { KINDS, KIND_LABEL, SORTS, SORT_LABEL, makeModel: savedModel, clean: cleanSaved, isFiltered: savedFiltered, toQuery: savedQuery, keeps: savedKeeps, loadFilters: loadSavedFilters, saveFilters: saveSavedFilters, teamKeyOf, setTeamNames } = await importOnce('./saved_filters.js');
@@ -375,7 +376,7 @@ export async function openSaved() {
     // What the sidebar was before, so closing leaves an agent's own dock as it was: open on its tab, or shut.
     if (!savedShowing()) _before = { open: dockOpen(), tab: document.querySelector('#agentic-block-top .agentic-tab.active')?.dataset.tab || '' }; // opening it again (the toast's link) keeps what the dock was before the first open
     const btn = $('agentic-tab-saved');
-    btn?.classList.remove('tab-hidden'); // a tab the user hid is still what this button opens
+    revealTab('saved'); // a hidden Saved tab is still what this button opens
     window.toggleAgenticPanel?.(true);
     window.switchAgenticTab?.('saved', 'top'); // refreshes through showSaved()
     btn?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); // the tab row scrolls sideways on a phone: the tab shown is in view

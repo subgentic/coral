@@ -34,7 +34,7 @@ const { settle, coralReady } = require('./helpers/wait');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await load();
-        await ev(`localStorage.removeItem('coral-agentic-tab-prefs'); true`);
+        await ev(`localStorage.setItem('coral-agentic-tab-prefs', '{"agent":{"order":[],"hidden":[]}}'); true`);
         await load();
 
         // #13529: Board is optional too, including when it is the active tab.
@@ -64,7 +64,7 @@ const { settle, coralReady } = require('./helpers/wait');
         const boardOrder = await listed();
         await close(); await load(true); await open();
         assert.deepEqual(await listed(), boardOrder, 'Board moved position survives reload');
-        await close(); await ev(`localStorage.removeItem('coral-agentic-tab-prefs'); true`); await load();
+        await close(); await ev(`localStorage.setItem('coral-agentic-tab-prefs', '{"agent":{"order":[],"hidden":[]}}'); true`); await load();
         ok('Board hides, moves and persists; every tab hidden has a recoverable empty state');
 
         const def = await row();
@@ -150,7 +150,7 @@ const { settle, coralReady } = require('./helpers/wait');
         // Corrupt storage is ignored.
         await ev(`localStorage.setItem('coral-agentic-tab-prefs', '{not json'); true`);
         await load();
-        assert.deepEqual(await row(), def);
+        assert.deepEqual(await row(), ['files', 'browse', 'artifacts', 'activity', 'tasks'], 'unreadable prefs: the default (#15731)');
         ok('unreadable saved prefs fall back to the default row');
 
         // What is read back is checked (Security, #4103): unknown and repeated ids dropped, non-strings dropped, missing tabs last, and hidden choices retained.
@@ -173,6 +173,7 @@ const { settle, coralReady } = require('./helpers/wait');
         // Kept per account: with a Hub account the key carries the account tag and the default key is not read.
         await ev(`localStorage.clear(); true`);
         await load();
+        await ev(`localStorage.removeItem('coral-agentic-tab-prefs'); true`); // the harness saved its all-tabs layout under the shared key on load: this part is about what is written where
         await ev(`import((window.__coralStatic || '/static/') + 'local_store.js').then(async m => { m.setStoreOwner('0123456789abcdef'); const t = await import((window.__coralStatic || '/static/') + 'tab_customize.js'); t.applyTabPrefs(); return true; })`);
         await open();
         await ev(`document.querySelector('#tab-customize .tc-check[data-tab="tasks"]').click(); true`);
@@ -215,7 +216,7 @@ const { settle, coralReady } = require('./helpers/wait');
         assert.ok(!(await row()).includes('tasks'));
         await open();
         await ev(`document.querySelector('#tab-customize .tc-reset').click(); true`);
-        assert.deepEqual(await row(), def, 'Reset restores the default');
+        assert.deepEqual(await row(), ['files', 'browse', 'artifacts', 'activity', 'tasks'], 'Reset restores the default: five tabs (#15731)');
         assert.equal(await ev(`localStorage.getItem('coral-agentic-tab-prefs')`), null, 'Reset leaves no key behind');
         assert.equal(await ev(`document.activeElement.classList.contains('tc-reset')`), true, 'focus stays on Reset');
         await key('Escape');
@@ -235,7 +236,7 @@ const { settle, coralReady } = require('./helpers/wait');
         await close();
         ok('right-click on the row opens the popover');
 
-        await ev(`localStorage.removeItem('coral-agentic-tab-prefs'); true`);
+        await ev(`localStorage.setItem('coral-agentic-tab-prefs', '{"agent":{"order":[],"hidden":[]}}'); true`);
 
         // Phone: a bottom sheet with 44px move buttons, no drag grip, inside the viewport; also at 200 percent text.
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });

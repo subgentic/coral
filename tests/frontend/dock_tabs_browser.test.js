@@ -6,7 +6,7 @@ const { connect } = require('./agent_view_harness');
 const { settle, coralReady } = require('./helpers/wait');
 
 (async () => {
-    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect({ tabLayout: '{"agent":{"order":[],"hidden":["board","info","saved"]}}' });
     const { Input } = client;
     const key = async k => { const vk = { ArrowDown: 40, ArrowUp: 38, Escape: 27, Enter: 13, Tab: 9 }[k]; for (const type of ['keyDown', 'keyUp']) await Input.dispatchKeyEvent({ type, key: k, code: k, windowsVirtualKeyCode: vk, ...(type === 'keyDown' && k === 'Enter' ? { text: '\r' } : {}) }); };
     const ok = name => console.log(`   ✓ ${name}`);
@@ -18,7 +18,7 @@ const { settle, coralReady } = require('./helpers/wait');
     const load = async (w, mobile) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
-        await ev(`localStorage.removeItem('coral-agentic-tab-prefs'); window.__m.add('dock-bot', 'A', 3, { sleeping: false }); true`);
+        await ev(`window.__m.add('dock-bot', 'A', 3, { sleeping: false }); true`);
         await settle(ev, 600); // sleep-ok: the first live list renders from several answers; no single completion event
         await ev(`window.selectLiveSession('dock-bot', 'claude', 'dock-bot-id', 'local'); true`);
         await ev(`(() => { const p = document.getElementById('agentic-state'); if (p.classList.contains('collapsed') || document.getElementById('agentic-tab-files').getBoundingClientRect().width === 0) window.toggleAgenticPanel(true); return true; })()`);
@@ -32,10 +32,10 @@ const { settle, coralReady } = require('./helpers/wait');
         await waitFor(`document.querySelector('${ROW}').hasAttribute('data-words')`, 'the words show at the default panel width', 4000);
         let r = await row();
         const named = r.shown.filter(([t]) => t !== 'customize'); // the Customize button at the row's end is an icon alone, as it was
-        assert.deepEqual(named.map(([t, w]) => [t, w]), [['files', 'Files'], ['artifacts', 'Artifacts'], ['tasks', 'Tasks'], ['info', 'Info'], ['saved', 'Saved'], ['more', 'More']], 'each shown tab says its word: ' + JSON.stringify(r.shown));
+        assert.deepEqual(named.map(([t, w]) => [t, w]), [['files', 'Files'], ['browse', 'Browse'], ['artifacts', 'Artifacts'], ['activity', 'Activity'], ['tasks', 'Tasks'], ['more', 'More']], 'each shown tab says its word: ' + JSON.stringify(r.shown));
         assert.deepEqual([r.tops.length, r.clipped], [1, false], 'one line, nothing clipped: ' + JSON.stringify(r));
-        assert.ok(!r.shown.some(([t]) => ['browse', 'notes', 'activity', 'agent-ui', 'branches'].includes(t)), 'the five rare tabs are not in the row: ' + JSON.stringify(r.shown));
-        assert.equal(r.more[0], 'More tabs'); ok('Files, Artifacts, Tasks, Info, Saved and More with their words, on one line');
+        assert.ok(!r.shown.some(([t]) => ['notes', 'agent-ui', 'branches'].includes(t)), 'the three rare tabs are not in the row: ' + JSON.stringify(r.shown));
+        assert.equal(r.more[0], 'More tabs'); ok('Files, Browse, Artifacts, Tasks, Activity and More with their words, on one line');
         await shot('dock-tabs-1280');
 
         // UI/UX's #7621 small points: the customizer icon is named, only the selected tab looks selected (a hovered one is not blue with an underline), and the files line is sentence case
@@ -53,19 +53,20 @@ const { settle, coralReady } = require('./helpers/wait');
         await key('ArrowDown');
         await waitFor(`!document.getElementById('agentic-more-menu').hidden && document.activeElement.getAttribute('role') === 'menuitem'`, 'the menu opens on ArrowDown with the focus in it', 4000);
         const items = await ev(`[...document.querySelectorAll('#agentic-more-menu [role=menuitem]')].map(i => i.dataset.tab + ':' + i.textContent.trim())`);
-        assert.deepEqual(items, ['browse:folder_openBrowse', 'notes:edit_noteNotes', 'activity:timelineActivity', 'agent-ui:widgetsAgent UI', 'branches:account_treeBranches'], JSON.stringify(items));
+        assert.deepEqual(items, ['notes:edit_noteNotes', 'agent-ui:widgetsAgent UI', 'branches:account_treeBranches'], JSON.stringify(items));
         await shot('dock-tabs-more-open');
-        await key('ArrowDown'); await key('ArrowDown'); await key('Enter'); // the menu opens on Browse: two steps down is Activity (Notes is the second item)
-        await waitFor(`document.getElementById('agentic-panel-activity').classList.contains('active')`, 'Enter opens Activity', 4000);
+        await key('ArrowDown'); await key('Enter'); // the menu opens on Notes: one step down is Agent UI
+        await waitFor(`document.getElementById('agentic-panel-agent-ui').classList.contains('active')`, 'Enter opens Agent UI', 4000);
         r = await row();
-        assert.deepEqual(r.more, ['More: Activity, open', true, 'false'], 'More carries the open tab: ' + JSON.stringify(r.more));
-        assert.equal(await ev(`document.querySelector('#agentic-tab-more .agentic-tab-word').textContent`), 'Activity', 'and says its word');
+        assert.deepEqual(r.more, ['More tabs', false, 'false'], 'More stays More, with the others behind it (#15733): ' + JSON.stringify(r.more));
+        assert.equal(await ev(`document.querySelector('#agentic-tab-more .agentic-tab-word').textContent`), 'More', 'and says More');
+        assert.deepEqual(r.shown.map(x => x[0]).filter(t => t === 'agent-ui'), ['agent-ui'], 'the open Agent UI is a tab of the row: ' + JSON.stringify(r.shown));
         assert.equal(await ev(`document.getElementById('agentic-menu') === null && document.getElementById('agentic-more-menu').hidden`), true, 'the menu closed');
         await ev(`document.getElementById('agentic-tab-more').focus(); true`); await key('ArrowDown'); await key('Escape');
         assert.equal(await ev(`document.activeElement.id`), 'agentic-tab-more', 'Escape closes the menu with the focus back on More');
         await ev(`document.getElementById('agentic-tab-files').click(); true`);
         r = await row(); assert.deepEqual([r.more[0], r.more[1]], ['More tabs', false], 'another tab: More says More again');
-        ok('the keyboard opens, picks and closes; the open rare tab is seen on More');
+        ok('the keyboard opens, picks and closes; the open rare tab swaps into the row and More stays');
 
         console.log('a panel dragged narrow: icons alone');
         await ev(`document.getElementById('agentic-state').style.width = '300px'; window.dispatchEvent(new Event('resize')); true`);
@@ -112,10 +113,11 @@ const { settle, coralReady } = require('./helpers/wait');
         const before = await ev(`(() => { const r = document.querySelector('${ROW}'); return r.scrollWidth - r.clientWidth; })()`);
         await ev(`document.querySelector('#agentic-more-menu [role=menuitem]').click(); true`); await settle(ev, 400); // sleep-ok: the tab switch redraws the strip
         const fit = await ev(`(() => { const r = document.querySelector('${ROW}'), rb = r.getBoundingClientRect(); const tabs = [...r.querySelectorAll('.agentic-tab')].filter(b => getComputedStyle(b).display !== 'none' && b.getClientRects().length); const out = tabs.filter(b => { const b2 = b.getBoundingClientRect(); return b2.right > rb.right + 1 || b2.left < rb.left - 1; }).map(b => (b.getAttribute('aria-label') || b.title || b.id)); return { n: tabs.length, out, scroll: r.scrollWidth - r.clientWidth, before: window.__before, more: (document.getElementById('agentic-tab-more') || {}).textContent }; })()`);
-        assert.ok(fit.scroll <= before, 'the open tab\'s word does not widen the row past what it was (' + before + ' px over before, ' + fit.scroll + ' after)');
-        assert.deepEqual(fit.out.filter(() => fit.scroll > before), [], 'no tab is cut at the strip\'s edge when the open tab shows its word at 390: ' + JSON.stringify(fit));
+        assert.equal(await ev(`(() => { const b = document.querySelector('${ROW} .agentic-tab.active'); if (!b) return 'none'; b.scrollIntoView({ inline: 'nearest', block: 'nearest' }); const r = document.querySelector('${ROW}').getBoundingClientRect(), t = b.getBoundingClientRect(); return t.width > 0 && t.left >= r.left - 1 && t.right <= r.right + 1 ? 'in view' : 'cut: ' + JSON.stringify([t.left, t.right, r.left, r.right]); })()`), 'in view', 'the picked tab swapped into the row is a whole tab on the strip (#15733; the strip scrolls on a phone)');
+        assert.equal(await ev(`document.getElementById('agentic-tab-more').getClientRects().length > 0 && document.querySelector('#agentic-tab-more .agentic-tab-word').textContent`), 'More', 'More is still there after the pick');
         await shot('dock-tabs-open-word-390');
         // a tab's new count widens the tabs and leaves the strip's size alone (it does not wrap while its words show, #9420): the tabs are watched, so the words come off and nothing is wrapped or clipped (#9435)
+        await ev(`document.getElementById('agentic-tab-files').click(); true`); // the picked tab stays open across the reload and is a tab of the row now (#15733): Files is the one the words were measured with
         await load(1280, false);
         await waitFor(`document.querySelector('${ROW}').hasAttribute('data-words')`, 'the words show again at 1280', 4000);
         await ev(`for (const id of ['files-bar-count', 'task-bar-count', 'note-bar-count']) document.getElementById(id).textContent = '88888888'; true`);
@@ -130,6 +132,7 @@ const { settle, coralReady } = require('./helpers/wait');
         for (const [w, mobile] of [[1280, false], [390, true]]) {
             console.log(`${w}: the focus after a pick from More`);
             await load(w, mobile);
+            await ev(`document.getElementById('agentic-tab-files').click(); true`); await waitFor(`document.getElementById('agentic-panel-files').classList.contains('active') && !document.querySelector('#agentic-more-menu [data-tab=branches]') === false`, 'Files is open and Branches is behind More again', 4000); // the open tab stays across a reload and is in the row now (#15733), so Branches is picked from More only when another tab is open
             await ev(`document.getElementById('agentic-tab-more').focus(); true`);
             await key('ArrowDown');
             await waitFor(`!document.getElementById('agentic-more-menu').hidden`, 'the menu opens', 4000);

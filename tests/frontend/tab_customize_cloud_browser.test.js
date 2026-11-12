@@ -16,7 +16,7 @@ const { coralReady } = require('./helpers/wait');
     const shown = () => ev(`[...document.querySelectorAll('#agentic-block-top .agentic-tab[data-tab]')].filter(b => getComputedStyle(b).display !== 'none').map(b => b.dataset.tab)`);
     const load = async () => {
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
-        await ev(`localStorage.removeItem('coral-agentic-tab-prefs'); window.__m.add('tab-bot', 'A', 3, { sleeping: false }); true`);
+        await ev(`localStorage.setItem('coral-agentic-tab-prefs', '{"agent":{"order":[],"hidden":[]}}'); window.__m.add('tab-bot', 'A', 3, { sleeping: false }); true`);
         await sleep(600); // sleep-ok: the first live list renders from several answers; no single completion event
         await ev(`window.selectLiveSession('tab-bot', 'claude', 'tab-bot-id', 'local'); true`);
         await ev(`(() => { const p = document.getElementById('agentic-state'); if (p.classList.contains('collapsed') || document.getElementById('agentic-tab-files').getBoundingClientRect().width === 0) window.toggleAgenticPanel(); return true; })()`);
@@ -62,7 +62,7 @@ const { coralReady } = require('./helpers/wait');
         const visible = await shown();
         assert.equal(visible.includes('saved'), false, 'Saved is not in the row');
         assert.equal(rows.some(r => r.tab === 'saved'), false, 'and not in the menu');
-        assert.deepEqual(rows.map(r => r.tab).filter(t => !visible.includes(t)), [], 'every menu row is a tab the row shows');
+        assert.deepEqual(rows.map(r => r.tab).filter(t => !visible.includes(t) && !['board', 'notes', 'agent-ui', 'info', 'branches'].includes(t)), [], 'every menu row is a tab the row shows, or one the default leaves out (#15731), unticked');
         assert.deepEqual(rows.filter(r => !r.glyph && !r.svg).map(r => r.tab), [], 'every row has an icon');
         console.log('PASS');
     } catch (e) {

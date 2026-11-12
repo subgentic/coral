@@ -57,7 +57,7 @@ const RECORD = `(() => {
             // selections; otherwise its timer can land in the draft-only step.
             // Keep all per-step requests (and the golden) unchanged.
             await waitFor(`window.__seen.fetches.includes('GET /api/board/projects')`, 'Home goal card teams read', 10000);
-            await ev(`localStorage.clear(); ${setup}; T.render.renderLiveSessions(T.state.liveSessions); true`);
+            await ev(`localStorage.clear(); localStorage.setItem('coral-agentic-tab-prefs', '{"agent":{"order":[],"hidden":[]}}'); ${setup}; T.render.renderLiveSessions(T.state.liveSessions); true`);
             await sleep(300); // sleep-ok: the list and startup loads settle over frames; there is no completion event
             const steps = [];
             for (const [label, expr] of calls) {

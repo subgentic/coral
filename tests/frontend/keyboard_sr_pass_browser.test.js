@@ -28,7 +28,7 @@ const { coralReady } = require('./helpers/wait');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev);
-        await ev(`localStorage.removeItem('coral-agentic-tab-prefs'); window.__m.add('kb-bot', 'A', 3, { sleeping: false }); true`);
+        await ev(`localStorage.setItem('coral-agentic-tab-prefs', '{"agent":{"order":[],"hidden":[]}}'); window.__m.add('kb-bot', 'A', 3, { sleeping: false }); true`);
         await sleep(600); // sleep-ok: the first live list renders from several answers; no single completion event
         await ev(`window.selectLiveSession('kb-bot', 'claude', 'kb-bot-id', 'local'); true`);
         await ev(`(() => { const p = document.getElementById('agentic-state'); if (p.classList.contains('collapsed') || document.getElementById('agentic-tab-files').getBoundingClientRect().width === 0) window.toggleAgenticPanel(true); return true; })()`);
