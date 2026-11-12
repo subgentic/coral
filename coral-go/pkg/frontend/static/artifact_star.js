@@ -13,7 +13,7 @@ export function starControl(item, { hex, name, onChange, reviewPin = false, labe
     b.type = 'button';
     const paint = () => {
         const on = !!item.starred;
-        b.className = `dt-star${on ? ' dt-star-on' : ''}${labelled ? ' btn btn-quiet btn-small dt-star-labelled' : ''}`;
+        b.className = `dt-star${on ? ' dt-star-on' : ''}${labelled ? ` btn btn-quiet btn-small dt-star-labelled inbox-star${on ? ' inbox-star-on' : ''}` : ''}`;
         b.setAttribute('aria-pressed', String(on));
         b.setAttribute('aria-label', `${on ? 'Remove the star from' : 'Star'} ${name}`);
         b.title = on ? 'Starred (click to remove the star)' : reviewPin ? 'Star: keep this document at the top of Needs you' : 'Star: find this again in Starred';
