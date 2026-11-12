@@ -95,14 +95,15 @@ const { coralReady } = require('./helpers/wait');
             await ev(`import(${S} + 'state.js').then(m => { m.state.hub = false; m.state.servers = []; return true; })`);
             await ev(`window.__remote = null; true`);
             await refill(null, 'all');
-            // turn Release summaries off and untick gamma, set the time, Save
-            await ev(`(() => { const set = (id, f) => { const e = document.getElementById(id); f(e); e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); };
-                set('settings-inbox-release', e => { e.checked = false; }); set('settings-inbox-digest-time', e => { e.value = '07:30'; });
-                const g = document.querySelector('#settings-inbox-teams input[data-team="gamma"]'); g.checked = false; g.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            await ev(`(async () => { await window.applySettings(); return true; })()`);
-            await sleep(600); // sleep-ok: the save is stubbed and answers at once; the toast and redraw follow
-            const put = await ev(`window.__puts[window.__puts.length - 1] || null`);
-            check(`${tag}: Save sends the switch, the teams and the time as chosen`, put && put.inbox_kind_release === false && put.inbox_kind_file === true && put.inbox_digest_time === '07:30' && put.inbox_included_teams === '["alpha","beta"]', JSON.stringify(put && Object.fromEntries(Object.entries(put).filter(([k]) => k.startsWith('inbox_')))));
+            await ev(`window.__puts=[];true`);
+            await ev(`(() => {const e=document.getElementById('settings-inbox-release');e.dispatchEvent(new FocusEvent('focusin',{bubbles:true}));e.checked=false;e.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
+            await waitFor(`document.getElementById('settings-inbox-release').dataset.saving !== '1'`, 'release row saved');
+            await ev(`(() => {const e=document.getElementById('settings-inbox-digest-time');e.dispatchEvent(new FocusEvent('focusin',{bubbles:true}));e.value='07:30';e.dispatchEvent(new FocusEvent('focusout',{bubbles:true}));return true;})()`);
+            await waitFor(`document.getElementById('settings-inbox-digest-time').dataset.saving !== '1'`, 'digest time saved');
+            await ev(`(() => {const e=document.querySelector('#settings-inbox-teams input[data-team="gamma"]');e.dispatchEvent(new FocusEvent('focusin',{bubbles:true}));e.checked=false;e.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
+            await waitFor(`window.__puts.length === 3`, 'three independent row writes');
+            const puts=await ev(`window.__puts`);
+            check(`${tag}: each row saves its own choice`, JSON.stringify(puts)===JSON.stringify([{inbox_kind_release:false},{inbox_digest_time:'07:30'},{inbox_included_teams:'["alpha","beta"]'}]),JSON.stringify(puts));
             await ev(`window.__puts.length = 0; true`);
 
             // the Needs you folder: the quiet line for what the switches keep out

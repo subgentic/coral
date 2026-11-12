@@ -7,6 +7,7 @@ const { coralReady } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const sleep = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: a real pointer press has no completion event to wait on
+    const guard = await require('./helpers/settings_guard').guardSettings();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -32,8 +33,9 @@ const { coralReady } = require('./helpers/wait');
         await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: at.x, y: at.y, button: 'left', clickCount: 1 });
         await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: at.x, y: at.y, button: 'left', clickCount: 1 });
         await sleep(150); // sleep-ok: the dialog must be there this soon after one click; that is the thing asserted
-        const asked = await ev(`/Discard unsaved changes/.test(document.body.innerText) && [...document.querySelectorAll('.modal')].some(m => getComputedStyle(m).display !== 'none' && /Discard unsaved changes/.test(m.innerText))`);
-        assert.ok(asked, 'the Discard dialog is on screen 150 ms after one click');
+        assert.equal(await ev(`getComputedStyle(document.getElementById('settings-modal')).display`), 'none', 'one pointer press closes Settings');
+        assert.notEqual(await ev(`document.getElementById('confirm-modal')?.style.display`), 'flex', 'no discard question');
+        await waitFor(`import((window.__coralStatic || '/static/') + 'state.js').then(m => m.state.settings.theme === 'light')`, 'Light saved after selection');
         console.log('PASS the first look at Settings');
-    } finally { await client.close(); }
+    } finally { await client.close(); await guard.restore(); }
 })().catch(e => { console.error(e.message); process.exitCode = 1; });

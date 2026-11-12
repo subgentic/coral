@@ -74,7 +74,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
 
         // Verify the native Windows row before the cross-platform stand-in cases.
         if (process.platform === 'win32') {
-            await ev(`window.showSettingsModal(); true`);
+            await ev(`window.showSettingsModal().then(() => true)`);
             await until(`document.getElementById('tb-now')?.closest('.sv-row')?.hidden === false`, 'the native Windows backend row');
             const native = await row();
             check('Windows runs pty with no backend choice', !native.hidden && native.now === 'Running now: pty' && !native.choice && native.fixed, JSON.stringify(native));
@@ -82,32 +82,27 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         }
 
         // ── The row for an install that chose tmux (this server itself runs the pty default) ─────────
-        await ev(`window.__tbFake = { status: () => ({ saved: 'tmux', running: 'tmux', next: 'tmux', forced: false, choice: true, restart_required: false, can_restart: false, running_agents: 0, leftover_tmux_agents: 0 }) }; window.showSettingsModal(); true`);
-        await until(`document.getElementById('tb-now')?.closest('.sv-row')?.hidden === false`, 'the backend row');
+        await ev(`window.__tbFake = { status: () => ({ saved: 'tmux', running: 'tmux', next: 'tmux', forced: false, choice: true, restart_required: false, can_restart: false, running_agents: 0, leftover_tmux_agents: 0 }) }; window.showSettingsModal().then(() => true)`);
+        await until(`document.getElementById('tb-now').textContent === 'tmux'`, 'the backend row');
         let r = await row();
         check('Settings shows the backend row: running tmux, tmux picked, both options', !r.hidden && r.now === 'Running now: tmux' && r.choice && !r.fixed && r.checked === 'tmux'
             && r.texts[0] === 'Keep agents running when Coral restarts (tmux)' && r.texts[1] === 'Put agents to sleep when Coral restarts (pty, default)', JSON.stringify(r));
         check("the pty text keeps Security's crash wording in Docs", r.docs === '/docs/settings-system' && /puts them to sleep first when it stops cleanly, and marks them asleep at the next start after a crash/.test(await ev(`fetch('/api/agent-docs/settings-system').then(r=>r.text())`)), r.docs);
         check('nothing pending to start with', r.pending === '', r.pending);
         await pick('pty');
-        r = await row();
-        check('picking pty says it switches when Coral restarts', r.pending === 'Switches to pty when Coral restarts. Apply asks first.', r.pending);
-        // the one line under the choice says what the chosen backend does, and follows the choice (#9490); the pty sentence says they wake next time only while Wake agents after a restart is on (#6263)
-        const hint = () => ev(`document.querySelector('#tb-choice').closest('.sv-row').querySelector('.tb-hint').textContent`);
-        const tick = on => ev(`(() => { const b = document.getElementById('tb-autowake-on'); b.checked = ${on}; b.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-        await tick(true);
-        check('with Wake agents after a restart on, the pty hint says they wake next time', (await hint()) === 'Agents stop when you quit Coral and wake next time.', await hint());
-        await tick(false);
-        check('with it off, the pty hint no longer says they wake', (await hint()) === 'Agents stop when you quit Coral.', await hint());
-        await pick('tmux');
-        check("picking tmux changes the hint to tmux's", (await hint()) === "Agents keep running when you quit Coral, and can reach each other's terminals.", await hint());
+        await until(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'changing the backend asks before saving');
+        check('the backend selection alone asks first', (await confirmState()).title === 'Switch to pty?');
+        check('the selected backend explains its quit behavior', /Agents stop when you quit Coral/.test(await ev(`document.querySelector('#tb-choice').closest('.sv-row').querySelector('.tb-hint').textContent`)));
+        await ev(`window.hideConfirmModal(); true`);
+        await until(`document.getElementById('tb-choice').dataset.saving !== '1'`, 'cancel rolls back the row');
+        check('Cancel restores the saved backend', (await row()).checked === 'tmux');
 
         // ── Apply, then Cancel: nothing saved, Settings stays open ──────────
         await ev(`window.__tbFake = { status: () => ({ saved: 'tmux', running: 'tmux', next: 'tmux', forced: false, choice: true, restart_required: false, can_restart: true, running_agents: 2, leftover_tmux_agents: 0 }) }; true`);
-        await ev(`window.showSettingsModal(); true`);
+        await ev(`window.showSettingsModal().then(() => true)`);
         await until(`document.getElementById('tb-now').textContent === 'tmux'`, 'the row again');
+        await ev(`window.__tbCalls.length = 0; true`);
         await pick('pty');
-        await ev(`window.__tbCalls.length = 0; window.applySettings(); true`);
         await until(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirm');
         let c = await confirmState();
         check('Apply asks: "Switch to pty?", says 2 agents end and are put to sleep first', c.shown && c.title === 'Switch to pty?' && /ends the 2 running agents\. Coral puts them to sleep first/.test(c.msg)
@@ -117,26 +112,28 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         const afterCancel = { open: await settingsOpen(), saved: await saved(), calls: await ev(`window.__tbCalls.filter(c => !c.startsWith('GET'))`), yes: (await confirmState()).yes };
         check('Cancel: nothing slept or saved, Settings stays open, the confirm button label is restored', afterCancel.open && afterCancel.saved === '' && afterCancel.calls.length === 0 && afterCancel.yes !== 'Sleep 2 agents and restart on pty', JSON.stringify(afterCancel));
 
-        // ── Apply and confirm, on this Coral (it can't restart itself): sleep first, then save ──
-        await ev(`window.__tbCalls.length = 0; window.applySettings(); true`);
+        // Confirming the choice sleeps agents before saving.
+        await until(`document.getElementById('tb-choice').dataset.saving !== '1'`, 'cancel settled');
+        await ev(`window.__tbCalls.length = 0; true`);
+        await pick('pty');
         await until(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirm again');
         await ev(`document.getElementById('confirm-modal-yes').click(); true`);
         await until(`window.__tbCalls.some(c => c.startsWith('PUT'))`, 'the save');
-        await until(`(!document.getElementById('settings-modal') || getComputedStyle(document.getElementById('settings-modal')).display === 'none')`, 'Settings closed');
+        await until(`document.getElementById('tb-choice').dataset.saving !== '1'`, 'backend row saved');
         let calls = await ev(`window.__tbCalls.filter(c => !c.startsWith('GET'))`);
         check('confirming puts the agents to sleep BEFORE saving pty',
             JSON.stringify(calls) === JSON.stringify(['POST /api/sessions/live/sleep-all', 'PUT /api/system/terminal-backend {"backend":"pty"}']), JSON.stringify(calls));
         check('the setting is saved on the server (for the next start)', await saved() === 'pty');
         const t = await toasts();
-        check("where Coral can't restart itself, it says to quit and start it again; Settings closes",
-            t.some(x => /quit Coral and start it again to switch to pty/.test(x)) && !(await settingsOpen()), JSON.stringify(t));
+        check("where Coral can't restart itself, it says to quit and start it again; Settings remains open",
+            t.some(x => /quit Coral and start it again to switch to pty/.test(x)) && (await settingsOpen()), JSON.stringify(t));
         await ev(`(() => { const f = window.__tbFake; window.__tbFake = null; return fetch('/api/system/terminal-backend', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ backend: 'tmux' }) }).then(() => { window.__tbFake = f; return true; }); })()`);
 
         // ── Where Coral can restart itself: the restart follows the save ────
-        await ev(`window.__tbFake.put = true; window.showSettingsModal(); true`);
+        await ev(`window.__tbFake.put = true; window.showSettingsModal().then(() => true)`);
         await until(`document.getElementById('tb-now').textContent === 'tmux'`, 'the row once more');
+        await ev(`window.__tbCalls.length = 0; true`);
         await pick('pty');
-        await ev(`window.__tbCalls.length = 0; window.applySettings(); true`);
         await until(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirm once more');
         await ev(`document.getElementById('confirm-modal-yes').click(); true`);
         await until(`window.__tbCalls.some(c => c.startsWith('POST /api/system/restart'))`, 'the restart');
@@ -146,7 +143,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await ev(`delete window.__tbFake.put; true`);
 
         // ── No choice here: pty fixed ──────────────────────────────────────
-        await ev(`window.__tbFake = { status: { saved: '', running: 'pty', forced: false, choice: false, restart_required: false, can_restart: false, running_agents: 0, leftover_tmux_agents: 0 } }; window.showSettingsModal(); true`);
+        await ev(`window.__tbFake = { status: { saved: '', running: 'pty', forced: false, choice: false, restart_required: false, can_restart: false, running_agents: 0, leftover_tmux_agents: 0 } }; window.showSettingsModal().then(() => true)`);
         await until(`document.getElementById('tb-now').textContent === 'pty'`, 'the fixed row');
         r = await row();
         check('with no choice (Windows, no tmux) the row shows pty as fixed, no radios', !r.hidden && !r.choice && r.fixed && r.now === 'Running now: pty', JSON.stringify(r));

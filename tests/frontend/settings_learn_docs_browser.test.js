@@ -29,15 +29,16 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(at.covered, false, `${w}: and nothing covers it: ${JSON.stringify(at)}`);
             assert.equal(at.focused, true, `${w}: and it has the focus: ${JSON.stringify(at)}`);
         }
-        // with a change not saved yet Settings asks first: the link waits, Settings stays open, and nothing is lost behind the person's back
+        // A choice autosaves before the Docs link closes Settings.
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`import(${MOD} + 'state.js').then(async s => { const d = await fetch('/api/settings').then(r => r.json()); s.state.settings = d.settings; return import(${MOD} + 'modals.js'); }).then(m => m.showSettingsModal('agents')).then(() => true)`);
         await waitFor(`!!document.getElementById('settings-permission-mode') && document.getElementById('settings-permission-mode').getClientRects().length > 0`, 'unsaved: the permission row', 10000);
         await ev(`(() => { const s = document.getElementById('settings-permission-mode'); s.value = s.value === 'plan' ? 'default' : 'plan'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+        await waitFor(`document.getElementById('settings-permission-mode').dataset.saving !== '1'`, 'permission row saved');
         await ev(`document.getElementById('settings-permission-mode').closest('.sv-row').querySelector('a.sv-learn').click(); true`);
-        await waitFor(`!!document.getElementById('confirm-modal') && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'unsaved: Settings asks before it closes', 6000);
-        assert.equal(await ev(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none' && location.pathname !== '/docs/how-do-i'`), true, 'unsaved: Settings stays open and Docs is not opened while the question is up');
+        await waitFor(`location.pathname === '/docs/how-do-i' && getComputedStyle(document.getElementById('settings-modal')).display === 'none'`, 'Docs opens directly after the row save');
+        assert.notEqual(await ev(`document.getElementById('confirm-modal')?.style.display`), 'flex', 'no discard question after autosave');
         console.log('PASS Settings > Learn more closes Settings and lands on the answer in Docs, at 1280 and 390');
     } finally { await client.close(); await guard.restore?.(); }
 })().catch(e => { console.error(e); process.exit(1); });
