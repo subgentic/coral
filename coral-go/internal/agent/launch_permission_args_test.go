@@ -36,8 +36,7 @@ func TestLaunchPermissionArgsAreWhatTheLaunchBuildersAdd(t *testing.T) {
 
 func TestLaunchPermissionArgsLeaveNoTempFiles(t *testing.T) {
 	dir := t.TempDir()
-	require.NoError(t, SetTempDir(dir))
-	t.Cleanup(func() { _ = SetTempDir(t.TempDir()) })
+	usePrivateLaunchTempDir(t, dir) // restores the earlier folder when the test ends
 	_, err := LaunchPermissionArgs("codex", LaunchParams{PermissionMode: "plan"})
 	require.NoError(t, err)
 	left, _ := filepathGlobAll(dir)
