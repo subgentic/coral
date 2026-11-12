@@ -48,10 +48,10 @@ const LONG = 'Not now: the build is red, the release notes are not written and I
                 assert.deepEqual(cols.map(c => c.detail), ['', 'Your answer: 1 is fine for now', 'from Orchestrator · Your answer: Option 2', 'Your answer: Yes', LONG, '', '', '', ''], `${width}: the detail is on its own line: ${JSON.stringify(cols.map(c => c.detail))}`);
                 assert.ok(cols.every(c => !c.cut), `${width}: no detail is cut`);
             } else {
-                const wrap = await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-mail-ask, #group-table-view tbody .dt-mail-title')].map(e => ({ t: e.textContent.slice(0, 30), cut: e.scrollWidth > e.clientWidth + 1 || getComputedStyle(e).textOverflow === 'ellipsis' }))`);
-                assert.ok(wrap.every(w => !w.cut), `${width}: neither the object nor the detail is cut on the phone: ${JSON.stringify(wrap.filter(w => w.cut))}`);
-                const asks = await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-mail-ask')].map(e => e.textContent)`);
-                assert.ok(asks.some(a => /^Answered \u00b7 from Orchestrator \u00b7 Your answer: Option 2$/.test(a)), `${width}: the phone's second line is the verb and the detail: ${JSON.stringify(asks)}`);
+                // a phone card (#15774): the words on line 1, the badge and who on line 2, the answer/detail on one line cut with an ellipsis, no team column
+                const ph = await ev(`[...document.querySelectorAll('#group-table-view tbody tr.activity-card')].map(r => { const q = s => r.querySelector(s); const d = q('.activity-detail'), cs = d && getComputedStyle(d); return { badge: !!q('td[data-key="action"] .chip'), who: !!q('td[data-key="who"] .activity-name'), team: getComputedStyle(q('td[data-key="team"]')).display, detail: d ? d.textContent : '', ellipsis: !d || (cs.textOverflow === 'ellipsis' && cs.whiteSpace === 'nowrap'), top: q('button, .activity-item').getBoundingClientRect().top, badgeTop: q('td[data-key="action"]').getBoundingClientRect().top }; })`);
+                assert.ok(ph.length >= 5 && ph.every(c => c.badge && c.who && c.team === 'none' && c.ellipsis && c.badgeTop > c.top), `${width}: each phone card is the words, then the badge and who, with the detail cut to one line and no team column: ${JSON.stringify(ph)}`);
+                assert.ok(ph.some(c => /^from Orchestrator \u00b7 Your answer: Option 2$/.test(c.detail) || /Your answer: Option 2/.test(c.detail)), `${width}: the answer is on the card: ${JSON.stringify(ph.map(c => c.detail))}`);
             }
         }
         console.log('activity_row_rule: ok');
