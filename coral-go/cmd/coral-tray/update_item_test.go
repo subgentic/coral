@@ -49,6 +49,7 @@ func TestTheItemSaysWhatTheTwoAnswersSayAndNothingElse(t *testing.T) {
 		"the update check cannot be asked":                {aerr: errors.New("connection refused"), st: updaterStatus{FeatureOn: true, Enabled: true}},
 		"the status cannot be asked":                      {a: approvedAnswer("1.4.157"), sterr: errors.New("connection refused")},
 		"an Agentic release that is not approved":         {a: unapproved, st: updaterStatus{FeatureOn: true, Enabled: true}},
+		"approved but the check found no promotion of it": {a: approvedAnswer("2.0.66"), st: updaterStatus{FeatureOn: true, Enabled: true, NotPromoted: true}, show: true, pane: true, title: "v2.0.66 is out; Coral can install it once it is signed for updates", page: "https://github.com/subgentic/coral/releases"},
 		"an approved release on the Agentic channel":      {a: agentic, st: updaterStatus{FeatureOn: true}, show: true, title: "Update to v1.4.158 available", page: "https://github.com/subgentic/coral/releases/tag/v1.4.158", agentc: true},
 	} {
 		c := chooseUpdateItem(tc.a, tc.aerr, tc.st, tc.sterr)
@@ -83,6 +84,9 @@ func TestTheUpdaterStatusIsReadFromTheLocalServerAndTheFeatureOffIsNotAnError(t 
 	assert.Equal(t, updaterStatus{FeatureOn: true, Enabled: true}, st)
 	assert.Equal(t, "/api/system/update", seen.Load())
 
+	st, err = askServerForUpdaterStatus(serve(200, `{"enabled":true,"not_ready_reason":"not_promoted","latest":"2.0.66"}`, nil), t.TempDir())
+	require.NoError(t, err)
+	assert.Equal(t, updaterStatus{FeatureOn: true, Enabled: true, NotPromoted: true}, st, "the server's not_promoted reason is read")
 	st, err = askServerForUpdaterStatus(serve(200, `{"enabled":false}`, nil), t.TempDir())
 	require.NoError(t, err)
 	assert.Equal(t, updaterStatus{FeatureOn: true}, st, "the feature is on and the updater is not")

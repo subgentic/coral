@@ -165,7 +165,7 @@ export const rollbackText = (reason) => (Object.hasOwn(ROLLBACK_TEXT, reason) ? 
 export function foundText(s) {
     switch (s.checkedResult) {
         case 'up_to_date': return 'Up to date.';
-        case 'not_promoted': return s.newest ? `${s.newest} is out. Coral will have it ready soon.` : 'A newer release is out. Coral will have it ready soon.';
+        case 'not_promoted': return s.newest ? `v${s.newest} is out; this Coral can install it once it is signed for updates, usually soon.` : 'A newer release is out; this Coral can install it once it is signed for updates, usually soon.'; // never "up to date" while a release is out with no promotion (#15768)
         case 'rate_limited': return 'Too many checks from this network. Coral checks again later.';
         case 'failed': return 'The check could not finish. Coral tries again later.';
         default: return '';
@@ -176,7 +176,7 @@ export function foundText(s) {
 export function notReadyText(s) {
     switch (s.notReady) {
         case 'up_to_date': return { title: 'Coral is up to date', sub: `You are on ${s.installed}.` };
-        case 'not_promoted': return { title: s.latest ? `Coral ${s.latest} is out` : 'A newer Coral is out', sub: 'Coral will download and check it once it is ready. Installing it is up to you.' };
+        case 'not_promoted': return { title: s.latest ? `v${s.latest} is out` : 'A newer Coral is out', sub: 'This Coral can install it once it is signed for updates, usually soon. Installing it is up to you.' }; // #15768
         case 'backoff': return { title: 'Nothing to install right now', sub: 'Coral will check again later.' };
         case 'rate_limited': return { title: 'Coral could not check for updates', sub: 'Too many checks from this network. Coral will try again later. Nothing was changed.' };
         case 'check_failed': return { title: 'Coral could not check for updates', sub: 'It will try again later. Nothing was changed.' };

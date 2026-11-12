@@ -28,8 +28,9 @@ const (
 
 // updaterStatus is what the tray reads of GET /api/system/update: whether the route exists (the feature is on) and whether the updater is on in this build.
 type updaterStatus struct {
-	FeatureOn bool
-	Enabled   bool
+	FeatureOn   bool
+	Enabled     bool
+	NotPromoted bool // the last check found a newer release with no promotion (not_ready_reason "not_promoted", #15768): it is approved and cannot be installed yet
 }
 
 // askServerForUpdaterStatus calls the server's updater status, signed with Coral's command-line token. A 404 is the feature being off (no error); anything else that is not a 200 is an error.
@@ -51,12 +52,13 @@ func askServerForUpdaterStatus(baseURL, dataDir string) (updaterStatus, error) {
 		return updaterStatus{}, fmt.Errorf("the server answered %d", resp.StatusCode)
 	}
 	var body struct {
-		Enabled bool `json:"enabled"` // anything but a JSON true is false
+		Enabled bool   `json:"enabled"` // anything but a JSON true is false
+		Reason  string `json:"not_ready_reason"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 256<<10)).Decode(&body); err != nil {
 		return updaterStatus{}, err
 	}
-	return updaterStatus{FeatureOn: true, Enabled: body.Enabled}, nil
+	return updaterStatus{FeatureOn: true, Enabled: body.Enabled, NotPromoted: body.Reason == "not_promoted"}, nil
 }
 
 // updateChoice is what the item says and does.
@@ -79,7 +81,11 @@ func chooseUpdateItem(a updateAnswer, askErr error, st updaterStatus, stErr erro
 	case stErr != nil || !st.FeatureOn:
 		return updateChoice{} // the update feature is off (or the server could not say): nothing
 	}
-	return updateChoice{Show: true, Title: fmt.Sprintf("Update to v%s available", a.Latest), Pane: st.Enabled, Page: a.pageURL(), Version: a.Latest, Channel: string(a.channelOf())}
+	title := fmt.Sprintf("Update to v%s available", a.Latest)
+	if st.NotPromoted { // approved, but no promotion yet: the item says so, and does not offer what cannot be installed (#15768)
+		title = fmt.Sprintf("v%s is out; Coral can install it once it is signed for updates", a.Latest)
+	}
+	return updateChoice{Show: true, Title: title, Pane: st.Enabled, Page: a.pageURL(), Version: a.Latest, Channel: string(a.channelOf())}
 }
 
 // menuItem is the part of a systray item the loop needs.

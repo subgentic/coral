@@ -93,3 +93,30 @@ func TestCheckWithNothingPromotedStagesNothing(t *testing.T) {
 	assert.Equal(t, stage.ResultNotPromoted, r.check().Result, "a signature file that is not there yet")
 	r.nothingStaged()
 }
+
+// A release newer than the installed one is out but not promoted yet, while an older promotion exists (v2.0.66 approved as Latest, the newest promotion promote-v2.0.64, an installed 2.0.65, #15768): the check
+// says "not promoted" and names the release, never "up to date". The newest promotion being no newer than the installed version only means it is up to date when no newer release is out.
+func TestANewerReleaseWithOnlyAnOlderPromotionIsNotPromoted(t *testing.T) {
+	for name, tc := range map[string]struct {
+		installed, promoted, out string
+		want                     string
+	}{
+		"the release after the installed one is out, only an older promotion": {"1.4.130", "1.4.129", "v1.4.131", stage.ResultNotPromoted},
+		"the newest promotion is the installed one":                           {"1.4.130", "1.4.130", "v1.4.131", stage.ResultNotPromoted},
+		"nothing newer is out: up to date":                                    {"1.4.130", "1.4.130", "v1.4.130", stage.ResultUpToDate},
+		"a newer prerelease is not a newer release":                           {"1.4.130", "1.4.130", "v1.4.131-rc1", stage.ResultUpToDate},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := newRig(t)
+			r.cfg.Installed = tc.installed
+			r.publish(Spec{Version: tc.promoted, Sequence: 7})
+			r.gh.FeedExtra = []string{tc.out}
+			res := r.check()
+			assert.Equal(t, tc.want, res.Result, "%+v", res)
+			if tc.want == stage.ResultNotPromoted {
+				assert.Equal(t, "1.4.131", lastResult(t, r).Newest, "the record names the release that is out")
+			}
+			r.nothingStaged()
+		})
+	}
+}

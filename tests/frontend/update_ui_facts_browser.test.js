@@ -61,7 +61,7 @@ const idle = (over = {}) => ({ enabled: true, relaunch_available: true, installe
         for (const [name, st, want, not] of [
             ['unknown', idle(), /Nothing is ready to install/, /up to date/i],
             ['up_to_date', idle({ not_ready_reason: 'up_to_date' }), /Coral is up to date/, null],
-            ['not_promoted', idle({ not_ready_reason: 'not_promoted', latest: '1.4.130' }), /Coral 1\.4\.130 is out.*Installing it is up to you/, /up to date/i],
+            ['not_promoted', idle({ not_ready_reason: 'not_promoted', latest: '1.4.130' }), /v1\.4\.130 is out.*signed for updates.*Installing it is up to you/, /up to date/i],
             ['rate_limited', idle({ not_ready_reason: 'rate_limited' }), /could not check for updates.*Too many checks from this network.*try again later/, /up to date/i],
             ['check_failed', idle({ not_ready_reason: 'check_failed' }), /could not check for updates/, /up to date/i],
             ['switch_off', idle({ not_ready_reason: 'switch_off' }), /Automatic update checks are off/, /up to date/i],
@@ -77,7 +77,7 @@ const idle = (over = {}) => ({ enabled: true, relaunch_available: true, installe
         // What the last check found (#9726): the server's own result word, with the newest release it saw, never a guess from the dashboard's own request
         for (const [name, st, want] of [
             ['up_to_date', idle({ not_ready_reason: 'up_to_date', checked_at: '2026-10-20T08:00:00Z', checked_result: 'up_to_date', newest: '1.4.125' }), /What it found.*Up to date\./],
-            ['not_promoted', idle({ not_ready_reason: 'not_promoted', latest: '1.4.140', checked_at: '2026-10-20T08:00:00Z', checked_result: 'not_promoted', newest: '1.4.140' }), /What it found.*1\.4\.140 is out\. Coral will have it ready soon\./],
+            ['not_promoted', idle({ not_ready_reason: 'not_promoted', latest: '1.4.140', checked_at: '2026-10-20T08:00:00Z', checked_result: 'not_promoted', newest: '1.4.140' }), /What it found.*v1\.4\.140 is out; this Coral can install it once it is signed for updates, usually soon\./],
             ['rate_limited', idle({ not_ready_reason: 'rate_limited', checked_at: '2026-10-20T08:00:00Z', checked_result: 'rate_limited', newest: '1.4.140' }), /What it found.*Too many checks from this network/],
             ['failed', idle({ not_ready_reason: 'check_failed', checked_at: '2026-10-20T08:00:00Z', checked_result: 'failed' }), /What it found.*could not finish/],
         ]) {

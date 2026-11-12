@@ -92,6 +92,14 @@ func (c *checker) findPromotion(ctx context.Context, onlyTag string) (p *promoti
 		return nil, 0, err
 	}
 	c.noteNewest(list)
+	for _, r := range list {
+		if sm := promoteTagRe.FindStringSubmatch(r.TagName); sm != nil {
+			if c.promoted == nil {
+				c.promoted = map[string]bool{}
+			}
+			c.promoted[sm[1]] = true
+		}
+	}
 	looked := 0
 	var rehearsal *promotion
 	var first *noneVerified
