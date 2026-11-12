@@ -29,8 +29,7 @@ const BASE = require('./test_base').BASE;
             window.T.render.renderLiveSessions(window.T.state.liveSessions);
             return true;
         })()`);
-        // #12942: keep the restart chip alone for terminal-gone sleepers. Plain and
-        // ended sleepers retain their existing pills; check both sidebar/list layouts.
+        // #12942: keep the restart chip alone for terminal-gone sleepers. Plain sleepers keep their pill, an ended agent says Ended alone (#15777); check both sidebar/list layouts.
         const failures = [];
         for (const [width, height, mobile] of [[1280, 800, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width, height, deviceScaleFactor: 1, mobile });
@@ -42,7 +41,7 @@ const BASE = require('./test_base').BASE;
                     return { gone: info('gone-a-id'), nap: info('nap-b-id'), ended: info('ended-d-id') }; })()`);
                 if (chips.gone.join('|') !== 'Terminal gone') failures.push(`${width} ${theme}: terminal-gone row has duplicate state chips: ${JSON.stringify(chips.gone)}`);
                 assert.deepEqual(chips.nap, ['Sleeping'], 'plain sleeper unchanged');
-                assert.deepEqual(chips.ended, ['Ended', 'Sleeping'], 'ended sleeper unchanged');
+                assert.deepEqual(chips.ended, ['Ended'], 'an ended agent says one word, Ended, with no Sleeping pill beside it (#15777)');
                 if (process.env.CORAL_SCREENSHOT_DIR) {
                     fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true });
                     fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/terminal-gone-${width}-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));

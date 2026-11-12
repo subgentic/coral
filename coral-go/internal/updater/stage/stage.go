@@ -183,12 +183,13 @@ func dropStaleStage(st *verify.State, installed string) string {
 }
 
 type checker struct {
-	cfg    Config
-	dir    string
-	st     verify.State
-	now    time.Time
-	res    Result
-	newest string // the highest product release (X.Y.Z) this check saw in the feed or the API's list, "" when it saw none
+	cfg      Config
+	dir      string
+	st       verify.State
+	now      time.Time
+	res      Result
+	newest   string          // the highest product release (X.Y.Z) this check saw in the feed or the API's list, "" when it saw none
+	promoted map[string]bool // the product tags (vX.Y.Z) some listed promote-<tag>-<n> release names: a tag with one was promoted at some point, whatever came of it
 }
 
 // recordOutcome keeps what the check found for Settings and the dashboard's notice (#9726): the result, the newest release it saw and when. A result is one of verify.CheckResults; a failure that was GitHub's rate limit
@@ -305,6 +306,9 @@ func (c *checker) run(ctx context.Context) Result {
 	if cmp, cerr := verify.CompareToInstalled(m.Version, cfg.Installed); cerr != nil || cmp <= 0 {
 		c.save()
 		c.res.Result = ResultUpToDate
+		if cerr == nil && c.newerReleaseIsOut() {
+			c.res.Result = ResultNotPromoted // the newest promotion is no newer than this install, but a newer release is out and has none: it is not "up to date" (#15768: v2.0.66 Latest, newest promotion v2.0.64, installed 2.0.65)
+		}
 		return c.res
 	}
 	base := cfg.DownloadBase + m.Tag + "/"
@@ -478,4 +482,14 @@ func (c *checker) prune(root, keep string) {
 			_ = os.RemoveAll(filepath.Join(root, e.Name()))
 		}
 	}
+}
+
+// newerReleaseIsOut is true when the newest product release the check saw (a listed vX.Y.Z, never a prerelease or a draft) is newer than the installed version and no listed promotion names it. A release
+// that has promotions (one replayed or revoked, refused by its sequence) is not "not promoted yet": the promotions say what became of it.
+func (c *checker) newerReleaseIsOut() bool {
+	if c.newest == "" || c.promoted["v"+c.newest] {
+		return false
+	}
+	cmp, err := verify.CompareToInstalled(c.newest, c.cfg.Installed)
+	return err == nil && cmp > 0
 }
