@@ -1,0 +1,40 @@
+/* Needs you rows on a computer, compact (#15722, the Operator's four points and the layouts picked from #15723's mockups). Lazy: loaded by inbox_sidebar.js with the Inbox, not at start.
+   One grid per row: line 1 is the select box, the kind icon, the sender and the name, then the team and how long it has waited at the right; the words sit beside the name (a file: layout A) or on a line
+   of their own under it (a question, a yes/no and everything else: layout B, so a question is never cut); the buttons, every one a labelled button, are the bottom line. Everything is under the folded
+   card list (.dt-fold-always), which only a computer's Needs you has: a phone's rows are not touched. */
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.dt-row.inbox-kind-row {
+    display: grid; grid-template-columns: auto auto minmax(0, clamp(15rem, 30%, 24rem)) minmax(0, 1fr) minmax(0, auto) auto; /* the tracks give way when the card is narrow (200% text): nothing is wider than the card */ column-gap: var(--space-md, 8px); row-gap: 2px; align-items: start; align-content: start;
+    padding: 8px var(--table-pad-x, 16px) 8px 4px; min-height: 0;
+}
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.dt-row.inbox-kind-row::before { display: none; } /* the folded row's line break is a flex thing: in the grid it would be a cell */
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row > td.dt-check { grid-column: 1; order: 1; width: var(--table-touch, 44px); }
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row > td[data-key="agent"] { display: contents; } /* the name's cell is not a box: its icon, name and words are cells of the row's grid */
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row .inbox-kind-column { position: static; inset: auto; width: auto; padding: 0; grid-column: 2; order: 2; display: flex; align-items: center; justify-content: center; }
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row > td[data-key="agent"] > :not(.dt-subtitle):not(.inbox-kind-column) { grid-column: 3 / 5; order: 3; min-width: 0; }
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row > td[data-key="agent"] > .dt-subtitle { grid-column: 3 / -1; order: 7; min-width: 0; margin: 0; white-space: normal; overflow-wrap: anywhere; } /* layout B: the words, whole, under the name */
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row:has(.inbox-kind-icon[data-kind="review"]) > td[data-key="agent"] > :not(.dt-subtitle):not(.inbox-kind-column) { grid-column: 3; } /* layout A, a file: the words are beside the name, and wrap inside their own column when long */
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row:has(.inbox-kind-icon[data-kind="review"]) > td[data-key="agent"] > .dt-subtitle { grid-column: 4; order: 4; }
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row > td[data-key="team"] { grid-column: 5; order: 5; justify-self: end; min-width: 0; padding: 0; }
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row > td[data-key="waiting"] { grid-column: 6; order: 6; justify-self: end; padding: 0; white-space: nowrap; }
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row > td.dt-line-2:not(.dt-col-unused) { grid-column: 3 / -1; order: 8; padding: 0; min-width: 0; }
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row > td[data-key="review"] { grid-column: 1 / -1; order: 9; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; padding: 4px 0 0; }
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row .inbox-review-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; }
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row .inbox-review-actions > .btn { flex: none; width: auto; min-width: 0; }
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row .inbox-review-actions > .inbox-main-action { order: -1; } /* Approve, Answer, Yes first, as the mockups have it */
+/* the star is a labelled button in the bottom row now, not a corner mark on the name */
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row .inbox-review-actions > .dt-star-labelled { position: static; inset: auto; width: auto; height: auto; margin: 0; opacity: 1; border: 1px solid var(--text-muted); border-radius: var(--radius-md); background: transparent; cursor: pointer; } /* .dt-star is a 24 px glyph that shows only on hover: this one is a button with a word, always drawn */
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row .inbox-review-actions :is(.inbox-row-more-toggle, .dt-star-labelled) { border-color: var(--text-muted); color: var(--text-secondary); } /* More and Star wear what Comment and Save do (needs_actions.css), though they are not the bar's own children */
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row .inbox-review-actions :is(.inbox-row-more-toggle, .dt-star-labelled):hover { border-color: var(--text-secondary); color: var(--text-primary); background: var(--bg-hover); }
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row .inbox-review-actions > .dt-star-labelled.dt-star-on { color: var(--accent); border-color: var(--accent); } /* a starred file: the accent, and aria-pressed says it */
+/* a question: the sender on the top line, its words (the asker's whole question) under it, across the row; the line that said 'Needs your answer' is the icon's name now */
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row:has(.inbox-ask-name) > td[data-key="agent"] > .inbox-review-item { display: contents; }
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row:has(.inbox-ask-name) > td[data-key="agent"] .inbox-review-from { grid-column: 3 / 5; order: 3; }
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row:has(.inbox-ask-name) > td[data-key="agent"] .inbox-ask-name { grid-column: 3 / -1; order: 7; min-width: 0; margin: 0; max-width: none; white-space: normal; overflow-wrap: anywhere; }
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row:has(.inbox-ask-name) > td[data-key="agent"] .inbox-review-wait { display: none; }
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row > td[data-key="agent"] > .dt-subtitle.inbox-kind-words { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* still read out; the icon and the buttons say it to the eye */
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row:has(.inbox-ask-name) .inbox-review-from::after { content: none; } /* the sender stands alone on the question's top line */
+/* line 1 is one 32 px band on every row, whatever the words do under it (a wrapped file name or a long question never moves the select box and the icon) */
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row > td.dt-check, .inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row .inbox-kind-column, .inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row > td[data-key="team"], .inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row > td[data-key="waiting"] { min-height: 32px; display: flex; align-items: center; }
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row > td.dt-check { justify-content: center; }
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row > td[data-key="agent"] > .inbox-review-item:not(:has(.inbox-ask-name)), .inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row:has(.inbox-ask-name) .inbox-review-from { min-height: 32px; display: flex; align-items: center; flex-wrap: wrap; column-gap: 0.4em; }
+.inbox-needs-results .dt-box.dt-fold-always.dt-folded tr.inbox-kind-row:has(.inbox-kind-icon[data-kind="review"]) > td[data-key="agent"] > .dt-subtitle { min-height: 32px; display: flex; align-items: center; }
