@@ -320,7 +320,7 @@ func (r Runner) ScanAlias(ctx context.Context, t Target) ([]HostKey, error) {
 func (r Runner) hopKeyError(ctx context.Context, sshBin, cfgPath string, t Target) error {
 	e := &HopKeyError{}
 	g := func(dest string, port ...string) map[string]string {
-		cctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		cctx, cancel := context.WithTimeout(ctx, r.hopTimeout())
 		defer cancel()
 		argv := []string{"-G", "-F", cfgPath}
 		for _, p := range port {
@@ -451,7 +451,7 @@ func (r Runner) HostKeyName(ctx context.Context, t Target) string {
 	if userCfg == "" || !aliasRe.MatchString(t.Alias) {
 		return ""
 	}
-	cctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	cctx, cancel := context.WithTimeout(ctx, r.hopTimeout())
 	defer cancel()
 	cmd := executil.Command(cctx, sshBin, "-G", "-F", userCfg, "--", t.Alias)
 	var out capped
