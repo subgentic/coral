@@ -14,7 +14,8 @@ const CHECKBOXES = `(() => [...document.querySelectorAll('#settings-modal input[
     .map(el => { const hit = el.closest('label') || el; const r = hit.getBoundingClientRect(); return { id: el.id || el.name || '', w: Math.round(r.width), h: Math.round(r.height), label: !!el.closest('label') }; }))()`;
 
 (async () => {
-    const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const guard = await require('./helpers/settings_guard').guardSettings();
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -61,7 +62,8 @@ const CHECKBOXES = `(() => [...document.querySelectorAll('#settings-modal input[
 
         console.log('\nAll Settings checkbox target checks passed');
     } finally {
-        await client.close();
+        try { await waitFor(`!document.querySelector('#settings-modal [data-saving="1"]')`, 'pending row saves finish before restoring settings'); }
+        finally { await client.close(); await guard.restore(); }
     }
 })().catch(err => {
     console.error(err);
