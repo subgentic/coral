@@ -219,7 +219,6 @@
 2	group_cards.js	_teamHeaderAttrs(boardName)
 2	group_cards.js	accentStyle
 2	group_cards.js	bKebab
-2	group_cards.js	boardLink
 2	group_cards.js	boardSleepIcon
 1	group_cards.js	changed > 0 ? `${changed} changed` : ''
 1	group_cards.js	changedBadge
