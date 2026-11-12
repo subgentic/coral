@@ -179,7 +179,7 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 			errInternalServer(w, err.Error())
 			return
 		}
-		if refuseHubSkip(w, r, h.ss, teamAsksToSkip(body, settings)) {
+		if refuseHubSkip(w, r, h.ss, teamAsksToSkip(body, settings, h.customFlagsOf(r.Context()))) {
 			return
 		}
 	}
@@ -467,9 +467,9 @@ func (h *SessionsHandler) rollBackTeamLaunch(ctx context.Context, body launchTea
 // every member; or capability allow rules, tools or hooks, unless the member is exactly an agent of a team template the
 // owner saved (inSavedTeamTemplate, every field). The built-in templates are not the owner's choice: their allow rules
 // count (#126 F4, the Orchestrator's decision). One member is enough to refuse the team.
-func teamAsksToSkip(body launchTeamRequest, settings map[string]string) bool {
+func teamAsksToSkip(body launchTeamRequest, settings map[string]string, custom customFlagsFor) bool {
 	for _, def := range body.Agents {
-		if memberAsksToSkip(body, def, settings) {
+		if memberAsksToSkip(body, def, settings, custom) {
 			return true
 		}
 	}
@@ -503,14 +503,34 @@ func teamIsRelaunch(body launchTeamRequest) bool {
 	return body.BoardID != "" && !body.NewBoard
 }
 
-// memberAsksToSkip is teamAsksToSkip for one member.
-func memberAsksToSkip(body launchTeamRequest, def launchTeamAgent, settings map[string]string) bool {
+// customFlagsFor resolves a custom permission mode (#15950) for a gate: the flags the mode adds to a launch of agentType, and false when it cannot be resolved (deleted, for another agent, no longer
+// passing its checks, unreadable).
+type customFlagsFor func(agentType, mode string) ([]string, bool)
+
+// customFlagsOf is the resolver a request's gates use: the stored mode, checked again as a launch checks it.
+func (h *SessionsHandler) customFlagsOf(ctx context.Context) customFlagsFor {
+	return func(agentType, mode string) ([]string, bool) {
+		extra, _ := h.customModeFlags(ctx, agentType, mode)
+		return extra, extra != nil
+	}
+}
+
+// memberAsksToSkip is teamAsksToSkip for one member. A member in a custom mode is judged by the flags the mode adds, as a launch runs them; one whose mode cannot be resolved counts as skipping
+// (Security, #15950: the gate fails closed, whatever the launch later does with a mode that is gone).
+func memberAsksToSkip(body launchTeamRequest, def launchTeamAgent, settings map[string]string, custom customFlagsFor) bool {
 	agentType, flags := body.AgentType, def.Flags
 	if def.AgentType != "" {
 		agentType = def.AgentType
 	}
 	if len(flags) == 0 {
 		flags = body.Flags
+	}
+	if _, isCustom := custommodes.IDOf(def.PermissionMode); isCustom {
+		extra, ok := custom(agentType, def.PermissionMode)
+		if !ok {
+			return true
+		}
+		flags = append(append([]string{}, flags...), extra...)
 	}
 	if agent.SkipsPermissionPrompts(agentType, flags) {
 		return true
@@ -548,7 +568,7 @@ func (h *SessionsHandler) hubMemberStopped(ctx context.Context, r *http.Request,
 	if err != nil {
 		return "hub_settings_unreadable", "the settings could not be read to check this member: " + err.Error(), true // fail closed
 	}
-	code, msg, refused, err := hubSkipRefusal(ctx, r, h.ss, memberAsksToSkip(body, def, settings))
+	code, msg, refused, err := hubSkipRefusal(ctx, r, h.ss, memberAsksToSkip(body, def, settings, h.customFlagsOf(ctx)))
 	if err != nil {
 		return "hub_settings_unreadable", "the settings could not be read to check this member: " + err.Error(), true
 	}
