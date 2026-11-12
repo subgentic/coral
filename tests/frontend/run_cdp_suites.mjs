@@ -97,7 +97,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classifySuites, problems } from './suites.mjs';
-import { loadDurations, orderLongestFirst, partsByDuration } from './suite_order.mjs';
+import { durationsFile, loadDurations, orderLongestFirst, partsByDuration } from './suite_order.mjs';
 import { failingOutput } from './failing_output.mjs';
 import { suiteTimeoutS } from './suite_timeout.mjs';
 import { shardDirName } from './shard_dir.mjs';
@@ -666,7 +666,7 @@ for (const t of [...STRICT_SUITES, ...PROD_TIER_EXTRA]) if (!suites.cdp.includes
 for (const t of TMUX_SUITES) if (!suites.cdp.includes(t)) { console.error(`TMUX_SUITES names ${t}, which is not a CDP suite`); process.exit(2); }
 // Longest first, from the durations of a previous run (suite_durations.json; update_suite_durations.mjs writes it): shards take the next
 // suite from one queue, and a long suite left to the end of an alphabetical queue would leave the other shards idle (#3916).
-const suiteDurations = loadDurations(path.join(here, 'suite_durations.json'));
+const suiteDurations = loadDurations(durationsFile(here));
 let tests = sequencesOnly ? [] : (strictOnly ? (prodTier ? [...STRICT_SUITES, ...PROD_TIER_EXTRA].filter(f => !(f in PROD_TIER_SKIPPED)) : STRICT_SUITES) : tmuxOnly ? TMUX_SUITES : [...suites.cdp, ...suites.server].filter(f => MAIN_BACKEND !== 'default' || !TMUX_ONLY_SUITES.includes(f)))
   .filter(f => !only || only.split(',').some(o => f.includes(o))).sort();
 // Suites known to fail on Windows only (windows_known_reds.json, each with its reason) are left out there; every entry must still be a CDP suite.

@@ -3,6 +3,7 @@
 // previous run, suite_durations.json) keeps every shard busy to the end. Suites without a recorded duration count as the median, so a
 // new suite neither jumps the queue nor falls to the back; ties and a missing file keep alphabetical order.
 import fs from 'node:fs';
+import path from 'node:path';
 
 /** The recorded durations ({ 'name.test.js': seconds }), or {} when the file is missing or unreadable. */
 export function loadDurations(file) {
@@ -10,6 +11,16 @@ export function loadDurations(file) {
         const d = JSON.parse(fs.readFileSync(file, 'utf8'));
         return d && typeof d === 'object' && !Array.isArray(d) ? d : {};
     } catch { return {}; }
+}
+
+/**
+ * The durations file for this platform (#14722): Windows runs suites at different speeds than Linux and the Mac (a part's suites ran 26.6 to 30.3
+ * min on Windows with the Linux-recorded split), so a Windows run reads suite_durations.windows.json (written from Windows runs' own times) when
+ * it is there, and every other platform, or a Windows checkout without that file, reads suite_durations.json.
+ */
+export function durationsFile(dir, platform = process.platform) {
+    const win = path.join(dir, 'suite_durations.windows.json');
+    return platform === 'win32' && fs.existsSync(win) ? win : path.join(dir, 'suite_durations.json');
 }
 
 /** `tests` longest first by `durations`; the order of `tests` itself (alphabetical) for ties. */
