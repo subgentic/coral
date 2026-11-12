@@ -671,6 +671,9 @@ func (p *provisionPlan) moveFrom(from1, from2, next string) (string, bool) {
 func scanSentence(err error) string {
 	var he *sshprov.HopKeyError
 	if errors.As(err, &he) {
+		if he.LookupFailed && len(he.Hops) == 0 {
+			return "Coral could not look up which jump host this was, so it cannot say which key is missing. Try again; if it keeps happening, connect through your jump hosts once with ssh in a terminal, then set up again."
+		}
 		which := he.Unknown
 		if len(which) == 0 {
 			which = he.Hops

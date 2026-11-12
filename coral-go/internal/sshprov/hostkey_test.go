@@ -576,6 +576,17 @@ func TestHopKeyErrorLookupLimitIsTheRunnersAndASlowSshIsNamedWithinIt(t *testing
 	if got := hops(100 * time.Millisecond); got != "" {
 		t.Errorf("a slow ssh past the limit: hops %q, want none", got)
 	}
+	// #15812: the lookup that was killed says so, and one that answered does not
+	lookup := func(limit time.Duration) *HopKeyError {
+		he, _ := (Runner{HopTimeout: limit}).hopKeyError(context.Background(), slow, cfg, tg).(*HopKeyError)
+		return he
+	}
+	if he := lookup(100 * time.Millisecond); he == nil || !he.LookupFailed {
+		t.Errorf("a killed ssh -G: %+v, want LookupFailed", he)
+	}
+	if he := lookup(time.Minute); he == nil || he.LookupFailed {
+		t.Errorf("an ssh -G that answered: %+v, want not LookupFailed", he)
+	}
 	if (Runner{}).hopTimeout() != 10*time.Second {
 		t.Errorf("the default limit is %v", (Runner{}).hopTimeout())
 	}
