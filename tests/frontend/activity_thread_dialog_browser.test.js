@@ -45,12 +45,16 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(await ev(`[...document.querySelectorAll('.activity-thread-msg .activity-thread-name')].map(e => e.textContent)`), ['Ada', 'You', 'Ada'], 'in order, the Operator as You');
         assert.deepEqual(await ev(`[...document.querySelectorAll('.activity-thread-body')].map(e => e.textContent.trim())`), ['Should we ship it?', '@Ada yes, ship it', 'Shipped. Anything else?']);
         assert.equal(await ev(`document.querySelector('.activity-thread-send').disabled`), true, 'Send reply waits for words');
+        // mockup v3 (#15774): one Reply box with Attach image and its hint, the buttons at the right with Send reply last, the thread as a chat (the Operator's words on the right)
+        const v3 = await ev(`(() => { const d = document.querySelector('dialog.activity-thread-dialog'); const b = [...d.querySelectorAll('.activity-thread-actions .btn')].filter(x => !x.hidden).map(x => x.textContent.trim()); const mine = d.querySelector('.activity-thread-mine'), other = d.querySelector('.activity-thread-msg:not(.activity-thread-mine)'); return { attach: [...d.querySelectorAll('button')].some(x => x.textContent.trim() === 'Attach image'), hint: /Paste or drop an image here too/.test(d.textContent), buttons: b, reply: !!d.querySelector('textarea') && d.querySelectorAll('textarea').length === 1, mineRight: !!mine && !!other && mine.getBoundingClientRect().left > other.getBoundingClientRect().left }; })()`);
+        assert.ok(v3.attach && v3.hint && v3.reply && v3.mineRight, JSON.stringify(v3));
+        assert.equal(v3.buttons[v3.buttons.length - 1], 'Send reply', 'Send reply is the last, right-most button: ' + JSON.stringify(v3.buttons));
         await shot('activity-thread-1280');
         await ev(`(() => { const t = document.querySelector('.activity-thread-box'); t.value = 'Yes, and tag it v2.'; t.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('.activity-thread-send').click(); return true; })()`);
         await waitFor(`window.__posts.length === 1 && document.querySelectorAll('.activity-thread-msg').length === 4`, 'the reply is sent and joins the thread', 8000);
         assert.deepEqual(await ev(`window.__posts`), [{ subscriber_id: 'Operator', as: 'Operator', content: '@Ada Yes, and tag it v2.', reply_to: 9 }], 'sent into the same thread, to the last message');
         assert.equal(await ev(`document.querySelector('.activity-thread-box').value`), '', 'the box is empty again');
-        await ev(`document.querySelector('.activity-thread-actions .btn:last-child').click(); true`);
+        await ev(`[...document.querySelectorAll('.activity-thread-actions .btn')].find(b => b.textContent.trim() === 'Close').click(); true`);
         await waitFor(`!document.querySelector('dialog.activity-thread-dialog')`, 'Close shuts it');
         // a thread the board no longer has: the record's words stand in
         await ev(`window.__noThread = true; [...document.querySelectorAll('#group-table-view tbody tr')].find(r => /Ship it/.test(r.textContent)).querySelector('button.dt-primary').click(); true`);

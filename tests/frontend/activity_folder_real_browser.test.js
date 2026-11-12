@@ -72,9 +72,7 @@ const HEX = 'c'.repeat(64);
         }
         const bad = Object.entries(widths).filter(([, z]) => z.on < 120 || z.scrolls !== false);
         assert.deepEqual(bad, [], `the On column is at least 120 px wide and nothing scrolls sideways, at each width: ${JSON.stringify(widths)}`);
-        const dropOrder = ['From', 'Team', 'When', 'You did'];
-        const shown = w => widths[w].cols; // (not monotonic across widths: at 900 the sidebar folds away and the table has more room)
-        for (const w of [1440, 1280, 1024, 900]) { const gone = dropOrder.filter(c => !shown(w).includes(c)); const expect = dropOrder.slice(0, gone.length); assert.deepEqual(gone, expect, `${w}: columns go in the order From, Team, When, You did ${JSON.stringify(widths[w])}`); assert.ok(shown(w).includes('On'), `${w}: On is always there`); }
+        // the list is cards now (#15774): the columns no longer drop one by one; the words keep their floor and nothing scrolls sideways, which is asserted above
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         console.log('   \u2713');
 

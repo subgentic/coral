@@ -166,6 +166,9 @@ async function httpJson(method, path, body, headers = {}) {
             await waitFor(`!!(${activityRow})`, 'the question in Activity', 10000);
             assert.ok(await ev(`!!(${activityRow}).querySelector('.dt-primary')`), 'the question in Activity can be opened');
             await ev(`(${activityRow}).querySelector('.dt-primary').click(); true`);
+            // an answered question opens as a thread (#15724); its Open on the Board button goes to the original message
+            await waitFor(`!!document.querySelector('dialog.activity-thread-dialog[open] .activity-thread-board')`, 'the thread dialog opens', 10000);
+            await ev(`document.querySelector('.activity-thread-board').click(); true`);
             await waitFor(`!!document.querySelector('.mb-message[data-message-id="${documentQuestion}"] [data-on-click="mb-msg-reply"]')`, 'Activity opens the original board question with Reply', 15000);
             assert.ok(await ev(`document.querySelector('.mb-message[data-message-id="${documentQuestion}"]').textContent.includes('(document review)')`), 'the original question can still be read');
         };
