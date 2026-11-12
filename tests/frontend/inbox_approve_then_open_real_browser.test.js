@@ -75,10 +75,22 @@ const { coralReady, framesJs } = require('./helpers/wait');
                     } }
                 await new Promise(r => setTimeout(r, 50)); } return null; })()`);
             const openBy = async (n, part, label) => {
-                const p = await where(n, part); check(!!p, at + `${label}: found ${n}'s ${part}`); if (!p) return;
+                // Aim, then confirm the aim at the moment of the press: the list can redraw between the read and the click (a slow runner's late redraw put the sort bar under the pointer, Windows
+                // v2.0.67 gate 1, #15930), so the point is read again after the pointer moves there and the press waits for it to name this row; a person who sees the list move aims again.
+                let p = null;
+                for (let a = 0; a < 5 && !p; a++) {
+                    const q = await where(n, part); if (!q) break;
+                    await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: q.x, y: q.y, button: 'none', buttons: 0, clickCount: 0 });
+                    await ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))`);
+                    const still = await ev(`(() => { const e = document.elementFromPoint(${q.x}, ${q.y}), tr = e && e.closest('${T} tbody tr'); return !!(tr && tr.querySelector('button[aria-label="Approve: ${n}"]')); })()`);
+                    if (still) p = q;
+                }
+                check(!!p, at + `${label}: found ${n}'s ${part}`); if (!p) return;
                 await click(p.x, p.y);
                 const ok = await waitFor(`!!document.querySelector('#artifact-viewer:not([hidden])')`, at + `${label}: the viewer opens`, 6000).then(() => true, () => false);
-                check(ok, at + `${label}: a click on ${n}'s ${part} opens it (hit ${JSON.stringify(p)})`);
+                const seen = ok ? '' : await ev(`(() => { const e = document.elementFromPoint(${p.x}, ${p.y}), v = document.getElementById('artifact-viewer'), tr = e && e.closest('tr'); return JSON.stringify({ at: e && (e.tagName + '.' + String(e.className).slice(0, 60)), row: tr && tr.className.slice(0, 80), viewer: v ? { hidden: v.hidden, display: getComputedStyle(v).display } : null, folded: !!document.querySelector('${T} .dt-folded'), w: innerWidth, errors: ${JSON.stringify(pageErrors.slice(-3))} }); })()`);
+                check(ok, at + `${label}: a click on ${n}'s ${part} opens it (hit ${JSON.stringify(p)}; ${seen})`);
+                if (!ok) return; // nothing opened: there is no viewer to close (a null close button threw here)
                 await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
                 await waitFor(`document.getElementById('artifact-viewer').hidden`, at + `${label}: the viewer closes`, 4000).catch(() => {});
                 await new Promise(r => setTimeout(r, 400)); // sleep-ok: the viewer's close
