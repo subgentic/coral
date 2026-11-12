@@ -9,8 +9,9 @@ const { coralReady } = require('./helpers/wait');
 // ST6 adds a visible short help line where there used to be only a closed More.
 // Keep the old section budgets plus the words in those authored lines (HELP_LINES /
 // HINTS); long explanations remain in Docs and never inflate the dialog.
-const BEFORE = { 'Network and Hub':186, Agents:166, 'Storage and cleanup':151, Terminal:70, General:39, Notifications:72, 'Files and Git':40, 'Security and privacy':59 };
-const HELP_WORDS = { 'Network and Hub':80, Agents:73, 'Storage and cleanup':21, Terminal:16, General:6, 'Files and Git':8, 'Security and privacy':17 };
+// Notifications includes the existing Inbox block; retain an allowance of 180 words for its labels/help and team notice.
+const BEFORE = { 'Coral Hub and remote access':186, Defaults:166, 'Storage and backup':151, Terminal:70, Appearance:39, Notifications:72+180, 'Files and Git':40, 'Security and privacy':59 };
+const HELP_WORDS = { 'Coral Hub and remote access':80, Defaults:73, 'Storage and backup':21, Terminal:16, Appearance:6, 'Files and Git':8, 'Security and privacy':17 };
 const BUDGET = Object.fromEntries(Object.entries(BEFORE).map(([k,v])=>[k,v+(HELP_WORDS[k]||0)]));
 
 (async () => {

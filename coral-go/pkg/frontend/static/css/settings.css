@@ -19,7 +19,7 @@
 #settings-modal :is(.tb-now, .tb-now b, .machine-health-note, .machine-health-status) { font: var(--dlg-hint); }
 #settings-modal .badge { font: var(--dlg-badge); }
 
-/* footer: Cancel at the left, Save at the right, as in New agent and New team (the note between them) */
+/* Settings saves each row; its footer contains only Close. */
 #settings-modal .modal-footer { justify-content: flex-end; align-items: center; gap: 12px; }
 
 /* a row: its label and its hint (always visible) at the left, its control at the right in a fixed column; a row marked wide puts the control on its own line under them */
@@ -52,3 +52,14 @@
 /* Per-row persistence feedback stays beside the setting, including at larger text sizes. */
 .settings-save-status { display: block; font-size: var(--sv-help-size); color: var(--text-muted); }
 .settings-save-status[data-error] { color: var(--danger); }
+
+#settings-modal .settings-nav-label { margin: 14px 10px 4px; color: var(--text-secondary); font-size: var(--fs-sm); font-weight: var(--fw-strong); }
+#settings-modal .settings-nav-label:first-child { margin-top: 4px; }
+#settings-modal .settings-inbox-block { margin-top: 20px; }
+
+@media (max-width: 767px) {
+    #settings-modal .settings-tab-name[data-sub] { display: flex; flex-direction: column; align-items: flex-start; }
+    #settings-modal .settings-tab-name[data-sub]::after { content: attr(data-sub); font-size: var(--fs-sm); line-height: var(--lh-body); font-weight: var(--fw-regular); color: var(--text-secondary); }
+}
+
+#settings-modal .settings-section-link { white-space: normal; height: auto; max-width: 100%; }

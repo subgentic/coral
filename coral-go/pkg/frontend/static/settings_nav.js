@@ -26,6 +26,7 @@ const setScreen = screen => modalEl()?.setAttribute('data-screen', screen);
 
 /** Opens the pane for a group; an unknown or empty group opens the first one. Returns the group shown. */
 function showSettingsGroup(id, { focus = false, remember = true } = {}) {
+    if (id === 'needs-you') id = 'notifications';
     const list = shown();
     const pane = list.find(p => p.dataset.group === id) || list[0];
     if (!pane) return null;
@@ -58,6 +59,11 @@ export function refreshSettingsGroups() {
         if (empty) p.dataset.empty = '1'; else delete p.dataset.empty;
         const tab = tabFor(p.dataset.group);
         if (tab) tab.hidden = empty;
+    }
+    for (const label of modalEl()?.querySelectorAll('.settings-nav-label') || []) {
+        let tab = label.nextElementSibling, any = false;
+        while (tab?.matches('.settings-tab')) { any ||= !tab.hidden; tab = tab.nextElementSibling; }
+        label.hidden = !any;
     }
     const pick = document.getElementById('settings-group-select');
     if (pick) for (const o of pick.options) o.hidden = !!panes().find(p => p.dataset.group === o.value)?.dataset.empty;
@@ -110,7 +116,12 @@ function buildTabs(modal) {
     const tabs = modal.querySelector('#settings-tabs');
     const pick = modal.querySelector('#settings-group-select');
     if (!tabs || tabs.childElementCount) return;
+    let group;
     for (const p of panes()) {
+        if (group !== p.dataset.navGroup) {
+            group = p.dataset.navGroup;
+            const label = document.createElement('p'); label.className = 'settings-nav-label'; label.textContent = group; tabs.append(label);
+        }
         const id = p.dataset.group;
         const b = document.createElement('button');
         b.type = 'button'; b.id = `settings-tab-${id}`; b.className = 'settings-tab'; b.setAttribute('role', 'tab');
