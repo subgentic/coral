@@ -226,3 +226,29 @@ An agent or team is identified by `(server, name)`. In the UI a remote key is `@
 ## Launching
 
 Send `POST /api/remote/{server}/api/sessions/launch` or `/launch-team` to start an agent or team on a remote. Paths in the body (such as `working_dir`) are interpreted on that remote. Use `/api/remote/{server}/api/filesystem/list` to browse the remote's folders. The New Agent dialog's prerequisite check goes through `/api/remote/{server}/api/system/cli-check?type=<agent type>` (Launch tier; the reply has no path, see [CLI Check](settings-system.md#cli-check)).
+
+## Settings help for Coral Hub access
+
+### Coral Hub can turn on auto-accept
+
+While access is Launch, a hub user can let an agent's permission prompts be approved for it, for up to 8 hours (1 hour unless they choose otherwise). Turn this off to keep that on this computer only; it also stops any auto-accept the hub turned on and any Keep Full access choice the hub made. An agent that is running keeps the mode it has until its next restart.
+
+### Let Coral Hub relaunch this Coral to install updates
+
+Coral Hub can ask for the relaunch of a version this computer has already downloaded and checked; it cannot choose a version or start one that is not ready, and it cannot change this switch. It only works at the Launch level above. Off until you turn it on: when it is on, the owner of the linked Hub account can update this computer without you being asked here. Changed on this computer only.
+
+### Let Coral Hub change cross-team settings
+
+Coral Hub's owner can turn cross-team messaging and file sharing on or off for your teams. Turn this off to forbid it.
+
+### Hide tokens from view-only hub users
+
+Coral Hub shows everything an agent printed or wrote. With this on, tokens and keys that the betterleaks rules recognise are replaced by "[redacted token]" before they leave this computer, for viewers who can only look (View). Viewers at Interact or Launch see everything: they can already run commands as you. The live terminal is never delayed, so a key typed one character at a time can show in part. On this computer nothing is hidden.
+
+### Let Coral Hub act as the Operator
+
+At Interact or Launch a hub user can create, assign and complete tasks and post as the Operator here. Each action shows which hub user did it ("Operator via Coral Hub · hub-user-…"), agents are told it came through Coral Hub, and it is recorded below. Board settings can never be changed through Coral Hub. Turn this off to keep the Operator on this computer only.
+
+### Coral Hub access limits
+
+The hub can read everything you view through it. This is the most Coral Hub can ever do here: its owner can limit it further for each computer but never raise it, and only you can change it, here. Interact lets a hub user type into running agents, which can run commands; Launch also lets them start, stop, sleep, wake and restart agents. Disconnect removes the token from this computer; revoke the computer on the hub's Computers page to cut it off from there.

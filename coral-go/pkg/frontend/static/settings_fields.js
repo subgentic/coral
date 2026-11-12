@@ -246,11 +246,33 @@ export const NETWORK_FIELDS = [
         help: { text: 'Adds a Computers tab; whoever signs in here controls every computer you add.', more: "It uses this Coral's own address, port and sign-in: the API key from other computers, and Remote access above for who can reach it. Nothing new listens. Turning it off keeps the computers you added." } },
 ];
 
+const HELP_LINES = {
+    check_updates: 'Shows a notice in this browser.',
+    git_poll_interval: 'How often Coral checks Git for changed files.',
+    fit_pane_width: 'Sizes the tmux terminal to this browser window.',
+    tb_fixed: 'Agents run in terminals held by this Coral.',
+    custom_models: 'Model ids are passed to the CLI as written.',
+    working_dir: 'The folder a new agent starts in.',
+    default_thinking_claude: 'How much Claude thinks before it answers.',
+    auto_resume: 'Wakes an agent again after a rate limit or API error.',
+    agent_low_priority: 'Keeps the dashboard quick while agents are busy.',
+    board_auto_attach: 'Saves local images and Markdown files linked in agent posts.',
+    nudge_claude_artifacts: 'Reminds agents to publish shared files to Coral.',
+    launch_in_worktree: 'Lets a team launch into its own Git worktree. Experimental; off by default.',
+    prune_days: 'Removes old saved diffs and unlinked artifacts after a preview.',
+    retention_enabled: 'Runs Prune every hour after you review what it would remove.',
+    accounts: 'Agents sign in through each CLI’s own login.',
+    debug_input_log: 'Records everything Coral types, including secrets. For troubleshooting only.',
+};
+
 /** Draws the groups that are fields into the Settings modal's panes (once, when the modal is built). mount is mountSettingsView. */
 export function drawSettingsGroups(modal, mount) {
     for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-inbox-rows', INBOX_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-terminal-rows', TERMINAL_FIELDS], ['settings-agents-rows', AGENTS_FIELDS], ['settings-cleanup-rows', CLEANUP_FIELDS], ['settings-security-rows', SECURITY_FIELDS], ['settings-network-rows', NETWORK_FIELDS]]) {
         const host = modal.querySelector(`#${hostId}`);
-        if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields: typeof fields === 'function' ? fields(host) : fields });
+        if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields: (typeof fields === 'function' ? fields(host) : fields).map(field => {
+            if (!field.help?.more) return field;
+            return { ...field, help: { ...field.help, text: field.help.text || HELP_LINES[field.key], more: undefined, docs: { topic: 'settings-system', answer: field.label } } };
+        }) });
         for (const id of hostId === 'settings-terminal-rows' ? TERMINAL_BACKEND_IDS : hostId === 'settings-agents-rows' ? ['settings-custom-models'] : []) host.querySelector(`#${id}`)?.closest('.sv-row')?.setAttribute('hidden', ''); // until the module that fills them has read its status
     }
 }

@@ -26,8 +26,7 @@
  * Events on the host: 'sv-dirty' { dirty }, 'sv-group' { id }, 'sv-saved' { changes }. */
 import { browserLocal } from './safe_storage.js';
 import { storeKey } from './local_store.js';
-import { wantDocsAnswer } from './docs_answer.js';
-import { closeDialog } from './modal_chrome.js';
+import { settingsDocsLink } from './docs_answer.js';
 
 import { initSectionDialog, showSection, markSectionError } from './section_dialog.js'; // the nav: the shared sectioned shell (loaded at startup with this module: the Settings dialog's rows are drawn from it the moment its markup is built)
 
@@ -137,22 +136,6 @@ export function mountSettingsView(host, spec) {
         return { node: input, input, get, set: v => { input.value = v === undefined || v === null ? '' : String(v); }, focus: () => input.focus(), disable: on => { input.disabled = on; } };
     }
 
-    /** The Learn more that is a link into Docs (help.docs: { topic, answer }): the answer is Docs', not a box behind Settings (#10765). A plain click goes through the router (a[data-route]); the answer's heading is remembered for the page to open at. */
-    function learnDocs(help, field) {
-        const a = node('a', 'sv-learn', 'Learn more'); a.href = `/docs/${encodeURIComponent(help.docs.topic)}`; a.setAttribute('data-route', ''); a.setAttribute('aria-label', `Learn more about ${help.about || field.label}, in Docs`);
-        a.addEventListener('click', e => {
-            const dlg = a.closest('.modal');
-            if (!dlg || a.dataset.afterClose) { if (!dlg) wantDocsAnswer(help.docs.answer); return; }
-            // A link out of a dialog closes the dialog first: the answer opens in Docs under it otherwise, and it looks as if nothing happened (#10906). Settings asks about unsaved changes before it closes: Discard
-            // follows the link, Keep editing does not, and the answer is remembered only once the link is followed, so nothing is left waiting to scroll a Docs page opened by hand later.
-            e.preventDefault();
-            const follow = () => { wantDocsAnswer(help.docs.answer); a.dataset.afterClose = '1'; a.click(); delete a.dataset.afterClose; }; // the router takes it now, with nothing over the page it opens
-            if (dlg.id === 'settings-modal') window.hideSettingsModal?.(false, follow);
-            else { closeDialog(dlg); follow(); }
-        });
-        return a;
-    }
-
     /** The Learn more of a help text: a button that opens the long part in place (named after what it is about, for the screen reader: "Learn more about working modes"). */
     function learnMore(help, field, id) {
         const more = node('div', 'sv-more'); more.id = `${id}-m`; more.hidden = true; more.append(...paragraphs(help.more));
@@ -171,7 +154,7 @@ export function mountSettingsView(host, spec) {
             const help = typeof field.help === 'string' ? { text: field.help } : field.help || null; // a heading's line may have its Learn more too
             if (t === 'heading') {
                 const h = node('h5', 'sv-heading', field.label); if (field.id) h.id = field.id; row.append(h);
-                if (help && (help.text || help.more)) { const p = node('p', 'sv-help', help.text || ''); row.append(p); if (help.more) { const { btn, more } = learnMore(help, field, id); p.append(help.text ? ' ' : '', btn); row.append(more); } }
+                if (help && (help.text || help.more || help.docs)) { const p = node('p', 'sv-help', help.text || ''); row.append(p); if (help.docs) p.append(' ', settingsDocsLink(help, field)); else if (help.more) { const { btn, more } = learnMore(help, field, id); p.append(help.text ? ' ' : '', btn); row.append(more); } }
             }
             else { const slot = node('div', 'sv-notice'); if (field.render) field.render(slot, { field, host: root }); row.append(slot); }
             return { field, group, row, ctl: { node: row, get: () => undefined, set: () => {}, disable: () => {}, focus: () => {} }, errorEl: node('p', 'sv-error'), helpEl: null, actionEl: null, id, label: null };
@@ -196,7 +179,7 @@ export function mountSettingsView(host, spec) {
             if (helpBits.length) { sentence.id = `${id}-ht`; descId = sentence.id; }
             helpEl.append(sentence);
             if (help && help.docs) {
-                helpEl.append(' ', learnDocs(help, field)); text.append(helpEl);
+                helpEl.append(' ', settingsDocsLink(help, field)); text.append(helpEl);
             } else if (help && help.more) {
                 const { btn, more } = learnMore(help, field, id);
                 helpEl.append(' ', btn); text.append(helpEl, more);

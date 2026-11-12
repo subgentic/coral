@@ -6,12 +6,13 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
 
-// words a person can see in a group now, per the audit (artifact 141071b6); a group with no number has not been cut yet
-// #10191: Agents 142 to 153 (+11): Settings' hint under Default permission mode no longer says Auto has safety checks for every CLI ('Everything; safety checks on Claude only.', +2 words), and #10000's one line under Default permission mode (13 words: Default asks, Auto acts on its own, Not set uses Auto; what Auto is on each CLI is behind its Learn more) and the closed CLI paths row's note (3), less what left with the Default models' placeholders, which became dropdowns; a feature's own lines, within UI/UX's about 150 for Agents.
-// #13899: Agents 153 to 164 (+11): the Operator-approved page adds a thinking row each for Codex, Antigravity and Pi and the Orchestrator defaults, each with its label and a Learn more (settings_fields.js workersThinking). Found alone on bde15f78c: 164 words.
-// The CLI-check note beside CLI paths (" · Claude found", settings_fill.js openCliPathsWhenMissing) is not counted: it comes from a real check of this machine's CLI after the pane opens, so its 3 words depended on timing and on what an earlier suite left on the server (#12901: 153 alone, 156 after phone_settings_theme or settings_modal_trace).
-// #14532: +2 words for the closed Permissions notice; the full server disclosure is available on expansion.
-const BUDGET = { 'Network and Hub': 186, 'Agents': 262, 'Storage and cleanup': 151, 'Terminal': 70, 'General': 39, 'Notifications': 72, 'Files and Git': 40, 'Security and privacy': 59 }; // #15638/#15648: Storage and cleanup 139 to 151 (+12: the Dropbox app-key row replaces the one status line: its status 'Add your Dropbox app key to connect.' (7), its field label (4), Save key (2) and How to get an app key (6) are a feature's own row, not a paragraph that crept back); #15312: Notifications 53 to 72 (+19: each of the three alert switches says what it is for and that it needs Desktop alerts, instead of looking half on with no reason); #14736: Storage and cleanup 130 to 139 (+9: the Dropbox backup block, shown at last: its title (2) and its one status line, 'Dropbox backup isn't available in this build.' (7), a feature's own row, as the board search row was); #10324: Network and Hub 171 to 186 (+15: Remote access and Manage other computers say their risk before the switch); Security and privacy 58 to 59 (+1: "Record what Coral types" for "Log terminal input"); Storage and cleanup 128 to 130 (+2: Shrink says what it shrinks, "Shrink saved diffs"); #9758: Storage and cleanup 105 to 128: the Board message search row (#9685), its label (3 words), its one-line hint (10), Learn more (2) and its status line (9) are 24 words, a feature's own row, not a paragraph that crept back; the rest of the group is as it was (103). // #7405: a row's hint is one short line (about ten words) under its label, and a longer one is behind its Learn more (UI/UX's rule: a tab about 120 words, Agents about 150; Network and Hub is its Hub status lines too, which are data); round 2: each Learn more-only row gets its one line (Agents +18, Storage +19 and +14 for the two limits' lines, Terminal +14); before #7405: Network and Hub 104, Agents 70, Storage and cleanup 65, Terminal 53, General 22, Notifications 7, Files and Git 16, Security and privacy 43 // (General: +7 on the assembled 168 for the auto-updater's setting row, #7360 on main: measured, the only group over) // Network and Hub 163 to 171: the Remote access hint (UI/UX, #7626) // Notifications 16 to 25: a full sentence for each hint and one for Desktop alerts (UI/UX, #7636) // #10068: Notifications 25 to 53: each switch says what it does, and the alert kinds (needs input, a finished reply) and the sound are switches of their own // #15886 (LA2): Agents 166 to 262 (+96: the six permission modes each say what they allow, and two carry a warning line: the spec asks for all six readable without choosing, so they are a feature's own rows, not a paragraph that crept back)
+// LA2 adds 96 words for the six readable permission modes and warning lines.
+// ST6 adds a visible short help line where there used to be only a closed More.
+// Keep the old section budgets plus the words in those authored lines (HELP_LINES /
+// HINTS); long explanations remain in Docs and never inflate the dialog.
+const BEFORE = { 'Network and Hub':186, Agents:262, 'Storage and cleanup':151, Terminal:70, General:39, Notifications:72, 'Files and Git':40, 'Security and privacy':59 };
+const HELP_WORDS = { 'Network and Hub':80, Agents:73, 'Storage and cleanup':21, Terminal:16, General:6, 'Files and Git':8, 'Security and privacy':17 };
+const BUDGET = Object.fromEntries(Object.entries(BEFORE).map(([k,v])=>[k,v+(HELP_WORDS[k]||0)]));
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -69,11 +70,10 @@ const BUDGET = { 'Network and Hub': 186, 'Agents': 262, 'Storage and cleanup': 1
             assert.ok(r.describes, `${r.id}: the control is still described by the text`);
         }
         await ev(`document.querySelectorAll('#settings-cloud details.settings-cloud-more').forEach(d => { d.hidden = false; d.open = true; }); true`); // the permissions are behind the closed "More Coral Hub permissions" (#6579)
-        const learn = `#settings-cloud-redact-row .settings-learn`;
-        assert.equal(await ev(`!!document.querySelector('${learn}') && document.querySelector('${learn}').getAttribute('aria-expanded')`), 'false', 'a long hint is clamped to a line with a Learn more');
+        const learn = '#settings-cloud-redact-row a.sv-learn';
+        assert.deepEqual(await ev(`(() => { const a=document.querySelector('${learn}'); return {href:a.getAttribute('href'), help:!!a.closest('.sv-help'), keyboard:a.tabIndex>=0, text:a.textContent}; })()`), {href:'/docs/hub', help:true, keyboard:true, text:'Learn more'});
         await ev(`document.querySelector('${learn}').focus(); true`);
-        await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
-        await waitFor(`document.querySelector('${learn}').getAttribute('aria-expanded') === 'true' && !document.getElementById(document.querySelector('${learn}').getAttribute('aria-controls').split(' ')[0]).classList.contains('settings-hint-clamp')`, 'the redaction text open by keyboard', 3000);
-        console.log('PASS Settings shows its hints, the long ones behind Learn more');
+        assert.equal(await ev(`document.activeElement.matches('${learn}')`), true, 'the Docs link takes keyboard focus');
+        console.log('PASS Settings shows its hints, the long ones in Docs');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
