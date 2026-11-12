@@ -3669,8 +3669,6 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .launch-type-glyph { font-size: var(--fs-display); } /* the agent card draws the same robot as the start page */
 
 /* Settings' footer: the note that something is not saved yet, on the left (UI audit #5589, finding 27); and the CLI paths behind one line. */
-.settings-unsaved { margin-right: auto; align-self: center; font-size: var(--fs-base); color: var(--text-secondary); }
-.settings-unsaved[hidden] { display: none; }
 
 /* The missing-CLI line of the New Agent dialog sits under the folder, outside More options (#5835): nothing shows while it has nothing to say. */
 .launch-cli-slot:empty { display: none; }

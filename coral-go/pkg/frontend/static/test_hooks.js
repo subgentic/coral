@@ -49,6 +49,8 @@ const { showResumeModal } = lazyFns(loadResumeDialog, ['showResumeModal']);
 
 // What the suites called as window functions.
 const windowHooks = {
+    applySettings: (...args) => importOnce('./settings_save.js').then(m => m.applySettings(...args)), // legacy save-flow probes; main Settings now saves rows
+
     // feed a live-sessions payload, or a /ws/coral message, through the real handlers without a socket
     _coralSetLiveSessions: (sessions) => { state.liveSessions = sessions || []; renderLiveSessions(state.liveSessions); },
     _coralHandleWsMessage: handleCoralMessage,

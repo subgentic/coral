@@ -114,7 +114,8 @@ const undersized = sel => `(() => {
                 await waitFor(shown('settings-modal'), `Settings (${pass})`);
                 await waitFor(`document.getElementById('settings-cli-path-claude')?.dataset.filled === '1'`, 'Settings filled in', { timeout: 8000 });
                 const want = await ev(`(() => { const b = document.getElementById('settings-show-scrollbars'); b.checked = !b.checked; b.dispatchEvent(new Event('change', { bubbles: true })); return b.checked; })()`);
-                await ev(`document.querySelector('#settings-modal [data-on-click="m-apply-settings"]').click(); true`);
+                await waitFor(`document.getElementById('settings-show-scrollbars').dataset.saving!=='1'`,'row saved');
+                await ev(`document.getElementById('settings-cancel-btn').click();true`);
                 const body = await waitFor(`(window.__reqs.find(([m, u]) => m === 'PUT' && new URL(u, location.href).pathname === '/api/settings') || [])[2]`, `${v.name}: Apply sends PUT /api/settings (${pass})`);
                 const sent = JSON.parse(body);
                 const saved = sent.settings || sent;

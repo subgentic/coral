@@ -38,7 +38,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`(() => { const e = document.getElementById('settings-model-pick-claude'); e.value = ${JSON.stringify(model)}; e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             s = await state('claude');
             check(s.input === model && !s.inputShown, `a model sets the box's value and the box stays hidden: ${JSON.stringify(s)}`);
-            check(await ev(`!document.getElementById('settings-unsaved').hidden`), 'the Unsaved changes note follows the pick');
+            check(await ev(`!document.getElementById('settings-save-btn')`), 'no footer Save is needed for the pick');
             // Other shows the box
             await ev(`(() => { const e = document.getElementById('settings-model-pick-claude'); e.value = '__other__'; e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             s = await state('claude');

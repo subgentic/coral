@@ -20,8 +20,7 @@
 #settings-modal .badge { font: var(--dlg-badge); }
 
 /* footer: Cancel at the left, Save at the right, as in New agent and New team (the note between them) */
-#settings-modal .modal-footer { justify-content: space-between; align-items: center; gap: 12px; }
-#settings-modal .modal-footer .settings-unsaved { margin: 0 auto; }
+#settings-modal .modal-footer { justify-content: flex-end; align-items: center; gap: 12px; }
 
 /* a row: its label and its hint (always visible) at the left, its control at the right in a fixed column; a row marked wide puts the control on its own line under them */
 #settings-modal .settings-hint-line { display: block; margin: 2px 0 0; color: var(--text-secondary); }
@@ -49,3 +48,7 @@
 #settings-modal .sec-switch > input.switch { flex: none; }
 
 @media (max-width: 767px), (pointer: coarse) { #settings-modal .sec-switch { min-height: var(--control-touch-height, 44px); } }
+
+/* Per-row persistence feedback stays beside the setting, including at larger text sizes. */
+.settings-save-status { display: block; font-size: var(--sv-help-size); color: var(--text-muted); }
+.settings-save-status[data-error] { color: var(--danger); }

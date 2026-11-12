@@ -1,42 +1,20 @@
-/* The Settings dialog's form: what its controls hold as a payload, the "Unsaved changes" note, and what changed since it opened (moved out of settings_dialog.js, #8383). */
+/* Main Settings values: a complete payload for row comparisons, and a diff for the legacy combined-save probes. */
 import { defaultTerminalFont } from './terminal_font.js';
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { filterSettingsPayload } from './cloud_settings.js';
 import { isCloud } from './server_base.js';
 import { settingBool, changedSettings, defaultThemeChoice } from './settings_core.js';
-const { databaseEncryptionChanged } = await importOnce('./settings_machine.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
 const { retentionSettings, receivedMaxSetting, artifactStoreMaxSetting } = await importOnce('./settings_storage.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
 const { dropUnfilledCLIPaths, editedCLIPathKeys } = await importOnce('./settings_fill.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 const { readInboxSettings } = await importOnce('./settings_inbox.js'); // what reaches Needs you (#12144): lazy the same way
-const { settingsAtOpen, formAtOpen, payloadAtOpen } = await importOnce('./settings_snapshots.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
+const { settingsAtOpen, payloadAtOpen } = await importOnce('./settings_snapshots.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 
-/** The "Unsaved changes" note in Settings' footer (UI audit #5589, finding 27): shown while the form differs from what it held when it finished opening (or was last saved), or a database encryption or terminal backend or wake choice is pending. The baseline is the form's own payload, not the saved settings: a new install has no saved settings, so everything would differ. Changes to the custom models and the update switches are saved too but are not counted here. */
-export const formKey = () => { try { return JSON.stringify(readSettingsForm().payload); } catch { return null; } };
 export const payloadNow = () => { try { return readSettingsForm().payload; } catch { return null; } };
-/** The part of a saved payload the person changed since the dialog opened (or was last saved). */
+/** Keys changed since the last combined-save probe, for the legacy test surface. */
 export const changedSince = payload => Object.fromEntries(Object.entries(payload).filter(([k, v]) => !payloadAtOpen() || JSON.stringify(payloadAtOpen()[k]) !== JSON.stringify(v)));
-/** Whether a field or the database encryption choice holds a change not saved yet: read at once, so Close can decide in the same turn (#10526). */
-export const unsavedFields = () => formAtOpen() !== null && (formKey() !== formAtOpen() || databaseEncryptionChanged());
-/** unsavedFields, or the terminal backend choice (saved apart): what the note and the Cancel word show. */
-async function hasUnsavedChanges() {
-    if (unsavedFields()) return true;
-    if (formAtOpen() === null) return false;
-    try { return await importOnce('./terminal_backend.js').then(tb => tb.hasUnsavedBackendChange(), () => false); } catch { return false; }
-}
-export async function refreshUnsavedNote() {
-    const note = document.getElementById('settings-unsaved');
-    if (!note) return;
-    const dirty = await hasUnsavedChanges();
-    if (note.hidden === dirty) note.hidden = !dirty;
-    const away = document.getElementById('settings-cancel-btn'), word = dirty ? 'Cancel' : 'Close'; // nothing to cancel until something is changed: on a page with nothing to edit it is plain Close (Beta Tester, #9955)
-    if (away && away.textContent !== word) away.textContent = word;
-    // A note, not a live region (#6656): while there are unsaved changes the Save button is described by it, so it is read when the person reaches Save, where it matters, and not announced on every edit.
-    const save = document.getElementById('settings-save-btn');
-    if (save) { if (dirty) { if (save.getAttribute('aria-describedby') !== 'settings-unsaved') save.setAttribute('aria-describedby', 'settings-unsaved'); } else if (save.hasAttribute('aria-describedby')) save.removeAttribute('aria-describedby'); }
-}
 /** What the dialog's controls hold: the payload to save (only what the person changed, and on the hub only the per-user keys) and the values the page applies once it is saved. */
-export function readSettingsForm() {
+export function readSettingsForm(all = false) {
     const themeValue = document.getElementById("settings-theme")?.value || "dark";
     const engineName = document.getElementById("settings-renderer-select").value;
     const agentType = document.getElementById("settings-agent-type")?.value || "claude";
@@ -147,7 +125,7 @@ export function readSettingsForm() {
 
     // Only what the person changed since the dialog opened: a field this dialog never touched (a CLI path another
     // tab saved meanwhile) is not written back with the value this page opened with.
-    payload = changedSettings(dropUnfilledCLIPaths(payload), settingsAtOpen(), themeValue, [...editedCLIPathKeys(), ...(document.getElementById('settings-permission-mode')?.dataset.edited === '1' && document.getElementById('settings-permission-mode').value ? ['default_permission_mode'] : [])], defaultThemeChoice());
+    if (!all) payload = changedSettings(dropUnfilledCLIPaths(payload), settingsAtOpen(), themeValue, [...editedCLIPathKeys(), ...(document.getElementById('settings-permission-mode')?.dataset.edited === '1' && document.getElementById('settings-permission-mode').value ? ['default_permission_mode'] : [])], defaultThemeChoice());
     // The hub accepts only the per-user keys (anything else refuses the whole request); the machine ones are hidden.
     if (isCloud()) payload = filterSettingsPayload(payload).kept;
 

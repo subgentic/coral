@@ -223,7 +223,7 @@ async function loadStorageDetail(fileCount = null) {
             const changed = () => {
                 const n = on.checked ? Math.max(1, Math.floor(Number(days.value) || 0)) : 0;
                 if (!n) showRetentionStatus({ days: 0, last: ret.last });
-                else if (n !== saved) _lines(document.getElementById('settings-retention-status'), [`Turns on at ${n} days when you save.`]);
+                else if (n !== saved) _lines(document.getElementById('settings-retention-status'), [`Prunes data older than ${n} days.`]);
                 else showRetentionStatus(ret);
             };
             on.addEventListener('change', changed);

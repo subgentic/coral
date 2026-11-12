@@ -4,6 +4,12 @@ System-level endpoints for settings, health checks, CLI tools, filesystem browsi
 
 ## Settings
 
+In the dashboard, a switch, select or choice saves when you change it. A text or number
+field saves when you leave it or press Enter. The row announces “Saved” for two seconds.
+A failed save restores the old value and says “Not saved. Try again.” Close leaves Settings
+without an unsaved-changes question. Chief and Dropbox use their own setup and action flows.
+
+
 ### Get All Settings
 
 ```

@@ -35,7 +35,7 @@ const path = require('node:path');
             await ev(`document.getElementById('settings-telemetry-install-copy').click();true`);
             await waitFor(`document.getElementById('settings-telemetry-install-status').textContent==='Install ID copied.'`, 'copy feedback');
             assert.equal(await ev(`window.__copiedIDs.at(-1)`), id);
-            assert.equal(await ev(`document.getElementById('settings-unsaved').hidden`),true,'copy does not mark Settings changed');
+            assert.equal(await ev(`!document.getElementById('settings-unsaved')`),true,'copy does not mark Settings changed');
             assert.match(await ev(`document.getElementById('settings-telemetry-install-hint').textContent`),/deletion request/);
             assert.equal(await ev(`document.documentElement.scrollWidth>innerWidth`),false,'no page overflow');
             if (process.env.SHOT_DIR) {

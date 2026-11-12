@@ -36,7 +36,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`(m => !!m && getComputedStyle(m).display !== 'none')(document.getElementById('settings-modal'))`, `${w}: Settings opens`, 8000);
             await new Promise(r => setTimeout(r, 600)); // sleep-ok: the dialog fills
             await ev(`(() => { const f = document.getElementById('settings-cli-path-claude'); f.value = ${JSON.stringify(good)}; f.dispatchEvent(new Event('input', { bubbles: true })); f.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            await ev(`document.getElementById('settings-save-btn').click(); true`);
+            await ev(`document.getElementById('settings-cli-path-claude').dispatchEvent(new Event('focusout',{bubbles:true})); true`);
             await waitFor(`(m => !m || getComputedStyle(m).display === 'none')(document.getElementById('settings-modal'))`, `${w}: Settings closes after Save`, 10000);
             await waitFor(`!document.querySelector('#launch-step-agent [data-blocks-launch]')`, `${w}: the blocker is gone`, 10000).catch(() => check(false, 'the blocker is still there after Save, until a refresh'));
             await waitFor(`!document.querySelector('#launch-agent-pick .provider-missing [data-type="claude"]') && !!document.querySelector('#launch-agent-pick .provider-card[data-type="claude"]:not(.is-missing)')`, `${w}: Claude is a card again`, 10000).catch(() => check(false, 'Claude is still under Not installed after Save'));
