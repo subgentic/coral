@@ -3262,8 +3262,6 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 .sec-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 767px), (pointer: coarse) { .sec-actions .btn { min-height: var(--control-touch-height, 44px); } }
 .sec-muted { color: var(--text-secondary); font-weight: var(--fw-regular); }
-#settings-modal .sec-switch { display: flex; flex-direction: row; gap: 10px; align-items: flex-start; font-size: var(--fs-md); margin: 6px 0; cursor: pointer; }
-#settings-modal .sec-switch input[type="checkbox"] { width: 16px; height: 16px; flex: none; margin: 2px 0 0; padding: 0; }
 .sec-warn { display: flex; gap: 8px; align-items: flex-start; background: rgba(212, 167, 44, .13); border: 1px solid rgba(212, 167, 44, .55); border-radius: var(--radius-lg); padding: 10px 12px; font-size: var(--fs-base); line-height: var(--lh-body); margin: 8px 0; }
 .sec-add { display: flex; gap: 8px; align-items: center; }
 .sec-add .btn { margin: 0; }

@@ -16,7 +16,7 @@
 #settings-modal :is(dt, dt label, .toggle-dt label, .tb-label, summary) { font: var(--dlg-label); }
 #settings-modal :is(input, select, textarea) { font: var(--dlg-control); }
 #settings-modal .btn, #settings-modal :is(.pw-toggle, .tb-learn) { font: var(--dlg-button); }
-#settings-modal :is(.settings-hint, .toggle-desc, .tb-now, .tb-now b, .machine-health-note, .machine-health-status, .tb-note) { font: var(--dlg-hint); }
+#settings-modal :is(.tb-now, .tb-now b, .machine-health-note, .machine-health-status) { font: var(--dlg-hint); }
 #settings-modal .badge { font: var(--dlg-badge); }
 
 /* footer: Cancel at the left, Save at the right, as in New agent and New team (the note between them) */
@@ -25,14 +25,8 @@
 
 /* a row: its label and its hint (always visible) at the left, its control at the right in a fixed column; a row marked wide puts the control on its own line under them */
 #settings-modal .settings-hint-line { display: block; margin: 2px 0 0; color: var(--text-secondary); }
-#settings-modal .settings-hint-clamp { display: none; } /* a long hint is behind its Learn more */
-#settings-modal .settings-learn { background: none; border: 0; padding: 2px 0; margin-top: 2px; font: var(--dlg-button); color: var(--link-text, var(--accent)); text-decoration: underline; cursor: pointer; }
-#settings-modal .settings-learn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @container settingspane (min-width: 40.01rem) { #settings-modal .settings-row { grid-template-columns: minmax(0, 1fr) 340px; } } /* (the pane stacks a row under 40rem of its own width: components.css) */
 #settings-modal .info-grid.settings-grid .settings-row > dt, #settings-modal .info-grid.settings-grid .settings-row > dt.toggle-dt { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; gap: 0; }
-#settings-modal .settings-hint-wrap { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: flex-start; }
-@media (max-width: 767px), (pointer: coarse) { #settings-modal .settings-learn { min-height: var(--control-touch-height, 44px); display: inline-flex; align-items: center; } }
-@media (max-width: 767px), (pointer: coarse) { #settings-modal .settings-cloud-head > .settings-learn { min-height: 0; display: inline; position: relative; } #settings-modal .settings-cloud-head > .settings-learn::after { content: ''; position: absolute; left: -8px; right: -8px; top: 50%; height: var(--control-touch-height, 44px); transform: translateY(-50%); } } /* beside the sentence the 44 px target is invisible, so a Learn more that wraps under it makes no gap (as .sv-learn) */
 /* a phone: the dialog is the screen on every section (the tab list is the Section selector) */
 @media (max-width: 767px) { #settings-modal .modal-content.settings-modal-content { width: 100vw; max-width: none; height: 100dvh; max-height: none; min-height: 0; border-radius: 0; margin: 0; } }
 
@@ -45,3 +39,13 @@
 #settings-modal .settings-pane .settings-inbox-team input[type="checkbox"] { flex: 0 0 auto; width: 18px; height: 18px; margin: 0; }
 #settings-modal .settings-pane #settings-inbox-muted .btn, #settings-modal .settings-pane .settings-inbox-teams-failed .btn, #settings-modal .settings-pane .settings-inbox-every { margin: 0 0 0 4px; } /* a small button beside its sentence, not indented by the sidebars' margin */
 @media (max-width: 700px) { #settings-modal .settings-pane .settings-inbox-team { min-height: 44px; } }
+
+/* ST6: all Settings help uses the shared small secondary text. */
+#settings-modal { --sv-help-size: var(--fs-sm); }
+#settings-modal .dropbox-inline input.switch { flex: none; }
+
+#settings-modal .sec-switch { display: flex; flex-direction: row; align-items: start; justify-content: space-between; gap: 12px; width: 100%; margin: 6px 0; font-size: var(--fs-md); cursor: pointer; }
+#settings-modal .sec-switch > span { flex: 1; min-width: 0; }
+#settings-modal .sec-switch > input.switch { flex: none; }
+
+@media (max-width: 767px), (pointer: coarse) { #settings-modal .sec-switch { min-height: var(--control-touch-height, 44px); } }

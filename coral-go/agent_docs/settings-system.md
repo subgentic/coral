@@ -685,3 +685,163 @@ Coral Hub's relaunch (`POST /api/system/update/relaunch`, and the status when a 
 - Localhost connections bypass authentication
 - Remote connections require a valid API key (header) or session cookie
 - Ungated paths: `/static/*`
+
+## Settings row help
+
+Details linked from the Settings dialog.
+
+### Tell me when a new version is out
+
+A notice in this browser. Downloading and installing are under Updates.
+
+### Desktop alerts
+
+An alert on this computer while this tab is in the background.
+
+This browser only. Shows the agent and computer names (your OS may keep them in its notification history), never agent output. May duplicate a local alert.
+
+### Git scan interval
+
+How often Coral rescans git for changed files. Scanning a large repository is slow — stretch this out, or turn it off and use the refresh button.
+
+### Fit pane width
+
+With the tmux backend, the terminal takes the size of this browser window.
+
+### Terminal backend
+
+Agents keep running when you quit Coral, and can reach each other's terminals.
+
+tmux: Agents keep running when Coral restarts, upgrades or crashes, and Coral picks them up again afterwards. Coral keeps its terminals in a tmux server whose socket sits in your Coral data folder. Any agent, and any other program running as you, can find that socket and read or type into other agents' terminals. Choose this if you restart or upgrade Coral often.
+
+pty: Coral holds each terminal itself, so there is no shared socket for an agent to use against another agent. The price: agents end whenever Coral restarts, upgrades or crashes (Coral puts them to sleep first when it stops cleanly, and marks them asleep at the next start after a crash). When Coral starts again it wakes them one at a time (not if Coral has restarted several times in a row; up to the number set below; more after you confirm; you can turn this off), and they resume their conversation, but a tool that was running is not continued.
+
+macOS: with pty, other programs normally cannot reach Coral's terminals; with tmux they can, through the socket. Neither backend separates Coral from programs running with your full user rights; for that, run agents under a separate account.
+
+This Coral runs agents in its own terminals (pty), the only backend here (no tmux on this system). Agents end when Coral restarts or upgrades; when it starts again Coral wakes them (up to the number set below; more after you confirm; you can turn this off), and they resume their conversation.
+
+### Wake agents after a restart
+
+Resumes what was running when Coral stopped.
+
+Coral wakes them one at a time when it starts, and they resume their conversation with the permissions they ran with, including an agent that bypassed permissions. More than the number below: Coral asks first. Agents you put to sleep stay asleep.
+
+### Custom models
+
+Model ids are passed to the CLI as they are written here. They appear in every model picker, including the one that switches a running agent's model.
+
+### Default working directory
+
+The folder a new agent starts in.
+
+### Default thinking
+
+How hard Claude thinks before it answers, when a launch does not say. How much Claude thinks before it answers, for agents launched with no choice of their own. A model that does not take a level uses the nearest one it does.
+
+### Resume after API errors
+
+Wakes an agent again after a rate limit or API error. When an agent's CLI stops on a rate limit, an overload or another API error, Coral wakes it again after about 2, then 5, then 15 minutes, and stops trying after the third. Waking the agent yourself starts the count again.
+
+### Name each agent's goal
+
+Haiku writes a short goal line from your requests.
+
+Coral asks Claude Code's smallest model (Haiku) for a short goal line for each agent, from your requests only: once when the agent first answers, then for a new request at most every 30 minutes. Each one is a short call made with your Claude Code account (about 1,300 input tokens). When off, the goal shows your first prompt.
+
+### Run agents at lower priority
+
+Keeps the dashboard quick while agents are busy. Agents and everything they start (builds, test runs) run below Coral itself (nice +10 on Mac and Linux, below normal on Windows), so the dashboard, Coral Hub and your own apps stay quick while agents use every CPU. It changes scheduling only, never what an agent may do. Applies to agents started after the change.
+
+### Attach files linked in posts
+
+Saves an image or Markdown file an agent links in a post, so the team can open it. When on, an agent's own board post that links a local image (png, jpg, gif, webp) or Markdown file changed in the last day has it stored as an artifact, so the team and Coral Hub can open it. When off, links stay as written and agents upload with coral-agent artifact upload.
+
+### Coral artifact reminders
+
+Asks an agent to publish to Coral when it publishes to claude.ai. When an agent publishes to claude.ai, Coral types one note into its terminal asking for a Coral artifact instead (coral-agent artifact upload) and a link to it. Once per artifact; Coral never uploads or posts for the agent. When off, nothing is typed.
+
+### Enable launch into git worktree (experimental)
+
+Experimental, and off until you turn it on: a team can then be launched into its own git worktree.
+
+### Skip Codex's review of Coral's hooks
+
+Turns off a safety check: Codex will not ask you to review Coral's hooks.
+
+Codex asks you to review new hooks before it runs them, because a trusted hook runs outside its sandbox. When this is on and only an administrator can change Coral's tools folder (an installed Coral), Coral trusts its own hooks for each Codex agent it launches, so the agent starts without that question; your own hooks and a repository's still ask. Off, Codex asks every time. Applies to Codex agents launched after the change, and can only be changed on this computer.
+
+### Artifact store limit
+
+The most space stored artifacts may take.
+
+Above it, agents' new uploads are refused until you delete some (Team Artifacts > Delete). 0 means no limit. Saved task and session diffs aren't counted.
+
+### Received files limit
+
+The most space received files may take.
+
+Files sent to this computer by other teams and Corals. Above it, new received files are refused; nothing is deleted, and your agents' own uploads are not affected. The default is 2; 0 means no limit.
+
+### Older than
+
+Prune deletes saved diffs of finished tasks and stopped sessions, and artifacts nothing links, older than the days you choose. Shrink rewrites saved diffs of finished tasks without secrets, dot-files, binaries and big files (the code changes stay). Kept artifacts and anything still linked are never touched. Each shows what it would do first.
+
+### Prune every hour
+
+Does the same as Prune by itself, once an hour. After you turn it on, nothing is removed until you review what it would do, or 24 hours later; each run frees at most 2 GiB.
+
+### Terminal logs
+
+Kept after an agent is killed.
+
+Each agent's terminal output stays in the logs folder of Coral's data folder. Deleting removes the logs of agents that have ended; the log of a live, sleeping or archived agent is never touched.
+
+### Examples
+
+The example job and workflow Coral added to Automations.
+
+They are there to show what Automations does. Removing them deletes only those; your own jobs and workflows stay.
+
+### Board message search
+
+An index that makes a search of board messages faster.
+
+On by default. It takes disk, about 0.6 times the text of the messages, and is built in the background after Coral starts: a search reads every message until it is ready. To turn it off, start Coral with CORAL_BOARD_SEARCH_INDEX=off; the index is then dropped.
+
+### Kept worktrees
+
+Kept because they still hold your work.
+
+Git worktrees Coral made for teams and jobs and kept when they stopped. Remove one when you no longer need it: Coral never forces a removal, so unsaved changes or unmerged commits keep it.
+
+### Accounts
+
+Agents sign in through each CLI's own login, not a key stored in Coral. Check asks Claude and Pi now; Pi signs in per provider and says which one.
+
+### Database encryption
+
+Applies after restart.
+
+Coral never stores a database password in browser storage, URLs, logs, or ordinary settings.
+
+### Usage analytics
+
+Anonymous product events only, no prompts.
+
+No prompts, transcripts or secrets are sent.
+
+### Record what Coral types (debug)
+
+Saves everything Coral sends to agent terminals, including anything typed or pasted, such as passwords. For troubleshooting only: turn it off afterwards. Applies immediately.
+
+### Remote access
+
+Lets other devices control agents and read files as you do; unencrypted unless TLS is on.
+
+They can also change settings. TLS is on when Coral was started with --tls-cert and --tls-key, or when you reach it through Coral Hub. A device needs your password or API key.
+
+### Manage other computers from this one
+
+Adds a Computers tab; whoever signs in here controls every computer you add.
+
+It uses this Coral's own address, port and sign-in: the API key from other computers, and Remote access above for who can reach it. Nothing new listens. Turning it off keeps the computers you added.

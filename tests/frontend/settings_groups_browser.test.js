@@ -67,16 +67,10 @@ const GROUPS = {
         assert.deepEqual(await shownGroup(), ['files'], 'Settings reopens on the group last used');
         console.log('   ✓ keys and memory');
 
-        console.log('3. A short explanation is a visible hint line; a long one is behind its Learn more, which opens it in place (#7405: no (i))');
+        console.log('3. A short help line ends with its named Docs link');
         await ev(`document.getElementById('settings-tab-cleanup').click(); true`);
-        const info = await ev(`(() => { const b = document.querySelector('#settings-pane-cleanup .sv-learn'); const t = document.getElementById(b.getAttribute('aria-controls').split(' ')[0]); return { name: b.getAttribute('aria-label'), exp: b.getAttribute('aria-expanded'), hidden: t.hidden, text: t.textContent.length, vis: t.getClientRects().length, infoBtn: document.querySelectorAll('#settings-pane-cleanup .settings-info-btn').length }; })()`);
-        assert.equal(info.exp, 'false'); assert.equal(info.hidden, true); assert.equal(info.vis, 0, 'a long hint is not on the page until its Learn more opens it'); assert.ok(info.text > 40, 'the explanation is there'); assert.equal(info.infoBtn, 0, 'no (i)');
-        assert.match(info.name, /^Learn more about /, 'the link is named after its setting: ' + info.name);
-        await ev(`document.querySelector('#settings-pane-cleanup .sv-learn').click(); true`);
-        const opened = await ev(`(() => { const b = document.querySelector('#settings-pane-cleanup .sv-learn'); const t = document.getElementById(b.getAttribute('aria-controls').split(' ')[0]); return { exp: b.getAttribute('aria-expanded'), open: !t.hidden && t.getClientRects().length > 0 }; })()`);
-        assert.deepEqual(opened, { exp: 'true', open: true });
-        await ev(`document.querySelector('#settings-pane-cleanup .sv-learn').click(); true`);
-        assert.equal(await ev(`document.querySelector('#settings-pane-cleanup .sv-learn').getAttribute('aria-expanded')`), 'false', 'a second tap closes it');
+        const info = await ev(`(() => { const a = document.querySelector('#settings-pane-cleanup a.sv-learn'); return {name:a.getAttribute('aria-label'), href:a.getAttribute('href'), help:!!a.closest('.sv-help'), more:!!document.querySelector('#settings-pane-cleanup .sv-more')}; })()`);
+        assert.match(info.name, /^Learn more about /); assert.equal(info.href, '/docs/settings-system'); assert.equal(info.help, true); assert.equal(info.more, false);
         const loose = await ev(`[...document.querySelectorAll('#settings-modal dt .toggle-desc:not(.settings-hint-line), #settings-modal [data-info]')].filter(e => !/^Now:/.test(e.textContent.trim())).map(e => (e.closest('.settings-row') || {}).id + ' ' + e.className + ' ' + e.textContent.slice(0, 30))`); // (a status line, "Now: Codex will ask", is not an explanation)
         assert.deepEqual(loose, [], 'every explanation is a hint line under its label, none half-built');
         const unnamed = await ev(`[...document.querySelectorAll('#settings-modal .settings-learn, #settings-modal .sv-learn')].filter(b => !b.getAttribute('aria-label')).length`);

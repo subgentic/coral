@@ -1,6 +1,6 @@
 {
   "settings-row": {
-    "css": 32,
+    "css": 19,
     "js": 5,
     "html": 2
   },
@@ -87,7 +87,7 @@
   "launch-field-*": {
     "css": 3,
     "js": 2,
-    "html": 4
+    "html": 2
   },
   "__families": [
     "launch-field-head",
@@ -99,7 +99,6 @@
     "settings-cloud-owner-row",
     "settings-cloud-switch-row",
     "settings-cloud-usercode-row",
-    "settings-hint-line",
     "settings-row"
   ]
 }
