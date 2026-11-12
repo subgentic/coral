@@ -19,3 +19,7 @@ is no network inside. Where namespaces aren't allowed it prints a note and runs 
 - `CDP_NETNS=0` turns the namespace off.
 - `CDP_NETLOG=1` (with `--keep`) has each shard's Chrome write its network log to
   `<shard>/netlog.json`.
+
+## Fake keys in fixtures
+
+gitleaks' `generic-api-key` rule (CI's "secrets" step, `.gitleaks.toml`) reads a key-like name (`app_key`, `api_key`) assigned a value of 16 or more letters and digits as a secret, and a hit in history stays a hit. Build a key-shaped fixture at run time and never write it as one literal: a `join('')` of short parts in JS, a `+` of short string parts in Go (see `dropbox_settings.test.js` and `dropbox_app_key_test.go`), or give it an obvious `test-` prefix with words, not random characters. Check before pushing: `go run github.com/zricethezav/gitleaks/v8@v8.21.2 detect --source . --config .gitleaks.toml --no-git`, and look for your file in the report.
