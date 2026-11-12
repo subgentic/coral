@@ -52,7 +52,7 @@ function flagsBody() {
 function paintFlags(answer, type) {
     const el = document.getElementById('launch-recap');
     if (!el) return;
-    el.querySelector('.launch-recap-flags')?.remove();
+    el.querySelectorAll('.launch-recap-flags').forEach(n => n.remove());
     if (!answer) return;
     const line = document.createElement('span'); line.className = 'launch-recap-note launch-recap-flags';
     const text = answer.text || '';
@@ -60,6 +60,9 @@ function paintFlags(answer, type) {
     else if (!text) line.textContent = `Adds no permission flags: ${TYPE[type] || type} starts in its own default.`;
     else { const code = document.createElement('code'); code.textContent = text; line.append('Adds ', code, ' to the command.'); }
     el.append(line);
+    if (answer.note) { // why what is added is not what the pick stands for (#15735): a role's rule, kept Full access, or Codex's own settings; the server says it
+        const why = document.createElement('span'); why.className = 'launch-recap-note launch-recap-flags launch-recap-why'; why.textContent = String(answer.note); el.append(why);
+    }
 }
 function syncFlags() {
     const body = flagsBody();

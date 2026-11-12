@@ -31,7 +31,17 @@ func (h *SessionsHandler) PostLaunchPermissionArgs(w http.ResponseWriter, r *htt
 			return
 		}
 	}
-	args, err := agent.LaunchPermissionArgs(body.AgentType, agent.LaunchParams{PermissionMode: body.PermissionMode, Flags: body.Flags, KeepFullAccess: body.KeepFullAccess, Capabilities: body.Capabilities})
+	// The program the launch would run: the configured CLI path, screened as a launch screens it. Without it a preview of agy would ask whatever "agy" is on the PATH for its --help (agy reads its own help
+	// to know if --mode takes auto), where the launch asks the configured file: the preview must read the same one (#15735, caught by the browser harness's real-CLI guard, #4354).
+	cliPath := ""
+	if h.ss != nil {
+		if st, serr := h.launchSettings(r.Context()); serr == nil {
+			if p, perr := resolveLaunchCLIScreened(body.AgentType, agent.ResolveCLIPath(st, body.AgentType), h.commonPlaceScreen(r.Context())); perr == nil {
+				cliPath = p
+			}
+		}
+	}
+	args, err := agent.LaunchPermissionArgs(body.AgentType, agent.LaunchParams{PermissionMode: body.PermissionMode, Flags: body.Flags, CLIPath: cliPath, KeepFullAccess: body.KeepFullAccess, Capabilities: body.Capabilities})
 	if err != nil {
 		errBadRequest(w, "that choice cannot be launched: "+err.Error())
 		return
@@ -39,5 +49,14 @@ func (h *SessionsHandler) PostLaunchPermissionArgs(w http.ResponseWriter, r *htt
 	if args == nil {
 		args = []string{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"args": args, "text": strings.Join(args, " ")})
+	// note: why the flags differ from the pick, for Codex (#15735): Full access kept, a capability set that narrows the mode (#6425) or sets the flags for a Default pick (#6422); and, when no flags are added at
+	// all, that Codex's own settings decide. "" for every other agent and when the pick's own flags are what runs.
+	note := ""
+	if body.AgentType == "codex" {
+		note = agent.CodexModeNote(body.Capabilities, body.PermissionMode, body.KeepFullAccess)
+		if note == "" && len(args) == 0 {
+			note = "No permission flags are added, so Codex's own settings (its config file) decide."
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"args": args, "text": strings.Join(args, " "), "note": note})
 }

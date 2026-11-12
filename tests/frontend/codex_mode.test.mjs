@@ -85,3 +85,11 @@ assert.equal(m.keepEventMatches({ sessionId: 'sid-1', on: false }, 'sid-1', 'm1'
 assert.equal(m.keepEventMatches({ sessionId: '', server: '' }, '', ''), false);
 assert.equal(m.keepEventMatches(null, 'sid-1', 'm1'), false);
 console.log('PASS codex_mode');
+
+// #15735: with Keep Full access in force the chip says Full access, not the stored mode, with or without a live read, for Codex and agy; a Claude row has no such chip; off, the live read stands.
+const kept = m.modeChip({ agent_type: 'codex', keep_full_access: true, permission_mode: 'plan', codex_live_mode: { approval: 'on-request', sandbox: 'read-only', label: 'Plan' } });
+assert.equal(kept.text, 'Full access'); assert.equal(kept.key, 'Mode: '); assert.equal(kept.warn, false); assert.match(kept.title, /whatever its stored mode \(plan\)/);
+assert.equal(m.modeChip({ agent_type: 'codex', keep_full_access: true }).text, 'Full access', 'before any turn has been read');
+assert.equal(m.modeChip({ agent_type: 'agy', keep_full_access: true, permission_effective: { effective: 'plan' } }).text, 'Full access');
+assert.equal(m.modeChip({ agent_type: 'claude', keep_full_access: true }), null);
+assert.equal(m.modeChip({ agent_type: 'codex', keep_full_access: false, codex_live_mode: { label: 'Plan' } }).text, 'Plan', 'off: the live read stands');
