@@ -32,7 +32,7 @@ const BASE = require('./test_base').BASE;
             const red = c => { const m = /rgba?\\((\\d+), (\\d+), (\\d+)(?:, ([\\d.]+))?/.exec(c); return !!m && Number(m[4] ?? 1) > 0.02 && Number(m[1]) > Number(m[2]) + 60 && Number(m[1]) > Number(m[3]) + 60; };
             const rows = [...document.querySelectorAll('.session-group-item')].filter(li => li.querySelector('.terminal-gone-chip')).map(li => {
                 const chip = li.querySelector('.terminal-gone-chip'), g = chip.querySelector('.status-glyph'), cs = getComputedStyle(chip), gs = getComputedStyle(g), row = li.querySelector('.session-name-row'), name = li.querySelector('.session-label'), r = e => e.getBoundingClientRect();
-                                return { id: li.dataset.sessionId, word: chip.textContent.trim(), state: chip.dataset.state, title: chip.title, textColor: cs.color, wordRed: red(cs.color) || red(cs.backgroundColor) || red(cs.borderTopColor) && parseFloat(cs.borderTopWidth) > 0, glyphColor: gs.color, glyphW: Math.round(r(g).width), chipR: Math.round(r(chip).right), rowR: Math.round(r(row).right), nameR: name ? Math.round(r(name).right) : 0, chipL: Math.round(r(chip).left), shown: chip.getClientRects().length > 0, forceAdjust: gs.forcedColorAdjust };
+                                return { id: li.dataset.sessionId, word: chip.textContent.trim(), state: chip.dataset.state, title: chip.title, textColor: cs.color, wordRed: red(cs.color) || red(cs.backgroundColor) || red(cs.borderTopColor) && parseFloat(cs.borderTopWidth) > 0, glyphColor: gs.color, glyphW: Math.round(r(g).width), chipR: Math.round(r(chip).right), rowR: Math.round(r(row).right), nameR: name ? Math.round(r(name).right) : 0, nameW: name ? Math.round(r(name).width) : 0, chipL: Math.round(r(chip).left), shown: chip.getClientRects().length > 0, forceAdjust: gs.forcedColorAdjust };
             });
             return { T, rows }; })()`);
         await ev(`(() => { const st = document.createElement('style'); st.textContent = '*, *::before, *::after { transition: none !important; }'; document.head.append(st); return true; })()`); // a colour read mid-transition is not the colour
@@ -60,6 +60,7 @@ const BASE = require('./test_base').BASE;
                 check(r.textColor === d.T.text && !r.wordRed, `${at}${r.id}: the word is the text colour, no red chip (${r.textColor})`);
                 check(r.glyphColor === (sleeping ? d.T.muted : d.T.error), `${at}${r.id}: the shape is ${sleeping ? 'grey' : 'red'} (${r.glyphColor})`);
                 check(r.glyphW === 10 || zoom, `${at}${r.id}: the shape is drawn (${r.glyphW})`);
+                check(r.nameW >= 40, `${at}${r.id}: the name keeps its room beside the mark, the Sleep button waits for a hover (${r.nameW} px)`);
                 check(r.chipR <= r.rowR + 1 && r.chipL >= r.nameR - 1, `${at}${r.id}: the mark and its word sit inside the row, after the name: ${JSON.stringify([r.chipL, r.chipR, r.nameR, r.rowR])}`);
                 check(/restart|exited|terminal|CLI/i.test(r.title), `${at}${r.id}: the reason is the tooltip (${r.title})`);
             }
