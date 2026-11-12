@@ -208,7 +208,7 @@ func CodexAutoNote(args, flags []string, mode string, keepFull bool) string {
 	}
 	for _, a := range args {
 		if a == "--approve-for-me" {
-			return "Auto uses Codex's own auto-review (--approve-for-me): Codex's reviewer judges each approval request, and commands run in the workspace-write sandbox. A role's Shell rule that limits the agent still narrows it."
+			return "Auto uses Codex's own auto-review (--approve-for-me): Codex's own reviewer judges each approval request, and it can approve actions outside the sandbox, such as writing outside the workspace, without asking you. A role's Shell rule that limits the agent still narrows it."
 		}
 	}
 	sandbox, approval := "", ""

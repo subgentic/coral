@@ -83,6 +83,7 @@ func TestLaunchPermissionArgsRouteShowsCodexAutoReview(t *testing.T) {
 	text, note := ask("0.163.0", `{"agent_type":"codex","permission_mode":"auto"}`)
 	assert.Equal(t, netOn+"--approve-for-me", text)
 	assert.Contains(t, note, "auto-review")
+	assert.Contains(t, note, "without asking you")
 	assert.Contains(t, note, "Shell rule")
 	text, note = ask("0.163.0", `{"agent_type":"codex","flags":["--sandbox","workspace-write","-a","never"]}`)
 	assert.Equal(t, netOn+"--approve-for-me", text, "the flags the dashboard sends for Auto")

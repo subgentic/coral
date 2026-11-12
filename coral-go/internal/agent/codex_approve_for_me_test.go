@@ -73,6 +73,7 @@ func TestCodexAutoReviewLeavesEveryOtherPickAlone(t *testing.T) {
 func TestCodexAutoNoteSaysWhichAutoRuns(t *testing.T) {
 	on := CodexAutoNote([]string{"--approve-for-me"}, nil, "auto", false)
 	assert.Contains(t, on, "auto-review")
+	assert.Contains(t, on, "outside the sandbox, such as writing outside the workspace, without asking you", "Security's #15795: the widening is said plainly")
 	assert.Contains(t, on, "Shell rule", "a role's Shell rule may still narrow it, said in the note")
 	off := CodexAutoNote([]string{"--sandbox", "workspace-write", "-a", "never"}, nil, "auto", false)
 	assert.Contains(t, off, "older than 0.163.0")
