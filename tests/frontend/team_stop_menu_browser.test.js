@@ -39,12 +39,12 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             await ev(`document.getElementById('team-page-more').click(); true`);
             await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu opens
             let it = await items(host);
-            check(JSON.stringify(it.map(i => i.text)) === JSON.stringify(['Sleep team', 'Reset team (clear context)', 'Kill all']), `the items are the sidebar row's own words: ${JSON.stringify(it)}`);
+            check(JSON.stringify(it.map(i => i.text)) === JSON.stringify(['Sleep team', 'Reset team (clear context)', 'Stop agents']), `the items are the sidebar row's own words: ${JSON.stringify(it)}`);
             check(/^Stops every agent for now; Wake team starts them again$/.test(it[0].hint) && /^Clears every agent's context; each starts in a new chat$/.test(it[1].hint) && /^Ends every agent now; their chats stay in History$/.test(it[2].hint), `each item says in one line what it does (#10357): ${JSON.stringify(it.map(i => i.hint))}`);
             check(it.every(i => i.shown) && (!mobile || it.every(i => i.h >= 44)), `shown (44 px on a phone): ${JSON.stringify(it)}`);
-            check(it[0] && !it[0].danger && !it[1].danger && it[2].danger, 'Kill all is the danger item; Sleep team and Reset team (clear context) are not red at rest (#15373)');
+            check(it[0] && !it[0].danger && !it[1].danger && it[2].danger, 'Stop agents is the danger item; Sleep team and Reset team (clear context) are not red at rest (#15373)');
             check(await ev(`document.querySelectorAll('${host} hr.overflow-menu-divider').length >= 1`), 'the danger items are set apart by a rule');
-            check(await ev(`(() => { const k = [...document.querySelectorAll('${host} > *')]; const last3 = k.slice(-4); return last3[0].tagName === 'HR' && last3.slice(1).every(e => e.dataset.stop); })()`), 'More ends with a line and then the three stop items (#15856)');
+            check(await ev(`(() => { const k = [...document.querySelectorAll('${host} > *')]; const last = k.slice(-5); return last[0].tagName === 'HR' && last.slice(1, 4).every(e => e.dataset.stop) && last[4].id === 'mb-delete-btn'; })()`), 'More ends with a line, the three stop items, then Remove team last (#15856, #16359)');
             await shot(`team-stop-menu-${w}`);
             const separation=await ev(`(()=>{const host=document.querySelector('${host}'),reset=host.querySelector('[data-stop="reset"]'),kill=host.querySelector('[data-stop="kill"]');return{gap:kill.getBoundingClientRect().top-reset.getBoundingClientRect().bottom,resetRule:parseFloat(getComputedStyle(reset).borderTopWidth),killRule:parseFloat(getComputedStyle(kill).borderTopWidth)}})()`);
             check(separation.gap>=8&&separation.killRule>=1,`destructive actions have space and a visible boundary: ${JSON.stringify(separation)}`);
@@ -64,7 +64,7 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             await ev(`document.getElementById('team-page-more').click(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu opens
             await ev(`document.querySelector('${host} [data-stop="kill"]').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the dialog opens
             d = await dialogText();
-            check(/Kill team/i.test(d) && /Kill (all \d+ agents|the 1 agent) in "/.test(d) && /stop now\. (Their chats|Its chat) stays? in History\./.test(d) && !/terminate|on board/i.test(d), `Kill all asks first, in plain words, and says what stays (#10371): ${d.slice(0, 300)}`);
+            check(/Stop agents/i.test(d) && /Stop (all \d+ agents|the 1 agent) in "/.test(d) && /stop now\. (Their chats|Its chat) stays? in History\./.test(d) && !/terminate|on board/i.test(d), `Stop agents asks first, in plain words, and says what stays (#10371): ${d.slice(0, 300)}`);
             await closeDialog(); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the dialog closes
             // a sleeping team says Wake team
             await ev(`T.state.liveSessions = ${JSON.stringify([mk('s1', 'Boss', true), mk('s2', 'Worker', true)])}; T.render.renderLiveSessions(T.state.liveSessions); document.getElementById('team-page-more').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the menu follows the team
