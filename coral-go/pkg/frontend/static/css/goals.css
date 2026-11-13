@@ -80,6 +80,7 @@
 
 /* Findings of the Goals usability check (#7218, #7224): chips with no goals quieter; a lighter phone header */
 .goals-chip-zero:not([aria-pressed="true"]) { color: var(--text-muted); } /* a pill with nothing in it is a little quieter in its text and keeps its edge like every other (#7715: Blocked 0 had none) */
+.goals-chip-zero:not([aria-pressed="true"]):hover { color: var(--text-primary); } /* hover raises the text: muted on the hover fill is 4.38:1 (a11y_dashboard pins 4.5) */
 @media (max-width: 767px) {
     /* a phone, large text (#7224): the page's own heading and New goal share a row, the sub-line is small, the chips take less, so the first goal is not a screen away */
     .goals-page { gap: 8px; }

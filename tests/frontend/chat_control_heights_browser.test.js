@@ -1,4 +1,4 @@
-// One control height on the agent chat page (design guidelines 4.6, #15821): the buttons were 16, 22, 24, 26, 28, 32, 36 and 37 px tall. Now every control on the page (the sidebar and the top navigation are other tasks) is 32 px (toolbar, composer, the
+// One control height on the agent chat page (design guidelines 4.6, #15821): the buttons were 16, 22, 24, 26, 28, 32, 36 and 37 px tall. Now every control on the page (the sidebar, the top navigation and the launch-disclosure banner are other surfaces; the banner's Dismiss is a 44 px target pinned by permissions_default) is 32 px (toolbar, composer, the
 // chips) or 36 px (the dock's tabs), 44 on touch; a message's icon buttons are drawn at 24 px inside a 32 px hit area (44 on touch). 1440 px dark and light, 390 px touch, and 200% text (nothing shorter, nothing cut).
 // Measured only after the chat is laid out; every box read in one call. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
@@ -23,7 +23,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await waitFor(`window.__rendered && window.__rendered().length >= 4`, `${label}: the chat is drawn`, 15000);
             if (!mobile) await waitFor(`!!document.querySelector('#agentic-tab-files') && document.querySelector('#agentic-tab-files').getClientRects().length > 0`, `${label}: the dock's tabs are laid out`, 15000);
             await ev(`document.fonts.ready.then(() => ${framesJs(3, 600)})`);
-            const r = await ev(`(() => { const out = []; for (const b of document.querySelectorAll('button, a.btn, [role="button"], input[type="button"], input[type="submit"], select, [role="tab"]')) { const x = b.getBoundingClientRect(); if (!x.width || !x.height || getComputedStyle(b).visibility === 'hidden') continue; if (b.closest('#sidebar, .sidebar, .top-bar, #top-bar, nav, .nav-tabs, .phone-nav')) continue;
+            const r = await ev(`(() => { const out = []; for (const b of document.querySelectorAll('button, a.btn, [role="button"], input[type="button"], input[type="submit"], select, [role="tab"]')) { const x = b.getBoundingClientRect(); if (!x.width || !x.height || getComputedStyle(b).visibility === 'hidden') continue; if (b.closest('#sidebar, .sidebar, .top-bar, #top-bar, nav, .nav-tabs, .phone-nav, #launch-disclosure-banner')) continue;
                 const row = !!b.closest('.chat-bubble') && b.classList.contains('btn-xs'), pe = row ? getComputedStyle(b, '::after') : null;
                 out.push({ h: Math.round(x.height * 10) / 10, tab: b.classList.contains('agentic-tab'), row, hit: pe ? Math.round(parseFloat(pe.height)) : 0, inset: pe ? pe.top : '', clipped: b.scrollHeight > b.clientHeight + 1 && !b.matches('select'), name: ((b.getAttribute('aria-label') || b.title || b.textContent || '').trim().slice(0, 26)) + (b.id ? '#' + b.id : '') }); } return out; })()`);
             const at = label + ': ';
