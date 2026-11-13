@@ -1,5 +1,5 @@
 // Custom permission modes (#15950): Settings > Agents > Custom permission modes (a name, an agent type, the flags one per line) and the pickers that list them. Against the real server: a mode is added
-// and saved with Apply, a flag that is not on the CLI's list is refused with its line, a mode that turns the prompts off says so, the mode shows in the New agent form for its CLI only (after the built-in
+// and saved at once (no Apply, #16345), a flag that is not on the CLI's list is refused with its line, a mode that turns the prompts off says so, the mode shows in the New agent form for its CLI only (after the built-in
 // ones, flags as its tip), and the launch names it ("custom:<id>", no flags typed by the form). 1440 and 390. Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -36,12 +36,12 @@ const { coralReady } = require('./helpers/wait');
             assert.match(await err(), /Line 3|not a flag/, at + 'a bare word is refused');
             await ev(`document.getElementById('cpm-flags').value = '--permission-mode\\nplan'; document.getElementById('cpm-name').value = 'Plan only'; document.querySelector('#settings-custom-modes .cm-form .sv-save').click(); true`);
             await waitFor(`document.querySelectorAll('#settings-custom-modes .cm-row[data-type="claude"]').length === 1 && !document.querySelector('#settings-custom-modes .cm-form')`, 'the mode is a row');
-            assert.match(await ev(`document.querySelector('#settings-custom-modes .cm-status').textContent`), /Unsaved changes/, at + 'not saved until Apply');
+            await waitFor(`fetch('/api/custom-modes').then(r => r.json()).then(d => d.modes.length === 1)`, 'the first mode is on the server without an Apply');
+            assert.doesNotMatch(await ev(`document.querySelector('#settings-custom-modes .cm-status').textContent`), /Unsaved|Apply/, at + 'no Apply to wait for');
             await fillForm('codex', 'Wide open', '--sandbox\ndanger-full-access\n-a\nnever');
             await waitFor(`document.querySelectorAll('#settings-custom-modes .cm-row[data-type]').length === 2`, 'a second row');
             assert.match(await ev(`document.querySelector('#settings-custom-modes .cm-row[data-type="codex"]').innerText`), /No prompts/, at + 'a mode that turns the prompts off says so');
-            // Apply saves the whole list with the rest of Settings
-            await ev(`Promise.resolve(window.applySettings()).then(() => true)`);
+            // each Add saved its own mode
             let saved;
             await waitFor(`fetch('/api/custom-modes').then(r => r.json()).then(d => { window.__cpm = d; return d.modes.length === 2; })`, 'both saved');
             saved = await api('GET');

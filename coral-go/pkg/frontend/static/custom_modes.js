@@ -1,7 +1,7 @@
 /* Custom permission modes (#15950): a mode a person adds in Settings > Agents > Custom permission modes: a name, an agent type and the CLI flags it passes in place of a built-in mode's. They are kept on this
  * computer (GET and PUT /api/custom-modes, Operator only: the PUT replaces the whole list), served beside the built-in modes to every picker (New agent, New team, Restart with changes, Settings' default), and a
  * launch names one as "custom:<id>". The flags are checked by the server against a list per CLI when saved and again at every launch; the form says what is wrong before the save, from the same list.
- * The form edits a draft and Apply saves it with the rest of Settings (applyCustomModes), as the custom models do. */
+ * Add mode, Update mode and Remove save at once (applyCustomModes), as the custom models do (#16345): Settings has no Apply button, so a draft kept for one was lost on Close or reload. */
 import { requestJson } from './api.js';
 import { importOnce } from './import_once.js';
 import { el as mk } from './dom_el.js';
@@ -110,8 +110,18 @@ export function flagsProblem(type, flags) {
 
 function status() {
     const s = host && host.querySelector('.cm-status');
-    if (s) s.textContent = customModesDirty() ? 'Unsaved changes. Apply to save.' : '';
+    if (s) s.textContent = '';
 }
+
+let feedbackTimer;
+function feedback(words) {
+    clearTimeout(feedbackTimer);
+    const s = host && host.querySelector('.cm-status');
+    if (!s) return;
+    s.textContent = words;
+    if (words === 'Saved') feedbackTimer = setTimeout(() => { s.textContent = ''; }, 2000);
+}
+const notSaved = error => (error && error.userMessage ? `Not saved. ${error.userMessage} Try again.` : 'Not saved. Try again.');
 
 function nameProblem(type, name, skip) {
     if (!name) return 'Enter a name.';
@@ -136,10 +146,12 @@ function form(index) {
     ];
     const view = mountSettingsView(box, { mode: 'form', fields, form: {
         submit: index >= 0 ? 'Update mode' : 'Add mode', cancel: 'Cancel',
-        onSubmit: values => {
+        onSubmit: async values => {
             const entry = { id: index >= 0 ? draft[index].id : '', agent_type: values.agent_type, name: String(values.name).trim(), flags: parseFlagLines(values.flags) };
             if (index >= 0) draft[index] = { ...draft[index], ...entry }; else draft.push(entry);
-            editing = null; render(); focusAfter(index >= 0 ? index : draft.length - 1);
+            const at = index >= 0 ? index : draft.length - 1;
+            try { await applyCustomModes(); feedback('Saved'); focusAfter(at); }
+            catch (error) { draft = clone(saved); editing = null; render(); feedback(notSaved(error)); }
         },
         onCancel: () => { editing = null; render(); focusAdd(); },
     } });
@@ -168,7 +180,11 @@ function render() {
         const edit = mk('button', 'btn btn-small', 'Edit'); edit.type = 'button'; edit.dataset.cpmEdit = String(i); edit.setAttribute('aria-label', `Edit ${m.name}`);
         edit.addEventListener('click', () => { editing = i; render(); });
         const rm = mk('button', 'btn btn-small', 'Remove'); rm.type = 'button'; rm.setAttribute('aria-label', `Remove ${m.name}`);
-        rm.addEventListener('click', () => { draft.splice(i, 1); editing = null; render(); focusAdd(); });
+        rm.addEventListener('click', async () => {
+            rm.disabled = true; draft.splice(i, 1); editing = null;
+            try { await applyCustomModes(); feedback('Saved'); focusAdd(); }
+            catch (error) { draft = clone(saved); render(); feedback(notSaved(error)); }
+        });
         li.append(text, edit, rm); list.append(li);
     });
     host.append(list);
