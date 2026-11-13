@@ -4,8 +4,10 @@
  * loadStyles at its top, before it draws anything or the view is shown (panel loaders show a page only when its module has loaded), so the page is never drawn unstyled. */
 
 const loads = new Map(); // href -> promise
+const GIVE_UP_MS = 3000; // a sheet that has said neither load nor error by then does not hold the page back (#16403)
 
-/** Load css/<name> once. Resolves when the sheet has applied; a sheet that cannot be fetched is forgotten (the next call asks again) and the promise still resolves: the page is readable without it. */
+/** Load css/<name> once. Resolves when the sheet has applied; a sheet that cannot be fetched is forgotten (the next call asks again) and the promise still resolves: the page is readable without it.
+ *  A sheet whose request never comes back (a busy Windows runner: the link's load event did not fire, nothing failed, #16403) resolves after a few seconds too, so the view that awaited it draws; the link stays, and applies if it ever arrives. */
 export function loadStyles(name) {
     const href = new URL(`./css/${name}`, import.meta.url).href;
     if (loads.has(href)) return loads.get(href);
@@ -13,8 +15,9 @@ export function loadStyles(name) {
     const p = new Promise(resolve => {
         const link = document.createElement('link');
         link.rel = 'stylesheet'; link.href = href;
-        link.onload = () => resolve();
-        link.onerror = () => { loads.delete(href); link.remove(); resolve(); };
+        const timer = setTimeout(resolve, GIVE_UP_MS);
+        link.onload = () => { clearTimeout(timer); resolve(); };
+        link.onerror = () => { clearTimeout(timer); loads.delete(href); link.remove(); resolve(); };
         document.head.appendChild(link);
     });
     loads.set(href, p);
