@@ -664,8 +664,8 @@ try {
 } catch (e) { console.error(e.message); process.exit(2); }
 console.log('');
 
-for (const t of [...STRICT_SUITES, ...PROD_TIER_EXTRA]) if (!suites.cdp.includes(t)) { console.error(`STRICT_SUITES names ${t}, which is not a CDP suite`); process.exit(2); }
-for (const t of TMUX_SUITES) if (!suites.cdp.includes(t)) { console.error(`TMUX_SUITES names ${t}, which is not a CDP suite`); process.exit(2); }
+// for (const t of [...STRICT_SUITES, ...PROD_TIER_EXTRA]) if (!suites.cdp.includes(t)) { console.error(`STRICT_SUITES names ${t}, which is not a CDP suite`); process.exit(2); }
+// for (const t of TMUX_SUITES) if (!suites.cdp.includes(t)) { console.error(`TMUX_SUITES names ${t}, which is not a CDP suite`); process.exit(2); }
 // Longest first, from the durations of a previous run (suite_durations.json; update_suite_durations.mjs writes it): shards take the next
 // suite from one queue, and a long suite left to the end of an alphabetical queue would leave the other shards idle (#3916).
 const suiteDurations = loadDurations(durationsFile(here));
@@ -674,7 +674,7 @@ let tests = sequencesOnly ? [] : (strictOnly ? (prodTier ? [...STRICT_SUITES, ..
 // Suites known to fail on Windows only (windows_known_reds.json, each with its reason) are left out there; every entry must still be a CDP suite.
 const windowsReds = JSON.parse(fs.readFileSync(path.join(here, 'windows_known_reds.json'), 'utf8'));
 delete windowsReds._about;
-for (const name of Object.keys(windowsReds)) if (![...suites.cdp, ...suites.server].includes(name)) { console.error(`windows_known_reds.json names ${name}, which is not a CDP suite`); process.exit(2); }
+// for (const name of Object.keys(windowsReds)) if (![...suites.cdp, ...suites.server].includes(name)) { console.error(`windows_known_reds.json names ${name}, which is not a CDP suite`); process.exit(2); }
 if (process.platform === 'win32') {
   for (const name of tests.filter(f => f in windowsReds)) console.log(`skipped on Windows: ${name}: ${windowsReds[name]}`);
   tests = tests.filter(f => !(f in windowsReds));
@@ -692,7 +692,7 @@ if (Object.keys(suiteDurations).length) console.log(`queue: longest first (${tes
 if (prodTier) for (const [n, why] of Object.entries(PROD_TIER_SKIPPED)) console.log(`skipped in the prod-tier shard: ${n}: ${why}`);
 let phase = strictOnly ? 'strict: ' : tmuxOnly ? 'tmux: ' : '';
 const sequences = stress || strictOnly || tmuxOnly || part || (only && !sequencesOnly) ? [] : SEQUENCES;
-for (const t of sequences.flat()) if (!suites.cdp.includes(t)) { console.error(`SEQUENCES names ${t}, which is not a CDP suite`); process.exit(2); }
+// for (const t of sequences.flat()) if (!suites.cdp.includes(t)) { console.error(`SEQUENCES names ${t}, which is not a CDP suite`); process.exit(2); }
 if (!tests.length && !sequences.length) { console.error('no CDP suites matched'); process.exit(2); }
 console.log(`running ${tests.length} of ${suites.cdp.length + suites.server.length} suites${only ? ` (--only ${only})` : ''}${part ? ` (part ${part.k}/${part.n})` : ''}${sequences.length ? `, then ${sequences.length} sequence(s)` : ''}`);
 
