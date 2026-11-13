@@ -7,7 +7,7 @@ const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 const { osNeutralCli } = require('./helpers/os_neutral_cli');
 
-const BUDGET = { chooser: 52, /* the title "New agent or project" (#7064) and the four description lines the type cards say again (#9253, the Operator): 10 + 9 + 10 + 11 words */ folder: 32, /* the 28 words of the folder step and the one way to a team from it, 'Start a team instead' (#11289) */ persona: 81, agent: 72 /* the provider cards (#11235): each installed one says 'Installed', and 'Installed · default <name>' only when a default is saved (five providers with OpenCode: 78 words with 'default model' on each, 63 without; v2.0.10), and a missing one is a name and an Install link under 'Not installed' (the mockup's stated cost: most information) */ }; // the three New Agent steps as the design words them (#7391): measured at 1280 px (the phone shows fewer). Step 1's 30 includes the 10-word "Next: the persona, then model and permissions. All have defaults." line (UI/UX cut it from 20), the step header, the screen-reader reason for Next and the Recent: label
+const BUDGET = { chooser: 52, /* the title "New agent or project" (#7064) and the four description lines the type cards say again (#9253, the Operator): 10 + 9 + 10 + 11 words */ page: 120, open: 150, folder: 32, /* the 28 words of the folder step and the one way to a team from it, 'Start a team instead' (#11289) */ persona: 81, agent: 72 /* the provider cards (#11235): each installed one says 'Installed', and 'Installed · default <name>' only when a default is saved (five providers with OpenCode: 78 words with 'default model' on each, 63 without; v2.0.10), and a missing one is a name and an Install link under 'Not installed' (the mockup's stated cost: most information) */ }; // the three New Agent steps as the design words them (#7391): measured at 1280 px (the phone shows fewer). Step 1's 30 includes the 10-word "Next: the persona, then model and permissions. All have defaults." line (UI/UX cut it from 20), the step header, the screen-reader reason for Next and the Recent: label
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -34,16 +34,11 @@ const BUDGET = { chooser: 52, /* the title "New agent or project" (#7064) and th
             await ev(`document.querySelector('#launch-step-chooser [data-arg="agent"]').click(); true`);
             await waitFor(`getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none'`, `${tag}: the New Agent step`, 8000);
             n = await words();
-            assert.ok(n <= BUDGET.folder, `${tag}: New Agent step 1 (the folder) shows ${n} words, budget ${BUDGET.folder}`);
-            await ev(`document.getElementById('launch-dir').value = '/tmp'; document.getElementById('launch-agent-next').click(); true`);
-            await waitFor(`document.getElementById('launch-step-agent').dataset.stage === 'persona'`, `${tag}: step 2`, 8000);
+            assert.ok(n <= BUDGET.page, `${tag}: New Agent, the one page as it opens (#15911), shows ${n} words, budget ${BUDGET.page}`);
+            await ev(`document.getElementById('launch-dir').value = '/tmp'; document.getElementById('launch-persona-more').open = true; document.getElementById('launch-more-options').open = true; true`);
+            await waitFor(`document.getElementById('launch-agent-acf').classList.contains('has-agent-pick') && document.getElementById('launch-agent-pick').dataset.probed === '1'`, `${tag}: the provider cards are built and the CLI checks answered`, 8000); // the words of the cards (a status, Not installed, an Install link each)
             n = await words();
-            assert.ok(n <= BUDGET.persona, `${tag}: New Agent step 2 (the persona) shows ${n} words, budget ${BUDGET.persona}`);
-            await ev(`document.getElementById('launch-agent-next').click(); true`);
-            await waitFor(`document.getElementById('launch-step-agent').dataset.stage === 'agent'`, `${tag}: step 3`, 8000);
-            await waitFor(`document.getElementById('launch-agent-acf').classList.contains('has-agent-pick') && document.getElementById('launch-agent-pick').dataset.probed === '1'`, `${tag}: the provider cards are built and the CLI checks answered`, 8000); // the words of the cards (a status, Not installed, an Install link each) are in only once the checks are
-            n = await words();
-            assert.ok(n <= BUDGET.agent, `${tag}: New Agent step 3 (the agent) shows ${n} words, budget ${BUDGET.agent}`);
+            assert.ok(n <= BUDGET.open, `${tag}: New Agent with the name and More options open shows ${n} words, budget ${BUDGET.open}`);
             const title = await ev(`getComputedStyle(document.querySelector('#launch-agent-acf .settings-pane:not([hidden]) .settings-pane-title')).display`);
             assert.notEqual(title, 'none', `${tag}: the open section is named by a heading beside its tabs (the design's)`);
             await ev(`window.hideLaunchModal(); true`);

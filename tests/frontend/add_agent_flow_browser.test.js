@@ -44,11 +44,11 @@ const DIR = '/work/crew';
             assert.equal(await title(), `Add agent to ${TEAM}`, `${label}: the team is named in the title`);
             await ev(`window.hideLaunchModal(); true`); await settle(150);
 
-            // a team with no folder keeps New Agent's folder step, three steps, the team still preset
+            // a team with no folder keeps New Agent's one page with the folder field, the team still preset
             await ev(`window.showAddAgentToBoard(${JSON.stringify(TEAM)}, ''); true`);
-            await waitFor(`${OPEN} && document.getElementById('launch-step-agent').dataset.stage === 'folder'`, `${label}: a team with no folder starts on the folder`);
+            await waitFor(`${OPEN} && document.getElementById('launch-step-agent').dataset.stage === 'page'`, `${label}: a team with no folder starts on the one page (the folder is asked there)`);
             assert.equal(await title(), `Add agent to ${TEAM}`);
-            assert.match(await sub(), /^Step 1 of 3: Where it launches/);
+            assert.equal(await sub(), '', `${label}: the one page has no Step n of 3 line`);
             assert.equal(await vis('launch-board-select'), false, `${label}: the team cannot be changed: the Message Board field is not there`);
             await ev(`window.hideLaunchModal(); true`); await settle(150);
 
@@ -69,14 +69,14 @@ const DIR = '/work/crew';
                 assert.ok(fit.w <= fit.vw + 1 && fit.h >= 44 && fit.inside && fit.side, `${label}: the dialog fits the phone and Next is a 44 px target: ` + JSON.stringify(fit));
             }
             // persona step -> Next -> the agent screen with its sections; Back returns to the persona
-            await ev(`{ const n = document.getElementById('launch-agent-name-input'); n.value = 'Bo'; n.dispatchEvent(new Event('input', { bubbles: true })); document.getElementById('launch-agent-next').click(); } true`);
+            await ev(`{ const n = document.getElementById('launch-agent-name-input'); n.value = 'Bo'; n.dispatchEvent(new Event('input', { bubbles: true })); window._launchStage('agent'); } true`);
             await waitFor(`document.getElementById('launch-step-agent').dataset.stage === 'agent'`, `${label}: the agent screen`);
             assert.match(await sub(), /^Step 2 of 2: The agent/);
             assert.equal(await vis('launch-agent-back'), true); assert.equal(await vis('launch-agent-go'), true, `${label}: Launch is on the agent screen`);
             assert.ok(await ev(`!!document.querySelector('#launch-step-agent .settings-tab') && [...document.querySelectorAll('#launch-step-agent .settings-tab')].some(t => /Permissions/i.test(t.textContent))`), `${label}: the agent screen has its Permissions section`);
             await ev(`document.getElementById('launch-agent-back').click(); true`);
             assert.equal(await stage(), 'persona', `${label}: Back returns to the persona`); assert.equal(await vis('launch-agent-back'), false, `${label}: and no further`);
-            await ev(`document.getElementById('launch-agent-next').click(); true`);
+            await ev(`window._launchStage('agent'); true`);
             await waitFor(`document.getElementById('launch-step-agent').dataset.stage === 'agent'`, `${label}: the agent screen again`);
 
             // the launch: the body Add agent always sent (no backend, the team joined by id, no remote board server)
@@ -89,9 +89,9 @@ const DIR = '/work/crew';
             assert.deepEqual(Object.keys(sent).filter(k => !allowed.has(k)), [], `${label}: nothing but what Add agent sent: ` + JSON.stringify(Object.keys(sent)));
             await waitFor(`!(${OPEN})`, `${label}: the dialog closes`);
 
-            // New Agent is as it was: its own title, the three steps, the Message Board field
+            // New Agent is as it was: its own title, the one page, the Message Board field
             await ev(`window.showLaunchModal(); window._selectLaunchType('agent'); true`); await settle(200);
-            assert.equal(await title(), 'New agent'); assert.equal(await stage(), 'folder'); assert.match(await sub(), /^Step 1 of 3:/);
+            assert.equal(await title(), 'New agent'); assert.equal(await stage(), 'page'); assert.equal(await sub(), '');
             assert.equal(await ev(`document.getElementById('launch-modal').hasAttribute('data-add-to')`), false);
             assert.equal(await ev(`document.getElementById('launch-board-select').closest('.form-row').hidden`), false, `${label}: New Agent still offers the Message Board`);
             await ev(`window.hideLaunchModal(); true`);
