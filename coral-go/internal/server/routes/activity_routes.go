@@ -216,15 +216,19 @@ func StoredFileName(coralDir, id string) string {
 	return ""
 }
 
-// firstLineExcerpt is what a row of the Activity record keeps of words the Operator sent: the first line with text, cut at 140 characters (the redaction follows in activityMetaFor). The rest of a long message
-// stays in the chat (#16000).
+// firstLineExcerpt is what a row of the Activity record keeps of words the Operator sent: the first line with text, redacted whole and then cut at 140 characters, so a secret that straddles the cut is never kept as
+// a fragment the redactor would not know (#16038). The rest of a long message stays in the chat (#16000). A line the redactor refuses is kept as no note.
 func firstLineExcerpt(text string) string {
 	for _, line := range strings.Split(text, "\n") {
 		if line = strings.TrimSpace(line); line != "" {
-			if r := []rune(line); len(r) > 140 {
+			red, ok := redactComment(line)
+			if !ok {
+				return ""
+			}
+			if r := []rune(red); len(r) > 140 {
 				return string(r[:139]) + "…"
 			}
-			return line
+			return red
 		}
 	}
 	return ""
