@@ -3799,6 +3799,7 @@ li:has(> .row-btn:focus-visible) { outline: 2px solid var(--accent); outline-off
 .launch-wizard[data-stage="page"] .launch-persona-top { padding: 0; }
 .launch-wizard[data-stage="page"] .acf-persona-page { order: 2; padding: 4px 24px 0; }
 .launch-wizard[data-stage="page"] .settings-tabs { display: flex; flex-direction: row; gap: 4px; overflow-x: auto; }
+@media (max-width: 767px), (pointer: coarse) { .launch-wizard[data-stage="page"] .settings-tab { min-height: var(--control-touch-height, 44px); } } /* the Agent, Permissions and Advanced tabs are 44 px targets on a phone (phone_targets_census_b) */
 .launch-wizard[data-stage="page"] .settings-nav { width: auto; border: 0; background: none; padding: 0; }
 .launch-wizard[data-stage="page"] #launch-more-options { order: 3; margin: 0 24px; }
 .launch-wizard[data-stage="page"] .launch-page-toggle > summary { padding-block: 8px; }
