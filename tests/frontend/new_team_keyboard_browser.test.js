@@ -1,5 +1,5 @@
 // New team and Edit member by keyboard and screen reader (#7407; UI/UX's final v4 doc ad146b3a, section 4), written failing-first by QA (#7415): both dialogs are modal and named, Enter in the name or folder is Next
-// (and does nothing while one is missing), each step is said once in a polite status, step 3's tabs and Edit member's tabs are real tabs (one tab stop, arrows, Home and End), a member row is one button named Edit <role> (#10836: no actions menu),
+// (and does nothing while one is missing), each step is said once in a polite status, More options on step 1 is a real disclosure and Edit member's tabs are real tabs (one tab stop, arrows, Home and End), a member row is one button named Edit <role> (#10836: no actions menu),
 // provider and model, the actions button has aria-haspopup and aria-expanded and its menu is a menu (arrows move, Escape closes and the focus goes back to the button), Escape in Edit member closes it and returns the
 // focus to the row that opened it, Tab stays inside the top dialog, Mode is a radiogroup with arrow keys, every control of every step and tab has an accessible name. 1280 px, isolated dev server.
 const assert = require('node:assert/strict');
@@ -31,33 +31,22 @@ const BASE = require('./test_base').BASE;
         await S.run('Enter in the folder is Next when the team name and folder are there, and does nothing while one is missing', async () => {
             await t.type('input', N.teamName, ''); await t.type('input', N.folder, '/work/payments-app');
             await ev(`window.__nt.find(window.__nt.dlg(${N.team}), 'input', ${N.folder}).focus(); true`); await key('Enter');
-            assert.match(await ev(`window.__na.text(window.__nt.dlg(${N.team}))`), /Step 1 of 3/, 'no name: still step 1');
+            assert.match(await ev(`window.__na.text(window.__nt.dlg(${N.team}))`), /Step 1 of 2/, 'no name: still step 1');
             await t.type('input', N.teamName, 'alpha'); await ev(`window.__nt.find(window.__nt.dlg(${N.team}), 'input', ${N.folder}).focus(); true`); await key('Enter');
             await t.step(2); assert.ok((await insideTop()).inside, 'focus stays inside the dialog after Next');
         });
-        await S.run('each step is said in a polite status ("Step 2 of 3: ...", "Step 3 of 3: ...")', async () => {
+        await S.run('each step is said in a polite status ("Step 2 of 2: ...", then "Step 1 of 2: ..." going back)', async () => {
             const say = () => ev(`[...window.__nt.dlg(${N.team}).querySelectorAll('[aria-live=polite],[role=status]')].map(e => window.__na.text(e)).join(' | ')`);
-            assert.match(await say(), /Step 2 of 3/);
-            await t.pick(N.template, /Coding|\(\d+ members\)/); await settle(400); await t.click('button', N.next); await t.step(3); await settle(200); assert.match(await say(), /Step 3 of 3/);
+            assert.match(await say(), /Step 2 of 2/);
+            await t.pick(N.template, /Coding|\(\d+ members\)/); await settle(400); await t.click('button', N.back); await t.step(1); await settle(200); assert.match(await say(), /Step 1 of 2/);
         });
-        await S.run('step 3 tabs are real tabs: a tablist, one selected, one tab stop, each tab controls a tabpanel named by it', async () => {
-            const tabs = await ev(`(() => { const tl = window.__nt.tablist(window.__nt.dlg(${N.team})); if (!tl) return null; return { o: tl.getAttribute('aria-orientation'), t: [...tl.querySelectorAll('[role=tab]')].map(x => ({ n: window.__na.name(x), s: x.getAttribute('aria-selected'), tab: x.tabIndex, c: (() => { const p = document.getElementById(x.getAttribute('aria-controls') || ''); return p ? { role: p.getAttribute('role'), by: p.getAttribute('aria-labelledby') === x.id } : null; })() })) }; })()`);
-            assert.ok(tabs, 'a role=tablist'); assert.equal(tabs.t.length, 4); assert.equal(tabs.t.filter(x => x.s === 'true').length, 1);
-            assert.deepEqual(tabs.t.map(x => x.tab).sort(), [-1, -1, -1, 0], 'one tab stop');
-            for (const x of tabs.t) { assert.ok(x.c, `${x.n}: aria-controls points to a panel`); assert.equal(x.c.role, 'tabpanel'); assert.ok(x.c.by, `${x.n}: the panel is labelled by its tab`); }
-        });
-        await S.run('tablist keys on step 3: arrows along the axis move and select (wrapping), Home and End go to the ends', async () => {
-            const vertical = await ev(`window.__nt.tablist(window.__nt.dlg(${N.team})).getAttribute('aria-orientation') === 'vertical'`);
-            const [next, prev] = vertical ? ['ArrowDown', 'ArrowUp'] : ['ArrowRight', 'ArrowLeft'];
-            const cur = () => ev(`(() => { const x = [...window.__nt.dlg(${N.team}).querySelectorAll('[role=tab]')].find(e => e.getAttribute('aria-selected') === 'true'); return { n: window.__na.name(x), f: document.activeElement === x }; })()`);
-            await ev(`[...window.__nt.dlg(${N.team}).querySelectorAll('[role=tab]')].find(e => e.getAttribute('aria-selected') === 'true').focus(); true`);
-            assert.equal((await cur()).n, 'Start'); await key(next); assert.deepEqual(await cur(), { n: 'Workflow', f: true });
-            await key(next); await key(next); assert.equal((await cur()).n, 'Messaging'); await key(next); assert.equal((await cur()).n, 'Start', 'wraps to the first');
-            await key(prev); assert.equal((await cur()).n, 'Messaging', 'wraps to the last'); await key('Home'); assert.equal((await cur()).n, 'Start'); await key('End'); assert.equal((await cur()).n, 'Messaging'); await key('Home');
-        });
-        await S.run('no control of any tab of step 3, and none of step 2, is without an accessible name', async () => {
-            for (const n of N.tabs) { await ev(`[...window.__nt.dlg(${N.team}).querySelectorAll('[role=tab]')].find(x => window.__na.name(x) === ${JSON.stringify(n)}).click(); true`); await settle(250); assert.deepEqual(await unnamed(N.team), [], `step 3, ${n}: unnamed controls`); }
-            await t.click('button', N.back); await t.step(2); assert.deepEqual(await unnamed(N.team), [], 'step 2: unnamed controls');
+        await S.run('More options (LT1 #15892, the old step-3 tabs) is a real disclosure: one tab stop, Enter and Space open and close it, and what is in it has names', async () => {
+            const state = () => ev(`(() => { const f = [...window.__nt.dlg(${N.team}).querySelectorAll('#team-start-host details')].find(x => /^More options/i.test(x.querySelector('summary').textContent.trim())); return f ? { open: f.open, focus: document.activeElement === f.querySelector('summary') } : null; })()`);
+            await ev(`[...window.__nt.dlg(${N.team}).querySelectorAll('#team-start-host details')].find(x => /^More options/i.test(x.querySelector('summary').textContent.trim())).querySelector('summary').focus(); true`);
+            let st = await state(); assert.ok(st && st.focus && !st.open, 'More options takes the keyboard focus, closed: ' + JSON.stringify(st));
+            await key('Enter'); st = await state(); assert.equal(st.open, true, 'Enter opens it'); await key(' '); st = await state(); assert.equal(st.open, false, 'Space closes it'); await key('Enter');
+            assert.deepEqual(await unnamed(N.team), [], 'step 1 with More options open: unnamed controls');
+            await t.click('button', N.next); await t.step(2); assert.deepEqual(await unnamed(N.team), [], 'step 2: unnamed controls');
         });
         await S.run('a member row is one button named "Edit <role>", described by its provider and model, with no menu; Alt+ArrowDown moves it and says so; Escape in Edit member returns the focus to it (#10836)', async () => {
             const role = (await ev(`window.__nt.roles(window.__nt.dlg(${N.team}))`))[1];

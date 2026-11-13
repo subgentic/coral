@@ -39,7 +39,7 @@ const T = (ev, waitFor) => {
         type: (sel, rx, v, within = N.team) => ev(`(() => { const e = window.__nt.find(window.__nt.dlg(${within}), ${JSON.stringify(sel)}, ${rx}); if (!e) return false; e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`),
         has: (sel, rx, within = N.team) => ev(`!!window.__nt.find(window.__nt.dlg(${within}), ${JSON.stringify(sel)}, ${rx})`),
         pick: (rx, text, within = N.team) => ev(`(() => { const s = window.__nt.find(window.__nt.dlg(${within}), 'select', ${rx}); if (!s) return false; const o = [...s.options].find(o => ${text}.test(o.textContent)); if (!o) return false; s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`),
-        step: n => waitFor(`/^Step ${n} of 2/.test((() => { const d = window.__nt.dlg(${N.team}); return d ? [...d.querySelectorAll('*')].filter(window.__na.vis).map(e => window.__na.text(e)).filter(x => /^Step \\d of 3: /.test(x)).sort((a, b) => a.length - b.length)[0] || '' : ''; })())`, `step ${n} of 3`, 5000),
+        step: n => waitFor(`/^Step ${n} of 2/.test((() => { const d = window.__nt.dlg(${N.team}); return d ? [...d.querySelectorAll('*')].filter(window.__na.vis).map(e => window.__na.text(e)).filter(x => /^Step \\d of 2: /.test(x)).sort((a, b) => a.length - b.length)[0] || '' : ''; })())`, `step ${n} of 2`, 5000),
         // to(n): fills what each step needs and presses Next; a step that does not come up says which one, so a setup that fails is not swallowed (#7511: new_team_members had 4 of 9 scenarios red on Windows with an empty log).
         to: async (n, { name = 'alpha', folder = '/work/payments-app', template } = {}) => {
             const need = async (ok, what) => assert_(await ok, `the setup to step ${n} did not come up: ${what}`);
@@ -48,6 +48,12 @@ const T = (ev, waitFor) => {
             if (n >= 2) { await t.click('button', N.next); await t.step(2); if (n === 2 && template) await pickTemplate(template); }
             if (n >= 3) { const tpl = template === undefined ? /Coding/ : template; if (tpl) await pickTemplate(tpl); } // LT1 (#15892): two steps; the settings that were step 3 are on step 1, so to(3) is step 2 with the template picked
         },
+        // LT1 (#15892): the first task, Workflow, Health check and Messaging are on step 1 (the last two under "More options"); the members are step 2. settings() goes back to step 1 from the members and opens More options; tab(name) is the old step-3 menu's name for where a setting is; launch() takes Next when still on step 1, then Launch team.
+        more: async () => { await ev(`(() => { const d = window.__nt.dlg(${N.team}); const f = d && [...d.querySelectorAll('#team-start-host details')].find(x => x.querySelector('summary') && /^More options/i.test(x.querySelector('summary').textContent.trim())); if (f && !f.open) f.querySelector('summary').click(); return true; })()`); },
+        onStep: async n => (await ev(`(() => { const d = window.__nt.dlg(${N.team}); return d ? [...d.querySelectorAll('*')].filter(window.__na.vis).map(e => window.__na.text(e)).filter(x => /^Step \\d of 2: /.test(x)).sort((a, b) => a.length - b.length)[0] || '' : ''; })()`)).startsWith(`Step ${n} of 2`),
+        settings: async () => { if (await t.onStep(2)) { await t.click('button', N.back); await t.step(1); } await t.more(); },
+        tab: async name => { if (name === 'Health check' || name === 'Messaging') await t.more(); },
+        launch: async () => { if (await t.onStep(1)) { await t.click('button', N.next); await t.step(2); } await t.click('button', N.launch); },
         rect: () => ev(`(() => { const p = window.__nt.panel(window.__nt.dlg(${N.team})); return p ? window.__na.box(p) : null; })()`),
     };
     return t;

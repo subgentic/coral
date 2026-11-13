@@ -889,6 +889,8 @@ async function launchTeam() {
     const settings = readTeamLaunchSettings(); // step 3's tabs (#7407)
     if (settings.problem) { // the form has opened its tab and focused the field
         showTeamStep('team');
+        const bad = document.querySelector('#team-start-host .sv-error:not(:empty)')?.closest('.sv-row, .sv')?.querySelector('input, select, textarea'); // the check ran while step 1 was away: its focus did not land, so put it on the field now that the page is back
+        bad?.closest('details')?.setAttribute('open', ''); bad?.focus();
         showToast(settings.problem.text, true);
         return;
     }

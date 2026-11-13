@@ -34,9 +34,9 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
         await recentsExist(ev); await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app', '/work/website', '/work/docs'])); true`);
         await openNewTeam(ev, waitFor);
 
-        await S.run('the dialog is a role=dialog named exactly "New team" and opens on "Step 1 of 3: Your team"', async () => {
+        await S.run('the dialog is a role=dialog named exactly "New team" and opens on "Step 1 of 2: Your team"', async () => {
             assert.ok(await ev(`!!window.__nt.dlg(${N.team})`), 'no role=dialog named "New team"');
-            assert.match(await stepLine(ev), /^Step 1 of 3: Your team/);
+            assert.match(await stepLine(ev), /^Step 1 of 2: Your team/);
         });
         await S.run('step 1: Team name and Folder say Required in words and aria-required, Browse, Cancel and Next, no Back, no tabs, no Machine with one machine, no Launch', async () => {
             for (const [sel, rx, what] of [['input', N.teamName, 'Team name'], ['input', N.folder, 'Folder']]) {
@@ -65,7 +65,7 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             assert.ok(!s.off && s.focus, 'Next stays on and the name takes the focus'); assert.match(s.live, /Team name is required/, 'one line names the first thing wrong'); assert.deepEqual(s.errors, ['Team name is required', 'Choose a folder for the team']);
             await t.type('input', N.teamName, 'alpha'); s = await state(); assert.match(s.live, /Choose a folder for the team/);
             await t.type('input', N.teamName, ''); await t.type('input', N.folder, '/work/payments-app'); s = await state(); assert.match(s.live, /Team name is required/);
-            await t.click('button', N.next); assert.match(await stepLine(ev), /^Step 1 of 3/, 'Next does not advance');
+            await t.click('button', N.next); assert.match(await stepLine(ev), /^Step 1 of 2/, 'Next does not advance');
         });
         await S.run('on a Hub New team opens on Which computer? with several machines; "Another computer\'s address..." is its last card and choosing it reveals the address field; with this computer alone there is no step', async () => {
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); T.state.hub = true; T.state.cloud = false; T.state.serversKnown = true; T.state.servers = [{ id: 'm1', label: 'build-server', status: 'online', version: '1.4.6', last_seen: new Date().toISOString() }]; true`);
@@ -92,14 +92,14 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
         });
         await S.run('step 1 footer: Cancel leftmost, Next rightmost, one row', async () => { await reopen(); await t.type('input', N.teamName, 'alpha'); await t.type('input', N.folder, '/work/payments-app'); await footer(N.next, 'step 1'); });
 
-        await S.run('step 2 is "Step 2 of 3: Members": a template select ("Blank team" first, templates with their member counts), a More menu, Add member, Back, Cancel, Next, no tabs', async () => {
+        await S.run('step 2 is "Step 2 of 2: Members": a template select ("Blank team" first, templates with their member counts), a More menu, Add member, Back, Cancel, Next, no tabs', async () => {
             await reopen(); await t.to(2);
-            assert.match(await stepLine(ev), /^Step 2 of 3: Members/);
+            assert.match(await stepLine(ev), /^Step 2 of 2: Members/);
             const o = await ev(`[...window.__nt.find(window.__nt.dlg(${N.team}), 'select', ${N.template}).options].map(o => o.textContent.trim())`);
             assert.match(o[0], /^Blank team/); assert.ok(o.slice(1).some(x => /\(\d+ members?\)/.test(x)), `templates show their member counts (${JSON.stringify(o)})`);
             assert.ok(await t.has('button', /^More/i), 'a More menu button');
-            for (const rx of [N.addMember, N.back, N.cancel, N.next]) assert.ok(await t.has('button', rx), `${rx}`);
-            await footer(N.next, 'step 2');
+            for (const rx of [N.addMember, N.back, N.cancel, N.launch]) assert.ok(await t.has('button', rx), `${rx}`); // LT1 (#15892): the members are the last step: Launch team, no Next
+            assert.ok(!(await t.has('button', N.next)), 'no Next on step 2'); await footer(N.launch, 'step 2');
         });
         await S.run('step 2: the More menu holds Import a template, Import from a folder, Save this team as a template', async () => {
             await t.click('button', /^More/i); await settle(200);
@@ -135,17 +135,13 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             await t.click('button', /^Undo/i); await settle(250);
             assert.deepEqual(await ev(`window.__nt.roles(window.__nt.dlg(${N.team}))`), before, 'Undo restores the member in its place');
         });
-        await S.run('step 3 is "Step 3 of 3: Start and team settings": a vertical tablist Start, Workflow, Health check, Messaging (Start open), recap above Back, Cancel and Launch team, no Next', async () => {
-            await t.click('button', N.next); await t.step(3);
-            assert.match(await stepLine(ev), /^Step 3 of 3: Start and team settings/);
-            const tabs = await ev(`(() => { const tl = window.__nt.tablist(window.__nt.dlg(${N.team})); return tl ? { o: tl.getAttribute('aria-orientation'), t: [...tl.querySelectorAll('[role=tab]')].filter(window.__na.vis).map(x => ({ n: window.__na.name(x), s: x.getAttribute('aria-selected') })) } : null; })()`);
-            assert.ok(tabs, 'a role=tablist'); assert.deepEqual(tabs.t.map(x => x.n), N.tabs); assert.equal(tabs.t[0].s, 'true', 'Start is the open tab');
-            for (const rx of [N.back, N.cancel, N.launch]) assert.ok(await t.has('button', rx), `${rx}`);
-            assert.ok(!(await t.has('button', N.next)), 'no Next on step 3'); await footer(N.launch, 'step 3');
+        await S.run('step 2 shows the recap above Back, Cancel and Launch team: "<team>: N members, <folder>"', async () => {
             assert.match(await ev(`window.__na.text(window.__nt.dlg(${N.team}))`), /alpha: \d+ members?, \/work\/payments-app/, 'the recap: "<team>: N members, <folder>"');
         });
-        await S.run('step 3 Start: What should the team work on? and Additional instructions; no team-wide Mode or Provider anywhere in the dialog', async () => {
+        await S.run('step 1 holds the first task, Additional instructions and Workflow with the name and folder (LT1 #15892); Health check and Messaging are under a closed More options; no team-wide Mode or Provider anywhere in the dialog', async () => {
+            await t.click('button', N.back); await t.step(1);
             for (const rx of [/^What should the team work on/i, /^Additional instructions/i]) assert.ok(await t.has('textarea', rx), `${rx}`);
+            assert.ok(await ev(`(() => { const f = [...document.querySelectorAll('#team-start-host details')].find(x => /^More options/i.test(x.querySelector('summary').textContent.trim())); return !!f && !f.open; })()`), 'More options is there and closed');
             assert.ok(!(await ev(`!!window.__nt.find(window.__nt.dlg(${N.team}), 'select, [role=radiogroup]', /^(Mode|Permission mode|Provider)$/i)`)), 'no team-wide Mode or Provider (each member has its own)');
         });
         S.finish();

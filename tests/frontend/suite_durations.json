@@ -1660,7 +1660,6 @@
  "skills_versions_browser.test.js": 0.6,
  "tag_cache_scope_browser.test.js": 0.6,
  "team_asleep_clock_browser.test.js": 0.6,
- "team_launch_tips_browser.test.js": 0.6,
  "terminal_backend_browser.test.js": 0.6,
  "wake_team_ended_browser.test.js": 0.6,
  "workflow_agent_browser.test.js": 0.6,

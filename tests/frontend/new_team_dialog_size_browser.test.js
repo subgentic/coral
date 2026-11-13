@@ -27,20 +27,20 @@ const VIEWS = [['1280x800', 1280, 800, false, false], ['390x844', 390, 844, true
             await ev(`document.documentElement.style.fontSize = ${big ? "'32px'" : "''"}; localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app'])); true`);
             await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.settings = { ...(m.state.settings || {}), launch_in_worktree: 'true' }; return true; })`); // the experimental switch is on (#12746): the worktree option is offered only then, and this suite measures it
             let base = null;
-            await S.run(`${label}: New team has the fixed size (desktop 960 wide, min(720, screen - 32) high; phone: a full-height sheet) and the same rectangle on steps 1, 2 (blank and with a template) and 3`, async () => {
+            await S.run(`${label}: New team has the fixed size (desktop 960 wide, min(720, screen - 32) high; phone: a full-height sheet) and the same rectangle on step 1 (also with More options open) and step 2 (blank and with a template)`, async () => {
                 await openNewTeam(ev, waitFor); await settle(400); base = await t.rect(); assert.ok(base, 'the New team dialog is open');
                 const problem = mobile ? (Math.abs(base.h - h) <= 2 && base.w >= w - 24 ? '' : `phone: a full-height sheet (dialog ${base.w}x${base.h} in ${w}x${h})`) : (Math.abs(base.w - 960) <= 1 && Math.abs(base.h - Math.min(720, h - 32)) <= 1 ? '' : `desktop: 960 x min(720, ${h - 32}) (dialog is ${base.w}x${base.h})`);
                 await t.type('input', N.teamName, 'alpha'); await t.type('input', N.folder, '/work/payments-app'); same(base, await t.rect(), 'step 1 filled');
+                await t.more(); await settle(300); same(base, await t.rect(), 'step 1 with More options open'); // LT1 (#15892): Health check and Messaging are in it
                 await t.click('button', N.next); await t.step(2); await settle(300); same(base, await t.rect(), 'step 2 blank');
                 await t.pick(N.template, /Coding|\(\d+ members\)/); await settle(500); same(base, await t.rect(), 'step 2 with a template');
-                await t.click('button', N.next); await t.step(3); await settle(300); same(base, await t.rect(), 'step 3');
                 assert.equal(problem, '', problem);
             });
-            await S.run(`${label}: every step-3 tab (Start, Workflow, Health check, Messaging) has the same rectangle, the footer is on screen, no sideways scroll`, async () => {
-                assert.ok(base, 'step 3 reached');
-                for (const n of N.tabs) { await goSection(N.section, n, N.team); same(base, await t.rect(), `tab ${n}`); }
+            await S.run(`${label}: step 2's footer is on screen with Launch team, and nothing scrolls sideways on either step`, async () => {
+                assert.ok(base, 'step 2 reached');
                 const b = await ev(`window.__nt.buttons(window.__nt.dlg(${N.team}))`); const l = b.find(x => N.launch.test(x.name)); assert.ok(l, 'Launch team is shown'); assert.ok(l.y + l.h <= h + 1, `the footer is on screen (Launch team bottom ${l.y + l.h} of ${h})`);
                 assert.ok(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), 'no sideways scroll');
+                await t.click('button', N.back); await t.step(1); await settle(300); same(base, await t.rect(), 'back on step 1'); assert.ok(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), 'no sideways scroll on step 1');
             });
             await S.run(`${label}: the worktree option and the remote address open in their reserved slot: step 1 does not move`, async () => {
                 await ev(`window.hideLaunchModal && window.hideLaunchModal(); T.state.hub = true; T.state.cloud = false; T.state.serversKnown = true; T.state.servers = [{ id: 'm1', label: 'build-server', status: 'online', version: '1.4.6', last_seen: new Date().toISOString() }]; true`);
