@@ -49,14 +49,15 @@ function _followTeamType() {
 
 /** "Everyone runs as" (LT1, #15892): what the workers that were not set by hand take. Provider and Mode are the team's own fields; Model and Thinking are kept here ('' is each provider's default). */
 const _everyone = { model: '', thinking: '' };
+/** Whether a member's Mode was set by hand: else it follows the team's Mode (#16147: that includes the built-in Orchestrator). */
+const _ownMode = row => row.dataset.permissionExplicit === '1' || (document.getElementById(row.dataset.acfId || '')?.querySelector('.acf-permission-mode')?.value || 'default') !== 'default';
 /** The things a member holds that differ from Everyone runs as AND were set by hand: a value that merely equals it is not a difference. */
 function _differsFromEveryone(row, config, type, mode) {
     const out = [];
     if (row.dataset.followsTeamType !== '1' && type !== (document.getElementById('team-agent-type')?.value || '')) out.push('provider');
     if (row.dataset.modelHand === '1' && (config.model || '') !== _everyone.model) out.push('model');
     if (row.dataset.thinkingHand === '1' && (config.thinking || '') !== _everyone.thinking) out.push('thinking');
-    const ownMode = row.dataset.permissionExplicit === '1' || (document.getElementById(row.dataset.acfId || '')?.querySelector('.acf-permission-mode')?.value || 'default') !== 'default';
-    if (ownMode && mode !== (document.getElementById('team-permission-mode')?.value || 'default')) out.push('mode');
+    if (_ownMode(row) && mode !== (document.getElementById('team-permission-mode')?.value || 'default')) out.push('mode');
     return out;
 }
 
@@ -757,12 +758,12 @@ function _saySet(what) {
     const n = _workerBoxes().length, hand = teamRows().filter(r => !isOrchestrator(rowRole(r)) && r.dataset[`${what}Hand`] === '1' || (what === 'provider' && r.dataset.followsTeamType !== '1' && !isOrchestrator(rowRole(r)))).length;
     if (line) line.textContent = `Set the ${what} of ${Math.max(0, n - hand)} ${n - hand === 1 ? 'worker' : 'workers'}${hand ? `; ${hand} set by hand ${hand === 1 ? 'keeps' : 'keep'} their own` : ''}.`;
 }
-/** The Orchestrator on its own line under Everyone runs as: it keeps its own provider, model and mode. */
+/** The Orchestrator on its own line under Everyone runs as: it keeps its own provider and model; its Mode is its own only when set by hand, else the team's. */
 function _syncOrchestratorLine() {
     const line = _eo('team-orch-runs'), row = teamRows().find(r => isOrchestrator(rowRole(r)));
     if (!line) return;
     line.hidden = !row;
-    if (row) line.textContent = `Orchestrator (its own): ${row.querySelector('.team-agent-summary')?.textContent || ''}`;
+    if (row) line.textContent = `Orchestrator (${_ownMode(row) ? 'its own' : "follows the team's Mode"}): ${row.querySelector('.team-agent-summary')?.textContent || ''}`; // #16147: only an Orchestrator set by hand keeps its own Mode; a built-in one takes Everyone's, Bypass included
 }
 function _fillEveryone() {
     const team = _eo('team-agent-type'), prov = _eo('team-set-all');
@@ -806,7 +807,23 @@ function _setAllThinking(value) {
     }
     _saySet('thinking'); _syncTeamMembers();
 }
-function _setAllMode(value) {
+// A mode that turns the checks off needs a yes, as in Settings (settings_risks.js): here it reaches every worker and a built-in Orchestrator too (#16147)
+const _RISKY_MODES = {
+    bypassPermissions: { label: 'Bypass permissions', text: 'Permission checks are off for every worker and the built-in Orchestrator. They can run tools without asking.' },
+    dontAsk: { label: "Don't ask", text: 'Permission questions are off for every worker and the built-in Orchestrator. Tools that need permission are denied instead of asking.' },
+};
+async function _setAllMode(value) {
+    const el = _eo('team-permission-mode'), risky = _RISKY_MODES[value];
+    if (el && risky && el.value !== value) { // ask first; Cancel puts the box back
+        const pick = _eo('team-set-all-mode'), back = () => { if (pick) { pick.value = el.value; pick.focus(); } };
+        if (pick) pick.value = el.value;
+        const { showConfirmModal } = await importOnce('./confirm_dialog.js');
+        showConfirmModal(`Turn on ${risky.label} for everyone?`, risky.text, () => { if (pick) pick.value = value; _applyAllMode(value); pick?.focus(); }, back, { label: 'Turn on', danger: false });
+        return;
+    }
+    _applyAllMode(value);
+}
+function _applyAllMode(value) {
     const el = _eo('team-permission-mode');
     if (!el || !value || ![...el.options].some(o => o.value === value)) return;
     el.value = value; el.dispatchEvent(new Event('change', { bubbles: true })); // the members with no Mode of their own follow it
