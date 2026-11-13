@@ -3,6 +3,7 @@ package routes
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -24,4 +25,19 @@ func TestAFirstLineSecretAtTheCutIsRedactedWholeNotStoredAsAFragment(t *testing.
 	}
 	assert.Equal(t, "hello there", firstLineExcerpt("\n  hello there\nsecond"))
 	assert.LessOrEqual(t, len([]rune(firstLineExcerpt(strings.Repeat("a b ", 100)))), 141)
+}
+
+// #16086 (a pin, not failing-first: the production redactor already catches this block from its header line alone): a key block on the first lines is not kept as the excerpt; a huge message costs a bounded redaction.
+func TestAKeyBlockOnTheFirstLinesIsRedactedWholeAndAHugeMessageIsBounded(t *testing.T) {
+	body := strings.Repeat("MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7VJTUt9Us8cKj\n", 20)
+	// Built from pieces so the source never holds a whole key-shaped literal (the repository scanner flags one, #16152).
+	dashes := strings.Repeat("-", 5)
+	key := dashes + "BEGIN " + "PRIVATE KEY" + dashes + "\n" + body + dashes + "END " + "PRIVATE KEY" + dashes
+	got := firstLineExcerpt(key + "\nplease use it")
+	assert.NotContains(t, got, "BEGIN PRIVATE KEY", "the key block's first line is not the excerpt")
+	assert.NotContains(t, got, "MIIEvQ")
+	huge := "hello world\n" + strings.Repeat("x", 5<<20)
+	start := time.Now()
+	assert.Equal(t, "hello world", firstLineExcerpt(huge))
+	assert.Less(t, time.Since(start), 2*time.Second, "a 5 MB message is not redacted whole")
 }

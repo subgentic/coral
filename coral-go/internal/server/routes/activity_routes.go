@@ -216,19 +216,27 @@ func StoredFileName(coralDir, id string) string {
 	return ""
 }
 
-// firstLineExcerpt is what a row of the Activity record keeps of words the Operator sent: the first line with text, redacted whole and then cut at 140 characters, so a secret that straddles the cut is never kept as
-// a fragment the redactor would not know (#16038). The rest of a long message stays in the chat (#16000). A line the redactor refuses is kept as no note.
+// excerptWindow is how much of a message is redacted to make its excerpt: the first line is cut at 140 characters, so only a secret that starts there matters, and a secret that spans lines (a key block) is whole
+// inside this much (#16086); the cost of a huge message is bounded by it.
+const excerptWindow = 16 << 10
+
+// firstLineExcerpt is what a row of the Activity record keeps of words the Operator sent: the redaction runs on the whole message (a window of it, excerptWindow), then the first line with text is taken and cut at 140
+// characters, so a secret that straddles the cut (#16038) or a line break (#16086) is never kept as a fragment the redactor would not know. The rest of a long message stays in the chat (#16000). A message the
+// redactor refuses is kept as no note.
 func firstLineExcerpt(text string) string {
-	for _, line := range strings.Split(text, "\n") {
+	if len(text) > excerptWindow {
+		text = strings.ToValidUTF8(text[:excerptWindow], "")
+	}
+	red, ok := redactComment(text)
+	if !ok {
+		return ""
+	}
+	for _, line := range strings.Split(red, "\n") {
 		if line = strings.TrimSpace(line); line != "" {
-			red, ok := redactComment(line)
-			if !ok {
-				return ""
-			}
-			if r := []rune(red); len(r) > 140 {
+			if r := []rune(line); len(r) > 140 {
 				return string(r[:139]) + "…"
 			}
-			return red
+			return line
 		}
 	}
 	return ""
