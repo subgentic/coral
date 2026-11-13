@@ -21,6 +21,8 @@ const { coralReady } = require('./helpers/wait');
         return { texts: btns.map(b => b.textContent.trim().replace(/^(Mark done).*/, '$1')), blue: btns.filter(b => b.classList.contains('btn-primary')).map(b => b.textContent.trim().replace(/^(Mark done).*/, '$1')),
             tops: [...new Set(btns.map(b => Math.round(r(b).top)))].length, menu, teamLinkOutside: !!document.querySelector('${M} .goal-back-row > .goal-team-link'), vw: innerWidth,
             inside: btns.every(b => r(b).left >= 0 && r(b).right <= innerWidth + 0.5), sideways: document.documentElement.scrollWidth > innerWidth + 1 }; })()`);
+    // the page is drawn again when its data lands (more often on a slow machine or a phone on its side at 200% text): a More pressed just before that is pressed on a button that is then replaced (the menu opened on the old page and was gone, #15832 batch). Wait until the page has held still for 600 ms.
+    const still = async () => { for (let i = 0; ; i++) { await ev(`document.querySelector('${M} .goal-head-actions .task-more-btn').__still = true; true`); await new Promise(r => setTimeout(r, 600)); /* sleep-ok: the page's own late redraw is what is waited out */ if (await ev(`document.querySelector('${M} .goal-head-actions .task-more-btn').__still === true`)) return; if (i > 20) throw new Error('the goal page never held still'); } };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await load('/', 16, 'light');
@@ -39,6 +41,7 @@ const { coralReady } = require('./helpers/wait');
             try {
                 await load(`/inbox/goals/${board}/${openId}`, fs16, theme);
                 await waitFor(`!!document.querySelector('${M} .goal-head-actions .goals-close')`, `${tag}: the goal page`, 15000);
+                await still();
                 const d = await read();
                 ok(JSON.stringify(d.texts) === JSON.stringify(['Add task', 'Mark done', 'More']), `${tag}: the buttons are Add task, Mark done and More`, d.texts);
                 ok(JSON.stringify(d.blue) === JSON.stringify(['Mark done']), `${tag}: Mark done is the one blue button`, d.blue);

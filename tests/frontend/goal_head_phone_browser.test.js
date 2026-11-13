@@ -23,6 +23,8 @@ const { coralReady } = require('./helpers/wait');
         const h2 = root.querySelector('#goals-detail-title'), lh = parseFloat(getComputedStyle(h2).lineHeight) || parseFloat(getComputedStyle(h2).fontSize) * 1.3;
         return { btns, lineBtns: root.querySelectorAll('.goals-detail-line button').length, titleLines: Math.round(h2.getBoundingClientRect().height / lh), more: !!acts.querySelector('.task-more-btn'), vw: innerWidth, sideways: document.documentElement.scrollWidth > innerWidth + 1 }; })()`);
     const items = () => ev(`[...document.querySelectorAll('${M} .goal-head-actions .task-more-menu [role=menuitem]')].map(b => ({ t: b.textContent.trim(), h: Math.round(b.getBoundingClientRect().height), vis: b.getClientRects().length > 0 }))`);
+    // the page is drawn again when its data lands (more often on a slow machine or a phone on its side at 200% text): a More pressed just before that is pressed on a button that is then replaced (the menu opened on the old page and was gone, #15832 batch). Wait until the page has held still for 600 ms.
+    const still = async () => { for (let i = 0; ; i++) { await ev(`document.querySelector('${M} .goal-head-actions .task-more-btn').__still = true; true`); await new Promise(r => setTimeout(r, 600)); /* sleep-ok: the page's own late redraw is what is waited out */ if (await ev(`document.querySelector('${M} .goal-head-actions .task-more-btn').__still === true`)) return; if (i > 20) throw new Error('the goal page never held still'); } };
     const key = async (k, code, vk) => { await Input.dispatchKeyEvent({ type: 'keyDown', key: k, code, windowsVirtualKeyCode: vk, ...(k === 'Enter' ? { text: '\r' } : {}) }); await Input.dispatchKeyEvent({ type: 'keyUp', key: k, code, windowsVirtualKeyCode: vk }); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -42,6 +44,7 @@ const { coralReady } = require('./helpers/wait');
             const phone = w < 900 || mobile && h < 500;
             await load(`/inbox/goals/${board}/${openId}`, fs16, theme);
             await waitFor(`!!document.querySelector('${M} #goals-detail-title') && !!document.querySelector('${M} .goal-head-actions button')`, `${tag}: the goal page`, 15000);
+            await still();
             let p = await head();
             if (!phone) {
                 assert.deepEqual(p.btns.map(b => b.t.replace(/^(Mark done).*/, '$1')), ['Add task', 'Mark done', 'More'], `${tag}: desktop keeps two buttons and More (#15832) ${JSON.stringify(p)}`);
