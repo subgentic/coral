@@ -41,10 +41,15 @@ func TestCodexAutoIsTheAutoReviewOnACodexThatHasIt(t *testing.T) {
 		assert.NotContains(t, cmd, " never", c.name+": and the approval policy")
 		assert.Contains(t, cmd, "network_access=true", c.name+": Coral's own calls still reach it")
 		assert.Equal(t, 1, strings.Count(cmd, "--approve-for-me"), c.name)
-		for _, v := range []string{"0.162.9", "", "unreadable"} {
+		for _, v := range []string{"0.162.9", "0.162.0", "0.100.1"} { // a version READ as older keeps today's pair
 			old := codexAutoLaunch(t, v, c.params)
 			assert.NotContains(t, old, "--approve-for-me", c.name+": Codex "+v+" keeps today's pair")
 			assert.Contains(t, old, "--sandbox workspace-write -a never", c.name+" "+v)
+		}
+		for _, v := range []string{"0.163.0", "0.166.0", "", "unreadable"} { // #16007 (the Operator): a version that cannot be read is the newest, so Auto is Codex's own auto-review
+			cur := codexAutoLaunch(t, v, c.params)
+			assert.Contains(t, cur, "--approve-for-me", c.name+": Codex "+v)
+			assert.NotContains(t, cur, "--sandbox", c.name+" "+v)
 		}
 	}
 }

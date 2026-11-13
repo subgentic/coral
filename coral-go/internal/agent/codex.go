@@ -347,7 +347,7 @@ func (a *CodexAgent) LaunchCommand(params LaunchParams) (string, error) {
 	}
 	parts = collapseCodexSandboxFlags(parts, presetApplied)
 	parts = codexCoralSandboxNetwork(parts, params)
-	if codexAutoPick(params, userFlags) && codexVersionAtLeast(version, codexApproveForMeMin) {
+	if codexAutoPick(params, userFlags) && codexHasFeature(version, codexApproveForMeMin) {
 		parts = useCodexAutoReview(parts)
 	}
 	if arg := codexActionPrompt(files, params); arg != "" {
@@ -427,11 +427,11 @@ var codexHookEvents = []string{"SessionStart", "UserPromptSubmit", "PreToolUse",
 // A Codex that shows an approval dialog (a command, a file change, a permission) says so to a PermissionRequest hook, and the hook is what puts the agent's row at Needs input and holds a
 // person's chat message behind the dialog (#6615, #6610): without it Codex's approval prompts sent no event at all, so Coral saw an agent at a dialog as a working one. The Codex 0.163.0 program
 // has the event (its hook input names hook_event_name PermissionRequest with tool_name and tool_input, its config key is permission_request); how far back it goes is not known, and a Codex
-// that does not know a hook key may refuse the launch's -c flag, so the hook is installed only for a Codex known to be at least this version, and for none whose version is not known.
+// that does not know a hook key may refuse the launch's -c flag, so the hook is not installed for a Codex read as older than this version; one whose version cannot be read is taken as the newest (#16007).
 const codexPermissionRequestMin = "0.163.0"
 
 // codexApproveForMeMin is the first Codex known to have --approve-for-me (#15780): Codex's own auto-review, a guardian that judges each approval request inside the workspace-write sandbox. It was
-// seen on 0.163.0 (internal/agent/testdata/codex-0163-guardian.md); an earlier release that has it is not known, so an older or unreadable version keeps the --sandbox workspace-write -a never pair.
+// seen on 0.163.0 (internal/agent/testdata/codex-0163-guardian.md); an earlier release that has it is not known, so a version read as older keeps the --sandbox workspace-write -a never pair (one that cannot be read is taken as the newest, #16007).
 const codexApproveForMeMin = "0.163.0"
 
 // codexAutoPick reports whether the launch is Codex's Auto pick, the one --approve-for-me stands in for: the Auto mode, or the flags the dashboard turns Auto into (--sandbox workspace-write -a never,
@@ -532,7 +532,7 @@ func lenOfCodexPermFlag(parts []string, i int) int {
 // codexHookEventsFor are the hooks to install for a Codex of this version ("" when unknown).
 func codexHookEventsFor(version string) []string {
 	events := append([]string(nil), codexHookEvents...)
-	if codexVersionAtLeast(version, codexPermissionRequestMin) {
+	if codexHasFeature(version, codexPermissionRequestMin) {
 		events = append(events, "PermissionRequest")
 	}
 	return events
@@ -564,6 +564,16 @@ func codexVersionAtLeast(version, min string) bool {
 		}
 	}
 	return true
+}
+
+// codexHasFeature reports whether a Codex of this version has what arrived in min. A version READ as older than min does not; a version that cannot be read is taken as the newest (the Operator's decision,
+// #16007: their Codex is the latest, and a probe that failed once made Auto fall back to the old --sandbox workspace-write pair, so Codex's own auto-review was never used). With no probe at all (a test) none
+// is known and none is assumed, as before.
+func codexHasFeature(version, min string) bool {
+	if codexVersionRe.MatchString(strings.TrimSpace(version)) {
+		return codexVersionAtLeast(version, min)
+	}
+	return CodexVersionProbe != nil
 }
 
 // CodexVersionProbe gives the version of the Codex at cliPath ("" for the default one), set once at startup from the CLI's own --version; nil (a test) knows no version, so only the

@@ -23,7 +23,7 @@ func TestCodexHookEventsForTheVersion(t *testing.T) {
 	assert.NotContains(t, codexHookEvents, "PermissionRequest", "the shared list is never changed")
 }
 
-// #6615: a Codex that has the PermissionRequest hook gets Coral's hook for it, with its trust entry; one that may not, or whose version is unknown, gets the five it always had.
+// #6615: a Codex that has the PermissionRequest hook gets Coral's hook for it, with its trust entry; one read as older gets the five it always had; one whose version cannot be read is taken as the newest (#16007, the Operator's decision); with no probe at all (a test) none is assumed.
 func TestCodexLaunchInstallsPermissionRequestOnlyForACodexThatHasIt(t *testing.T) {
 	withHookTool(t) // a Coral tools folder with the hook tool in it: on Windows a launch carries no Coral hooks without one (the sibling test TestCodex_InjectsCoralAgenticHooks does the same)
 	old := CodexVersionProbe
@@ -42,7 +42,7 @@ func TestCodexLaunchInstallsPermissionRequestOnlyForACodexThatHasIt(t *testing.T
 		version string
 		probe   bool
 		want    bool
-	}{{"0.163.0", true, true}, {"0.170.2", true, true}, {"0.155.1", true, false}, {"", true, false}, {"unreadable", true, false}, {"", false, false}} {
+	}{{"0.163.0", true, true}, {"0.170.2", true, true}, {"0.155.1", true, false}, {"0.162.9", true, false}, {"", true, true}, {"unreadable", true, true}, {"", false, false}} {
 		cmd := launch(c.version, c.probe)
 		assert.Equal(t, c.want, strings.Contains(cmd, "hooks.PermissionRequest="), "version %q probe %v", c.version, c.probe)
 		assert.Contains(t, cmd, "hooks.PostToolUse=", "the other hooks are installed as before")
