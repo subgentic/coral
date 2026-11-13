@@ -26,12 +26,11 @@ const { coralReady } = require('./helpers/wait');
         for (let i = 0; i < 8; i++) { await tab(); const w = await where(); if (!w.inDialog) break; stops.push(w); if (/^Cancel$|^Next$/.test(w.name) && /^Next$/.test(w.name)) break; }
         const bad = stops.filter(s => !s.shown || !s.name);
         check(bad.length === 0, `every Tab stop on step 1 is visible and named: ${JSON.stringify(bad)} (stops: ${JSON.stringify(stops.map(s => s.name || s.id))})`);
-        // (2) step 3 opens in its first field
+        // (2) step 2 (the members; LT1 #15892 folded the old step 3 into step 1) opens with the keyboard inside the dialog on a real control
         await t.click('button', N.next); await t.step(2);
-        await t.click('button', N.next); await t.step(3);
         await new Promise(r => setTimeout(r, 500)); // sleep-ok: the step draws and takes the keyboard
         const w3 = await where();
-        check(!w3.body && w3.inDialog && w3.role !== 'tab' && /^(input|textarea|select)$/.test(w3.tag), `step 3 opens with the keyboard in its first field, not on a menu tab: ${JSON.stringify(w3)}`);
+        check(!w3.body && w3.inDialog && w3.role !== 'tab', `step 2 opens with the keyboard in the dialog, not on the page behind it: ${JSON.stringify(w3)}`);
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'New team by keyboard:\n  ' + problems.join('\n  '));
     console.log('PASS New team steps open on a field and have no unnamed stops');
