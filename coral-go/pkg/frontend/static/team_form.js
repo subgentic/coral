@@ -103,6 +103,14 @@ export function showTeamWorktree(on) {
 
 let _members = null;
 
+/** Show or hide the "Describe your team" box under the template row (the row of the form that holds it goes with it). */
+export function showTeamDescribe(on) {
+    const panel = document.getElementById('team-wizard-panel'), row = rowOf('team-wizard-panel');
+    if (panel) panel.hidden = !on;
+    if (row) row.hidden = !on;
+    document.getElementById('team-describe')?.setAttribute('aria-expanded', on ? 'true' : 'false');
+}
+
 /** Show "Set all workers to" (there is a worker to set): the row follows team_dialogs' member list. */
 export function showTeamWorkers(on) {
     const row = rowOf('team-set-all');
@@ -116,11 +124,13 @@ function mountMembers(modal) {
     const take = sel => parts.querySelector(sel);
     const fields = [
         { key: 'template', type: 'custom', label: 'Start from a template', help: 'Optional. Fills the member list.', wide: true, render: slot => slot.append(take('.team-template-row')) },
+        { key: 'describe', type: 'custom', label: ' ', wide: true, render: slot => slot.append(take('#team-wizard-panel')) }, // "Describe your team" opens here, under the template, not in a second dialog
         { key: 'workers', type: 'custom', label: 'Everyone runs as', help: 'Every worker takes these unless you set it by hand. The Orchestrator keeps its own.', render: slot => slot.append(take('#team-allworkers')) },
         { key: 'members', type: 'custom', label: 'Members', wide: true, render: slot => { slot.append(take('#team-agents-count'), take('.team-agents-container')); } },
     ];
     _members = mountSettingsView(host, { mode: 'form', fields });
     showTeamWorkers(false);
+    showTeamDescribe(false);
 }
 
 function mount(modal) {

@@ -272,7 +272,7 @@
                                 <input type="search" id="team-template-search" class="team-template-search" aria-label="Search templates" placeholder="Search templates" autocomplete="off" data-on-input="team-template-filter" hidden>
                                 <select id="team-template-select" data-on-change="team-template-select"></select>
                             </div>
-                            <button type="button" class="btn" id="team-describe" data-on-click="m-show-team-wizard-modal">Describe your team</button><!-- the AI draft is a choice beside the templates, not behind More (#10314) -->
+                            <button type="button" class="btn" id="team-describe" aria-expanded="false" aria-controls="team-wizard-panel" data-on-click="m-show-team-wizard-modal">Describe your team</button><!-- the AI draft is a choice beside the templates, not behind More (#10314) -->
                             <div class="team-more-wrap">
                                 <button type="button" class="btn" id="team-template-more" aria-haspopup="menu" aria-expanded="false" aria-controls="team-template-menu" data-on-click="team-menu">More</button>
                                 <div class="menu team-menu" id="team-template-menu" role="menu" aria-label="Template options" hidden>
@@ -282,6 +282,17 @@
                                     <button type="button" role="menuitem" class="menu-item team-menu-item" data-on-click="m-save-team-template">Save this team as a template</button>
                                 </div>
                                 <input type="file" id="team-folder-input" webkitdirectory directory multiple style="display:none" data-on-change="m-handle-team-folder-import">
+                            </div>
+                        </div>
+                        <div class="team-wizard-body team-wizard-panel" id="team-wizard-panel" role="group" aria-labelledby="team-wizard-title" hidden>
+                            <p id="team-wizard-title" class="sv-help">Say what the team should do and, if you like, who should be on it. Coral drafts the members; you change any of them before anything starts.</p>
+                            <label class="sr-only" for="team-wizard-directive">Describe your team</label>
+                            <textarea id="team-wizard-directive" rows="5" placeholder="For example: Build a launch plan for a developer tool aimed at small engineering teams. I want an orchestrator, a product strategist, a marketer and a copywriter."></textarea>
+                            <div id="team-wizard-error" class="team-wizard-error team-wizard-error-quiet" role="alert"></div><!-- its room is always kept (hidden while empty): an error appearing must not move Generate and Try a sample (#10517) -->
+                            <div class="team-wizard-actions">
+                                <button type="button" class="btn" id="team-wizard-cancel" data-on-click="m-hide-team-wizard-modal">Cancel</button>
+                                <button type="button" id="team-wizard-test-btn" class="btn" data-on-click="m-test-team-wizard" title="Fills the member list with a sample team of three; nothing is generated and no model is called.">Try a sample</button>
+                                <button type="button" id="team-wizard-generate-btn" class="btn btn-primary" data-on-click="m-generate-team-from-wizard">Generate team</button>
                             </div>
                         </div>
                         <div class="team-allworkers team-runs-as" id="team-allworkers" role="group" aria-label="Everyone runs as">
@@ -376,35 +387,6 @@
             <div class="modal-actions modal-footer">
                 <button class="btn" data-on-click="m-hide-save-template-modal">Cancel</button>
                 <button class="btn btn-primary" data-on-click="m-confirm-save-template">Save</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="team-wizard-modal" class="modal" role="dialog" aria-labelledby="team-wizard-title" aria-modal="true" style="display:none">
-        <div class="modal-content dlg-flow">
-            <div class="modal-header">
-                <h3 id="team-wizard-title">Describe your team</h3>
-                <p class="team-wizard-subtitle">Say what the team should do and, if you like, who should be on it. Coral drafts the members; you review and edit each one before anything starts.</p>
-            </div>
-            <div class="modal-body team-wizard-body">
-                <div class="team-wizard-intro">
-                    <div class="team-wizard-intro-icon">
-                        <span class="material-icons" aria-hidden="true">auto_awesome</span>
-                    </div>
-                    <div>
-                        <strong>AI team builder</strong>
-                        <p>The draft opens on the Members step, where you can change anything.</p>
-                    </div>
-                </div>
-                <label for="team-wizard-directive">Describe your team
-                    <textarea id="team-wizard-directive" rows="7" placeholder="For example: Build a launch plan for a developer tool aimed at small engineering teams. I want an orchestrator, a product strategist, a marketer and a copywriter."></textarea>
-                </label>
-                <div id="team-wizard-error" class="team-wizard-error team-wizard-error-quiet" role="alert"></div><!-- its room is always kept (hidden while empty): an error appearing must not move Generate and Try a sample (#10517) -->
-            </div>
-            <div class="modal-actions modal-footer">
-                <button class="btn" data-on-click="m-hide-team-wizard-modal">Cancel</button>
-                <button id="team-wizard-test-btn" class="btn" data-on-click="m-test-team-wizard" title="Fills the Members step with a sample team of three; nothing is generated and no model is called.">Try a sample</button>
-                <button id="team-wizard-generate-btn" class="btn btn-primary" data-on-click="m-generate-team-from-wizard">Generate team</button>
             </div>
         </div>
     </div>

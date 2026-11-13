@@ -20,7 +20,6 @@ const DIALOGS = {
     'job-modal': { ...MODAL('job-modal'), open: `window.showJobModal()` },
     'default-prompts-modal': { ...MODAL('default-prompts-modal'), open: `window.showDefaultPromptsModal()` },
     'create-task-modal': { ...MODAL('create-task-modal'), open: `window.showCreateTaskModal()` },
-    'team-wizard-modal': { ...MODAL('team-wizard-modal'), open: `(async () => { await __M('modals.js'); await __M('team_wizard.js'); window.showTeamWizardModal(); })()` },
     'mobile-connect-modal': { ...MODAL('mobile-connect-modal'), open: `(async () => { await __M('modals.js'); await window._showMobileConnectModal(); })()` },
     'wf-create-modal': { ...MODAL('wf-create-modal'), open: `window.showWorkflowCreateModal()` },
     // Built by script (registerDialog) or native <dialog>: found by what they hold, not by an id in the page shell.

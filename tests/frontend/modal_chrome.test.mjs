@@ -15,26 +15,20 @@ const dialog = (id, shown = true) => {
 };
 const esc = () => document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
 
-const launch = dialog('launch-modal'), macro = dialog('macro-modal'), wizard = dialog('team-wizard-modal'), other = dialog('job-modal');
+const launch = dialog('launch-modal'), macro = dialog('macro-modal'), other = dialog('job-modal');
 launch.click();
 assert.deepEqual(calls, ['hideLaunchModal'], 'a backdrop click calls the dialog\'s hide function');
 macro.click();
 assert.equal(macro.style.display, 'none', 'a dialog with no hide function is hidden');
-wizard.click();
-assert.deepEqual(calls, ['hideLaunchModal'], 'the team wizard is not closed by a backdrop click here (it wires its own)');
-assert.equal(wizard.style.display, 'block');
 other.click();
 assert.equal(other.style.display, 'block', 'an unlisted dialog is not closed by a backdrop click');
 
 calls.length = 0;
-// the topmost visible one is the last in the document: job-modal, then team-wizard-modal
+// the topmost visible one is the last in the document: job-modal, then the launch dialog
 esc();
 assert.equal(other.style.display, 'none', 'Escape hides an unlisted dialog by display none');
 assert.deepEqual(calls, [], 'and only that one');
 esc();
-assert.deepEqual(calls, ['hideTeamWizardModal'], 'then the next visible one, through its hide function');
-wizard.style.display = 'none'; wizard.getClientRects = () => [];
-esc();
-assert.deepEqual(calls, ['hideTeamWizardModal', 'hideLaunchModal'], 'then the launch dialog');
+assert.deepEqual(calls, ['hideLaunchModal'], 'then the launch dialog, through its hide function');
 console.log('modal_chrome: ok');
 process.exit(0); // importing modal_chrome loads controls.js, whose timers would keep node alive

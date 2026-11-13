@@ -2163,53 +2163,10 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     display: none;
 }
 
-.team-wizard-subtitle {
-    margin: 10px 0 0;
-    font-size: var(--fs-md);
-    line-height: var(--lh-body);
-    color: var(--text-secondary);
-}
-
 .team-wizard-body {
     display: flex;
     flex-direction: column;
     gap: 14px;
-}
-
-.team-wizard-intro {
-    display: flex;
-    align-items: flex-start;
-    gap: 14px;
-    padding: 14px 16px;
-    border-radius: 14px;
-    border: 1px solid rgba(var(--accent-rgb), 0.14);
-    background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.08), rgba(var(--accent-rgb), 0.02));
-}
-
-.team-wizard-intro-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: var(--radius-xl);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(var(--accent-rgb), 0.12);
-    color: var(--accent);
-    flex-shrink: 0;
-}
-
-.team-wizard-intro strong {
-    display: block;
-    margin-bottom: 4px;
-    font-size: var(--fs-lg);
-    color: var(--text-primary);
-}
-
-.team-wizard-intro p {
-    margin: 0;
-    font-size: var(--fs-base);
-    line-height: var(--lh-body);
-    color: var(--text-secondary);
 }
 
 .team-wizard-body textarea {
@@ -2219,7 +2176,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 
 .team-wizard-error {
-    min-height: 5.5rem;
+    min-height: 3rem;
     box-sizing: border-box;
     padding: 12px 14px;
     border-radius: var(--radius-ml);
@@ -2231,6 +2188,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 
 .team-wizard-error-quiet { visibility: hidden; }
+.team-wizard-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .team-wizard-note { color: var(--text-primary); background: var(--bg-secondary); border-color: var(--border); } /* what the sample will add, said before it replaces the members: a note, not an error (#10658) */
 
 .generated-team-banner { margin: 12px 0; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */

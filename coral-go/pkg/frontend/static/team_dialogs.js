@@ -6,7 +6,7 @@ import { scrollBehavior } from './motion.js';
 import { showToast, escapeHtml, escapeAttr, boardNameProblem, OPERATOR_ID } from './utils.js';
 import { loadLiveSessions } from './api.js';
 import { recordRecentDir, getRecentDirs, pruneMissingRecents } from './browser.js';
-import { teamForm, showTeamWorktree, showTeamWorkers, syncSuggestionExists, trustTicked, resetFolderTrust, scheduleFolderTrust } from './team_form.js';
+import { teamForm, showTeamWorktree, showTeamWorkers, showTeamDescribe, syncSuggestionExists, trustTicked, resetFolderTrust, scheduleFolderTrust } from './team_form.js';
 import { agentNameForm } from './agent_form.js';
 import { cliPathButton } from './prerequisites.js';
 import { serverFetch, boardFetch, identityKey, LOCAL_SERVER, isHub } from './server_base.js';
@@ -441,6 +441,7 @@ async function _initTeamForm() {
     // Hide generated-team banner on normal opens
     const banner = document.getElementById('generated-team-banner');
     if (banner) banner.style.display = 'none';
+    showTeamDescribe(false); // the Describe box is closed on a fresh open
 
     // Reset form
     _teamFolderGeneration++;
