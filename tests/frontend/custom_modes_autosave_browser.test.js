@@ -57,6 +57,30 @@ const { coralReady } = require('./helpers/wait');
             assert.deepEqual(await list(), [['Plan, renamed', '--permission-mode plan']], at + 'and the server still has only the saved one');
             await ev(`window.__putRefused = false; true`);
 
+            // a double press on Update/Add mode while the save is in flight sends the list once (#16364)
+            await ev(`(() => { window.__puts = 0; const f = window.fetch; window.fetch = (u, o) => { if (String(u).includes('/api/custom-modes') && o && o.method === 'PUT') { window.__puts++; return new Promise(r => setTimeout(r, 400)).then(() => f(u, o)); } return f(u, o); }; return true; })()`);
+            await ev(`document.querySelector('#settings-custom-modes [data-cpm-edit="0"]').click(); true`);
+            await waitFor(`!!document.getElementById('cpm-name')`, 'the edit form again');
+            await ev(`(() => { document.getElementById('cpm-name').value = 'Plan, twice'; const b = document.querySelector('#settings-custom-modes .cm-form .sv-save'); b.click(); b.click(); b.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })); return true; })()`);
+            await waitFor(`[...document.querySelectorAll('#settings-custom-modes .cm-name')].some(e => e.textContent === 'Plan, twice')`, 'the saved row');
+            await new Promise(r => setTimeout(r, 800));
+            assert.equal(await ev(`window.__puts`), 1, at + 'two presses while saving sent one request');
+            await ev(`document.querySelector('#settings-custom-modes [data-cpm-add]').click(); true`); // and Add: the second press adds no second row and sends once
+            await waitFor(`!!document.getElementById('cpm-name')`, 'the add form');
+            await ev(`window.__puts = 0; true`);
+            await ev(`(() => { document.getElementById('cpm-name').value = 'Third'; document.getElementById('cpm-flags').value = '--permission-mode\\nplan'; const b = document.querySelector('#settings-custom-modes .cm-form .sv-save'); b.click(); b.click(); return true; })()`);
+            await waitFor(`[...document.querySelectorAll('#settings-custom-modes .cm-name')].some(e => e.textContent === 'Third')`, 'the third row');
+            await new Promise(r => setTimeout(r, 800));
+            assert.equal(await ev(`window.__puts`), 1, at + 'two presses on Add sent one request');
+            assert.deepEqual((await rows()).sort(), ['Plan, twice', 'Third'], at + 'each mode once');
+            // Remove asks nothing, as the custom models' Remove does: it saves at once. Two presses send one request, and the list is left with one mode.
+            await ev(`window.__puts = 0; (() => { const b = [...document.querySelectorAll('#settings-custom-modes .cm-row[data-type]')].find(r => r.querySelector('.cm-name').textContent === 'Third').querySelector('button[aria-label^="Remove"]'); b.click(); b.click(); return true; })()`);
+            await waitFor(`document.querySelectorAll('#settings-custom-modes .cm-row[data-type]').length === 1`, 'Third removed');
+            await new Promise(r => setTimeout(r, 800));
+            assert.equal(await ev(`window.__puts`), 1, at + 'two presses on Remove sent one request');
+            assert.equal(await ev(`getComputedStyle(document.getElementById('confirm-modal')).display`), 'none', at + 'Remove opened no confirm, as the custom models do');
+            await ev(`window.fetch = window.fetch.__orig || window.fetch; true`);
+
             // remove: saved at once, gone after a reload
             await ev(`document.querySelector('#settings-custom-modes .cm-row[data-type] button[aria-label^="Remove"]').click(); true`);
             await waitFor(`document.querySelectorAll('#settings-custom-modes .cm-row[data-type]').length === 0`, 'the row removed');
