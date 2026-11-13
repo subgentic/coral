@@ -93,7 +93,7 @@ const BASE = require('./test_base').BASE;
             await ev(`(() => { const d = window.__nt.dlg(${N.member}); const g = [...d.querySelectorAll('[role=radiogroup]')].find(e => /mode$/i.test(window.__na.name(e))); const r = window.__na.radios(g).find(x => /^Plan/i.test(window.__na.radioName(x))); r.click(); return true; })()`); await settle(200); await save();
             const orchBefore = await rowText('Orchestrator'), w1Before = await rowText(r0[1]);
             assert.match(w1Before, /small|High/i, 'the worker shows its model and thinking before'); assert.match(w1Before, /Plan/i, 'and its mode');
-            assert.match(await ev(`window.__na.text(window.__nt.dlg(${N.team}))`), /Changes every worker's provider\.\s*The Orchestrator keeps its own, and each worker's model goes back to the default\./, 'the line says what changes, who it leaves out and what happens to the model (#11368)');
+            assert.match(await ev(`window.__na.text(window.__nt.dlg(${N.team}))`), /Everyone runs as[\s\S]*Every worker takes these unless you set it by hand\.\s*The Orchestrator keeps its own\./, 'the group says who takes it, what keeps its own, and that the Orchestrator is left out (LT1, #15892)');
             const ok = await ev(`(() => { const s = window.__nt.find(window.__nt.dlg(${N.team}), 'select', ${N.bulk}); if (!s) return false; const o = [...s.options].find(o => /Codex/.test(o.textContent)); if (!o) return false; s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             assert.ok(ok, 'a Set all workers to select with Codex'); await settle(500);
             assert.equal(await rowText('Orchestrator'), orchBefore, 'the Orchestrator keeps its own provider, model and thinking');
@@ -105,6 +105,14 @@ const BASE = require('./test_base').BASE;
             await ev(`(() => { const m = document.getElementById('team-set-all-model'); m.value = 'codex-small'; m.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(400);
             assert.equal(await rowText('Orchestrator'), orchBefore, 'the Orchestrator keeps its own model when the workers are set');
             for (const w of r0.slice(1)) assert.match(await rowText(w), /small/i, `${w}: the model is the one picked for all`);
+            // LT1 (#15892): a member set by hand keeps its own and says so; the rest follow Everyone runs as
+            await openRow(r0[1]); await mtab('Agent'); await setModel(/codex-large|codex-small/); await ev(`(() => { const d = window.__nt.dlg(${N.member}); const s = window.__nt.find(d, 'select', /^Model$/i); const o = [...s.options].filter(o => o.value && !/^__/.test(o.value)).pop(); s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await save();
+            const handModel = await ev(`document.getElementById('team-agents-list').querySelectorAll('.team-agent-row')[1].dataset.modelHand`);
+            const handBefore = await rowText(r0[1]);
+            await ev(`(() => { const m = document.getElementById('team-set-all-mode'); m.value = 'plan'; m.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(300);
+            const wOther = r0[2]; { const tx = await rowText(wOther); assert.match(tx, /Set by hand: mode[\s\S]*Auto/, `${wOther}: its template's own Mode is kept and it says it differs (${tx})`); }
+            if (handModel === '1') { assert.match(await ev(`${'document.querySelectorAll("#team-agents-list .team-agent-row")[1].textContent'}`), /Set by hand: model/, 'a member whose model was set by hand says that it differs'); }
+            assert.match(handBefore, /\S/, 'the hand-set member still has its summary');
         });
         await S.run('Edit member is a dialog named "Edit member": it opens on the member\'s settings (the sections Agent, Permissions, Advanced), the persona page (Role) is one Back away; Cancel is leftmost and Save member the rightmost; it is the same size as New team', async () => {
             const roles0 = await roles(); const tt = await t.rect(); await openRow(roles0[1]);
