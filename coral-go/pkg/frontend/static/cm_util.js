@@ -10,6 +10,39 @@ import { isCloud } from './server_base.js';
 // hanging the tab.
 export const DIFF_CONFIG = { scanLimit: 20000, timeout: 1500 };
 
+/** The unified merge view for a diff (#16171). */
+export function diffMergeView(cm, original, content, extra = {}) {
+    return cm.unifiedMergeView({ original: cm.Text.of(original.split('\n')), diffConfig: DIFF_CONFIG, mergeControls: false, ...extra });
+}
+
+/** The stronger word mark belongs to the words that changed inside a line (#16171). Lines that are only added (no old text beside them) or only removed have every word changed, and the library then draws a solid box
+ *  behind each line's text on top of the line band, which the Operator called out: such lines keep the plain band. A changed chunk that has old lines (a deleted block drawn just before it) is an edit and keeps its marks.
+ *  The editor's DOM says which is which: an added line whose block is not preceded by a deleted block, a deleted block not followed by an added line. data-plain on those lines and blocks is what the CSS reads; the editor
+ *  draws the lines in view only, so it is done again whenever its lines change. */
+export function plainWholeLineMarks(view) {
+    const content = view.contentDOM;
+    const put = (el, v) => { if (v === null) { if (el.hasAttribute('data-plain')) el.removeAttribute('data-plain'); } else if (el.getAttribute('data-plain') !== v) el.setAttribute('data-plain', v); };
+    const mark = () => {
+        try {
+            const kids = [...content.children];
+            let edit = false;
+            kids.forEach((el, i) => {
+                const prev = kids[i - 1], next = kids[i + 1];
+                if (el.classList.contains('cm-deletedChunk')) { // a deleted block: an edit when it has text and added lines follow it (a new file has an empty one before its first line)
+                    edit = !!(next && next.classList.contains('cm-changedLine')) && el.textContent.trim() !== '';
+                    put(el, edit ? null : 'del');
+                } else if (el.classList.contains('cm-changedLine')) {
+                    const starts = !prev || !prev.classList.contains('cm-changedLine');
+                    if (starts) edit = !!(prev && prev.classList.contains('cm-deletedChunk') && prev.textContent.trim() !== '');
+                    put(el, edit ? null : 'add');
+                } else edit = false;
+            });
+        } catch { /* a line the editor is redrawing: the next change marks it */ }
+    };
+    new MutationObserver(mark).observe(content, { childList: true, attributes: true, attributeFilter: ['class', 'data-plain'], subtree: true }); // after each change of the lines or of their classes (the band comes after the line), before the next paint; our own data-plain is neither
+    mark();
+}
+
 /** Get the CodeMirror module (window.CoralCM), or null when it is not loaded yet.
  *  It loads on demand (vendor_loader.loadCodeMirror, #3083): callers await that first. */
 export function getCm() {
