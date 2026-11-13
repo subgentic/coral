@@ -61,7 +61,8 @@ It is a **record for the Operator, not a tamper-proof audit trail**: a program t
       | `Hub-User-1234ABCD` | `hub:e7c28f167ef5` |
 
       (the last shows that nothing is folded). A Go test (`TestAPersonalComputersHubActorLabelMatchesTheVectorsInTheAPINote`) holds these same values and fails if this note and the code disagree.
-    - `hub:unknown`: a request that was not an authentic owner's. No owner ever reads it.
+    - `hub-guest:<12 hex>`: an authentic Hub request from a signed-in person who is not the owner (a grantee), by the same short hash of their label. The page says "A Hub guest" for it, never the Operator (#16039).
+    - `hub:unknown`: a request with no one behind it (the Hub's own call, or a stamp that was not authentic). No owner ever reads it.
     - Never an email or a name.
   - `action`: as in the table above.
   - `item_kind`: `file`, `question`, `goal`, `proposal`, `message`, `task` (a task, #13609), `chat`, `workflow_run` or `job_run` (a failed run's `run_seen`: a workflow run's `item_id` is the run's number; a `job_run`'s is `jobID:runID`, two numbers and a colon, with the job's name as the title (#13626); an older `job_run`-less row of kind `run` has the run's number alone and cannot be linked), `setting`, `goal_request` or `agent` (an agent's session name, #13609). `item_id`: the item's id (a file's digest, a goal's or proposal's number, a question's message number). `version`: for a file, the digest of the exact version acted on (the same as `item_id` today; a file is addressed by its digest), else absent. The item is named by id and kind plus `title`, a **short label** (at most 120 characters): words an agent wrote, so show it as text and never build a link from it.

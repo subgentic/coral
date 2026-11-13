@@ -42,7 +42,7 @@ func activityMetaFor(r *http.Request, title, note string) board.ActivityMeta {
 }
 
 // activityActor is the label the record keeps for who acted: "local" at this computer, a Hub account by its stable id when the machine is a team's, else by a short hash of the label the stamp carried (never
-// the label itself: not an email, not a name), and "hub:unknown" for a request that is not an authentic owner's.
+// the label itself: not an email, not a name), "hub-guest:" and the same short hash for an authentic Hub request from someone who is not the owner (#16039), and "hub:unknown" for a request with no one behind it.
 func activityActor(id callerIdentity) string {
 	switch {
 	case id.local:
@@ -52,6 +52,10 @@ func activityActor(id callerIdentity) string {
 	case id.owner && id.pseudo != "":
 		sum := sha256.Sum256([]byte(id.pseudo))
 		return "hub:" + hex.EncodeToString(sum[:6])
+	case !id.owner && id.pseudo != "":
+		// An authentic Hub request that carries a user but is not the owner's (a grantee at Interact): its own pseudonymous label, so a row is never taken for the Operator's (#16039).
+		sum := sha256.Sum256([]byte(id.pseudo))
+		return "hub-guest:" + hex.EncodeToString(sum[:6])
 	}
 	return "hub:unknown"
 }

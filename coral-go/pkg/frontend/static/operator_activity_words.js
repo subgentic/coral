@@ -39,7 +39,9 @@ export function activityParts(row, itemWords) {
     if (row.action === 'file_edit_send') return mk('Sent your edit', `${row.title || 'a file'}`, [note, 'to agents'].filter(Boolean).join(' · '));
     if (row.action === 'file_edit') return mk('Saved a new version', `${row.title || 'a file'}`, note);
     if (row.action === 'wait_dismiss') return mk('Dismissed', `${who}’s waiting card`);
-    if (row.action === 'chat_send' && row.send_count > 1) return mk(`Sent ${row.send_count} messages to`, obj, row.send_notes.filter(Boolean).slice(0, 5).join(' · ') + (row.send_count > 5 ? ` · and ${row.send_count - 5} more` : ''));
+    const guest = row.action === 'chat_send' && /^hub-guest:|^hub:unknown$/.test(String(row.actor || '')); // not the Operator's own send (#16039)
+    if (row.action === 'chat_send' && row.send_count > 1) return mk(`${guest ? 'A Hub guest sent' : 'Sent'} ${row.send_count} messages to`, obj, row.send_notes.filter(Boolean).slice(0, 5).join(' · ') + (row.send_count > 5 ? ` · and ${row.send_count - 5} more` : ''));
+    if (guest) return mk('A Hub guest sent words to', obj, note);
     if (row.action === 'wait_send') return mk('Sent held words to', who);
     let did = ACTION_LABEL[row.action] || row.action;
     const kind = KIND_OBJECT.find(k => did.endsWith(` ${k}`));

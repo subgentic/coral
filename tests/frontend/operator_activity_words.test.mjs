@@ -65,3 +65,9 @@ assert.deepEqual(activityParts({action:'chat_send',item_kind:'agent',item_id:'wo
         assert.equal(activityParts(out[1], r => r.item_id).did, 'Sent words to an agent');
     }
 }
+
+// #16039: a send by a Hub guest (not the owner) is never the Operator's "Sent words": it says who, alone or merged.
+assert.equal(activityParts({action:'chat_send',item_kind:'agent',item_id:'w1',actor:'hub-guest:abc123abc123',note:'hi'},r=>r.item_id).did,'A Hub guest sent words to');
+assert.equal(activityParts({action:'chat_send',item_kind:'agent',item_id:'w1',actor:'hub:unknown',note:'hi'},r=>r.item_id).did,'A Hub guest sent words to');
+assert.equal(activityParts({action:'chat_send',item_kind:'agent',item_id:'w1',actor:'hub:90328ec01809',note:'hi'},r=>r.item_id).did,'Sent words to an agent');
+assert.equal(collapseSends([{id:2,action:'chat_send',item_id:'w1',source:'hub',actor:'hub-guest:x',note:'b'},{id:1,action:'chat_send',item_id:'w1',source:'hub',actor:'hub-guest:x',note:'a'}]).map(r=>activityParts(r,x=>x.item_id).did)[0],'A Hub guest sent 2 messages to');

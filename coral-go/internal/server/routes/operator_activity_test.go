@@ -215,7 +215,9 @@ func TestTheActorLabelIsTheStableIdOrAHashNeverTheNameOrTheEmail(t *testing.T) {
 	assert.NotContains(t, got, "@")
 	assert.Equal(t, got, activityActor(callerIdentity{owner: true, pseudo: "Rich Knorowski <rich@example.com>"}), "the same account is the same label")
 	assert.Equal(t, "hub:unknown", activityActor(callerIdentity{}), "a request that is not an authentic owner's names nobody")
-	assert.Equal(t, "hub:unknown", activityActor(callerIdentity{pseudo: "Rich"}))
+	g := activityActor(callerIdentity{pseudo: "Rich"})
+	assert.True(t, strings.HasPrefix(g, "hub-guest:") && !strings.Contains(g, "Rich"), "a stamped user who is not the owner has a pseudonymous guest label: "+g)
+	assert.True(t, strings.HasPrefix(activityActor(callerIdentity{owner: true, pseudo: "Rich"}), "hub:"), "the owner keeps hub:")
 	// a request with a stamp that is not authentic is recorded as the Hub, by nobody
 	forged := httptest.NewRequest("POST", "/", nil)
 	forged.Header.Set(tunnel.ViaHeader, "not-the-secret")
