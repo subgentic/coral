@@ -990,8 +990,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 
 /* The launch notice stays in flow, but cannot consume a phone's app viewport,
    including enlarged text. Its full server text and acknowledgement scroll together. */
-#launch-disclosure-banner { flex: 0 0 auto; min-height: 0; max-height: 25dvh; overflow-y: auto; }
-@media (max-width: 767px), (pointer: coarse) { #launch-disclosure-banner { padding-block: 0; } } /* Keep the collapsed notice to its 44 px summary row so the phone list retains the space it needs. */
+#launch-disclosure-banner { flex: 0 0 auto; min-height: 0; max-height: 25dvh; overflow-y: auto; padding-block: 0; } /* the collapsed notice is its 44 px summary row at every width (it was 73 px on a wide screen, #16367; a phone's list needs the space) */
 #launch-disclosure-banner > details { min-width: 0; width: 100%; overflow-wrap: anywhere; }
 #launch-disclosure-banner summary { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; width: 100%; min-height: 44px; list-style: none; }
 #launch-disclosure-banner summary::-webkit-details-marker { display: none; }

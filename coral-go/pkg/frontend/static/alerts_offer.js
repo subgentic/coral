@@ -57,5 +57,6 @@ function showOfferBanner() {
     banner.append(text, on, off);
     const after = document.getElementById('local-auth-banner') || document.querySelector('header.top-bar');
     if (after) after.after(banner); else document.body.prepend(banner);
+    if (window.scrollY > 0) window.scrollBy(0, banner.getBoundingClientRect().height); // the row is 44 px at every width and a scrolled page keeps the content it was showing in place (#16367)
     announceNotice(OFFER); // a strip drawn with its words is not reliably read out: the notices' own live region says the sentence once
 }
