@@ -28,6 +28,8 @@ const BASE = require('./test_base').BASE;
             await ev(`document.getElementById('team-describe').click(); true`);
             await waitFor(`!document.getElementById('team-wizard-panel').hidden`, `${at}: the box opens`, 4000);
             await settle(300);
+            const nm = await ev(`(() => { const p = document.getElementById("team-wizard-panel"); const l = document.getElementById(p.getAttribute("aria-labelledby")); return l ? l.textContent.trim() : null; })()`);
+            if (nm !== "Describe your team") problems.push(`${at}: the box is named by a short label (got ${JSON.stringify(nm)})`);
             const s = await ev(`(() => { const p = document.getElementById('team-wizard-panel'), d = document.querySelector('#launch-modal .modal-content'), r = e => e.getBoundingClientRect(),
                 visibleModals = [...document.querySelectorAll('.modal')].filter(m => getComputedStyle(m).display !== 'none' && m.getClientRects().length).map(m => m.id),
                 inside = e => { const a = r(e), b = r(d); return a.left >= b.left - 1 && a.right <= b.right + 1; };
