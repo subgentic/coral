@@ -1,6 +1,6 @@
-/* The Launch Agent Team dialog's three steps (#6397, #7407): 1 Name and where it launches, 2 Members, 3 Start and team settings. Pure DOM: `data-stage` on the step says which page shows (css), and the buttons and the line under the title follow it. */
-export const TEAM_STEPS = ['team', 'members', 'start'];
-const STEP_NAMES = { team: 'Your team', members: 'Members', start: 'Start and team settings' };
+/* The Launch Agent Team dialog's three steps (#6397, #7407): 1 Team (name, folder, first task, workflow, More options), 2 Members (Everyone runs as, More options: skills). Pure DOM: `data-stage` on the step says which page shows (css), and the buttons and the line under the title follow it. */
+export const TEAM_STEPS = ['team', 'members'];
+const STEP_NAMES = { team: 'Your team', members: 'Members' };
 
 export function currentTeamStep() {
     return document.getElementById('launch-step-team')?.dataset.stage || 'team';
@@ -49,7 +49,7 @@ export function showTeamStep(step, { focus = false } = {}) {
     if (live) live.textContent = `Step ${i + 1} of ${TEAM_STEPS.length}: ${STEP_NAMES[step]}`;
     document.dispatchEvent(new CustomEvent('team-step-shown', { detail: { step } }));
     if (focus) {
-        const first = { team: '#team-board-name', members: '#team-template-select', start: '#team-goal' }[step];
-        (step === 'start' ? document.getElementById('team-goal') || document.querySelector('#launch-step-team .settings-tab[aria-selected="true"]') : document.querySelector(first))?.focus(); // step 3 opens in its first field, the task: the keyboard that typed it was on the menu's "Start" tab and the text went nowhere (#10410)
+        const first = { team: '#team-board-name', members: '#team-template-select' }[step];
+        document.querySelector(first)?.focus();
     }
 }
