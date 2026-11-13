@@ -518,6 +518,9 @@ func (b *DropboxBackup) share(ctx context.Context, cl *dropbox.Client, access, a
 		_ = b.stopShare(ctx, cl, access, sh)
 		return nil, http.StatusInternalServerError, shareRefusal("", "could not record the share; it was undone")
 	}
+	if audience == store.DropboxSharePeople {
+		_ = b.outbox.RememberShareContacts(ctx, account, emails, b.clock()) // for the dialog's suggestions (#16170); a failure loses a suggestion, not the share
+	}
 	_ = b.d.store.AddAudit(ctx, store.DropboxAudit{Kind: store.DropboxAuditShare, Who: "operator", Reason: audience, Count: len(emails)})
 	return out, http.StatusOK, nil
 }
@@ -760,4 +763,67 @@ func (d *dropboxRoutes) forgetShares(ctx context.Context) {
 			slog.Warn("[dropbox] the list of shared files was not cleared")
 		}
 	}
+}
+
+const (
+	shareSuggestMax      = 8
+	shareSuggestFolders  = 20
+	shareSuggestCacheTTL = 5 * time.Minute
+)
+
+// DropboxShareContacts answers GET /api/dropbox/share-contacts?q=: up to eight addresses for the share dialog to suggest as the person types (#16170). Dropbox has no call that lists
+// a person's contacts, so they come from (a) the addresses this Coral already shared to (kept here, per account) and (b) the people in the shared folders this Dropbox account has
+// (read live under the sharing.read scope Coral already holds, cached five minutes in memory, never stored). Only the person at this computer's dashboard gets any (shareGate:
+// nothing over the Hub path), and an address already shared to comes first.
+func (h *CloudHandler) DropboxShareContacts(w http.ResponseWriter, r *http.Request) {
+	b, ok := h.shareGate(w, r)
+	if !ok {
+		return
+	}
+	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
+	if len(q) > 100 {
+		q = q[:100]
+	}
+	ctx := r.Context()
+	cl, access, account, err := b.dropboxAccess(ctx)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"emails": []string{}})
+		return
+	}
+	out := []string{}
+	seen := map[string]bool{}
+	if mine, err := b.outbox.ShareContacts(ctx, account, q, shareSuggestMax); err == nil {
+		for _, e := range mine {
+			seen[e] = true
+			out = append(out, e)
+		}
+	}
+	if len(out) < shareSuggestMax {
+		for _, e := range b.folderContacts(ctx, cl, access, account) {
+			if len(out) >= shareSuggestMax {
+				break
+			}
+			if !seen[e] && strings.Contains(e, q) {
+				seen[e] = true
+				out = append(out, e)
+			}
+		}
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, map[string]any{"emails": out})
+}
+
+// folderContacts is the people in the account's shared folders (cached five minutes per account); a Dropbox that cannot be read gives none.
+func (b *DropboxBackup) folderContacts(ctx context.Context, cl *dropbox.Client, access, account string) []string {
+	b.contactsMu.Lock()
+	defer b.contactsMu.Unlock()
+	if b.contactsFor == account && b.clock().Sub(b.contactsAt) < shareSuggestCacheTTL {
+		return b.contactsList
+	}
+	list, err := cl.FolderMemberEmails(ctx, access, shareSuggestFolders)
+	if err != nil {
+		return nil // not kept: the next keystroke after a failure asks again
+	}
+	b.contactsFor, b.contactsAt, b.contactsList = account, b.clock(), list
+	return list
 }

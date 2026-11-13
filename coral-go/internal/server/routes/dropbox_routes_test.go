@@ -78,6 +78,8 @@ type fakeDropbox struct {
 	revokeFail  bool                  // revoke_shared_link answers 500
 	membersFail bool                  // add_file_member refuses the member
 	copies      int                   // copy_v2 calls
+	folders     map[string][]string   // #16170: shared folder id -> the addresses of its members (list_folders, list_folder_members)
+	folderCalls int                   // list_folders calls
 	checkFail   string                // the sharing check (list_shared_links with no path) answers 409 with this summary
 }
 
@@ -428,7 +430,7 @@ func newFakeDropbox(t *testing.T) *fakeDropbox {
 			delete(f.jobs, a["async_job_id"])
 			json.NewEncoder(w).Encode(map[string]any{".tag": "complete", "entries": f.applyDeletes(keyed)})
 		case "/2/files/copy_v2", "/2/users/get_current_account", "/2/sharing/add_file_member", "/2/sharing/create_shared_link_with_settings",
-			"/2/sharing/list_shared_links", "/2/sharing/revoke_shared_link", "/2/sharing/unshare_file":
+			"/2/sharing/list_shared_links", "/2/sharing/revoke_shared_link", "/2/sharing/unshare_file", "/2/sharing/list_folders", "/2/sharing/list_folder_members":
 			f.sharing(w, r)
 		case "/2/users/get_space_usage":
 			if f.noDate {

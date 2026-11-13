@@ -176,13 +176,14 @@ var operatorOnlyRoutes = map[string]string{
 	"PUT /api/dropbox/autosync":                      "choose whether edits made in Dropbox become new versions",
 	"PUT /api/dropbox/offload":                       "choose whether old files are kept only in Dropbox",
 	"POST /api/dropbox/undo/{digest}":                "undo an edit made in Dropbox that became the newest version",
-	"GET /api/dropbox/share/{digest}":                "see how a file is shared through Dropbox",       // #14944
-	"POST /api/dropbox/share/{digest}":               "share a file through Dropbox",                   // #14944
-	"POST /api/dropbox/share/stop/{id}":              "stop sharing a file through Dropbox",            // #14944
-	"GET /api/dropbox/shares":                        "see the files shared through Dropbox",           // #14944
-	"POST /api/dropbox/shares/stop-all":              "stop sharing every file shared through Dropbox", // #14944
-	"POST /api/dropbox/share-chat/{project}/preview": "preview a chat page to share through Dropbox",   // #14944
-	"POST /api/dropbox/share-chat/{project}":         "share a chat page through Dropbox",              // #14944
+	"GET /api/dropbox/share-contacts":                "see addresses to suggest when sharing through Dropbox", // #16170
+	"GET /api/dropbox/share/{digest}":                "see how a file is shared through Dropbox",              // #14944
+	"POST /api/dropbox/share/{digest}":               "share a file through Dropbox",                          // #14944
+	"POST /api/dropbox/share/stop/{id}":              "stop sharing a file through Dropbox",                   // #14944
+	"GET /api/dropbox/shares":                        "see the files shared through Dropbox",                  // #14944
+	"POST /api/dropbox/shares/stop-all":              "stop sharing every file shared through Dropbox",        // #14944
+	"POST /api/dropbox/share-chat/{project}/preview": "preview a chat page to share through Dropbox",          // #14944
+	"POST /api/dropbox/share-chat/{project}":         "share a chat page through Dropbox",                     // #14944
 	"POST /api/dropbox/check":                        "ask the Dropbox backup to check for space again",
 	"POST /api/cloud/redeem":                         "redeem a Coral Hub credential",
 	"POST /api/cloud/rekey":                          "replace the secret key and discard what it sealed", // #3698
