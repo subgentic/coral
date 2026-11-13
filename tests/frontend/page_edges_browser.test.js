@@ -58,7 +58,7 @@ const EMPTY = `(() => { const vis = e => e && e.getClientRects().length && getCo
         // a phone: the toast stays where it was, under the app bar, over the list's heading and no control (the audit's own words: "it does not cover a control"); one width is the 1280 check above
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
         await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
-        await open('/agents', `!!document.querySelector('.mobile-list-title') && document.querySelector('.mobile-list-title').getClientRects().length > 0`);
+        await open('/agents', `!!document.querySelector('#mobile-agent-list .phone-bar-title') && document.querySelector('#mobile-agent-list .phone-bar-title').getClientRects().length > 0`);
         await ev(`(async () => { const n = await import(${JSON.stringify((await ev(`window.__coralStatic || '/static/'`)) + 'notifications.js')}); n.showToast('Saved.'); return true; })()`);
         await waitFor(`!!document.querySelector('#toast-host > .toast')`, 'the toast', 5000);
         await ev(`Promise.all(document.querySelector('#toast-host > .toast').getAnimations().map(a => a.finished.catch(() => {}))).then(() => true)`); // slid in: the box is where it stays
