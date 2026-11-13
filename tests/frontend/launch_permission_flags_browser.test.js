@@ -26,7 +26,8 @@ const { install: installNA, stubModels, stubCliChecks } = require('./helpers/new
         const check = async (type, mode, full, want) => { try { await pick(type, mode, full); await line(want); console.log(`   ✓ ${type} / ${mode}${full ? ' / Full access' : ''}: ${want}`); } catch (e) { problems.push(e.message.slice(0, 300)); } };
         await check('codex', 'default', null, 'Adds no permission flags: Codex starts in its own default.');
         await check('codex', 'plan', null, 'Adds --sandbox read-only -a on-request to the command.');
-        await check('codex', 'auto', null, 'Adds -c sandbox_workspace_write.network_access=true --sandbox workspace-write -a never to the command.');
+        // the runner's stub codex gives no version, which is the newest behaviour (#16007): Codex's own auto-review
+        await check('codex', 'auto', null, 'Adds -c sandbox_workspace_write.network_access=true --approve-for-me to the command.');
         await check('codex', 'bypassPermissions', null, 'Adds --dangerously-bypass-approvals-and-sandbox to the command.');
         await check('codex', 'plan', true, 'Adds --dangerously-bypass-approvals-and-sandbox to the command.');
         await check('claude', 'plan', false, 'Adds --permission-mode plan to the command.');
