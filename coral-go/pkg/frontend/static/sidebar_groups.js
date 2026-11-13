@@ -206,10 +206,14 @@ function drawTable() {
         for (const x of tables) { const f = x.foot && x.foot(); if (f) host.querySelector('.vl-panel') ? host.querySelector('.vl-panel').append(f) : host.append(f); } // a line under the page that is not part of the table (Needs you's alerts offer, #11837); a phone's panel holds the page
     }
     if (host.dataset.drawn === drawn) { // nothing to draw again: the head's count and the status line follow in place
-        if (folderPage && bar?.node && host.contains(bar.node)) { // the head's count span only: a page may add its own to the head (the Artifacts page's), and drawing the head again would take it away
+        if (folderPage && bar?.node && host.contains(bar.node)) { // the head's count span only: drawing the head again would replace the h2 the keyboard may be on
             const head = bar.node.querySelector(':scope .inbox-folder-head'), n = folderPage.count === undefined ? folderPage.rows.length : folderPage.count, c = head && head.querySelector('.session-group-count');
             if (!head) folderHead(bar.node, folderPage);
-            else if (n != null && c) { if (c.textContent !== String(n)) c.textContent = String(n); head.dataset.words = `${folderPage.title}|${n}`; }
+            else if (n != null) {
+                if (!c) { const s = document.createElement('span'); s.className = 'session-group-count'; s.textContent = String(n); head.append(s); } // the count arrived after the head was drawn (a page that reads its count first, #15834)
+                else if (c.textContent !== String(n)) c.textContent = String(n);
+                head.dataset.words = `${folderPage.title}|${n}`;
+            }
         }
         host.querySelectorAll('.group-table-status').forEach((p, i) => { const t = tables[i]; if (t && t.status && p.textContent !== t.status) p.textContent = t.status; });
     }
