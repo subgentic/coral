@@ -162,8 +162,8 @@ func (u *subagentUsage) record(ctx context.Context, sessionID string, t *subagen
 		recs = append(recs, &store.TokenUsage{
 			SessionID: sessionID, AgentName: u.agentName, AgentType: u.agentType, TeamID: u.teamID, BoardName: u.boardName,
 			InputTokens: c.InputTokens, OutputTokens: c.OutputTokens, CacheReadTokens: c.CacheReadTokens, CacheWriteTokens: c.CacheWriteTokens,
-			TotalTokens: c.InputTokens + c.OutputTokens + c.CacheReadTokens + c.CacheWriteTokens,
-			CostUSD:     estimateCost(model, c.InputTokens, c.OutputTokens, c.CacheReadTokens, c.CacheWriteTokens),
+			TotalTokens:    c.InputTokens + c.OutputTokens + c.CacheReadTokens + c.CacheWriteTokens,
+			CostUSD:        estimateCost(model, c.InputTokens, c.OutputTokens, c.CacheReadTokens, c.CacheWriteTokens),
 			SessionStartAt: t.StartedAt, LastActivityAt: c.Timestamp, RecordedAt: at, Source: "jsonl", Model: c.Model,
 		})
 	}
