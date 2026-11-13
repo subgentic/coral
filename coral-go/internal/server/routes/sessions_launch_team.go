@@ -530,6 +530,9 @@ func memberAsksToSkip(body launchTeamRequest, def launchTeamAgent, settings map[
 		if !ok {
 			return true
 		}
+		if len(def.Flags) == 0 {
+			flags = stripAgentPermissionFlags(flags) // the team's own permission flags are not this member's: the launch drops them for its custom mode, so the gate judges the mode alone (#16388)
+		}
 		flags = append(append([]string{}, flags...), extra...)
 	}
 	if agent.SkipsPermissionPrompts(agentType, flags) {
@@ -772,7 +775,9 @@ func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamR
 		// The team's mode is every member's own unless it names one (#6425): capabilities do not replace it. A member with none gets the mode's flags with the rest of its flags; one
 		// with capabilities gets the mode as its permission mode, which the agent's command builder applies with the capabilities only narrowing it (Claude keeps the lists apart).
 		carried, _ := agent.SplitPermissionFlags(body.Flags)
+		_, memberCustom := custommodes.IDOf(def.PermissionMode)
 		switch {
+		case memberCustom: // the mode the member's own form picked (#15950) is its mode: the team's flags add no permission flags of theirs, launchSession adds the custom mode's (#16388)
 		case permMode == "" && len(carried) > 0 && def.Capabilities.IsEmpty():
 			cleanFlags = append(cleanFlags, carried...) // flags nobody here can read as a mode are handed on, never dropped (#6423)
 		case permMode != "" && permMode != "default" && def.Capabilities.IsEmpty():
