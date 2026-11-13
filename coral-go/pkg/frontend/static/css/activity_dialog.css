@@ -26,3 +26,7 @@
 .activity-thread-attach { display: flex; flex-wrap: wrap; gap: var(--space-md, 8px); align-items: center; }
 .activity-thread-hint { color: var(--text-muted); font-size: var(--fs-sm); }
 .activity-thread-pics { display: flex; flex-wrap: wrap; gap: 8px; }
+.activity-file-line { padding: var(--card-pad); border: var(--card-border); border-radius: var(--card-radius); background: var(--card-fill); overflow-wrap: anywhere; }
+.activity-file-version { color: var(--text-muted); }
+.activity-file-said { margin: 0; color: var(--text-secondary); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.activity-file-said:empty { display: none; }

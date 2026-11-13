@@ -517,6 +517,12 @@
       "type": "table"
     },
     {
+      "name": "board_ask_reopened",
+      "sql": "CREATE TABLE board_ask_reopened (\n\t\t\tmessage_id INTEGER PRIMARY KEY,\n\t\t\tproject    TEXT NOT NULL,\n\t\t\tafter_id   INTEGER NOT NULL,\n\t\t\treopened_at TEXT NOT NULL\n\t\t)",
+      "tbl_name": "board_ask_reopened",
+      "type": "table"
+    },
+    {
       "name": "board_ask_subjects",
       "sql": "CREATE TABLE board_ask_subjects (\n\t\t\tmessage_id INTEGER PRIMARY KEY,\n\t\t\tproject    TEXT NOT NULL,\n\t\t\tgoal_id    INTEGER NOT NULL DEFAULT 0,\n\t\t\ttask_id    INTEGER NOT NULL DEFAULT 0\n\t\t)",
       "tbl_name": "board_ask_subjects",
@@ -1790,6 +1796,47 @@
           "dflt_value": null,
           "hidden": 0,
           "name": "closed_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": []
+    },
+    "board_ask_reopened": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "message_id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "after_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "reopened_at",
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"

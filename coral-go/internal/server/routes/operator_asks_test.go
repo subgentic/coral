@@ -447,3 +447,50 @@ func TestOperatorAsksMarksAnOlderQuestionOfTheSameAskerSuperseded(t *testing.T) 
 	}
 	assert.Equal(t, map[float64]bool{float64(old1.ID): true, float64(old2.ID): true, float64(other.ID): false, float64(newest.ID): false}, got, "only the older questions of the agent that asked again; all four are still listed")
 }
+
+// #15792: Reopen question on an ANSWERED question: undo with unanswer puts it back in the Operator's list, the thread's replies stay, only the Operator's (person's) call may do it, and nothing is posted.
+func TestAnAnsweredAskIsOpenedAgainByUndoWithUnanswer(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	_, err := bs.Subscribe(ctx, "team", "Lead", "Lead Developer", "", nil, "all")
+	require.NoError(t, err)
+	q, err := bs.PostMessage(ctx, "team", "Lead", "@Operator may I proceed?", nil)
+	require.NoError(t, err)
+	require.NoError(t, bs.RecordAsk(ctx, "team", q, []string{"Operator"}))
+	reply, err := bs.PostMessage(ctx, "team", "Operator", "@Lead yes", nil)
+	require.NoError(t, err)
+	require.NoError(t, bs.RecordReply(ctx, "team", reply.ID, q.ID))
+	call := func(who string, body map[string]any) (int, map[string]any) {
+		raw, _ := json.Marshal(body)
+		req := httptest.NewRequest(http.MethodPost, "/api/board/team/asks/x/close", strings.NewReader(string(raw)))
+		if who == "Operator" {
+			req = asPerson(withActor(req, Actor{Kind: ActorOperator, Name: "Operator"}))
+		} else {
+			req = withActor(req, Actor{Kind: ActorToken, Name: who, Session: "claude-" + who})
+		}
+		rc := chi.NewRouteContext()
+		rc.URLParams.Add("project", "team")
+		rc.URLParams.Add("messageID", fmt.Sprint(q.ID))
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rc))
+		w := httptest.NewRecorder()
+		h.CloseAsk(w, req)
+		var out map[string]any
+		_ = json.Unmarshal(w.Body.Bytes(), &out)
+		return w.Code, out
+	}
+	open := func() int { _, rows, _ := readOperatorAsks(t, h, asPerson); return len(rows) }
+	posts := func() int { m, err := bs.ListMessages(ctx, "team", 100, 0, 0); require.NoError(t, err); return len(m) }
+	require.Equal(t, 0, open(), "answered: not in the list")
+	before := posts()
+	code, out := call("Lead", map[string]any{"undo": true, "unanswer": true})
+	assert.Equal(t, http.StatusForbidden, code, "the asking agent may not reopen what the Operator answered")
+	assert.Equal(t, "owner_only", out["code"])
+	assert.Equal(t, 0, open())
+	code, out = call("Operator", map[string]any{"undo": true, "unanswer": true})
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, true, out["reopened"])
+	assert.Equal(t, 1, open(), "the answered question is open again")
+	assert.Equal(t, before, posts(), "and nothing was posted")
+	_, err = bs.GetMessageByID(ctx, "team", reply.ID)
+	assert.NoError(t, err, "the reply stays on the board")
+}

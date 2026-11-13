@@ -96,6 +96,9 @@ const HEX = 'c'.repeat(64);
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, 'the stubbed row', 10000);
         assert.match(await ev(`document.querySelector('#group-table-view tbody tr').textContent`), /Approved.*plan\.md.*this computer, phone \(reported by the page\)/s);
         await ev(`document.querySelector('#group-table-view tbody tr .dt-primary').click(); true`);
+        // an approved file opens its decision dialog (#15792); Open file is the way to the viewer
+        await waitFor(`!!document.querySelector('dialog.activity-file-dialog[open]')`, 'the file decision dialog', 10000);
+        await ev(`[...document.querySelectorAll('.activity-file-dialog .btn')].find(b => b.textContent.trim() === 'Open file').click(); true`);
         await waitFor(`!!document.getElementById('artifact-viewer')`, 'the viewer', 10000);
         console.log('   ✓');
 

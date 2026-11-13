@@ -73,6 +73,12 @@ func (s *Store) ensureAsksSchema(ctx context.Context) error {
 			note       TEXT NOT NULL,
 			closed_at  TEXT NOT NULL
 		)`,
+		`CREATE TABLE IF NOT EXISTS board_ask_reopened (
+			message_id INTEGER PRIMARY KEY,
+			project    TEXT NOT NULL,
+			after_id   INTEGER NOT NULL,
+			reopened_at TEXT NOT NULL
+		)`,
 		`CREATE TABLE IF NOT EXISTS board_ask_buttons (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
 			project    TEXT NOT NULL,
@@ -280,7 +286,16 @@ func (s *Store) RecordReply(ctx context.Context, project string, msgID, replyTo 
 	return err
 }
 
+// floor is the id after which a reply counts as an answer.
+func (a askRow) floor() int64 {
+	if a.Floor > a.MessageID {
+		return a.Floor
+	}
+	return a.MessageID
+}
+
 type askRow struct {
+	Floor     int64  `db:"-"` // replies count only from messages after this id: the question's own id, or the newest message when the Operator reopened it (ReopenAskAnswer)
 	MessageID int64  `db:"message_id"`
 	Asker     string `db:"asker"`
 	Asked     string `db:"asked"`
@@ -292,14 +307,14 @@ type askRow struct {
 func (s *Store) answeredBy(ctx context.Context, project string, a askRow, member string, subs map[string]Subscriber) (bool, error) {
 	var replied bool
 	if err := s.reader().GetContext(ctx, &replied, `SELECT EXISTS(SELECT 1 FROM board_messages m JOIN board_replies r ON r.message_id = m.id
-		WHERE m.project = ? AND m.id > ? AND m.subscriber_id = ? AND COALESCE(m.is_system, 0) = 0 AND r.reply_to = ?)`, project, a.MessageID, member, a.MessageID); err != nil {
+		WHERE m.project = ? AND m.id > ? AND m.subscriber_id = ? AND COALESCE(m.is_system, 0) = 0 AND r.reply_to = ?)`, project, a.floor(), member, a.MessageID); err != nil {
 		return false, err
 	}
 	if replied {
 		return true, nil
 	}
 	title := subs[strings.ToLower(a.Asker)].JobTitle
-	last := a.MessageID
+	last := a.floor()
 	for {
 		var posts []struct {
 			ID      int64  `db:"id"`
@@ -409,6 +424,10 @@ func (s *Store) askInfo(ctx context.Context, project string, a askRow, subs map[
 	if err := s.reader().GetContext(ctx, &closed, `SELECT closed_by, note FROM board_ask_closed WHERE project = ? AND message_id = ?`, project, a.MessageID); err == nil {
 		info.Closed, info.ClosedBy, info.ClosedNote, info.Answered = true, closed.By, closed.Note, true
 		return info, nil
+	}
+	var after int64
+	if err := s.reader().GetContext(ctx, &after, `SELECT after_id FROM board_ask_reopened WHERE project = ? AND message_id = ?`, project, a.MessageID); err == nil {
+		a.Floor = after // the Operator reopened it: what was answered before then does not count
 	}
 	for _, m := range to {
 		done, err := s.answeredBy(ctx, project, a, m, subs)
@@ -616,4 +635,18 @@ func (s *Store) ReopenAsk(ctx context.Context, project string, messageID int64) 
 	}
 	n, err := res.RowsAffected()
 	return n > 0, err
+}
+
+// ReopenAskAnswer puts an ANSWERED question back to unanswered (#15792, the Activity thread's Reopen question): the replies already on the board stay (the thread is kept), but only a reply made after this
+// counts as an answer, so the question is open again, in the Operator's Needs you. An ignored question is opened by ReopenAsk; this does both. Reopening twice moves the line to now.
+func (s *Store) ReopenAskAnswer(ctx context.Context, project string, messageID int64) error {
+	if _, err := s.AskAsker(ctx, project, messageID); err != nil {
+		return err
+	}
+	var newest int64
+	if err := s.db.GetContext(ctx, &newest, `SELECT COALESCE(MAX(id), 0) FROM board_messages WHERE project = ?`, project); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT OR REPLACE INTO board_ask_reopened (message_id, project, after_id, reopened_at) VALUES (?, ?, ?, ?)`, messageID, project, newest, nowUTC())
+	return err
 }
