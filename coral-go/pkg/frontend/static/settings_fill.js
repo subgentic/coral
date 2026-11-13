@@ -193,7 +193,12 @@ export function _fillDefaults(s) {
         if (s.default_permission_mode) { notSet?.remove(); permModeSelect.value = s.default_permission_mode; }
         else { if (!notSet) permModeSelect.prepend(new Option('Not set (Auto)', '')); permModeSelect.value = ''; }
         _updatePermModeDescription(permModeSelect, !s.default_permission_mode);
-        importOnce('./permission_mode_list.js').then(m => m.modeList(permModeSelect)).catch(() => {}); // the same rows as New agent (#15886)
+        if (!permModeSelect.dataset.listWired) { // the same rows as New agent (#15886), loaded when the field is first on screen: opening Settings on another section does not fetch the list, its sheet and the segmented control (the 24-file budget)
+            permModeSelect.dataset.listWired = '1';
+            const load = () => importOnce('./permission_mode_list.js').then(m => m.modeList(permModeSelect)).catch(() => {});
+            if (typeof IntersectionObserver !== 'function') load();
+            else { const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); load(); } }); io.observe(permModeSelect); }
+        }
         // A pick is a choice even when it is the mode the field showed (nothing saved shows Auto): it is saved, so a person who picks Auto and saves has Auto saved (#7620)
         permModeSelect.dataset.edited = '';
         if (!permModeSelect.dataset.watched) { permModeSelect.dataset.watched = '1'; permModeSelect.addEventListener('change', () => { permModeSelect.dataset.edited = '1'; }); }
