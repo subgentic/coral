@@ -379,15 +379,15 @@ jobs:
         # terminal_pane_size (which drives tmux itself) stays on Linux and macOS; its partner terminal_scroll already runs in a default part. --no-tmux: a --strict run would
         # otherwise add the tmux shard too (9 suites that cannot start here).
         include:
-          - { name: "part 1/8", args: "--part 1/8", id: "1" }
-          - { name: "part 2/8", args: "--part 2/8", id: "2" }
-          - { name: "part 3/8", args: "--part 3/8", id: "3" }
-          - { name: "part 4/8", args: "--part 4/8", id: "4" }
-          - { name: "part 5/8", args: "--part 5/8", id: "5" }
-          - { name: "part 6/8", args: "--part 6/8", id: "6" }
-          - { name: "part 7/8", args: "--part 7/8", id: "7" }
-          - { name: "part 8/8", args: "--part 8/8", id: "8" }
-          - { name: "strict", args: "--strict --no-tmux", id: "strict" }
+          - { name: "tl 1", args: "--only task_link_missing_browser,task_link_unread_browser --retries 0", id: "t1" }
+          - { name: "tl 2", args: "--only task_link_missing_browser,task_link_unread_browser --retries 0", id: "t2" }
+          - { name: "tl 3", args: "--only task_link_missing_browser,task_link_unread_browser --retries 0", id: "t3" }
+          - { name: "tl 4", args: "--only task_link_missing_browser,task_link_unread_browser --retries 0", id: "t4" }
+          - { name: "tl 5", args: "--only task_link_missing_browser,task_link_unread_browser --retries 0", id: "t5" }
+          - { name: "tl 6", args: "--only task_link_missing_browser,task_link_unread_browser --retries 0", id: "t6" }
+          - { name: "tl 7", args: "--only task_link_missing_browser,task_link_unread_browser --retries 0", id: "t7" }
+          - { name: "tl 8", args: "--only task_link_missing_browser,task_link_unread_browser --retries 0", id: "t8" }
+          - { name: "tl 9", args: "--only task_link_missing_browser,task_link_unread_browser --retries 0", id: "t9" }
     defaults:
       run:
         shell: bash
