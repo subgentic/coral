@@ -33,6 +33,9 @@ func (h *CloudHandler) codexTrustStatus(r *http.Request) map[string]any {
 	if s, err := h.ss.GetSettings(r.Context()); err == nil {
 		on = setreg.Bool(s, CodexTrustHooksSetting)
 	}
+	if !on { // the switch as this request read it: off is never trusted, whatever the process-wide switch the launch reads says (#16123)
+		return map[string]any{"trust": false, "trusted": false, "why": "turned off in Settings"}
+	}
 	trusted, why := agent.CodexHookTrust()
 	return map[string]any{"trust": on, "trusted": trusted, "why": why}
 }
