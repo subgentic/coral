@@ -62,7 +62,7 @@ func TestAStrangerThatRefusesAWrongPasswordIsNeverSentTheRealOneWhileTheChildLiv
 		t.Skip("no tool to ask who listens")
 	}
 	t.Setenv("STANDIN_BIND_OTHER", "1")
-	t.Setenv(pidDelayVar, "3000") // the child is slow to write its pid record: the failing-first shape of the -race flake (#16250); the start ends it first
+	t.Setenv(pidDelayVar, "1000") // the child is slow to write its pid record: the failing-first shape of the -race flake (#16250); the start ends it first
 	cfg, envFile := stubConfig(t)
 	cfg.Ready = 5 * time.Second
 	var mu sync.Mutex
@@ -94,7 +94,9 @@ func TestAStrangerThatRefusesAWrongPasswordIsNeverSentTheRealOneWhileTheChildLiv
 	raw, rerr := os.ReadFile(envFile + ".pids")
 	if os.IsNotExist(rerr) {
 		// The start fails closed and ends the child within a few ms when the listener is a stranger, and the child may be gone before it wrote its pid record (a Windows process is slow to reach it; a Linux -race run under load too, #16250: gate 1 of v2.0.68),
-		// which leaves nothing running either. The stand-in's pid delay above makes this the case every run.
+		// which leaves nothing running either. The stand-in's pid delay above makes this the case every run. That it is gone is still checked (#16258): a child that survived the start writes its record when its delay is over, so a record
+		// that appears within twice the delay is a stand-in left running.
+		assert.Never(t, func() bool { _, err := os.Stat(envFile + ".pids"); return err == nil }, 1500*time.Millisecond, 20*time.Millisecond, "a stand-in survived the start: it wrote its pid record after the start had failed")
 		return
 	}
 	require.NoError(t, rerr)
