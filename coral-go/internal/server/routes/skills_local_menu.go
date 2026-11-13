@@ -47,8 +47,8 @@ func localSkills(base string, roots []string, source string, room int) []skillSu
 		if !ok {
 			continue
 		}
-		entries, err := os.ReadDir(dir)
-		if err != nil {
+		entries, ok := readSomeEntries(dir, dirEntryCap)
+		if !ok {
 			continue
 		}
 		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
@@ -74,6 +74,24 @@ func localSkills(base string, roots []string, source string, room int) []skillSu
 		}
 	}
 	return out
+}
+
+// dirEntryCap is how many entries of one skills folder a call reads (a var so a test can lower it): a huge folder costs a bounded read, and the menu has room for 40 skills anyway (#16083).
+var dirEntryCap = 500
+
+// readSomeEntries lists at most max entries of a folder, without reading the rest of it, sorted by name.
+func readSomeEntries(dir string, max int) ([]os.DirEntry, bool) {
+	f, err := os.Open(dir)
+	if err != nil {
+		return nil, false
+	}
+	defer f.Close()
+	entries, err := f.ReadDir(max)
+	if err != nil && err != io.EOF {
+		return nil, false
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+	return entries, true
 }
 
 // plainSubfolder walks down from base one name at a time, refusing a link or a non-folder at every step: the result is inside base.
