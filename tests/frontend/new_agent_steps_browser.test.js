@@ -64,10 +64,10 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
         });
         await S.run('with no folder Next is on; pressing it says "Choose a folder" under the field and on one red line, and it does not advance; nothing is said before the first press', async () => {
             await reopen(); await ev(`(() => { const i = window.__na.find('input', ${N.folder}); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            const state = () => ev(`(() => { const b = window.__na.find('button', ${N.next}); const f = document.getElementById('launch-dir'); const e = f.closest('.sv-row').querySelector('.sv-error'); return { off: b.disabled || b.getAttribute('aria-disabled') === 'true', status: window.__na.text(document.getElementById('launch-agent-status')), error: e.hidden ? '' : e.textContent, focus: document.activeElement === f }; })()`);
-            let n = await state(); assert.ok(!n.off, 'Next is on'); assert.equal(n.status, '', 'nothing before the first press'); assert.equal(n.error, '');
+            const state = () => ev(`(() => { const b = window.__na.find('button', ${N.next}); const f = document.getElementById('launch-dir'); const e = f.closest('.sv-row').querySelector('.sv-error'); return { off: b.disabled || b.getAttribute('aria-disabled') === 'true', error: e.hidden ? '' : e.textContent, focus: document.activeElement === f }; })()`);
+            let n = await state(); assert.ok(!n.off, 'Next is on'); assert.equal(n.error, '');
             await click('button', N.next); n = await state();
-            assert.ok(!n.off && n.focus, 'Next stays on and the folder takes the focus'); assert.equal(n.status, 'Choose a folder', 'one line above the buttons'); assert.match(n.error, /Choose a folder/, 'and the error under the field');
+            assert.ok(!n.off && n.focus, 'Next stays on and the folder takes the focus'); assert.equal(await ev(`!!document.getElementById('launch-agent-status')`), false, 'no second line above the buttons (#15891)'); assert.match(n.error, /Choose a folder/, 'and the error under the field');
             assert.match(await stepLine(ev), /^Step 1 of 3/, 'pressing Next with no folder stays on step 1');
         });
         await S.run('on a Hub the first step is Which computer? with several machines and only then (no machine select on step 1 either way)', async () => {

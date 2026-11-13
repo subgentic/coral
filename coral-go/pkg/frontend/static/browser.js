@@ -5,6 +5,7 @@ import { registerActions, textOf } from './actions.js';
 import { serverFetch, LOCAL_SERVER, normServer, isCloud } from './server_base.js';
 import { recentDirsKey, machineBlock } from './launch_server.js';
 import { browserLocal } from './safe_storage.js';
+import { importOnce } from './import_once.js';
 
 /* Multi-server hub: a directory input may belong to a remote server. The
  * launch modals register a resolver (input id -> server id) so listing,
@@ -83,7 +84,7 @@ function renderRecentDirs() {
         dirs.map(dir => {
             const name = dir.split("/").filter(Boolean).pop() || dir;
             return `<div class="dir-browser-recent" data-on-click="browser-recent" role="button" tabindex="0" data-key-click data-dir="${escapeAttr(dir)}" title="${escapeAttr(dir)}">
-                <span class="dir-icon">&#128338;</span>
+                <span class="dir-icon material-icons" aria-hidden="true">history</span>
                 <span class="dir-name">${escapeHtml(name)}</span>
                 <span class="dir-browser-recent-path">&lrm;${escapeHtml(dir)}</span>
             </div>`;
@@ -129,6 +130,7 @@ export function toggleBrowser(dirInputId, browserId, listId, pathId) {
     const isVisible = browser.style.display !== "none";
     browser.style.display = isVisible ? "none" : "";
     if (!isVisible) {
+        importOnce('./lazy_styles.js').then(m => m.loadStyles('launch_folder.css')).catch(() => {});
         const inputPath = document.getElementById(_activeDirInputId).value;
         browserCurrentPath = browseStartPath(inputPath, activeServer() !== LOCAL_SERVER, getCoralRoot());
         renderRecentDirs();
@@ -170,7 +172,7 @@ async function loadBrowserEntries(path) {
 
         list.innerHTML = data.entries.map(name =>
             `<li data-on-click="browser-nav" data-name="${escapeAttr(name)}" title="${escapeAttr(name)}"><button type="button" class="row-btn">
-                <span class="dir-icon">&#128193;</span>
+                <span class="dir-icon material-icons" aria-hidden="true">folder</span>
                 <span class="dir-name">${escapeHtml(name)}</span>
             </button></li>`
         ).join("");

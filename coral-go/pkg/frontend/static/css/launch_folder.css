@@ -1,0 +1,5 @@
+/* The folder list in New agent (#15891, LA7), lazy: loaded by launch_dialog.js, not at start. a row is 32 px high with the icon set's folder, not an emoji; and while the list is open "Use this folder" is the one Primary, so Next and Launch wear the Default look until it closes. */
+.modal-content .dir-browser-list li { min-height: 32px; padding-block: 0; }
+.modal-content .dir-browser-list .dir-icon.material-icons, .modal-content .dir-browser-recent .dir-icon.material-icons { font-size: var(--fs-xl); width: 1em; height: 1em; }
+.modal-content:has(.dir-browser:not([style*="display: none"], [style*="display:none"])) .modal-actions .btn-primary, .modal-content:has(.dir-browser:not([style*="display: none"], [style*="display:none"])) .modal-actions .btn-primary:hover { background: var(--bg-tertiary); border-color: var(--control-border); color: var(--text-primary); }
+.modal-content:has(.dir-browser:not([style*="display: none"], [style*="display:none"])) .modal-actions .btn-primary:hover { background: var(--bg-hover); }

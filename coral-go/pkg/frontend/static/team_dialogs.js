@@ -7,7 +7,7 @@ import { showToast, escapeHtml, escapeAttr, boardNameProblem, OPERATOR_ID } from
 import { loadLiveSessions } from './api.js';
 import { recordRecentDir, getRecentDirs, pruneMissingRecents } from './browser.js';
 import { teamForm, showTeamWorktree, showTeamWorkers, syncSuggestionExists, trustTicked, resetFolderTrust, scheduleFolderTrust } from './team_form.js';
-import { agentNameForm, agentStatus } from './agent_form.js';
+import { agentNameForm } from './agent_form.js';
 import { cliPathButton } from './prerequisites.js';
 import { serverFetch, boardFetch, identityKey, LOCAL_SERVER, isHub } from './server_base.js';
 const { launch } = await importOnce('./launch_state.js');
@@ -275,8 +275,7 @@ function saveTeamAgentFromModal() {
     config.name = (document.getElementById('launch-agent-name-input')?.value || '').trim() || config.name; // the role is the persona step's name field
     if (!config.name) {
         window._launchStage?.('persona');
-        agentNameForm().validate({ focus: true }); // the role is flagged under its field, and one red line above the buttons says it
-        agentStatus('A member needs a role');
+        agentNameForm().validate({ focus: true }); // the role is flagged under its field, and only there (#15891)
         return;
     }
 
