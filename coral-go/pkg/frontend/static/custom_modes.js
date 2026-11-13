@@ -147,6 +147,22 @@ function form(index) {
     const hint = box.querySelector('.cpm-allowed');
     const showAllowed = () => { const t = (box.querySelector('[name="agent_type"]') || {}).value || cur.agent_type; const a = (limits.allowed_flags && limits.allowed_flags[family(t)]) || []; if (hint) hint.textContent = a.length ? `${label(t)} flags: ${a.join(' · ')}` : ''; };
     showAllowed(); box.addEventListener('change', showAllowed);
+    // the command the mode would start the agent with (#15951), read off the server's launch builder as the flags are typed; a flag the form refuses keeps it from being shown, and the line says why
+    const cmdSlot = mk('div', 'cpm-command'); if (hint && hint.parentNode) hint.parentNode.append(cmdSlot);
+    let cmdSeq = 0, cmdTimer = 0;
+    const showCommand = () => {
+        const t = (box.querySelector('[name="agent_type"]') || {}).value || cur.agent_type, flags = parseFlagLines((box.querySelector('[name="flags"]') || {}).value);
+        const mine = ++cmdSeq; clearTimeout(cmdTimer);
+        if (!flags.length) { cmdSlot.replaceChildren(); return; }
+        const problem = flagsProblem(t, flags);
+        if (problem) { cmdSlot.replaceChildren(mk('p', 'sv-help cpm-command-refused', `Start command: not shown until every flag is accepted. ${problem}`)); return; }
+        cmdTimer = setTimeout(async () => {
+            const { fetchFlags, commandNode } = await importOnce('./permission_flags_line.js');
+            const answer = await fetchFlags(null, { agent_type: t, permission_mode: 'default', flags });
+            if (mine === cmdSeq) cmdSlot.replaceChildren(...(answer && answer.command ? [commandNode(String(answer.command))] : []));
+        }, 150);
+    };
+    box.addEventListener('input', showCommand); box.addEventListener('change', showCommand); showCommand();
     box.querySelector('.sv-cancel').setAttribute('aria-label', index >= 0 ? 'Cancel the mode change' : 'Cancel adding a mode');
     box.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); view.cancel(); } });
     return { f: box, focus: () => view.focus(index < 0 ? 'agent_type' : 'name') };

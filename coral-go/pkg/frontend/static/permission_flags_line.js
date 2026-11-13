@@ -2,6 +2,8 @@
  * New agent's recap, Restart's settings step and Resume's mode picker all draw it from here. Lazy: loaded with the dialogs, not at start. */
 import { serverFetch } from './server_base.js';
 import { loadStyles } from './lazy_styles.js';
+import { copyText } from './utils.js';
+import { showToast } from './notifications.js';
 
 await loadStyles('launch_recap_flags.css'); // the line's rules: not at start
 
@@ -32,7 +34,21 @@ export function flagsNodes(answer, type) {
     else { const code = document.createElement('code'); code.textContent = text; line.append('Adds ', code, ' to the command.'); }
     const nodes = [line];
     if (answer.note) { const why = document.createElement('span'); why.className = 'launch-recap-note launch-recap-flags launch-recap-why'; why.textContent = String(answer.note); nodes.push(why); }
+    if (answer.command && type !== 'terminal') nodes.push(commandNode(String(answer.command)));
     return nodes;
+}
+
+/** The agent's whole start command (#15951), as the server's launch builder gives it with Coral's own values as <placeholders>: read-only, with Copy, and on a phone one line with 'Show full command'. */
+export function commandNode(command) {
+    const row = document.createElement('div'); row.className = 'launch-recap-note launch-recap-flags launch-recap-command';
+    const label = document.createElement('span'); label.className = 'lrc-label'; label.textContent = 'Start command';
+    const code = document.createElement('code'); code.className = 'lrc-text'; code.textContent = command; code.id = 'lrc-' + Math.random().toString(36).slice(2, 8);
+    const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'btn btn-small lrc-copy'; copy.textContent = 'Copy'; copy.setAttribute('aria-label', 'Copy the start command');
+    copy.addEventListener('click', async () => { showToast(await copyText(command) ? 'Copied the start command' : 'Could not copy the start command', false); });
+    const more = document.createElement('button'); more.type = 'button'; more.className = 'btn btn-small lrc-more'; more.textContent = 'Show full command'; more.setAttribute('aria-expanded', 'false'); more.setAttribute('aria-controls', code.id);
+    more.addEventListener('click', () => { const open = row.classList.toggle('lrc-open'); more.setAttribute('aria-expanded', String(open)); more.textContent = open ? 'Show less' : 'Show full command'; });
+    row.append(label, copy, more, code);
+    return row;
 }
 
 /** Keep `el` showing the line for whatever `getBody()` returns now (null: no line, el hidden). Call the returned function after any change in the form. A stale answer is never drawn: a later call wins. */
