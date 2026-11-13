@@ -389,9 +389,13 @@ const teamHooks = () => ({
 });
 
 /** A goal or task the address names is not on this team: say so by name, with the way back to the list (#15295). */
-function itemNotFound(what, id, tab) {
+async function itemNotFound(what, id, tab) {
     const team = S.team;
-    importOnce('./np.js').then(m => m.showNotFound({ what, id: `#${id}`, back: { view: 'team', id: splitKey(team).name, server: splitKey(team).server, sub: tab }, backLabel: `Back to ${what === 'goal' ? 'Goals' : 'Tasks'}` })).catch(() => {});
+    // The address asked for this view, so a module that fails to load is not dropped quietly (#16376: one dropped request left the route on /tasks/77 with nothing on screen): it is tried once more, and a second failure says so in a toast.
+    let m;
+    try { m = await importOnce('./np.js'); } catch { m = await importOnce('./np.js', 'the page that says it was not found').catch(() => null); }
+    if (!m) return;
+    return m.showNotFound({ what, id: `#${id}`, back: { view: 'team', id: splitKey(team).name, server: splitKey(team).server, sub: tab }, backLabel: `Back to ${what === 'goal' ? 'Goals' : 'Tasks'}` }).catch(e => console.error('[coral]', e));
 }
 
 async function fillTab(tab, item = 0) {
