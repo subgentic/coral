@@ -70,11 +70,11 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
         await S.run('on a Hub New team opens on Which computer? with several machines; "Another computer\'s address..." is its last card and choosing it reveals the address field; with this computer alone there is no step', async () => {
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); T.state.hub = true; T.state.cloud = false; T.state.serversKnown = true; T.state.servers = [{ id: 'm1', label: 'build-server', status: 'online', version: '1.4.6', last_seen: new Date().toISOString() }]; true`);
             await ev(`(async () => { await window.showLaunchModal(); const c = document.querySelector('#launch-step-chooser [data-arg="team"]'); if (c && c.getClientRects().length) c.click(); return true; })()`);
-            await waitFor(`(() => { const s = document.getElementById('launch-step-computer'); return !!s && getComputedStyle(s).display !== 'none' && document.querySelectorAll('#launch-computer-list input[type=radio]').length >= 2; })()`, 'the Which computer? step', 6000);
+            await waitFor(`(() => { const s = document.getElementById('launch-step-computer'); return !!s && getComputedStyle(s).display !== 'none' && document.querySelectorAll('#launch-computer-list .launch-computer-pick').length >= 2; })()`, 'the Which computer? step', 6000);
             const names = await ev(`[...document.querySelectorAll('#launch-computer-list .launch-computer-card strong')].map(e => e.textContent.trim())`);
             assert.match(names[names.length - 1], /^Another computer.s address/, `the last card is Another computer's address... (${JSON.stringify(names)})`);
-            await ev(`document.querySelector('#launch-computer-list input[value="__address__"]').click(); document.getElementById('launch-computer-go').click(); true`);
-            await waitFor(`!!window.__nt.dlg(${N.team})`, 'the New team dialog after Continue', 6000); await settle(300);
+            await ev(`document.querySelector('#launch-computer-list .launch-computer-pick[data-computer="__address__"]').click(); true`);
+            await waitFor(`!!window.__nt.dlg(${N.team})`, 'the New team dialog after Select', 6000); await settle(300);
             assert.ok(await t.has('input', N.address), 'the address field after choosing it');
             await ev(`window.hideLaunchModal(); T.state.servers = []; T.state.hub = false; T.state.cloud = false; true`);
             await openNewTeam(ev, waitFor); assert.ok(!(await t.has('select', N.machine)), 'no Machine select with this computer alone');
