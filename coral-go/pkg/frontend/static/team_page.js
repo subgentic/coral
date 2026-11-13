@@ -23,7 +23,7 @@ await loadStyles('team_tabs.css'); // the tab strip's steady widths (count room,
 const { revealInStrip } = await importOnce('./strip_reveal.js'); // a part of the team page's group: loaded with it
 const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 const { el } = await importOnce('./team_table.js');
-const { agentCopyButton } = await importOnce('./agent_copy_button.js'); // the robot beside the team's name (#15063)
+const { copyForAgent } = await importOnce('./agent_copy_button.js'); // the More menu's Copy for an agent (#15993; the robot beside the name is gone)
 const { quietFocus } = await importOnce('./quiet_focus.js');
 
 const PHONE_MORE = ['knowledge', 'messages', 'branches']; // (the last three of TEAM_TABS: the row is the others, in the operator's order, #8791) // the tabs a phone puts behind its More menu (CSS hides their tabs under 761 px)
@@ -167,8 +167,8 @@ function buildMore() {
     const settings = el('button', 'menu-item team-more-settings', 'Settings'); settings.type = 'button'; settings.id = 'team-page-more-settings';
     settings.addEventListener('click', () => { openSettings(); });
     const tpl = Object.assign(el('button', 'menu-item', 'Save as template'), { type: 'button', id: 'team-page-more-template', onclick: () => window.saveTeamFromSidebar?.(S.team) });
-    const copy = el('button', 'menu-item team-phone-copy', 'Copy for an agent'); copy.type = 'button';
-    copy.addEventListener('click', () => $('team-page-agent-copy')?.click());
+    const copy = el('button', 'menu-item team-more-copy', 'Copy for an agent'); copy.type = 'button'; copy.id = 'team-page-more-copy';
+    copy.addEventListener('click', () => { copyForAgent('board', () => `Team \u201c${keyLabel(S.team)}\u201d, its board: run coral-board read`); });
     menu.append(add, settings, tpl, copy);
     host.append(b, menu);
     const set = (open, { focus = false } = {}) => { moreOpen = open; menu.hidden = !open; b.setAttribute('aria-expanded', String(open)); if (open) menu.style.setProperty('--more-max', `${Math.max(160, Math.floor(innerHeight - menu.getBoundingClientRect().top - 12))}px`); /* the room under the button: at 200% text the header is tall and the menu must scroll inside the window, not run off it (#15856) */ if (open) menu.querySelector('button:not([hidden])')?.focus(); else if (focus) b.focus(); };
@@ -214,8 +214,6 @@ function drawHeader() {
         if (computer) h.append(el('span', 'team-page-machine', ` on ${computer.label || computer.id}`));
     }
     document.title = `${keyLabel(S.team)} · Coral`;
-    document.getElementById('team-page-agent-copy')?.remove(); // the team may have changed: its line is drawn again
-    const robot = agentCopyButton('board', () => `Team \u201c${keyLabel(S.team)}\u201d, its board: run coral-board read`, { className: 'team-page-agent-copy' }); robot.id = 'team-page-agent-copy'; h.after(robot);
 }
 
 function drawStatus(data) {

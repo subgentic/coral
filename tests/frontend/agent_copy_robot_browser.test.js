@@ -1,4 +1,4 @@
-// The robot "Copy for an agent" buttons (#15063, the Operator): a small icon button, named 'Copy for an agent', on a team's page (beside its name), on each Team settings section, and beside the title and every
+// The robot "Copy for an agent" buttons (#15063, the Operator): a small icon button, named 'Copy for an agent', on a team's page (an item in its More menu since #15993, no robot beside its name), on each Team settings section, and beside the title and every
 // section heading of a document in Docs; each copies the object's line and where in the agent docs to read ("Docs: coral-agent docs <topic>, section “<heading>”"), and says it was copied. The goal page's is in
 // goal_copy_for_agent; the table behind them is checked against agent_docs/ in agent_doc_map.test.mjs. Real board on the isolated dev server (removed again); the clipboard is a stand-in. 1280 and 390 px.
 const assert = require('node:assert/strict');
@@ -24,21 +24,16 @@ const { coralReady } = require('./helpers/wait');
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
 
-            console.log(`${at}1. The team page has the robot beside its name`);
+            console.log(`${at}1. The team page has no robot beside its name: Copy for an agent is in More (#15993)`);
             await load(`/team/${B}`);
-            await waitFor(`!!document.querySelector('#team-page-agent-copy')`, `${at}the robot on the team page`, 15000);
+            await waitFor(`document.getElementById('team-page-title') && document.getElementById('team-page-title').textContent.length > 0 && !!document.getElementById('team-page-more')`, `${at}the team page header`, 15000);
             await clip();
-            if (mobile) {
-                assert.equal(await ev(`document.getElementById('team-page-agent-copy').getClientRects().length`), 0, at + 'the phone header keeps one action; Copy is in More');
-                await ev(`document.getElementById('team-page-more').click(); true`);
-                await waitFor(`document.querySelector('.team-phone-copy').getClientRects().length > 0`, at + 'Copy in More');
-                await ev(`document.querySelector('.team-phone-copy').click(); true`);
-            } else {
-                const t = await robotInfo('#team-page-agent-copy');
-                assert.ok(t.label === 'Copy for an agent' && t.title === 'Copy for an agent' && t.icon === 'smart_toy' && t.text === '' && t.within, at + 'an icon only, named: ' + JSON.stringify(t));
-                assert.ok(t.w === 32 && t.h === 32, at + 'a 32 px square: ' + JSON.stringify(t));
-                await ev(`document.querySelector('#team-page-agent-copy').click(); true`);
-            }
+            assert.equal(await ev(`!!document.getElementById('team-page-agent-copy') || !!document.querySelector('#team-page-head .agent-copy')`), false, at + 'no robot beside the name');
+            await ev(`document.getElementById('team-page-more').click(); true`);
+            await waitFor(`!!document.getElementById('team-page-more-copy') && document.getElementById('team-page-more-copy').getClientRects().length > 0`, at + 'Copy for an agent in More', 8000);
+            const item = await ev(`(() => { const m = document.getElementById('team-page-more-copy'); const items = [...document.querySelectorAll('#team-page-more-menu .menu-item')].filter(x => x.getClientRects().length); return { text: m.textContent.trim(), last: items[items.length - 1] === m }; })()`);
+            assert.equal(item.text, 'Copy for an agent', at + 'worded Copy for an agent');
+            await ev(`document.getElementById('team-page-more-copy').click(); true`);
             await waitFor(`window.__copied.length === 1`, `${at}the text copied`, 8000);
             const copied = (await ev(`window.__copied[0]`));
             assert.ok(copied.includes(B) && /coral-board read/.test(copied) && /\nDocs: coral-agent docs board, section “Messages”$/.test(copied), at + 'the team, its command, then the docs: ' + JSON.stringify(copied));
@@ -64,6 +59,17 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`window.__copied.length === 1`, `${at}the place copied`, 8000);
             const dc = await ev(`window.__copied[0]`);
             assert.equal(dc, `Docs: coral-agent docs board, section “${heads.section.replace(/\s*\(#\d+\)\s*$/, '')}”`, at + 'just the exact place');
+
+            console.log(`${at}4. Settings > General has no robot: a labelled Quiet button on the section's last row (#15993)`);
+            await load('/');
+            await ev(`window.showSettingsModal(); true`);
+            await waitFor(`!!document.querySelector('#settings-pane-general .settings-copy-last button')`, `${at}the General section's button`, 15000);
+            const gen = await ev(`(() => { const p = document.getElementById('settings-pane-general'), b = p.querySelector('.settings-copy-last button'); return { text: b.textContent.trim(), quiet: b.classList.contains('btn-quiet'), robot: !!p.querySelector('.agent-copy'), last: p.lastElementChild === b.parentElement, icon: !!b.querySelector('.material-icons') }; })()`);
+            assert.ok(gen.text === 'Copy for an agent' && gen.quiet && !gen.robot && gen.last && !gen.icon, at + 'words, Quiet, last, no robot: ' + JSON.stringify(gen));
+            assert.ok(await ev(`!!document.querySelector('#settings-pane-updates .agent-copy, #settings-pane-agents .agent-copy')`), at + 'the other sections keep their robot');
+            await clip(); await ev(`document.querySelector('#settings-pane-general .settings-copy-last button').click(); true`);
+            await waitFor(`window.__copied.length === 1`, `${at}General's line copied`, 8000);
+            assert.match(await ev(`window.__copied[0]`), /General/, at + 'names the section');
         }
         console.log('PASS agent copy robot');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
