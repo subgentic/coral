@@ -205,6 +205,9 @@ async function connect(opts = {}) {
         // The real feed would replace the mocked agents with the test server's (empty) list:
         // detach it and drive sleeping/awake changes through handleCoralMessage instead.
         ws.feedHooks.schedule = () => {};
+        // A feed still connecting is let open first: closing it then never fires 'open', the page's feed part of
+        // window.__coralReady would stay false, and nothing reconnects now (#15978, a slow Windows runner).
+        for (let i = 0; i < 1000 && state.coralWs && state.coralWs.readyState === 0; i++) await new Promise(r => setTimeout(r, 10));
         if (state.coralWs) { state.coralWs.onmessage = null; state.coralWs.onclose = null; state.coralWs.close(); }
         // A feed update that landed before this detach (after the page's list load, before here) already replaced the mocked agents with that empty list, and nothing draws them again:
         // agent_instructions_browser waited 15 s for its rows once in the trial-250 gate. Read the mocked list again when an agent is missing (agent_view_harness_feed_race_browser).
