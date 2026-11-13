@@ -45,7 +45,7 @@ const SID = '11111111-2222-4333-8444-555555555555';
             assert.equal(await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`), 0, at + 'nothing scrolls sideways');
 
             // the preview follows the name and the colour; a long name is refused in words
-            const type = (sel, v) => ev(`(() => { const i = document.querySelector(${JSON.stringify(sel)}); i.value = ${JSON.stringify(v)}; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            const type = (sel, v) => ev(`(() => { const i = document.querySelector(${JSON.stringify(sel)}); i.value = ${JSON.stringify(v)}; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event(i.tagName==='SELECT'?'change':'focusout', { bubbles: true })); return true; })()`);
             await type(`${host} input[name=chief_name]`, 'Ada');
             await ev(`document.querySelector('${host} .chief-swatch[aria-label=Teal]').click(); true`);
             assert.deepEqual(await ev(`(() => { const a = document.querySelector('${host} .chief-preview .chief-avatar'); return [a.textContent, a.dataset.color, document.querySelector('${host} .chief-preview-name').textContent]; })()`), ['A', '3', 'Ada'], at + 'the preview is the name\'s first letter on the chosen colour');
@@ -58,27 +58,29 @@ const SID = '11111111-2222-4333-8444-555555555555';
             assert.deepEqual(await ev(`['chief_name', 'chief_avatar_letter'].map(n => document.querySelector('${host} input[name=' + n + ']').value)`), ['Ada', 'k'], at + 'the unsaved name and letter are still there after another tab and back');
             assert.equal(await ev(`document.querySelector('${host} .chief-preview .chief-avatar').textContent`), 'K', at + 'a chosen letter wins');
             await type(`${host} input[name=chief_name]`, 'x'.repeat(41));
-            await ev(`[...document.querySelectorAll('#settings-modal ${host} button, ${host} button')].find(b => /^Save Chief/.test(b.textContent.trim())).click(); true`);
             await waitFor(`/At most 40 characters/.test(document.querySelector('${host}').textContent)`, at + 'a name over 40 characters is refused in words', 5000);
-            assert.equal(((await api('GET', '/api/settings')).body.settings || {}).chief_name || '', '', at + 'and nothing was saved');
+            assert.equal(((await api('GET', '/api/settings')).body.settings || {}).chief_name || '', 'Ada', at + 'the last saved name is retained');
 
             // The page toggle says what Save alone does (#12497): Chief stays off until it is on and saved
             const helpOfPage = `document.querySelector('${host} .sv-row[data-key=chief_page]').textContent`;
-            assert.match(await ev(helpOfPage), /Chief stays off.*until this is on and saved/, at + 'the page toggle says Chief stays off until it is on and saved');
-            // An agent on the team it would front is refused in words, and nothing is saved (#12497)
-            await ev(`(() => { const s = document.querySelector('${host} select[name=chief_agent]'); s.value = '${SID}'; s.dispatchEvent(new Event('change', { bubbles: true })); const f = document.querySelector('${host} select[name=chief_fronts]'); f.value = 'Chief desk'; f.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            await ev(`[...document.querySelectorAll('${host} button')].find(b => /^Save Chief/.test(b.textContent.trim())).click(); true`);
-            await waitFor(`/Chief would hear none of that team/.test(document.querySelector('${host}').textContent)`, at + 'the agent on the fronted team is refused with the reason', 5000);
-            assert.equal(((await api('GET', '/api/settings')).body.settings || {}).chief_session || '', '', at + 'and nothing was saved');
-
-            // Save: every setting is written
+            assert.match(await ev(helpOfPage), /Chief stays off.*until you turn this on/, at + 'the page toggle says Chief stays off until it is on and saved');
+            const pickRoute = async (key, value) => {
+                await type(`${host} select[name=${key}]`, value);
+                await waitFor(`document.getElementById('confirm-modal').style.display==='flex'`, at+'routing confirmation');
+                await ev(`document.getElementById('confirm-modal-yes').click();true`);
+                await waitFor(`document.querySelector('${host} [data-key=${key}] .settings-save-status')?.textContent==='Saved'`,at+'routing row saved');
+            };
             await type(`${host} input[name=chief_name]`, 'Ada');
-            await ev(`(() => { const s = document.querySelector('${host} select[name=chief_agent]'); s.value = '${SID}'; s.dispatchEvent(new Event('change', { bubbles: true })); const f = document.querySelector('${host} select[name=chief_fronts]'); f.value = 'Dev team'; f.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            await pickRoute('chief_agent', SID);
+            // An agent cannot front its own team; its already saved routing stays unchanged.
+            await type(`${host} select[name=chief_fronts]`, 'Chief desk');
+            await waitFor(`/Pick an agent on another team/.test(document.querySelector('${host}').textContent)`,at+'same-team validation');
+            assert.equal(((await api('GET','/api/settings')).body.settings || {}).chief_fronts || '', '',at+'invalid team was not saved');
+            await pickRoute('chief_fronts', 'Dev team');
             assert.match(await ev(`document.querySelector('${host} .chief-model').textContent`), /Model: claude-opus-5-5\./, at + 'the agent\'s model is shown');
             assert.equal(await ev(`document.querySelector('${host} .chief-model a').getAttribute('href')`), `/agent/${SID}`, at + 'with the way to change it on the agent\'s page');
             await ev(`document.querySelector('${host} input[name=chief_page]').click(); true`);
-            await ev(`[...document.querySelectorAll('${host} button')].find(b => /^Save Chief/.test(b.textContent.trim())).click(); true`);
-            await waitFor(`/Saved/.test(document.querySelector('${host}').textContent)`, at + 'Saved', 8000);
+            await waitFor(`document.querySelector('${host} [data-key=chief_page] .settings-save-status')?.textContent==='Saved'`, at + 'page row saved', 8000);
             const st = (await api('GET', '/api/settings')).body.settings;
             assert.deepEqual([st.chief_name, st.chief_avatar, st.chief_avatar_letter, st.chief_session, st.chief_team, st.chief_fronts, String(st.chief_page)], ['Ada', '3', 'k', SID, 'chiefteam', 'Dev team', 'true'], at + 'saved to the machine: ' + JSON.stringify(st));
             const chief = (await api('GET', '/api/chief')).body;

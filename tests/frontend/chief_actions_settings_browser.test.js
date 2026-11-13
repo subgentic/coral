@@ -10,11 +10,11 @@ const { coralReady } = require('./helpers/wait');
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const S = `(window.__coralStatic||'/static/')`;
     const host = '#settings-chief-host';
-    const open = async () => { await ev(`window.SD.showSettingsModal('chief').then(() => true)`); await waitFor(`!!document.querySelector('${host} .sv[data-ready]')`, 'the Chief screen', 10000); };
+    const open = async () => { await ev(`window.SD.showSettingsModal('chief').then(() => true)`); await ev(`(async()=>{const m=await import(${S}+'chief_setup.js');await m.mountChiefSetup(document.querySelector('${host}'));return true;})()`); await waitFor(`document.querySelector('${host}').dataset.ready==='1'`, 'the Chief screen', 10000); };
     const sel = `${host} select[name=chief_actions]`;
     const val = () => ev(`document.querySelector('${sel}').value`);
     const pick = (v) => ev(`(() => { const e = document.querySelector('${sel}'); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-    const save = async () => { await ev(`window.__puts.length = 0; [...document.querySelectorAll('${host} button')].find(b => /^Save Chief/.test(b.textContent.trim())).click(); true`); await waitFor(`window.__puts.length > 0`, 'the save', 8000); };
+    const save = async () => { await waitFor(`window.__puts.length > 0 && /Saved/.test(document.querySelector('${host}').textContent)`, 'the row saved', 8000); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -33,14 +33,14 @@ const { coralReady } = require('./helpers/wait');
         assert.deepEqual(await ev(`[...document.querySelector('${sel}').options].map(o => o.value + '=' + o.textContent)`), ['ask_first=Ask first', 'act=Act']);
         const help = await ev(`document.querySelector('${sel}').closest('.sv-row').textContent`);
         assert.match(help, /Chief's actions/); assert.match(help, /shell command still asks/); assert.match(help, /restarts/);
-        await pick('act'); await pick('ask_first'); // back to what it was: nothing to send for it
-        await ev(`(() => { const n = document.querySelector('${host} input[name=chief_name]'); n.value = 'Ada'; n.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+        assert.deepEqual(await ev('window.__puts'), [], 'opening an untouched choice writes nothing');
+        await ev(`(() => { const n = document.querySelector('${host} input[name=chief_name]'); n.value = 'Ada'; n.dispatchEvent(new Event('input', { bubbles: true })); n.dispatchEvent(new Event('focusout', { bubbles: true })); return true; })()`);
         await save();
         let p = await ev(`window.__puts.map(b => JSON.parse(b))`);
         assert.equal(p.length, 1, JSON.stringify(p)); assert.ok(!('chief_actions' in p[0]), 'an untouched Chief choice writes no change: ' + JSON.stringify(p[0]));
 
         // Choosing Act sends it.
-        await open(); await pick('act'); await save();
+        await open(); await ev('window.__puts.length=0'); await pick('act'); await save();
         p = await ev(`window.__puts.map(b => JSON.parse(b))`);
         assert.equal(p.length, 1, JSON.stringify(p)); assert.deepEqual(p[0], { chief_actions: 'act' }, JSON.stringify(p[0]));
 
