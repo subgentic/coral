@@ -458,3 +458,17 @@ func TestHubDropboxShareView_OffersTheHubsPageFromTheEnrolmentOnly(t *testing.T)
 	e.d.Enrolment = nil
 	assert.Equal(t, map[string]any{"offered": false}, e.d.ShareView(t.Context(), d, data), "no enrolment source: not offered")
 }
+
+// coral-hub's ask 2 on #211336: a production (non-loopback) enrolment never builds an http share address, whatever the host looks like. Only a literal loopback host may be http (a development Hub).
+func TestHubSharePage_ANonLoopbackEnrolmentNeverBuildsAnHTTPAddress(t *testing.T) {
+	digest := strings.Repeat("c", 64)
+	for _, hub := range []string{
+		"http://hub.example.test", "http://hub.example.test:80", "http://hub.example.test:8421", "http://app.coralhub.dev",
+		"http://localhost.evil.test", "http://127.0.0.1.evil.test", "http://127.0.0.1@hub.example.test", "http://evil.test#@127.0.0.1",
+		"http://10.0.0.5", "http://[::2]", "http://0.0.0.0", "http://127.0.0.1.nip.io", "HTTP://hub.example.test", "ftp://hub.example.test", "//hub.example.test", "hub.example.test",
+	} {
+		assert.Empty(t, hubSharePage(hub, "srv_1", digest), hub)
+	}
+	assert.Equal(t, "https://app.coralhub.dev/dropbox/share/srv_1/"+digest, hubSharePage("https://app.coralhub.dev", "srv_1", digest))
+	assert.Equal(t, "http://127.0.0.1:8421/dropbox/share/srv_1/"+digest, hubSharePage("http://127.0.0.1:8421", "srv_1", digest), "a literal loopback development Hub")
+}

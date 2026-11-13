@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync/atomic"
 	"time"
 )
 
@@ -110,7 +111,7 @@ func (u *Uploader) Upload(ctx context.Context, link, wantDigest string, f *File)
 	req.Header.Set("Content-Type", "application/octet-stream")
 	resp, err := u.client.Do(req)
 	if err != nil {
-		if body.denied {
+		if body.denied.Load() {
 			return ErrNotAllowed // the mark or tag appeared while the bytes were going: the last chunk was never read
 		}
 		return ErrNetwork // never the url.Error: it holds the link
@@ -141,13 +142,13 @@ type gatedBody struct {
 	data    []byte
 	pos     int
 	checked bool
-	denied  bool
+	denied  atomic.Bool // written by the transport's writer goroutine, read after Do returns
 	ctx     context.Context
 	allowed func(ctx context.Context) (bool, error)
 }
 
 func (b *gatedBody) Read(p []byte) (int, error) {
-	if b.denied {
+	if b.denied.Load() {
 		return 0, ErrNotAllowed
 	}
 	hold := len(b.data) - tailHold
@@ -156,7 +157,7 @@ func (b *gatedBody) Read(p []byte) (int, error) {
 	}
 	if b.pos >= hold && !b.checked {
 		if ok, err := b.allowed(b.ctx); err != nil || !ok {
-			b.denied = true
+			b.denied.Store(true)
 			return 0, ErrNotAllowed
 		}
 		b.checked = true
