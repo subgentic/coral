@@ -182,14 +182,7 @@ func TestListRoutesAreBounded(t *testing.T) {
 				req.Header.Set(tunnel.ViaHeader, "1")
 			}
 			rec := httptest.NewRecorder()
-			// The local board read names a subscriber with no verified actor behind it, which enforce refuses with a 403; the update-task and relay oracles turn enforce on for a request
-			// of their own while this test runs beside them (#16309: a 403 on 'board messages (local)'). Their lock is the process's: hold it, and leave the flag as this read needs it.
-			updateOracleFlagMu.Lock()
-			wasEnforced := identityActorEnforced()
-			setIdentityActorEnforced(false)
 			r.ServeHTTP(rec, req)
-			setIdentityActorEnforced(wasEnforced)
-			updateOracleFlagMu.Unlock()
 			require.Equal(t, http.StatusOK, rec.Code, "%s limit=%q: %s", rt.name, c.limit, rec.Body.String())
 			assert.Equal(t, c.want(rt.def, rt.max), count(t, rec.Body.Bytes()), "%s limit=%q", rt.name, c.limit)
 		}

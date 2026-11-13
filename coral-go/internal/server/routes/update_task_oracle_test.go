@@ -55,7 +55,8 @@ var oracleStamp = regexp.MustCompile(`\d{4}-\d\d-\d\d[T ][0-9:.]+(Z|[+-]\d\d:\d\
 // board and terminal, take the same random edits in lockstep: the old handler and the new one answer the same,
 // leave the same tasks and board messages, and type the same nudges.
 func TestUpdateTaskAgreesWithBefore4756(t *testing.T) {
-	t.Parallel() // its own handler and store, no shared state: it ran alone among thousands, one after another (#15686)
+	// Not parallel at the top level (#16337): it turns the process-wide enforce flag on, which a test running beside it would meet as a 403 (identity_unverified). Its 60 seeds below still run together,
+	// and a test that is not parallel has the package to itself until they finish.
 	prevEnforced := identityActorEnforced()
 	t.Cleanup(func() { setIdentityActorEnforced(prevEnforced) })
 	counts := map[string]int{}
