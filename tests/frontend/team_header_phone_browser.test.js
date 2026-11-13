@@ -14,7 +14,7 @@ const TEAM = `qa-hdr-${Date.now() % 100000}`;
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [w, h] of [[390, 844], [430, 932]]) {
+        for (const [w, h] of [[320, 844], [390, 844]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
             await seed(ev, TEAM);
@@ -25,6 +25,18 @@ const TEAM = `qa-hdr-${Date.now() % 100000}`;
             await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await ev(`window.switchNavTab('agents'); window.openTeamPage(${JSON.stringify(TEAM)}, { tab: 'agents' }); true`);
             await waitFor(`(document.getElementById('team-page-title') || {}).textContent === ${JSON.stringify(TEAM)}`, 'the team page opened on its Agents tab', 10000); await settle(1500);
+            const originalStatus = await ev(`document.getElementById('team-page-status').textContent`);
+            for (const theme of ['dark', 'light']) for (const size of [16, 32]) {
+                await ev(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}; document.documentElement.style.fontSize = '${size}px'; true`);
+                await settle(100);
+                await ev(`document.getElementById('team-page-status').textContent = 'Checking attention status'; true`);
+                const title = await ev(`(() => { const e = document.getElementById('team-page-title'), r = e.getBoundingClientRect(), range = document.createRange(); range.selectNodeContents(e); const t = range.getBoundingClientRect(); return { box: { top: r.top, bottom: r.bottom, height: r.height }, text: { top: t.top, bottom: t.bottom, height: t.height }, head: document.getElementById('team-page-head').getBoundingClientRect().toJSON(), line: getComputedStyle(e).lineHeight, textOverflow: getComputedStyle(e).textOverflow }; })()`);
+                await shot(`team-title-${w}-${theme}-${size}`);
+
+                assert.ok(title.text.top >= title.head.top && title.text.bottom <= title.head.bottom && title.text.top >= title.box.top && title.text.bottom <= title.box.bottom, 'the title glyphs fit vertically: ' + JSON.stringify(title));
+                assert.equal(title.textOverflow, 'ellipsis', 'long titles retain an ellipsis');
+            }
+            await ev(`document.documentElement.style.fontSize = ''; document.getElementById('team-page-status').textContent = ${JSON.stringify(originalStatus)}; true`);
             const at = `${w}: `;
             const st = await ev(`(() => { const e = document.getElementById('team-page-status'); return { text: e.textContent.trim(), cutX: e.scrollWidth > e.clientWidth + 1, cutY: e.scrollHeight > e.clientHeight + 1, ellipsis: getComputedStyle(e).textOverflow === 'ellipsis' && getComputedStyle(e).whiteSpace === 'nowrap' }; })()`);
             await shot(`team-header-${w}`);
