@@ -10,6 +10,7 @@ const { loadTelemetryInstallID } = await importOnce('./settings_machine.js'); //
 const { CLI_PATH_FIELDS, _fillMachineSettings, _fillThemeSelect, _fillDefaults, _fillApiKey, _fillCliAndModels, _fillTerminalAndBrowserPrefs, _fillFilesAndGit } = await importOnce('./settings_fill.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 const { payloadNow } = await importOnce('./settings_form.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 const { hideSettingsModal, applySettings } = await importOnce('./settings_save.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
+const { wireSettingsRisks } = await importOnce('./settings_risks.js');
 const { wireSettingsAutosave } = await importOnce('./settings_autosave.js');
 const { setSettingsAtOpen, setPayloadAtOpen } = await importOnce('./settings_snapshots.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 
@@ -69,6 +70,7 @@ export async function showSettingsModal(group) {
 
     openSettingsGroup(typeof group === 'string' ? group : undefined); // the group last used here, or the one asked for
     const modalEl = document.getElementById('settings-modal');
+    wireSettingsRisks(modalEl);
     wireSettingsAutosave(modalEl);
     setPayloadAtOpen(payloadNow());
     document.getElementById("settings-modal").style.display = "flex";
