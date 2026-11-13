@@ -292,6 +292,10 @@ var routeTable = cat(
 	// Chief through Coral Hub (#11470): which agent the Operator recorded as Chief ({enabled, session_id, team}), for the Hub's own Chief page to open. An API read, the owner's alone: the machine refuses anyone
 	// else (a viewer, a guest, a guide) before it reads a setting. The Hub never asks the machine for the page itself (no machine-supplied HTML on the Hub's origin).
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/chief")),
+	// The resource queue's list through Coral Hub (#16140, Security on #16030): the owner's alone. The queue spans every team on this computer and holds agents' notes and agent, task and goal names, so a viewer, a
+	// guest or a guide is refused by the machine (403 owner_only) before it reads anything; each note is redacted before it leaves (ResourcesHandler.List). The list only: {name}, claim, release, renew, define,
+	// remove, move and kick stay "never".
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/resources")),
 	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/artifacts/{hex64}/comments/lock")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/artifacts/{hex64}/comments/lock")),
 	// Trust one version of an HTML file to run its scripts in the viewer's sealed frame (#14730, design v3, Security): the owner's alone through the Hub (a grantee, guide or viewer is refused by the machine), the read

@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/resources"
 	"github.com/subgentic/coral/pkg/resourcequeue"
 )
@@ -127,6 +128,9 @@ func (h *ResourcesHandler) reap() {
 
 // List answers GET /api/resources.
 func (h *ResourcesHandler) List(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // through Coral Hub the computer owner's alone: the queue spans every team here (#16140, Security on #16030)
+		return
+	}
 	h.reap()
 	out := []resourceView{}
 	for _, st := range h.M.Queue().All() {
@@ -135,7 +139,32 @@ func (h *ResourcesHandler) List(w http.ResponseWriter, r *http.Request) {
 	h.addGoals(r.Context(), out)
 	h.addStuck(out)
 	h.addMachines(out)
+	if cloud.Tunneled(r) {
+		redactNotes(out) // an agent's note is free text: through the Hub it leaves only after the secret rules, and without the note when they cannot run
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"resources": out})
+}
+
+// redactNotes puts every note of the list through redactComment (the secret scanner plus the Hub's keyword rules). A note the redactor cannot check is dropped, never sent as it was (#16140).
+func redactNotes(views []resourceView) {
+	fix := func(e *entryView) {
+		if e.Note == "" {
+			return
+		}
+		if red, ok := redactComment(e.Note); ok {
+			e.Note = red
+		} else {
+			e.Note = ""
+		}
+	}
+	for i := range views {
+		for j := range views[i].Holders {
+			fix(&views[i].Holders[j])
+		}
+		for j := range views[i].Queue {
+			fix(&views[i].Queue[j])
+		}
+	}
 }
 
 // addGoals gives each entry whose task has a goal that goal's id and title (#13704, the Queue folder links it): one lookup per board for every task on it, never one per row. A board that cannot be read leaves its entries without a goal: the line itself is unaffected.

@@ -95,6 +95,7 @@ func ownerLabelRecordedWith(r *http.Request, label func(context.Context) (string
 // ownerRefusals are the words a non-owner gets (403, code owner_only) on each route the table marks owner-only, by "METHOD pattern". The decision is the table's and one helper's
 // (refuseNonOwner); only the sentence belongs to the route.
 var ownerRefusals = map[string]string{
+	tunnel.OwnerRouteKey("GET", "/api/resources"):                                                   textHubResourcesOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/artifacts/{hex64}/thumbnail"):                                 textArtifactsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/artifacts/{hex64}"):                                           textArtifactsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/artifacts"):                                                   textArtifactsOwnerOnly,
@@ -178,6 +179,7 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("PUT", "/api/board/{project}/guide-roster"):                                textGuideRosterOwnerOnly,
 }
 
+const textHubResourcesOwnerOnly = "through Coral Hub only the account this computer is linked to can read its resource queue (#16140)"
 const textNoticesOwnerOnly = "through Coral Hub pausing an agent's notices is for the account this computer is linked to only (#11387)"
 const textActivityRecordOwnerOnly = "through Coral Hub the record of what the Operator did in Needs you is for the account this computer is linked to only (#12070)"
 const textNeedsYouOwnerOnly = "through Coral Hub what is waiting for the Operator is for the account this computer is linked to only (#11596)"

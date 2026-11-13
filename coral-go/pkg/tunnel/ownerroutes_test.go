@@ -221,6 +221,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/artifacts/") && strings.HasSuffix(p, "/opened") {
 				continue
 			}
+			// The resource queue's list (#16140, Security on #16030) is read through the hub by the owner alone: the old list never had it.
+			if m == http.MethodGet && p == "/api/resources" {
+				continue
+			}
 			// The one difference of #5610: the table's {id} is any one segment, so a task artifact-content path with a non-number id is stamped too (its handler refuses it).
 			if strings.HasPrefix(p, "/api/board/") && strings.HasSuffix(p, "/artifact-content") && m == http.MethodGet {
 				continue

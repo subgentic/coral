@@ -56,6 +56,7 @@ GET /api/needs-you redact
 GET /api/operator-asks redact
 GET /api/pinned-folders redact
 GET /api/proposals redact
+GET /api/resources redact
 GET /api/saved redact
 GET /api/saved/{id}/message redact
 GET /api/scheduled/jobs redact
