@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -109,6 +110,9 @@ func ActivityRecorder(bs *board.Store, nameOf func(id string) string) func(http.
 			if pend.set { // a handler that knows more than its route does (the body, a header) said which row this click is
 				if humanInputCaller(r) {
 					meta := activityMetaFor(r, pend.title, pend.note)
+					if typesIntoAnAgent(pend.action) && meta.Actor == "hub:unknown" {
+						return
+					}
 					meta.TaskID = pend.task
 					_ = bs.RecordActivity(context.WithoutCancel(r.Context()), meta, pend.action, pend.kind, pend.item, "", pend.team)
 				}
@@ -144,10 +148,17 @@ func ActivityRecorder(bs *board.Store, nameOf func(id string) string) func(http.
 					}
 				}
 			}
-			_ = bs.RecordActivity(ctx, activityMetaFor(r, title, ""), ar.Action, ar.Kind, item, "", team)
+			meta := activityMetaFor(r, title, "")
+			if typesIntoAnAgent(ar.Action) && meta.Actor == "hub:unknown" { // the Hub's own traffic (its notices typed into a remote agent): an authentic tunnel with nobody behind it is no one typing (#16000)
+				return
+			}
+			_ = bs.RecordActivity(ctx, meta, ar.Action, ar.Kind, item, "", team)
 		})
 	}
 }
+
+// typesIntoAnAgent is true for the actions whose row says the Operator typed words to an agent: a row made of the Hub's own traffic would put words in the Operator's mouth (#16000).
+func typesIntoAnAgent(action string) bool { return action == board.ActChatSend || action == board.ActWaitSend }
 
 // recordWords writes the row of an action whose words the Operator typed (a reply, a message): the same person-only rule, with the words as the row's note (redacted and cut by activityMetaFor).
 func (h *BoardHandler) recordWords(r *http.Request, action, kind, item, team, title, words string) {
@@ -210,6 +221,20 @@ func StoredFileName(coralDir, id string) string {
 	}
 	if m, ok := readSidecar(filepath.Join(coralDir, "artifacts", "objects", id+".json")); ok {
 		return m.Name
+	}
+	return ""
+}
+
+// firstLineExcerpt is what a row of the Activity record keeps of words the Operator sent: the first line with text, cut at 140 characters (the redaction follows in activityMetaFor). The rest of a long message
+// stays in the chat (#16000).
+func firstLineExcerpt(text string) string {
+	for _, line := range strings.Split(text, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			if r := []rune(line); len(r) > 140 {
+				return string(r[:139]) + "…"
+			}
+			return line
+		}
 	}
 	return ""
 }

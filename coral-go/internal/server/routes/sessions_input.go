@@ -63,6 +63,7 @@ func (h *SessionsHandler) Send(w http.ResponseWriter, r *http.Request) {
 	// automation: it goes through the automated-input gate and is held while the
 	// agent waits on a prompt, so it can't answer one (#3431).
 	h.noteTouchSource(r, body.SessionID)
+	noteActivity(r, board.ActChatSend, "agent", name, "", "", firstLineExcerpt(body.Command)) // the row says what was sent: its first line, cut (#16000); a request that is no person's writes nothing
 	if !humanInputCaller(r) {
 		if held := h.sendAutomatedHTTP(w, r, name, body.AgentType, body.SessionID, body.Command, "/send", send); held {
 			return

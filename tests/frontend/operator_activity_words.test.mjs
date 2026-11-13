@@ -50,3 +50,6 @@ assert.equal(activityParts({action:'answer',item_kind:'question',title:'@Operato
 assert.equal(activityParts({action:'answer',item_kind:'question',title:'Ask @Operator about release',asker:'Lead'},words).on,'Ask @Operator about release');
 assert.deepEqual(activityParts({action:'file_tags',item_kind:'file',title:'plan.md'},words),{did:'Changed the tags',on:'plan.md',detail:''});
 assert.deepEqual(activityParts({action:'file_share',item_kind:'file',title:'plan.md'},words),{did:'Shared',on:'plan.md',detail:''});
+
+// #16000: the Operator's own send says what was sent: the first line is the row's detail, under "Sent words to an agent" and the agent's name.
+assert.deepEqual(activityParts({action:'chat_send',item_kind:'agent',item_id:'worktree1',note:'Please rebase on main'},r=>r.item_id),{did:'Sent words to an agent',on:'worktree1',detail:'Please rebase on main'});
