@@ -20,7 +20,7 @@ let menuOpen = false;
 
 /** The words fit when every tab of the row is on one line with them showing and none is clipped: measured, so a narrow panel, a large text size and an unusual word all fall back the same way.
  *  The words are put on to look (only when they are off) and taken off again when they do not fit; with them already on it only looks. */
-function fitWords() {
+export function fitWords() {
     const row = strip();
     if (!row) return;
     const on = row.hasAttribute('data-words');
@@ -118,9 +118,7 @@ export function initDockTabs() {
     if (row) {
         const ro = new ResizeObserver(fitWords);
         ro.observe(row);
-        const watchTabs = () => { for (const b of row.children) ro.observe(b); };
-        watchTabs(); // with the words on the row does not wrap (agentic.css), so a larger text size or a tab's new count widens the tabs and leaves the row's size alone: the tabs are watched, and the words come off when they do not fit (#9435)
-        new MutationObserver(() => { watchTabs(); fitWords(); }).observe(row, { childList: true }); // a tab added from script (the Sub-agents tab, #16016) is measured like the others
+        for (const b of row.children) ro.observe(b); // with the words on the row does not wrap (agentic.css), so a larger text size or a tab's new count widens the tabs and leaves the row's size alone: the tabs are watched, and the words come off when they do not fit (#9435)
         watchScrollCue(row);
     } // the phone's overlay strip scrolls: a fade says which edge hides tabs
     WIDE.addEventListener('change', fitWords);

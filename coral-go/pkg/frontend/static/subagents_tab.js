@@ -6,6 +6,7 @@ import { el } from './dom_el.js';
 import { loadStyles } from './lazy_styles.js';
 import { compactDuration, formatCost } from './format.js';
 import { pollEvery } from './overload.js';
+import { fitWords } from './dock_tabs.js';
 
 const TAB = 'agentic-tab-subagents', PANEL = 'agentic-panel-subagents';
 let _timer = null;
@@ -49,6 +50,7 @@ function ensureTab() {
     const count = el('span', 'tab-count agentic-tab-count'); count.id = 'subagents-count';
     btn.append(icon, el('span', 'agentic-tab-word', 'Sub-agents'), count);
     tasks.after(btn);
+    new ResizeObserver(fitWords).observe(btn); fitWords(); // the tab strip refits its words for the new tab (it is not in the strip at start)
     panel = el('div', 'agentic-panel'); panel.id = PANEL; panel.setAttribute('role', 'region'); panel.setAttribute('aria-label', 'Sub-agents');
     tasksPanel.after(panel);
     return { btn, panel };
