@@ -83,4 +83,9 @@ assert.deepEqual(activityParts({action:'file_share',item_kind:'file',title:'plan
     const plain = { action: 'prompt_answer', item_kind: 'agent', item_id: 'coral-hub', title: '', note: 'Green' };
     for (const r of [quit, without]) { assert.ok(F.inKind(r, 'permissions'), r.note); assert.ok(F.inKind(r, 'answers'), r.note); }
     assert.ok(!F.inKind(plain, 'permissions') && F.inKind(plain, 'answers'));
+    // QA's reject of the first make: the row's title is the dialog's kind, so the words and the agent filter must still name the agent that was answered (its item)
+    assert.deepEqual(activityParts(quit, words), { did: 'Answered', on: 'coral-go’s question', detail: 'No, quit' }, 'the row says which agent was answered, not "Trust dialog’s question"');
+    assert.equal(F.agentOf(quit), 'coral-go', 'the agent filter and grouping see the agent, not the dialog kind');
+    assert.equal(F.agentOf(plain), 'coral-hub');
+    assert.deepEqual(activityParts(plain, words), { did: 'Answered', on: 'coral-hub’s question', detail: 'Green' });
 }

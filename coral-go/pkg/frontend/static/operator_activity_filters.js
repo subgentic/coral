@@ -39,7 +39,7 @@ export const inKind = (r, k) => !k || !!(KIND_TEST[k] && KIND_TEST[k](r));
 
 export const NO_GOAL = 'No goal';
 /** The agent a row is about, when the record says (#14445): who asked, for an ask (an older answer kept the asker as its title), or the agent named by a prompt, wait or chat row; '' for a row about no agent. */
-export const agentOf = row => String(row.asker || ((row.item_kind === 'agent' || /^(prompt_|wait_)/.test(row.action || '') || (row.action === 'answer' && row.item_kind === 'question')) ? (row.title || (row.item_kind === 'agent' ? row.item_id : '')) : '') || '').trim();
+export const agentOf = row => String(row.asker || ((row.item_kind === 'agent' || /^(prompt_|wait_)/.test(row.action || '') || (row.action === 'answer' && row.item_kind === 'question')) ? ((row.action === 'prompt_answer' ? row.item_id : row.title) || (row.item_kind === 'agent' ? row.item_id : '')) : '') || '').trim();
 /** The goal a row served: its title (the server looks it up now), else its number, else the words for none; a row from before the record kept goals has none. */
 export const goalOf = row => (row.goal_title ? String(row.goal_title).trim() : Number(row.goal_id) > 0 ? `Goal #${Number(row.goal_id)}` : NO_GOAL);
 export const ACTIONS = Object.keys(ACTION_LABEL);
