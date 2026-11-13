@@ -60,7 +60,17 @@ assert.deepEqual(activityParts({action:'file_share',item_kind:'file',title:'plan
         assert.equal(activityParts(row, r => r.item_id).did, 'Answered');
         assert.equal(activityParts(row, r => r.item_id).on, `${row.item_id}’s question`);
         assert.ok(F.inKind(row, 'answers'), 'filed under Answers');
-        assert.ok(!(F.inKind(row, 'permissions')), 'not under Permissions');
+        assert.equal(F.inKind(row, 'permissions'), row === codex, 'under Permissions only when it is a trust decision (#16116)');
     }
     for (const action of ['prompt_allow', 'prompt_reject']) assert.ok(F.inKind({ action }, 'permissions'), action + ' stays under Permissions');
+}
+
+// #16116: a trust dialog's answer is a permission decision: under Permissions as well as Answers; a plain question answer stays out of Permissions.
+{
+    const F = await import('../../coral-go/pkg/frontend/static/operator_activity_filters.js');
+    const trust = { action: 'prompt_answer', item_kind: 'agent', item_id: 'coral-go', note: 'Trust all and continue' };
+    const folder = { action: 'prompt_answer', item_kind: 'agent', item_id: 'a', note: 'Yes, I trust this folder: /tmp/x' };
+    const choice = { action: 'prompt_answer', item_kind: 'agent', item_id: 'coral-hub', note: "On that group's own Coral" };
+    for (const r of [trust, folder]) { assert.ok(F.inKind(r, 'permissions'), r.note); assert.ok(F.inKind(r, 'answers'), r.note); }
+    assert.ok(!F.inKind(choice, 'permissions') && F.inKind(choice, 'answers'));
 }

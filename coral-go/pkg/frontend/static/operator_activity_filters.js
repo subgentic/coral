@@ -26,10 +26,12 @@ export const decisionOf = row => ({ ignore: 'dismiss', wait_dismiss: 'dismiss', 
 /** The kinds of action the folder's chips show (#15724, the Operator's pick of design B): the page opens on Everything, and a chip narrows the record to one kind. The full record stays one chip away. */
 export const KINDS = ['decisions', 'answers', 'permissions', 'files', 'words'];
 export const KIND_LABEL = { decisions: 'Decisions', answers: 'Answers', permissions: 'Permissions', files: 'Files and tasks', words: 'Words sent' };
+/** An answer to a dialog about trusting something (Codex's "Trust all and continue", a folder trust): the row keeps only the option's words, so the words decide. */
+export const isTrustAnswer = r => r.action === 'prompt_answer' && /\btrust/i.test(String(r.note || ''));
 const KIND_TEST = {
     decisions: r => !!DECISION_LABEL[decisionOf(r)] || ['goal_close', 'task_complete', 'task_cancel', 'goal_review'].includes(r.action), // Answered, Allowed, Denied, Approved, Closed, Completed and the like
     answers: r => r.action === 'answer' || r.action === 'proposal' || r.action === 'prompt_answer', // an agent's question answered (#16088)
-    permissions: r => r.action === 'prompt_allow' || r.action === 'prompt_reject', // a request to use a tool, allowed or refused: not a question's answer (#16088)
+    permissions: r => r.action === 'prompt_allow' || r.action === 'prompt_reject' || isTrustAnswer(r), // a request to use a tool, allowed or refused (#16088); a trust dialog's answer is a permission decision too, so it is in both lists (#16116)
     files: r => ['file', 'task', 'goal'].includes(r.item_kind) && r.action !== 'chat_send',
     words: r => ['message', 'chat_send', 'task_reply'].includes(r.action),
 };
