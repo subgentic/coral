@@ -139,6 +139,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     const paintStatus = () => { for (const [type, card] of cards) { const st = card.querySelector('.provider-status'), t = statusOf(type); if (st) st.textContent = t; const line = bodies.get(type)?.querySelector('.provider-body-status'); if (line) line.textContent = t ? `${t}` : ''; } };
 
     function draw() {
+        if (group._pickToken !== gen) return; // a newer build owns the group
         keepFocus(() => drawCards());
     }
     function drawCards() {
@@ -217,7 +218,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     if (state.get(signin.type).found === true) askSignin();
     // a later check of a CLI (Check again, or after Set path and Save) draws its card again from the fresh answer (#10161)
     const onChecked = e => {
-        if (!group.isConnected) { document.removeEventListener('cli-checked', onChecked); return; }
+        if (!group.isConnected || group._pickToken !== gen) { document.removeEventListener('cli-checked', onChecked); return; } // an older build of this group (the dialog opened again since) draws nothing: its rows are the form's OLD ones, and drawing them put a second Model field into the dialog, which the form's own reads then missed (#16404)
         const type = ALIAS[e.detail.type] || e.detail.type; if (!state.has(type)) return;
         state.set(type, { found: !!e.detail.found, url: state.get(type).url, why: state.get(type).why, refused: e.detail.refused || '' });
         if (!group.contains(document.activeElement)) draw();
