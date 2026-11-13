@@ -18,6 +18,8 @@ const { coralReady } = require('./helpers/wait');
             await ev(`T.state.liveSessions = ${JSON.stringify([base])}; T.render.renderLiveSessions(T.state.liveSessions); window.selectLiveSession('coral-go', 'claude', 'o1'); window.toggleAgenticPanel && window.toggleAgenticPanel(true); true`);
             await waitFor(`!!document.getElementById('agentic-tab-more') && document.getElementById('agentic-tab-more').getClientRects().length > 0`, `${w}: the dock's More tab`, 10000);
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: the dock draws
+            // The row's edge fade (data-more) was the condition in question when eight icons overflowed a phone; with four labelled tabs and More (#15855) the row fits, so the fade is put on here by hand and the taps are tried with it on.
+            await ev(`document.querySelector('.agentic-state-tabs').setAttribute('data-more', 'end'); true`);
             check(await ev(`!!document.querySelector('.agentic-state-tabs[data-more]')`), 'the tab row has its edge fade on (data-more), the condition in question');
             await ev(`document.getElementById('agentic-tab-more').click(); true`);
             await waitFor(`!document.getElementById('agentic-more-menu').hidden`, `${w}: the More menu is open`, 5000);
