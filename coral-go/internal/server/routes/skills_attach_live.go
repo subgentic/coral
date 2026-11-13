@@ -74,9 +74,27 @@ func (h *SkillsHandler) SearchSkillsMenu(w http.ResponseWriter, r *http.Request)
 		if c, ok := current[x.Name]; ok {
 			x = c
 		}
-		out = append(out, skillSummary{ID: x.ID, Name: x.Name, Version: x.Version, Description: x.Description, HasScripts: x.HasScripts, NotReviewable: x.NotReviewable})
+		out = append(out, summaryOf(x))
 		if len(out) == maxMenuSkills {
 			break
+		}
+	}
+	// the person's own skills and the agent's folder's (#16015): after Coral's, at most maxLocalMenuSkills, narrowed by the words
+	var local []skillSummary
+	if home, err := h.home(); err == nil {
+		local = localSkills(home, homeSkillRoots, sourceYou, maxLocalMenuSkills)
+	}
+	if id := r.URL.Query().Get("session_id"); id != "" {
+		if live, err := h.ss.GetLiveSession(r.Context(), id); err == nil && live != nil && live.IsArchived != 1 {
+			local = append(local, localSkills(live.WorkingDir, repoSkillRoots, sourceRepo, maxLocalMenuSkills)...)
+		}
+	}
+	for _, x := range local {
+		if len(out) >= maxMenuSkills+maxLocalMenuSkills {
+			break
+		}
+		if q == "" || matchesWords(x, q) {
+			out = append(out, x)
 		}
 	}
 	w.Header().Set("Cache-Control", "no-store")
