@@ -162,8 +162,8 @@ export async function _launchOn(server, path, payload, agentType, { dirInput = n
     if (named) { markFieldInvalid(named, res.error, { alert: true }); return null; }
     if (!res.ok) {
         if (agentType && res.error.includes('not found') && res.error.includes('CLI')) _showCLINotFoundModal(agentType, server, { retry }); // retry: the caller's own launch, run when Check again finds the CLI (none: the dialog says to press Launch again)
-        else showToast(res.error, true);
-        if (dirInput && res.data && res.data.field === 'working_dir') { markFieldInvalid(dirInput, res.error); if (/^directory not found/i.test(res.error)) offerCreateFolder(dirInput); }
+        else if (!(dirInput && res.data && res.data.field === 'working_dir')) showToast(res.error, true); // a folder the server refused is said under the folder field, not in a toast that goes in five seconds (#16351)
+        if (dirInput && res.data && res.data.field === 'working_dir') { if (document.getElementById('launch-step-agent')?.contains(dirInput)) setLaunchStage('folder'); markFieldInvalid(dirInput, res.error); if (/^directory not found/i.test(res.error)) offerCreateFolder(dirInput); } // the Folder field is on screen when it is the one that is wrong (#16351)
         return null;
     }
     return res.data;
