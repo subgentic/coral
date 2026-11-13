@@ -6,6 +6,7 @@ import { loadLiveSessions } from './api.js';
 import { showToast } from './utils.js';
 import { askedBefore, dismissAsked } from './asked_before_restart.js';
 import { openAgent } from './agent_live.js';
+import { dialogOf } from './at_dialog.js';
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
 const { remoteRemoveWaitAllowed, removeWaitRequest } = await importOnce('./remove_wait_policy.js');
@@ -45,7 +46,7 @@ export async function dismissWait(session, button) {
     try {
         const resp = await serverFetch(sessionServer(session), `/api/sessions/live/${encodeURIComponent(session.name)}/dismiss-wait`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: session.session_id, agent_type: session.agent_type || '' }),
+            body: JSON.stringify({ session_id: session.session_id, agent_type: session.agent_type || '', ...(dialogOf(session)?.since ? { dialog_since: new Date(dialogOf(session).since).toISOString() } : {}) }),
         });
         if (resp.status === 403 && await resp.json().then(b => b && (b.code === 'owner_only' || b.error === 'owner_only'), () => false)) {
             if (button) button.disabled = false;
@@ -54,7 +55,8 @@ export async function dismissWait(session, button) {
         }
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const said = await resp.json().catch(() => ({}));
-        if (said.hidden || said.dismissed) saidDismiss(said.hidden ? 'Dismissed. An active wait stays in Needs you. Nothing was sent to the agent.' : 'Dismissed. Nothing was sent to the agent.', session); else showToast('It was not waiting any more.', false, 4000); // hidden: a request the machine cannot clear, kept as hidden on the machine (#11946)
+        if (said.dialog_hidden) saidDismiss('Dialog notice dismissed until a new dialog. Nothing was sent to the agent.', session);
+        else if (said.hidden || said.dismissed) saidDismiss(said.hidden ? 'Dismissed. An active wait stays in Needs you. Nothing was sent to the agent.' : 'Dismissed. Nothing was sent to the agent.', session); else showToast('It was not waiting any more.', false, 4000); // hidden: a request the machine cannot clear, kept as hidden on the machine (#11946)
         await loadLiveSessions();
     } catch {
         if (button) button.disabled = false;
