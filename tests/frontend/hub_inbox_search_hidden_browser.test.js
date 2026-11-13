@@ -1,4 +1,4 @@
-// A page never shows two search boxes (#11838, #11859): the shell's top search (the sidebar's box on a desktop, the pill's field in the top bar on a phone) is not shown above an Inbox tab that has a search box of its
+// A phone page never shows two search boxes (#11838, #11859); a desktop's Inbox sidebar has its search box again beside the page's, the two sharing one search (#15912, inbox_rail_search_browser): the shell's top search (the sidebar's box on a desktop, the pill's field in the top bar on a phone) is not shown above an Inbox tab that has a search box of its
 // own. On a Hub the three tabs that frame a Hub page (Needs you, Tasks, Saved for later) show none of Coral's (the framed page has its own); the Inbox's own tabs (Goals, Artifacts, chats) show the page's box alone. In
 // local mode every tab (Needs you, Tasks, Goals, Artifacts, Saved, the chat folders) shows the page's box alone. 1280 and 390 px; the stubbed Hub of helpers/hub_world.js (native boot) and the plain local dev server.
 const assert = require('node:assert/strict');
@@ -21,7 +21,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab(${JSON.stringify(group)})).then(() => true)`);
         await ev(framesJs(8));
     };
-    const want = (mobile, group, own) => [mobile ? 'phone-bar-search' : own]; // on a phone the pill is the page's search and the page's box is not drawn
+    const want = (mobile, group, own) => mobile ? ['phone-bar-search'] : ['inbox-search', own]; // on a phone the pill is the page's search and the page's box is not drawn; on a desktop the sidebar's box is back beside the page's (#15912)
     const OWN = { needs: 'inbox-needs-search', tasks: 'inbox-tk-search', goals: 'inbox-goals-search', artifacts: 'ia-search', saved: 'inbox-saved-search', chats: 'inbox-chats-search', 'chats-active': 'inbox-chats-search' };
     try {
         await Page.enable();
