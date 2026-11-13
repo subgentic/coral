@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -165,6 +166,25 @@ func TestAnswerPrompt_ClaudeUnnumbered(t *testing.T) {
 			assert.Equal(t, 1, term.enters["claude-trust"], "one Enter: never into the trust menu that follows")
 		})
 	}
+	t.Run("a sent answer is in the log (#16398)", func(t *testing.T) {
+		var buf bytes.Buffer
+		old := slog.Default()
+		slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})))
+		t.Cleanup(func() { slog.SetDefault(old) })
+		answer, term, setScreen, _, _ := setup(t, "tmux")
+		setScreen(claudeUnnumbered(t, "trust.txt"))
+		term.onArrow = func(string) { setScreen(claudeUnnumbered(t, "trust_yes.txt")) }
+		term.onEnter = func(string) { setScreen(claudeUnnumbered(t, "ready.txt")) }
+		code, body := answer(2, "Yes, I trust this folder")
+		assert.Equal(t, http.StatusOK, code, "%v", body)
+		line := buf.String()
+		assert.Contains(t, line, "answer-prompt sent")
+		assert.Contains(t, line, "session=claude-trust")
+		assert.Contains(t, line, "n=2")
+		assert.Contains(t, line, `label="Yes, I trust this folder"`)
+		assert.Contains(t, line, "by=arrows")
+		assert.NotContains(t, line, "Quick safety check", "the question is not logged")
+	})
 	t.Run("the option already selected: Enter alone", func(t *testing.T) {
 		answer, term, setScreen, _, _ := setup(t, "tmux")
 		setScreen(claudeUnnumbered(t, "apikey.txt"))
