@@ -74,10 +74,9 @@ const { coralReady } = require('./helpers/wait');
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installNT(ev);
         await stubModels(ev); await openNewTeam(ev, waitFor);
         const t = T(ev, waitFor);
-        await t.to(3);
-        await ev(`document.querySelector('#team-start-host .settings-tab[data-section="workflow"]').click(); true`);
+        // LT1 (#15892): Workflow is on step 1 with the team name: no menu to open
         await waitFor(`!!document.querySelector('#team-start-host select[name=planning_approval]')`, 'the approval row', 5000);
-        const w = () => ev(`(() => { const h = document.querySelector('#team-start-host'), s = h.querySelector('select[name=planning_approval]'), rg = h.querySelector('[name=require_goal]'); return { value: s.value, options: [...s.options].map(o => o.value), requireGoal: rg.checked, rgDisabled: rg.disabled, state: h.querySelector('.settings-tab[data-section="workflow"] .menu-item-state').textContent, board: window.__launch.read().board }; })()`);
+        const w = () => ev(`(() => { const h = document.querySelector('#team-start-host'), s = h.querySelector('select[name=planning_approval]'), rg = h.querySelector('[name=require_goal]'); return { value: s.value, options: [...s.options].map(o => o.value), requireGoal: rg.checked, rgDisabled: rg.disabled, board: window.__launch.read().board }; })()`);
         await ev(`import(${S} + 'team_launch_settings.js').then(m => { window.__launch = { read: () => m.readTeamLaunchSettings() }; return true; })`);
         await ev(`(() => { const m = document.querySelector('#team-start-host select[name=mode]'); m.value = 'none'; m.dispatchEvent(new Event('input', { bubbles: true })); m.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); // the template the helper picks names a working mode, which the menu says first
         let n = await w();
@@ -89,17 +88,14 @@ const { coralReady } = require('./helpers/wait');
         await pick('goals');
         n = await w();
         assert.deepEqual([n.requireGoal, n.rgDisabled], [true, true], 'Operator approves goals holds Require a goal on (it is needed, so it is not offered)');
-        assert.equal(n.state, 'you approve goals', 'the menu says it');
         assert.deepEqual(n.board, { require_goal: true, goals_need_approval: true }, 'what the new team is given when it is chosen: the flags, never the name');
         await pick('tasks');
         n = await w();
         assert.deepEqual(n.board, { require_goal: true, goals_need_approval: true, tasks_need_approval: true }, 'Operator approves tasks');
-        assert.equal(n.state, 'you approve tasks');
         await pick('auto');
         n = await w();
         assert.deepEqual([n.requireGoal, n.rgDisabled], [false, false], 'Fully autonomous is how teams were: no goal rule, and the switch is the person\'s again');
         assert.equal(n.board, null, 'and a new team on it is given nothing to save');
-        assert.equal(n.state, 'no extra rules');
         console.log('   ✓ New team step');
         console.log('PASS approval presets: three names for the flags in Team settings and the New team step; a new team starts on Fully autonomous');
     } finally { await removeBoards(ev, [TEAM]).catch(() => {}); await client.close(); }

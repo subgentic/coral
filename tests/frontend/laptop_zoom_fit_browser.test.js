@@ -26,7 +26,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`!document.getElementById('team-panel-team').hidden`, `${tag}: step 1 shown`);
             await outside('New team step 1');
             await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'laptop-x'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/work/payments-app'; d.dispatchEvent(new Event('input', { bubbles: true })); } true`);
-            for (const [n, panel] of [[2, 'members'], [3, 'start']]) { await ev(`document.getElementById('launch-team-next').click(); true`); await waitFor(`document.getElementById('launch-step-team').dataset.stage === '${panel}'`, `${tag}: step ${n} shown`); await outside(`New team step ${n}`); }
+            for (const [n, panel] of [[2, 'members']]) { await ev(`document.getElementById('launch-team-next').click(); true`); await waitFor(`document.getElementById('launch-step-team').dataset.stage === '${panel}'`, `${tag}: step ${n} shown`); await outside(`New team step ${n}`); }
             await ev(`(async () => { await window.showTeamAgentModal(); return true; })()`);
             await waitFor(`document.getElementById('launch-step-agent')?.dataset.stage === 'persona' && getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none'`, `${tag}: the member's role page`);
             await outside('Add member, the role');

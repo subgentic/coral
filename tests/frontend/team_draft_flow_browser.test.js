@@ -48,9 +48,9 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.getElementById('team-board-name').value`), 'draft-x', 'the team name the person typed is kept');
         assert.equal(await ev(`document.getElementById('launch-team-dir').value`), '/work/repo', 'and so is the folder');
         // the sample is a team that can go on (#10658): Next from the Members step is not blocked for want of an Orchestrator
-        await ev(`document.getElementById('launch-team-next').click(); true`); await settle(500);
-        const next = await ev(`({ members: getComputedStyle(document.getElementById('team-panel-members')).display, recap: (document.getElementById('team-recap') || {}).textContent || '' })`);
-        assert.ok(next.members === 'none' && !/Orchestrator/.test(next.recap), 'Next goes on from the sample: ' + JSON.stringify(next));
+        await settle(300); // LT1 (#15892): the Members step is the last: Launch team is its button, and it is not held for want of an Orchestrator
+        const next = await ev(`({ members: getComputedStyle(document.getElementById('team-panel-members')).display, off: document.getElementById('launch-team-go').disabled, recap: (document.getElementById('team-recap') || {}).textContent || '' })`);
+        assert.ok(next.members !== 'none' && next.off === false && !/Orchestrator/.test(next.recap), 'Launch team is on for the sample: ' + JSON.stringify(next));
         await ev(`document.getElementById('launch-team-back') ? document.getElementById('launch-team-back').click() : null; true`); await settle(400);
         // until something is edited
         await ev(`document.querySelector('#team-agents-list .team-agent-edit-btn, #team-panel-members #team-add-member').click(); true`); // editing a member (its Edit button; Remove is in that dialog now, #10836) is an edit

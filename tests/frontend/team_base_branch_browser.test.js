@@ -49,8 +49,7 @@ const MISSING = 'The base branch main does not exist in /work/repo. Its branches
             await waitFor(`document.getElementById('launch-step-team').dataset.stage === 'members'`, 'step 2 shows: Next checks the folder first and goes on when it is found (acfb782ec; #14437)', 6000);
             await ev(`{ const sel = document.getElementById('team-template-select'); sel.value = [...sel.options].find(o => o.value).value; sel.dispatchEvent(new Event('change', { bubbles: true })); } true`);
             await waitFor(`document.querySelectorAll('#team-agents-list .team-agent-row').length > 0`, 'the template members');
-            await click('#launch-team-next'); // step 3
-            await waitFor(`document.getElementById('launch-step-team').dataset.stage === 'start'`, 'step 3 shows', 6000);
+            // LT1 (#15892): the members are the last step: Launch team is here
             await click('#launch-team-go');
             await waitFor(`!!document.getElementById('launch-team-base-branch-error')`, 'the inline error', 6000);
             await sleep(300); // sleep-ok: the absence of a toast

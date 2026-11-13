@@ -25,7 +25,7 @@ const BASE = require('./test_base').BASE;
         await t.to(2, { template: /Coding/ });
         await waitFor(`document.querySelectorAll('#team-agents-list .team-agent-row').length >= 2`, 'the template members', 8000);
         // 3. plain words in the team Settings (step 3, Workflow)
-        await t.click('button', N.next); await t.step(3);
+        await t.settings(); // LT1 (#15892): the team's Workflow is on step 1
         await ev(`(() => { const d = window.__nt.dlg(${N.team}); const x = [...d.querySelectorAll('[role=tab]')].filter(window.__na.vis).find(e => window.__na.name(e) === 'Workflow'); if (x) x.click(); return true; })()`);
         await settle(300);
         const labels = await ev(`[...window.__nt.dlg(${N.team}).querySelectorAll('label, .sv-label')].filter(window.__na.vis).map(e => e.textContent.trim())`);
