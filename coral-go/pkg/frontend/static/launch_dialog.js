@@ -32,6 +32,14 @@ const { offerSuggestion, syncSuggestionLine, usesSuggestion } = await importOnce
 /** New Agent's three steps (#7391): Next goes from the folder to the persona to the agent (a folder is needed first), Back returns. `arg` is a stage name, "next" or "back" (the old "details" is the persona step). Focus follows, and a screen reader hears which step. */
 function _launchStage(arg) {
     const step = document.getElementById('launch-step-agent');
+    if (launchStages()[0] === 'page') { // one page (LA1b): "next" is Launch (the folder is checked there), "agent" opens More options, any other name shows the page with the focus on the folder
+        if (arg === 'next') { const go = document.getElementById('launch-agent-go'); if (go && !go.hidden && !go.disabled) go.click(); return; }
+        setLaunchStage('page'); syncRecap(); _syncLaunchBlock();
+        if (!launch.member) suggestAgentName(document.getElementById('launch-agent-name-input')); // a role-like name, not the folder's (#11289): ready for when the name is opened
+        if (arg === 'agent') { const more = document.getElementById('launch-more-options'); if (more) more.open = true; return; } // "the agent's sections" are More options on the page
+        document.getElementById('launch-dir')?.focus();
+        return;
+    }
     const stages = launchStages(), cur = step?.dataset.stage || stages[0], at = Math.max(0, stages.indexOf(cur));
     const to = arg === 'details' ? 'persona' : arg === 'next' ? stages[Math.min(at + 1, stages.length - 1)] : arg === 'back' ? stages[Math.max(at - 1, 0)] : arg;
     if (!stages.includes(to)) return;
@@ -52,6 +60,7 @@ function _launchStage(arg) {
     first?.focus();
 }
 window._launchStage = _launchStage;
+document.addEventListener('toggle', e => { if (e.target && e.target.id === 'launch-persona-more' && e.target.open && !launch.member) suggestAgentName(document.getElementById('launch-agent-name-input')); }, true); // the name is offered when it is opened: by then the live agents are known
 
 /** Enter in a single-line field of a wizard step is that step's primary button: Next, and Launch on the last step (#11289; a form's Enter). Not in a multi-line field, a select, a button or the folder picker; not with a modifier; and not when the field's own Enter (the folder's) has already acted. */
 function wireEnterAdvances(step) {

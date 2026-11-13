@@ -21,8 +21,8 @@ const { coralReady } = require('./helpers/wait');
             await openNewAgent(ev, waitFor);
             for (let n = 1; n < step; n++) {
                 if (n === 1) await ev(`(() => { const e = window.__na.find('input', ${N.folder}); e.value = '/work/payments-app'; e.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-                await ev(`window.__na.find('button', ${N.next}).click(); true`);
-                await waitFor(`new RegExp('Step ${n + 1} of 3').test(window.__na.dialog().textContent)`, `step ${n + 1}`, 6000);
+                await ev(`window.__na.next(); true`);
+                await new Promise(r => setTimeout(r, 200)); // sleep-ok: a fold of the one page opens
             }
         };
         // 1. providers: even columns

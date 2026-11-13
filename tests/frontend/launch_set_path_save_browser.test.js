@@ -24,7 +24,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app'])); true`);
             await openNewAgent(ev, waitFor);
             await ev(`(() => { const i = window.__na.find('input', ${NA.folder}); i.value = '/work/payments-app'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            for (let s = 1; s < 3; s++) { await ev(`window.__na.find('button', ${NA.next}).click(); true`); await waitFor(`/Step ${s + 1} of 3/.test(window.__na.dialog() ? window.__na.dialog().textContent : '')`, `${w}: step ${s + 1}`, 6000); }
+            for (let s = 1; s < 3; s++) { await ev(`window.__na.next(); true`);  }
             await waitFor(`!!document.querySelector('#launch-step-agent [data-blocks-launch] .cli-set-path')`, `${w}: the blocker with Set path`, 12000).catch(async e => { throw new Error(e.message + ' :: ' + JSON.stringify(await ev(`(() => { const x = document.querySelector('#launch-step-agent .acf-cli-warning, #launch-step-agent [data-blocks-launch]'); return { html: x ? x.outerHTML.slice(0, 500) : null, check: null }; })()`)) + ' :: ' + JSON.stringify(await ev(`fetch('/api/system/cli-check?type=claude').then(async r => ({ s: r.status, b: await r.text() }))`))); });
             const tile = () => ev(`(() => ({ card: !!document.querySelector('#launch-agent-pick .provider-card[data-type="claude"]:not(.is-missing)') }))()`); // Claude is a card with a radio, or an entry under Not installed (#11235)
             const modelNote = () => ev(`(() => { const n = document.querySelector('#launch-step-agent .acf-model-note, #launch-step-agent [id$="model-note"]'); return n ? n.textContent.trim() : null; })()`);

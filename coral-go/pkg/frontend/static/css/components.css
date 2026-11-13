@@ -3805,10 +3805,29 @@ li:has(> .row-btn:focus-visible) { outline: 2px solid var(--accent); outline-off
 .launch-page-agent { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .launch-page-agent .launch-shell { flex: 1; min-height: 0; }
 .launch-wizard[data-stage="folder"] .launch-page-agent { display: none; }
-.launch-wizard:not([data-stage="folder"]) .launch-page-folder { display: none; }
+.launch-wizard:not([data-stage="folder"]):not([data-stage="page"]) .launch-page-folder { display: none; }
 .launch-wizard[data-stage="persona"] :is(.launch-shell .settings-nav, .launch-shell .settings-pane) { display: none; }
 .launch-wizard[data-stage="agent"] .acf-persona-page { display: none; }
 .launch-wizard .acf-persona-page { padding: 0; }
+/* LA1b (#15911): New agent is one page: Folder, Persona (the name and the instructions under a switch), Runs as (the line above the footer), More options (the tabs). The switches are empty details: what they open is shown by :has, so no field moves. */
+.launch-wizard:not([data-stage="page"]) .launch-page-toggle { display: none; }
+.launch-wizard[data-stage="page"] .launch-page-agent { flex: none; }
+.launch-wizard[data-stage="page"] :is(.launch-shell, .settings-panes, .sd-acf) { display: contents; }
+.launch-wizard[data-stage="page"] .launch-stage-sub { display: none; }
+.launch-wizard[data-stage="page"] :is(#launch-persona-top .launch-optional, .acf-persona-page .sv-optional, #agent-name-host .sv-optional) { display: none; } /* the whole persona block is optional: said once by the page, not on each field */
+.launch-wizard[data-stage="page"] .launch-page-folder { padding-bottom: 8px; }
+.launch-wizard[data-stage="page"] .launch-persona-top { padding: 0; }
+.launch-wizard[data-stage="page"] .acf-persona-page { order: 2; padding: 4px 24px 0; }
+.launch-wizard[data-stage="page"] .settings-tabs { display: flex; flex-direction: row; gap: 4px; overflow-x: auto; }
+.launch-wizard[data-stage="page"] .settings-nav { width: auto; border: 0; background: none; padding: 0; }
+.launch-wizard[data-stage="page"] #launch-more-options { order: 3; margin: 0 24px; }
+.launch-wizard[data-stage="page"] .launch-page-toggle > summary { padding-block: 8px; }
+.launch-wizard[data-stage="page"] .settings-nav, .launch-wizard[data-stage="page"] .settings-pane, .launch-wizard[data-stage="page"] #launch-advanced-extra { order: 4; margin-inline: 24px; }
+.launch-wizard[data-stage="page"]:not(:has(#launch-persona-more[open])) :is(#agent-name-host, .acf-prompt-host) { display: none; }
+.launch-wizard[data-stage="page"]:not(:has(#launch-more-options[open])) :is(.settings-nav, .settings-pane, #launch-advanced-extra) { display: none; }
+.launch-wizard[data-stage="page"] > .modal-actions { border-top: 0; }
+.launch-wizard[data-stage="page"] > .modal-actions #launch-agent-cancel { margin-right: 0; }
+.launch-wizard[data-stage="page"] > .modal-actions { justify-content: flex-end; }
 .launch-wizard .settings-panes { padding: 20px 24px; overflow: auto; scrollbar-gutter: stable; }
 #launch-modal[data-agent-stage="persona"] .launch-server-row, #launch-modal[data-agent-stage="agent"] .launch-server-row { display: none !important; } /* the machine is a step 1 choice; its row is set by style where it is drawn (launch_dialog.js) */
 .launch-field-head, .acf-pick-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; margin: 0 0 6px; font-size: var(--fs-md); font-weight: var(--fw-medium); } /* the field label style of every form: 13/500 (UI/UX on #8401) */
