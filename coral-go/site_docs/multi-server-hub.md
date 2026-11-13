@@ -80,6 +80,7 @@ The launch dialogs (agent, team, terminal, quick launch) gain a **Computer** pic
 - **Keys never reach the browser.** The browser's own credentials are stripped before a request is forwarded, and the remote's key is added by the hub. No API returns a stored key.
 - **Back up the key file with the database.** If `.remote_secret_key` is lost, the remotes show `key_unreadable` and you re-enter each key. Nothing else is affected.
 - **The hub holds keys that give full control of each remote.** Anyone who can use the hub's web UI can reach every registered remote, so protect the hub as you would the remotes themselves.
+- **SSH access.** Whoever controls the hub's Coral or the account it runs as can reach every computer you set up over SSH with your SSH access, so protect the hub computer as you would your SSH keys.
 - Encryption protects the database and its backups. It does not protect against someone who already controls the hub's user account or process.
 
 ## Troubleshooting
