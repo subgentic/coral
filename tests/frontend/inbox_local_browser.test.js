@@ -219,6 +219,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         await settle(`document.getElementById('saved-ui').getAttribute('aria-label') === 'Saved: QA Alpha' && document.querySelectorAll('#saved-table tbody tr').length > 0`, 'the agent panel');
         s = await state();
         check('the dock\'s Saved tab on the same page is still the agent\'s: scoped, in the right sidebar', !s.inbox && s.uiIn === 'agentic-panel-saved' && s.dockShown && s.dockHeading === 'Saved: QA Alpha' && JSON.stringify(s.dockRows) === JSON.stringify(['qa-a chat', 'team-a board, by the QA Engineer']), JSON.stringify([s.inbox, s.uiIn, s.dockShown, s.dockHeading, s.dockRows]));
+        await settle(`document.getElementById('nav-tab-hub-inbox-badge')?.textContent === '1' && document.getElementById('saved-tab-count')?.textContent === '2'`, 'the Inbox tab badge and the Saved tab count'); s = await state(); // the counts arrive after the panel is drawn: wait for them (#15947)
         check('its tab says 2, and the Inbox tab counts the agents waiting (1)', s.navBadge === '1' && (await ev(`document.getElementById('saved-tab-count').textContent`)) === '2', JSON.stringify([s.navBadge]));
         await shot('inbox-scoped-agent-desktop');
         await ev(`Promise.resolve(window.openTeamPage('team-a')).then(() => true)`); // (the team page is a lazy module: the first call loads it, so wait for it)

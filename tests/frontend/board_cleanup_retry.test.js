@@ -15,6 +15,11 @@ const { removeBoards, AGAIN_MS } = require('./helpers/board_cleanup');
     assert.equal(none.length, 0, 'no boards, no calls, no wait');
     assert.ok(Date.now() - t0 < 5000);
     // a page that throws is not the suite's failure
-    await removeBoards(async () => { throw new Error('page gone'); }, ['x']);
+    await removeBoards(async () => { throw new Error('page gone'); }, ['x'], async () => {});
+    // a page that is gone (the CDP socket closed, the suite killed at its limit) is no reason to leave the board (#15947): each board is deleted from Node instead, in both passes
+    const via = []; await removeBoards(async () => { throw new Error('WebSocket connection closed'); }, ['gone-a', null, 'gone-b'], async n => { via.push(n); });
+    assert.deepEqual(via, ['gone-a', 'gone-b', 'gone-a', 'gone-b'], 'the fallback deletes each board in both passes');
+    const viaOk = []; await removeBoards(async () => 200, ['fine'], async n => { viaOk.push(n); });
+    assert.deepEqual(viaOk, [], 'a page that answers is not second-guessed');
     console.log('PASS removeBoards deletes twice, a moment apart');
 })().catch(e => { console.error(e); process.exit(1); });
