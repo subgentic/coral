@@ -32,7 +32,7 @@ Without hub mode nothing about the hub exists: the hub routes are not registered
 
 In the hub's top bar, open the settings menu and choose **Computers**, then **Add computer**. There are two ways to connect a computer.
 
-**Set up over SSH (Coral 2.0.10 or later).** Choose **Set up over SSH**. The hub installs, verifies and starts Coral on that computer for you. The hub reaches the computer by `ssh -W` to the computer's own loopback address, so no port is opened to the network and you do not need to turn on remote access.
+**Set up over SSH (hub on Coral 2.0.10 or later).** Choose **Set up over SSH**. The hub installs, verifies and starts Coral on that computer for you. The hub reaches the computer by `ssh -W` to the computer's own loopback address, so no port is opened to the network and you do not need to turn on remote access.
 
 **Add by URL and API key.** This is the original way, and it still works. On the remote computer:
 
@@ -43,18 +43,18 @@ Then, in the hub, fill in:
 
 | Field | Meaning |
 | --- | --- |
-| **ID** | A short name using lowercase letters, digits and `-` (up to 32 characters). It appears in URLs and cannot be `local`. |
-| **Label** | The display name. |
+| **Computer id** | A short name using lowercase letters, digits and `-` (up to 32 characters). It appears in URLs and cannot be `local`. |
+| **Display name** | The name shown in the dashboard. |
 | **URL** | The remote's address, for example `http://192.168.1.20:8420`. |
 | **API key** | The remote's key. Write-only: it is never shown again. |
-| **Allow private network** | Turn this on for LAN, tailnet or localhost remotes. |
+| **Allow private network address** | Turn this on for LAN, tailnet or localhost remotes. |
 
 A computer added by URL is reached over plain HTTP by default; start it with `--tls-cert` and `--tls-key` to serve HTTPS on the port. Otherwise use a network you trust, a VPN or tailnet, or put your own encrypted tunnel in front of it. This applies only to computers added by URL.
 
 The hub checks the computer's health with the key before it saves anything. Use **Test** later to re-run the check.
 
 !!! warning "Private addresses are blocked by default"
-    To stop the hub being used to reach arbitrary hosts, it refuses private and reserved addresses unless **Allow private network** is on for that computer. The address is checked again each time the hub connects, not only when you register it.
+    To stop the hub being used to reach arbitrary hosts, it refuses private and reserved addresses unless **Allow private network address** is on for that computer. The address is checked again each time the hub connects, not only when you register it.
 
 ## Using it
 
@@ -87,8 +87,8 @@ The launch dialogs (agent, team, terminal, quick launch) gain a **Computer** pic
 
 | You see | Likely cause |
 | --- | --- |
-| No **Computers** entry | Hub mode is not turned on. |
-| Registering fails with a private-address error | Turn on **Allow private network** for that computer. |
+| No **Computers** entry | Hub mode is not turned on, or Coral has not been restarted since you turned it on. |
+| Registering fails with a private-address error | Turn on **Allow private network address** for that computer. |
 | Status **unreachable** | The remote is down, the URL or port is wrong, or the remote is still listening on loopback only. Enable remote access on it and restart. |
 | Status **unauthorized** | The remote rejected the key. It may have been regenerated. Edit the computer and paste the new key. |
 | Status **key_unreadable** | The hub's master key changed or is missing. Re-enter the key. |
