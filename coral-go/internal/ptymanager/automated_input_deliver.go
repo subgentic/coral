@@ -28,7 +28,7 @@ const (
 	SkipTeamBusy   = "this team's sends are spaced out and the next slot is too far away"
 )
 
-// errPromptBeforeText: the screen showed a prompt (or could not be read) at the second look, just before the text: nothing was typed.
+// errPromptBeforeText: the screen showed a prompt that blocks this send at the second look, just before the text: nothing was typed. A screen that cannot be read at the second look is not this: the first look already judged it (a person's Send now goes on without one), so the send goes on.
 var errPromptBeforeText = errors.New("a prompt opened before the text")
 
 // DeliverAutomated types an automated send now, with its Enter, unless the screen shows that typing would be a wrong answer
