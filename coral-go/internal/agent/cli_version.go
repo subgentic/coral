@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/subgentic/coral/internal/agentenv"
 	"github.com/subgentic/coral/internal/executil"
+	"github.com/subgentic/coral/internal/logsafe"
 	"log"
 	"os"
 	"os/exec"
@@ -65,7 +66,7 @@ func CLIVersion(settings map[string]string, agentType string) string {
 	v := cliVersionRe.FindString(string(out))
 	if v == "" { // say why once per binary: a version that cannot be read decides what a launch does (#16007), and nothing said why the Operator's Codex gave none
 		if _, seen := cliVersionLogged.LoadOrStore(path+"|"+stamp, true); !seen {
-			log.Printf("cli version: no version read from %s --version (run error: %v, timed out: %v, output: %.80q)", path, runErr, ctx.Err() != nil, string(out))
+			log.Printf("cli version: no version read from %s --version (run error: %v, timed out: %v, output: %.80q)", logsafe.Path(path), logsafe.HomeInText(fmt.Sprint(runErr)), ctx.Err() != nil, logsafe.HomeInText(string(out)))
 		}
 	}
 	if ctx.Err() == nil {
