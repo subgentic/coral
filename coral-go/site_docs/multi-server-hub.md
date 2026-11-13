@@ -7,6 +7,8 @@ description: "Connect Coral on several machines to one hub and see all their age
 
 Run Coral on several machines (a laptop, a workstation, a cloud box) and see all of their agents and teams in one dashboard. One Coral server acts as the **hub**. The others are **remotes** (also called spokes). The hub shows the remotes' agents next to its own, lets you open their chat and terminal views, and lets you launch agents and teams on them.
 
+![The hub's dashboard: the agent list grouped by computer, studio-mac, workstation and cloud-box, each with its own teams and their agents](assets/hub-overview.png)
+
 A remote is an ordinary standalone Coral server. It needs no special mode and no changes. The hub calls the same API your browser uses, through an authenticated proxy.
 
 !!! note "What the hub does not do"
@@ -16,15 +18,17 @@ A remote is an ordinary standalone Coral server. It needs no special mode and no
 
 ### 1. Turn on the hub
 
-On the computer you will use as the hub, turn on **Run a hub on this computer** on Coral's Home page (Coral 2.0.65 or later). Turning it on asks first. The setting is saved and applied when Coral restarts.
+On the computer you will use as the hub, open Coral's Home page and choose **Run your own hub**. Turn on **Run a hub on this computer** (Coral 2.0.65 or later).
 
-`coral --hub` and `CORAL_HUB=1 coral` still work as well:
+![The Run your own hub panel on Home, with the Run a hub on this computer switch off and marked](assets/hub-switch-1-off.png)
 
-```bash
-coral --hub
-# or
-CORAL_HUB=1 coral
-```
+Turning it on asks first. Press **Enable on this computer**.
+
+![The confirmation: Run as a hub on this computer? The Enable on this computer button is marked](assets/hub-switch-2-confirm.png)
+
+The setting is saved and applied when Coral restarts: press **Restart Coral** in the panel.
+
+![The same panel after turning it on: the switch is on, the panel says the setting is saved, and a Restart Coral button appears](assets/hub-switch-3-on.png)
 
 Without hub mode nothing about the hub exists: the hub routes are not registered and the UI shows none of it.
 
@@ -32,14 +36,20 @@ Without hub mode nothing about the hub exists: the hub routes are not registered
 
 In the hub's top bar, open the settings menu and choose **Computers**, then **Add computer**. There are two ways to connect a computer.
 
+![The Computers tab with its two buttons marked: Set up over SSH, the easiest way, and Add computer](assets/add-computer-1-choose.png)
+
 **Set up over SSH (hub on Coral 2.0.10 or later).** Choose **Set up over SSH**. The hub installs, verifies and starts Coral on that computer for you. The hub reaches the computer by `ssh -W` to the computer's own loopback address, so no port is opened to the network and you do not need to turn on remote access.
+
+![The Set up over SSH form: type the computer as user@host, then press Review the plan](assets/add-computer-2-ssh.png)
 
 **Add by URL and API key.** This is the original way, and it still works. On the remote computer:
 
 1. Turn on [remote access](remote-access.md) and restart, so Coral listens on a network address and not only on `127.0.0.1`.
 2. Copy its API key. It is shown with the QR code, and stored in `~/.coral/api_key`.
 
-Then, in the hub, fill in:
+Then, in the hub, choose **Add computer** and fill in:
+
+![The Add computer form: the computer id, display name, URL and API key](assets/add-computer-3-url.png)
 
 | Field | Meaning |
 | --- | --- |
