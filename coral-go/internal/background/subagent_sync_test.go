@@ -118,7 +118,7 @@ func TestSyncSubagentSpend_ParsesPricesAndStoresFixture(t *testing.T) {
 	env := newSubagentEnv(t)
 	env.installFixture()
 
-	n, err := syncSubagentSpend(context.Background(), env.subagents, subMainSID, env.parentPath, nil)
+	n, err := syncSubagentSpend(context.Background(), env.subagents, subMainSID, env.parentPath, nil, nil)
 	require.NoError(t, err)
 	assert.Equal(t, 1, n)
 
@@ -151,7 +151,7 @@ func TestSyncSubagentSpend_MultipleSubagentsAndMissingMetadata(t *testing.T) {
 	env.installFixture()
 	env.writeSubagent("nometa", subLine("msg_1", "claude-opus-5", 1, 100, 0, 0))
 
-	n, err := syncSubagentSpend(context.Background(), env.subagents, subMainSID, env.parentPath, nil)
+	n, err := syncSubagentSpend(context.Background(), env.subagents, subMainSID, env.parentPath, nil, nil)
 	require.NoError(t, err)
 	assert.Equal(t, 2, n)
 
@@ -174,7 +174,7 @@ func TestSyncSubagentSpend_IsIdempotentAndTracksGrowth(t *testing.T) {
 	env.writeSubagent("s1", subLine("msg_1", "claude-opus-5", 1, 100, 1000, 0))
 
 	for i := 0; i < 3; i++ {
-		_, err := syncSubagentSpend(ctx, env.subagents, subMainSID, env.parentPath, nil)
+		_, err := syncSubagentSpend(ctx, env.subagents, subMainSID, env.parentPath, nil, nil)
 		require.NoError(t, err)
 	}
 	first := env.get("s1")
@@ -184,7 +184,7 @@ func TestSyncSubagentSpend_IsIdempotentAndTracksGrowth(t *testing.T) {
 	env.appendSubagent("s1",
 		subLine("msg_1", "claude-opus-5", 1, 250, 1000, 0), // msg_1 finished streaming
 		subLine("msg_2", "claude-opus-5", 1, 40, 2000, 0))
-	_, err := syncSubagentSpend(ctx, env.subagents, subMainSID, env.parentPath, nil)
+	_, err := syncSubagentSpend(ctx, env.subagents, subMainSID, env.parentPath, nil, nil)
 	require.NoError(t, err)
 
 	grown := env.get("s1")
@@ -200,7 +200,7 @@ func TestSyncSubagentSpend_PricesEachCallWithItsOwnModel(t *testing.T) {
 	env.writeSubagent("mixed",
 		subLine("msg_1", "claude-opus-5", 0, 1_000_000, 0, 0),             // $25.00
 		subLine("msg_2", "claude-haiku-4-5-20251001", 0, 1_000_000, 0, 0)) // $5.00
-	_, err := syncSubagentSpend(context.Background(), env.subagents, subMainSID, env.parentPath, nil)
+	_, err := syncSubagentSpend(context.Background(), env.subagents, subMainSID, env.parentPath, nil, nil)
 	require.NoError(t, err)
 
 	sa := env.get("mixed")
@@ -211,7 +211,7 @@ func TestSyncSubagentSpend_PricesEachCallWithItsOwnModel(t *testing.T) {
 func TestSyncSubagentSpend_UnknownModelStoresTokensWithZeroCost(t *testing.T) {
 	env := newSubagentEnv(t)
 	env.writeSubagent("s1", subLine("msg_1", "totally-unknown-model-x", 10, 500, 0, 0))
-	_, err := syncSubagentSpend(context.Background(), env.subagents, subMainSID, env.parentPath, nil)
+	_, err := syncSubagentSpend(context.Background(), env.subagents, subMainSID, env.parentPath, nil, nil)
 	require.NoError(t, err)
 
 	sa := env.get("s1")
@@ -222,7 +222,7 @@ func TestSyncSubagentSpend_UnknownModelStoresTokensWithZeroCost(t *testing.T) {
 func TestSyncSubagentSpend_SessionWithoutSubagents(t *testing.T) {
 	env := newSubagentEnv(t)
 	require.NoError(t, os.RemoveAll(subagent.Dir(env.parentPath)))
-	n, err := syncSubagentSpend(context.Background(), env.subagents, subMainSID, env.parentPath, nil)
+	n, err := syncSubagentSpend(context.Background(), env.subagents, subMainSID, env.parentPath, nil, nil)
 	require.NoError(t, err)
 	assert.Zero(t, n)
 }
@@ -234,7 +234,7 @@ func TestSyncSubagentSpend_OneBadSubagentDoesNotBlockOthers(t *testing.T) {
 	require.NoError(t, os.Mkdir(filepath.Join(subagent.Dir(env.parentPath), "unreadable"), 0o755))
 	linktest.Symlink(t, filepath.Join(subagent.Dir(env.parentPath), "unreadable"), env.transcriptPath("bad"))
 
-	n, err := syncSubagentSpend(context.Background(), env.subagents, subMainSID, env.parentPath, nil)
+	n, err := syncSubagentSpend(context.Background(), env.subagents, subMainSID, env.parentPath, nil, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bad")
 	assert.Equal(t, 1, n)
@@ -245,14 +245,14 @@ func TestSyncSubagentSpend_OneBadSubagentDoesNotBlockOthers(t *testing.T) {
 func TestSyncSubagentSpend_UnknownMainAgentIsRejected(t *testing.T) {
 	env := newSubagentEnv(t)
 	env.writeSubagent("s1", subLine("msg_1", "claude-opus-5", 1, 100, 0, 0))
-	n, err := syncSubagentSpend(context.Background(), env.subagents, "99999999-0000-0000-0000-000000000000", env.parentPath, nil)
+	n, err := syncSubagentSpend(context.Background(), env.subagents, "99999999-0000-0000-0000-000000000000", env.parentPath, nil, nil)
 	require.Error(t, err, "a subagent cannot be stored without a main agent to belong to")
 	assert.Zero(t, n)
 }
 
 // ── Token poller integration ─────────────────────────────────
 
-func TestPollClaudeSession_RecordsSubagentSpendSeparatelyFromMainAgent(t *testing.T) {
+func TestPollClaudeSession_RecordsSubagentSpendAndAddsItToTheMainAgentsCost(t *testing.T) {
 	env := newSubagentEnv(t)
 	env.installFixture()
 	env.poll(env.poller())
@@ -261,14 +261,14 @@ func TestPollClaudeSession_RecordsSubagentSpendSeparatelyFromMainAgent(t *testin
 	require.NotNil(t, sa)
 	assert.Equal(t, 600, sa.OutputTokens)
 
-	// The main agent's own usage holds only its own transcript's call.
+	// The subagent is its own row in the subagents table, and its calls are in the main agent's usage beside the agent's own call (#16016).
 	var mainRows, mainOutput int
 	require.NoError(t, env.db.GetContext(context.Background(), &mainRows,
 		"SELECT COUNT(*) FROM token_usage WHERE session_id = ?", subMainSID))
 	require.NoError(t, env.db.GetContext(context.Background(), &mainOutput,
 		"SELECT COALESCE(SUM(output_tokens), 0) FROM token_usage WHERE session_id = ?", subMainSID))
-	assert.Equal(t, 1, mainRows)
-	assert.Equal(t, 20, mainOutput, "subagent tokens are not mixed into the main agent's usage")
+	assert.Equal(t, 3, mainRows, "the agent's own call and the fixture's two subagent calls")
+	assert.Equal(t, 20+600, mainOutput, "the subagent's 600 output tokens are in the agent's usage, once")
 }
 
 // Subagents run in the background while the main agent waits on them, so the
@@ -354,17 +354,17 @@ func TestSyncSubagentSpend_TracksFinishedState(t *testing.T) {
 		return fmt.Sprintf(`{"type":"assistant","timestamp":"2026-09-17T03:00:00Z","message":{"id":%q,"model":"claude-opus-5","stop_reason":%q,"usage":{"input_tokens":1,"output_tokens":10}}}`, msgID, reason)
 	}
 	env.writeSubagent("s1", stop("msg_1", "tool_use"))
-	_, err := syncSubagentSpend(ctx, env.subagents, subMainSID, env.parentPath, nil)
+	_, err := syncSubagentSpend(ctx, env.subagents, subMainSID, env.parentPath, nil, nil)
 	require.NoError(t, err)
 	assert.False(t, env.get("s1").Finished, "mid tool call")
 
 	env.appendSubagent("s1", stop("msg_2", "end_turn"))
-	_, err = syncSubagentSpend(ctx, env.subagents, subMainSID, env.parentPath, nil)
+	_, err = syncSubagentSpend(ctx, env.subagents, subMainSID, env.parentPath, nil, nil)
 	require.NoError(t, err)
 	assert.True(t, env.get("s1").Finished)
 
 	env.installFixture()
-	_, err = syncSubagentSpend(ctx, env.subagents, subMainSID, env.parentPath, nil)
+	_, err = syncSubagentSpend(ctx, env.subagents, subMainSID, env.parentPath, nil, nil)
 	require.NoError(t, err)
 	assert.True(t, env.get(subFixtureID).Finished, "the realistic fixture ends with end_turn")
 }
@@ -372,7 +372,78 @@ func TestSyncSubagentSpend_TracksFinishedState(t *testing.T) {
 func TestSyncOneSubagent_SkipsAnEmptyOrMarkupID(t *testing.T) {
 	e := newSubagentEnv(t)
 	for _, id := range []string{"", "<b onclick=x>"} {
-		err := syncOneSubagent(context.Background(), e.subagents, "sess", subagent.Files{SubagentID: id, TranscriptPath: filepath.Join(t.TempDir(), "none.jsonl")})
+		err := syncOneSubagent(context.Background(), e.subagents, "sess", subagent.Files{SubagentID: id, TranscriptPath: filepath.Join(t.TempDir(), "none.jsonl")}, nil)
 		assert.Error(t, err, id)
 	}
+}
+
+// ── a subagent's tokens are in the agent's cost, once (#16016) ─────────────
+
+// usageSums is what the cost views read for the main agent: the session's own total, the latest rollup and the by-agent totals.
+func (e *subagentEnv) cost() (session *store.TokenUsage, byAgent store.UsageAgent) {
+	e.t.Helper()
+	ctx := context.Background()
+	u, err := e.usage.GetSessionUsage(ctx, subMainSID)
+	require.NoError(e.t, err)
+	require.NotNil(e.t, u)
+	agents, err := e.usage.UsageByAgent(ctx, store.UsageFilter{})
+	require.NoError(e.t, err)
+	require.Len(e.t, agents, 1, "one agent, whatever its subagents did")
+	return u, agents[0]
+}
+
+// A subagent that has finished adds its calls to the agent's cost: the session's total, the by-agent total (the team's and Analytics' sums are over the same rows), and
+// polling again, or re-reading the transcript, adds nothing more.
+func TestSubagentTokensAreInTheAgentCostExactlyOnce(t *testing.T) {
+	env := newSubagentEnv(t)
+	p := env.poller()
+	env.poll(p) // the parent's own call: 10 in, 20 out
+	parent, _ := env.cost()
+	require.Equal(t, 10, parent.InputTokens)
+	require.Equal(t, 20, parent.OutputTokens)
+
+	call := func(id string, in, out int, ts, stop string) string {
+		return fmt.Sprintf(`{"type":"assistant","timestamp":%q,"message":{"id":%q,"model":"claude-opus-5","stop_reason":%q,"usage":{"input_tokens":%d,"output_tokens":%d,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}`, ts, id, stop, in, out)
+	}
+	env.writeSubagent("s1", call("m1", 1000, 200, "2026-09-17T03:00:00.100Z", "tool_use"), call("m2", 3000, 400, "2026-09-17T03:00:01.100Z", "end_turn"))
+	env.poll(p)
+	session, byAgent := env.cost()
+	assert.Equal(t, 10+1000+3000, session.InputTokens, "the subagent's two calls are in the agent's session total")
+	assert.Equal(t, 20+200+400, session.OutputTokens)
+	assert.EqualValues(t, 10+1000+3000, byAgent.InputTokens, "and in the by-agent total Analytics and the team read")
+	want := session.CostUSD
+	assert.Greater(t, want, parent.CostUSD, "and in its cost")
+
+	for i := 0; i < 3; i++ { // the transcript read again, and again changed in mtime only: the same rows
+		future := time.Now().Add(time.Duration(i+2) * time.Minute)
+		require.NoError(t, os.Chtimes(env.transcriptPath("s1"), future, future))
+		env.poll(p)
+	}
+	again, byAgentAgain := env.cost()
+	assert.Equal(t, session.InputTokens, again.InputTokens, "counted once")
+	assert.Equal(t, want, again.CostUSD)
+	assert.Equal(t, byAgent.InputTokens, byAgentAgain.InputTokens)
+
+	// the totals the Tasks tab shows for the subagent are the same tokens
+	sa := env.get("s1")
+	assert.Equal(t, 4000, sa.InputTokens)
+}
+
+// A call the subagent is still writing is recorded when it is complete, not before: its timestamp moves while it streams, and a row recorded part-way would be counted again.
+func TestSubagentNewestCallWaitsForItsEnd(t *testing.T) {
+	env := newSubagentEnv(t)
+	p := env.poller()
+	env.poll(p)
+	call := func(id string, in, out int, ts, stop string) string {
+		return fmt.Sprintf(`{"type":"assistant","timestamp":%q,"message":{"id":%q,"model":"claude-opus-5","stop_reason":%q,"usage":{"input_tokens":%d,"output_tokens":%d}}}`, ts, id, stop, in, out)
+	}
+	env.writeSubagent("s1", call("m1", 1000, 100, "2026-09-17T03:00:00.100Z", "tool_use"))
+	env.poll(p)
+	s, _ := env.cost()
+	assert.Equal(t, 10, s.InputTokens, "the only call is still the newest: not recorded yet")
+	env.appendSubagent("s1", call("m1", 1000, 150, "2026-09-17T03:00:00.900Z", "tool_use"), call("m2", 2000, 50, "2026-09-17T03:00:02.000Z", "end_turn"))
+	env.poll(p)
+	s, _ = env.cost()
+	assert.Equal(t, 10+1000+2000, s.InputTokens, "both complete now, m1 once with its final 150 output")
+	assert.Equal(t, 20+150+50, s.OutputTokens)
 }

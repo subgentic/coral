@@ -445,7 +445,12 @@ func (p *TokenPoller) pollClaudeSubagents(ctx context.Context, ls *store.LiveSes
 		return true
 	}
 
-	synced, err := syncSubagentSpend(ctx, p.subagentStore, ls.SessionID, parentTranscriptPath, changed)
+	agentName := ""
+	if ls.DisplayName != nil {
+		agentName = *ls.DisplayName
+	}
+	usage := &subagentUsage{store: p.usageStore, agentName: agentName, agentType: at.Claude, teamID: ls.TeamID, boardName: ls.BoardName}
+	synced, err := syncSubagentSpend(ctx, p.subagentStore, ls.SessionID, parentTranscriptPath, changed, usage)
 	if err != nil {
 		// Leave lastMtime alone so the failed subagent is retried next poll.
 		p.logger.Error("failed to sync subagent spend", "session_id", ls.SessionID, "error", err)
