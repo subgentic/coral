@@ -556,6 +556,10 @@ func (s *JobScheduler) launchAndWatch(runID int64, job store.ScheduledJob, rc ru
 		return
 	}
 
+	if wt.worktreeDir != "" { // the job's Trust box: the run's own folder only, never the repository (#16421)
+		s.trustRunFolder(runID, job, wt.worktreeDir)
+	}
+
 	// Update run with worktree path
 	startedAt := time.Now().UTC().Format(store.ISOFormat)
 	s.store.UpdateScheduledRun(ctx, runID, map[string]interface{}{
