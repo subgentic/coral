@@ -760,7 +760,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     border-bottom: 1px solid var(--border);
 }
 
-@media (max-width: 767px) { #launch-agent-remove { flex: 1 1 100%; } #launch-agent-move-up, #launch-agent-move-down { flex: 1 1 calc(50% - 4px); } } /* Edit member's own row of Move up and Move down, and Remove on one of its own, not wrapped off to the right (#11015) */
+@media (max-width: 767px) { #launch-agent-remove { flex: 1 1 100%; } } /* Edit member's Remove on a row of its own, not wrapped off to the right (#10868; Move up and Move down are in the header since #16361)11015) */
 .launch-modal-step > .modal-actions {
     position: sticky;
     bottom: -24px;
@@ -3819,7 +3819,8 @@ li:has(> .row-btn:focus-visible) { outline: 2px solid var(--accent); outline-off
 .launch-recap[hidden] { display: none; }
 .sd-modal-content .launch-wizard > .modal-actions, .sd-modal-content.launch-wizard > .modal-actions { display: flex; align-items: center; gap: 8px; padding: 10px 24px 16px; border-top: 0; }
 .launch-wizard[data-stage="folder"] > .modal-actions { border-top: 1px solid var(--border); padding-top: 16px; }
-.launch-wizard > .modal-actions #launch-agent-cancel { margin-right: auto; }
+.launch-wizard > .modal-actions { justify-content: flex-end; } /* Cancel then the Primary at the right, like every dialog footer (#16361, #15816); a destructive Quiet one stays alone at the far left */
+.launch-member-move { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; } .launch-member-move[hidden] { display: none; } /* Edit member's Move up and Move down, in its header: not crowding the footer (#16361) */
 .launch-wizard > .modal-actions [hidden] { display: none; }
 .launch-wizard > .modal-actions .btn[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
 /* The provider as a segmented control (the radios stay: one tab stop, the arrows choose) and a slot for its notes as tall as the longest. */

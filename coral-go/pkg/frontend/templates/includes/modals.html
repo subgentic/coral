@@ -83,6 +83,7 @@
                         <h3 id="launch-agent-title"><span id="launch-agent-title-text">New agent</span></h3>
                     </div>
                     <p id="launch-stage-sub" class="sd-sub launch-stage-sub">Step 1 of 3: Where it launches</p>
+                    <div id="launch-member-move" class="launch-member-move" role="group" aria-label="Position in the team" hidden><button class="btn btn-quiet btn-small" id="launch-agent-move-up" data-on-click="team-agent-move" data-dir="up">Move up</button><button class="btn btn-quiet btn-small" id="launch-agent-move-down" data-on-click="team-agent-move" data-dir="down">Move down</button></div>
                 </div>
                 <div class="settings-modal-body">
                     <div class="launch-page launch-page-folder">
@@ -178,14 +179,12 @@
                 </div>
                 <p id="launch-recap" class="launch-recap" role="region" aria-label="What this agent will use"></p>
                 <div class="modal-actions">
-                    <button class="btn" id="launch-agent-cancel" data-on-click="m-hide-launch-modal">Cancel</button>
                     <button class="btn" id="launch-agent-back" data-on-click="m-agent-step" data-arg="back">Back</button>
+                    <button class="btn" id="launch-agent-cancel" data-on-click="m-hide-launch-modal">Cancel</button>
                     <button class="btn btn-primary" id="launch-agent-next" data-on-click="m-agent-step" data-arg="next">Next</button>
                     <button class="btn btn-primary" id="launch-agent-go" data-on-click="m-launch-session">Launch</button>
                     <button class="btn btn-primary" id="launch-agent-save" data-on-click="m-save-team-member" hidden>Save member</button>
                     <button class="btn btn-quiet btn-danger" id="launch-agent-remove" data-on-click="team-agent-remove" hidden>Remove from team</button>
-                    <button class="btn btn-quiet" id="launch-agent-move-up" data-on-click="team-agent-move" data-dir="up" hidden>Move up</button>
-                    <button class="btn btn-quiet" id="launch-agent-move-down" data-on-click="team-agent-move" data-dir="down" hidden>Move down</button>
                     <p id="launch-stage-live" class="sr-only" role="status"></p>
                 </div>
             </div>
