@@ -79,6 +79,7 @@ type fakeDropbox struct {
 	membersFail bool                  // add_file_member refuses the member
 	copies      int                   // copy_v2 calls
 	folders     map[string][]string   // #16170: shared folder id -> the addresses of its members (list_folders, list_folder_members)
+	foldersFail bool                  // list_folders refuses (a Dropbox that is down or rate-limited)
 	folderCalls int                   // list_folders calls
 	checkFail   string                // the sharing check (list_shared_links with no path) answers 409 with this summary
 }
