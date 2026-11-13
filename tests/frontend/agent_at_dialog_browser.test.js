@@ -41,13 +41,13 @@ const { connect } = require('./agent_view_harness');
         await ev(`import(${S}+'dismiss_wait.js').then(m=>m.dismissWait(T.state.liveSessions.find(r=>r.session_id==='d5'))).then(()=>true)`);
         const sent = await ev('window.__dialogPosts');
         assert.equal(sent.length,1);assert.equal(sent[0].session_id,'d5');assert.equal(sent[0].dialog_since,rows.find(r=>r.session_id==='d5').at_dialog.since);
-        await ev(`import(${S}+'api.js').then(m=>m.loadLiveSessions()).then(()=>true)`);
+        await ev(`window._coralLoadLiveSessions().then(()=>true)`);
         const after = await ev(`import(${S}+'asked_before_restart.js').then(m=>T.state.liveSessions.filter(m.needsYou).map(r=>r.session_id))`);
         check(!after.includes('d5'),'the dismissed dialog stays out after another live-list read');
         const stateAfter = await ev(`import(${S}+'session_state.js').then(m=>m.sessionStateInfo(T.state.liveSessions.find(r=>r.session_id==='d5')).label)`);
         check(stateAfter==='At a dialog','dismiss does not change the agent state');
         await ev(`(()=>{const r=window.__dialogRows.find(r=>r.session_id==='d5');r.at_dialog={since:new Date(Date.now()-20*60000).toISOString(),after_min:5,notify:true};return true;})()`);
-        await ev(`import(${S}+'api.js').then(m=>m.loadLiveSessions()).then(()=>true)`);
+        await ev(`window._coralLoadLiveSessions().then(()=>true)`);
         check(await ev(`import(${S}+'asked_before_restart.js').then(m=>m.needsYou(T.state.liveSessions.find(r=>r.session_id==='d5')))`),'a new dialog episode returns to Needs you');
         if(process.env.CORAL_SCREENSHOT_DIR){fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/dialog-episodes.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
         assert.equal(found.length, 0, '\n' + found.join('\n'));
