@@ -224,3 +224,25 @@ func TestTheSpacerIsUsedOnlyForCoralsOwnSendsAndStarts(t *testing.T) {
 	assert.Zero(t, strings.Count(string(b), "SpaceTeam("), "no request waits for the spacing")
 	assert.Equal(t, 1, strings.Count(string(b), "ReserveTeamStart("), "only startAgentCLI")
 }
+
+// #16433: the screen was read before the team's spacing wait (2-3 s); a question that opened during the wait was typed into. The screen is read again right before the text.
+func TestAPromptThatOpensWhileTheTeamSlotWaitsGetsNoText(t *testing.T) {
+	s := newTeamSpacer()
+	s.gap = func() time.Duration { return 0 }
+	useSpacer(t, s)
+	SetTeamResolver(func(string) string { return "slow-team" })
+	t.Cleanup(func() { SetTeamResolver(nil) })
+	s.mu.Lock()
+	s.next["slow-team"] = time.Now().Add(400 * time.Millisecond) // sleep-ok: the slot is 400 ms away; the question opens inside that wait
+	s.mu.Unlock()
+
+	a := &fakeAgent{screen: idleInputBox}
+	go func() { time.Sleep(100 * time.Millisecond); a.show(permissionMenu) }() // sleep-ok: opens during the wait
+	d, err := DeliverAutomated(context.Background(), a.input("claude-gate-slow", "You have 1 unread message", false))
+	require.NoError(t, err)
+	assert.Equal(t, Skipped, d, "a question is open: nothing is typed")
+	assert.Empty(t, a.sent(), "no text into the question that opened while the slot waited")
+	sk, _ := SkippedOf("claude-gate-slow")
+	assert.Equal(t, SkipPrompt, sk.Why)
+	ForgetSession("claude-gate-slow")
+}

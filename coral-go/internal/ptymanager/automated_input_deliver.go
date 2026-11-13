@@ -28,6 +28,9 @@ const (
 	SkipTeamBusy   = "this team's sends are spaced out and the next slot is too far away"
 )
 
+// errPromptBeforeText: the screen showed a prompt (or could not be read) at the second look, just before the text: nothing was typed.
+var errPromptBeforeText = errors.New("a prompt opened before the text")
+
 // DeliverAutomated types an automated send now, with its Enter, unless the screen shows that typing would be a wrong answer
 // (see the package comment): then it types nothing, keeps nothing and says so (SkippedOf).
 func DeliverAutomated(ctx context.Context, in AutomatedInput) (Delivery, error) {
@@ -106,6 +109,10 @@ func DeliverAutomated(ctx context.Context, in AutomatedInput) (Delivery, error) 
 		return Skipped, nil
 	}
 	enterWithheld, err := gate.typeNow(ctx, in)
+	if errors.Is(err, errPromptBeforeText) {
+		noteSkipped(in, SkipPrompt)
+		return Skipped, nil
+	}
 	if errors.Is(err, ErrTeamBusy) {
 		noteSkipped(in, SkipTeamBusy)
 		return Skipped, nil
@@ -255,9 +262,6 @@ func (in AutomatedInput) submitLeftoverAndSay(ctx context.Context) {
 // with the screen looked at once more just before the Enter: if a prompt opened since the look, the Enter is not pressed.
 func (g *inputGate) typeNow(ctx context.Context, in AutomatedInput) (enterWithheld bool, err error) {
 	// Coral's automated sends to one team are spaced (#3613): the first goes at once, the next 2-3 s after.
-	if err := SpaceTeam(ctx, teamFor(in.Name)); err != nil {
-		return false, err
-	}
 	agentType, sessionID := in.identity()
 	check := func(ctx context.Context) bool {
 		r, ok := in.Term.(ScreenReader)
@@ -270,6 +274,17 @@ func (g *inputGate) typeNow(ctx context.Context, in AutomatedInput) (enterWithhe
 		}
 		open, why := PromptOnScreen(screen)
 		return !(open && in.blocks(why, agentType, screen))
+	}
+	if err := SpaceTeam(ctx, teamFor(in.Name)); err != nil {
+		return false, err
+	}
+	// The screen was read before the spacing wait (up to a few seconds): a question that opened during it must get no text (#16433, the Operator: a reminder typed into an open question). Asked again right before the text.
+	if r, ok := in.Term.(ScreenReader); ok {
+		if screen, err := r.AgentScreen(ctx, in.Name, agentType, sessionID); err == nil { // a screen that cannot be read here was handled by the first look (a person's Send now goes on without one)
+			if open, why := PromptOnScreen(screen); open && in.blocks(why, agentType, screen) {
+				return false, errPromptBeforeText
+			}
+		}
 	}
 	pctx := tmux.WithBeforeEnter(ctx, check)
 	if _, known := BracketedPasteHint(pctx); !known {
