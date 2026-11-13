@@ -1,0 +1,8 @@
+/* Activity's kind chips (#16087): several at once. Lazy: loaded by inbox_activity.js, not at start. Below 64 rem of toolbar the six chips and their counts no longer fit beside the title, the search and the icon: they become check boxes in the Filters panel, never scrolled or cut. */
+@container inboxfolder (max-width: 64rem) { /* Activity's six chips and their counts (#16087) take about 40 rem beside the title, the search and the icon: below that they are the panel's check boxes, never scrolled or cut */
+    .inbox-folder-toolbar:has(.team-tb-pills-multi) .team-tb-pills { display: none; }
+    .inbox-folder-toolbar:has(.team-tb-pills-multi) .inbox-pill-field { display: flex; }
+}
+.inbox-folder-toolbar .inbox-pill-field .team-tb-checks { display: flex; flex-wrap: wrap; gap: 2px 14px; } /* a folder whose pills are several at once (Activity, #16087) lists them as check boxes in the panel */
+.team-tb-check { display: inline-flex; align-items: center; gap: 6px; min-height: var(--toolbar-control-h, 32px); white-space: nowrap; }
+@media (max-width: 767px), (pointer: coarse) { .team-tb-check { min-height: var(--control-touch-height, 44px); } }

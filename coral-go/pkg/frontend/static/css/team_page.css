@@ -303,9 +303,6 @@
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .team-tb-select { display: none; }
 .inbox-folder-toolbar .inbox-pill-field { display: none; }
 .inbox-folder-toolbar .inbox-pill-field .team-tb-select { display: block; max-width: none; }
-.inbox-folder-toolbar .inbox-pill-field .team-tb-checks { display: flex; flex-wrap: wrap; gap: 2px 14px; } /* a folder whose pills are several at once (Activity, #16087) lists them as check boxes in the panel */
-.team-tb-check { display: inline-flex; align-items: center; gap: 6px; min-height: var(--toolbar-control-h, 32px); white-space: nowrap; }
-@media (max-width: 767px), (pointer: coarse) { .team-tb-check { min-height: var(--control-touch-height, 44px); } }
 .inbox-folder-head { display: flex; align-items: baseline; gap: var(--space-md, 8px); flex: 0 0 auto; min-width: 0; max-width: 40%; margin-right: 4px; } /* the title never gives: the chips scroll sideways first (#12455: it read 'Nee…' beside them) */
 .inbox-folder-toolbar .team-tb-pills::-webkit-scrollbar { display: none; }
 .inbox-folder-head h2 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-2xl); font-weight: var(--fw-title); line-height: var(--lh-label); color: var(--text-primary); }
@@ -325,10 +322,6 @@
     .inbox-folder-toolbar { position: relative; }
     .inbox-folder-toolbar .list-bar-menu.list-bar-sheet { position: absolute; left: 0; right: 0; z-index: 20; max-height: 60vh; overflow-y: auto; box-sizing: border-box; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); grid-template-columns: minmax(0, 1fr); }
     .inbox-folder-head { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); } /* the folder select names the page and carries its count: the title is for screen readers (and the focus when there is no search box) */
-}
-@container inboxfolder (max-width: 64rem) { /* Activity's six chips and their counts (#16087) take about 40 rem beside the title, the search and the icon: below that they are the panel's check boxes, never scrolled or cut */
-    .inbox-folder-toolbar:has(.team-tb-pills-multi) .team-tb-pills { display: none; }
-    .inbox-folder-toolbar:has(.team-tb-pills-multi) .inbox-pill-field { display: flex; }
 }
 @container inboxfolder (max-width: 46rem) { /* the title, the search at its minimum, the pills and the icon no longer fit one line: the pills are the panel's select */
     .inbox-folder-toolbar .team-tb-pills { display: none; }
