@@ -73,7 +73,7 @@ const STUB = `(() => { const R = window.fetch; const json = (b, s = 200) => Prom
             // search (the sidebar's box)
             if (!mobile) { await ev(`document.getElementById('skills-search').focus(); true`); await Input.insertText({ text: 'pdf' }); await waitFor(`document.querySelectorAll('#skills-view tr.dt-row').length === 1`, `${tag}: the search`, 6000); check(`${tag}: the search narrows the table`, /pdf-forms/.test((await names())[0])); await ev(`document.getElementById('skills-search').value = ''; document.getElementById('skills-search').dispatchEvent(new Event('input', { bubbles: true })); true`); }
             check(`${tag}: nothing scrolls sideways`, (await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`)) <= 0);
-            if (theme === 'dark' && fs === 16) await shot(`skills-sidebar-${w}`);
+            await shot(`skills-${w}-px-${fs === 32 ? '200pct' : '100pct'}-${theme}`);
         }
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'the Skills sidebar:\n  ' + problems.join('\n  '));

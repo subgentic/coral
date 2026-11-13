@@ -9,6 +9,7 @@ import { isPhoneLayout } from './phone_layout.js';
 import { SKILL_FOLDERS } from './routes.js';
 const { latestSkillRows, skillVersions } = await importOnce('./skill_versions.js');
 const DT = await importOnce('./data_table.js');
+const PH = await importOnce('./page_header.js'); // the shared page header: title and count, the Primary at the far right (#15838, guidelines 4.2)
 const VL = await importOnce('./view_list.js'); // the folders in the sidebar (and a phone's strip), as Automations and the Inbox have them (#12997)
 await loadStyles('skills.css');
 
@@ -99,15 +100,23 @@ function draw() {
 function drawList() {
     const page = el('div', 'skills-page');
     if (isPhoneLayout()) page.append(VL.build({ id: 'skills-folders-page', label: 'Skills folders', sections: sections(), current: folder || 'all', onPick: pickFolder, tabs: true })); // a phone has no sidebar: the folders are a strip at the top of the page, as Automations has them
-    const head = el('div', 'skills-head');
-    const sel = el('select', 'field field-dense'); sel.setAttribute('aria-label', 'Show'); // the shared field look: padding, radius, the page font (#12990); 44 px on a phone or touch
+    const shown = rows.filter(r => inFolder(r, folder) && matches(r));
+    const head = el('div', 'list-bar-search-row gt-toolbar toolbar');
+    const title = el('h2', '', 'Skills'); title.id = 'skills-title'; title.tabIndex = -1;
+    const count = el('span', 'session-group-count', String(shown.length)); count.setAttribute('aria-label', `${shown.length} ${shown.length === 1 ? 'skill' : 'skills'}`);
+    const sel = el('select', 'field field-dense team-tb-select'); sel.setAttribute('aria-label', 'Show'); // the shared field look: padding, radius, the page font (#12990); 44 px on a phone or touch
     for (const [v, label] of FILTERS) { const o = el('option', '', label); o.value = v; sel.append(o); }
     sel.value = showStatus;
     sel.addEventListener('change', async () => { showStatus = sel.value; await loadList(); draw(); });
     const input = el('input'); input.type = 'file'; input.accept = '.zip,.md,.markdown,application/zip,text/markdown'; input.hidden = true;
     input.addEventListener('change', () => { const f = input.files && input.files[0]; input.value = ''; if (f) importFile(f, false, false); });
-    head.append(el('h2', '', 'Skills'), sel, button('btn', 'Import a skill', () => input.click()), el('span', 'skills-hint', '.zip or a SKILL.md'), input);
-    page.append(head, el('p', 'skills-note', 'Agent Skills: a folder with SKILL.md that agents read when it fits their task. A skill an agent publishes waits here until you approve it; one you import is approved at once.'));
+    const importBtn = button('btn btn-primary team-tb-action', 'Import', () => input.click());
+    importBtn.title = 'Import a skill: a .zip or a SKILL.md file'; importBtn.setAttribute('aria-label', 'Import a skill (a .zip or a SKILL.md file)');
+    const folderHead = el('div', 'inbox-folder-head'); folderHead.append(title, count);
+    head.append(folderHead, sel, importBtn, input);
+    PH.pageHeader(head, { idp: 'skills' });
+    page.append(head);
+    if (!rows.length && !loadError) page.append(el('p', 'skills-note', 'Agent Skills: a folder with SKILL.md that agents read when it fits their task. A skill an agent publishes waits here until you approve it; one you import is approved at once.')); // the description is for an empty list: with skills, the list is the page
     if (loadError) { const p = el('p', 'skills-error', loadError); p.setAttribute('role', 'alert'); page.append(p); }
     const columns = [
         { key: 'name', label: 'Name', primary: true, width: 'grow', sort: true, sortValue: r => r.name.toLowerCase(), line: 1, cell: r => r.name },
@@ -127,7 +136,6 @@ function drawList() {
         { key: 'scripts', label: 'Scripts', width: '5rem', align: 'end', sort: true, sortValue: r => (r.has_scripts || r.not_reviewable ? 1 : 0), cell: r => (r.has_scripts ? 'yes' : r.not_reviewable ? 'files' : '-'), narrowHide: true },
         { key: 'updated', label: 'Updated', width: '7rem', fixed: true, sort: 'date', sortValue: r => r.decided_at || r.created_at, cell: r => DT.timeCell(r.decided_at || r.created_at) },
     ];
-    const shown = rows.filter(r => inFolder(r, folder) && matches(r));
     page.append(DT.dataTable({ label: `${FOLDER_LABEL[folder]}, ${shown.length}`, rows: shown, rowKey: r => r.id, rowName: r => r.name, state: tableState, columns, open: r => loadOne(r.id),
         ...(isPhoneLayout() ? { bare: true, sortBar: false, mail: r => ({ lead: { icon: 'auto_awesome', square: true, name: r.name }, title: r.name, snippet: r.description, state: (STATUS[r.status] || [r.status])[0] + (r.pendingVersion && r.pendingVersion.id !== r.id ? ` · v${r.pendingVersion.version} waiting` : ''), time: DT.timeCell(r.decided_at || r.created_at).textContent, mark: r.pendingVersion ? 'attention' : undefined }) } : {}), // a phone's rows run edge to edge like the Inbox lists (#12957, the Operator's note on #12997): the shared mail row, no bordered box
         empty: { line: showStatus || folder || query ? 'No skill in this list.' : 'No skills yet.', hint: 'Import a skill, or an agent can publish one with coral-agent skills publish.' } }).el);
