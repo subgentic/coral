@@ -227,7 +227,7 @@ func CodexAutoNote(args, flags []string, mode string, keepFull bool) string {
 		}
 	}
 	if sandbox == "workspace-write" && approval == "never" {
-		return "This Codex is older than " + codexApproveForMeMin + " (or its version is not known), which has Codex's own auto-review, so Auto keeps workspace writes with no approvals."
+		return "This Codex is older than " + codexApproveForMeMin + ", which has Codex's own auto-review, so Auto keeps workspace writes with no approvals."
 	}
 	return ""
 }

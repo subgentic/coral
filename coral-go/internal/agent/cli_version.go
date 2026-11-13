@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/subgentic/coral/internal/agentenv"
 	"github.com/subgentic/coral/internal/executil"
+	"log"
 	"os"
 	"os/exec"
 	"regexp"
@@ -22,6 +23,8 @@ func VersionNumber(output string) string { return cliVersionRe.FindString(output
 // cliVersions caches each CLI path's version with the binary's modification time and size,
 // so an update of the CLI is noticed and an unchanged one is asked only once. One entry per
 // path: an update replaces it, so the cache doesn't grow with every version ever seen (#4057).
+var cliVersionLogged sync.Map
+
 var cliVersions sync.Map // path -> cliVersion
 
 type cliVersion struct {
@@ -58,8 +61,13 @@ func CLIVersion(settings map[string]string, agentType string) string {
 	cmd.WaitDelay = 2 * time.Second
 	executil.NoCwdSearch(cmd) // Windows: a claude.cmd shim looks for node in the current folder first, so a repository's node.exe would run
 	executil.HideWindow(cmd)  // Windows: a console program started by a Coral with no console of its own would open a visible window (#211); its output still comes through the pipes
-	out, _ := cmd.Output()
+	out, runErr := cmd.Output()
 	v := cliVersionRe.FindString(string(out))
+	if v == "" { // say why once per binary: a version that cannot be read decides what a launch does (#16007), and nothing said why the Operator's Codex gave none
+		if _, seen := cliVersionLogged.LoadOrStore(path+"|"+stamp, true); !seen {
+			log.Printf("cli version: no version read from %s --version (run error: %v, timed out: %v, output: %.80q)", path, runErr, ctx.Err() != nil, string(out))
+		}
+	}
 	if ctx.Err() == nil {
 		cliVersions.Store(path, cliVersion{stamp: stamp, version: v})
 	}
