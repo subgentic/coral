@@ -1480,7 +1480,7 @@ func TestBoardTaskNudge_UsesTheTasksBoard(t *testing.T) {
 	postJSON(t, server.URL+"/api/board/myproject/subscribe", map[string]string{
 		"subscriber_id": "Frontend Dev", "job_title": "Frontend Dev", "session_name": "claude-00000004-3864-4864-8864-000000000004",
 	}).Body.Close()
-	time.Sleep(1100 * time.Millisecond) // subscribed_at has second resolution
+	// no wait: the lookup orders by subscribed_at then rowid DESC, so the later subscription wins inside one second too
 	postJSON(t, server.URL+"/api/board/other/subscribe", map[string]string{
 		"subscriber_id": "Frontend Dev", "job_title": "Frontend Dev", "session_name": "claude-00000005-3864-4864-8864-000000000005",
 	}).Body.Close()
