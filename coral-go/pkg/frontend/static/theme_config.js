@@ -8,6 +8,8 @@ import { updateTerminalTheme } from './xterm_renderer.js';
 import { isCloud } from './server_base.js';
 import { applyTheme, applyThemeData, clearCustomThemeVars } from './settings_core.js';
 import { browserLocal } from './safe_storage.js';
+import { importOnce } from './import_once.js';
+const { moreMenu } = await importOnce('./more_menu.js'); // Import, Export, Reset and Preview live in a More menu (#15845, guidelines 4.8)
 
 let variableGroups = {};   // { groupName: { cssVar: label, ... }, ... }
 let currentEdits = {};     // { cssVar: colorValue, ... }
@@ -119,14 +121,12 @@ function renderModal() {
                     ${themeOptions}
                 </select>
                 <button class="btn" data-on-click="theme-load">Use theme</button>
-                <button class="btn btn-danger" data-on-click="theme-delete">Delete</button>
                 <span class="toolbar-spacer"></span>
-                ${isCloud() ? '' : '<button class="btn" data-on-click="theme-import">Import</button>'}
-                <button class="btn" data-on-click="theme-export">Export</button>
+                <span id="theme-more-slot"></span>
             </div>
             ${isCloud() ? '' : `<div class="toolbar toolbar-stretch toolbar-nowrap toolbar-pad-bare theme-generate-bar">
                 <input type="text" id="theme-ai-prompt" class="settings-input" placeholder="Describe your theme... (e.g. &quot;cyberpunk neon with pink and teal&quot;)">
-                <button class="btn btn-primary" id="theme-generate-btn" data-on-click="theme-generate">Generate</button>
+                <button class="btn" id="theme-generate-btn" data-on-click="theme-generate">Generate</button>
             </div>`}
             <div class="theme-editor-scroll">
                 ${groups}
@@ -141,13 +141,19 @@ function renderModal() {
             </div>
             <p class="settings-hint theme-save-hint" id="theme-save-hint" role="status"></p>
             <div class="modal-actions">
+                <button class="btn btn-quiet btn-danger" data-on-click="theme-delete">Delete</button>
                 <button class="btn" data-on-click="theme-close">Cancel</button>
-                <button class="btn" data-on-click="theme-reset">Reset</button>
-                <button class="btn" data-on-click="theme-preview">Preview</button>
                 <button class="btn btn-primary" data-on-click="theme-save">Save and apply</button>
             </div>
         </div>
     `;
+    { // the four page actions that are not the dialog's decision: one More menu at the top right. Each item carries its action name, so the shared action table runs it (the click handler of the menu only closes the menu)
+        const A = { import: 'data-on-click="theme-import"', export: 'data-on-click="theme-export"', reset: 'data-on-click="theme-reset"', preview: 'data-on-click="theme-preview"' }; // written out, so the action census finds the markup that names each action
+        const items = [...(isCloud() ? [] : [{ label: 'Import', attr: A.import, title: 'Import a theme from a file' }]), { label: 'Export', attr: A.export, title: 'Save the theme being edited as a file' }, { label: 'Reset', attr: A.reset, title: 'Put every colour back to the base theme' }, { label: 'Preview', attr: A.preview, title: 'Show the colours on the page without saving' }];
+        const menu = moreMenu('theme-more', items.map(i => ({ label: i.label, title: i.title, run: () => {} })), { label: 'Theme actions', wrapClass: 'theme-more', menuClass: 'theme-more-menu' });
+        menu.querySelectorAll('.menu-item').forEach((b, i) => { const [k, v] = items[i].attr.split('='); b.setAttribute(k, JSON.parse(v)); });
+        modal.querySelector('#theme-more-slot').replaceWith(menu);
+    }
 }
 
 // ── Color picker handlers (exposed globally) ────────────────────────────

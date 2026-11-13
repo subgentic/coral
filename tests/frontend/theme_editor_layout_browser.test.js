@@ -28,7 +28,7 @@ const BASE = require('./test_base').BASE;
                 assert.ok(m.name.w >= 150 && m.desc.w >= 150, at + `the two save fields are wide enough to type in: ${m.name.w}, ${m.desc.w}`);
                 assert.ok(m.namePh && m.descPh, at + 'both fields say what they are');
                 assert.ok(m.sel.w >= 12 * m.rem - 1, at + `the Load select keeps 12 rem: ${m.sel.w}`); assert.ok(m.selFits, at + 'the Load select shows its whole text'); assert.ok(m.saveSelFits, at + 'the Based on select shows its whole text');
-                if (mobile) { assert.ok(m.tb.every(b => b.top >= m.sel.bottom - 1), at + 'Load, Delete, Import and Export are under the select'); assert.ok(m.foot.length === 2 && m.foot.every(n => n >= 2), at + 'the four footer buttons are two rows of two: ' + JSON.stringify(m.foot)); }
+                if (mobile) { assert.ok(m.tb.every(b => b.top >= m.sel.bottom - 1), at + 'Use theme and More are under the select'); assert.ok(m.foot.length <= 2, at + 'the three footer buttons are at most two rows: ' + JSON.stringify(m.foot)); }
                 else { assert.ok(m.tb.every(b => Math.abs(b.top - m.sel.top) <= 8), at + 'the select and the buttons share the line'); assert.equal(m.foot.length, 1, at + 'the footer is one row'); }
                 assert.ok(m.over <= 1, at + 'no sideways scroll: ' + m.over);
                 await shot(`theme-editor-${label}-${theme}`);
