@@ -340,6 +340,7 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 // registerSessions: the live-session, agent task, note, event and WebSocket routes.
 func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	sessHandler := h.sess
+	hubTarget := routes.HubTargetGuard(s.ownHubServerID) // typing into an agent through the hub: the hub names the server it routed to, and it must be this one (#16032)
 	// Live sessions
 	r.Get("/api/sessions/resolve", sessHandler.ResolveByPIDs)
 	r.Get("/api/sessions/live", sessHandler.List)
@@ -364,7 +365,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/sessions/live/{name}/search-files", sessHandler.SearchFiles)
 	r.Get("/api/sessions/live/{name}/git", sessHandler.Git)
 	r.Get("/api/sessions/live/{name}/branches", sessHandler.Branches)
-	r.Post("/api/sessions/live/{name}/send", sessHandler.Send)
+	r.With(hubTarget).Post("/api/sessions/live/{name}/send", sessHandler.Send)
 	r.Delete("/api/sessions/live/{name}/held/{id}", sessHandler.CancelHeld)
 	r.With(routes.RefuseSignInLink).Post("/api/sessions/live/{name}/goal", sessHandler.RequestGoal)
 	s.goalMetrics = routes.NewGoalMetricsHandler(s.db)
@@ -372,7 +373,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	callMetrics := routes.NewCallMetricsHandler(s.db)
 	r.Post("/api/call-metrics", callMetrics.Record)
 	r.Get("/api/call-metrics/summary", callMetrics.Summary)
-	r.Post("/api/sessions/live/{name}/keys", sessHandler.Keys)
+	r.With(hubTarget).Post("/api/sessions/live/{name}/keys", sessHandler.Keys)
 	r.Post("/api/sessions/live/{name}/resize", sessHandler.Resize)
 	r.Post("/api/sessions/live/{name}/kill", sessHandler.Kill)
 	r.Get("/api/sessions/live/{name}/waiting", sessHandler.ListWaiting)             // what waits for the agent: its unread board messages and the last send not typed (#7727)
@@ -486,7 +487,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.With(routes.RedactSignInLink).Post("/api/sessions/live/{name}/events", sessHandler.CreateEvent)
 	r.With(routes.RedactSignInLink).Post("/api/sessions/live/{name}/turn-end", sessHandler.TurnEndHandoff)
 	r.With(routes.RedactSignInLink).Post("/api/sessions/live/{name}/pending-tool", sessHandler.SetPendingTool)
-	r.Post("/api/sessions/live/{name}/answer-prompt", sessHandler.AnswerPrompt)
+	r.With(hubTarget).Post("/api/sessions/live/{name}/answer-prompt", sessHandler.AnswerPrompt)
 	r.Post("/api/sessions/live/{name}/dismiss-wait", sessHandler.DismissWait)
 	r.Post("/api/sessions/live/{name}/auto-sleep", sessHandler.AutoSleepOpt)
 	r.Post("/api/sessions/live/{name}/keep-full-access", sessHandler.KeepFullAccessOpt)
@@ -964,4 +965,13 @@ func stampAt(o *routes.IdentityObserver) string {
 		return at.Format(time.RFC3339)
 	}
 	return ""
+}
+
+// ownHubServerID is this computer's Coral Hub server id, "" when it is not linked to a hub.
+func (s *Server) ownHubServerID(ctx context.Context) (string, error) {
+	c, err := store.NewCloudStore(s.db, store.NewRemoteServerStore(s.db, s.cfg.CoralDir())).Get(ctx)
+	if err != nil || c == nil {
+		return "", err
+	}
+	return c.ServerID, nil
 }
