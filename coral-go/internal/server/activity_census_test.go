@@ -190,6 +190,11 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/folder-tags/{folderName}":                                   "tags on folders",
 	"POST /api/history-import":                                             "importing earlier chats",
 	"POST /api/hub-auto-accept":                                            "settings",
+	"PUT /api/cloud/hub-dropbox-share":                                     "Coral Hub connection and Hub-to-computer calls", // #16109
+	"POST /api/dropbox/upload-anyway/{digest}":                             "sharing through Coral Hub",
+	"POST /api/dropbox/prepare":                                            "sharing through Coral Hub",
+	"POST /api/dropbox/push":                                               "sharing through Coral Hub",
+	"POST /api/dropbox/shared":                                             "sharing through Coral Hub",
 	"POST /api/indexer/refresh":                                            "search index",
 	"POST /api/notifications":                                              "notification settings",
 	"POST /api/pinned-folders":                                             "pinned folders",

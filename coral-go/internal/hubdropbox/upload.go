@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -21,9 +22,18 @@ var (
 	ErrBadLink        = errors.New("the upload link is not a Dropbox upload link")
 	ErrDigestMismatch = errors.New("the file's bytes do not match the requested digest")
 	ErrNotAllowed     = errors.New("this file may not be sent")
-	ErrRefused        = errors.New("Dropbox did not take the file")
 	ErrNetwork        = errors.New("could not reach Dropbox")
 )
+
+// Refused is Dropbox's answer when it did not take the file: the status, and whether a 409 said the space is full (the only tag read, never Dropbox's text).
+type Refused struct {
+	Status    int
+	QuotaFull bool
+}
+
+func (r *Refused) Error() string {
+	return fmt.Sprintf("Dropbox did not take the file (status %d)", r.Status)
+}
 
 // RateLimited carries a wait, clamped to an hour (a missing one is a minute).
 type RateLimited struct{ After time.Duration }
@@ -56,6 +66,11 @@ type Uploader struct {
 // NewUploader builds the production client: no redirects, no proxy from the environment, a total timeout.
 func NewUploader(allowed func(ctx context.Context) (bool, error)) *Uploader {
 	return newUploader(&http.Transport{Proxy: nil, TLSHandshakeTimeout: 10 * time.Second, ResponseHeaderTimeout: 60 * time.Second, MaxResponseHeaderBytes: 16 << 10}, allowed)
+}
+
+// NewUploaderWith is NewUploader over a given transport, for the tests of the code that calls it.
+func NewUploaderWith(rt http.RoundTripper, allowed func(ctx context.Context) (bool, error)) *Uploader {
+	return newUploader(rt, allowed)
 }
 
 func newUploader(rt http.RoundTripper, allowed func(ctx context.Context) (bool, error)) *Uploader {
@@ -103,7 +118,12 @@ func (u *Uploader) Upload(ctx context.Context, link, wantDigest string, f *File)
 	case resp.StatusCode == http.StatusTooManyRequests:
 		return &RateLimited{After: retryAfter(resp.Header.Get("Retry-After"))}
 	default:
-		return fmt.Errorf("%w (status %d)", ErrRefused, resp.StatusCode)
+		ref := &Refused{Status: resp.StatusCode}
+		if resp.StatusCode == http.StatusConflict {
+			b, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<10))
+			ref.QuotaFull = bytes.Contains(b, []byte("insufficient_space"))
+		}
+		return ref
 	}
 }
 

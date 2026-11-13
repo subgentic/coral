@@ -103,6 +103,26 @@ func (h *CloudHandler) SetHubRelaunch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, h.status())
 }
 
+// SetHubDropboxShare: PUT /api/cloud/hub-dropbox-share {"allow": bool}. Local dashboard and the signed command line only (never through the tunnel, any role): whether Coral Hub's owner may send a file the person pressed Share on
+// to the Dropbox connected on the Hub (#16109). Off by default.
+func (h *CloudHandler) SetHubDropboxShare(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard|allowCLI) || !requireJSON(w, r) {
+		return
+	}
+	var body struct {
+		Allow *bool `json:"allow"`
+	}
+	if err := decodeJSON(r, &body); err != nil || body.Allow == nil {
+		errBadRequest(w, "allow is required")
+		return
+	}
+	if err := h.ss.SetSetting(r.Context(), HubDropboxShareSetting, strconv.FormatBool(*body.Allow)); err != nil {
+		errInternalServer(w, "Could not save the setting")
+		return
+	}
+	writeJSON(w, http.StatusOK, h.status())
+}
+
 // SetHubCrossTeam: PUT /api/cloud/hub-cross-team {"allow": bool}. Local dashboard and the signed command line only (never through the tunnel, any role): whether Coral Hub's owner may turn
 // cross-team messaging and file sharing on or off for this computer's teams (#5572). Off refuses the Hub in both directions.
 func (h *CloudHandler) SetHubCrossTeam(w http.ResponseWriter, r *http.Request) {

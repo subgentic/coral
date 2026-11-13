@@ -216,7 +216,9 @@ func TestUpload_NeverFollowsARedirect(t *testing.T) {
 		return reply(302, map[string]string{"Location": "https://evil.example/steal"}), nil
 	}), allow)
 	err := u.Upload(context.Background(), goodLink, f.Digest, f)
-	assert.ErrorIs(t, err, ErrRefused)
+	var ref *Refused
+	require.ErrorAs(t, err, &ref)
+	assert.Equal(t, 302, ref.Status)
 	assert.Equal(t, 1, hits, "the redirect target is never requested")
 }
 
@@ -261,10 +263,39 @@ func TestUpload_RetryAfterIsClamped(t *testing.T) {
 }
 
 func TestFlagged_AScanThatFailsIsNotClean(t *testing.T) {
-	old := scan
-	defer func() { scan = old }()
-	scan = func([]byte) []byte { panic("scanner broke") }
+	old := Scan
+	defer func() { Scan = old }()
+	Scan = func([]byte) ([]byte, error) { panic("scanner broke") }
 	f, err := ReadOnce(strings.NewReader("harmless text"))
 	require.NoError(t, err)
-	assert.True(t, f.Flagged, "a scan that did not finish is held, never clean")
+	assert.True(t, f.Flagged, "a scan that panicked is held, never clean")
+	Scan = func(b []byte) ([]byte, error) { return b, errors.New("scanner failed") }
+	f, err = ReadOnce(strings.NewReader("harmless text"))
+	require.NoError(t, err)
+	assert.True(t, f.Flagged, "a scan that returned an error is held, never clean")
+}
+
+func TestUpload_MapsDropboxsAnswers(t *testing.T) {
+	f := fileOf(t, "x")
+	body := func(code int, text string) *http.Response {
+		r := reply(code, nil)
+		r.Body = io.NopCloser(strings.NewReader(text))
+		return r
+	}
+	for name, c := range map[string]struct {
+		resp *http.Response
+		full bool
+		code int
+	}{
+		"space full": {body(409, `{"error_summary":"insufficient_space/..."}`), true, 409},
+		"other 409":  {body(409, `{"error_summary":"path/conflict"}`), false, 409},
+		"expired":    {body(410, ""), false, 410},
+		"server":     {body(500, ""), false, 500},
+	} {
+		u := newUploader(rt(func(*http.Request) (*http.Response, error) { return c.resp, nil }), allow)
+		var ref *Refused
+		require.ErrorAs(t, u.Upload(context.Background(), goodLink, f.Digest, f), &ref, name)
+		assert.Equal(t, c.code, ref.Status, name)
+		assert.Equal(t, c.full, ref.QuotaFull, name)
+	}
 }

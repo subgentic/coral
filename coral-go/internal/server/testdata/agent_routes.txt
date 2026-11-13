@@ -590,6 +590,11 @@ b GET /api/dropbox/status
 b POST /api/dropbox/connect
 b POST /api/dropbox/disconnect
 b POST /api/dropbox/switch
+b POST /api/dropbox/prepare
+b POST /api/dropbox/push
+b POST /api/dropbox/shared
+b POST /api/dropbox/upload-anyway/{digest}
+b PUT /api/cloud/hub-dropbox-share
 b POST /api/dropbox/takeover
 b PUT /api/dropbox/app-key
 b PUT /api/dropbox/filters

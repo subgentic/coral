@@ -41,7 +41,7 @@ var neverStamped = []string{
 	"POST /api/system/auto-wake/dismiss", "POST /api/artifacts/prune",
 	"POST /api/chief/checks", "POST /api/chief/checks/{checkID}/run", "PUT /api/chief/checks/{checkID}", "DELETE /api/chief/checks/{checkID}",
 	"POST /api/pinned-folders", "DELETE /api/pinned-folders", "DELETE /api/shared-images/{id}",
-	"POST /api/board/remotes", "DELETE /api/board/remotes", "PUT /api/custom-models", "POST /api/hub-auto-accept",
+	"POST /api/board/remotes", "DELETE /api/board/remotes", "PUT /api/custom-models", "POST /api/hub-auto-accept", "PUT /api/cloud/hub-dropbox-share", "POST /api/dropbox/upload-anyway/{digest}", "POST /api/dropbox/prepare", "POST /api/dropbox/push", "POST /api/dropbox/shared",
 	"POST /api/artifacts/{id}/comment-images", "POST /api/board/{project}/goal-images",
 	// the routes that install the stamp's secret and hold the API keys of the computers (Hub mode: served by hubModeRoutes below)
 	"POST /api/servers/{id}/owner-secret", "POST /api/servers", "PATCH /api/servers/{id}", "DELETE /api/servers/{id}",

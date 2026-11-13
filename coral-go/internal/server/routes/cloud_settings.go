@@ -35,6 +35,14 @@ const AllowHubAutoAcceptSetting = "cloud_allow_hub_auto_accept"
 // PUT /api/settings refuses it like the mode cap.
 const HubRelaunchSetting = "hub_relaunch_updates"
 
+// HubDropboxShareSetting is the local switch "Share through Coral Hub" (#16109): off unless "true", set only by the person at this computer (PUT /api/cloud/hub-dropbox-share), never through the tunnel.
+const HubDropboxShareSetting = "hub_dropbox_share"
+
+// HubDropboxShareOn reads the switch: on only for the word true.
+func HubDropboxShareOn(settings map[string]string) bool {
+	return setreg.Bool(settings, HubDropboxShareSetting)
+}
+
 // UpdateAutoSetting is "check for updates automatically" (#5280 step 3 B): the background check and staging. Installing one needs a person (the relaunch with its acknowledgement) unless update_auto_install is on: then Coral installs it once idle (#11170).
 const UpdateAutoSetting = "update_auto"
 

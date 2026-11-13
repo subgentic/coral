@@ -243,6 +243,14 @@ var routeTable = cat(
 	// A content-addressed agent artifact is named by its full SHA-256; the only query on the content is the link form v=2 (routes_query.go, #3179). Pasted images are artifacts
 	// too (#5284); /api/upload and /api/shared-images stay local only. Upload (POST /api/agent/artifacts) and the artifact list under /api/agent/ stay unlisted (never).
 	// Pausing Coral's notices to one agent, and resuming them (#11387), is the OWNER's alone through the Hub, like the Operator's other controls on that agent: it changes what is typed into the agent.
+	// Sharing a file the owner pressed Share on to the Dropbox connected on the Hub (#16109): the Hub calls these on this computer as the owner, after a share job a signed-in owner started. The machine refuses anyone else and
+	// a request that did not come through Coral Hub (403 owner_only), and answers {"word":"disabled"} while the local switch "Share through Coral Hub" is off. Closed JSON bodies, no query. "Upload anyway" for a held file
+	// is a click in this computer's own dashboard and is not in this table (never).
+	owner(OwnerHubOnly, rules(http.MethodPost, TierInteract,
+		"/api/dropbox/prepare",
+		"/api/dropbox/push",
+		"/api/dropbox/shared",
+	)),
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract,
 		"/api/sessions/live/{name}/notices/pause",
 		"/api/sessions/live/{name}/notices/resume",

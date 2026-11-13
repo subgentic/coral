@@ -85,8 +85,9 @@ func ReadOnce(r io.Reader) (*File, error) {
 	}, nil
 }
 
-// scan is the redactor; a variable so a test can make it fail.
-var scan = redact.Tokens
+// Scan is the secret scanner: the text it returns differs from its input when it would change something. The default knows token formats only; the server sets it to Coral's full redactor (keyword rules too),
+// the one Share via Dropbox already uses, so both paths flag the same files. An error counts as flagged.
+var Scan = func(b []byte) ([]byte, error) { return redact.Tokens(b), nil }
 
 // flagged runs the redactor over the bytes. Any panic or doubt is "flagged": a scan that did not finish is never "clean".
 func flagged(data []byte) (f bool) {
@@ -95,5 +96,6 @@ func flagged(data []byte) (f bool) {
 			f = true
 		}
 	}()
-	return !bytes.Equal(scan(data), data)
+	out, err := Scan(data)
+	return err != nil || !bytes.Equal(out, data)
 }

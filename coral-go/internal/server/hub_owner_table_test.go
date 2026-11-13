@@ -115,6 +115,9 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"PATCH /api/saved/{id}":                         "owner-only",
 		"DELETE /api/saved/{id}":                        "owner-only",
 		"POST /api/hub-auto-accept":                     "owner-only-hub",
+		"POST /api/dropbox/prepare":                     "owner-only-hub", // #16109
+		"POST /api/dropbox/push":                        "owner-only-hub",
+		"POST /api/dropbox/shared":                      "owner-only-hub",
 		"GET /api/analytics/activity":                   "owner-only", // the activity counts of the Analytics tabs (#11225)
 		"POST /api/sessions/live/{name}/notices/pause":  "owner-only", // pausing Coral's notices to an agent (#11387)
 		"POST /api/sessions/live/{name}/notices/resume": "owner-only",

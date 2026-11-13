@@ -64,6 +64,7 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 		"/api/board/team/tasks/12/artifact-content", "/api/board/team/settings", "/api/board//settings", "/api/board/a/b/settings", "/api/board/team/settings/x", "/api/board/team/status",
 		"/api/board/team/cross-team/enable", "/api/board/team/cross-team/disable", "/api/board/team/cross-team/files/enable", "/api/board/team/cross-team/files/disable",
 		"/api/hub-auto-accept", "/api/hub-auto-accept/enable", "/api/hub-auto-accept/x",
+		"/api/dropbox/prepare", "/api/dropbox/push", "/api/dropbox/shared", "/api/dropbox/upload-anyway/" + hex,
 		"/api/board/team/cross-team/toggle", "/api/board/team/cross-team/files", "/api/board/team/cross-team/enable/x", "/api/settings/prompt-inspection", "/api/settings/default-prompts",
 		"/api/settings", "/api/system/update", "/api/system/update/relaunch", "/api/system/update/", "/api/system/update-check", "/api/system/hub-operator", "/api/health",
 		"/api/sessions/live", "/api/cloud/hub-cross-team",
@@ -80,6 +81,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			want := oldIsOwnerRoute(m, p)
 			got := IsOwnerRoute(m, p)
 			if m == http.MethodHead { // the table treats HEAD as GET; the old list never saw one
+				continue
+			}
+			// The Hub owner's Dropbox share routes (#16109) are new: the old list never had them.
+			if m == http.MethodPost && (p == "/api/dropbox/prepare" || p == "/api/dropbox/push" || p == "/api/dropbox/shared") {
 				continue
 			}
 			// The owner's switch for Coral Hub auto-accept (#5840) is new: the old list never had it.

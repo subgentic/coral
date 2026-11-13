@@ -28,7 +28,7 @@ func TestEveryOptInBoolFailsClosed(t *testing.T) {
 // The set of opt-in switches is pinned: a new setting that widens exposure must be declared OptIn on purpose, and this list changed with it.
 func TestTheOptInKeysAreTheKnownOnes(t *testing.T) {
 	got := optInKeys(t)
-	want := []string{ArtifactCommentsHubWrite, HubMode, HubRelaunchUpdates, "hub_signin_enabled", RemoteAccessEnabled}
+	want := []string{ArtifactCommentsHubWrite, HubDropboxShare, HubMode, HubRelaunchUpdates, "hub_signin_enabled", RemoteAccessEnabled}
 	sort.Strings(want)
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("the OptIn settings are %v, want %v: a setting that widens exposure must fail closed (only the word true), and be added here", got, want)

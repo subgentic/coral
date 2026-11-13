@@ -549,6 +549,13 @@ func (s *Server) registerCloud(r *chi.Mux) {
 		dbxBackup.SetChat(s.boardStore.GetMessageByID)                                  // #14944: a board chat's messages, for Share via Dropbox
 	}
 	s.goBackground(func(ctx context.Context) { dbxBackup.Run(ctx, 5*time.Minute) })
+	// Share through Coral Hub (#16109): the Hub calls prepare, push and shared on this computer as the owner (OwnerHubOnly, tier Interact); "Upload anyway" is the owner's click here and never in the tunnel table.
+	hubDropbox := s.cloudHandler.NewHubDropbox(s.cfg.CoralDir(), s.boardStore)
+	r.Post("/api/dropbox/prepare", hubDropbox.Prepare)
+	r.Post("/api/dropbox/push", hubDropbox.Push)
+	r.Post("/api/dropbox/shared", hubDropbox.SharedHint)
+	r.Post("/api/dropbox/upload-anyway/{digest}", hubDropbox.LocalUploadAnyway(s.cloudHandler))
+	r.Put("/api/cloud/hub-dropbox-share", s.cloudHandler.SetHubDropboxShare)
 	r.Post("/api/cloud/disconnect", s.cloudHandler.Disconnect)
 	r.Post("/api/cloud/rekey", s.cloudHandler.Rekey)                   // #3698
 	r.Get("/api/cloud/owner-label", s.cloudHandler.OwnerLabel)         // #6108: is the owner recorded, and who would be

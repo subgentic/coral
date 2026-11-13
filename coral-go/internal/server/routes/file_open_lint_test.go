@@ -24,6 +24,7 @@ var reviewedFileOpens = map[string]string{
 	"telemetry_install_id.go:telemetryInstallID:OpenNoFollow":             "fixed .install_id in the server instance data folder, not a request path; read-only, no-follow, regular file, 128-byte cap and 36-character UUID validation (#6047)",
 	"relaunch_fixture.go:readFixture:OpenNoFollow":                        "relaunchfixture builds only: the one fixture file in the owner-only folder named by CORAL_RELAUNCH_FIXTURE_DIR, Lstat-checked regular 0600 own file, 16 KiB cap (#5452)",
 	"updates_dir.go:updatesDir.read:OpenNoFollow":                         "<data dir>/updates/ack.key and ack_used.json: fixed names, Lstat-checked plain files only this user can read (#5280)",
+	"hub_dropbox.go:HubDropbox.readFile:OpenNoFollow":                     "the artifact the Hub asked to back up (#16109): <coral dir>/artifacts/objects/<digest>, the digest a 64-hex word checked before the path is made (never a request path), opened once without following a link, regular file, at most 64 MiB, and the bytes must hash to the digest before any is sent",
 	"artifact_prune_diffs.go:SessionsHandler.shrinkDiffs:ReadFile":        "server data folder; object names match objectNameRe",
 	"artifact_prune_scan.go:recordTime:ReadFile":                          "server data folder (a sidecar the server wrote)",
 	"artifact_prune_scan.go:scanKnowledgeReferences:Open":                 "server data folder (agent_knowledge), regular files only",
