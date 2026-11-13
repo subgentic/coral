@@ -776,7 +776,7 @@ Experimental, and off until you turn it on: a team can then be launched into its
 
 Turns off a safety check: Codex will not ask you to review Coral's hooks.
 
-Codex asks you to review new hooks before it runs them, because a trusted hook runs outside its sandbox. When this is on and only an administrator can change Coral's tools folder (an installed Coral), Coral trusts its own hooks for each Codex agent it launches, so the agent starts without that question; your own hooks and a repository's still ask. Off, Codex asks every time. Applies to Codex agents launched after the change, and can only be changed on this computer.
+Codex asks you to review new hooks before it runs them, because a trusted hook runs outside its sandbox. This is on by default, on every OS: Coral trusts its own hooks, and only those exact commands, for each Codex agent it launches, so the agent starts without that question; your own hooks, a repository's and a plugin's still ask. Turn the switch off and Codex asks every time. Applies to Codex agents launched after the change, and can only be changed on this computer.
 
 ### Artifact store limit
 
