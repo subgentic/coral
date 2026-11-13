@@ -67,11 +67,11 @@ func TestPostDashRefusesEmptyStdin(t *testing.T) {
 
 	srv := newRecordingServer(t)
 	res := runBoardInput(t, srv.URL, subscribedDataDir(t, srv.URL), strings.NewReader("ignored"), "post", "--broadcast", "--", "-")
-	if res.code != 0 {
-		t.Fatalf("post -- -: exit %d, stderr %q", res.code, res.stderr)
+	if res.code != 2 || !strings.Contains(res.stderr, "no words") { // a lone dash is the empty card of #16186: refused, not posted
+		t.Errorf("post -- -: exit %d, stderr %q; want exit 2 saying it has no words", res.code, res.stderr)
 	}
-	if got := postedContent(t, srv); got != "-" {
-		t.Errorf("post -- - posted %q, want a literal dash", got)
+	if reqs := srv.requests(); len(reqs) != 0 {
+		t.Errorf("post -- - made a request: %v", reqs)
 	}
 }
 
