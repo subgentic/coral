@@ -1,6 +1,7 @@
 // The Tasks table's Assigned to column is circles, not words (#8492, the operator): the person responsible as one solid circle, then the reviewers as smaller outlined circles (two, then "+N"), and nothing else;
 // the whole cell is one image named in words ("Done by Dev, reviewed by QA"), which is also its hover text, so the column is as narrow as its circles. Seeded team with the Tasks answered by the suite, at 1280 and 390
 // (CORAL_SCREENSHOT_DIR keeps a shot of each). Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
+const { showState } = require('./helpers/team_tasks_show');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -27,7 +28,7 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
             await seed(ev, TEAM); if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await ev(`(() => { const real = window.fetch; window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href); if (/\\/api\\/board\\/[^/]+\\/tasks$/.test(p.pathname) && (!o.method || o.method === 'GET')) return Promise.resolve(new Response(JSON.stringify({ tasks: ${JSON.stringify(TASKS)}, next_cursor: '', total_open: 3, total_completed: 2 }), { status: 200, headers: { 'content-type': 'application/json' } })); return real(u, o); }; return true; })()`);
             await openTeam(ev, waitFor, TEAM).catch(() => {});
-            await goTab(ev, settle, 'Tasks'); await waitFor(`document.querySelectorAll('[role=tabpanel]:not([hidden]) .dt-primary').length >= 3`, 'tasks', 10000); await ev(`(() => { const b = [...document.querySelectorAll('[role=tabpanel]:not([hidden]) button, [role=tabpanel]:not([hidden]) option')].find(x => /^All\\b/.test(x.textContent.trim())); if (b && b.tagName === 'BUTTON') b.click(); return !!b; })()`); await waitFor(`document.querySelectorAll('[role=tabpanel]:not([hidden]) .dt-primary').length >= 5`, 'all five tasks', 10000); await settle(500);
+            await goTab(ev, settle, 'Tasks'); await waitFor(`document.querySelectorAll('[role=tabpanel]:not([hidden]) .dt-primary').length >= 3`, 'tasks', 10000); await showState(ev, 'all'); await waitFor(`document.querySelectorAll('[role=tabpanel]:not([hidden]) .dt-primary').length >= 5`, 'all five tasks', 10000); await settle(500);
             if (mobile) { // a phone's task is a two-line mail row (#12230): the task, then who has it in words, in the row's one button: no Assigned to column, so no circles
                 const said = await ev(`[...document.querySelectorAll('[role=tabpanel]:not([hidden]) tbody tr')].map(r => (r.querySelector('.dt-primary') || r).textContent.replace(/\\s+/g, ' ').trim())`);
                 assert.ok(said.length >= 5 && said.some(t => /Frontend Dev/.test(t)) && said.every(t => !/\\bundefined\\b/.test(t)), `${tag}: a phone's task rows say who has them in words: ` + JSON.stringify(said));

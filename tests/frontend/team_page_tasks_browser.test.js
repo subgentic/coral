@@ -1,5 +1,6 @@
 // The team page's Tasks tab carries what the old dock tab had (#7453, the inventory): the search, Filters and Sort bar (a search, a filter or an order the default list does not have asks the task query, GET /api/board/tasks, whose answer is paged with
 // a total: "Showing 2 of 3" and Load more), New task, and on a task's page the cost and what blocks it. The board's tasks and the query route are stubbed in the page. 1600 px, isolated dev server.
+const { showState } = require('./helpers/team_tasks_show');
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam, goTab, scenarios } = require('./helpers/team_page');
@@ -31,7 +32,7 @@ const TEAM = `qa-tasks-${Date.now() % 100000}`;
         await S.run('Hide completed is the Open chip, on by default, remembered until All is chosen', async () => {
             assert.equal((await rows()).length, 3, 'a finished task is not in the table by default');
             assert.ok(await ev(`document.querySelector('#team-panel-tasks .goals-chip[aria-pressed="true"]').dataset.filter === 'open'`), 'Open is the chosen chip');
-            await ev(`document.querySelector('#team-panel-tasks .goals-chip[data-filter="all"]').click(); true`); await settle(300);
+            await showState(ev, 'all'); await settle(300);
             assert.equal((await rows()).length, 4, 'All shows the finished one too');
             assert.equal(await ev(`localStorage.getItem('coral-hide-completed')`), 'false', 'the choice is kept under the old key');
             await ev(`document.querySelector('#team-panel-tasks .goals-chip[data-filter="open"]').click(); true`); await settle(300);

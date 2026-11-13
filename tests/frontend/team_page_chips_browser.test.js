@@ -23,7 +23,7 @@ const TEAM = `qa-chips-${Date.now() % 100000}`;
             await S.run(`${tab} at 390 px and 200% text: the pills are one compact select, 44 px, nothing scrolls sideways`, async () => {
                 await goTab(ev, settle, tab); await settle(300);
                 const r = await sel(); assert.ok(r, 'the compact select'); assert.equal(r.pillsShown, false, 'the strip of pills is not shown');
-                assert.ok(r.h >= 43.5, `the select is a 44 px target (${r.h})`); assert.ok(r.options >= 5, `it holds every pill (${r.options})`); assert.ok(r.side <= 0, `nothing scrolls sideways (${r.side})`); heights.push(String(r.h));
+                assert.ok(r.h >= 43.5, `the select is a 44 px target (${r.h})`); assert.ok(r.options >= 4, `it holds every pill (${r.options})`); assert.ok(r.side <= 0, `nothing scrolls sideways (${r.side})`); heights.push(String(r.h));
             });
         }
         await S.run('the Goals and Tasks selects are the same height', async () => { assert.equal(heights[0], heights[1], `Goals ${heights[0]} and Tasks ${heights[1]}`); });

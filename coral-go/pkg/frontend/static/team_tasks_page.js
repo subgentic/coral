@@ -31,6 +31,7 @@ const { loadSafeMarkdown } = await importOnce('./vendor_loader.js');
 const PAGE = 50;
 const REREAD_PAGES = 5; // a refresh reads at most this many loaded pages again: a person who scrolled a big board to its end does not make 30 requests every 10 s (#9121); the pages beyond are dropped, Load more fetches them again
 const FILTERS = [['open', 'Open'], ['all', 'All'], ['queued', 'Queued'], ['active', 'In progress'], ['blocked', 'Blocked'], ['review', 'In review'], ['needs_review', 'Needs review'], ['done', 'Done']];
+const STRIP = ['open', 'review', 'blocked', 'done']; // the strip above the table keeps four (#15829, Design T6); the other four are in the Filters panel's Show select, and a chip says one of them is on
 const PHONE = matchMedia('(max-width: 760px)'); // the team page's phone layout (team_page.css)
 /** The empty page says what to do next: the New task button, and the team's Orchestrator when it has one (it makes the tasks the person asks for; #10371). */
 function noTasksYet() {
@@ -228,6 +229,20 @@ const counts = () => {
     return c;
 };
 
+// The Filters panel's Show select (#15829): every state the strip does not show, with the strip's four, bound to the page's own state filter (not a board filter: it is not in the query or the saved filters).
+let showSel = null;
+function showSelect(c) {
+    if (!bar) return;
+    if (!showSel || showSel.bar !== bar) {
+        const wrap = el('label', 'list-bar-field'), sel = el('select', 'field list-bar-select'); sel.id = 'team-tasks-show';
+        wrap.append(el('span', 'list-bar-field-label', 'Show tasks that are'), sel);
+        sel.addEventListener('change', () => { const key = sel.value; model.filter = key; if (key === 'open' || key === 'all') browserLocal.set(HIDE_KEY, key === 'open' ? 'true' : 'false'); say(`${FILTERS.find(f => f[0] === key)[1]}: ${counts()[key]} tasks`); draw(); });
+        showSel = { bar, wrap, sel }; bar.setExtras([wrap]);
+    }
+    showSel.sel.replaceChildren(...FILTERS.map(([key, label]) => { const o = new Option(`${label} (${c[key]})`, key); o.selected = key === model.filter; return o; }));
+    bar.setExtraOn(STRIP.includes(model.filter) ? 0 : 1);
+}
+
 function draw() {
     const body = root && root.querySelector('.team-tasks-body'); if (!body) return;
     if (!phoneWatched) { phoneWatched = true; PHONE.addEventListener('change', () => draw()); }
@@ -243,11 +258,12 @@ function draw() {
     // The one toolbar line (#7717): the list bar's own row holds the search, the state pills (one compact select when they do not fit), the Filters icon and + Task at the right.
     if (PHONE.matches) bar.node.querySelector('.list-bar-search-row')?.classList.add('phone-list-bar');
     Toolbar.adopt(bar.node.querySelector('.list-bar-search-row'), {
-        pills: { label: 'Show tasks that are', current: model.filter, items: FILTERS.map(([key, label]) => ({ key, label, count: c[key] })),
+        pills: { label: 'Show tasks that are', current: model.filter, items: FILTERS.filter(f => STRIP.includes(f[0])).sort((x, y) => STRIP.indexOf(x[0]) - STRIP.indexOf(y[0])).map(([key, label]) => ({ key, label, count: c[key] })),
             onPick: key => { model.filter = key; if (key === 'open' || key === 'all') browserLocal.set(HIDE_KEY, key === 'open' ? 'true' : 'false'); say(`${FILTERS.find(f => f[0] === key)[1]}: ${c[key]} tasks`); draw(); } },
-        chips: TF.chips(model.filters).filter(c => c.key !== 'q').map(c => ({ label: c.label, aria: `Remove the filter: ${c.label}`, onRemove: () => { say(`Removed the filter: ${c.label}`); setFilters(TF.without(model.filters, c.key)); } })),
+        chips: [...(STRIP.includes(model.filter) ? [] : [{ label: `Show: ${FILTERS.find(f => f[0] === model.filter)[1]}`, aria: `Remove the filter: Show ${FILTERS.find(f => f[0] === model.filter)[1]}`, onRemove: () => { say('Showing Open tasks'); model.filter = 'open'; browserLocal.set(HIDE_KEY, 'true'); draw(); } }]), ...TF.chips(model.filters).filter(c => c.key !== 'q').map(c => ({ label: c.label, aria: `Remove the filter: ${c.label}`, onRemove: () => { say(`Removed the filter: ${c.label}`); setFilters(TF.without(model.filters, c.key)); } }))],
         action: newTask,
     });
+    showSelect(c);
     // No count line: the selected pill's number is the count of the table under it (it said every task read, 69, beside "Open 19"). Only a search that matched more than was read says so.
     if (query && L.total != null && L.total > all.length && all.length && !model.loading) body.append(el('p', 'goals-note team-count-line', `Showing ${all.length} of ${L.total}${L.truncated ? '+' : ''}`));
     if (failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, failed), btn('btn btn-small', 'Retry', loadTasks)); body.append(f); }

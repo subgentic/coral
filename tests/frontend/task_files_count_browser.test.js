@@ -1,6 +1,7 @@
 // A task row says how many artifacts its results reference (#8575, goal #61): a quiet "3 files" button on the row's meta line (the page icon and the count, 12/400, named "3 artifacts, open"),
 // nothing for a task with none; pressed, it opens the task and brings its Artifacts section to the top, focused. The count is the server's artifact_count on the list item, read from real completions (no stubs), and it equals the
 // rows the task page's section draws for the same task, a file two tasks reference (the team's list holds it once, under the newest task: #8591) included. Real board on the isolated dev server (removed again); the team Tasks tab at 1280, folded at 390 px: the button is a 44 px target there without a taller row.
+const { showState } = require('./helpers/team_tasks_show');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -33,8 +34,8 @@ const SHARED = 'coral://artifacts/' + 'c'.repeat(64);
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks' }); true`);
-            await waitFor(`!!document.querySelector('#team-panel-tasks .goals-chip[data-filter="all"]')`, 'the All filter', 15000);
-            await ev(`document.querySelector('#team-panel-tasks .goals-chip[data-filter="all"]').click(); true`); // the two completed tasks are in All
+            await waitFor(`!!document.querySelector('#team-panel-tasks .list-bar-toggle')`, 'the Filters icon', 15000);
+            await showState(ev, 'all'); // the two completed tasks are in All
             await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr').length === 3`, 'the three tasks', 15000);
 
             console.log(`${at}the count on the rows that have artifacts`);

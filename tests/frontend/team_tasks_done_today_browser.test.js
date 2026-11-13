@@ -1,5 +1,6 @@
 // #10604 (Beta team page pass), 1: the Tasks tab's default view (Open) keeps a task that finished today, so what an agent just did is not behind Show all: its result is the first thing a person looks for.
 // A real board on the isolated dev server (removed again): two open tasks and one finished a moment ago. The Open view shows all three and counts them; Done shows the finished one; All shows all three.
+const { showState } = require('./helpers/team_tasks_show');
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -42,7 +43,7 @@ const B = 'done-today-' + Date.now().toString(36);
             await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr.dt-row').length === 2`, `${w}: the Done view`, 5000);
             rows = await titles();
             assert.ok(rows.length === 2 && rows.some(r => r.includes('Finished a moment ago')) && rows.some(r => r.includes('Cancelled a moment ago')), `${w}: Done shows the finished one and the cancelled one: ${JSON.stringify(rows)}`);
-            await ev(`[...document.querySelectorAll('#team-panel-tasks button')].find(b => b.dataset.filter === 'all').click(); true`);
+            await showState(ev, 'all');
             await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr.dt-row').length === 4`, `${w}: the All view`, 5000);
             await ev(`[...document.querySelectorAll('#team-panel-tasks button')].find(b => b.dataset.filter === 'open').click(); true`); // the page remembers the view a person chose: the next width starts on the default (Open) again
         }
