@@ -12,6 +12,7 @@ const DT = await importOnce('./data_table.js');
 const { statusMark } = await importOnce('./status_mark.js');
 /** A goal's state as the one status mark (design guidelines 4.5, #15827): Active works, Blocked waits, Proposed is idle, Done is done, Dropped is switched off; a server that refused its key failed. */
 const MARK = { active: 'working', blocked: 'waiting', proposed: 'idle', done: 'done', dropped: 'sleeping', failed: 'failed' };
+const markOf = state => { const key = String(state || '').toLowerCase(); return Object.hasOwn(MARK, key) ? MARK[key] : 'idle'; }; // an own key only: a Hub-supplied state of 'constructor' or '__proto__' is an unknown state, not a function on the prototype (#15946)
 
 export function goalColumns(ctx = {}, keys = ['goal', 'state', 'team', 'progress', 'updated']) {
     const total = g => W.allTasksOf(g.rollup || {});
@@ -20,7 +21,7 @@ export function goalColumns(ctx = {}, keys = ['goal', 'state', 'team', 'progress
     const stamp = g => g.updatedAt || g.updated_at || '';
     const all = {
         state: { key: 'state', label: 'State', sort: true, sortValue: W.stateWord, line: 2, width: '6.5rem', dropAt: 16,
-            cell: g => g.noGoal ? '' : statusMark(MARK[String(g.state || '').toLowerCase()] || 'idle', W.stateWord(g)) },
+            cell: g => g.noGoal ? '' : statusMark(markOf(g.state), W.stateWord(g)) },
         goal: { key: 'goal', label: 'Goal', primary: true, width: 'grow', sort: true, sortValue: g => g.title, line: 1,
             cell: g => { const b = DT.primaryButton(g.noGoal ? g.title : g.title ? shortTitle(g.title) : `Goal ${g.id}`); if (!g.noGoal && g.title) b.title = g.title; b.dataset.goalId = String(g.id); if (g.noGoal) b.classList.add('goals-no-goal');
                 const n = total(g), left = W.openTasksOf(g.rollup || {}), news = Number(g.newComments || g.new_comments) > 0; if (g.noGoal || (!n && !news)) return b;
