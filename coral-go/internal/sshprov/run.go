@@ -91,7 +91,7 @@ const (
 // ourCoralPids lists, one per line, the PIDs of this user's processes that run a Coral from the install folder: the program is the first word of the command line and is exactly <install>/<version>/root/coral.
 // It is what the stop and the check mean by "this install's Coral", whatever coral.pid says: a Coral that restarted itself runs under a PID the file never learned (#15997, the Operator's upgrade to v2.0.67).
 // The program is read as a word of its own, so the shell that runs this very command (its text is in its arguments) is never taken for one.
-const ourCoralPids = "ps -u \"$(id -u)\" -o pid= -o args= 2>/dev/null | awk -v d=\"$HOME/" + InstallDir + "/\" 'index($2, d) == 1 && $2 ~ /\\/root\\/coral$/ { print $1 }'"
+const ourCoralPids = "ps -u \"$(id -u)\" -o pid= -o args= 2>/dev/null | awk -v d=\"$HOME/" + InstallDir + "/\" 'index($2, d) == 1 && substr($2, length(d) + 1) ~ /^[^\\/]+\\/root\\/coral$/ { print $1 }'"
 
 // aliveTest is true (exit 0) when <install>/coral.pid names a live process of this user whose command line is a Coral from the install folder: the daemon a start left. A recycled PID of another program fails the
 // command-line test, so it is never taken for Coral (and never signalled).
