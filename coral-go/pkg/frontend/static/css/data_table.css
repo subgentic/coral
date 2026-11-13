@@ -198,10 +198,6 @@
 .dt-progress-meter::-webkit-progress-value { background: var(--table-progress-fill); }
 .dt-progress-meter::-moz-progress-bar { background: var(--table-progress-fill); }
 
-.dt-table .dt-action { margin: 0; white-space: nowrap; }
-.dt-table td:has(> .dt-action-roomy) { padding-block: 5px; padding-inline-end: var(--table-pad-x); } /* a touch-size button as tall as the row gets room above and below it and from the edge, so the rows' lines are not drawn through it (the team's Open chat, #11401 d) */
-.dt-table td:has(> .dt-action) { overflow: visible; text-overflow: clip; } /* a cell that holds a button never clips it or draws an ellipsis beside it: Open chat was 8 px wider than its 7rem cell's content box and a stray ellipsis stood at its right (#11142) */
-.dt-box.dt-folded .dt-action { min-height: var(--table-touch); }
 
 .dt-note { max-width: 100%; box-sizing: border-box; white-space: normal; overflow-wrap: anywhere; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); }
 .dt-warning { border-color: var(--table-warning); color: var(--table-primary-color); }
@@ -751,3 +747,4 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-box.dt-fold-column.dt-folded td.dt-line-3 { order: 4; flex: 1 1 100%; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; padding-top: 8px; } /* the row's buttons along its bottom (#15120, the Operator's bottom-row layout): after both lines */
 
 :is(.dt-primary, .dt-link, .dt-mail-open)[data-goal-id]::before { content: '#' attr(data-goal-id) ' '; color: var(--text-secondary); } /* the number agents write in 'goal #3' (#15245): drawn from the element's data-goal-id, so the name's own text is unchanged */
+.dt-row:hover .dt-reveal, .dt-row:focus-within .dt-reveal { opacity: 1; } /* a control that shows on its row's hover or focus (the Agents table's Details link, #15857) */
