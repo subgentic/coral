@@ -1293,8 +1293,9 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 #command-pane.chat-mode .btn-esc .esc-label-chat {
     display: inline;
 }
-/* While the agent works and the box is empty the chat's Stop is the one red control, named: the quiet grey square was not seen (#10085). */
-#command-pane.chat-mode[data-stop-now="true"] .btn-esc { background: var(--danger); border-color: var(--danger); color: var(--text-on-accent); }
+/* While the agent works and the box is empty the chat's Stop is a Default button, named (#10085): a grey box at rest, red only on hover or press (design guidelines section 8, #15822). */
+#command-pane.chat-mode[data-stop-now="true"] .btn-esc { background: var(--bg-tertiary); border-color: var(--control-border); color: var(--text-primary); }
+#command-pane.chat-mode[data-stop-now="true"]:not([data-stopping="true"]) .btn-esc:is(:hover, :active) { background: var(--danger); border-color: var(--danger); color: var(--text-on-accent); }
 #command-pane.chat-mode[data-stop-now="true"] .btn-esc .esc-label-chat::after { content: "Stop"; margin-left: 2px; font-weight: var(--fw-strong); }
 #command-pane.chat-mode[data-stopping="true"] .btn-esc { background: var(--bg-tertiary); border-color: var(--border); color: var(--text-secondary); }
 #command-pane.chat-mode[data-stopping="true"] .btn-esc .esc-label-chat::after { content: "Stopping…"; }

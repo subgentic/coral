@@ -1305,7 +1305,8 @@
     .keys-chip { display: inline-flex; align-items: center; gap: 6px; min-height: var(--control-touch-height, 44px); padding: 0 14px; }
     .keys-chip[aria-pressed="true"] { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--text-on-accent); } /* pressed = the Send button's own pair (5:1 or better), not accent text on the chip (4.08:1 on the light theme) */
     .terminal-key-bar .tkb-key[data-keys="C-c"] { border-color: var(--danger); } /* the interrupt: a red edge (text red on the key was 4.24:1 on the dark theme, under 4.5) */
-    .mobile-send-btn.is-stop { background: var(--danger); color: var(--text-on-accent); border-radius: var(--radius-xl); margin-left: 4px; } /* a rounded square, 10 px from the team button: not the same round blue as its neighbour */
+    .mobile-send-btn.is-stop { background: var(--bg-tertiary); border-color: var(--control-border); color: var(--text-primary); border-radius: var(--radius-xl); margin-left: 4px; } /* a rounded square, 10 px from the team button, a Default button at rest: red only on press (#15822) */
+    .mobile-send-btn.is-stop:is(:hover, :active) { background: var(--danger); border-color: var(--danger); color: var(--text-on-accent); }
     .mobile-send-btn.is-stop .send-icon { display: none; }
     .mobile-send-btn.is-stop .stop-icon { display: block; }
     #command-pane[data-stopping="true"] .mobile-send-btn.is-stop { background: var(--bg-tertiary); color: var(--text-secondary); opacity: 1; }
