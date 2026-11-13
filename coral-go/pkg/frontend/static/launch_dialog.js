@@ -102,6 +102,7 @@ function _selectLaunchType(type) {
         _initAgentPresets();
         { const row = document.getElementById('launch-skills-row'), park = document.getElementById('launch-advanced-extra'); if (row && park && !park.contains(row)) park.prepend(row); } // the form's panes are built again: the skills row goes back to the part that is kept, and is placed in the Agent section after (#12569)
         // Render agent config form
+        (window.__rlog ||= []).push({ t: Math.round(performance.now()), member: !!launch.member, stack: (new Error().stack || '').split('\n').slice(1, 8).map(x => x.trim().replace(/https?:[^ )]*\//, '')).join(' < ') });
         renderAgentConfigForm('launch-agent-acf', {
             offerUseFullAccess: !launch.member, // the Operator's "Use Full access for this agent" (#14085): a launch has it; the member being edited for a team does not (a team launch carries no such field, so a box there would do nothing)
             showPreset: false,

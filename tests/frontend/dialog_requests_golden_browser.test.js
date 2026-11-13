@@ -133,7 +133,7 @@ const GOLDEN = path.join(__dirname, 'fixtures', 'dialog_requests_golden.json');
             if (cfg.mode) await set('launch-agent-acf', '.acf-permission-mode', cfg.mode);
             if (cfg.flags) await set('launch-agent-acf', '.acf-flags', cfg.flags);
             for (const [t, c] of cfg.chips || []) await chip('launch-agent-acf', t, c);
-            if (cfg.model) { const got = await ev(`document.querySelector('#launch-agent-acf .acf-model').value`); if (got !== cfg.model) console.log('DIAG16210 model lost for ' + cfg.name + ' sameElement=' + await ev(`!!document.querySelector('#launch-agent-acf .acf-model').__trap`) + ': want ' + cfg.model + ' got ' + JSON.stringify(got) + ' log ' + JSON.stringify(await ev('window.__mlog'))); }
+            if (cfg.model) { const got = await ev(`document.querySelector('#launch-agent-acf .acf-model').value`); if (got !== cfg.model) console.log('DIAG16210 model lost for ' + cfg.name + ' sameElement=' + await ev(`!!document.querySelector('#launch-agent-acf .acf-model').__trap`) + ': want ' + cfg.model + ' got ' + JSON.stringify(got) + ' log ' + JSON.stringify(await ev('window.__mlog')) + ' RLOG ' + JSON.stringify(await ev('window.__rlog'))); }
             await click('#launch-step-agent #launch-agent-save');
             await waitFor(`!document.getElementById('launch-modal').hasAttribute('data-member')`, 'the team agent dialog to close');
         };
