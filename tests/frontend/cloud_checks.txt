@@ -424,3 +424,5 @@ node queued_mark.test.mjs
 node inbox_needs_count.test.mjs
 node inbox_last_seen.test.mjs
 node open_link.test.mjs
+
+node pending_kept_receipts.test.mjs

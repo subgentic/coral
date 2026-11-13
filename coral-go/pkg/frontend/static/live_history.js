@@ -43,6 +43,16 @@ let keptRenderGeneration = -1; // the generation whose kept page is being built 
 let refreshInFlight = -1;
 let activeChatAbortController = null;
 let activeLoadMoreAbortController = null;
+// Cached and fresh pages carry the same delivery receipts. Replaying the kept
+// page must settle pending bubbles before a delta-only poll with no new rows.
+function noteHistoryReceipts(sessionId, messages) {
+    for (const msg of messages) {
+        if (msg.type === "user" && INTERRUPT_RE.test(String(msg.content || "").trim())) noteInterrupt(sessionId, msg);
+        else if (msg.type === "user") rememberUserMessage(sessionId, msg);
+        else noteAgentActivity(sessionId, msg);
+    }
+}
+
 /** Shows the kept page of an agent seen a moment ago (built off screen in slices). True when the agent was switched while it was built: the refresh ends. */
 async function _showKeptPage(session, container, kept) {
     // Built off screen in slices; a poll that comes while it builds returns at once (keptRenderGeneration).
@@ -62,6 +72,7 @@ async function _showKeptPage(session, container, kept) {
     }
     if (generation !== historyGeneration) return true; // the agent was switched while it built
     if (rebuilt) {
+        noteHistoryReceipts(session.session_id, kept.messages);
         clearMessages(container);
         while (built.firstChild) container.appendChild(built.firstChild);
         historyHasMore = kept.start > 0;
@@ -117,11 +128,7 @@ function _renderHistoryReply(container, session, data) {
             }
             keepMore(session.session_id, data.messages, data.total);
         }
-        for (const msg of data.messages) {
-            if (msg.type === "user" && INTERRUPT_RE.test(String(msg.content || "").trim())) noteInterrupt(session.session_id, msg);
-            else if (msg.type === "user") rememberUserMessage(session.session_id, msg);
-            else noteAgentActivity(session.session_id, msg);
-        }
+        noteHistoryReceipts(session.session_id, data.messages);
         historyMessageCount = data.total;
     } else if (!initialLoadDone) {
         clearMessages(container);
