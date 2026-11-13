@@ -99,7 +99,7 @@ func codexTrustOn() bool {
 	if f := codexTrustSwitch.Load(); f != nil && *f != nil {
 		return (*f)()
 	}
-	return true
+	return false // unwired: nobody told the launch what the person chose, so it never trusts (#16128)
 }
 
 // CodexHookTrust says whether Coral would trust its Codex hooks on a launch now, and why not: the switch, or a hook tool

@@ -69,5 +69,6 @@ func TestCodexHookTrustFollowsTheSwitchOnEveryOS(t *testing.T) {
 	}
 	codexTrustSwitch.Store(nil)
 	trusted, _ := CodexHookTrust()
-	assert.True(t, trusted, "unset is on")
+	assert.False(t, trusted, "unwired is off: a launch nobody told the person's choice never trusts (#16128)")
+	assert.NotContains(t, strings.Join(codexHookArgs("sid"), " "), "hooks.state={", "and passes no trust")
 }

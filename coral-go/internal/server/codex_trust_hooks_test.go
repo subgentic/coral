@@ -112,3 +112,20 @@ func TestTurningTheCodexTrustSwitchOffStopsTheLaunchTrustingHooks(t *testing.T) 
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
 	assert.Equal(t, false, out["trusted"], "the PUT's own reply says it too")
 }
+
+// #16128: a settings read that fails is off for the status page, as it is for the launch: it must not say Coral trusts.
+func TestCodexTrustStatusWithAFailedSettingsReadIsOff(t *testing.T) {
+	r := newE2ERemote(t, "codex-trust-readerr", nil)
+	h := r.srv.Router()
+	r.srv.cloudHandler.SetPeerCheck(func(*http.Request) (bool, bool) { return true, true })
+	t.Cleanup(func() { agent.SetCodexHookTrust(nil) })
+	agent.SetCodexHookTrust(func() bool { return true }) // the launch's switch is on; only the page's own read fails
+	require.NoError(t, r.db.Close())
+	dashboard := map[string]string{"Content-Type": "application/json", "Sec-Fetch-Site": "same-origin", "Origin": "http://127.0.0.1:8420"}
+	rec := call(h, "GET", "/api/system/codex-trust-hooks", "", dashboard)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var out map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+	assert.Equal(t, false, out["trust"], "a failed read is off")
+	assert.Equal(t, false, out["trusted"])
+}
