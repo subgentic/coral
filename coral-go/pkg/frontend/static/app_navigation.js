@@ -39,9 +39,10 @@ export function switchNavTab(tab, opts = {}) {
     // Clean up any active cost dashboard timer when leaving tokens tab
     stopCostDashboard();
     if (tab !== 'servers') importOnce('./servers_tab.js').then(m => m.leaveServersTab());
+    if (tab !== 'queue' && document.getElementById('queue-view')?.style.display === 'block') importOnce('./queue_tab.js').then(m => m.leaveQueueTab()); // the queue is read only while its tab is on screen (#16030)
     // The URL follows the tab (#3532): a tab the user chose is a history entry. Servers writes its
     // own (it can carry a server); the board tab names no board, so it keeps the URL.
-    const TAB_ROUTE = { agents: 'agents', history: 'chats', automations: 'automations', tokens: 'analytics', docs: 'docs', skills: 'skills' };
+    const TAB_ROUTE = { agents: 'agents', history: 'chats', automations: 'automations', tokens: 'analytics', docs: 'docs', skills: 'skills', queue: 'queue' };
     if (!opts.fromHistory && TAB_ROUTE[routeTab]) {
         const cur = currentRoute();
         const route = tabRoute(routeTab, TAB_ROUTE[routeTab]);
@@ -49,7 +50,7 @@ export function switchNavTab(tab, opts = {}) {
     }
 
     // Toggle sidebar visibility — full-width views hide the sidebar
-    const fullWidthTabs = new Set(['servers', 'artifacts', 'skills', ...(isCloud() ? ['hub-inbox'] : [])]); // Workflows, Analytics and the Inbox have their sidebars (#7471, #7473, #7472), except where the hub serves the Inbox as a frame
+    const fullWidthTabs = new Set(['servers', 'artifacts', 'skills', 'queue', ...(isCloud() ? ['hub-inbox'] : [])]); // Workflows, Analytics and the Inbox have their sidebars (#7471, #7473, #7472), except where the hub serves the Inbox as a frame
     const layout = document.querySelector('.layout');
     if (layout) layout.classList.toggle('sidebar-hidden', fullWidthTabs.has(tab));
 
@@ -85,6 +86,10 @@ export function switchNavTab(tab, opts = {}) {
         // The Skills Store: the Operator's list, the approval view and Import (skills_tab.js), local Coral only; it writes its own address.
         showView('skills-view');
         importOnce('./skills_tab.js').then(m => m.showSkillsTab({ id: opts.skillId, folder: opts.skillFolder }));
+    } else if (tab === 'queue') {
+        // The resource queue of this computer or a linked one (queue_tab.js, #16030), local Coral only; it writes the address above.
+        showView('queue-view');
+        importOnce('./queue_tab.js').then(m => m.showQueueTab());
     } else if (tab === 'artifacts') {
         // The hub's /artifacts page in a frame (artifacts_tab.js), the Inbox's way; the tab writes no address of its own.
         showView('artifacts-view');

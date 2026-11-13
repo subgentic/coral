@@ -8,13 +8,31 @@ import { compactDuration } from './format.js';
 import { announceNotice } from './notifications.js';
 import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
-import { isCloud } from './server_base.js';
+import { registerActions } from './actions.js';
+import { isCloud, serverFetch } from './server_base.js';
 const HUB_WORDS = 'The queue is kept by each computer: open this computer\'s own Coral to see it, and move or remove an entry there.';
 const DT = await importOnce('./data_table.js');
 const { agentLink } = await importOnce('./agent_link.js');
 const { liveAgentOf, openAgent } = await importOnce('./agent_live.js'); // the one way an agent's name opens its chat (#12168); a task and a goal open where their own links do (opened when clicked)
 
 const POLL_MS = 5000;
+/** Which computer's queue is read (#16030): 'local' is this one, anything else is a linked server read through the hub's own link (GET /api/remote/<id>/api/resources). What was last read is kept per computer, with when, so a computer that stops answering still shows its last queue and when it was read. A linked computer's queue is read-only here: Move and Kick are this computer's alone. */
+let machine = 'local';
+const lastRead = new Map(); // server id -> { resources, at }
+export const queueMachine = () => machine;
+export const queueReadOnly = () => machine !== 'local';
+export const queueUnavailable = () => unavailable;
+export const queueLoaded = () => loaded;
+/** When the shown queue was last read from the computer chosen (ms), or 0 when it has not been. */
+export const queueReadAt = () => (machine === 'local' ? (loaded ? Date.now() : 0) : (lastRead.get(machine) || { at: 0 }).at);
+export function setQueueMachine(id) {
+    const next = !id || id === 'local' ? 'local' : String(id);
+    if (next === machine) return;
+    machine = next; reading = null; unavailable = ''; denied = false;
+    const kept = machine === 'local' ? null : lastRead.get(machine);
+    resources = kept ? kept.resources : []; loaded = !!kept;
+    emit(); refreshQueue();
+}
 let unavailable = '', resources = [], loaded = false, denied = false, timer = 0, tickTimer = 0, listeners = new Set(), wanted = false, reading = null, pendingFocus = null;
 const TICK_MS = (typeof window !== 'undefined' && Number(window.__queueTickMs)) || 30000; // the lease and the wait are said again at least this often, with no data change (#13651)
 
@@ -35,14 +53,25 @@ export async function refreshQueue() {
     if (reading) return reading;
     reading = (async () => {
         try {
-            if (isCloud()) { unavailable = HUB_WORDS; loaded = false; emit(); return; } // the Hub has no queue: each computer keeps its own (a bare read would ask the Hub itself, #13871)
-            const r = await fetch('/api/resources');
-            if (!r.ok) { const was = unavailable; unavailable = `The queue could not be read from this computer (HTTP ${r.status}).`; if (was !== unavailable) emit(); return; } // said, not left on 'Reading the queue.' (#13871)
+            const asked = machine;
+            if (asked === 'local' && isCloud()) { unavailable = HUB_WORDS; loaded = false; emit(); return; } // the Hub has no queue: each computer keeps its own (a bare read would ask the Hub itself, #13871)
+            const was = unavailable;
+            let r;
+            try { r = asked === 'local' ? await fetch('/api/resources') : await serverFetch(asked, '/api/resources', { cache: 'no-store' }); } catch { r = null; }
+            if (asked !== machine) return; // another computer was chosen while this read was out
+            if (!r || !r.ok) { // said, not left on 'Reading the queue.' (#13871); a linked computer that does not answer keeps its last queue, said as such (#16030)
+                unavailable = asked === 'local' ? (r ? `The queue could not be read from this computer (HTTP ${r.status}).` : '') : !r ? 'Not answering.' : r.status === 403 || r.status === 404 ? 'Does not share its queue with the hub.' : `The queue could not be read from this computer (HTTP ${r.status}).`;
+                if (was !== unavailable) emit();
+                return;
+            }
             unavailable = '';
             const body = await r.json();
-            const next = Array.isArray(body && body.resources) ? body.resources : [];
-            const same = loaded && JSON.stringify(next) === JSON.stringify(resources);
+            if (asked !== machine) return;
+            if (!Array.isArray(body && body.resources)) { unavailable = asked === 'local' ? '' : 'Answered with something that is not a queue.'; if (was !== unavailable) emit(); return; } // not a list: never "nothing waiting"
+            const next = body.resources;
+            const same = loaded && !was && JSON.stringify(next) === JSON.stringify(resources);
             resources = next; loaded = true;
+            if (asked !== 'local') lastRead.set(asked, { resources: next, at: Date.now() });
             if (!same) emit();
         } catch { /* the next poll */ } finally { reading = null; }
     })();
@@ -79,14 +108,13 @@ export function queueItems() {
     }
     return rows;
 }
-export const queueCount = () => resources.reduce((n, r) => n + (r.queue || []).length + ownHolders(r).length, 0);
 export const resourceWords = r => `${r.resource}: ${r.used} of ${r.slots} in use${r.waiting ? `, ${r.waiting} waiting` : ''}${r.machine ? `, on ${r.machine}` : ''}`;
 export const groupOf = r => ({ key: r.resource, label: resourceWords(r) });
 
 /** After an action the table is drawn again: the keyboard goes back to the same entry's same button (or the first one that is on, where it just went off), and after a kick to its neighbour. */
 function restoreFocus(tries = 6) {
     const want = pendingFocus; if (!want) return;
-    const row = document.querySelector(`#group-table-view tr[data-key$="-${Number(want.id)}"]`);
+    const row = document.querySelector(`:is(#group-table-view, #queue-tab-body) tr[data-key$="-${Number(want.id)}"]`);
     const btn = row && (row.querySelector(`.queue-act[data-act="${want.label}"]:not(:disabled)`) || row.querySelector('.queue-act:not(:disabled)') || row.querySelector('.dt-mail-more-toggle'));
     if (btn) { pendingFocus = null; btn.focus({ preventScroll: true }); return; }
     if (tries > 0) setTimeout(() => restoreFocus(tries - 1), 80); else pendingFocus = null;
@@ -109,7 +137,7 @@ export const kickEntry = row => act('DELETE', `/api/resources/entries/${Number(r
 
 /** The actions a row has for the person: Move first, up and down for an entry in line (first and up are off at the front, down at the back), Kick for any entry. None when the server refused once. */
 export function rowActions(row) {
-    if (denied || row.state === 'free') return [];
+    if (denied || queueReadOnly() || row.state === 'free') return [];
     const out = [];
     if (row.state === 'waiting') {
         out.push({ label: 'Move first', short: 'First', title: 'Put it at the front of the line', off: row.first, run: () => moveEntry(row, 'first') },
@@ -132,7 +160,7 @@ export function actionsCell(row) {
         b.addEventListener('click', e => {
             e.stopPropagation();
             if (!a.kick) { noteFocus(row.id, a.label); a.run(); return; }
-            if (b.dataset.sure) { clearTimeout(Number(b.dataset.sure)); delete b.dataset.sure; noteFocus(...neighbour(row)); a.run(); return; }
+            if (b.dataset.sure) { clearTimeout(Number(b.dataset.sure)); delete b.dataset.sure; b.classList.remove('queue-sure'); noteFocus(...neighbour(row)); a.run(); return; }
             // the first press arms it: the button says so (its name too) and the line is announced; ten seconds to confirm
             b.textContent = 'Confirm kick'; b.classList.add('queue-sure'); b.setAttribute('aria-label', `Confirm kick: ${row.agent}, ${row.resource}`);
             announceNotice(`Press Confirm kick to remove ${row.agent} from ${row.resource}.`);
@@ -158,11 +186,11 @@ const openTaskPage = (r, from) => importOnce('./task_navigation.js').then(m => m
 const openGoalPage = r => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(r.project, r.goal_id));
 const goalWords = r => `#${r.goal_id} ${r.goal_title}`;
 /** The links of one row (#13704): the agent opens its chat, the task its page, the goal its page on the team's. A row with no task has no task or goal link; a task with no goal has no goal link. */
-const taskLink = r => (r.task && r.project ? DT.link(`#${r.task}`, ev => openTaskPage(r, ev && ev.currentTarget)) : r.task ? DT.el('span', '', `#${r.task}`) : '');
-const goalLink = r => { if (!(r.goal_id && r.project)) return ''; const b = DT.link(goalWords(r), () => openGoalPage(r)); b.classList.add('queue-goal'); b.title = goalWords(r); b.setAttribute('aria-label', `Open goal ${goalWords(r)}`); return b; };
+const taskLink = r => (queueReadOnly() ? (r.task ? DT.el('span', '', `#${r.task}`) : '') : r.task && r.project ? DT.link(`#${r.task}`, ev => openTaskPage(r, ev && ev.currentTarget)) : r.task ? DT.el('span', '', `#${r.task}`) : '');
+const goalLink = r => { if (queueReadOnly()) return r.goal_id ? DT.el('span', 'queue-goal', goalWords(r)) : ''; if (!(r.goal_id && r.project)) return ''; const b = DT.link(goalWords(r), () => openGoalPage(r)); b.classList.add('queue-goal'); b.title = goalWords(r); b.setAttribute('aria-label', `Open goal ${goalWords(r)}`); return b; };
 
 /** On a phone the row is a card: the links are its first actions (Agent, Task, Goal), each a button with its own name. */
-const linkActions = r => (r.state === 'free' ? [] : [
+const linkActions = r => (r.state === 'free' || queueReadOnly() ? [] : [
     ...(liveAgentOf(r.agent, { board: r.project }) ? [{ label: `Open ${r.agent}`, title: `Open ${r.agent}`, run: () => openAgent(liveAgentOf(r.agent, { board: r.project })) }] : []),
     ...(r.task && r.project ? [{ label: `Task #${r.task}`, title: `Open task #${r.task}`, link: true, run: () => openTaskPage(r, null) }] : []),
     ...(r.goal_id && r.project ? [{ label: `Goal #${r.goal_id}`, title: `Open goal ${goalWords(r)}`, link: true, run: () => openGoalPage(r) }] : [])]);
@@ -171,18 +199,18 @@ const linkActions = r => (r.state === 'free' ? [] : [
 export function queueTable(rows, narrowed) {
     return { title: 'Queue (experimental)', noun: ['entry', 'entries'], rows,
         empty: { line: narrowed ? 'No entry matches the search.' : unavailable ? unavailable : loaded ? 'No resource is defined.' : 'Reading the queue.', hint: narrowed || !loaded || unavailable ? '' : 'An Orchestrator defines a resource with coral-board resource; agents claim a slot before a heavy run and wait in line when it is taken.' },
-        signature: JSON.stringify([denied, unavailable, rows.map(r => [r.key, r.state, r.place, r.agent, r.project, r.goal_id, r.goal_title, r.stuck, r.stuck_min, r.member, r.heldOn, r.note, r.used, r.slots, r.waiting, r.lease_until, r.first, r.last, r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : ''])]), // the words of the clock are in it: the table is drawn again when they change
+        signature: JSON.stringify([machine, denied, unavailable, loaded, rows.map(r => [r.key, r.state, r.place, r.agent, r.project, r.goal_id, r.goal_title, r.stuck, r.stuck_min, r.member, r.heldOn, r.note, r.used, r.slots, r.waiting, r.lease_until, r.first, r.last, r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : ''])]), // the words of the clock are in it: the table is drawn again when they change
         node: () => DT.dataTable({
             label: `Queue, ${rows.length}`, rows, oneLine: true, resize: true, keepOrder: true, rowKey: r => r.key, rowName: r => (r.state === 'free' ? `${r.resource}, all free` : `${r.agent}, ${stateWord(r)}, ${r.resource}`),
             groupBy: groupOf,
             columns: [ // a narrow list drops the note (62 rem), then the task and the time (52): the data_table.css steps are 62, 52, 36, 28 and 16, no other number hides a column
-                { key: 'agent', label: 'Agent', primary: true, width: 'grow', cell: r => (r.state === 'free' ? DT.el('span', 'dt-time', 'All slots free') : agentLink(r.agent, { board: r.project, cls: 'queue-agent' })) },
+                { key: 'agent', label: 'Agent', primary: true, width: 'grow', cell: r => (r.state === 'free' ? DT.el('span', 'dt-time', 'All slots free') : queueReadOnly() ? DT.el('span', 'queue-agent', r.agent) : agentLink(r.agent, { board: r.project, cls: 'queue-agent' })) },
                 { key: 'state', label: 'State', width: '8.5rem', cell: r => (r.state === 'free' ? '' : (() => { const c = DT.chip(stateWord(r), r.state === 'holding' && !r.stuck ? 'goal-state-task-active' : ''); if (r.stuck) c.title = stuckWords(r) + '. The Orchestrator has been told.'; return c; })()) },
                 { key: 'why', label: 'Note', width: '12rem', dropAt: 62, tone: 'tertiary', cell: r => r.note || '' },
                 { key: 'task', label: 'Task', width: '5rem', dropAt: 52, cell: taskLink },
                 { key: 'goal', label: 'Goal', width: '9rem', dropAt: 52, cell: goalLink },
                 { key: 'time', label: 'Lease left / waited', width: '9rem', dropAt: 52, tone: 'tertiary', cell: r => (r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : '') },
-                ...(denied ? [] : [{ key: 'actions', label: 'Move or kick', width: '14rem', cell: actionsCell }]),
+                ...(denied || queueReadOnly() ? [] : [{ key: 'actions', label: 'Move or kick', width: '14rem', cell: actionsCell }]),
             ],
             mail: r => ({ lead: { icon: r.state === 'holding' ? 'lock' : r.state === 'waiting' ? 'hourglass_empty' : 'check_circle', square: true, name: stateWord(r) }, title: r.state === 'free' ? `${r.resource}: all slots free` : r.agent,
                 snippet: r.state === 'free' ? '' : `${r.resource}${r.note ? ' · ' + r.note : ''}`, state: stateWord(r), time: r.state === 'holding' ? `${holdWord(r)} \u00b7 ${leaseWords(r)}` : r.state === 'waiting' ? `Place ${r.place} \u00b7 ${waitWords(r)}` : '',
@@ -190,4 +218,8 @@ export function queueTable(rows, narrowed) {
         }).el };
 }
 
-export const queueSearch = (rows, q) => { const t = String(q || '').trim().toLowerCase(); return t ? rows.filter(r => [r.resource, r.machine, r.agent, r.note, r.task ? `#${r.task}` : '', r.goal_title || ''].some(s => String(s).toLowerCase().includes(t))) : rows; };
+/** The Automations folder that was the queue's home (#16030): the queue has its own tab, and this is the link to it. */
+export const movedTable = () => ({ title: 'Queue', noun: ['entry', 'entries'], rows: [], signature: 'moved',
+    empty: { line: 'The resource queue has its own tab.', hint: 'It shows the queue of this computer and of each linked one.', go: { action: 'queue-tab-open', label: 'Open the Queue tab' } } });
+registerActions({ 'queue-tab-open': () => window.switchNavTab?.('queue') });
+

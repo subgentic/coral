@@ -28,6 +28,7 @@ export const PHONE_SCREENS = {
     'messageboard-view': { type: 'drill-down', slice: 'B' },
     'history-session-view': { type: 'drill-down', slice: 'B' },                      // a past chat
     'skills-view': { type: 'top-level', nav: 'menu', slice: 'D' },               // Skills (the list; an open skill is a page in the same view)
+    'queue-view': { type: 'top-level', nav: 'menu', slice: 'D' },               // Queue: the resource queue of a computer (#16030)
     'servers-view': { type: 'top-level', nav: 'menu', slice: 'D' },              // Computers (its item pages have no data-phone-item marker yet: it keeps today's chrome until D)
     'artifacts-view': { type: 'top-level', nav: 'menu', slice: 'D' },            // the Hub's Artifacts
     'welcome-screen': { type: 'top-level', nav: 'nav-agents', slice: 'D' },                             // a wide window's first page: a phone never shows it (#4497)

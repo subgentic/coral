@@ -14,6 +14,7 @@
      /workflows[/<id>[/runs/<run>]]       { view: 'workflows', id, run }
      /automations[/<folder>[/<id>[/runs/<run>]]]  { view: 'automations', folder, id, run }: Workflows and Jobs as one screen (Goal #74); <folder> is one of AUTOMATION_FOLDERS, <id> a job or a workflow, <run> a workflow's run
      /analytics[/<page>]                  { view: 'analytics', sub }: <page> is one of ANALYTICS_PAGES (none = Overview, #8606)
+     /queue                               { view: 'queue' }: the resource queue of this computer or a linked one (#16030)
      /jobs, /docs[/<name>], /servers[/<id>]
 
    A remote object's server is the RAW segment "@<server>". A name that starts with "@" is written
@@ -180,6 +181,8 @@ export function parse(pathname, search = '') {
             if (rest[0] === 'overview') return { view: 'analytics' };
             return ANALYTICS_PAGES.includes(rest[0]) ? { view: 'analytics', sub: rest[0] } : null;
         }
+        case 'queue':
+            return rest.length ? null : { view: 'queue' };
         case 'docs': {
             if (!rest.length) return { view: 'docs' };
             return rest.length === 1 && DOC_RE.test(rest[0]) ? { view: 'docs', id: rest[0] } : null;
@@ -265,6 +268,8 @@ export function build(r) {
         case 'inbox-folder':
             if (r.need && r.folder === 'needs') return `/inbox/needs/${r.need.kind}/${srvSeg(r.need.server)}${seg(r.need.team)}/${seg(r.need.id)}`;
             return INBOX_FOLDER_RE.test(String(r.folder)) ? `/inbox/${r.folder === 'needs' || r.folder === 'saved' || r.folder === 'artifacts' ? r.folder : 'chats/' + (r.folder === 'chats' ? 'all' : r.folder.slice(6))}${r.id && String(r.folder).startsWith('chats') ? '/' + srvSeg(r.server) + seg(r.id) : ''}` : '/';
+        case 'queue':
+            return '/queue';
         case 'workflows':
             return r.id ? `/workflows/${r.id}${r.run ? '/runs/' + r.run : ''}` : '/workflows';
         case 'jobs':
@@ -311,7 +316,7 @@ export function fromLegacyHash(hash) {
             return d.length ? { view: 'servers', id: d[0] } : { view: 'servers' };
         case 'tokens': case 'analytics':
             return { view: 'analytics' };
-        case 'workflows': case 'jobs': case 'docs':
+        case 'workflows': case 'jobs': case 'docs': case 'queue':
             return d.length ? null : { view: v };
         case 'chats':
             return d.length ? null : { view: 'chats', query: '' };
@@ -382,6 +387,6 @@ export function inboxFolderPath(key) {
 }
 
 /** The views the Hub does not serve (#9368): Automations and the old Workflows and Jobs addresses that open it. */
-export const HIDDEN_IN_CLOUD = ['automations', 'workflows', 'jobs', 'skills'];
+export const HIDDEN_IN_CLOUD = ['automations', 'workflows', 'jobs', 'skills', 'queue'];
 /** Where an address goes when the dashboard is served by the Hub: a hidden view opens the Agents home, any other route is as it was. */
 export const cloudRedirect = (route, cloud) => (cloud && route && HIDDEN_IN_CLOUD.includes(route.view) ? { view: 'agents' } : route);

@@ -144,6 +144,7 @@ function registerRouteHandlers() {
         switchNavTab('tokens', { fromHistory: true });
     });
 
+    route('queue', async () => { switchNavTab('queue', { fromHistory: true }); }); // the Queue tab (#16030)
     route('docs', async r => {
         switchNavTab('docs', { fromHistory: true });
         (await loadDocs()).openDoc(r.id || null);
