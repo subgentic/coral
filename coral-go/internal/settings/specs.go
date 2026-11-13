@@ -251,7 +251,7 @@ func init() {
 	register(Spec{Key: IdentityActor, Kind: KindEnum, Values: []string{"log", "enforce"}, Default: "log", Class: ClassOwnRoute, Apply: ApplyLive, Doc: "Whether the actor header is enforced."})
 	ownRoute(CloudMaxMode, KindText, "", "The most access Coral Hub may have.")
 	ownRoute(CloudAllowHubAutoAccept, KindBool, "true", "The Hub may auto-accept, or start an agent that skips permission prompts (on unless the owner turned it off; the Hub owner may change it, #5840).")
-	ownRoute(CodexTrustCoralHooks, KindBool, "true", "Coral trusts its own hooks for each Codex it launches, when only an administrator can change them (#153); off, Codex asks the person to review them.")
+	ownRoute(CodexTrustCoralHooks, KindBool, "true", "Coral trusts its own hooks for each Codex it launches, on every OS and only its exact hook commands (#153, #16008); off, Codex asks the person to review them.")
 	ownRoute(UpdateAuto, KindBool, "true", "Coral checks for updates in the background and keeps a verified one ready (#5280); installing one needs a person to relaunch it unless update_auto_install is on (#11170).")
 	ownRoute(HubRelaunchUpdates, KindBool, "false", "The Hub's owner may relaunch this Coral to install a staged update (#5280). Off until the person at this computer turns it on (#6290): an install the person here was not asked about is never the default.")
 	optIn(HubRelaunchUpdates)

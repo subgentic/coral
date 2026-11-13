@@ -42,9 +42,7 @@ func TestCodexHookTrustRealCLI(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(tools, "coral-hook-agentic-state.exe"), standIn, 0o755))
 	t.Setenv(HookDirEnv, tools)
 
-	oldSafe := codexHooksFolderSafe
-	t.Cleanup(func() { codexHooksFolderSafe = oldSafe; codexTrustSwitch.Store(nil) })
-	codexHooksFolderSafe = func(string) (bool, string) { return true, "" } // an installed Coral's protected folder, which a temp dir is not
+	t.Cleanup(func() { codexTrustSwitch.Store(nil) })
 
 	SetCodexHookTrust(func() bool { return false })
 	hooks := codexHookArgs("real-cli-hooks-only")

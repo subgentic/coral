@@ -7,12 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"sync/atomic"
-
-	"github.com/subgentic/coral/internal/secfile"
 )
 
 // Trusting Coral's own Codex hooks (#153). Codex 0.161 runs a hook only once the person has trusted it: until then a
@@ -22,11 +19,10 @@ import (
 // exactly the hooks it passes, and never writes CODEX_HOME. Every other hook Codex loads (the person's own, a repository's,
 // a plugin's) still asks. Codex's --dangerously-bypass-hook-trust is never used: it skips the review for all of them.
 //
-// Coral trusts its hooks only where nobody but an administrator can change them (codexHooksFolderSafe): otherwise anything
-// running as this user, another agent included, could replace a hook binary and Codex would run it outside its sandbox
-// with no dialog. That is an installed Coral (Program Files); a portable or dev build keeps the dialog. Windows only: on
-// macOS and Linux an app or an unpacked tarball is owned by the person, so no check tells a protected install from a
-// folder this user can change, and the dialog stays there.
+// Coral trusts its own hooks by default on every OS (the Operator's decision, #16008): the person asked not to be asked on
+// each launch. The trust covers only Coral's exact hook commands, hashed as Codex hashes them; the switch "Trust Coral's
+// hooks in Codex" turns it off. A hook tool that could be swapped by anything running as this user would run outside Codex's
+// sandbox: that is the accepted trade-off of this default, and the reason the trust never extends past those commands.
 
 // codexHookEventLabel is Codex's key label for each event Coral installs a hook for (hook_event_key_label).
 var codexHookEventLabel = map[string]string{
@@ -106,37 +102,14 @@ func codexTrustOn() bool {
 	return true
 }
 
-// codexHooksFolderSafe reports whether the hook tool at toolPath, and the folder it is in, can be changed by nobody but
-// SYSTEM, Administrators and TrustedInstaller (secfile.Writers names everyone else, this user included, and an access list
-// it can't read is an error), and why not. A test replaces it.
-var codexHooksFolderSafe = func(toolPath string) (bool, string) {
-	for _, p := range []string{filepath.Dir(toolPath), toolPath} {
-		who, err := secfile.Writers(p)
-		if err != nil {
-			return false, fmt.Sprintf("its access list could not be read (%s: %v)", p, err)
-		}
-		if len(who) > 0 {
-			return false, fmt.Sprintf("%s can be changed by %s, not only by an administrator", p, strings.Join(who, ", "))
-		}
-	}
-	return true, ""
-}
-
-// CodexHookTrust says whether Coral would trust its Codex hooks on a launch now, and why not: the switch, the platform, a
-// hook tool with no absolute path, or a folder others can change. For the settings page and the launch.
+// CodexHookTrust says whether Coral would trust its Codex hooks on a launch now, and why not: the switch, or a hook tool
+// with no absolute path. For the settings page and the launch.
 func CodexHookTrust() (trusted bool, why string) {
 	if !codexTrustOn() {
 		return false, "turned off in Settings"
 	}
-	if runtime.GOOS != "windows" {
-		return false, "only on Windows: an app folder here is owned by its user, so no check tells an installed Coral from one this user can change"
-	}
-	toolPath := hookToolPath("coral-hook-agentic-state")
-	if toolPath == "" {
+	if hookToolPath("coral-hook-agentic-state") == "" {
 		return false, "the hook tool has no absolute path (no tools folder, or no tool in it)"
-	}
-	if ok, why := codexHooksFolderSafe(filepath.FromSlash(toolPath)); !ok {
-		return false, "Coral's hooks folder isn't protected: " + why
 	}
 	return true, ""
 }
