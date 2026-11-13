@@ -13,17 +13,22 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 /** The pills of a tab as one group of buttons, and the same choice as a compact select (shown instead of the group when the line is narrow). */
 function pillElements(p) {
     // more than six pills (Tasks has seven, each with its count; Goals' six fit) need more room before they stand in for the select (team_page.css, #9861)
-    const group = el('div', `goals-chips goals-chips-row team-tb-pills${p.items.length > 6 ? ' team-tb-pills-many' : ''}`); group.setAttribute('role', 'group'); group.setAttribute('aria-label', p.label);
-    const select = el('select', 'field list-bar-select team-tb-select'); select.setAttribute('aria-label', p.label);
+    const group = el('div', `goals-chips goals-chips-row team-tb-pills${p.items.length > 6 ? ' team-tb-pills-many' : ''}${p.multi ? ' team-tb-pills-multi' : ''}`); group.setAttribute('role', 'group'); group.setAttribute('aria-label', p.label);
+    // p.multi (#16087): several pills may be on at once; `current` is the list of keys that are, [] stands for the pill 'all', which clears the rest; the compact form is a check box each, not a select
+    const multi = !!p.multi, on = key => multi ? (key === 'all' ? !p.current.length : p.current.includes(key)) : p.current === key;
+    const select = multi ? el('div', 'team-tb-select team-tb-checks') : el('select', 'field list-bar-select team-tb-select'); select.setAttribute('aria-label', p.label); if (multi) select.setAttribute('role', 'group');
     for (const it of p.items) {
         const text = it.count == null ? it.label : `${it.label} ${it.count}`; // a pill whose count is not known yet (Goals' Done: read when picked, #14641) says no number
-        const b = el('button', 'goals-chip', text); b.type = 'button'; b.dataset.filter = it.key; b.setAttribute('aria-pressed', String(p.current === it.key));
+        const b = el('button', 'goals-chip', text); b.type = 'button'; b.dataset.filter = it.key; b.setAttribute('aria-pressed', String(on(it.key)));
         if (!it.count && it.key !== 'all') b.classList.add('goals-chip-zero');
         b.addEventListener('click', () => p.onPick(it.key));
         group.append(b);
-        const o = el('option', null, text); o.value = it.key; o.selected = p.current === it.key; select.append(o);
+        if (multi) {
+            const box = el('input'); box.type = 'checkbox'; box.checked = on(it.key); box.addEventListener('change', () => p.onPick(it.key));
+            const lab = el('label', 'team-tb-check'); lab.append(box, el('span', null, text)); select.append(lab);
+        } else { const o = el('option', null, text); o.value = it.key; o.selected = p.current === it.key; select.append(o); }
     }
-    select.addEventListener('change', () => p.onPick(select.value));
+    if (!multi) select.addEventListener('change', () => p.onPick(select.value));
     return [group, select];
 }
 

@@ -33,7 +33,10 @@ const KIND_TEST = {
     files: r => ['file', 'task', 'goal'].includes(r.item_kind) && r.action !== 'chat_send',
     words: r => ['message', 'chat_send', 'task_reply'].includes(r.action),
 };
-export const inKind = (r, k) => !k || !!(KIND_TEST[k] && KIND_TEST[k](r));
+/** The kinds a value stands for, in the chips' order and with none twice: an array of them, or one (what an earlier version kept in the browser); anything else is none, which is Everything. */
+export const kindsOf = v => { const a = Array.isArray(v) ? v : typeof v === 'string' ? [v] : []; return KINDS.filter(k => a.includes(k)); };
+/** Whether a row is of a kind, or of any of several (an empty list or '' is every row). */
+export const inKind = (r, k) => { const ks = kindsOf(k); return !ks.length || ks.some(x => KIND_TEST[x](r)); };
 
 export const NO_GOAL = 'No goal';
 /** The agent a row is about, when the record says (#14445): who asked, for an ask (an older answer kept the asker as its title), or the agent named by a prompt, wait or chat row; '' for a row about no agent. */
@@ -58,7 +61,7 @@ const model = defineFilters({
     server: { type: 'text', max: 200, chip: v => `Computer: ${serverNames.get(v) || v}` }, // which computer's record a row came from (a Hub-served dashboard reads several, #15730)
     agent: { type: 'text', max: 80, chip: v => `Agent: ${v}` },
     goal: { type: 'text', max: 200, chip: v => `Goal: ${v}` }, // the goal a row served, or "No goal", as Needs you says it (#14445)
-    kind: { type: 'choice', values: KINDS, chip: v => `Kind: ${KIND_LABEL[v]}` },
+    kind: { type: 'custom', empty: [], clean: v => kindsOf(v), filtered: v => kindsOf(v).length > 0, clear: f => ({ ...f, kind: [] }) }, // the chips of the toolbar are these (several at once); no filter chip repeats them over the strip (#16087)
     decision: { type: 'choice', values: DECISIONS, chip: v => `Decision: ${DECISION_LABEL[v]}` },
     action: { type: 'choice', values: ACTIONS, chip: v => `Action: ${ACTION_LABEL[v]}` },
     from: { type: 'day', chip: v => `Since ${v}` },
@@ -81,7 +84,7 @@ export function matches(r, f, teamOf = x => x.team || '') {
         const hay = [r.title, r.note, r.asker, r.goal_title, r.task_title, DECISION_LABEL[decisionOf(r)], teamOf(r), ACTION_LABEL[r.action] || r.action, r.item_kind].join(' ').toLowerCase();
         if (!hay.includes(c.q.toLowerCase())) return false;
     }
-    if (c.kind && !inKind(r, c.kind)) return false;
+    if (!inKind(r, c.kind)) return false;
     if (c.decision && decisionOf(r) !== c.decision) return false;
     if (c.agent && agentOf(r) !== c.agent) return false;
     if (c.goal && goalOf(r) !== c.goal) return false;

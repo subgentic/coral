@@ -812,7 +812,8 @@ function inboxActivityToolbar() {
     const teams = AC.teams();
     AF.setTeamNames(new Map(teams.map(t => [t, teamLabel(t)])));
     AF.setServerNames(new Map(serverChoices().map(id => [id, pagingServerLabel(id)])));
-    const pills = { label: 'Show', panelLabel: 'Show', current: activityFilters.kind || 'all', items: [{ key: 'all', label: 'Everything', count: AC.total() }, ...AF.KINDS.map(k => ({ key: k, label: AF.KIND_LABEL[k], count: AC.countKind(k) }))], onPick: key => { activityFilters = { ...activityFilters, kind: key === 'all' ? '' : key }; AF.saveFilters(activityFilters); renderInboxNav(true); } };
+    const picked = AF.kindsOf(activityFilters.kind); // several kinds may be on (#16087): a chip toggles its kind, Everything clears them all, and the last one off is Everything again
+    const pills = { label: 'Show', panelLabel: 'Show', multi: true, current: picked, items: [{ key: 'all', label: 'Everything', count: AC.total() }, ...AF.KINDS.map(k => ({ key: k, label: AF.KIND_LABEL[k], count: AC.countKind(k) }))], onPick: key => { activityFilters = { ...activityFilters, kind: key === 'all' ? [] : AF.kindsOf(picked.includes(key) ? picked.filter(k => k !== key) : [...picked, key]) }; AF.saveFilters(activityFilters); renderInboxNav(true); } };
     const node = activityBar.draw({ filters: activityFilters, pills, options: { team: { values: teams, labels: Object.fromEntries(teams.map(t => [t, teamLabel(t)])) }, agent: { values: AC.agents(), labels: {} }, goal: { values: AC.goals(), labels: {} } } });
     activityBar.bar.showField('server', multipleServers());
     const menu = node.querySelector('.list-bar-menu');
