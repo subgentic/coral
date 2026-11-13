@@ -46,6 +46,9 @@ function writeCodex(dir) {
         await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); true`);
         const put = await api('PUT', '/api/settings', { cli_path_codex: writeCodex(dir) });
         assert.equal(put.status, 200, 'cli_path_codex set: ' + JSON.stringify(put.data));
+        // Coral trusts its own hooks by default (#16008), so Codex shows no review dialog; this card is the one a person sees with the switch off. On Windows the trusted launch also puts <, > and & in a .cmd's arguments, which cmd.exe reads as redirects and a second command, so the scripted codex.cmd never ran (#16178).
+        const off = await api('PUT', '/api/system/codex-trust-hooks', { trust: false });
+        assert.equal(off.status, 200, 'hook trust switched off: ' + JSON.stringify(off.data));
         launch = await api('POST', '/api/sessions/launch', { working_dir: work, agent_type: 'codex', display_name: 'Codex Dialog' });
         assert.ok(launch.data && launch.data.session_id, 'launched: ' + JSON.stringify(launch));
         const { session_id: sid, session_name: name } = launch.data;

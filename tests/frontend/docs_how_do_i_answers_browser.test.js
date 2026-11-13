@@ -31,7 +31,7 @@ const { coralReady } = require('./helpers/wait');
 
         // Settings' Learn more beside Default permission mode opens the answer in Docs, at its heading
         await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(async s => { const d = await fetch('/api/settings').then(r => r.json()); s.state.settings = d.settings; return import((window.__coralStatic || '/static/') + 'modals.js'); }).then(m => m.showSettingsModal('agents')).then(() => true)`);
-        await waitFor(`!!document.getElementById('settings-permission-mode') && document.getElementById('settings-permission-mode').getClientRects().length > 0`, 'the permission row', 10000);
+        await waitFor(`(() => { const s = document.getElementById('settings-permission-mode'), r = s && s.closest('.sv-row'); return !!r && r.getClientRects().length > 0; })()`, 'the permission row', 10000); // the row, not the select: once the mode list is laid out it replaces the select with its own rows (the select is display:none then), a race this wait must not depend on (#16178)
         const link = await ev(`(() => { const a = document.getElementById('settings-permission-mode').closest('.sv-row').querySelector('a.sv-learn'); return a && { href: a.getAttribute('href'), label: a.getAttribute('aria-label') }; })()`);
         assert.deepEqual(link, { href: '/docs/how-do-i', label: 'Learn more about Default permission mode, in Docs' }, 'Learn more is a link into Docs');
         await ev(`document.getElementById('settings-permission-mode').closest('.sv-row').querySelector('a.sv-learn').click(); true`);
