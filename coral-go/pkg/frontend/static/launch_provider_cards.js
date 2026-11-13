@@ -57,6 +57,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
         for (const r of group.querySelectorAll('input[type="radio"]')) r.setAttribute('aria-describedby', [`${group.id}-st-${r.value}`, on ? n.id : ''].filter(Boolean).join(' '));
     };
     const typeNow = () => ALIAS[select.value] || select.value;
+    const modelOwned = () => form?.dataset.acfModelDirty === 'true'; // a model the person typed or picked is theirs: a probe's answer must not move the provider under it and drop it (#16210)
     let chosen = false; // a person picked a provider here, or the select moved some other way: the answers of the checks leave the selection alone
     const start = select.value;
     const state = new Map(TYPES.map(([t]) => [t, { found: null, url: '' }])); // found: null until the check answers
@@ -196,15 +197,15 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     if (group._pickToken !== gen || !group.isConnected) return; // another New Agent opened meanwhile
     TYPES.forEach(([t], i) => state.set(t, found[i]));
     // nothing was ever chosen and the built-in default is not here: start on the first provider that is
-    if (!chosen && implicitDefault && typeNow() === 'claude' && found[0].found === false) {
+    if (!chosen && !modelOwned() && implicitDefault && typeNow() === 'claude' && found[0].found === false) {
         const first = TYPES.findIndex((_, i) => found[i].found === true);
         if (first >= 0) { select.value = TYPES[first][0]; select.dispatchEvent(new Event('change', { bubbles: true })); chosen = false; }
     }
     // Claude is missing and nothing was chosen, but a provider has not answered yet (the check runs "<cli> --version", which Hermes, a Python program, takes seconds to do): wait for it a while longer before
     // giving up on finding one to start on (#12169). The cards are already drawn and usable; this only moves the start, and not once a person has chosen.
-    if (!chosen && implicitDefault && typeNow() === 'claude' && found[0].found === false && !found.some(f => f.found === true) && found.some(f => f.found === null)) {
+    if (!chosen && !modelOwned() && implicitDefault && typeNow() === 'claude' && found[0].found === false && !found.some(f => f.found === true) && found.some(f => f.found === null)) {
         const late = await Promise.race([Promise.all(probes), new Promise(r => setTimeout(() => r(null), LATE_PROBE_MS))]);
-        if (late && group._pickToken === gen && group.isConnected && !chosen) {
+        if (late && group._pickToken === gen && group.isConnected && !chosen && !modelOwned()) {
             TYPES.forEach(([t], i) => state.set(t, late[i]));
             const first = TYPES.findIndex((_, i) => late[i].found === true);
             if (first >= 0) { select.value = TYPES[first][0]; select.dispatchEvent(new Event('change', { bubbles: true })); chosen = false; }
