@@ -15,6 +15,7 @@ const DT = await importOnce('./data_table.js');
 const Threads = await importOnce('./activity_threads.js');
 const AF = await importOnce('./operator_activity_filters.js'); // lazy, as the sidebar loads it: its failure is retried
 await loadStyles('inbox_activity.css'); // the folder's rules load with the folder, not at start (page_weight)
+await loadStyles('activity_kinds.css'); // the kind chips' rules (several at once, #16087): not at start
 
 const PAGE = 200;
 const PHONE_HINT = 'pho' + 'ne'; // the record's hint word, spelled in two parts: the icon-name lint reads that quoted word as an icon name
