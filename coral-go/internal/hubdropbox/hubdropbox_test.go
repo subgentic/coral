@@ -299,3 +299,61 @@ func TestUpload_MapsDropboxsAnswers(t *testing.T) {
 		assert.Equal(t, c.full, ref.QuotaFull, name)
 	}
 }
+
+// Security's S3 on #16109: the gate is asked in full before the first byte AND again before the last 64 KiB, which are held back. A mark or tag set while
+// the stream runs never delivers the final chunk to Dropbox.
+func TestUpload_AMarkSetDuringTheStreamNeverDeliversTheFinalChunk(t *testing.T) {
+	big := strings.Repeat("0123456789abcdef", 16<<10) // 256 KiB
+	f := fileOf(t, big)
+	for name, second := range map[string]func() (bool, error){
+		"marked private": func() (bool, error) { return false, nil },
+		"unreadable":     func() (bool, error) { return true, errors.New("db locked") },
+	} {
+		calls := 0
+		var received int
+		var readErr error
+		u := newUploader(rt(func(r *http.Request) (*http.Response, error) {
+			b, err := io.ReadAll(r.Body) // the stub Dropbox: counts what it is given, fails as a real transport does
+			received, readErr = len(b), err
+			if err != nil {
+				return nil, err
+			}
+			return reply(200, nil), nil
+		}), func(context.Context) (bool, error) {
+			calls++
+			if calls == 1 {
+				return true, nil // the full check before the first byte
+			}
+			return second()
+		})
+		err := u.Upload(context.Background(), goodLink, f.Digest, f)
+		assert.ErrorIs(t, err, ErrNotAllowed, name)
+		assert.Error(t, readErr, name+": the stream ended with an error, not a clean end")
+		assert.LessOrEqual(t, received, len(big)-tailHold, name+": the last 64 KiB were never read by Dropbox")
+		assert.Equal(t, 2, calls, name)
+	}
+	// All clear both times: the whole file arrives, once.
+	var got []byte
+	u := newUploader(rt(func(r *http.Request) (*http.Response, error) {
+		got, _ = io.ReadAll(r.Body)
+		return reply(200, nil), nil
+	}), allow)
+	require.NoError(t, u.Upload(context.Background(), goodLink, f.Digest, f))
+	assert.Equal(t, f.Data, got)
+}
+
+func TestUpload_AFileShorterThanTheHeldTailIsCheckedAgainBeforeItsBytes(t *testing.T) {
+	f := fileOf(t, "short file")
+	calls := 0
+	var received int
+	u := newUploader(rt(func(r *http.Request) (*http.Response, error) {
+		b, err := io.ReadAll(r.Body)
+		received = len(b)
+		if err != nil {
+			return nil, err
+		}
+		return reply(200, nil), nil
+	}), func(context.Context) (bool, error) { calls++; return calls == 1, nil })
+	assert.ErrorIs(t, u.Upload(context.Background(), goodLink, f.Digest, f), ErrNotAllowed)
+	assert.Equal(t, 0, received, "a small file is all held tail: none of it goes")
+}

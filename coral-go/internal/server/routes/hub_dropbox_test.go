@@ -349,3 +349,71 @@ func TestHubDropbox_ALocalRequestOnTheRealPathsIsRefusedAsNotTheHubOwner(t *test
 	}
 	assert.Empty(t, e.stub.got)
 }
+
+type hdFuncRT func(*http.Request) (*http.Response, error)
+
+func (f hdFuncRT) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// coral-hub's r4 question (#211112): when the Hub closes its call, the request's context is cancelled and the upload to Dropbox is aborted with it.
+func TestHubDropboxPush_ACancelledHubCallAbortsTheUploadToDropbox(t *testing.T) {
+	e := newHDEnv(t)
+	d := e.put(t, "plain notes")
+	started := make(chan struct{})
+	aborted := make(chan struct{})
+	e.d.Client = func(g func(context.Context) (bool, error)) *hubdropbox.Uploader {
+		return hubdropbox.NewUploaderWith(hdFuncRT(func(r *http.Request) (*http.Response, error) {
+			io.ReadAll(r.Body)
+			close(started)
+			<-r.Context().Done() // a Dropbox that never answers
+			close(aborted)
+			return nil, r.Context().Err()
+		}), g)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodPost, "/x", strings.NewReader(`{"digest":"`+d+`","link":"`+hdLink+`"}`)).WithContext(ctx)
+	w := httptest.NewRecorder()
+	done := make(chan struct{})
+	go func() { e.d.Push(w, req); close(done) }()
+	<-started
+	cancel() // the Hub closed the call
+	select {
+	case <-aborted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the upload to Dropbox was not aborted when the Hub's call was cancelled")
+	}
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Push did not return after the Hub's call was cancelled")
+	}
+	assert.NotContains(t, w.Body.String(), "CANARYLINKTOKEN")
+}
+
+// Security's S3 on #16109, at the handler: a mark set while the stream runs never delivers the last 64 KiB to Dropbox.
+func TestHubDropboxPush_AMarkSetDuringTheStreamNeverDeliversTheFinalChunk(t *testing.T) {
+	e := newHDEnv(t)
+	big := strings.Repeat("0123456789abcdef", 16<<10) // 256 KiB
+	d := e.put(t, big)
+	var received int
+	e.d.Client = func(g func(context.Context) (bool, error)) *hubdropbox.Uploader {
+		return hubdropbox.NewUploaderWith(hdFuncRT(func(r *http.Request) (*http.Response, error) {
+			buf := make([]byte, 32<<10)
+			for {
+				n, err := r.Body.Read(buf)
+				received += n
+				if received >= 64<<10 {
+					e.priv = true // the owner marks it private while the stream runs
+				}
+				if err == io.EOF {
+					return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(""))}, nil
+				}
+				if err != nil {
+					return nil, err
+				}
+			}
+		}), g)
+	}
+	_, got := e.call(e.d.Push, `{"digest":"`+d+`","link":"`+hdLink+`"}`)
+	assert.JSONEq(t, `{"word":"not_available"}`, got)
+	assert.LessOrEqual(t, received, len(big)-64<<10, "the last 64 KiB never reached Dropbox")
+}

@@ -101,7 +101,8 @@ func (u *Uploader) Upload(ctx context.Context, link, wantDigest string, f *File)
 	if ok, err := u.Allowed(ctx); err != nil || !ok {
 		return ErrNotAllowed
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target.String(), bytes.NewReader(f.Data))
+	body := &gatedBody{data: f.Data, ctx: ctx, allowed: u.Allowed}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target.String(), body)
 	if err != nil {
 		return ErrBadLink
 	}
@@ -109,6 +110,9 @@ func (u *Uploader) Upload(ctx context.Context, link, wantDigest string, f *File)
 	req.Header.Set("Content-Type", "application/octet-stream")
 	resp, err := u.client.Do(req)
 	if err != nil {
+		if body.denied {
+			return ErrNotAllowed // the mark or tag appeared while the bytes were going: the last chunk was never read
+		}
 		return ErrNetwork // never the url.Error: it holds the link
 	}
 	defer resp.Body.Close()
@@ -125,6 +129,48 @@ func (u *Uploader) Upload(ctx context.Context, link, wantDigest string, f *File)
 		}
 		return ref
 	}
+}
+
+// tailHold is the part of the file held back until the gate has been asked a second time (Security's S3 on #16109): a mark or tag set while the
+// stream runs stops the last chunk, and Dropbox never gets a complete file.
+const tailHold = 64 << 10
+
+// gatedBody serves f.Data, but not its last tailHold bytes until Allowed says yes again. A no, or an error, ends the stream with an error (the request fails,
+// short of its declared length) and sets denied.
+type gatedBody struct {
+	data    []byte
+	pos     int
+	checked bool
+	denied  bool
+	ctx     context.Context
+	allowed func(ctx context.Context) (bool, error)
+}
+
+func (b *gatedBody) Read(p []byte) (int, error) {
+	if b.denied {
+		return 0, ErrNotAllowed
+	}
+	hold := len(b.data) - tailHold
+	if hold < 0 {
+		hold = 0
+	}
+	if b.pos >= hold && !b.checked {
+		if ok, err := b.allowed(b.ctx); err != nil || !ok {
+			b.denied = true
+			return 0, ErrNotAllowed
+		}
+		b.checked = true
+	}
+	if b.pos >= len(b.data) {
+		return 0, io.EOF
+	}
+	end := len(b.data)
+	if !b.checked {
+		end = hold // before the check, only the part ahead of the held tail
+	}
+	n := copy(p, b.data[b.pos:end])
+	b.pos += n
+	return n, nil
 }
 
 func retryAfter(v string) time.Duration {

@@ -16,6 +16,10 @@ func (h *CloudHandler) NewHubDropbox(coralDir string, bs *board.Store) *HubDropb
 	d := &HubDropbox{
 		CoralDir: coralDir,
 		On: func(ctx context.Context) (bool, error) {
+			// A team's computer never shares through the Hub in v1 (coral-hub's Security, #211076): refused here, before prepare, on every route. A record that cannot be read counts as a team's.
+			if machineIsTeam(ctx, hubOwnerRecord) {
+				return false, nil
+			}
 			s, err := h.ss.GetSettings(ctx)
 			if err != nil {
 				return false, err
