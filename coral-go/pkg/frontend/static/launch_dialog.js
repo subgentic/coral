@@ -20,7 +20,7 @@ import { sectionFocus } from './section_dialog.js';
 import { loadStyles } from './lazy_styles.js';
 import { showTeamAddress } from './team_form.js';
 import { agentForm as folderForm, setAgentNameMode } from './agent_form.js';
-import { checkNewAgentFolder } from './agent_new_folder.js';
+const { checkNewAgentFolder } = await importOnce('./agent_new_folder.js');
 const { _syncACFModelField, getAgentConfig, renderAgentConfigForm, cliWarningOf } = await importOnce('./agent_config_form.js');
 const { _checkPermissionFlag } = await importOnce('./cli_dialogs.js');
 const { _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards } = await importOnce('./team_dialogs.js');

@@ -1,7 +1,8 @@
 /* A new folder typed at step 1 of New agent (#16351). The server makes one new folder inside one that exists (create_new_folder, #12833: createChosenFolder), and the team dialog already checks for it at its step 1
  * (_checkNewTeamFolder); this is the same check for the agent dialog, which sent create_dir for its own suggestion only and so answered a typed new folder with "directory not found" at Launch. */
 import { serverFetch, LOCAL_SERVER } from './server_base.js';
-import { usesSuggestion, fitsCoralFolder, offerCreateFolder } from './folder_suggestion.js';
+import { importOnce } from './import_once.js';
+const { usesSuggestion, fitsCoralFolder, offerCreateFolder } = await importOnce('./folder_suggestion.js');
 
 const NEW_FOLDER_NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$/;
 
