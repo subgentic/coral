@@ -824,7 +824,6 @@ window._validateTeamName = _validateTeamName;
 
 let teamLaunchPending = false;
 async function launchTeam() {
-    if (!hasOrchestrator()) { _membersPressed = true; showTeamStep('members'); document.getElementById('team-add-orchestrator')?.focus(); _syncTeamGate(); return; } // Launch team is on the last step now: the Orchestrator check that Next made
     if (teamLaunchPending) return;
     const boardName = document.getElementById("team-board-name").value.trim();
     if (!boardName) {

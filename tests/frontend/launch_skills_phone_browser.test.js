@@ -40,12 +40,14 @@ const SKILLS = [
             for (const x of m.rows) {
                 assert.ok(x.descTop >= x.nameBottom - 1, `${what}: the description is below the name, not beside it: ${JSON.stringify(x)}`);
                 assert.ok(x.descRight <= m.vw - 8, `${what}: the description stays inside the screen: ${JSON.stringify(x)}`);
-                assert.ok(x.tick >= 20, `${what}: the tick is at least 20 px: ${x.tick}`);
+                assert.ok(x.tick >= 20, `${what}: the tick is at least 20 px: ${JSON.stringify(x)}`);
             }
         };
 
         await ev(`window.showLaunchModal(); window._selectLaunchType('team'); true`);
         await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none' && !document.getElementById('team-skills-row').hidden`, 'the team step with its skills row', 8000);
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_steps.js'); m.showTeamStep('members'); document.getElementById('team-members-more').open = true; return true; })()`); // LT1 (#15892): the skills are on step 2, under More options
+        await waitFor(`!!document.querySelector('#team-skills-host details')`, 'the skills in More options', 5000);
         const team = await measure('team-skills-host');
         await new Promise(r => setTimeout(r, 300)); // sleep-ok: the opened list is laid out
         await shot('skills-team-390');
