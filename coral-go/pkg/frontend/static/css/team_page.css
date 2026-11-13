@@ -469,7 +469,7 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
     .team-page-status { display: block; min-width: 0; grid-column: 2; grid-row: 2; font-size: var(--fs-md); color: var(--text-secondary); overflow-wrap: anywhere; } /* it wraps: '2 of 3 waiting for first signal. A signal is an agent's first message.' was cut with an ellipsis (#12534) */
     .team-page-status:not(:empty) { min-height: 2lh; } /* the line is two lines high whatever it says (a long one wraps, a short one does not): its words change with the first read, and a height that changes above a scrolled page moves it (scroll anchoring; team_redraw_keeps_scroll on Linux CI, #14569) */
     .team-page-no-team .team-bar-back { display: none; } /* a team that is not there: the page says so and has its own Back to Agents button */
-    .team-page-no-team .team-page-head { grid-template-columns: minmax(0, 1fr); padding-inline: 16px; }
+    #team-page-view.team-page-no-team #team-page-head { grid-template-columns: minmax(0, 1fr); padding-inline: 16px; } /* the id is the phone header's own (mobile.css: 44px columns for the back arrow this state hides): without it the title sat in the arrow's 44 px column at 8 px (#16301) */
     .team-page-no-team .team-page-title { grid-column: 1; }
     .team-page-actions { grid-column: 3; grid-row: 1 / span 2; margin: 0; } /* the Actions button is the dots, its menu opens under them */
     #team-page-more { display: grid; place-items: center; width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); min-height: 0; padding: 0; border: 0; border-radius: 22px; background: none; }
