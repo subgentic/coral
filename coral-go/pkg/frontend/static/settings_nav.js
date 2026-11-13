@@ -74,14 +74,15 @@ const HINTS = {
     'Let Coral Hub change cross-team settings': 'Allow Coral Hub to change how teams communicate.',
     'Hide tokens from view-only hub users': 'Redacts recognised credentials before sharing output with read-only viewers.',
     'Let Coral Hub act as the Operator': 'Allow Coral Hub users to make Operator decisions here.',
+    'Agent tools folder': "Where agents get coral-board and Coral's hooks.",
 };
 function docsHint(holder, name, original = null) {
     const p = original || document.createElement('p'); p.hidden = false; p.classList.add('sv-help', 'settings-hint-line');
     const sentence = document.createElement('span'); sentence.textContent = HINTS[name] || 'Permissions and limits for this computer.';
     if (p.id) { sentence.id = p.id; p.removeAttribute('id'); }
     p.replaceChildren(sentence, ' ');
-    const answer = ['Coral Hub', 'What may Coral Hub do on this computer?'].includes(name) ? 'Coral Hub access limits' : HINTS[name] ? name : 'Settings help for Coral Hub access';
-    const a = settingsDocsLink({ docs: { topic: 'hub', answer } }, { label: name });
+    const answer = ['Coral Hub', 'What may Coral Hub do on this computer?'].includes(name) ? 'Coral Hub access limits' : name;
+    const a = settingsDocsLink({ docs: { topic: 'settings', answer } }, { label: name });
     p.append(a); if (!original) holder.append(p);
 }
 function buildInfoButtons(root) {
@@ -91,7 +92,7 @@ function buildInfoButtons(root) {
         if (!dt || !texts.length || row.dataset.hinted) continue;
         row.dataset.hinted = '1';
         for (const t of texts) { t.removeAttribute('data-info'); t.hidden = true; }
-        const name = (dt.querySelector('label, [id$="-label"]') || dt).textContent.trim();
+        const name = (dt.querySelector('label, [id$="-label"], :scope > span:first-child') || dt).textContent.trim();
         docsHint(row.querySelector('.net-body') || dt, name, texts[0]);
         const lead = row.dataset.learnAfter && row.querySelector(row.dataset.learnAfter);
         lead?.closest('.net-body > *')?.after(texts[0]);

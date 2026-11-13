@@ -208,7 +208,7 @@ func TestDocsMetaIntroductionsHaveExplicitSummaries(t *testing.T) {
 
 // #10093 v2 (Desktop #10087): the pages a newcomer reads first carry no source paths and no agent CLI flags (they are for developers, and a newcomer cannot use them). The example files of the quickstart's demo (stringutil.go) are not source paths.
 func TestNewcomerPagesHaveNoSourcePathsOrAgentFlags(t *testing.T) {
-	pages := []string{"how-do-i", "quickstart", "using-the-dashboard", "worked-demos", "workflow-quickstart", "troubleshooting"}
+	pages := []string{"how-do-i", "quickstart", "using-the-dashboard", "settings", "worked-demos", "workflow-quickstart", "troubleshooting"}
 	path := regexp.MustCompile("`(?:internal|pkg|cmd|tests)/[^`]*`|`[A-Za-z0-9_./-]*\\.(?:go|js):?[0-9]*`|\\((?:`[A-Za-z]+` in )?`(?:internal|pkg|cmd)/[^`]*`\\)")
 	flag := regexp.MustCompile("--(?:permission-mode|dangerously-skip-permissions|effort)\\b|model_reasoning_effort")
 	for _, p := range pages {

@@ -273,7 +273,7 @@ export function drawSettingsGroups(modal, mount) {
         const host = modal.querySelector(`#${hostId}`);
         if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields: (typeof fields === 'function' ? fields(host) : fields).map(field => {
             if (!field.help?.more) return field;
-            return { ...field, help: { ...field.help, text: field.help.text || HELP_LINES[field.key], more: undefined, docs: { topic: 'settings-system', answer: field.label } } };
+            return { ...field, help: { ...field.help, text: field.help.text || HELP_LINES[field.key], more: undefined, docs: { topic: 'settings', answer: field.label } } };
         }) });
         for (const id of hostId === 'settings-terminal-rows' ? TERMINAL_BACKEND_IDS : hostId === 'settings-agents-rows' ? ['settings-custom-models', 'settings-custom-modes'] : []) host.querySelector(`#${id}`)?.closest('.sv-row')?.setAttribute('hidden', ''); // until the module that fills them has read its status
     }

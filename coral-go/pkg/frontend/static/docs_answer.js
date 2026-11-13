@@ -12,7 +12,7 @@ export function takeDocsAnswer() { const h = wanted; wanted = ''; return h; }
 
 /** The Learn more that is a link into Docs (help.docs: { topic, answer }): the answer is Docs', not a box behind Settings (#10765). A plain click goes through the router (a[data-route]); the answer's heading is remembered for the page to open at. */
 export function settingsDocsLink(help, field) {
-    const a = document.createElement('a'); a.className = 'sv-learn'; a.textContent = 'Learn more'; a.href = `/docs/${encodeURIComponent(help.docs.topic)}`; a.setAttribute('data-route', ''); a.setAttribute('aria-label', `Learn more about ${help.about || field.label}, in Docs`);
+    const a = document.createElement('a'); a.className = 'sv-learn'; a.textContent = 'Learn more'; a.href = `/docs/${encodeURIComponent(help.docs.topic)}`; a.dataset.answer = help.docs.answer || ''; a.setAttribute('data-route', ''); a.setAttribute('aria-label', `Learn more about ${help.about || field.label}, in Docs`);
     a.addEventListener('click', async e => {
         const dlg = a.closest('.modal');
         if (!dlg || a.dataset.afterClose) { if (!dlg) wantDocsAnswer(help.docs.answer); return; }
