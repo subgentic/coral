@@ -14,6 +14,7 @@ const { wireSettingsRisks } = await importOnce('./settings_risks.js');
 const { wireSettingsAutosave } = await importOnce('./settings_autosave.js');
 const { setSettingsAtOpen, setPayloadAtOpen } = await importOnce('./settings_snapshots.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 
+const whenPaneShown = (id, fn) => { const pane = document.getElementById(id); if (!pane || typeof ResizeObserver !== 'function') return fn(); const ro = new ResizeObserver(es => { if (es.some(e => e.contentRect.width > 0)) { ro.disconnect(); fn(); } }); ro.observe(pane); }; // Storage and cleanup's modules load when that pane is first shown: opening Settings on another section does not fetch them (the 24-file budget)
 export { hideSettingsModal, applySettings }; // the dialog's public surface stays here; closing and Save live in settings_save.js (#8383)
 
 let chiefMounted = false; // one mount per open of Settings: going to another group and back keeps what was typed and not yet saved (#11839)
@@ -28,7 +29,7 @@ export async function showSettingsModal(group) {
     importOnce('./quiet_focus.js').then(m => m.quietFocus(document.getElementById('settings-modal')), () => {}); // the open tab takes the focus by script: no ring for a pointer's start, the ring for a key press (#7405, as #7391's New Agent)
 
     importOnce('./terminal_backend.js').then(m => m.loadTerminalBackendRow()).catch(() => {}); // #3634
-    importOnce('./worktrees_panel.js').then(m => m.loadWorktrees()).catch(() => {}); // the kept worktrees, in Storage and cleanup (#6743)
+    whenPaneShown('settings-pane-cleanup', () => importOnce('./worktrees_panel.js').then(m => m.loadWorktrees()).catch(() => {})); // the kept worktrees, in Storage and cleanup (#6743)
     importOnce('./security_settings.js').then(m => m.loadSecurityRow()).catch(() => {}); // #3948
     if (!isCloud() && document.getElementById('settings-pane-chief')?.hidden === false) mountChief(); // the Chief screen's modules load when its group is shown, not with every open (#11796)
     const s = state.settings || {};

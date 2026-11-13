@@ -15,7 +15,7 @@ const BASE = require('./test_base').BASE;
   for (const width of [1440,390]) for (const theme of ['dark','light']) for (const size of [16,32]) {
    await Emulation.setDeviceMetricsOverride({width,height:1000,deviceScaleFactor:1,mobile:width===390});
    await Page.navigate({url:BASE+'/'}); await Page.loadEventFired(); await install(); await coralReady(ev);
-   await ev(`document.documentElement.dataset.theme='${theme}'; document.documentElement.style.fontSize='${size}px'; window.showSettingsModal()`);
+   await ev(`document.documentElement.dataset.theme='${theme}'; document.documentElement.style.fontSize='${size}px'; window.showSettingsModal('cleanup')`); // Storage and cleanup is the pane in view: its Dropbox module loads when it is shown
    await waitFor(`!!document.getElementById('sec-hub-enabled')`,'Hub sign-in switch');
    await waitFor(`!document.getElementById('settings-dropbox-backup').hidden`,'connected Dropbox controls');
    const groups = await ev(`[...document.querySelectorAll('#settings-modal .settings-pane[data-group]')].map(p=>p.dataset.group)`);
