@@ -594,6 +594,13 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	// Where the owner routes read the owner's label recorded at enrolment (#5307).
 	ownerCloud := store.NewCloudStore(s.db, store.NewRemoteServerStore(s.db, s.cfg.CoralDir()))
 	routes.SetHubOwnerLabel(ownerCloud.OwnerUser)
+	hubDropbox.Enrolment = func(ctx context.Context) (string, string, error) { // the Hub's own Share page is opened at the enrolled address only (#16109)
+		c, err := ownerCloud.Get(ctx)
+		if err != nil || c == nil {
+			return "", "", errors.New("not enrolled")
+		}
+		return c.HubURL, c.ServerID, nil
+	}
 	routes.SetHubOwnerRecord(ownerCloud.OwnerRecord) // and what it is enrolled as: a person's or an organisation's (#7061)
 	s.cloudHandler.SetOwnerLabelStore(ownerCloud)    // and where the person at this computer records it when it is missing (#6108)
 	updater := routes.BuildRelaunchUpdater(s.cfg.CoralDir(), func() { s.endForUpdate(endThisServer) })

@@ -417,3 +417,44 @@ func TestHubDropboxPush_AMarkSetDuringTheStreamNeverDeliversTheFinalChunk(t *tes
 	assert.JSONEq(t, `{"word":"not_available"}`, got)
 	assert.LessOrEqual(t, received, len(big)-64<<10, "the last 64 KiB never reached Dropbox")
 }
+
+// The Share dialog's Hub view (#16109, coral-hub's differences #211076): Coral only opens the Hub's page, at the address in its enrolment record.
+func TestHubDropboxShareView_OffersTheHubsPageFromTheEnrolmentOnly(t *testing.T) {
+	e := newHDEnv(t)
+	d := e.put(t, "plain notes")
+	data := []byte("plain notes")
+	e.d.Enrolment = func(context.Context) (string, string, error) {
+		return "https://hub.example.test/some/path?x=1", "srv_1-A", nil
+	}
+	v := e.d.ShareView(t.Context(), d, data)
+	assert.Equal(t, map[string]any{"offered": true, "url": "https://hub.example.test/dropbox/share/srv_1-A/" + d, "flagged": false}, v)
+
+	assert.Equal(t, true, e.d.ShareView(t.Context(), d, []byte(canaryText()))["flagged"], "a file that looks like it holds a secret is flagged")
+
+	e.on = false
+	assert.Equal(t, map[string]any{"offered": false}, e.d.ShareView(t.Context(), d, data), "switch off: nothing offered")
+	e.on = true
+
+	e.intern = true
+	assert.Equal(t, map[string]any{"offered": false, "blocked": "internal"}, e.d.ShareView(t.Context(), d, data))
+	e.intern, e.readEr = false, errors.New("db locked")
+	assert.Equal(t, map[string]any{"offered": false}, e.d.ShareView(t.Context(), d, data), "an unreadable tag offers nothing")
+	e.readEr = nil
+
+	for name, enrol := range map[string]func(context.Context) (string, string, error){
+		"not enrolled":    func(context.Context) (string, string, error) { return "", "", errors.New("none") },
+		"http hub":        func(context.Context) (string, string, error) { return "http://hub.example.test", "srv_1", nil },
+		"user info":       func(context.Context) (string, string, error) { return "https://u:p@hub.example.test", "srv_1", nil },
+		"javascript":      func(context.Context) (string, string, error) { return "javascript:alert(1)", "srv_1", nil },
+		"bad server id":   func(context.Context) (string, string, error) { return "https://hub.example.test", "srv/../1", nil },
+		"empty server id": func(context.Context) (string, string, error) { return "https://hub.example.test", "", nil },
+		"no host":         func(context.Context) (string, string, error) { return "https:///x", "srv_1", nil },
+	} {
+		e.d.Enrolment = enrol
+		assert.Equal(t, map[string]any{"offered": false}, e.d.ShareView(t.Context(), d, data), name)
+	}
+	e.d.Enrolment = func(context.Context) (string, string, error) { return "http://127.0.0.1:8421", "srv_1", nil }
+	assert.Equal(t, true, e.d.ShareView(t.Context(), d, data)["offered"], "a loopback development Hub may be http")
+	e.d.Enrolment = nil
+	assert.Equal(t, map[string]any{"offered": false}, e.d.ShareView(t.Context(), d, data), "no enrolment source: not offered")
+}

@@ -43,6 +43,7 @@ func (h *CloudHandler) NewHubDropbox(coralDir string, bs *board.Store) *HubDropb
 			return bs.ArtifactTaggedAnywhere(ctx, digest, "internal")
 		}
 	}
+	h.hubShare = d.ShareView
 	return d
 }
 

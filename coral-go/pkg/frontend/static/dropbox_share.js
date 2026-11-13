@@ -73,6 +73,41 @@ function busy(on) {
 
 const audienceWords = { people: 'Specific people', team: 'People in your team', public: 'Anyone with the link' };
 
+// The Hub's own Share page (#16109): the server builds the address from this computer's enrolment; the page checks it again before it opens anything: https (http only for a
+// loopback Hub), no user info, the Hub's fixed path. Coral only opens that page: the link, the share and its record are the Hub's.
+const HUB_PAGE = /^\/dropbox\/share\/[A-Za-z0-9_-]{1,64}\/[a-f0-9]{64}$/;
+function safeHubPage(u) {
+    let x;
+    try { x = new URL(String(u)); } catch { return false; }
+    const loop = ['localhost', '127.0.0.1', '[::1]'].includes(x.hostname);
+    return (x.protocol === 'https:' || (x.protocol === 'http:' && loop)) && !x.username && !x.password && !x.search && !x.hash && HUB_PAGE.test(x.pathname);
+}
+
+// hubView is the dialog when no Dropbox is connected here but Coral Hub can share (the "Share through Coral Hub" switch is on): one line saying which way, the Hub's page
+// for Share and Stop sharing, and, for a file that looks like it holds a secret, the local "Upload anyway" the Hub waits for. Nothing from the Hub is shown as text.
+function hubView(f, hex, hub, filename) {
+    f.h.textContent = `Share ${filename || 'this file'} through Coral Hub`;
+    f.body.append(
+        mk('p', 'settings-hint dropbox-share-via', 'Through Coral Hub'),
+        mk('p', null, 'Coral Hub makes the link and keeps the record of this share: its page is the record, and Coral does not show or keep the link. Nothing is sent until you press Share there.'),
+    );
+    if (hub.flagged === true) {
+        f.body.append(mk('p', 'field-error', 'This file looks like it holds a secret. It is not sent until you press Upload anyway here, and Coral Hub says it is held until then.'));
+        const any = btn('Upload anyway', 'btn', async () => {
+            busy(true);
+            const r = await call('POST', '/api/dropbox/upload-anyway/' + hex, {});
+            busy(false);
+            sayIt(f.say, r.status === 200 ? 'Allowed for 10 minutes, for one send. Press Share on Coral Hub\u2019s page now.' : 'Not changed: Coral could not save it.');
+        });
+        f.acts.prepend(any);
+    }
+    const open = () => { window.open(hub.url, '_blank', 'noopener,noreferrer'); };
+    const stop = btn('Stop sharing\u2026', 'btn', open);
+    f.acts.prepend(stop);
+    f.acts.prepend(btn('Share on Coral Hub\u2026', 'btn btn-primary', open));
+    f.body.append(mk('p', 'settings-hint', 'Stop sharing opens Coral Hub\u2019s page. Coral Hub deletes the file from Dropbox.'));
+}
+
 /** Open the dialog for an artifact. opts: { hex, filename, opener }. */
 export async function openShareDialog(opts) {
     const hex = String(opts.hex || '');
@@ -86,9 +121,16 @@ export async function openShareDialog(opts) {
     f.body.replaceChildren();
     if (res.status === 403 && res.body.code === 'private') { f.body.append(mk('p', null, 'A private file is not shared.')); return; }
     if (res.status !== 200) { f.body.append(mk('p', null, String(res.body.error || "Couldn't read this file's sharing. Try again."))); return; }
-    if (!res.body.connected) { f.body.append(mk('p', null, 'Connect Dropbox in Settings, Storage and cleanup, to share through it.')); return; }
+    if (!res.body.connected) {
+        const hub = res.body.hub;
+        if (hub && hub.offered === true && safeHubPage(hub.url)) { hubView(f, hex, hub, opts.filename); return; } // no Dropbox here: through Coral Hub (#16109)
+        if (hub && hub.blocked === 'internal') { f.body.append(mk('p', null, 'A file tagged internal is never sent through Coral Hub.')); return; }
+        f.body.append(mk('p', null, 'Connect Dropbox in Settings, Storage and cleanup, to share through it.'));
+        return;
+    }
     const info = res.body;
     f.h.textContent = `Share ${info.name || 'this file'} via Dropbox`;
+    f.body.append(mk('p', 'settings-hint dropbox-share-via', 'Through your Dropbox on this computer'));
     const live = Array.isArray(info.shares) ? info.shares.filter(s => s.state === 'live') : [];
     if (live.length) {
         f.body.append(sharesList(live, f));

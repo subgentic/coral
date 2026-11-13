@@ -13,8 +13,10 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -47,6 +49,9 @@ type HubDropbox struct {
 	// Client is the upload client; a test supplies one with a fake transport.
 	Client func(allowed func(context.Context) (bool, error)) *hubdropbox.Uploader
 	Now    func() time.Time
+	// Enrolment is this computer's Hub address and server id, from its enrolment record only (never from a request, an artifact or a page): the Share button
+	// opens the Hub's page at that address. Unset: the Hub is not offered.
+	Enrolment func(ctx context.Context) (hubURL, serverID string, err error)
 
 	busy   sync.Mutex // one prepare or push at a time per computer
 	mu     sync.Mutex
@@ -412,4 +417,47 @@ func (d *HubDropbox) UploadAnyway(w http.ResponseWriter, r *http.Request) {
 	}
 	d.AllowAnyway(digest)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "valid_minutes": int(hubDropboxAnywayTTL / time.Minute)})
+}
+
+var hubServerIDRe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+// hubSharePage is the Hub's own Share page for one file, built from the enrolment record only: https (http only for a loopback Hub, as a development Hub is),
+// no user info, the Hub's origin and a fixed path. Anything else is "" (nothing is offered).
+func hubSharePage(hubURL, serverID, digest string) string {
+	u, err := url.Parse(hubURL)
+	if err != nil || u.Host == "" || u.User != nil || !hubServerIDRe.MatchString(serverID) || !lowerHex64(digest) {
+		return ""
+	}
+	loop := u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1" || u.Hostname() == "::1"
+	if u.Scheme != "https" && !(u.Scheme == "http" && loop) {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host + "/dropbox/share/" + serverID + "/" + digest
+}
+
+// ShareView is what the Share dialog needs when no Dropbox is connected on this computer (#16109, coral-hub's differences #211076): whether Share goes through Coral Hub,
+// the Hub's page to open, and whether the file looks like it holds a secret (then it waits for "Upload anyway" here). It offers nothing on a team's computer, with the
+// switch off, with no enrolment, or for a file tagged internal. In v1 Coral only opens the Hub's page: no call from Coral to the Hub starts a share.
+func (d *HubDropbox) ShareView(ctx context.Context, digest string, data []byte) map[string]any {
+	no := map[string]any{"offered": false}
+	if d == nil || d.Enrolment == nil || !d.enabled(ctx) {
+		return no
+	}
+	if d.Internal != nil {
+		if internal, err := d.Internal(ctx, digest); err != nil {
+			return no
+		} else if internal {
+			return map[string]any{"offered": false, "blocked": "internal"}
+		}
+	}
+	hubURL, serverID, err := d.Enrolment(ctx)
+	if err != nil {
+		return no
+	}
+	page := hubSharePage(hubURL, serverID, digest)
+	if page == "" {
+		return no
+	}
+	f, err := hubdropbox.ReadOnce(bytes.NewReader(data))
+	return map[string]any{"offered": true, "url": page, "flagged": err != nil || f.Flagged}
 }

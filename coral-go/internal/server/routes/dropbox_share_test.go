@@ -543,3 +543,26 @@ func TestAShareLimitIsAMarkedActionLimit(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, rec.Code)
 	assert.Empty(t, rec.Header().Get(httputil.ActionLimitHeader))
 }
+
+// #16109: with no Dropbox connected on this computer, the Share dialog's read carries the Hub view (the Hub's page to open), and nothing else of the Hub.
+func TestShareInfoWithNoDropboxCarriesTheHubView(t *testing.T) {
+	be, d := newDropboxShareEnv(t)
+	be.body = `{}`
+	rec := be.call(http.MethodPost, "/api/dropbox/disconnect", true, nil)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	code, out := be.shareCall(http.MethodGet, "/api/dropbox/share/"+d, "", callerDashCookie)
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, false, out["connected"])
+	assert.Nil(t, out["hub"], "no Hub view without Hub sharing wired")
+	hd := &HubDropbox{
+		On:        func(context.Context) (bool, error) { return true, nil },
+		Enrolment: func(context.Context) (string, string, error) { return "https://hub.example.test", "srv_1", nil },
+	}
+	be.h.hubShare = hd.ShareView
+	code, out = be.shareCall(http.MethodGet, "/api/dropbox/share/"+d, "", callerDashCookie)
+	require.Equal(t, http.StatusOK, code)
+	hub, _ := out["hub"].(map[string]any)
+	require.NotNil(t, hub, "%v", out)
+	assert.Equal(t, true, hub["offered"])
+	assert.Equal(t, "https://hub.example.test/dropbox/share/srv_1/"+d, hub["url"])
+}
