@@ -322,7 +322,7 @@ function acfAutoPermissionsHtml(container, opts, { showAutoPermissions, agentTyp
                 ${liveNote}
                 ${codexNote}
             </label>
-            ${opts.offerUseFullAccess ? `<label class="acf-use-full-access" hidden><input type="checkbox" class="acf-use-full-access-input"> <span class="acf-use-full-access-name">Use Full access for this agent</span>
+            ${opts.offerUseFullAccess ? `<label class="acf-use-full-access" hidden><input type="checkbox" role="switch" class="switch acf-use-full-access-input"> <span class="acf-use-full-access-name">Use Full access for this agent</span>
                 <span class="settings-hint">It runs with Full access whatever its role's capabilities say, and every time it restarts. Only you can set it.</span>
             </label>` : ''}`;
     }

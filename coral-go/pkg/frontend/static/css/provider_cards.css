@@ -31,7 +31,7 @@
 
 /* Model and Thinking are two rows of a form in the open tab's panel (#11709): the labels in one column, the controls the same width; Thinking is one select that never wraps (a strip of eight levels did) */
 .provider-card-body .seg-group { display: none; }
-.provider-card-body select.seg-source { display: block; width: 100%; max-width: none; min-height: var(--control-touch-height, 44px); }
+.provider-card-body select.seg-source { display: block; width: 100%; max-width: none; min-height: var(--control-height, 36px); }
 .provider-card-body .acf-model-select { width: 100%; min-width: 0; }
 .provider-card-body .provider-think-hint { flex: 1 0 100%; margin: 0; } /* the hint goes under the select, which fills the row like Model's; beside it the hint took 393 px and the select shrank to 82, cutting 'Default' at 960 (#15494 M7) */
 /* The agents this computer cannot use yet: one list, one row per CLI, three aligned columns (name, status chip, action) on a grid the rows share (subgrid); a phone puts the action under the name and chip (#12364) */
@@ -45,8 +45,8 @@
 .provider-chip { justify-self: start; white-space: nowrap; color: var(--text-secondary); }
 .provider-entry.is-refused .provider-chip { color: var(--warning, var(--text-primary)); border-color: currentColor; }
 .provider-action { justify-self: end; display: inline-flex; align-items: center; min-width: 0; }
-.provider-entry .provider-install { margin-left: 0; min-height: var(--control-touch-height, 44px); } /* still a 44 px target */
-.provider-entry .provider-choose { min-height: var(--control-touch-height, 44px); }
+.provider-entry .provider-install { margin-left: 0; min-height: var(--control-height, 36px); } /* 36 px on a computer, 44 on a phone: the media rule at the end (#15889) */
+.provider-entry .provider-choose { min-height: var(--control-height, 36px); }
 .provider-why-line { grid-column: 1 / -1; margin: 0; overflow-wrap: anywhere; }
 .provider-why { grid-column: 1 / -1; margin: 0 0 4px; }
 .provider-why summary { cursor: pointer; color: var(--link-text); min-height: var(--control-touch-height, 44px); display: flex; align-items: center; }
@@ -76,3 +76,5 @@
 .launch-computer-card input { margin-left: auto; flex: none; }
 /* A short window (200% zoom on a laptop, 720 x 450, #15303): Edit member's buttons stay on one row (the phone rule above gives Remove a row of its own and Move up and Move down half each), so the footer is one row, not three. */
 @media (max-height: 520px) { #launch-agent-remove, #launch-agent-move-up, #launch-agent-move-down { flex: 0 0 auto; } }
+/* one control height in the New agent dialog (#15889): 36 px, 44 px on a phone or touch; Thinking, Install and Choose a path used to be 44 on a computer */
+@media (pointer: coarse), (max-width: 767px) { .provider-card-body select.seg-source, .provider-entry .provider-install, .provider-entry .provider-choose { min-height: var(--control-touch-height, 44px); } }
