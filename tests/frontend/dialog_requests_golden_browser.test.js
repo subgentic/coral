@@ -128,6 +128,7 @@ const GOLDEN = path.join(__dirname, 'fixtures', 'dialog_requests_golden.json');
             await fill('launch-agent-name-input', cfg.name); // the role is the persona step's name field
             if (cfg.type) await set('launch-agent-acf', '.acf-agent-type', cfg.type);
             if (cfg.model) await set('launch-agent-acf', '.acf-model', cfg.model);
+            if (cfg.model) console.log('DIAGMODEL', cfg.name, JSON.stringify(await ev(`(() => { const r = document.getElementById('launch-agent-acf'), m = r && r.querySelector('.acf-model'); return m && { tag: m.tagName, value: m.value, n: m.options ? m.options.length : null, opts: m.options ? [...m.options].slice(0, 8).map(o => o.value) : null, dirty: m.dataset.dirty, agent: r.querySelector('.acf-agent-type') && r.querySelector('.acf-agent-type').value }; })()`)));
             await set('launch-agent-acf', '.acf-prompt', cfg.prompt);
             if (cfg.mode) await set('launch-agent-acf', '.acf-permission-mode', cfg.mode);
             if (cfg.flags) await set('launch-agent-acf', '.acf-flags', cfg.flags);
