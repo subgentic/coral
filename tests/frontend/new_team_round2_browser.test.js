@@ -10,13 +10,13 @@ const BASE = require('./test_base').BASE;
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios(); const t = T(ev, waitFor);
-    const tab = async n => { await ev(`(() => { const d = window.__nt.dlg(${N.team}); const x = [...d.querySelectorAll('[role=tab]')].filter(window.__na.vis).find(e => window.__na.name(e) === ${JSON.stringify(n)}); if (x) { x.click(); return true; } return false; })()`); await settle(250); };
+    const tab = n => t.tab(n); // LT1 (#15892): the old step-3 menu's names, now where the setting is on step 1
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installNT(ev);
         await stubModels(ev); await openNewTeam(ev, waitFor);
-        await t.to(3);
+        await t.to(3); await t.settings(); // LT1 (#15892): the first task, Workflow and Health check are on step 1
         await S.run('Start tab: What should the team work on? and Additional instructions span the pane under their label, not the right column only (#8479)', async () => {
             await tab('Start');
             const r = await ev(`(() => { const d = window.__nt.dlg(${N.team}); return ['team-goal', 'team-custom-instructions'].map(id => { const t = document.getElementById(id), row = t && t.closest('.sv-row'); if (!t || !row) return null; const a = t.getBoundingClientRect(), b = row.getBoundingClientRect(); return { id, left: Math.round(a.left - b.left), right: Math.round(b.right - a.right) }; }); })()`);
@@ -24,7 +24,7 @@ const BASE = require('./test_base').BASE;
         });
         await S.run('Health check (a settings_view, #8455): no (i) icons, a line for each switch, the dependent rows off until Send health check is on', async () => {
             await tab('Health check');
-            const probe = () => ev(`(() => { const d = window.__nt.dlg(${N.team}); const p = [...d.querySelectorAll('.settings-pane')].find(x => x.dataset.section === 'health'); const vis = window.__na.vis;
+            const probe = () => ev(`(() => { const d = window.__nt.dlg(${N.team}); const p = d.querySelector('#team-start-host'); const vis = window.__na.vis;
                 const row = k => p.querySelector('[data-key="' + k + '"]'); const help = k => { const h = row(k) && row(k).querySelector('.sv-help'); return h ? [vis(h), h.textContent.trim()] : null; };
                 return { info: [...p.querySelectorAll('.settings-info-btn')].filter(vis).length, onHelp: help('on'), clearHelp: help('all_clear'), everyOff: row('interval_min').hasAttribute('data-disabled'), clearOff: row('all_clear').hasAttribute('data-disabled'), recipient: !!row('recipient') }; })()`);
             const off0 = await probe(); const off = off0;
@@ -36,7 +36,7 @@ const BASE = require('./test_base').BASE;
             assert.equal(on.everyOff, true, 'Look every is off once Send health check is unticked'); assert.equal(on.clearOff, true, 'and so is Post when all is well');
         });
         await S.run('Edit member: the persona select is labelled "Start from a persona" (optional) and the Behavior prompt is not mono', async () => {
-            await t.click('button', /^Back$/i); await t.step(2); await settle(200);
+            await t.click('button', N.next); await t.step(2); await settle(200);
             await ev(`(() => { const d = window.__nt.dlg(${N.team}); const b = window.__nt.rows(d)[1]; b.click(); return true; })()`);
             await waitFor(`!!window.__nt.dlg(${N.member})`, 'the Edit member dialog', 4000);
             const mem = M(ev, waitFor); await mem.toPersona(); // the persona and the prompt are the page before a member's settings (#7861)

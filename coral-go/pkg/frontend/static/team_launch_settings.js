@@ -87,7 +87,7 @@ export function mountTeamLaunchSettings() {
                 { key: 'require_goal', type: 'toggle', label: 'Require a goal', help: requireGoalSentence, disabledWhen: v => (v.planning_approval === 'auto' ? false : 'The approval choice above needs it: without a goal on every task, an agent could add tasks that skip the gate.') },
             { key: 'more_title', type: 'heading', id: 'team-more-options', label: 'More options', fold: true },
             { key: 'health_title', type: 'notice', render: slot => { const h = document.createElement('h5'); h.className = 'sv-heading'; h.textContent = 'Health check'; slot.append(h); } }, // not a heading field: a heading closes the More options fold
-            ...healthRows(),
+            ...healthRows().map(f => f.type !== 'heading' ? f : { key: f.key, type: 'notice', render: slot => { const h = document.createElement('h5'); h.className = 'sv-heading'; h.textContent = f.label; slot.append(h); if (f.help) { const p = document.createElement('p'); p.className = 'sv-hint'; p.textContent = f.help; slot.append(p); } } }), // a heading would end the More options disclosure: the Health check's own sub-headings are labels inside it
             { key: 'messaging_title', type: 'notice', render: slot => { const h = document.createElement('h5'); h.className = 'sv-heading'; h.textContent = 'Messaging'; slot.append(h); } },
                 ...XT_SWITCHES.map(sw => ({ ...sw, type: 'toggle' })),
                 { key: 'xt_here', type: 'notice', render: slot => { slot.innerHTML = `<p class="xt-reach xt-reach-here">${HERE_NOT_YET} Allow it in the team's settings once the team has started.</p>`; } },

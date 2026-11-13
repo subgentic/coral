@@ -264,7 +264,7 @@ export function mountSettingsView(host, spec) {
                 const head = node('div', 'prov-card-head'); head.append(node('h5', 'prov-card-title', field.label)); card.append(head);
                 fold = null; set = null; body.append(card); continue;
             }
-            if (field.type === 'heading' && field.fold) { fold = node('details', 'disclosure sv-fold'); if (field.id) fold.id = field.id; fold.append(node('summary', '', field.label)); folds.push(fold); (card || body).append(fold); continue; }
+            if (field.type === 'heading' && field.fold) { set = null; fold = node('details', 'disclosure sv-fold'); if (field.id) fold.id = field.id; fold.append(node('summary', '', field.label)); folds.push(fold); (card || body).append(fold); continue; }
             if (field.type === 'heading') { fold = null; set = null; card = null; }
             if (field.fieldset) { set = node('fieldset', 'sv-fieldset'); set.append(node('legend', 'sv-legend', field.fieldset)); (fold || card || body).append(set); }
             const rec = buildRow(field, g); fields.set(field.key, rec); (set || fold || card || body).append(rec.row);

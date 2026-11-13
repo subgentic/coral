@@ -66,7 +66,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window.cancelTeamMember(); document.getElementById('team-permission-mode').value = 'default'; document.getElementById('team-permission-mode').dataset.pickedByPerson = ''; true`);
 
         console.log('The launch carries the default Mode as the team flags: Default adds none');
-        await click('#launch-team-next'); assert.equal(await step(), 'start');
+        assert.equal(await step(), 'members'); // LT1 (#15892): the members are the last step: Launch team is here
         await click('#launch-team-go');
         await waitFor(`window.__teamLaunches.length === 1`, 'the launch request');
         const sent = await ev(`window.__teamLaunches[0]`);
