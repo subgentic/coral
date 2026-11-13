@@ -40,6 +40,8 @@
 .provider-card-body .provider-think-hint { flex: 1 0 100%; margin: 0; } /* the hint goes under the select, which fills the row like Model's; beside it the hint took 393 px and the select shrank to 82, cutting 'Default' at 960 (#15494 M7) */
 .provider-why-line { grid-column: 1 / -1; margin: 0; overflow-wrap: anywhere; }
 .provider-why { grid-column: 1 / -1; margin: 0 0 4px; }
+#settings-modal .cli-refused-why { grid-column: 1 / -1; padding: 4px 0 0; } /* under a CLI path in Settings (#16003): the size and colour of a help line */
+#settings-modal .cli-refused-why .provider-why-line, #settings-modal .cli-refused-why .provider-why > p { font-size: var(--fs-base); color: var(--text-secondary); }
 .provider-why summary { cursor: pointer; color: var(--link-text); min-height: var(--control-touch-height, 44px); display: flex; align-items: center; }
 .provider-steps { margin: 4px 0 4px 20px; padding: 0; }
 .provider-panel .acf-model-refresh-text { display: none; }

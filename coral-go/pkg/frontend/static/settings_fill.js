@@ -237,6 +237,24 @@ function openCliPathsWhenMissing(type) {
     }).catch(() => {});
 }
 
+/** A CLI that was found and is not used (an agent works in its folder, #12053) is told here, under its path field, in the one short line with its Why? fold (#16003: New agent no longer says it, #15887). The server's note is read as text by cli_missing_list.js, loaded only when there is one to show. */
+function showRefusedClis() {
+    for (const type of Object.keys(CLI_PATH_FIELDS).map(k => k.replace('cli_path_', ''))) {
+        const input = document.getElementById(`settings-cli-path-${type}`);
+        if (!input) continue;
+        fetch(`/api/system/cli-check?type=${encodeURIComponent(type)}`).then(r => r.ok ? r.json() : null).then(async d => {
+            if (!d || d.found !== false || !d.refused || typeof d.install_note !== 'string' || !input.isConnected) return;
+            const [list, styles] = await Promise.all([importOnce('./cli_missing_list.js'), importOnce('./lazy_styles.js')]);
+            await styles.loadStyles('provider_cards.css');
+            const row = input.closest('.sv-row'); if (!row || row.querySelector('.cli-refused-why')) return;
+            const box = document.createElement('div'); box.className = 'cli-refused-why'; box.dataset.cli = type;
+            box.append(...list.refusedBlock(d.install_note, {}));
+            row.append(box);
+            const details = document.querySelector('#settings-modal #settings-cli-paths'); if (details) details.open = true; // the way out (the path) is the field above it
+        }).catch(() => {});
+    }
+}
+
 // The CLI paths and the default models (and their datalists, from the model catalog; not on the hub).
 export function _fillCliAndModels(s) {
     // CLI paths
@@ -252,6 +270,7 @@ export function _fillCliAndModels(s) {
     for (const id of Object.values(CLI_PATH_FIELDS)) { const el = document.getElementById(id); if (el) el.dataset.filled = '1'; }
     refreshCLIPathFields();
     openCliPathsWhenMissing(s.default_agent_type || 'claude');
+    showRefusedClis();
 
     // Default Models — populate combo inputs + datalists from /api/agent-models
     const defClaude = document.getElementById("settings-default-model-claude");
