@@ -32,7 +32,7 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`${OPEN} && document.getElementById('launch-dir').value === '/tmp/second-worker'`, 'the dialog with the session folder', 8000);
         await ev(`window.hideLaunchModal(); true`);
         await ev(`window.showAddAgentToBoard(${JSON.stringify(TEAM)}, ''); true`);
-        await waitFor(`${OPEN} && document.getElementById('launch-step-agent').dataset.stage === 'folder'`, 'a team with no folder anywhere keeps the folder step', 8000);
+        await waitFor(`${OPEN} && document.getElementById('launch-step-agent').dataset.stage === 'page'`, 'a team with no folder anywhere keeps the folder field (the one page)', 8000);
         console.log('PASS Add agent picks the team home folder, else the first session that has a folder');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
