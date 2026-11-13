@@ -181,10 +181,10 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         // One header at every width (#15832, design G1): Add task and Mark done (Reopen for a closed goal) are the buttons, Mark done the one blue; the rest is in More (the way to the team page, Not yet, Edit goal, Change driver, Move to another team; on a phone Copy for an agent too).
         for (const k of ['add', 'close', 'reopen']) { const a = act.find(x => x.key === k); if (a) acts.append(makeBtn(a)); }
         const menuItems = [];
-        if (teamLink) menuItems.push({ key: 'team', cls: 'goal-team-link', label: 'Open on team page', aria: `Open ${keyLabel(team)} on team page`, run: () => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(team, id)) });
+        if (teamLink) menuItems.push({ key: 'team', cls: 'goal-team-link', href: teamLink, label: 'Open on team page', aria: `Open ${keyLabel(team)} on team page`, run: () => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(team, id)) });
         for (const k of ['notyet', 'edit', 'driver', 'move']) { const a = act.find(x => x.key === k); if (a) menuItems.push(a); }
         if (phone) menuItems.push({ key: 'copy', cls: 'goal-copy-agent', label: 'Copy for an agent', title: 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal', run: () => { copyText(agentCopyText('goal', W.agentBriefLine(g))).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok)); } });
-        if (menuItems.length) acts.append(moreMenu(`goal-more-${g.id}`, menuItems.map(a => ({ label: a.label, title: a.title, ariaLabel: a.aria, className: a.cls.replace(/^btn( btn-primary)? ?/, ''), run: a.run })), { label: 'More goal actions' }));
+        if (menuItems.length) acts.append(moreMenu(`goal-more-${g.id}`, menuItems.map(a => ({ href: a.href, label: a.label, title: a.title, ariaLabel: a.aria, className: a.cls.replace(/^btn( btn-primary)? ?/, ''), run: a.run })), { label: 'More goal actions' }));
         row.append(acts); main.append(row);
         if (W.isOpenGoal(g) && operatorChangesNeedNewer(sp.server)) { const note = el('p', 'goals-note goals-ops-note', operatorChangesNote()); note.setAttribute('role', 'note'); main.append(note); } // an older computer behind a Hub: the two buttons are hidden, and the page says why (#13517)
         const h = el('h2', 'goals-detail-title', shortTitle(g.title)); h.dataset.goalId = String(g.id); h.tabIndex = -1; if (phone) { row.classList.add('goal-head-phone'); } h.id = 'goals-detail-title';
