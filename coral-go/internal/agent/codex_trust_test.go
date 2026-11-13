@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/psquote"
 )
 
 // #153: Coral's trust for its own Codex hooks must be exactly what Codex computes, or Codex ignores it and asks. These
@@ -40,10 +42,13 @@ func TestCodexHookTrustArgsShape(t *testing.T) {
 	args := codexHookTrustArgs("windows", command)
 	require.Len(t, args, 2)
 	assert.Equal(t, "-c", args[0])
-	assert.True(t, strings.HasPrefix(args[1], "hooks.state={'C:\\<session-flags>\\config.toml:session_start:0:0'={trusted_hash=\"sha256:"), args[1])
-	assert.True(t, strings.HasSuffix(args[1], "\"}}"), args[1])
+	assert.True(t, strings.HasPrefix(args[1], "hooks.state={'C:\\<session-flags>\\config.toml:session_start:0:0'={trusted_hash='sha256:"), args[1])
+	assert.True(t, strings.HasSuffix(args[1], "'}}"), args[1])
+	assert.NotContains(t, args[1], `"`, "#16207: no double quote, so a .cmd that starts Codex reads the whole argument as quoted text once it is wrapped (psquote.CmdArg)")
+	_, wraps := psquote.CmdArg(args[1])
+	assert.True(t, wraps, "the < > in the key are quoted for cmd.exe")
 	for _, event := range codexHookEvents {
-		assert.Contains(t, args[1], "'"+codexHookStateKey("windows", event)+"'={trusted_hash=\""+codexHookTrustHash(event, command)+"\"}")
+		assert.Contains(t, args[1], "'"+codexHookStateKey("windows", event)+"'={trusted_hash='"+codexHookTrustHash(event, command)+"'}")
 	}
 	assert.Equal(t, len(codexHookEvents), strings.Count(args[1], "trusted_hash="))
 	assert.NotContains(t, strings.Join(args, " "), "bypass", "never Codex's --dangerously-bypass-hook-trust")

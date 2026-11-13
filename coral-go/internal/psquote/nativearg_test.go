@@ -32,3 +32,27 @@ func TestNativeArg(t *testing.T) {
 		assert.Equal(t, want, NativeArg(s), "%s", s)
 	}
 }
+
+// A .cmd or .bat reads its arguments through cmd.exe twice (#16207): one with < > & | or ^ in it is wrapped in double quotes, which are plain text in both readings; one that cannot be wrapped safely is left alone.
+func TestCmdArg(t *testing.T) {
+	for _, c := range []struct {
+		in, want string
+		ok       bool
+	}{
+		{`hooks.state={'C:\<session-flags>\config.toml:session_start:0:0'={trusted_hash='sha256:ab'}}`, `"hooks.state={'C:\<session-flags>\config.toml:session_start:0:0'={trusted_hash='sha256:ab'}}"`, true},
+		{"a&b", `"a&b"`, true},
+		{"a|b", `"a|b"`, true},
+		{"a^b", `"a^b"`, true},
+		{"plain", "plain", false},
+		{"--flag=value", "--flag=value", false},
+		{`a"<b`, `a"<b`, false},   // cmd counts every quote
+		{"50%<x", "50%<x", false}, // cmd expands % inside quotes
+		{`a<b\`, `a<b\`, false},   // a trailing backslash would escape the closing quote
+		{"a<\nb", "a<\nb", false},
+	} {
+		got, ok := CmdArg(c.in)
+		if got != c.want || ok != c.ok {
+			t.Errorf("CmdArg(%q) = %q, %v; want %q, %v", c.in, got, ok, c.want, c.ok)
+		}
+	}
+}

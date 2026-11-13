@@ -65,3 +65,19 @@ func wrapsNativeArg(s string) bool {
 	}
 	return false
 }
+
+// CmdArg is for an argument of a program that is a .cmd or .bat file, which cmd.exe starts and whose
+// "%*" reads the arguments again: an unquoted < > & | or ^ is a redirect, a second command or an escape
+// (twice: once when the line is read and once when the file's own line is). Inside double quotes they are
+// plain in both readings, so an argument with one of them is returned wrapped in double quotes, and ok is
+// true: the program's argv parser takes the quotes off. Not wrapped (ok false) is an argument with none of
+// them, and one that cannot be wrapped safely: it has a " (cmd counts every quote, so what follows would
+// move in or out of the quotes), a % (cmd expands it even inside quotes), a line break, or ends in a
+// backslash (it would escape the closing quote). The caller writes the result as it is, without NativeArg:
+// that would write each " as \" and cmd does not read a backslash as an escape.
+func CmdArg(s string) (string, bool) {
+	if !strings.ContainsAny(s, "<>&|^") || strings.ContainsAny(s, "\"%\r\n") || strings.HasSuffix(s, `\`) {
+		return s, false
+	}
+	return `"` + s + `"`, true
+}
