@@ -427,6 +427,10 @@ func (pr *Provisioner) upgradeSteps(ctx context.Context, p *provisionPlan) {
 		pr.fail(p, "install", "That computer runs a newer Coral than this hub ("+cleanVersionText(h.Version)+", this hub runs "+want+"). Nothing was changed. To install this hub's release over it anyway, choose to allow a downgrade.")
 		return
 	}
+	kept, ok := pr.keepRunningDataDir(ctx, p)
+	if !ok {
+		return
+	}
 	if err := pr.install(ctx, p, arch); err != nil {
 		var ie *sshprov.ErrInstall
 		msg := "Could not install Coral on that computer."
@@ -440,7 +444,7 @@ func (pr *Provisioner) upgradeSteps(ctx context.Context, p *provisionPlan) {
 	if !sshprov.ValidPort(farPort) {
 		farPort = sshprov.DefaultPort
 	}
-	p.setStep("restart", stepRunning, "Stopping Coral and starting the new release.")
+	p.setStep("restart", stepRunning, "Stopping Coral and starting the new release."+kept)
 	if err := pr.runner.StopAndConfirm(ctx, p.Target); err != nil {
 		pr.failRestart(ctx, p, "restart", stopFailureSentence(err), err, restartNote{port: farPort})
 		return
@@ -472,7 +476,7 @@ func (pr *Provisioner) upgradeSteps(ctx context.Context, p *provisionPlan) {
 		}
 		return
 	}
-	p.setStep("restart", stepOK, "Started.")
+	p.setStep("restart", stepOK, "Started."+kept)
 	p.setStep("verify", stepRunning, "")
 	if h := pr.checkHealth(ctx, row, key); h.Status != store.RemoteStatusOnline || h.Version != want {
 		slog.Info("[provision] upgrade did not come back", "plan", p.ID)
@@ -501,4 +505,41 @@ func (pr *Provisioner) ensureOwnerSecret(ctx context.Context, p *provisionPlan, 
 		return " Approve and Request changes through this hub are not set up for it."
 	}
 	return " Approve and Request changes now work through this hub."
+}
+
+// keepRunningDataDir makes the upgrade keep the data folder the running Coral actually uses (#16021): its --home, read from its command line before anything is stopped. A folder under the home folder there is
+// recorded as the relative path the start reads; one outside it is kept only when it is a Coral data folder (a sessions.db in it), and is named in the steps. A Coral that was started with no --home, or none that
+// runs (the recorded folder then stands), changes nothing. What it cannot place or keep stops the upgrade before anything is changed: never a silent fall back to the default folder. It returns the sentence the
+// steps show ("" when nothing is kept) and false when the run was failed.
+func (pr *Provisioner) keepRunningDataDir(ctx context.Context, p *provisionPlan) (string, bool) {
+	kind, path, err := pr.runner.RunningHome(ctx, p.Target)
+	if err != nil {
+		pr.fail(p, "install", "Could not read which data folder that Coral uses, so nothing was changed.")
+		return "", false
+	}
+	switch kind {
+	case "rel":
+		if sshprov.DataDirProblem(path) != "" {
+			pr.fail(p, "install", "That Coral keeps its data in ~/"+path+", a folder this hub will not carry over. Nothing was changed.")
+			return "", false
+		}
+	case "abs":
+		if !pr.runner.IsCoralDataDir(ctx, p.Target, path) {
+			pr.fail(p, "install", "That Coral keeps its data in "+path+", which is not a Coral data folder this hub can keep (no sessions.db there, or it is not yours). Nothing was changed.")
+			return "", false
+		}
+	case "relative":
+		pr.fail(p, "install", "That Coral was started with a data folder given as a relative path, so this hub cannot tell where it is. Nothing was changed.")
+		return "", false
+	default:
+		return "", true
+	}
+	if err := pr.runner.RecordDataDir(ctx, p.Target, path); err != nil {
+		pr.fail(p, "install", "Could not record that Coral's data folder, so nothing was changed.")
+		return "", false
+	}
+	if kind == "rel" {
+		return " Keeping its data folder ~/" + path + ".", true
+	}
+	return " Keeping its data folder " + path + ".", true
 }
