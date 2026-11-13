@@ -857,8 +857,7 @@ async function launchTeam() {
     const rows = document.querySelectorAll("#team-agents-list .team-agent-row");
     const members = () => showTeamStep('members'); // the problem is in Members: open it
     if (rows.length === 0 || !hasOrchestrator()) {
-        showToast("Add an Orchestrator", true);
-        members(); _syncTeamGate();
+        _membersPressed = true; members(); document.getElementById('team-add-orchestrator')?.focus(); _syncTeamGate(); // Launch team is the press: the button that fixes it takes the focus and the one red line says what is missing
         return;
     }
 
