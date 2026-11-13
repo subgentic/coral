@@ -119,11 +119,11 @@ function drawList() {
     if (!rows.length && !loadError) page.append(el('p', 'skills-note', 'Agent Skills: a folder with SKILL.md that agents read when it fits their task. A skill an agent publishes waits here until you approve it; one you import is approved at once.')); // the description is for an empty list: with skills, the list is the page
     if (loadError) { const p = el('p', 'skills-error', loadError); p.setAttribute('role', 'alert'); page.append(p); }
     const columns = [
-        { key: 'name', label: 'Name', primary: true, width: 'grow', sort: true, sortValue: r => r.name.toLowerCase(), line: 1, cell: r => r.name },
-        { key: 'description', label: 'Description', width: '16rem', line: 2, cell: r => r.description, narrowHide: true },
+        { key: 'name', label: 'Name', primary: true, width: 'grow', min: 32, sort: true, sortValue: r => r.name.toLowerCase(), line: 1, cell: r => r.name },
+        { key: 'description', label: 'Description', share: 3, min: 24, line: 2, cell: r => r.description, narrowHide: true },
         { key: 'by', label: 'Published by', width: '10rem', sort: true, sortValue: publisher, cell: publisher },
         { key: 'usedBy', label: 'Used by', width: '9rem', sort: true, sortValue: usedBy, cell: r => usedBy(r) || '-', narrowHide: true }, // the teams whose agents have it attached or loaded (#15383)
-        { key: 'version', label: 'Version', width: '10rem', align: 'end', sort: 'number', sortValue: r => r.version, cell: r => {
+        { key: 'version', label: 'Version', width: '6rem', align: 'end', sort: 'number', sortValue: r => r.version, cell: r => {
             const cell = el('span', '', `v${r.version}`), pending = r.pendingVersion;
             if (pending && pending.id !== r.id) {
                 const review = button('btn btn-small', `v${pending.version} waiting`, e => { e.stopPropagation(); loadOne(pending.id); });
