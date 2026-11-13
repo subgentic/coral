@@ -16,7 +16,7 @@ const LINK = 'https://www.dropbox.com/scl/fi/abc/release-plan.md?rlkey=k&dl=0';
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
-    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; await sleep(300); /* sleep-ok: a screenshot waits out transitions */ fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, `${name}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; name = process.env.CORAL_SHOT_THEME === 'light' ? name + '-light' : name; await sleep(300); /* sleep-ok: a screenshot waits out transitions */ fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, `${name}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true]]) {
@@ -24,6 +24,7 @@ const LINK = 'https://www.dropbox.com/scl/fi/abc/release-plan.md?rlkey=k&dl=0';
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev);
+            if (process.env.CORAL_SHOT_THEME === 'light') await ev(`document.documentElement.setAttribute('data-theme', 'light'); true`); // light-theme screenshots (#16170); the default run is the dark theme
             await ev(STUB);
             await ev(`(() => { const inner = window.fetch; window.__shareCalls = [];
                 const json = (o, s) => Promise.resolve(new Response(JSON.stringify(o), { status: s || 200, headers: { 'Content-Type': 'application/json' } }));
