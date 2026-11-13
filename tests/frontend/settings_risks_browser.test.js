@@ -69,10 +69,11 @@ const BASE = require('./test_base').BASE;
    await waitFor(`window.__riskWrites.length===${before+1} && document.getElementById('${id}').dataset.saving!=='1'`,'real row saved once');
    assert.deepEqual(await ev(`window.__riskWrites[${before}]`),{[key]:value},'only the confirmed row is saved');
    assert.equal(await ev(`import((window.__coralStatic||'/static/')+'state.js').then(m=>String(m.state.settings['${key}']).toLowerCase())`),String(value).toLowerCase(),'current page retains confirmed value');
+   if(id==='settings-permission-mode') await waitFor(`!!document.getElementById('${id}')._segmented?.querySelector('[aria-checked="true"]')`, 'visible permission mode control rendered');
    await ev(`document.getElementById('settings-tab-security').click();true`);
    const label=id==='settings-permission-mode'?(value==='dontAsk'?"Don't ask":'Bypass permissions'):id==='settings-remote-access-enabled'?'Remote access':'Record what Coral types';
    await ev(`document.querySelector('#settings-safety-summary details').open=true;[...document.querySelectorAll('#settings-safety-summary button')].find(b=>b.textContent===${JSON.stringify(label)}).click();true`);
-   assert.equal(await ev(`(()=>{const e=document.getElementById('${id}');return document.activeElement===(e._segmented?.querySelector('[aria-checked="true"]')||e);})()`),true,'summary navigates and focuses the visible risk row');
+   await waitFor(`(()=>{const e=document.getElementById('${id}');const target=e._segmented?.querySelector('[aria-checked="true"]')||e;return !e.closest('.settings-pane').hidden && target.getClientRects().length>0 && document.activeElement===target;})()`, 'summary opens the pane and focuses the rendered risk control');
    const warning=await ev(`document.getElementById('${id}-risk').textContent`);assert.match(warning,/⚠ /);
    await shot(`settings-risks-active-${id}-${typeof value==='boolean'?'on':value}`);
    if(id==='settings-permission-mode'&&value==='dontAsk') {
