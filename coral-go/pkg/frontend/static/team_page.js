@@ -459,7 +459,7 @@ async function openTaskById(id) {
     const host = $('team-panel-item');
     let missing = false;
     const full = await m.readTask(team, id, () => { missing = true; });
-    if (missing && seq === S.navSeq && team === S.team && S.tab === 'tasks') { itemNotFound('task', id, 'tasks'); return; }
+    if ((missing || !full) && seq === S.navSeq && team === S.team && S.tab === 'tasks') { itemNotFound('task', id, 'tasks'); return; } // a task that could not be read at all (both tries failed) is said too, never a blank route (#16403)
     if (!full || seq !== S.navSeq || team !== S.team || S.tab !== 'tasks') return;
     const origin = panel('tasks');
     S.item = { kind: 'task', id, origin };
