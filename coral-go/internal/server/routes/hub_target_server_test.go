@@ -47,3 +47,17 @@ func TestHubTargetGuardRefusesARequestRoutedToAnotherComputer(t *testing.T) {
 	assert.Equal(t, 409, w.Code)
 	assert.Equal(t, 4, reached)
 }
+
+// #16218: the refusal covers kill, restart and sleep too, so it says nothing was changed (not "typed").
+func TestHubTargetGuardRefusalSaysNothingWasChanged(t *testing.T) {
+	h := HubTargetGuard(func(context.Context) (string, error) { return "srv-own", nil })(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	req := httptest.NewRequest("POST", "/api/sessions/live/worktree1/kill", nil)
+	req.Header.Set(tunnel.ViaHeader, "1")
+	req.Header.Set(tunnel.HubServerHeader, "srv-other")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	assert.Equal(t, 409, w.Code)
+	assert.Contains(t, w.Body.String(), "nothing was changed")
+	assert.NotContains(t, w.Body.String(), "typed")
+	assert.Contains(t, w.Body.String(), "hub_wrong_server")
+}

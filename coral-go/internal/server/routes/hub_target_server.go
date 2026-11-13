@@ -34,7 +34,7 @@ func HubTargetGuard(own func(context.Context) (string, error)) func(http.Handler
 				mine, _ = own(r.Context())
 			}
 			if named == "" || mine == "" || !strings.EqualFold(named, mine) {
-				writeJSON(w, http.StatusConflict, map[string]any{"error": "this request was routed to another computer, so nothing was typed", "code": "hub_wrong_server"})
+				writeJSON(w, http.StatusConflict, map[string]any{"error": "this request was routed to another computer, so nothing was changed", "code": "hub_wrong_server"})
 				return
 			}
 			next.ServeHTTP(w, r)
