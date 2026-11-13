@@ -139,10 +139,14 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
         await S.run('step 2 shows the recap above Back, Cancel and Launch team: "<team>: N members, <folder>"', async () => {
             assert.match(await ev(`window.__na.text(window.__nt.dlg(${N.team}))`), /alpha: \d+ members?, \/work\/payments-app/, 'the recap: "<team>: N members, <folder>"');
         });
-        await S.run('step 1 holds the first task, Additional instructions and Workflow with the name and folder (LT1 #15892); Health check and Messaging are under a closed More options; no team-wide Mode or Provider anywhere in the dialog', async () => {
+        await S.run('step 1 holds the first task with the name and folder (LT1 #15892); Additional instructions, Workflow, Health check and Messaging are under a closed More options (#16298: the page fits the dialog); no team-wide Mode or Provider anywhere in the dialog', async () => {
             await t.click('button', N.back); await t.step(1);
-            for (const rx of [/^What should the team work on/i, /^Additional instructions/i]) assert.ok(await t.has('textarea', rx), `${rx}`);
+            assert.ok(await t.has('textarea', /^What should the team work on/i), 'the first task is on the page');
+            assert.ok(!(await t.has('textarea', /^Additional instructions/i)), 'Additional instructions wait under More options');
             assert.ok(await ev(`(() => { const f = [...document.querySelectorAll('#team-start-host details')].find(x => /^More options/i.test(x.querySelector('summary').textContent.trim())); return !!f && !f.open; })()`), 'More options is there and closed');
+            await ev(`(() => { const f = [...document.querySelectorAll('#team-start-host details')].find(x => /^More options/i.test(x.querySelector('summary').textContent.trim())); f.open = true; return true; })()`); await settle(200);
+            assert.ok(await t.has('textarea', /^Additional instructions/i), 'Additional instructions are inside More options');
+            assert.ok(await ev(`!!document.getElementById('team-workflow-title') && document.getElementById('team-workflow-title').getClientRects().length > 0`), 'and so is Workflow');
             assert.ok(!(await ev(`!!window.__nt.find(window.__nt.dlg(${N.team}), 'select, [role=radiogroup]', /^(Mode|Permission mode|Provider)$/i)`)), 'no team-wide Mode or Provider (each member has its own)');
         });
         S.finish();
