@@ -118,7 +118,7 @@ function mountMembers(modal) {
     const take = sel => parts.querySelector(sel);
     const fields = [
         { key: 'template', type: 'custom', label: 'Start from a template', help: 'Optional. Fills the member list.', wide: true, render: slot => slot.append(take('.team-template-row')) },
-        { key: 'workers', type: 'custom', label: 'Set all workers to', help: "Changes every worker's provider. The Orchestrator keeps its own. Models reset only when the provider changes.", render: slot => slot.append(take('#team-allworkers')) },
+        { key: 'workers', type: 'custom', label: 'Everyone runs as', help: 'Every worker takes these unless you set it by hand. The Orchestrator keeps its own.', render: slot => slot.append(take('#team-allworkers')) },
         { key: 'members', type: 'custom', label: 'Members', wide: true, render: slot => { slot.append(take('#team-agents-count'), take('.team-agents-container')); } },
     ];
     _members = mountSettingsView(host, { mode: 'form', fields });

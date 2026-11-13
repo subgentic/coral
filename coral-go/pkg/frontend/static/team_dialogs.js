@@ -47,6 +47,19 @@ function _followTeamType() {
     }
 }
 
+/** "Everyone runs as" (LT1, #15892): what the workers that were not set by hand take. Provider and Mode are the team's own fields; Model and Thinking are kept here ('' is each provider's default). */
+const _everyone = { model: '', thinking: '' };
+/** The things a member holds that differ from Everyone runs as AND were set by hand: a value that merely equals it is not a difference. */
+function _differsFromEveryone(row, config, type, mode) {
+    const out = [];
+    if (row.dataset.followsTeamType !== '1' && type !== (document.getElementById('team-agent-type')?.value || '')) out.push('provider');
+    if (row.dataset.modelHand === '1' && (config.model || '') !== _everyone.model) out.push('model');
+    if (row.dataset.thinkingHand === '1' && (config.thinking || '') !== _everyone.thinking) out.push('thinking');
+    const ownMode = row.dataset.permissionExplicit === '1' || (document.getElementById(row.dataset.acfId || '')?.querySelector('.acf-permission-mode')?.value || 'default') !== 'default';
+    if (ownMode && mode !== (document.getElementById('team-permission-mode')?.value || 'default')) out.push('mode');
+    return out;
+}
+
 // One quiet line under the role: "Claude · default model · default mode"; what the member changed is bold ("Claude · Opus 5.5 · High thinking · Plan mode").
 function _updateTeamAgentSummary(row) {
     if (!row) return;
@@ -70,6 +83,13 @@ function _updateTeamAgentSummary(row) {
     const modeLabel = selectedMode?.value === mode ? selectedMode.textContent : _modeLabel(mode);
     const lm = launchedMode(type, mode, config.capabilities);
     parts.push([lm.narrowed ? lm.text : `${modeLabel} mode`.replace(/^Default mode$/, 'default mode'), mode !== 'default' || !!lm.narrowed, !!lm.warn]);
+    const differs = isOrchestrator(name) ? [] : _differsFromEveryone(row, config, type, mode); // the Orchestrator is on its own line, not one of everyone
+    const main = row.querySelector('.team-agent-main');
+    if (main) { // a member set by hand says so, and in what (the rest follow "Everyone runs as")
+        let chip = main.querySelector('.team-agent-differs');
+        if (differs.length && !chip) { chip = document.createElement('span'); chip.className = 'chip team-agent-differs'; main.append(chip); }
+        if (chip) { chip.hidden = !differs.length; chip.textContent = `Set by hand: ${differs.join(', ')}`; }
+    }
     const line = row.querySelector('.team-agent-summary');
     if (line) {
         line.replaceChildren();
@@ -101,6 +121,8 @@ function _syncTeamMembers() {
     if (count) count.textContent = rows.length ? `${rows.length} ${rows.length === 1 ? 'member' : 'members'}. Select one to edit it. The Orchestrator plans the work and hands tasks to the others.` : '';
     const line = document.getElementById('team-orchestrator-line'); if (line) line.hidden = hasOrchestrator();
     showTeamWorkers(rows.some(r => !isOrchestrator(rowRole(r))));
+    _fillEveryone(); // the four controls show what the team and its workers hold
+    _syncOrchestratorLine();
     _syncTeamGate();
 }
 
@@ -288,6 +310,8 @@ function saveTeamAgentFromModal() {
     const opener = m.row;
     if (opener?.dataset.acfId) {
         opener.dataset.followsTeamType = followsType ? '1' : '';
+        opener.dataset.modelHand = (config.model || '') !== _everyone.model ? '1' : ''; // set by hand only when it differs from Everyone runs as
+        opener.dataset.thinkingHand = (config.thinking || '') !== _everyone.thinking ? '1' : '';
         setAgentConfig(opener.dataset.acfId, config);
         opener.dataset.permissionExplicit = modalMode === 'default' || modalMode !== document.getElementById('team-permission-mode')?.value ? '1' : '';
         if (!opener.dataset.permissionExplicit) delete document.getElementById(opener.dataset.acfId)?.querySelector('.acf-permission-mode')?.dataset.pickedByPerson;
@@ -438,6 +462,7 @@ async function _initTeamForm() {
         const teamSettings = _settingsFor(_effectiveServer(launch.server));
         _applyTeamDefaultMode();
     }
+    _everyone.model = ''; _everyone.thinking = '';
     launch.teamAgentCounter = 0;
     const list = document.getElementById("team-agents-list");
     list.innerHTML = "";
@@ -555,6 +580,8 @@ function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultA
     row.dataset.idx = idx;
     row.dataset.acfId = acfId;
     if (!defaultAgentType) row.dataset.followsTeamType = '1';
+    if (defaultModel) row.dataset.modelHand = '1';
+    if (thinking) row.dataset.thinkingHand = '1';
 
     // A member is one quiet row, read-only: its role and one summary line. The row opens the Edit member dialog, and so does the one Edit button at its end (Remove is in that dialog; Alt+Up/Down on the row's button reorders, as dragging does, #10836). The form that holds the member's values is kept (hidden) in the row.
     row.innerHTML = `
@@ -704,45 +731,86 @@ function _pickTeamTemplate(name) {
     _loadTeamTemplate(name);
 }
 
-/** Set all workers to a provider (#7407): every worker takes it; Model and Thinking reset only when the provider changes. Mode, role and prompt stay. */
-function _setAllWorkers(type) {
-    const sel = document.getElementById('team-set-all');
-    if (!type) return;
-    let n = 0;
-    for (const row of teamRows()) {
-        if (isOrchestrator(rowRole(row))) continue;
-        row.dataset.followsTeamType = '';
-        if (getAgentConfig(row.dataset.acfId).agentType !== type) resetProviderChoices(row.dataset.acfId, type);
-        n++;
+/** Everyone runs as (LT1, #15892): four controls (provider, model, thinking, mode) that every worker takes unless it was set by hand; the Orchestrator keeps its own. Provider and Mode are the team's own fields, which the members with none of their own already follow. */
+const _workerBoxes = () => teamRows().filter(r => !isOrchestrator(rowRole(r))).map(r => document.getElementById(r.dataset.acfId)).filter(Boolean);
+const _followingBoxes = key => teamRows().filter(r => !isOrchestrator(rowRole(r)) && r.dataset[key] !== '1').map(r => document.getElementById(r.dataset.acfId)).filter(Boolean);
+const _eo = id => document.getElementById(id);
+function _setAllWorkers(type) { // Provider
+    const team = _eo('team-agent-type');
+    if (!type || !team || ![...team.options].some(o => o.value === type)) return;
+    const same = team.value === type; // #15121: choosing the provider they already have keeps every worker's model and thinking
+    for (const row of teamRows()) if (isOrchestrator(rowRole(row))) row.dataset.followsTeamType = ''; // the Orchestrator keeps the provider it has: it stops following the team's
+    team.value = type;
+    team.dispatchEvent(new Event('change', { bubbles: true })); // the members that follow take it (_followTeamType); the others keep their own
+    if (!same) {
+        _everyone.model = ''; _everyone.thinking = ''; // a new provider: its own models and levels
+        for (const row of teamRows()) if (!isOrchestrator(rowRole(row)) && row.dataset.followsTeamType === '1') { row.dataset.modelHand = ''; row.dataset.thinkingHand = ''; const box = _eo(row.dataset.acfId); if (box && getAgentConfig(row.dataset.acfId).agentType !== type) resetProviderChoices(row.dataset.acfId, type); }
+        _eo('team-set-all-model')?.setAttribute('hidden', ''); _eo('team-set-all-thinking')?.closest('label')?.setAttribute('hidden', '');
     }
-    if (sel) sel.value = '';
-    const label = [...(document.getElementById('team-agent-type')?.options || [])].find(o => o.value === type)?.textContent.replace(/ \(.*\)$/, '') || type;
-    _clearTeamUndo();
-    const line = document.getElementById('team-undo');
-    if (line) line.textContent = `Set ${n} ${n === 1 ? 'worker' : 'workers'} to ${label}. Existing models stay when the provider is unchanged.`;
-    document.getElementById('team-set-all-model')?.setAttribute('hidden', ''); setTimeout(_fillAllModels, 800); // the new provider's list arrives a moment after the change
+    setTimeout(_fillEveryone, 800); // the new provider's lists arrive a moment after the change
+    _saySet('provider');
     _syncTeamMembers();
 }
-
-/** Set all workers' model (#15079): after a provider is chosen, a second list offers that provider's models; choosing one sets it on every worker (the Orchestrator keeps its own), as the provider list does for the provider. */
-const _workerBoxes = () => teamRows().filter(r => !isOrchestrator(rowRole(r))).map(r => document.getElementById(r.dataset.acfId)).filter(Boolean);
+function _saySet(what) {
+    _clearTeamUndo(); const line = _eo('team-undo');
+    const n = _workerBoxes().length, hand = teamRows().filter(r => !isOrchestrator(rowRole(r)) && r.dataset[`${what}Hand`] === '1' || (what === 'provider' && r.dataset.followsTeamType !== '1' && !isOrchestrator(rowRole(r)))).length;
+    if (line) line.textContent = `Set the ${what} of ${Math.max(0, n - hand)} ${n - hand === 1 ? 'worker' : 'workers'}${hand ? `; ${hand} set by hand ${hand === 1 ? 'keeps' : 'keep'} their own` : ''}.`;
+}
+/** The Orchestrator on its own line under Everyone runs as: it keeps its own provider, model and mode. */
+function _syncOrchestratorLine() {
+    const line = _eo('team-orch-runs'), row = teamRows().find(r => isOrchestrator(rowRole(r)));
+    if (!line) return;
+    line.hidden = !row;
+    if (row) line.textContent = `Orchestrator (its own): ${row.querySelector('.team-agent-summary')?.textContent || ''}`;
+}
+function _fillEveryone() {
+    const team = _eo('team-agent-type'), prov = _eo('team-set-all');
+    if (prov && team) { prov.replaceChildren(...[...team.options].map(o => new Option(o.textContent.replace(/ \(.*\)$/, ''), o.value))); prov.value = team.value; }
+    const mode = _eo('team-set-all-mode'), src = _eo('team-permission-mode');
+    if (mode && src) { mode.replaceChildren(...[...src.options].map(o => new Option(o.textContent, o.value))); mode.value = src.value; }
+    _fillAllModels(); _fillAllThinking();
+}
 function _fillAllModels() {
-    const sel = document.getElementById('team-set-all-model'), box = _workerBoxes().find(b => b.querySelector('.acf-model-select'));
+    const sel = _eo('team-set-all-model'), box = _workerBoxes().find(b => b.querySelector('.acf-model-select'));
     if (!sel || !box) return;
-    const keep = sel.value;
-    sel.replaceChildren(new Option('Model: each worker\'s default', ''), ...[...box.querySelector('.acf-model-select').options].filter(o => o.value && !o.dataset.unlisted && !o.value.startsWith('__')).map(o => new Option(o.textContent, o.value)));
-    sel.value = [...sel.options].some(o => o.value === keep) ? keep : '';
+    sel.replaceChildren(new Option('Default model', ''), ...[...box.querySelector('.acf-model-select').options].filter(o => o.value && !o.dataset.unlisted && !o.value.startsWith('__')).map(o => new Option(o.textContent, o.value)));
+    sel.value = [...sel.options].some(o => o.value === _everyone.model) ? _everyone.model : '';
     sel.hidden = false;
 }
+function _fillAllThinking() {
+    const sel = _eo('team-set-all-thinking'), box = _workerBoxes().find(b => b.querySelector('.acf-thinking') && !b.querySelector('.acf-thinking-wrap')?.hidden);
+    if (!sel) return;
+    const lab = sel?.closest('label');
+    if (!box) { if (lab) lab.hidden = true; return; }
+    const src = box.querySelector('.acf-thinking');
+    sel.replaceChildren(new Option('Default thinking', ''), ...[...src.options].filter(o => o.value).map(o => new Option(o.textContent, o.value)));
+    sel.value = [...sel.options].some(o => o.value === _everyone.thinking) ? _everyone.thinking : '';
+    if (lab) lab.hidden = false;
+}
 function _setAllModel(value) {
-    let n = 0;
-    for (const box of _workerBoxes()) {
+    _everyone.model = value || '';
+    for (const box of _followingBoxes('modelHand')) {
         const s = box.querySelector('.acf-model-select');
-        if (!s || ![...s.options].some(o => o.value === value)) continue;
-        s.value = value; s.dispatchEvent(new Event('change', { bubbles: true })); n++;
+        if (!s) continue;
+        const want = value && [...s.options].some(o => o.value === value) ? value : '';
+        s.value = want; s.dispatchEvent(new Event('change', { bubbles: true }));
     }
-    _clearTeamUndo(); const line = document.getElementById('team-undo'); if (line) line.textContent = n ? `Set the model of ${n} ${n === 1 ? 'worker' : 'workers'}.` : 'No worker offers that model.';
-    _syncTeamMembers();
+    _saySet('model'); _syncTeamMembers();
+}
+function _setAllThinking(value) {
+    _everyone.thinking = value || '';
+    for (const box of _followingBoxes('thinkingHand')) {
+        const cfg = getAgentConfig(box.id);
+        setAgentConfig(box.id, { ...cfg, thinking: value || undefined });
+    }
+    _saySet('thinking'); _syncTeamMembers();
+}
+function _setAllMode(value) {
+    const el = _eo('team-permission-mode');
+    if (!el || !value || ![...el.options].some(o => o.value === value)) return;
+    el.value = value; el.dispatchEvent(new Event('change', { bubbles: true })); // the members with no Mode of their own follow it
+    _updatePermModeDescription?.(el);
+    _saySet('mode'); _syncTeamMembers();
 }
 
 function _validateTeamName() {
@@ -974,4 +1042,4 @@ async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSet
 }
 window.launchTeam = launchTeam;
 
-export { _fillAllModels, _setAllModel, _openLaunchedTeam, _addTeamAgent, _applyACFPresetFor, _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards, _moveTeamAgent, _removeMemberFromDialog, _moveMemberFromDialog, _renderTeamTemplateSelector, _syncTemplateMenu, _removeTeamAgent, _undoTeamAgentRemoval, _syncTeamMembers, _pickTeamTemplate, _setAllWorkers, _addOrchestrator, teamStepMove };
+export { _fillAllModels, _setAllModel, _setAllThinking, _setAllMode, _fillEveryone, _openLaunchedTeam, _addTeamAgent, _applyACFPresetFor, _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards, _moveTeamAgent, _removeMemberFromDialog, _moveMemberFromDialog, _renderTeamTemplateSelector, _syncTemplateMenu, _removeTeamAgent, _undoTeamAgentRemoval, _syncTeamMembers, _pickTeamTemplate, _setAllWorkers, _addOrchestrator, teamStepMove };

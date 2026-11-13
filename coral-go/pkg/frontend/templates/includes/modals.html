@@ -288,15 +288,12 @@
                                 <input type="file" id="team-folder-input" webkitdirectory directory multiple style="display:none" data-on-change="m-handle-team-folder-import">
                             </div>
                         </div>
-                        <div class="team-allworkers" id="team-allworkers">
-                            <select id="team-set-all" aria-label="Set all workers to" data-on-change="team-set-all">
-                                <option value="">Choose a provider</option>
-                                <option value="claude">Claude</option>
-                                <option value="agy">Antigravity</option>
-                                <option value="codex">Codex</option>
-                                <option value="pi">Pi</option>
-                            </select>
-                            <select id="team-set-all-model" aria-label="Set all workers' model" data-on-change="team-set-all-model" data-on-mousedown="team-set-all-models" hidden></select>
+                        <div class="team-allworkers team-runs-as" id="team-allworkers" role="group" aria-label="Everyone runs as">
+                            <label class="team-ra-field"><span class="team-ra-cap">Provider</span><select id="team-set-all" aria-label="Everyone's provider" data-on-change="team-set-all"></select></label>
+                            <label class="team-ra-field"><span class="team-ra-cap">Model</span><select id="team-set-all-model" aria-label="Everyone's model" data-on-change="team-set-all-model" data-on-mousedown="team-set-all-models"></select></label>
+                            <label class="team-ra-field" hidden><span class="team-ra-cap">Thinking</span><select id="team-set-all-thinking" aria-label="Everyone's thinking level" data-on-change="team-set-all-thinking"></select></label>
+                            <label class="team-ra-field"><span class="team-ra-cap">Mode</span><select id="team-set-all-mode" aria-label="Everyone's permission mode" data-on-change="team-set-all-mode"></select></label>
+                            <p class="settings-hint team-ra-orch" id="team-orch-runs" hidden></p>
                         </div>
                         <p class="team-agents-count" id="team-agents-count" aria-live="polite"></p>
                         <p class="sr-only" id="team-agents-live" role="status"></p>
