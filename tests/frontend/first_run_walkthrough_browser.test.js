@@ -155,6 +155,8 @@ setInterval(() => {}, 1 << 30);
         const before = (await live()).map(x => x.session_id);
         if (!mobile) {
             await clickVisible('[data-on-click="launch-show"]');
+            await waitFor(visible('#launch-dir'), `${tag}: New agent opens the form (#15888)`, { timeout: 8000 });
+            await ev(`document.querySelector('.launch-back-btn').click(); true`); // the choice of what to launch is one step back
             await waitFor(visible('#launch-step-chooser .launch-type-card'), `${tag}: the choice of what to launch`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
             const cards = await ev(`[...document.querySelectorAll('#launch-step-chooser .launch-type-card')].map(c => c.querySelector('.launch-type-label').textContent.trim() + ' ' + c.querySelector('.launch-type-desc').textContent.trim())`);
             assert.deepEqual(cards.slice(0, 3), ['New agent One agent in a folder you choose.', 'New team Launch a team of agents collaborating on a shared board.', 'Open folder Add a project folder to start agents in later.'], `${tag}: step one offers the kinds in this order, each with what it opens (#9253) (${JSON.stringify(cards)})`);
@@ -188,6 +190,8 @@ setInterval(() => {}, 1 << 30);
                 await waitFor(visible('[data-on-click="launch-show"]'), `${tag}: the Agents list with its New button`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
             }
             await clickVisible('[data-on-click="launch-show"]');
+            await waitFor(visible('#launch-dir'), `${tag}: New agent opens the form again`, { timeout: 8000 });
+            await ev(`document.querySelector('.launch-back-btn').click(); true`);
             await waitFor(visible('#launch-step-chooser .launch-type-card[data-arg="team"]'), `${tag}: the choice of what to launch, again`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
             await ev(`document.querySelector('#launch-step-chooser .launch-type-card[data-arg="team"]').click(); true`);
         } else { // on a phone the opened agent fills the page: back to the Agents list, where the + menu has New team
