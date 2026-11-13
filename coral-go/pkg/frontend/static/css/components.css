@@ -3794,7 +3794,7 @@ li:has(> .row-btn:focus-visible) { outline: 2px solid var(--accent); outline-off
 .launch-wizard[data-stage="page"] .launch-page-agent { flex: none; }
 .launch-wizard[data-stage="page"] :is(.launch-shell, .settings-panes, .sd-acf) { display: contents; }
 .launch-wizard[data-stage="page"] .launch-stage-sub { display: none; }
-.launch-wizard[data-stage="page"] :is(#launch-persona-top .launch-optional, .acf-persona-page .sv-optional, #agent-name-host .sv-optional) { display: none; } /* the whole persona block is optional: said once by the page, not on each field */
+.launch-wizard[data-stage="page"] :is(#launch-persona-top .launch-optional) { display: none; } /* the whole persona block is optional: said once by the page, not on each field */
 .launch-wizard[data-stage="page"] .launch-page-folder { padding-bottom: 8px; }
 .launch-wizard[data-stage="page"] .launch-persona-top { padding: 0; }
 .launch-wizard[data-stage="page"] .acf-persona-page { order: 2; padding: 4px 24px 0; }
@@ -3805,9 +3805,8 @@ li:has(> .row-btn:focus-visible) { outline: 2px solid var(--accent); outline-off
 .launch-wizard[data-stage="page"] .settings-nav, .launch-wizard[data-stage="page"] .settings-pane, .launch-wizard[data-stage="page"] #launch-advanced-extra { order: 4; margin-inline: 24px; }
 .launch-wizard[data-stage="page"]:not(:has(#launch-persona-more[open])) :is(#agent-name-host, .acf-prompt-host) { display: none; }
 .launch-wizard[data-stage="page"]:not(:has(#launch-more-options[open])) :is(.settings-nav, .settings-pane, #launch-advanced-extra) { display: none; }
-.launch-wizard[data-stage="page"] > .modal-actions { border-top: 0; }
+.launch-wizard[data-stage="page"] > .modal-actions { border-top: 0; justify-content: flex-end; }
 .launch-wizard[data-stage="page"] > .modal-actions #launch-agent-cancel { margin-right: 0; }
-.launch-wizard[data-stage="page"] > .modal-actions { justify-content: flex-end; }
 .launch-wizard .settings-panes { padding: 20px 24px; overflow: auto; scrollbar-gutter: stable; }
 #launch-modal[data-agent-stage="persona"] .launch-server-row, #launch-modal[data-agent-stage="agent"] .launch-server-row { display: none !important; } /* the machine is a step 1 choice; its row is set by style where it is drawn (launch_dialog.js) */
 .launch-field-head, .acf-pick-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; margin: 0 0 6px; font-size: var(--fs-md); font-weight: var(--fw-medium); } /* the field label style of every form: 13/500 (UI/UX on #8401) */
