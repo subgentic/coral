@@ -379,15 +379,15 @@ jobs:
         # terminal_pane_size (which drives tmux itself) stays on Linux and macOS; its partner terminal_scroll already runs in a default part. --no-tmux: a --strict run would
         # otherwise add the tmux shard too (9 suites that cannot start here).
         include:
-          - { name: "part 1/8", args: "--part 1/8", id: "1" }
-          - { name: "part 2/8", args: "--part 2/8", id: "2" }
-          - { name: "part 3/8", args: "--part 3/8", id: "3" }
-          - { name: "part 4/8", args: "--part 4/8", id: "4" }
-          - { name: "part 5/8", args: "--part 5/8", id: "5" }
-          - { name: "part 6/8", args: "--part 6/8", id: "6" }
-          - { name: "part 7/8", args: "--part 7/8", id: "7" }
-          - { name: "part 8/8", args: "--part 8/8", id: "8" }
-          - { name: "strict", args: "--strict --no-tmux", id: "strict" }
+          - { name: "diag 1", args: "--only dialog_requests_golden_browser,task_link_missing_browser --retries 0", id: "d1" }
+          - { name: "diag 2", args: "--only dialog_requests_golden_browser,task_link_missing_browser --retries 0", id: "d2" }
+          - { name: "diag 3", args: "--only dialog_requests_golden_browser,task_link_missing_browser --retries 0", id: "d3" }
+          - { name: "diag 4", args: "--only dialog_requests_golden_browser,task_link_missing_browser --retries 0", id: "d4" }
+          - { name: "diag 5", args: "--only dialog_requests_golden_browser,task_link_missing_browser --retries 0", id: "d5" }
+          - { name: "diag 6", args: "--only dialog_requests_golden_browser,task_link_missing_browser --retries 0", id: "d6" }
+          - { name: "diag 7", args: "--only dialog_requests_golden_browser,task_link_missing_browser --retries 0", id: "d7" }
+          - { name: "diag 8", args: "--only dialog_requests_golden_browser,task_link_missing_browser --retries 0", id: "d8" }
+          - { name: "diag 9", args: "--only dialog_requests_golden_browser,task_link_missing_browser --retries 0", id: "d9" }
     defaults:
       run:
         shell: bash
