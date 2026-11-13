@@ -232,23 +232,20 @@
                 </div>
             </div>
 
-            <!-- Step 2c: Agent Team form (#7407): three steps in the one fixed-size dialog: 1 Name and where it launches, 2 Members, 3 Start and team settings (tabs Start, Workflow, Health check, Messaging) -->
+            <!-- Step 2c: Agent Team form (#7407): two steps in the one fixed-size dialog (LT1): 1 Team (name, where it launches, the first task, Workflow, More options: Health check, Messaging), 2 Members (Everyone runs as, More options: skills) -->
             <div id="launch-step-team" class="launch-modal-step launch-wizard team-wizard" style="display:none" data-stage="team">
                 <div class="sd-step-header">
                     <div class="sd-step-title-row">
                         <button class="launch-back-btn" data-on-click="m-select-launch-type" data-arg="back" title="Back" aria-label="Back to the choices">&larr;</button>
                         <h3 id="launch-team-title"><span id="launch-team-title-text">New team</span></h3>
                     </div>
-                    <p id="team-stage-sub" class="sd-sub launch-stage-sub">Step 1 of 3: Your team</p>
+                    <p id="team-stage-sub" class="sd-sub launch-stage-sub">Step 1 of 2: Your team</p>
                 </div>
-                <p class="sr-only" id="team-step-live" role="status">Step 1 of 3</p>
+                <p class="sr-only" id="team-step-live" role="status">Step 1 of 2</p>
                 <div class="settings-modal-body team-steps-body">
                     <section class="launch-page team-page team-page-team" id="team-panel-team" data-page="team" aria-label="Name and where it launches">
                         <div id="team-form-host" data-coral-root="{{ .CoralRoot }}"></div>
-                        <div class="form-row" id="team-skills-row" hidden>
-                            <span class="form-label" id="team-skills-label">Skills for every member <span class="launch-optional">optional</span></span>
-                            <div id="team-skills-host" role="group" aria-labelledby="team-skills-label"></div>
-                        </div>
+                        <div id="team-start-host"></div><!-- LT1: the first task, Workflow and, under More options, Health check and Messaging: step 3 folded into step 1 -->
                         <div id="team-form-parts" hidden>
                             <div id="team-board-name-hint" class="team-field-hint"></div>
                             <button class="btn" id="btn-browse-team" data-on-click="m-toggle-browser" data-browser="launch-team-dir dir-browser-team browser-list-team browser-current-path-team">Browse</button>
@@ -309,10 +306,13 @@
                                 <button class="btn team-add-agent-btn" data-on-click="m-show-team-agent-modal">Add member</button>
                             </div>
                         </div>
+                        <details class="disclosure team-more-options" id="team-members-more"><summary>More options</summary>
+                        <div class="form-row" id="team-skills-row" hidden>
+                            <span class="form-label" id="team-skills-label">Skills for every member <span class="launch-optional">optional</span></span>
+                            <div id="team-skills-host" role="group" aria-labelledby="team-skills-label"></div>
                         </div>
-                    </section>
-                    <section class="launch-page team-page team-page-start" id="team-panel-start" data-page="start" aria-label="Start and team settings">
-                        <div id="team-start-host"></div>
+                        </details>
+                        </div>
                     </section>
                 </div>
                 <div hidden aria-hidden="true">
