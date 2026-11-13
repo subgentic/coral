@@ -196,6 +196,25 @@ function renderAutoSync(a) {
         : 'An edited file becomes its next version, marked as edited in Dropbox. A file whose type changed, or that grew very large, waits here for you.';
 }
 
+// renderHubShare shows the "Share through Coral Hub" switch (#16109) once the status is read, connected to a local Dropbox or not: the Hub's Dropbox
+// does not need this computer's. Off unless the server says it is on; a refused or failed read shows none of a stale state.
+function renderHubShare(st) {
+    const row = $('settings-dropbox-hubshare'), box = $('settings-dropbox-hubshare-on');
+    if (!row || !box) return;
+    row.hidden = !st;
+    if (st) box.checked = st.hub_share === true;
+}
+
+export async function setHubShare(on) {
+    let res;
+    try { res = await post('/api/cloud/hub-dropbox-share', 'PUT', JSON.stringify({ allow: !!on })); } catch { res = { ok: false, body: {} }; }
+    const box = $('settings-dropbox-hubshare-on');
+    if (!res.ok) { note('Not changed: Coral could not save it.'); if (box) box.checked = !on; return; }
+    if (lastStatus) lastStatus.hub_share = !!on;
+    if (box) box.checked = !!on;
+    note(on ? 'Saved. A file can go through Coral Hub when its owner presses Share on it.' : 'Saved. Nothing is sent through Coral Hub.');
+}
+
 export async function setAutoSync(on) {
     let res;
     try { res = await post('/api/dropbox/autosync', 'PUT', JSON.stringify({ on: !!on })); } catch { res = { ok: false, body: {} }; }
@@ -407,6 +426,7 @@ function hideAll() {
     const del = $('settings-dropbox-delete-confirm');
     if (del) { del.hidden = true; del.textContent = ''; }
     renderBackup(null);
+    renderHubShare(null);
     const kf = $('settings-dropbox-key');
     if (kf) kf.hidden = true;
     const counts = $('settings-dropbox-counts');
@@ -422,6 +442,7 @@ function render(st) {
     hideAll();
     lastStatus = st;
     renderBackup(st);
+    renderHubShare(st);
     showKey(st);
     if (st && st.paused_no_key) { // signed in with the key an earlier build shipped, and no key now (#15641, #15638): paused, not broken; the files are safe here
         setStatus('Dropbox now uses your own app key: add it and connect again. Your files are safe on this computer.');
@@ -953,6 +974,8 @@ function wire() {
     on('settings-dropbox-retention-cancel', cancelRetention);
     const sync = $('settings-dropbox-autosync');
     if (sync) sync.addEventListener('change', () => setAutoSync(sync.checked));
+    const hubShare = $('settings-dropbox-hubshare-on');
+    if (hubShare) hubShare.addEventListener('change', () => setHubShare(hubShare.checked));
     on('settings-dropbox-autosync-resume', async () => { await setAutoSync(true); focusEl('settings-dropbox-autosync'); }); // Resume hides itself: the keyboard goes to the switch (UI Accessibility's 5)
     on('settings-dropbox-offload-save', saveOffload);
     const field = $('settings-dropbox-keep-for');

@@ -539,6 +539,17 @@ func (e *dropboxEnv) status() map[string]any {
 }
 
 // signIn starts a sign-in and comes back as a browser would: with the flow cookie (binding "" means keep the real one) and the state from the URL.
+// "Share through Coral Hub" (#16109): the status carries the local switch so Settings can draw it. Off by default, on only for the word true, and a
+// value that is not exactly true (a typo, another case) reads as off.
+func TestDropboxStatus_HubShareSwitch(t *testing.T) {
+	e := newDropboxEnv(t)
+	assert.Equal(t, false, e.status()["hub_share"], "off by default")
+	require.NoError(t, e.h.ss.SetSetting(t.Context(), HubDropboxShareSetting, "true"))
+	assert.Equal(t, true, e.status()["hub_share"], "on after the switch is turned on")
+	require.NoError(t, e.h.ss.SetSetting(t.Context(), HubDropboxShareSetting, "yes"))
+	assert.Equal(t, false, e.status()["hub_share"], "anything but true is off")
+}
+
 func (e *dropboxEnv) signIn(binding string) string {
 	e.t.Helper()
 	rec := e.call(http.MethodPost, "/api/dropbox/connect", true, nil)
