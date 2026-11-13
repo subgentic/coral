@@ -258,7 +258,7 @@ export function mountSettingsView(host, spec) {
         let fold = null; // a heading with fold: true starts a disclosure (closed) that holds the rows after it, up to the next heading: a form's optional part
         for (const g of groups) for (const field of g.fields || []) {
             if (!field.key) continue;
-            if (field.type === 'heading' && field.fold) { fold = node('details', 'disclosure sv-fold'); if (field.id) fold.id = field.id; fold.append(node('summary', '', field.label)); folds.push(fold); body.append(fold); continue; }
+            if (field.type === 'heading' && field.fold) { set = null; fold = node('details', 'disclosure sv-fold'); if (field.id) fold.id = field.id; fold.append(node('summary', '', field.label)); folds.push(fold); body.append(fold); continue; }
             if (field.type === 'heading') { fold = null; set = null; }
             if (field.fieldset) { set = node('fieldset', 'sv-fieldset'); set.append(node('legend', 'sv-legend', field.fieldset)); (fold || body).append(set); }
             const rec = buildRow(field, g); fields.set(field.key, rec); (set || fold || body).append(rec.row);
