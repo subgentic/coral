@@ -184,6 +184,9 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if derr == nil && body.Ask && !body.Again && !body.DryRun && guideAsk == "" && !cloud.Tunneled(r) && h.answerDuplicateOperatorAsk(w, r, project, body, asked) {
+		return
+	}
 	msg, ok := h.postMessageCore(w, r, project, derr, body, answer)
 	if !ok {
 		return
@@ -269,6 +272,8 @@ type postMessageBody struct {
 	// no mention is added (the person reads the task's page), the sender is the one the request proves, exactly as for any post.
 	// Ask makes the post a question to the members it @mentions (#7794), open until each has answered; ReplyTo makes it an answer to that message of the board.
 	Ask bool `json:"ask,omitempty"`
+	// Again posts a question to the Operator even when the same sender's identical one is still open (#16135): without it that second post is answered with the first one's id and duplicate=true, nothing stored.
+	Again bool `json:"again,omitempty"`
 	// AskGoal and AskTask say which goal and which task a question is about (#12164): both must be of this board, and only a question (Ask) takes them. An agent with exactly one claimed task attaches it, and its goal, when it says neither.
 	AskGoal int64 `json:"ask_goal,omitempty"`
 	AskTask int64 `json:"ask_task,omitempty"`
@@ -921,4 +926,32 @@ func (h *BoardHandler) refuseReplyToOperatorAsk(w http.ResponseWriter, r *http.R
 		}
 	}
 	return false
+}
+
+// answerDuplicateOperatorAsk: an --ask to the Operator with the same text, from the same sender, while that sender's earlier one is still open is not posted again (#16135). The Operator
+// got one question twice (#210160, #210164) and had to answer both. It answers {id, duplicate: true} with the open one's id and reports whether it did. The sender is the one the request
+// proves (an agent's token), else the name the post gives; the text is compared as it is stored (cleaned, line breaks unescaped). post --again posts it anyway.
+func (h *BoardHandler) answerDuplicateOperatorAsk(w http.ResponseWriter, r *http.Request, project string, body postMessageBody, asked []string) bool {
+	toOperator := false
+	for _, who := range asked {
+		if strings.EqualFold(who, operatorIdentity) {
+			toOperator = true
+		}
+	}
+	if !toOperator {
+		return false
+	}
+	sender := body.SubscriberID
+	if name, verified := actorName(callerActor(r)); verified && name != "" {
+		sender = name
+	}
+	if strings.TrimSpace(sender) == "" {
+		return false
+	}
+	id, err := h.bs.OpenDuplicateAsk(r.Context(), project, sender, clitext.Clean(unescapeLineBreaks(body.Content)), time.Now())
+	if err != nil || id == 0 {
+		return false // a lookup that fails posts, as before: a question is never lost to this check
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"id": id, "duplicate": true, "message": fmt.Sprintf("Already asked as #%d; it is still open in Needs you.", id)})
+	return true
 }

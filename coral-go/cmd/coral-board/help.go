@@ -141,14 +141,14 @@ any board message ends the wait.`
 
 // postFlags and sendFlags are the options of post and of send. They are read in any case (--TO is --to) and anywhere before or among the words of the message.
 var (
-	postFlags = []string{"--to", "--file", "--task", "--assign", "--goal", "--title", "--priority", "--ask", "--reply-to", "--guide", "--button", "--yes-no"}
+	postFlags = []string{"--to", "--file", "--task", "--assign", "--goal", "--title", "--priority", "--ask", "--reply-to", "--guide", "--button", "--yes-no", "--again", "--withdraw"}
 	sendFlags = []string{"--board", "--to", "--address", "--reply-to", "--message-id", "--attach", "--file"}
 )
 
 // isPostValueOption: post's options, each of which takes a value.
 func isPostValueOption(opt string) bool {
 	for _, k := range postFlags {
-		if opt == k && k != "--ask" { // --ask is a switch: it takes no value
+		if opt == k && k != "--ask" && k != "--again" { // --ask and --again are switches: they take no value
 			return true
 		}
 	}
@@ -195,7 +195,7 @@ func checkFreeText(args []string) error {
 			if opt := foldOpt(rest[i], postFlags); isPostValueOption(opt) {
 				i++
 				continue
-			} else if opt == "--ask" || rest[i] == "--broadcast" { // --broadcast is the operator's own opt-out, not listed anywhere an agent reads
+			} else if opt == "--ask" || opt == "--again" || rest[i] == "--broadcast" { // --broadcast is the operator's own opt-out, not listed anywhere an agent reads
 				continue
 			}
 			if clihelp.IsFlagLike(rest[i]) {

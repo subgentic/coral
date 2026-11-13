@@ -113,7 +113,8 @@ func cmdPost() {
 	// Parse --to flag and collect remaining args as the message
 	var toNames, filePath, taskArg, assignArg, goalArg, titleArg, priorityArg, replyArg, guideArg string
 	var buttons []string // --button 'Label=action[:arg]', repeatable: the server checks each one (#11643)
-	ask, broadcast, yesNo := false, false, false
+	ask, broadcast, yesNo, again := false, false, false, false
+	var withdrawArg string // --withdraw N: take back my own unanswered question N (the same as ask withdraw N, #16135)
 	var msgParts []string
 	literal := false
 	for i := 2; i < len(os.Args); i++ {
@@ -136,6 +137,11 @@ func cmdPost() {
 			yesNo = true
 		} else if opt == "--ask" {
 			ask = true
+		} else if opt == "--again" {
+			again = true // post the question even if my identical one is still open (#16135)
+		} else if opt == "--withdraw" && i+1 < len(os.Args) {
+			withdrawArg = os.Args[i+1]
+			i++
 		} else if os.Args[i] == "--broadcast" {
 			broadcast = true // a status post meant for no one: the operator's own opt-out of the refusal below, for their scripts. Not in the help, the docs or the error, and not offered as a "did you mean" (#11441)
 		} else if opt == "--reply-to" && i+1 < len(os.Args) {
@@ -165,6 +171,16 @@ func cmdPost() {
 		} else {
 			msgParts = append(msgParts, os.Args[i])
 		}
+	}
+	if withdrawArg != "" {
+		id, perr := strconv.ParseInt(strings.TrimPrefix(withdrawArg, "#"), 10, 64)
+		if perr != nil || id <= 0 || ask || len(msgParts) > 0 || filePath != "" {
+			fmt.Fprintln(os.Stderr, "Error: --withdraw takes the number of your own open question and nothing else: post --withdraw N")
+			os.Exit(2)
+		}
+		goalCall("POST", fmt.Sprintf("/%s/asks/%d/close", url.PathEscape(st.Project), id), map[string]any{"subscriber_id": resolveSubscriberID(), "withdraw": true, "note": ""}, "withdrawing the question", 200)
+		fmt.Printf("Withdrew the question in message #%d.\n", id)
+		return
 	}
 	var message string
 	if filePath != "" {
@@ -285,6 +301,13 @@ func cmdPost() {
 	if ask {
 		body["ask"] = true // a question to the members it @mentions, open until each has answered (#7794)
 	}
+	if again {
+		if !ask {
+			fmt.Fprintln(os.Stderr, "Error: --again is for a question: post --ask --again \"@Operator ...\"")
+			os.Exit(2)
+		}
+		body["again"] = true
+	}
 	if len(buttons) > 0 {
 		body["buttons"] = buttons // the server checks each against a closed list and this team; the Operator's click runs one (#11643)
 	}
@@ -332,7 +355,10 @@ func cmdPost() {
 		clierr.Exit1()
 	}
 	if id, ok := result["id"]; ok {
-		fmt.Printf("Message #%.0f posted to '%s'\n", id, st.Project)
+		if dup, _ := result["duplicate"].(bool); dup { // the same question of mine is still open (#16135): nothing was posted
+			fmt.Printf("Already asked as #%.0f; it is still open in Needs you. (post --again posts it anyway; post --withdraw %.0f takes it back)\n", id, id)
+			return
+		}
 		if list, ok := result["notified"].([]any); ok && len(list) == 0 && !broadcast && taskArg == "" && replyArg == "" && assigned == nil {
 			fmt.Fprintln(os.Stderr, postReachedNoOne(message)) // posted, but nobody was told (#11441): a name that is no member of the team
 		}
@@ -354,6 +380,7 @@ func cmdPost() {
 		if ask {
 			fmt.Println("  For a yes/no question to the Operator, use post --ask --yes-no: Approve sends Yes and Deny sends No. Other choices need explicit --button labels or a written reply.")
 		}
+		fmt.Printf("Message #%.0f posted to '%s'\n", id, st.Project) // last, so a '| tail -1' still shows the post went through (#16135)
 	} else {
 		fmt.Fprintln(os.Stderr, "Error: Coral accepted the request but returned no message id")
 		clierr.Exit1()
