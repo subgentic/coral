@@ -23,7 +23,7 @@
     try {
         var hint = /^([pd])\|(\d{1,3})$/.exec(localStorage.getItem('coral-launch-notice') || ''), phoneScreen = window.innerWidth <= 600 || screen.width <= 600, room_px = '';
         if (hint && (hint[1] === 'p') === phoneScreen) room_px = hint[2];
-        else { // no hint for this kind of screen (a new profile, a phone after a wide window): when the server says the notice is unseen, a typical height is reserved (#14935, 57 px on a phone since the longer headline of #15079, 53 px on a wide screen since #16367 made the notice a single 44 px row; the notice's real height is kept as the hint once it is shown)
+        else { // no hint for this kind of screen (a new profile, a phone after a wide window): when the server says the notice is unseen, a typical height is reserved (#14935, 57 px on a phone since the longer headline of #15079; the notice's real height is kept as the hint once it is shown)
             var unseen = false; try { unseen = JSON.parse(document.getElementById('coral-boot').textContent).launch_unseen === true; } catch (_) {}
             if (unseen) room_px = phoneScreen ? '57' : '53';
         }
