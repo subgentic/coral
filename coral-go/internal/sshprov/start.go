@@ -349,3 +349,45 @@ func (r Runner) PortHolder(ctx context.Context, t Target, port int) (int, string
 	pid, _ := strconv.Atoi(m[1])
 	return pid, m[2]
 }
+
+// RunningHome is the data folder the running Coral of this install was started with (#16021): its --home, read from its command line. kind is "rel" (path is relative to the home folder there), "abs" (an
+// absolute path outside it), "relative" (a --home the hub cannot place) or "" when no Coral of this install runs or it has no --home.
+func (r Runner) RunningHome(ctx context.Context, t Target) (kind, path string, err error) {
+	res, err := r.Run(ctx, t, CmdReadRunningHome)
+	if err != nil {
+		return "", "", err
+	}
+	if res.ExitCode != 0 {
+		return "", "", &StartError{ExitCode: res.ExitCode}
+	}
+	k, p, _ := strings.Cut(strings.TrimSpace(res.Stdout), " ")
+	switch k {
+	case "rel", "abs", "relative":
+		return k, p, nil
+	}
+	return "", "", nil
+}
+
+// IsCoralDataDir reports whether the absolute folder is a Coral data folder this user owns (a sessions.db in it, no link).
+func (r Runner) IsCoralDataDir(ctx context.Context, t Target, dir string) bool {
+	if !absDirRe.MatchString(dir) {
+		return false
+	}
+	res, err := r.Run(ctx, t, CmdCheckDataDir, dir)
+	return err == nil && res.ExitCode == 0
+}
+
+// RecordDataDir makes the start after an upgrade keep the folder: a relative one DataDirProblem passes, or an absolute one IsCoralDataDir passed.
+func (r Runner) RecordDataDir(ctx context.Context, t Target, dir string) error {
+	if !recordDirRe.MatchString(dir) || (!strings.HasPrefix(dir, "/") && DataDirProblem(dir) != "") {
+		return errors.New("sshprov: not a data folder that can be kept")
+	}
+	res, err := r.Run(ctx, t, CmdRecordDataDir, dir)
+	if err != nil {
+		return err
+	}
+	if res.ExitCode != 0 {
+		return &StartError{ExitCode: res.ExitCode}
+	}
+	return nil
+}
