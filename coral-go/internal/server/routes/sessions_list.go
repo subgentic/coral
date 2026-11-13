@@ -584,8 +584,8 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"board_project":         boardProject(d.boardSubs, lv.boardNames, tmuxName, sid),
 		"board_job_title":       boardJobTitle(d.boardSubs, lv.boardNames, tmuxName, sid),
 		"board_unread":          boardUnread,
-		"skipped_send":          skippedSendField(tmuxName, boardUnread), // the last automated send Coral did not type and why ({why, what, at, since}), null at none (#7727)
-		"at_dialog":             h.dismissedDialogField(sid, d.waitIgnored[sid]),                    // {since, after_min, notify} while the same prompt has been on the agent's screen for two passes (#11437), null otherwise
+		"skipped_send":          skippedSendField(tmuxName, boardUnread),         // the last automated send Coral did not type and why ({why, what, at, since}), null at none (#7727)
+		"at_dialog":             h.dismissedDialogField(sid, d.waitIgnored[sid]), // {since, after_min, notify} while the same prompt has been on the agent's screen for two passes (#11437), null otherwise
 		"board_is_orchestrator": boardSubscriberFlag(boardSub),
 		"board_subscriber_id":   boardSubscriberID(boardSub),
 		"log_path":              agent.LogPath,
