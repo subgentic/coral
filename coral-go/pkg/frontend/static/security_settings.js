@@ -96,7 +96,9 @@ function changeForm() {
         document.dispatchEvent(new CustomEvent('coral:password-changed'));
         loadSecurityRow();
     });
-    d.append(form, el('p', 'tb-note', 'Forgot it? Run coral reset-password on this computer.'));
+    const help = el('a', 'tb-note tb-learn', 'Forgot password');
+    help.href = '/static/password-reset.html'; help.target = '_blank'; help.rel = 'noopener';
+    d.append(form, help);
     return d;
 }
 

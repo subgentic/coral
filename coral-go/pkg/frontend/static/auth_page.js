@@ -24,7 +24,7 @@ async function post(url, body) {
 
 const main = $('panel-signin') || $('panel-create');
 function showPanel(panel) {
-    for (const p of [main, $('panel-forgot'), $('panel-key'), $('panel-hublink'), $('panel-hubwait')]) if (p) p.hidden = p !== panel;
+    for (const p of [main, $('panel-key'), $('panel-hublink'), $('panel-hubwait')]) if (p) p.hidden = p !== panel;
     const focus = panel && panel.querySelector('input:not([hidden]):not([type=checkbox])');
     if (focus) focus.focus();
 }
@@ -76,14 +76,7 @@ for (const b of document.querySelectorAll('[data-toggle]')) {
     });
 }
 for (const b of document.querySelectorAll('[data-back]')) b.addEventListener('click', () => showPanel(main));
-if ($('show-forgot')) $('show-forgot').addEventListener('click', () => showPanel($('panel-forgot')));
 if ($('show-key')) $('show-key').addEventListener('click', () => showPanel($('panel-key')));
-if ($('copy-reset')) $('copy-reset').addEventListener('click', async () => {
-    const btn = $('copy-reset');
-    try { await navigator.clipboard.writeText($('reset-cmd').textContent); btn.textContent = 'Copied'; }
-    catch { const r = document.createRange(); r.selectNodeContents($('reset-cmd')); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = 'Press Ctrl+C'; }
-    setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
-});
 
 if (passwordSet) {
     $('signin-form').addEventListener('submit', async e => {

@@ -26,7 +26,7 @@ func TestAuthPageStates(t *testing.T) {
 	assert.Contains(t, set, "Keep me signed in on this browser")
 	assert.Regexp(t, `<input type="checkbox" id="keep">`, set, "unchecked by default (the operator's rule)")
 	assert.Contains(t, set, "Forgot password?")
-	assert.Contains(t, set, "coral reset-password", "the local-only reset, named")
+	assert.Contains(t, set, `href="/static/password-reset.html"`, "recovery Docs are reachable")
 	assert.Contains(t, set, `id="panel-key"`, "an API key still works")
 	assert.NotContains(t, set, `id="create-form"`)
 	assert.NotContains(t, set, `id="setup-code"`)
@@ -40,8 +40,8 @@ func TestAuthPageStates(t *testing.T) {
 	remote := AuthPage(PageState{})
 	assert.Contains(t, remote, `id="create-form"`)
 	assert.Contains(t, remote, `id="setup-code"`, "from another computer the one-time setup code is asked for")
-	assert.Contains(t, remote, "coral setup-code", "and says where to find it")
-	assert.Contains(t, remote, "Settings &rsaquo; Network and Hub</b> (or the tray menu), or run <b>coral setup-code</b> there", "where the person is, then the terminal (#6410)")
+	assert.NotContains(t, remote, "coral setup-code", "commands live in Docs")
+	assert.Contains(t, remote, "Settings &rsaquo; Network and Hub</b> (or the tray menu)", "the setup code is reachable in Coral")
 	assert.NotContains(t, remote, "startup log", "the code is never in a log, so the page does not send anyone to one")
 
 	assert.Contains(t, AuthPage(PageState{PasswordSet: true, Strict: true}), "The Coral app signs in by itself")
@@ -123,7 +123,7 @@ func TestAuthPageHubStates(t *testing.T) {
 	assert.Contains(t, unpaired, "Not now, use a password", "always an exit to the password")
 	remote := AuthPage(PageState{PasswordSet: true, HubSignin: "unpaired"})
 	assert.NotRegexp(t, `id="hub-setup-field" hidden`, remote, "from another computer the setup code field shows")
-	assert.Contains(t, remote, "coral setup-code")
+	assert.Contains(t, remote, "Settings &rsaquo; Network and Hub")
 
 	off := AuthPage(PageState{PasswordSet: true, Local: true, HubSignin: "disabled_in_hub", HubURL: "https://app.coralhub.dev"})
 	assert.Contains(t, off, "Sign in with Coral Hub is off for this computer.")
@@ -175,12 +175,12 @@ func TestAuthPageFirstRunDetails(t *testing.T) {
 // the computer with coral open, or create a password here with the setup code. Strict local auth is untouched: this is words, and the page still takes nothing it did not before.
 func TestAuthPageSaysHowToGetInWhenThereIsNoPasswordYet(t *testing.T) {
 	remote := AuthPage(PageState{}) // another device, no password
-	for _, want := range []string{`class="how"`, "Other ways in", "coral open", "coral setup-code", "On the computer that runs Coral", "coral open --print", "127.0.0.1", "works once, for 10 minutes", "do not post it where others can read it"} {
+	for _, want := range []string{`class="how"`, "Other ways in", "On the computer that runs Coral", "open the Coral app", "/static/password-reset.html#other-ways"} {
 		assert.Contains(t, remote, want, "another device: "+want)
 	}
 	locked := AuthPage(PageState{Local: true, Locked: true}) // a browser on this computer sent here by a locked page
 	assert.Contains(t, locked, `class="how"`)
-	assert.Contains(t, locked, "coral open")
+	assert.Contains(t, locked, "Open the Coral app")
 	assert.NotContains(t, locked, "coral setup-code", "this computer needs no setup code")
 	assert.NotContains(t, locked, "coral open --print", "a browser on this computer needs no link carried to a phone")
 	assert.NotContains(t, AuthPage(PageState{Local: true}), `class="how"`, "a browser on this computer that was not locked out sees the plain page")
@@ -222,11 +222,11 @@ func TestAuthPageSaysWhyAPasswordIsNeededAndOffersNoSkip(t *testing.T) {
 	for _, skip := range []string{"do not need one", "You do not need", "opens without", "without one", "continue without", "skip", "Only you use this computer"} {
 		assert.NotContains(t, strings.ToLower(create), strings.ToLower(skip), "the create screen suggests no way around the password: "+skip)
 	}
-	assert.Contains(t, create, "Your password manager can save it. Forgot it later? Run coral reset-password in a terminal on this computer.", "the note under the form keeps the password-manager and reset help (#14731)")
-	// the sign-in and forgot-password panel (a computer with a password) says why, and not that the app opens without one
+	assert.Contains(t, create, `Your password manager can save it. <a class="link" href="/static/password-reset.html"`, "the note keeps the password-manager advice and recovery Docs (#15858)")
+	// Sign-in links to recovery Docs and does not suggest bypassing the browser password.
 	signin := AuthPage(PageState{PasswordSet: true, Local: true, Strict: true})
 	assert.NotContains(t, strings.ToLower(signin), "opens without a password", "the forgot-password note no longer says the app opens without one")
-	assert.Contains(t, signin, `<p class="note">A password keeps other people and other devices out of Coral when it is opened in a web browser.</p>`)
+	assert.Contains(t, signin, `id="show-forgot" href="/static/password-reset.html"`)
 }
 
 // #12546 (Security): when Coral cannot tell which account opens a sign-in link (the check is unavailable on this computer), the sign-in page says so in one line, where the person is, and
@@ -275,7 +275,7 @@ func TestCreatePasswordPageLeadsWithTheFormAndFoldsTheOtherWays(t *testing.T) {
 		assert.Contains(t, page, `<details class="otherways" id="other-ways">`, name)
 		assert.NotContains(t, page, `id="other-ways" open`, "%s: folded", name)
 		assert.Contains(t, page, "<summary>Other ways in</summary>", name)
-		assert.Contains(t, page, "coral open", "%s: the way in stays on the page", name)
+		assert.Contains(t, page, "/static/password-reset.html#other-ways", "%s: Docs keeps the other ways reachable", name)
 	}
 }
 
@@ -309,7 +309,7 @@ func TestCreatePasswordPageIsOneClearPath(t *testing.T) {
 		if s.HubSignin == "unpaired" {
 			assert.Contains(t, ways, `id="hub-link-open"`, "%s: the Hub link is under Other ways in", name)
 		}
-		assert.Contains(t, create, "coral reset-password", "%s: the reset help stays", name)
+		assert.Contains(t, create, `href="/static/password-reset.html"`, "%s: recovery Docs stay reachable", name)
 	}
 	// the sign-in page keeps its primary same-computer button: this is the create page's change only
 	assert.Contains(t, AuthPage(PageState{PasswordSet: true, Local: true, LocalOpen: true}), `btn btn-primary wide" id="local-open"`)
@@ -346,5 +346,17 @@ func TestCreatePasswordPageHasOneFoldInOneOrder(t *testing.T) {
 		}
 		assert.NotContains(t, create, "Other ways to sign in", "%s: the second fold is gone", name)
 		assert.NotContains(t, create, "login_token", "%s: no link or token is printed", name)
+	}
+}
+
+// Recovery stays reachable when signed out and commands live in Docs (#15858).
+func TestPasswordRecoveryDocsLink(t *testing.T) {
+	for _, state := range []PageState{{PasswordSet: true}, {Local: true}, {}} {
+		page := AuthPage(state)
+		assert.Contains(t, page, `href="/static/password-reset.html"`)
+		assert.NotContains(t, page, "coral reset-password")
+		assert.NotContains(t, page, "coral open")
+		assert.NotContains(t, page, "coral setup-code")
+		assert.NotContains(t, page, `id="panel-forgot"`)
 	}
 }
