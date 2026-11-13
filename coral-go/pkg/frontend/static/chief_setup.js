@@ -4,6 +4,7 @@
  * the way to change it where every agent's is changed (its own page); a launch is not made here. Every name that comes from an agent or a team is set as text, never as HTML. Machine-only: nothing of it exists through Coral Hub. */
 import { importOnce } from './import_once.js';
 import { showToast } from './utils.js';
+import { showConfirmModal } from './confirm_dialog.js';
 const { mountSettingsView } = await importOnce('./settings_view.js');
 const { COLORS, avatarNode, lookOf } = await importOnce('./chief_look.js');
 
@@ -80,7 +81,7 @@ export async function mountChiefSetup(host) {
     const openLink = el('a', 'chief-open-link', 'Open Chief'); openLink.href = '/chief'; openLink.hidden = true;
     view = mountSettingsView(form, {
         mode: 'settings',
-        saveBar: { save: 'Save Chief', cancel: 'Cancel' },
+        saveBar: false,
         words: { saved: 'Saved. /chief shows it now.' },
         fields: [
             { key: 'chief_name', type: 'text', label: 'Name', default: '', placeholder: 'Chief', help: `What /chief and its chat call it (at most ${NAME_MAX} characters). Empty keeps the agent’s own name.`, validate: v => ([...String(v || '')].length > NAME_MAX ? `At most ${NAME_MAX} characters.` : '') },
@@ -91,7 +92,7 @@ export async function mountChiefSetup(host) {
             { key: 'chief_model', type: 'custom', label: 'Its model', render: slot => { slot.append(modelRow); drawModel(); } },
             { key: 'chief_actions', type: 'select', label: "Chief's actions", default: 'ask_first', options: ACTIONS, help: 'Ask first: Chief asks before each action. Act: Chief edits without asking, and a shell command still asks. Applies when Chief restarts.' },
             { key: 'chief_fronts', type: 'select', label: 'Team it fronts', default: '', options: [{ value: '', label: 'No team chosen' }, ...teams], help: 'The team whose agents Chief takes your requests to. It must be a team other than the one Chief is on.' },
-            { key: 'chief_page', type: 'toggle', label: 'Serve the Chief page', default: false, help: 'Turns on /chief, the page for your phone.', helpOf: () => (view && view.values().chief_page ? 'Turns on /chief, the page for your phone.' : 'Off: Chief stays off, whatever else you save here, until this is on and saved. Turn it on to use /chief.') },
+            { key: 'chief_page', type: 'toggle', label: 'Serve the Chief page', default: false, help: 'Turns on /chief, the page for your phone.', helpOf: () => (view && view.values().chief_page ? 'Turns on /chief, the page for your phone.' : 'Off: Chief stays off, whatever else you save here, until you turn this on. Turn it on to use /chief.') },
             { key: 'chief_open', type: 'custom', label: 'Chief page', render: slot => { slot.append(openLink); } }, // a plain link to /chief, the one way in to Chief besides its URL (#15793: no sidebar card, no menu entry); shown while the page is on
         ],
         load: async () => {
@@ -99,19 +100,83 @@ export async function mountChiefSetup(host) {
             const agent = choices.find(c => c.value === String(st.chief_session || '') && c.team === String(st.chief_team || ''));
             return { chief_name: String(st.chief_name || ''), chief_avatar: String(st.chief_avatar || '1'), chief_avatar_letter: String(st.chief_avatar_letter || ''), chief_agent: agent ? agent.value : '', chief_fronts: frontsOf(st.chief_fronts), chief_page: yes(st.chief_page), chief_actions: st.chief_actions === 'act' ? 'act' : 'ask_first' }; // anything else is Ask first, never a wider mode
         },
-        save: async (changes, { values }) => {
+
+    });
+    const persist = async changes => {
             const body = {};
             for (const [k, v] of Object.entries(changes)) { if (k === 'chief_agent') Object.assign(body, agentSettings(v, choices)); else if (k !== 'chief_model' && KEYS.includes(k)) body[k] = typeof v === 'boolean' ? String(v) : String(v == null ? '' : v).trim(); }
             if (!Object.keys(body).length) return {};
             const r = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
             if (!r.ok) { let m = ''; try { m = (await r.json()).error || ''; } catch { /* no reason given */ } throw new Error(m || `Chief could not be saved (HTTP ${r.status}).`); }
-            if (Object.hasOwn(body, 'chief_name') || Object.hasOwn(body, 'chief_avatar') || Object.hasOwn(body, 'chief_avatar_letter')) showToast('Chief’s look is saved.', false, 3000);
             return {};
-        },
-    });
+    };
     const redraw = () => { drawPreview(); drawModel(); openLink.hidden = !(view && view.values().chief_page); view.refresh?.(); }; // refresh re-reads a help sentence that follows the choice (the page toggle's)
     form.addEventListener('input', redraw); form.addEventListener('change', redraw); form.addEventListener('sv-saved', redraw);
+    let saved = {}, ready = false, queue = Promise.resolve();
+    const pending = new Map();
+    const statuses = new Map();
+    const status = (key, text) => {
+        let node = statuses.get(key);
+        if (!node) {
+            node = el('span', 'settings-save-status'); node.setAttribute('role', 'status');
+            node.setAttribute('aria-live', 'polite'); node.setAttribute('aria-atomic', 'true');
+            form.querySelector(`[data-key="${key}"] .sv-text`).append(node); statuses.set(key, node);
+        }
+        node.textContent = text; node.toggleAttribute('data-error', text.startsWith('Not saved'));
+    };
+    const commit = (key, value) => {
+        pending.set(key, (pending.get(key) || 0) + 1);
+        queue = queue.then(async () => {
+            if (value === saved[key]) { pending.set(key, pending.get(key) - 1); status(key, 'Saved'); return; }
+            const before = saved[key];
+            status(key, 'Saving…');
+            try {
+                const next = { ...saved, [key]: value };
+                if (['chief_agent', 'chief_fronts'].includes(key) && agentIsOnFrontedTeam(next.chief_agent, next.chief_fronts, choices, teamNames)) throw new Error('Pick an agent on another team, or another team to front.');
+                await persist({ [key]: value }); saved[key] = value;
+                if (view.values()[key] === value) view.accept([key]);
+                status(key, 'Saved');
+            } catch (error) {
+                if (view.values()[key] === value) { view.set(key, before); view.accept([key]); }
+                status(key, `Not saved. ${error.message}`);
+            }
+            pending.set(key, pending.get(key) - 1);
+            redraw();
+        });
+    };
+    const saveRow = key => {
+        if (!ready || !Object.hasOwn(saved, key)) return;
+        const value = view.values()[key];
+        let reason = '';
+        if (key === 'chief_name' && [...value].length > NAME_MAX) reason = `At most ${NAME_MAX} characters.`;
+        if (key === 'chief_avatar_letter' && [...value.trim()].length > 1) reason = 'One letter or digit.';
+        const values = { ...saved, [key]: value };
+        if ((key === 'chief_agent' || key === 'chief_fronts') && agentIsOnFrontedTeam(values.chief_agent, values.chief_fronts, choices, teamNames)) reason = 'Pick an agent on another team, or another team to front.';
+        if (reason) { view.error(key, reason); return; }
+        view.error(key, '');
+        if (value === saved[key] && !pending.get(key)) return;
+        if (key === 'chief_agent' || key === 'chief_fronts') {
+            view.set(key, saved[key]); redraw();
+            const name = key === 'chief_agent' ? (choices.find(c => c.value === value)?.label || 'No agent picked') : (value || 'No team chosen');
+            showConfirmModal('Chief routing', `Save ${key === 'chief_agent' ? 'Which agent' : 'Team it fronts'}: ${name}?`, () => {
+                view.set(key, value); redraw(); commit(key, value);
+            }, () => {}, { label: 'Save change', danger: false });
+        } else commit(key, value);
+    };
+    const keyOf = target => target.closest('[data-key]')?.dataset.key;
+    form.addEventListener('change', event => {
+        const key = keyOf(event.target);
+        if (key && !['chief_name', 'chief_avatar_letter'].includes(key)) saveRow(key);
+    });
+    form.addEventListener('focusout', event => {
+        const key = keyOf(event.target);
+        if (['chief_name', 'chief_avatar_letter'].includes(key)) saveRow(key);
+    });
+    form.addEventListener('keydown', event => {
+        const key = keyOf(event.target);
+        if (event.key === 'Enter' && ['chief_name', 'chief_avatar_letter'].includes(key)) { event.preventDefault(); saveRow(key); }
+    });
     host.dataset.ready = '';
-    view.ready.then(() => { redraw(); host.dataset.ready = '1'; }, () => { redraw(); host.dataset.ready = '1'; });
+    view.ready.then(() => { saved = view.values(); ready = true; redraw(); host.dataset.ready = '1'; }, () => { redraw(); host.dataset.ready = '1'; });
     return view;
 }
