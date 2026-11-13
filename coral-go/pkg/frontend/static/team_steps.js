@@ -1,4 +1,6 @@
 /* The Launch Agent Team dialog's three steps (#6397, #7407): 1 Name and where it launches, 2 Members, 3 Start and team settings. Pure DOM: `data-stage` on the step says which page shows (css), and the buttons and the line under the title follow it. */
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('team_footer.css'); // the footer's one layout on every step, and Edit member's quiet Remove (#15846): not at start
 export const TEAM_STEPS = ['team', 'members', 'start'];
 const STEP_NAMES = { team: 'Your team', members: 'Members', start: 'Start and team settings' };
 
@@ -30,7 +32,7 @@ export function showTeamStep(step, { focus = false } = {}) {
     const back = document.getElementById('launch-team-back');
     const next = document.getElementById('launch-team-next');
     const go = document.getElementById('launch-team-go');
-    if (back) back.hidden = i === 0;
+    if (back) back.toggleAttribute('inert', i === 0); // step 1 keeps Back's place, unpressable and unseen (css), so the footer is one on every step (#15846)
     if (next) next.hidden = i === TEAM_STEPS.length - 1;
     if (go) go.hidden = i !== TEAM_STEPS.length - 1;
     const name = (document.getElementById('team-board-name')?.value || '').trim(), dir = (document.getElementById('launch-team-dir')?.value || '').trim();

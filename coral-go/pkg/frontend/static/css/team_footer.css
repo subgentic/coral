@@ -1,0 +1,6 @@
+/* The New team wizard's footer, one on all three steps (#15846, guideline 4.8), and Edit member's Remove from team. A lazy sheet (team_steps.js awaits it): none of it is at start. */
+.launch-wizard > .modal-actions #launch-team-back { margin-right: auto; transition: none; } /* Back quiet at the left; Cancel and Next (Launch team on step 3) at the right */
+.launch-wizard > .modal-actions #launch-team-back[inert] { visibility: hidden; } /* step 1 keeps Back's place, unseen and unpressable: nothing moves between steps */
+.launch-wizard > .modal-actions #launch-team-next, .launch-wizard > .modal-actions #launch-team-go { min-width: 9rem; } /* one slot of one width for Next and Launch team */
+.launch-wizard > .modal-actions #launch-agent-remove { color: var(--text-secondary); } /* grey at rest: the later .btn-danger in theme-configurator.css paints it red, and a red Remove beside Save member is what got a member removed by mistake */
+.launch-wizard > .modal-actions #launch-agent-remove:hover, .launch-wizard > .modal-actions #launch-agent-remove:focus-visible { color: var(--error-text); background: rgba(var(--fx-red-rgb), 0.15); } /* red where it is about to act */
