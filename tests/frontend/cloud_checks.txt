@@ -258,6 +258,7 @@ node menu_census.test.mjs
 node kill_action_name.test.mjs
 node goal_short_title.test.mjs
 node font_literal_census.test.mjs
+node design_guideline_census.test.mjs
 node team_link_dialog_unit.test.mjs
 node team_link_dialog_calls.test.mjs
 node selected_style.test.mjs
