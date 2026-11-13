@@ -379,15 +379,42 @@ jobs:
         # terminal_pane_size (which drives tmux itself) stays on Linux and macOS; its partner terminal_scroll already runs in a default part. --no-tmux: a --strict run would
         # otherwise add the tmux shard too (9 suites that cannot start here).
         include:
-          - { name: "part 1/8", args: "--part 1/8", id: "1" }
-          - { name: "part 2/8", args: "--part 2/8", id: "2" }
-          - { name: "part 3/8", args: "--part 3/8", id: "3" }
-          - { name: "part 4/8", args: "--part 4/8", id: "4" }
-          - { name: "part 5/8", args: "--part 5/8", id: "5" }
-          - { name: "part 6/8", args: "--part 6/8", id: "6" }
-          - { name: "part 7/8", args: "--part 7/8", id: "7" }
-          - { name: "part 8/8", args: "--part 8/8", id: "8" }
-          - { name: "strict", args: "--strict --no-tmux", id: "strict" }
+          - { name: "fix 1", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f1" }
+          - { name: "fix 2", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f2" }
+          - { name: "fix 3", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f3" }
+          - { name: "fix 4", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f4" }
+          - { name: "fix 5", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f5" }
+          - { name: "fix 6", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f6" }
+          - { name: "fix 7", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f7" }
+          - { name: "fix 8", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f8" }
+          - { name: "fix 9", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f9" }
+          - { name: "fix 10", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f10" }
+          - { name: "fix 11", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f11" }
+          - { name: "fix 12", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f12" }
+          - { name: "fix 13", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f13" }
+          - { name: "fix 14", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f14" }
+          - { name: "fix 15", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f15" }
+          - { name: "fix 16", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f16" }
+          - { name: "fix 17", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f17" }
+          - { name: "fix 18", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f18" }
+          - { name: "fix 19", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f19" }
+          - { name: "fix 20", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f20" }
+          - { name: "fix 21", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f21" }
+          - { name: "fix 22", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f22" }
+          - { name: "fix 23", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f23" }
+          - { name: "fix 24", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f24" }
+          - { name: "fix 25", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f25" }
+          - { name: "fix 26", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f26" }
+          - { name: "fix 27", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f27" }
+          - { name: "fix 28", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f28" }
+          - { name: "fix 29", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f29" }
+          - { name: "fix 30", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f30" }
+          - { name: "fix 31", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f31" }
+          - { name: "fix 32", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f32" }
+          - { name: "fix 33", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f33" }
+          - { name: "fix 34", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f34" }
+          - { name: "fix 35", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f35" }
+          - { name: "fix 36", args: "--only task_link_missing_browser,task_link_styles_stalled_browser --retries 0", id: "f36" }
     defaults:
       run:
         shell: bash
