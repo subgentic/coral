@@ -145,17 +145,20 @@ func (h *ResourcesHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"resources": out})
 }
 
-// redactNotes puts every note of the list through redactComment (the secret scanner plus the Hub's keyword rules). A note the redactor cannot check is dropped, never sent as it was (#16140).
+// redactNotes puts every note and goal title of the list through redactComment (the secret scanner plus the Hub's keyword rules). Text the redactor cannot check is dropped, never sent as it was (#16140; a goal's title is free text too, #16247).
 func redactNotes(views []resourceView) {
+	clean := func(text string) string {
+		if text == "" {
+			return ""
+		}
+		if red, ok := redactComment(text); ok {
+			return red
+		}
+		return ""
+	}
 	fix := func(e *entryView) {
-		if e.Note == "" {
-			return
-		}
-		if red, ok := redactComment(e.Note); ok {
-			e.Note = red
-		} else {
-			e.Note = ""
-		}
+		e.Note = clean(e.Note)
+		e.GoalTitle = clean(e.GoalTitle)
 	}
 	for i := range views {
 		for j := range views[i].Holders {
