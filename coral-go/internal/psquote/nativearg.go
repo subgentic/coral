@@ -81,3 +81,14 @@ func CmdArg(s string) (string, bool) {
 	}
 	return `"` + s + `"`, true
 }
+
+// CmdUnsafe reports an argument of a .cmd or .bat that CmdArg cannot make safe: it has one of < > & | ^ and also a ", a % or a line
+// break, or ends in a backslash, so cmd.exe would read part of it as a redirect or a second command (a path C:\Users\A&B%x). The
+// caller does not start the program with it.
+func CmdUnsafe(s string) bool {
+	if !strings.ContainsAny(s, "<>&|^") {
+		return false
+	}
+	_, ok := CmdArg(s)
+	return !ok
+}

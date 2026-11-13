@@ -56,3 +56,20 @@ func TestCmdArg(t *testing.T) {
 		}
 	}
 }
+
+// A path with a % or a " and also a & < > | or ^ cannot be quoted for cmd.exe (#16224): CmdUnsafe says so, and the launch refuses it.
+func TestCmdUnsafe(t *testing.T) {
+	for in, want := range map[string]bool{
+		`C:\Users\A&B%x`:         true,
+		`C:\Users\A&B"x`:         true,
+		`C:\Users\A&B\`:          true,
+		`C:\Users\A&B`:           false, // wrapped by CmdArg
+		`C:\Users\A%x`:           false, // no metacharacter: cmd leaves it as it is
+		"plain":                  false,
+		`hooks.state={'C:\<s>'}`: false,
+	} {
+		if got := CmdUnsafe(in); got != want {
+			t.Errorf("CmdUnsafe(%q) = %v, want %v", in, got, want)
+		}
+	}
+}
