@@ -71,3 +71,12 @@ assert.equal(activityParts({action:'chat_send',item_kind:'agent',item_id:'w1',ac
 assert.equal(activityParts({action:'chat_send',item_kind:'agent',item_id:'w1',actor:'hub:unknown',note:'hi'},r=>r.item_id).did,'A Hub guest sent words to');
 assert.equal(activityParts({action:'chat_send',item_kind:'agent',item_id:'w1',actor:'hub:90328ec01809',note:'hi'},r=>r.item_id).did,'Sent words to an agent');
 assert.equal(collapseSends([{id:2,action:'chat_send',item_id:'w1',source:'hub',actor:'hub-guest:x',note:'b'},{id:1,action:'chat_send',item_id:'w1',source:'hub',actor:'hub-guest:x',note:'a'}]).map(r=>activityParts(r,x=>x.item_id).did)[0],'A Hub guest sent 2 messages to');
+
+// #16098: every action of a Hub guest says so, not only a chat send; the Operator's own and the owner's through the Hub read as before.
+for (const actor of ['hub-guest:abc123abc123', 'hub:unknown']) {
+    for (const row of [{action:'task_reply',item_kind:'task',item_id:'5',title:'T',note:'ok'}, {action:'file_share',item_kind:'file',title:'plan.md'}, {action:'prompt_answer',item_kind:'agent',item_id:'a',note:'Yes'}, {action:'answer',item_kind:'question',title:'Q?',asker:'Lead',note:'yes'}]) {
+        const p = activityParts({ ...row, actor }, r => r.title || r.item_id || '');
+        assert.match(p.did, /^A Hub guest: /, `${actor} ${row.action}`);
+    }
+}
+for (const actor of ['local', 'hub:90328ec01809', undefined]) assert.ok(!/Hub guest/.test(activityParts({action:'file_share',item_kind:'file',title:'plan.md',actor},r=>r.title).did), String(actor));

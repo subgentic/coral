@@ -23,6 +23,13 @@ export const cleanAnswer = (note, asker) => {
 };
 /** @returns {{ did: string, on: string, detail: string }} the verb for YOU DID, the object for ON (what the record kept, else the kind), and the detail for its own line. `itemWords(row)` is the row's own object words (inbox_activity.js). */
 export function activityParts(row, itemWords) {
+    const p = partsFor(row, itemWords);
+    // An action by a Hub guest (not the owner) never reads as the Operator's own: every verb says so (#16098). A chat send already says it in its own words.
+    if (isGuestRow(row) && !/^A Hub guest/.test(p.did)) p.did = `A Hub guest: ${p.did}`;
+    return p;
+}
+const isGuestRow = row => /^hub-guest:|^hub:unknown$/.test(String(row.actor || ''));
+function partsFor(row, itemWords) {
     const obj = itemWords(row), who = row.title || row.item_id || 'an agent', note = String(row.note || '').trim();
     const mk = (did, on, detail = '') => ({ did, on, detail: detail === FIXED_DISMISS_NOTE ? '' : detail });
     if (row.action === 'answer' && row.item_kind === 'question') { // a NEW row: the title is the ask's line and `asker` is who asked; an older row keeps the asker in the title
@@ -39,7 +46,7 @@ export function activityParts(row, itemWords) {
     if (row.action === 'file_edit_send') return mk('Sent your edit', `${row.title || 'a file'}`, [note, 'to agents'].filter(Boolean).join(' · '));
     if (row.action === 'file_edit') return mk('Saved a new version', `${row.title || 'a file'}`, note);
     if (row.action === 'wait_dismiss') return mk('Dismissed', `${who}’s waiting card`);
-    const guest = row.action === 'chat_send' && /^hub-guest:|^hub:unknown$/.test(String(row.actor || '')); // not the Operator's own send (#16039)
+    const guest = row.action === 'chat_send' && isGuestRow(row); // not the Operator's own send (#16039)
     if (row.action === 'chat_send' && row.send_count > 1) return mk(`${guest ? 'A Hub guest sent' : 'Sent'} ${row.send_count} messages to`, obj, row.send_notes.filter(Boolean).slice(0, 5).join(' · ') + (row.send_count > 5 ? ` · and ${row.send_count - 5} more` : ''));
     if (guest) return mk('A Hub guest sent words to', obj, note);
     if (row.action === 'wait_send') return mk('Sent held words to', who);
