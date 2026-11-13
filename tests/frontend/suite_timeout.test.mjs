@@ -18,9 +18,9 @@ try {
   assert.equal(suiteTimeoutS(tmp, 'late.test.js', 120), 120, 'only the first lines are read');
   assert.equal(suiteTimeoutS(tmp, 'missing.test.js', 120), 120, 'a missing file is the run\'s limit');
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
-for (const f of ['keyboard_census_desktop_browser.test.js', 'phone_targets_census_browser.test.js', 'contrast_census_desktop_browser.test.js', 'phone_targets_census_hub_browser.test.js']) {
+for (const f of ['keyboard_census_desktop_browser.test.js', 'phone_targets_census_browser.test.js', 'contrast_census_desktop_browser.test.js', 'contrast_census_desktop_b_browser.test.js', 'contrast_census_desktop_c_browser.test.js', 'phone_targets_census_hub_browser.test.js']) {
   assert.ok(suiteTimeoutS(here, f, 120) >= 300, `${f} asks for 300 s: a loaded machine takes longer than 120 s for it and that is not a failure`);
 }
 const runner = fs.readFileSync(path.join(here, 'run_cdp_suites.mjs'), 'utf8');
 assert.match(runner, /suiteTimeoutS\(here, t, timeoutS\)/, 'the runner takes each suite\'s limit from suiteTimeoutS');
-console.log('PASS suite_timeout: the header lifts a long suite\'s limit, the four long censuses carry it, the runner uses it');
+console.log('PASS suite_timeout: the header lifts a long suite\'s limit, the long censuses carry it, the runner uses it');
