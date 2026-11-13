@@ -3035,7 +3035,7 @@ button.auto-accept-header-off:hover { color: var(--text-primary); border-color: 
 button.auto-accept-header-off:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* An agent whose terminal is gone or whose program ended (#3218, #15819): its row's status mark, a shape and a word (the moon for sleeping, the cross for a real error), no red chip; a click restarts it. The header badge keeps its red. */
-.terminal-gone-chip { display: inline-flex; align-items: center; flex-shrink: 0; gap: 4px; margin-left: 4px; padding: 0 2px; border: 0; border-radius: var(--radius-sm); background: none; font: inherit; font-size: var(--fs-sm); line-height: 16px; color: var(--text-primary); cursor: pointer; }
+.terminal-gone-chip { display: inline-flex; align-items: center; flex-shrink: 1; min-width: 1.25rem; overflow: hidden; white-space: nowrap; gap: 4px; margin-left: 4px; padding: 0 2px; border: 0; border-radius: var(--radius-sm); background: none; font: inherit; font-size: var(--fs-sm); line-height: var(--lh-label); color: var(--text-primary); cursor: pointer; }
 .terminal-gone-chip:hover { background: var(--bg-hover); }
 .terminal-gone-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .status-glyph { flex: none; width: 10px; height: 10px; border-radius: 50%; box-shadow: inset -3px -1px 0 0 currentColor; color: var(--text-muted); }
