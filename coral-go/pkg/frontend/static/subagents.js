@@ -5,6 +5,7 @@ import { _formatTokenCount, formatTaskDate } from './task_format.js';
 import { redrawBoardTaskList, closeTaskDetailModal } from './task_hooks.js';
 import { serverFetch, serverForSession, dropBody } from './server_base.js';
 import { state } from './state.js';
+import { importOnce } from './import_once.js';
 import { formatCost, compactDuration } from './format.js';
 
 // Which session state.currentSubagents belongs to. Lets a session switch drop
@@ -37,6 +38,7 @@ export async function loadSubagents(agentName, sessionId, options) {
     if (sid !== _subagentsSessionId) return; // the user moved to another session meanwhile
     state.currentSubagents = Array.isArray(subagents) ? subagents : [];
     redrawBoardTaskList();
+    if (state.currentSubagents.length || document.getElementById('agentic-tab-subagents')) importOnce('./subagents_tab.js').then(m => m.syncSubagentsTab()).catch(() => {}); // the tab is added while the agent has sub-agents (#16016)
     _refreshOpenSubagentModal();
 }
 

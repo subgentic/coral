@@ -118,7 +118,9 @@ export function initDockTabs() {
     if (row) {
         const ro = new ResizeObserver(fitWords);
         ro.observe(row);
-        for (const b of row.children) ro.observe(b); // with the words on the row does not wrap (agentic.css), so a larger text size or a tab's new count widens the tabs and leaves the row's size alone: the tabs are watched, and the words come off when they do not fit (#9435)
+        const watchTabs = () => { for (const b of row.children) ro.observe(b); };
+        watchTabs(); // with the words on the row does not wrap (agentic.css), so a larger text size or a tab's new count widens the tabs and leaves the row's size alone: the tabs are watched, and the words come off when they do not fit (#9435)
+        new MutationObserver(() => { watchTabs(); fitWords(); }).observe(row, { childList: true }); // a tab added from script (the Sub-agents tab, #16016) is measured like the others
         watchScrollCue(row);
     } // the phone's overlay strip scrolls: a fade says which edge hides tabs
     WIDE.addEventListener('change', fitWords);
