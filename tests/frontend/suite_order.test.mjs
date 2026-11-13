@@ -5,7 +5,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadDurations, orderLongestFirst, durationsFromResults, partsByDuration } from './suite_order.mjs';
+import { durationsFile, loadDurations, orderLongestFirst, durationsFromResults, partsByDuration } from './suite_order.mjs';
 
 const tests = ['a.test.js', 'b.test.js', 'c.test.js', 'd.test.js', 'e.test.js', 'f.test.js'];
 assert.deepEqual(orderLongestFirst(tests, {}), tests, 'no durations: alphabetical');
@@ -20,6 +20,13 @@ const input = tests.slice(); orderLongestFirst(input, { 'f.test.js': 99 });
 assert.deepEqual(input, tests, 'the input array is not changed');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'suite-order-'));
+// #14722: a Windows run reads suite_durations.windows.json when it is there; every other platform, and Windows without the file, reads suite_durations.json.
+assert.equal(durationsFile(dir, 'win32'), path.join(dir, 'suite_durations.json'), 'Windows without its own file: the shared one');
+fs.writeFileSync(path.join(dir, 'suite_durations.windows.json'), '{}');
+assert.equal(durationsFile(dir, 'win32'), path.join(dir, 'suite_durations.windows.json'), 'Windows with its own file reads it');
+assert.equal(durationsFile(dir, 'linux'), path.join(dir, 'suite_durations.json'), 'Linux never reads the Windows file');
+assert.equal(durationsFile(dir, 'darwin'), path.join(dir, 'suite_durations.json'), 'the Mac never reads the Windows file');
+fs.unlinkSync(path.join(dir, 'suite_durations.windows.json'));
 try {
     assert.deepEqual(loadDurations(path.join(dir, 'missing.json')), {}, 'a missing file is no durations');
     fs.writeFileSync(path.join(dir, 'bad.json'), '{not json'); assert.deepEqual(loadDurations(path.join(dir, 'bad.json')), {}, 'a broken file is no durations');
