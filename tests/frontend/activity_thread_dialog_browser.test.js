@@ -37,7 +37,7 @@ const BASE = require('./test_base').BASE;
         const pills = await ev(`[...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.replace(/\\s+/g, ' ').trim()).filter(Boolean)`);
         for (const w of ['Everything', 'Decisions', 'Answers', 'Permissions', 'Files and tasks', 'Words sent']) assert.ok(pills.some(p => p.startsWith(w)), `a '${w}' chip: ${JSON.stringify(pills)}`);
         const pick = word => ev(`(() => { const b = [...document.querySelectorAll('.team-tb-pills .goals-chip')].find(x => x.textContent.trim().startsWith('${word}')); if (!b) return false; b.click(); return true; })()`);
-        for (const [word, n] of [['Permissions', 1], ['Answers', 1], ['Decisions', 4], ['Everything', 4]]) {
+        for (const [word, n] of [['Permissions', 1], ['Everything', 4], ['Answers', 1], ['Everything', 4], ['Decisions', 4], ['Everything', 4]]) { // a chip adds to the others (#16087): Everything clears between; 'Sent words' rows are not shown (#18466), so Everything is 4
             assert.ok(await pick(word), `the ${word} chip is there`); await ev(framesJs(4));
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === ${n}`, `${word}: ${n} row(s)`);
         }
