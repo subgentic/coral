@@ -1,0 +1,4 @@
+/* One control height in the New agent dialog (#15889, LA5): Refresh models is a control of 36 px (it was 30), 44 px on a phone or touch; a permission chip is at least 24 px (the Deny chips were 21). Lazy: loaded by agent_config_form.js, not at start, so the start stylesheet does not grow. */
+.acf-model-refresh { width: var(--control-height, 36px); height: var(--control-height, 36px); }
+.perm-chip { min-height: 24px; }
+@media (pointer: coarse), (max-width: 767px) { .acf-model-refresh { width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); } }

@@ -2485,7 +2485,7 @@ div.overflow-menu-note { margin: 0; padding: 6px 12px 2px; } /* a row menu's fir
 .perm-chip {
     font-size: var(--fs-sm);
     font-family: var(--font-mono);
-    padding: 3px 8px; min-height: 24px; /* a chip is at least 24 px (#15889): the Deny chips were 21 */
+    padding: 3px 8px;
     border-radius: var(--radius-sm);
     color: var(--text-secondary);
     border: 1px solid var(--control-border);
@@ -3287,7 +3287,7 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 .acf-model-select { flex: 1; min-width: 0; }
 .acf-model-refresh {
     flex: none; display: inline-flex; align-items: center; justify-content: center;
-    width: var(--control-height, 36px); height: var(--control-height, 36px); padding: 0; /* the one control height (#15889): it was 30 */
+    width: 30px; height: 30px; padding: 0;
     border: 1px solid var(--control-border); border-radius: var(--radius-md);
     background: none; color: var(--text-secondary); cursor: pointer;
 }

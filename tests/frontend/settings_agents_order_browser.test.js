@@ -13,7 +13,7 @@ const BASE = require('./test_base').BASE;
         await require('./helpers/wait').bind(ev).coralReady('startup', 'settings');
         await ev(`(async () => { await window.showSettingsModal('agents'); return true; })()`);
         await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'Settings');
-        const top = (id) => ev(`document.getElementById(${JSON.stringify(id)}).getBoundingClientRect().top`);
+        const top = (id) => ev(`(() => { let e = document.getElementById(${JSON.stringify(id)}); if (e.classList.contains('seg-source') && e.nextElementSibling) e = e.nextElementSibling; return e.getBoundingClientRect().top; })()`); // a select drawn as segments or a list is hidden: the control is its group (#15886)
         const model = await top('settings-default-model-claude');
         for (const id of ['settings-permission-mode', 'settings-working-dir', 'settings-default-thinking-claude', 'settings-cli-path-claude']) {
             assert.ok(model < await top(id), `Default models come before ${id}`);

@@ -1,0 +1,14 @@
+/* The permission mode as a list of rows (#15886, LA2): a radio mark, the name, and one line on what the agent may do without asking, for all six modes at once. Lazy: loaded by segmented.js when a control is drawn as a list.
+   One component in New agent, New team and Settings > Defaults. Bypass permissions and Don't ask carry an amber line. */
+.seg-group.seg-list { display: flex; flex-direction: column; gap: 4px; width: 100%; margin: 2px 0 8px; }
+.seg-list .seg-btn { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--space-md, 8px); row-gap: 2px; align-items: start; justify-content: start; width: 100%; height: auto; min-height: var(--control-height, 36px); padding: 8px 12px; text-align: left; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: transparent; color: var(--text-primary); cursor: pointer; }
+.seg-list .seg-btn:hover { border-color: var(--text-secondary); }
+.seg-list .seg-btn[aria-checked="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); color: var(--text-primary); } /* the chosen row: a double accent edge and the filled mark, no fill: its description (secondary text) is 4.4:1 on the hover fill and unreadable on an accent one */
+.seg-list .seg-mark { grid-column: 1; grid-row: 1 / span 3; width: 1rem; height: 1rem; margin-top: 0.15rem; border: 2px solid var(--text-muted); border-radius: 50%; box-sizing: border-box; }
+.seg-list .seg-btn[aria-checked="true"] .seg-mark { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 40%, transparent 45%); }
+.seg-list .seg-name { grid-column: 2; font-weight: var(--fw-strong); font-size: var(--fs-lg); }
+.seg-list .seg-desc { grid-column: 2; font-size: var(--fs-base); color: var(--text-secondary); font-weight: var(--fw-regular); white-space: normal; overflow-wrap: anywhere; }
+.seg-list .seg-warn { grid-column: 2; font-size: var(--fs-base); color: var(--warning-text, var(--warning)); font-weight: var(--fw-regular); white-space: normal; overflow-wrap: anywhere; }
+.seg-list .seg-btn[data-value="bypassPermissions"], .seg-list .seg-btn[data-value="dontAsk"] { color: var(--text-primary); }
+@media (pointer: coarse), (max-width: 767px) { .seg-list .seg-btn { min-height: var(--control-touch-height, 44px); } }
+.perm-mode-desc[hidden] { display: none; } /* every row says it: modeList() hides the one-line hint under the select, which would say it a second time */

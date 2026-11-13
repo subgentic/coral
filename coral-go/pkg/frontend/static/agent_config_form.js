@@ -10,8 +10,9 @@ const { _renderPresetButtons, syncRoleLimits } = await importOnce('./persona_sto
 const { presetEnforcement, launchedMode } = await importOnce('./preset_enforcement.js');
 const { initSectionDialog } = await importOnce('./section_dialog.js');
 const { segmentSelect } = await importOnce('./segmented.js');
-const { launchFlags } = await importOnce('./launch_flags.js');
+const { modeList } = await importOnce('./permission_mode_list.js');
 await loadStyles('acf_full_access.css'); // the Full access box's layout: not at start (#15719)
+await loadStyles('acf_sizes.css'); // the control heights of the New agent dialog: not at start (#15889)
 import { escapeHtml, escapeAttr } from './utils.js';
 import { loadStyles } from './lazy_styles.js';
 import { restartHint } from './codex_mode.js';
@@ -534,7 +535,7 @@ function finishAcfControls(container, opts) {
         const thinking = container.querySelector('.acf-thinking');
         if (thinking) segmentSelect(thinking, { labelledby: 'acf-thinking-label' });
         const mode = container.querySelector('.acf-permission-mode');
-        if (mode && launchFlags.modeCards) segmentSelect(mode, { label: 'Permission mode', cards: true, className: 'seg-modes' });
+        if (mode) modeList(mode); // the six modes as explained rows (#15886); the select when the flag is off
         _syncEnforcement(container);
     }
     if (opts.sections) { mountAgentRows(container); mountPermissionRows(container); mountAdvancedRows(container); } // the Agent, Permissions and Advanced panes' rows are fields of settings_view

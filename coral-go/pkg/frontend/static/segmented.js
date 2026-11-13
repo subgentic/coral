@@ -6,26 +6,27 @@ import { importOnce } from './import_once.js';
 const { markOf } = await importOnce('./agent_marks.js');
 let seq = 0;
 
-export function segmentSelect(select, { label = '', labelledby = '', cards = false, className = '' } = {}) {
+export function segmentSelect(select, { label = '', labelledby = '', cards = false, className = '', list = false } = {}) {
     if (!select || select._segmented) return select && select._segmented;
     const group = document.createElement('div');
-    group.className = `seg-group${cards ? ' seg-cards' : ' btn-seg'}${className ? ' ' + className : ''}`;
+    group.className = `seg-group${list ? ' seg-list' : cards ? ' seg-cards' : ' btn-seg'}${className ? ' ' + className : ''}`;
     group.setAttribute('role', 'radiogroup');
     if (labelledby) group.setAttribute('aria-labelledby', labelledby); else if (label) group.setAttribute('aria-label', label);
     group.id = `seg-${++seq}`;
+    if (list) importOnce('./lazy_styles.js').then(m => m.loadStyles('permission_mode_list.css')).catch(() => {}); // the rows' layout: not at start (#15886)
     select.after(group);
     select.classList.add('seg-source');
     select.setAttribute('aria-hidden', 'true');
     select.tabIndex = -1;
     select._segmented = group;
     let rebuilding = false;
-    const options = () => [...select.options].filter(o => !o.hidden && !o.disabled);
+    const options = () => [...select.options].filter(o => !o.hidden && !o.disabled && !(list && o.value === '')); // the list has no 'Not set' row: nothing saved reads as Auto, which it is
     const draw = () => {
         if (rebuilding) return;
         rebuilding = true;
         const keep = group.contains(document.activeElement) ? document.activeElement.dataset.value : null; // a rebuild must not drop the focus
         group.replaceChildren();
-        const cur = select.value;
+        const cur = select.value || (list ? 'auto' : '');
         for (const o of options()) {
             const b = document.createElement('button');
             b.type = 'button'; b.className = 'btn seg-btn'; b.setAttribute('role', 'radio'); b.dataset.value = o.value;
@@ -33,7 +34,11 @@ export function segmentSelect(select, { label = '', labelledby = '', cards = fal
             const on = o.value === cur;
             b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1;
             const name = document.createElement('span'); name.className = 'seg-name'; name.textContent = o.textContent.trim();
+            if (list) { const m = document.createElement('span'); m.className = 'seg-mark'; m.setAttribute('aria-hidden', 'true'); b.append(m); } // the radio mark: a list of rows is read as radios
             b.append(name);
+            if (list) { name.id = `${group.id}-${o.value}-n`; b.setAttribute('aria-labelledby', name.id); } // the radio is named by its mode, and the explanation is its description (not part of the name)
+            if (list && (o.dataset.desc || o.title)) { const d = document.createElement('span'); d.className = 'seg-desc'; d.id = `${group.id}-${o.value}-d`; d.textContent = o.dataset.desc || o.title; b.append(d); b.setAttribute('aria-describedby', d.id); } // every row says what it lets the agent do, chosen or not (#15886)
+            if (list && o.dataset.warn) { const w = document.createElement('span'); w.className = 'seg-warn'; w.textContent = o.dataset.warn; b.append(w); }
             if (cards && o.dataset.desc) { const d = document.createElement('span'); d.className = 'seg-desc'; d.textContent = o.dataset.desc; b.append(d); }
             b.addEventListener('click', () => choose(o.value));
             group.append(b);
@@ -61,7 +66,7 @@ export function segmentSelect(select, { label = '', labelledby = '', cards = fal
     // A script that sets select.value (a persona, a saved configuration, the provider's default) moves the view with it.
     const proto = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
     Object.defineProperty(select, 'value', { configurable: true, get() { return proto.get.call(this); }, set(v) { proto.set.call(this, v); draw(); } });
-    new MutationObserver(draw).observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'disabled'] });
+    new MutationObserver(draw).observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'disabled', 'title'] });
     select.addEventListener('change', draw);
     draw();
     return group;
