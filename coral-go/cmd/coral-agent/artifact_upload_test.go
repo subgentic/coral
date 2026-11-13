@@ -163,7 +163,7 @@ func TestUploadArtifactSendsTheNewVersionHeaderAndAnOlderVersionIsAnError(t *tes
 	}
 }
 
-// #7739: --task N and --no-task go to the server as X-Artifact-Task (a number, or "none"); without either no such header goes. The task the reply says it linked is on stderr as "Linked to task #N",
+// #7739: --task N and --no-task go to the server as X-Artifact-Task (a number, or "none"); without either no such header goes. The task the reply says it linked is on stderr as "Attached to task #N <title>",
 // and stdout is still the reply alone, which a script parses.
 func TestUploadArtifactSendsTheTaskHeaderAndSaysWhatItLinked(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "note.txt")
@@ -178,7 +178,7 @@ func TestUploadArtifactSendsTheTaskHeaderAndSaysWhatItLinked(t *testing.T) {
 			_, _ = w.Write([]byte(`{"uri":"coral://artifacts/abc123"}`))
 			return
 		}
-		_, _ = w.Write([]byte(`{"uri":"coral://artifacts/abc123","task_id":7644}`))
+		_, _ = w.Write([]byte(`{"uri":"coral://artifacts/abc123","task_id":7644,"task_title":"Fix the thing"}`))
 	}))
 	defer srv.Close()
 	for _, task := range []string{"", "7644", "none"} {
@@ -186,11 +186,11 @@ func TestUploadArtifactSendsTheTaskHeaderAndSaysWhatItLinked(t *testing.T) {
 		if err := uploadArtifact(srv.URL, file, "note.txt", "text/plain", "sess-1", "", task, &out, &errOut); err != nil {
 			t.Fatalf("task %q: %v", task, err)
 		}
-		linked := strings.Contains(errOut.String(), "Linked to task #7644")
+		linked := strings.Contains(errOut.String(), "Attached to task #7644 Fix the thing") // the title is on the line (#16139)
 		if linked != (task != "none") {
 			t.Errorf("task %q: stderr %q", task, errOut.String())
 		}
-		if strings.Contains(out.String(), "Linked to") || !strings.Contains(out.String(), "coral://artifacts/abc123") {
+		if strings.Contains(out.String(), "Attached to") || !strings.Contains(out.String(), "coral://artifacts/abc123") {
 			t.Errorf("task %q: stdout must be the reply alone, got %q", task, out.String())
 		}
 	}

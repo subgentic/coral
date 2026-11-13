@@ -38,7 +38,7 @@ Publish with Coral, not on claude.ai: if you publish an artifact on claude.ai (a
 
    `--kind done|release|decided` (with `--tag "for review"`) says what the file is, so the Operator can choose what reaches Needs you. No `--kind` is a plain file, which cannot be muted. Coral checks the fact, not your word: `done` needs `--task N` of an OPERATOR task assigned to you, `release` needs `--task N` of the task titled exactly `Release vX.Y.Z` assigned to you, `decided` is accepted only from the team's Orchestrator, and a digest is Coral's alone. The kind belongs to the file's series: a new version has the same kind, never another. A question you need answered is never a kind: use `coral-board post --ask` or `wait --operator`.
 
-   An upload is linked to the task you have in progress: the reply carries `task_id`, `coral-agent` prints `Linked to task #N`, and the task's page lists it. `--task N` links it to another task assigned to you instead, `--no-task` to none; a task that is not yours is refused and nothing is stored.
+   An upload is linked to the task you have in progress: the reply carries `task_id`, `coral-agent` prints `Attached to task #N <title>`, and the task's page lists it. `--task N` links it to another task assigned to you instead, `--no-task` to none; a task that is not yours is refused and nothing is stored (never linked to another task instead). A task you submitted for review is still yours for this: `--task N` adds screenshots to it while it is reviewed.
 
 2. Optional: attach it to a task result (so it carries the task's number and title). Write a manifest and complete the task with it:
 

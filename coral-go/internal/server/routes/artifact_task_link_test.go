@@ -297,3 +297,32 @@ func TestAChangeDuringAScanMakesItsAnswerStale(t *testing.T) {
 	assert.Zero(t, bh.taskArtifactCounts(ctx, "alpha")[task], "this scan began before the upload")
 	assert.Equal(t, 1, bh.taskArtifactCounts(ctx, "alpha")[task], "its kept answer is not used: the generation changed after it began")
 }
+
+// #16139: a task handed in for review is assigned to the orchestrator and keeps its author in the workflow. The author's screenshots, asked for during the review, link to it with --task N
+// (they used to be refused as "not yours", and the author's next upload landed on whatever else they had open). Another member's task, in review or not, stays refused, nothing is stored on a
+// refusal, and the refusal says what to do. The reply names the task it landed on.
+func TestTheAuthorOfATaskInReviewCanAttachFilesToItAndTheReplyNamesIt(t *testing.T) {
+	l := newLinkRig(t)
+	ctx := context.Background()
+	_, err := l.h.bs.Subscribe(ctx, "alpha", "Orchestrator", "Orchestrator", "agent-s9", nil, "all")
+	require.NoError(t, err)
+	reviewed := l.task("alpha", "Backend", true)
+	_, _, err = l.h.bs.HandToOrchestrator(ctx, "alpha", reviewed, "Backend")
+	require.NoError(t, err)
+	current := l.task("alpha", "Backend", true) // the author's next task, open now
+	theirs := l.task("alpha", "Frontend", true)
+	_, _, err = l.h.bs.HandToOrchestrator(ctx, "alpha", theirs, "Frontend")
+	require.NoError(t, err)
+
+	code, out := l.post("s1", "after shot", map[string]string{taskHeader: strconv.FormatInt(reviewed, 10)})
+	require.Equal(t, http.StatusCreated, code, out)
+	assert.EqualValues(t, reviewed, out["task_id"], "attached to the task in review, not to the one open now (%d)", current)
+	assert.Equal(t, "Work for Backend", out["task_title"], "the reply names it")
+
+	code, out = l.post("s1", "someone else's", map[string]string{taskHeader: strconv.FormatInt(theirs, 10)})
+	assert.Equal(t, http.StatusNotFound, code, out)
+	assert.Contains(t, out["error"], "--no-task", "the refusal says what to do")
+	assert.Contains(t, out["error"], "not linked to any other task")
+	_, stored := l.linkOf("s1", "someone else's")
+	assert.False(t, stored, "a refusal stores nothing")
+}
