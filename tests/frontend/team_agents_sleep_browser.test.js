@@ -22,11 +22,11 @@ const TEAM = `qa-sleep-${Date.now() % 100000}`;
         await openTeam(ev, waitFor, TEAM); await settle(500);
         await ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === 'Agents'); t.click(); return true; })()`);
         await waitFor(`[...document.querySelectorAll('tr.dt-row')].filter(r => r.getClientRects().length).length === 2`, 'the two agents in the table', { timeout: 8000 });
-        const before = await ev(`document.querySelector('.team-agents-body').textContent`);
+        const before = await ev(`[...document.querySelectorAll('tr.dt-row .status-word')].map(e => e.textContent).join(' ')`);
         assert.ok(!/Sleeping/.test(before), 'awake before the sleep: ' + before.slice(0, 200));
         await ev(`(() => { window.__asleep = true; document.dispatchEvent(new CustomEvent('coral:team-sleep-changed', { detail: { team: '${TEAM}' } })); return true; })()`);
         const t0 = Date.now();
-        await waitFor(`/Sleeping/.test(document.querySelector('.team-agents-body').textContent)`, 'the table says Sleeping', { timeout: 20000 });
+        await waitFor(`/Sleeping/.test([...document.querySelectorAll('tr.dt-row .status-word')].map(e => e.textContent).join(' '))`, 'the table says Sleeping', { timeout: 20000 });
         assert.ok(Date.now() - t0 < 4000, 'the table said Sleeping at once, not at the 15 s poll: ' + (Date.now() - t0) + ' ms');
         console.log('PASS the Agents table follows Sleep team at once');
     } finally { await removeBoards(ev, [TEAM]).catch(() => { }); await client.close(); }
