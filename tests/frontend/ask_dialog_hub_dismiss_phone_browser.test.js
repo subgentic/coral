@@ -15,7 +15,7 @@ const {coralReady}=require('./helpers/wait');
    const source=hub?'m2':'local',expected=hub?'/api/remote/m2/api/board/release/asks/41/close':'/api/board/release/asks/41/close';
    await ev(`(()=>{const real=window.fetch;window.__dismissWrites=[];window.__dismissRefused=false;window.fetch=(u,o={})=>{const url=new URL(String(u),location.href);if(url.pathname.endsWith('/asks/41/close')){window.__dismissWrites.push({path:url.pathname,query:url.search,method:o.method,body:JSON.parse(o.body)});return Promise.resolve(window.__dismissRefused?Response.json({code:'owner_only',error:'owner_only'},{status:403}):Response.json({ok:true}));}return real(u,o)};return true})()`);
    const open=kind=>ev(`import((window.__coralStatic||'/static/')+'operator_asks.js').then(m=>m.openAskDialog({server:${JSON.stringify(source)},board:'release',kind:${JSON.stringify(kind)},id:41,asker:'Lead',text:'Confirm release',at:new Date().toISOString()},()=>{}))`);
-   const button=`[...document.querySelectorAll('dialog.inbox-ask-dialog[open] .inbox-ask-buttons button')].find(b=>b.textContent.trim()==='Dismiss')`;
+   const button=`[...document.querySelectorAll('dialog.inbox-ask-dialog[open] .inbox-ask-buttons button')].find(b=>b.textContent.trim()==='Dismiss, no reply')`;
    await open('ask');await waitFor(`!!(${button})?.getClientRects().length`,'phone question offers Dismiss');
    assert.ok(await ev(`(${button}).getBoundingClientRect().height>=44`),'Dismiss is a phone target');
    await ev(`(${button}).click();true`);await waitFor(`!document.querySelector('dialog.inbox-ask-dialog[open]')`,'successful close dismisses the question dialog');

@@ -2,7 +2,7 @@
  * goalColumns(ctx, keys) accepts goal, state, team, progress, updated (in the requested order; the order on both pages is Goal, State, Team, Progress, Updated, and the team page has no Team, #15827).
  * Rows: {id, title, outcome?, state, rollup:{done,active,blocked,queued}, updatedAt|updated_at, board?|project?}.
  * ctx: teamOf(goal) optionally supplies the displayed team; openTeam(goal) optionally makes it a link;
- * progressLabel optionally renames Progress (the team page calls it Tasks). noGoal rows are navigation only.
+ * progressLabel optionally renames Progress (neither page does since #16371: both say Progress). noGoal rows are navigation only.
  * The columns are for a one-line table (oneLine: true): the narrow container drops Progress, then Team, then State, and Updated last (a time stays, #11943); the title keeps the row.
  * The caller supplies rowKey/open/state to dataTable; team-scoped numeric ids must be qualified in the mailbox. */
 import { importOnce } from './import_once.js';

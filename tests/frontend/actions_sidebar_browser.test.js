@@ -66,6 +66,7 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         // The menu is the ⋮ button's next sibling (toggleSidebarKebab shows it with display: block).
         const opened = await ev(`(() => { const m = ${row}.querySelector('[data-on-click="kebab-toggle"]').nextElementSibling; return !!m && m.classList.contains('sidebar-kebab-menu') && m.style.display === 'block'; })()`);
         check('the ⋮ button opens the agent\'s menu', opened);
+        check('Sleep is the first item of the agent\'s menu (#16371, the Operator\'s #15819: Sleep is the one thing done often)', await ev(`(() => { const m = ${row}.querySelector('[data-on-click="kebab-toggle"]').nextElementSibling; const first = m.querySelector('.overflow-menu-item'); return !!first && first.dataset.onClick === 'agent-sleep' && first.textContent.trim() === 'Sleep'; })()`));
         // The menu passes the agent's name as the list has it (s.name), its type and its id.
         const liveName = await ev(`import(${MOD} + 'state.js').then(({ state }) => (state.liveSessions.find(s => s.session_id === ${JSON.stringify(agent.session_id)}) || {}).name)`);
         const want = [liveName, 'terminal', agent.session_id];

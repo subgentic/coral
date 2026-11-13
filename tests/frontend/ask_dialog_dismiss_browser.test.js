@@ -27,7 +27,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'the question and the wait', 10000);
             const open = who => ev(`document.querySelector('button[aria-label="Answer the question of ${who}"]').click(); true`);
-            const dismissIn = () => ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog[open]'); const b = d && [...d.querySelectorAll('.inbox-ask-buttons button')].find(x => x.textContent.trim() === 'Dismiss'); return b ? { text: b.textContent.trim(), h: Math.round(b.getBoundingClientRect().height), order: [...d.querySelectorAll('.inbox-ask-buttons button')].map(x => x.textContent.trim()) } : null; })()`);
+            const dismissIn = () => ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog[open]'); const b = d && [...d.querySelectorAll('.inbox-ask-buttons button')].find(x => x.textContent.trim() === 'Dismiss, no reply'); return b ? { text: b.textContent.trim(), h: Math.round(b.getBoundingClientRect().height), order: [...d.querySelectorAll('.inbox-ask-buttons button')].map(x => x.textContent.trim()) } : null; })()`);
 
             // a wait has no Dismiss
             await open('QA'); await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the wait dialog opens', 4000);
@@ -38,7 +38,11 @@ const { coralReady, framesJs } = require('./helpers/wait');
             // Escape and Close dismiss nothing
             await open('Dev'); await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the question dialog opens', 4000);
             const d = await dismissIn();
-            check(at + 'a question has Close and Dismiss in the footer (Send reply is under the box, #13148)', !!d && JSON.stringify(d.order) === JSON.stringify(['Close', 'Dismiss']), JSON.stringify(d));
+            check(at + 'a question has Dismiss (far left) and Close in the footer (Send reply is under the box, #13148)', !!d && JSON.stringify(d.order) === JSON.stringify(['Dismiss, no reply', 'Close']), JSON.stringify(d));
+            const geo = await ev(`(() => { const dlg = document.querySelector('dialog.inbox-ask-dialog[open]'), foot = dlg.querySelector('.inbox-ask-foot').getBoundingClientRect(), bs = [...dlg.querySelectorAll('.inbox-ask-buttons button')], r = x => x.getBoundingClientRect(); return { dismissLeft: Math.round(r(bs[0]).left - foot.left), closeRight: Math.round(foot.right - r(bs[1]).right), sendInFooter: !!dlg.querySelector('.inbox-ask-foot .inbox-ask-send'), label: bs[0].textContent.trim(), title: bs[0].title }; })()`);
+            check(at + 'Dismiss stands alone at the far left of the footer and Close at the right (#16371)', geo.dismissLeft <= 4 && geo.closeRight <= 4, JSON.stringify(geo));
+            check(at + 'Send reply is not in the footer (it is under the box, #13148)', geo.sendInFooter === false, JSON.stringify(geo));
+            check(at + 'the label says what Dismiss does, the tooltip says nobody is told', geo.label === 'Dismiss, no reply' && /nobody is told/.test(geo.title), JSON.stringify(geo));
             check(at + 'Dismiss is a touch target', !!d && d.h >= (mobile ? 44 : 28), JSON.stringify(d));
             await ev(`document.querySelector('dialog.inbox-ask-dialog[open]').dispatchEvent(new Event('cancel', { cancelable: true })); true`);
             await waitFor(`!document.querySelector('dialog.inbox-ask-dialog')`, at + 'Escape closes the dialog', 4000);
@@ -46,12 +50,12 @@ const { coralReady, framesJs } = require('./helpers/wait');
 
             // a refused close says why and keeps the dialog and the question
             await open('Dev'); await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the dialog opens again', 4000);
-            await ev(`window.__refuse = 'the question is already closed'; [...document.querySelectorAll('dialog.inbox-ask-dialog[open] .inbox-ask-buttons button')].find(x => x.textContent.trim() === 'Dismiss').click(); true`);
+            await ev(`window.__refuse = 'the question is already closed'; [...document.querySelectorAll('dialog.inbox-ask-dialog[open] .inbox-ask-buttons button')].find(x => x.textContent.trim() === 'Dismiss, no reply').click(); true`);
             await waitFor(`/already closed/.test((document.querySelector('dialog.inbox-ask-dialog .inbox-ask-error') || {}).textContent || '')`, at + 'the refusal is said in the dialog', 4000);
-            check(at + 'a refused Dismiss keeps the dialog open and the button usable', await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog[open]'); return !!d && ![...d.querySelectorAll('.inbox-ask-buttons button')].find(x => x.textContent.trim() === 'Dismiss').disabled; })()`));
+            check(at + 'a refused Dismiss keeps the dialog open and the button usable', await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog[open]'); return !!d && ![...d.querySelectorAll('.inbox-ask-buttons button')].find(x => x.textContent.trim() === 'Dismiss, no reply').disabled; })()`));
 
             // Dismiss closes the question quietly, with Undo
-            await ev(`window.__refuse = ''; [...document.querySelectorAll('dialog.inbox-ask-dialog[open] .inbox-ask-buttons button')].find(x => x.textContent.trim() === 'Dismiss').click(); true`);
+            await ev(`window.__refuse = ''; [...document.querySelectorAll('dialog.inbox-ask-dialog[open] .inbox-ask-buttons button')].find(x => x.textContent.trim() === 'Dismiss, no reply').click(); true`);
             await waitFor(`!document.querySelector('dialog.inbox-ask-dialog')`, at + 'the dialog closes on Dismiss', 6000);
             await waitFor(`window.__closes.length === 2`, at + 'the close route is called', 4000);
             const c = await ev(`window.__closes[1]`);

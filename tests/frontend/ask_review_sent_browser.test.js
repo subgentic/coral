@@ -53,7 +53,7 @@ const { coralReady } = require('./helpers/wait');
             const olderAt = lead.findIndex(x => x && /Older: Lead asked again/.test(x.note)), older = lead[olderAt];
             check(at + 'exactly one Lead question says it is older', olderAt >= 0 && lead.filter(x => /Older:/.test(x.note)).length === 1, JSON.stringify(lead));
             if (older) {
-                check(at + 'the older question: Dismiss comes first in the footer', older.footer[0] === 'Dismiss', JSON.stringify(older));
+                check(at + 'the older question: Dismiss comes first in the footer', older.footer[0] === 'Dismiss, no reply', JSON.stringify(older));
                 check(at + 'the older question has no Approve', !older.sendrow.includes('Approve'), JSON.stringify(older));
             }
             await ev(`[...document.querySelectorAll('button[aria-label="Answer the question of Lead"]')][${olderAt === 0 ? 1 : 0}].click(); true`);

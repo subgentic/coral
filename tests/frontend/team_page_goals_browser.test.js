@@ -1,4 +1,4 @@
-// The team page's Goals face, a goal's page and a task's page (#7453, stage 1; UI/UX's team page doc 7aa984fe): Goals is a table (Goal, State, Tasks, Updated, and New goal); choosing a goal swaps the body for the goal's own
+// The team page's Goals face, a goal's page and a task's page (#7453, stage 1; UI/UX's team page doc 7aa984fe): Goals is a table (Goal, State, Progress, Updated, and New goal); choosing a goal swaps the body for the goal's own
 // page (a back link "Goals", an h2 with the name, Description (the outcome) and Done when, its tasks in a column beside it, a pinned bar with Add task and Close goal) and Back returns to the list with the focus on the row; a task opens its own
 // page the same way (back link "Tasks", h2 "#<id> <title>", its goal as a link); the Agents sidebar has no goals (#7659). 1280 and 390 px. Written failing-first by QA
 // (#7466): controls by role and accessible name (helpers/team_page.js). Isolated dev server.
@@ -31,10 +31,10 @@ const GOAL = 'Explore goals with two teams';
             if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await openTeam(ev, waitFor, TEAM).catch(() => {}); await settle(400);
             const onGoals = ev(`window.__tp.tabs().length > 0`);
-            await S.run(`${label}: Goals is a table with the columns Goal, State, Tasks, Updated, a row per goal, and a New goal button`, async () => {
+            await S.run(`${label}: Goals is a table with the columns Goal, State, Progress, Updated, a row per goal, and a New goal button`, async () => {
                 assert.ok(await onGoals, 'the team page is open');
                 if (!mobile) { const hd = await headers(); assert.ok(hd, 'Goals has a table');
-                    assert.deepEqual(hd.map(x => x.replace(/[↕↑↓]/g, '').replace(/\s+/g, ' ').trim()).slice(0, 4), ['Goal', 'State', 'Tasks', 'Updated'], 'the columns'); } // a phone has the shared phone form (#12230): two-line rows, no column heads
+                    assert.deepEqual(hd.map(x => x.replace(/[↕↑↓]/g, '').replace(/\s+/g, ' ').trim()).slice(0, 4), ['Goal', 'State', 'Progress', 'Updated'], 'the columns'); } // a phone has the shared phone form (#12230): two-line rows, no column heads
                 const rows = (await rowsOf()).filter(r => !/ no goal\b/.test(r)); assert.equal(rows.length, 2, `a row per goal (got ${rows.length}); the tasks with no goal are the last row (#7717)`);
                 assert.ok(rows.some(r => r.includes(GOAL)) && rows.some(r => r.includes('Plan the release notes')), 'the two goals are the rows');
                 assert.equal(await ev(`!!window.__tp.page().querySelector('.dt-table')`), true, 'Goals uses the shared table');

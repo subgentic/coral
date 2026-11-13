@@ -43,6 +43,8 @@ const GOALS = [
             await waitFor(`/Goals4/.test(${FOLDER_ROWS}.join('|')) && /All chats/.test(${FOLDER_ROWS}.join('|'))`, 'the folder counts', 10000);
             if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); if (s) { s.value = 'goals'; s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()`);
             else await ev(`document.querySelector('.view-list-item[data-key="goals"]').click(); true`);
+            await waitFor(`!!document.querySelector('.inbox-folder-toolbar .team-tb-pills, .inbox-folder-toolbar .team-tb-select')`, 'the goals pills', 10000);
+            await ev(`(() => { const s = document.querySelector('.inbox-folder-toolbar .team-tb-select'); if (s && s.getClientRects().length) { s.value = 'all'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; } const b = [...document.querySelectorAll('.team-tb-pills .goals-chip')].find(x => x.dataset.filter === 'all'); if (b) b.click(); return true; })()`); // the folder opens on Active (#16371); this suite starts from every open goal
             await waitFor(`document.querySelectorAll('button.dt-primary').length >= 4`, 'four open goals', 10000); await settle(300);
             // the Filters panel stays shut: the toolbar's own height is what is measured (the fields are set while it is hidden)
             const none = await bar();

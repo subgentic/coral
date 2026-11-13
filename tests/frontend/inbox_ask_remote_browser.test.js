@@ -22,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
             await open({});
             let r = await read();
             assert.equal(r.offers, 2, at + 'a question of this computer offers its two buttons');
-            assert.deepEqual(r.buttons, ['Close', 'Dismiss'], at + 'beside the plain Reply and Close, with Dismiss (Send reply is under the box now, #13148)');
+            assert.deepEqual(r.buttons, ['Dismiss, no reply', 'Close'], at + 'beside the plain Reply and Close, with Dismiss (Send reply is under the box now, #13148)');
             await close();
 
             await open({ server: 'box-2' });
