@@ -27,7 +27,7 @@ export const decisionOf = row => ({ ignore: 'dismiss', wait_dismiss: 'dismiss', 
 export const KINDS = ['decisions', 'answers', 'permissions', 'files', 'words'];
 export const KIND_LABEL = { decisions: 'Decisions', answers: 'Answers', permissions: 'Permissions', files: 'Files and tasks', words: 'Words sent' };
 /** An answer to a dialog about trusting something (Codex's "Trust all and continue", a folder trust): the row keeps only the option's words, so the words decide. */
-export const isTrustAnswer = r => r.action === 'prompt_answer' && /\btrust/i.test(String(r.note || ''));
+export const isTrustAnswer = r => r.action === 'prompt_answer' && (r.title === 'Trust dialog' || /\btrust/i.test(String(r.note || ''))); // a newer row says it answered a trust dialog (title, whichever option: 'No, quit' too, #16129); an older one is told by its note's words
 const KIND_TEST = {
     decisions: r => !!DECISION_LABEL[decisionOf(r)] || ['goal_close', 'task_complete', 'task_cancel', 'goal_review'].includes(r.action), // Answered, Allowed, Denied, Approved, Closed, Completed and the like
     answers: r => r.action === 'answer' || r.action === 'proposal' || r.action === 'prompt_answer', // an agent's question answered (#16088)

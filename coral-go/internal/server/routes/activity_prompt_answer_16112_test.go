@@ -83,6 +83,22 @@ func TestAnAnswerToAClaudeQuestionAndToACodexDialogIsRecordedAsAnAnswer(t *testi
 			assert.Equal(t, board.ActPromptAnswer, rows[0].Action, "an answer, not prompt_allow or prompt_reject")
 			assert.Equal(t, c.label, rows[0].Note)
 			assert.Equal(t, agentName, rows[0].ItemID)
+			if c.agent == "codex" {
+				assert.Equal(t, activityTrustDialog, rows[0].Title, "the row says it answered a trust dialog (#16129)")
+			} else {
+				assert.Empty(t, rows[0].Title, "a plain question is no trust dialog")
+			}
 		})
 	}
+}
+
+// #16129: a trust dialog is told by its structure, not by an option's words, so every answer to it ("No, quit" included) lists under Permissions; an agent's own question that says "trust" is not one.
+func TestATrustDialogIsToldByItsStructure(t *testing.T) {
+	assert.True(t, trustDialogOf(promptScreen{Title: "Hooks need review", Question: "Hooks need review 2 hooks are new or changed"}))
+	assert.True(t, trustDialogOf(promptScreen{Question: "Do you trust the files in this folder?", Options: []promptOption{{Label: "Yes, continue"}, {Label: "No, quit"}}}))
+	assert.True(t, trustDialogOf(promptScreen{Question: "Do you trust the contents of this folder?", TrustFolder: "/tmp/x"}))
+	assert.False(t, trustDialogOf(promptScreen{Question: "Which colour do you trust most?", Options: []promptOption{{Label: "Green"}, {Label: "Blue"}}}))
+	assert.False(t, trustDialogOf(promptScreen{Question: "Allow this command?"}))
+	assert.Equal(t, "", trustDialogTitle(promptScreen{Question: "Which colour?"}))
+	assert.Equal(t, "Trust dialog", trustDialogTitle(promptScreen{Title: "Hooks need review"}))
 }

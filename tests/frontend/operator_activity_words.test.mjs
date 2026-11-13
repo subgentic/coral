@@ -74,3 +74,13 @@ assert.deepEqual(activityParts({action:'file_share',item_kind:'file',title:'plan
     for (const r of [trust, folder]) { assert.ok(F.inKind(r, 'permissions'), r.note); assert.ok(F.inKind(r, 'answers'), r.note); }
     assert.ok(!F.inKind(choice, 'permissions') && F.inKind(choice, 'answers'));
 }
+
+// #16129: a row that says it answered a trust dialog lists under Permissions whatever option was taken (no word 'trust' in "No, quit"); a row of an older make is told by its note, and a plain question stays out.
+{
+    const F = await import('../../coral-go/pkg/frontend/static/operator_activity_filters.js');
+    const quit = { action: 'prompt_answer', item_kind: 'agent', item_id: 'coral-go', title: 'Trust dialog', note: 'No, quit' };
+    const without = { action: 'prompt_answer', item_kind: 'agent', item_id: 'coral-go', title: 'Trust dialog', note: 'Continue without' };
+    const plain = { action: 'prompt_answer', item_kind: 'agent', item_id: 'coral-hub', title: '', note: 'Green' };
+    for (const r of [quit, without]) { assert.ok(F.inKind(r, 'permissions'), r.note); assert.ok(F.inKind(r, 'answers'), r.note); }
+    assert.ok(!F.inKind(plain, 'permissions') && F.inKind(plain, 'answers'));
+}
