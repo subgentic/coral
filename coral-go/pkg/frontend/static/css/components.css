@@ -3444,7 +3444,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-tab[hidden] { display: none; }
 .settings-tab .material-icons { font-size: var(--icon-size); flex: none; }
 .menu-item-state { display: block; font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-primary); } /* muted was 4.1:1 and secondary 4.4:1 on the hovered row (4.5 needed): the team start menu's state words */
-.team-start-lead, .team-goal-state { margin: 0 0 10px; color: var(--text-secondary); font-size: var(--fs-sm); } /* the lines Coral adds to step 3 are the help text's size, not the dialog's body (#11401) */
+.team-goal-state { margin: 0 0 10px; color: var(--text-secondary); font-size: var(--fs-sm); } /* the lines Coral adds to step 3 are the help text's size, not the dialog's body (#11401) */
 .launch-stage-sub .team-sub-path { all: unset; font-weight: var(--fw-strong); color: var(--text-primary); cursor: pointer; text-decoration: underline dotted; overflow-wrap: anywhere; }
 .launch-stage-sub .team-sub-path:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .launch-stage-sub span.team-sub-path { cursor: default; text-decoration: none; } /* the whole path, nothing to open (#11482 gate) */
@@ -3956,10 +3956,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-wizard[data-stage="team"] .team-page:not(.team-page-team), .team-wizard[data-stage="members"] .team-page:not(.team-page-members) { display: none; }
 .team-more-options:has(#team-skills-row[hidden]) { display: none; }
 .team-wizard .team-page { padding: 20px 24px; }
-.team-wizard .team-page-start { flex: 1; min-height: 0; display: flex; padding: 0; }
-.team-wizard .team-page-start.team-page { display: flex; }
-.team-wizard[data-stage="team"] .team-page-start, .team-wizard[data-stage="members"] .team-page-start { display: none; }
-.team-page-start .launch-shell, #team-start-host { flex: 1; min-width: 0; min-height: 0; display: flex; } /* step 3 is one settings_view (#8455): it fills the page the way the tab shell did */
+#team-start-host { min-width: 0; } /* LT1: the first task, Workflow and More options are one form on step 1 (it was step 3's page, #8455) */
 .team-page-team .dir-input-row input { flex: 1; }
 .team-field-hint:empty { display: none; }
 #team-panel-team #btn-browse-team, #launch-step-agent #btn-browse { width: auto; justify-self: start; align-self: flex-start; } /* Browse is its own size under the folder, not the field's width */
@@ -4015,7 +4012,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-agents-footer { margin-top: 10px; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .team-wizard .team-page { padding: 16px; }
-    .team-wizard .team-page-start { padding: 0; }
     .team-agent-open { grid-template-columns: 1fr auto; row-gap: 2px; }
     .team-agent-summary { grid-column: 1 / -1; order: 3; }
     .team-agent-badge { display: block; width: max-content; margin: 4px 0 0; }
