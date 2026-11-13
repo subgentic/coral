@@ -12,3 +12,5 @@
   /* the phone's recap is cut to a few lines to leave the form room: with the command in it, it shows all of it and scrolls inside a capped height instead */
   .launch-recap:has(.launch-recap-command) { display: block; -webkit-line-clamp: unset; overflow-y: auto; max-height: 38vh; }
 }
+.launch-recap-command .lrc-note { order: 6; flex: 1 1 100%; color: var(--text-secondary); font-size: var(--fs-sm); }
+.launch-recap-command-error { color: var(--warning-text, var(--warning)); }

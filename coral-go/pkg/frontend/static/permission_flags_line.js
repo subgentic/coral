@@ -35,6 +35,7 @@ export function flagsNodes(answer, type) {
     const nodes = [line];
     if (answer.note) { const why = document.createElement('span'); why.className = 'launch-recap-note launch-recap-flags launch-recap-why'; why.textContent = String(answer.note); nodes.push(why); }
     if (answer.command && type !== 'terminal') nodes.push(commandNode(String(answer.command)));
+    else if (answer.command_error && type !== 'terminal') { const e = document.createElement('div'); e.className = 'launch-recap-note launch-recap-flags launch-recap-command-error'; e.textContent = 'Start command: could not be built. ' + String(answer.command_error); nodes.push(e); }
     return nodes;
 }
 
@@ -47,7 +48,8 @@ export function commandNode(command) {
     copy.addEventListener('click', async () => { showToast(await copyText(command) ? 'Copied the start command' : 'Could not copy the start command', false); });
     const more = document.createElement('button'); more.type = 'button'; more.className = 'btn btn-small lrc-more'; more.textContent = 'Show full command'; more.setAttribute('aria-expanded', 'false'); more.setAttribute('aria-controls', code.id);
     more.addEventListener('click', () => { const open = row.classList.toggle('lrc-open'); more.setAttribute('aria-expanded', String(open)); more.textContent = open ? 'Show less' : 'Show full command'; });
-    row.append(label, copy, more, code);
+    const note = document.createElement('span'); note.className = 'lrc-note'; note.textContent = 'A value you type after a flag is shown as typed: keep keys and tokens out of flags.';
+    row.append(label, copy, more, code, note);
     return row;
 }
 

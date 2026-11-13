@@ -37,6 +37,10 @@ const { install: installNA, stubModels, stubCliChecks } = require('./helpers/new
             await expectCmd('codex', 'plan', '--sandbox read-only');
             await expectCmd('codex', 'bypassPermissions', '--dangerously-bypass-approvals-and-sandbox', ['--sandbox read-only']);
             await expectCmd('claude', 'plan', '--permission-mode plan');
+            // the note under the line, and the reason in place of a line that could not be built (#16052)
+            const extra = await ev(`(async () => { const note = document.querySelector('#launch-recap .launch-recap-command .lrc-note')?.textContent || ''; const m = await import((window.__coralStatic || '/static/') + 'permission_flags_line.js'); const n = m.flagsNodes({ args: [], text: '', command: '', command_error: 'the agent home could not be made' }, 'claude'); return { note, err: n.map(x => x.className + ': ' + x.textContent).join(' | ') }; })()`);
+            if (!/shown as typed/.test(extra.note)) problems.push(label + ': no note about values typed after a flag: ' + JSON.stringify(extra.note));
+            if (!/launch-recap-command-error: Start command: could not be built. the agent home could not be made/.test(extra.err)) problems.push(label + ': a failed build does not show its reason: ' + extra.err);
             // read-only and labelled
             const g = await ev(`(() => { const r = document.querySelector('#launch-recap .launch-recap-command'); if (!r) return null; const b = [...r.querySelectorAll('button')].map(x => ({ t: x.textContent.trim(), shown: x.getClientRects().length > 0 })); return { label: r.querySelector('.lrc-label').textContent, buttons: b, editable: !!r.querySelector('input,textarea,[contenteditable]') }; })()`);
             if (!g) problems.push(label + ': no start command row'); else {

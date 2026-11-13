@@ -107,3 +107,6 @@ func lastTopLevelSeparator(s string) int {
 	}
 	return last
 }
+
+// RedactTokenShapes hides anything shaped like a key or a token in a sentence (an error text shown beside a preview, #16052), the same shapes RedactLaunchCommand hides in a command.
+func RedactTokenShapes(s string) string { return reSecretish.ReplaceAllString(s, "<redacted>") }

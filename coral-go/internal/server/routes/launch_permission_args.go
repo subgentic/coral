@@ -76,9 +76,32 @@ func (h *SessionsHandler) PostLaunchPermissionArgs(w http.ResponseWriter, r *htt
 		note = customNote
 	}
 	// command: the agent's whole start command, read off the same builder (#15951), with what Coral makes up for the session as <placeholders>. "" when this agent has none to show.
-	command, cerr := agent.LaunchCommandPreview(body.AgentType, params)
-	if cerr != nil {
-		command = ""
+	command, cerr := launchCommandPreview(body.AgentType, params)
+	answer := map[string]any{"args": args, "text": strings.Join(args, " "), "note": note, "command": command}
+	if cerr != nil { // the reason is shown in place of the line, never dropped (#16052)
+		answer["command"] = ""
+		answer["command_error"] = previewErrorText(cerr)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"args": args, "text": strings.Join(args, " "), "note": note, "command": command})
+	writeJSON(w, http.StatusOK, answer)
+}
+
+// launchCommandPreview builds the start command a launch would use (a variable so a test can make the build fail).
+var launchCommandPreview = agent.LaunchCommandPreview
+
+// previewErrorText is why a start command could not be built, as one short sentence for the person: printable characters only, key and token shapes hidden, at most 160 characters.
+func previewErrorText(err error) string {
+	var b strings.Builder
+	n := 0
+	for _, r := range agent.RedactTokenShapes(err.Error()) {
+		if r < 0x20 || r > 0x7e {
+			r = ' '
+		}
+		if n == 160 {
+			b.WriteString("...")
+			break
+		}
+		b.WriteRune(r)
+		n++
+	}
+	return strings.TrimSpace(b.String())
 }

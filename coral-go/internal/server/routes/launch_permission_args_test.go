@@ -2,6 +2,7 @@ package routes
 
 import (
 	"bytes"
+	"errors"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -152,4 +153,25 @@ func trimLaunchWrappers(cmd string) string {
 		return cmd[i:]
 	}
 	return cmd
+}
+
+// #16052 (Security's INFO on #15951): a start command that cannot be built shows why instead of showing nothing; the reason is short, printable and has no key or token in it.
+func TestLaunchPermissionArgsRouteSaysWhyTheStartCommandCouldNotBeBuilt(t *testing.T) {
+	old := launchCommandPreview
+	t.Cleanup(func() { launchCommandPreview = old })
+	launchCommandPreview = func(string, agent.LaunchParams) (string, error) {
+		return "wrong", errors.New("hermes: the agent's home could not be made\x1b[31m: sk-" + strings.Repeat("a", 30) + " " + strings.Repeat("x", 400))
+	}
+	h := &SessionsHandler{}
+	w := httptest.NewRecorder()
+	h.PostLaunchPermissionArgs(w, httptest.NewRequest(http.MethodPost, "/api/launch/permission-args", strings.NewReader(`{"agent_type":"claude","permission_mode":"plan"}`)))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var m map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &m))
+	assert.Equal(t, "", m["command"], "no line when the build failed")
+	reason, _ := m["command_error"].(string)
+	assert.Contains(t, reason, "could not be made")
+	assert.NotContains(t, reason, "sk-aaaa")
+	assert.NotContains(t, reason, "\x1b")
+	assert.LessOrEqual(t, len(reason), 163)
 }
