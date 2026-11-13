@@ -277,7 +277,7 @@ export function _fillCliAndModels(s) {
     const picks = () => importOnce('./settings_model_pick.js').then(m => m.syncModelPicks()).catch(() => {}); // each box is a dropdown of the models with Other… behind it (#10000)
     picks();
     // On the hub the Default Models rows are hidden (machine settings), and the hub has no model catalog of its own to ask.
-    if (!isCloud()) importOnce('./custom_models.js').then(m => m.initCustomModels()).catch(() => {}); // the custom models list (#5480): hidden when this server has no such route
+    if (!isCloud()) whenPaneShown('settings-pane-agents', () => importOnce('./custom_models.js').then(m => m.initCustomModels()).catch(() => {})); // the custom models list (#5480): hidden when this server has no such route
     if (!isCloud()) importOnce('./custom_modes.js').then(m => m.initCustomModes()).catch(() => {}); // the custom permission modes (#15950): hidden when this server has no such route
     if (!isCloud()) _getAgentModels().then(models => {
         // _getAgentModels swallows errors and resolves with {} on failure; on
