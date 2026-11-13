@@ -81,6 +81,7 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             const trigger=mobile?'#mobile-session-list .group-kebab-btn':'#live-sessions-list .group-kebab-btn';
             await waitFor(`!!document.querySelector('${trigger}')?.getClientRects().length`,'team sidebar menu trigger');
             await ev(`document.querySelector('${trigger}').click();true`);
+            await waitFor(`!!document.querySelector('${trigger}').nextElementSibling.querySelector('.menu-help-foot')`,'the menu has its help lines (menu_help.js adds them a tick after the click, between the items: measure after, as the person sees it)');
             const sidebar=await ev(`(()=>{const host=document.querySelector('${trigger}').nextElementSibling;host.scrollTop=host.scrollHeight;const buttons=[...host.querySelectorAll('[data-on-click="team-kill"],[data-on-click="team-delete"]')];return{n:buttons.length,heights:buttons.map(b=>b.getBoundingClientRect().height),gaps:buttons.slice(1).map((b,i)=>b.getBoundingClientRect().top-buttons[i].getBoundingClientRect().bottom)}})()`);
             await shot(`team-sidebar-destructive-${w}`);
             check(sidebar.n>=2&&sidebar.gaps.every(g=>g>=8)&&(!mobile||sidebar.heights.every(h=>h>=44)),`sidebar destructive actions are separated with phone targets: ${JSON.stringify(sidebar)}`);
