@@ -65,11 +65,15 @@ func DeliverAutomated(ctx context.Context, in AutomatedInput) (Delivery, error) 
 		// A first prompt is not repeated by anything, so it waits for the agent's normal input box (the one wait there is): while a prompt is open (a
 		// trust screen) or the screen is still blank, up to launchWait; and for an agent whose box Coral does not recognise, up to launchFallback (waits()).
 		w := waits()
+		launchWait := w.launchWait
+		if d, ok := launchWaitFrom(ctx); ok {
+			launchWait = d
+		}
 		start := time.Now()
 		for {
 			elapsed := time.Since(start)
 			ready := v.skip == "" && !v.leftover && (v.boxShown || elapsed >= w.launchFallback)
-			if ready || elapsed >= w.launchWait {
+			if ready || elapsed >= launchWait {
 				break
 			}
 			select {
@@ -309,4 +313,17 @@ func AutoAcceptSend(ctx context.Context, name string, send func(ctx context.Cont
 // NoteDialogClose logs, in the input debug log, that the dialog timeout is closing a prompt (its Esc or reject key follows): the gate's own annotation, as AutoAcceptSend's is.
 func NoteDialogClose(name string) {
 	inputlog.Note(name, inputlog.Keys, "[dialog timeout closes a prompt]")
+}
+
+type launchWaitKey struct{}
+
+// WithLaunchWait bounds how long a RequireInputBox send waits for the agent's normal input box (an open prompt such as the trust card, or a blank screen) to d, instead of the default 15 minutes: a scheduled
+// run has no person to answer the card, so it should not wait as long as one with the dashboard open (#16421).
+func WithLaunchWait(ctx context.Context, d time.Duration) context.Context {
+	return context.WithValue(ctx, launchWaitKey{}, d)
+}
+
+func launchWaitFrom(ctx context.Context) (time.Duration, bool) {
+	d, ok := ctx.Value(launchWaitKey{}).(time.Duration)
+	return d, ok
 }

@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/logsafe"
 	"log/slog"
@@ -306,21 +307,46 @@ func (l *AgentLauncher) SendPrompt(ctx context.Context, sessionID, sessionName, 
 	// its normal input box: a freshly started CLI may be on its trust-this-folder
 	// screen or a login or model picker, and the prompt plus Enter would answer
 	// it. Held until the user deals with that screen.
-	if _, err := deliverAutomated(ctx, l.runtime, l.logger, sessionName, agentType, sessionID, prompt, "initial prompt", ptymanager.InputBoxKnown(agentType), false); err != nil {
+	skipped, err := deliverAutomated(ctx, l.runtime, l.logger, sessionName, agentType, sessionID, prompt, "initial prompt", ptymanager.InputBoxKnown(agentType), false)
+	if err != nil {
 		l.logger.Warn("prompt send failed", "session", sessionID[:8], "error", err)
+	}
+	if skipped { // the first prompt is not repeated by anything: when a screen of the CLI's own held it, it will not come, and the caller is told (#16421)
+		if sk, ok := ptymanager.SkippedOf(sessionName); ok && strings.HasPrefix(sk.Why, ptymanager.SkipPrompt) {
+			return errHeldAtPrompt
+		}
 	}
 
 	return nil
 }
 
+// heldPromptWait is how long a scheduled run's first prompt waits for a screen of the CLI's own (its trust card) to be answered before the run ends as needing a person (a variable for the tests).
+var heldPromptWait = 3 * time.Minute
+
+// errHeldAtPrompt is SendPrompt's answer when the agent's first prompt was not typed because a screen of the CLI's own (its trust-this-folder card, a login or model picker) was open and stayed open.
+var errHeldAtPrompt = errors.New("the agent's first prompt was held by a screen waiting for a person")
+
+// heldAtPromptCode is the error_code of a scheduled run that ended because its agent stopped at a screen nobody was there to answer, heldAtPromptMsg the one fixed sentence in its history (never the screen's own words).
+const (
+	heldAtPromptCode = "held_at_prompt"
+	heldAtPromptMsg  = "Needs you: the agent stopped at a question (such as 'trust this folder?') and nobody was there to answer, so the run ended without its prompt. Answer it once by hand, or tick the job's Trust this folder box."
+)
+
 // startPromptDelivery sends prompt in the background and returns a channel that closes when the
 // delivery is over. It runs on ctx, so cancelling ctx (the run ended) ends it too.
 func (l *AgentLauncher) startPromptDelivery(ctx context.Context, sessionID, sessionName, agentType, prompt string) <-chan struct{} {
+	return l.startPromptDeliveryHeld(ctx, sessionID, sessionName, agentType, prompt, nil)
+}
+
+// startPromptDeliveryHeld is startPromptDelivery that also closes held (when not nil) if the prompt was held by a screen waiting for a person (errHeldAtPrompt).
+func (l *AgentLauncher) startPromptDeliveryHeld(ctx context.Context, sessionID, sessionName, agentType, prompt string, held chan<- struct{}) <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
 		defer safego.Recover("background/launcher:startPromptDelivery")
 		defer close(done)
-		_ = l.SendPrompt(ctx, sessionID, sessionName, agentType, prompt)
+		if err := l.SendPrompt(ctx, sessionID, sessionName, agentType, prompt); errors.Is(err, errHeldAtPrompt) && held != nil {
+			close(held)
+		}
 	}()
 	return done
 }
@@ -348,17 +374,19 @@ func (l *AgentLauncher) BuildSchedulerLaunchFn(schedStore *store.ScheduleStore) 
 
 		// Send prompt to the agent after delay, on the run's own context: when the run ends the
 		// delivery (and an initial prompt held for a screen nobody answers) ends with it (#3999).
+		held := make(chan struct{})
+		promptCtx := ptymanager.WithLaunchWait(ctx, heldPromptWait) // nobody is there to answer a card: a held first prompt is given up on sooner (#16421)
 		if !oneShot { // a one-shot run has its prompt on the command line
-			l.startPromptDelivery(ctx, result.SessionID, result.SessionName, job.AgentType, job.Prompt)
+			l.startPromptDeliveryHeld(promptCtx, result.SessionID, result.SessionName, job.AgentType, job.Prompt, held)
 		}
 
-		// Monitor the tmux session — return when agent finishes or context expires
-		return l.watchSession(ctx, result.SessionName)
+		// Monitor the tmux session — return when agent finishes or context expires, or when its prompt was held by a screen no person is there to answer
+		return l.watchSession(ctx, result.SessionName, held)
 	}
 }
 
 // watchSession polls for session existence until it exits or context is cancelled.
-func (l *AgentLauncher) watchSession(ctx context.Context, sessionName string) error {
+func (l *AgentLauncher) watchSession(ctx context.Context, sessionName string, held <-chan struct{}) error {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
@@ -366,6 +394,8 @@ func (l *AgentLauncher) watchSession(ctx context.Context, sessionName string) er
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case <-held:
+			return errHeldAtPrompt
 		case <-ticker.C:
 			if !l.runtime.IsAlive(context.Background(), sessionName) {
 				return nil // Session finished

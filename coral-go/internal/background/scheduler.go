@@ -604,6 +604,10 @@ func (s *JobScheduler) launchAndWatch(runID int64, job store.ScheduledJob, rc ru
 		exitReason = startCommandFailedCode
 		s.store.UpdateScheduledRun(ctx, runID, map[string]interface{}{"error_msg": ptymanager.ErrStartCommand.Error(), "error_code": startCommandFailedCode})
 	}
+	if status == "failed" && errors.Is(launchErr, errHeldAtPrompt) { // the agent stopped at a screen nobody answered: the run says so and ends, not Running until its time is out (#16421)
+		exitReason = heldAtPromptCode
+		s.store.UpdateScheduledRun(ctx, runID, map[string]interface{}{"error_msg": heldAtPromptMsg, "error_code": heldAtPromptCode})
+	}
 	if status == "completed" && s.exitedBeforeStarting(ctx, runID, job, time.Now().UTC().Format(store.ISOFormat), startedAt) {
 		status, exitReason = "failed", agentExitedEarlyCode // the sentence is in error_msg (exitedBeforeStarting)
 	}
