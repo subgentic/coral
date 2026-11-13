@@ -47,9 +47,9 @@ async function openNewAgent(ev, waitFor) {
     await waitFor(`!!window.__na.dialog()`, 'the New agent dialog (role=dialog named New agent)', 6000);
 }
 
-/** On a Hub (#15014) New agent and New team open on 'Which computer?': Continue past it, as a person does, when it is up. A suite that checks the step itself opens the dialog without this. */
+/** On a Hub (#15014) New agent and New team open on 'Which computer?': Select the first computer, as a person does, when it is up. A suite that checks the step itself opens the dialog without this. */
 async function passComputerStep(ev, waitFor) {
-    await ev(`(async () => { for (let i = 0; i < 60; i++) { const s = document.getElementById('launch-step-computer'); if (s && getComputedStyle(s).display !== 'none') { document.getElementById('launch-computer-go').click(); return true; } if (['launch-step-agent', 'launch-step-team'].some(id => { const e = document.getElementById(id); return e && getComputedStyle(e).display !== 'none'; })) return true; await new Promise(r => setTimeout(r, 50)); } return true; })()`);
+    await ev(`(async () => { for (let i = 0; i < 60; i++) { const s = document.getElementById('launch-step-computer'); if (s && getComputedStyle(s).display !== 'none') { document.querySelector('#launch-computer-list .launch-computer-pick:not(:disabled)').click(); return true; } if (['launch-step-agent', 'launch-step-team'].some(id => { const e = document.getElementById(id); return e && getComputedStyle(e).display !== 'none'; })) return true; await new Promise(r => setTimeout(r, 50)); } return true; })()`);
 }
 const stepLine = ev => ev(`(() => { const d = window.__na.dialog(); if (!d) return ''; const hits = [...d.querySelectorAll('*')].filter(window.__na.vis).map(e => window.__na.text(e)).filter(t => /^Step \\d of 3: /.test(t)); hits.sort((a, b) => a.length - b.length); return hits[0] || ''; })()`);
 

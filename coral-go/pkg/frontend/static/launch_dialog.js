@@ -250,22 +250,23 @@ function _needsComputerStep(type) {
     return (type === 'agent' || type === 'team') && isHub() && !launch.serverLocked && !launch.member && !launch.addTo && !launch.computerChosen && pickerVisible(true, state.servers);
 }
 
-function _showComputerStep(type) {
-    loadStyles('provider_cards.css').catch(() => {});
-    const list = document.getElementById('launch-computer-list'), go = document.getElementById('launch-computer-go');
-    if (!list || !go) return;
+async function _showComputerStep(type) {
+    await loadStyles('provider_cards.css').catch(() => {}); // the cards are styled before they are drawn: unstyled, a radio took the card's width (#16397)
+    const list = document.getElementById('launch-computer-list');
+    if (!list) return;
     document.getElementById('launch-computer-sub').textContent = type === 'team' ? 'The team will launch on it and use its folders.' : 'The agent will run on it and use its folders.';
     const opts = pickerOptions(state.servers).map(o => ({ ...o, name: o.label.replace(/ \([^)]*\)$/, '') }));
     if (type === 'team') opts.push({ id: TEAM_ADDRESS, name: 'Another computer\u2019s address\u2026', other: true });
     const pick = opts.find(o => !o.disabled && o.id === launch.server) || opts.find(o => !o.disabled);
-    list.innerHTML = opts.map(o => `<label class="launch-computer-card"><span class="launch-computer-dot" data-state="${o.disabled ? 'off' : 'on'}" aria-hidden="true"></span><span class="launch-computer-text"><strong>${escapeHtml(o.name)}</strong><small>${escapeHtml(o.other ? 'Type the address of a computer that is not in the list' : o.disabled ? `Offline: ${o.reason}` : o.id === LOCAL_SERVER ? 'The hub, this computer \u00b7 Online' : 'Online')}</small></span><input type="radio" name="launch-computer" value="${escapeAttr(o.id)}"${o.disabled ? ' disabled' : ''}${o === pick ? ' checked' : ''}></label>`).join(''); // real radios: the arrows, the disabled ones skipped and the state are the browser's own
-    go.disabled = !pick;
+    // a card is the computer's name and state at the left and one Select button at the right (one computer is picked, so a button, not a switch, #16397); an offline one's Select is off and its reason stays in the text
+    list.innerHTML = opts.map(o => `<div class="launch-computer-card" role="listitem"><span class="launch-computer-dot" data-state="${o.disabled ? 'off' : 'on'}" aria-hidden="true"></span><span class="launch-computer-text"><strong>${escapeHtml(o.name)}</strong><small>${escapeHtml(o.other ? 'Type the address of a computer that is not in the list' : o.disabled ? `Offline: ${o.reason}` : o.id === LOCAL_SERVER ? 'The hub, this computer \u00b7 Online' : 'Online')}</small></span><button type="button" class="btn launch-computer-pick" data-launch-computer="pick" data-computer="${escapeAttr(o.id)}" aria-label="Select ${escapeAttr(o.name)}"${o.disabled ? ' disabled' : ''}>Select</button></div>`).join('');
     _showLaunchStep('pickComputer'); document.getElementById('launch-step-computer').style.display = 'flex'; document.getElementById('launch-modal')?.setAttribute('aria-labelledby', 'launch-computer-title'); // display-ok: a step of the launch modal, shown here, hidden by _hideComputerStep
-    (list.querySelector('input:checked') || list.querySelector('input:not(:disabled)'))?.focus();
+    const first = pick && [...list.querySelectorAll('.launch-computer-pick')].find(b => b.dataset.computer === pick.id && !b.disabled);
+    (first || list.querySelector('.launch-computer-pick:not(:disabled)'))?.focus(); // the first computer that can be picked has the focus (the one in use, when it is there)
 }
 const _hideComputerStep = () => { document.getElementById('launch-step-computer').style.display = 'none'; }; // display-ok: a step of the launch modal
-async function _computerGo() {
-    const type = launch.pendingType, pick = document.querySelector('#launch-computer-list input:checked')?.value; if (!type || !pick) return;
+async function _computerGo(pick) {
+    const type = launch.pendingType; if (!type || !pick) return;
     const wantAddress = pick === TEAM_ADDRESS;
     launch.computerChosen = true; _hideComputerStep();
     if (!wantAddress) await _onLaunchServerChange(pick, { force: true });
@@ -275,8 +276,8 @@ async function _computerGo() {
 }
 function _computerBack() { launch.pendingType = null; launch.mode = null; _hideComputerStep(); _showLaunchStep('chooser'); }
 function _computerChange() { const type = launch.mode; if (type !== 'agent' && type !== 'team') return; launch.computerChosen = false; launch.mode = null; launch.pendingType = type; _showComputerStep(type); }
-const _computerActs = { go: _computerGo, back: _computerBack, change: _computerChange };
-document.getElementById('launch-modal')?.addEventListener('click', e => { const b = e.target.closest?.('[data-launch-computer]'); if (b) { e.preventDefault(); _computerActs[b.dataset.launchComputer]?.(); } }); // the step's own buttons (no entry in the start's action map)
+const _computerActs = { pick: b => _computerGo(b.dataset.computer), back: _computerBack, change: _computerChange };
+document.getElementById('launch-modal')?.addEventListener('click', e => { const b = e.target.closest?.('[data-launch-computer]'); if (b) { e.preventDefault(); _computerActs[b.dataset.launchComputer]?.(b); } }); // the step's own buttons (no entry in the start's action map)
 /** Show the address field when the Machine is "Another computer's address..." (the field is in step 1, in its own slot); nothing typed there survives another choice. */
 function _syncTeamAddress(on) {
     launch.teamAddress = !!on;
