@@ -66,3 +66,22 @@ export function segmentSelect(select, { label = '', labelledby = '', cards = fal
     draw();
     return group;
 }
+
+/** Arrow keys for a strip of plain buttons that is not drawn over a select (the New job dialog's Type and When, #15836): the arrows (and Home and End) move to the next button and press it, one tab stop for the strip
+ *  (the pressed one), as segmentSelect's radiogroup does. The buttons keep their own click and their aria-pressed; the tab stop follows whichever is pressed, however it was pressed. */
+export function stripKeys(group) {
+    const list = () => [...group.querySelectorAll(':scope > .btn')];
+    const stops = () => { const all = list(), on = all.find(b => b.getAttribute('aria-pressed') === 'true') || all[0]; for (const b of all) b.tabIndex = b === on ? 0 : -1; };
+    group.addEventListener('keydown', e => {
+        const all = list(), i = all.indexOf(document.activeElement);
+        if (i < 0) return;
+        const to = { ArrowRight: i + 1, ArrowDown: i + 1, ArrowLeft: i - 1, ArrowUp: i - 1, Home: 0, End: all.length - 1 }[e.key];
+        if (to === undefined) return;
+        e.preventDefault();
+        const next = all[(to + all.length) % all.length];
+        next.click(); next.focus();
+    });
+    new MutationObserver(stops).observe(group, { attributes: true, attributeFilter: ['aria-pressed'], subtree: true });
+    stops();
+    return stops;
+}

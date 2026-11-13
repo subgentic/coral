@@ -10,6 +10,7 @@ import { importOnce } from './import_once.js';
 import { joinBrowse, FOLDER_ON_THIS_COMPUTER } from './dir_row.js';
 const { DAYS, MINUTE_STEPS, HOUR_STEPS, composeCron, parseCron } = await importOnce('./cron_picker.js'); // this form loads on first use (#10218), and so do the pieces only it uses
 const { limitSeconds, limitParts } = await importOnce('./time_limit.js');
+const { stripKeys } = await importOnce('./segmented.js'); // the arrows move the choice in the Type and When strips
 
 let view = null;
 let editingJobId = null;  // non-null when editing an existing job
@@ -134,9 +135,9 @@ function scheduleField() {
         key: 'cron_expr', type: 'custom', id: 'sched-picker', labelId: 'sched-label', label: 'When', required: true, requiredMessage: 'Enter a schedule, or pick one above.', default: DEFAULT_CRON,
         render: slot => {
             slot.setAttribute('role', 'group'); slot.setAttribute('aria-labelledby', 'sched-label');
-            const modes = el('div', 'sched-presets');
+            const modes = el('div', 'sched-presets btn-seg');
             for (const [mode, label] of MODES) {
-                const b = el('button', 'sched-preset', label); b.type = 'button'; b.dataset.mode = mode; press(b, mode === pickerState.mode);
+                const b = el('button', 'btn sched-preset', label); b.type = 'button'; b.dataset.mode = mode; press(b, mode === pickerState.mode);
                 b.addEventListener('click', () => setMode(mode, { focus: true }));
                 modes.append(b);
             }
@@ -168,6 +169,7 @@ function scheduleField() {
             const preview = el('div', 'sched-preview'); preview.id = 'cron-preview'; preview.setAttribute('role', 'status');
             const whenNote = el('p', 'sched-when-note', `Runs ${RUNS_WHILE_OPEN}`);
             slot.append(modes, every, days, at, row, preview, whenNote);
+            modes.setAttribute('role', 'group'); modes.setAttribute('aria-label', 'How often'); stripKeys(modes); // a group with arrows: one Tab stop
             for (const p of slot.querySelectorAll('[data-for]')) p.hidden = !p.dataset.for.split(' ').includes(pickerState.mode);
             return {
                 get: () => input.value.trim(),
@@ -223,7 +225,7 @@ function jobFields(host) {
                     get: () => value,
                     set: t => { value = t === 'workflow' ? 'workflow' : 'prompt'; for (const b of buttons) press(b, b.dataset.type === value); },
                 };
-                slot.append(...buttons); api.set('workflow');
+                slot.append(...buttons); api.set('workflow'); slot.setAttribute('role', 'group'); slot.setAttribute('aria-label', 'Job type'); stripKeys(slot);
                 return api;
             },
         },
