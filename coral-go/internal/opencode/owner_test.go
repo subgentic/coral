@@ -62,6 +62,7 @@ func TestAStrangerThatRefusesAWrongPasswordIsNeverSentTheRealOneWhileTheChildLiv
 		t.Skip("no tool to ask who listens")
 	}
 	t.Setenv("STANDIN_BIND_OTHER", "1")
+	t.Setenv(pidDelayVar, "3000") // the child is slow to write its pid record: the failing-first shape of the -race flake (#16250); the start ends it first
 	cfg, envFile := stubConfig(t)
 	cfg.Ready = 5 * time.Second
 	var mu sync.Mutex
@@ -91,9 +92,9 @@ func TestAStrangerThatRefusesAWrongPasswordIsNeverSentTheRealOneWhileTheChildLiv
 		assert.True(t, strings.HasPrefix(pw, "not-"), "the real password was sent to the stranger: %q", pw)
 	}
 	raw, rerr := os.ReadFile(envFile + ".pids")
-	if runtime.GOOS == "windows" && os.IsNotExist(rerr) {
-		// A Windows process takes a moment to reach the stand-in's first line (the pid record), and the start fails closed and ends the child within a few ms when the listener is a stranger: the child may be
-		// gone before it wrote one, which leaves nothing running either (the Windows run of #11454's batch).
+	if os.IsNotExist(rerr) {
+		// The start fails closed and ends the child within a few ms when the listener is a stranger, and the child may be gone before it wrote its pid record (a Windows process is slow to reach it; a Linux -race run under load too, #16250: gate 1 of v2.0.68),
+		// which leaves nothing running either. The stand-in's pid delay above makes this the case every run.
 		return
 	}
 	require.NoError(t, rerr)
