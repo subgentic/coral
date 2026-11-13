@@ -1250,12 +1250,12 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
     text-underline-offset: 3px;
     display: inline-flex;
     align-items: center;
-    min-height: 24px; /* WCAG 2.5.8; 44 px on a phone below */
+    min-height: 24px; /* WCAG 2.5.8; 44 px on a phone or touch screen below */
 }
 .cni-link:hover:not(:disabled) {
     color: var(--text-primary);
 }
-@media (max-width: 600px) { .cni-link { min-height: 44px; min-width: 44px; } }
+@media (max-width: 767px), (pointer: coarse) { .cni-link { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); } } /* the phone layout's width and any touch screen, as every other 44 px target (#16356: it was 600 px, so a window of 601 to 767 px and a phone turned sideways kept 24 px) */
 .cni-hint {
     color: var(--text-muted);
 }

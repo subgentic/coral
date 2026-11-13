@@ -1,56 +1,35 @@
-// The chat's step bars and "Load older messages" are 44 px tap targets on a phone or touch screen and keep their compact 32 px on a mouse screen
-// (#4327, #4276 finding 5). Covers a plain steps group, a roll-up bar (#4264) and the load-more button; opened groups and the rolled-up members
-// keep working. Run against an isolated dev server. SHOT_DIR=<dir> saves a phone screenshot.
+// A phone's chat controls are 44 px touch targets (#16356, Beta Tester's walk #16339): the prompt card's Open terminal and Dismiss (they were 81x26 and 44x26) and the composer's image button (33x33), in the
+// chat view at 390 and 360 px, in a window up to 767 px wide with a mouse, and on a touch screen of any width (a phone turned sideways, a tablet). On a wide screen the card's links keep their small size. The card is drawn on its own as dismiss_wait_browser does.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
+const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
-
-const call = (id, label) => [{ type: 'assistant', text: '', tool_uses: [{ name: 'Bash', tool_use_id: id, input_summary: label, description: label }] }, { type: 'tool_result', tool_use_id: id, tool_name: 'Bash', content: 'ok' }];
-const NOTICE = "You have 2 unread messages on the message board. Run 'coral-board read' to see them.";
-const turn = (n, label) => [{ type: 'user', content: NOTICE }, ...call('c' + n, label)]; // a notice and its steps, no reply (a reply ends a run now: #7419)
-const plain = [{ type: 'user', content: 'Watch' }, ...call('p1', 'List files'), { type: 'assistant', text: 'Found them, a reply that stays visible and ends the run of steps. '.repeat(6) + '\n\nSecond paragraph.' }];
-// Two notice turns joined side by side at a seam (what loadMoreHistory and the stitching do): a reply is never folded into a group now (#7419), so a roll-up bar comes only from joined pages.
-const pages = [turn(1, 'first'), turn(2, 'second')];
-
 (async () => {
-    const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
-    const ok = name => console.log(`   ✓ ${name}`);
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install, select } = await connect();
+    const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const problems = [];
     try {
-        await Page.enable();
-        await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await coralReady(ev);
-        await ev(`import((window.__coralStatic || '/static/') + 'live_chat.js').then(m => { const b = document.createElement('div'); b.id = 'tt-box'; b.className = 'chat-messages chat-prose';
-            b.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;overflow:auto;background:var(--bg-primary);z-index:99999;padding:12px';
-            document.body.appendChild(b); const more = document.createElement('button'); more.type = 'button'; more.className = 'btn load-more-btn'; more.textContent = 'Load older messages'; b.appendChild(more);
-            m.renderTranscript(${JSON.stringify(plain)}, b, 'claude'); return (async () => { for (const page of ${JSON.stringify(pages)}) { const tmp = document.createElement('div'); m.renderTranscript(page, tmp, 'claude'); while (tmp.firstChild) b.appendChild(tmp.firstChild); } (await import((window.__coralStatic || '/static/') + 'chat_content.js')).rollUpGroups(b); return true; })(); })`);
-        const sizes = () => ev(`(() => { const h = el => Math.round(el.getBoundingClientRect().height * 10) / 10; const q = s => [...document.querySelectorAll('#tt-box ' + s)].filter(e => e.checkVisibility({ checkVisibilityCSS: true }));
-            return { group: q('.work-group > summary').map(h), rollup: q('.work-rollup > summary').map(h), more: q('.load-more-btn').map(h), coarse: matchMedia('(pointer: coarse)').matches, w: innerWidth }; })()`);
-
-        let s = await sizes();
-        assert.ok(s.group.length >= 1 && s.rollup.length >= 1 && s.more.length === 1, 'the fixture has a step bar, a roll-up bar and the load-more button: ' + JSON.stringify(s));
-        assert.ok([...s.group, ...s.rollup, ...s.more].every(h => h >= 30 && h < 40), 'on a mouse screen they keep the compact height: ' + JSON.stringify(s));
-        ok('with a mouse at 1280 px they keep their compact height (' + JSON.stringify(s) + ')');
-
-        await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
-        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await sleep(500); // sleep-ok: layout settles after the emulation change
-        s = await sizes();
-        if (process.env.SHOT_DIR) fs.writeFileSync(`${process.env.SHOT_DIR}/chat-targets-phone.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
-        assert.ok([...s.group, ...s.rollup, ...s.more].every(h => h >= 44), 'on a phone every step bar and the load-more button is at least 44 px: ' + JSON.stringify(s));
-        ok('on a phone (390 px, touch) the step bar, the roll-up bar and "Load older messages" are at least 44 px: ' + JSON.stringify(s));
-
-        // they still work: a tap opens the roll-up bar and shows its groups
-        await ev(`document.querySelector('#tt-box .work-rollup').open = true; true`);
-        await waitFor(`document.querySelector('#tt-box .work-rollup + .work-group').checkVisibility({ checkVisibilityCSS: true })`, 'the roll-up to open');
-        s = await sizes();
-        assert.ok(s.group.length >= 3 && s.group.every(h => h >= 44), 'the groups inside an opened roll-up are 44 px too: ' + JSON.stringify(s));
-        ok('the groups inside an opened roll-up bar are 44 px as well');
-    } catch (e) {
-        console.error(e);
-        process.exitCode = 1;
-    } finally {
-        await client.close();
-    }
-})();
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        for (const [w, h, mobile, touch, theme] of [[390, 844, true, true, 'dark'], [390, 844, true, true, 'light'], [390, 844, false, false, 'dark'], [360, 800, true, true, 'dark'], [700, 900, false, false, 'dark'], [844, 390, true, true, 'dark'], [1024, 768, true, true, 'dark'], [1280, 900, false, false, 'dark'], [1280, 900, false, false, 'light']]) {
+            const tag = `${w}${touch ? '-touch' : ''}-${theme}`, phone = w <= 767 || touch; // a narrow window, or a touch screen of any width (a phone turned sideways, a tablet)
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: touch });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+            await ev(`import((window.__coralStatic || '/static/') + 'settings_core.js').then(m => m.applyTheme('${theme}')).then(() => true)`);
+            await ev(`window.__m.add('ct-a', 'A', 4, { sleeping: false }); true`); await select('ct-a');
+            await ev(`window.setLiveViewMode && window.setLiveViewMode('chat'); true`);
+            await waitFor(`!!document.querySelector('.attach-image-btn')?.checkVisibility()`, `${tag}: the composer`, 10000);
+            await ev(`window.__row = { session_id: 'ct-id', name: 'claude-ct-id', display_name: 'Agent 1', agent_type: 'claude', waiting_for_input: true, waiting_kind: 'permission', waiting_summary: 'Wants to run: npm test', waiting_since: new Date().toISOString(), status: 'idle', server: 'local' };
+                window.__host = document.createElement('div'); window.__host.id = 'ct-host'; window.__host.style.cssText = 'position:fixed;left:0;right:0;bottom:120px;z-index:9999;background:var(--bg-primary)'; document.body.append(window.__host);
+                import((window.__coralStatic || '/static/') + 'needs_input_card.js').then(m => { m.syncNeedsInputCard(window.__host, window.__row); return true; })`);
+            await waitFor(`!!document.querySelector('#ct-host [data-on-click="terminal-view-open"]')`, `${tag}: the card`, 8000);
+            const sizes = await ev(`(() => { const box = e => { if (!e) return null; const r = e.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height) }; }; return { terminal: box(document.querySelector('#ct-host [data-on-click="terminal-view-open"]')), dismiss: box(document.querySelector('#ct-host [data-on-click="dismiss-wait"]')), image: box(document.querySelector('.attach-image-btn')) }; })()`);
+            if (phone) for (const k of ['terminal', 'dismiss', 'image']) { const s = sizes[k]; if (!s || s.w < 44 || s.h < 44) problems.push(`${tag}: ${k} is ${s ? s.w + 'x' + s.h : 'missing'}, not a 44 px target`); }
+            else if (!sizes.terminal || !sizes.dismiss) problems.push(`${tag}: the card's controls are missing: ${JSON.stringify(sizes)}`);
+            await shot(`chat-targets-${tag}`);
+            await ev(`document.getElementById('ct-host').remove(); true`);
+        }
+    } finally { await client.close(); }
+    assert.deepEqual(problems, [], '\n' + problems.join('\n'));
+    console.log('PASS the phone chat controls are 44 px targets');
+})().catch(e => { console.error(e); process.exit(1); });
