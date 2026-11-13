@@ -376,7 +376,7 @@ func (l *AgentLauncher) BuildSchedulerLaunchFn(schedStore *store.ScheduleStore) 
 		// delivery (and an initial prompt held for a screen nobody answers) ends with it (#3999).
 		held := make(chan struct{})
 		promptCtx := ptymanager.WithLaunchWait(ctx, heldPromptWait) // nobody is there to answer a card: a held first prompt is given up on sooner (#16421)
-		if !oneShot { // a one-shot run has its prompt on the command line
+		if !oneShot {                                               // a one-shot run has its prompt on the command line
 			l.startPromptDeliveryHeld(promptCtx, result.SessionID, result.SessionName, job.AgentType, job.Prompt, held)
 		}
 

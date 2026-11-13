@@ -189,6 +189,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
         ['Time limit', escapeHtml(limitWords(job.max_duration_s) || `${job.max_duration_s} seconds`)],
         !isWorkflow && job.no_worktree === 1 ? ['Works in', 'The folder itself, no worktree'] : null,
         !isWorkflow && job.no_worktree !== 1 ? ['Cleanup worktree', job.cleanup_worktree ? 'Yes' : 'No'] : null,
+        !isWorkflow && job.trust_worktree === 1 ? ['Trusts its runs\' folders', 'Yes: each run trusts the worktree it made'] : null,
         job.flags ? ['Flags', `<code>${escapeHtml(job.flags)}</code>`] : null,
     ].filter(Boolean);
 

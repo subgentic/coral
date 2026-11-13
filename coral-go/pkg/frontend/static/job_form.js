@@ -275,6 +275,11 @@ function jobFields(host) {
         },
         { key: 'no_worktree', type: 'toggle', id: 'job-modal-no-worktree', label: 'Run in the folder itself, without a worktree', default: false, help: 'Each run works straight in the folder, which can be any folder, not a git repository. Runs that overlap share it.', visibleWhen: prompt },
         { key: 'cleanup_worktree', type: 'toggle', id: 'job-modal-cleanup', label: 'Remove the worktree when the run ends', default: true, visibleWhen: v => prompt(v) && !v.no_worktree },
+        {
+            key: 'trust_worktree', type: 'toggle', id: 'job-modal-trust', label: 'Trust this folder, so runs need no one to answer', default: false,
+            help: 'Claude and Codex ask before working in a new folder, and a run on a schedule has no one to answer. Ticked, each run trusts only the worktree it made for itself. That lets the code in the folder run its own settings and tools with no question: tick it only for a folder you wrote or trust.',
+            visibleWhen: v => prompt(v) && !v.no_worktree && (v.agent_type === 'claude' || v.agent_type === 'codex'),
+        },
     ];
 }
 
@@ -302,6 +307,7 @@ function jobFormValues() {
         values.agent_type = v.agent_type;
         values.prompt = String(v.prompt || '').trim();
         values.flags = String(v.flags || '').trim();
+        values.trust_worktree = v.trust_worktree && !v.no_worktree && (v.agent_type === 'claude' || v.agent_type === 'codex') ? 1 : 0; // the person's own tick, for a worktree job of Claude or Codex (#16421)
     }
     return values;
 }
@@ -431,11 +437,11 @@ export async function editScheduledJob(jobId) {
     const type = job.job_type || (job.workflow_id ? 'workflow' : 'prompt');
     for (const [k, val] of Object.entries({
         job_type: type, name: job.name, description: job.description || '', cron_expr: job.cron_expr, timezone: job.timezone || 'UTC', repo_path: job.repo_path || '',
-        base_branch: job.base_branch || '', agent_type: job.agent_type || 'claude', prompt: job.prompt || '', max_duration_s: job.max_duration_s || 3600, cleanup_worktree: !!job.cleanup_worktree, no_worktree: job.no_worktree === 1, flags: job.flags || '',
+        base_branch: job.base_branch || '', agent_type: job.agent_type || 'claude', prompt: job.prompt || '', max_duration_s: job.max_duration_s || 3600, cleanup_worktree: !!job.cleanup_worktree, no_worktree: job.no_worktree === 1, trust_worktree: job.trust_worktree === 1, flags: job.flags || '',
     })) v.set(k, val);
     document.getElementById('cron-preview').textContent = '';
     // Nothing a job already has is hidden: More options opens when it holds something other than the defaults.
-    v.fold(!!(job.description || (job.timezone && job.timezone !== LOCAL_ZONE) || (job.max_duration_s && job.max_duration_s !== 3600) || job.flags || (job.base_branch && job.base_branch !== 'main') || job.no_worktree === 1));
+    v.fold(!!(job.description || (job.timezone && job.timezone !== LOCAL_ZONE) || (job.max_duration_s && job.max_duration_s !== 3600) || job.flags || (job.base_branch && job.base_branch !== 'main') || job.no_worktree === 1 || job.trust_worktree === 1));
     document.getElementById('job-modal-flags').dispatchEvent(new Event('input')); // the flag shortcuts show which flags are on
     if (type === 'workflow') {
         await loadWorkflowOptions();
