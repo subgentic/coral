@@ -3952,7 +3952,8 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 @container (max-width: 40em) { .launch-note-slot { min-height: 3.8em; } }
 @container (max-width: 17em) { .launch-note-slot { min-height: 5.6em; } }
 /* ── New team, three steps (#7407): the New Agent shell with the team's own pages ─────────────────────────────────────────────────────────────── */
-.team-wizard[data-stage="team"] .team-page:not(.team-page-team), .team-wizard[data-stage="members"] .team-page:not(.team-page-members), .team-wizard[data-stage="start"] .team-page:not(.team-page-start) { display: none; }
+.team-wizard[data-stage="team"] .team-page:not(.team-page-team), .team-wizard[data-stage="members"] .team-page:not(.team-page-members) { display: none; }
+.team-more-options:has(#team-skills-row[hidden]) { display: none; }
 .team-wizard .team-page { padding: 20px 24px; }
 .team-wizard .team-page-start { flex: 1; min-height: 0; display: flex; padding: 0; }
 .team-wizard .team-page-start.team-page { display: flex; }
@@ -3962,7 +3963,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-field-hint:empty { display: none; }
 #team-panel-team #btn-browse-team, #launch-step-agent #btn-browse { width: auto; justify-self: start; align-self: flex-start; } /* Browse is its own size under the folder, not the field's width */
 .launch-wizard > .modal-actions #launch-team-cancel { margin-right: auto; }
-#launch-modal[data-team-stage="members"] .launch-server-row, #launch-modal[data-team-stage="start"] .launch-server-row { display: none !important; } /* the machine is a step 1 choice */
+#launch-modal[data-team-stage="members"] .launch-server-row { display: none !important; } /* the machine is a step 1 choice */
 .launch-recap.launch-recap-warn { color: var(--warning-text, var(--warning)); }
 .launch-recap.launch-recap-error { color: var(--sv-error-color); }
 #team-recap:empty { display: none; }
