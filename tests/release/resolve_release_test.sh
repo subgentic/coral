@@ -15,10 +15,10 @@ check v1.4.69 fts5 false
 check v1.4.69-rc1 fts5 true
 check v1.4.69-rc.2 fts5 true
 check v1.4.69-dev fts5,dev true
-check v1.4.69-beta fts5,beta true
-check v1.4.69-forDropbox fts5,dropboxers true
-check v1.4.69-dev-forDropbox fts5,dropboxers true   # -forDropbox wins, as the old if/elif did
-check v1.4.69-beta-dev fts5,beta true               # -beta before -dev
+check v1.4.69-beta fts5 true                         # the beta tier is gone (#15075): an old tag still parses and builds prod
+check v1.4.69-forDropbox fts5 true                   # likewise the Dropbox tier
+check v1.4.69-dev-forDropbox fts5,dev true
+check v1.4.69-beta-dev fts5,dev true
 # Intentional shipped program-list pin, separate from the fixed tier cases above.
 out=$(bash "$here/resolve_release.sh" v1.4.69)
 [ "$(sed -n 's/^commands=//p' <<<"$out")" = "coral launch-coral coral-board coral-agent coral-hook-agentic-state coral-hook-message-check coral-hook-session-start coral-hook-task-sync coral-update" ] || { echo "FAIL commands list changed"; fail=1; }
