@@ -1,7 +1,7 @@
 // A job's "Trust this folder" box (#16421): off on a new job, shown for a worktree job of Claude or Codex only, saved with the job, shown ticked when the job is edited, and cleared by the server when the job's
 // folder changes. Isolated dev server; the real API is used (the page is the person's own dashboard).
 const assert = require('node:assert/strict');
-const { execFileSync } = require('node:child_process');
+const { execFileSync } = require('./helpers/child_process.js');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;

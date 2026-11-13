@@ -237,6 +237,7 @@ POST /api/board/{project}/working-mode/presets/{presetID}/reset | board-claims |
 POST /api/chief/triggers/{triggerID}/state | token-session
 POST /api/launch-disclosure/ack | token-session | operator-only
 POST /api/notifications | token-bound
+POST /api/scheduled/jobs | token-session | operator-only
 POST /api/sessions/history/{sessionID}/resummarize | unbound | operator-only
 POST /api/sessions/history/{sessionID}/tags | unbound | operator-only
 POST /api/sessions/launch | token-session
@@ -298,6 +299,7 @@ PUT /api/board/{project}/subscribers/{subscriberID}/review-settings | board-clai
 PUT /api/board/{project}/tasks/{taskID}/goal | board-claims
 PUT /api/board/{project}/working-mode | board-claims | operator-only
 PUT /api/board/{project}/working-mode/presets/{presetID} | board-claims | operator-only
+PUT /api/scheduled/jobs/{jobID} | token-session | operator-only
 PUT /api/sessions/history/{sessionID}/notes | unbound | operator-only
 PUT /api/sessions/live/{name}/display-name | unbound | operator-only
 PUT /api/sessions/live/{name}/file-content | unbound | operator-only
