@@ -56,7 +56,7 @@ jobs:
       sums_sha256: ${{ steps.release.outputs.sums_sha256 }}
       prerelease: ${{ steps.release.outputs.prerelease }}
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Check the inputs
@@ -66,7 +66,7 @@ jobs:
           PROMOTE_REVOKE: ${{ inputs.revoke }}
         run: python3 -I tools/promote_manifest.py check
       - name: Install cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
         with:
           cosign-release: "v3.0.6"
       - name: Read the release and check what release.yml signed
@@ -124,7 +124,7 @@ jobs:
               if part:
                   print("::add-mask::" + part)
           PY
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Check the release code
@@ -133,7 +133,7 @@ jobs:
           RELEASE_CODE_SEED: ${{ secrets.PROMOTE_TOTP_SEED }}
         run: python3 -I tools/release_code.py verify
       - name: Install cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
         with:
           cosign-release: "v3.0.6"
       - name: Write promote.json

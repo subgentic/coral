@@ -29,11 +29,11 @@ jobs:
       commands: ${{ steps.r.outputs.commands }}
       gui_commands: ${{ steps.r.outputs.gui_commands }}
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       # The Go toolchain the module asks for: the linker-flag check below builds ./cmd/coral (#5539).
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: coral-go/go.mod
           cache: false
@@ -113,11 +113,11 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.26.11"
           cache-dependency-path: coral-go/go.sum
@@ -213,11 +213,11 @@ jobs:
     runs-on: windows-latest
     environment: release # the release secrets live in this environment only: tags v* and the owner's approval (#5522)
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.26.11"
           cache-dependency-path: coral-go/go.sum
@@ -459,7 +459,7 @@ jobs:
       contents: read
       attestations: read # the cached tmux payload's attestation (bundled-tmux)
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       # Go from go.dev, checksum-pinned: one copy for the three macOS jobs (#3855). The Go caches are
@@ -528,7 +528,7 @@ jobs:
       contents: read
       attestations: read # the cached tmux payload's attestation (bundled-tmux)
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       # Go from go.dev, checksum-pinned: one copy for the three macOS jobs (#3855).
@@ -591,7 +591,7 @@ jobs:
     runs-on: macos-15
     environment: release # the release secrets live in this environment only: tags v* and the owner's approval (#5522)
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       # Go from go.dev, checksum-pinned: one copy for the three macOS jobs (#3855).
@@ -873,7 +873,7 @@ jobs:
     needs: [resolve, build-linux, build-windows, build-macos]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -883,7 +883,7 @@ jobs:
           path: artifacts
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
         with:
           cosign-release: "v3.0.6"
 
