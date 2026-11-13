@@ -99,7 +99,10 @@ const { coralReady } = require('./helpers/wait');
             assert.deepEqual(await ev(`window.__calls.filter(c => c[0] === 'operator').pop()[1]`), { disabled: true }, at + 'turning the switch off stores the opt-out (disabled: true)');
             await waitFor(`/may not act as the Operator/.test(document.getElementById('settings-cloud-operator-line').textContent)`, 'the line follows', 8000);
             assert.equal(await text('#settings-cloud-more-summary'), 'More Coral Hub permissions: may change cross-team settings', at + 'and the summary stops naming it');
-            assert.equal(await flip('settings-cloud-hub-operator'), true);
+            assert.equal(await flip('settings-cloud-hub-operator'), false, at + 'turning it on asks first: the switch stays off until Turn on (the risk notice, settings_risks.js)');
+            await waitFor(`document.getElementById('confirm-modal-title').textContent === 'Turn on Let Coral Hub act as the Operator?'`, 'the question before turning it on', 8000);
+            await ev(`document.getElementById('confirm-modal-yes').click(); true`);
+            await waitFor(`document.getElementById('settings-cloud-hub-operator').checked === true`, 'Turn on switches it on', 8000);
             await waitFor(`window.__calls.filter(c => c[0] === 'operator').length === 2`, 'the second save', 8000);
             assert.deepEqual(await ev(`window.__calls.filter(c => c[0] === 'operator').pop()[1]`), { disabled: false }, at + 'turning it on clears the opt-out');
             // a computer that had opted out reads OFF after the page loads
