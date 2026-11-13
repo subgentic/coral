@@ -38,6 +38,12 @@ const BASE = require('./test_base').BASE;
         c = await confirmState(); check(c.open && /Don't ask for everyone/.test(c.title), `Don't ask asks too: ${c.title}`);
         await ev(`document.getElementById('confirm-modal-yes').click(); true`); await settle(400);
         check(await teamMode() === 'dontAsk', `Turn on applies it to the team: ${await teamMode()}`);
+        // the built-in Orchestrator's own row and its line read the team's Mode too, not the old one (what the dialog promises)
+        const modes = JSON.parse(await ev(`JSON.stringify([...document.querySelectorAll('#team-agents-list .team-agent-row')].map(r => ({ orch: (r.querySelector('.team-agent-role-name')?.textContent || '').trim() === 'Orchestrator', mode: (r.querySelector('.team-agent-summary')?.textContent || '').split('·').pop().trim() })))`));
+        const orchMode = (modes.find(m => m.orch) || {}).mode, workerModes = modes.filter(m => !m.orch).map(m => m.mode);
+        check(orchMode && /don.?t ask/i.test(orchMode) && workerModes.length >= 2 && workerModes.every(m => m === orchMode), `after Turn on the Orchestrator's row reads the team's Mode like the workers: ${JSON.stringify(modes)}`);
+        line = await orchLine();
+        check(/^Orchestrator \(follows the team's Mode\)/.test(line) && /don.?t ask/i.test(line), `its line reads the team's Mode: ${line}`);
         await pickAll('plan'); await settle(300);
         c = await confirmState(); check(!c.open && await teamMode() === 'plan', `a safe Mode needs no question: ${JSON.stringify([c.open, await teamMode()])}`);
         // an Orchestrator set by hand keeps its own
