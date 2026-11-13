@@ -77,9 +77,8 @@
     .team-panel .list-bar-toggle, .team-panel .list-bar-more-btn { min-width: var(--control-touch-height, 44px); }
     .team-panel .team-tb-select { flex: 1 1 7em; max-width: 11em; }
 }
-.goals-table-page .goals-chips-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-width: 0; flex: 1; gap: 6px; } /* one line that scrolls sideways, its scrollbar hidden: the Goals and Tasks chips are alike */
-.goals-table-page .goals-chips-row::-webkit-scrollbar { display: none; }
-.goals-table-page .goals-chip { flex: none; min-height: var(--toolbar-control-h); white-space: nowrap; }
+.goals-table-page .goals-chips-row { min-width: 0; } /* the strip (goals.css) already scrolls sideways on one line with its scrollbar hidden */
+.goals-table-page .goals-chip { min-height: var(--toolbar-control-h); }
 .goals-table-page .goals-new { flex: none; }
 .goals-table-page .goals-back, .inbox-board-head .goals-back { display: inline-flex; align-items: center; align-self: flex-start; min-height: 36px; }
 .team-count-line { margin: 0; }

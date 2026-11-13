@@ -1781,7 +1781,7 @@ body.panel-dragging .agentic-state {
 /* "+N" only where it shows whole beside five pills, the search box and the icon (#9144); on a narrower row the chip stands alone and the number badge on the Filters icon says how many are on */
 @container (max-width: 62rem) { .list-bar-chips-inrow > .list-bar-chips-more-item, .team-panel .team-tb-chips .team-tb-chip-more { display: none; } }
 @container (min-width: 62.01rem) { .list-bar-chips-inrow:has(.list-bar-chips-more-item), .team-panel .team-tb-chips:has(.team-tb-chip-more) { min-width: 12rem; } } /* the chip's 8 rem and the "+N" (#9144) */
-.list-bar-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 2px 8px; font-size: var(--fs-base); color: var(--text-primary); background: var(--bg-hover); border: 1px solid var(--control-border); border-radius: 999px; cursor: pointer; }
+.list-bar-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 2px 8px; font-size: var(--fs-base); color: var(--text-primary); background: var(--bg-hover); border: 1px solid var(--control-border); border-radius: var(--radius-md); cursor: pointer; }
 .list-bar-chip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .list-bar-chip-x { color: var(--text-primary); } /* 4.4:1 in the light theme with the secondary text colour on the chip's fill (#4851) */
 .list-bar-chip-all { background: none; }

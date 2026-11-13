@@ -5,8 +5,11 @@
 .goals-detail-col { min-width: 0; display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px; background: var(--bg-secondary); container-type: inline-size; }
 .goals-back { display: none; align-self: flex-start; min-height: var(--control-touch-height, 44px); }
 
-.goals-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.goals-chip { min-height: var(--toolbar-control-h, 32px); padding: 4px 10px; border: 1px solid var(--control-border); border-radius: 999px; background: var(--bg-secondary); color: var(--text-secondary); font: inherit; font-size: var(--fs-md); cursor: pointer; }
+.goals-chips { display: flex; flex-wrap: nowrap; gap: 0; width: fit-content; max-width: 100%; border: 1px solid var(--control-border); border-radius: var(--radius-md); overflow-x: auto; scrollbar-width: none; } /* the filter strip (guidelines 4.7, #15815): one bordered box, 6 px corners; it scrolls sideways when the parts do not fit (a phone), never wraps, no bar is drawn */
+.goals-chip { flex: none; white-space: nowrap; min-height: var(--toolbar-control-h, 32px); padding: 0 12px; border: 0; border-radius: 0; background: var(--bg-secondary); color: var(--text-secondary); font: inherit; font-size: var(--fs-md); cursor: pointer; }
+.goals-chip + .goals-chip { border-inline-start: 1px solid var(--control-border); }
+.goals-chip:hover { background: var(--bg-hover); color: var(--text-primary); }
+.goals-chip.team-tb-chip { border: 1px solid var(--control-border); border-radius: var(--radius-md); } /* a filter that is on (a removable chip), not a part of the strip: its own 6 px box */
 @media (max-width: 767px), (pointer: coarse) { .goals-chip { min-height: var(--control-touch-height, 44px); } } /* the pills are the toolbar's 32 px beside a search field on a mouse, 44 on touch (#9454) */
 .goals-chip[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); border-color: var(--accent); }
 
@@ -76,20 +79,17 @@
 .goals-add-task, .goals-close, .goals-reopen { min-height: var(--control-touch-height, 44px); }
 
 /* Findings of the Goals usability check (#7218, #7224): chips with no goals quieter; a lighter phone header */
-.goals-chip-zero:not([aria-pressed="true"]) { font-size: var(--fs-base); } /* a pill with nothing in it is a little quieter in its text and keeps its edge like every other (#7715: Blocked 0 had none) */
+.goals-chip-zero:not([aria-pressed="true"]) { color: var(--text-muted); } /* a pill with nothing in it is a little quieter in its text and keeps its edge like every other (#7715: Blocked 0 had none) */
 @media (max-width: 767px) {
     /* a phone, large text (#7224): the page's own heading and New goal share a row, the sub-line is small, the chips take less, so the first goal is not a screen away */
     .goals-page { gap: 8px; }
-    .goals-chips { gap: 4px; }
-    .goals-chip { padding: 2px 8px; font-size: var(--fs-base); min-width: var(--control-touch-height, 44px); }
+    .goals-chip { padding: 0 10px; font-size: var(--fs-base); min-width: var(--control-touch-height, 44px); }
 }
 
 /* Goals uses the width (#7404, UI/UX's #7401): the list 280 to 360 px beside a wide detail, the detail under the list when the Goals area is under 880 px (never a strip), the chips on one line,
    no ring round the detail (it takes focus when a goal opens, as a region named by the goal's title; real controls inside it keep their rings), Outcome and Done when side by side, one-line task rows.
    A phone keeps its own rules above: one column, the list then the detail. */
 .goals-page { max-width: 1440px; width: 100%; margin-inline: auto; }
-.goals-chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; } /* it scrolls sideways when the six do not fit (a phone); no bar is drawn under the chips */
-.goals-chip { flex: none; white-space: nowrap; }
 .goals-detail-col:focus { outline: none; }
 .goals-detail-col .goals-sub { margin: 0 0 4px; }
 @media (min-width: 768px) {
