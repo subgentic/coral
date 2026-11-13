@@ -79,6 +79,13 @@ const { install: installNA, N, stubModels } = require('./helpers/new_agent');
             check(d.noteAmber !== d.plainColor, `${tag}: the warning is amber: ${d.noteAmber} vs ${d.plainColor}`);
             await set('mode', 'plan'); await settle(200);
             d = await ev(READ); check(!d.risky && !d.note.includes('\u26a0'), `${tag}: a safe mode clears the amber and the warning: ${JSON.stringify([d.risky, d.note])}`);
+            // risk is the mode's own record (#16057): a custom mode flagged risky warns whatever its words say, and words that say "isolated" do not make a safe mode risky
+            const custom = (value, risky, note) => ev(`(() => { const f = document.querySelector('#launch-agent-acf .acf-permission-mode'); for (const o of [...f.options].filter(o => o.dataset.custom)) o.remove(); const o = document.createElement('option'); o.value = ${JSON.stringify(value)}; o.textContent = 'Custom'; o.dataset.custom = '1'; ${risky ? "o.dataset.risky = '1';" : ''} o.dataset.note = ${JSON.stringify(note)}; f.append(o); f.value = o.value; f.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            await custom('custom-risky', true, 'Runs everything on this machine'); await settle(300);
+            d = await ev(READ); check(d.risky && d.noteAmber !== d.plainColor, `${tag}: a custom mode marked risky warns (amber control and note) with no pattern in its words: ${JSON.stringify([d.risky, d.noteAmber, d.plainColor])}`);
+            await custom('custom-safe', false, 'Reads files in an isolated copy'); await settle(300);
+            d = await ev(READ); check(!d.risky && !d.note.includes('\u26a0'), `${tag}: the word isolated alone does not make a mode risky: ${JSON.stringify([d.risky, d.note])}`);
+            await ev(`(() => { const f = document.querySelector('#launch-agent-acf .acf-permission-mode'); f.value = 'plan'; f.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(200);
             // the provider
             await set('provider', 'codex'); await settle(500);
             d = await ev(READ); check(d.fType === 'codex' && d.cfg.agentType === 'codex' && d.provider === 'codex', `${tag}: Codex in the line is Codex in the launch: ${JSON.stringify([d.fType, d.cfg.agentType, d.provider])}`);

@@ -2,12 +2,12 @@
  * fields (the fields stay the one place that sets anything), so the line can never say one thing and the launch another. */
 import { importOnce } from './import_once.js';
 const { TYPE, fetchFlags, flagsNodes } = await importOnce('./permission_flags_line.js'); // the flags line is shared with Restart and Resume (#15761)
-const { permissionDescription, PI_NO_PERMISSIONS } = await importOnce('./permission_flags.js'); // lazy like launch_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
+const { permissionDescription, permissionRisky, PI_NO_PERMISSIONS } = await importOnce('./permission_flags.js'); // lazy like launch_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 
 const container = () => document.getElementById('launch-agent-acf');
 
 /** What a permission mode allows for this CLI, in the words Settings and the Permissions tab use for it (Codex's Auto is its workspace sandbox with the network on; Antigravity's and Gemini's skip every prompt and check; Pi has no permissions at all): the footer says it, so 'Auto mode' is not left unexplained (Desktop tester, #10000). */
-function modeNote(type, value) { return permissionDescription(type, value).replace(/\.$/, ''); }
+function modeNote(type, value, opt) { return (permissionDescription(type, value) || opt?.dataset.note || '').replace(/\.$/, ''); } // a mode the table does not know (a custom one) carries its own words in data-note
 
 /** What the note under the line needs: the mode in words and what it allows for this CLI. */
 function recapParts() {
@@ -17,7 +17,8 @@ function recapParts() {
     const modeSel = acf.querySelector('.acf-permission-mode');
     return {
         mode: modeSel ? (modeSel.options[modeSel.selectedIndex]?.textContent.trim() || '') : '',
-        modeNote: modeSel ? modeNote(type, modeSel.value) : '',
+        modeNote: modeSel ? modeNote(type, modeSel.value, modeSel.options[modeSel.selectedIndex]) : '',
+        modeRisky: modeSel ? permissionRisky(type, modeSel.value) || modeSel.options[modeSel.selectedIndex]?.dataset.risky === '1' : false, // risk is the mode's own record (permissionRisky, or data-risky on a custom mode's option), not a pattern in its description
     };
 }
 
@@ -86,7 +87,11 @@ function buildLine() {
         const name = Object.assign(document.createElement('span'), { className: 'runs-as-name', textContent: c.name });
         label.append(name);
         if (c.tag === 'select') label.append(Object.assign(document.createElement('select'), { className: `runs-as-field runs-as-${c.key}-field` }));
-        else label.insertAdjacentHTML('beforeend', '<input type="text" class="runs-as-field runs-as-model-field" list="runs-as-models" autocomplete="off" placeholder="Default model"><datalist id="runs-as-models"></datalist>'); // the model box offers the form\'s own names
+        else { // the model box offers the form's own names
+            const box = Object.assign(document.createElement('input'), { type: 'text', className: 'runs-as-field runs-as-model-field', autocomplete: 'off', placeholder: 'Default model' });
+            box.setAttribute('list', 'runs-as-models');
+            label.append(box, Object.assign(document.createElement('datalist'), { id: 'runs-as-models' }));
+        }
         label.querySelector('.runs-as-field').dataset.field = c.key;
         line.append(label);
     }
@@ -143,8 +148,8 @@ function paintRecap() {
     let line = lineEl();
     if (!line) { line = buildLine(); el.prepend(line); }
     const allows = !p.mode || !p.modeNote ? '' : p.modeNote === PI_NO_PERMISSIONS.replace(/\.$/, '') ? PI_NO_PERMISSIONS : `${p.mode} mode allows: ${p.modeNote.charAt(0).toLowerCase() + p.modeNote.slice(1)}.`; // Pi has no modes to allow: its sentence stands alone
-    const dash = /isolated/i.test(allows) ? allows.indexOf(' \u2014 ') : -1; // a mode that is only safe somewhere (Bypass: "...isolated containers and VMs only") keeps its warning in two words: the whole sentence is its hover
-    const risky = /isolated|no safety checks/i.test(allows);
+    const dash = p.modeRisky ? allows.indexOf(' \u2014 ') : -1; // a mode that is only safe somewhere (Bypass: "...isolated containers and VMs only") keeps its warning in two words: the whole sentence is its hover
+    const risky = !!allows && p.modeRisky;
     syncLine(line, risky);
     if (el.dataset.recap === allows) return;
     el.dataset.recap = allows;
