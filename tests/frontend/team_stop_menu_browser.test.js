@@ -26,19 +26,17 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             // a team with no live agent: nothing to put to sleep, reset or kill, and the menu says so
             await ev(`T.state.liveSessions = []; T.render.renderLiveSessions([]); window.openTeamPage(${JSON.stringify(BOARD)}).then(() => true)`);
             await waitFor(`!!document.getElementById('team-page-view') && document.getElementById('team-page-view').getClientRects().length > 0 && document.getElementById('team-page-title').textContent.includes('stop-menu')`, `${w}: the team page, no agents`, 15000);
-            await ev(`document.getElementById('${mobile ? 'team-page-more' : 'team-page-stop'}').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the menu opens
-            const none = await ev(`[...document.querySelectorAll('${mobile ? '#team-page-more-menu' : '#team-page-stop-menu'} [data-stop]:not([data-stop="sep"])')].map(b => ({ disabled: b.disabled, title: b.title, note: (b.querySelector('.overflow-menu-note') || {}).textContent || '' }))`); // the reason is written beside a disabled item; a title that repeated it is gone (#11566)
+            await ev(`document.getElementById('team-page-more').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the menu opens
+            const none = await ev(`[...document.querySelectorAll('#team-page-more-menu [data-stop]:not([data-stop="sep"])')].map(b => ({ disabled: b.disabled, title: b.title, note: (b.querySelector('.overflow-menu-note') || {}).textContent || '' }))`); // the reason is written beside a disabled item; a title that repeated it is gone (#11566)
             check(none.length === 3 && none.every(x => x.disabled && /No agent of this team is running/.test(x.note) && x.title === ''), `with no live agent the three are off, with the reason: ${JSON.stringify(none)}`);
-            await ev(`document.getElementById('${mobile ? 'team-page-more' : 'team-page-stop'}').click(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu closes
+            await ev(`document.getElementById('team-page-more').click(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu closes
             await ev(`T.state.liveSessions = ${JSON.stringify([mk('s1', 'Boss', false), mk('s2', 'Worker', false)])}; T.render.renderLiveSessions(T.state.liveSessions); window.openTeamPage(${JSON.stringify(BOARD)}).then(() => true)`);
             await waitFor(`!!document.getElementById('team-page-view') && document.getElementById('team-page-view').getClientRects().length > 0 && document.getElementById('team-page-title').textContent.includes('stop-menu')`, `${w}: the team page`, 15000);
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: the header fills
-            const host = mobile ? '#team-page-more-menu' : '#team-page-stop-menu';
-            if (mobile) check(await ev(`document.getElementById('team-page-stop').getClientRects().length === 0`), 'a phone has no Stop button, its header has one button: More');
-            else check(await ev(`document.getElementById('team-page-stop').getClientRects().length > 0`), 'the header has a Stop button');
-            if (!mobile) check(await ev(`document.getElementById('team-page-stop').textContent.trim()`) === 'Stop agents', 'the header\'s Stop button says what it stops: Stop agents (#10718)');
+            const host = '#team-page-more-menu';
+            check(await ev(`!document.getElementById('team-page-stop') && !document.getElementById('team-page-stop-menu')`), 'the header has no Stop button of its own: the stop items are in More, last, under a line (#15856)');
             // open the menu
-            await ev(`document.getElementById('${mobile ? 'team-page-more' : 'team-page-stop'}').click(); true`);
+            await ev(`document.getElementById('team-page-more').click(); true`);
             await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu opens
             let it = await items(host);
             check(JSON.stringify(it.map(i => i.text)) === JSON.stringify(['Sleep team', 'Reset team (clear context)', 'Kill all']), `the items are the sidebar row's own words: ${JSON.stringify(it)}`);
@@ -46,6 +44,7 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             check(it.every(i => i.shown) && (!mobile || it.every(i => i.h >= 44)), `shown (44 px on a phone): ${JSON.stringify(it)}`);
             check(it[0] && !it[0].danger && !it[1].danger && it[2].danger, 'Kill all is the danger item; Sleep team and Reset team (clear context) are not red at rest (#15373)');
             check(await ev(`document.querySelectorAll('${host} hr.overflow-menu-divider').length >= 1`), 'the danger items are set apart by a rule');
+            check(await ev(`(() => { const k = [...document.querySelectorAll('${host} > *')]; const last3 = k.slice(-4); return last3[0].tagName === 'HR' && last3.slice(1).every(e => e.dataset.stop); })()`), 'More ends with a line and then the three stop items (#15856)');
             await shot(`team-stop-menu-${w}`);
             const separation=await ev(`(()=>{const host=document.querySelector('${host}'),reset=host.querySelector('[data-stop="reset"]'),kill=host.querySelector('[data-stop="kill"]');return{gap:kill.getBoundingClientRect().top-reset.getBoundingClientRect().bottom,resetRule:parseFloat(getComputedStyle(reset).borderTopWidth),killRule:parseFloat(getComputedStyle(kill).borderTopWidth)}})()`);
             check(separation.gap>=8&&separation.killRule>=1,`destructive actions have space and a visible boundary: ${JSON.stringify(separation)}`);
@@ -62,22 +61,20 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             check(/Reset team/.test(d) && /Reset all agents in/.test(d), `Reset team asks first: ${d.slice(0, 120)}`);
             check(/starts again from its first instructions, in a new chat\. The old chats stay in History and your files are not touched\./.test(d) && !/context|original prompts/i.test(d), `Reset team says what happens to chats and files, in plain words (#10371): ${d.slice(0, 300)}`);
             await closeDialog(); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the dialog closes
-            await ev(`document.getElementById('${mobile ? 'team-page-more' : 'team-page-stop'}').click(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu opens
+            await ev(`document.getElementById('team-page-more').click(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu opens
             await ev(`document.querySelector('${host} [data-stop="kill"]').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the dialog opens
             d = await dialogText();
             check(/Kill team/i.test(d) && /Kill (all \d+ agents|the 1 agent) in "/.test(d) && /stop now\. (Their chats|Its chat) stays? in History\./.test(d) && !/terminate|on board/i.test(d), `Kill all asks first, in plain words, and says what stays (#10371): ${d.slice(0, 300)}`);
             await closeDialog(); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the dialog closes
             // a sleeping team says Wake team
-            await ev(`T.state.liveSessions = ${JSON.stringify([mk('s1', 'Boss', true), mk('s2', 'Worker', true)])}; T.render.renderLiveSessions(T.state.liveSessions); document.getElementById('${mobile ? 'team-page-more' : 'team-page-stop'}').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the menu follows the team
+            await ev(`T.state.liveSessions = ${JSON.stringify([mk('s1', 'Boss', true), mk('s2', 'Worker', true)])}; T.render.renderLiveSessions(T.state.liveSessions); document.getElementById('team-page-more').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the menu follows the team
             it = await items(host);
             check(it[0] && it[0].text === 'Wake team' && /^Starts the sleeping agents again$/.test(it[0].hint), `a sleeping team offers Wake team, and says what it does: ${JSON.stringify(it)}`);
-            if (!mobile) check(await ev(`document.getElementById('team-page-stop').textContent.trim()`) === 'Wake agents', 'a sleeping team is already stopped: its button says Wake agents, not Stop agents (walk 13 M9)');
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
             // Pause board says what it does (the board's actions are in More)
             await ev(`document.getElementById('team-page-more').click(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu opens
             const pause = await ev(`(() => { const b = document.getElementById('mb-pause-btn'), n = document.getElementById('mb-pause-note'); return { btn: b && b.textContent.trim(), note: n && n.textContent.trim(), shown: !!n && n.getClientRects().length > 0, described: b && b.getAttribute('aria-describedby') }; })()`);
             check(pause.btn === 'Pause team' && /stop receiving new messages/.test(pause.note || '') && pause.shown && pause.described === 'mb-pause-note', `Pause team says what it does: ${JSON.stringify(pause)}`);
-            if (!mobile) check(await ev(`[...document.querySelectorAll('#team-page-more-menu hr')].every(r => r.getClientRects().length === 0)`), 'a wide More menu has no stray rule (the Stop items are phone-only in it)');
             await shot(`team-more-pause-${w}`);
             await closeDialog();
             await ev(`(async()=>{await window.exitTeamPage({force:true});window.switchNavTab('agents');T.render.renderLiveSessions(T.state.liveSessions);if(${mobile})window.mobileBack();return true})()`);

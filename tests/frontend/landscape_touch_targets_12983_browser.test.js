@@ -35,7 +35,7 @@ if (process.platform === 'win32') { console.log('landscape_touch_targets_12983_b
         await api('POST', '/api/sessions/launch', { working_dir: dir, agent_type: 'claude' });
         await waitFor(`(window._coralGetLiveSessions ? window._coralGetLiveSessions() : []).some(s => s.working_directory === ${JSON.stringify(dir)})`, 'the agent', { timeout: 20000 });
         agent = await ev(`(window._coralGetLiveSessions() || []).find(s => s.working_directory === ${JSON.stringify(dir)})`);
-        const TEAMBAR = ['.team-page-add', '.team-page-settings', '.team-page-stop', '.team-page-more'];
+        const TEAMBAR = ['.team-page-add', '.team-page-more'];
         const TOOLBAR = ['.team-panel .list-bar-search', '.team-panel .team-tb-select', '.team-panel .team-tb-action'];
         for (const [w, h] of [[844, 390], [915, 412]]) {
             const tag = `${w}x${h}`;
@@ -43,7 +43,7 @@ if (process.platform === 'win32') { console.log('landscape_touch_targets_12983_b
             const visit = async (url, sel) => { await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await coralReady(); await waitFor(sel, url, { timeout: 15000 }).catch(() => {}); await new Promise(r => setTimeout(r, 700)); }; // sleep-ok: the page draws its controls in a few steps
             await visit(`/team/${team}/goals`, `!!document.querySelector('.team-page-more, #team-page-more')`);
             let r = await reach([...TEAMBAR, ...TOOLBAR]);
-            check(`${tag}: the team page has its header buttons and toolbar`, r.length >= 6, JSON.stringify(r.map(x => x.name)));
+            check(`${tag}: the team page has its header buttons and toolbar`, r.length >= 5, JSON.stringify(r.map(x => x.name)));
             check(`${tag}: the team page's header buttons and toolbar are reached by a finger`, r.every(x => x.tall && x.wide), JSON.stringify(r.filter(x => !x.tall || !x.wide)));
             await visit(`/team/${team}/messages`, `!!document.querySelector('.mb-pill, #bm-search')`);
             r = await reach(['.goals-chip.mb-pill']); check(`${tag}: Messages' All filter is reached`, r.length >= 1 && r.every(x => x.tall && x.wide), JSON.stringify(r));
@@ -58,7 +58,7 @@ if (process.platform === 'win32') { console.log('landscape_touch_targets_12983_b
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await Page.navigate({ url: BASE + `/team/${team}/goals` }); await Page.loadEventFired(); await coralReady(); await waitFor(`!!document.querySelector('.team-page-more, #team-page-more')`, 'team page', { timeout: 15000 }).catch(() => {}); await new Promise(r2 => setTimeout(r2, 700)); // sleep-ok: the page draws its controls in a few steps
         const mouse = await reach([...TEAMBAR, ...TOOLBAR]);
-        check('with a mouse the team page keeps its desktop control heights (under 40 px)', mouse.length >= 6 && mouse.every(x => x.h < 40), JSON.stringify(mouse.map(x => [x.name, x.h])));
+        check('with a mouse the team page keeps its desktop control heights (under 40 px)', mouse.length >= 4 && mouse.every(x => x.h < 40), JSON.stringify(mouse.map(x => [x.name, x.h])));
     } finally {
         if (agent) await api('POST', `/api/sessions/live/${encodeURIComponent(agent.session_name || agent.name)}/kill`, { session_id: agent.session_id, agent_type: 'claude' }).catch(() => {});
         if (originalCli) await api('PUT', '/api/settings', { cli_path_claude: originalCli }).catch(() => {});

@@ -18,10 +18,10 @@
 .team-page-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; position: relative; }
 .team-page-actions .btn { min-height: 36px; }
 .team-more-menu .menu-note { display: block; padding: 0 12px 8px; margin-top: -4px; color: var(--text-secondary); font-size: var(--fs-sm); max-width: 16rem; } /* what Pause board does, under it (#10008) */
-.team-more-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; } /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
+.team-more-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; max-height: var(--more-max, 60vh); overflow-y: auto; } /* with the stop items in it (#15856) it is taller than the stage at 200% text: it scrolls, as on a phone */ /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
 .team-more-menu > :is(button, hr).team-more-add { display: none !important; }
 .team-more-menu > .mb-action-btn { width: 100%; padding: 6px 12px; border: 0; background: none; text-align: left; justify-content: flex-start; } .team-more-menu > .mb-action-btn:hover { background: var(--bg-hover); } .team-more-menu > .mb-action-btn.mb-action-danger { color: var(--error-text); background: none; } /* the board's actions in this menu are plain rows like Add agent and Sleep team, not boxed buttons (#11015) */
-@media (max-width: 767px), (pointer: coarse) { .team-more-menu { max-height: 60vh; overflow-y: auto; } .menu-item[data-stop][aria-disabled="true"] { flex-wrap: wrap; white-space: normal; } .menu-item[data-stop] .overflow-menu-note { flex: 1 1 100%; margin-left: 0; } } /* a Stop item that says why it is off ("No agent of this team is running") puts the words under its label on a phone: at 200% text one line was cut by the screen, and three such rows are taller than the page under the header: the menu scrolls inside 60% of the screen rather than being cut by the stage (#10328) */
+@media (max-width: 767px), (pointer: coarse) { .menu-item[data-stop][aria-disabled="true"] { flex-wrap: wrap; white-space: normal; } .menu-item[data-stop] .overflow-menu-note { flex: 1 1 100%; margin-left: 0; } } /* a Stop item that says why it is off ("No agent of this team is running") puts the words under its label on a phone: at 200% text one line was cut by the screen, and three such rows are taller than the page under the header: the menu scrolls inside 60% of the screen rather than being cut by the stage (#10328) */
 
 .tabs.team-tabs { flex: none; padding: 6px 24px 0; scroll-padding-inline: 2rem; } /* one row that never changes height: when the tabs are wider than the window the strip scrolls sideways, the selected tab is scrolled into view, and a fade at the edge says there is more */
 /* the tab row: the tab list and, on a phone, the More button beside it (Artifacts, Knowledge and Settings behind it, #8648) */
@@ -138,7 +138,7 @@
     .team-page-title { font-size: var(--fs-2xl); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: var(--fw-title); } /* 17/700, one line: at 200% text the header and the tabs stay near a quarter of the screen */
     .team-page-status { grid-column: 1; }
     .team-page-actions { grid-column: 2; grid-row: 1 / span 2; }
-    #team-page-add-agent, #team-page-settings, #team-page-stop, #team-page-stop-menu { display: none; }
+    #team-page-add-agent { display: none; }
     .team-page-health { min-height: 44px; grid-column: 1; }
     .team-tab[data-tab="knowledge"], .team-tab[data-tab="messages"], .team-tab[data-tab="branches"] { display: none; } /* behind More: the row never scrolls sideways */
     .team-tabs-row > .team-tab-more { display: inline-flex; align-items: center; flex: none; margin: 6px 8px 0 0; padding: 0 8px; }
@@ -503,7 +503,7 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
 .team-task-page .task-jump-role { color: var(--text-secondary); }
 @media (pointer: coarse), (max-width: 767px) { .team-task-page .task-jump-btn { min-height: var(--control-touch-height, 44px); } }
 /* Give each destructive team action its own boundary; the menu still scrolls on phones. */
-:is(#team-page-stop-menu, #team-page-more-menu) > :is([data-stop="kill"], #mb-delete-btn) {
+:is(#team-page-more-menu) > :is([data-stop="kill"], #mb-delete-btn) {
     margin-top: 12px;
     border-top: 1px solid var(--border);
 }
