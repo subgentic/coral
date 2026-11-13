@@ -4,6 +4,7 @@ const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
+const { goneId, advanceCounterTo } = require('./helpers/task_ids');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -14,16 +15,18 @@ const { coralReady } = require('./helpers/wait');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         assert.equal((await api('POST', `/api/board/${board}/subscribe`, { subscriber_id: 'Orchestrator', job_title: 'Orchestrator' })).status, 200);
+        await advanceCounterTo(api, board, 77); // a long shard's task counter: the task this suite makes is #77, the number it asks for below (#16403)
         const t = await api('POST', `/api/board/${board}/tasks`, { created_by: 'Orchestrator', title: 'Build a small calculator', body: 'x', priority: 'medium', assigned_to: 'Orchestrator' }); assert.ok(t.status < 300, JSON.stringify(t));
+        const GONE = goneId(t.body && (t.body.id || (t.body.task && t.body.task.id))); // a number no task has: ids are one counter for the server, so a fixed 77 was the suite's own task on a long shard (#16403)
         await Page.navigate({ url: BASE + `/team/${board}/messages` }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await waitFor(`!!document.querySelector('#mb-messages .mb-queue-run .mb-queue-task')`, 'the task link', 15000);
-        await ev(`document.querySelector('#mb-messages .mb-queue-run .mb-queue-task').dataset.taskId = '77'; document.querySelector('#mb-messages .mb-queue-run .mb-queue-task').click(); true`); // the line's task is one that cannot be read (deleted, or not this team's)
-        await waitFor(`location.pathname === ${JSON.stringify(`/team/${board}/tasks/77`)}`, 'the task route', 10000);
+        await ev(`document.querySelector('#mb-messages .mb-queue-run .mb-queue-task').dataset.taskId = '${GONE}'; document.querySelector('#mb-messages .mb-queue-run .mb-queue-task').click(); true`); // the line's task is one that cannot be read (deleted, or not this team's)
+        await waitFor(`location.pathname === ${JSON.stringify(`/team/${board}/tasks/${GONE}`)}`, 'the task route', 10000);
         const diag = `({ tab: location.pathname, nf: (() => { const v = document.getElementById('not-found-view'); return v ? { hidden: v.hidden, text: v.textContent.trim().slice(0, 80) } : null; })() })`;
-        await waitFor(`(() => { const v = document.getElementById('not-found-view'); return !!v && !v.hidden && /77/.test(v.textContent); })()`, 'the not-found view naming task 77', 15000, diag); // the read that fails settles when the view shows, however slow the machine: wait for it, not a fixed pause (#16280)
+        await waitFor(`(() => { const v = document.getElementById('not-found-view'); return !!v && !v.hidden && /${GONE}/.test(v.textContent); })()`, 'the not-found view naming the missing task', 15000, diag); // the read that fails settles when the view shows, however slow the machine: wait for it, not a fixed pause (#16280)
         const seen = await ev(`({ modal: [...document.querySelectorAll('dialog[open], .modal')].filter(m => getComputedStyle(m).display !== 'none' && m.offsetHeight).map(m => m.id + ':' + m.textContent.trim().slice(0, 80)), item: (() => { const v = document.getElementById('not-found-view'); return v && !v.hidden ? v.querySelector('.not-found-title').textContent.trim() : null; })(), tab: location.pathname })`);
         console.log(JSON.stringify(seen));
-        assert.ok(seen.item && /Task #?77|no longer|could not|not found/i.test(seen.item) && /77/.test(seen.item), 'the place says which task it could not show: ' + JSON.stringify(seen));
+        assert.ok(seen.item && /Task #?\d+|no longer|could not|not found/i.test(seen.item) && seen.item.includes(String(GONE)), 'the place says which task it could not show: ' + JSON.stringify(seen));
         assert.deepEqual(seen.modal, [], 'no empty dialog: ' + JSON.stringify(seen.modal));
         console.log('\nPASS A task link whose task cannot be read says so');
     } finally { await removeBoards(ev, boards).catch(() => {}); await client.close(); }
