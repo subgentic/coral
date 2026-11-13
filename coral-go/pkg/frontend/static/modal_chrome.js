@@ -38,7 +38,6 @@ const DIALOGS = Object.assign(Object.create(null), { // no prototype: an element
     'mb-export-modal': { backdrop: true },
     'prompt-modal': { hide: byWindow('hidePromptModal') },
     'default-prompts-modal': { hide: byWindow('hideDefaultPromptsModal') },
-    'team-wizard-modal': { hide: byWindow('hideTeamWizardModal') },
     'mobile-connect-modal': { hide: () => window._hideMobileConnectModal() },
 });
 

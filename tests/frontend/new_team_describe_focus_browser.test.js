@@ -23,10 +23,10 @@ const BASE = require('./test_base').BASE;
             await t.click('button', N.next); await t.step(2); await settle(400);
             for (const how of ['Escape', 'Cancel']) {
                 await ev(`document.getElementById('team-describe').focus(); true`); await key('Enter', 13, '\r');
-                await waitFor(`getComputedStyle(document.getElementById('team-wizard-modal')).display !== 'none'`, `${w}: the box opens`, 4000);
+                await waitFor(`!document.getElementById('team-wizard-panel').hidden`, `${w}: the box opens`, 4000);
                 const open = await where();
                 if (open !== 'textarea#team-wizard-directive') problems.push(`${w}: the box opens with the keyboard in its text box (it is on ${open})`);
-                if (how === 'Escape') await key('Escape', 27); else await ev(`[...document.querySelectorAll('#team-wizard-modal button')].find(b => /^Cancel$/.test(b.textContent.trim())).focus(); true`).then(() => key('Enter', 13, '\r'));
+                if (how === 'Escape') await key('Escape', 27); else await ev(`[...document.querySelectorAll('#team-wizard-panel button')].find(b => /^Cancel$/.test(b.textContent.trim())).focus(); true`).then(() => key('Enter', 13, '\r'));
                 await settle(300);
                 const back = await where();
                 if (back !== 'button#team-describe') problems.push(`${w}: ${how} puts the keyboard back on Describe your team (it is on ${back})`);
