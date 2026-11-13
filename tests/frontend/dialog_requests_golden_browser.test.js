@@ -126,12 +126,14 @@ const GOLDEN = path.join(__dirname, 'fixtures', 'dialog_requests_golden.json');
             await ev(`window.showTeamAgentModal(); true`);
             await waitFor(`(document.getElementById('launch-modal').hasAttribute('data-member') && getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none') && !!document.getElementById('launch-agent-name-input')`, 'the team agent dialog');
             await fill('launch-agent-name-input', cfg.name); // the role is the persona step's name field
+            await ev(`(() => { const e = document.querySelector('#launch-agent-acf .acf-model'); window.__mlog = []; if (!e || e.__trap) return true; e.__trap = true; const d = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value'); Object.defineProperty(e, 'value', { get() { return d.get.call(this); }, set(v) { const c = document.getElementById('launch-agent-acf'); window.__mlog.push({ t: Math.round(performance.now()), v, dirty: c.dataset.acfModelDirty, cls: c.dataset.acfModelClassifying, def: c.dataset.acfDefaults, last: c._acfLastType, type: c.querySelector('.acf-agent-type')?.value, stack: (new Error().stack || '').split('\\n').slice(2, 6).map(x => x.trim().replace(/https?:[^ )]*\\//, '')).join(' < ') }); d.set.call(this, v); }, configurable: true }); return true; })()`);
             if (cfg.type) await set('launch-agent-acf', '.acf-agent-type', cfg.type);
             if (cfg.model) await set('launch-agent-acf', '.acf-model', cfg.model);
             await set('launch-agent-acf', '.acf-prompt', cfg.prompt);
             if (cfg.mode) await set('launch-agent-acf', '.acf-permission-mode', cfg.mode);
             if (cfg.flags) await set('launch-agent-acf', '.acf-flags', cfg.flags);
             for (const [t, c] of cfg.chips || []) await chip('launch-agent-acf', t, c);
+            if (cfg.model) { const got = await ev(`document.querySelector('#launch-agent-acf .acf-model').value`); if (got !== cfg.model) console.log('DIAG16210 model lost for ' + cfg.name + ': want ' + cfg.model + ' got ' + JSON.stringify(got) + ' log ' + JSON.stringify(await ev('window.__mlog'))); }
             await click('#launch-step-agent #launch-agent-save');
             await waitFor(`!document.getElementById('launch-modal').hasAttribute('data-member')`, 'the team agent dialog to close');
         };
