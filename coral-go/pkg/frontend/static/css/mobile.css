@@ -1331,13 +1331,13 @@
 @media (max-width: 639px) {
     body.live-session-active:not(.popout-mode) { --top-bar-height: env(safe-area-inset-top, 0px); } /* no bar: the side panel and the sidebar start under the notch's band, over the row */
     body.live-session-active:not(.popout-mode) header.top-bar { display: none; }
-    body.live-session-active:not(.popout-mode) .terminal-header { height: auto; min-height: calc(56px + env(safe-area-inset-top, 0px)); flex-wrap: nowrap; justify-content: flex-start; padding: env(safe-area-inset-top, 0px) var(--space-md) 0; gap: 0 var(--space-xs); }
+    body.live-session-active:not(.popout-mode) .terminal-header { height: auto; min-height: calc(48px + env(safe-area-inset-top, 0px)); flex-wrap: nowrap; justify-content: flex-start; padding: env(safe-area-inset-top, 0px) var(--space-md) 0; gap: 0 var(--space-xs); }
     body.live-session-active:not(.popout-mode) .terminal-header-left { flex: 1 1 0; min-width: 0; flex-wrap: nowrap; gap: var(--space-xs); order: 1; } /* the name takes what is left and ends in an ellipsis: the row never wraps (the Orchestrator: one row matters more than the rest) */
     body.live-session-active:not(.popout-mode) .terminal-header-actions { display: contents; }
     body.live-session-active:not(.popout-mode) .agent-bar-more { display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 44px; min-height: 44px; }
     body.live-session-active:not(.popout-mode) .terminal-state-pill { display: none; } /* the header draws only the dot, named with the state (aria-label, title): no word (the operator, #9927; the Orchestrator, #11056) */
     body.live-session-active:not(.popout-mode) .terminal-identity { display: flex; flex-direction: column; justify-content: center; flex: 1 1 0; min-width: var(--control-touch-height, 44px); }
-    body.live-session-active:not(.popout-mode) .terminal-session-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 0; }
+    body.live-session-active:not(.popout-mode) .terminal-session-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 0; font-size: var(--fs-xl); line-height: var(--lh-body); }
     body.live-session-active:not(.popout-mode) .terminal-session-context { margin-left: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     body.live-session-active:not(.popout-mode) .terminal-header .live-view-toggle { display: none; } /* Chat and Terminal are one button here (#11187, the operator): it shows the view it goes to, and the dots' second line has it with its words */
     body.live-session-active:not(.popout-mode) .terminal-header .live-view-switch:not([hidden]) { display: inline-flex; order: 2; margin-left: 0; min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); align-items: center; justify-content: center; }
@@ -1358,43 +1358,34 @@
    avatar (the team's colour, the agent's initial) with the state as a dot on its corner, the name, the short time at the right and a two-line preview (the goal until the last message is a field of the row). No borders, soft
    surfaces. Wider screens keep the sidebar's row (the avatar, the time and the preview are drawn by this block only). */
 .session-avatar, .session-time, .session-preview, .phone-menu-btn, .phone-account-btn, .phone-break, .phone-chips { display: none; }
-.phone-bar { display: none; }
+.phone-bar, .phone-bar-title { display: none; }
 #mobile-agent-list .phone-bar { display: flex; align-items: center; gap: 4px; flex: 1 0 100%; min-width: 0; } /* Home's list is the page up to 767 px, and its search is in this bar: the bar is there at every width the list is (the ☰ and the avatar are drawn only on a phone, below) */
 #mobile-agent-list .phone-bar .phone-bar-pill { flex: 1 1 0; min-width: 0; margin: 0; }
 @media (max-width: 300px) { body.live-session-active:not(.popout-mode) .terminal-header { flex-wrap: wrap; } } /* a phone at 200% zoom is 195 px wide: the row wraps before ⋯ is cut off (phone_layout) */
 /* #12698: the bar includes PHONE_QUERY's landscape phones; the cards below keep their 600px breakpoint. */
 @media (max-width: 639px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { /* PHONE_BAR_QUERY (phone_layout.js): the width the old top pill was a button for (layout.css, #9021), #13591 */
-    body.agent-home-active header.top-bar { display: none; }
+    body.agent-home-active header.top-bar, #mobile-agent-list .mobile-list-title { display: none; }
     body.agent-home-active { --top-bar-height: env(safe-area-inset-top, 0px); }
     #mobile-agent-list .mobile-list-header { padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 4px; gap: 4px; flex-wrap: wrap; justify-content: flex-start; align-items: center; }
     .phone-bar .phone-menu-btn, .phone-bar .phone-account-btn { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; min-width: 44px; padding: 0; border-radius: 50%; }
-    .phone-bar .phone-menu-btn { order: 0; }
+    .phone-bar .phone-menu-btn { grid-column: 1; grid-row: 1; }
     #mobile-agent-list .mobile-search-row { order: 1; flex: 1 1 0; min-width: 0; }
-    .phone-bar { order: 0; display: flex; align-items: center; gap: 4px; flex: 1 0 100%; min-width: 0; }
-    .phone-bar .phone-bar-pill { order: 1; flex: 1 1 0; min-width: 0; margin: 0; }
-    .phone-bar .phone-bar-title { display: flex; align-items: center; height: 48px; box-sizing: border-box; padding: 0 18px; border: 0; border-radius: 24px; background: var(--bg-secondary); color: var(--text-primary); font-size: var(--fs-lg); font-weight: var(--fw-regular); line-height: var(--lh-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* a view's name in the pill: the same box as Home's search (48 px, fully rounded, filled, no border); a heading, with no title attribute, so no tooltip lands on it */
-    .phone-bar .phone-bar-title .phone-bar-search { flex: 1 1 auto; min-width: 0; width: 100%; height: 100%; padding: 0; margin: 0; border: 0; outline: 0; background: transparent; color: var(--text-primary); font: inherit; } /* the view's search, in the pill (#11476) */
-    .phone-bar .phone-bar-title:has(.phone-bar-search) .phone-bar-title-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; } /* the title stays for a screen reader: the field says what it searches */
+    .phone-bar, #mobile-agent-list .phone-bar { order: 0; display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; grid-template-rows: 48px; align-items: center; gap: 0 4px; flex: 1 0 100%; min-width: 0; }
+    .phone-bar .phone-bar-title { display: block; grid-column: 2; grid-row: 1; margin: 0; padding: 0; border: 0; background: none; color: var(--text-primary); font-size: var(--fs-xl); font-weight: var(--fw-strong); line-height: var(--lh-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+    .phone-bar .phone-bar-title-text { display: block; overflow: hidden; text-overflow: ellipsis; }
+    .phone-bar .phone-bar-search, #mobile-agent-list .phone-bar-search-row { grid-column: 1 / -1; grid-row: 2; width: 100%; min-width: 0; box-sizing: border-box; margin: 4px 0 0; }
+    .phone-bar .phone-bar-search { min-height: 44px; padding: 8px 12px; border: 1px solid var(--control-border); border-radius: var(--radius-lg); background: var(--bg-primary); color: var(--text-primary); font: inherit; }
     .nav-more-menu.nav-drawer .nav-drawer-folder.is-current { font-weight: var(--fw-strong, 600); box-shadow: inset 3px 0 0 var(--accent); background: var(--bg-hover, var(--bg-secondary)); } /* the open folder (#13596) */
     .list-bar-search-wrap.phone-searched { display: none; } /* the pill is this page's search field (#13591) */
     .list-bar-search-row:has(> .phone-searched) { justify-content: flex-end; } /* the Filters icon keeps the right end of the row, where it sat beside the box */
-    .phone-bar .phone-bar-title:has(.phone-bar-search):focus-within { box-shadow: 0 0 0 2px var(--accent); }
-    header.top-bar > .phone-bar { display: flex; }
+    .phone-inbox-bar .phone-bar-search { padding-inline: 3px; } /* its text shares the Inbox cards' 12 px left edge */
+    .phone-bar .phone-bar-search:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    header.top-bar > .phone-bar { display: grid; }
     header.top-bar > :not(.phone-bar) { display: none !important; } /* the old pill, the views menu, Home and the gear: the one bar replaces them on a phone */
     header.top-bar { padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 4px; gap: 4px; background: var(--bg-primary); border: 0 solid var(--bg-primary); box-shadow: none; min-height: 0; } /* the notch's band is the padding in the bar's own colour (the border keeps its style and colour, at no width: pwa_head)*/
-    .phone-bar .phone-account-btn { position: relative; order: 2; border: 0; background: none; color: var(--text-secondary); cursor: pointer; }
+    .phone-bar .phone-account-btn { position: relative; grid-column: 3; grid-row: 1; border: 0; background: none; color: var(--text-secondary); cursor: pointer; }
     .phone-bar .phone-account-btn .material-icons { font-size: var(--icon-size); }
-    /* #13811: Inbox keeps its controls on line one and its real search edge to edge below.
-       Framed Hub folders have no shell field: their own full-width search starts below this header. */
-    header.top-bar:has(> .phone-inbox-bar) { padding-bottom: 0; }
-    header.top-bar > .phone-bar.phone-inbox-bar { display: grid; grid-template-columns: 52px minmax(0, 1fr) 52px; gap: 0; margin-inline: -8px; width: calc(100% + 16px); flex-basis: calc(100% + 16px); }
-    .phone-inbox-bar .phone-menu-btn { grid-column: 1; grid-row: 1; justify-self: center; }
-    .phone-inbox-bar .phone-account-btn { grid-column: 3; grid-row: 1; justify-self: center; }
-    .phone-inbox-bar .phone-bar-title { display: contents; }
-    .phone-bar.phone-inbox-bar .phone-bar-title .phone-bar-title-text { position: static; display: flex; grid-column: 2; grid-row: 1; align-items: center; justify-content: center; width: auto; height: auto; min-height: 52px; overflow: visible; clip: auto; white-space: normal; }
-    .phone-inbox-bar .phone-bar-title .phone-bar-search { grid-column: 1 / -1; grid-row: 2; box-sizing: border-box; height: auto; min-height: 52px; padding: 12px max(20px, env(safe-area-inset-right, 0px)) 12px max(20px, env(safe-area-inset-left, 0px)); border-block: 1px solid var(--border); border-radius: 0; background: var(--bg-secondary); font-size: var(--fs-lg); line-height: var(--lh-label); }
-    .phone-inbox-bar .phone-bar-title .phone-bar-search:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-    #mobile-agent-list .mobile-list-header .mobile-search-input { height: 48px; border-radius: 24px; border: 0; background: var(--bg-secondary); padding: 0 18px; font-size: var(--fs-lg); }
+    #mobile-agent-list .mobile-list-header .mobile-search-input { height: auto; min-height: 44px; border-radius: var(--radius-lg); border: 1px solid var(--control-border); background: var(--bg-primary); padding: 8px 12px; font: inherit; }
 }
 @media (max-width: 600px) {
     #mobile-agent-list .phone-break { order: 3; display: block; flex: 0 0 100%; height: 0; }
@@ -1404,8 +1395,7 @@
     #mobile-agent-list .phone-chip[hidden] { display: none; }
     #mobile-agent-list .phone-chip-need { background: rgba(var(--fx-yellow-rgb), 0.18); color: var(--warning); }
     #mobile-agent-list .phone-chip[aria-pressed="true"] { box-shadow: inset 0 0 0 2px currentColor; }
-    #mobile-agent-list .mobile-list-header > .btn-small, #mobile-agent-list .mobile-list-header > .sidebar-collapse-btn { order: 7; }
-    #mobile-agent-list .mobile-list-header > .sidebar-collapse-btn[data-display-button] { order: 6; margin-left: auto; } /* Display options, the groups' toggle and New share the line under the title, at its right */
+    #mobile-agent-list .mobile-list-header > .btn-small { order: 7; }
 
     /* the cards */
     #mobile-session-list { padding: 0 8px 112px; } /* room under the floating nav and the + (96 px of them) */
@@ -1519,4 +1509,18 @@
 
 @media (max-width: 600px) {
     body:has(:is(#inbox-view, #scheduler-view, #workflows-view, #docs-view, #cost-dashboard-view, #servers-view)[data-phone-item]:not([style*="display: none"])) header.top-bar { display: none; } /* an item opened is a drill-down: its own bar (the arrow and the title) replaces the page's pill (#11239 slice B) */
+}
+
+@media (max-width: 639px) {
+    .team-page #team-page-head { grid-template-columns: 44px minmax(0, 1fr) 44px; grid-template-rows: 48px auto; align-content: start; min-height: 48px; padding-inline: 8px; }
+    .team-page #team-page-head .team-bar-back { grid-row: 1; }
+    .team-page #team-page-head .team-page-actions { grid-row: 1; grid-column: 3; }
+    .team-page-head .team-page-title { line-height: var(--lh-body); }
+    .team-page #team-page-head > .team-page-agent-copy { display: none; }
+    .team-page #team-page-head .team-phone-copy { display: flex; }
+    .team-page #team-page-head .team-page-status { align-self: start; }
+    .team-page #team-page-head > .team-bar-needs { grid-row: 2; grid-column: 1; justify-self: center; }
+    body.live-session-active:not(.popout-mode) .terminal-header:not([data-more]) :is(.live-view-switch, .notice-pause-btn, .terminal-session-context) { display: none !important; }
+    body.live-session-active:not(.popout-mode) .terminal-back-btn { display: inline-flex; align-items: center; justify-content: center; height: 44px; padding: 0; line-height: 1; }
+    body.live-session-active:not(.popout-mode) .terminal-back-btn > span { font-size: var(--icon-size); line-height: 1; }
 }

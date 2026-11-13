@@ -20,6 +20,7 @@ const S = `(window.__coralStatic || '/static/')`;
             await waitFor(`(window._coralGetLiveSessions() || []).some(r => r.session_id === 'talk-agent-id')`, `${tag}: the agent's row`, 8000);
             await ev(`window.selectLiveSession('talk-agent', 'claude', 'talk-agent-id', 'local'); true`);
             await waitFor(`!!document.getElementById('notice-pause-btn') && document.getElementById('notice-pause-btn').closest('.terminal-header').getClientRects().length > 0`, `${tag}: the chat header`, 8000);
+            if (mobile) await ev(`document.getElementById('agent-bar-more').click(); true`); // The one header action reveals Pause in More (#15859).
             const feed = extra => ev(`(() => { const rows = window._coralGetLiveSessions().map(r => r.session_id === 'talk-agent-id' ? { ...r, notices_paused: false, paused_until: null, notices_holding: false, notices_waiting: 0, board_unread: 0, ...${JSON.stringify(extra)} } : r); window._coralSetLiveSessions(rows);
                 return import(${S} + 'session_header_updates.js').then(m => { m.updateWaitingIndicator(rows.find(r => r.session_id === 'talk-agent-id')); return true; }); })()`);
             const view = () => ev(`(() => { const vis = e => !!e && !e.hidden && e.getClientRects().length > 0; const b = document.getElementById('notice-pause-btn'), bar = document.getElementById('notice-pause-bar'), r = b ? b.getBoundingClientRect() : { width: 0, height: 0 };

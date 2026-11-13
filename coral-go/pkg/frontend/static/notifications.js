@@ -226,7 +226,7 @@ function placeNotices() {
     const bar = document.querySelector("header.top-bar");
     const banner = document.getElementById("local-auth-banner");
     const head = document.querySelector("#live-session-view .terminal-header"); // an open agent's header (state, name, the Chat and Terminal toggle, Find, the panel) is not covered either (Mobile tester, #9985)
-    const listTitle = document.querySelector(".mobile-list-title"); // the phone's list title (Agents) is not covered either (Mobile tester, #10052)
+    const listTitle = document.querySelector("#mobile-agent-list .phone-bar"); // the phone's list title (Agents) is not covered either (Mobile tester, #10052)
     const teamHead = document.getElementById("team-page-head"); // nor is a team page's header, its name and status ("Team demo is awake" sat over both, #10359)
     const teamTabs = document.getElementById("team-tabs-row"); // nor is its tab strip (Goals, Agents, Tasks, Artifacts): a toast over it hid the tabs until it left (#11026)
     const inboxTabs = document.querySelector(".view-list-nav"); // the Inbox's phone tab strip (Needs you, Tasks, Goals...) is not covered either (#11694)

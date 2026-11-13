@@ -1663,8 +1663,8 @@ button.server-update-badge { background: transparent; font: inherit; cursor: poi
 .session-label-split .session-label-tags { flex: 0 100 auto; min-width: 0; overflow: hidden; white-space: nowrap; }
 
 /* The phone's Search agents box, under the list header's controls (#4624) */
-.mobile-list-header .mobile-search-row { flex: 1 0 100%; }
-.mobile-list-header .mobile-search-input { width: 100%; box-sizing: border-box; height: var(--ctl-h); padding-left: 12px; }
+.mobile-list-header .mobile-search-row { display: flex; align-items: center; gap: 4px; flex: 1 0 100%; }
+.mobile-list-header .mobile-search-input { flex: 1; min-width: 0; width: 100%; box-sizing: border-box; height: var(--ctl-h); padding-left: 12px; }
 .server-details-update:not(.server-below-minimum) { flex-wrap: wrap; } /* #5487 review: the long "Update required" sentence and its badge wrap instead of squeezing the badge out of the panel */
 .server-details-update .server-update-badge { flex: none; white-space: nowrap; }
 /* Team settings > Workflow: the preset editor is behind "Edit presets"; the working mode comes first (UI audit #5589, finding 9). */

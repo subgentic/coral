@@ -11,7 +11,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
     const { client, Page, Emulation, ev, waitFor } = await connect();
     const shot = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const S = `(window.__coralStatic || '/static/')`;
-    const boxes = () => ev(`[...document.querySelectorAll('input[type=search]')].filter(e => e.getClientRects().length).map(e => e.id || e.className.slice(0, 24))`);
+    const boxes = () => ev(`[...document.querySelectorAll('input[type=search]')].filter(e => e.getClientRects().length).map(e => e.id || (e.classList.contains('phone-bar-search') ? 'phone-bar-search' : e.className.slice(0, 24)))`);
     const open = async (w, mobile, group) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
