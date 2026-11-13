@@ -99,11 +99,11 @@ func ForwardsHubServer(method, decodedPath string) bool {
 	return method == http.MethodPost && hubServerRoute.MatchString(decodedPath)
 }
 
-// hubTargetRoute is where X-Coral-Hub-Server means "the server this request was routed to" (#16032): the three routes that type into an agent. The hub routes by server id alone, so two computers that
+// hubTargetRoute is where X-Coral-Hub-Server means "the server this request was routed to" (#16032): the routes that act on one agent (type into it, set its goal, kill, restart, sleep, wake, dismiss its wait; #16074 added all but the first three). The hub routes by server id alone, so two computers that
 // share an agent name could be mixed up; the server checks the id the hub names against its own (HubTargetGuard).
-var hubTargetRoute = regexp.MustCompile(`^/api/sessions/live/[^/]+/(send|keys|answer-prompt)$`)
+var hubTargetRoute = regexp.MustCompile(`^/api/sessions/live/(?:[^/]+/(?:send|keys|answer-prompt|goal|kill|restart|dismiss-wait|sleep|wake)|team/[^/]+/(?:sleep|wake))$`)
 
-// ForwardsHubTarget reports whether X-Coral-Hub-Server is forwarded as the routed-to server id: a POST to send, keys or answer-prompt of a live agent, and nothing else.
+// ForwardsHubTarget reports whether X-Coral-Hub-Server is forwarded as the routed-to server id: a POST to one of those agent routes (or a team's sleep or wake), and nothing else.
 func ForwardsHubTarget(method, decodedPath string) bool {
 	return method == http.MethodPost && hubTargetRoute.MatchString(decodedPath)
 }

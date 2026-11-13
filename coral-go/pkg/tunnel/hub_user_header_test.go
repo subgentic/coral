@@ -80,7 +80,8 @@ func TestScrubForwardsTheHubServerHeaderOnlyOnExternalMessages(t *testing.T) {
 		{http.MethodPost, "/api/board/team/tasks", false},
 		{http.MethodPut, "/api/board/team/settings", false},
 		{http.MethodPost, "/api/sessions/live/x/send", true}, // the routed-to server id of a typing route (#16032), not a relay: see local_headers_target_test.go
-		{http.MethodPost, "/api/sessions/live/x/kill", false},
+		{http.MethodPost, "/api/sessions/live/x/kill", true}, // the routed-to server id of an agent route too (#16074)
+		{http.MethodPost, "/api/sessions/live/x/resume", false},
 	} {
 		for _, key := range []string{HubServerHeader, "x-coral-hub-server", "X-CORAL-HUB-SERVER"} {
 			in := http.Header{}
