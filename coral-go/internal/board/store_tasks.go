@@ -198,6 +198,11 @@ func (s *Store) goalForNewTask(ctx context.Context, project string, opts *Create
 	} else if w.RetryOf != 0 {
 		goalID = s.inheritedGoal(ctx, project, w.RetryOf)
 	}
+	// A review task Coral makes serves the goal of the task it reviews (#16183), so Goals and the Operator's rule see it where the work is: the task's own goal while that goal is open.
+	// Only a reviewed task with no goal, or a closed one, leaves it with none (and exempt, below).
+	if goalID == nil && opts != nil && opts.reviewTask && w.ReviewOf != 0 {
+		goalID = s.inheritedGoal(ctx, project, w.ReviewOf)
+	}
 	// A board that requires a goal refuses a task with none, before anything is stored (#7116). A review task Coral makes for a task in review is not the person's to give a goal: it is exempt, or
 	// a board that requires goals could not review its own work.
 	if goalID == nil && (opts == nil || (!opts.reviewTask && opts.remote == nil)) { // a task made for another team's request has that team's goal
