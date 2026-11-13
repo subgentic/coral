@@ -1,5 +1,6 @@
 // #14152: Dismiss sends nothing; an active terminal wait remains reachable and counted.
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
 const BASE = require('./test_base').BASE;
@@ -7,9 +8,10 @@ const { removeBoards } = require('./helpers/board_cleanup');
 (async () => {
  const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
  const teams=[];
+ const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
  try {
   await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-  for (const width of [1280,390]) {
+  for (const width of [1440,390]) {
    await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: width===390 });
    await Page.navigate({ url: BASE+'/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
    const team='retained-wait-'+Date.now().toString(36);teams.push(team);
@@ -26,11 +28,19 @@ const { removeBoards } = require('./helpers/board_cleanup');
     assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tr[data-key="local:retained-agent-id"] [role="menuitem"]')].map(item=>item.textContent.trim()).filter(text=>text==='Dismiss')`),[],'phone row menu cannot dismiss an already still-waiting request again');
    }
    await ev(`globalThis.__coralAttentionGraceMs=4000;window.T.state.liveSessions=window.T.state.liveSessions.filter(row=>row!==window.__retained);window.openTeamPage(${JSON.stringify(team)})`);
-   await waitFor(`document.querySelector('#team-page-status')?.textContent.trim()==='Checking attention status'`,'explicit checking status after availability arrives before local live snapshot');
+   await waitFor(`document.querySelector('#team-page-status')?.classList.contains('pending')`,'the header says nothing, with no dot, while the rows catch up (T3: no Checking text)');
+   assert.equal(await ev(`document.querySelector('#team-page-status').textContent.trim() + document.querySelectorAll('#team-page-status .team-status-dot').length`),'0','pending: no words and no dot');
+   const pendingBox = await ev(`(() => { const r = document.querySelector('#team-page-head').getBoundingClientRect(), s = document.querySelector('#team-page-status').getBoundingClientRect(); return { h: Math.round(r.height), sh: Math.round(s.height), badge: document.querySelector('#team-tab-needs .team-tab-count')?.textContent || '' }; })()`);
+   assert.ok(!/…/.test(pendingBox.badge), width + ': the Needs you tab shows no … while it does not know: ' + JSON.stringify(pendingBox));
+   assert.ok(pendingBox.sh >= 12, width + ': the status line keeps its height while empty: ' + JSON.stringify(pendingBox));
+   for (const theme of ['dark','light']) { await ev(`document.documentElement.setAttribute('data-theme','${theme}'); true`); await shot(`team-pending-${width}-${theme}`); }
    assert.notEqual(await ev(`document.querySelector('#team-page-status').textContent.trim()`),'All well',width+': missing live row cannot certify zero attention');
    assert.equal(await ev(`document.querySelector('#team-page-status').classList.contains('well')`),false,'mismatch has neutral status');
    // #15151 (walk 4 F13, seen again on walks 6 and 7): 'Checking attention status' is for a moment. When the board still says an agent waits and no live row agrees after the grace, the board's word counts: the header settles.
-   await waitFor(`/^1 needs? attention$/.test(document.querySelector('#team-page-status')?.textContent.trim()||'')`,'the header settles on the board\'s word and never stays on Checking',20000);
+   await waitFor(`/^1 needs? attention$/.test(document.querySelector('#team-page-status')?.textContent.trim()||'')`,'the header settles on the board\'s word and never stays blank',20000);
+   for (const theme of ['dark','light']) { await ev(`document.documentElement.setAttribute('data-theme','${theme}'); true`); await shot(`team-settled-${width}-${theme}`); }
+   const settledBox = await ev(`Math.round(document.querySelector('#team-page-head').getBoundingClientRect().height)`);
+   assert.ok(Math.abs(settledBox - pendingBox.h) <= 1, width + ': the answer arriving moves nothing in the header (' + pendingBox.h + ' to ' + settledBox + ')');
    await ev(`window.__failAvailability=true;window.openTeamPage(${JSON.stringify(team)})`);
    await waitFor(`window.__availabilityFailed && document.querySelector('#team-page-status')?.textContent.trim()==='Status unavailable'`,'failed availability ends at explicit unavailable status');
    assert.equal(await ev(`document.querySelector('#team-page-status').classList.contains('well')`),false,'failed availability remains neutral');

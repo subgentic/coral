@@ -255,13 +255,15 @@ function drawStatus(data) {
     const tp = state.teamPause, paused = tp?.paused && tp.team === S.team; // the person's Pause (#15331): the header says so, with the way out in the line under it (team_pause.js)
     // every task done, none open, nobody working and nothing needs the person: not the same as "All well" while the team is still at it (walk 21 H2, #15304)
     const finished = !shown && !unknown && S.counts.tasks === 0 && S.tasksDone > 0 && data.agents.every(a => a.availability !== 'busy' && a.availability !== 'needs_input' && a.availability !== 'waiting');
-    const text = paused ? 'Paused' : uncertainAttention ? 'Checking attention status' : asleep ? 'Asleep' : wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : shown ? `${shown} ${shown === 1 ? 'needs' : 'need'} attention` : unknown ? (unknown === data.agents.length ? 'No agent has sent a first message yet' : `${unknown} of ${data.agents.length} agents have not sent a first message yet`) : finished ? 'Finished: your turn' : 'All well';
+    const text = paused ? 'Paused' : uncertainAttention ? '' : asleep ? 'Asleep' : wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : shown ? `${shown} ${shown === 1 ? 'needs' : 'need'} attention` : unknown ? (unknown === data.agents.length ? 'No agent has sent a first message yet' : `${unknown} of ${data.agents.length} agents have not sent a first message yet`) : finished ? 'Finished: your turn' : 'All well';
     // When agents need attention the visible status is a button to the Agents tab (beside the live region, which keeps saying it and is then only for a screen reader: the button's name is not announced twice); "All well" is plain text.
     const b = $('team-page-health');
     if (b) {
         b.hidden = !shown || uncertainAttention;
         if (shown && !uncertainAttention) { b.replaceChildren(Object.assign(el('span', 'team-status-dot'), {}), document.createTextNode(text)); b.firstChild.setAttribute('aria-hidden', 'true'); b.setAttribute('aria-label', `Team health: ${text}`); }
     }
+    // while the rows catch up (uncertainAttention) the header says nothing, with no dot: nothing is known yet (design guidelines, T3). The box keeps its height (css .pending) so the answer moves nothing
+    if (!text) { s.textContent = ''; s.className = 'team-page-status pending'; return; }
     if (s.textContent === text) return; // the same words are not said again
     s.className = `team-page-status ${paused || uncertainAttention || asleep ? 'unknown' : shown ? 'needs sr-only' : unknown ? 'unknown' : 'well'}`; // Asleep takes the neutral dot, as waiting does
     const dot = el('span', 'team-status-dot'); dot.setAttribute('aria-hidden', 'true');
@@ -300,11 +302,11 @@ function drawCounts() {
 async function readCounts() {
     const team = S.team, seq = ++S.countSeq;
     if (!team) return;
-    S.counts.needs ??= '…';
+    S.counts.needs ??= ''; // unknown: no badge until the answer is known (design guidelines, T3)
     importOnce('./inbox_sidebar.js').then(m => m.refreshTeamNeedsCount(team)).then(count => {
         if (seq !== S.countSeq || team !== S.team) return;
-        S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts();
-    }).catch(() => { if (seq === S.countSeq && team === S.team) { S.counts.needs = '…'; drawCounts(); } });
+        S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : ''; drawCounts();
+    }).catch(() => { if (seq === S.countSeq && team === S.team) { S.counts.needs = ''; drawCounts(); } });
     const knowledge = S.knowledgeFor === team ? null : (S.knowledgeFor = team, teamFetch(team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge`).then(async r => { const data = await r.json(); return r.ok ? data : null; }).catch(() => null)); // the Knowledge tab's count once per team, with the others (the notes are read again when the tab opens)
     importOnce('./team_pause.js').then(m => m.readTeamPause(team)); // the pause is read on every poll, so a pause made elsewhere (another tab, a restart) shows here too
     const [goals, tasks, avail, kn] = await Promise.allSettled([
@@ -329,7 +331,7 @@ async function readCounts() {
 function syncNeedsCount() {
     if (!S.team || !currentTeamPage()) return;
     const team = S.team;
-    importOnce('./inbox_sidebar.js').then(m => { if (S.team !== team) return; const count = m.teamNeedsCount(team); S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts(); });
+    importOnce('./inbox_sidebar.js').then(m => { if (S.team !== team) return; const count = m.teamNeedsCount(team); S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : ''; drawCounts(); });
 }
 document.addEventListener('coral:needs-updated', () => { if (S.team && currentTeamPage()) drawStatus(S.statusData); syncNeedsCount(); });
 document.addEventListener('coral:team-needs-count', e => { if (e.detail?.team === S.team) syncNeedsCount(); });
