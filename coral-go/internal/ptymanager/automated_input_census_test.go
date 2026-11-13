@@ -61,7 +61,7 @@ var allowedSenders = map[string]sender{
 	"internal/ptymanager/notice_pause.go\ttypeSummary\tSendInput":                            {guardGate, "gate: the one line for held notices is the Send of a DeliverAutomated call (#11387)", ""},
 	"internal/server/routes/agent_ui_request.go\tSessionsHandler.agentUIRequest\tSendPrompt": {guardGate, "gate (its send closure)", ""},
 	// AgentLauncher.SendPrompt, which goes through the gate itself.
-	"internal/background/launcher.go\tAgentLauncher.startPromptDelivery\tSendPrompt":            {guardGate, "gated launcher prompt", ""},
+	"internal/background/launcher.go\tAgentLauncher.startPromptDeliveryHeld\tSendPrompt":            {guardGate, "gated launcher prompt", ""},
 	"internal/background/workflow_steps.go\tWorkflowRunner.executeAgentInteractive\tSendPrompt": {guardGate, "gated launcher prompt", ""},
 	// #7727: the gate's own sends: one look at the screen, then the text and its Enter at once; nothing into an open prompt or over a draft.
 	"internal/ptymanager/automated_input_deliver.go\tinputGate.typeNow\tSendPrompt":            {guardGate, "gate (the paste with its Enter: the screen is looked at once before, and again just before the Enter)", ""},
