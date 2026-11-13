@@ -520,12 +520,12 @@ func (pr *Provisioner) keepRunningDataDir(ctx context.Context, p *provisionPlan)
 	switch kind {
 	case "rel":
 		if sshprov.DataDirProblem(path) != "" {
-			pr.fail(p, "install", "That Coral keeps its data in ~/"+path+", a folder this hub will not carry over. Nothing was changed.")
+			pr.fail(p, "install", "That Coral keeps its data in ~/"+remoteFolderText(path)+", a folder this hub will not carry over. Nothing was changed.")
 			return "", false
 		}
 	case "abs":
 		if !pr.runner.IsCoralDataDir(ctx, p.Target, path) {
-			pr.fail(p, "install", "That Coral keeps its data in "+path+", which is not a Coral data folder this hub can keep (no sessions.db there, or it is not yours). Nothing was changed.")
+			pr.fail(p, "install", "That Coral keeps its data in "+remoteFolderText(path)+", which is not a Coral data folder this hub can keep (no sessions.db there, or it is not yours). Nothing was changed.")
 			return "", false
 		}
 	case "relative":
@@ -539,7 +539,26 @@ func (pr *Provisioner) keepRunningDataDir(ctx context.Context, p *provisionPlan)
 		return "", false
 	}
 	if kind == "rel" {
-		return " Keeping its data folder ~/" + path + ".", true
+		return " Keeping its data folder ~/" + remoteFolderText(path) + ".", true
 	}
-	return " Keeping its data folder " + path + ".", true
+	return " Keeping its data folder " + remoteFolderText(path) + ".", true
+}
+
+// remoteFolderText is a folder as the far computer's command line gave it, made fit for a sentence the person reads (#16047): printable ASCII only (no control characters, no escape sequences, nothing that
+// reads as markup in another script) and at most 80 characters, the rest cut with "...". The record kept for the start is never this text, only a path the checks passed.
+func remoteFolderText(s string) string {
+	var b strings.Builder
+	n := 0
+	for _, r := range s {
+		if r < 0x20 || r > 0x7e {
+			r = '?'
+		}
+		if n == 80 {
+			b.WriteString("...")
+			break
+		}
+		b.WriteRune(r)
+		n++
+	}
+	return b.String()
 }

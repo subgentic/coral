@@ -128,3 +128,22 @@ func dataHomeFailText(v map[string]any) string {
 	}
 	return strings.Join(out, " ")
 }
+
+// #16047 (Security's INFO on #16021): the refusal sentence names the far --home, which is another computer's text: cut to a sane length, and only printable characters.
+func TestUpgradeRefusalSentenceCutsAndCleansTheRemoteDataFolderText(t *testing.T) {
+	for name, runs := range map[string]string{
+		"long rel":   "rel .ssh/" + strings.Repeat("a", 300),
+		"long abs":   "abs /" + strings.Repeat("b", 300),
+		"escape abs": "abs /srv/x\x1b[31mred",
+	} {
+		t.Run(name, func(t *testing.T) {
+			me := newManageEnv(t)
+			phase, failed := me.upgradeWithRunningHome(t, runs)
+			require.Equal(t, "failed", phase, "%v", failed)
+			text := dataHomeFailText(failed)
+			assert.NotContains(t, text, "\x1b", "a control character reached the sentence")
+			assert.Less(t, len(text), 400, "the remote text was not cut: %d characters", len(text))
+			assert.Contains(t, text, "Nothing was changed.")
+		})
+	}
+}
