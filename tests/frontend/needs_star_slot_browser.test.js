@@ -37,7 +37,7 @@ const BASE = require('./test_base').BASE;
                     return { star: [Math.round(sr.left), Math.round(sr.top), Math.round(sr.right), Math.round(sr.bottom)], under: out, anchor: anchor.className + ' ' + box(anchor), cell: box(star.closest('td')), name: box(anchor.querySelector('.inbox-review-name')), ctx: box(anchor.querySelector('.inbox-pinned-context')), kids: [...anchor.children].map(c => c.className.split(' ')[0] + ' ' + box(c)).join(' | '), rowCells: [...row.children].map(c => box(c)).join(' ; ') }; }); })()`);
             if (!over.length || over.some(o => o.under.length)) problems.push(`${at}text runs under the star: ${JSON.stringify(over)}`);
         }
-    } finally { await Promise.race([removeBoards(ev, [team]).catch(() => {}), new Promise(r => setTimeout(r, 15000))]); await client.close().catch(() => {}); } // a page that stalled must not hold the cleanup (or the board) for the rest of the suite's budget
+    } finally { await Promise.race([removeBoards(ev, [team]).catch(() => {}), new Promise(r => setTimeout(r, 15000))]); /* sleep-ok: the cap on a cleanup that a stalled page would hold */ await client.close().catch(() => {}); } // a page that stalled must not hold the cleanup (or the board) for the rest of the suite's budget
     if (problems.length) { console.error('FAIL\n  ' + problems.join('\n  ')); process.exit(1); }
     console.log('needs_star_slot_browser: ok');
 })().catch(e => { console.error(e); process.exit(1); });
