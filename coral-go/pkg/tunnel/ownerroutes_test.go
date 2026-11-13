@@ -86,6 +86,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodPost && p == "/api/hub-auto-accept" {
 				continue
 			}
+			// Send, keys and answer-prompt carry the owner marker since #16000 (OwnerSees): the old list never had them.
+			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && (strings.HasSuffix(p, "/send") || strings.HasSuffix(p, "/keys") || strings.HasSuffix(p, "/answer-prompt")) {
+				continue
+			}
 			// The owner's Dismiss of an agent's stale wait (#11352) is new: the old list never had it.
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && strings.HasSuffix(p, "/dismiss-wait") {
 				continue
@@ -341,5 +345,22 @@ func TestTheLiveSessionListIsAnOwnerSeesRouteAndNothingAroundItChanged(t *testin
 	// only the read: nothing else on the exact path is an owner route
 	for _, m := range []string{http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch} {
 		assert.False(t, IsOwnerRoute(m, "/api/sessions/live"), m)
+	}
+}
+
+// #16000: the owner marker reaches send, keys and answer-prompt (so an Operator's Hub send can be recorded) and never refuses a grantee (OwnerSees), and the tier stays Interact.
+func TestSendKeysAnswerPromptCarryTheOwnerMarkerButRefuseNobody(t *testing.T) {
+	for _, suffix := range []string{"send", "keys", "answer-prompt"} {
+		path := "/api/sessions/live/worktree1/" + suffix
+		pat, mode := OwnerRoute(http.MethodPost, path)
+		if pat == "" || mode != OwnerSees {
+			t.Fatalf("%s: pattern %q mode %v, want OwnerSees", suffix, pat, mode)
+		}
+		if mode.Refuses() {
+			t.Fatalf("%s must not refuse a grantee", suffix)
+		}
+		if tier := Classify(http.MethodPost, path, ""); tier != TierInteract {
+			t.Fatalf("%s tier %v, want Interact", suffix, tier)
+		}
 	}
 }

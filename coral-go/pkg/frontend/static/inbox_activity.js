@@ -8,7 +8,7 @@ import { teamLabel } from './server_status.js';
 import { serverFetch, identityKey, LOCAL_SERVER } from './server_base.js';
 import { state as appState } from './state.js';
 import { inboxSources, multipleServers, serverLabel } from './inbox_servers.js';
-const { activityParts, aboutWords, jobRunParts } = await importOnce('./operator_activity_words.js');
+const { activityParts, aboutWords, jobRunParts, collapseSends } = await importOnce('./operator_activity_words.js');
 import { markHidden } from './visible_marks.js';
 import { loadStyles } from './lazy_styles.js';
 const DT = await importOnce('./data_table.js');
@@ -136,7 +136,7 @@ export const teams = () => [...new Set(rows.map(r => r.team))].sort((a, b) => te
 export const agents = () => [...new Set(rows.map(AF.agentOf).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 export const goals = () => { const all = [...new Set(rows.map(AF.goalOf))]; return [...all.filter(g => g !== AF.NO_GOAL).sort((a, b) => a.localeCompare(b)), ...all.filter(g => g === AF.NO_GOAL)]; };
 export const teamOf = r => teamLabel(r.team);
-export const filtered = f => AF.ordered(rows.filter(r => AF.matches(r, f, teamOf)), f);
+export const filtered = f => collapseSends(AF.ordered(rows.filter(r => AF.matches(r, f, teamOf)), f));
 export const total = () => rows.length;
 /** How many of the rows read are of a kind (the chips' counts); '' is all of them. */
 export const countKind = k => rows.filter(r => AF.inKind(r, k)).length;

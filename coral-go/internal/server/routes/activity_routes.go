@@ -110,9 +110,6 @@ func ActivityRecorder(bs *board.Store, nameOf func(id string) string) func(http.
 			if pend.set { // a handler that knows more than its route does (the body, a header) said which row this click is
 				if humanInputCaller(r) {
 					meta := activityMetaFor(r, pend.title, pend.note)
-					if typesIntoAnAgent(pend.action) && meta.Actor == "hub:unknown" {
-						return
-					}
 					meta.TaskID = pend.task
 					_ = bs.RecordActivity(context.WithoutCancel(r.Context()), meta, pend.action, pend.kind, pend.item, "", pend.team)
 				}
@@ -149,16 +146,10 @@ func ActivityRecorder(bs *board.Store, nameOf func(id string) string) func(http.
 				}
 			}
 			meta := activityMetaFor(r, title, "")
-			if typesIntoAnAgent(ar.Action) && meta.Actor == "hub:unknown" { // the Hub's own traffic (its notices typed into a remote agent): an authentic tunnel with nobody behind it is no one typing (#16000)
-				return
-			}
 			_ = bs.RecordActivity(ctx, meta, ar.Action, ar.Kind, item, "", team)
 		})
 	}
 }
-
-// typesIntoAnAgent is true for the actions whose row says the Operator typed words to an agent: a row made of the Hub's own traffic would put words in the Operator's mouth (#16000).
-func typesIntoAnAgent(action string) bool { return action == board.ActChatSend || action == board.ActWaitSend }
 
 // recordWords writes the row of an action whose words the Operator typed (a reply, a message): the same person-only rule, with the words as the row's note (redacted and cut by activityMetaFor).
 func (h *BoardHandler) recordWords(r *http.Request, action, kind, item, team, title, words string) {

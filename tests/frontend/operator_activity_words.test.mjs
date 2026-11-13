@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { activityParts, cleanAnswer, jobRunParts } from '../../coral-go/pkg/frontend/static/operator_activity_words.js';
+import { activityParts, cleanAnswer, jobRunParts, collapseSends } from '../../coral-go/pkg/frontend/static/operator_activity_words.js';
 import { ACTION_LABEL, ACTIONS } from '../../coral-go/pkg/frontend/static/operator_activity_filters.js';
 const boardDir = new URL('../../coral-go/internal/board/',import.meta.url);
 const constants = fs.readdirSync(boardDir).filter(n=>n.endsWith('.go')&&!n.endsWith('_test.go')).map(n=>fs.readFileSync(new URL(n,boardDir),'utf8')).join('\n');
@@ -53,3 +53,15 @@ assert.deepEqual(activityParts({action:'file_share',item_kind:'file',title:'plan
 
 // #16000: the Operator's own send says what was sent: the first line is the row's detail, under "Sent words to an agent" and the agent's name.
 assert.deepEqual(activityParts({action:'chat_send',item_kind:'agent',item_id:'worktree1',note:'Please rebase on main'},r=>r.item_id),{did:'Sent words to an agent',on:'worktree1',detail:'Please rebase on main'});
+
+// #16000: sends in a row to one agent read as one row, "Sent 3 messages to", with each first line (newest first); a different agent, source or action breaks the run.
+{
+    {
+        const s = (id, item, note, source = 'hub') => ({ id, action: 'chat_send', item_id: item, source, actor: 'hub:u', note });
+        const out = collapseSends([s(5, 'w1', 'c'), s(4, 'w1', 'b'), s(3, 'w1', 'a'), s(2, 'w2', 'x'), s(1, 'w1', 'y')]);
+        assert.equal(out.length, 3);
+        assert.equal(out[0].send_count, 3);
+        assert.deepEqual(activityParts(out[0], r => r.item_id), { did: 'Sent 3 messages to', on: 'w1', detail: 'c · b · a' });
+        assert.equal(activityParts(out[1], r => r.item_id).did, 'Sent words to an agent');
+    }
+}

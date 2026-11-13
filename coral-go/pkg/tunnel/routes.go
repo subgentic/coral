@@ -322,6 +322,8 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/asks/{messageID}/close")),
 	// The Operator's Dismiss of a stale wait (#11352) is the OWNER's alone through the hub (the operator's rule: the owner gets everything): a guest or a grantee gets 403 owner_only. It clears Coral's
 	// own record of a wait and types nothing, presses nothing in the agent's terminal, so Interact; the machine's own mode still caps it.
+	// Words, keys and an answer typed into an agent (#16000): still Interact for anyone the Hub lets type, but the owner marker is stamped so the machine can tell the signed-in owner's own send (an Activity row) from the Hub's service call (none). OwnerSees, not OwnerRefuse: a grantee still sends.
+	owner(OwnerSees, rules(http.MethodPost, TierInteract, "/api/sessions/live/{name}/send", "/api/sessions/live/{name}/keys", "/api/sessions/live/{name}/answer-prompt")),
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/live/{name}/dismiss-wait")),
 	// The Operator's per-agent auto-sleep switch (#12111) is the OWNER's alone through the hub: it changes Coral's own record and types and kills nothing, so Interact.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/live/{name}/auto-sleep")),
@@ -393,10 +395,7 @@ var routeTable = cat(
 		// A panel interaction and a request to the agent put user text in front of an agent, like send.
 		"/api/agent/ui/{uiid}/events",
 		"/api/agent/ui-request",
-		"/api/sessions/live/{name}/send",
-		"/api/sessions/live/{name}/keys",
 		"/api/sessions/live/{name}/resize",
-		"/api/sessions/live/{name}/answer-prompt",
 		// Turning auto-accept off is always safe (#3182); turning it on is Launch, below.
 		"/api/sessions/live/{name}/auto-accept/disable",
 		"/api/auto-accept/disable-all",

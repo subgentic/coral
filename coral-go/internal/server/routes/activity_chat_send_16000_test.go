@@ -20,10 +20,8 @@ import (
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
-// #16000: the Activity record said "Sent words to an agent" over and over for an agent the Operator had not typed to. The Hub's own traffic (its Task Queue notices typed into a remote agent) arrives through the
-// tunnel with the Hub's stamp and no owner: humanInputCaller counts the tunnel as a person, so the recorder wrote a row for it. A row of "the Operator sent words" is for this computer's dashboard and for the
-// Hub's signed-in owner only.
-func TestChatSendRowsAreTheOperatorsOwnSendsOnly(t *testing.T) {
+// #16000: every Hub-forwarded send is a person's browser (the Hub has no automatic sender), so it is a row, never dropped; the owner stamp attributes it, an agent's tool writes none, and (below) a failed send writes none.
+func TestChatSendRowsCoverTheDashboardAndTheHubButNotAgents(t *testing.T) {
 	withLabel(t, "hub-user-1234abcd", nil) // this machine is enrolled as that account's
 	owner := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: "hub-user-1234abcd"}
 	service := map[string]string{tunnel.ViaHeader: cloud.ViaSecret()} // the Hub's own call: authentic tunnel, nobody behind it
@@ -36,7 +34,7 @@ func TestChatSendRowsAreTheOperatorsOwnSendsOnly(t *testing.T) {
 	}{
 		{"this computer's dashboard", callerDashCookie, nil, true, "local"},
 		{"the Hub's signed-in owner", callerHub, owner, true, "hub"},
-		{"the Hub's own traffic, no owner behind it", callerHub, service, false, ""},
+		{"a Hub send with no owner stamp is still the Operator's send, attributed to no one in particular", callerHub, service, true, "hub"},
 		{"an agent's tool", callerAgentNoToken, nil, false, ""},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -65,7 +63,7 @@ func TestChatSendRowsAreTheOperatorsOwnSendsOnly(t *testing.T) {
 			require.Len(t, rows, 1)
 			assert.Equal(t, board.ActChatSend, rows[0].Action)
 			assert.Equal(t, c.source, rows[0].Source)
-			assert.NotEqual(t, "hub:unknown", rows[0].Actor)
+			assert.NotEmpty(t, rows[0].Actor)
 		})
 	}
 }
@@ -108,4 +106,26 @@ func TestTheOperatorsSendRowShowsTheFirstLineOfTheWords(t *testing.T) {
 	rows = wordRows(t, bs)
 	require.Len(t, rows, 2)
 	assert.LessOrEqual(t, len([]rune(rows[0].Note)), 140, "a long line is cut")
+}
+
+// #16000: a send the server refuses (an unknown agent, a 404) is no row; only a 2xx is recorded.
+func TestAFailedSendWritesNoActivityRow(t *testing.T) {
+	bs, err := boardtest.Open(filepath.Join(t.TempDir(), "board.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { bs.Close() })
+	r := chi.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			next.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie)))
+		})
+	})
+	r.Use(ActivityRecorder(bs, nil))
+	r.Post("/api/sessions/live/{name}/send", func(w http.ResponseWriter, req *http.Request) {
+		noteActivity(req, board.ActChatSend, "agent", "worktree1", "", "", "words")
+		w.WriteHeader(http.StatusNotFound)
+	})
+	r.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/api/sessions/live/worktree1/send", nil))
+	rows, _, err := bs.ActivityPage(context.Background(), board.ActivityFilter{Limit: board.ActivityMaxLimit})
+	require.NoError(t, err)
+	assert.Empty(t, rows)
 }

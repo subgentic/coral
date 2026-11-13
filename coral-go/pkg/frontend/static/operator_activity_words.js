@@ -39,6 +39,7 @@ export function activityParts(row, itemWords) {
     if (row.action === 'file_edit_send') return mk('Sent your edit', `${row.title || 'a file'}`, [note, 'to agents'].filter(Boolean).join(' · '));
     if (row.action === 'file_edit') return mk('Saved a new version', `${row.title || 'a file'}`, note);
     if (row.action === 'wait_dismiss') return mk('Dismissed', `${who}’s waiting card`);
+    if (row.action === 'chat_send' && row.send_count > 1) return mk(`Sent ${row.send_count} messages to`, obj, row.send_notes.filter(Boolean).slice(0, 5).join(' · ') + (row.send_count > 5 ? ` · and ${row.send_count - 5} more` : ''));
     if (row.action === 'wait_send') return mk('Sent held words to', who);
     let did = ACTION_LABEL[row.action] || row.action;
     const kind = KIND_OBJECT.find(k => did.endsWith(` ${k}`));
@@ -53,4 +54,16 @@ export function aboutWords(row) {
     if (goalId && !(row.item_kind === 'goal' && String(row.item_id) === String(goalId))) out.push(`Goal #${goalId}${row.goal_title ? ` \u00b7 ${row.goal_title}` : ''}`);
     if (taskId && !(row.item_kind === 'task' && String(row.item_id) === String(taskId))) out.push(`Task #${taskId}${row.task_title ? ` \u00b7 ${row.task_title}` : ''}`);
     return out.join(' \u00b7 ');
+}
+
+/** Sends one after another to the same agent from the same place read as one row (#16000): the newest row, with how many and the first line of each (newest first). Only rows next to each other in the list join. */
+export function collapseSends(list) {
+    const out = [];
+    for (const r of list) {
+        const last = out[out.length - 1];
+        if (r.action === 'chat_send' && last && last.action === 'chat_send' && last.item_id === r.item_id && last.source === r.source && last.actor === r.actor) {
+            last.send_count = (last.send_count || 1) + 1; last.send_notes.push(String(r.note || '').trim());
+        } else out.push(r.action === 'chat_send' ? { ...r, send_notes: [String(r.note || '').trim()] } : r);
+    }
+    return out;
 }
