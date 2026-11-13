@@ -199,6 +199,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     if (!group.contains(document.activeElement) || !chosen) draw(); // moving a card would drop the keyboard from it: only when nobody is on the group
     else paintStatus();
     group.dataset.probed = '1';
+    form.dispatchEvent(new Event('acf-synced', { bubbles: true })); // the "Runs as" line offers the providers the strip shows (#15885)
     if (state.get(signin.type).found === true) askSignin();
     // a later check of a CLI (Check again, or after Set path and Save) draws its card again from the fresh answer (#10161)
     const onChecked = e => {

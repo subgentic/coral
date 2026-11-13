@@ -353,7 +353,7 @@
  "phone_bar_browser.test.js": 6.6,
  "agent_kept_page_browser.test.js": 6.5,
  "auto_wake_browser.test.js": 6.5,
- "launch_recap_first_draw_browser.test.js": 6.5,
+ "runs_as_line_browser.test.js": 20,
  "new_surfaces_a11y_browser.test.js": 6.5,
  "team_settings_phone_browser.test.js": 6.5,
  "a11y_polish_6038_browser.test.js": 6.4,

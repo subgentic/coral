@@ -1,6 +1,5 @@
-/* New Agent's recap line (#7391): above the footer from step 2 on, one read-only sentence of what Launch will do: "QA Engineer: Claude, /tmp/payments-app, default model, Auto mode". It is plain text read from the form's own
- * fields (the fields stay the one place that sets anything), so it can never say one thing and the launch another. */
-import { modelName } from './model_labels.js';
+/* New Agent's "Runs as" line (#7391, #15885): above the footer, the four values Launch will use as compact controls (see paintRecap), the warning for a risky mode and the exact flags under them. The controls are windows on the form's own
+ * fields (the fields stay the one place that sets anything), so the line can never say one thing and the launch another. */
 import { importOnce } from './import_once.js';
 const { TYPE, fetchFlags, flagsNodes } = await importOnce('./permission_flags_line.js'); // the flags line is shared with Restart and Resume (#15761)
 const { permissionDescription, PI_NO_PERMISSIONS } = await importOnce('./permission_flags.js'); // lazy like launch_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
@@ -10,26 +9,17 @@ const container = () => document.getElementById('launch-agent-acf');
 /** What a permission mode allows for this CLI, in the words Settings and the Permissions tab use for it (Codex's Auto is its workspace sandbox with the network on; Antigravity's and Gemini's skip every prompt and check; Pi has no permissions at all): the footer says it, so 'Auto mode' is not left unexplained (Desktop tester, #10000). */
 function modeNote(type, value) { return permissionDescription(type, value).replace(/\.$/, ''); }
 
-/** The recap's parts: the person's name for the agent, then the provider, the folder, the model and the mode, each as words. */
+/** What the note under the line needs: the mode in words and what it allows for this CLI. */
 function recapParts() {
     const acf = container();
     if (!acf) return null;
     const type = acf.querySelector('.acf-agent-type')?.value || 'claude';
-    const model = (acf.querySelector('.acf-model')?.value || '').trim();
     const modeSel = acf.querySelector('.acf-permission-mode');
     return {
-        name: (document.getElementById('launch-agent-name-input')?.value || '').trim(),
-        provider: TYPE[type] || type,
-        folder: (document.getElementById('launch-dir')?.value || '').trim() || 'no folder yet',
-        model: model ? modelName(type, model) : 'default model',
         mode: modeSel ? (modeSel.options[modeSel.selectedIndex]?.textContent.trim() || '') : '',
         modeNote: modeSel ? modeNote(type, modeSel.value) : '',
     };
 }
-
-/** A long folder on a phone (under 600 px) is cut in the middle, its ends kept, so the summary above Launch stays two or three lines at 320 px (#11235); its whole path is the hover. */
-const PHONE_PATH_MAX = 26;
-const shortPath = p => (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 599px)').matches && p.length > PHONE_PATH_MAX) ? `${p.slice(0, 10)}\u2026${p.slice(-(PHONE_PATH_MAX - 11))}` : p;
 
 /** Put the recap right for what the form holds now (the nodes are replaced only when the words changed). */
 export function syncRecap() {
@@ -68,28 +58,106 @@ function syncFlags() {
     }, 120);
 }
 
+// The "Runs as" line (#15885, LA1a): Provider, Model, Thinking and Permission mode as four compact controls on one line (two at 390 px), the
+// recap's place. Each one is a window on the form's own field (the fields stay the one place that sets anything): it shows that field's value, the
+// Settings default until the person changes it, and a change in it is a change in the field (the field's own change handler runs), so the line
+// can never say one thing and the launch another. A control whose field is hidden for this CLI (no Thinking, no Model for a terminal) is hidden.
+const CONTROLS = [
+    { key: 'provider', name: 'Provider', field: '.acf-agent-type', tag: 'select' },
+    { key: 'model', name: 'Model', field: '.acf-model', tag: 'input' },
+    { key: 'thinking', name: 'Thinking', field: '.acf-thinking', tag: 'select' },
+    { key: 'mode', name: 'Permission mode', field: '.acf-permission-mode', tag: 'select' },
+];
+const lineEl = () => document.querySelector('#launch-recap .runs-as');
+
+function buildLine() {
+    const line = document.createElement('div');
+    line.className = 'runs-as';
+    line.setAttribute('role', 'group');
+    line.setAttribute('aria-label', 'Runs as');
+    const lead = document.createElement('span');
+    lead.className = 'runs-as-lead';
+    lead.textContent = 'Runs as';
+    lead.setAttribute('aria-hidden', 'true');
+    line.append(lead);
+    for (const c of CONTROLS) {
+        const label = document.createElement('label');
+        label.className = `runs-as-ctl runs-as-${c.key}`;
+        const name = Object.assign(document.createElement('span'), { className: 'runs-as-name', textContent: c.name });
+        label.append(name);
+        if (c.tag === 'select') label.append(Object.assign(document.createElement('select'), { className: `runs-as-field runs-as-${c.key}-field` }));
+        else label.insertAdjacentHTML('beforeend', '<input type="text" class="runs-as-field runs-as-model-field" list="runs-as-models" autocomplete="off" placeholder="Default model"><datalist id="runs-as-models"></datalist>'); // the model box offers the form\'s own names
+        label.querySelector('.runs-as-field').dataset.field = c.key;
+        line.append(label);
+    }
+    line.addEventListener('change', forward);
+    line.addEventListener('input', forward);
+    return line;
+}
+
+/** A change in a control is a change in the form's field: the value is set there and the field's own listeners run. */
+function forward(e) {
+    const ctl = e.target.closest?.('.runs-as-field'), acf = container();
+    if (!ctl || !acf) return;
+    const c = CONTROLS.find(x => x.key === ctl.dataset.field), field = acf.querySelector(c.field);
+    if (!field) return;
+    if (c.key === 'model') {
+        if (e.type !== 'input') return;
+        field.value = ctl.value;
+        acf.dataset.acfModelClassifying = 'false'; acf.dataset.acfModelDirty = 'true'; // the person's own value: a provider switch keeps it, as for a keystroke in the field itself
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        field.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+    }
+    if (e.type !== 'change') return;
+    field.value = ctl.value;
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/** Each control shows its field now: the options the field offers (a provider that is not installed is not one), its value, and whether it applies to this CLI. */
+function syncLine(line, risky) {
+    const acf = container();
+    for (const c of CONTROLS) {
+        const field = acf?.querySelector(c.field), label = line.querySelector(`.runs-as-${c.key}`), ctl = label.querySelector('.runs-as-field');
+        const gone = !field || (c.key === 'thinking' && (field.closest('.acf-thinking-wrap')?.hidden || !field.options?.length)) || (c.key === 'model' && field.closest('.acf-model-wrap')?.style.display === 'none');
+        label.hidden = !!gone;
+        if (gone) continue;
+        if (c.tag === 'select') {
+            const shown = new Set([...document.querySelectorAll('#launch-agent-pick .provider-strip .provider-card-head')].map(h => h.dataset.type)); // the providers this computer has, as the strip shows them
+            const opts = [...field.options].filter(o => !o.hidden && !o.disabled && (c.key !== 'provider' || !shown.size || shown.has(o.value) || o.value === field.value)), key = opts.map(o => o.value + '\u0001' + o.textContent).join('\u0002');
+            if (ctl.dataset.opts !== key) { ctl.replaceChildren(...opts.map(o => Object.assign(document.createElement('option'), { value: o.value, textContent: o.textContent.trim() }))); ctl.dataset.opts = key; }
+            if (ctl.value !== field.value) ctl.value = field.value;
+        } else {
+            const names = field.list, mine = label.querySelector('datalist'); // the form's own model names, copied into the line's list
+            const key = names ? [...names.options].map(o => o.value).join('\u0001') : '';
+            if (mine && mine.dataset.names !== key) { mine.dataset.names = key; mine.replaceChildren(...[...names.options].map(o => Object.assign(document.createElement('option'), { value: o.value }))); }
+            if (document.activeElement !== ctl && ctl.value !== field.value) ctl.value = field.value;
+        }
+    }
+    line.querySelector('.runs-as-mode')?.classList.toggle('runs-as-risky', !!risky); // a risky mode: amber, and the warning is under the line
+}
+
 function paintRecap() {
     const el = document.getElementById('launch-recap'), p = recapParts();
     if (!el || !p) return;
-    const folder = shortPath(p.folder), text = `${p.name ? p.name + ': ' : ''}${p.provider}, ${folder}, ${p.model}${p.mode ? ', ' + p.mode + ' mode' : ''}`;
-    const note = !p.mode || !p.modeNote ? '' : p.modeNote === PI_NO_PERMISSIONS.replace(/\.$/, '') ? PI_NO_PERMISSIONS : `${p.mode} mode allows: ${p.modeNote.charAt(0).toLowerCase() + p.modeNote.slice(1)}.`; // Pi has no modes to allow: its sentence stands alone
-    if (el.dataset.recap === text + note) return;
-    el.dataset.recap = text + note;
-    const b = s => { const e = document.createElement('b'); e.textContent = s; return e; };
-    const dash = /isolated/i.test(note) ? note.indexOf(' \u2014 ') : -1; // a mode that is only safe somewhere (Bypass: "...isolated containers and VMs only") keeps its warning in two words: the whole sentence is its hover
-    const line = note ? [Object.assign(document.createElement('span'), { className: 'launch-recap-note', textContent: dash > 0 ? `\u26a0 ${note.slice(dash + 3).charAt(0).toUpperCase()}${note.slice(dash + 4)}` : note, title: dash > 0 ? note : '' })] : [];
-    flagsShown = ''; // the replaced nodes took the flags line with them: syncFlags draws it again
-    el.replaceChildren(...(p.name ? [b(p.name), ': '] : []), b(p.provider), ', ', Object.assign(b(folder), { title: folder === p.folder ? '' : p.folder }), `, ${p.model}`, ...(p.mode ? [', ', b(p.mode), ' mode'] : []), ...line);
+    let line = lineEl();
+    if (!line) { line = buildLine(); el.prepend(line); }
+    const allows = !p.mode || !p.modeNote ? '' : p.modeNote === PI_NO_PERMISSIONS.replace(/\.$/, '') ? PI_NO_PERMISSIONS : `${p.mode} mode allows: ${p.modeNote.charAt(0).toLowerCase() + p.modeNote.slice(1)}.`; // Pi has no modes to allow: its sentence stands alone
+    const dash = /isolated/i.test(allows) ? allows.indexOf(' \u2014 ') : -1; // a mode that is only safe somewhere (Bypass: "...isolated containers and VMs only") keeps its warning in two words: the whole sentence is its hover
+    const risky = /isolated|no safety checks/i.test(allows);
+    syncLine(line, risky);
+    if (el.dataset.recap === allows) return;
+    el.dataset.recap = allows;
+    el.querySelectorAll('.launch-recap-note').forEach(n => n.remove());
+    if (allows) line.after(Object.assign(document.createElement('span'), { className: `launch-recap-note${risky ? ' launch-recap-warn-note' : ''}`, textContent: dash > 0 ? `\u26a0 ${allows.slice(dash + 3).charAt(0).toUpperCase()}${allows.slice(dash + 4)}` : allows, title: dash > 0 ? allows : '' }));
 }
 
-let phoneWidthWired = false;
 
 /** Follow the form once: any change in it, in the folder or the name, and the model default arriving after it was drawn. */
 export function wireRecap() {
     const acf = container();
     if (!acf || acf.dataset.recapWired) return;
     acf.dataset.recapWired = '1';
-    if (!phoneWidthWired) { phoneWidthWired = true; window.matchMedia?.('(max-width: 599px)').addEventListener?.('change', () => syncRecap()); } // a rotation or a resized window: the folder is cut or whole again at once, not at the next change in the form (#11791); one listener for the page, however many dialogs open (#11794)
     for (const t of ['input', 'change', 'acf-synced']) acf.addEventListener(t, () => syncRecap());
     for (const id of ['launch-dir', 'launch-agent-name-input']) { const e = document.getElementById(id); if (e) for (const t of ['input', 'change']) e.addEventListener(t, () => syncRecap()); }
 }

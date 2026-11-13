@@ -1,2 +1,14 @@
 /* The exact flags a launch adds for the chosen permissions (#15719): the New agent recap's last line. Lazy: loaded by launch_recap.js, not at start. */
 .launch-recap-flags code { font-family: var(--font-mono); font-size: var(--fs-base); color: var(--text-primary); overflow-wrap: anywhere; }
+
+/* The "Runs as" line (#15885): four compact controls on one line, two lines at 390 px; a risky mode turns its control amber. */
+.runs-as { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-sm, 6px) var(--space-md, 8px); margin: 0 0 6px; }
+.runs-as-lead { align-self: center; font-weight: var(--fw-strong); color: var(--text-primary); margin-right: 2px; }
+.runs-as-ctl { display: flex; flex-direction: column; gap: 2px; flex: 1 1 9rem; min-width: 0; }
+.runs-as-ctl[hidden] { display: none; }
+.runs-as-name { font-size: var(--fs-sm); color: var(--text-secondary); }
+.runs-as-field { width: 100%; min-width: 0; height: var(--control-height, 36px); box-sizing: border-box; font-size: var(--fs-base); }
+.runs-as-mode.runs-as-risky .runs-as-field { border-color: var(--warning); box-shadow: 0 0 0 1px var(--warning); }
+.launch-recap-warn-note { color: var(--warning-text, var(--warning)); }
+@media (max-width: 599px) { .runs-as-field { height: 44px; } .runs-as-lead { flex: 0 0 100%; } .runs-as-ctl { flex: 1 1 calc(50% - var(--space-md, 8px)); } }
+.launch-recap:has(.runs-as) { display: block; overflow: visible; -webkit-line-clamp: unset; }
