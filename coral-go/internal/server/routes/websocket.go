@@ -17,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/ptymanager"
@@ -136,6 +137,10 @@ func (h *SessionsHandler) WSCoral(w http.ResponseWriter, r *http.Request) {
 	// (#5011). An agent gets the feed (a read left open, see the route census) and no notifications.
 	if _, agent := VerifiedSession(r.Context()); agent {
 		notifications = nil
+	}
+	// The for-review events (#15996): a Hub's feed (through the tunnel, or ?feed=hub) is told when an artifact is tagged or untagged "for review". An agent's socket and a dashboard get none.
+	if _, agent := VerifiedSession(r.Context()); !agent && h.bs != nil && (cloud.Tunneled(r) || r.URL.Query().Get("feed") == "hub") {
+		feed.reviewOn, feed.reviewSeq = true, h.bs.ForReviewSeq()
 	}
 	// backlog: notifications no dashboard had received when this one
 	// connected; they go out with the first message.
@@ -260,6 +265,9 @@ func (h *SessionsHandler) WSCoral(w http.ResponseWriter, r *http.Request) {
 		// (and null for one that went away, such as reason back at ok) in coral_diff.
 		healthDelta, healthNow := h.machineHealthDelta(feed.prevHealth)
 
+		if feed.reviewOn {
+			feed.reviewEvents, feed.reviewNow, feed.reviewGap = h.bs.ForReviewEventsSince(feed.reviewSeq)
+		}
 		msg, kind := feed.frame(tick, pending, healthDelta, healthNow, time.Now(), h.heartbeatInterval())
 		if msg == nil {
 			continue
@@ -287,12 +295,18 @@ type coralFeed struct {
 	prevByKey         map[string]map[string]any // session key -> the row last sent (read-only tick data)
 	prevRunsJSON      string
 	prevArtifactsJSON string
-	prevGoalsJSON     string            // the goals brief as last sent (#7116)
-	prevGoalSeqs      map[string]int64  // each board's goals counter as last sent: the goal events a frame carries are the ones above it (#7355)
-	prevHealth        map[string]string // machine_health: each top-level field as last sent (#3444)
-	prevServersJSON   string
-	firstMessage      bool
-	lastSent          time.Time // last message written to this connection
+	// the for-review events (#15996): on for a Hub's feed; the counter this connection has been told up to, and what the frame being built carries
+	reviewOn        bool
+	reviewSeq       int64
+	reviewEvents    []board.ForReviewEvent
+	reviewNow       int64
+	reviewGap       bool
+	prevGoalsJSON   string            // the goals brief as last sent (#7116)
+	prevGoalSeqs    map[string]int64  // each board's goals counter as last sent: the goal events a frame carries are the ones above it (#7355)
+	prevHealth      map[string]string // machine_health: each top-level field as last sent (#3444)
+	prevServersJSON string
+	firstMessage    bool
+	lastSent        time.Time // last message written to this connection
 }
 
 // coralFrame is the kind of frame coralFeed.frame built.
@@ -327,6 +341,13 @@ func (f *coralFeed) frame(tick *wsTick, pending []Notification, healthDelta map[
 		if tick.hasRemotes {
 			msg["servers"] = tick.servers
 		}
+		if len(f.reviewEvents) > 0 || f.reviewGap { // what happened between this connection opening and its first frame (#15996)
+			if len(f.reviewEvents) > 0 && len(f.reviewEvents) <= forReviewEventsPerFrame {
+				msg["for_review_events"] = f.reviewEvents
+			} else {
+				msg["for_review_gap"] = true
+			}
+		}
 		if len(tick.goals) > 0 { // each board's open goals and change counter, and the totals: no text (#7116)
 			msg["goals_brief"], msg["goals_open"], msg["goals_seq"] = tick.goals, tick.goalsOpen, tick.goalsSeq
 		}
@@ -359,11 +380,22 @@ func (f *coralFeed) frame(tick *wsTick, pending []Notification, healthDelta map[
 	serversChanged := tick.serversJSON != f.prevServersJSON
 	runsChanged := tick.runsJSON != f.prevRunsJSON
 	artifactsChanged := tick.artifactsJSON != f.prevArtifactsJSON
+	reviewEvents, reviewGap := f.reviewEvents, f.reviewGap
+	if len(reviewEvents) > forReviewEventsPerFrame {
+		reviewEvents, reviewGap = reviewEvents[:forReviewEventsPerFrame], true
+	}
+	reviewChanged := len(reviewEvents) > 0 || reviewGap
 	goalsChanged := tick.goalsJSON != f.prevGoalsJSON
 	hasNotifications := len(pending) > 0
 	healthChanged := len(healthDelta) > 0
-	if len(changed) > 0 || len(removed) > 0 || len(removedRemote) > 0 || serversChanged || runsChanged || goalsChanged || artifactsChanged || hasNotifications || healthChanged {
+	if len(changed) > 0 || len(removed) > 0 || len(removedRemote) > 0 || serversChanged || runsChanged || goalsChanged || artifactsChanged || reviewChanged || hasNotifications || healthChanged {
 		payload := map[string]any{"type": "coral_diff"}
+		if len(reviewEvents) > 0 { // artifact id and tagged only (#15996)
+			payload["for_review_events"] = reviewEvents
+		}
+		if reviewGap {
+			payload["for_review_gap"] = true // some were missed: read the artifacts again
+		}
 		if artifactsChanged {
 			payload["artifacts_rev"] = tick.artifactsRev
 		}
@@ -430,6 +462,9 @@ func (f *coralFeed) sent(kind coralFrame, tick *wsTick, healthDelta map[string]a
 	f.prevByKey = tick.byKey
 	f.prevRunsJSON = tick.runsJSON
 	f.prevArtifactsJSON = tick.artifactsJSON
+	if f.reviewOn { // told everything up to the counter the frame was built at (a gap says the rest was missed)
+		f.reviewSeq = f.reviewNow
+	}
 	f.prevGoalsJSON = tick.goalsJSON
 	f.prevGoalSeqs = make(map[string]int64, len(tick.goals))
 	for id, b := range tick.goals {

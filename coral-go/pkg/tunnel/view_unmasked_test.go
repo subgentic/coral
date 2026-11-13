@@ -22,7 +22,7 @@ import (
 // goals_brief, goals_open and goals_seq. This test is the pin: a View viewer gets all nine with their values over HTTP and on the live feed, a token in the same reply is still redacted, and a write is
 // still refused. If someone adds a mask again this fails; if someone removes the redaction, this fails.
 
-const unmaskedKeys = `"waiting_summary":"Claude needs your permission to use Bash: rm -rf <dir>","held_messages":[{"id":"h1","text":"queued words"}],"blocked_on":"the Operator","decision":"pick a date","recommendation":"Friday","if_silent":"we ship Friday","goals_brief":{"team":{"open":2,"seq":9}},"goals_open":2,"goals_seq":9,"goal_events":[{"board":"team","goal":7,"kind":"goal_closed","seq":9}],"goal_events_gap":true`
+const unmaskedKeys = `"waiting_summary":"Claude needs your permission to use Bash: rm -rf <dir>","held_messages":[{"id":"h1","text":"queued words"}],"blocked_on":"the Operator","decision":"pick a date","recommendation":"Friday","if_silent":"we ship Friday","goals_brief":{"team":{"open":2,"seq":9}},"goals_open":2,"goals_seq":9,"goal_events":[{"board":"team","goal":7,"kind":"goal_closed","seq":9}],"goal_events_gap":true,"for_review_events":[{"artifact":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","tagged":true}],"for_review_gap":true`
 
 func unmaskedBody(tok string) string {
 	return `{"token":"` + tok + `",` + unmaskedKeys + `}`
@@ -32,7 +32,7 @@ func assertNineKeys(t *testing.T, body, tok, where string) {
 	t.Helper()
 	var m map[string]any
 	require.NoError(t, json.Unmarshal([]byte(body), &m), where+": "+body)
-	for _, k := range []string{"waiting_summary", "held_messages", "blocked_on", "decision", "recommendation", "if_silent", "goals_brief", "goals_open", "goals_seq", "goal_events", "goal_events_gap"} { // the last two are the goal events of the feed (#7355): ids and kinds, nothing the connector masks
+	for _, k := range []string{"waiting_summary", "held_messages", "blocked_on", "decision", "recommendation", "if_silent", "goals_brief", "goals_open", "goals_seq", "goal_events", "goal_events_gap", "for_review_events", "for_review_gap"} { // the goal events of the feed (#7355): ids and kinds; the for-review events (#15996): an artifact id and tagged: nothing the connector masks
 		assert.NotNil(t, m[k], where+": "+k+" has its value for a View viewer")
 	}
 	assert.Contains(t, body, "rm -rf <dir>", where)
