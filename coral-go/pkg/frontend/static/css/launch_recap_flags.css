@@ -12,3 +12,15 @@
 .launch-recap-warn-note { color: var(--warning-text, var(--warning)); }
 @media (max-width: 599px) { .runs-as-field { height: 44px; } .runs-as-lead { flex: 0 0 100%; } .runs-as-ctl { flex: 1 1 calc(50% - var(--space-md, 8px)); } }
 .launch-recap:has(.runs-as) { display: block; overflow: visible; -webkit-line-clamp: unset; }
+
+/* The start command (#15951): read-only, a row of label, Copy and the command under them; on a phone one line until 'Show full command'. */
+.launch-recap-command { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.launch-recap-command .lrc-label { color: var(--text-secondary); }
+.launch-recap-command .lrc-text { order: 5; flex: 1 1 100%; min-width: 0; padding: 6px 8px; border: 1px solid var(--border-subtle, var(--border)); border-radius: var(--radius-md); background: var(--bg-tertiary, transparent); white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
+.launch-recap-command .lrc-more { display: none; }
+@media (max-width: 767px) {
+  .launch-recap-command .lrc-more { display: inline-flex; }
+  .launch-recap-command:not(.lrc-open) .lrc-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* the phone's recap is cut to a few lines to leave the form room: with the command in it, it shows all of it and scrolls inside a capped height instead */
+  .launch-recap:has(.launch-recap-command) { display: block; -webkit-line-clamp: unset; overflow-y: auto; max-height: 38vh; }
+}
