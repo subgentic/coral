@@ -30,13 +30,26 @@ func countBuilds(t *testing.T) *atomic.Int64 {
 	return &n
 }
 
+// shortSettleServer is teamArtifactServer with the upload directory's settle window cut from 2 s to 250 ms (#16253): the tests here wait the window out so the cache trusts a folder, and
+// waited 2.5 s about nine times. The rules are the same at any length; the tests that pin the length itself (team_artifacts_test.go) set their own. Tests here run serially (they swap globals).
+func shortSettleServer(t *testing.T) (*httptest.Server, *BoardHandler, string) {
+	t.Helper()
+	settle := uploadDirSettle
+	uploadDirSettle = 250 * time.Millisecond
+	t.Cleanup(func() { uploadDirSettle = settle })
+	return teamArtifactServer(t)
+}
+
+// waitSettled sleeps until what was just written is older than the settle window, with a margin for a coarse file clock.
+func waitSettled() { time.Sleep(uploadDirSettle + 100*time.Millisecond) }
+
 func TestTeamArtifactsListIsBuiltOnceForAWalk(t *testing.T) {
-	srv, h, coralDir := teamArtifactServer(t)
+	srv, h, coralDir := shortSettleServer(t)
 	subscribeSession(t, h, "alpha", "Alice", sessAlice)
 	for i := 0; i < 5; i++ {
 		writeUpload(t, coralDir, sessAlice, "# doc "+string(rune('a'+i))+"\n", "doc.md", "2026-10-09T1"+string(rune('0'+i))+":00:00Z")
 	}
-	time.Sleep(uploadDirSettle + 500*time.Millisecond)
+	waitSettled()
 	builds := countBuilds(t)
 	for page := 0; page < 5; page++ {
 		got := getTeamArtifacts(t, srv, "/api/board/alpha/artifacts?limit=1&offset="+string(rune('0'+page)), 200)
@@ -46,11 +59,11 @@ func TestTeamArtifactsListIsBuiltOnceForAWalk(t *testing.T) {
 }
 
 func TestTeamArtifactsListShowsEveryInputOnTheNextRead(t *testing.T) {
-	srv, h, coralDir := teamArtifactServer(t)
+	srv, h, coralDir := shortSettleServer(t)
 	ctx := context.Background()
 	subscribeSession(t, h, "alpha", "Alice", sessAlice)
 	first := writeUpload(t, coralDir, sessAlice, "# first\n", "first.md", "2026-10-09T10:00:00Z")
-	time.Sleep(uploadDirSettle + 500*time.Millisecond)
+	waitSettled()
 	r := chi.NewRouter() // the Operator's own requests: the kinds and the private marks are the owner's
 	r.Get("/api/board/{project}/artifacts", func(w http.ResponseWriter, rq *http.Request) { h.ListTeamArtifacts(w, asPerson(rq)) })
 	owner := httptest.NewServer(r)
@@ -109,10 +122,10 @@ func TestTeamArtifactsListShowsEveryInputOnTheNextRead(t *testing.T) {
 }
 
 func TestTeamArtifactsListNeverOutlivesItsTTL(t *testing.T) {
-	srv, h, coralDir := teamArtifactServer(t)
+	srv, h, coralDir := shortSettleServer(t)
 	subscribeSession(t, h, "alpha", "Alice", sessAlice)
 	writeUpload(t, coralDir, sessAlice, "# one\n", "one.md", "2026-10-09T10:00:00Z")
-	time.Sleep(uploadDirSettle + 500*time.Millisecond)
+	waitSettled()
 	now := time.Now()
 	h.itemsCache.now = func() time.Time { return now }
 	builds := countBuilds(t)
@@ -146,7 +159,7 @@ func TestKeptListIsNeverAnotherCallersView(t *testing.T) {
 
 	t.Run("an agent and the owner, either order", func(t *testing.T) {
 		for _, ownerFirst := range []bool{true, false} {
-			_, h, coralDir := teamArtifactServer(t)
+			_, h, coralDir := shortSettleServer(t)
 			w := &world{sessions: map[string]string{"a1": "alpha", "b1": "beta"}, owners: map[string]artifactPrincipal{"alpha": hubOwner(aliceUser), "beta": hubOwner(bobUser)}}
 			useCircle(t, w.circle())
 			userA, _, err := storeArtifactBy(coralDir, "a1", "alice.md", "text/markdown", "", "", []byte("# alice\n"))
@@ -156,7 +169,7 @@ func TestKeptListIsNeverAnotherCallersView(t *testing.T) {
 			subscribeSession(t, h, "alpha", "Alice", "a1")
 			subscribeSession(t, h, "alpha", "Bob", "b1") // both uploaded to this board's folder set: the kept list holds both rows
 			require.NoError(t, h.bs.SetArtifactPrivate(context.Background(), userA, true, "Operator"))
-			time.Sleep(uploadDirSettle + 300*time.Millisecond)
+			waitSettled()
 			owner := func() []teamArtifact {
 				items, _, err := h.projectArtifactItems(httptest.NewRequest(http.MethodGet, "/x", nil), "alpha", "")
 				require.NoError(t, err)
@@ -194,7 +207,7 @@ func TestKeptListIsNeverAnotherCallersView(t *testing.T) {
 
 	t.Run("a Hub guest and the owner, either order", func(t *testing.T) {
 		for _, ownerFirst := range []bool{true, false} {
-			_, h, coralDir := teamArtifactServer(t)
+			_, h, coralDir := shortSettleServer(t)
 			prev := artifactCircle
 			w := &world{sessions: map[string]string{"s-a": gaBoard}, owners: map[string]artifactPrincipal{gaBoard: hubOwner(aliceUser)}}
 			circle := w.circle()
@@ -211,7 +224,7 @@ func TestKeptListIsNeverAnotherCallersView(t *testing.T) {
 			record(gaPrivate)
 			subscribeSession(t, h, gaBoard, "Ann", "s-a")
 			require.NoError(t, h.bs.SetArtifactPrivate(context.Background(), gaPrivate, true, "Operator"))
-			time.Sleep(uploadDirSettle + 300*time.Millisecond)
+			waitSettled()
 			guest := func() []teamArtifact {
 				req := httptest.NewRequest(http.MethodGet, "/x", nil)
 				for k, v := range gaGuide(gaDana) {
@@ -250,7 +263,7 @@ func TestKeptListIsNeverAnotherCallersView(t *testing.T) {
 // kept rows are the same after all of them: the owner's two query paths, a filtered and a sorted one, a Hub owner (whose rows the query redacts in place), a guest and an agent. And the list a caller gets from
 // projectArtifactItems is its own: it changes every field of it and reads again.
 func TestNoRequestCanChangeTheKeptList(t *testing.T) {
-	_, h, coralDir := teamArtifactServer(t)
+	_, h, coralDir := shortSettleServer(t)
 	prev := artifactCircle
 	w := &world{sessions: map[string]string{"s-a": gaBoard, "a1": gaBoard}, owners: map[string]artifactPrincipal{gaBoard: hubOwner(aliceUser)}}
 	circle := w.circle()
@@ -273,7 +286,7 @@ func TestNoRequestCanChangeTheKeptList(t *testing.T) {
 	_, err := h.bs.SetArtifactKind(ctx, gaBoard, gaMine, board.KindRelease, "sess", time.Now())
 	require.NoError(t, err)
 	withLabel(t, ownerLabel, nil)
-	time.Sleep(uploadDirSettle + 300*time.Millisecond)
+	waitSettled()
 
 	serve := func(wrap func(*http.Request) *http.Request) *httptest.Server {
 		r := chi.NewRouter()
@@ -350,11 +363,11 @@ func TestNoRequestCanChangeTheKeptList(t *testing.T) {
 
 // The task writers whose saves change what the list shows of a task (its review files, its title) note the board's revision, so the kept list is built again after them (Backend Dev's SHOULD on #13522).
 func TestTeamArtifactsListShowsTheTaskWritersOnTheNextRead(t *testing.T) {
-	srv, h, coralDir := teamArtifactServer(t)
+	srv, h, coralDir := shortSettleServer(t)
 	ctx := context.Background()
 	subscribeSession(t, h, "alpha", "Alice", sessAlice)
 	writeUpload(t, coralDir, sessAlice, "# first\n", "first.md", "2026-10-09T10:00:00Z")
-	time.Sleep(uploadDirSettle + 500*time.Millisecond)
+	waitSettled()
 	list := func() []teamArtifact {
 		return getTeamArtifacts(t, srv, "/api/board/alpha/artifacts?limit=200", 200).Artifacts
 	}
@@ -402,10 +415,10 @@ func TestTeamArtifactsListShowsTheTaskWritersOnTheNextRead(t *testing.T) {
 
 // The 5 s a kept list may live count from when its build started (when its data was read), not from when it was stored: a build that takes longer than the TTL leaves an entry that is already out of date (Backend Dev's SHOULD on #13522).
 func TestTeamArtifactsListTTLCountsFromTheStartOfTheBuild(t *testing.T) {
-	srv, h, coralDir := teamArtifactServer(t)
+	srv, h, coralDir := shortSettleServer(t)
 	subscribeSession(t, h, "alpha", "Alice", sessAlice)
 	writeUpload(t, coralDir, sessAlice, "# one\n", "one.md", "2026-10-09T10:00:00Z")
-	time.Sleep(uploadDirSettle + 500*time.Millisecond)
+	waitSettled()
 	now := time.Now()
 	h.itemsCache.now = func() time.Time { return now }
 	var n atomic.Int64
@@ -425,12 +438,12 @@ func TestTeamArtifactsListTTLCountsFromTheStartOfTheBuild(t *testing.T) {
 
 // The request that BUILDS the list reads it too: its rows must not share what they point to with the entry kept for the next (Security's SHOULD on #13552: a cross-caller leak on a cold read).
 func TestNoWriteThroughTheColdReadReachesTheKeptList(t *testing.T) {
-	_, h, coralDir := teamArtifactServer(t)
+	_, h, coralDir := shortSettleServer(t)
 	ctx := context.Background()
 	subscribeSession(t, h, "alpha", "Alice", sessAlice)
 	id := writeUpload(t, coralDir, sessAlice, "# one\n", "one.md", "2026-10-09T10:00:00Z")
 	require.NoError(t, h.bs.SetArtifactTags(ctx, "alpha", id, []string{"for review", "notes"}))
-	time.Sleep(uploadDirSettle + 500*time.Millisecond)
+	waitSettled()
 	ownerReq := func() *http.Request { return asPerson(httptest.NewRequest(http.MethodGet, "/x", nil)) }
 	builds := countBuilds(t)
 	cold, _, err := h.projectArtifactItems(ownerReq(), "alpha", "") // the miss: this request builds the list
