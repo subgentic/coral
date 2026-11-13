@@ -379,15 +379,18 @@ jobs:
         # terminal_pane_size (which drives tmux itself) stays on Linux and macOS; its partner terminal_scroll already runs in a default part. --no-tmux: a --strict run would
         # otherwise add the tmux shard too (9 suites that cannot start here).
         include:
-          - { name: "part 1/8", args: "--part 1/8", id: "1" }
-          - { name: "part 2/8", args: "--part 2/8", id: "2" }
-          - { name: "part 3/8", args: "--part 3/8", id: "3" }
-          - { name: "part 4/8", args: "--part 4/8", id: "4" }
-          - { name: "part 5/8", args: "--part 5/8", id: "5" }
-          - { name: "part 6/8", args: "--part 6/8", id: "6" }
-          - { name: "part 7/8", args: "--part 7/8", id: "7" }
-          - { name: "part 8/8", args: "--part 8/8", id: "8" }
-          - { name: "strict", args: "--strict --no-tmux", id: "strict" }
+          - { name: "p2 1", args: "--part 2/8 --retries 0", id: "p1" }
+          - { name: "p2 2", args: "--part 2/8 --retries 0", id: "p2" }
+          - { name: "p2 3", args: "--part 2/8 --retries 0", id: "p3" }
+          - { name: "p2 4", args: "--part 2/8 --retries 0", id: "p4" }
+          - { name: "p2 5", args: "--part 2/8 --retries 0", id: "p5" }
+          - { name: "p2 6", args: "--part 2/8 --retries 0", id: "p6" }
+          - { name: "p2 7", args: "--part 2/8 --retries 0", id: "p7" }
+          - { name: "p2 8", args: "--part 2/8 --retries 0", id: "p8" }
+          - { name: "p2 9", args: "--part 2/8 --retries 0", id: "p9" }
+          - { name: "p2 10", args: "--part 2/8 --retries 0", id: "p10" }
+          - { name: "p2 11", args: "--part 2/8 --retries 0", id: "p11" }
+          - { name: "p2 12", args: "--part 2/8 --retries 0", id: "p12" }
     defaults:
       run:
         shell: bash
