@@ -66,8 +66,10 @@ function _updateTeamAgentSummary(row) {
     const ownMode = acf?.querySelector('.acf-permission-mode')?.value || 'default';
     const teamMode = document.getElementById('team-permission-mode')?.value || 'default';
     const mode = ownMode !== 'default' ? ownMode : (row.dataset.permissionExplicit === '1' ? 'default' : teamMode);
+    const selectedMode = acf?.querySelector('.acf-permission-mode')?.selectedOptions[0];
+    const modeLabel = selectedMode?.value === mode ? selectedMode.textContent : _modeLabel(mode);
     const lm = launchedMode(type, mode, config.capabilities);
-    parts.push([lm.narrowed ? lm.text : `${_modeLabel(mode)} mode`.replace(/^Default mode$/, 'default mode'), mode !== 'default' || !!lm.narrowed, !!lm.warn]);
+    parts.push([lm.narrowed ? lm.text : `${modeLabel} mode`.replace(/^Default mode$/, 'default mode'), mode !== 'default' || !!lm.narrowed, !!lm.warn]);
     const line = row.querySelector('.team-agent-summary');
     if (line) {
         line.replaceChildren();
@@ -290,7 +292,9 @@ function saveTeamAgentFromModal() {
         opener.dataset.permissionExplicit = modalMode === 'default' || modalMode !== document.getElementById('team-permission-mode')?.value ? '1' : '';
         if (!opener.dataset.permissionExplicit) delete document.getElementById(opener.dataset.acfId)?.querySelector('.acf-permission-mode')?.dataset.pickedByPerson;
     } else {
-        _addTeamAgent(config.name, config.prompt, config.capabilities, followsType ? '' : config.agentType, config.model, config.flags, { reveal: true });
+        const added = _addTeamAgent(config.name, config.prompt, config.capabilities, followsType ? '' : config.agentType, config.model, config.flags, { reveal: true, thinking: config.thinking });
+        setAgentConfig(added.dataset.acfId, config);
+        added.dataset.permissionExplicit = modalMode === 'default' || modalMode !== document.getElementById('team-permission-mode')?.value ? '1' : '';
     }
     _leaveMember();
     _syncTeamMembers(); // a rename can make or lose the Orchestrator
