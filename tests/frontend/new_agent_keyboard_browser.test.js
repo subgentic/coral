@@ -18,7 +18,8 @@ const BASE = require('./test_base').BASE;
     const focusEl = (sel, rx) => ev(`(() => { const e = window.__na.find(${JSON.stringify(sel)}, ${rx}); if (!e) return false; e.focus(); return document.activeElement === e; })()`);
     const toStep3 = async () => {
         await ev(`(() => { const i = window.__na.find('input', ${N.folder}); i.value = '/work/payments-app'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-        for (const s of [2, 3]) { await click('button', N.next); await waitFor(`/Step ${s} of 3/.test(window.__na.dialog().textContent)`, `step ${s}`, 4000); }
+        for (let i = 0; i < 2; i++) await ev(`window.__na.next(); true`); // the two folds of the one page (#15911)
+        await waitFor(`!![...window.__na.dialog().querySelectorAll('[role=tablist]')].find(window.__na.vis)`, 'the tabs', 4000);
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -30,33 +31,22 @@ const BASE = require('./test_base').BASE;
             const d = await ev(`(() => { const d = window.__na.dialog(); return d ? { modal: d.getAttribute('aria-modal'), name: window.__na.name(d) } : null; })()`);
             assert.ok(d, 'role=dialog named New agent'); assert.equal(d.modal, 'true', 'aria-modal'); assert.match(d.name, /^New agent$/, `the dialog is named "New agent" on its steps (it is "${d.name}")`); assert.ok((await active()).inside, 'focus starts inside the dialog');
         });
-        await S.run('Enter in the folder is Next; with no folder it does not advance', async () => {
+        await S.run('Enter in the folder is Launch (the one page has no Next); with no folder it does not launch and says so under the field', async () => {
             await ev(`(() => { const i = window.__na.find('input', ${N.folder}); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`); // the suggested folder (#11258) is cleared: this is the person with none
             await focusEl('input', N.folder); await key('Enter');
-            assert.match(await ev(`window.__na.dialog().textContent`), /Step 1 of 3/, 'no folder: still step 1');
-            await ev(`(() => { const i = window.__na.find('input', ${N.folder}); i.value = '/work/payments-app'; i.dispatchEvent(new Event('input', { bubbles: true })); i.focus(); return true; })()`);
-            await key('Enter'); await waitFor(`/Step 2 of 3/.test(window.__na.dialog().textContent)`, 'Enter is Next', 4000);
-            assert.ok((await active()).inside, 'after Next the focus is still inside the dialog (not on the page behind)');
+            assert.ok(await ev(`!!window.__na.dialog()`), 'no folder: the dialog is still open');
+            assert.match(await ev(`document.getElementById('launch-dir').closest('.sv-row').querySelector('.sv-error').textContent`), /Choose a folder/, 'the error is under the folder');
+            assert.ok((await active()).inside, 'the focus is still inside the dialog (not on the page behind)');
         });
-        await S.run('each step is said once in a polite status ("Step 2 of 3: ...", then "Step 3 of 3: ...")', async () => {
-            const say = () => ev(`(() => { const d = window.__na.dialog(); return [...d.querySelectorAll('[aria-live=polite],[role=status]')].map(e => window.__na.text(e)).join(' | '); })()`);
-            assert.match(await say(), /Step 2 of 3/, 'step 2 is announced');
-            await click('button', N.next); await waitFor(`/Step 3 of 3/.test(window.__na.dialog().textContent)`, 'step 3', 4000); await settle(200);
-            assert.match(await say(), /Step 3 of 3/, 'step 3 is announced');
-        });
-        await S.run('on a phone (the sections are a select) Next and Back put the focus on the new step\'s first control, never on the page body (#8432)', async () => {
+        await S.run('the folds of the one page keep the focus inside the dialog, never on the page body (#8432), on a phone too', async () => {
             await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); true`); await settle(200);
             await openNewAgent(ev, waitFor);
-            const where = () => ev(`(() => { const a = document.activeElement; const d = window.__na.dialog(); return { inside: !!(d && a && d.contains(a)), body: a === document.body, tag: a ? a.tagName : '', cls: a ? String(a.className) : '', id: a ? a.id : '', visible: !!a && a.getClientRects().length > 0 }; })()`);
             await ev(`(() => { const i = window.__na.find('input', ${N.folder}); i.value = '/work/payments-app'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            await click('button', N.next); await waitFor(`/Step 2 of 3/.test(window.__na.dialog().textContent)`, 'step 2', 4000); await settle(200);
-            let w = await where(); assert.ok(w.inside && !w.body && w.visible, 'Next to the persona step: ' + JSON.stringify(w));
-            await click('button', N.next); await waitFor(`/Step 3 of 3/.test(window.__na.dialog().textContent)`, 'step 3', 4000); await settle(200);
-            w = await where(); assert.ok(w.inside && !w.body && w.visible, 'Next to the settings step: the focus is on a visible control of it, not on the page body: ' + JSON.stringify(w));
-            assert.equal(w.tag, 'SELECT', 'where the sections are a select, that select takes the focus: ' + JSON.stringify(w));
-            await click('button', /^Back$/); await waitFor(`/Step 2 of 3/.test(window.__na.dialog().textContent)`, 'back to step 2', 4000); await settle(200);
-            w = await where(); assert.ok(w.inside && !w.body && w.visible, 'Back to the persona step: ' + JSON.stringify(w));
+            for (const id of ['launch-persona-more', 'launch-more-options']) {
+                await ev(`(() => { const s = document.querySelector('#${id} > summary'); s.focus(); s.click(); return true; })()`); await settle(200);
+                const w = await active(); assert.ok(w.inside && w.tag !== 'BODY', `opening ${id}: the focus stays inside the dialog: ` + JSON.stringify(w));
+            }
             await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); true`); await settle(200);
             await openNewAgent(ev, waitFor); await toStep3();
@@ -106,8 +96,8 @@ const BASE = require('./test_base').BASE;
         await S.run('no control in any step or tab is without an accessible name, and every tab panel that is shown has a name', async () => {
             const bad = async () => ev(`(() => { const d = window.__na.dialog(); return [...d.querySelectorAll('button, input, select, textarea, [role=radio], [role=tab], summary')].filter(window.__na.vis).filter(e => e.type !== 'hidden' && !window.__na.name(e)).map(e => e.tagName.toLowerCase() + (e.className ? '.' + String(e.className).split(' ')[0] : '')); })()`);
             for (const t of N.tabs) { await ev(`(() => { const e = [...window.__na.dialog().querySelectorAll('[role=tab]')].find(x => window.__na.name(x) === ${JSON.stringify(t)}); e.click(); return true; })()`); await settle(200); assert.deepEqual(await bad(), [], `step 3, ${t}: unnamed controls`); }
-            await click('button', N.back); await waitFor(`/Step 2 of 3/.test(window.__na.dialog().textContent)`, 'step 2', 4000); assert.deepEqual(await bad(), [], 'step 2: unnamed controls');
-            await click('button', N.back); await waitFor(`/Step 1 of 3/.test(window.__na.dialog().textContent)`, 'step 1', 4000); assert.deepEqual(await bad(), [], 'step 1: unnamed controls');
+            await ev(`window.__na.back(); true`);  assert.deepEqual(await bad(), [], 'step 2: unnamed controls');
+            await ev(`window.__na.back(); true`);  assert.deepEqual(await bad(), [], 'step 1: unnamed controls');
         });
         await S.run('Tab and Shift+Tab stay inside the dialog (40 presses each way)', async () => {
             await focusEl('input', N.folder);

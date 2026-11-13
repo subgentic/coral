@@ -37,7 +37,7 @@ const { coralReady } = require('./helpers/wait');
         const line = await ev(`(() => { const s = ${slot}, go = document.getElementById('launch-agent-go');
             return { command: s.querySelector('code').textContent, buttons: [...s.querySelectorAll('button')].map(b => b.textContent), role: s.getAttribute('role'),
                 disabled: go.disabled, describedBy: go.getAttribute('aria-describedby') === s.id, blocks: s.dataset.blocksLaunch, stage: document.getElementById('launch-step-agent').dataset.stage }; })()`);
-        assert.deepEqual(line, { command: 'brew install tmux', buttons: ['Check again'], role: 'status', disabled: true, describedBy: true, blocks: '1', stage: 'agent' });
+        assert.deepEqual(line, { command: 'brew install tmux', buttons: ['Check again'], role: 'status', disabled: true, describedBy: true, blocks: '1', stage: 'page' });
         assert.equal(await ev(`getComputedStyle(document.getElementById('tmux-missing-banner')).display`), 'none', 'said once: the app-wide banner steps aside while the dialog has the line');
         await ev(`window.launchSession(); true`);
         assert.equal(await ev(`window.__launches.length`), 0, 'a launch is not sent while tmux is missing');

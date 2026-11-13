@@ -28,7 +28,7 @@ const BASE = require('./test_base').BASE;
             // New agent, step 3: the CLI warning
             await openNewAgent(ev, waitFor);
             await ev(`(() => { const i = window.__na.find('input', ${NA.folder}); i.value = '/work/payments-app'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            for (let s = 1; s < 3; s++) { await ev(`window.__na.find('button', ${NA.next}).click(); true`); await waitFor(`/Step ${s + 1} of 3/.test(window.__na.dialog() ? window.__na.dialog().textContent : '')`, `${w}: step ${s + 1}`, 6000); }
+            for (let s = 1; s < 3; s++) { await ev(`window.__na.next(); true`);  }
             await waitFor(`!!document.querySelector('#launch-step-agent [data-blocks-launch] .cli-set-path')`, `${w}: New agent's CLI warning has a Set path button`, 10000).catch(() => {});
             let b = await setPath('#launch-step-agent [data-blocks-launch]');
             check(!!b, 'New agent: the missing-CLI warning has a Set path button');
