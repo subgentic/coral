@@ -26,6 +26,7 @@ const { coralReady } = require('./helpers/wait');
                 await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
                 await coralReady(ev, 'startup', 'liveList', 'settings');
                 await ev(p.open);
+                if (place === 'Settings > Defaults') await ev(`document.querySelector('#settings-permission-mode').scrollIntoView({block:'center'});true`);
                 if (p.ready) { await waitFor(p.ready, 8000); await ev(p.then); }
                 if (p.stage) { p.pane = p.pane || places['New agent'].pane; await waitFor(`!!document.querySelector('#launch-step-agent .acf-permission-mode + .seg-list .seg-btn')`, 10000); await ev(p.stage); await waitFor(p.pane, 8000).catch(async e => { throw new Error('the Permissions pane did not show: ' + await ev(`JSON.stringify({ tabs: [...document.querySelectorAll('#launch-step-agent [role=tab]')].map(t => t.dataset.section + ':' + t.getClientRects().length), pick: !!document.querySelector('#launch-step-agent .settings-group-pick select'), stage: document.getElementById('launch-step-agent').dataset.stage })`)); }); }
                 await waitFor(`!!document.querySelector(${JSON.stringify(p.root + ' ' + p.sel)}) && !!document.querySelector(${JSON.stringify(p.root + ' ' + p.sel)}).nextElementSibling?.classList.contains('seg-list') && [...document.querySelectorAll(${JSON.stringify(p.root + ' .seg-list .seg-desc')})].some(e => e.getBoundingClientRect().height > 0) && getComputedStyle(document.querySelector(${JSON.stringify(p.root + ' .seg-list .seg-btn')})).display === 'grid'`, 8000).catch(async e => { throw new Error(place + ' ' + label + ': no list: ' + JSON.stringify(await ev(`(() => { const s = document.querySelector(${JSON.stringify(p.root + ' ' + p.sel)}); return s ? { next: s.nextElementSibling && s.nextElementSibling.className, html: s.nextElementSibling && s.nextElementSibling.innerHTML.slice(0, 500), disp: s.nextElementSibling && getComputedStyle(s.nextElementSibling.querySelector(".seg-desc") || s).display, sheet: !!document.querySelector("link[href*=permission_mode_list]") } : null; })()`))); });
@@ -45,6 +46,8 @@ const { coralReady } = require('./helpers/wait');
                 const before = r.rows.find(x => x.checked === 'true').v;
                 await ev(`document.querySelector(${JSON.stringify(p.root + ' .seg-list [aria-checked="true"]')}).focus(); true`);
                 await ev(`document.querySelector(${JSON.stringify(p.root + ' .seg-list [aria-checked="true"]')}).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); true`);
+                // Settings confirms moving into a risky mode before committing the selection (ST3).
+                if (place === 'Settings > Defaults' && await ev(`document.getElementById('confirm-modal')?.style.display === 'flex'`)) await ev(`document.getElementById('confirm-modal-yes').click();true`);
                 const after = (await inspect(p)).rows.find(x => x.checked === 'true').v;
                 assert.notEqual(after, before, `${tag}: ArrowDown moves the choice (${before} -> ${after})`);
                 assert.equal(await ev(`document.querySelector(${JSON.stringify(p.root + ' ' + p.sel)}).value`), after, tag + ': and the select follows it');

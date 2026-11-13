@@ -38,14 +38,15 @@ export function wireSettingsRisks(modal) {
         const signature = enabled.map(c=>c.label).join('|');
         if(summary.dataset.signature!==signature) {
             summary.dataset.signature=signature; summary.replaceChildren();
-            const title=document.createElement('p'); title.textContent=enabled.length ? `Safety checks turned off: ${enabled.length}` : 'All safety checks are on'; summary.append(title);
+            const list=document.createElement(enabled.length ? 'details' : 'div');summary.append(list);
+            const title=document.createElement(enabled.length ? 'summary' : 'p'); title.textContent=enabled.length ? `Safety checks turned off: ${enabled.length}` : 'All safety checks are on'; list.append(title);
             for(const c of enabled) {
                 const link=document.createElement('button'); link.type='button'; link.className='btn btn-small'; link.textContent=c.label;
-                link.addEventListener('click',()=>{const e=document.getElementById(c.id),pane=e?.closest('.settings-pane');if(!e||!pane)return;openSettingsGroup(pane.dataset.group || pane.dataset.section);for(const fold of [e.closest('details')])if(fold)fold.open=true;const target=e._segmented?.querySelector('[aria-checked="true"]') || e;target.focus();target.scrollIntoView({block:'nearest'});}); summary.append(link);
+                link.addEventListener('click',()=>{const e=document.getElementById(c.id),pane=e?.closest('.settings-pane');if(!e||!pane)return;openSettingsGroup(pane.dataset.group || pane.dataset.section);for(const fold of [e.closest('details')])if(fold)fold.open=true;const target=e._segmented?.querySelector('[aria-checked="true"]') || e;target.focus();target.scrollIntoView({block:'nearest'});}); list.append(link);
             }
         }
         const wake=document.getElementById('tb-autowake-on'),row=wake?.closest('.sv-row');
-        if(row) { let note=row.querySelector('.settings-wake-warning'); if(!note){note=document.createElement('p');note.className='settings-risk-warning settings-wake-warning';note.textContent='⚠ Wakes agents with their saved permissions, including permission bypass.';row.append(note);}note.hidden=!wake.checked; }
+        if(row) { let note=row.querySelector('.settings-wake-warning'); if(!note){note=document.createElement('p');note.className='settings-risk-warning settings-wake-warning';note.textContent='⚠ Wakes with saved permissions, including bypass.';row.append(note);}note.hidden=!wake.checked;const hint=row.querySelector('.sv-help-text');if(hint)hint.hidden=wake.checked; }
     }
     modal.addEventListener('change',event=>{
         const e=event.target;if(e.dataset.saving==='1')return;if(accepted.has(e)){accepted.delete(e);return;}

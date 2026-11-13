@@ -61,6 +61,6 @@
 #settings-modal a.tb-note { font: inherit; font-size: var(--sv-help-size); }
 .settings-risk-warning { grid-column: 1 / -1; margin: 4px 0 0; color: var(--warning); font-size: var(--sv-help-size); overflow-wrap: anywhere; }
 .settings-risk-warning[hidden] { display: none; }
-.settings-safety-summary { margin-bottom: 12px; }
+.settings-safety-summary { margin-bottom: 12px; font-size: var(--fs-md); }
 .settings-safety-summary p { margin: 0 0 6px; }
 .settings-safety-summary button { max-width: 100%; white-space: normal; margin: 0 6px 6px 0; }

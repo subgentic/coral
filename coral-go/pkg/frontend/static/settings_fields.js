@@ -263,7 +263,7 @@ const HELP_LINES = {
     launch_in_worktree: 'Uses an isolated checkout for each team. Experimental; off by default.',
     prune_days: 'Removes old saved diffs and unlinked artifacts after a preview.',
     retention_enabled: 'Deletes old saved diffs and unlinked artifacts automatically after a preview.',
-    accounts: 'Agents sign in through each CLI’s own login.',
+    accounts: 'Use CLI sign-in.',
     debug_input_log: 'Records everything Coral types, including secrets. For troubleshooting only.',
 };
 

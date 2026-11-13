@@ -1,4 +1,4 @@
-// Custom models end to end (#5480), on the real server (no stub): a model added in Settings > Agents and saved with Apply comes back from GET /api/custom-models, is in both model catalogs the pickers read
+// Custom models end to end (#5480), on the real server (no stub): a model added in Settings > Agents and saved immediately comes back from GET /api/custom-models, is in both model catalogs the pickers read
 // (GET /api/agents/models?type= with custom true and the levels ticked, and GET /api/agent-models), shows in a launch form's model list marked "(custom)" with its own thinking levels, and is gone from
 // all of them once removed. A refused id is refused by the server too (400 naming the row), with nothing changed. The list is emptied at the end. Run against an isolated dev server.
 const assert = require('node:assert/strict');
@@ -14,7 +14,7 @@ const { coralReady } = require('./helpers/wait');
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' — ' + detail : ''}`); };
     const api = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body === undefined ? 'undefined' : JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
     const click = sel => ev(`document.querySelector(${JSON.stringify(sel)}).click(); true`);
-    const guard = await guardSettings(); // Apply saves the whole form: the settings it writes are put back
+    const guard = await guardSettings(); // restore any settings used by the picker checks
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -23,7 +23,7 @@ const { coralReady } = require('./helpers/wait');
         await api('PUT', '/api/custom-models', { models: [] });
 
         const addFor = async p => { await click('#settings-custom-models [data-cm-add]'); await ev(`(() => { const s = document.getElementById('cm-provider'); s.value = ${JSON.stringify(p)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); };
-        console.log('1. add two models in Settings and Apply');
+        console.log('1. add two models in Settings with immediate saves');
         await ev(`window.showSettingsModal('agents'); true`);
         await waitFor(`!!document.querySelector('#settings-custom-models [data-cm-add]')`, 'the section from the real route', 8000);
         const lim = await api('GET', '/api/custom-models');
@@ -31,10 +31,10 @@ const { coralReady } = require('./helpers/wait');
         check(`the server's limits drive the level boxes (claude: ${claudeLevels.join()})`, claudeLevels.includes('low') && claudeLevels.includes('high') && lim.body.limits.families.join() === 'claude,codex,agy,pi,opencode,hermes');
         await addFor('claude');
         await ev(`(() => { document.getElementById('cm-id').value = 'e2e-claude-model'; document.getElementById('cm-name').value = 'E2E Claude'; document.querySelectorAll('#settings-custom-models .cm-form input[type=checkbox]').forEach(c => { if (c.value === 'low' || c.value === 'high') c.checked = true; }); document.querySelector('#settings-custom-models .cm-form .sv-save').click(); return true; })()`);
+        await waitFor(`!!document.querySelector('#settings-custom-models [data-cm-add]') && document.querySelector('#settings-custom-models .cm-status')?.textContent === 'Saved'`, 'first Add saved', 8000);
         await addFor('pi');
         await ev(`(() => { document.getElementById('cm-id').value = 'e2e/pi-model'; document.querySelector('#settings-custom-models .cm-form .sv-save').click(); return true; })()`);
-        await ev(`Promise.resolve(window.applySettings()).then(() => true)`);
-        await waitFor(`(document.querySelector('#settings-custom-models .cm-status') || { textContent: 'not drawn' }).textContent === ''`, 'the save to finish', 8000);
+        await waitFor(`!!document.querySelector('#settings-custom-models [data-cm-add]') && document.querySelector('#settings-custom-models .cm-status')?.textContent === 'Saved'`, 'second Add saved', 8000);
         let got = await api('GET', '/api/custom-models');
         check(`GET /api/custom-models has both rows (${JSON.stringify(got.body.models)})`, got.body.models.length === 2 && got.body.models.some(m => m.family === 'claude' && m.value === 'e2e-claude-model' && m.display_name === 'E2E Claude' && m.efforts.join() === 'low,high') && got.body.models.some(m => m.family === 'pi' && m.value === 'e2e/pi-model' && m.efforts.length === 0));
 
@@ -77,10 +77,11 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window.showSettingsModal('agents'); true`);
         await waitFor(`!!document.querySelector('#settings-custom-models [data-cm-add]')`, 'the section again', 8000);
         check('the saved models are listed after a reopen', /e2e-claude-model/.test(await ev(`document.getElementById('settings-custom-models').innerText`)));
-        await ev(`document.querySelectorAll('#settings-custom-models button[aria-label^="Remove"]').forEach(b => b.click()); true`);
-        check(`both rows are out of the draft, and the form says unsaved (${await ev(`JSON.stringify([window.__x = 1, document.querySelector('#settings-custom-models .cm-status').textContent])`)})`, (await ev(`import(${S} + 'custom_models.js').then(m => m.customModelsPayload().models.length)`)) === 0);
-        await ev(`Promise.resolve(window.applySettings()).then(() => true)`);
-        await waitFor(`(document.querySelector('#settings-custom-models .cm-status') || { textContent: 'not drawn' }).textContent === ''`, 'the save', 8000);
+        for (const [id, left] of [['e2e-claude-model', 1], ['e2e/pi-model', 0]]) {
+            await ev(`document.querySelector('#settings-custom-models .cm-status').textContent='';document.querySelector('#settings-custom-models button[aria-label="Remove ${id}"]').click();true`);
+            await waitFor(`document.querySelectorAll('#settings-custom-models .cm-row').length === ${left} && import(${S} + 'custom_models.js').then(m => !m.customModelsDirty())`, 'Remove saved before next action', 8000);
+        }
+        check('both rows are saved as removed', (await api('GET', '/api/custom-models')).body.models.length === 0);
         cat = await api('GET', '/api/agents/models?type=claude');
         const flat2 = await api('GET', '/api/agent-models');
         check('removed from both catalogs on the next read', !(cat.body.models || []).some(m => m.value === 'e2e-claude-model') && !(flat2.body.claude || []).includes('e2e-claude-model') && !(flat2.body.pi || []).includes('e2e/pi-model'));
