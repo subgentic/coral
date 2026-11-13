@@ -56,3 +56,6 @@
 /* Per-row persistence feedback stays beside the setting, including at larger text sizes. */
 .settings-save-status { display: block; font-size: var(--sv-help-size); color: var(--text-muted); }
 .settings-save-status[data-error] { color: var(--danger); }
+
+/* Password recovery is help text; retain its public link and phone target. */
+#settings-modal a.tb-note { font: inherit; font-size: var(--sv-help-size); }
