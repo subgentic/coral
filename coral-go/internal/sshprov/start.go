@@ -53,13 +53,15 @@ func (r Runner) AcceptTerms(ctx context.Context, t Target, version string, paylo
 var (
 	stopWait = 15 * time.Second
 	stopPoll = time.Second
+	// stopKillWait is how long a Coral that outlived stopWait is given after the escalation (SIGKILL) before the stop is refused.
+	stopKillWait = 5 * time.Second
 )
 
 // SetStopTimingForTest shortens how long StopAndConfirm waits (other packages' tests run it against a Coral that will not stop); it returns the function that puts the old values back.
 func SetStopTimingForTest(wait, poll time.Duration) (restore func()) {
-	oldW, oldP := stopWait, stopPoll
-	stopWait, stopPoll = wait, poll
-	return func() { stopWait, stopPoll = oldW, oldP }
+	oldW, oldP, oldK := stopWait, stopPoll, stopKillWait
+	stopWait, stopPoll, stopKillWait = wait, poll, wait
+	return func() { stopWait, stopPoll, stopKillWait = oldW, oldP, oldK }
 }
 
 // ErrNotStopped is a Coral that is still there after a stop (a session, or a process of this user running it), or one that could not be checked.
@@ -88,7 +90,7 @@ func (r Runner) StopAndConfirm(ctx context.Context, t Target) error {
 	if _, err := r.Run(ctx, t, CmdStopTmux); err != nil { // a Coral set up before the daemon start lives in this session
 		return err
 	}
-	deadline := time.Now().Add(stopWait)
+	deadline, escalated := time.Now().Add(stopWait), false
 	for {
 		res, err := r.Run(ctx, t, CmdCheckStopped)
 		if err != nil {
@@ -97,8 +99,18 @@ func (r Runner) StopAndConfirm(ctx context.Context, t Target) error {
 		if res.ExitCode == 0 {
 			return nil
 		}
-		if res.ExitCode == CannotTell || time.Now().After(deadline) {
+		if res.ExitCode == CannotTell {
 			return &NotStoppedError{Found: res.ExitCode}
+		}
+		if time.Now().After(deadline) {
+			// a Coral that ignored the SIGTERM for the whole grace period (#15997): SIGKILL it, this install's processes only, and give it one short wait more
+			if escalated || res.ExitCode != StillProcess {
+				return &NotStoppedError{Found: res.ExitCode}
+			}
+			if _, err := r.Run(ctx, t, CmdKillStuck); err != nil {
+				return err
+			}
+			escalated, deadline = true, time.Now().Add(stopKillWait)
 		}
 		select {
 		case <-ctx.Done():
