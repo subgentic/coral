@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -34,6 +35,8 @@ const (
 	hubDropboxFieldMax  = 80
 	hubDropboxLinkMax   = 1024
 	hubDropboxPushMax   = 120 * time.Second
+	// hubDropboxSharedMax caps the in-memory yes/no hint: the Hub could otherwise grow it one digest at a time (#16206, Security on #16109).
+	hubDropboxSharedMax = 4096
 )
 
 // HubDropbox is the state and the checks behind the three routes. Every dependency is a function so a test can fake it, and an unset one fails closed.
@@ -131,17 +134,31 @@ func (d *HubDropbox) Shared(digest string) bool {
 	return d.shared[digest]
 }
 
-func (d *HubDropbox) setShared(digest string, yes bool) {
+// setShared records a yes or forgets it, and reports whether the hint was kept: a yes is kept only for a digest of a real artifact on this computer and only while fewer than hubDropboxSharedMax are held (#16206).
+func (d *HubDropbox) setShared(digest string, yes bool) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if !yes {
+		delete(d.shared, digest)
+		return true
+	}
+	if !d.isArtifact(digest) {
+		return false
+	}
 	if d.shared == nil {
 		d.shared = map[string]bool{}
 	}
-	if yes {
-		d.shared[digest] = true
-	} else {
-		delete(d.shared, digest)
+	if _, held := d.shared[digest]; !held && len(d.shared) >= hubDropboxSharedMax {
+		return false
 	}
+	d.shared[digest] = true
+	return true
+}
+
+// isArtifact is whether the artifact store holds a regular file under this digest (a link or a folder is not one). It reads no bytes.
+func (d *HubDropbox) isArtifact(digest string) bool {
+	st, err := os.Lstat(filepath.Join(d.CoralDir, "artifacts", "objects", digest))
+	return err == nil && st.Mode().IsRegular()
 }
 
 // strictBody reads a closed JSON object: the body is at most max bytes, every key is exactly one of keys, none is repeated or missing, and nothing follows it.
@@ -305,7 +322,8 @@ func validPushLink(raw string) bool {
 	if err != nil {
 		return false
 	}
-	return strings.HasPrefix(u.Path, "/2/files/") && !strings.Contains(u.EscapedPath(), "..")
+	// u.Path is the decoded path, so %2e%2e and %2E%2E are ".." here: a path that cleans to something else (dot segments, a doubled or trailing slash) is refused (#16206, Security INFO on #16109).
+	return strings.HasPrefix(u.Path, "/2/files/") && !strings.Contains(u.EscapedPath(), "..") && path.Clean(u.Path) == u.Path
 }
 
 // Push answers POST /api/dropbox/push {"digest","link"}: read the file once and send it to the link. Order, each step failing closed: the link, the switch, the mark and tag, one read whose SHA-256 must be the digest,
@@ -398,8 +416,9 @@ func (d *HubDropbox) SharedHint(w http.ResponseWriter, r *http.Request) {
 		badHubDropbox(w)
 		return
 	}
-	if d.enabled(r.Context()) {
-		d.setShared(digest, shared)
+	if d.enabled(r.Context()) && !d.setShared(digest, shared) {
+		d.reply(w, word("not_available")) // not an artifact here, or the hint is full: nothing was kept
+		return
 	}
 	d.reply(w, word("ok"))
 }
