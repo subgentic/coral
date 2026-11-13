@@ -21,7 +21,7 @@ const BASE = require('./test_base').BASE;
         const before = await ev(`[...document.querySelectorAll('#team-agents-list [role=listitem], #team-agents-list > *')].map(r => r.textContent.replace(/\\s+/g, ' ').trim().slice(0, 40))`);
         assert.ok(before.length > 0, 'the template has members to replace: ' + JSON.stringify(before));
         await ev(`document.getElementById('team-describe').click(); true`);
-        await waitFor(`getComputedStyle(document.getElementById('team-wizard-modal')).display !== 'none'`, 'the dialog', 4000);
+        await waitFor(`!document.getElementById('team-wizard-panel').hidden`, 'the dialog', 4000);
         // 1. the error does not move the buttons
         const pos = () => ev(`(() => { const t = document.getElementById('team-wizard-test-btn').getBoundingClientRect(), g = document.getElementById('team-wizard-generate-btn').getBoundingClientRect(); return [Math.round(t.top), Math.round(g.top)]; })()`);
         const still = await pos();
@@ -30,13 +30,13 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(await pos(), still, 'Generate and Try a sample have not moved: ' + JSON.stringify([still, await pos()]));
         // 2. Try a sample shows what it will add before it replaces the members (#10658), then goes to the drafted members
         await ev(`document.getElementById('team-wizard-test-btn').click(); true`); await settle(300);
-        const preview = await ev(`(() => { const e = document.getElementById('team-wizard-error'); return { text: e.textContent.trim(), quiet: e.classList.contains('team-wizard-error-quiet'), open: getComputedStyle(document.getElementById('team-wizard-modal')).display !== 'none', btn: document.getElementById('team-wizard-test-btn').textContent.trim(), rows: document.querySelectorAll('#team-agents-list > *').length }; })()`);
+        const preview = await ev(`(() => { const e = document.getElementById('team-wizard-error'); return { text: e.textContent.trim(), quiet: e.classList.contains('team-wizard-error-quiet'), open: !document.getElementById('team-wizard-panel').hidden, btn: document.getElementById('team-wizard-test-btn').textContent.trim(), rows: document.querySelectorAll('#team-agents-list > *').length }; })()`);
         assert.ok(preview.open && !preview.quiet && /Orchestrator, Sample Builder, Sample Reviewer/.test(preview.text) && /replaces/i.test(preview.text), 'the first press says what the sample will add: ' + JSON.stringify(preview));
         assert.equal(preview.rows, before.length, 'and has replaced nothing yet: ' + JSON.stringify(preview));
         assert.deepEqual(await pos(), still, 'the buttons did not move for it');
         assert.equal(preview.btn, 'Replace members', 'the button says what the next press does: ' + JSON.stringify(preview));
         await ev(`document.getElementById('team-wizard-test-btn').click(); true`);
-        await waitFor(`getComputedStyle(document.getElementById('team-wizard-modal')).display === 'none'`, 'the dialog closes by itself', 6000);
+        await waitFor(`document.getElementById('team-wizard-panel').hidden`, 'the dialog closes by itself', 6000);
         await waitFor(vis('#team-agents-list'), 'the members', 4000);
         const names = await ev(`[...document.querySelectorAll('#team-agents-list [role=listitem], #team-agents-list > *')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
         assert.equal(names.length, 3, 'three members: ' + JSON.stringify(names));
