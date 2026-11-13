@@ -72,5 +72,7 @@ registerActions({
     'team-set-all': el => teamDialogs._setAllWorkers(textOf(el.value, 40) || ''),
     'team-set-all-model': el => teamDialogs._setAllModel(textOf(el.value, 120) || ''),
     'team-set-all-models': () => teamDialogs._fillAllModels(),
+    'team-set-all-thinking': el => teamDialogs._setAllThinking(textOf(el.value, 40) || ''),
+    'team-set-all-mode': el => teamDialogs._setAllMode(textOf(el.value, 40) || ''),
     'team-add-orchestrator': () => teamDialogs._addOrchestrator(),
 });
