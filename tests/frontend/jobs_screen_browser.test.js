@@ -50,9 +50,9 @@ const S = `(window.__coralStatic || '/static/')`;
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 3`, `${at}: the three jobs listed at once`, 8000);
 
             if (!mobile) {
-                await waitFor(`document.querySelectorAll('#group-table-view .dt-chip').length >= 3`, at + 'status chips in group tables', 4000);
-                assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .dt-chip')].map(e => e.textContent)`), ['Failed', 'Passed', 'Turned off'], at + 'failed, passed and turned off use the shared chips (one word with the job page, #10475)');
-                assert.equal(await ev(`document.querySelectorAll('#group-table-view .dt-chip .goal-dot[aria-hidden="true"]').length`), 3, at + 'words convey state; dots are decorative');
+                await waitFor(`document.querySelectorAll('#group-table-view .status-mark').length >= 2 && document.querySelectorAll('#group-table-view .dt-chip').length >= 1`, at + 'status marks and chips in group tables', 4000);
+                assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .status-mark .status-word, #group-table-view .dt-chip')].map(e => e.textContent)`), ['Failed', 'Passed', 'Turned off'], at + 'Last run is the shared status mark (shape and word, #15813) and a turned-off job keeps its chip (one word with the job page, #10475)');
+                assert.equal(await ev(`document.querySelectorAll('#group-table-view .status-mark svg[aria-hidden="true"], #group-table-view .dt-chip .goal-dot[aria-hidden="true"]').length`), 3, at + 'words convey state; shapes and dots are decorative');
                 await shot('jobs-state-chips');
             }
             console.log(`${at}: one table, every job, in words`);
