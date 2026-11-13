@@ -9,7 +9,7 @@ import { pollEvery } from './overload.js';
 import { fitWords } from './dock_tabs.js';
 
 const TAB = 'agentic-tab-subagents', PANEL = 'agentic-panel-subagents';
-let _timer = null;
+let _timer = null, _ro = null;
 
 const STATE_CLASS = { Done: 'subagents-state-done', Running: 'subagents-state-running', Stopped: 'subagents-state-stopped' };
 const stateWord = sa => (sa.status === 'completed' || sa.finished ? 'Done' : sa.status === 'in_progress' ? 'Running' : 'Stopped');
@@ -50,7 +50,7 @@ function ensureTab() {
     const count = el('span', 'tab-count agentic-tab-count'); count.id = 'subagents-count';
     btn.append(icon, el('span', 'agentic-tab-word', 'Sub-agents'), count);
     tasks.after(btn);
-    new ResizeObserver(fitWords).observe(btn); fitWords(); // the tab strip refits its words for the new tab (it is not in the strip at start)
+    _ro = new ResizeObserver(fitWords); _ro.observe(btn); fitWords(); // the tab strip refits its words for the new tab (it is not in the strip at start)
     panel = el('div', 'agentic-panel'); panel.id = PANEL; panel.setAttribute('role', 'region'); panel.setAttribute('aria-label', 'Sub-agents');
     tasksPanel.after(panel);
     return { btn, panel };
@@ -58,6 +58,7 @@ function ensureTab() {
 
 function removeTab() {
     clearInterval(_timer); _timer = null;
+    _ro?.disconnect(); _ro = null; // the observer goes with the tab it watched (Security INFO, #16314)
     const btn = document.getElementById(TAB), panel = document.getElementById(PANEL);
     const wasOpen = !!btn?.classList.contains('active');
     btn?.remove(); panel?.remove();

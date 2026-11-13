@@ -50,10 +50,12 @@ const FIXTURE = [
             await ev(`document.querySelector('#agentic-panel-subagents [data-subagent-id="sa1"]').click(); true`);
             await waitFor(`/Subagent/.test(document.getElementById('task-detail-modal-title')?.textContent || '') && getComputedStyle(document.getElementById('task-detail-modal')).display !== 'none'`, `${at}: a row opens the sub-agent's detail`, 6000);
             await ev(`window.closeTaskDetailModal?.(); document.getElementById('task-detail-modal').style.display = 'none'; true`);
+            await ev(`window.__roDisc = 0; const d = ResizeObserver.prototype.disconnect; ResizeObserver.prototype.disconnect = function () { window.__roDisc++; return d.call(this); }; true`);
             // another agent with none: the tab goes and Tasks is open
             await ev(`(() => { window.__subs = []; window.selectLiveSession('dev2', 'claude', 'sid2', 'local'); return true; })()`);
             await waitFor(`!document.getElementById('agentic-tab-subagents') && !document.getElementById('agentic-panel-subagents')`, `${at}: the tab goes with the sub-agents`, 6000);
             check(await ev(`document.getElementById('agentic-tab-tasks').classList.contains('active')`), `${at}: Tasks is the open tab again`);
+            check(await ev(`window.__roDisc >= 1`), `${at}: the tab's ResizeObserver is disconnected when the tab goes (#16314)`);
         }
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'The Sub-agents tab:\n  ' + problems.join('\n  '));
