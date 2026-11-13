@@ -72,7 +72,7 @@ const BASE = require('./test_base').BASE;
    await ev(`document.getElementById('settings-tab-security').click();true`);
    const label=id==='settings-permission-mode'?(value==='dontAsk'?"Don't ask":'Bypass permissions'):id==='settings-remote-access-enabled'?'Remote access':'Record what Coral types';
    await ev(`[...document.querySelectorAll('#settings-safety-summary button')].find(b=>b.textContent===${JSON.stringify(label)}).click();true`);
-   assert.equal(await ev(`document.activeElement.id`),id,'summary navigates and focuses the risk row');
+   assert.equal(await ev(`(()=>{const e=document.getElementById('${id}');return document.activeElement===(e._segmented?.querySelector('[aria-checked="true"]')||e);})()`),true,'summary navigates and focuses the visible risk row');
    const warning=await ev(`document.getElementById('${id}-risk').textContent`);assert.match(warning,/⚠ /);
    await shot(`settings-risks-active-${id}-${typeof value==='boolean'?'on':value}`);
    if(id==='settings-permission-mode'&&value==='dontAsk') {
