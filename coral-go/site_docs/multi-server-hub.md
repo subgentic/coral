@@ -34,7 +34,7 @@ Without hub mode nothing about the hub exists: the hub routes are not registered
 
 ### 2. Add a computer
 
-In the hub's top bar, open the settings menu and choose **Computers**, then **Add computer**. There are two ways to connect a computer.
+In the hub's top bar, open the **Computers** tab, then choose **Add computer**. There are two ways to connect a computer.
 
 ![The Computers tab with its two buttons marked: Set up over SSH, the easiest way, and Add computer](assets/add-computer-1-choose.png)
 
