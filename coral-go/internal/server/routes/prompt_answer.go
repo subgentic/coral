@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"github.com/subgentic/coral/internal/board"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -1120,6 +1121,8 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	noteActivity(r, row, "agent", name, "", "", note)
 	h.kickWS()                     // every screen showing the card takes the answer now
 	h.forgetDialog(body.SessionID) // the prompt was answered: it is not a dialog the agent is stuck at (#11437); the next pass reads the screen again
+	// One line on success too (#16398: a report that an answer "changed nothing" had no log to show whether it reached the terminal): who, which option, how it was sent, never the question or any typed text.
+	slog.Info("answer-prompt sent", "session", name, "agent_type", body.AgentType, "session_id", body.SessionID, "n", body.N, "label", opt.Label, "by", map[bool]string{true: "arrows", false: "digit"}[byArrows], "trust_folder", body.TrustFolder != "" && isTrustYes(screen, opt))
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "answered": opt.Label, "at": at})
 }
 
