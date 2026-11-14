@@ -226,3 +226,57 @@ func TestAReplyToOneQuestionClosesOnlyThatQuestion(t *testing.T) {
 	assert.Empty(t, askOf(t, s, ctx, q1.ID).Open)
 	assert.Empty(t, askOf(t, s, ctx, q3.ID).Open)
 }
+
+// #16617 (walk 26 L2): a question posted on a task stops waiting for an answer when the task is completed after it, or when its asker posts on that task again; a question on no task is closed only by an answer, and
+// one the Operator reopened stays open.
+func TestAnAskOnATaskClosesWhenTheTaskIsDecidedOrTheAskerPostsAgain(t *testing.T) {
+	s, ctx := askBoard(t)
+	post := func(who, text string, ask bool, task *Task) *Message {
+		var asked []string
+		if ask {
+			var err error
+			asked, err = s.AskTargets(ctx, "alpha", who, text)
+			require.NoError(t, err)
+		}
+		var tid *int64
+		if task != nil {
+			tid = &task.ID
+		}
+		m, err := s.PostMessageForTask(ctx, "alpha", who, text, nil, "", tid)
+		require.NoError(t, err)
+		if ask {
+			require.NoError(t, s.RecordAsk(ctx, "alpha", m, asked))
+		}
+		return m
+	}
+	task := func(title string) *Task {
+		tk, err := s.CreateTask(ctx, "alpha", title, "", "medium", "Lead", "Dev A")
+		require.NoError(t, err)
+		return tk
+	}
+	t1, t2, t3 := task("one"), task("two"), task("three")
+	q1 := post("Lead", "@Dev A is v2 right?", true, t1)
+	q2 := post("Lead", "@Dev A open the terminal", true, t2)
+	q3 := post("Lead", "@Dev A a question on no task", true, nil)
+	_ = t3
+	for _, id := range []int64{q1.ID, q2.ID, q3.ID} {
+		assert.Equal(t, []string{"Dev A"}, askOf(t, s, ctx, id).Open, "all three wait")
+	}
+	time.Sleep(1100 * time.Millisecond) // the task is completed after the question (RFC3339 seconds)
+	_, err := s.CompleteTask(ctx, "alpha", t1.ID, "Dev A", nil)
+	require.NoError(t, err)
+	info := askOf(t, s, ctx, q1.ID)
+	assert.Empty(t, info.Open, "the task was decided")
+	assert.True(t, info.Answered)
+	assert.True(t, info.Closed)
+	assert.Equal(t, "Coral", info.ClosedBy)
+	post("Lead", "all fine now", false, t2)
+	info = askOf(t, s, ctx, q2.ID)
+	assert.Empty(t, info.Open, "the asker posted on the task again")
+	assert.True(t, info.Closed)
+	assert.Equal(t, []string{"Dev A"}, askOf(t, s, ctx, q3.ID).Open, "a question on no task is closed only by an answer")
+	post("Dev A", "someone else posting on the task", false, t3)
+	q4 := post("Lead", "@Dev A question on t3", true, t3)
+	post("Dev A", "not the asker", false, t3)
+	assert.Equal(t, []string{"Dev A"}, askOf(t, s, ctx, q4.ID).Open, "only the asker's own later post closes it")
+}

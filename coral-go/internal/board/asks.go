@@ -2,6 +2,7 @@ package board
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -438,8 +439,47 @@ func (s *Store) askInfo(ctx context.Context, project string, a askRow, subs map[
 			info.Open = append(info.Open, m)
 		}
 	}
+	if len(info.Open) > 0 && a.Floor == 0 { // an ask the Operator reopened stays open
+		reason, err := s.askClosedBy(ctx, project, a)
+		if err != nil {
+			return nil, err
+		}
+		if reason != "" { // nobody owes an answer any more (#16617): the Inbox no longer lists it and the reminders skip it
+			info.Open, info.Closed, info.ClosedBy, info.ClosedNote = []string{}, true, "Coral", reason
+		}
+	}
 	info.Answered = len(info.Open) == 0
 	return info, nil
+}
+
+// askClosedBy says (in words) why an unanswered question posted on a task (post --ask --task N) no longer needs an answer, or "" when it does: the task was completed after the question (its review is decided), or the
+// asker posted on the same task again after it (the later post says what is now true, so the old question is stale). A question on no task is closed only by an answer (#16617).
+func (s *Store) askClosedBy(ctx context.Context, project string, a askRow) (string, error) {
+	var taskID sql.NullInt64
+	if err := s.reader().GetContext(ctx, &taskID, `SELECT task_id FROM board_messages WHERE project = ? AND id = ?`, project, a.MessageID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", err
+	}
+	if !taskID.Valid {
+		return "", nil
+	}
+	var again bool
+	if err := s.reader().GetContext(ctx, &again, `SELECT EXISTS(SELECT 1 FROM board_messages WHERE project = ? AND task_id = ? AND subscriber_id = ? AND id > ? AND COALESCE(is_system, 0) = 0)`, project, taskID.Int64, a.Asker, a.MessageID); err != nil {
+		return "", err
+	}
+	if again {
+		return "The asker posted on this task again.", nil
+	}
+	var decided bool
+	if err := s.reader().GetContext(ctx, &decided, `SELECT EXISTS(SELECT 1 FROM board_tasks WHERE board_id = ? AND id = ? AND completed_at IS NOT NULL AND completed_at > ?)`, project, taskID.Int64, a.CreatedAt); err != nil {
+		return "", err
+	}
+	if decided {
+		return "The task was completed after this was asked.", nil
+	}
+	return "", nil
 }
 
 // AskUpdate is a question the reader already holds, with its state now: a new post may have answered it (#8200).
