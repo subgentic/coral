@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/board"
 )
 
 // #16140 (Security on #16030): the queue's list through Coral Hub is the computer owner's alone, and each note is redacted before it leaves.
@@ -79,4 +82,40 @@ func TestTheResourceListThroughTheHubRedactsEachNoteAndLocalIsUnchanged(t *testi
 	holders := list[0]["holders"].([]any)
 	require.Len(t, holders, 1)
 	assert.Equal(t, "Dev A", holders[0].(map[string]any)["agent"], "the entry stays, only its note is gone")
+}
+
+// #16247 (Security INFO on #16140): a goal's title is free text too, so through the Hub it is redacted like a note, and dropped when it cannot be checked.
+func TestTheResourceListThroughTheHubRedactsTheGoalTitle(t *testing.T) {
+	g := newResRig(t)
+	ctx := context.Background()
+	g.subscribe("alpha", "Dev A", "Developer", false)
+	secret := "s3cr3t" + "Value99AbCdEf1234" // built at runtime: no token-shaped string sits in the source
+	goal, err := g.bs.CreateGoal(ctx, "alpha", board.GoalInput{Title: "Ship it, api_key=" + secret, Outcome: "x", DoneWhen: "y", CreatedBy: "Dev A"})
+	require.NoError(t, err)
+	task, err := g.bs.CreateTask(ctx, "alpha", "work", "", "high", "Dev A", "Dev A")
+	require.NoError(t, err)
+	_, err = g.bs.ClaimTask(ctx, "alpha", "Dev A", task.ID)
+	require.NoError(t, err)
+	require.NoError(t, g.bs.SetTaskGoal(ctx, "alpha", task.ID, &goal.ID))
+	g.do("operator", "PUT", "/api/resources/mac-heavy", map[string]any{"slots": 1})
+	g.do("token:Dev A", "POST", "/api/resources/mac-heavy/claim", map[string]any{})
+	withLabel(t, ownerLabel, nil)
+
+	code, list, body := g.list(ownerHeaders(ownerLabel))
+	require.Equal(t, http.StatusOK, code)
+	assert.NotContains(t, body, secret, "the goal's title leaves without its secret")
+	holder := list[0]["holders"].([]any)[0].(map[string]any)
+	assert.Contains(t, holder["goal_title"], "Ship it", "the rest of the title is kept")
+	assert.EqualValues(t, goal.ID, holder["goal_id"])
+
+	_, _, local := g.list(nil)
+	assert.Contains(t, local, secret, "this computer shows the title as it was written")
+
+	redactCommentFailsFor = func(text string) bool { return strings.Contains(text, "Ship it") }
+	t.Cleanup(func() { redactCommentFailsFor = nil })
+	_, list, body = g.list(ownerHeaders(ownerLabel))
+	assert.NotContains(t, body, secret)
+	holder = list[0]["holders"].([]any)[0].(map[string]any)
+	assert.NotContains(t, holder, "goal_title", "a title that cannot be checked is dropped")
+	assert.EqualValues(t, goal.ID, holder["goal_id"], "the entry keeps its goal link")
 }
