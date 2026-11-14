@@ -16,3 +16,12 @@
 .branches-more { background:none; border:0; padding:4px 0; margin-top:4px; color:var(--accent); font:inherit; font-size:var(--fs-sm); cursor:pointer; min-height:32px; }
 .branches-commits { list-style:none; margin:4px 0 8px; padding:0; display:flex; flex-direction:column; gap:4px; font-size:var(--fs-sm); overflow-wrap:anywhere; }
 .branches-sha { font-family:var(--font-mono, monospace); color:var(--text-secondary); }
+.branches-changes { margin: 6px 0; min-height: 44px; text-align: left; white-space: normal; }
+.branches-changes-dialog { max-width: var(--dlg-max); max-height: calc(100dvh - 24px); padding: 16px; overflow: auto; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border); border-radius: var(--radius-ml); }
+.branch-changes-header { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.branch-changes-header h2 { margin: 0 0 12px; overflow-wrap: anywhere; min-width: 0; }
+.branch-agent-label { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.branch-file-open { min-height: 44px; max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+.branches-changes-dialog .file-diff { position: relative; min-width: 0; }
+.branches-changes-dialog .file-diff-body { max-height: none; }
+.branches-changes-dialog .branch-close { min-height: 44px; flex-shrink: 0; }
