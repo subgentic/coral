@@ -58,3 +58,17 @@
 @media (max-width: 768px) { .inbox-ask-text .msg-ref { padding: 10px 4px; margin: -10px -2px; } }
 .inbox-ask-dialog .inbox-ask-foot > .inbox-ask-buttons { flex: 1 1 100%; } /* the button row spans the footer, so Dismiss can sit at its left end */
 .inbox-ask-dialog .inbox-ask-buttons > .btn-quiet { margin-inline-end: auto; } /* Dismiss, the quiet exit that tells nobody, stands alone at the far left of the footer and Close is at the right (#16371, the one-footer rule of #15816); Send reply is under the reply box (#13148) */
+
+/* #16754: a phone with the keyboard open leaves a band of ~300 px. The footer (Close, Dismiss) was the sticky part, so Send reply scrolled out of sight under it and the person saw only Close and Dismiss.
+   There the reply row is the sticky one at the foot of the visible area (Send reply first, the way the keyboard's own Send is) and Close and Dismiss follow it as ordinary content. Chrome on Android shrinks the
+   layout viewport for the keyboard (the max-height media query sees it); iOS and older Chrome shrink only the visual one (html.kb-open, keyboard_open.js). */
+@media (max-width: 599px) and (max-height: 520px) { /* (a sideways phone is the two-column layout above, where the reply scrolls on its own) */
+    dialog.inbox-ask-dialog .inbox-ask-pics, dialog.inbox-ask-dialog .inbox-ask-attach { display: contents; }
+    dialog.inbox-ask-dialog .inbox-ask-sendrow { position: sticky; bottom: calc(-1 * var(--space-2xl)); z-index: 2; padding: 8px 0; background: var(--bg-secondary); }
+    dialog.inbox-ask-dialog .inbox-ask-foot { position: static; }
+}
+@media (max-width: 599px) {
+    html.kb-open dialog.inbox-ask-dialog .inbox-ask-pics, html.kb-open dialog.inbox-ask-dialog .inbox-ask-attach { display: contents; }
+    html.kb-open dialog.inbox-ask-dialog .inbox-ask-sendrow { position: sticky; bottom: calc(-1 * var(--space-2xl)); z-index: 2; padding: 8px 0; background: var(--bg-secondary); }
+    html.kb-open dialog.inbox-ask-dialog .inbox-ask-foot { position: static; }
+}

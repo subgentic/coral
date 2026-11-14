@@ -1,6 +1,7 @@
 /* The question's reply box, pictures and offered actions; loaded when opened, not for the Inbox badge. */
 import { LOCAL_SERVER, boardTeamKey, normServer, serverFetch, decisionNeedsPerson, isCloud } from './server_base.js';
 import { openWithQuestionReturn } from './suspend_native_dialog.js';
+import { startKeyboardWatch } from './keyboard_open.js'; // html.kb-open: with the keyboard up, Send reply is the sticky row (#16754)
 import { markHidden } from './visible_marks.js';
 import { renderMarkdownStrict } from './utils.js';
 import { whenText } from './when_text.js';
@@ -161,6 +162,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     });
     document.body.append(dlg);
     dlg.showModal();
+    startKeyboardWatch();
     box.focus();
     if (missingCloudSource) err.textContent = 'This question’s computer is not loaded yet. Close and reopen it after the computer list arrives.';
     // Older list/link snapshots may precede the question's button metadata.
