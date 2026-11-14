@@ -695,6 +695,15 @@ func (h *SessionsHandler) restartRecord(ctx context.Context, p *restartPlan) {
 			return ptr.NonEmpty(p.permMode) // the mode it restarted in is recorded, so the next restart knows it (#10297)
 		}(),
 	})
+	// The model line of the row (#16434): an agent started on its CLI's own default has no model stored, and the line came from what the CLI reported (the transcript, a hook). The new session has none of that until
+	// its first turn, so the row lost the line while a Claude row with a stored model kept it. The model the replaced row showed is kept as the new one's observed model (display only, never a launch setting).
+	if p.model == "" {
+		if shown := h.shownModel(p.req.SessionID, p.stored); shown != "" {
+			if err := h.ss.SetObservedModel(ctx, p.newSessionID, shown); err != nil {
+				log.Printf("[restart] could not carry the shown model to %s: %v", p.newSessionID, err)
+			}
+		}
+	}
 	if p.req.KeepFullAccess { // the form's choice goes to the NEW session even when the same restart edited the capabilities (which ends an earlier choice): the person just made it (#14085)
 		if _, err := h.ss.SetKeepFullAccessFrom(ctx, p.newSessionID, true, p.keepSource); err != nil {
 			log.Printf("[keep-full-access] could not store the choice on the restarted session %s: %v", p.newSessionID, err)

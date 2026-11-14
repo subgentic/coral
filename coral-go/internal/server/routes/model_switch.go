@@ -15,6 +15,7 @@ import (
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/jsonl"
 	"github.com/subgentic/coral/internal/proxy"
+	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -331,6 +332,17 @@ func (h *SessionsHandler) transcriptModel(sessionID string) string {
 		return ""
 	}
 	return h.jsonl.TranscriptModel(sessionID)
+}
+
+// shownModel is the model the agent's row names when it has no stored one: what its transcript says it ran, else what a hook reported (#16434).
+func (h *SessionsHandler) shownModel(sessionID string, stored *store.LiveSession) string {
+	if m := h.transcriptModel(sessionID); m != "" {
+		return m
+	}
+	if stored != nil {
+		return ptr.Value(stored.ObservedModel)
+	}
+	return ""
 }
 
 // switchGone says why a switch can no longer finish: its agent was killed (no row), or put to sleep (no terminal). "" while the agent is there. Read at each wait, so Sleep, Sleep all, Kill and a
