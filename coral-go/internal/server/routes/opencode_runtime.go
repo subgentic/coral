@@ -3,7 +3,6 @@ package routes
 import (
 	"context"
 	"fmt"
-	"github.com/subgentic/coral/internal/custommodes"
 	"strconv"
 	"strings"
 	"time"
@@ -70,13 +69,7 @@ func (h *SessionsHandler) SetOpencodeRuntime(rt OpencodeRuntime) { h.opencode = 
 func (h *SessionsHandler) launchCommand(ctx context.Context, ag agent.Agent, p agent.LaunchParams) (string, error) {
 	// Every launch, restart, wake and resume builds its command here: a custom permission mode (#15950) is resolved to its flags at this one place, checked again (a row edited in the database never
 	// reaches the command), and a mode that is gone or no longer passes starts the agent in Default.
-	if _, custom := custommodes.IDOf(p.PermissionMode); custom {
-		extra, _ := h.customModeFlags(ctx, ag.AgentType(), p.PermissionMode)
-		p.PermissionMode = "default"
-		if extra != nil {
-			p.Flags = append(append([]string{}, p.Flags...), extra...)
-		}
-	}
+	h.resolveCustomMode(ctx, ag.AgentType(), &p)
 	if ag.AgentType() == at.Opencode {
 		if h.opencode == nil {
 			return "", fmt.Errorf("opencode: Coral's opencode server is not available")

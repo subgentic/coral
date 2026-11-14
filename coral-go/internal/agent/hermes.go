@@ -54,12 +54,16 @@ var hermesValueFlags = map[string]bool{
 func (a *HermesAgent) LaunchCommand(params LaunchParams) (string, error) {
 	bin := resolveBinary(params.CLIPath, "hermes")
 	// The agent runs in its own Hermes home, never the person's and never another agent's: a launch that cannot make it does not start (and never falls back to ~/.hermes).
-	home, err := PrepareHermesHome(hermesDataDir(params), params.BoardName, params.SessionID, PersonalHermesHome(), time.Now())
-	if err != nil {
-		return "", fmt.Errorf("hermes: the agent's Hermes home could not be made: %w", err)
-	}
-	if err := writeHermesFirstMessage(hermesDataDir(params), params); err != nil {
-		return "", fmt.Errorf("hermes: what the agent is told could not be written: %w", err)
+	home := filepath.Join(hermesDataDir(params), "hermes-homes", "<team>", params.SessionID) // a preview (#15951) writes nothing: it names the folder a launch would make
+	if !params.PermissionPreview {
+		var err error
+		home, err = PrepareHermesHome(hermesDataDir(params), params.BoardName, params.SessionID, PersonalHermesHome(), time.Now())
+		if err != nil {
+			return "", fmt.Errorf("hermes: the agent's Hermes home could not be made: %w", err)
+		}
+		if err := writeHermesFirstMessage(hermesDataDir(params), params); err != nil {
+			return "", fmt.Errorf("hermes: what the agent is told could not be written: %w", err)
+		}
 	}
 	var parts, raw []string
 	export := formatEnvExport("HERMES_HOME", home)

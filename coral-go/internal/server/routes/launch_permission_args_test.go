@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/agent"
+	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // #15719: the dialog's line is the launch builders' answer for the chosen permissions.
@@ -19,6 +22,12 @@ func TestLaunchPermissionArgsRouteAnswersFromTheLaunchBuilders(t *testing.T) {
 	ask := func(body string) (int, string) {
 		w := httptest.NewRecorder()
 		h.PostLaunchPermissionArgs(w, httptest.NewRequest(http.MethodPost, "/api/launch/permission-args", strings.NewReader(body)))
+		var m map[string]any
+		if json.Unmarshal(w.Body.Bytes(), &m) == nil && m["command"] != nil {
+			delete(m, "command") // the start command has its own test (#15951); here the permission arguments are the question
+			b, _ := json.Marshal(m)
+			return w.Code, string(b)
+		}
 		return w.Code, w.Body.String()
 	}
 	code, out := ask(`{"agent_type":"codex","permission_mode":"bypassPermissions"}`)
@@ -101,4 +110,50 @@ func TestLaunchPermissionArgsRouteShowsCodexAutoReview(t *testing.T) {
 	text, note = ask("0.163.0", `{"agent_type":"codex","permission_mode":"plan"}`)
 	assert.Equal(t, "--sandbox read-only -a on-request", text)
 	assert.Equal(t, "", note)
+}
+
+// #15951: the start command the dialogs show is the one the launch sends, for each agent type and for a custom permission mode, with the session's own values as placeholders.
+func TestLaunchPermissionArgsRouteShowsTheCommandTheLaunchSends(t *testing.T) {
+	rig := newCustomLaunchRig(t)
+	preview := func(body map[string]any) string {
+		b, _ := json.Marshal(body)
+		w := httptest.NewRecorder()
+		rig.h.PostLaunchPermissionArgs(w, httptest.NewRequest(http.MethodPost, "/api/launch/permission-args", bytes.NewReader(b)))
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var got struct{ Command string }
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+		return got.Command
+	}
+	rig.save(t, store.CustomMode{ID: "aaaaaaaaaaaaaaaa", AgentType: at.Claude, Name: "mine", Flags: []string{"--permission-mode", "plan"}},
+		store.CustomMode{ID: "bbbbbbbbbbbbbbbb", AgentType: at.Codex, Name: "mine too", Flags: []string{"-s", "workspace-write", "-a", "never"}})
+	for _, c := range []struct{ typ, mode string }{{at.Claude, "default"}, {at.Claude, "plan"}, {at.Claude, "custom:aaaaaaaaaaaaaaaa"}, {at.Codex, "bypassPermissions"}, {at.Codex, "custom:bbbbbbbbbbbbbbbb"}, {at.Agy, "plan"}} {
+		// the dashboard sends a built-in mode as the CLI's own flags and a custom one by name
+		launchMode, flags := c.mode, []string(nil)
+		if !strings.HasPrefix(c.mode, "custom:") {
+			launchMode, flags = "default", agent.PermissionFlagsForAgent(c.typ, c.mode)
+		}
+		lb, _ := json.Marshal(map[string]any{"agent_type": c.typ, "working_dir": rig.workdir, "permission_mode": launchMode, "flags": flags})
+		rec := httptest.NewRecorder()
+		rig.router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/sessions/launch", bytes.NewReader(lb)))
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		var out map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+		sent := lastSentCommand(rig.term)
+		want := agent.RedactLaunchCommand(sent, out["session_id"].(string))
+		got := preview(map[string]any{"agent_type": c.typ, "permission_mode": launchMode, "flags": flags})
+		// a launch wraps the program in the CLI's own node and bundle path and adds Coral's own flags; the preview is that command's program and arguments
+		assert.Equal(t, trimLaunchWrappers(want), trimLaunchWrappers(got), c.typ+" "+c.mode+": the preview is the launch's command")
+		assert.NotContains(t, got, "custom:", "the id never shows")
+		assert.NotContains(t, got, out["session_id"].(string))
+	}
+	// a thinking level is the CLI's one --effort, as the launch puts it
+	assert.Contains(t, preview(map[string]any{"agent_type": at.Claude, "permission_mode": "default", "thinking": "high"}), "--effort high")
+}
+
+// trimLaunchWrappers drops what only a real launch adds in front of the program (the CLI's node, the bundle's PATH), so the two lines are compared from the program on.
+func trimLaunchWrappers(cmd string) string {
+	if i := strings.Index(cmd, "claude"); i > 0 && strings.Contains(cmd[:i], "fake-") {
+		return cmd[i:]
+	}
+	return cmd
 }

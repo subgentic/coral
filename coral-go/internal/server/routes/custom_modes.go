@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/custommodes"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -171,4 +172,18 @@ func (h *SessionsHandler) customModeFlags(ctx context.Context, agentType, mode s
 		return append([]string{}, m.Flags...), ""
 	}
 	return nil, "the custom permission mode was deleted, so this agent started in Default"
+}
+
+// resolveCustomMode turns a "custom:<id>" mode in p into the mode's flags and Default, the one step every launch path and the start-command preview (#15951) share, and returns the note for the
+// person when the mode could not be used ("" otherwise).
+func (h *SessionsHandler) resolveCustomMode(ctx context.Context, agentType string, p *agent.LaunchParams) string {
+	if _, custom := custommodes.IDOf(p.PermissionMode); !custom {
+		return ""
+	}
+	extra, note := h.customModeFlags(ctx, agentType, p.PermissionMode)
+	p.PermissionMode = "default"
+	if extra != nil {
+		p.Flags = append(append([]string{}, p.Flags...), extra...)
+	}
+	return note
 }
