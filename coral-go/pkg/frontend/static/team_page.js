@@ -137,7 +137,7 @@ function openSettings() { importOnce('./team_settings_modal.js').then(m => m.ope
 const teamAsleep = () => { const m = (state.liveSessions || []).filter(s => inTeam(s, S.team)); return m.length > 0 && m.every(s => s.sleeping); };
 function stopItems() {
     const asleep = teamAsleep();
-    const none = !(state.liveSessions || []).some(s => inTeam(s, S.team)); // a team with no live agent has nothing to put to sleep, reset or kill: say so, do not offer a button that does nothing (#10187)
+    const none = !(state.liveSessions || []).some(s => inTeam(s, S.team)); // a team with no live agent has nothing to put to sleep, reset or stop: say so, do not offer a button that does nothing (#10187)
     const why = none ? 'No agent of this team is running' : '';
     return [
         { key: 'sleep', label: asleep ? 'Wake team' : 'Sleep team', hint: asleep ? 'Starts the sleeping agents again' : 'Stops every agent for now; Wake team starts them again', why, run: () => window.toggleTeamSleep?.(S.team, asleep ? 'wake' : 'sleep') },

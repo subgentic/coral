@@ -1,4 +1,4 @@
-/* What the sidebar's menus do to a team or a folder's agents: kill all, share, save as a template, sleep (moved out of render.js, #4996; no behaviour change). */
+/* What the sidebar's menus do to a team or a folder's agents: stop team, stop all, share, save as a template, sleep (moved out of render.js, #4996; no behaviour change). */
 import { state } from './state.js';
 import { registerDialog } from './modal_chrome.js';
 import { sessionFolderKey, keyLabel, splitKey, inTeam, teamFetch } from './server_base.js';
@@ -18,7 +18,7 @@ import { killLiveSession, killLiveTeam, dropKilledRows } from './kill_live.js';
 import { importOnce } from './import_once.js';
 
 // The agents a folder or workflow group shows, and only those (#3053): team
-// members are listed (and killed) under their team, archived agents in the
+// members are listed (and stopped) under their team, archived agents in the
 // Archived section, and with Group by Team on, workflow-run agents in their
 // workflow group. A search narrows the group as it does in the list.
 function _groupMembers(groupName) {
@@ -39,7 +39,7 @@ export async function killGroup(groupName) {
         "Stop all agents",
         `Stop ${killCount(groupSessions.length).agents} in "${groupName.startsWith('wf:') ? groupName.slice(3) : keyLabel(groupName)}"? ${groupSessions.length === 1 ? 'Its process ends' : 'Their processes end'} now. ${whatStaysKill(groupSessions)} ${killCount(groupSessions.length).note}`,
         async () => {
-            const release = await importOnce('./kill_pending.js').then(m => m.markStopping(groupSessions)); // every row says Stopping... from the click, not only the one being killed now (#15431)
+            const release = await importOnce('./kill_pending.js').then(m => m.markStopping(groupSessions)); // every row says Stopping... from the click, not only the one being stopped now (#15431)
             const failed = [];
             for (const s of groupSessions) {
                 try {
@@ -56,7 +56,7 @@ export async function killGroup(groupName) {
     );
 }
 
-/** Kill Team's confirmation says what happens to the team's worktree, when it has one (an agent of the team is on a worktree). */
+/** Stop team's confirmation says what happens to the team's worktree, when it has one (an agent of the team is on a worktree). */
 function _teamWorktreeSentence(sessions) {
     const wt = sessions.find(s => s.git_state && s.git_state.is_worktree);
     return wt ? `${worktreeConfirmWords(wt.branch)} ` : '';
@@ -169,7 +169,7 @@ export function saveTeamFromSidebar(boardName) {
     });
 }
 
-/** Wake team found members that were ended (Kill all, or their own exit) and says so: ask once to resume them all, each in its own folder with its earlier chat, on the team's own computer. */
+/** Wake team found members that were ended (Stop team, or their own exit) and says so: ask once to resume them all, each in its own folder with its earlier chat, on the team's own computer. */
 async function offerResumeEnded(boardName, ended) {
     if (!Array.isArray(ended) || !ended.length) return;
     const { endedSessionOf, resumeEndedAgents, resumeEndedWords, resumeEndedQuestion } = await importOnce('./resume_ended.js');
@@ -198,7 +198,7 @@ export function toggleTeamSleep(boardName, action) {
             // The route answers 200 with ok: false when it did nothing (no sessions on that board): that is a refusal to say, not a team that is awake (#12417: Sleep team "did nothing" and said nothing).
             if (!resp.ok || data.ok === false) {
                 showToast(data.error || data.message || `Could not ${action} the team (HTTP ${resp.status})`, true);
-                if (action === 'wake') offerResumeEnded(boardName, data.ended); // members Kill all ended: one click brings them back (#14208)
+                if (action === 'wake') offerResumeEnded(boardName, data.ended); // members Stop team ended: one click brings them back (#14208)
                 return;
             }
             const sleeping = !!data.sleeping;
