@@ -73,6 +73,7 @@ export function failureNotice(s) {
     if (!s || !s.enabled) return null;
     const to = (s.last && s.last.to) || (s.staged && s.staged.version) || '';
     if (s.state === 'failed' || (s.last && s.last.result === 'refused')) {
+        if (!to) return null; // no version to name means no download was refused: a clean offline install whose own version the server cannot read (an rc) says state failed, and "(v)" is not a notice (#16499)
         return { kind: 'verify', key: `verify:${to}:${s.last ? s.last.at : ''}`, lead: `Coral found an update (v${to}) it could not verify, so it was not installed.`, rest: ` Your version is unchanged.` }; // the docs' sentence (updates.md)
     }
     if (s.last && s.last.result === 'failed_rolled_back') {
