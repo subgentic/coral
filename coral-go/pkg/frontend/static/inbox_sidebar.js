@@ -87,8 +87,9 @@ const { answerCell, rowActions, readWholeQuestion } = await importOnce('./inbox_
 const openInAgents = s => { window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => window.showChatView?.()); };
 /** A computer cut its list short (#14827): said once under the list. With no filter applied the way out is Filters; with one on and the list still cut, a narrower filter. A list that is complete says nothing. */
 // A source can mark its wider scan truncated even when this review page is
-// complete. Warn only when it also reports omitted rows or fills the 50-row page.
-const cutShort = () => reviewPages().some(p => p.truncated && (p.has_more || p.total > p.loadedCount || p.loadedCount >= 50)) ? (NF.isFiltered(needsFilters) ? 'filtered' : 'open') : '';
+// complete. Unfiltered pages use omitted rows or a full 50-row page; filtered
+// pages use the server’s scan result, even when only one matching row is loaded.
+const cutShort = () => { const filtered = NF.isFiltered(needsFilters); return reviewPages().some(p => filtered ? p.filtered_truncated : p.truncated && (p.has_more || p.total > p.loadedCount || p.loadedCount >= 50)) ? (filtered ? 'filtered' : 'open') : ''; };
 function cutShortLine() { const c = cutShort(); return c ? DT.el('p', 'goals-note inbox-cut-short', c === 'filtered' ? 'This list is cut short. Narrow the filters further.' : 'This list is cut short. Use Filters to narrow it.') : null; }
 /** The one quiet line under Needs you when the Operator's own switches keep files out of it (#12144): what and how many, and the way to them (their folder, Artifacts). Never counted, never pushed: a line, not an item. */
 // A muted file that is more than a day old and still unread surfaces ONCE, in this quiet line only (never in the badge or a push): the ones already shown in an earlier visit are remembered in this browser, the ones shown
@@ -1049,7 +1050,7 @@ function renderFolderCounts() {
 /** "Loading…" is on screen only while the list is empty, so only then does a read's ending change what is drawn (#14841): it is part of the keys of the folder list and of the tables, and a list with rows keeps its draw, and the links in it, as it is (#14524). */
 const loadingEmpty = () => (group === 'needs' && !needsRows().length && !reviewItems().length && reviewPages().some(p => p.loading && !p.loaded)) || (group === 'saved' && !saved.savedView().shown.length && savedReviewPages().some(p => p.loading && !p.loaded)); // (a first read only: a page already read that is read again keeps what is drawn, #14906)
 function reviewPagingSignature() {
-    return [reviewPages(), savedReviewPages()].map(pages => pages.map(p => [p.server, p.error, p.has_more, p.next_cursor, p.loadedCount, p.total, p.truncated]));
+    return [reviewPages(), savedReviewPages()].map(pages => pages.map(p => [p.server, p.error, p.has_more, p.next_cursor, p.loadedCount, p.total, p.truncated, p.filtered_truncated]));
 }
 function syncReviewPagingControls() {
     const pages = new Map();

@@ -13,13 +13,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const words = () => ev(`(() => { const t = document.querySelector('${T}').textContent.replace(/\\s+/g, ' '); return { incomplete: /incomplete (review )?list/i.test(t), cut: [...document.querySelectorAll('${T} .inbox-cut-short')].map(e => e.textContent.trim()) }; })()`);
-    const open = async (w, mobile, truncated, itemCount = 51) => {
+    const open = async (w, mobile, truncated, itemCount = 51, filteredTruncated = truncated) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`fetch('/api/board/${team}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Orchestrator', job_title: 'Orchestrator' }) }).then(r => r.status)`);
         await ev(`(() => { const original = window.fetch, json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } })), hex = n => n.toString(16).padStart(64, '0');
             const items = Array.from({ length: ${itemCount} }, (_, n) => n + 1).map(i => ({ id: hex(i), name: 'plan-' + i + '.md', media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - i * 60000).toISOString(), source: 'upload', available: true, tags: ['for review'], produced_by: 'Orchestrator', review_question: 'Ready?', uri: 'coral://artifacts/' + hex(i) }));
-            window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'${team}': items}, { truncated: ${truncated} }) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin); if ((opts.method || 'GET') === 'GET' && u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: items, has_more: false }); return original(url, opts); }; return true; })()`);
+            window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'${team}': items}, { truncated: ${truncated} }) : null; if (reviewPage) return json({ ...reviewPage, filtered_truncated: ${filteredTruncated} }); const u = window.__reviewFixtureURL(String(url), location.origin); if ((opts.method || 'GET') === 'GET' && u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: items, has_more: false }); return original(url, opts); }; return true; })()`);
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
         await waitFor(`document.querySelectorAll('${T} tbody tr').length >= ${Math.min(itemCount, 2)}`, 'review rows', 15000);
@@ -42,6 +42,19 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(framesJs(8));
             g = await words();
             check(!g.incomplete && g.cut.length === 1 && g.cut[0] === 'This list is cut short. Narrow the filters further.', at + 'with a filter on and the list still cut, the one line says to narrow it further (UI Accessibility): ' + JSON.stringify(g));
+            // The filtered scan can miss older matches even with just one row.
+            await open(w, mobile, true, 1, true);
+            await ev(`(() => { const i = document.getElementById('inbox-search'); i.value = 'plan'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+            await ev(framesJs(12));
+            g = await words();
+            check(g.cut.length === 1 && g.cut[0].includes('Narrow the filters further'), at + 'server filtered_truncated warns even for one row: ' + JSON.stringify(g));
+            await shot(`needs-filtered-cut-${w}`);
+            // A large filtered result is complete when the server says it is.
+            await open(w, mobile, true, 51, false);
+            await ev(`(() => { const i = document.getElementById('inbox-search'); i.value = 'plan'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+            await ev(framesJs(12));
+            g = await words();
+            check(g.cut.length === 0, at + 'server filtered_truncated false hides the notice despite 50 loaded rows: ' + JSON.stringify(g));
             // a list that is not cut: nothing
             await open(w, mobile, false);
             g = await words();

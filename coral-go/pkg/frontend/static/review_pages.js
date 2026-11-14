@@ -5,9 +5,9 @@ export function createReviewPages({ read, key, changed = () => {} }) {
     if (typeof read !== 'function' || typeof key !== 'function') throw new TypeError('Review pages need a reader and a row key.');
     let generation = 0, query = '', sources = new Map();
     const make = server => ({ server, rows: new Map(), loaded: false, pending: null, abort: null,
-        total: null, attentionTotal: null, tags: null, facets: null, cursor: '', more: false, error: '', pages: 0, ownerOnly: false, truncated: false, freshness: null });
+        total: null, attentionTotal: null, tags: null, facets: null, cursor: '', more: false, error: '', pages: 0, ownerOnly: false, truncated: false, filtered_truncated: false, freshness: null });
     const statusOf = s => ({ server: s.server, loadedCount: s.rows.size, total: s.total, attentionTotal: s.attentionTotal, tag_counts: s.tags, facets: s.facets,
-        loaded: s.loaded, loading: !!s.pending, has_more: s.more, next_cursor: s.cursor, error: s.error, ownerOnly: s.ownerOnly, truncated: s.truncated });
+        loaded: s.loaded, loading: !!s.pending, has_more: s.more, next_cursor: s.cursor, error: s.error, ownerOnly: s.ownerOnly, truncated: s.truncated, filtered_truncated: s.filtered_truncated });
     const status = () => [...sources.values()].map(statusOf);
     const snapshot = () => [...sources.values()].map(s => ({ ...statusOf(s), artifacts: [...s.rows.values()] }));
     const current = (s, at) => generation === at && sources.get(s.server) === s;
@@ -64,7 +64,7 @@ export function createReviewPages({ read, key, changed = () => {} }) {
             // page cannot clamp scroll by briefly replacing it with page one.
             s.freshness = freshness || null;
             s.rows = rows; s.loaded = true; s.more = hasMore; s.cursor = cursor;
-            s.pages = append ? s.pages + count : count; s.ownerOnly = metadata.ownerOnly === true; s.truncated = metadata.truncated === true;
+            s.pages = append ? s.pages + count : count; s.ownerOnly = metadata.ownerOnly === true; s.truncated = metadata.truncated === true; s.filtered_truncated = metadata.filtered_truncated === true;
             if (!append) {
             if ('attention_total' in metadata) s.attentionTotal = Number.isSafeInteger(metadata.attention_total) && metadata.attention_total >= 0 ? metadata.attention_total : null;
             if (Number.isSafeInteger(metadata.total) && metadata.total >= 0) s.total = metadata.total;
