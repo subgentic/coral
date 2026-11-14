@@ -67,6 +67,9 @@ func hubSigninSettingKey(k string) bool {
 	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(k)), "hub_signin")
 }
 
+// AutoSaveHeader marks a settings write the dashboard made on its own (it keeps the Welcome cards' done list in step with what the person did), as opposed to a click on Dismiss (#16972): Activity records the click only.
+const AutoSaveHeader = "X-Coral-Auto-Save"
+
 func (h *SystemHandler) PutSettings(w http.ResponseWriter, r *http.Request) {
 	var body map[string]any
 	if err := decodeJSON(r, &body); err != nil {
@@ -117,6 +120,9 @@ func (h *SystemHandler) PutSettings(w http.ResponseWriter, r *http.Request) {
 		inboxActioned(r, tracking.InboxGoalDone, "", "hide", time.Time{})
 	}
 	for _, key := range []string{"goal_done_hidden", "inbox_welcome", "inbox_welcome_done"} { // a Dismiss or a Not yet kept in the settings is the Operator's click too (#13609)
+		if r.Header.Get(AutoSaveHeader) != "" { // the page keeping its own count (a Welcome step the person did elsewhere is marked done, #16972): not a click, so not a row of Activity
+			break
+		}
 		if _, ok := values[key]; ok {
 			noteActivity(r, board.ActInboxHide, "setting", key, "", "", "")
 			break

@@ -52,9 +52,9 @@ export function welcomeRows() {
 }
 
 let _saving = Promise.resolve();
-export function save(values) {
+export function save(values, { auto = false } = {}) { // auto: the page keeping its own count (a step done elsewhere), not a click: Activity does not record it (#16972)
     Object.assign(state.settings || (state.settings = {}), values);
-    _saving = _saving.then(() => fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values) })).catch(() => {}); // kept for this page if it fails: the server shows them again next time
+    _saving = _saving.then(() => fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json', ...(auto ? { 'X-Coral-Auto-Save': '1' } : {}) }, body: JSON.stringify(values) })).catch(() => {}); // kept for this page if it fails: the server shows them again next time
 }
 
 /** Keep the setting in step: a step seen is remembered (deleting the agent later brings nothing back), and with all six done the items are off for good. Safe to call often. */
@@ -63,8 +63,8 @@ export function syncWelcome() {
     if (!finished().has('team')) readTeams();
     const have = doneList(), now = finished();
     if (now.size === have.size && [...now].every(id => have.has(id))) return;
-    if (WELCOME_IDS.every(id => now.has(id))) { save({ inbox_welcome_done: [...now].join(','), inbox_welcome: 'off' }); return; }
-    save({ inbox_welcome_done: [...now].join(',') });
+    if (WELCOME_IDS.every(id => now.has(id))) { save({ inbox_welcome_done: [...now].join(','), inbox_welcome: 'off' }, { auto: true }); return; }
+    save({ inbox_welcome_done: [...now].join(',') }, { auto: true });
 }
 
 function mark(id) {
