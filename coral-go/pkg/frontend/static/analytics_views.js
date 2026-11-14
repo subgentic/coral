@@ -12,6 +12,7 @@ import { note } from './nav.js';
 export const VIEWS = [
     { key: 'overview', label: 'Overview', question: 'What am I spending?' }, // each page is subtitled by the question it answers (#10482)
     { key: 'usage', label: 'Usage', question: 'Where does the usage go, day by day?' }, // the three below Overview (#11222): Overview stays the landing page
+    { key: 'tasks', label: 'Tasks', question: 'How many tasks is each agent completing?' }, // #17206: tasks completed, by agent, team, agent type or model
     { key: 'operator', label: 'Operator interaction', question: 'How often does the Operator have to step in?' },
     { key: 'inbox-' + 'chat', label: 'Inbox vs chat', question: 'Am I switching to the Inbox?' }, // #12158: the share of what the Operator does in the Inbox, and whether it is rising
     { key: 'resource-queue', label: 'Resource queue', question: 'Is the queue helping us coordinate?' }, // #13671: how much the resource queue is used and whether heavy runs stopped overlapping

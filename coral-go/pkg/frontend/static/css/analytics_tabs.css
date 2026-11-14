@@ -71,3 +71,7 @@
 #cost-dashboard-view:is([data-view="usage"], [data-view="operator"], [data-view="inbox-chat"], [data-view="comm"]) :is(#cost-time-range, #cost-range-line) { display: none; }
 .atab-drill { align-self: flex-start; }
 .atab-trend { display: flex; flex-direction: column; gap: 8px; }
+
+/* The Tasks view (#17206): a table's name cell carries the line's swatch; the review-tasks switch sits with the other filters. */
+.atab-tname { display: inline-flex; align-items: center; gap: 6px; }
+.atab-check { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; color: var(--text-secondary); }
