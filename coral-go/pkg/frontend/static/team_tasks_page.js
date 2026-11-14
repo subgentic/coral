@@ -312,7 +312,7 @@ export function showTasks(host, project, h = {}) {
     if (project !== model.project) { bar = null; Object.assign(model, { dt: DT.tableState(), choices: null, project, filters: { ...TF.loadFilters(project, browserLocal), sort: 'open' }, q: emptyQuery(), rows: [], cursor: '', moreLoaded: false, extraPages: 0, totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' }); }
     hooks = h;
     if (!model.choices || Date.now() - (model.choicesAt || 0) > CHOICES_MS) loadChoices();
-    if (h.query) model.filters = TF.fromQuery(h.query); // an address with filters in it (a link): they are the view, over what this browser kept
+    if (h.query) { model.filters = TF.fromQuery(h.query); if (TF.isQuery(model.filters)) model.filter = 'all'; } // an address with filters in it (a link): they are the view with every status shown, over what this browser kept (#16735)
     if (h.noGoal) { model.filters = TF.clean({ ...TF.EMPTY, goal: TF.NO_GOAL }); model.filter = 'open'; } // opened from the Goals table's "N tasks have no goal" row: exactly those tasks, the Goal filter's No goal, a chip that removes it (#7717, #7782)
     if (!host.dataset.built) {
         host.dataset.built = '1';
