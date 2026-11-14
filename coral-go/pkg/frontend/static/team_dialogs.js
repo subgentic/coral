@@ -959,7 +959,7 @@ async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSet
     try {
         await loadLiveSessions();
         const { openTeamPage } = await importOnce('./team_page.js');
-        await openTeamPage(key, { tab: 'messages' }); // the team opens on its board, where the first task was sent (or waits to be)
+        await openTeamPage(key, { tab: sent ? 'needs' : 'messages' }); // sent: the Inbox, where the first approval arrives; failed: the Board, where the message box has the unsent text
     } catch { /* the toast and the row are still there */ }
     const input = document.getElementById('mb-post-input');
     if (!sent) {
