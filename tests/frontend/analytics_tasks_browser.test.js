@@ -75,14 +75,14 @@ const answer = (group, reviews) => {
                 assert.ok(t.includes('—'), 'a missing figure is a dash, not 0');
             });
             await run(`${at}: Group by and the review switch each make their own read`, async () => {
-                await ev(`window.__reqs.length = 0; const s = [...document.querySelectorAll('#cost-tasks select')].find(x => [...x.options].some(o => o.value === 'provider')); s.value = 'model'; s.dispatchEvent(new Event('change', { bubbles: true })); true`);
+                await ev(`(() => { window.__reqs.length = 0; const s = [...document.querySelectorAll('#cost-tasks select')].find(x => [...x.options].some(o => o.value === 'provider')); s.value = 'model'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
                 await waitFor(`window.__reqs.some(r => /group_by=model/.test(r))`, 'the by-model read', 8000);
                 await waitFor(`[...document.querySelectorAll('#cost-tasks .atab-tname')].some(e => e.textContent === 'claude-sonnet-5-5')`, 'the models drawn', 8000);
-                await ev(`window.__reqs.length = 0; const b = document.querySelector('#cost-tasks input[type=checkbox]'); b.click(); true`);
+                await ev(`(() => { window.__reqs.length = 0; document.querySelector('#cost-tasks input[type=checkbox]').click(); return true; })()`);
                 await waitFor(`window.__reqs.some(r => /reviews=1/.test(r))`, 'the read with reviews', 8000);
                 const before = answer('model', false).total.completed, after = answer('model', true).total.completed;
                 await waitFor(`((document.querySelector('#cost-tasks .atab-kpi') || {}).textContent || '').includes(${JSON.stringify(String(after))})`, `the total moves from ${before} to ${after}`, 8000);
-                await ev(`const b = document.querySelector('#cost-tasks input[type=checkbox]'); window.__reqs.length = 0; b.click(); true`);
+                await ev(`(() => { window.__reqs.length = 0; document.querySelector('#cost-tasks input[type=checkbox]').click(); return true; })()`);
                 await waitFor(`window.__reqs.length > 0`, 'the read without reviews', 8000);
                 await ev(`(() => { const s = [...document.querySelectorAll('#cost-tasks select')].find(x => [...x.options].some(o => o.value === 'provider')); s.value = 'agent'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
                 await waitFor(`[...document.querySelectorAll('#cost-tasks .atab-tname')].some(e => e.textContent === 'Backend Dev')`, 'back to agents', 8000);
