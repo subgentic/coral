@@ -641,7 +641,7 @@ var DashboardPagePaths = []string{
 	"/analytics", "/analytics/*",
 	"/docs", "/docs/*",
 	"/servers", "/servers/*",
-	"/queue", // the Queue tab (#16030): the router parses only the bare /queue (a longer path is no page), so a reload must serve the shell (#17385)
+	"/queue",               // the Queue tab (#16030): the router parses only the bare /queue (a longer path is no page), so a reload must serve the shell (#17385)
 	"/skills", "/skills/*", // the Skills tab and one skill's approval view (/skills/<id>): the client router parses them, so a reload must serve the shell (#12078)
 }
 
