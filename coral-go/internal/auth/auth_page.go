@@ -131,6 +131,8 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
   ol.steps { margin: 0 0 18px 18px; padding: 0; font-size: 0.875rem; line-height: 1.6; }
   ol.steps li { margin-bottom: 8px; }
   .note { font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; margin: 14px 0 0; }
+  #panel-signin #err { min-height: calc(1.45em + 22px); }
+  #panel-signin #err[hidden] { display: flex; visibility: hidden; }
   .panel[hidden], .err[hidden], .lock[hidden], .warn[hidden] { display: none; }
   .or { display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 0.75rem; margin: 18px 0; }
   .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--border); }

@@ -16,6 +16,7 @@
  *   - A local dashboard has no account: its keys stay as they were (nothing is lost on update). */
 
 import { browserLocal, browserSession } from './safe_storage.js';
+import { importOnce } from './import_once.js';
 
 const STORED_KINDS = ['coral-input-drafts', 'coral-pending-messages', 'coral-recent-dirs', 'coral-starred-files-', 'coral-auto-accept-seen'];
 const OWNER_KEY = 'coral-store-owner';
@@ -81,11 +82,13 @@ function purgePanelDrafts() {
  *  messages, recent folders, stars, the panels' requests) and what the page holds in memory go first, then the session ends
  *  (POST /auth/logout) and the sign-in page shows. The tab layout is a display preference and stays (#4164). */
 export async function signOutThisBrowser() {
+    const { signoutAddress } = await importOnce('./signout_address.js');
+    const signin = signoutAddress(location);
     try { purgeStored(); } catch { /* storage refused */ }
     purgePanelDrafts();
     forgetAccountMemory();
     try { await fetch('/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', credentials: 'same-origin' }); } catch { /* the sign-in page shows either way */ }
-    location.replace('/signin');
+    location.replace(signin);
 }
 
 /** Remove the stored kinds: all of them, or those `which(key, owner)` picks. */

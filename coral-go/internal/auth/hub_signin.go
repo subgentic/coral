@@ -258,7 +258,7 @@ func (h *HubSignin) requestOrigin(r *http.Request) string {
 // PageState is the sign-in page's Hub state for r: "" (no Hub UI), "ready", "unpaired" or
 // "disabled_in_hub".
 func (h *HubSignin) PageState(r *http.Request) string {
-	if h == nil || h.team() || (h.operatorAllowed != nil && !h.operatorAllowed()) {
+	if h == nil || h.hub.HubPage() == "" || h.team() || (h.operatorAllowed != nil && !h.operatorAllowed()) {
 		return ""
 	}
 	if !h.hub.Linked() {

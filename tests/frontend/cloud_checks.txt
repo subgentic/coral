@@ -424,3 +424,6 @@ node queued_mark.test.mjs
 node inbox_needs_count.test.mjs
 node inbox_last_seen.test.mjs
 node open_link.test.mjs
+
+node signout_destination.test.mjs
+node signout_hub_destination.test.mjs
