@@ -22,6 +22,10 @@
     .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .team-tb-pills { flex: 0 1 auto; min-width: 0; flex-wrap: wrap; overflow: visible; } /* the chips go to their own line only when they do not fit beside the search (#15366: at 900 px a row that fits stays one line) */
 }
 
+/* Tasks retains the shared single-line toolbar; its extra assignee chip scrolls with the state chips. */
+.inbox-tasks-toolbar .list-bar-search-row.gt-toolbar { flex-wrap: nowrap; }
+.inbox-tasks-toolbar .list-bar-search-row.gt-toolbar > .team-tb-pills { flex-wrap: nowrap; overflow-x: auto; }
+
 /* Walk 15 M4 (#15259): the Filters panel opens over the list on a computer, it does not push the list down. The filter line sits under the toolbar. */
 .inbox-filter-note { display: flex; align-items: center; gap: 8px; margin: 0 0 var(--space-md); }
 @media (min-width: 768px) {

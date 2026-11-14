@@ -1,6 +1,6 @@
 // The phone's Inbox has no tab row (#13596, the Operator: "we just want to use the menu at the top left"): under 600 px no strip of Needs you, Tasks, Goals, Saved, no scroll arrow; the ☰ drawer lists every
 // folder of the Inbox with its count (Needs you says "0 of 3" style words when some are read) and marks the open one (aria-current); choosing one opens it, the pill's search says which; the page's title
-// and count are visible as the open folder's name. At 1280 the sidebar's folder list is as it was. Drives Chrome over CDP on the isolated dev server.
+// and count are visible as the open folder's name. At 1280 the sidebar follows the requested folder order. Drives Chrome over CDP on the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
@@ -64,8 +64,8 @@ const fs = require('node:fs');
                 d = await drawer();
                 check(`${label}: the drawer now marks Goals`, d.rows.filter(r => r.current).map(r => r.label).join() === 'Goals', JSON.stringify(d.rows.filter(r => r.current)));
             } else {
-                const items = await ev(`[...document.querySelectorAll('.view-list-item')].filter(b => b.getClientRects().length).map(b => b.dataset.key).slice(0, 4).join()`);
-                check(`${label}: the sidebar's folder list is as it was`, /needs,tasks,goals,saved/.test(items), items);
+                const items = await ev(`[...document.querySelectorAll('.view-list-item')].filter(b => b.getClientRects().length).map(b => b.dataset.key).slice(0, 6).join()`);
+                check(`${label}: the sidebar follows the requested folder order`, items === 'needs,saved,activity,goals,tasks,artifacts', items);
             }
         }
     } finally { await client.close(); }

@@ -17,7 +17,7 @@ function countWords(label, count, { unread = false, noun: explicitNoun } = {}) {
         return split ? `${split[1]} waiting out of ${split[2]} items` : `${count} waiting`;
     }
     // Task rows reflect the current filters; Goals includes pending proposals; Saved counts open saved items and files.
-    const noun = explicitNoun || { Tasks: 'task', Goals: 'goal or proposal', Saved: 'saved item', Artifacts: 'file', 'All agents': 'agent' }[label];
+    const noun = explicitNoun || { Tasks: 'task', Goals: 'goal or proposal', Saved: 'saved item', 'Saved for later': 'saved item', Artifacts: 'file', 'All agents': 'agent' }[label];
     if (!noun) return String(count);
     if (label === 'Goals' && !explicitNoun) return `${count} ${Number(count) === 1 ? 'goal or proposal' : 'goals or proposals'}`;
     return `${count} ${noun}${Number(count) === 1 ? '' : 's'}`;
