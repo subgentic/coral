@@ -1524,3 +1524,6 @@
     body.live-session-active:not(.popout-mode) .terminal-back-btn { display: inline-flex; align-items: center; justify-content: center; height: 44px; padding: 0; line-height: 1; }
     body.live-session-active:not(.popout-mode) .terminal-back-btn > span { font-size: var(--icon-size); line-height: 1; }
 }
+
+/* Folder trust remains an explicit lasting choice, with a readable touch target. */
+.chat-needs-input:has([data-label="No, exit"]) .cni-standing .cni-answer[data-label="Yes, I trust this folder"] { min-height: 44px; padding: 10px 16px; background: var(--accent); color: var(--text-on-accent, #fff); text-decoration: none; border-radius: var(--radius-sm); }

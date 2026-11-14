@@ -279,7 +279,7 @@ function needsInputHtml(info, session) {
         if (target) context += `<pre class="cni-target"${target.length > 160 ? ` tabindex="0" role="region" aria-label="The whole request, scrollable"` : ""}><code>${escapeHtml(target)}</code></pre>`;
         if (patterns.length && target !== patterns.join("\n")) context += `<div class="cni-context-text cni-patterns">Covers: ${escapeHtml(patterns.join(", "))}${more ? " " + escapeHtml(more) : ""}</div>`;
         else if (more) context += `<div class="cni-context-text cni-patterns">${escapeHtml(more)}</div>`;
-        else if (info.summary && info.summary !== question) context += `<div class="cni-context-text cni-ask">${escapeHtml(info.summary)}</div>`; // what is asked, from the event, as the Inbox row says it (#10141)
+        else if (info.summary && info.summary !== question && !(screenQuestion && /quick safety check/i.test(info.summary))) context += `<div class="cni-context-text cni-ask">${escapeHtml(info.summary)}</div>`; // what is asked, from the event, as the Inbox row says it (#10141)
     } else if (info.kind === "prompt") {
         question = screenQuestion || "The agent is waiting for you";
     } else {
@@ -523,6 +523,7 @@ export function syncNeedsInputCard(container, session) {
 function takeKeyboard(card) {
     const now = document.activeElement;
     const free = !now || now === document.body || (now.id === "command-input" && !now.value);
+    if (free && card.querySelector('[data-label="Yes, I trust this folder"]') && card.querySelector('[data-label="No, exit"]')) { card.tabIndex = -1; card.focus({ preventScroll: true }); return; }
     const first = free && card.querySelector(".cni-answer:not(:disabled)");
     if (first) first.focus({ preventScroll: true });
 }
