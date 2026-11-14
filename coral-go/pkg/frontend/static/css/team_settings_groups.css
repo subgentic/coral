@@ -6,6 +6,12 @@
 .tsg-dep { margin-left: 14px; padding-left: 12px; border-left: 2px solid var(--border); } /* a setting that hangs on a toggle sits under it with a rail */
 .tsg-dep[data-disabled] { opacity: .6; } /* and dims with it when the toggle is off */
 .tsg-search { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; max-width: 860px; }
+/* In the dialog's header (#16542): a compact box at the right of the title's row, 260 px; the count of matches hangs under it so the header does not change height while typing. On a phone it goes under the title, full width. */
+.modal-header.has-search { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; }
+.modal-header.has-search > h3 { flex: 1 1 auto; min-width: 0; }
+.modal-header.has-search .tsg-search { position: relative; flex: 0 0 260px; width: 260px; max-width: 100%; margin: 0; }
+.modal-header.has-search .tsg-search-status { position: absolute; top: 100%; right: 0; margin-top: 1px; white-space: nowrap; font-size: var(--fs-base); z-index: 2; background: var(--bg-secondary); padding: 0 4px; }
+@media (max-width: 760px) { .modal-header.has-search .tsg-search { flex: 1 1 100%; width: 100%; } .modal-header.has-search .tsg-search-status { position: static; margin: 0; padding: 0; background: none; } }
 .tsg-search-status { margin: 0; color: var(--text-secondary); }
 .tsg-search-status[hidden] { display: none; }
 [data-match] { background: var(--bg-hover); border-radius: var(--radius-sm); outline: 1px solid var(--accent-dim); outline-offset: -1px; }
