@@ -64,7 +64,7 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/analytics/resource-queue":                 "read how much the resource queue is used and whether it helps coordination (numbers only, #13671)",
 	"GET /api/chief":                                    "read which agent the Operator recorded as Chief (#11470)",
 	"GET /api/board/{project}/orchestrator-grant":       "read what a board's orchestrator may do",
-	"PUT /api/board/{project}/orchestrator-grant":       "change what a board's orchestrator may do (wake, sleep and start agents)",
+	"PUT /api/board/{project}/orchestrator-grant":       "change what a board's orchestrator may do (wake, sleep, stop and start agents)",
 	"GET /api/board/{project}/lifecycle-log":            "read what agents did to a board's agents",
 	"GET /api/artifacts/{id}/private":                   "read whether an artifact is private to the manager",
 	"PUT /api/artifacts/{id}/private":                   "mark an artifact private to the manager, or clear it",
