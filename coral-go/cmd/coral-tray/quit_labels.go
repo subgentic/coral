@@ -155,7 +155,7 @@ func exitItemsKept(goos, backend string, agents, kept int, wakes bool, why strin
 		return it
 	}
 	return exitItems{quit: "Quit Coral", quitTip: "Exit Coral. The agents keep running (tmux terminal backend).",
-		shutdown: "Quit and stop all agents", shutTip: "Kill all agents, then stop the server and exit"}
+		shutdown: "Quit and stop all agents", shutTip: "Stop all agents, then stop the server and exit"}
 }
 
 // runningAgents counts the agents that stop when Coral quits: the live sessions that are not asleep and are not on the tmux terminal. 0 when the server does not answer.

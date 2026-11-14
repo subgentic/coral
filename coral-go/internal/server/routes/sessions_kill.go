@@ -161,7 +161,7 @@ func (h *SessionsHandler) Kill(w http.ResponseWriter, r *http.Request) {
 		// The row is already gone (above), so it cannot be put back: its agent token is revoked and the orphan sweep (background killOrphans, two minutes after a row is marked stopped) ends a process that is still
 		// running. Say so instead of "ok": nothing below (its Hermes home, its worktree) is touched while the process may still be using it (#15431, Security's INFO on #15370).
 		slog.Warn("kill: the agent's terminal did not end", "session_id", body.SessionID, "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "Kill failed: the agent's terminal did not end. Coral ends it again within a few minutes."})
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "Stop failed: the agent's terminal did not end. Coral ends it again within a few minutes."})
 		return
 	}
 	dropHermesHome()
