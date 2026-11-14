@@ -33,6 +33,7 @@ const { makeDetails } = await importOnce('./details_disclosure.js'); // "Who can
 // Asked for when used, not imported: this module loads lazily and may only import startup modules statically.
 const { attachComments, commentBoard } = await importOnce('./artifact_comments.js');
 const { attachVersions } = await importOnce('./artifact_versions.js');
+const { attachFileNavigation } = await importOnce('./artifact_file_navigation.js');
 const { attachReview } = await importOnce('./artifact_review.js');
 const { dropboxConnected } = await importOnce('./dropbox_connected.js'); // Share via Dropbox's entries (#14944): a lazy module loads it through importOnce, so a failed load is retried
 
@@ -45,6 +46,7 @@ let _openIntent = 0;
 let _returnFocus = null;
 let _comments = null;    // the comments panel of the viewer (#5182)
 let _versions = null;    // the version bar of the viewer (#6472)
+let _fileNavigation = null;
 let _review = null;      // Approve and Request changes of a for-review artifact (#136584)
 let _hex = '';           // the artifact on show and what it was opened with, for a version chosen from the bar
 let _lastOpts = {};
@@ -170,6 +172,7 @@ function _build() {
         <div class="artifact-viewer-main"><div class="artifact-viewer-body"></div></div>
         <div class="modal-actions modal-footer artifact-viewer-foot"><button type="button" class="btn btn-primary artifact-edit-send-action" hidden>Send to agent</button><button type="button" class="btn artifact-viewer-close">Close</button></div>
     </div>`;
+    _fileNavigation = attachFileNavigation(d, openArtifactViewer);
     _details = makeDetails({ panel: d.querySelector('.artifact-viewer-readers'), remember: false, hide: true }); // closed on every open of the viewer: one open Details no longer fills the next file's screen (#12725)
     d.querySelector('.artifact-viewer-details-item').addEventListener('click', () => _details.button.click());
     { const toggleFocus = _details.button.focus.bind(_details.button); _details.button.focus = o => { toggleFocus(o); if (document.activeElement !== _details.button) d.querySelector('.artifact-viewer-more')?.focus(o); }; } // closed on a phone the button is out of the header: Hide details hands the keyboard to ⋯, where Details is (#15033) // a phone's Details is an item of the ⋯ menu (the header has no room for the button, #15033)
@@ -449,6 +452,7 @@ export function openArtifactViewer(hex, opts = {}) {
     showTrail(d);
     opts = { ...opts, lineHex: opts.lineHex || hex }; // the hex a caller's file id and line were given for: a version switch or a save spreads these opts onto ANOTHER hex, and the line must stay with its own (#14178)
     _hex = hex; _lastOpts = opts;
+    _fileNavigation(opts);
     _barLine = null; // before the bar is opened below: it may draw at once and tell the version it shows, and that line must survive the rest of this open
     _sendCapability = null; const sendButton = d.querySelector('.artifact-edit-send-action'); sendButton.hidden = true; sendButton.disabled = false; const sendNote = d.querySelector('.artifact-edit-send-note'); sendNote.hidden = !opts.editSaved; sendNote.textContent = opts.editSaved ? 'Saved as a new version. Nothing was sent to an agent automatically.' : '';
     _editCapability = null; const editButton = d.querySelector('.artifact-viewer-edit'); editButton.hidden = true; d.querySelector('.artifact-viewer-edit-item').hidden = true; d.querySelector('.artifact-viewer-edit-item').disabled = false; editButton.disabled = false; editButton.textContent = 'Edit text';

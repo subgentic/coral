@@ -3,6 +3,7 @@
  * when the task has no artifact or the list cannot be read (a Coral Hub viewer's: the team's artifacts are the owner's alone). Lazy: team_tasks_page.js imports it. */
 import { boardFetch, pathId, splitKey } from './server_base.js';
 import { importOnce } from './import_once.js';
+const { fileContext } = await importOnce('./artifact_file_context.js');
 const { artifactTable, serverArtifactSort } = await importOnce('./artifact_table.js');
 const { el, tableState } = await importOnce('./data_table.js'); // lazy: its failure is retried
 
@@ -10,12 +11,12 @@ const SHOWN = 50;
 const HEX = /^coral:\/\/artifacts\/([a-f0-9]{64})$/i;
 
 /** Opens the artifact the way the Artifacts tab's Open does: a task result's inline text in the preview, a stored file in the viewer. */
-function openIt(item, project) {
+function openIt(item, project, items = [], opener) {
     const { server, name: board } = splitKey(project || ''); // the task's own team: opening a file reads that team's review state only (#13489)
     const name = String(item.name || 'Artifact');
     const m = HEX.exec(String(item.uri || ''));
     if (item.inline && item.content_url) return importOnce('./preview_pane.js').then(p => p.openArtifactTab(item.uri || '', { contentURL: item.content_url, mediaType: item.media_type, filename: name, phoneFull: true, server, board }));
-    if (m) return importOnce('./artifact_viewer.js').then(v => v.openArtifactViewer(m[1].toLowerCase(), { server, board, filename: name, mediaType: item.media_type }));
+    if (m) return importOnce('./artifact_viewer.js').then(v => v.openArtifactViewer(m[1].toLowerCase(), { server, board, filename: name, mediaType: item.media_type, ...fileContext(items, item, { key: r => r.uri, opener, options: r => ({ hex: HEX.exec(String(r.uri || ''))?.[1], server, board, filename: r.name, mediaType: r.media_type }) }) }));
     return null;
 }
 
@@ -37,7 +38,7 @@ export async function taskArtifactsSection(project, task, sort = serverArtifactS
         const table = artifactTable({ label: 'Task artifacts', rows: items, state,
             paged: !!data.has_more || Number(data.total) > items.length,
             onPageSort: next => { taskArtifactsSection(project, task, next).then(updated => { if (updated && section.isConnected) section.replaceWith(updated); }).catch(() => {}); },
-            open: item => { const p = openIt(item, project); if (p) p.catch(() => {}); },
+            open: (item, tr) => { const p = openIt(item, project, items, tr); if (p) p.catch(() => {}); },
         });
         body.replaceChildren(table.el);
     }
@@ -54,6 +55,6 @@ export async function taskResultLinks(project, task) {
         if (!resp.ok) return [];
         const data = await resp.json();
         const items = (Array.isArray(data && data.artifacts) ? data.artifacts : []).filter(a => a && Number(a.task_id) === Number(task.id));
-        return items.map(item => { const b = el('button', 'team-link', String(item.name || 'Artifact')); b.type = 'button'; b.addEventListener('click', () => { const p = openIt(item, project); if (p) p.catch(() => {}); }); return b; });
+        return items.map(item => { const b = el('button', 'team-link', String(item.name || 'Artifact')); b.type = 'button'; b.addEventListener('click', () => { const p = openIt(item, project, items, b); if (p) p.catch(() => {}); }); return b; });
     } catch { return []; }
 }

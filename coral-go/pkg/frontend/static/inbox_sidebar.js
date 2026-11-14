@@ -45,6 +45,7 @@ import { loadStyles } from './lazy_styles.js';
 import { syncDisplayPanels } from './display_panel.js';
 import { onViewShown } from './view_switch.js';
 import { importOnce, loadedModule } from './import_once.js';
+const { fileContext } = await importOnce('./artifact_file_context.js');
 import { claudeSignedIn, onSigninChange } from './signin_line.js';
 import { markHidden } from './visible_marks.js';
 import { onInboxHooks, setInboxCount, askOf, updateInboxTab, needsCount } from './inbox_tab.js';
@@ -415,10 +416,18 @@ const stateOf = t => TV.taskWord(t);
 const inboxTasksState = DT.tableState();
 let needsState = DT.tableState();
 
+function reviewViewerOptions(row) { return { openLatest: true, server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, fileId: row.file_id, versionLine: row.version_line, board: splitKey(row.team).name, uploader: row.produced_by ? { role: String(row.produced_by), hex: row.hex, server: splitKey(row.team).server, board: splitKey(row.team).name, seriesId: String(row.series_id || '') } : undefined, goal: row.goal_id && row.goal_title ? String(row.goal_title) : '', goalId: row.goal_id ? String(row.goal_id) : '', goalTeam: row.team || '', task: row.task_id ? String(row.task_title || `Task #${row.task_id}`) : '', from: subOf({ review: row, board_project: splitKey(row.team).name, server: splitKey(row.team).server }, true) }; }
+
 export async function openReview(row, extra = {}) {
+    // Capture the currently rendered list before lazy loading or marking this file read can redraw it.
+    const reviews = needsRows().filter(s => s.review);
+    const current = reviews.find(s => s.review.reviewKey === row.reviewKey);
+    const opener = document.activeElement?.closest('tr') || (teamNeedsMount?.host || $('group-table-view'))?.querySelector(`tr[data-key="${CSS.escape(current ? needsKey(current) : '')}"]`);
+    const files = current ? fileContext(reviews, current, { key: needsKey, opener, options: s => ({ hex: s.review.hex, ...reviewViewerOptions(s.review) }) }) : {};
+
     const { openArtifactViewer } = await importOnce('./artifact_viewer.js', 'the file viewer').catch(() => ({})); // a failed load is said (importOnce's toast) and the next click tries again: a page left open across an update must not have rows that do nothing (#11963)
     if (!openArtifactViewer) return;
-    openArtifactViewer(row.hex, { openLatest: true, server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, fileId: row.file_id, versionLine: row.version_line, board: splitKey(row.team).name, uploader: row.produced_by ? { role: String(row.produced_by), hex: row.hex, server: splitKey(row.team).server, board: splitKey(row.team).name, seriesId: String(row.series_id || '') } : undefined, goal: row.goal_id && row.goal_title ? String(row.goal_title) : '', goalId: row.goal_id ? String(row.goal_id) : '', goalTeam: row.team || '', task: row.task_id ? String(row.task_title || `Task #${row.task_id}`) : '', from: subOf({ review: row, board_project: splitKey(row.team).name, server: splitKey(row.team).server }, true), ...extra }); // the newest version itself: a diff only when Compare is pressed (#11628)
+    openArtifactViewer(row.hex, { ...reviewViewerOptions(row), server: splitKey(row.team).server, ...files, ...extra }); // the newest version itself: a diff only when Compare is pressed (#11628)
     markOpenedReadVisibly(row.hex, sayLive, row.team); // opening is reading it: the 'read' tag, so it stops counting everywhere (#9277); the viewer does the same for any for-review artifact, once; a failed save is said, and the item keeps counting
 }
 /** A row's action clears it from the list: the list is drawn again, and the person keeps their place (#11558). Called before the write, it notes where the page and the list are scrolled and the row beside this one (the next, or the

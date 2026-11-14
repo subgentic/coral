@@ -8,6 +8,7 @@ import { boardFetch, isCloud, pathId, splitKey } from './server_base.js';
 import { whenText } from './when_text.js';
 import { showToast } from './utils.js';
 import { importOnce } from './import_once.js';
+const { fileContext } = await importOnce('./artifact_file_context.js');
 const DT = await importOnce('./data_table.js');
 const { artifactTable, serverArtifactSort } = await importOnce('./artifact_table.js');
 const { itemKey, isUnverified, readableName, sizeText, typeText, createdText, taskText, linkOfItem, renderText, orderByGroup, groupHead } = await importOnce('./artifact_item.js');
@@ -32,14 +33,14 @@ async function read(team, goalId, extra) {
 }
 
 /** The file in the goal screen's own pane: its name, its facts behind Details, the document, Open and Copy link. `host` is the pane element, `onClose` runs when it is closed. */
-export function openArtifactInPane(item, { team, host, opener, onClose, backLabel = '' }) {
+export function openArtifactInPane(item, { team, host, opener, onClose, backLabel = '', files = {} }) {
     const link = linkOfItem(item, { server: splitKey(team).server, project: team }), name = readableName(item), un = isUnverified(item);
     const actions = [];
     // A task's own result file has no link of its own (its text is read from the task): on the Hub an address into the team's server cannot be opened by a click or passed on, so Open and Copy link are not offered
     // for it there, and the pane says so (#11190); a file kept under a digest still has the viewer, which saves its bytes through the Hub.
     const noHubLink = isCloud() && !!link && !link.hex;
     if (link && !noHubLink) {
-        if (link.preview) actions.push({ label: 'Open', primary: true, run: () => importOnce('./artifact_viewer.js').then(m => (link.hex ? m.openArtifactViewer(link.hex, { server: link.server, board: splitKey(team).name, filename: name, mediaType: item.media_type }) : window.open(link.url, '_blank', 'noopener,noreferrer'))) });
+        if (link.preview) actions.push({ label: 'Open', primary: true, run: () => importOnce('./artifact_viewer.js').then(m => (link.hex ? m.openArtifactViewer(link.hex, { server: link.server, board: splitKey(team).name, filename: name, mediaType: item.media_type, ...files }) : window.open(link.url, '_blank', 'noopener,noreferrer'))) });
         else actions.push({ label: 'Open link', primary: true, href: link.url });
         actions.push({ label: 'Copy link', run: () => { navigator.clipboard?.writeText(link.hex ? `coral://artifacts/${link.hex}` : new URL(link.url, location.href).href).then(() => showToast('Link copied'), () => showToast('The link could not be copied', true)); } });
     }
@@ -74,7 +75,7 @@ export function mountGoalArtifactsList(host, { team, goalId, onOpen = () => {}, 
         const table = artifactTable({
             label: `Artifacts of this goal, ${rows.length}`, bare: true, compact: true, fold: 'none', rows, rowKey: itemKey, rowName: readableName, state: st.tableState, sortBar: false,
             groupBy: (it) => groupHead(it, 'task', rows, !st.cursor),
-            open: (item, tr) => onOpen(item, tr.querySelector('.dt-primary')),
+            open: (item, tr) => onOpen(item, tr.querySelector('.dt-primary'), fileContext(rows, item, { key: itemKey, opener: tr, options: r => { const link = linkOfItem(r, { server: splitKey(team).server, project: team }); return { hex: link?.hex, server: link?.server, board: splitKey(team).name, filename: readableName(r), mediaType: r.media_type }; } })),
             paged: !!st.cursor,
             onPageSort: order => { st.sort = order; load(false); },
             footer: st.cursor ? { text: `Showing ${st.items.length} of ${st.total}`, more: { label: 'Load more', busy: st.busy, run: () => load(true) } } : null, // by the button, not as the footer scrolls into view

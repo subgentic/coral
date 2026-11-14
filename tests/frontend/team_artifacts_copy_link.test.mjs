@@ -26,9 +26,9 @@ Object.defineProperty(navigator, 'clipboard', {
 
 const { state } = await importUi('state');
 state.currentSession = { type: 'live', session_id: 's1', name: 'dev' }; // standalone: no team
-const previews = [];
+const previews = [], viewers = [];
 const { registerBundled } = await importUi('import_once');
-registerBundled({'preview_pane.js': {openArtifactTab: (uri, options) => previews.push({uri, options})}});
+registerBundled({'artifact_viewer.js': {openArtifactViewer: (hex, options) => viewers.push({hex, options})}, 'preview_pane.js': {openArtifactTab: (uri, options) => previews.push({uri, options})}});
 const { initFilesSourcePicker, selectFilesSource } = await importUi('team_artifacts');
 initFilesSourcePicker(() => {});
 selectFilesSource('artifacts');
@@ -39,12 +39,14 @@ let rows = [...view.querySelectorAll('tbody tr')];
 assert.equal(rows.length, 3, view.textContent);
 const pane = document.getElementById('agentic-detail-pane');
 rows[0].querySelector('.dt-primary').click();
-await until(() => previews.length === 1);
-assert.equal(previews[0].uri, `coral://artifacts/${digest}`);
-assert.equal(pane.hidden, true, 'the dock opens preview without covering the list');
+await until(() => viewers.length === 1);
+assert.equal(viewers[0].hex, digest);
+assert.equal(viewers[0].options.fileList.length, 1, 'only available stored files belong to file navigation');
+assert.equal(viewers[0].options.fileIndex, 0);
+assert.equal(pane.hidden, true, 'stored agent files open the shared viewer');
 rows[1].querySelector('.dt-primary').click();
-await until(() => previews.length === 2);
-assert.equal(previews[1].options.externalURL, 'https://docs.example/d/1');
+await until(() => previews.length === 1);
+assert.equal(previews[0].options.externalURL, 'https://docs.example/d/1');
 assert.equal(pane.hidden, true, 'a second click needs no close step');
 // Team-wide artifacts retain their detail sheet and Copy link actions.
 const { showArtifacts } = await importUi('team_artifacts_page');
