@@ -29,7 +29,12 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`!!document.querySelector('.inbox-muted-line')`, `${tag}: the quiet Muted line on the FIRST view`, 8000).catch(() => {});
             const line = await ev(`(() => { const p = document.querySelector('.inbox-muted-line'); return p ? p.textContent.replace(/\\s+/g, ' ').trim() : null; })()`);
-            check(`${tag}: only muted files exist: the quiet line is there on the first view, without leaving the tab`, /^Muted by your settings: 1 release summary, 1 decision made for you\. Show them$/.test(line || ''), JSON.stringify(line));
+            check(`${tag}: only muted files exist: the quiet line is there on the first view, without leaving the tab`, /^Muted by your settings: 1 release summary, 1 decision made for you\. Show them Change in Settings$/.test(line || ''), JSON.stringify(line));
+            const sw = await ev(`(() => [...document.querySelectorAll('.inbox-muted-line button')].map(b => b.textContent.trim()))()`);
+            check(`${tag}: the line says where the switch is: a Change in Settings button after Show them`, JSON.stringify(sw) === JSON.stringify(['Show them', 'Change in Settings']), JSON.stringify(sw));
+            await ev(`[...document.querySelectorAll('.inbox-muted-line button')].find(b => b.textContent.trim() === 'Change in Settings').click(); true`);
+            await waitFor(`(() => { const sw = document.getElementById('settings-inbox-file'); const pane = document.getElementById('settings-pane-notifications'); return !!sw && sw.getClientRects().length > 0 && !!pane && !pane.hidden; })()`, `${tag}: it opens Settings, Notifications, with the Files for review switch on screen`, 8000).catch(() => {});
+            check(`${tag}: Change in Settings shows the per-kind switches in Notifications`, await ev(`(() => { const sw = document.getElementById('settings-inbox-file'); return !!sw && sw.getClientRects().length > 0 && !document.getElementById('settings-pane-notifications').hidden; })()`));
             check(`${tag}: and nothing is counted`, (await ev(`import(${S} + 'inbox_reviews.js').then(m => m.unreadReviewItems().length)`)) === 0);
             await ev(`import(${S} + 'inbox_reviews.js').then(m => m.refreshReviews(false))`); // join the first full snapshot before changing the next response; a visible line can precede the Saved page
             // The same count of muted files, but other kinds (a release summary and a decision become a decision and a digest): the line must be redrawn with the new words (#12881, QA's SHOULD: a key on the count alone missed it).

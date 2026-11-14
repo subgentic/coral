@@ -111,7 +111,9 @@ function mutedLine() {
     const p = DT.el('p', 'goals-note inbox-muted-line', `Muted by your settings: ${words}. ${dayOldWords(old)}`);
     const b = DT.el('button', 'btn btn-quiet btn-small', 'Show them'); b.type = 'button';
     b.addEventListener('click', () => openInboxGroup('artifacts'));
-    p.append(b);
+    const sw = DT.el('button', 'btn btn-quiet btn-small', 'Change in Settings'); sw.type = 'button'; sw.title = 'Settings, Notifications: What reaches Needs you'; // the switch that muted them is one click away (#16973)
+    sw.addEventListener('click', async () => { await window.showSettingsModal?.(); (await importOnce('./settings_nav.js')).openSettingsGroup('needs-you'); });
+    p.append(b, ' ', sw);
     return p;
 }
 /** Under a filtered list of files: how many matches the computers have, and Show more for the next 50 (#13162). */
