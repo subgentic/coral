@@ -81,6 +81,6 @@ async function agentsUp(ev) {
         d.agents = d.agents.map((a, i) => (a.availability === 'offline' ? (i === 0 ? { ...a, availability: 'available', available: true, reason: 'Idle' } : { ...a, availability: 'needs_input', available: false, reason: 'Waiting for user input or approval' }) : a));
         return new Response(JSON.stringify(d), { status: 200, headers: { 'content-type': 'application/json' } }); }; return true; })()`);
 }
-// The team page's header counts attention from the live rows and believes a "needs input" status only when a live row agrees (42b847cc3, #14437): otherwise it says "Checking attention status". A suite whose status says an agent waits makes the matching live row wait too (the seeded Backend Dev, sid-2).
+// The team page's header counts attention from the live rows and believes a "needs input" status only when a live row agrees (42b847cc3, #14437): otherwise it says "Checking". A suite whose status says an agent waits makes the matching live row wait too (the seeded Backend Dev, sid-2).
 const liveWaiting = (ev, on = true, sid = 'sid-2') => ev(`(() => { for (const s of (T.state.liveSessions || [])) if (s.session_id === ${JSON.stringify(sid)}) s.waiting_for_input = ${on ? 'true' : 'false'}; return true; })()`);
 module.exports = { SOURCE, install, TABS, seed, agentsUp, liveWaiting, post, openTeam, goTab, openSettings, closeSettings, rect, scenarios: na.scenarios };

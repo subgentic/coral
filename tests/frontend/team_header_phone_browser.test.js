@@ -29,7 +29,7 @@ const TEAM = `qa-hdr-${Date.now() % 100000}`;
             for (const theme of ['dark', 'light']) for (const size of [16, 32]) {
                 await ev(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}; document.documentElement.style.fontSize = '${size}px'; true`);
                 await settle(100);
-                await ev(`document.getElementById('team-page-status').textContent = 'Checking attention status'; true`);
+                await ev(`document.getElementById('team-page-status').textContent = 'Checking'; true`);
                 const title = await ev(`(() => { const e = document.getElementById('team-page-title'), r = e.getBoundingClientRect(), range = document.createRange(); range.selectNodeContents(e); const t = range.getBoundingClientRect(); return { box: { top: r.top, bottom: r.bottom, height: r.height }, text: { top: t.top, bottom: t.bottom, height: t.height }, head: document.getElementById('team-page-head').getBoundingClientRect().toJSON(), line: getComputedStyle(e).lineHeight, textOverflow: getComputedStyle(e).textOverflow }; })()`);
                 await shot(`team-title-${w}-${theme}-${size}`);
 
@@ -40,7 +40,7 @@ const TEAM = `qa-hdr-${Date.now() % 100000}`;
             const at = `${w}: `;
             const st = await ev(`(() => { const e = document.getElementById('team-page-status'); return { text: e.textContent.trim(), cutX: e.scrollWidth > e.clientWidth + 1, cutY: e.scrollHeight > e.clientHeight + 1, ellipsis: getComputedStyle(e).textOverflow === 'ellipsis' && getComputedStyle(e).whiteSpace === 'nowrap' }; })()`);
             await shot(`team-header-${w}`);
-            assert.match(st.text, /2 of 3 agents have not sent a first message yet/, at + 'the status says it: ' + JSON.stringify(st));
+            assert.match(st.text, /1 of 3 ready/, at + 'the status says it: ' + JSON.stringify(st));
             assert.ok(!st.cutX && !st.cutY && !st.ellipsis, at + 'the whole line is shown, not cut: ' + JSON.stringify(st));
             const clipped = () => ev(`(() => { const s = document.getElementById('team-tabs'), sr = s.getBoundingClientRect(); return { scrollLeft: Math.round(s.scrollLeft), clipped: [...s.querySelectorAll('[role=tab]')].filter(t => t.getClientRects().length).map(t => { const r = t.getBoundingClientRect(); return { name: t.textContent.trim(), left: r.left < sr.left - 1 && r.right > sr.left + 1 }; }).filter(t => t.left).map(t => t.name) }; })()`);
             for (const tab of ['agents', 'tasks', 'artifacts', 'agents']) {

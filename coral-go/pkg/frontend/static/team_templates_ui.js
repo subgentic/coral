@@ -160,7 +160,7 @@ async function _saveTeamTemplate() {
     _pendingSaveTemplateAgents = agents;
     _pendingSaveTemplateFlags = document.getElementById("team-flags")?.value.trim() || '';
     try { _pendingSaveTemplateWorking = (await importOnce('./team_launch_settings.js')).readTeamLaunchSettings().working_mode || null; } catch { _pendingSaveTemplateWorking = null; }
-    const kept = document.getElementById('save-template-kept'); if (kept) kept.textContent = 'Saves: members, roles, instructions, models, thinking levels, permission modes, working mode, Additional instructions. Not saved: skills, goal, tasks, notes, chats.';
+    const kept = document.getElementById('save-template-kept'); if (kept) kept.textContent = 'Saves agents, roles, instructions, models and settings. Does not save skills, the goal, tasks, notes or chats.';
 
     // Show custom modal instead of prompt()
     const modal = document.getElementById('save-template-modal');

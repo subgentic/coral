@@ -155,10 +155,12 @@ export function rowParts(m, { agent, timeHtml, moreLabel, replyName = '', self =
     const tagHtml = layoutChips(chips, { all: true });
     const who = authorLabel(m, agent);
     const initial = Array.from(String(who || '?'))[0] || '?';
+    const replyText = `Reply to ${who}`;
     return {
         bodyId: `${idp}-${Number(m.id)}`, // each surface its own ids: the team page and the dock can show the same message at once
         classes: `${open ? ' mb-open' : ''}${tags.ask ? ' mb-q' : ''}${tags.mine ? ' mb-mine' : ''}${replyName ? ' mb-is-reply' : ''}`,
         toggle: `<button type="button" class="mb-row-toggle" data-on-click="mb-row-toggle" aria-expanded="${escapeAttr(String(open))}" aria-controls="${escapeAttr(idp)}-${Number(m.id)}"><span class="mb-row-chev" aria-hidden="true"></span><span class="mb-row-avatar" style="--mb-avatar:${escapeAttr(avatarColor(agent))}" aria-hidden="true">${escapeHtml(initial.toUpperCase())}</span><span class="mb-row-who" title="${escapeAttr(who)}">${escapeHtml(who)}</span><span class="mb-row-snippet">${escapeHtml(snippet)}</span><span class="mb-row-tags" data-chips="${escapeAttr(JSON.stringify(chips))}">${layoutChips(chips)}</span>${timeHtml}</button>`,
+        quickReply: `<button type="button" class="btn btn-small mb-row-quick-reply" data-on-click="mb-msg-reply" data-msg-id="${Number(m.id)}" data-sender="${escapeAttr(agent)}" aria-label="${escapeAttr(replyText)}">Reply</button>`,
         tagsOpen: open ? openParts(m.id, agent, moreLabel, more, tagHtml).tagsOpen : '',
         actions: open ? openParts(m.id, agent, moreLabel, more, tagHtml).actions : '',
         attrs: more ? ` data-more="${escapeAttr(moreLabel)}"` : '', // what an opened row needs to build its actions (a collapsed row has none: a long board is a lot of rows)

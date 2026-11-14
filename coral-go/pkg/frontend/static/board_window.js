@@ -174,6 +174,7 @@ function renderBoardItem(item, prev) {
     return `
         <div class="mb-message ${spacing}${alignClass}${selectedClass}${parts.classes}${item.nested ? ' mb-thread-reply' : ''}"${parts.attrs} role="listitem" data-message-id="${escapeAttr(String(m.id))}"${m.reply_to ? ` data-reply-to="${Number(m.reply_to)}"` : ''}${messageAttachmentAttrs(m)} style="${boardMessageColorStyle(color)}">
             ${parts.toggle}
+            ${parts.quickReply}
             <div class="mb-message-header">
                 ${checkbox}
                 <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${escapeHtml(authorLabel(m, agent, bs.currentProject || ''))}</span>

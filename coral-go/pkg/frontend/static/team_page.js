@@ -230,7 +230,7 @@ function drawStatus(data) {
     if (!data.agents.length) { s.textContent = ''; s.className = 'team-page-status'; const hb = $('team-page-health'); if (hb) hb.hidden = true; return; }
     const owed = Math.max(0, data.agents.filter(agent => ['needs_input', 'waiting'].includes(agent.availability) && !live.some(row => row.session_id === agent.session_id && row.wait_removed)).length - n); // agents the board says wait, that no live row here agrees with
     if (!owed) S.disagreeSince = 0; else if (!S.disagreeSince) S.disagreeSince = Date.now();
-    const settled = owed > 0 && Date.now() - S.disagreeSince > (Number(globalThis.__coralAttentionGraceMs) >= 0 ? Number(globalThis.__coralAttentionGraceMs) : 30000); // #15151: 'Checking attention status' is for a moment (the rows catch up); when the two still disagree after 30 s the board's word counts, it never stays
+    const settled = owed > 0 && Date.now() - S.disagreeSince > (Number(globalThis.__coralAttentionGraceMs) >= 0 ? Number(globalThis.__coralAttentionGraceMs) : 30000); // #15151: 'Checking' is for a moment (the rows catch up); when the two still disagree after 30 s the board's word counts, it never stays
     const uncertainAttention = owed > 0 && !settled;
     const shown = n + (settled ? owed : 0);
     const waking = wakingSince(S.team) > 0;
@@ -245,7 +245,7 @@ function drawStatus(data) {
     const tp = state.teamPause, paused = tp?.paused && tp.team === S.team; // the person's Pause (#15331): the header says so, with the way out in the line under it (team_pause.js)
     // every task done, none open, nobody working and nothing needs the person: not the same as "All well" while the team is still at it (walk 21 H2, #15304)
     const finished = !shown && !unknown && S.counts.tasks === 0 && S.tasksDone > 0 && data.agents.every(a => a.availability !== 'busy' && a.availability !== 'needs_input' && a.availability !== 'waiting');
-    const text = paused ? 'Paused' : uncertainAttention ? 'Checking attention status' : asleep ? 'Asleep' : wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : shown ? `${shown} ${shown === 1 ? 'needs' : 'need'} attention` : unknown ? (unknown === data.agents.length ? 'No agent has sent a first message yet' : `${unknown} of ${data.agents.length} agents have not sent a first message yet`) : finished ? 'Finished: your turn' : 'All well';
+    const text = paused ? 'Paused' : uncertainAttention ? 'Checking' : asleep ? 'Asleep' : wakingNow ? `Waking · ${data.agents.length - unknown} of ${data.agents.length} ready` : shown ? `${shown} ${shown === 1 ? 'needs' : 'need'} attention` : unknown ? (unknown === data.agents.length ? 'No first message yet' : `${data.agents.length - unknown} of ${data.agents.length} ready`) : finished ? 'Finished: your turn' : 'All well';
     // When agents need attention the visible status is a button to the Agents tab (beside the live region, which keeps saying it and is then only for a screen reader: the button's name is not announced twice); "All well" is plain text.
     const b = $('team-page-health');
     if (b) {

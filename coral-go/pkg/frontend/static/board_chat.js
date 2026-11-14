@@ -386,6 +386,7 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
         const parts = rowParts(m, { agent, timeHtml: messageTimeHtml(m.created_at), moreLabel: '', replyName: m.reply_to ? (parent ? (boardSenderName(parent)) : 'an earlier message') : '', more: false, idp: 'dbd' });
         return day + `<div class="mb-message ${spacing}${alignClass}${selectedClass}${parts.classes}${item.nested ? ' mb-thread-reply' : ''}"${parts.attrs} data-message-id="${Number(m.id)}"${m.reply_to ? ` data-reply-to="${Number(m.reply_to)}"` : ''}${messageAttachmentAttrs(m)} style="${boardMessageColorStyle(color)}">
             ${parts.toggle}
+            ${parts.quickReply}
             <div class="mb-message-header">
                 ${checkbox}
                 <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${agentLinkHtml(agent, { board: _activeBoardChat || '', text: authorLabel(m, agent, _activeBoardChat || '') })}</span>

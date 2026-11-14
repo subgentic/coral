@@ -492,7 +492,7 @@ export function renderQuickActions() {
                     <button class="menu-item send-menu-item" role="menuitem" data-on-click="send-menu-send">
                         ${SVGO.o3}<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                         Send
-                        <span class="send-menu-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></span>
+                        <span class="send-menu-hint"><kbd>${/Mac/.test(navigator.platform) ? '⌘' : 'Ctrl'}</kbd>+<kbd>Enter</kbd></span>
                     </button>
                     <button class="menu-item send-menu-item" role="menuitem" data-on-click="send-menu-team">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M17 11a4 4 0 0 1 4 4v2"/></svg>
