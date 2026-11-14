@@ -28,7 +28,7 @@ const TEAM = 'kind-limit-' + Date.now().toString(36);
                 return original(url, opts); }; return true; })()`);
         await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr.dt-row').length >= 5`, 'the rows of Needs you', 20000);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr.dt-row').length >= 5 && !!document.querySelector('#group-table-view .inbox-group-more')`, 'the rows of Needs you, with the limit (its module loads when the list has more than five rows)', 20000);
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
