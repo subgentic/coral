@@ -13,7 +13,7 @@ const WANT = { 'Which hub': ['help_outline', 'Question'], 'Ship batch': ['help_o
     const failures = [], T = '#group-table-view', team = 'nki-' + Date.now().toString(36);
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-    const icon = needle => ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes(${JSON.stringify(needle)})); const i = tr && tr.querySelector('.inbox-kind-icon'); if (!i) return null; const cs = getComputedStyle(i), b = i.getBoundingClientRect();
+    const icon = needle => ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(r => r.textContent.includes(${JSON.stringify(needle)})); const i = tr && tr.querySelector('.inbox-kind-icon'); if (!i) return null; const cs = getComputedStyle(i), b = i.getBoundingClientRect();
         const svg=i.querySelector('.artifact-thumbnail > svg'); return { svg:svg?.outerHTML||'',svgHidden:svg?.getAttribute('aria-hidden'),glyph: getComputedStyle(i, '::before').content.replace(/"/g, ''), label: i.getAttribute('aria-label'), role: i.getAttribute('role'), text: i.textContent, font: cs.fontFamily, w: Math.round(b.width), color: cs.color, bg: cs.backgroundColor }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -36,7 +36,7 @@ const WANT = { 'Which hub': ['help_outline', 'Question'], 'Ship batch': ['help_o
                 return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`Object.keys(${JSON.stringify(WANT)}).every(n => [...document.querySelectorAll('${T} tbody tr')].some(r => r.textContent.includes(n)))`, at + 'the four rows', 15000);
+            await waitFor(`Object.keys(${JSON.stringify(WANT)}).every(n => [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].some(r => r.textContent.includes(n)))`, at + 'the four rows', 15000);
             for (const theme of ['light', 'dark']) {
                 await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); true`); await ev(framesJs(2));
                 for (const [needle, [glyph, label]] of Object.entries(WANT)) {

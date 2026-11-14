@@ -37,7 +37,7 @@ const STUB = `(() => {
     const S = `(window.__coralStatic || '/static/')`;
     const status = () => ev(`(document.querySelector('#group-table-view .team-count-line') || {}).textContent || ''`);
     const partial = () => ev(`(document.querySelector('#group-table-view .team-partial-line') || {}).textContent || ''`);
-    const rowCount = () => ev(`document.querySelectorAll('#group-table-view tbody tr').length`);
+    const rowCount = () => ev(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length`);
     const open = async (plan, servers, { hubNow = true } = {}) => {
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`localStorage.removeItem('coral.inbox.tab'); localStorage.removeItem('coral-team-artifacts-filters:@inbox'); ${STUB}; window.__plan = ${JSON.stringify(plan)}; true`);
@@ -54,7 +54,7 @@ const STUB = `(() => {
         await open({ srv1: { rows: 3, all: 500 }, srv2: { rows: 2, all: 113, delay: 1500 }, srv3: { status: 500 } }, three);
         const early = await status();
         check('while a computer is still answering the page says it is loading, never "No artifacts yet"', /Loading artifacts/.test(early) && !/No artifacts yet/.test(early), early);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 5`, 'the rows of the two computers that answered', 15000);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length >= 5`, 'the rows of the two computers that answered', 15000);
         check('the computers that answered are shown (3 + 2 rows) though one failed', (await rowCount()) === 5, String(await rowCount()));
         const p = await partial();
         check('one quiet line says the count is of 2 of 3 computers and names the one that failed', /613 artifacts from 2 of 3 computers/.test(p) && /Gamma could not be read/.test(p), p);
@@ -62,7 +62,7 @@ const STUB = `(() => {
         check('the line is not an alert (the page keeps quiet)', await ev(`!document.querySelector('#group-table-view .team-partial-line').closest('[role="alert"]') && !document.querySelector('#group-table-view .team-partial-line').getAttribute('role')`));
         // Retry, with the failing computer back: the line goes and its rows join
         await ev(`window.__plan.srv3 = { rows: 4, all: 4 }; document.querySelector('#group-table-view .team-partial-retry').click(); true`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 9`, 'Retry reads the computer that failed', 15000);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length >= 9`, 'Retry reads the computer that failed', 15000);
         check('Retry brings the computer that failed back and the partial line goes', (await rowCount()) === 9 && (await partial()) === '', `${await rowCount()} rows, "${await partial()}"`);
 
         // 2. every computer fails: the failure line (an alert with Retry), not the empty state
@@ -79,7 +79,7 @@ const STUB = `(() => {
 
         // 3b. the sidebar's count does not go down on a read some computer did not answer
         await open({ srv1: { rows: 3, all: 500 }, srv2: { rows: 2, all: 113 }, srv3: { rows: 4, all: 4 } }, three);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 9`, 'the whole folder', 15000);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length >= 9`, 'the whole folder', 15000);
         const full = await ev(`import(${S} + 'inbox_artifacts.js').then(m => m.artifactCount())`);
         check('the folder\'s count is the sum of all three computers', full === 617, String(full));
         await ev(`window.__plan.srv3 = { status: 500 }; const real = Date.now.bind(Date); Date.now = () => real() + 120000; true`); // the count's own freshness window has passed
@@ -92,13 +92,13 @@ const STUB = `(() => {
         await ev(`import(${S} + 'state.js').then(m => { m.state.hub = true; m.state.servers = ${JSON.stringify(three)}; return true; })`);
         await ev(`window.__lines = []; new MutationObserver(() => { const t = (document.querySelector('#group-table-view .team-count-line') || {}).textContent; if (t !== undefined && window.__lines[window.__lines.length - 1] !== t) window.__lines.push(t); }).observe(document.body, { subtree: true, childList: true, characterData: true }); window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_sidebar.js').then(m => m.openInboxGroup('artifacts')).then(() => true)`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 4`, 'the rows after the slow computers', 15000);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length >= 4`, 'the rows after the slow computers', 15000);
         const lines = await ev(`window.__lines`);
         check('from the first drawing until the rows arrive the status line says loading, never "No artifacts yet"', lines.length > 0 && lines.every(l => !/No artifacts yet/.test(l)) && lines.some(l => /Loading artifacts/.test(l)), JSON.stringify(lines));
 
         // 4. an older Coral that does not know versions=newest: its count is of every version, and the page says so; the key is read without it there
         await open({ srv1: { rows: 2, all: 20809, versionsBad: true }, srv2: { rows: 1, all: 3 }, srv3: { rows: 1, all: 2 } }, three);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 4`, 'the rows of all three', 15000);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length >= 4`, 'the rows of all three', 15000);
         const v = await partial();
         check('a computer that counts every version is named, and the count is not presented as files alone', /Alpha counts every version of a file, not files/.test(v), v);
         check('it was asked without the key after the 400', (await ev(`window.__asked`)).includes('srv1') && (await ev(`window.__asked`)).includes('srv1+v'), JSON.stringify(await ev(`window.__asked`)));

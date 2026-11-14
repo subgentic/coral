@@ -15,7 +15,7 @@ const B = 'goal-done-' + Date.now().toString(36);
     const api = (method, path, body) => ev(`fetch('/api/board/${B}' + ${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, json: await r.json().catch(() => ({})) }))`);
     const root = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, json: await r.json().catch(() => ({})) }))`);
     const T = '#group-table-view';
-    const doneRows = () => ev(`[...document.querySelectorAll('${T} tbody tr')].filter(tr => /looks done/.test(tr.textContent)).map(tr => ({ text: tr.textContent.replace(/\\s+/g, ' ').trim(), buttons: [...tr.querySelectorAll('button')].map(b => b.textContent.trim()) }))`);
+    const doneRows = () => ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].filter(tr => /looks done/.test(tr.textContent)).map(tr => ({ text: tr.textContent.replace(/\\s+/g, ' ').trim(), buttons: [...tr.querySelectorAll('button')].map(b => b.textContent.trim()) }))`);
     const openNeeds = async () => {
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
@@ -61,7 +61,7 @@ const B = 'goal-done-' + Date.now().toString(36);
             await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: theme }] });
             await openNeeds();
             await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, `${theme}: the goal item`, 20000);
-            const g = await ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => /looks done/.test(r.textContent)), box = tr.querySelector('.inbox-goaldone-actions'), td = box.closest('td'), R = e => e.getBoundingClientRect(),
+            const g = await ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(r => /looks done/.test(r.textContent)), box = tr.querySelector('.inbox-goaldone-actions'), td = box.closest('td'), R = e => e.getBoundingClientRect(),
                 btns = [...box.querySelectorAll(':scope > button, :scope > .inbox-row-more > button')].filter(b => R(b).width > 0), tr_ = R(tr), c = e => { const r = R(e); return (r.top + r.bottom) / 2; },
                 px = col => { const cv = document.createElement('canvas'); cv.width = cv.height = 1; const x = cv.getContext('2d'); x.fillStyle = col; x.fillRect(0, 0, 1, 1); return [...x.getImageData(0, 0, 1, 1).data].slice(0, 3); },
                 lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); },
@@ -84,8 +84,8 @@ const B = 'goal-done-' + Date.now().toString(36);
         try {
             await openNeeds();
             try { await waitFor(`/plan-mixed/.test(document.querySelector('${T}')?.textContent || '') && /looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'a review row and the goal row in one list', 20000); }
-            catch (e) { assert.fail('the mixed list did not appear; rows: ' + JSON.stringify(await ev(`[...document.querySelectorAll('${T} tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ').trim().slice(0, 80))`))); }
-        const mixed = await ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => /looks done/.test(r.textContent)), box = tr.querySelector('.inbox-goaldone-actions'), td = box.closest('td'), R = e => e.getBoundingClientRect(), bs = [...box.querySelectorAll(':scope > button, :scope > .inbox-row-more > button')].filter(b => R(b).width > 0), cell = R(td), c = e => (R(e).top + R(e).bottom) / 2;
+            catch (e) { assert.fail('the mixed list did not appear; rows: ' + JSON.stringify(await ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].map(r => r.textContent.replace(/\\s+/g, ' ').trim().slice(0, 80))`))); }
+        const mixed = await ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(r => /looks done/.test(r.textContent)), box = tr.querySelector('.inbox-goaldone-actions'), td = box.closest('td'), R = e => e.getBoundingClientRect(), bs = [...box.querySelectorAll(':scope > button, :scope > .inbox-row-more > button')].filter(b => R(b).width > 0), cell = R(td), c = e => (R(e).top + R(e).bottom) / 2;
             return { n: bs.length, inside: bs.every(b => R(b).left >= cell.left - 1 && R(b).right <= cell.right + 1), spread: Math.max(...bs.map(c)) - Math.min(...bs.map(c)), cellW: Math.round(cell.width), fits: box.scrollWidth <= box.clientWidth + 1, align: getComputedStyle(td).verticalAlign }; })()`);
         assert.ok(mixed.n >= 3 && mixed.inside && mixed.spread <= 1 && mixed.fits && mixed.align === 'middle' && mixed.cellW >= 17 * 16 - 2, 'with a review row listed too, the goal row keeps its controls inside the cell, on one line, centred, in a 17rem column: ' + JSON.stringify(mixed));
         } finally { await Page.removeScriptToEvaluateOnNewDocument({ identifier: stubId }); }
@@ -100,7 +100,7 @@ const B = 'goal-done-' + Date.now().toString(36);
 
         // Not yet: gone here and on the machine, until a task is added
         await root('PUT', '/api/settings', { goal_done_hidden: JSON.stringify(['other|9|9']) }); // another browser hid something since this page read the list (#13841): the page's copy is stale, and pressing Not yet must not erase it
-        await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Not yet"]').click(); true`);
+        await ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Not yet"]').click(); true`);
         await waitFor(`!/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the item gone after Not yet', 8000);
         await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) === ${withItem - 1}`, 'and out of the Inbox number', 10000);
         assert.equal(await badge(), withItem - 1, 'and out of the Inbox number');
@@ -115,13 +115,13 @@ const B = 'goal-done-' + Date.now().toString(36);
         await require('./helpers/wait').settle(ev, 600, 300);
         await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) >= 1`, 'the badge counts the item before it is read', 15000);
         const unreadBadge = await badge();
-        await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('.inbox-review-name').click(); true`);
+        await ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(tr => /looks done/.test(tr.textContent)).querySelector('.inbox-review-name').click(); true`);
         await waitFor(`!!document.querySelector('.goal-view, [data-goal-view], #goal-view') || /goals|goal/i.test(location.hash + location.pathname)`, 'the goal opened', 10000);
         await openNeeds();
         await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the opened item is still listed', 20000);
         await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) === ${unreadBadge - 1}`, 'and out of the Inbox number', 10000);
         assert.equal((await doneRows()).length, 1, 'listed once');
-        assert.ok(await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).classList.contains('dt-read')`), 'the opened row is drawn read (needsUnread, QA #11983)');
+        assert.ok(await ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(tr => /looks done/.test(tr.textContent)).classList.contains('dt-read')`), 'the opened row is drawn read (needsUnread, QA #11983)');
         assert.equal(await ev(`(document.querySelector('${T} .session-group-count') || {}).textContent`), '0', 'the heading counts what the badge counts: nothing unread (needsUnread)');
         assert.ok(await ev(`[...document.querySelectorAll('button.goals-chip')].some(e => /^All 0 of 1$/.test(e.textContent.trim()))`), 'the All pill says 0 unread of the 1 listed (needsUnread)');
         const readSaved = JSON.parse((await root('GET', '/api/settings')).json.settings.goal_done_read);
@@ -134,10 +134,10 @@ const B = 'goal-done-' + Date.now().toString(36);
         assert.ok((await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid}`), 'and in /api/needs-you again');
 
         // Dismiss with Undo, with a pointer RESTING on the table (#14373): the person's own completed Dismiss is not held (a hold is up to 10 s)
-        const rowAt = await ev(`(() => { const r = [...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)); r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { x: Math.round(b.left + 40), y: Math.round(b.top + b.height / 2) }; })()`);
+        const rowAt = await ev(`(() => { const r = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(tr => /looks done/.test(tr.textContent)); r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { x: Math.round(b.left + 40), y: Math.round(b.top + b.height / 2) }; })()`);
         await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: rowAt.x, y: rowAt.y }); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the pointer events reach the page
         const dismissAt = Date.now();
-        await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Dismiss"]').click(); true`);
+        await ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Dismiss"]').click(); true`);
         await waitFor(`!/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the item gone after Dismiss', 8000);
         assert.ok(Date.now() - dismissAt < 4000, `the dismissed goal left at once under a resting pointer (took ${Date.now() - dismissAt} ms)`);
         await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 });
@@ -147,13 +147,13 @@ const B = 'goal-done-' + Date.now().toString(36);
         await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'Undo brings it back', 8000);
 
         // Close goal: the goal's page with the Close dialog set to Done; closing it takes the item away
-        await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Mark goal"]').click(); true`);
+        await ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Mark goal"]').click(); true`);
         await waitFor(`!!document.querySelector('dialog.goals-close-dialog[open]')`, 'the Close dialog', 10000);
         assert.equal(await ev(`document.querySelector('dialog.goals-close-dialog input[name=goal-close-state]:checked')?.value`), 'done', 'set to Done');
         await ev(`[...document.querySelectorAll('dialog.goals-close-dialog button')].find(b => /^(Close goal|Close|Confirm)/.test(b.textContent.trim()) && b.type !== 'button' || /Close goal/.test(b.textContent)).click(); true`);
         await waitFor(`!document.querySelector('dialog.goals-close-dialog[open]')`, 'the dialog closes', 10000);
         await openNeeds();
-        await waitFor(`!!document.querySelector('${T} tbody tr, ${T}')`, 'Needs you', 10000);
+        await waitFor(`!!document.querySelector('${T} tbody tr:not(.dt-group), ${T}')`, 'Needs you', 10000);
         await require('./helpers/wait').settle(ev, 600, 300); // the goals were read again when the list opened
         assert.equal((await doneRows()).length, 0, 'gone when the goal closes');
         assert.ok(!(await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid}`), 'and from the phone-push read');
@@ -166,14 +166,14 @@ const B = 'goal-done-' + Date.now().toString(36);
             await openNeeds();
             await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the goal item on a phone', 20000);
             const shown = await ev(`(() => {
-                const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => /looks done/.test(r.textContent)); if (!tr) return { error: 'no row' };
+                const tr = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(r => /looks done/.test(r.textContent)); if (!tr) return { error: 'no row' };
                 const title = [...tr.querySelectorAll('*')].find(e => [...e.children].every(c => c.classList.contains('inbox-kind-icon')) && (/looks done: Customers sign up without help/.test(e.textContent) || (e.classList.contains('inbox-review-name') && e.textContent.trim() === 'Customers sign up without help'))); /* the title's own element: its only element child may be the kind icon in front of it (#13144) */ if (!title) return { error: 'no title element' };
                 title.scrollIntoView({ block: 'center' }); const b = title.getBoundingClientRect(), hit = document.elementFromPoint(b.left + Math.min(20, b.width / 2), b.top + b.height / 2);
                 return { w: Math.round(b.width), h: Math.round(b.height), inView: b.left >= 0 && b.right <= innerWidth, onTop: !!hit && (hit === title || title.contains(hit)) }; // the title itself (or a part of it) is what a finger or an eye meets there: not the row it is clipped inside
             })()`);
             assert.ok(shown.w > 40 && shown.h >= 10 && shown.inView && shown.onTop, 'the title is drawn on a phone, not clipped away: ' + JSON.stringify(shown));
             const touch = (type, p) => client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x: p.x, y: p.y, id: 1 }] });
-            const point = () => ev(`(() => { const r = [...document.querySelectorAll('${T} tbody tr')].find(r => /looks done/.test(r.textContent)); r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { x: b.left + b.width * 0.35, y: b.top + b.height * 0.5 }; })()`);
+            const point = () => ev(`(() => { const r = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(r => /looks done/.test(r.textContent)); r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { x: b.left + b.width * 0.35, y: b.top + b.height * 0.5 }; })()`);
             const press = async () => { const p = await point(); await touch('touchStart', p); await new Promise(r => setTimeout(r, 700)); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 300)); }; // sleep-ok: a long press is a held finger
             await press();
             const bar = await ev(`(() => { const b = document.querySelector('.dt-bar'); return b ? { count: (b.querySelector('.dt-bar-count, .team-tb-count') || b).textContent.replace(/\\s+/g, ' ').trim(), actions: [...b.querySelectorAll('button')].map(x => ({ label: (x.getAttribute('aria-label') || x.textContent).trim(), off: x.disabled })) } : null; })()`);
@@ -197,35 +197,35 @@ const B = 'goal-done-' + Date.now().toString(36);
             const menuItem = async label => { await ev(`document.querySelector('.dt-bar [aria-label="More actions"]')?.click(); true`); await waitFor(`!![...document.querySelectorAll('.menu-item, [role=menuitem]')].find(b => /^${label}$/.test(b.textContent.trim()))`, label + ' in the bar menu', 5000); await ev(`[...document.querySelectorAll('.menu-item, [role=menuitem]')].find(b => /^${label}$/.test(b.textContent.trim())).click(); true`); await require('./helpers/wait').settle(ev, 600, 300); };
             const gid3 = await mk('Billing page loads fast', 'The billing page loads in under a second'); await task(gid3, true);
             await openNeeds();
-            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'two goals that look done on a phone', 20000);
-            const rowAt = i => ev(`(() => { const r = [...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent))[${i}]; r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { x: b.left + b.width * 0.35, y: b.top + b.height * 0.5 }; })()`);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'two goals that look done on a phone', 20000);
+            const rowAt = i => ev(`(() => { const r = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].filter(r => /looks done/.test(r.textContent))[${i}]; r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { x: b.left + b.width * 0.35, y: b.top + b.height * 0.5 }; })()`);
             const holdRow = async i => { const p = await rowAt(i); await touch('touchStart', p); await new Promise(r => setTimeout(r, 700)); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 300)); }; // sleep-ok: a long press is a held finger
             await holdRow(0);
             await menuItem('Mark done');
             assert.ok(await ev(`!![...document.querySelectorAll('dialog[open], .modal')].find(d => d.getClientRects().length && /Close goal/i.test(d.textContent) && /Done/.test(d.textContent))`), 'Close goal from the bar opens the Close dialog, set to Done');
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`); await require('./helpers/wait').settle(ev, 400, 200);
             await openNeeds();
-            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'the two goals again', 20000);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'the two goals again', 20000);
             await holdRow(0);
             { const p = await rowAt(1); await touch('touchStart', p); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 300)); } // sleep-ok: a tap adds a row to the selection
             assert.equal(await ev(`(document.querySelector('.dt-bar .dt-bar-count, .dt-bar') || {}).textContent.replace(/\\s+/g, ' ').match(/2 selected/) ? 2 : 0`), 2, 'two goals selected');
             assert.equal(await ev(`[...document.querySelectorAll('.dt-bar button')].some(b => (b.getAttribute('aria-label') || b.textContent).trim() === 'Mark done')`), true, 'Close goal is in the bar');
             await menuItem('Not yet');
-            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length === 0`, 'both goals hidden until a task is added', 10000);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].filter(r => /looks done/.test(r.textContent)).length === 0`, 'both goals hidden until a task is added', 10000);
             assert.equal(JSON.parse((await root('GET', '/api/settings')).json.settings.goal_done_hidden || '[]').length >= 2, true, 'both are hidden on the machine');
             await waitFor(`!![...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim()))`, 'the Undo in the notice', 5000);
             await ev(`[...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim())).click(); true`); await require('./helpers/wait').settle(ev, 800, 300);
-            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'Undo brings both back', 10000);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'Undo brings both back', 10000);
             // the same for the bar's Dismiss: two goals ignored, Undo, both back (each undo rewrites the one hidden list; run at once, one stayed hidden)
             await openNeeds();
-            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'the two goals for Dismiss', 20000);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'the two goals for Dismiss', 20000);
             await holdRow(0);
             { const p = await rowAt(1); await touch('touchStart', p); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 300)); } // sleep-ok: a tap adds a row to the selection
             await ev(`document.querySelector('.dt-bar [aria-label="Dismiss"], .dt-bar button[title="Dismiss"]')?.click(); true`);
-            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length === 0`, 'both goals ignored', 10000);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].filter(r => /looks done/.test(r.textContent)).length === 0`, 'both goals ignored', 10000);
             await waitFor(`!![...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim()))`, 'the Undo in the notice', 5000);
             await ev(`[...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim())).click(); true`);
-            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'Undo of Dismiss brings both goals back', 10000);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].filter(r => /looks done/.test(r.textContent)).length >= 2`, 'Undo of Dismiss brings both goals back', 10000);
             await Emulation.setTouchEmulationEnabled({ enabled: false });
             await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         }

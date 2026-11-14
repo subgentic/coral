@@ -9,7 +9,7 @@ const { coralReady } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const team = 'review-inbox-' + Date.now().toString(36), failures = [];
-    const row = name => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r=>r.textContent.includes(${JSON.stringify(name)}))`;
+    const row = name => `[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(r=>r.textContent.includes(${JSON.stringify(name)}))`;
     const rows = `document.querySelectorAll('#group-table-view [data-review-artifact]')`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD}); await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' }));` }); // the Inbox's list is read before a test can set its order: oldest first, set before the page loads (newest first is the default, #11552)
@@ -46,7 +46,7 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
                 await waitFor(`!!(${row('Review file 01.txt')})`,'for-review artifact in Needs you',15000);
                 // the row has no goal, no task link and no Goal column (the operator's approved row, #11719): they are in the opened file and in the Filters
-                const gone = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view tbody tr')]; return { rows: rows.length, goalCells: rows.filter(r => r.querySelector('.inbox-review-goal, [data-goal-link], [data-task-link]')).length, noGoalText: rows.filter(r => /No goal/.test(r.textContent)).length, goalHead: [...document.querySelectorAll('#group-table-view th')].filter(h => getComputedStyle(h).display !== 'none').some(h => h.textContent.replace(/[\u2191\u2193\u2195]/g, '').trim() === 'Goal') }; })()`);
+                const gone = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')]; return { rows: rows.length, goalCells: rows.filter(r => r.querySelector('.inbox-review-goal, [data-goal-link], [data-task-link]')).length, noGoalText: rows.filter(r => /No goal/.test(r.textContent)).length, goalHead: [...document.querySelectorAll('#group-table-view th')].filter(h => getComputedStyle(h).display !== 'none').some(h => h.textContent.replace(/[\u2191\u2193\u2195]/g, '').trim() === 'Goal') }; })()`);
                 assert.ok(gone.rows >= 9 && gone.goalCells === 0 && gone.noGoalText === 0 && !gone.goalHead, 'a review row shows no goal, task link or Goal column: ' + JSON.stringify(gone));
                 // the card's pills (#16576, the Operator's Option B): a goal pill and a task pill only where the file really has one
                 const pillsOf = n => ev(`(() => { const r = ${row('Review file ' + n + '.txt')}; return r ? [...r.querySelectorAll('.inbox-pill')].map(p => p.textContent) : null; })()`);
@@ -79,7 +79,7 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`document.querySelectorAll('#group-table-view [data-review-artifact]').length >= 12`, 'the filter cleared', 8000);
                 if (dir) { fs.mkdirSync(dir, { recursive: true }); for (const theme of ['light', 'dark']) { await ev(`document.documentElement.setAttribute('data-theme','${theme}');true`); fs.writeFileSync(path.join(dir, `inbox-review-goal-${width}-${theme}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
                 // the goal and the task are in the opened file's Details (#11751): they left the row, the viewer says them
-                await ev(`[...document.querySelectorAll('#group-table-view tbody tr button')].find(b => b.getAttribute('aria-label') === 'Open Review file 01.txt').click(); true`);
+                await ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group) button')].find(b => b.getAttribute('aria-label') === 'Open Review file 01.txt').click(); true`);
                 await waitFor(`!!document.querySelector('.artifact-viewer .details-toggle:not([hidden])')`, 'the viewer has a Details button', 10000);
                 await ev(`(() => { const b = document.querySelector('.artifact-viewer .details-toggle'); if (b.getAttribute('aria-expanded') !== 'true') b.click(); return true; })()`);
                 await waitFor(`/Ship the installer/.test((document.querySelector('.artifact-viewer .detail-details') || {}).textContent || '')`, 'the Details name the goal', 6000).catch(() => {});

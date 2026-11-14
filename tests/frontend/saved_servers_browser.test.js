@@ -82,7 +82,7 @@ const REMOTE = `(() => {
         fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
     };
     // The dock's Saved tab is the Inbox's Saved table, filtered to the page's scope (#7631); on a hub its Computer column says which server a message is on. A row opens the message's page in the Inbox (Open on it jumps, More has Remove).
-    const items = () => ev(`[...document.querySelectorAll('#saved-table tbody tr')].map(tr => { const a = tr.querySelector('.dt-primary'); return { id: a.dataset.id, src: a.textContent.split(', ')[0], server: tr.querySelector('td[data-key="machine"], td[data-key="server"]') ? tr.querySelector('td[data-key="machine"], td[data-key="server"]').textContent.trim() : null }; })`);
+    const items = () => ev(`[...document.querySelectorAll('#saved-table tbody tr:not(.dt-group)')].map(tr => { const a = tr.querySelector('.dt-primary'); return { id: a.dataset.id, src: a.textContent.split(', ')[0], server: tr.querySelector('td[data-key="machine"], td[data-key="server"]') ? tr.querySelector('td[data-key="machine"], td[data-key="server"]').textContent.trim() : null }; })`);
     const INBOX_SAVED = `(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`;
     const pageOf = async id => { await ev(`document.querySelector('#saved-table .dt-primary[data-id="${id}"]').click(); true`); await waitFor(`!!document.querySelector('#agentic-saved-detail-pane:not([hidden]) .detail-foot .btn')`, 'the message sheet of ' + id, 8000); };
     const removeFromPage = async () => { await ev(`[...document.querySelectorAll('#agentic-saved-detail-pane .detail-foot .btn')].find(b => b.textContent === 'Remove from saved').click(); true`); await waitFor(`document.getElementById('agentic-saved-detail-pane').hidden`, 'back at the Saved table', 6000); };
@@ -90,7 +90,7 @@ const REMOTE = `(() => {
     const openSaved = async () => {
         if (await ev(`document.getElementById('nav-tab-hub-inbox').classList.contains('active')`)) { await ev(`window.switchNavTab('agents'); true`); await waitFor(`document.querySelector('.top-nav-tab.active').dataset.arg === 'agents'`, 'the page left', 4000); }
         await ev(`import((window.__coralStatic || '/static/') + 'saved.js').then(m => m.showSaved()).then(() => { window.toggleAgenticPanel(true); window.switchAgenticTab('saved', 'top'); return true; })`);
-        await waitFor(`document.getElementById('saved-ui').getClientRects().length > 0 && document.querySelectorAll('#saved-table tbody tr, #saved-table .empty-state-line, #saved-table .group-table-note').length > 0`, 'the Saved list', 8000);
+        await waitFor(`document.getElementById('saved-ui').getClientRects().length > 0 && document.querySelectorAll('#saved-table tbody tr:not(.dt-group), #saved-table .empty-state-line, #saved-table .group-table-note').length > 0`, 'the Saved list', 8000);
     };
     const refresh = async () => { await ev(`import((window.__coralStatic || '/static/') + 'saved.js').then(m => m.showSaved()).then(() => true)`); await sleep(300); }; // sleep-ok: item checks draw their chips as each answer arrives (the refresh reads the page on home, the sidebar's tab for an agent)
 
@@ -131,7 +131,7 @@ const REMOTE = `(() => {
         await ev(`window.__box.items.push({ id: 101, kind: 'board', ref: 'box-board', key: '7', agent_type: '', title: 'box-board', snippet: 'a board message on Box B', said_at: '', saved_at: new Date(Date.now() + 5000).toISOString(), done_at: null }); true`);
         await ev(`window.selectLiveSession('', '', '', 'local'); true`); // home: the list is of the agent or team on screen (#4792), and the merge across servers is home's
         await openSaved();
-        await waitFor(`document.querySelectorAll('#saved-table tbody tr').length === 3`, 'three items', 8000);
+        await waitFor(`document.querySelectorAll('#saved-table tbody tr:not(.dt-group)').length === 3`, 'three items', 8000);
         const merged = await items();
         assert.deepEqual(merged.map(i => i.server).sort(), ['Box B', 'Box B', 'This computer']);
         assert.equal(merged[0].src, 'box-board', 'newest saved first: the board item saved last');
@@ -144,12 +144,12 @@ const REMOTE = `(() => {
         await waitFor(`document.querySelectorAll('#saved-table .group-table-note').length === 1`, 'the one-line notice', 6000);
         const note = await ev(`document.querySelector('#saved-table .group-table-note').textContent`);
         assert.ok(note.includes('Box B') && /did not answer/.test(note), note);
-        assert.equal(await ev(`document.querySelectorAll('#saved-table tbody tr').length`), 1, 'only this server\'s item');
+        assert.equal(await ev(`document.querySelectorAll('#saved-table tbody tr:not(.dt-group)').length`), 1, 'only this server\'s item');
         assert.equal(await ev(`document.querySelector('.toast.error, .toast-error') ? 1 : 0`), 0, 'no error toast');
         await shot('saved-servers-down');
         await ev(`window.__box.up = true; true`);
         await refresh();
-        await waitFor(`document.querySelectorAll('#saved-table tbody tr').length === 3 && !document.querySelector('#saved-table .group-table-note')`, 'back to three', 6000);
+        await waitFor(`document.querySelectorAll('#saved-table tbody tr:not(.dt-group)').length === 3 && !document.querySelector('#saved-table .group-table-note')`, 'back to three', 6000);
 
         console.log('5. Done, Reopen and Remove go to the right server');
         const boxItem = () => ev(`!!document.querySelector('#saved-table .dt-primary[data-id="box-b:101"]')`);
@@ -171,7 +171,7 @@ const REMOTE = `(() => {
         console.log('6. A jump opens the remote agent at the message, and a remote board by its server key');
         await ev(`window.selectLiveSession('', '', '', 'local'); true`); // away from the remote agent, home: the merge across servers is home's (#4792)
         await openSaved();
-        await waitFor(`document.querySelectorAll('#saved-table tbody tr').length === 2`, 'two items', 8000);
+        await waitFor(`document.querySelectorAll('#saved-table tbody tr:not(.dt-group)').length === 2`, 'two items', 8000);
         await ev(`window.selectLiveSession('', '', '', 'local'); true`);
         await pageOf(await ev(`document.querySelector('#saved-table .dt-primary[data-id^="box-b:"]').dataset.id`));
         await ev(`document.querySelector('#agentic-saved-detail-pane .detail-foot .btn-primary').click(); true`);
@@ -205,9 +205,9 @@ const REMOTE = `(() => {
         await ev(`window.selectLiveSession('', '', '', 'local'); true`); // home: the server names are of the merged list (#4792)
         await ev(`document.getElementById('agentic-state').style.width = '300px'; true`);
         await refresh();
-        await waitFor(`document.querySelectorAll('#saved-table tbody tr').length >= 2`, 'the Saved rows');
+        await waitFor(`document.querySelectorAll('#saved-table tbody tr:not(.dt-group)').length >= 2`, 'the Saved rows');
         // #8981: a Saved row is one line when narrow (the message, when it was saved, its action); the Computer column goes, and the computer's name stays on the row's hover (its title)
-        const narrow = await ev(`(() => { const t = document.getElementById('saved-table'); const rows = [...t.querySelectorAll('tbody tr')].map(tr => ({ title: (tr.querySelector('.dt-primary') || {}).title || '', h: Math.round(tr.getBoundingClientRect().height), computerColumn: tr.cells.length > 4 && !!tr.querySelector('td[data-key=machine]') && tr.querySelector('td[data-key=machine]').getClientRects().length > 0 })); return { over: t.scrollWidth > t.clientWidth + 1, rows }; })()`);
+        const narrow = await ev(`(() => { const t = document.getElementById('saved-table'); const rows = [...t.querySelectorAll('tbody tr:not(.dt-group)')].map(tr => ({ title: (tr.querySelector('.dt-primary') || {}).title || '', h: Math.round(tr.getBoundingClientRect().height), computerColumn: tr.cells.length > 4 && !!tr.querySelector('td[data-key=machine]') && tr.querySelector('td[data-key=machine]').getClientRects().length > 0 })); return { over: t.scrollWidth > t.clientWidth + 1, rows }; })()`);
         assert.ok(!narrow.over && narrow.rows.length >= 2 && narrow.rows.every(r => /Box B|This computer/.test(r.title) && r.h <= 64 && !r.computerColumn), 'in a 300 px panel a row is one line, with no Computer column and the computer\'s name on its hover: ' + JSON.stringify(narrow));
         await shot('saved-servers-narrow');
         await ev(`document.getElementById('agentic-state').style.width = ''; true`);
@@ -219,8 +219,8 @@ const REMOTE = `(() => {
         await sleep(400); // sleep-ok: the layout settles over frames after a viewport change; there is no completion event
         await ev(`window.toggleAgenticPanel(true); window.switchAgenticTab('saved', 'top'); true`);
         await refresh();
-        await waitFor(`document.querySelectorAll('#saved-table tbody tr').length >= 2`, 'the rows', 6000);
-        const gap = await ev(`(() => { const t = document.getElementById('saved-table'), r = t.getBoundingClientRect(); return { over: t.scrollWidth > t.clientWidth + 1, cells: [...t.querySelectorAll('tbody tr')].map(tr => { const c = tr.cells[0], cr = c.getBoundingClientRect(); return cr.right <= r.right + 1 && cr.left >= r.left - 1 && c.scrollWidth <= c.clientWidth + 1 && /Box B|This computer/.test((tr.querySelector('.dt-primary') || {}).title || ''); }) }; })()`);
+        await waitFor(`document.querySelectorAll('#saved-table tbody tr:not(.dt-group)').length >= 2`, 'the rows', 6000);
+        const gap = await ev(`(() => { const t = document.getElementById('saved-table'), r = t.getBoundingClientRect(); return { over: t.scrollWidth > t.clientWidth + 1, cells: [...t.querySelectorAll('tbody tr:not(.dt-group)')].map(tr => { const c = tr.cells[0], cr = c.getBoundingClientRect(); return cr.right <= r.right + 1 && cr.left >= r.left - 1 && c.scrollWidth <= c.clientWidth + 1 && /Box B|This computer/.test((tr.querySelector('.dt-primary') || {}).title || ''); }) }; })()`);
         assert.ok(!gap.over && gap.cells.length >= 2 && gap.cells.every(Boolean), 'at 200% text the rows are the one-cell mail rows (#9786), inside the panel, and each row\'s hover names its computer: ' + JSON.stringify(gap));
         await shot('saved-servers-phone-200');
         await ev(`document.documentElement.style.fontSize = ''; window.toggleAgenticPanel(false); true`);

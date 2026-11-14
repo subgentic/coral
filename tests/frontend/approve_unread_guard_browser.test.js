@@ -30,7 +30,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 3`, at + 'three review rows', 15000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 3`, at + 'three review rows', 15000);
             await ev(framesJs(4));
             await ev(`(() => { const st = document.createElement('style'); st.textContent = '*, *::before, *::after { transition: none !important; }'; document.head.append(st); return true; })()`);
             const modal = () => ev(`(() => { const m = document.getElementById('confirm-modal'); return m && getComputedStyle(m).display !== 'none' ? { title: document.getElementById('confirm-modal-title').textContent, yes: document.getElementById('confirm-modal-yes').textContent, no: document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)').textContent } : null; })()`);

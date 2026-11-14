@@ -9,7 +9,7 @@ const { coralReady } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const team = 'new-comments-' + Date.now().toString(36), failures = [];
-    const row = name => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r=>r.textContent.includes(${JSON.stringify(name)}))`;
+    const row = name => `[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(r=>r.textContent.includes(${JSON.stringify(name)}))`;
     const badge = () => ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`);
     const marker = name => ev(`!![...(${row(name)}).querySelectorAll('.inbox-new-comments')].find(t => /[1-9][0-9]* new comments?/.test(t.textContent))`);
     try {
@@ -62,7 +62,7 @@ const { coralReady } = require('./helpers/wait');
                 assert.ok(await marker('Replied file.txt'), 'its row says New comments');
                 assert.ok(!(await marker('Quiet file.txt')), 'a file with no news carries no marker');
                 assert.ok(await ev(`(() => { const r = ${row('Replied file.txt')}; return r.classList.contains('dt-unread') && !r.classList.contains('dt-read') && /unread/.test(r.querySelector('.inbox-review-item .sr-only').textContent); })()`), 'the row is unread again');
-                assert.equal(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].filter(r => /Replied file/.test(r.textContent)).length`), 1, 'one row, not a second item');
+                assert.equal(await ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].filter(r => /Replied file/.test(r.textContent)).length`), 1, 'one row, not a second item');
                 assert.equal(await ev(`(document.querySelector('#group-table-view .session-group-count') || {}).textContent`), '4', 'the heading agrees');
                 assert.ok(!(await ev(`window.__tagReads.includes('new comments')`)), 'the page asks for one list (for review), not a second one for news (#12097)');
                 // opening it at its thread clears it
@@ -94,8 +94,8 @@ const { coralReady } = require('./helpers/wait');
                 // a saved file's row says it too, and it is not counted (the Orchestrator's decision, #12026)
                 const before = await badge();
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('saved')).then(()=>true)`);
-                await waitFor(`[...document.querySelectorAll('.saved-files tbody tr')].some(r => /Saved file\\.txt/.test(r.textContent))`, 'the saved file listed', 10000);
-                assert.ok(await ev(`[...document.querySelectorAll('.saved-files tbody tr')].find(r => /Saved file\\.txt/.test(r.textContent)).textContent.includes('New comments')`), 'the saved file says New comments');
+                await waitFor(`[...document.querySelectorAll('.saved-files tbody tr:not(.dt-group)')].some(r => /Saved file\\.txt/.test(r.textContent))`, 'the saved file listed', 10000);
+                assert.ok(await ev(`[...document.querySelectorAll('.saved-files tbody tr:not(.dt-group)')].find(r => /Saved file\\.txt/.test(r.textContent)).textContent.includes('New comments')`), 'the saved file says New comments');
                 assert.equal(await badge(), before, 'and it is not counted');
                 console.log('PASS new comments marker ' + width);
             } catch (error) { failures.push(width + ': ' + error.message); console.error(failures.at(-1)); }

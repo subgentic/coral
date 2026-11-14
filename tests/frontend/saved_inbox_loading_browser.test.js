@@ -47,7 +47,7 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(new Set(shown.filter(f => f.k.stripTop !== null).map(f => f.k.stripTop)).size, 1, `${tag}: the chips do not move while the list loads`);
             assert.ok(new Set(shown.filter(f => f.k.searchTop !== null).map(f => f.k.searchTop)).size <= 1, `${tag}: the search does not move when the list arrives (${JSON.stringify([...new Set(shown.map(f => f.k.searchTop))])})`);
             assert.ok(slow.every(f => f.k.scrollTop === 0), `${tag}: the page does not scroll while it loads or after`);
-            assert.ok(await ev(`document.querySelectorAll('#group-table-view tbody tr').length >= 30`), `${tag}: the list fills in`);
+            assert.ok(await ev(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length >= 30`), `${tag}: the list fills in`);
             if (mobile) assert.equal(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), true, 'nothing scrolls sideways at 390');
         }
         // a list that cannot be read: the loading line is gone and the error is said (the screen does not say it is loading and that it failed)

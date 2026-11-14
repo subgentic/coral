@@ -30,7 +30,7 @@ const STUB = `(() => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const S = `(window.__coralStatic || '/static/')`;
     const settle = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: a redraw the trigger caused would have happened by now; only waiting shows that nothing moved
-    const ROWS = '#group-table-view tbody tr';
+    const ROWS = '#group-table-view tbody tr:not(.dt-group)';
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 900, false]]) {

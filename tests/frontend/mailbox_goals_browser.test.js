@@ -19,7 +19,7 @@ const { coralReady } = require('./helpers/wait');
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('goals')).then(() => true)`);
-        await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr').length >= 3`, 'the goals', 15000);
+        await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length >= 3`, 'the goals', 15000);
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -31,13 +31,13 @@ const { coralReady } = require('./helpers/wait');
 
         console.log('1. Desktop: the Goals folder');
         await open(1280, 800, false);
-        const d = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr')]; return { title: document.getElementById('group-table-title').textContent, heads: [...document.querySelectorAll('#group-table-view th')].map(h => h.textContent.replace(/[↑↓↕]/g, '').trim()),
+        const d = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')]; return { title: document.getElementById('group-table-title').textContent, heads: [...document.querySelectorAll('#group-table-view th')].map(h => h.textContent.replace(/[↑↓↕]/g, '').trim()),
             rows: rows.map(r => ({ goal: r.querySelector('.dt-primary').textContent, team: r.querySelector('td[data-key="team"]').textContent.trim(), chip: r.querySelector('.status-mark').textContent, shape: !!r.querySelector('.status-mark svg.status-shape'), progress: r.querySelector('td[data-key="progress"]').textContent.replace(/\\s+/g, ' ').trim() })),
             sidebar: [...document.querySelectorAll('.view-list-item')].map(${ROW_WORDS}).filter(t => /^(Needs you|Tasks|Goals|Saved)/.test(t)), goalsSoon: !!document.querySelector('.view-list-item[data-key="goals"].view-list-soon, .view-list-item[data-key="goals"][aria-disabled="true"]') }; })()`);
         assert.equal(d.title, 'Goals'); assert.deepEqual(d.heads, ['Goal', 'State', 'Team', 'Progress', 'Updated'], 'the team page\'s goal row plus a Team column, in the same order');
         assert.ok(d.rows.every(r => r.shape), 'each State is the status mark: a shape and its word ' + JSON.stringify(d.rows));
         await ev(`document.querySelector('#group-table-view .dt-sort[data-key="state"]').click(); true`); // sort still works on State (#15827)
-        await waitFor(`(() => { const w = [...document.querySelectorAll('#group-table-view .dt-table tbody tr .status-word')].map(e => e.textContent); return w.length >= 3 && w.every((x, i) => !i || w[i - 1].localeCompare(x) <= 0); })()`, 'the rows are in State order after the sort');
+        await waitFor(`(() => { const w = [...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group) .status-word')].map(e => e.textContent); return w.length >= 3 && w.every((x, i) => !i || w[i - 1].localeCompare(x) <= 0); })()`, 'the rows are in State order after the sort');
         for (const bw of [1280, 1024]) { // the table's default sizes (#9856): the goal's title is at least 24 characters and nothing scrolls sideways, at 1280 and at 1024
             await Emulation.setDeviceMetricsOverride({ width: bw, height: 800, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the table follows its box
             const z = await ev(SIZING('#group-table-view .dt-box', 'goal'));
@@ -51,20 +51,20 @@ const { coralReady } = require('./helpers/wait');
         assert.ok(d.sidebar.some(t => /^Goals\s*\d+$/.test(t)) && !d.goalsSoon, 'Goals is a folder in the sidebar with its count, not "soon" ' + JSON.stringify(d.sidebar));
         // the search narrows the folder
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => { m.filterInbox('notes'); return true; })`);
-        await waitFor(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr .dt-primary')].every(b => /notes/i.test(b.textContent)) && document.querySelectorAll('#group-table-view .dt-table tbody tr').length >= 1`, 'the search narrows the goals');
+        await waitFor(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group) .dt-primary')].every(b => /notes/i.test(b.textContent)) && document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length >= 1`, 'the search narrows the goals');
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => { m.filterInbox(''); return true; })`);
-        await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr').length >= 3`, 'all goals again');
+        await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length >= 3`, 'all goals again');
         // a click opens the goal on its team's page
-        await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr')].find(r => r.querySelector('.dt-primary').textContent === 'Plan the notes').click(); true`);
+        await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')].find(r => r.querySelector('.dt-primary').textContent === 'Plan the notes').click(); true`);
         await waitFor(`!!document.getElementById('goals-detail-title') && document.getElementById('goals-detail-title').textContent === 'Plan the notes'`, 'the goal opened on its team page', 12000);
         console.log('   ✓');
 
         console.log('2. Phone: the one-line row (#8960)');
         await open(390, 844, true);
         await waitFor(`!!document.querySelector('#group-table-view .dt-box.dt-one-line')`, 'a one-line table on a phone', 5000);
-        const p = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr')]; return { h: rows.map(r => Math.round(r.getBoundingClientRect().height)), over: document.documentElement.scrollWidth - innerWidth, head: getComputedStyle(document.querySelector('#group-table-view thead')).display }; })()`);
+        const p = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')]; return { h: rows.map(r => Math.round(r.getBoundingClientRect().height)), over: document.documentElement.scrollWidth - innerWidth, head: getComputedStyle(document.querySelector('#group-table-view thead')).display }; })()`);
         assert.equal(p.head, 'none', 'a phone\'s rows are mail rows (#9545): no column heads, and no Sort row (a mail list has none)'); assert.ok(p.h.every(h => h >= 44), '44 px rows ' + JSON.stringify(p.h)); assert.ok(p.over <= 1, 'no sideways scroll');
-        await ev(`document.querySelectorAll('#group-table-view .dt-table tbody tr .dt-primary').forEach((b, i) => b.setAttribute('data-axp', b.querySelector('.dt-mail-title')?.textContent === 'Ship the mailbox' ? 'with-tasks' : String(i))); true`);
+        await ev(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group) .dt-primary').forEach((b, i) => b.setAttribute('data-axp', b.querySelector('.dt-mail-title')?.textContent === 'Ship the mailbox' ? 'with-tasks' : String(i))); true`);
         // The first sorted goal can be Explore goals (no tasks, so its time/state is just Active).
         // Pin the goal with a known 0/3 rollup; never assume the first returned row has progress.
         const axn = await axName(client, '[data-axp="with-tasks"]'); assert.match(axn && axn.name, /^Ship the mailbox, Active, Active \u00b7 0\/3$/, `a goal's phone button is "<goal>, <state>, <time>" as Chrome computes it (its state is on the row's second line: #9747): ${axn && axn.name}`);

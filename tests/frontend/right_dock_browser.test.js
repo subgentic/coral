@@ -117,7 +117,7 @@ const BASE = require('./test_base').BASE;
         await ev(`switchNavTab('history'); import((window.__coralStatic || '/static/') + 'utils.js').then(u => { u.showView('history-session-view'); return true; })`); // a chat open under the Inbox (#7776): the Chats tab is gone, its page is the chat's
         await waitFor(`document.getElementById('agentic-state').dataset.page === 'chats'`, 'Chats');
         await ev(OPEN_INBOX_SAVED); // from Chats: the Saved page
-        await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && document.querySelectorAll('#group-table-view tbody tr').length === 1`, 'the Saved page with the item', 10000);
+        await waitFor(`(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })() && document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 1`, 'the Saved page with the item', 10000);
         await ev(`document.querySelector('#group-table-view tbody .dt-primary').click(); true`);
         await waitFor(`!!document.querySelector('#inbox-page .item-bar .btn-primary:not([disabled])')`, 'the message page', 8000);
         await ev(`document.querySelector('#inbox-page .item-bar .btn-primary').click(); true`);

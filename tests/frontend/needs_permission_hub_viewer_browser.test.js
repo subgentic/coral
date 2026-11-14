@@ -16,10 +16,10 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`import(${S} + 'server_access.js').then(m => Promise.all([m.serverAccess('m1'), m.serverAccess('m2')])).then(() => true)`); // the access answers are known before a row is opened
         await ev(`(async () => { const { state } = await import(${S} + 'state.js'); const m = await import(${S} + 'inbox_tab.js'); state.liveSessions = [${JSON.stringify(row('m1'))}, ${JSON.stringify(row('m2'))}]; m.updateInboxTab(); window.switchNavTab('hub-inbox'); await m.selectInboxTab('needs'); return true; })()`);
-        await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 2`, 'the two permission rows', 15000); await ev(framesJs(6));
+        await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length >= 2`, 'the two permission rows', 15000); await ev(framesJs(6));
         const can = await ev(`import(${S} + 'inbox_agent_card.js').then(m => [m.canOpenCard(${JSON.stringify(row('m1'))}), m.canOpenCard(${JSON.stringify(row('m2'))})])`);
         assert.deepEqual(can, [false, true], 'the view-only Laptop refuses the card, the Desktop allows it: ' + JSON.stringify(can));
-        const open = name => ev(`[...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes(${JSON.stringify(name)})).querySelector('.dt-primary').click(); true`);
+        const open = name => ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(r => r.textContent.includes(${JSON.stringify(name)})).querySelector('.dt-primary').click(); true`);
         await open('Laptop agent'); await ev(framesJs(8));
         assert.equal(await ev(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`), false, 'a view-only computer\'s permission row puts up no card dialog');
         await waitFor(`document.querySelector('.top-nav-tab.active')?.dataset.arg === 'agents'`, 'it opened the agent instead, as before', 8000);

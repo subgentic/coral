@@ -13,7 +13,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const S = `(window.__coralStatic || '/static/')`;
-    const rowsOf = () => ev(`[...document.querySelectorAll('.saved-files tbody tr')].map(r => (r.textContent.match(/plan-\\d/) || [''])[0])`);
+    const rowsOf = () => ev(`[...document.querySelectorAll('.saved-files tbody tr:not(.dt-group)')].map(r => (r.textContent.match(/plan-\\d/) || [''])[0])`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1440, 800, false], [390, 800, true]]) {
@@ -40,17 +40,17 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('saved')).then(() => true)`);
-            await waitFor(`!!document.querySelector('.saved-files') && document.querySelectorAll('.saved-files tbody tr').length === 2`, at + 'Saved lists the two files', 15000);
+            await waitFor(`!!document.querySelector('.saved-files') && document.querySelectorAll('.saved-files tbody tr:not(.dt-group)').length === 2`, at + 'Saved lists the two files', 15000);
             await ev(framesJs(4));
             if (!mobile) { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 5, y: 5 }); await ev(framesJs(3)); }
             // the row's actions: the same set and slots as a Needs you row
-            const shape = await ev(`(() => { const box = document.querySelector('.saved-files tbody tr .inbox-review-actions'), names = [...box.querySelectorAll('button')].map(b => (b.getAttribute('data-slot') || b.getAttribute('aria-label'))); return { slots: [...box.children].map(c => c.getAttribute('data-slot')).filter(Boolean), hover: !!box.closest('.inbox-actions-hover'), opacity: Number(getComputedStyle(box).opacity), names }; })()`);
+            const shape = await ev(`(() => { const box = document.querySelector('.saved-files tbody tr:not(.dt-group) .inbox-review-actions'), names = [...box.querySelectorAll('button')].map(b => (b.getAttribute('data-slot') || b.getAttribute('aria-label'))); return { slots: [...box.children].map(c => c.getAttribute('data-slot')).filter(Boolean), hover: !!box.closest('.inbox-actions-hover'), opacity: Number(getComputedStyle(box).opacity), names }; })()`);
             check(JSON.stringify(shape.slots) === JSON.stringify(mobile ? ['approve', 'changes', 'dots'] : ['approve', 'changes', 'dots'] /* option B (#12231): Deny and Dismiss are in the dots on every width */), at + 'the buttons are in Needs you\'s slots: ' + JSON.stringify(shape.slots));
             if (!mobile) {
                 check(!shape.hover && shape.opacity === 1, at + 'with a mouse the buttons are always shown, not only at the row\'s hover (Needs you\'s rule since #15120, #15162): ' + JSON.stringify([shape.hover, shape.opacity]));
-                const at1 = await ev(`(() => { const r = document.querySelector('.saved-files tbody tr').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+                const at1 = await ev(`(() => { const r = document.querySelector('.saved-files tbody tr:not(.dt-group)').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
                 await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: at1.x, y: at1.y }); await ev(framesJs(3));
-                check(await ev(`Number(getComputedStyle(document.querySelector('.saved-files tbody tr .inbox-review-actions')).opacity) === 1`), at + 'the buttons show while the row is hovered');
+                check(await ev(`Number(getComputedStyle(document.querySelector('.saved-files tbody tr:not(.dt-group) .inbox-review-actions')).opacity) === 1`), at + 'the buttons show while the row is hovered');
             }
             await shot(`saved-actions-${w}`);
             // the dots
@@ -62,13 +62,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
             // Dismiss: out of Saved, with a toast and Undo
             if (!mobile) await ev(`document.querySelector('.saved-files button[aria-label="Dismiss: plan-1.md"]').click(); true`);
             else { await ev(`document.querySelector('.saved-files button[aria-label="More actions for plan-1.md"]').click(); true`); await waitFor(`!!document.querySelector('.saved-files .menu-item[aria-label="Dismiss: plan-1.md"]')`, at + 'the dots have Dismiss', 5000); await ev(`document.querySelector('.saved-files .menu-item[aria-label="Dismiss: plan-1.md"]').click(); true`); }
-            await waitFor(`document.querySelectorAll('.saved-files tbody tr').length === 1`, at + 'the ignored file leaves Saved', 8000);
+            await waitFor(`document.querySelectorAll('.saved-files tbody tr:not(.dt-group)').length === 1`, at + 'the ignored file leaves Saved', 8000);
             check(JSON.stringify(await rowsOf()) === JSON.stringify(['plan-2']), at + 'the other stays: ' + JSON.stringify(await rowsOf()));
             let calls = await ev(`window.__calls`);
             check(calls.length === 1 && calls[0].path.endsWith('/review') && calls[0].body.decision === 'ignore', at + 'one decision, "ignore", and nothing else was posted: ' + JSON.stringify(calls));
             await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Dismissed: plan-1\\.md/.test(t.textContent) && [...t.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo'))`, at + 'a toast says it, with Undo', 8000);
             await ev(`[...document.querySelectorAll('.toast')].find(t => /Dismissed: plan-1\\.md/.test(t.textContent)).querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); }); true`);
-            await waitFor(`document.querySelectorAll('.saved-files tbody tr').length === 2`, at + 'Undo brings it back to Saved', 8000);
+            await waitFor(`document.querySelectorAll('.saved-files tbody tr:not(.dt-group)').length === 2`, at + 'Undo brings it back to Saved', 8000);
             calls = await ev(`window.__calls`);
             check(calls.length === 2 && calls[1].body.decision === 'unignore', at + 'Undo is one "unignore": ' + JSON.stringify(calls));
             // A read already in flight when Undo lands (the no-team read is slow, #13601): its team list was taken before the Undo's write, so it must not be the answer Saved shows
@@ -76,11 +76,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`document.querySelector('.saved-files button[aria-label="More actions for plan-1.md"]').click(); true`);
             await waitFor(`!!document.querySelector('.saved-files .menu-item[aria-label="Dismiss: plan-1.md"]')`, at + 'the dots have Dismiss (second time)', 5000);
             await ev(`document.querySelector('.saved-files .menu-item[aria-label="Dismiss: plan-1.md"]').click(); true`);
-            await waitFor(`document.querySelectorAll('.saved-files tbody tr').length === 1`, at + 'the second Dismiss leaves Saved', 8000);
+            await waitFor(`document.querySelectorAll('.saved-files tbody tr:not(.dt-group)').length === 1`, at + 'the second Dismiss leaves Saved', 8000);
             await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Dismissed: plan-1\\.md/.test(t.textContent) && [...t.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo'))`, at + 'the second toast, with Undo', 8000);
             await ev(`import(${S} + 'inbox_reviews.js').then(m => { window.__inFlight = m.refreshReviews(true); return true; })`); // a refresh starts now and is held by the slow read
             await ev(`[...document.querySelectorAll('.toast')].filter(t => /Dismissed: plan-1\\.md/.test(t.textContent)).forEach(t => t.querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); })); true`);
-            await waitFor(`document.querySelectorAll('.saved-files tbody tr').length === 2`, at + 'Undo during a read in flight still brings it back to Saved', 8000);
+            await waitFor(`document.querySelectorAll('.saved-files tbody tr:not(.dt-group)').length === 2`, at + 'Undo during a read in flight still brings it back to Saved', 8000);
             await ev(`window.__ntDelay = 0; window.__inFlight.then(() => true)`);
             await removeBoards(ev, [team]).catch(() => {});
         }

@@ -27,7 +27,7 @@ const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a te
                         window.__asks = window.__asks.filter(a => !(body.content.startsWith('@' + a.asker + ' ') && (a.kind === 'wait' || body.reply_to === a.id))); return json({ id: 99 }); }
                     return orig(u, o); }; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, at + 'three rows of Needs you', 10000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 3`, at + 'three rows of Needs you', 10000);
             const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
             // the long question
             await ev(`document.querySelector('button[aria-label="Answer the question of Orchestrator"]').click(); true`);

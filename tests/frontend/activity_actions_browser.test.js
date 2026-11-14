@@ -26,7 +26,7 @@ const BASE = require('./test_base').BASE;
                 window.switchNavTab('hub-inbox');
                 await (await import(prefix+'inbox_sidebar.js')).openInboxGroup('activity');
             })()`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length===window.__activityRows.length`,'all recorded actions');
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length===window.__activityRows.length`,'all recorded actions');
             if(process.env.CORAL_SCREENSHOT_DIR){fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/activity-actions-'+width+'.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
             const words=await ev(`document.querySelector('#group-table-view').textContent`);
             assert.ok(!words.includes('__oneshot__'),'internal one-off name is never shown');

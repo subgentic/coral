@@ -36,14 +36,14 @@ const { coralReady } = require('./helpers/wait');
                 assert.equal(await ev(`!!document.querySelector('#group-table-view iframe')`), false, at + 'no frame');
                 assert.equal(await ev(`(() => { const i = document.querySelector('.sidebar-search input'); return !!i && !i.disabled; })()`), true, at + 'its own search box is on');
                 // the agents' questions are read by the page itself from each online computer through the Hub (stubbed at page start below), shown as rows; Dismiss posts to the close route the Hub now offers; a refusal is said on the row
-                await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr')].some(r => /rename the folder/.test(r.textContent))`, at + "the agents' question is a row of the table (read through the Hub)", 15000);
+                await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].some(r => /rename the folder/.test(r.textContent))`, at + "the agents' question is a row of the table (read through the Hub)", 15000);
                 await ev(`document.querySelector('#group-table-view button[aria-label^="Dismiss the question of"]').click(); true`);
                 await waitFor(`window.__closes.length === 1`, at + 'Dismiss posts to the close route', 10000);
                 const sent = await ev(`window.__closes[0]`);
                 assert.equal(sent.id, '7', at + 'the first question was closed');
                 assert.deepEqual(JSON.parse(sent.body), { note: 'Dismissed by the operator' }, at + 'with the fixed note');
                 await ev(`window.__closeStatus = 403; true`); // the page read the list again itself after the first close
-                await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr')].some(r => /test server/.test(r.textContent))`, at + 'the second question', 10000);
+                await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].some(r => /test server/.test(r.textContent))`, at + 'the second question', 10000);
                 await ev(`document.querySelector('#group-table-view button[aria-label^="Dismiss the question of"]').click(); true`);
                 await waitFor(`/Could not save \\(HTTP 403\\)|owner_only/.test(document.querySelector('#group-table-view .inbox-review-error')?.textContent || '')`, at + 'a refused close is said on the row', 10000);
             }

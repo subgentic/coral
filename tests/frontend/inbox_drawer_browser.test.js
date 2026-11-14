@@ -25,7 +25,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(INBOX_WORLD);
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} .dt-table tbody tr').length === 3 && document.querySelector('${T}').getClientRects().length > 0`, at + 'the three tasks', 10000);
+            await waitFor(`document.querySelectorAll('${T} .dt-table tbody tr:not(.dt-group)').length === 3 && document.querySelector('${T}').getClientRects().length > 0`, at + 'the three tasks', 10000);
             let s = await state();
             if (!mobile) {
                 assert.ok(!s.trigger && !s.select && s.nav && !s.scrim, at + 'a desktop shows the column, no button and no select ' + JSON.stringify(s));

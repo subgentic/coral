@@ -30,10 +30,10 @@ const STUB = `(() => {
             await ev(`localStorage.removeItem('coral.inbox.tab'); localStorage.removeItem('coral-team-artifacts-filters:@inbox'); ${STUB}`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_sidebar.js').then(m => m.openInboxGroup('artifacts')).then(() => true)`);
-            await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:artifacts' && document.querySelectorAll('#group-table-view tbody tr').length >= 30 && document.querySelectorAll('#group-table-view tbody .dt-primary').length >= 2`, at + 'the rows', 10000);
+            await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:artifacts' && document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length >= 30 && document.querySelectorAll('#group-table-view tbody .dt-primary').length >= 2`, at + 'the rows', 10000);
             await new Promise(r => setTimeout(r, 600)); // sleep-ok: the count read the opening starts settles first
             // watch the table, then let a changed count arrive
-            await ev(`(() => { const host = document.getElementById('group-table-view'); window.__row0 = host.querySelector('tbody tr'); window.__n0 = host.querySelectorAll('tbody tr').length; window.__changes = 0;
+            await ev(`(() => { const host = document.getElementById('group-table-view'); window.__row0 = host.querySelector('tbody tr:not(.dt-group)'); window.__n0 = host.querySelectorAll('tbody tr:not(.dt-group)').length; window.__changes = 0;
                 new MutationObserver(list => { for (const m of list) if (m.type === 'childList' && [...m.addedNodes, ...m.removedNodes].some(n => n.nodeType === 1 && (n.matches('tr, tbody, table') || n.querySelector && n.querySelector('tr')))) window.__changes++; }).observe(host, { childList: true, subtree: true });
                 const real = Date.now.bind(Date); Date.now = () => real() + 60000; window.__all = 77; return true; })()`);
             // the count is read and told to the sidebar (its callback runs as the number is set); on a phone the folder list is a select, so what is checked is the number the module holds and, below, the table
@@ -43,7 +43,7 @@ const STUB = `(() => {
             // too, and they were part of what told the page to rebuild, so the rows were drawn again a moment later, when something else redrew the Inbox
             await ev(`import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return true; })`);
             await new Promise(r => setTimeout(r, 400)); // sleep-ok: a redraw that follows would have happened by now
-            const r = await ev(`(() => { const host = document.getElementById('group-table-view'); return { same: host.querySelector('tbody tr') === window.__row0, n: host.querySelectorAll('tbody tr').length, n0: window.__n0, changes: window.__changes }; })()`);
+            const r = await ev(`(() => { const host = document.getElementById('group-table-view'); return { same: host.querySelector('tbody tr:not(.dt-group)') === window.__row0, n: host.querySelectorAll('tbody tr:not(.dt-group)').length, n0: window.__n0, changes: window.__changes }; })()`);
             assert.ok(r.same, at + 'the first row is the same element: the table was not built again: ' + JSON.stringify(r));
             assert.equal(r.changes, 0, at + 'nothing was added to or taken from the table when the count arrived: ' + JSON.stringify(r));
             assert.equal(r.n, r.n0, at + 'the same rows: ' + JSON.stringify(r));

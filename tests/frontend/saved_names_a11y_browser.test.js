@@ -19,7 +19,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(INBOX_WORLD);
             await ev(`localStorage.setItem('coral.inbox.tab', 'saved'); window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('saved')).then(() => true)`); // a phone opens on the list: the group's name opens its table
-            await waitFor(`document.getElementById('group-table-view').getClientRects().length > 0 && document.querySelectorAll('#group-table-view tbody tr').length === 4`, `${tag}: four saved items`, 10000);
+            await waitFor(`document.getElementById('group-table-view').getClientRects().length > 0 && document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 4`, `${tag}: four saved items`, 10000);
             const btnNames = sel => ev(`[...document.querySelectorAll(${JSON.stringify(sel)})].map(b => ({ name: (b.getAttribute('aria-label') || b.textContent).replace(/\\s+/g, ' ').trim(), visible: [...b.childNodes].filter(n => !(n.classList && n.classList.contains('material-icons'))).map(n => n.textContent).join('').replace(/\\s+/g, ' ').trim() }))`);
             const names = async () => [await btnNames('#group-table-view tbody button')]; // the rows' links and their Done buttons
             const words = x => x.toLowerCase().replace(/[,·.:;…]/g, ' ').replace(/\s+/g, ' ').trim(); // the words, not the punctuation a name puts between them
@@ -36,14 +36,14 @@ const { coralReady } = require('./helpers/wait');
             const page = async () => [await btnNames('#inbox-page .item-bar button, #inbox-page .item-bar .btn')];
             check(await page(), 'a message page');
             await ev(`document.querySelector('#inbox-page .back-link:not(.inbox-phone-back)').click(); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 4`, `${tag}: back at the table`, 8000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 4`, `${tag}: back at the table`, 8000);
             // two items from one source that start alike are named apart, and a cut at 40 characters never leaves half an emoji
             // fixed times, so the list's own order (newest saved first) does not depend on the clock
             await ev(`(() => { const real = window.fetch; const mk = (id, snippet) => ({ id, kind: 'agent', ref: 'sess-same', key: String(id).padStart(20, '0'), title: 'Same Agent', snippet, agent_type: 'claude', saved_at: '2026-10-23T10:0' + (9 - (id - 20)) + ':00Z', said_at: '2026-10-23T09:00:00Z' });
                 const items = [mk(21, 'The same first words'), mk(22, 'The same first words'), mk(23, 'x'.repeat(39) + '\u{1F600} and then more words after it')];
                 window.fetch = (u, o = {}) => new URL(String(u), location.origin).pathname === '/api/saved' && (o.method || 'GET').toUpperCase() === 'GET' ? Promise.resolve(new Response(JSON.stringify({ items, open: 3, done: 0 }), { status: 200, headers: { 'content-type': 'application/json' } })) : real(u, o); return true; })()`);
             await ev(`import((window.__coralStatic || '/static/') + 'saved.js').then(m => m.loadSaved()).then(() => true)`); // the list is read again
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, `${tag}: the three items`, 10000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 3`, `${tag}: the three items`, 10000);
             check(await names(), 'two that start alike');
             const lone = await ev(`[...document.querySelectorAll('#group-table-view .dt-quiet, #group-table-view .dt-mail-open[data-row-name]')].map(b => b.dataset.rowName || b.getAttribute('aria-label'))`); // a phone's Saved rows are mail rows with no Done column (#9583): the row's own name is what tells the pair apart
             // told apart by what the names say, not by where the list put them

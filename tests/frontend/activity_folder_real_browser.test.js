@@ -50,7 +50,7 @@ const HEX = 'c'.repeat(64);
 
         console.log('1. The folder lists what was done, to what, where, from where; the check is said above it');
         await openFolder(false);
-        const mine = `[...document.querySelectorAll('#group-table-view tbody tr')].filter(r => r.textContent.includes(${JSON.stringify(FIRST)}) || r.textContent.includes(${JSON.stringify(SECOND)}))`; // only this run's goals' rows
+        const mine = `[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].filter(r => r.textContent.includes(${JSON.stringify(FIRST)}) || r.textContent.includes(${JSON.stringify(SECOND)}))`; // only this run's goals' rows
         await waitFor(`${mine}.length === 4`, 'this run\'s four rows (each goal is created and then closed: a row for each, #13609)', 10000);
         const t = await ev(`document.getElementById('group-table-view').textContent.replace(/\\s+/g, ' ')`);
         assert.match(t, /Closed/); assert.match(t, /Created/); // the verb is YOU DID, the goal is ON (#14423) assert.ok(t.includes(SECOND) && t.includes(FIRST), 'both of this run\'s goals are listed');
@@ -60,7 +60,7 @@ const HEX = 'c'.repeat(64);
         const checkText = await ev(`document.querySelector('.activity-check').textContent`); // the record's whole count is the shard's, not this run's: only what the line says is checked, never the number
         assert.match(checkText, /^\d+ actions in the record, none changed outside Coral\. Edits made outside Coral are shown unless the whole record was rewritten\.$/);
         assert.equal(await ev(`document.querySelector('.activity-check').getAttribute('role')`), 'status');
-        assert.match(await ev(`document.querySelector('#group-table-view tbody tr').textContent`), new RegExp(SECOND), 'newest first');
+        assert.match(await ev(`document.querySelector('#group-table-view tbody tr:not(.dt-group)').textContent`), new RegExp(SECOND), 'newest first');
         console.log('   ✓');
 
         console.log('1b. The On column keeps its floor at every width: From and Team go before it shrinks (R2 of the table rules)');
@@ -78,14 +78,14 @@ const HEX = 'c'.repeat(64);
 
         console.log('2. The sidebar search narrows the rows');
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.filterInbox(${JSON.stringify(FIRST)})).then(() => true)`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'the two rows of that goal (created, closed)', 8000);
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => (((r.querySelector('td[data-key="action"]') || r).textContent.trim() === 'Closed') ? 'close' : ((r.querySelector('td[data-key="action"]') || r).textContent.trim() === 'Created') ? 'create' : '?')).sort()`), ['close', 'create'], 'the search keeps both of the goal\'s rows');
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2`, 'the two rows of that goal (created, closed)', 8000);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].map(r => (((r.querySelector('td[data-key="action"]') || r).textContent.trim() === 'Closed') ? 'close' : ((r.querySelector('td[data-key="action"]') || r).textContent.trim() === 'Created') ? 'create' : '?')).sort()`), ['close', 'create'], 'the search keeps both of the goal\'s rows');
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.filterInbox('')).then(() => true)`);
         await waitFor(`${mine}.length === 4`, 'this run\'s four rows again', 8000);
         console.log('   ✓');
 
         console.log('3. A goal row opens the goal');
-        await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.textContent.includes(${JSON.stringify(FIRST)})).querySelector('.dt-primary').click(); true`);
+        await ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(r => r.textContent.includes(${JSON.stringify(FIRST)})).querySelector('.dt-primary').click(); true`);
         await waitFor(`document.getElementById('goals-detail-title')?.textContent === ${JSON.stringify(FIRST)}`, 'the goal page', 15000);
         console.log('   ✓');
 
@@ -93,9 +93,9 @@ const HEX = 'c'.repeat(64);
         await load();
         await ev(`(() => { const real = window.fetch; window.fetch = (u, o) => String(u).startsWith('/api/activity') ? Promise.resolve(new Response(JSON.stringify({ actions: [{ id: 9, at: new Date().toISOString(), actor: 'local', action: 'approve', item_kind: 'file', item_id: '${HEX}', version: '${HEX}', team: '${B}', source: 'local', hint: 'phone', title: 'plan.md', note: '' }], check: { rows: 1, intact: true, note: 'Edits made outside Coral are shown unless the whole record was rewritten.' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : real(u, o); return true; })()`);
         await openFolder(false);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, 'the stubbed row', 10000);
-        assert.match(await ev(`document.querySelector('#group-table-view tbody tr').textContent`), /Approved.*plan\.md.*this computer, phone \(reported by the page\)/s);
-        await ev(`document.querySelector('#group-table-view tbody tr .dt-primary').click(); true`);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 1`, 'the stubbed row', 10000);
+        assert.match(await ev(`document.querySelector('#group-table-view tbody tr:not(.dt-group)').textContent`), /Approved.*plan\.md.*this computer, phone \(reported by the page\)/s);
+        await ev(`document.querySelector('#group-table-view tbody tr:not(.dt-group) .dt-primary').click(); true`);
         // an approved file opens its decision dialog (#15792); Open file is the way to the viewer
         await waitFor(`!!document.querySelector('dialog.activity-file-dialog[open]')`, 'the file decision dialog', 10000);
         await ev(`[...document.querySelectorAll('.activity-file-dialog .btn')].find(b => b.textContent.trim() === 'Open file').click(); true`);
@@ -130,7 +130,7 @@ const HEX = 'c'.repeat(64);
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await load();
         await openFolder(true);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 2`, 'rows on a phone', 10000);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length >= 2`, 'rows on a phone', 10000);
         assert.equal(await ev(`document.documentElement.scrollWidth <= window.innerWidth + 1`), true, 'no sideways scroll');
         console.log('   ✓');
         console.log('PASS activity folder: rows, the check, search, a goal and a file opening, a broken record said, a phone');

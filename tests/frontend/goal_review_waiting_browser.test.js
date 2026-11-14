@@ -47,8 +47,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await ev(`import(${S} + 'needs_filters.js').then(m => { m.saveFilters({ ...m.EMPTY, kind: 'review', sort: 'oldest' }); return true; })`);
             const savedBefore = await ev(`localStorage.getItem('coral-inbox-needs-filters')`);
             await ev(`document.querySelector('.goal-reviews-link').click(); true`);
-            await waitFor(`document.body.dataset.navTab === 'hub-inbox' && document.querySelectorAll('#group-table-view tbody tr').length === 3`, at + 'Needs you shows this goal\'s three files', 15000);
-            assert.ok(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].every(r => /file-[123]\\.md/.test(r.textContent))`), at + 'and only those');
+            await waitFor(`document.body.dataset.navTab === 'hub-inbox' && document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 3`, at + 'Needs you shows this goal\'s three files', 15000);
+            assert.ok(await ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].every(r => /file-[123]\\.md/.test(r.textContent))`), at + 'and only those');
             assert.equal(await ev(`localStorage.getItem('coral-inbox-needs-filters')`), savedBefore, at + 'Review them did not overwrite the person\'s saved Needs you filters: ' + savedBefore);
             // a goal with no files waiting: no warning, no line
             await load(`/team/${B}/goals/${G3}`);

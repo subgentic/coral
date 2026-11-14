@@ -24,7 +24,7 @@ const { coralReady } = require('./helpers/wait');
                     if (/^\\/api\\/board\\/[^/]+\\/messages$/.test(url) && o && o.method === 'POST') { const body = JSON.parse(o.body); window.__posts.push(body); window.__asks = []; return json({ id: 99 }); }
                     return orig(u, o); }; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 1`, `${tag}: a row of Needs you`, 10000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length >= 1`, `${tag}: a row of Needs you`, 10000);
             await ev(`document.querySelector('button[aria-label="Answer the question of Orchestrator"]').click(); true`);
             await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]') && !!document.querySelector('dialog.inbox-ask-dialog .ac-add-image')`, `${tag}: the dialog with Add image`, 8000);
             const refs = await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-text .msg-ref')].map(b => { const r = b.getBoundingClientRect(); return { id: b.dataset.message, text: b.textContent, label: b.getAttribute('aria-label'), h: Math.round(r.height), w: Math.round(r.width) }; })`);

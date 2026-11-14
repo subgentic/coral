@@ -22,9 +22,9 @@ const { coralReady } = require('./helpers/wait');
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
             for (const tab of ['tasks', 'saved']) {
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('${tab}')).then(() => true)`);
-                await waitFor(`document.querySelectorAll('.dt-table tbody tr .dt-primary').length >= 2`, `${tag} ${tab}: rows`, 8000); await waitFor(`!!document.querySelector('.dt-table tbody tr .dt-primary')`, 'row', 4000);
-                await ev(`document.querySelectorAll('.dt-table tbody tr .dt-primary')[1].focus(); true`); const before = await active();
-                await key('Enter'); await waitFor(`!document.querySelector('.dt-table tbody tr .dt-primary') || document.activeElement !== document.querySelector('.dt-table tbody tr .dt-primary')`, `${tag} ${tab}: the item opens`, 6000);
+                await waitFor(`document.querySelectorAll('.dt-table tbody tr:not(.dt-group) .dt-primary').length >= 2`, `${tag} ${tab}: rows`, 8000); await waitFor(`!!document.querySelector('.dt-table tbody tr:not(.dt-group) .dt-primary')`, 'row', 4000);
+                await ev(`document.querySelectorAll('.dt-table tbody tr:not(.dt-group) .dt-primary')[1].focus(); true`); const before = await active();
+                await key('Enter'); await waitFor(`!document.querySelector('.dt-table tbody tr:not(.dt-group) .dt-primary') || document.activeElement !== document.querySelector('.dt-table tbody tr:not(.dt-group) .dt-primary')`, `${tag} ${tab}: the item opens`, 6000);
                 const inside = await active(); check(inside && inside.visible && !/dt-primary|dt-mail-open/.test(inside.cls), `${tag} ${tab}: Enter puts focus inside the item, visible: ${JSON.stringify(inside)}`);
                 await key('Escape'); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the list redraws
                 const back = await active(); check(back && back.visible && back.text === before.text, `${tag} ${tab}: Escape puts focus back on the row it came from (${JSON.stringify(before.text)}): ${JSON.stringify(back)}`);

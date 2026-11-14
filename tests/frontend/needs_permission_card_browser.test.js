@@ -17,7 +17,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
     const TRUST = { title: 'Do you trust the files in this folder?', question: 'Do you trust the files in this folder?\nOnly continue for a folder you made or got from someone you trust.', target: '/home/me/Coral/team-a', unnumbered: true, ask_id: 'ask1', options: [{ n: 1, label: 'Yes, I trust this folder', action: 'select' }, { n: 2, label: 'No, exit', action: 'select' }] };
     const setCard = po => ev(`window.__card = ${JSON.stringify(po)}; window.__reads = 0; window.__posts = []; true`);
     const dialog = () => ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog[open]'); return d ? { title: d.querySelector('#inbox-card-title').textContent, text: d.textContent.replace(/\\s+/g, ' '), buttons: [...d.querySelectorAll('.inbox-ask-offers-list button')].map(b => b.textContent), err: (d.querySelector('.inbox-ask-error') || {}).textContent || '' } : null; })()`);
-    const openRow = async () => { await ev(`document.querySelector('${T} tbody tr .dt-primary').click(); true`); await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open] .inbox-card-body > *')`, 'the card dialog', 8000); };
+    const openRow = async () => { await ev(`document.querySelector('${T} tbody tr:not(.dt-group) .dt-primary').click(); true`); await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open] .inbox-card-body > *')`, 'the card dialog', 8000); };
     const closeDialog = () => ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog[open] .inbox-ask-buttons button')].find(b => b.textContent === 'Close')?.click(); true`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -35,9 +35,9 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 return true; })()`);
             await setCard(TRUST);
             await ev(`(async () => { const { state } = await import(${S} + 'state.js'); const m = await import(${S} + 'inbox_tab.js'); state.liveSessions = [${JSON.stringify(AGENT)}]; m.updateInboxTab(); window.switchNavTab('hub-inbox'); await m.selectInboxTab('needs'); return true; })()`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 1`, at + 'the permission row', 15000); await ev(framesJs(6));
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length >= 1`, at + 'the permission row', 15000); await ev(framesJs(6));
             // the row offers no trust button; Open stays in the Inbox and shows the whole card
-            check(!(await ev(`[...document.querySelectorAll('${T} tbody tr .inbox-answer')].some(b => /trust/i.test(b.textContent))`)), at + 'the row itself never offers "trust this folder"');
+            check(!(await ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group) .inbox-answer')].some(b => /trust/i.test(b.textContent))`)), at + 'the row itself never offers "trust this folder"');
             await openRow();
             let d = await dialog();
             check(await ev(`document.body.dataset.navTab`) === 'hub-inbox', at + 'Open leaves you in the Inbox');

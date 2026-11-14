@@ -29,21 +29,21 @@ const B = 'tasks-opener-spent-' + Date.now().toString(36);
             await Emulation.setDeviceMetricsOverride({ width: w, height: 420, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await openFolder('tasks');
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 12`, at + 'the twelve tasks are listed', 20000);
-            const SCROLLER = `(() => { const tr = document.querySelector('${T} tbody tr'); for (let e = tr; e; e = e.parentElement) { const o = getComputedStyle(e).overflowY; if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight + 2) return e; } return document.scrollingElement; })()`;
-            const rows = `[...document.querySelectorAll('${T} tbody tr')]`;
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length >= 12`, at + 'the twelve tasks are listed', 20000);
+            const SCROLLER = `(() => { const tr = document.querySelector('${T} tbody tr:not(.dt-group)'); for (let e = tr; e; e = e.parentElement) { const o = getComputedStyle(e).overflowY; if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight + 2) return e; } return document.scrollingElement; })()`;
+            const rows = `[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')]`;
             const top = await holdScroll(ev, SCROLLER, `${rows}.slice(-3)[0]`);
             const pos = await ev(`(() => { const tr = ${rows}.slice(-3)[0], el = tr.querySelector('.dt-primary') || tr, r = el.getBoundingClientRect(); return { x: r.left + Math.min(r.width / 2, 20), y: r.top + r.height / 2, name: (tr.textContent.match(/Task number \\d+/) || [''])[0] }; })()`);
             assert.ok(top > 100 && pos.name, at + 'the list is scrolled down and holds it: ' + JSON.stringify({ top, pos }));
             for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await client.Input.dispatchMouseEvent({ type, x: pos.x, y: pos.y, button: type === 'mouseMoved' ? 'none' : 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: type === 'mouseMoved' ? 0 : 1 });
             await waitFor(`/^\\/inbox\\/tasks\\/.+/.test(location.pathname)`, at + 'the task opened by a real click (its own route)', 10000);
             await ev(`history.back(); true`);
-            await waitFor(`/^\\/inbox\\/tasks\\/?$/.test(location.pathname) && document.querySelectorAll('${T} tbody tr').length >= 12`, at + 'back on the Tasks list', 10000);
+            await waitFor(`/^\\/inbox\\/tasks\\/?$/.test(location.pathname) && document.querySelectorAll('${T} tbody tr:not(.dt-group)').length >= 12`, at + 'back on the Tasks list', 10000);
             await frames(ev, 90); // the restore holds the list's place for 60 frames, then lets go
             // the opener is spent: another folder and then Tasks again (a fresh open) starts at the top, no old row holds the focus
             await openFolder('goals'); await frames(ev, 20);
             await openFolder('tasks');
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 12`, at + 'Tasks opened afresh', 15000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length >= 12`, at + 'Tasks opened afresh', 15000);
             const seen = [];
             for (let i = 0; i < 6; i++) { await frames(ev, 12); seen.push(await ev(`(() => { const a = document.activeElement, tr = a && a.closest && a.closest('tr[data-key]'); return { top: Math.round(${SCROLLER}.scrollTop), focusRow: tr ? ((tr.textContent.match(/Task number \\d+/) || [''])[0] || tr.dataset.key) : '' }; })()`)); }
             assert.ok(seen.every(s => s.top <= 40), at + 'a fresh open of Tasks starts at the top, it is not thrown back to the old offset ' + top + ': ' + JSON.stringify(seen));

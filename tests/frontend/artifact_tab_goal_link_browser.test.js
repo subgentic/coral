@@ -25,9 +25,9 @@ const ITEMS = [art('a', 'with-goal.md', { task_id: 7, task_title: 'A task', goal
             await waitFor(`document.querySelectorAll('.view-list-item').length > 3 || !!document.querySelector('.view-list select')`, at + 'the folders', 10000);
             if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); s.value = 'artifacts'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             else await ev(`document.querySelector('.view-list-item[data-key="artifacts"]').click(); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr .dt-primary').length >= 2`, at + 'the rows', 10000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group) .dt-primary').length >= 2`, at + 'the rows', 10000);
             for (const [name, goal] of [['with-goal.md', 'Ship the beta'], ['no-goal.md', '']]) {
-                await ev(`[...document.querySelectorAll('#group-table-view tbody tr .dt-primary')].find(e => e.textContent.includes(${JSON.stringify(name)})).click(); true`);
+                await ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group) .dt-primary')].find(e => e.textContent.includes(${JSON.stringify(name)})).click(); true`);
                 await waitFor(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Open' && b.getClientRects().length)`, at + name + ' sheet has Open', 8000);
                 await ev(`[...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Open' && b.getClientRects().length).click(); true`);
                 await waitFor(`!!document.querySelector('.artifact-viewer:not([hidden])') && document.querySelector('.artifact-viewer-title').textContent.includes(${JSON.stringify(name)})`, at + name + ' viewer', 8000);

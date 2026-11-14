@@ -25,7 +25,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
                     if (m && o && o.method === 'POST') { const body = JSON.parse(o.body); window.__closes.push({ board: m[1], id: Number(m[2]), body }); if (window.__refuse) return json({ error: window.__refuse }, 409); if (body.undo) window.__asks.push({ board: 'team', board_label: 'Sprout', kind: 'ask', id: 42, asker: 'Dev', text: '@Operator may I delete the old table?', at: new Date().toISOString() }); else window.__asks = window.__asks.filter(a => !(a.kind === 'ask' && a.id === Number(m[2]))); return json({ ok: true }); }
                     return orig(u, o); }; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'the question and the wait', 10000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2`, at + 'the question and the wait', 10000);
             const open = who => ev(`document.querySelector('button[aria-label="Answer the question of ${who}"]').click(); true`);
             const dismissIn = () => ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog[open]'); const b = d && [...d.querySelectorAll('.inbox-ask-buttons button')].find(x => x.textContent.trim() === 'Dismiss'); return b ? { text: b.textContent.trim(), h: Math.round(b.getBoundingClientRect().height), order: [...d.querySelectorAll('.inbox-ask-buttons button')].map(x => x.textContent.trim()) } : null; })()`);
 
@@ -57,9 +57,9 @@ const { coralReady, framesJs } = require('./helpers/wait');
             const c = await ev(`window.__closes[1]`);
             check(at + 'the close is the board route with the fixed note and nothing else', c.board === 'team' && c.id === 42 && JSON.stringify(c.body) === JSON.stringify({ note: 'Dismissed by the operator' }), JSON.stringify(c));
             await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Dismissed/.test(t.textContent) && [...t.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo'))`, at + 'a toast says it, with Undo', 4000);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'the question leaves Needs you', 6000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 1`, at + 'the question leaves Needs you', 6000);
             await ev(`[...document.querySelectorAll('.toast')].find(t => /Dismissed/.test(t.textContent)).querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); }); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'Undo brings the question back', 6000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2`, at + 'Undo brings the question back', 6000);
             check(at + 'the question is back in Needs you after Undo', await ev(`!!document.querySelector('button[aria-label="Answer the question of Dev"]')`));
         }
     } finally { await client.close(); }

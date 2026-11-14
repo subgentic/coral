@@ -51,7 +51,7 @@ async function httpJson(method, path, body, headers = {}) {
             await ev(`(()=>{const original=window.fetch;window.__maskAskButtons=true;window.fetch=async(u,o)=>{const mask=window.__maskAskButtons&&new URL(String(u),location.href).pathname==='/api/operator-asks',r=await original(u,o);if(!mask||!r.ok)return r;const rows=await r.json();for(const a of rows)if(a.id===${binary})delete a.buttons;return Response.json(rows);};return true;})()`);
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => import(${S} + 'inbox_tab.js')).then(m => m.selectInboxTab('needs')).then(() => true)`);
             await ev(`window.__maskAskButtons=false;true`);
-            const row = `[...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.textContent.includes('(yes-no)'))`;
+            const row = `[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(r => r.textContent.includes('(yes-no)'))`;
             await waitFor(`!!(${row})`, width + ': explicit question in phone/desktop list', 15000);
             if(width===390) await ev(`(${row}).querySelector('.inbox-review-name').click();true`);
             else if(width===320) await ev(`import(${S}+'inbox_link.js').then(m=>m.openNeed({kind:'ask',server:'',team:'${B}',id:'${binary}'})).then(()=>true)`);
@@ -154,7 +154,7 @@ async function httpJson(method, path, body, headers = {}) {
         assert.equal(upload.status, 201, JSON.stringify(upload));
         const documentQuestion = await ask('@Operator Read the design before deciding (document review)', [`Open document=open:artifact:${upload.data.id}`, 'Build the design=reply']);
         await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => import(${S} + 'inbox_tab.js')).then(m => m.selectInboxTab('needs')).then(() => true)`);
-        const documentRow = `[...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.textContent.includes('(document review)'))`;
+        const documentRow = `[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(r => r.textContent.includes('(document review)'))`;
         await waitFor(`!!(${documentRow})`, 'the document question in Needs you', 15000);
         await ev(`(() => { const original = window.fetch; window.__askRefreshes = 0; window.__buttonSettles = 0; window.fetch = async function(u, ...args) { const r = await original.call(this, u, ...args); const path = String(u); if (path.includes('/api/operator-asks')) window.__askRefreshes++; if (/buttons\\/\\d+\\/settle/.test(path)) window.__buttonSettles++; return r; }; })()`);
         const reopenFromActivity = async () => {
@@ -202,7 +202,7 @@ async function httpJson(method, path, body, headers = {}) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => import(${S} + 'inbox_tab.js')).then(m => m.selectInboxTab('needs')).then(() => true)`);
-            const rowOf = text => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.textContent.includes(${JSON.stringify(text)}))`;
+            const rowOf = text => `[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(r => r.textContent.includes(${JSON.stringify(text)}))`;
             await waitFor(`!!(${rowOf(which)})`, at + 'the question is in Needs you', 15000);
             const answer = text => ev(`(${rowOf(text)}).querySelector('button[aria-label^="Answer the question of"]').click(); true`);
             const open = async text => { await answer(text); await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the question opens', 6000); };
@@ -247,8 +247,8 @@ async function httpJson(method, path, body, headers = {}) {
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => import(${S} + 'inbox_tab.js')).then(m => m.selectInboxTab('needs')).then(() => true)`);
-        await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr')].some(r => r.textContent.includes('(two)'))`, 'the second question', 15000);
-        await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.textContent.includes('(two)')).querySelector('button[aria-label^="Answer the question of"]').click(); true`);
+        await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].some(r => r.textContent.includes('(two)'))`, 'the second question', 15000);
+        await ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(r => r.textContent.includes('(two)')).querySelector('button[aria-label^="Answer the question of"]').click(); true`);
         await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'the second question opens', 6000);
         await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-offer button')].find(b => b.textContent === 'Yes, ship it').click(); true`);
         await waitFor(`!document.querySelector('dialog.inbox-ask-dialog[open]')`, 'closes', 6000);

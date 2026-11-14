@@ -34,8 +34,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return true; })()`);
             await ev(STUB);
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'the one review row', 15000);
-            const from = await ev(`(([...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.querySelector('.inbox-review-name')) || {}).textContent || '')`); // the data row, not the agent's group head
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 1`, at + 'the one review row', 15000);
+            const from = await ev(`(([...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(r => r.querySelector('.inbox-review-name')) || {}).textContent || '')`); // the data row, not the agent's group head
             check(from.includes(headOf(3)) && !from.includes('(file '), at + `the row says the line: ${JSON.stringify(from)}`);
             await ev(`document.querySelector('#group-table-view .inbox-review-name').click(); true`);
             await waitFor(`!!document.getElementById('artifact-viewer') && !document.getElementById('artifact-viewer').hidden && !!document.querySelector('#artifact-viewer .av-current')`, at + 'the viewer opens with its versions', 10000);
@@ -64,9 +64,9 @@ const { removeBoards } = require('./helpers/board_cleanup');
                     return original(url, opts); };
                 return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('artifacts')).then(() => true)`);
-            try { await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 2`, at + 'the two rows', 15000); }
-            catch (e) { const d = await ev(`JSON.stringify({ rows: document.querySelectorAll('tbody tr').length, text: (document.getElementById('group-table-view') || document.body).innerText.slice(0, 300) })`).catch(x => String(x)); throw new Error(e.message + ' | page: ' + d); }
-            const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.textContent)`);
+            try { await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length >= 2`, at + 'the two rows', 15000); }
+            catch (e) { const d = await ev(`JSON.stringify({ rows: document.querySelectorAll('tbody tr:not(.dt-group)').length, text: (document.getElementById('group-table-view') || document.body).innerText.slice(0, 300) })`).catch(x => String(x)); throw new Error(e.message + ' | page: ' + d); }
+            const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].map(r => r.textContent)`);
             check(rows.some(t => t.includes('release-plan.md') && t.includes(headOf(3))), at + `the row with a file id says its line: ${JSON.stringify(rows)}`);
             check(rows.filter(t => t.includes('plain-notes.md')).every(t => !/version \d+ of/.test(t)), at + `a row with no id says none: ${JSON.stringify(rows)}`);
             await removeBoards(ev, [team]).catch(() => {});
@@ -92,9 +92,9 @@ const { removeBoards } = require('./helpers/board_cleanup');
             })()`);
             await ev(STUB);
             await ev(`localStorage.removeItem('coral-agentic-tab-top'); document.getElementById('agentic-tab-artifacts').click(); true`);
-            const ROWS = '#agentic-panel-artifacts-view tbody tr';
+            const ROWS = '#agentic-panel-artifacts-view tbody tr:not(.dt-group)';
             try { await waitFor(`document.querySelectorAll('${ROWS}').length === 2`, at + 'both rows', 15000); }
-            catch (e) { const d = await ev(`(() => { const p = document.getElementById('agentic-panel-artifacts-view'); const tab = document.getElementById('agentic-tab-artifacts'); return JSON.stringify({ panel: !!p, hidden: p && p.hidden, text: p && p.innerText.slice(0, 300), tabSelected: tab && tab.getAttribute('aria-selected'), rows: document.querySelectorAll('tbody tr').length, view: document.querySelector('.view.active, [data-view][aria-current]')?.id || null, listFetched: window.__listFetched || 0 }); })()`).catch(x => String(x)); throw new Error(e.message + ' | page: ' + d); }
+            catch (e) { const d = await ev(`(() => { const p = document.getElementById('agentic-panel-artifacts-view'); const tab = document.getElementById('agentic-tab-artifacts'); return JSON.stringify({ panel: !!p, hidden: p && p.hidden, text: p && p.innerText.slice(0, 300), tabSelected: tab && tab.getAttribute('aria-selected'), rows: document.querySelectorAll('tbody tr:not(.dt-group)').length, view: document.querySelector('.view.active, [data-view][aria-current]')?.id || null, listFetched: window.__listFetched || 0 }); })()`).catch(x => String(x)); throw new Error(e.message + ' | page: ' + d); }
             const rowOf = name => `[...document.querySelectorAll('${ROWS}')].find(r => r.querySelector('.dt-primary').textContent === ${JSON.stringify(name)})`;
             await ev(`(${rowOf('release-plan.md')}).querySelector('.artifact-details').click(); true`);
             await waitFor(`!document.getElementById('agentic-detail-pane').hidden && document.querySelector('#agentic-detail-pane .detail-title').textContent === 'release-plan.md'`, at + 'the sheet opens', 6000);

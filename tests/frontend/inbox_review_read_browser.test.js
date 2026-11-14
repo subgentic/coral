@@ -11,7 +11,7 @@ const { coralReady } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const team = 'review-read-' + Date.now().toString(36), failures = [];
-    const row = name => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r=>r.textContent.includes(${JSON.stringify(name)}))`;
+    const row = name => `[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(r=>r.textContent.includes(${JSON.stringify(name)}))`;
     const badge = () => ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`);
     const navCount = () => ev(`(() => { const e = [...document.querySelectorAll('.view-list-item, [data-view-key="needs"], #inbox-nav [data-key="needs"]')].find(x => /Needs you/.test(x.textContent)); return e ? e.textContent.replace(/Needs you/, '').trim() : null; })()`);
     const YES = "(()=>{const m=document.getElementById('confirm-modal');if(m&&getComputedStyle(m).display!=='none')document.getElementById('confirm-modal-yes').click();return true})()"; // an unopened file asks 'Approve without opening?' (#11999)

@@ -38,19 +38,19 @@ const { coralReady, framesJs } = require('./helpers/wait');
                     return original(url, opts); };
                 return true; })()`);
             await ev(`(async () => { const { state } = await import(${S} + 'state.js'); const m = await import(${S} + 'inbox_tab.js'); state.liveSessions = [${JSON.stringify(AGENT)}]; m.updateInboxTab(); window.switchNavTab('hub-inbox'); await m.selectInboxTab('needs'); return true; })()`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 1`, at + 'the permission row', 15000); await ev(framesJs(6));
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length >= 1`, at + 'the permission row', 15000); await ev(framesJs(6));
             // 1. the row: no answer, the words, Open agent as the main button
-            await waitFor(`/could not read this request in full/i.test(document.querySelector('${T} tbody tr').textContent)`, at + 'the row says Coral could not read it', 8000).catch(() => {});
-            const row = await ev(`(() => { const r = document.querySelector('${T} tbody tr'); const o = r.querySelector('button.inbox-open-agent'); return { answers: [...r.querySelectorAll('button.inbox-answer')].map(b => b.textContent), text: r.textContent.replace(/\\s+/g, ' '), open: o ? { text: o.textContent, primary: o.classList.contains('btn-primary') } : null }; })()`);
+            await waitFor(`/could not read this request in full/i.test(document.querySelector('${T} tbody tr:not(.dt-group)').textContent)`, at + 'the row says Coral could not read it', 8000).catch(() => {});
+            const row = await ev(`(() => { const r = document.querySelector('${T} tbody tr:not(.dt-group)'); const o = r.querySelector('button.inbox-open-agent'); return { answers: [...r.querySelectorAll('button.inbox-answer')].map(b => b.textContent), text: r.textContent.replace(/\\s+/g, ' '), open: o ? { text: o.textContent, primary: o.classList.contains('btn-primary') } : null }; })()`);
             check(row.answers.length === 0, at + 'the row has no answer button, not even No: ' + JSON.stringify(row.answers));
             check(/could not read this request in full/i.test(row.text) && /answer it in the agent.s terminal/i.test(row.text), at + 'the row says it and where to answer: ' + row.text);
             check(!!row.open && row.open.text === 'Open agent' && row.open.primary, at + 'Open agent is the main button on the row: ' + JSON.stringify(row.open));
             check(!/can only be rejected/i.test(row.text), at + 'the old wording is gone from the row');
-            const seen = await ev(`(() => { const r = document.querySelector('${T} tbody tr'), n = r.querySelector('.inbox-unread'), o = r.querySelector('button.inbox-open-agent'), vis = e => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden'; return { note: vis(n), open: vis(o), touch: !${mobile} || (!!o && o.getBoundingClientRect().height >= 40) }; })()`);
+            const seen = await ev(`(() => { const r = document.querySelector('${T} tbody tr:not(.dt-group)'), n = r.querySelector('.inbox-unread'), o = r.querySelector('button.inbox-open-agent'), vis = e => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden'; return { note: vis(n), open: vis(o), touch: !${mobile} || (!!o && o.getBoundingClientRect().height >= 40) }; })()`);
             check(seen.note && seen.open && seen.touch, at + 'the words and Open agent are on screen on the row (a phone too), as a touch target: ' + JSON.stringify(seen));
             await shot(`unreadable-row-${w}`);
             // 2. the dialog (the phone's card): the same, and not half of the request
-            await ev(`document.querySelector('${T} tbody tr .dt-primary').click(); true`);
+            await ev(`document.querySelector('${T} tbody tr:not(.dt-group) .dt-primary').click(); true`);
             await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open] .inbox-card-body > *')`, at + 'the card dialog', 8000);
             const d = await dialog();
             check(!!d && d.answers.length === 0, at + 'the dialog has no list of answers: ' + JSON.stringify(d && d.answers));

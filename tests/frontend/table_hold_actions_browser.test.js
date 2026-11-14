@@ -13,7 +13,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const S = `(window.__coralStatic || '/static/')`;
-    const rowsOf = () => ev(`[...document.querySelectorAll('.saved-files tbody tr')].map(r => (r.textContent.match(/plan-\\d/) || [''])[0])`);
+    const rowsOf = () => ev(`[...document.querySelectorAll('.saved-files tbody tr:not(.dt-group)')].map(r => (r.textContent.match(/plan-\\d/) || [''])[0])`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1440, 800, false]]) { // a resting pointer is a desktop thing
@@ -42,13 +42,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('saved')).then(() => true)`);
-            await waitFor(`!!document.querySelector('.saved-files') && document.querySelectorAll('.saved-files tbody tr').length === 2`, at + 'Saved lists the two files', 15000);
+            await waitFor(`!!document.querySelector('.saved-files') && document.querySelectorAll('.saved-files tbody tr:not(.dt-group)').length === 2`, at + 'Saved lists the two files', 15000);
             await ev(framesJs(4));
-            const rows = () => ev(`document.querySelectorAll('.saved-files tbody tr').length`);
-            const mark = () => ev(`document.querySelectorAll('.saved-files tbody tr').forEach(r => { r.__kept = 1; }); true`);
-            const kept = () => ev(`[...document.querySelectorAll('.saved-files tbody tr')].filter(r => r.__kept).length`);
+            const rows = () => ev(`document.querySelectorAll('.saved-files tbody tr:not(.dt-group)').length`);
+            const mark = () => ev(`document.querySelectorAll('.saved-files tbody tr:not(.dt-group)').forEach(r => { r.__kept = 1; }); true`);
+            const kept = () => ev(`[...document.querySelectorAll('.saved-files tbody tr:not(.dt-group)')].filter(r => r.__kept).length`);
             const rest = async () => { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 5, y: 5 }); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the pointer leaves, so the next rest starts a fresh hold
-                const p = await ev(`(() => { const r = document.querySelector('.saved-files tbody tr').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+                const p = await ev(`(() => { const r = document.querySelector('.saved-files tbody tr:not(.dt-group)').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
                 await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: p.x, y: p.y }); await new Promise(r => setTimeout(r, 300)); }; // sleep-ok: the pointer events reach the page
             const arrive = async n => { await ev(`(() => { const hex = n => n.toString(16).padStart(64, '0'); window.__items.push({ ...window.__items[0], id: hex(${n}), name: 'plan-${n}.md', tags: ['for review', 'saved'] }); return import(${S} + 'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true); })()`); await new Promise(r => setTimeout(r, 900)); }; // sleep-ok: a redraw that was going to happen would have happened
             const heldNote = () => ev(`!!document.querySelector('#group-table-view .group-table-held')`);
@@ -63,7 +63,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await arrive(3);
             check(await rows() === 2 && await kept() === 2 && await heldNote(), at + 'after the menu and a refused Dismiss an unrelated new row is still held (rows ' + await rows() + ', kept ' + await kept() + ', note ' + await heldNote() + ')');
             { // the held note must not sit over a row's buttons (#15142): More, Download and Open were clipped by the full-width bar, and a click on them hit the bar
-                const cover = await ev(`(() => { const n = document.querySelector('#group-table-view .group-table-held'); if (!n) return null; const a = n.getBoundingClientRect(); const hit = [...document.querySelectorAll('.saved-files tbody tr button')].filter(b => { const r = b.getBoundingClientRect(); return r.width > 0 && r.left < a.right && r.right > a.left && r.top < a.bottom && r.bottom > a.top; }).map(b => b.getAttribute('aria-label')); return { hit, events: getComputedStyle(n).pointerEvents, w: Math.round(a.width), vw: innerWidth }; })()`);
+                const cover = await ev(`(() => { const n = document.querySelector('#group-table-view .group-table-held'); if (!n) return null; const a = n.getBoundingClientRect(); const hit = [...document.querySelectorAll('.saved-files tbody tr:not(.dt-group) button')].filter(b => { const r = b.getBoundingClientRect(); return r.width > 0 && r.left < a.right && r.right > a.left && r.top < a.bottom && r.bottom > a.top; }).map(b => b.getAttribute('aria-label')); return { hit, events: getComputedStyle(n).pointerEvents, w: Math.round(a.width), vw: innerWidth }; })()`);
                 check(cover && cover.hit.length === 0 && cover.events === 'none' && cover.w < cover.vw * 0.9, at + 'the held note covers no row button and lets a click through: ' + JSON.stringify(cover));
             }
             // 3) a Dismiss that is accepted after 6.5 s: the row leaves at once when it is, not up to 10 s later
@@ -72,7 +72,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`document.querySelector('.saved-files button[aria-label="Dismiss: plan-1.md"]').click(); true`);
             await waitFor(`!!window.__replied`, at + 'the slow answer came', 12000);
             const t0 = Date.now();
-            await waitFor(`document.querySelectorAll('.saved-files tbody tr').length === 2 && ![...document.querySelectorAll('.saved-files tbody tr')].some(r => /plan-1\\.md/.test(r.textContent))`, at + 'the dismissed row leaves after the slow success', 10000);
+            await waitFor(`document.querySelectorAll('.saved-files tbody tr:not(.dt-group)').length === 2 && ![...document.querySelectorAll('.saved-files tbody tr:not(.dt-group)')].some(r => /plan-1\\.md/.test(r.textContent))`, at + 'the dismissed row leaves after the slow success', 10000);
             check(Date.now() - t0 < 2500, at + 'it left within 2.5 s of the answer (took ' + (Date.now() - t0) + ' ms), though the pointer rests and the answer came after 6.5 s');
             // 4) the person goes ELSEWHERE while a Dismiss is slow, and comes back to a fresh Saved: the late success is for the table it began in, not this one
             await ev(`window.__replied = 0; window.__delay = 6500; true`);
@@ -80,7 +80,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`document.querySelector('.saved-files button[aria-label^="Dismiss: plan-"]').click(); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the other table is drawn
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('saved')).then(() => true)`);
-            await waitFor(`!!document.querySelector('.saved-files') && document.querySelectorAll('.saved-files tbody tr').length >= 2`, at + 'Saved is drawn again (a new table)', 10000);
+            await waitFor(`!!document.querySelector('.saved-files') && document.querySelectorAll('.saved-files tbody tr:not(.dt-group)').length >= 2`, at + 'Saved is drawn again (a new table)', 10000);
             await rest(); await mark(); await arrive(4); // a new row arrives in the NEW table, held under the resting pointer
             const before = await rows();
             await waitFor(`!!window.__replied`, at + 'the slow answer of the first table came', 12000);

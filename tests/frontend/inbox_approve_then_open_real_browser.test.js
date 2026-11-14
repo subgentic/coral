@@ -66,7 +66,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             // point the page has not scrolled to yet (or that a redraw moved) lands on nothing (#11680: that was the whole flake; the Approve never reached the server).
             const reveal = (finder, within = '') => ev(`(async () => { for (let i = 0; i < 40; i++) { const el = (${finder}); if (el) { el.scrollIntoView({ block: 'center', behavior: 'instant' }); await ${framesJs(2)}; const r = el.getBoundingClientRect(), x = Math.round(r.left + Math.min(r.width / 2, 30)), y = Math.round(r.top + r.height / 2), hit = document.elementFromPoint(x, y); if (hit && (hit === el || el.contains(hit))${within}) return { x, y }; } await new Promise(r => setTimeout(r, 50)); } return null; })()`);
             const click = async (x, y) => { for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await client.Input.dispatchMouseEvent({ type, x, y, button: type === 'mouseMoved' ? 'none' : 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: type === 'mouseMoved' ? 0 : 1 }); };
-            const where = (n, part) => ev(`(async () => { for (let k = 0; k < 40; k++) { const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => r.querySelector('button[aria-label="Approve: ${n}"]'));
+            const where = (n, part) => ev(`(async () => { for (let k = 0; k < 40; k++) { const tr = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(r => r.querySelector('button[aria-label="Approve: ${n}"]'));
                 if (tr) { tr.scrollIntoView({ block: 'center', behavior: 'instant' }); await ${framesJs(2)};
                     const R = tr.getBoundingClientRect(), y = Math.round(R.top + R.height / 2), INT = 'a, input, select, textarea, summary, button:not(.dt-primary)';
                     if (R.height > 0 && y > 0 && y < innerHeight) {
@@ -82,7 +82,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
                     const q = await where(n, part); if (!q) break;
                     await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: q.x, y: q.y, button: 'none', buttons: 0, clickCount: 0 });
                     await ev(`(async () => { await ${framesJs(2)}; return true; })()`);
-                    const still = await ev(`(() => { const e = document.elementFromPoint(${q.x}, ${q.y}), tr = e && e.closest('${T} tbody tr'); return !!(tr && tr.querySelector('button[aria-label="Approve: ${n}"]')); })()`);
+                    const still = await ev(`(() => { const e = document.elementFromPoint(${q.x}, ${q.y}), tr = e && e.closest('${T} tbody tr:not(.dt-group)'); return !!(tr && tr.querySelector('button[aria-label="Approve: ${n}"]')); })()`);
                     if (still) p = q;
                 }
                 check(!!p, at + `${label}: found ${n}'s ${part}`); if (!p) return;
@@ -99,7 +99,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             // an agent waiting beside the files (a stood-in row of the live list; the app's own opening of it is counted)
             await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 }); // the pointer is off the list: one resting on it holds a new row back until Show (#15339, walk 23 M9)
             await ev(`window.__opened = []; window.selectLiveSession = (...a) => { window.__opened.push(a[2]); return Promise.resolve(); }; T.state.liveSessions = [{ name: 'wa', session_id: '00000001-0000-4000-8000-0000000000aa', agent_type: 'claude', server: 'local', status: 'idle', display_name: 'Waiting Agent', working_directory: '/repo/a', waiting_for_input: true, waiting_kind: 'permission', waiting_since: new Date(Date.now() - 300000).toISOString(), sleeping: false }]; import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return true; })`);
-            await waitFor(`!![...document.querySelectorAll('${T} tbody tr')].find(r => /Waiting Agent/.test(r.textContent))`, at + 'the waiting agent row', 8000);
+            await waitFor(`!![...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(r => /Waiting Agent/.test(r.textContent))`, at + 'the waiting agent row', 8000);
             await press(names.a, 'Approve');
             await new Promise(r => setTimeout(r, 1500)); // sleep-ok: the list settles after the approve
             console.log(at + 'page errors after Approve: ' + JSON.stringify(pageErrors) + ' open dialogs: ' + (await ev(`document.querySelectorAll('dialog[open]').length`)));
@@ -120,7 +120,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await waitFor(rowGone(names.d), at + 'the row approved in the viewer leaves', 15000).catch(() => {});
             await openBy(names.b, 'body', 'after Approve in the viewer, by the body');
             await openBy(names.b, 'name', 'after Approve in the viewer, by the name');
-            { const q = await reveal(`[...document.querySelectorAll('${T} tbody tr')].find(r => /Waiting Agent/.test(r.textContent))${''}`); // the whole row opens the agent (a tap on a phone, a click on a card, #15162), and the first cell is the selection check
+            { const q = await reveal(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(r => /Waiting Agent/.test(r.textContent))${''}`); // the whole row opens the agent (a tap on a phone, a click on a card, #15162), and the first cell is the selection check
               check(!!q, at + 'the waiting agent row could be reached'); if (q) { await click(q.x, q.y); await waitFor(`window.__opened.length > 0 || !!document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'after the Approves, a click on the waiting agent opens it (its card over the Inbox for a permission, #11837, else the agent)', 4000).catch(() => check(false, at + 'after the Approves, a click on the waiting agent row opened nothing')); } }
         }
     } finally {

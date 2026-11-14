@@ -16,19 +16,19 @@ const { coralReady } = require('./helpers/wait');
         await ev(INBOX_WORLD);
         await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
         await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`);
-        await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr').length === 3 && document.getElementById('group-table-view').getClientRects().length > 0`, 'the three tasks', 10000);
+        await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length === 3 && document.getElementById('group-table-view').getClientRects().length > 0`, 'the three tasks', 10000);
         await waitFor(`!!document.querySelector('#group-table-view .dt-box.dt-folded')`, 'the table has folded to its phone rows', 5000); // the fold is the table's own box: it settles after the first paint (#7868)
         const m = await ev(`(() => { const v = document.getElementById('group-table-view'), sel = v.querySelector('.view-list-nav .view-list-item[aria-current="true"]'), sc = v.querySelector('.dt-box'), back = v.querySelector('.group-table-back'), h = v.querySelector('#group-table-title');
             const rect = e => e ? e.getBoundingClientRect() : null; const b = rect(back), t = rect(h);
             return { select: sel && { h: Math.round(sel.getBoundingClientRect().height), top: Math.round(sel.getBoundingClientRect().top), current: sel.querySelector('.view-list-name').textContent }, back: !!back, scroll: sc ? [sc.scrollWidth, sc.clientWidth] : null, page: [document.documentElement.scrollWidth, document.documentElement.clientWidth], backTop: b && Math.round(b.top), titleTop: t && Math.round(t.top), backH: b && Math.round(b.height), titleH: t && Math.round(t.height),
-                rows: [...v.querySelectorAll('.dt-table tbody tr')].map(r => r.innerText.replace(/\\s+/g, ' ').trim()) }; })()`);
+                rows: [...v.querySelectorAll('.dt-table tbody tr:not(.dt-group)')].map(r => r.innerText.replace(/\\s+/g, ' ').trim()) }; })()`);
         assert.ok(m.scroll && m.scroll[0] <= m.scroll[1] + 1, `the Tasks table does not scroll sideways (scrollWidth ${m.scroll && m.scroll[0]} > ${m.scroll && m.scroll[1]}) ${JSON.stringify(m)}`);
         assert.ok(m.page[0] <= m.page[1] + 1, 'and neither does the page ' + JSON.stringify(m));
         assert.ok(!m.select && !m.back && m.titleH >= 20, `no folder tab strip and no way back on a phone: the ☰ drawer lists the folders (#13596) and the page's title is the open folder's name ${JSON.stringify(m)}`);
         // the one task row's two-line form (#7737): the id and title, then the state, and the priority only when it is High; the team is the table's column and is not in the phone's line
         for (const [i, word] of [[0, /Queued/], [1, /In progress/], [2, /In review/]]) assert.match(m.rows[i], word, `row ${i + 1} still says its ${word} ${JSON.stringify(m.rows)}`);
         assert.ok(m.rows.every(r => !/Nobody yet/.test(r)), 'the Inbox says nothing of who: every task is the operator\'s ' + JSON.stringify(m.rows));
-        await ev(`document.querySelectorAll('#group-table-view .dt-table tbody tr .dt-primary').forEach((b, i) => b.setAttribute('data-axp', String(i))); true`);
+        await ev(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group) .dt-primary').forEach((b, i) => b.setAttribute('data-axp', String(i))); true`);
         for (const [i, state] of [[0, 'Queued'], [1, 'In progress'], [2, 'In review']]) { const ax = await axName(client, `[data-axp="${i}"]`); assert.match(ax && ax.name, new RegExp(`^#${i + 1} .+, ${state}, .+$`), `row ${i + 1}'s button is "<task>, <state>, <time>" as Chrome computes it (the state is on the row as an icon and a word: #9747): ${ax && ax.name}`); }
         console.log('PASS the Inbox Tasks table fits a phone');
     } finally { await client.close(); }

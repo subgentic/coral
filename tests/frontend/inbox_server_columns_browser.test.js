@@ -121,8 +121,8 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
    if(width===1280){ // reads the Server cell of a chat row: a phone's mail rows have none (#9545)
    // Same id on two sources: a remote Inbox preview must not capture a local URL.
    await open('chats');
-   await waitFor(`!![...document.querySelectorAll('#group-table-view tbody tr')].find(r=>r.querySelector('td[data-key="server"]')?.textContent==='Remote box')`,'remote chat row');
-   await ev(`window.__serverReads=[];[...document.querySelectorAll('#group-table-view tbody tr')].find(r=>r.querySelector('td[data-key="server"]')?.textContent==='Remote box').querySelector('.dt-primary').click();true`);
+   await waitFor(`!![...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(r=>r.querySelector('td[data-key="server"]')?.textContent==='Remote box')`,'remote chat row');
+   await ev(`window.__serverReads=[];[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(r=>r.querySelector('td[data-key="server"]')?.textContent==='Remote box').querySelector('.dt-primary').click();true`);
    await waitFor(`window.__serverReads.includes('/api/remote/box-2/api/sessions/history/same-chat')&&window.__serverState.currentSession?.server==='box-2'`,'remote preview reads its server');
    await ev(`window.__serverReads=[];history.pushState({},'', '/chats/same-chat');window.dispatchEvent(new PopStateEvent('popstate'));true`);
    await waitFor(`window.__serverReads.includes('/api/sessions/history/same-chat')&&window.__serverState.currentSession?.server==='local'`,'local URL resets remote preview source');

@@ -49,8 +49,8 @@ const WORLD = `(() => {
                 await waitFor(`!!document.querySelector('[data-view-list="inbox-folders"] .view-list-item[data-key="artifacts"]')`, at + 'the Artifacts folder', 10000);
                 await ev(`document.querySelector('[data-view-list="inbox-folders"] .view-list-item[data-key="artifacts"]').click(); true`);
             } else await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.openInboxGroup('artifacts')).then(() => true)`);
-            await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:artifacts' && document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'two rows', 10000);
-            const rowText = await ev(`(() => { const r = [...document.querySelectorAll('#group-table-view tbody tr')].find(x => !/plan/i.test(x.textContent)); return r ? r.textContent.replace(/\\s+/g, ' ') : ''; })()`);
+            await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:artifacts' && document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2`, at + 'two rows', 10000);
+            const rowText = await ev(`(() => { const r = [...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(x => !/plan/i.test(x.textContent)); return r ? r.textContent.replace(/\\s+/g, ' ') : ''; })()`);
             const name = await ev(`(() => { const a = window.__qaState.liveSessions.find(s => s.session_id === 'helper-sid'); return a ? (a.display_name || a.name) : ''; })()`);
             assert.ok(name && rowText.includes(name) && !/No team/.test(rowText), at + `the row names the agent (${name}), not "No team": ` + rowText);
         }

@@ -11,7 +11,7 @@ const id = n => n.toString(16).padStart(64, '0');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const api = (method, path, body) => ev(`fetch('/api/board/${team}' + ${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, json: await r.json().catch(() => ({})) }))`);
-    const rowOf = name => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.textContent.includes(${JSON.stringify(name)}))`;
+    const rowOf = name => `[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(r => r.textContent.includes(${JSON.stringify(name)}))`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {

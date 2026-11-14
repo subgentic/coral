@@ -26,7 +26,7 @@ const hex = i => i.toString(16).padStart(20, '0');
     const api = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
     const saved = async (q = '') => (await api('GET', '/api/saved' + q)).body;
     const C = `document.getElementById('live-history-messages')`;
-    const ROWS = '#saved-table tbody tr'; // the dock's Saved tab is the Inbox's Saved table, filtered to the page's scope (#7631)
+    const ROWS = '#saved-table tbody tr:not(.dt-group)'; // the dock's Saved tab is the Inbox's Saved table, filtered to the page's scope (#7631)
     const rowWith = text => `[...document.querySelectorAll('${ROWS}')].find(tr => tr.textContent.includes(${JSON.stringify(text)}))`;
     const INBOX_SAVED = `(() => { const t = document.getElementById('group-table-view'); return t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved'; })()`;
     // The Saved tab of the right sidebar is shown: its panel is the active one and the sidebar is not collapsed.
@@ -268,7 +268,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         // selector so no late selection can navigate away after Saved opens.
         await ev(`(async () => { await window.selectLiveSession('sv-a', 'claude', 'sv-a-id', 'local'); await window.selectLiveSession('', '', '', 'local'); return true; })()`); // home: this list reads every conversation
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`); // the page's own Saved tab; the top bar's bookmark is the Inbox's (#4905)
-        const INBOX_ROWS = '#group-table-view tbody tr';
+        const INBOX_ROWS = '#group-table-view tbody tr:not(.dt-group)';
         await waitFor(`${INBOX_SAVED} && [...document.querySelectorAll('${INBOX_ROWS} .dt-primary')].filter(e => e.textContent.toLowerCase().includes('saved-4510-board')).length === 2`, 'the board items (home\'s list is the Inbox\'s, everything\'s)', 6000);
         await waitFor(`[...document.querySelectorAll('${INBOX_ROWS}')].some(tr => tr.textContent.includes('the one to delete') && tr.cells[2].textContent.trim() === 'Gone')`, 'the exact deleted board message to be found gone', 8000);
         const goneClick = await ev(`(async () => { const tr = [...document.querySelectorAll('${INBOX_ROWS}')].find(tr => tr.textContent.includes('the one to delete')); const b = tr.querySelector('.dt-primary'); const m = await import((window.__coralStatic || '/static/') + 'saved.js'); const it = m.findSavedItem(b.dataset.id); const facts = it && m.savedItemFacts(it); b.click(); return { id: b.dataset.id, facts, page: document.getElementById('inbox-page').textContent, dock: document.getElementById('agentic-saved-detail-pane').textContent }; })()`);
@@ -315,7 +315,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         assert.equal(e1.status, 200); assert.equal(e2.status, 200);
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'sessions.js'); await m.selectLiveSession('', '', '', 'local'); return true; })()`); // home: the list is of the agent or team on screen (#4792), and these are three agents'
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`); // the page's own Saved tab; the top bar's bookmark is the Inbox's (#4905)
-        const IR = '#group-table-view tbody tr';
+        const IR = '#group-table-view tbody tr:not(.dt-group)';
         await waitFor(`${INBOX_SAVED} && document.querySelectorAll('${IR}').length === 4 && document.getElementById('group-table-view').textContent.includes('transcript that is gone')`, 'the four items (home\'s list is the Inbox\'s)', 6000);
         await waitFor(`[...document.querySelectorAll('${IR}')].some(tr => tr.textContent.includes('transcript that is gone') && tr.cells[2].textContent.trim() === 'Gone')`, 'the missing transcript to be found gone', 8000);
         await ev(`[...document.querySelectorAll('${IR}')].find(tr => tr.textContent.includes('transcript that is gone')).querySelector('.dt-primary').click(); true`);

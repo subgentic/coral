@@ -17,7 +17,7 @@ const {coralReady}=require('./helpers/wait');
    await ev(`window.openTeamPage('@m2/same-team',{tab:'needs'})`);
    await waitFor(`document.querySelector('#team-panel-needs')?.textContent.includes("Only this computer's owner sees this.")`,'explicit grantee owner-only message');
    assert.equal(await ev(`document.querySelector('#team-tab-needs .team-tab-count').textContent`),'','grantee badge is not an authoritative zero');
-   assert.equal(await ev(`document.querySelectorAll('#team-panel-needs tbody tr').length`),0,'restricted list is not presented as empty success');
+   assert.equal(await ev(`document.querySelectorAll('#team-panel-needs tbody tr:not(.dt-group)').length`),0,'restricted list is not presented as empty success');
 
   }
   console.log('PASS Hub grantee owner-only team message and hidden count at desktop/phone');

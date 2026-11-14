@@ -28,7 +28,7 @@ const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a te
                     return orig(u, o); }; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'two rows of Needs you', 10000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2`, at + 'two rows of Needs you', 10000);
             await ev(`(() => { const orig = window.fetch.bind(window); window.__uploads = []; window.fetch = (u, o) => { if (/\\/goal-images/.test(String(u)) && o && o.method === 'POST') { const n = window.__uploads.push({ url: String(u), type: o.body && o.body.type }); return Promise.resolve(new Response(JSON.stringify({ hex: String(n).repeat(64), name: 'shot.png', content_type: 'image/png', size: 120 }), { status: 200, headers: { 'Content-Type': 'application/json' } })); } return orig(u, o); }; return true; })()`);
             await ev(`document.querySelector('button[aria-label="Answer the question of Orchestrator"]').click(); true`);
             await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the dialog opens', 4000);

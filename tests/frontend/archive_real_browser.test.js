@@ -59,9 +59,9 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         assert.equal(archivedRow.buttons, 0, 'a row with no chat has no Star, Archive or Continue buttons');
         // and this agent is not an All chats row: the folder is read for ITS name only (it holds whatever earlier suites left)
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('chats')).then(() => true)`);
-        await until(`!document.querySelector('#group-table-view tbody tr .dt-primary') || document.querySelectorAll('#group-table-view tbody tr').length > 0`, 'the All chats folder is drawn');
+        await until(`!document.querySelector('#group-table-view tbody tr:not(.dt-group) .dt-primary') || document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length > 0`, 'the All chats folder is drawn');
         await new Promise(r => setTimeout(r, 600)); // sleep-ok: the folder's rows settle
-        assert.equal(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].filter(r => r.textContent.includes(${JSON.stringify(QA_NAME)})).length`), 0, 'the agent is not an All chats row');
+        assert.equal(await ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].filter(r => r.textContent.includes(${JSON.stringify(QA_NAME)})).length`), 0, 'the agent is not an All chats row');
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('chats-archived')).then(() => true)`);
         await until(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].some(r => r.textContent.includes(${JSON.stringify(QA_NAME)}))`, 'the archived agent\'s row is back in Inbox > Archived');
         await ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(x => /Archived, no messages yet/.test(x.textContent) && x.textContent.includes(${JSON.stringify(QA_NAME)})).querySelector('.dt-primary, button, td').click(); true`);

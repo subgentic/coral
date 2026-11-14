@@ -13,7 +13,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const T = '#group-table-view';
-    const rowsOf = () => ev(`[...document.querySelectorAll('${T} tbody tr')].map(tr => ({ text: tr.textContent.replace(/\\s+/g, ' ').trim(), sub: [...tr.querySelectorAll('.inbox-review-from')].filter(e => e.getBoundingClientRect().width > 0).map(e => e.textContent.replace(/ \u00b7$/, '')).join('|'), visible: [...tr.querySelectorAll('.inbox-review-from')].filter(e => e.getBoundingClientRect().width > 0).length === 1 }))`); // who it is from leads the top line, before the file's name, at every width (#11719)
+    const rowsOf = () => ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].map(tr => ({ text: tr.textContent.replace(/\\s+/g, ' ').trim(), sub: [...tr.querySelectorAll('.inbox-review-from')].filter(e => e.getBoundingClientRect().width > 0).map(e => e.textContent.replace(/ \u00b7$/, '')).join('|'), visible: [...tr.querySelectorAll('.inbox-review-from')].filter(e => e.getBoundingClientRect().width > 0).length === 1 }))`); // who it is from leads the top line, before the file's name, at every width (#11719)
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true]]) {
@@ -32,7 +32,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`['checkout-mockup.html', 'guide-role-design.html', 'orphan-notes.html'].every(n => [...document.querySelectorAll('${T} tbody tr')].some(r => r.textContent.includes(n)))`, at + 'the three for-review rows', 15000);
+            await waitFor(`['checkout-mockup.html', 'guide-role-design.html', 'orphan-notes.html'].every(n => [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].some(r => r.textContent.includes(n)))`, at + 'the three for-review rows', 15000);
             const rows = await rowsOf(), by = n => rows.find(r => r.text.includes(n)) || { text: '', sub: '', visible: false };
             const tail = t => (mobile ? '' : ` · ${t}`);
             const a = by('checkout-mockup.html'), b = by('guide-role-design.html'), c = by('orphan-notes.html');
@@ -44,7 +44,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             check(!(await ev(`document.documentElement.scrollWidth > innerWidth + 1`)), at + 'no sideways scroll');
             await shot(`inbox-review-from-${w}`);
             // the opened item says the same in its header
-            await ev(`[...document.querySelectorAll('${T} tbody tr button')].find(b => b.getAttribute('aria-label') === 'Open checkout-mockup.html').click(); true`);
+            await ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group) button')].find(b => b.getAttribute('aria-label') === 'Open checkout-mockup.html').click(); true`);
             await waitFor(`!!document.querySelector('.artifact-viewer-from') && !document.querySelector('.artifact-viewer-from').hidden`, at + 'the opened item\'s "from" line', 10000).catch(() => {});
             const opened = await ev(`(document.querySelector('.artifact-viewer-from') || {}).textContent || ''`);
             check(opened === `from Lead Developer · ${t1}`, at + 'the opened item says who sent it: ' + JSON.stringify(opened));

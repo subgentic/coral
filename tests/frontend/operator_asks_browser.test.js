@@ -27,8 +27,8 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
                         window.__asks = window.__asks.filter(a => !(body.content.startsWith('@' + a.asker + ' ') && (a.kind === 'wait' || body.reply_to === a.id))); return json({ id: 99 }); }
                     return orig(u, o); }; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'two rows of Needs you', 10000);
-            const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => ({ text: r.textContent, reply: !!r.querySelector('button[aria-label^="Answer the question of"]') }))`);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2`, at + 'two rows of Needs you', 10000);
+            const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].map(r => ({ text: r.textContent, reply: !!r.querySelector('button[aria-label^="Answer the question of"]') }))`);
             let rs = await rows();
             assert.ok(rs.every(r => r.reply), at + 'each row has an Answer button: ' + JSON.stringify(rs));
             const lead = rs.find(r => r.text.includes('Lead')), dev = rs.find(r => r.text.includes('Dev'));
@@ -38,7 +38,7 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             assert.ok(dev.text.includes('may I delete the old table?'), at + "the wait's question is on the row");
             // #12649: the asker leads the preview; its subtitle continues the question without repeating that preview.
             // #12722: the dialog names the asker/team and retains the complete question, checked below.
-            const leadRow = await ev(`(() => { const r = [...document.querySelectorAll('#group-table-view tbody tr')].find(x => x.textContent.includes('Lead')); const n = r.querySelector('.inbox-review-name'), sub = r.querySelector('.cell-subtitle, [class*="subtitle"]'), from = r.querySelector('.inbox-review-from'); return { name: n ? n.textContent : '', sub: sub ? sub.textContent : '', from: from ? from.textContent.replace(/ \u00b7$/, '') : '' }; })()`);
+            const leadRow = await ev(`(() => { const r = [...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(x => x.textContent.includes('Lead')); const n = r.querySelector('.inbox-review-name'), sub = r.querySelector('.cell-subtitle, [class*="subtitle"]'), from = r.querySelector('.inbox-review-from'); return { name: n ? n.textContent : '', sub: sub ? sub.textContent : '', from: from ? from.textContent.replace(/ \u00b7$/, '') : '' }; })()`);
             assert.ok(leadRow.name.startsWith('Which of the two'), at + "the row's name is the question's first line: " + JSON.stringify(leadRow));
             assert.equal(leadRow.from, 'Lead', at + 'the asker leads the top line');
             { const said = leadRow.name.replace(/…$/, '').replace(/\s+/g, ' ').trim(), whole = LONG.replace(/\u202e/g, '<U+202E>').replace(/\s+/g, ' ').trim(); assert.ok(whole.startsWith(said) && said.length >= Math.min(whole.length, 450) && !leadRow.sub.includes(said.slice(0, 40)), at + 'the row\'s name is the whole question (the preview\'s 500 characters), and the line under it does not say it again (#12649, #14574): ' + leadRow.sub.slice(0, 80)); }
@@ -69,7 +69,7 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             const post = await ev(`window.__posts[window.__posts.length - 1]`);
             assert.equal(post.url, '/api/board/team/messages'); assert.equal(post.body.subscriber_id, 'Operator'); assert.equal(post.body.as, 'Operator');
             assert.equal(post.body.content, '@Lead Ship the second.', at + 'the asker is @named'); assert.equal(post.body.reply_to, 41, at + 'an ask is answered with reply_to');
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'the answered row leaves', 6000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 1`, at + 'the answered row leaves', 6000);
             await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '1'`, at + 'the badge counts one', 6000);
 
             // the wait: a plain post to its asker, no reply_to
@@ -82,12 +82,12 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             await waitFor(`!document.querySelector('dialog.inbox-ask-dialog')`, at + 'closed', 4000);
             const p2 = await ev(`window.__posts[window.__posts.length - 1]`);
             assert.equal(p2.body.content, '@Dev yes, delete it'); assert.ok(!('reply_to' in p2.body), at + 'a wait has no reply_to');
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 0`, at + 'no rows left', 6000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 0`, at + 'no rows left', 6000);
             await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').hidden`, at + 'the badge is gone', 6000);
 
             // Escape closes without sending
             await ev(`window.__asks = [{ board: 'team', kind: 'ask', id: 50, asker: 'Lead', text: 'short question', at: '2026-10-31T03:00:00Z' }]; (async () => (await import(${S} + 'operator_asks.js')).refreshOperatorAsks(true))(); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'a new question appears on the next read', 6000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 1`, at + 'a new question appears on the next read', 6000);
             const before = await ev(`window.__posts.length`);
             await ev(`document.querySelector('button[aria-label="Answer the question of Lead"]').click(); true`);
             await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'opens again', 4000);
@@ -97,8 +97,8 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
 
             // a question with no first line: the row's name falls back to the asker, with a hidden character in their name written out like the subtitle's (#11545)
             await ev(`window.__asks = [{ board: 'team', kind: 'ask', id: 51, asker: 'Lead\u202e', text: '   ', at: '2026-10-31T04:00:00Z' }]; (async () => (await import(${S} + 'operator_asks.js')).refreshOperatorAsks(true))(); true`);
-            await waitFor(`document.querySelector('#group-table-view tbody tr .inbox-review-name') && /^Lead/.test(document.querySelector('#group-table-view tbody tr .inbox-review-name').textContent)`, at + 'the empty question shows its asker as the name', 6000);
-            const fb = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr'); return { name: r.querySelector('.inbox-review-name').textContent, row: r.textContent }; })()`);
+            await waitFor(`document.querySelector('#group-table-view tbody tr:not(.dt-group) .inbox-review-name') && /^Lead/.test(document.querySelector('#group-table-view tbody tr:not(.dt-group) .inbox-review-name').textContent)`, at + 'the empty question shows its asker as the name', 6000);
+            const fb = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr:not(.dt-group)'); return { name: r.querySelector('.inbox-review-name').textContent, row: r.textContent }; })()`);
             assert.ok(fb.name.includes('<U+202E>') && !fb.row.includes('\u202e'), at + 'the fallback name has the hidden character written out, never drawn raw: ' + JSON.stringify(fb));
         }
         console.log('PASS operator asks in Needs you: the rows, the badge, the whole question, the reply, and a refused post that keeps the text');

@@ -61,13 +61,13 @@ const SHAPES = {
                 return true; })()`);
             await ev(`(async () => { await import(${S} + 'operator_ask_dialog.js'); return true; })()`); // loads the question dialog's styles, its grid among them: the shot's state
             await ev(`(async () => { const { state } = await import(${S} + 'state.js'); const m = await import(${S} + 'inbox_tab.js'); state.liveSessions = [${JSON.stringify(AGENT)}]; m.updateInboxTab(); window.switchNavTab('hub-inbox'); await m.selectInboxTab('needs'); return true; })()`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 1`, 'the permission row', 15000); await ev(framesJs(6));
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length >= 1`, 'the permission row', 15000); await ev(framesJs(6));
             for (const theme of ['dark', 'light']) {
                 await ev(`${themeJs(theme)}; document.documentElement.style.fontSize = ${JSON.stringify(zoom)}; true`);
                 for (const [shape, card] of Object.entries(SHAPES)) {
                     const at = `${w}px ${zoom} ${theme} ${shape}: `;
                     await ev(`window.__card = ${JSON.stringify(card)}; true`);
-                    await ev(`document.querySelector('${T} tbody tr .dt-primary').click(); true`);
+                    await ev(`document.querySelector('${T} tbody tr:not(.dt-group) .dt-primary').click(); true`);
                     await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open] .inbox-ask-offers-list button')`, at + 'the card dialog', 8000); await ev(framesJs(4));
                     const m = await measure();
                     check(!!m && m.n >= 6, at + 'the card drew its parts: ' + JSON.stringify(m));

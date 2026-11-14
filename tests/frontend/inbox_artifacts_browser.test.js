@@ -49,7 +49,7 @@ const WORLD = `(() => {
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' — ' + detail : ''}`); };
     const shot = require('./helpers/scene_shots')(Page); // the gate's uploaded output in CI, CORAL_SCREENSHOT_DIR locally
-    const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => (r.querySelector('.dt-mail-title') || r.querySelector('.dt-primary') || {}).textContent || '')`); // a phone's row is a mail row (#9583): the file's name is its title, the team and task follow it
+    const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].map(r => (r.querySelector('.dt-mail-title') || r.querySelector('.dt-primary') || {}).textContent || '')`); // a phone's row is a mail row (#9583): the file's name is its title, the team and task follow it
     const pane = () => ev(`(() => { const p = document.querySelector('.inbox-detail-pane'); return p && !p.hidden ? { title: (p.querySelector('.detail-title') || {}).textContent || '', back: (p.querySelector('.detail-back') || {}).textContent || '', fixed: getComputedStyle(p).position, body: p.textContent } : null; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -66,7 +66,7 @@ const WORLD = `(() => {
                 check('desktop: the sidebar has a Files section with the Artifacts folder and its count (5)', /Artifacts\s*5/.test(f.text) && f.section === 'Files', JSON.stringify(f));
                 await ev(`document.querySelector('[data-view-list="inbox-folders"] .view-list-item[data-key="artifacts"]').click(); true`);
             } else await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.openInboxGroup('artifacts')).then(() => true)`);
-            await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:artifacts' && document.querySelectorAll('#group-table-view tbody tr').length === 5`, `${label}: five rows`, 10000);
+            await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:artifacts' && document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 5`, `${label}: five rows`, 10000);
             if (!mobile) { // the table's default sizes (#9856): the artifact's name is at least 24 characters and nothing scrolls sideways, at 1280 and at 1024
                 for (const bw of [1280, 1024]) {
                     await Emulation.setDeviceMetricsOverride({ width: bw, height: h, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the table follows its box
@@ -80,7 +80,7 @@ const WORLD = `(() => {
             check(`${label}: the page is titled Artifacts with the count`, (await ev(`(document.getElementById('group-table-title') || {}).textContent + '|' + (document.querySelector('.inbox-artifacts-count') || {}).textContent`)) === 'Artifacts|5');
             check(`${label}: the rows of both teams are one list, newest first`, (await rows()).join() === 'beta-notes.txt,alpha-report.md,beta-data.json,alpha-chart.png,alpha-plan.md', (await rows()).join());
             // The star on a row (#9834): the filled glyph on a starred row, the empty star only at a hover (a mouse), nothing on touch; the row's name says starred
-            const starRow = n => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r => /${n}/.test(r.textContent))`;
+            const starRow = n => `[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(r => /${n}/.test(r.textContent))`;
             const stars = await ev(`(() => { const st = ${starRow('alpha-report')}, un = ${starRow('beta-notes')}; const f = e => e ? { on: e.classList.contains('dt-star-on'), op: getComputedStyle(e).opacity, shown: getComputedStyle(e).display !== 'none', pe: getComputedStyle(e).pointerEvents } : null; return { starred: f(st.querySelector('.dt-star')), plain: f(un.querySelector('.dt-star')), name: (st.querySelector('.dt-mail-open, .dt-primary') || {}).getAttribute('aria-label') || (st.querySelector('.dt-primary') || {}).textContent }; })()`);
             check(`${label}: a starred row has the filled star, always drawn`, stars.starred && stars.starred.on && stars.starred.shown && stars.starred.op === '1', JSON.stringify(stars));
             if (!mobile) {
@@ -99,7 +99,7 @@ const WORLD = `(() => {
             } else {
                 check(`${label}: on a phone an unstarred row has no star control, and the glyph is not a button`, stars.plain === null || !stars.plain.shown, JSON.stringify(stars)); check(`${label}: the starred row's name says starred, once`, (String(stars.name).match(/starred/g) || []).length === 1, String(stars.name)); check(`${label}: the glyph does not take a tap`, stars.starred.pe === 'none', JSON.stringify(stars.starred));
             }
-            check(`${label}: a Team column names each row's team`, (await ev(`[...document.querySelectorAll('#group-table-view thead th')].some(t => /Team/.test(t.textContent)) && /beta/.test(document.querySelector('#group-table-view tbody tr').textContent)`)));
+            check(`${label}: a Team column names each row's team`, (await ev(`[...document.querySelectorAll('#group-table-view thead th')].some(t => /Team/.test(t.textContent)) && /beta/.test(document.querySelector('#group-table-view tbody tr:not(.dt-group)').textContent)`)));
             await shot(`inbox-artifacts-${label}`);
 
             // the Team filter
@@ -119,12 +119,12 @@ const WORLD = `(() => {
             await ev(`document.getElementById('ia-starred').closest('label').querySelector('.list-bar-field-label').click(); true`);
             await ev(`window.__ta.length = 0; true`);
             await ev(`(() => { const s = document.getElementById('ia-team'); s.value = 'beta'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, `${label}: the rows narrowed to the team`, 8000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2`, `${label}: the rows narrowed to the team`, 8000);
             check(`${label}: with Starred only cleared the route is not asked for starred`, !(await ev(`window.__ta.some(q => /starred=/.test(q))`)));
             check(`${label}: the Team filter asks the route for that team`, (await ev(`window.__ta.some(q => /(^|[?&])team=beta(&|$)/.test(q))`)));
             check(`${label}: with one team chosen the Team column goes`, !(await ev(`[...document.querySelectorAll('#group-table-view thead th')].some(t => /^Team$/.test(t.textContent.trim()))`)));
             await ev(`(() => { const s = document.getElementById('ia-team'); s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 5`, `${label}: all rows again`, 8000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 5`, `${label}: all rows again`, 8000);
 
             // a row opens its document beside the list
             await ev(`document.querySelectorAll('#group-table-view tbody .dt-primary')[1].click(); true`);
@@ -148,7 +148,7 @@ const WORLD = `(() => {
             // the sidebar's search is the folder's
             if (!mobile) {
                 await ev(`(() => { const i = document.getElementById('inbox-search'); i.value = 'chart'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-                await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, 'the search narrowed the list', 8000);
+                await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 1`, 'the search narrowed the list', 8000);
                 check('1280: the sidebar search box searches the folder (q goes to the route)', (await ev(`window.__ta.some(q => /(^|[?&])q=chart(&|$)/.test(q))`)));
             }
             check(`${label}: nothing runs past the page edge`, (await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`)) <= 0);

@@ -45,18 +45,18 @@ const id = n => n.toString(16).padStart(64, '0');
         assert.ok(rows.length === 1 && /2 earlier versions/.test(rows[0]), 'the file is one row with its earlier versions: ' + JSON.stringify(rows));
 
         // Save for later: every version leaves Needs you, together
-        await ev(`document.querySelector('#group-table-view tbody tr .inbox-bookmark').click(); true`);
+        await ev(`document.querySelector('#group-table-view tbody tr:not(.dt-group) .inbox-bookmark').click(); true`);
         await waitFor(`document.querySelectorAll('#group-table-view [data-review-artifact]').length === 0 && window.__decisions.length >= 3`, 'the file left Needs you', 8000);
         assert.deepEqual((await decisions()).sort(), ['save:1', 'save:2', 'save:3'], 'the save went to all three versions');
         await refresh();
         assert.deepEqual(await needs(), [], 'no earlier version comes up as the row');
         await openSaved(); await refresh();
-        await waitFor(`document.querySelectorAll('.saved-files tbody tr').length === 1`, 'Saved lists the file once', 8000);
-        const saved = await ev(`[...document.querySelectorAll('.saved-files tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
+        await waitFor(`document.querySelectorAll('.saved-files tbody tr:not(.dt-group)').length === 1`, 'Saved lists the file once', 8000);
+        const saved = await ev(`[...document.querySelectorAll('.saved-files tbody tr:not(.dt-group)')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
         assert.ok(saved.length === 1 && /2 earlier versions/.test(saved[0]), 'one Saved row, the newest with its earlier versions: ' + JSON.stringify(saved));
 
         // Move to Needs you: back as one row
-        await ev(`window.__decisions.length = 0; const r = document.querySelector('.saved-files tbody tr'); r.querySelector('[data-slot=dots] button, button[aria-haspopup=menu]').click(); true`);
+        await ev(`window.__decisions.length = 0; const r = document.querySelector('.saved-files tbody tr:not(.dt-group)'); r.querySelector('[data-slot=dots] button, button[aria-haspopup=menu]').click(); true`);
         await waitFor(`!![...document.querySelectorAll('.saved-files .menu-item')].find(b => /Move to Needs you/.test(b.textContent))`, 'the menu', 4000);
         await ev(`[...document.querySelectorAll('.saved-files .menu-item')].find(b => /Move to Needs you/.test(b.textContent)).click(); true`);
         await waitFor(`window.__decisions.length >= 3`, 'unsave went to every version', 8000);
@@ -66,7 +66,7 @@ const id = n => n.toString(16).padStart(64, '0');
         assert.ok(/2 earlier versions/.test((await needs())[0]), 'with its earlier versions');
 
         // Dismiss: all of them
-        await ev(`window.__decisions.length = 0; [...document.querySelectorAll('#group-table-view tbody tr button')].find(b => /^Dismiss: /.test(b.getAttribute('aria-label') || '')).click(); true`);
+        await ev(`window.__decisions.length = 0; [...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group) button')].find(b => /^Dismiss: /.test(b.getAttribute('aria-label') || '')).click(); true`);
         await waitFor(`window.__decisions.length >= 3`, 'the ignore went to every version', 8000);
         assert.deepEqual((await decisions()).sort(), ['ignore:1', 'ignore:2', 'ignore:3']);
         await refresh();
@@ -74,7 +74,7 @@ const id = n => n.toString(16).padStart(64, '0');
         // Deny: the newest is denied (the agent is told once), the older versions leave Needs you quietly with it
         await ev(`window.__decisions.length = 0; window.__items.forEach(a => { a.tags = ['for review', 'internal']; }); true`); await refresh();
         await waitFor(`document.querySelectorAll('#group-table-view [data-review-artifact]').length === 1`, 'the file is back for the deny', 8000);
-        await ev(`[...document.querySelectorAll('#group-table-view tbody tr button')].find(b => /^Deny: /.test(b.getAttribute('aria-label') || '')).click(); true`);
+        await ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group) button')].find(b => /^Deny: /.test(b.getAttribute('aria-label') || '')).click(); true`);
         await waitFor(`!!document.querySelector('dialog.inbox-deny-dialog[open]')`, 'the deny dialog', 4000);
         await ev(`document.querySelector('.inbox-deny-confirm').click(); true`);
         await waitFor(`window.__decisions.length >= 3`, 'the deny and the older versions', 8000);
@@ -85,8 +85,8 @@ const id = n => n.toString(16).padStart(64, '0');
         // a Saved list that already holds two versions saved on their own (as the Operator's did) is one row
         await ev(`window.__decisions.length = 0; window.__items.forEach(a => { a.tags = ['for review', 'internal']; }); window.__items[0].tags.push('saved'); window.__items[1].tags.push('saved'); window.__items.pop(); true`); await refresh();
         await openSaved(); await refresh();
-        await waitFor(`document.querySelectorAll('.saved-files tbody tr').length >= 1`, 'the saved files', 8000);
-        const legacy = await ev(`[...document.querySelectorAll('.saved-files tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
+        await waitFor(`document.querySelectorAll('.saved-files tbody tr:not(.dt-group)').length >= 1`, 'the saved files', 8000);
+        const legacy = await ev(`[...document.querySelectorAll('.saved-files tbody tr:not(.dt-group)')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
         assert.ok(legacy.length === 1 && /1 earlier version(?!s)/.test(legacy[0]), 'two saved versions are one Saved row with "1 earlier version": ' + JSON.stringify(legacy));
         console.log('PASS a file with several versions: Save, Dismiss and Move to Needs you apply to the whole file; Saved is one row per file');
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }

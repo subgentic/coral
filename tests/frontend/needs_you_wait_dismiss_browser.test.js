@@ -26,8 +26,8 @@ const BASE = require('./test_base').BASE;
         const waiting = () => ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); return m.waitingCount(); })()`);
         assert.equal(await waiting(), 4, 'four agents wait on the person');
         await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')); true`);
-        const rowOf = who => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.textContent.includes(${JSON.stringify(who)}))`;
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 4`, 'the four rows', 10000);
+        const rowOf = who => `[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(r => r.textContent.includes(${JSON.stringify(who)}))`;
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length >= 4`, 'the four rows', 10000);
         const dismissOf = who => ev(`!!(${rowOf(who)} || document.body).querySelector('.inbox-dismiss')`);
         for (const [who, words] of [['inputter', 'Needs input: pick a colour'], ['signer', 'Sign in to continue'], ['sleeper', 'Wants to know: which font'], ['permit', 'Wants to run: npm test']]) {
             assert.ok(await ev(`!!(${rowOf(words)})`), `${who}: its row is listed`);

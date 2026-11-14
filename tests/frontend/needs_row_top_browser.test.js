@@ -31,13 +31,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`(() => { const orig = window.fetch.bind(window); window.fetch = (u, o) => String(u) === '/api/operator-asks' ? Promise.resolve(new Response(JSON.stringify([{ board: '${team}', kind: 'ask', id: 71, asker: 'Lead', text: 'Which port should the test server use for the integration run, and should it be the same one the dashboard is on? Say which, and why.', at: new Date(Date.now() - 300000).toISOString() }]), { status: 200, headers: { 'Content-Type': 'application/json' } })) : orig(u, o); return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 3 && !!document.querySelector('${T} tbody tr .inbox-answers, ${T} tbody tr [data-on-click*="ask"], ${T} tbody tr button')`, at + 'the review rows and the question', 15000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length >= 3 && !!document.querySelector('${T} tbody tr:not(.dt-group) .inbox-answers, ${T} tbody tr:not(.dt-group) [data-on-click*="ask"], ${T} tbody tr:not(.dt-group) button')`, at + 'the review rows and the question', 15000);
             await ev(framesJs(4));
             await ev(`(() => { const st = document.createElement('style'); st.textContent = '*, *::before, *::after { transition: none !important; }'; document.head.append(st); return true; })()`);
 
             const vis = () => ev(`(() => { const r = e => !!(e && e.getClientRects().length); const row = document.querySelector('${T} .list-bar-search-row, ${T} .gt-toolbar'); return { head: r(row && row.querySelector('.inbox-folder-head')), search: r(row && row.querySelector('.list-bar-search-wrap')), pills: r(row && row.querySelector('.team-tb-pills, .goals-chips, .list-bar-chips')) }; })()`);
             const idle = await vis();
-            await ev(`document.querySelector('${T} tbody tr .dt-check input, ${T} tbody tr .dt-mail-lead')?.click(); true`); await ev(framesJs(4));
+            await ev(`document.querySelector('${T} tbody tr:not(.dt-group) .dt-check input, ${T} tbody tr:not(.dt-group) .dt-mail-lead')?.click(); true`); await ev(framesJs(4));
             const geo = await ev(`(() => { const r = e => e && e.getClientRects().length ? e.getBoundingClientRect() : null; return [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].map(tr => { const rb = tr.getBoundingClientRect(), c = x => x ? Math.round(x.top - rb.top + x.height / 2) : null;
                 return { h: Math.round(rb.height), check: c(r(tr.querySelector('.dt-check input, .dt-mail-lead'))), icon: c(r(tr.querySelector('.inbox-kind-icon'))), star: c(r(tr.querySelector('.inbox-review-star'))) }; }); })()`);
             check(geo.length >= 4, at + 'four rows: ' + JSON.stringify(geo));

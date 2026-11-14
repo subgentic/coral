@@ -30,14 +30,14 @@ const CASES = [
                 else await ev(`window.switchNavTab('hub-inbox'); true`);
                 await ev(`import(${S}+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
                 try { await waitFor(`document.querySelectorAll('#group-table-view .inbox-answer').length === ${shown.length}`, at + 'the choices are buttons on the row', 15000); }
-                catch (e) { throw new Error(e.message + ' :: ' + await ev(`JSON.stringify({ group: (document.getElementById('group-table-view') || {}).dataset, rows: [...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ').trim().slice(0, 160)), buttons: [...document.querySelectorAll('#group-table-view tbody button')].map(b => (b.getAttribute('aria-label') || b.textContent).trim().slice(0, 60)), chatReads: (window.__chatReads || 0), iframe: !!document.querySelector('#group-table-view iframe'), live: (window.__qaState || {}).liveSessions ? 1 : 0 })`)); }
+                catch (e) { throw new Error(e.message + ' :: ' + await ev(`JSON.stringify({ group: (document.getElementById('group-table-view') || {}).dataset, rows: [...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].map(r => r.textContent.replace(/\\s+/g, ' ').trim().slice(0, 160)), buttons: [...document.querySelectorAll('#group-table-view tbody button')].map(b => (b.getAttribute('aria-label') || b.textContent).trim().slice(0, 60)), chatReads: (window.__chatReads || 0), iframe: !!document.querySelector('#group-table-view iframe'), live: (window.__qaState || {}).liveSessions ? 1 : 0 })`)); }
                 const names = await ev(`[...document.querySelectorAll('#group-table-view .inbox-answer')].map(b => ({ text: b.textContent.trim(), name: (b.getAttribute('aria-label') || b.textContent).trim() }))`);
                 assert.deepEqual(names.map(b => b.text), shown, at + 'each button carries its own words, not an icon');
                 for (const b of names) assert.ok(b.name.length > 0 && !/^[\W_]*$/.test(b.name), at + 'a name a person and a screen reader can read: ' + JSON.stringify(b));
                 await ev(`new Promise(r => setTimeout(r, 900))`); // sleep-ok: a permission's Yes ignores a press for its first 400 ms (the arm hold, #14302)
                 await ev(`document.querySelector('#group-table-view .inbox-answer').click(); true`);
                 try { await waitFor(`window.__answers.length === 1`, at + 'one press answers', 10000); }
-                catch (e) { throw new Error(e.message + ' :: posts ' + await ev(`JSON.stringify(window.__posts || [])`) + ' :: row ' + await ev(`(document.querySelector('#group-table-view tbody tr') || {}).textContent`)); }
+                catch (e) { throw new Error(e.message + ' :: posts ' + await ev(`JSON.stringify(window.__posts || [])`) + ' :: row ' + await ev(`(document.querySelector('#group-table-view tbody tr:not(.dt-group)') || {}).textContent`)); }
                 const sent = await ev(`window.__answers[0]`);
                 assert.match(sent.path, /^\/api\/remote\/m2\/api\/sessions\/live\/hub-agent-2\/answer-prompt$/, at + 'through the computer, not the Hub itself: ' + sent.path);
                 assert.equal(sent.body.label, shown[0], at + 'the label sent is the button\'s');

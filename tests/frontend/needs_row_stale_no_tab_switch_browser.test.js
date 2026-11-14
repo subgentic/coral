@@ -30,10 +30,10 @@ const { coralReady } = require('./helpers/wait');
             await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && document.querySelectorAll('#group-table-view .inbox-answer').length === 4`, `${w}: both rows' two choices`, 12000);
             await new Promise(r => setTimeout(r, 600)); // sleep-ok: the buttons are armed (the table has settled) before a press
-            const rowOf = name => `[...document.querySelectorAll('#group-table-view tbody tr')].find(tr => tr.textContent.includes('${name}'))`; // the rows of the agents named qa and qb (neither name is part of the other)
+            const rowOf = name => `[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(tr => tr.textContent.includes('${name}'))`; // the rows of the agents named qa and qb (neither name is part of the other)
             const stoppedAt = Date.now();
             await ev(`window.__waiting = false; window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.updateInboxTab()); true`);
-            await waitFor(`!${rowOf('qa')}`, `${w}: qa's row leaves`, 12000).catch(async e => { throw new Error(e.message + ' | rows: ' + await ev(`JSON.stringify([...document.querySelectorAll('#group-table-view tbody tr')].map(t => t.textContent.replace(/\\s+/g, ' ').slice(0, 60)))`) + ' badge: ' + await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`)); });
+            await waitFor(`!${rowOf('qa')}`, `${w}: qa's row leaves`, 12000).catch(async e => { throw new Error(e.message + ' | rows: ' + await ev(`JSON.stringify([...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].map(t => t.textContent.replace(/\\s+/g, ' ').slice(0, 60)))`) + ' badge: ' + await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`)); });
             const took = Date.now() - stoppedAt;
             assert.ok(took < 3500, `${w}: the answered row left as soon as the agent stopped waiting, under a resting pointer (took ${took} ms; a hold is up to 10 s)`);
             assert.ok(await ev(`!!${rowOf('qb')}`), `${w}: the other waiting agent's row stays`);

@@ -32,7 +32,7 @@ const { coralReady } = require('./helpers/wait');
         // 2: the Inbox opened: its full read runs and the badge keeps the same number
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 7`, 'the 7 files are listed', 10000);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length >= 7`, 'the 7 files are listed', 10000);
         assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), '7', 'the badge is the full read\'s number now, the same');
         console.log('PASS');
     } finally { try { client.close(); } catch (e) {} }

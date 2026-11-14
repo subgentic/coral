@@ -29,13 +29,13 @@ const { coralReady } = require('./helpers/wait');
                     if (m && o && o.method === 'POST') { const body = JSON.parse(o.body); window.__posts.push(body); window.__asks = window.__asks.filter(x => x.id !== body.reply_to); return json({ ok: true, id: 900 + window.__posts.length }); }
                     return orig(u, o); }; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 3`, at + 'the three questions', 10000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length >= 3`, at + 'the three questions', 10000);
             const open = who => ev(`document.querySelector('button[aria-label="Answer the question of ${who}"]').click(); true`);
             const btns = () => ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog[open]'); return d ? { sendrow: [...d.querySelectorAll('.inbox-ask-sendrow button')].map(b => b.textContent.trim()), footer: [...d.querySelectorAll('.inbox-ask-buttons button')].map(b => b.textContent.trim()), note: [...d.querySelectorAll('.inbox-ask-sub')].map(p => p.textContent).join(' | ') } : null; })()`);
             const closeDlg = async () => { await ev(`document.querySelector('dialog.inbox-ask-dialog[open]').dispatchEvent(new Event('cancel', { cancelable: true })); true`); await waitFor(`!document.querySelector('dialog.inbox-ask-dialog')`, at + 'the dialog closes', 4000); };
 
             // a plain question: reply box only, Send reply says it was sent
-            const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ')).join(' || ')`);
+            const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].map(r => r.textContent.replace(/\\s+/g, ' ')).join(' || ')`);
             await open('Dev'); await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the plain question opens', 4000);
             const plain = await btns();
             check(at + 'a plain question has no Approve or Request changes', !!plain && !plain.sendrow.includes('Approve') && !plain.sendrow.includes('Request changes'), JSON.stringify(plain));

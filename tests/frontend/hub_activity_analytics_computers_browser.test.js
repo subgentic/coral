@@ -55,8 +55,8 @@ const SERVERS = [{ id: 'srv1', label: 'Alpha', status: 'online' }, { id: 'srv2',
         await start();
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_sidebar.js').then(m => m.openInboxGroup('activity')).then(() => true)`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 4 || /Not in this list|could not be read/.test(document.body.innerText)`, 'the Activity rows', 15000);
-        const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(tr => tr.innerText.replace(/\\s+/g, ' ').trim())`);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length >= 4 || /Not in this list|could not be read/.test(document.body.innerText)`, 'the Activity rows', 15000);
+        const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].map(tr => tr.innerText.replace(/\\s+/g, ' ').trim())`);
         const got = await rows();
         check('every online computer\'s record is in the folder, newest first (Alpha 2 min, this computer 5, Beta 10, Alpha 30)', got.length === 4 && /Alpha report/.test(got[0]) && /Hub note/.test(got[1]) && /Beta report/.test(got[2]) && /Alpha plan/.test(got[3]), JSON.stringify(got));
         check('each row\'s From names its computer', /Alpha/.test(got[0]) && /This computer/.test(got[1]) && /Beta/.test(got[2]) && /Alpha/.test(got[3]), JSON.stringify(got));
@@ -69,7 +69,7 @@ const SERVERS = [{ id: 'srv1', label: 'Alpha', status: 'online' }, { id: 'srv2',
         check('the Computer filter is on the Activity toolbar', !!filterId, filterId);
         if (filterId) {
             await ev(`(() => { const s = document.getElementById(${JSON.stringify(filterId)}); s.value = 'srv1'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'only Alpha\'s rows', 8000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2`, 'only Alpha\'s rows', 8000);
             const only = await rows();
             check('choosing Alpha keeps its two rows and no other computer\'s', only.length === 2 && only.every(r => /Alpha/.test(r)), JSON.stringify(only));
             await shot('activity-filtered-to-one-computer');

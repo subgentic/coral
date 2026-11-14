@@ -22,7 +22,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'${team}': items}, { truncated: ${truncated} }) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin); if ((opts.method || 'GET') === 'GET' && u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: items, has_more: false }); return original(url, opts); }; return true; })()`);
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-        await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 2`, 'two rows', 15000);
+        await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length >= 2`, 'two rows', 15000);
         await ev(framesJs(6));
     };
     try {

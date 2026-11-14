@@ -38,13 +38,13 @@ const { coralReady } = require('./helpers/wait');
                 return true; })()`);
             await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.settings = { ...m.state.settings, inbox_welcome: 'on', inbox_welcome_done: '' }; return true; })`);
             await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 8`, at + 'welcome, review and question rows', 15000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length >= 8`, at + 'welcome, review and question rows', 15000);
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: the table settles after its first draw
 
             assert.equal(await ev(`(document.querySelector('#group-table-view .view-list-nav')?.getClientRects().length || 0)`), 0, at + 'row actions remain usable without the Inbox strip');
             assert.equal(await ev(`document.getElementById('group-table-title').textContent`), 'Needs you', at + 'the current folder name stays visible');
 
-            const rowOf = name => `[...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes(${JSON.stringify(name)}))`;
+            const rowOf = name => `[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(r => r.textContent.includes(${JSON.stringify(name)}))`;
             const point = async name => ev(`(() => { const r = ${rowOf(name)}; r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { x: b.left + b.width * 0.35, y: b.top + b.height * 0.35 }; })()`); // the row's own box, off its two links
             const touch = (type, p) => client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x: p.x, y: p.y, id: 1 }] });
             const tap = async name => { const p = await point(name); await touch('touchStart', p); await new Promise(r => setTimeout(r, 60)); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 250)); }; // sleep-ok: a tap, and the table redraws
@@ -54,7 +54,7 @@ const { coralReady } = require('./helpers/wait');
             const selected = () => ev(`[...document.querySelectorAll('${T} tbody tr.dt-selected')].map(r => r.textContent.slice(0, 60))`);
 
             // Phone rows keep navigation and the approved review star; other actions stay in selection.
-            const visible = await ev(`[...document.querySelectorAll('${T} tbody tr button')].filter(b => { const c = (b.closest('.dt-td') || b).getBoundingClientRect(); return c.width > 2 && c.height > 2 && getComputedStyle(b).visibility !== 'hidden'; }).map(b => b.getAttribute('aria-label') || b.textContent)`);
+            const visible = await ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group) button')].filter(b => { const c = (b.closest('.dt-td') || b).getBoundingClientRect(); return c.width > 2 && c.height > 2 && getComputedStyle(b).visibility !== 'hidden'; }).map(b => b.getAttribute('aria-label') || b.textContent)`);
             assert.deepEqual(visible.filter(l => !/^(Open |Task: |Star |Remove the star from |Approve: |Request changes: |More actions for |Approve with a note: |Dismiss: |Deny: |Save for later: |Copy version ID: |Answer the question of |Got it: |New agent: |New team: |Connect: |Read it: |Open guide: )/.test(l)), [], at + 'a phone row carries navigation, the review star and its own review buttons (#14627: Approve and Request changes at rest, the rest in More actions): ' + JSON.stringify(visible));
             // a tap opens the question
             await tap('Which port should the test server use?');
@@ -92,7 +92,7 @@ const { coralReady } = require('./helpers/wait');
             const stay = await ev(`(() => { const bar = document.querySelector('.dt-bar'), sc = document.getElementById('group-table-view'); sc.scrollTop = sc.scrollTop + 500; const r = bar.getBoundingClientRect(), t = sc.getBoundingClientRect(); return { top: Math.round(r.top - t.top), shown: r.height > 0 }; })()`);
             assert.ok(stay.shown && stay.top >= -1 && stay.top <= 40, at + 'after the list scrolls the bar is still at the top of the screen (within 40 px of the list top): ' + JSON.stringify(stay));
             // the empty area under the list at its end is the same with rows selected as without (the Hide-all-welcome button and the bottom bar's room, 173 px here): a selection adds none (#11765)
-            const end = await ev(`(() => { const sc = document.getElementById('group-table-view'); sc.scrollTop = sc.scrollHeight; const rows = [...document.querySelectorAll('${T} tbody tr')], last = rows[rows.length - 1].getBoundingClientRect(), s = sc.getBoundingClientRect(); const note = document.querySelector('${T} .inbox-alerts-link'), cs = note && getComputedStyle(note); return Math.round(s.bottom - last.bottom - (note ? note.getBoundingClientRect().height + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom) : 0)); })()`); // the "Turn on alerts" line (#11837, 11d) is under the list on purpose: it is not empty room
+            const end = await ev(`(() => { const sc = document.getElementById('group-table-view'); sc.scrollTop = sc.scrollHeight; const rows = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')], last = rows[rows.length - 1].getBoundingClientRect(), s = sc.getBoundingClientRect(); const note = document.querySelector('${T} .inbox-alerts-link'), cs = note && getComputedStyle(note); return Math.round(s.bottom - last.bottom - (note ? note.getBoundingClientRect().height + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom) : 0)); })()`); // the "Turn on alerts" line (#11837, 11d) is under the list on purpose: it is not empty room
             assert.ok(end <= 240, at + 'under the last row there is only the page\'s own room (the bar, and the room the + New button needs: at most 240 px, #12634), not a selection\'s empty area: ' + end);
             assert.ok(!b.actions.find(a => a.label === 'Approve').off && !b.actions.find(a => a.label === 'Changes').off, at + 'a file can be approved or sent back');
             // the three dots hold Changes, Mark read and Mark unread, and open on a tap

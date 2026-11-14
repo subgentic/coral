@@ -35,7 +35,7 @@ const STUB = `(() => {
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const T = '#group-table-view', S = `(window.__coralStatic || '/static/')`;
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-    const rowOf = re => `[...document.querySelectorAll('${T} tbody tr')].find(r => ${re}.test(r.textContent))`;
+    const rowOf = re => `[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(r => ${re}.test(r.textContent))`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
@@ -48,7 +48,7 @@ const STUB = `(() => {
         await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
         await ev(`import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => true)`);
-        await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 5`, 'rows', 15000); await ev(framesJs(8));
+        await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length >= 5`, 'rows', 15000); await ev(framesJs(8));
         // (1) a question shows up to two lines
         const q = await ev(`(() => { const n = (${rowOf('/Which port/')}).querySelector('.inbox-review-name'), cs = getComputedStyle(n), lh = parseFloat(cs.lineHeight) || 1.4 * parseFloat(cs.fontSize); return { lines: Math.round(n.getBoundingClientRect().height / lh), clamp: cs.webkitLineClamp, text: n.textContent.length }; })()`);
         check(q.lines >= 3 && q.clamp === 'none', 'a long question shows all its lines, not two (#14574): ' + JSON.stringify(q));

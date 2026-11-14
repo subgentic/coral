@@ -25,7 +25,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         }
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-        if (withRows) await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 2`, 'two rows', 15000);
+        if (withRows) await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length >= 2`, 'two rows', 15000);
         await ev(framesJs(6));
     };
     try {

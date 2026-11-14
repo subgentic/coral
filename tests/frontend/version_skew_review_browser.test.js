@@ -40,7 +40,7 @@ const { coralReady } = require('./helpers/wait');
             })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(r => r.textContent.includes('Old computer plan.md'))`, label + ': the older computer\'s review file is listed in Needs you', 15000);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].some(r => r.textContent.includes('Old computer plan.md'))`, label + ': the older computer\'s review file is listed in Needs you', 15000);
             const page = await ev(`document.body.innerText`);
             const note = /Review artifacts could not be read|could not be asked|Not everything is shown/.exec(page);
             assert.ok(!note, label + ': no "could not be read" note: ' + (note && JSON.stringify(page.slice(Math.max(0, note.index - 120), note.index + 160))));
@@ -51,7 +51,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`import(${S} + 'inbox_reviews.js').then(m => { m.refreshReviews(true); return true; })`);
             await ev(`new Promise(r => { let last = -1, still = 0; const t = setInterval(() => { const n = window.__oldReads.length; still = n === last ? still + 1 : 0; last = n; if (still >= 8) { clearInterval(t); r(true); } }, 150); })`); // the refresh's reads have all landed when the reads of that computer stop growing
             assert.equal(await ev(`window.__oldRefused`), first, label + ': a later read sends no newer key to that computer again: ' + JSON.stringify(await ev(`window.__oldRefusedAt`)));
-            assert.ok(await ev(`[...document.querySelectorAll('${T} tbody tr')].some(r => r.textContent.includes('Old computer plan.md'))`), label + ': the file is still listed after a later read');
+            assert.ok(await ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].some(r => r.textContent.includes('Old computer plan.md'))`), label + ': the file is still listed after a later read');
             console.log(`PASS ${label}: the older computer's review file is listed; ${first} refused read(s), none after`);
         }
     } finally { await client.close(); }

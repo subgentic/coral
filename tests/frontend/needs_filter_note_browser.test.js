@@ -31,14 +31,14 @@ const { coralReady, framesJs } = require('./helpers/wait');
             const open = who => ev(`document.querySelector('button[aria-label="Answer the question of ${who}"]').click(); true`);
 
 
-            const noteOf = () => ev(`(() => { const n = document.querySelector('.inbox-filter-note'); return n ? { text: n.textContent.trim(), btn: !!n.querySelector('button'), rows: document.querySelectorAll('#group-table-view tbody tr').length } : null; })()`);
+            const noteOf = () => ev(`(() => { const n = document.querySelector('.inbox-filter-note'); return n ? { text: n.textContent.trim(), btn: !!n.querySelector('button'), rows: document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length } : null; })()`);
             await waitFor(`!!document.querySelector('.inbox-filter-note')`, at + 'the filter line', 8000).catch(() => {});
             const n0 = await noteOf();
             check(at + 'a kept team filter says so above the list, with Clear', n0 && /^Filtered by team: zz-no-such-team/.test(n0.text) && n0.btn, JSON.stringify(n0));
             await ev(`document.querySelector('.inbox-filter-note button').click(); true`);
-            await waitFor(`!document.querySelector('.inbox-filter-note') && document.querySelectorAll('#group-table-view tbody tr').length >= 1`, at + 'Clear brings the rows back', 8000).catch(async () => check(at + 'Clear removes the line and brings the rows back: ' + JSON.stringify(await ev(`({ note: !!document.querySelector('.inbox-filter-note'), rows: document.querySelectorAll('#group-table-view tbody tr').length, saved: localStorage.getItem('coral-inbox-needs-filters'), text: document.querySelector('#group-table-view').innerText.slice(0, 200) })`)), false));
+            await waitFor(`!document.querySelector('.inbox-filter-note') && document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length >= 1`, at + 'Clear brings the rows back', 8000).catch(async () => check(at + 'Clear removes the line and brings the rows back: ' + JSON.stringify(await ev(`({ note: !!document.querySelector('.inbox-filter-note'), rows: document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length, saved: localStorage.getItem('coral-inbox-needs-filters'), text: document.querySelector('#group-table-view').innerText.slice(0, 200) })`)), false));
             check(at + 'one skip link, not one more per redraw', (await ev(`document.querySelectorAll('#group-table-view .skip-link').length`)) === 1);
-            const top = () => ev(`Math.round(document.querySelector('#group-table-view tbody tr').getBoundingClientRect().top)`);
+            const top = () => ev(`Math.round(document.querySelector('#group-table-view tbody tr:not(.dt-group)').getBoundingClientRect().top)`);
             const t0 = await top();
             await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle, .inbox-folder-toolbar .list-bar-filter-btn').click(); true`);
             await waitFor(`!!document.querySelector('.inbox-folder-toolbar .list-bar-menu') && getComputedStyle(document.querySelector('.inbox-folder-toolbar .list-bar-menu')).display !== 'none'`, at + 'the panel opens', 4000);

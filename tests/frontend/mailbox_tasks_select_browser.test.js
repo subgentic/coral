@@ -22,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
         for (const t of ['One', 'Two', 'Three']) { const r = await api('POST', `/api/board/${B}/tasks`, { title: t, body: 'x', created_by: 'orch', priority: 'medium', assigned_to: 'Operator' }); assert.ok(r.status < 300, JSON.stringify(r)); ids.push(r.body.id || r.body.task.id); }
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`);
-        await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr').length === 3`, 'the three tasks', 15000);
+        await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length === 3`, 'the three tasks', 15000);
         await ev(`(() => { const s=document.createElement('style'); s.textContent='*, *::before, *::after { transition: none !important; animation: none !important; }'; document.head.append(s); return true; })()`);
         assert.equal(await ev(`document.querySelectorAll('#group-table-view [data-key="files"]').length`), 0, 'no empty Files heading or cells');
         for (const width of [1280,390]) {
@@ -34,7 +34,7 @@ const { coralReady } = require('./helpers/wait');
                 await shot(`${width}-${theme}`);
                 if (width === 1280) { // the State column is the state's word in the state's colour: no pill, no dot, no fill, and 4.5:1 or more in each state (the Operator, #11189)
                     const st = await ev(`(() => { const lum = c => { const [r, g, b] = c.match(/[\\d.]+/g).slice(0, 3).map(Number).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
-                        const td = document.querySelector('.dt-table tbody tr td[data-key=state], .dt-table tbody tr td:nth-child(2)'), cell = td.firstElementChild; const cs = getComputedStyle(cell);
+                        const td = document.querySelector('.dt-table tbody tr:not(.dt-group) td[data-key=state], .dt-table tbody tr:not(.dt-group) td:nth-child(2)'), cell = td.firstElementChild; const cs = getComputedStyle(cell);
                         const bgOf = e => { for (let n = e; n; n = n.parentElement) { const c = getComputedStyle(n).backgroundColor; if (c && !/rgba\\(.*, 0\\)$/.test(c) && c !== 'transparent') return c; } return getComputedStyle(document.body).backgroundColor; };
                         const bg = bgOf(td), ratios = {}; for (const k of ['queued', 'active', 'blocked', 'done']) { const p = document.createElement('span'); p.className = 'dt-state goal-state-task-' + k; p.textContent = k; td.append(p); ratios[k] = Math.round(((a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05))(lum(getComputedStyle(p).color), lum(bg)) * 100) / 100; p.remove(); }
                         return { cls: cell.className, text: cell.textContent.trim(), dot: !!td.querySelector('.goal-dot'), border: cs.borderTopWidth, bg: cs.backgroundColor, radius: cs.borderTopLeftRadius, ratios }; })()`);
@@ -103,7 +103,7 @@ const { coralReady } = require('./helpers/wait');
         let s = await state();
         assert.deepEqual([s.selecting, s.count, s.actions], [true, '2 selected', ['Mark done', 'Clear']], 'the bar takes the toolbar line ' + JSON.stringify(s));
         await ev(`[...document.querySelectorAll('#group-table-view .dt-bar-action')].find(b => b.textContent === 'Mark done').click(); true`);
-        await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr').length === 1`, 'the two done tasks leave the list', 12000);
+        await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length === 1`, 'the two done tasks leave the list', 12000);
         await ev(`[...document.querySelectorAll('.toast')].some(t => /Marked done 2 tasks/.test(t.textContent))`).then(ok => assert.ok(ok, 'the toast says two were marked done'));
         assert.equal((await state()).selecting, false, 'the toolbar is back');
         // the table's order is the Inbox's (not the order they were made in): the two rows that were selected are the two the server completed, and the one left is still open
