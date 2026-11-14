@@ -64,12 +64,12 @@ const TEAM = `qa-design-${Date.now() % 100000}`;
                 else { assert.equal(t.sameLine, true, 'the field, the pills, the Filters icon and New task share one line'); assert.ok(t.newH <= t.searchH + 4, `New task is not taller than the field (${t.newH} against ${t.searchH})`); }
             });
 
-            if (!mobile) await S.run(`${label}: item 6, Open chat is left-aligned under its header and on the name's line`, async () => {
+            if (!mobile) await S.run(`${label}: item 6 (#15857: the Chat column is gone), the Details link sits on the name's line, right after the name`, async () => {
                 await goTab(ev, settle, 'Agents'); await settle(600);
-                const r = await ev(`(() => { const p = ${panel()}; const th = [...p.querySelectorAll('th')].find(x => x.textContent.trim() === 'Chat'); const b = [...p.querySelectorAll('button')].find(x => /^Open chat with /.test(window.__na.name(x)) && window.__na.vis(x)); const td = b.closest('tr').querySelector('td'); const range = document.createRange(); range.selectNodeContents(td.querySelector('button, a, span') || td); const nr = range.getBoundingClientRect(), br = b.getBoundingClientRect(), hr = th.getBoundingClientRect();
-                    return { header: Math.round(hr.left + parseFloat(getComputedStyle(th).paddingLeft)), button: Math.round(br.left), dy: Math.round(Math.abs((br.top + br.bottom) / 2 - (nr.top + nr.bottom) / 2)) }; })()`);
-                assert.ok(Math.abs(r.button - r.header) <= 2, `Open chat starts at its header's text (${r.button} vs ${r.header})`);
-                assert.ok(r.dy <= 6, `Open chat is on the name's line (centres ${r.dy} px apart)`);
+                const r = await ev(`(() => { const p = ${panel()}; const th = [...p.querySelectorAll('th')]; const b = [...p.querySelectorAll('button.team-agent-details')].find(window.__na.vis); const nm = b.closest('tr').querySelector('.dt-primary'); const br = b.getBoundingClientRect(), nr = nm.getBoundingClientRect();
+                    return { chatColumn: th.some(x => x.textContent.trim() === 'Chat'), dy: Math.round(Math.abs((br.top + br.bottom) / 2 - (nr.top + nr.bottom) / 2)), after: br.left >= nr.left }; })()`);
+                assert.equal(r.chatColumn, false, 'no Chat column');
+                assert.ok(r.dy <= 6 && r.after, `Details is on the name's line (centres ${r.dy} px apart): ` + JSON.stringify(r));
             });
         }
         await removeBoards(ev, [TEAM]); S.finish(); // finish() exits the process, so the board goes first

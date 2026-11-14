@@ -1,14 +1,16 @@
-/* The team page's Agents tab (#7453 stage 3, UI/UX's Team view design): status chips with counts, one table of everyone on the board (Agent, Status, Doing, Provider, Chat), and an agent's own page.
- * Each live row has "Open chat" (that agent's chat, local or a Hub computer's; none for an ended agent or a terminal). "Remind <name>" is on the agent's own page and opens a small dialog (the message, a repeat, Remind): the message goes now as an @mention board message to the agent, and with a repeat the repeating reminder is set too; then "Reminded <name>."
+/* The team page's Agents tab (#7453 stage 3, UI/UX's Team view design): status chips with counts, one table of everyone on the board (Agent, Status, Doing, Provider and more), and an agent's own page.
+ * A live row opens that agent's chat (local or a Hub computer's), by click or Enter, with no button of its own (#15857); an ended agent's or a terminal's row opens its page, where Resume is. "Remind <name>" is on the agent's own page and opens a small dialog (the message, a repeat, Remind): the message goes now as an @mention board message to the agent, and with a repeat the repeating reminder is set too; then "Reminded <name>."
  * in a polite status. An agent that already has a repeating reminder has Edit reminder and Remove reminder on its page. Everything drawn is built with the DOM and textContent: names, reasons and task titles are written by agents.
  * Lazy: team_page.js imports it. */
 import { importOnce } from './import_once.js';
+import { loadStyles } from './lazy_styles.js';
 import { foldWayBack } from './way_back.js';
 import { state } from './state.js';
 import { boardFetch, inTeam, keyLabel, isCloud, splitKey } from './server_base.js';
 import { pollEvery } from './overload.js';
 import { OPERATOR_ID } from './utils.js';
 import { refreshTeamAvailability, remindAgent, stopAgentReminder } from './team_availability.js';
+await loadStyles('team_agent_details.css'); // the quiet Details link's rules load with the tab (#15857)
 const { openRemindDialog, REPEATS } = await importOnce('./team_remind_dialog.js');
 const { searchChip, readSearchLevels, openSearchAccess } = await importOnce('./search_access.js'); // how far an agent's chat search reaches (#11048)
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
@@ -141,8 +143,8 @@ function removeSeatButton(agent, ctx) {
     return b;
 }
 
-/** Resume an ended agent from its earlier chat: the same action as Continue this chat, Resume session in All chats (resume_ended.js), on its own row (#15294). Null when the server named no session to resume. */
-function resumeButton(agent, cls = 'btn btn-small dt-action dt-action-roomy team-resume') {
+/** Resume an ended agent from its earlier chat: the same action as Continue this chat, Resume session in All chats (resume_ended.js), on the agent's page (#15294, #15857). Null when the server named no session to resume. */
+function resumeButton(agent, cls, onDone) {
     const e = agent.ended_session; if (!e || agent.availability !== 'offline') return null;
     const b = btn(cls, 'Resume', null);
     b.setAttribute('aria-label', `Resume ${agent.name}`);
@@ -153,21 +155,14 @@ function resumeButton(agent, cls = 'btn btn-small dt-action dt-action-roomy team
             const { resumeEndedAgent } = await importOnce('./resume_ended.js');
             await resumeEndedAgent(splitKey(model.team).server, { agentType: e.agent_type, sid: e.session_id, name: agent.name }, splitKey(model.team).name);
             showToast(`${agent.name} is back in "${keyLabel(model.team)}".`);
-            await load();
+            await load(); onDone?.();
         } catch (err) { showToast(err.message || `Could not resume ${agent.name}.`, true); b.disabled = false; }
     });
     return b;
 }
 
-function chatButton(agent) {
-    const resume = resumeButton(agent); if (resume) return resume;
-    const session = agent.availability !== 'offline' && agent.agent_type !== 'terminal' ? sessionOf(agent) : null;
-    if (!session) return '';
-    const b = btn('btn btn-small dt-action dt-action-roomy team-open-chat', 'Open chat');
-    b.setAttribute('aria-label', `Open chat with ${agent.name}`); // one button per row, each named for whose
-    b.addEventListener('click', (e) => { e.stopPropagation(); openChat(session); });
-    return b;
-}
+/** The live session a row opens, or null (an ended agent, a terminal: no chat). */
+function chatSessionOf(agent) { return agent.availability !== 'offline' && agent.agent_type !== 'terminal' ? sessionOf(agent) : null; }
 
 // The Orchestrator first, then the agents that need a person (the header's "N need attention" opens this tab): a waiting agent, then a queued one, then an offline one; the rest in the sidebar's order.
 const NEEDS = ['waiting', 'needs_input']; // an ended agent needs no one: it sorts with the rest (#8271)
@@ -216,17 +211,17 @@ function draw() {
     const rows = visibleAgents(), searchShown = [...model.levels.values()].some(l => l && l.level && l.level !== 'own');
     body.append(DT.dataTable({
         label: `Agents, ${rows.length}`, rows, rowKey: ag => ag.subscriber_id || ag.session_id || ag.name, state: agentsTableState,
-        open: (ag, tr) => hooks.openAgent?.(ag, tr.querySelector('.dt-primary')),
+        open: (ag, tr) => { const session = chatSessionOf(ag); if (session) openChat(session); else hooks.openAgent?.(ag, tr.querySelector('.dt-primary')); }, // the row opens the agent's chat (#15857); an ended agent or a terminal has none, so its row opens its page (Resume is there)
         columns: [
             { key: 'agent', label: 'Agent', primary: true, width: 'grow', line: 1, field: 'name', sort: true,
-                cell: ag => { const b = DT.primaryButton('', ''); b.append(DT.avatar(ag.name)); const dot = el('span', `team-agent-dot team-agent-dot-${ag.availability === 'available' || ag.availability === 'busy' ? 'ok' : ag.availability === 'needs_input' ? 'ask' : 'quiet'}`); dot.setAttribute('aria-hidden', 'true'); dot.title = statusWord(ag); b.prepend(dot); b.append(el('span', 'team-agent-state sr-only', `, ${statusWord(ag)}`)); if (ag.availability === 'needs_input' || ag.availability === 'unavailable') { const ask = DT.chip(statusWord(ag), CLASS[ag.availability]); ask.classList.add('team-agent-ask'); ask.setAttribute('aria-hidden', 'true'); b.append(ask); } return b; } }, // the state as a dot by the name where the Status column has given way (a phone); a state that asks something of a person also keeps its word there, as a chip the dot already names for a screen reader (#9713)
+                cell: ag => { const b = DT.primaryButton('', ''); b.classList.add('team-agent-name'); b.append(DT.avatar(ag.name)); const dot = el('span', `team-agent-dot team-agent-dot-${ag.availability === 'available' || ag.availability === 'busy' ? 'ok' : ag.availability === 'needs_input' ? 'ask' : 'quiet'}`); dot.setAttribute('aria-hidden', 'true'); dot.title = statusWord(ag); b.prepend(dot); b.append(el('span', 'team-agent-state sr-only', `, ${statusWord(ag)}`)); if (ag.availability === 'needs_input' || ag.availability === 'unavailable') { const ask = DT.chip(statusWord(ag), CLASS[ag.availability]); ask.classList.add('team-agent-ask'); ask.setAttribute('aria-hidden', 'true'); b.append(ask); } const more = el('button', 'team-agent-details dt-reveal', 'Details'); more.type = 'button'; more.setAttribute('aria-label', `Details for ${ag.name}`); more.addEventListener('click', e => { e.stopPropagation(); hooks.openAgent?.(ag, more); }); const cell = el('span', 'team-agent-namecell'); cell.append(b, more); return cell; } }, // the state as a dot by the name where the Status column has given way (a phone); a state that asks something of a person also keeps its word there, as a chip the dot already names for a screen reader (#9713)
             { key: 'status', label: 'Status', line: 2, width: '11rem', dropAt: 28, sort: true, sortValue: statusWord, cell: ag => statusNode(ag) },
+
             { key: 'doing', label: 'Doing', line: 2, width: '18rem', dropAt: 52, sort: true, sortValue: doingOf, cell: ag => { const t = doingOf(ag), span = el('span', null, t); if (t) span.title = t; return span; } }, // one line a row (Goal #79): the whole line is the tooltip
             { key: 'open', label: 'Open tasks', line: 2, width: '6rem', dropAt: 36, sort: true, align: 'end', sortValue: openTasksOf, cell: ag => { const n = openTasksOf(ag); if (!n) return '0'; const link = DT.link(String(n), () => importOnce('./nav.js').then(nav => importOnce('./routes.js').then(r => nav.go(r.keyRoute('team', model.team, 'tasks', null, new URLSearchParams({ agent: ag.name }).toString()))))); link.setAttribute('aria-label', `${n} open ${n === 1 ? 'task' : 'tasks'}: ${ag.name}`); return link; } },
             { key: 'onTask', label: 'Time on task', line: 2, width: '6.75rem', dropAt: 36, sort: true, align: 'end', sortValue: ag => claimedAt(ag) === null ? 0 : Date.now() - claimedAt(ag), blankLast: ag => claimedAt(ag) === null, cell: ag => { const w = onTaskWords(ag); if (w) return w; const none = el('span', null, '\u2014'); none.setAttribute('role', 'img'); none.setAttribute('aria-label', 'none'); return none; } }, // a row with no task is last under either order; its dash is named "none" for a screen reader
             { key: 'provider', label: 'Provider', line: 2, width: '6rem', dropAt: 36, tone: 'tertiary', sort: true, sortValue: providerOf, cell: providerOf },
             ...(searchShown ? [{ key: 'search', label: 'Search', line: 2, width: '12rem', dropAt: 52, tone: 'tertiary', cell: ag => searchChip((model.levels.get(ag.name) || {}).level) || '' }] : []), // a column only while some member is above "own": an empty one was drawn, clipped at the right edge of a phone's table as a stray "…" (#11128)
-            { key: 'chat', label: 'Chat', line: 1, width: 'calc(6.25rem + 26px)', cell: chatButton },
         ], oneLine: true, resize: true, sortBar: false,
     }).el);
     if (held) { const sel = held.startsWith('row:') ? rowFocusTarget(body, held.slice(4)) : body.querySelector(`.goals-chip[data-filter="${CSS.escape(held.slice(5))}"]`); sel?.focus({ preventScroll: true }); }
@@ -309,7 +304,7 @@ export function renderAgentPage(host, agent, ctx) {
     const session = sessionOf(agent), reach = model.levels.get(agent.name);
     if (reach) { const c = searchChip(reach.level); if (c) line.append(c); const b = btn('btn', 'Search access\u2026', null); b.setAttribute('aria-label', `Search access for ${agent.name}`); b.addEventListener('click', () => openSearchAccess({ name: agent.name, team: model.team, ...reach }, { opener: b, onChanged: () => load().then(() => renderAgentPage(host, agent, ctx)) })); bar.append(b); }
     if (!isCloud() && !String(model.team).startsWith('@') && agent.subscriber_id) bar.append(removeSeatButton(agent, ctx)); // the Operator takes a seat off the board (#11112): on this computer only, never through the Hub
-    const resume = resumeButton(agent, 'btn btn-primary'); if (resume) bar.append(resume);
+    const resume = resumeButton(agent, 'btn btn-primary', () => { const fresh = ((model.data && model.data.agents) || []).find(a => a.name === agent.name); if (fresh) renderAgentPage(host, fresh, ctx); }); if (resume) bar.append(resume); // the page reads the agent again once it is back (it was the row's Resume before, #15857)
     if (session) bar.append(btn('btn', 'Open chat', () => openChat(session)));
     if (agent.reminder) {
         const id = agent.subscriber_id || agent.name;

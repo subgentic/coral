@@ -23,12 +23,12 @@ const TEAM = `qa-agents-${Date.now() % 100000}`;
             await seed(ev, TEAM); await agentsUp(ev); await liveWaiting(ev); // agentsUp's status says the second agent needs input: its live row agrees (#14437)
             if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await openTeam(ev, waitFor, TEAM).catch(() => {});
-            await S.run(`${label}: the Agents tab's name carries the count (2) and the tab opens a table with Agent, Status, Doing, Open tasks, Provider, Chat`, async () => {
+            await S.run(`${label}: the Agents tab's name carries the count (2) and the tab opens a table with Agent, Status, Doing, Open tasks, Provider (no Chat column: the row opens the chat, #15857)`, async () => {
                 await goTab(ev, settle, 'Agents');
                 const full = await ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === 'Agents'); return t ? window.__na.name(t) : ''; })()`);
                 assert.ok(/Agents\s*[2-3]/.test(full), `the tab says Agents with its count (got ${JSON.stringify(full)})`);
                 const hd = await ev(`window.__tp.headers()`); assert.ok(hd, 'the Agents tab has a table');
-                if (!mobile) assert.deepEqual(hd.map(x => x.replace(/[↕↑↓]/g, '').trim()).slice(0, 6), ['Agent', 'Status', 'Doing', 'Open tasks', 'Provider', 'Chat'], 'the columns (#14861: Open tasks always, Time on task only while an agent has a task in progress; none has here): ' + JSON.stringify(hd));
+                if (!mobile) assert.deepEqual(hd.map(x => x.replace(/[↕↑↓]/g, '').trim()).slice(0, 5), ['Agent', 'Status', 'Doing', 'Open tasks', 'Provider'], 'the columns (#14861: Open tasks always, Time on task only while an agent has a task in progress; none has here): ' + JSON.stringify(hd));
                 const rows = await ev(`window.__tp.rows()`); assert.ok(rows.some(r => /Orchestrator/.test(r)) && rows.some(r => /Backend Dev/.test(r)), `both agents are rows (${JSON.stringify(rows.map(r => r.slice(0, 30)))})`);
             });
             await S.run(`${label}: no folder line and no Refresh button (the tab refreshes itself); the Orchestrator is the first row; Knowledge has no "0" badge`, async () => {
@@ -45,29 +45,39 @@ const TEAM = `qa-agents-${Date.now() % 100000}`;
                 assert.match(c[0].name, /^All\s*\d+$/, 'All with its count'); assert.equal(c[0].pressed, 'true', 'All is pressed');
                 assert.ok(c.length >= 3, `at least All and two statuses (${JSON.stringify(c.map(x => x.name))})`); assert.ok(c.every(x => /\d+$/.test(x.name)), 'every chip has its count');
             });
-            await S.run(`${label}: every live row has a button named "Open chat with <name>", enabled, at least 44 px on a phone, and none says Remind`, async () => {
+            await S.run(`${label}: no row has an Open chat or Remind button; each has a quiet Details button that is on the screen on a phone (#15857)`, async () => {
+                assert.equal(await ev(`[...window.__tp.table().querySelectorAll('button')].some(x => /^(Open chat|Remind)/.test(window.__na.name(x)))`), false, 'no Open chat or Remind button on a row');
                 for (const n of ['Orchestrator', 'Backend Dev']) {
-                    const b = await ev(`(() => { const e = [...window.__tp.table().querySelectorAll('button')].find(x => window.__na.name(x) === ${JSON.stringify('Open chat with ' + n)}); if (!e) return null; const r = e.getBoundingClientRect(); return { disabled: e.disabled || e.getAttribute('aria-disabled') === 'true', h: Math.round(r.height), label: e.textContent.trim() }; })()`);
-                    assert.ok(b, `a button named Open chat with ${n}`); assert.equal(b.disabled, false, `Open chat with ${n} is enabled`); assert.equal(b.label, 'Open chat', 'its words are Open chat'); if (mobile) assert.ok(b.h >= 44, `Open chat with ${n} is ${b.h} px high`);
+                    const b = await ev(`(() => { const e = [...window.__tp.table().querySelectorAll('button.team-agent-details')].find(x => window.__na.name(x) === ${JSON.stringify('Details for ' + n)}); if (!e) return null; const r = e.getBoundingClientRect(); return { label: e.textContent.trim(), shown: r.width > 0 && getComputedStyle(e).opacity === '1', inView: r.right <= innerWidth }; })()`);
+                    assert.ok(b, `a Details button for ${n}`); assert.equal(b.label, 'Details', 'its word is Details'); if (mobile) assert.ok(b.shown && b.inView, `Details for ${n} is shown on a phone: ` + JSON.stringify(b));
                 }
-                assert.equal(await ev(`[...window.__tp.table().querySelectorAll('button')].some(x => /^Remind/.test(window.__na.name(x)))`), false, 'Remind is not on a row (it is on the agent\'s page)');
             });
-            { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/team-agents-open-chat-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } } // opt-in picture of the rows
-            await S.run(`${label}: Open chat selects that agent's live session: its name, type, session id and server (a Hub computer's too)`, async () => {
+            { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/team-agents-details-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } } // opt-in picture of the rows
+            await S.run(`${label}: a click on the row selects that agent's live session: its name, type, session id and server (the session's own, so a Hub computer's agent carries its computer)`, async () => {
                 await ev(`(() => { window.__chat = []; window.switchNavTab = () => {}; window.selectLiveSession = (...a) => { window.__chat.push(a.slice(0, 4)); window.__chatOpts = a[4]; }; return true; })()`);
-                const click = () => ev(`(() => { const e = [...window.__tp.table().querySelectorAll('button')].find(x => window.__na.name(x) === 'Open chat with Backend Dev'); if (e) e.click(); return true; })()`);
+                const click = () => ev(`(() => { const e = [...window.__tp.table().querySelectorAll('.dt-primary')].find(x => /^Backend Dev(, |$)/.test(window.__na.name(x))); if (e) e.click(); return true; })()`);
                 await click();
                 const want = await ev(`(() => { const s = window.__LIVE[1]; return [s.name, s.agent_type, s.session_id, s.server]; })()`);
                 assert.equal(want[0], 'Backend Dev'); assert.deepEqual(await ev(`window.__chat`), [want], 'a local agent: its own session'); assert.deepEqual(await ev(`window.__chatOpts`), { focusChat: true }, 'and asks for the keyboard to land in the chat (Open chat\'s fifth argument, #9783: it left focus on the page)');
-                await ev(`window.__LIVE[1].server = 'epoch'; window.__chat.length = 0; true`); await click();
-                assert.deepEqual(await ev(`window.__chat`), [[want[0], want[1], want[2], 'epoch']], 'a Hub computer\'s agent: the same call with that computer');
-                await ev(`delete window.__LIVE[1].server; true`);
             });
             // Remind is on the agent's own page: these helpers open it and come back to the table.
-            const openPage = async n => { await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button, a')].find(x => { const nm = window.__na.name(x); return nm === ${JSON.stringify(n)} || nm.startsWith(${JSON.stringify(n)} + ', '); }); if (b) b.click(); return true; })()`); await settle(400); };
+            const openPage = async n => { await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button.team-agent-details')].find(x => window.__na.name(x) === ${JSON.stringify('Details for ' + n)}); if (b) b.click(); return true; })()`); await settle(400); };
             const backToTable = async () => { await ev(`(() => { const b = window.__tp.find('button, a', /^(\u2190\s*)?Agents$/); if (b) b.click(); return true; })()`); await settle(300); };
             const clickRemind = n => ev(`(() => { const e = [...window.__tp.page().querySelectorAll('button')].find(x => window.__na.name(x) === ${JSON.stringify('Remind ' + n)}); if (e) e.click(); return true; })()`);
             const dlg = n => `(() => { const d = [...document.querySelectorAll('[role=dialog]')].filter(window.__na.vis).find(x => window.__na.name(x).startsWith(${JSON.stringify('Remind ' + n)})); return d; })()`;
+            await S.run(`${label}: from the keyboard, Enter on a row opens its chat, and Tab reaches Details whose Enter opens the agent page (#15857)`, async () => {
+                const row = () => `[...window.__tp.table().querySelectorAll('.dt-primary')].find(x => /^Backend Dev(, |$)/.test(window.__na.name(x)))`;
+                const key = async (k, code, vk, text) => { const o = { key: k, code, windowsVirtualKeyCode: vk }; await client.Input.dispatchKeyEvent({ type: 'keyDown', text, ...o }); await client.Input.dispatchKeyEvent({ type: 'keyUp', ...o }); };
+                await ev(`window.__chat = []; ${row()}.focus(); true`);
+                await key('Enter', 'Enter', 13, '\r'); await settle(300);
+                assert.equal(await ev(`window.__chat.length`), 1, 'Enter on the row opened the chat');
+                await key('Tab', 'Tab', 9); await settle(100);
+                assert.equal(await ev(`window.__na.name(document.activeElement)`), 'Details for Backend Dev', 'Tab reaches the Details button');
+                await key('Enter', 'Enter', 13, '\r'); await settle(400);
+                assert.equal(await ev(`window.__chat.length`), 1, 'Details did not also open the chat');
+                assert.ok(await ev(`(() => { const e = [...window.__tp.page().querySelectorAll('h2')].find(window.__na.vis); return !!e && /Backend Dev/.test(window.__na.text(e)); })()`), 'Enter on Details opened the agent page');
+                await ev(`(() => { const b = window.__tp.find('button, a', /^(\u2190\s*)?Agents$/); if (b) b.click(); return true; })()`); await settle(300);
+            });
             const inDlg = (n, sel, rx) => `(() => { const d = ${dlg(n)}; return d ? [...d.querySelectorAll(${JSON.stringify(sel)})].filter(window.__na.vis).find(e => ${rx}.test(window.__na.name(e))) : null; })()`;
             const status = () => ev(`(() => { const e = [...document.querySelectorAll('[role=status]')].filter(window.__na.vis).map(x => window.__na.text(x).trim()).find(t => /^Reminded /.test(t)); return e || ''; })()`);
             await S.run(`${label}: Remind <name> opens a dialog named "Remind <name>" with the Message prefilled, Repeat on "Don't repeat" (30 minutes, hour, 4 hours, day), and "Remind" focused`, async () => {
@@ -106,13 +116,13 @@ const TEAM = `qa-agents-${Date.now() % 100000}`;
                 assert.equal((await ev(`window.__writes`)).length, 0, 'nothing was sent'); assert.equal(await ev(`!!${dlg('Backend Dev')}`), false, 'the dialog closed');
                 await backToTable();
             });
-            await S.run(`${label}: an agent's row opens its page: back link Agents, h2 with the name, buttons Remind and Open chat; Back puts the focus on the row`, async () => {
-                await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button, a')].find(x => /^Backend Dev(, |$)/.test(window.__na.name(x))); if (b) b.click(); return true; })()`); await settle(400);
+            await S.run(`${label}: an agent's Details button opens its page: back link Agents, h2 with the name, buttons Remind and Open chat; Back puts the focus on the row`, async () => {
+                await ev(`(() => { const b = [...window.__tp.table().querySelectorAll('button.team-agent-details')].find(x => window.__na.name(x) === 'Details for Backend Dev'); if (b) b.click(); return true; })()`); await settle(400);
                 assert.ok(await ev(`(() => { const e = [...window.__tp.page().querySelectorAll('h2')].find(window.__na.vis); return !!e && /Backend Dev/.test(window.__na.text(e)); })()`), 'the agent page h2 names the agent');
                 for (const rx of ['/^(\\u2190\\s*)?Agents$/', '/^Remind/', '/^Open chat$/']) assert.ok(await ev(`!!window.__tp.find('button, a', ${rx})`), `a control named ${rx}`);
                 assert.equal(await ev(`window.__tp.pane() === null`), true, 'no Details pane for an agent');
                 await ev(`(() => { const b = window.__tp.find('button, a', /^(\\u2190\\s*)?Agents$/); if (b) b.click(); return true; })()`); await settle(300);
-                assert.ok(await ev(`document.activeElement && /Backend Dev/.test(window.__na.text(document.activeElement))`), 'the focus is on the agent row');
+                assert.ok(await ev(`document.activeElement && /Backend Dev/.test(window.__na.name(document.activeElement))`), 'the focus is back on the agent row (its Details button, which opened the page)');
             });
             await S.run(`${label}: the health settings button opens the team's Health check section`, async () => {
                 await goTab(ev, settle, 'Goals');

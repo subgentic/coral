@@ -1,0 +1,7 @@
+/* The Agents table's quiet Details link (#15857): a row opens the chat, so the agent's page is one text link in the name cell, shown on hover and focus (always on a touch screen). */
+.team-agent-namecell{display:flex;align-items:center;min-width:0}
+.team-agent-namecell>.team-agent-name{flex:1 1 auto;min-width:0}
+.team-agent-details{flex:none;margin-left:.5rem;padding:0 .25rem;border:0;background:none;color:var(--text-secondary);font:inherit;font-size:var(--fs-md);text-decoration:underline;cursor:pointer;opacity:0;white-space:nowrap}
+.team-agent-details:focus-visible{opacity:1}
+.team-agent-details:hover{color:var(--text-primary)}
+@media (hover:none),(max-width:600px){.team-agent-details{opacity:1}}

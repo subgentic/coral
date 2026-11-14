@@ -25,20 +25,22 @@ const TEAM = `qa-resume-${Date.now() % 100000}`;
             return R(u, o); }; return true; })()`);
         await openTeam(ev, waitFor, TEAM); await settle(500);
         await ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === 'Agents'); t.click(); return true; })()`);
-        await waitFor(`!!document.querySelector('button[aria-label="Resume Lead"]')`, 'the ended agent has a Resume button', 8000);
+        await waitFor(`!![...document.querySelectorAll('tr.dt-row')].find(r => r.innerText.includes('Lead'))`, 'the ended agent is a row', 8000);
         const row = await ev(`(() => { const rows = [...document.querySelectorAll('tr.dt-row')].filter(r => r.getClientRects().length), of = n => rows.find(r => r.innerText.includes(n)); return { lead: [...of('Lead').querySelectorAll('button')].map(b => b.textContent.trim()), ghost: [...of('Ghost').querySelectorAll('button')].map(b => b.textContent.trim()), text: of('Lead').innerText }; })()`);
-        assert.ok(row.lead.includes('Resume') && !row.lead.includes('Open chat'), 'the ended row offers Resume: ' + JSON.stringify(row));
+        assert.ok(!row.lead.includes('Resume') && !row.lead.includes('Open chat'), 'the row itself has no Resume or Open chat button (the agent page has Resume, #15857): ' + JSON.stringify(row));
         assert.ok(!row.ghost.includes('Resume'), 'a member with no session of its own has nothing to resume: ' + JSON.stringify(row));
         assert.doesNotMatch(row.text, /registered local session/i, 'no jargon in the row: ' + row.text);
         const before = await ev('window.__calls.status');
         await ev(`window.dispatchEvent(new Event('kill')); true`);
         await waitFor(`window.__calls.status > ${before}`, 'a kill makes the open tab read its rows again', 5000);
+        await ev(`[...document.querySelectorAll('tr.dt-row')].find(r => r.innerText.includes('Lead')).querySelector('.dt-primary').click(); true`); // an ended agent has no chat: its row opens its page
+        await waitFor(`!!document.querySelector('button[aria-label="Resume Lead"]')`, 'the ended agent\'s page has a Resume button', 8000);
         await ev(`document.querySelector('button[aria-label="Resume Lead"]').click(); true`);
         await waitFor(`window.__calls.launch.length === 1`, 'Resume starts the agent from its earlier chat', 8000);
         const l = await ev('window.__calls.launch[0]');
         assert.equal(l.resume_session_id, 'rs-lead', 'from its own chat: ' + JSON.stringify(l));
         assert.equal(l.display_name, 'Lead'); assert.equal(l.board_name, TEAM, 'back in the team: ' + JSON.stringify(l));
-        await waitFor(`!document.querySelector('button[aria-label="Resume Lead"]')`, 'the row reads again and the Resume button is gone', 8000);
-        console.log('PASS the ended agent\'s row has Resume, it resumes the earlier chat in the team, and a kill refreshes the tab');
+        await waitFor(`!document.querySelector('button[aria-label="Resume Lead"]')`, 'the page reads again and the Resume button is gone', 8000);
+        console.log('PASS the ended agent\'s page has Resume, it resumes the earlier chat in the team, and a kill refreshes the tab');
     } finally { await removeBoards(ev, [TEAM]).catch(() => { }); await client.close(); }
 })().catch(e => { console.error('FAIL', e); process.exit(1); });
