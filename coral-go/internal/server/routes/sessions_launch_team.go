@@ -777,6 +777,7 @@ func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamR
 		carried, _ := agent.SplitPermissionFlags(body.Flags)
 		_, memberCustom := custommodes.IDOf(def.PermissionMode)
 		switch {
+		case def.PermissionMode == "default" && permMode != "": // the member's own mode is Default (#10362): the team's mode flags are not added to it, or a Default member ran in the team's mode, e.g. Auto (#16583, walk 25); launchSession starts it in Default
 		case memberCustom: // the mode the member's own form picked (#15950) is its mode: the team's flags add no permission flags of theirs, launchSession adds the custom mode's (#16388)
 		case permMode == "" && len(carried) > 0 && def.Capabilities.IsEmpty():
 			cleanFlags = append(cleanFlags, carried...) // flags nobody here can read as a mode are handed on, never dropped (#6423)
