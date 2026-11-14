@@ -1,4 +1,4 @@
-// #15257 (Beta walk 12 H1): a goal an agent closed as done is a row of Needs you, "Goal #N closed as done by <agent>", with Reopen and Dismiss. It is listed, not counted: the Inbox badge does not move. Reopen puts the goal
+// #15257 (Beta walk 12 H1): a goal an agent closed as done is a row of Needs you, "Goal #N closed as done by <agent>", with Reopen and Dismiss. It is listed AND counted (#16753, the Operator): the Needs you count and the Inbox badge go up by one for each goal the person made that an agent closed. Reopen puts the goal
 // back to active (and the row goes); Dismiss hides it in this browser; a goal the Operator closed has no such row. Real server, a real goal closed through the close route as an agent and as the Operator.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -33,15 +33,17 @@ const { coralReady } = require('./helpers/wait');
         const titles = await rowTitles();
         assert.ok(titles.some(t => t.includes(`Goal #${c} closed as done by orch`)), 'the second agent-closed goal too: ' + JSON.stringify(titles));
         assert.ok(!titles.some(t => t.includes(`Goal #${b} `)), 'a goal the Operator closed has no row: ' + JSON.stringify(titles));
-        assert.equal(await needsCount(), baseline, 'listed, not counted: the Needs you count is the same with two rows as without them');
-        assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), baselineBadge, 'the Inbox badge is the same too');
+        assert.equal(await needsCount(), baseline + 2, 'counted (#16753): two goals the person made, closed by an agent, add two (the one the Operator closed adds nothing)');
+        assert.equal(Number(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`) || 0), Number(baselineBadge || 0) + 2, 'the Inbox badge moves with it');
         const press = (goal, label) => ev(`(() => { const tr = [...document.querySelectorAll('#group-table-view tr')].find(r => r.textContent.includes('Goal #${goal} closed as done')); const btn = tr && [...tr.querySelectorAll('button')].find(x => x.textContent === ${JSON.stringify(label)}); if (btn) btn.click(); return !!btn; })()`);
         assert.ok(await press(a, 'Reopen'), 'Reopen is on the row');
         await waitFor(`![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.textContent.includes('Goal #${a} closed as done'))`, 'Reopen takes the row away', 10000);
         assert.equal((await api('GET', `/api/board/${B}/goals/${a}`)).body.state, 'active', 'the goal is active again');
+        assert.equal(await needsCount(), baseline + 1, 'Reopen takes its count away');
         assert.ok(await press(c, 'Dismiss'), 'Dismiss is on the row');
         await waitFor(`![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.textContent.includes('Goal #${c} closed as done'))`, 'Dismiss takes the row away', 10000);
         assert.equal((await api('GET', `/api/board/${B}/goals/${c}`)).body.state, 'done', 'dismissed, not reopened');
-        console.log('PASS a goal an agent closed has a listed, uncounted row with Reopen and Dismiss');
+        assert.equal(await needsCount(), baseline, 'Dismiss takes its count away');
+        console.log('PASS a goal an agent closed has a listed, counted row with Reopen and Dismiss');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
