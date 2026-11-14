@@ -66,14 +66,14 @@ const MD = ['# Plan', '', 'First line of a paragraph that goes on', 'and a secon
             console.log(`${at}3. The status line: the read mark is about the newest message, and no "already asked"`);
             const status = () => ev(`document.querySelector('.ac-card[data-id="1"] .ac-ask-status')?.textContent || null`);
             let st = await status();
-            assert.ok(st && /Sent to Lead Developer, not read yet \(it replied once before\)/.test(st) && !/already asked/i.test(st), at + 'newest (yours) not read yet: ' + st);
+            assert.ok(st && /^Lead Developer replied$/.test(st), at + 'the agent replied: a reply is never overridden to "not read yet" (F29): ' + st);
             await ev(`window.__cs[0].asks[0].read_at = new Date().toISOString(); document.querySelector('.artifact-viewer-close')?.click(); true`);
             await waitFor(`document.getElementById('artifact-viewer').hidden`, `${at}the viewer closes`, 4000);
             await open();
             if (await ev(`document.querySelector('.ac-toggle').getAttribute('aria-expanded') !== 'true'`)) await ev(`document.querySelector('.ac-toggle').click(); true`);
             await waitFor(`!!document.querySelector('.ac-card[data-id="1"] .ac-ask-status')`, `${at}the status line`, 6000);
             st = await status();
-            assert.ok(/^Read by Lead Developer, /.test(st || ''), at + 'read after the newest message: ' + st);
+            assert.ok(/^Lead Developer replied$/.test(st || ''), at + 'a reply stays replied, never downgraded to Read by (F29): ' + st);
 
             console.log(`${at}4. A selection over two paragraphs and over a line break shows Add comment`);
             for (const [label, js] of [['two paragraphs', `(() => { const ps = [...document.querySelectorAll('#artifact-viewer .artifact-viewer-body p')]; const r = document.createRange(); r.setStart(ps[0].firstChild, 3); r.setEnd(ps[1].firstChild, 8); const s = getSelection(); s.removeAllRanges(); s.addRange(r); return true; })()`], ['a triple click (the end is the start of the next block)', `(() => { const p = document.querySelector('#artifact-viewer .artifact-viewer-body p'); const r = document.createRange(); r.setStart(p.firstChild, 0); r.setEnd(p.nextElementSibling, 0); const s = getSelection(); s.removeAllRanges(); s.addRange(r); return true; })()`], ['a table cell over to the next row', `(() => { const tds = [...document.querySelectorAll('#artifact-viewer .artifact-viewer-body td')]; const r = document.createRange(); r.setStart(tds[1].firstChild, 0); r.setEnd(tds[2].firstChild, 0); const s = getSelection(); s.removeAllRanges(); s.addRange(r); return true; })()`], ['one paragraph over its line break', `(() => { const p = document.querySelector('#artifact-viewer .artifact-viewer-body p'); const r = document.createRange(); r.selectNodeContents(p); const s = getSelection(); s.removeAllRanges(); s.addRange(r); return true; })()`]]) {
