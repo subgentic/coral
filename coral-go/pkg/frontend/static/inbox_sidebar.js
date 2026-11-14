@@ -8,7 +8,7 @@ import { unrecordedItem, recordAllAgents } from './waiting.js';
 import { welcomeRows, runWelcome, dismissWelcome } from './welcome_items.js';
 import { incompleteNote, readGaps } from './needs_incomplete.js';
 import { loadPendingSkills, skillRows, skillLine, skillName, openSkill } from './needs_skills.js';
-import { doneGoals, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, setClosedByAgentCount, isGoalDoneRead, markGoalDoneRead, markGoalDoneUnread, SETTING as GOAL_DONE_SETTING } from './goal_done.js';
+import { doneGoals, looksDone, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, setClosedByAgentCount, isGoalDoneRead, markGoalDoneRead, markGoalDoneUnread, SETTING as GOAL_DONE_SETTING } from './goal_done.js';
 /* The dashboard's own Inbox on the shared sidebar (#7472), loaded the first time the Inbox tab is shown (inbox_tab.js keeps the badge and the counts, which are always there).
  *
  * Three groups, the hub's /inbox order: Needs you (the agents waiting for input, from the live list the dashboard already holds), Tasks (the open tasks assigned to the Operator) and Saved (the
@@ -1452,7 +1452,9 @@ registerGroupSource('hub-inbox', {
             const rows = goalRows();
             const waitingGoals = goalProposals().length, waitingNote0 = waitingGoals ? `${waitingGoals} goal${waitingGoals === 1 ? '' : 's'} an agent proposed ${waitingGoals === 1 ? 'is' : 'are'} waiting for your approval in Needs you.` : '';
             const waitingNote = [waitingNote0, goalFilters.state === 'done' && doneGoalsCapped() ? 'Each computer shows up to 100 finished goals, oldest first. Newer goals may be missing when this limit is reached.' : ''].filter(Boolean).join(' ');
-            return { title: 'Goals', noun: ['goal', 'goals'], rows, ...(waitingNote ? { note: waitingNote } : {}), empty: { line: GF.isFiltered(goalFilters) ? 'No goal matches the search and filters.' : 'No open goals.', hint: waitingNote || (GF.isFiltered(goalFilters) ? undefined : "A team's Goals tab has New goal; an Orchestrator can propose one too.") },
+            const hasDone = goals.some(g => String(g.state || '').toLowerCase() === 'done');
+            const emptyLine = GF.isFiltered(goalFilters) ? 'No goal matches the search and filters.' : goalFilters.state === 'done' ? 'No finished goals.' : hasDone ? 'All goals are done.' : 'No open goals.';
+            return { title: 'Goals', noun: ['goal', 'goals'], rows, ...(waitingNote ? { note: waitingNote } : {}), empty: { line: emptyLine, hint: waitingNote || (GF.isFiltered(goalFilters) ? undefined : goalFilters.state === 'done' || hasDone ? undefined : "A team's Goals tab has New goal; an Orchestrator can propose one too.") },
                 signature: JSON.stringify(rows.map(g => [g.board_id, g.id, g.title, g.outcome, g.state, g.updated_at, g.rollup])),
                 node: () => { const phone = isPhoneLayout(), mountBar = () => { const bar = document.querySelector('#group-table-view .gt-toolbar'); if (bar) { Toolbar.mountSelection(bar, goalsState.selected.size ? table.bar : null); if (phone) bar.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); } }; const table = DT.dataTable({ label: `Goals, ${rows.length}`, rows, rowKey: goalKey, state: goalsState, rowName: g => g.title,
                     selectable: { contextKey: 'inbox-goals', canSelect: g => ['proposed', 'active', 'blocked'].includes(String(g.state || '').toLowerCase()), actions: closeGoalsActions(), onChange: () => mountBar(), ...(phone ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) }, // the tick column of the team page's Goals too (#16371); a phone: a long press selects, as in Needs you (#12230)
@@ -1464,7 +1466,7 @@ registerGroupSource('hub-inbox', {
                         go({ ...folderRoute, id: g.board_id, item: g.id });
                     },
                     oneLine: true, resize: true, sortBar: false,
-                    mail: g => ({ lead: { icon: 'flag', square: true, name: g.state }, title: g.title, data: { goalId: String(g.id) }, team: goalTeam(g), ask: [g.new_comments > 0 ? 'New comments' : '', g.outcome || ''].filter(Boolean).join(' \u00b7 '), state: GW.stateWord(g), time: `${GW.stateWord(g)}${GW.allTasksOf(g.rollup) ? ` \u00b7 ${(g.rollup || {}).done || 0}/${GW.allTasksOf(g.rollup)}` : ''}` }), // a phone's row (#9583): a flag, the goal, its outcome, when it moved
+                    mail: g => ({ lead: { icon: 'flag', square: true, name: g.state }, title: g.title, data: { goalId: String(g.id) }, team: goalTeam(g), ask: [g.new_comments > 0 ? 'New comments' : '', g.outcome || ''].filter(Boolean).join(' \u00b7 '), state: GW.stateWord(g), time: `${GW.stateWord(g)}${looksDone(g) ? ', all tasks done' : ''}${GW.allTasksOf(g.rollup) ? ` \u00b7 ${(g.rollup || {}).done || 0}/${GW.allTasksOf(g.rollup)}` : ''}` }), // a phone's row (#9583): a flag, the goal, its outcome, when it moved; "all tasks done" when every task is done (#16635)
                     columns: GC.goalColumns({ teamOf: goalTeam }, ['goal', 'state', 'team', 'progress', 'updated']).flatMap(c => c.key === 'team' ? [...serverColumns().map(x => ({ ...x, width: '8rem', dropAt: 52 })), c] : [c]) }); if (phone) setTimeout(mountBar, 0); return table.el; } };
         }
         if (key === 'artifacts') return IA.artifactsSpec();
