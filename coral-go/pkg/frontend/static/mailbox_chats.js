@@ -37,7 +37,7 @@ let counts = null; // the last answer of the counts route
 let unread = null; // the last count of unread chats per folder (#9687): { folder key: n }, from the chats changed since the marker began
 
 /** What a chat folder's search box says (#12664): the Board history folder lists boards, every other chat folder lists chats. */
-export const searchWords = key => key === 'chats-group' ? 'Search boards' : 'Search chats';
+export const searchWords = key => key === 'chats-group' ? 'Search boards' : key === 'chats-starred' ? 'Search starred chats' : 'Search chats'; // Starred searches its chats only (its starred files are listed whole, #10258): the box says so (#17159)
 
 export function chatFolder(key, c = counts) {
     const f = FOLDERS.find(x => x.key === key);

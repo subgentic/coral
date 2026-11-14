@@ -74,6 +74,8 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
             // another folder has its own set and its own memory; its own rule stays
             await openFolder('chats-starred', mobile, 'Starred'); await panel();
             check(`${label}: Starred starts with none of All chats' filters`, (await chipText()) === '', await chipText());
+            const sg = await ev(`(() => { const q = document.querySelector('.inbox-folder-toolbar .list-bar-search-row input[type=search]'); return q && q.getAttribute('aria-label'); })()`);
+            check(`${label}: the Starred search box says it searches starred chats, not all chats (#17159)`, sg === 'Search starred chats', JSON.stringify(sg));
             await setField('inbox-chats-agent', 'QA Engineer', 'input'); await waitFor(`(window.__hist || []).some(p => p.agent_name === 'QA Engineer')`, 'a read in Starred', 6000);
             check(`${label}: Starred keeps its own rule (starred=1) beside the filter`, (await lastRead()).starred === '1' && (await lastRead()).agent_name === 'QA Engineer', JSON.stringify(await lastRead()));
             await openFolder('chats-cli-claude', mobile, 'Claude'); await panel();
