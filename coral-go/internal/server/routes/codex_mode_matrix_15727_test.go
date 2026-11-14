@@ -113,16 +113,18 @@ func codexModeMatrix(t *testing.T, version string) {
 		return "bypass" // bypass, and bypass with the widest capabilities
 	}
 	var table []string
+	// One server for all 24 cases (a rig per case was most of the test's 36 s): each case launches its own sessions (their own ids and names), and what it reads back is the last command typed, so
+	// nothing carries from one case to the next (#16528).
+	rig := setupAgyTestRig(t)
+	ctx := context.Background()
+	fake := filepath.Join(t.TempDir(), "codex")
+	require.NoError(t, os.WriteFile(fake, []byte("#!/bin/sh\nexit 0\n"), 0o755))
+	require.NoError(t, rig.ss.SetSetting(ctx, agent.CLIPathSettingKey(at.Codex), fake))
 	for _, p := range picks {
 		for _, keep := range []bool{false, true} {
 			for _, caps := range []string{"", "narrow", "wide"} {
 				c := p
 				c.keep, c.caps = keep, caps
-				rig := setupAgyTestRig(t)
-				ctx := context.Background()
-				fake := filepath.Join(t.TempDir(), "codex")
-				require.NoError(t, os.WriteFile(fake, []byte("#!/bin/sh\nexit 0\n"), 0o755))
-				require.NoError(t, rig.ss.SetSetting(ctx, agent.CLIPathSettingKey(at.Codex), fake))
 				post := func(path string, body map[string]any) map[string]any {
 					b, _ := json.Marshal(body)
 					rec := httptest.NewRecorder()
