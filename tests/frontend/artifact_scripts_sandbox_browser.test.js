@@ -116,7 +116,8 @@ const base = require('./test_base').BASE;
         await ev(`window.runFile(${JSON.stringify('probe-' + label)}, ${JSON.stringify(page(probe))}, ${JSON.stringify(hostUrl || '')}, ${JSON.stringify(outerSandbox || '')})`);
         let pr = null; for (let i = 0; i < 120 && !pr; i++) { await sleep(50); pr = await readProbe(hostMatch); }
         if (!pr) leaks.push('the file never ran (no probe): zero hits would mean nothing');
-        else for (const k of ['parentDom', 'topDom', 'storage', 'session', 'cookie', 'idb', 'cspFetch']) if (pr[k] !== 'blocked') leaks.push(k + '=' + pr[k]);
+        else for (const k of ['parentDom', 'topDom', 'cookie', 'idb', 'cspFetch']) if (pr[k] !== 'blocked') leaks.push(k + '=' + pr[k]);
+        // storage and session are intentionally reachable via the in-memory shim in artifact_host.html (#16735); the shim's data is lost when the frame is removed and never touches the dashboard's real storage
         await ev(`window.clearRuns()`);
         const before = hits.length;
         for (let i = 0; i < names.length; i++) await ev(`window.runFile(${JSON.stringify(label + ':' + names[i])}, ${JSON.stringify(page(vectors[names[i]](URLX + '&v=' + i, WSX + '?v=' + i)))}, ${JSON.stringify(hostUrl || '')}, ${JSON.stringify(outerSandbox || '')})`);

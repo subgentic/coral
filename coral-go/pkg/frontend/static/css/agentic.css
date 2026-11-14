@@ -1799,8 +1799,7 @@ body.panel-dragging .agentic-state {
 .artifact-linked-preview iframe { flex: 1; min-height: 240px; width: 100%; border: 0; background: #fff; }
 /* Scripts in an HTML file's preview (#14730): the offer under the notice, its confirmation, and the bar that stays outside the frame while they run */
 .artifact-scripts-offer { padding: 8px 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; border-bottom: 1px solid var(--border); }
-.artifact-scripts-offer:not(:has(.artifact-scripts-sure)) { padding-block: 0; border-bottom: 0; } /* the offer's own row (a phone) is only its button: no padding above the frame (#14916); the confirmation keeps the room */
-.artifact-linked-notice .artifact-scripts-ask { flex: none; margin-inline-start: 8px; } /* the offer sits on the notice's line (#14916) */
+.artifact-scripts-offer:not(:has(.artifact-scripts-sure)) { padding: 4px 16px; border-bottom: 0; } /* the offer row is only its button: slim padding above the frame; the confirmation keeps the full room */
 .artifact-scripts-sure { display: flex; flex-direction: column; gap: 8px; max-width: 64ch; }
 .artifact-scripts-sure p, .artifact-scripts-msg { margin: 0; font-size: var(--fs-base); color: var(--text-secondary); }
 .artifact-scripts-actions { display: flex; flex-wrap: wrap; gap: 8px; }
