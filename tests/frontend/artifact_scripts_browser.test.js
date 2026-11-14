@@ -98,7 +98,7 @@ const OTHER = 'cd'.repeat(32);
             assert.equal(f.sandbox, 'allow-scripts', `${w}: the frame is sandboxed with allow-scripts and nothing else`);
             assert.equal(f.allow, '', `${w}: no device or feature is allowed`);
             assert.equal(f.ref, 'no-referrer'); assert.equal(f.src, '/static/artifact_host.html');
-            assert.ok(f.barOutside && /Scripts are on/.test(f.bar) && /no web requests, no cookies, no files/.test(f.bar) && !/blocks them/.test(f.bar) && f.off, `${w}: the bar is outside the frame, says Scripts are on and holds Turn off: ` + JSON.stringify(f));
+            assert.ok(f.barOutside && /Scripts are on/.test(f.bar) && /no web requests, no cookies, no storage, no files/.test(f.bar) && !/blocks them/.test(f.bar) && f.off, `${w}: the bar is outside the frame, says Scripts are on and holds Turn off: ` + JSON.stringify(f));
             assert.ok(!f.plainBanner && f.chipHidden, `${w}: the plain banner and its chip are gone while scripts are on: ` + JSON.stringify(f));
             await waitFor(`true`, 'tick', 100);
             // #14783: the header says Scripts on, the ⋯ menu offers Turn off scripts, and Sandboxed is gone

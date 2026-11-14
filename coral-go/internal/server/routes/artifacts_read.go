@@ -84,6 +84,9 @@ func (h *SessionsHandler) getAgentArtifact(w http.ResponseWriter, r *http.Reques
 	defer f.Close()
 	// An agent chose these bytes and their type: an HTML or SVG upload must not
 	// run on the dashboard's origin when someone opens its link.
+	if r.URL.Query().Get("run") == "1" && h.serveArtifactToRun(w, r, f, id, meta.MediaType, meta.Name) { // the viewer's Open in browser (#16735): a tab with scripts and storage, only for trusted HTML
+		return
+	}
 	if r.URL.Query().Get("open") == "1" && serveArtifactToRead(w, r, f, meta.MediaType, meta.Name, info.Size()) { // the viewer's Open in new tab (#11836): a readable tab, never a download
 		return
 	}

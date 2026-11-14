@@ -186,8 +186,9 @@ async function _scriptsFor(body, { hex, content, name, server, board, ctx }) {
         if ((await scripts.sha256Hex(content)) !== hex) { scripts.drawNote(wrapper, 'Scripts are off: Coral could not check that this is the version you trusted.'); return; }
         if (ctx.isStale()) return;
         const redrawn = () => body.dispatchEvent(new CustomEvent('coral-preview-redrawn', { bubbles: true })); // the viewer's "Sandboxed" chip follows the banner that is there now
+        const openUrl = serverUrl(artifactPath(hex), server) + '&run=1'; // the file with storage, in its own tab (#16735)
         scripts.drawScripted(wrapper, {
-            html: content, name,
+            html: content, name, openUrl,
             turnOff: async () => {
                 const state = await scripts.writeTrust(hex, server, false);
                 if (ctx.isStale()) return;

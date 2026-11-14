@@ -47,6 +47,36 @@ func setUntrustedContentHeaders(h http.Header, contentType, filename string) {
 	}
 }
 
+// RunCSP is the Content-Security-Policy for a trusted HTML file opened in its own browser tab
+// (?run=1, #16735): scripts run with storage access (allow-same-origin) so localStorage and
+// sessionStorage work, but no network, no forms, no popups and no navigation. The page keeps
+// Coral's origin (allow-same-origin) — connect-src 'none' prevents exfiltration — and the
+// sandbox directive adds restrictions the CSP alone cannot (no popups, no pointer lock, no
+// downloads). Only served for a digest the owner has trusted (artifact_preview_trust).
+const RunCSP = "sandbox allow-scripts allow-same-origin; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+
+// serveArtifactToRun answers the viewer's Open in browser (?run=1, #16735): a tab where a trusted HTML file runs with
+// storage access. Only the Operator's trusted HTML files (the person clicked Run scripts for this exact digest).
+// Returns true when it answered; false leaves the caller to serve the link as before.
+func (h *SessionsHandler) serveArtifactToRun(w http.ResponseWriter, r *http.Request, f io.ReadSeeker, id, contentType, filename string) bool {
+	if !trustableMediaType(contentType) {
+		return false
+	}
+	var n int
+	if err := h.db.GetContext(r.Context(), &n, "SELECT COUNT(*) FROM artifact_preview_trust WHERE hex = ?", id); err != nil || n == 0 {
+		return false
+	}
+	hdr := w.Header()
+	hdr.Set("Content-Type", "text/html; charset=utf-8")
+	hdr.Set("Content-Disposition", hubproxy.Disposition("inline", filename))
+	hdr.Set("Content-Security-Policy", RunCSP)
+	hdr.Set("X-Content-Type-Options", "nosniff")
+	hdr.Set("Cache-Control", "private, no-store")
+	hdr.Del("X-Coral-Build")
+	http.ServeContent(w, r, "", time.Time{}, f)
+	return true
+}
+
 // artifactURL is the dashboard path for a managed artifact. The ?v=2 form is new in v1.4.12:
 // before it the bare path was served inline without a sandbox and cached for a year, so links
 // handed out from now on never match such a cache entry. The bare path still works.
