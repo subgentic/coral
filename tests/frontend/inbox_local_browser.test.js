@@ -196,7 +196,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         check('and says what puts something there (a hint under the line, as Tasks and Saved have)', await ev(`/review artifact, appear here\. A task assigned to you is under Tasks\./.test((document.querySelector('#group-table-view .empty-state-hint') || {}).textContent || '')`), await ev(`(document.querySelector('#group-table-view .empty-state-hint') || {}).textContent || ''`));
         await ev(tabBtn('goals'));
         await settle(`/No open goals/.test(document.getElementById('group-table-view').textContent)`, 'the Goals empty line');
-        check('an empty Goals says where one is made', await ev(`/Goals tab has New goal/.test((document.querySelector('#group-table-view .empty-state-hint') || {}).textContent || '')`), await ev(`(document.querySelector('#group-table-view .empty-state-hint') || {}).textContent || ''`));
+        check('an empty Goals says where one is made', await ev(`/Press New goal/.test((document.querySelector('#group-table-view .empty-state-hint') || {}).textContent || '')`), await ev(`(document.querySelector('#group-table-view .empty-state-hint') || {}).textContent || ''`));
         await ev(tabBtn('needs'));
         await settle(`/You are all caught up/.test(document.getElementById('group-table-view').textContent)`, 'Needs you again');
         s = await state();

@@ -782,7 +782,7 @@ function inboxGoalsToolbar() {
         filters: goalFilters,
         options: { team: { values: teams, labels: Object.fromEntries(teams.map(t => [t, goalTeam({ board_id: t })])) }, driver: { values: drivers } },
         pills: { label: 'Show goals that are', current: goalFilters.state || 'all',
-            items: [{ key: 'all', label: 'All', count: rows.filter(g => String(g.state || '').toLowerCase() !== 'done').length }, ...GF.STATES.map((key, i) => ({ key, label: GF.STATE_LABEL[key], count: key === 'done' && !doneKnown ? undefined : counts[i] }))],
+            items: [{ key: 'all', label: 'All', count: rows.length }, ...GF.STATES.map((key, i) => ({ key, label: GF.STATE_LABEL[key], count: key === 'done' && !doneKnown ? undefined : counts[i] }))],
             onPick: key => { const was = goalFilters.state === 'done'; goalFilters = { ...goalFilters, state: key === 'all' ? '' : key }; GF.saveFilters(goalFilters); renderInboxNav(true); if (was !== (goalFilters.state === 'done')) refreshGoals(); /* the Done pill reads the finished goals, the others the open ones (one read each) */ } },
         action: newGoalAction(),
     });
@@ -1457,7 +1457,7 @@ registerGroupSource('hub-inbox', {
             const rows = goalRows();
             const waitingGoals = goalProposals().length, waitingNote0 = waitingGoals ? `${waitingGoals} goal${waitingGoals === 1 ? '' : 's'} an agent proposed ${waitingGoals === 1 ? 'is' : 'are'} waiting for your approval in Needs you.` : '';
             const waitingNote = [waitingNote0, goalFilters.state === 'done' && doneGoalsCapped() ? 'Each computer shows up to 100 finished goals, oldest first. Newer goals may be missing when this limit is reached.' : ''].filter(Boolean).join(' ');
-            return { title: 'Goals', noun: ['goal', 'goals'], rows, ...(waitingNote ? { note: waitingNote } : {}), empty: { line: GF.isFiltered(goalFilters) ? 'No goal matches the search and filters.' : 'No open goals.', hint: waitingNote || (GF.isFiltered(goalFilters) ? undefined : "A team's Goals tab has New goal; an Orchestrator can propose one too.") },
+            return { title: 'Goals', noun: ['goal', 'goals'], rows, ...(waitingNote ? { note: waitingNote } : {}), empty: { line: GF.isFiltered(goalFilters) ? 'No goal matches the search and filters.' : 'No open goals.', hint: waitingNote || (GF.isFiltered(goalFilters) ? undefined : 'Press New goal to create one, or an Orchestrator can propose one too.') },
                 signature: JSON.stringify(rows.map(g => [g.board_id, g.id, g.title, g.outcome, g.state, g.updated_at, g.rollup])),
                 node: () => { const phone = isPhoneLayout(), mountBar = () => { const bar = document.querySelector('#group-table-view .gt-toolbar'); if (bar) { Toolbar.mountSelection(bar, goalsState.selected.size ? table.bar : null); bar.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); } }; const table = DT.dataTable({ label: `Goals, ${rows.length}`, rows, rowKey: goalKey, state: goalsState, rowName: g => g.title,
                     ...(phone ? { selectable: { contextKey: 'inbox-goals', longPress: true, iconBar: true, clearLabel: 'Cancel', canSelect: g => ['proposed', 'active', 'blocked'].includes(String(g.state || '').toLowerCase()), actions: closeGoalsActions(), onChange: () => mountBar() } } : {}), // a phone: a long press selects, as in Needs you (#12230)
