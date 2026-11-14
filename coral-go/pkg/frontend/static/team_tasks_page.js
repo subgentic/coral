@@ -243,7 +243,7 @@ function draw() {
     // The one toolbar line (#7717): the list bar's own row holds the search, the state pills (one compact select when they do not fit), the Filters icon and + Task at the right.
     if (PHONE.matches) bar.node.querySelector('.list-bar-search-row')?.classList.add('phone-list-bar');
     Toolbar.adopt(bar.node.querySelector('.list-bar-search-row'), {
-        pills: { label: 'Show tasks that are', current: model.filter, items: FILTERS.map(([key, label]) => ({ key, label, count: c[key] })),
+        pills: { label: 'Show tasks that are', current: model.filter, items: FILTERS.map(([key, label]) => ({ key, label, count: c[key], ...(key === 'open' && c.blocked ? { title: `${c.blocked} blocked task${c.blocked === 1 ? '' : 's'} not counted` } : {}) })),
             onPick: key => { model.filter = key; if (key === 'open' || key === 'all') browserLocal.set(HIDE_KEY, key === 'open' ? 'true' : 'false'); say(`${FILTERS.find(f => f[0] === key)[1]}: ${c[key]} tasks`); draw(); } },
         chips: TF.chips(model.filters).filter(c => c.key !== 'q').map(c => ({ label: c.label, aria: `Remove the filter: ${c.label}`, onRemove: () => { say(`Removed the filter: ${c.label}`); setFilters(TF.without(model.filters, c.key)); } })),
         action: newTask,

@@ -18,10 +18,11 @@ function pillElements(p) {
     for (const it of p.items) {
         const text = it.count == null ? it.label : `${it.label} ${it.count}`; // a pill whose count is not known yet (Goals' Done: read when picked, #14641) says no number
         const b = el('button', 'goals-chip', text); b.type = 'button'; b.dataset.filter = it.key; b.setAttribute('aria-pressed', String(p.current === it.key));
+        if (it.title) b.title = it.title;
         if (!it.count && it.key !== 'all') b.classList.add('goals-chip-zero');
         b.addEventListener('click', () => p.onPick(it.key));
         group.append(b);
-        const o = el('option', null, text); o.value = it.key; o.selected = p.current === it.key; select.append(o);
+        const o = el('option', null, it.title ? `${text} — ${it.title}` : text); o.value = it.key; o.selected = p.current === it.key; select.append(o);
     }
     select.addEventListener('change', () => p.onPick(select.value));
     return [group, select];
