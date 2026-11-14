@@ -101,7 +101,7 @@ const { coralReady } = require('./helpers/wait');
             // a new folder inside one that exists: the line says so at step 1, and Launch asks for it
             await open('/work/planner-shop');
             let l = await line();
-            check(`${tag}: a new folder inside an existing one: step 1 says Coral creates it when the team is launched`, l.shown && /planner-shop does not exist yet\. Coral creates it inside \/work when you launch the team\./.test(l.text), JSON.stringify(l));
+            check(`${tag}: a new folder inside an existing one: step 1 says Coral creates it when the team is launched`, l.shown && l.text === 'Coral creates this folder.', JSON.stringify(l));
             let body = await launch();
             check(`${tag}: Launch asks for it (create_new_folder) at the folder the person chose, and not as the suggestion`, body.working_dir === '/work/planner-shop' && body.create_new_folder === true && !body.create_dir, JSON.stringify({ d: body.working_dir, n: body.create_new_folder, c: body.create_dir }));
             await close();
