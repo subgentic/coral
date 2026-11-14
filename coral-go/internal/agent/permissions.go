@@ -364,6 +364,9 @@ func PermissionFlagsForAgent(agentType, mode string) []string {
 	if mode == "" || mode == "default" || agentType == at.Pi || agentType == at.Terminal {
 		return nil
 	}
+	if _, custom := custommodes.IDOf(mode); custom {
+		return nil // a custom mode (#15950) has no flags of its own here: the launch builder resolves it to the mode's flags (launchCommand), and the raw "custom:<id>" must never reach a CLI, which rejects it and exits (#16589)
+	}
 	switch agentType {
 	case at.Claude:
 		return []string{"--permission-mode", mode}

@@ -187,6 +187,7 @@ func TestARestartKeepsTheCustomMode(t *testing.T) {
 	rig.router.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.Contains(t, lastSentCommand(rig.term), "--permission-mode plan", "a restart keeps the custom mode")
+	assert.NotContains(t, lastSentCommand(rig.term), "custom:", "the raw custom mode never reaches the CLI (#16589)")
 	// the mode deleted in between: a restart of another agent in it goes on as Default
 	rig.save(t)
 	sid2 := "44444444-5555-6666-7777-888888888888"
@@ -199,4 +200,51 @@ func TestARestartKeepsTheCustomMode(t *testing.T) {
 	rig.router.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.NotContains(t, lastSentCommand(rig.term), "--permission-mode plan")
+}
+
+// #16589 (walk 25): Restart, same settings and Wake of an agent in a custom mode put the raw "custom:<id>" on the CLI as its --permission-mode, which Claude rejects (the agent exits). The argv carries
+// the mode's own flags and no "custom:" anywhere; a mode deleted since starts the agent in Default, never escalated.
+func TestRestartAndWakeNeverPassTheRawCustomMode(t *testing.T) {
+	rig := newCustomLaunchRig(t)
+	rig.save(t, store.CustomMode{ID: "1234567890abcdef", AgentType: at.Claude, Name: "plan", Flags: []string{"--permission-mode", "plan"}})
+	mode := "custom:1234567890abcdef"
+	register := func(sid string) string {
+		name := naming.SessionName(at.Claude, sid)
+		require.NoError(t, rig.term.CreateSession(context.Background(), name, rig.workdir))
+		require.NoError(t, rig.ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: at.Claude, AgentName: filepath.Base(rig.workdir), WorkingDir: rig.workdir, PermissionMode: &mode}))
+		return name
+	}
+	post := func(path string, body map[string]any) {
+		b, _ := json.Marshal(body)
+		rec := httptest.NewRecorder()
+		rig.router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, path, bytes.NewReader(b)))
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	}
+	check := func(what string, wantPlan bool) {
+		cmd := lastSentCommand(rig.term)
+		assert.NotContains(t, cmd, "custom:", what)
+		if wantPlan {
+			assert.Contains(t, cmd, "--permission-mode plan", what)
+		} else {
+			assert.NotContains(t, cmd, "--permission-mode plan", what)
+			assert.NotContains(t, cmd, "bypassPermissions", what)
+		}
+	}
+	sid := "55555555-4444-5555-6666-777777777777"
+	name := register(sid)
+	post("/api/sessions/live/"+name+"/restart", map[string]any{"session_id": sid, "agent_type": at.Claude})
+	check("restart", true)
+	sid2 := "66666666-4444-5555-6666-777777777777"
+	name2 := register(sid2)
+	post("/api/sessions/live/"+name2+"/wake", map[string]any{"session_id": sid2, "agent_type": at.Claude})
+	check("wake", true)
+	rig.save(t) // the mode deleted in between
+	sid3 := "77777777-4444-5555-6666-777777777777"
+	name3 := register(sid3)
+	post("/api/sessions/live/"+name3+"/restart", map[string]any{"session_id": sid3, "agent_type": at.Claude})
+	check("restart, mode deleted", false)
+	sid4 := "88888888-4444-5555-6666-777777777777"
+	name4 := register(sid4)
+	post("/api/sessions/live/"+name4+"/wake", map[string]any{"session_id": sid4, "agent_type": at.Claude})
+	check("wake, mode deleted", false)
 }
