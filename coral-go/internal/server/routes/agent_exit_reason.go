@@ -62,6 +62,12 @@ func lastErrorLine(screen string) string {
 	return ""
 }
 
+// exitNoErrorReason is the reason when nothing in the terminal looked like an error.
+const exitNoErrorReason = "its CLI ended and left its terminal at a shell, with no error shown"
+
+// exitRapidPlan is what a person can do about an agent that stops right after each start: waking it starts the same CLI the same way, so the cause comes first (#16596).
+const exitRapidPlan = "Check its terminal for the error, then Wake it once that is fixed"
+
 // exitReason is the few words that say why a stopped agent stopped (see above). It never returns "".
 func (h *SessionsHandler) exitReason(ctx context.Context, ls store.LiveSession) string {
 	switch ptr.Value(ls.StartFailure) {
@@ -87,7 +93,7 @@ func (h *SessionsHandler) exitReason(ctx context.Context, ls store.LiveSession) 
 	if ptr.Value(ls.SleepReason) == store.SleepReasonTerminalGone {
 		return "its terminal was lost"
 	}
-	return "its CLI ended and left its terminal at a shell, with no error shown"
+	return exitNoErrorReason
 }
 
 // exitSeen is what the last notice for a session said, so the same stop is not said again.
@@ -112,6 +118,9 @@ func (h *SessionsHandler) exitPhrase(ls store.LiveSession, reason string, now ti
 	rapid := false
 	if t, err := time.Parse(store.ISOFormat, launched); err == nil && now.Sub(t) <= exitRapidWindow+exitBurstWindow {
 		rapid = true
+		if reason == exitNoErrorReason {
+			reason = "its CLI refused to start" // the person can see its output in the terminal; "no error shown" told them there was none
+		}
 		label = "exits right after it starts: " + reason
 	}
 	h.exits.mu.Lock()

@@ -151,6 +151,9 @@ func (h *SessionsHandler) flushExits(ctx context.Context, team string) {
 				continue // the same stop, said before (#15062)
 			}
 			a.label = label
+			if strings.HasPrefix(label, "exits right after it starts") {
+				a.plan = exitRapidPlan
+			}
 		}
 		if failed && resumeOn {
 			if n := attempts[sid]; n < len(autoResumeDelays) {
