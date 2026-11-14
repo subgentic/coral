@@ -420,6 +420,8 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/automations/runs":                                 "list every job and workflow run, a page at a time (#13183)",
 	"DELETE /api/teams/detail/{name}":                           "delete a team",
 	"PUT /api/teams/detail/{name}/home-folder":                  "change the folder a team's agents start in",
+	"GET /api/teams/detail/{name}/uncommitted":                  "read the files a team left uncommitted in its folders",
+	"POST /api/teams/detail/{name}/commit":                      "make one local commit of the files a team left in its folder",
 	"PUT /api/team-members/{memberID}/search-access":            "change how far an agent's chat search reaches",
 	"GET /api/search-access/log":                                "read the log of search access (raises and reads above own)",
 	"POST /api/teams/generate":                                  "generate a team",

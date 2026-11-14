@@ -544,6 +544,8 @@ b PUT /api/system/codex-trust-hooks
 b PUT /api/system/hub-operator
 b PUT /api/system/terminal-backend
 b PUT /api/teams/detail/{name}/home-folder
+b GET /api/teams/detail/{name}/uncommitted
+b POST /api/teams/detail/{name}/commit
 b PUT /api/team-members/{memberID}/search-access
 b GET /api/search-access/log
 b PUT /api/teams/detail/{name}/knowledge/{agentName}

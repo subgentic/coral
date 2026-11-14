@@ -323,6 +323,7 @@ var activityNotAnInboxAction = map[string]string{
 	"PUT /api/system/update/settings":                                      "this computer's settings and controls, not an Inbox action",
 	"PUT /api/team-members/{memberID}/search-access":                       "the Teams pages",
 	"PUT /api/teams/detail/{name}/home-folder":                             "the Teams pages",
+	"POST /api/teams/detail/{name}/commit":                                 "a local commit of the files a team left in its folder (#17203): its own Activity row comes with the Activity words, after #16972's",
 	"PUT /api/teams/detail/{name}/knowledge/{agentName}":                   "the Teams pages",
 	"PUT /api/themes/{name}":                                               "themes",
 	"PUT /api/views/{id}":                                                  "saved views",

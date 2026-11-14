@@ -700,6 +700,8 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Delete("/api/teams/detail/{name}", teamsHandler.DeleteTeam)
 	r.Post("/api/teams/detail/{name}/resurrect", sessHandler.ResurrectTeam)
 	r.Put("/api/teams/detail/{name}/home-folder", sessHandler.SetTeamHomeFolder)
+	r.Get("/api/teams/detail/{name}/uncommitted", sessHandler.TeamUncommitted)
+	r.With(routes.RefuseSignInLink).Post("/api/teams/detail/{name}/commit", sessHandler.TeamCommit)
 	r.Put("/api/team-members/{memberID}/search-access", sessHandler.SetMemberSearchAccess)
 	r.Get("/api/search-access/log", sessHandler.SearchAccessLog)
 
