@@ -3,20 +3,22 @@ import { teamFetch, boardFetch, splitKey } from './server_base.js';
 
 const $ = (id) => document.getElementById(id);
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
-let seq = 0;
 
 const countWords = (r) => [r.changed ? `${r.changed} changed` : '', r.new ? `${r.new} new` : ''].filter(Boolean).join(', ');
 
-/** Reads the team's folders and draws one line per folder with work not committed; none draws nothing. */
-export async function refreshUncommitted(team) {
-    const box = $('team-page-uncommitted'); if (!box) return;
-    const mine = ++seq;
+async function readRepos(team) {
+    const r = await teamFetch(team, (n) => `/api/teams/detail/${encodeURIComponent(n)}/uncommitted`, { cache: 'no-store' });
+    return r.ok ? ((await r.json()) || {}).repos || [] : [];
+}
+
+/** Reads the team's folders and draws one line per folder with work not committed; none draws nothing. Into the team page's slot, or into the box given (the goal page, #17284). */
+export async function refreshUncommitted(team, into) {
+    const box = into || $('team-page-uncommitted'); if (!box) return;
+    const mine = (box._uncSeq = (box._uncSeq || 0) + 1);
+    box.dataset.uncommittedHost = '1';
     let repos = [];
-    try {
-        const r = await teamFetch(team, (n) => `/api/teams/detail/${encodeURIComponent(n)}/uncommitted`, { cache: 'no-store' });
-        if (r.ok) repos = ((await r.json()) || {}).repos || [];
-    } catch { /* offline: the line stays as it was */ return; }
-    if (mine !== seq) return;
+    try { repos = await readRepos(team); } catch { /* offline: the line stays as it was */ return; }
+    if (mine !== box._uncSeq) return;
     box.replaceChildren(...repos.map((repo) => drawRepo(team, repo)));
     box.hidden = !repos.length;
 }
@@ -80,10 +82,29 @@ function buildForm(team, repo, form, commitBtn, title) {
         try {
             const r = await teamFetch(team, (n) => `/api/teams/detail/${encodeURIComponent(n)}/commit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folder: repo.folder, message, include_secret_like: !!(tick && tick.checked) }) });
             const d = await r.json().catch(() => ({}));
-            if (r.ok) { form.hidden = true; refreshUncommitted(team); return; }
+            if (r.ok) { form.hidden = true; refreshUncommitted(team, form.closest('[data-uncommitted-host]')); return; }
             err.textContent = d.error || 'The commit did not happen.'; err.hidden = false;
             if (d.output) { out.textContent = d.output; out.hidden = false; }
         } catch { err.textContent = 'The commit did not happen: Coral could not be reached.'; err.hidden = false; }
         go.disabled = false;
     });
+}
+
+const notes = new Map(), asked = new Map(); // team -> words, team -> when last asked
+/** The words for a goal that looks done in Needs you: "3 files in shop not committed", from the last read of the team's folder ('' until read, or when nothing is left). */
+export const noteFor = (team) => notes.get(team) || '';
+/** Reads the team's folder (at most every 30 s) and calls changed() when the words differ (#17284). */
+export async function loadNote(team, changed) {
+    const now = Date.now();
+    if (now - (asked.get(team) || 0) < 30000) return;
+    asked.set(team, now);
+    try {
+        const repos = await readRepos(team);
+        let words = '';
+        if (repos.length) {
+            const r = repos[0], n = r.changed + r.new, folder = r.folder.split(/[\\/]/).filter(Boolean).pop() || r.folder;
+            words = `${n}${r.truncated ? '+' : ''} file${n === 1 ? '' : 's'} in ${folder} not committed${repos.length > 1 ? ' (and more folders)' : ''}`;
+        }
+        if (words !== (notes.get(team) || '')) { notes.set(team, words); changed(); }
+    } catch { /* no note */ }
 }
