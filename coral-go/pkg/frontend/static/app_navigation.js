@@ -27,6 +27,8 @@ export function switchNavTab(tab, opts = {}) {
     // The Hub's native Inbox (Goal #100, nativeInbox()) is the same: its Chats and Board tabs are gone from the top bar, so a link, a shortcut or Back to either opens the Inbox (the chat folders, or the Boards folder).
     const routeTab = tab, toBoards = tab === 'board' && nativeInbox(), chatsInInbox = (tab === 'history' && (!isCloud() || nativeInbox())) || toBoards;
     if (toBoards) opts = { ...opts, folder: 'chats-group' };
+    // The Inbox tab chosen while the Inbox already shows one of its pages (a goal, a task, a file): back to the Inbox's front door, Needs you, not the same page again (#16633). A link or Back (fromHistory) and a named folder keep their own way.
+    if (routeTab === 'hub-inbox' && !opts.fromHistory && !opts.initial && !opts.folder && document.body.getAttribute('data-nav-tab') === 'hub-inbox' && document.getElementById('inbox-page') && !document.getElementById('inbox-page').hidden && !nativeInbox()) opts = { ...opts, folder: 'needs' };
     if (chatsInInbox) tab = 'hub-inbox';
     // A panel that loads on first use (lazy_panels.js) shows its view only if
     // nothing else was selected or shown while it loaded. Once loaded it shows at once.
