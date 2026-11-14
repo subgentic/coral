@@ -61,9 +61,10 @@ const { coralReady, framesJs } = require('./helpers/wait');
             // the Operator's #10443 still holds: after the edge before the last column is dragged far right (the last column narrows to its floor) the table fills to the box's edge: no short table, no scrollbar over empty space
             await mount(shape, noGrow); await drag(shape[shape.length - 2], 400); const w = await widths();
             check(`${name}: the edge before the last column dragged far right still fills to the box's edge: no short table, no scrollbar`, w.table >= w.cw - 1 && w.sw <= w.cw + 1, JSON.stringify({ table: w.table, cw: w.cw, sw: w.sw }));
-            // Reset column widths takes every kept width back
-            await mount(shape, noGrow); const w0 = await widths(); await drag(shape[0], -60);
-            check(`${name}: a Reset column widths button is offered after a drag and gives back the widths nobody dragged`, await (async () => { const btn = await ev(`!!document.querySelector('#dt-host .cols-reset-btn:not([hidden])')`); if (!btn) return false; await ev(`document.querySelector('#dt-host .cols-reset-btn').click(); true`); await ev(framesJs(6)); const w2 = await widths(); return Object.keys(w0.cols).every(k => Math.abs(w2.cols[k] - w0.cols[k]) <= 1); })());
+            // Saved drag widths do not create another toolbar row (#16800).
+            await mount(shape, noGrow); await drag(shape[0], -60);
+            check(`${name}: a drag adds no reset button`, await ev(`!document.querySelector('#dt-host .cols-reset-btn')`));
+
         }
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }

@@ -270,8 +270,7 @@ export function dataTable(cfg) {
     const hiddenMenu = el('div', 'menu cols-hidden-menu'); hiddenMenu.id = `${hiddenId}-menu`; hiddenMenu.hidden = true; hiddenMenu.setAttribute('role', 'menu'); hiddenMenu.setAttribute('aria-label', 'Hidden columns');
     const hiddenBtn = button('btn btn-quiet btn-small cols-hidden-btn', '', async (e) => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(hiddenBtn); });
     hiddenBtn.id = hiddenId; hiddenBtn.setAttribute('aria-haspopup', 'menu'); hiddenBtn.setAttribute('aria-expanded', 'false'); hiddenBtn.setAttribute('aria-controls', hiddenMenu.id);
-    const resetBtn = button('btn btn-quiet btn-small cols-reset-btn', 'Reset column widths', () => resetWidths()); resetBtn.hidden = true; resetBtn.title = 'Give every column the width it has when nobody has dragged one'; // widths kept by a drag can be taken back (#12409)
-    hiddenBar.append(resetBtn, hiddenBtn, hiddenMenu);
+    hiddenBar.append(hiddenBtn, hiddenMenu);
     const closeHidden = () => { if (!hiddenMenu.hidden) importOnce('./menu_button.js').then(m => m.closeMenus()).catch(() => {}); };
     box.append(sortBar, hiddenBar, table);
 
@@ -306,9 +305,8 @@ export function dataTable(cfg) {
     /** Every column's width is decided here, in one place (#11943, the operator's table rules, design note 9ced561a): the table always fits its box; ONE column (the primary, or the one that grows) is elastic and takes what the others leave; a column is never narrower than its whole header; a kept width is fitted to the box it meets; Time and Actions (fixed, in rem) keep their width. The columns have the width their content needs (at most their own max), a kept width wins; when they do not fit, the optional ones go by priority (`drop`, lowest first), then the others are squeezed, last first, down to their header, and only then does the table scroll. A phone's folded rows are laid out by CSS: nothing here. */
     function syncHidden(dropped) {
         const gone = columns.filter(c => dropped.has(c.key));
-        const kept = Object.keys(st.widths).length > 0;
-        resetBtn.hidden = !kept; hiddenBtn.hidden = !gone.length; hiddenBar.hidden = !gone.length && !kept;
-        if (!hiddenBar.hidden) loadStyles('data_table_hidden.css'); // the bar's rules come the first time a column is hidden or a width is kept, not at start
+        hiddenBtn.hidden = !gone.length; hiddenBar.hidden = !gone.length;
+        if (!hiddenBar.hidden) loadStyles('data_table_hidden.css'); // the bar's rules come the first time a column is hidden, not at start
         if (!gone.length) { closeHidden(); return; }
         const word = `${gone.length} column${gone.length === 1 ? '' : 's'} hidden`; hiddenBtn.textContent = word; hiddenBtn.setAttribute('aria-label', `${word}: ${gone.map(c => c.label || c.key).join(', ')}. Show one`);
         hiddenMenu.replaceChildren(...gone.map(c => { const b = button('menu-item', `Show ${c.label || c.key}`, async e => { e.stopPropagation(); (st.pinned ||= new Set()).add(c.key); (await importOnce('./menu_button.js')).closeMenus({ restoreFocus: true }); applyWidths(); }); b.setAttribute('role', 'menuitem'); return b; }));
@@ -396,13 +394,11 @@ export function dataTable(cfg) {
         for (const y of pool) if (change[y.key] && y !== L0.prim) st.widths[y.key] = Math.round((S.w[y.key] || 0) + change[y.key]);
         applyWidths();
         if (h) h.setAttribute('aria-valuenow', String(L0 && L0.w[c.key] || Math.round(newW)));
-        syncHidden(tightKeys); // the bar offers Reset as soon as a width is kept
+        syncHidden(tightKeys); // refresh the hidden-column menu after resizing
     }
-    /** Back to the widths nobody dragged: the kept ones go, in this browser too. */
-    function resetWidths() { st.widths = {}; saveWidths(); applyWidths(); }
     /** The width the column needs for its widest cell and its head (laid out at its natural width for a moment). */
     function fitWidth(c) { const live = columns.filter(x => !emptyKeys.has(x.key) && !cssHides(x)), n = measureNatural(live)[c.key] || 0; applyWidths(); return Math.min(800, n); }
-    /** Fit the column to its content: when that is the width it has, nothing changed and nothing is kept (no Reset appears for it). */
+    /** Fit the column to its content: when that is the width it has, nothing changed and nothing is kept. */
     function fitTo(c, th) {
         const w = fitWidth(c);
         if (Math.abs(w - Math.round(th.getBoundingClientRect().width)) <= 1) return;

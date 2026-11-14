@@ -1,5 +1,5 @@
 // A list's Actions column is never clipped (#9845, the operator via coral-hub's #9839): it is a fixed column (fixed: true with a rem width): no resize handle, never frozen or kept, so a width saved when the list had fewer buttons, or another column's resize, cannot squeeze
-// its buttons (the third Needs you action was cut off). Also: a Reset column widths button is offered when widths are kept (#12409). A fixture table in the dashboard's own page, 1280 px; CORAL_SCREENSHOT_DIR saves the picture. Isolated dev server.
+// its buttons (the third Needs you action was cut off). Saved widths add no reset bar (#16800). A fixture table in the dashboard's own page, 1440 px; CORAL_SCREENSHOT_DIR saves the picture. Isolated dev server.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -23,7 +23,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         return { thW: Math.round(th.getBoundingClientRect().width), handle: !!th.querySelector('.dt-resize'), lastRight: Math.round(Math.max(...bs.map(b => b.right))), tdRight: Math.round(td.getBoundingClientRect().right), boxRight: Math.round(box.right), cellClipped: td.scrollWidth > td.clientWidth + 1, kept: localStorage.getItem(${JSON.stringify(KEY)}) }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+        await Emulation.setDeviceMetricsOverride({ width: 1440, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         // a width kept when the Actions column was narrower (it had two buttons), and another column's kept width: both are in storage before the table is drawn
@@ -33,17 +33,21 @@ const { coralReady, framesJs } = require('./helpers/wait');
         assert.ok(Math.abs(m.thW - 304) <= 2, 'the Actions column has the 19 rem it declares, not the 150 px kept for it: ' + JSON.stringify(m));
         assert.equal(m.handle, false, 'a fixed column has no resize handle');
         assert.ok(m.lastRight <= m.tdRight + 1 && m.lastRight <= m.boxRight && !m.cellClipped, 'the third action is whole, inside its cell and inside the table: ' + JSON.stringify(m));
-        await waitFor(`!!document.querySelector('#dt-host .cols-reset-btn:not([hidden])')`, 'a Reset column widths button is offered when widths are kept', 4000).catch(() => {});
-        assert.equal(await ev(`!!document.querySelector('#dt-host .cols-reset-btn:not([hidden])')`), true, 'widths are kept in this browser, so a Reset column widths button is offered (#12409; it was "no reset" before, #9845), and the Actions column is still the width it declares');
-        await shot('table-actions-fixed-1280');
         // resizing another column keeps nothing for the fixed one
-        await ev(`localStorage.removeItem(${JSON.stringify(KEY)}); true`); await mount(true); await ev(framesJs(8)); // the layout settles before the handle is read (the bar of Reset appears above the table when a width is kept)
+        await ev(`localStorage.removeItem(${JSON.stringify(KEY)}); true`); await mount(true); await ev(framesJs(8)); // the layout settles before the handle is read before the handle is read
         const h = await ev(`(() => { const r = document.querySelector('#dt-host th[data-key="name"] .dt-resize').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
         const mouse = (type, x, y) => client.Input.dispatchMouseEvent({ type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 });
         await mouse('mouseMoved', h.x, h.y); await mouse('mousePressed', h.x, h.y); for (let i = 1; i <= 4; i++) await mouse('mouseMoved', h.x - 15 * i, h.y); await mouse('mouseReleased', h.x - 60, h.y); // the Name edge is dragged left: Who, on its right, takes the room (the last column on show, Who, has no handle of its own now, #12409)
         const m2 = await measure();
         assert.ok(Math.abs(m2.thW - 304) <= 2 && m2.lastRight <= m2.boxRight && !m2.cellClipped, 'after dragging the Name edge the Actions column is the same width and whole: ' + JSON.stringify(m2));
         assert.ok(m2.kept && !('act' in JSON.parse(m2.kept)) && 'who' in JSON.parse(m2.kept), 'the width kept is Who\'s (it took the room), never the fixed column\'s: ' + m2.kept);
+        await shot('table-actions-dragged-1440');
+        assert.equal(await ev(`!!document.querySelector('#dt-host .cols-reset-btn')`),false,'no reset control is added after a drag');
+        assert.equal(await ev(`document.querySelector('#dt-host .cols-hidden-bar').hidden`),true,'saved widths add no bar row when no column is hidden');
+        await mount(true); await ev(framesJs(3));
+        assert.equal((await measure()).kept,m2.kept,'a remount keeps dragged widths');
+        await ev(`document.querySelector('#dt-host th[data-key="name"] .dt-resize').dispatchEvent(new MouseEvent('dblclick',{bubbles:true})); true`); await ev(framesJs(3));
+        assert.equal(await ev(`!!document.querySelector('#dt-host .cols-reset-btn')`),false,'double-click to fit adds no reset control');
         await ev(`localStorage.removeItem(${JSON.stringify(KEY)}); true`);
         console.log('PASS the fixed Actions column is never clipped and nothing resets it');
     } finally { await client.close(); }
