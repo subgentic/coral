@@ -74,7 +74,7 @@ const BUDGET = Object.fromEntries(Object.entries(BEFORE).map(([k,v])=>[k,v+(HELP
         }
         await ev(`document.querySelectorAll('#settings-cloud details.settings-cloud-more').forEach(d => { d.hidden = false; d.open = true; }); true`); // the permissions are behind the closed "More Coral Hub permissions" (#6579)
         const learn = '#settings-cloud-redact-row a.sv-learn';
-        assert.deepEqual(await ev(`(() => { const a=document.querySelector('${learn}'); return {href:a.getAttribute('href'), help:!!a.closest('.sv-help'), keyboard:a.tabIndex>=0, text:a.textContent}; })()`), {href:'/docs/settings-system', help:true, keyboard:true, text:'Learn more'});
+        assert.deepEqual(await ev(`(() => { const a=document.querySelector('${learn}'); return {href:a.getAttribute('href'), help:!!a.closest('.sv-help'), keyboard:a.tabIndex>=0, text:a.textContent}; })()`), {href:'/docs/hub', help:true, keyboard:true, text:'Learn more'});
         await ev(`document.querySelector('${learn}').focus(); true`);
         assert.equal(await ev(`document.activeElement.matches('${learn}')`), true, 'the Docs link takes keyboard focus');
         console.log('PASS Settings shows its hints, the long ones in Docs');
