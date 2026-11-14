@@ -233,3 +233,31 @@ func TestAnUntrackedScanThatDidNotFinishIsNotCounted(t *testing.T) {
 	assert.Zero(t, w.Untracked)
 	assert.False(t, w.Unreadable, "the tracked changes were read")
 }
+
+// #17058: ReadState says 'pending' before the first Observe and 'done' / notGit after, for both git and non-git folders.
+func TestReadStatePendingThenDoneForGitAndNonGitFolders(t *testing.T) {
+	_, feature, _ := repoWithWorktrees(t)
+	nonGit := t.TempDir()
+
+	c := New()
+	c.For(feature)
+	c.For(nonGit)
+
+	st, ng := c.ReadState(feature)
+	assert.Equal(t, "pending", st, "before Observe: pending")
+	assert.False(t, ng)
+
+	st, ng = c.ReadState(nonGit)
+	assert.Equal(t, "pending", st, "a non-git folder before Observe: pending")
+	assert.False(t, ng)
+
+	c.Observe(context.Background(), []string{feature, nonGit})
+
+	st, ng = c.ReadState(feature)
+	assert.Equal(t, "done", st, "after Observe: the git folder is done")
+	assert.False(t, ng, "it is a git repository")
+
+	st, ng = c.ReadState(nonGit)
+	assert.Equal(t, "done", st, "the non-git folder is done")
+	assert.True(t, ng, "it is not a git repository")
+}
