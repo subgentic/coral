@@ -3,7 +3,9 @@
 import assert from 'node:assert/strict';
 import { installDom, importUi } from './helpers/jsdom_env.mjs';
 installDom({ mode: 'local' });
-const { plainTaskNotice, appendCoralNotice } = await importUi('pending_messages');
+const { appendCoralNotice } = await importUi('pending_messages');
+const { plainTaskNotice } = await importUi('task_notice_plain');
+await new Promise(r => setTimeout(r, 100)); // the plain-words module loads beside pending_messages (not in the start path)
 const { state } = await importUi('state');
 
 const stored = { 4: 'Quiz page, final wording' };
