@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"io"
 	"os"
+	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -292,7 +293,19 @@ func hasPlaceholder(screen string) bool {
 func boxPlaceholder(box string) bool {
 	t := strings.TrimSpace(box)
 	return t == "" || strings.HasPrefix(t, `Try "`) || strings.HasPrefix(t, "Ask Codex to do anything") ||
-		strings.HasPrefix(t, "Type your message") || hermesHints[t]
+		strings.HasPrefix(t, "Type your message") || hermesHints[t] || agyModeHint(t)
+}
+
+// agyModeHintRe is the hint agy (1.5.x) draws in its empty input box: its current mode and how to change it ("Auto mode: edits & safe commands auto-approved (shift+tab to cycle)", and the same
+// for Accept-edits, Plan and Best-of-N), matched whole by its shape so a mode agy adds later is known too (#16875). The bypass line is a fixed one.
+var agyModeHintRe = regexp.MustCompile(`^[A-Z][A-Za-z-]* mode: [^()]{3,80} \(shift\+tab to cycle\)$`)
+
+const agyBypassHint = "--dangerously-skip-permissions: auto-approving all tool permissions"
+
+// agyModeHint reports whether t, the text of an input box, is only agy's mode hint. Without it every agy box looked like a person's draft and nothing automated was typed into an agy agent
+// (no board nudge, no /send, no /compact: found in a real run, #16875). A person's text that merely starts like a hint, or has more after it, is not matched.
+func agyModeHint(t string) bool {
+	return t == agyBypassHint || agyModeHintRe.MatchString(t)
 }
 
 // hermesHints are the hints Hermes v0.22.5 rotates through in its empty input box: all eleven of the English ones, from Hermes's own locales/en.yaml (key placeholder, p01 to p11; the tester's run on a build with five
