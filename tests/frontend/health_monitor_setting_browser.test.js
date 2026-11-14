@@ -1,4 +1,4 @@
-// "Team health checks" (board_health_monitor, #5128) is a switch of the main Settings, in Agents, not of the team panel:
+// "Team health checks" (board_health_monitor, #5128) is a switch of the main Settings, in Teams and Chief (moved there by #15910), not of the team panel:
 //   - Settings > Agents has it, labelled as the operator asked with its one sentence, on for a server that has no value, and Apply saves the key (true and false);
 //   - Team settings has no Global settings tab and no such checkbox (it is Workflow, Prompt inspection and, from the server, Health check);
 //   - the Health check tab says it needs the switch when it is off, with a Settings link that opens Settings at Agents; with the switch on it says nothing.
@@ -26,7 +26,7 @@ const SENTENCE = 'Applies to every team; each team still turns its own check on 
         await require('./helpers/wait').bind(ev).coralReady('startup', 'settings');
     };
     const openSettings = async () => {
-        await ev(`(async () => { await window.showSettingsModal('agents'); return true; })()`);
+        await ev(`(async () => { await window.showSettingsModal('chief'); return true; })()`);
         await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none' && !!document.getElementById('settings-board-health-monitor')`, 'Settings');
     };
     const openTeam = async () => {
@@ -43,7 +43,7 @@ const SENTENCE = 'Applies to every team; each team still turns its own check on 
         await load(); await openSettings();
         const row = await ev(`(() => { const box = document.getElementById('settings-board-health-monitor'); const rowEl = box.closest('.sv-row'); const lab = document.getElementById(box.getAttribute('aria-labelledby')); const pane = box.closest('.settings-pane');
             return { label: lab.textContent.trim(), desc: rowEl.querySelector('.sv-help-text').textContent.trim(), checked: box.checked, group: pane.dataset.group, shown: !pane.hidden }; })()`);
-        check('Settings > Agents has "Team health checks" with the operator\'s sentence as its hint, its label naming the box', row.group === 'agents' && row.shown && row.label === 'Team health checks' && row.desc === SENTENCE, JSON.stringify(row));
+        check('Settings > Teams and Chief has "Team health checks" (#15910) with the operator\'s sentence as its hint, its label naming the box', row.group === 'chief' && row.shown && row.label === 'Team health checks' && row.desc === SENTENCE, JSON.stringify(row));
         check('it is on when the server has no value', row.checked === true);
         await ev(`(() => { document.querySelector('#settings-board-health-monitor').closest('.sv-row').scrollIntoView({ block: 'center' }); return true; })()`);
         for (const th of ['dark', 'light']) { await theme(th); await new Promise(r => setTimeout(r, 350)); await shot(`health-monitor-settings-${th}`); } // sleep-ok: the theme's colour transitions

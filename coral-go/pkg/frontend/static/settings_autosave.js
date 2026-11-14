@@ -13,7 +13,7 @@ const same = (a,b) => JSON.stringify(a) === JSON.stringify(b);
 function remember(e) { const v = read(e); for (const i of controls(e)) values.set(i,v); }
 function eligible(e) {
     return e?.matches?.('input,select,textarea') && !e.disabled && !e.readOnly &&
-        !e.closest('#settings-pane-chief,#settings-dropbox,.cm-form,#settings-security,.settings-cloud-connect') &&
+        !e.closest('#settings-chief-host,#settings-dropbox,.cm-form,#settings-security,.settings-cloud-connect') &&
         !e.id.startsWith('settings-dropbox-') && !!e.closest('.sv-row');
 }
 function status(row) {
