@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -142,7 +143,7 @@ var milestoneInflight = map[string]bool{}
 // accepts it (confirmMilestoneSent), so a failed delivery, an opt-out or a
 // keyless build never consumes the install's one-time event.
 //
-// canSend must already include "telemetry enabled". If the state cannot be
+// canSend says whether the caller can send (key present, generation valid); telemetry being on is checked here too, under the lock, so an opt-out between the caller's check and this call cannot leave a fresh pending entry for a later opt-in to replay. If the state cannot be
 // persisted it returns false, so a broken disk yields no events rather than
 // one per launch.
 func reserveMilestone(name string, canSend bool, props map[string]string) (send bool, snap pendingMilestone) {
@@ -171,11 +172,12 @@ func reserveMilestoneAt(name string, canSend bool, props map[string]string, at s
 	}
 	// With telemetry off (by any means) nothing pending may survive: an old
 	// event must not be replayed after a later opt-in.
-	if !telemetryEnabled() && len(s.Pending) > 0 {
+	on := telemetryEnabled() // read once, under the lock: the caller's own check may be older than an opt-out that came since (#16582)
+	if !on && len(s.Pending) > 0 {
 		s.Pending = nil
 		changed = true
 	}
-	send = canSend && !milestoneInflight[name]
+	send = canSend && on && !milestoneInflight[name]
 	if _, fired := s.Fired[name]; fired {
 		send = false
 	}
@@ -305,6 +307,38 @@ func TrackOnce(eventName string, extraProps map[string]string) {
 		}
 		releaseMilestone(eventName)
 	})
+}
+
+// replayPendingMilestones sends the one-time events that were reached and kept, frozen, but could not be delivered then (#16569): a send that found no install ID (the first run says the Terms were
+// accepted inside startup.Start, before TrackInstallAsync writes the ID) or no network. Nothing called their trigger a second time, so they waited for ever (eula_accepted never arrived in PostHog).
+// Called at each start once the install ID exists. Only with analytics on (an opt-out has already dropped what was pending, clearPendingMilestones); each goes out under its own frozen time and
+// event id, once (confirmMilestoneSent). The per-day active keys (their names carry a "|") are not replayed: a day that passed is not sent late.
+func replayPendingMilestones(gen uint64) {
+	if !stateDirReady() || !(posthogKeyPresent() && telemetryValid(gen)) {
+		return
+	}
+	milestoneMu.Lock()
+	s := loadMilestones()
+	var names []string
+	for name := range s.Pending {
+		if _, fired := s.Fired[name]; fired || strings.Contains(name, "|") {
+			continue
+		}
+		names = append(names, name)
+	}
+	milestoneMu.Unlock()
+	sort.Strings(names)
+	for _, name := range names {
+		send, snap := reserveMilestoneAt(name, true, nil, "") // the stored snapshot: its time and its properties
+		if !send {
+			continue
+		}
+		if emitEvent(name, snap.Props, milestoneEventUUID(name, snap.Timestamp), snap.Timestamp, gen) {
+			confirmMilestoneSent(name)
+			continue
+		}
+		releaseMilestone(name)
+	}
 }
 
 // recordFirstOpen stores the first-open timestamp if it is not already set and
