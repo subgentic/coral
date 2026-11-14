@@ -4,4 +4,5 @@
 .version-list-entry[aria-current="true"] { border-width: 2px; }
 .version-list-name { font-weight: var(--fw-strong); }
 .version-list-who { flex: 1 1 10rem; min-width: 0; overflow-wrap: anywhere; }
+.version-list-note { flex: 1 1 100%; min-width: 0; overflow-wrap: anywhere; color: var(--text-secondary); } /* the version's own note, on its own line under its name and who (#17119) */
 .version-list-actions { display: flex; gap: 0.5rem; margin-left: auto; }

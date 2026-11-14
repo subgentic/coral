@@ -228,6 +228,16 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// The note of this version (#17119): one cleaned line, cut at 140; empty is no note, a link that signs someone in is refused as in a name.
+	var uploadNote string
+	if raw := r.URL.Query().Get("note"); strings.TrimSpace(raw) != "" {
+		if hasSignInLink(raw) {
+			writeError(w, http.StatusBadRequest, "sign_in_link", signInLinkRefusal)
+			return
+		}
+		uploadNote, _ = board.CleanArtifactNote(raw)
+	}
+
 	// A file for review says what the Operator is to decide (#11555): one cleaned line, cut at 140, refused when there is none; a link that signs someone in is refused as in a name.
 	var reviewQuestion string
 	if hasTag(board.CleanArtifactTags(r.URL.Query()["tag"]), tagForReview) {
@@ -454,6 +464,11 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 			if _, kerr := h.bs.SetArtifactKind(r.Context(), teamBoard, hexID, kind, sid, time.Now()); kerr != nil {
 				slog.Warn("[artifacts] the kind of an upload for review was not recorded", "digest", hexID, "error", kerr)
 			}
+		}
+	}
+	if uploadNote != "" && h.bs != nil {
+		if nerr := h.bs.SetArtifactNote(r.Context(), hexID, uploadNote, sid, time.Now()); nerr != nil {
+			slog.Warn("[artifacts] the note of an upload was not recorded", "digest", hexID, "error", nerr)
 		}
 	}
 	if reviewQuestion != "" && h.bs != nil && hasTag(tags, tagForReview) { // kept with the upload's own session: no other agent's tag or question changes it, and a person's edit of the tags does not drop it

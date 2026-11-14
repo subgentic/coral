@@ -11,7 +11,7 @@ const when = iso => { const t = new Date(iso); return Number.isNaN(t.getTime()) 
 
 const madeByYou = v => v.role === 'operator' || v.source === 'edit'; // the person's own: an upload as the Operator or an edit in the dashboard (#15329, #15369); one test for the series and the fallback list
 
-/** The versions of the file the row stands for, oldest first: [{ n, hex, at, who, current }]. The server's series when it has one, else the older uploads of the same file the row already holds (`earlier`) and itself. */
+/** The versions of the file the row stands for, oldest first: [{ n, hex, at, who, note, current }]. The server's series when it has one, else the older uploads of the same file the row already holds (`earlier`) and itself. */
 export async function versionsOf({ hex, server, board, current, earlier }) {
     try {
         const { response: r, dropped } = await readVersions(server, hex, board, { reuse: true });
@@ -19,7 +19,7 @@ export async function versionsOf({ hex, server, board, current, earlier }) {
             const d = await r.json();
             if (Array.isArray(d) && d.length > 1) {
                 const rows = d.slice().sort((a, b) => a.version - b.version);
-                return rows.map((v, i) => ({ n: v.version, hex: v.digest, at: v.at, who: v.edited_in_dropbox ? 'Edited in Dropbox' : v.role || v.uploader || '', you: madeByYou(v), current: i === rows.length - 1 }));
+                return rows.map((v, i) => ({ n: v.version, hex: v.digest, at: v.at, who: v.edited_in_dropbox ? 'Edited in Dropbox' : v.role || v.uploader || '', you: madeByYou(v), note: v.note || '', current: i === rows.length - 1 }));
             }
         }
     } catch { /* no series: the row's own older uploads below */ }
@@ -62,7 +62,9 @@ export async function openVersionList(opts) {
             const rb = document.createElement('button'); rb.type = 'button'; rb.className = 'btn btn-small version-list-restore'; rb.textContent = 'Restore'; rb.setAttribute('aria-label', `Restore v${v.n}`);
             rb.addEventListener('click', () => confirmRestore(v, li)); actions.append(rb);
         }
-        li.append(name, who, actions); list.append(li);
+        li.append(name, who, actions);
+        if (v.note) { const note = document.createElement('span'); note.className = 'version-list-note'; note.textContent = shown(v.note); li.append(note); } // what the uploading agent said this version changed (--note, #17119): text, never markup
+        list.append(li);
     }
     const buttons = document.createElement('div'); buttons.className = 'inbox-ask-buttons';
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close'; close.addEventListener('click', finish);
