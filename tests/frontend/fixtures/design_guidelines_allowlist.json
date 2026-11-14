@@ -7,8 +7,8 @@
   "coral-go/pkg/frontend/static/board_export_render.js": {
    "radius: inline 10px": 1
   },
-  "coral-go/pkg/frontend/static/css/acf_full_access.css": {
-   "height: .settings-pane label.acf-use-full-access > input { height: 1rem }": 1
+  "coral-go/pkg/frontend/static/css/acf_sizes.css": {
+   "height: .perm-chip { min-height: 24px }": 1
   },
   "coral-go/pkg/frontend/static/css/agentic.css": {
    "height: .activity-chart-mode button { min-height: 24px }": 1,
@@ -16,7 +16,7 @@
    "radius: 14px 14px 0 0": 1,
    "radius: 22px": 1,
    "radius: 2px": 2,
-   "radius: 999px": 3
+   "radius: 999px": 2
   },
   "coral-go/pkg/frontend/static/css/analytics_tabs.css": {
    "radius: 2px": 1
@@ -48,7 +48,6 @@
   },
   "coral-go/pkg/frontend/static/css/command-pane.css": {
    "height: #board-chat-input-pane textarea { min-height: 2.75rem }": 1,
-   "height: .model-chip { min-height: 28px }": 1,
    "height: .model-chip-note:empty { height: 1px }": 1,
    "height: :is(#command-pane, #board-chat-input-pane) textarea { min-height: 2.75rem }": 1,
    "radius: 0 16px 16px 0": 1,
@@ -60,7 +59,6 @@
   },
   "coral-go/pkg/frontend/static/css/components.css": {
    "height: #launch-agent-pick .launch-agent-opt input { height: 1px }": 1,
-   "height: #settings-modal .sec-switch input[type=\"checkbox\"] { height: 16px }": 1,
    "height: .btn-icon.btn-xs { height: max(24px, calc(var(--fs-lg) + 10px)) }": 1,
    "height: .btn-icon.btn-xs { min-height: max(24px, calc(var(--fs-lg) + 10px)) }": 2,
    "height: .jumpbar .btn { min-height: 26px }": 1,
@@ -98,8 +96,7 @@
    "radius: 16px": 2
   },
   "coral-go/pkg/frontend/static/css/goals.css": {
-   "radius: 22px": 1,
-   "radius: 999px": 1
+   "radius: 22px": 1
   },
   "coral-go/pkg/frontend/static/css/history.css": {
    "radius: 2px": 1,
@@ -109,7 +106,8 @@
    "radius: 999px": 1
   },
   "coral-go/pkg/frontend/static/css/inbox_review_groups.css": {
-   "height: .inbox-group-review-toggle input { height: 18px }": 1
+   "height: .inbox-group-review-toggle input { height: 18px }": 1,
+   "radius: 999px": 2
   },
   "coral-go/pkg/frontend/static/css/layout.css": {
    "radius: 11px": 2,
@@ -127,7 +125,7 @@
    "radius: 16px": 2,
    "radius: 18px": 2,
    "radius: 20px": 1,
-   "radius: 24px": 3,
+   "radius: 24px": 1,
    "radius: 26px": 1
   },
   "coral-go/pkg/frontend/static/css/output.css": {
@@ -138,7 +136,7 @@
    "height: .inbox-ask-subjects .btn { min-height: 28px }": 1
   },
   "coral-go/pkg/frontend/static/css/provider_cards.css": {
-   "height: .provider-tabs .provider-card-head input { height: 1px }": 1
+   "height: .provider-strip .provider-card-head input { height: 1px }": 1
   },
   "coral-go/pkg/frontend/static/css/session.css": {
    "height: .hub-readonly-chip:empty { height: 1px }": 1,
@@ -156,6 +154,9 @@
   },
   "coral-go/pkg/frontend/static/css/short_screen.css": {
    "height: .alerts-offer-banner .btn { min-height: 28px }": 1
+  },
+  "coral-go/pkg/frontend/static/css/skill_mention.css": {
+   "radius: 999px": 1
   },
   "coral-go/pkg/frontend/static/css/skills.css": {
    "height: .skills-pick-label input[type=checkbox] { height: 20px }": 1
@@ -181,7 +182,7 @@
    "radius: --radius-xs = 3px": 1
   },
   "coral-go/pkg/frontend/static/dropbox_share.js": {
-   "btn-primary written in a dialog module": 5
+   "btn-primary written in a dialog module": 6
   },
   "coral-go/pkg/frontend/static/editions.js": {
    "btn-primary written in a dialog module": 3
@@ -190,7 +191,7 @@
    "btn-primary written in a dialog module": 2
   },
   "coral-go/pkg/frontend/static/goal_view.js": {
-   "btn-primary written in a dialog module": 4
+   "btn-primary written in a dialog module": 3
   },
   "coral-go/pkg/frontend/static/platform/native.js": {
    "radius: inline 3px": 1
