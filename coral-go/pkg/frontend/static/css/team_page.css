@@ -430,7 +430,6 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
 
 /* On a phone the folder button already names the page and its count: the Artifacts heading and number under it are not drawn, and stay in the page for a screen reader (the page's name, and what the focus lands on; #9631). */
 @media (max-width: 767px) {
-    .inbox-artifacts-main > .group-table-head { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 }
 @media (max-width: 767px) { .inbox-folder-toolbar .list-bar-search-row.gt-toolbar { flex-wrap: wrap; } } /* a full line (200% text) wraps its Select button to the next, whole, not cut at the screen's edge (#9658) */
 
@@ -492,7 +491,6 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
 
 @media (max-width: 639px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { /* PHONE_BAR_QUERY: the Inbox has no tab strip here (#13596) and the top pill is its search: the page's title and count are the open folder's visible name, the Filters icon at the right. Other pages (Jobs, Workflows) keep their strip and the one-pixel title. */
     #group-table-view[data-group^="hub-inbox"] .inbox-folder-head { position: static; width: auto; height: auto; margin: 0 4px 0 0; overflow: visible; clip-path: none; max-width: none; flex: 1 1 auto; }
-    #group-table-view[data-group^="hub-inbox"] .inbox-artifacts-main > .group-table-head { position: static; width: auto; height: auto; min-height: var(--control-touch-height, 44px); padding: 0 4px; margin: 0; overflow: visible; clip: auto; white-space: normal; } /* Files: the heading and count are the visible name too */
 }
 
 /* Jump to agent (#14565): the Assigned to cell is the name, the button and a quiet word for the agent's state */

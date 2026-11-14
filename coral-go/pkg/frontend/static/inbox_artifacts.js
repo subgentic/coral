@@ -10,6 +10,7 @@ const DT = await importOnce('./data_table.js');
 const { createArtifactsList } = await importOnce('./team_artifacts_page.js');
 const { inboxBarSpec } = await importOnce('./team_artifact_bar.js');
 const IT = await importOnce('./inbox_toolbar.js'); // the folders' toolbar on the shared list bar (#8596)
+const PH = await importOnce('./page_header.js'); // the shared page header: title and count in row 1, the search and the filter icon in row 2 (#15834, design guidelines 4.2)
 
 const KEY = '@inbox'; // the key the folder keeps its filters under, beside the teams' own (the team page's showArtifacts takes it as its project)
 const list = createArtifactsList({ inbox: true });
@@ -61,7 +62,7 @@ export function setArtifactSearch(text) {
 }
 
 let pageHost = null;
-const hooks = () => ({ detailHost: pageHost && pageHost.querySelector('.inbox-detail-pane'), onCount: n => { count = n; countAt = Date.now(); onCount(); const c = pageHost && pageHost.querySelector('.inbox-artifacts-count'); if (c) c.textContent = String(n); } });
+const hooks = () => ({ detailHost: pageHost && pageHost.querySelector('.inbox-detail-pane'), onCount: n => { count = n; countAt = Date.now(); onCount(); const head = document.querySelector('#group-table-view .inbox-folder-head'); if (head) { let c = head.querySelector('.session-group-count'); if (!c) { c = document.createElement('span'); c.className = 'session-group-count'; head.append(c); } c.textContent = String(n); head.dataset.words = `Artifacts|${n}`; } } }); // the head's count follows the list's answer, drawn the first time it comes
 
 let folderBar = null;
 /** The folder's toolbar (the shared one every Inbox folder has): the search, the Filters icon beside it (Team, Type, Origin, Uploaded by, Kept only, dates, Sort), the chips of what is on. The list uses this bar as its own. */
@@ -76,24 +77,21 @@ export function artifactsToolbar(redraw) {
         const teams = list.teams(), pills = list.reviewPills();
         const node = folderBar.draw({ filters: list.filters(), pills, options: { team: { values: teams.map(t => t.board_id), labels: Object.fromEntries(teams.map(t => [t.board_id, `${teamLabel(t.board_id, t.team)} (${t.all})`])) } } });
         folderBar.bar.names(list.names());
+        PH.pageHeader(node.querySelector('.list-bar-search-row'), { idp: 'inbox-artifacts' }); // the title and count are row 1 and the search row 2, the order the other list pages have (drawn again at each draw of the bar)
         return node;
     };
     if (redraw) onCount = () => { paint(); redraw(); }; // the list tells the folder when it has read (its count, its teams, its names)
     return { node: paint(), signature: JSON.stringify(list.filters()) };
 }
 
-/** The folder's page for the group table: its own title row, the list and the detail pane. */
+/** The folder's page for the group table: the list and the detail pane; its title and count are the first thing of the toolbar's row (folderHead), like every folder's (#15834). */
 export function artifactsSpec() {
-    return { title: 'Artifacts', headless: true, rows: [], signature: 'artifacts', node: () => {
+    return { title: 'Artifacts', noun: ['artifact', 'artifacts'], get count() { return count; }, rows: [], signature: 'artifacts', node: () => {
         const row = DT.el('div', 'inbox-artifacts-row');
         const main = DT.el('div', 'inbox-artifacts-main');
-        const head = DT.el('div', 'group-table-head');
-        const h = DT.el('h2', null, 'Artifacts'); h.id = 'group-table-title'; // not focusable: the page opens on its search box (the group table's focus), and no ring is drawn round words (#7404)
-        const n = DT.el('span', 'session-group-count inbox-artifacts-count', count == null ? '' : String(count));
-        head.append(h, n);
         const body = DT.el('div', 'inbox-artifacts-list team-panel'); // the team page's list rules (its bar, its table) apply by .team-panel
         const pane = DT.el('aside', 'pane pane-aside detail-pane inbox-detail-pane'); pane.setAttribute('aria-label', 'Details'); pane.hidden = true;
-        main.append(head, body); row.append(main, pane);
+        main.append(body); row.append(main, pane);
         pageHost = row;
         // the pane is the folder's right sidebar: as tall as the view and reaching up to its top edge (sticky, so the page scrolls under it), and the search row ends where it begins. Its height, its offset and its
         // width are set on the row and the view, and kept when the window, the view or the pane's width changes (#8925)
