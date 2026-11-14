@@ -3,6 +3,7 @@ package routes
 import (
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -21,8 +22,9 @@ func (h *SessionsHandler) DismissWait(w http.ResponseWriter, r *http.Request) {
 	}
 	name := chi.URLParam(r, "name")
 	var body struct {
-		SessionID string `json:"session_id"`
-		AgentType string `json:"agent_type"`
+		SessionID   string `json:"session_id"`
+		AgentType   string `json:"agent_type"`
+		DialogSince string `json:"dialog_since"`
 		// Remove: the second action on a wait that is already dismissed and still waiting (#14266): the evidence never came, so the Operator takes the row out of Needs you and its count. A request is told from
 		// the next by when the agent raised it, so one raised AGAIN after the turn moved on (identical, the same kind or not) is a new ask and shows again; only a request the agent made itself has such a time.
 		Remove bool `json:"remove"`
@@ -42,6 +44,25 @@ func (h *SessionsHandler) DismissWait(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	st := h.deriveSingleSessionState(r.Context(), body.SessionID, 0)
+	if body.DialogSince != "" {
+		// Only the named screen-dialog episode is hidden. A stale browser cannot
+		// dismiss a newer dialog or replace the record of a hook-owned wait.
+		field, _ := h.dialogs.field(body.SessionID).(map[string]any)
+		since, _ := field["since"].(string)
+		parsed, parseErr := time.Parse(time.RFC3339, body.DialogSince)
+		if st.NeedsInput || since == "" || parseErr != nil || parsed.UTC().Format(time.RFC3339) != since {
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "dismissed": false})
+			return
+		}
+		if err := h.ss.SetWaitIgnored(r.Context(), body.SessionID, "dialog:"+since); err != nil {
+			slog.Warn("could not record dialog dismissal", "session_id", body.SessionID, "error", err)
+			errInternalServer(w, "Could not dismiss it. Try again.")
+			return
+		}
+		h.kickFeedForRequestChange(body.SessionID, "request_resolved")
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "dismissed": true, "dialog_hidden": true})
+		return
+	}
 	if !st.NeedsInput {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "dismissed": false})
 		return

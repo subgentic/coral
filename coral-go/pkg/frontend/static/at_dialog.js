@@ -15,8 +15,11 @@ export function dialogOf(row) {
     const own = row.at_dialog;
     if (own && typeof own === 'object') { // the server's own sighting (#11437): its minutes, and whether the team wants the Needs you item (notify)
         const t = Date.parse(own.since), m = Number(own.after_min);
-        return { since: Number.isFinite(t) ? t : 0, afterMin: Number.isFinite(m) && m > 0 ? m : DIALOG_AFTER_MIN, notify: own.notify !== false };
+        return { since: Number.isFinite(t) ? t : 0, afterMin: Number.isFinite(m) && m > 0 ? m : DIALOG_AFTER_MIN, notify: own.notify !== false, dismissed: own.dismissed === true };
     }
+    // A current server's null is authoritative: its watcher no longer sees a prompt.
+    // Only servers without this field need the old skipped-send fallback.
+    if (Object.hasOwn(row, 'at_dialog')) return null;
     const k = row.skipped_send;
     if (!k || typeof k.why !== 'string' || !k.why.toLowerCase().startsWith(PROMPT_SKIP)) return null;
     const t = Date.parse(k.since);
@@ -26,7 +29,7 @@ export function dialogOf(row) {
 /** The dialog has stood for the set minutes (the row's own after_min, else DIALOG_AFTER_MIN) and the team wants to hear of it: the agent needs one click and is a Needs you item. A dialog with no known start is not counted (no guess). */
 export function dialogDue(row, now = Date.now()) {
     const d = dialogOf(row);
-    return !!d && d.notify && d.since > 0 && now - d.since >= d.afterMin * 60000;
+    return !!d && !d.dismissed && d.notify && d.since > 0 && now - d.since >= d.afterMin * 60000;
 }
 
 /** What Needs you says for it. */

@@ -221,3 +221,13 @@ func dialogMinutesOf(hs board.HealthSettings, onTeam bool) (int, bool, time.Dura
 	}
 	return atDialogMinutes, hs.HeldNotice.On, timeout
 }
+
+// dismissedDialogField keeps the state sighting intact while hiding only this
+// episode's Needs you notice. The ignored key is persisted on the machine.
+func (h *SessionsHandler) dismissedDialogField(sid, ignored string) any {
+	field, _ := h.dialogs.field(sid).(map[string]any)
+	if field != nil && ignored == "dialog:"+field["since"].(string) {
+		field["dismissed"] = true
+	}
+	return field
+}

@@ -2,6 +2,7 @@
 // agent's screen (the row's skipped_send, "a prompt is open"), its state is "At a dialog", not Idle; after the set minutes (5) it is a Needs you item, "needs one click", and counts in the Inbox badge; a prompt that has stood
 // only a minute is calm. An agent that asks through its own hook keeps its own state. 1280 px, a desktop sidebar.
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 
 (async () => {
@@ -16,12 +17,14 @@ const { connect } = require('./agent_view_harness');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        const rows = [row('d1', 'Security Reviewer', { skipped_send: trust(12) }), row('d2', 'Fresh Dialog', { skipped_send: trust(1) }), row('d3', 'Plain Idle', {}), row('d5', 'Server Dialog', { board_unread: 0, at_dialog: { since: ago(11), after_min: 10, notify: true } }), row('d6', 'Server Early', { board_unread: 0, at_dialog: { since: ago(7), after_min: 10, notify: true } }), row('d7', 'Server Muted', { board_unread: 0, at_dialog: { since: ago(60), after_min: 10, notify: false } }), row('d4', 'Own Ask', { skipped_send: trust(30), waiting_for_input: true, waiting_kind: 'permission' })];
+        const rows = [row('d1', 'Security Reviewer', { skipped_send: trust(12) }), row('d2', 'Fresh Dialog', { skipped_send: trust(1) }), row('d3', 'Plain Idle', {}), row('d8', 'Cleared Dialog', {at_dialog:null,skipped_send:trust(48)}), row('d9', 'Dismissed Dialog', {at_dialog:{since:ago(30),after_min:5,notify:true,dismissed:true}}), row('d5', 'Server Dialog', { board_unread: 0, at_dialog: { since: ago(11), after_min: 10, notify: true } }), row('d6', 'Server Early', { board_unread: 0, at_dialog: { since: ago(7), after_min: 10, notify: true } }), row('d7', 'Server Muted', { board_unread: 0, at_dialog: { since: ago(60), after_min: 10, notify: false } }), row('d4', 'Own Ask', { skipped_send: trust(30), waiting_for_input: true, waiting_kind: 'permission' })];
         await ev(`(async () => { T.state.liveSessions = ${JSON.stringify(rows)}; T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
         await waitFor(`document.querySelectorAll('#live-sessions-list .session-group-item').length >= 7`, 'the rows', 6000);
         const info = await ev(`import(${S} + 'session_state.js').then(m => Object.fromEntries(T.state.liveSessions.map(r => [r.display_name, m.sessionStateInfo(r).label])))`);
         check(info['Security Reviewer'] === 'At a dialog' && info['Fresh Dialog'] === 'At a dialog', 'an agent whose message waits for a prompt is At a dialog, not Idle: ' + JSON.stringify(info));
         check(info['Server Early'] === 'At a dialog' && info['Server Muted'] === 'At a dialog', 'a dialog the server reports with nothing queued is At a dialog too: ' + JSON.stringify(info));
+        check(info['Cleared Dialog'] === 'Idle', 'explicit null from the watcher clears the stale skipped-send fallback: '+JSON.stringify(info));
+        check(info['Dismissed Dialog'] === 'At a dialog', 'dismissal preserves the agent state');
         check(info['Plain Idle'] === 'Idle', 'an agent with nothing wrong stays Idle: ' + JSON.stringify(info));
         check(/^Needs input/.test(info['Own Ask']), 'an agent that asks through its own hook keeps its own state: ' + JSON.stringify(info));
         const seen = await ev(`(() => { const r = document.querySelector('#live-sessions-list .session-group-item[data-session-id="d1"]'); return r ? r.textContent + ' ' + [...r.querySelectorAll('[aria-label],[title]')].map(e => (e.getAttribute('aria-label') || '') + ' ' + (e.title || '')).join(' ') : ''; })()`);
@@ -32,6 +35,21 @@ const { connect } = require('./agent_view_harness');
         check(item.summary === 'Needs one click: it is at a dialog' && item.kind === 'dialog', 'the Needs you row says it needs one click: ' + JSON.stringify(item));
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.updateInboxTab()); true`);
         await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '3'`, 'the Inbox badge counts the two dialogs and the ask', 6000);
+        // Exercise the public Dismiss action and successive live-list reads. The
+        // route's persistent storage and stale-episode guard have a Go handler test.
+        await ev(`(()=>{const real=window.fetch;window.__dialogRows=T.state.liveSessions;window.__dialogPosts=[];window.fetch=(u,o={})=>{const p=new URL(String(u),location.origin).pathname;const json=b=>Promise.resolve(new Response(JSON.stringify(b),{status:200,headers:{'Content-Type':'application/json'}}));if(p.endsWith('/dismiss-wait')){const b=JSON.parse(o.body);window.__dialogPosts.push(b);const row=window.__dialogRows.find(r=>r.session_id===b.session_id);if(b.dialog_since!==row.at_dialog.since)return json({ok:true,dismissed:false});row.at_dialog={...row.at_dialog,dismissed:true};return json({ok:true,dismissed:true,dialog_hidden:true});}if(p==='/api/sessions/live')return json(window.__dialogRows);return real(u,o);};return true;})()`);
+        await ev(`import(${S}+'dismiss_wait.js').then(m=>m.dismissWait(T.state.liveSessions.find(r=>r.session_id==='d5'))).then(()=>true)`);
+        const sent = await ev('window.__dialogPosts');
+        assert.equal(sent.length,1);assert.equal(sent[0].session_id,'d5');assert.equal(sent[0].dialog_since,rows.find(r=>r.session_id==='d5').at_dialog.since);
+        await ev(`window._coralLoadLiveSessions().then(()=>true)`);
+        const after = await ev(`import(${S}+'asked_before_restart.js').then(m=>T.state.liveSessions.filter(m.needsYou).map(r=>r.session_id))`);
+        check(!after.includes('d5'),'the dismissed dialog stays out after another live-list read');
+        const stateAfter = await ev(`import(${S}+'session_state.js').then(m=>m.sessionStateInfo(T.state.liveSessions.find(r=>r.session_id==='d5')).label)`);
+        check(stateAfter==='At a dialog','dismiss does not change the agent state');
+        await ev(`(()=>{const r=window.__dialogRows.find(r=>r.session_id==='d5');r.at_dialog={since:new Date(Date.now()-20*60000).toISOString(),after_min:5,notify:true};return true;})()`);
+        await ev(`window._coralLoadLiveSessions().then(()=>true)`);
+        check(await ev(`import(${S}+'asked_before_restart.js').then(m=>m.needsYou(T.state.liveSessions.find(r=>r.session_id==='d5')))`),'a new dialog episode returns to Needs you');
+        if(process.env.CORAL_SCREENSHOT_DIR){fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/dialog-episodes.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
         assert.equal(found.length, 0, '\n' + found.join('\n'));
         console.log('PASS an agent at a dialog is "At a dialog", and needs one click after 5 minutes');
     } finally { await client.close(); }
