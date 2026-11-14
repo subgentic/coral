@@ -12,6 +12,7 @@ tests/release/download_section_test.sh | dryrun | the Download section of the no
 tests/release/go_mod_download_retry_test.sh | dryrun | the module download retries a dropped stream, never a checksum mismatch
 tests/release/install_cli_tools_test.sh | dryrun | installers/install-cli.sh links exactly the programs the app ships (tests/release/commands.txt)
 tests/release/ldflags_build_test.sh | dryrun | every build script's -X flags take effect
+tests/release/new_routes_test.sh | dryrun | the new-routes list coral-hub gets with each tag (#16727)
 tests/release/notes_commit_test.sh | dryrun | the notes commit's trailers are what the release reads
 tests/release/promote_copy_check_test.sh | dryrun | the pinned copy of promote.yml and main's are byte-identical when it changes
 tests/release/promote_workflow_test.py | dryrun | promote.yml's order of steps, permissions and pinned actions
