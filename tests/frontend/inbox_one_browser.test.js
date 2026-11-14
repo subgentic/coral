@@ -124,7 +124,7 @@ const AGENTS = (waiting) => waiting ? [
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'cleared', 5000);
 
             // Tasks
-            await ev(`window.switchNavTab('hub-inbox'); document.querySelector('${pane} .view-list-item[data-key="tasks"]').click(); true`);
+            await ev(`window.switchNavTab('hub-inbox', { folder: 'tasks' }); true`);
             await waitFor(`document.querySelector('#group-table-title').textContent === 'Tasks'`, at + 'Tasks opens its table', 8000);
             assert.equal(await ev(`document.querySelector('${pane} .sidebar-search-input').getAttribute('aria-label')`), 'Search tasks', at + 'the search is named for Tasks now');
             // the one task row (#7737): a table on a desktop (State, Task, Team, Updated), the two-line column on a phone; one word set for the state (the Inbox's "Open" is Queued)
@@ -239,7 +239,7 @@ const AGENTS = (waiting) => waiting ? [
             if (w === 1280) for (const theme of ['dark', 'light']) for (const zoom of ['', '32px']) {
                 const how = at + `${theme}${zoom ? ', 200% text' : ''}: `;
                 await setTheme(ev, theme); await ev(`document.documentElement.style.fontSize = ${JSON.stringify(zoom)}; true`);
-                await ev(`window.switchNavTab('hub-inbox'); document.querySelector('${pane} .view-list-item[data-key="tasks"]').click(); true`);
+                await ev(`window.switchNavTab('hub-inbox', { folder: 'tasks' }); true`);
                 await waitFor(`document.querySelector('#group-table-title').textContent === 'Tasks'`, how + 'the tasks table', 8000);
                 const au = await auditRegion(ev, ['.sidebar', '#group-table-view']);
                 assert.deepEqual(au.fails.map(f => `${f.sel} ${f.what} ${f.ratio}`), [], how + 'the sidebar and the table: contrast');

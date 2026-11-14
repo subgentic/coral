@@ -8,6 +8,7 @@ const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const settingsGuard = await require('./helpers/settings_guard').guardSettings();
     const found = [];
     const check = (ok, msg) => { if (!ok) found.push(msg); };
     const S = `(window.__coralStatic || '/static/')`;
@@ -89,5 +90,5 @@ const { coralReady } = require('./helpers/wait');
         }
         assert.equal(found.length, 0, '\n' + found.join('\n'));
         console.log('PASS the new-user Inbox: six items that complete themselves');
-    } finally { await client.close(); }
+    } finally { await settingsGuard.restore(); await client.close(); }
 })().catch(e => { console.error(e.message); process.exitCode = 1; });
