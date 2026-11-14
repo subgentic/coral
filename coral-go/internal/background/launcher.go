@@ -3,11 +3,11 @@
 package background
 
 import (
-	"errors"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/logsafe"
 	"log/slog"
