@@ -31,9 +31,10 @@ func (h *SessionsHandler) SetBranches(src BranchesSource) { h.branches = src }
 
 // branchAgent is an agent shown on a worktree's card.
 type branchAgent struct {
-	Name      string `json:"name"`
-	SessionID string `json:"session_id"`
-	AgentType string `json:"agent_type"`
+	Name        string `json:"name"`
+	DisplayName string `json:"display_name,omitempty"`
+	SessionID   string `json:"session_id"`
+	AgentType   string `json:"agent_type"`
 }
 
 // branchAgentName is how the agent is called on screen: its display name (Developer 2) when it has one, else its name, which for a plain agent is its folder (#17543).
@@ -114,7 +115,7 @@ func (h *SessionsHandler) Branches(w http.ResponseWriter, r *http.Request) {
 				}
 				for i := range rows {
 					if h.branches.Holds(repo, i, ls.WorkingDir) {
-						rows[i].Agents = append(rows[i].Agents, branchAgent{Name: branchAgentName(ls), SessionID: ls.SessionID, AgentType: ls.AgentType})
+						rows[i].Agents = append(rows[i].Agents, branchAgent{Name: branchAgentName(ls), SessionID: ls.SessionID, AgentType: ls.AgentType, DisplayName: ptrOr(ls.DisplayName)})
 						break
 					}
 				}
@@ -191,7 +192,7 @@ func (h *SessionsHandler) TeamBranches(w http.ResponseWriter, r *http.Request) {
 			sec.ask = &branchAgent{Name: ls.AgentName, SessionID: ls.SessionID, AgentType: ls.AgentType}
 		}
 		if own < len(sec.rows) {
-			sec.rows[own].Agents = append(sec.rows[own].Agents, branchAgent{Name: branchAgentName(ls), SessionID: ls.SessionID, AgentType: ls.AgentType})
+			sec.rows[own].Agents = append(sec.rows[own].Agents, branchAgent{Name: branchAgentName(ls), SessionID: ls.SessionID, AgentType: ls.AgentType, DisplayName: ptrOr(ls.DisplayName)})
 		}
 	}
 	out := make([]map[string]any, 0, len(sections))
