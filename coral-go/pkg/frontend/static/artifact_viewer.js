@@ -487,6 +487,7 @@ export function openArtifactViewer(hex, opts = {}) {
             d.querySelector('.artifact-viewer-fullscreen').disabled = false;
         },
         renderContent: (el, content, path, server) => { textShown = true; renderArtifactText(el, content, path, server); _comments.docRendered(content, true); if (/\.(?:md|markdown|mdown)$/i.test(path || '')) { offerMarkdownEdit(d, hex, opts, gen); offerEditSend(d, hex, opts, gen); } },
+        resetContent: () => { textShown = false; _comments.docWhole(); },
         openEntry: (entry) => {
             const m = /^coral:\/\/artifacts\/([a-f0-9]{64})$/i.exec(entry.uri || '');
             if (m) openArtifactViewer(m[1], { server: opts.server, board: opts.board, sourceNamed: opts.sourceNamed, onClose: opts.onClose, filename: entry.name, mediaType: entry.media_type });
