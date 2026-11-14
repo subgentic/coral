@@ -59,7 +59,8 @@ func homeOrRootRefusal(dir string) string {
 // POST /api/scheduled/jobs/init-repo {"repo_path": "..."}
 func (h *ScheduleHandler) InitJobRepo(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		RepoPath string `json:"repo_path"`
+		RepoPath     string `json:"repo_path"`
+		IncludeFiles bool   `json:"include_files"` // the first commit holds the files that are in the folder now (git add -A, so .gitignore is honoured); else it is empty (#17150)
 	}
 	if err := decodeJSON(r, &body); err != nil || strings.TrimSpace(body.RepoPath) == "" {
 		errBadRequest(w, "repo_path is required")
@@ -94,6 +95,12 @@ func (h *ScheduleHandler) InitJobRepo(w http.ResponseWriter, r *http.Request) {
 	for key, fallback := range map[string]string{"user.name": "Coral", "user.email": "coral@localhost"} { // the person's own identity when git has one; a placeholder only when it has none
 		if out, _ := gitutil.Command(ctx, dir, "config", key).Output(); strings.TrimSpace(string(out)) == "" {
 			args = append(args, "-c", key+"="+fallback)
+		}
+	}
+	if body.IncludeFiles {
+		if out, err := gitutil.Command(ctx, dir, "add", "-A").CombinedOutput(); err != nil {
+			errBadRequest(w, "adding the folder's files failed: "+strings.TrimSpace(string(out)))
+			return
 		}
 	}
 	args = append(args, "-c", "commit.gpgsign=false", "commit", "--allow-empty", "--no-verify", "-m", "Initial commit") // never a signing prompt or a failed signature on Coral's own placeholder commit (#10534)

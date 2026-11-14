@@ -30,7 +30,7 @@
       "reason": "Share via Dropbox (#14944): the Dropbox status, read only for this computer's own file or board outside Coral Hub, to show the share entries; Dropbox is this computer's alone"
     },
     "job_form.js": {
-      "count": 5,
+      "count": 6,
       "reason": "Automations (scheduled jobs and workflows) run on this computer: the page has no server for them"
     },
     "needs_skills.js": {

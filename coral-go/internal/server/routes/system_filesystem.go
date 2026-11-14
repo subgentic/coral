@@ -96,7 +96,8 @@ func (h *SystemHandler) ListFilesystem(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// IsGitDir checks if a directory is a git repository.
+// IsGitDir checks if a directory is a git repository, and for one that cannot yet be a job's folder (no repository, or no commit yet) how many files and folders it holds: the New job dialog offers to
+// make it a repository and says what the first commit would include (#17150).
 // GET /api/filesystem/is-git?path=/some/dir
 func (h *SystemHandler) IsGitDir(w http.ResponseWriter, r *http.Request) {
 	reqPath := r.URL.Query().Get("path")
@@ -111,11 +112,24 @@ func (h *SystemHandler) IsGitDir(w http.ResponseWriter, r *http.Request) {
 	}
 	_, err := os.Stat(filepath.Join(expanded, ".git"))
 	resp := map[string]any{"is_git": err == nil}
+	branch := ""
 	if err == nil {
 		// The repository's current branch ("" when it has no commit yet): the launch and job forms prefill Base Branch with it instead of "main" (#6701).
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
-		resp["branch"] = gitutil.CurrentBranch(ctx, expanded)
+		branch = gitutil.CurrentBranch(ctx, expanded)
+		resp["branch"] = branch
+	}
+	if branch == "" { // no repository, or one with no commit: how much is in the folder (the entries of its top level, .git aside)
+		if entries, rerr := os.ReadDir(expanded); rerr == nil {
+			n := 0
+			for _, e := range entries {
+				if e.Name() != ".git" {
+					n++
+				}
+			}
+			resp["files"] = n
+		}
 	}
 	writeJSON(w, http.StatusOK, resp)
 }

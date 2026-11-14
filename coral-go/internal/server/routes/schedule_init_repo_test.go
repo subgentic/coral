@@ -2,7 +2,9 @@ package routes
 
 import (
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -97,4 +99,32 @@ func TestJobRunWithoutAWorktreeNeedsOnlyAFolder(t *testing.T) {
 	code, body = sendJSON(t, http.MethodPost, srv.URL+"/api/scheduled/jobs", job)
 	require.Equal(t, http.StatusOK, code, "%v", body)
 	assert.EqualValues(t, 0, body["no_worktree"], "a job that says nothing keeps its worktree")
+}
+
+// #17150: the first commit was empty, so a job's worktree (made from it) had none of the folder's files, and the dialog said "Nothing in the folder is changed". With include_files the first commit holds
+// the files that are in the folder now; without it the commit stays empty, as before.
+func TestInitJobRepoCanIncludeTheFoldersFiles(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	srv, _ := scheduleTestServer(t)
+	tracked := func(dir string) string {
+		out, _ := consoletest.HiddenCommand("git", "-C", dir, "ls-tree", "-r", "--name-only", "HEAD").Output()
+		return strings.TrimSpace(string(out))
+	}
+	mk := func() string {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "index.html"), []byte("<p>hi</p>"), 0o644))
+		return dir
+	}
+
+	empty := mk()
+	code, body := sendJSON(t, http.MethodPost, srv.URL+"/api/scheduled/jobs/init-repo", map[string]any{"repo_path": empty})
+	require.Equal(t, http.StatusOK, code, "%v", body)
+	assert.Equal(t, "", tracked(empty), "without the choice the first commit is empty")
+
+	full := mk()
+	code, body = sendJSON(t, http.MethodPost, srv.URL+"/api/scheduled/jobs/init-repo", map[string]any{"repo_path": full, "include_files": true})
+	require.Equal(t, http.StatusOK, code, "%v", body)
+	assert.Equal(t, "index.html", tracked(full), "with the choice the first commit holds the folder's files, so a run's worktree has them")
 }

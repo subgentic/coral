@@ -8,6 +8,7 @@ import { changedFields, NOTHING_TO_SAVE } from './settings_diff.js';
 import { cronWords, atWords, localZone, zoneNote, RUNS_WHILE_OPEN, runsWords } from './job_words.js';
 import { importOnce } from './import_once.js';
 import { joinBrowse, FOLDER_ON_THIS_COMPUTER } from './dir_row.js';
+import { plural } from './format.js';
 const { DAYS, MINUTE_STEPS, HOUR_STEPS, composeCron, parseCron } = await importOnce('./cron_picker.js'); // this form loads on first use (#10218), and so do the pieces only it uses
 const { limitSeconds, limitParts } = await importOnce('./time_limit.js');
 
@@ -15,6 +16,8 @@ let view = null;
 let editingJobId = null;  // non-null when editing an existing job
 let openedJob = null;     // what the editor showed for the job it opened (#4423): Save sends only what the person changed since
 let repoOffer = '';      // the server refused the folder for a missing repository or first commit (#10276): the form offers to make it one
+let repoFiles = null;    // how many files and folders the chosen folder holds, when it is not yet a job's folder (is-git says so, #17150): the first commit's choice names it
+let folderSeq = 0, folderTimer = 0; // the newest folder check wins; a typed path is checked a moment after the last key
 let noWorkflows = false;  // the workflow list came back empty: the form says so and offers to make one
 
 const DEFAULT_CRON = '0 9 * * *'; // a new job runs every day at 09:00 until the person says otherwise (#10276): the time a first job is most often wanted, not every hour
@@ -306,19 +309,42 @@ function jobFormValues() {
     return values;
 }
 
-/** Make the folder a repository with one first commit, once the person has agreed (#10276); then the job is created, with nothing else changed (#10783). */
+/** The words under the Folder field for a folder a job cannot work in yet ('a git repository' or 'commit yet'): the same whether the check on picking the folder or the refusal on Create job says it. */
+function folderWords(why, dir) { return why === 'a git repository' ? `That folder is not a git repository: ${dir}` : `That repository has no commit yet: ${dir}`; }
+
+/** Say it where the folder is chosen (#17150): the folder is looked at as soon as it is picked or typed, not when Create job is pressed. A folder that is missing, or that a worktree is not wanted for, says nothing here. */
+async function checkFolder() {
+    const v = view.values(), dir = String(v.repo_path || '').trim(), mine = ++folderSeq;
+    const clear = () => { if (repoOffer) { repoOffer = ''; view.error('repo_path', ''); view.refresh(); } };
+    if (!dir || v.job_type === 'workflow' || v.no_worktree) { clear(); return; }
+    let data;
+    try { data = await (await fetch(`/api/filesystem/is-git?path=${encodeURIComponent(dir)}`)).json(); } catch { return; }
+    if (mine !== folderSeq) return;
+    const why = !data.is_git ? 'a git repository' : data.branch === '' ? 'commit yet' : '';
+    repoFiles = typeof data.files === 'number' ? data.files : null;
+    if (!why || !(data.is_git || repoFiles !== null)) { clear(); return; } // fine as it is, or a folder the server could not read: Create job says why
+    repoOffer = why;
+    view.error('repo_path', folderWords(why, dir));
+    view.refresh();
+}
+const checkFolderSoon = () => { clearTimeout(folderTimer); folderTimer = setTimeout(checkFolder, 400); };
+
+/** Make the folder a repository with one first commit, once the person has agreed (#10276); then the job is created, with nothing else changed (#10783). The first commit is empty unless the person ticks the box: a run works in a worktree of that commit, so an empty one starts without the folder's files (#17150). */
 function makeRepo() {
     const dir = String(view.values().repo_path || '').trim();
     if (!dir) return;
-    window.showConfirmModal('Make this folder a git repo', `Coral will run git init in ${dir} if it is not a repository yet, and make one empty first commit, so each run of the job has a branch to start from. Nothing in the folder is changed. Then the job is created.`, async () => {
+    const files = repoFiles, fresh = repoOffer === 'a git repository';
+    const choice = files === 0 ? undefined : { label: `Include the files that are in this folder now${files ? ` (${plural(files, 'file')})` : ''}`, checked: fresh && files !== null }; // ticked by default for a folder that is not a repository yet and has files
+    const says = `Coral will run git init in ${dir} if it is not a repository yet, and make a first commit on this computer only; nothing is pushed anywhere. Each run of the job works in a copy made from that commit, so the commit is empty unless the box is ticked: then a run starts without the folder's files. Files that .gitignore lists are left out. Then the job is created.`;
+    window.showConfirmModal('Make this folder a git repo', files === 0 ? `Coral will run git init in ${dir} if it is not a repository yet, and make an empty first commit, so each run of the job has a branch to start from. The folder has no files yet. Then the job is created.` : says, async (_ack, include) => {
         try {
-            const resp = await fetch('/api/scheduled/jobs/init-repo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repo_path: dir }) });
+            const resp = await fetch('/api/scheduled/jobs/init-repo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repo_path: dir, include_files: !!include }) });
             const data = await resp.json().catch(() => ({}));
             if (!resp.ok || data.error) { showToast(data.error || 'Could not make the folder a git repo.', true); return; }
             repoOffer = ''; view.error('repo_path', ''); view.refresh();
             submitJob(); // the person asked for this job: it is created now, not asked for again (#10783)
         } catch { showToast('Could not make the folder a git repo.', true); }
-    }, undefined, { label: 'Make it a git repo', danger: false });
+    }, undefined, { label: 'Make it a git repo', danger: false, choice });
 }
 
 async function submitJob() {
@@ -346,7 +372,7 @@ async function submitJob() {
     const repoWhy = data.error && /^repo_path (?:is not (an existing directory|a git repository)|has no (commit yet)): (.*)$/s.exec(data.error);
     if (repoWhy) { // the server refused the repository path: said under that field, which takes the focus, in words (a refusal at the dialog's foot was far from the field, #9965)
         const why = repoWhy[1] || repoWhy[2], dir = repoWhy[3];
-        view.error('repo_path', why === 'a git repository' ? `That folder is not a git repository: ${dir}` : why === 'commit yet' ? `That repository has no commit yet: ${dir}` : `That folder does not exist: ${dir}`);
+        view.error('repo_path', why === 'an existing directory' ? `That folder does not exist: ${dir}` : folderWords(why, dir));
         repoOffer = why === 'an existing directory' ? '' : why; // a folder that is not there cannot be made a repository; the other two can
         view.refresh();
         view.focus('repo_path');
@@ -372,6 +398,9 @@ function jobView() {
         fields: jobFields(host),
         form: { submit: 'Create job', submitId: 'job-modal-submit', cancel: 'Cancel', barHost: footer, onSubmit: submitJob, onCancel: hideJobModal },
     });
+    const repoInput = document.getElementById('job-modal-repo');
+    repoInput?.addEventListener('input', checkFolderSoon); repoInput?.addEventListener('change', () => { clearTimeout(folderTimer); checkFolder(); }); // typed or picked with Browse (#17150)
+    document.getElementById('job-modal-no-worktree')?.addEventListener('change', checkFolder);
     joinBrowse('job-modal-repo', 'btn-browse-job'); // Browse at the input's right, as New agent has it (#10276)
     return view;
 }
@@ -405,7 +434,8 @@ export function showJobModal() {
     repoOffer = '';
     v.reset(); // every field at its default, no errors, an empty status line
     // No folder is chosen for the person: the Settings default if they set one, else empty and required, never the home folder (as New Agent has it, #5989; #9958).
-    if (state.settings?.default_working_dir) v.set('repo_path', state.settings.default_working_dir);
+    repoFiles = null;
+    if (state.settings?.default_working_dir) { v.set('repo_path', state.settings.default_working_dir); checkFolder(); }
     v.fold(false);
     openModal('New job', 'Create job');
     loadWorkflowOptions(); // the New job dialog opens on Run a prompt, the first choice; the workflow list is read for the other one (#10515)

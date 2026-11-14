@@ -11,9 +11,10 @@ const { coralReady } = require('./helpers/wait');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 820, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
-        await ev(`window.__refusal = ''; window.__inits = []; window.__posts = []; const real = window.fetch;
+        await ev(`window.__refusal = ''; window.__isgit = { is_git: false }; window.__inits = []; window.__posts = []; const real = window.fetch;
             window.fetch = (u, o = {}) => { const url = String(u && u.url ? u.url : u), m = (o.method || 'GET').toUpperCase(), json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
                 if (m === 'POST' && /\\/api\\/scheduled\\/jobs$/.test(url)) { window.__posts.push(JSON.parse(o.body)); } if (m === 'POST' && /\\/api\\/scheduled\\/jobs$/.test(url)) return window.__refusal ? json({ error: window.__refusal }, 400) : json({ id: 9 });
+                if (m === 'GET' && /\\/api\\/filesystem\\/is-git\?/.test(url)) return json(window.__isgit);
                 if (m === 'POST' && /\\/api\\/scheduled\\/jobs\\/init-repo$/.test(url)) { window.__inits.push(JSON.parse(o.body)); return json({ ok: true, created: true }); }
                 return real(u, o); }; true`);
         await ev(`Promise.resolve(window.showJobModal()).then(() => true)`);
@@ -45,12 +46,44 @@ const { coralReady } = require('./helpers/wait');
         assert.deepEqual(await ev(`window.__inits`), [], 'nothing is made before the person agrees');
         const asked = await ev(`document.getElementById('confirm-modal-message').textContent`);
         assert.match(asked, /git init in \/work\/plain/, 'the dialog names the folder: ' + asked);
-        assert.match(asked, /one empty first commit/, 'and what Coral will do');
+        assert.match(asked, /first commit on this computer only; nothing is pushed/, 'and what Coral will do, and that nothing leaves the computer (#17150)');
+        assert.match(asked, /the commit is empty unless the box is ticked/, 'and that the commit is empty unless the box is ticked');
+        assert.doesNotMatch(asked, /Nothing in the folder is changed/, 'the old sentence hid that a run starts without the files');
         assert.match(asked, /Then the job is created\./, 'and that the job is created after it (#10783)');
         await ev(`window.__refusal = ''; document.getElementById('confirm-modal-yes').click(); true`); // the server will take the folder now
         await waitFor(`window.__inits.length === 1`, 'the folder is made a repository', 5000);
-        assert.deepEqual(await ev(`window.__inits[0]`), { repo_path: '/work/plain' });
+        assert.deepEqual(await ev(`window.__inits[0]`), { repo_path: '/work/plain', include_files: false }, 'a folder the check never looked at (a refusal on Create job) has no file count: the box is not ticked');
         await waitFor(`window.__posts.length === 1 && getComputedStyle(document.getElementById('job-modal')).display === 'none'`, 'the job is created at once, the person is not asked to create it again (#10783)', 5000);
+
+        // #17150: the folder is looked at as soon as it is picked: the rule is said under the field and the button is there before Create job is pressed; the first commit's files are a tick box.
+        await ev(`document.getElementById('confirm-modal-no')?.click(); window.__inits = []; window.__posts = []; window.__refusal = ''; window.__isgit = { is_git: false, files: 12 }; true`);
+        await ev(`Promise.resolve(window.showJobModal()).then(() => true)`);
+        await waitFor(`!!document.getElementById('job-modal-name') && getComputedStyle(document.getElementById('job-modal')).display !== 'none'`, 'the New job dialog again', 8000);
+        await ev(`(() => { const b = [...document.querySelectorAll('#job-type-toggle button')].find(x => x.dataset.type === 'prompt'); if (b) b.click(); return true; })()`);
+        await fill();
+        await ev(`document.getElementById('job-modal-repo').dispatchEvent(new Event('change', { bubbles: true })); true`);
+        await waitFor(`!!document.getElementById('job-repo-offer') && document.getElementById('job-repo-offer').getClientRects().length > 0`, 'the offer, before Create job is pressed', 5000);
+        assert.deepEqual(await ev(`window.__posts`), [], 'nothing was created: the rule was said on picking the folder');
+        assert.match(await ev(`document.getElementById('job-form').textContent`), /That folder is not a git repository: \/work\/plain/, 'said under the field');
+        await ev(`document.getElementById('job-make-repo').click(); true`);
+        await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the question', 5000);
+        assert.match(await ev(`document.getElementById('confirm-modal-choice').textContent`), /Include the files that are in this folder now \(12 files\)/, 'the tick box names the file count');
+        assert.equal(await ev(`document.querySelector('#confirm-modal-choice input').checked`), true, 'ticked by default for a folder that is not a repository yet');
+        await ev(`document.getElementById('confirm-modal-yes').click(); true`);
+        await waitFor(`window.__inits.length === 1`, 'made a repository', 5000);
+        assert.deepEqual(await ev(`window.__inits[0]`), { repo_path: '/work/plain', include_files: true }, 'ticked: the first commit holds the files');
+        await waitFor(`window.__posts.length === 1`, 'the job is created', 5000);
+
+        await ev(`window.__inits = []; window.__posts = []; Promise.resolve(window.showJobModal()).then(() => true)`);
+        await waitFor(`!!document.getElementById('job-modal-name') && getComputedStyle(document.getElementById('job-modal')).display !== 'none'`, 'the dialog a third time', 8000);
+        await fill();
+        await ev(`document.getElementById('job-modal-repo').dispatchEvent(new Event('change', { bubbles: true })); true`);
+        await waitFor(`!!document.getElementById('job-repo-offer') && document.getElementById('job-repo-offer').getClientRects().length > 0`, 'the offer again', 5000);
+        await ev(`document.getElementById('job-make-repo').click(); true`);
+        await waitFor(`!!document.querySelector('#confirm-modal-choice input')`, 'the question again', 5000);
+        await ev(`document.querySelector('#confirm-modal-choice input').click(); document.getElementById('confirm-modal-yes').click(); true`);
+        await waitFor(`window.__inits.length === 1`, 'made a repository again', 5000);
+        assert.deepEqual(await ev(`window.__inits[0]`), { repo_path: '/work/plain', include_files: false }, 'unticked: the first commit is empty');
         console.log('PASS New job: a folder that is not a repository is offered one "Make it a git repo" button, asked first, made one, and the job is created; a missing folder is not offered');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
