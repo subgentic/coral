@@ -57,6 +57,7 @@ export function syncCustomModeOptions(select, type) {
         const group = mk('optgroup'); group.label = 'Custom'; group.dataset.customModes = '1';
         for (const m of mine) {
             const o = new Option(m.risky ? `${m.name} (no prompts)` : m.name, PREFIX + m.id);
+            if (m.risky) o.dataset.risky = '1'; // New Agent's "Runs as" line reads it for the amber warning (#16777)
             o.title = customModeFlagsLine(m) ? `Runs with: ${customModeFlagsLine(m)}` : '';
             if (type == null || type === '') o.textContent = `${m.name} (${label(m.agent_type)})`;
             group.append(o);
