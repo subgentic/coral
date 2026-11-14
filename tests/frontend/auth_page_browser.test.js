@@ -120,7 +120,8 @@ const GOLD = n => fs.readFileSync(path.join(__dirname, '../../coral-go/internal/
             for (const [sel, v] of Object.entries(r)) assert.ok(v >= 4.5, `${theme}: ${sel} is ${v}:1 on the card, AA needs 4.5`);
         }
         await ev(`document.documentElement.setAttribute('data-theme', 'dark'); true`);   // autofocus lands a moment after the page script
-        assert.ok(!(await visible('err')) && !(await visible('lock')), 'the error and lockout boxes take no room until they are needed');
+        assert.ok(!(await visible('err')) && !(await visible('lock')), 'empty error and lockout boxes remain hidden from assistive technology');
+        const signInTop = await ev(`document.getElementById('submit').getBoundingClientRect().top`);
         assert.equal(await $('keep', 'checked'), false, '"Keep me signed in" is off by default');
         await ev(`document.querySelector('[data-toggle=password]').click(); true`);
         assert.equal(await $('password', 'type'), 'text', 'Show reveals it'); await ev(`document.querySelector('[data-toggle=password]').click(); true`);
@@ -131,6 +132,7 @@ const GOLD = n => fs.readFileSync(path.join(__dirname, '../../coral-go/internal/
         replies = [json(401, { code: 'wrong_password', error: 'Wrong password' })];
         await type('password', ' wrong one '); await submit('signin-form');
         await waitFor(`document.getElementById('err').textContent === 'That password is not right.'`, 'the wrong-password message');
+        assert.equal(await ev(`document.getElementById('submit').getBoundingClientRect().top`), signInTop, 'wrong-password feedback keeps Sign in under the pointer');
         assert.deepEqual(posts[0], { url: '/auth/password', body: { password: ' wrong one ', keep: false } }, 'sent exactly as typed');
         assert.ok(await ev(`document.getElementById('password').classList.contains('bad')`));
         assert.equal(await $('submit', 'disabled'), false, 'and you can try again');
