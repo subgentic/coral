@@ -134,8 +134,8 @@ const BASE = require('./test_base').BASE;
         // No sign-in: the key answers 401 (or 403): say how to see it, with no QR, no key and no generic error.
         for (const code of [401, 403]) {
             await ev(`window.__saved=true;window.__effective=true;window.__mode="normal";window.__keyStatus=${code};window._showMobileConnectModal()`);await tick();
-            assert.equal(await status(),'Sign in to see the API key (run: coral open)',`a ${code} says to sign in`);await noQR();
-            assert.equal(await ev(`[...document.querySelectorAll('#mobile-connect-actions button')].map(b=>b.textContent).join()`),'Close');
+            assert.equal(await status(),'Sign in to see the API key',`a ${code} says to sign in`);await noQR();
+            assert.equal(await ev(`[...document.querySelectorAll('#mobile-connect-actions button')].map(b=>b.textContent).join()`),'Close,Sign in');
         }
         await ev(`window.__keyStatus=0`);
         // Closing during a delayed status check cannot re-open/populate the modal.

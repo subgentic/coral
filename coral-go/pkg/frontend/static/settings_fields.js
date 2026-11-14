@@ -187,10 +187,12 @@ const apiKeyLine = slot => {
     const input = mk('input', 'field field-dense sv-input settings-mono-input', { type: 'password', id: 'settings-api-key', readonly: '', autocomplete: 'off', placeholder: 'Loading...', 'aria-label': 'Coral API key' });
     const show = mk('button', 'btn btn-small settings-copy-btn', { type: 'button', id: 'settings-api-key-show', 'aria-pressed': 'false' }, 'Show'); show.hidden = true;
     const copy = mk('button', 'btn btn-small settings-copy-btn', { type: 'button', id: 'settings-api-key-copy' }, 'Copy'); copy.disabled = true;
+    const signin = mk('button', 'btn btn-small', { type: 'button', id: 'settings-api-key-signin' }, 'Sign in'); signin.hidden = true;
+    signin.addEventListener('click', () => { location.assign('/auth?return_to=' + encodeURIComponent(location.pathname)); });
     const qr = mk('button', 'btn btn-small', { type: 'button', title: 'Show QR code for mobile connection' });
     qr.setAttribute('data-on-click', 'm-show-mobile-connect-modal');
     const icon = mk('span', 'material-icons sv-ctl-icon', { 'aria-hidden': 'true' }, 'qr_code_2'); qr.append(icon, ' Mobile QR');
-    line.append(input, show, copy, qr); slot.append(line);
+    line.append(input, show, copy, signin, qr); slot.append(line);
 };
 
 // The agents' CLI accounts, one row (#10526 Claude, #11293 Pi, #11320): who the agents sign in as is each CLI's own login, so Check asks the CLIs (GET /api/system/cli-check?type=<cli>&signin=1) and each line says signed in,

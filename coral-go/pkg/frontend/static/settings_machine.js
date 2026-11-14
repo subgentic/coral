@@ -7,13 +7,15 @@ import { requestJson } from './api.js';
 // Masked at full width with Show and Copy; a status message (not configured,
 // not available) is shown as plain text with the controls off.
 
-export function _setApiKey(input, key, message) {
+export function _setApiKey(input, key, message, signIn = false) {
     const show = document.getElementById('settings-api-key-show');
     const copy = document.getElementById('settings-api-key-copy');
+    const signin = document.getElementById('settings-api-key-signin');
     input.value = key || message;
     input.type = key ? 'password' : 'text';
     if (show) { show.hidden = !key; show.textContent = 'Show'; show.setAttribute('aria-pressed', 'false'); }
     if (copy) copy.disabled = !key;
+    if (signin) signin.hidden = !signIn;
 }
 
 export function _wireApiKeyControls(input) {

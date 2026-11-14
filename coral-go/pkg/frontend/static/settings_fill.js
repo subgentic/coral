@@ -224,7 +224,7 @@ export function _fillApiKey() {
             if (r.status === 401 || r.status === 403) return { signIn: true };
             return r.ok ? r.json() : null;
         }).then(data => {
-            _setApiKey(apiKeyInput, data && data.key, data && data.signIn ? 'Sign in to see the API key (run: coral open)' : 'Not configured');
+            _setApiKey(apiKeyInput, data && data.key, data && data.signIn ? 'Sign in to see the API key' : 'Not configured', !!(data && data.signIn));
         }).catch(() => _setApiKey(apiKeyInput, '', 'Not available'));
     }
 }
