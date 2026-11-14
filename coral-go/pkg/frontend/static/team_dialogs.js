@@ -966,9 +966,10 @@ async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSet
         if (input && !input.value) { input.value = content; input.dispatchEvent(new Event('input', { bubbles: true })); }
         showToast('The team started, but the first task was not sent. It is in the message box: press Send to try again.', true);
     }
-    // A mouse: the box, where the person types next, with a first task sent or not (a launch left the keyboard on the page's body, Beta #10401). A touch screen: the page's heading, not the box, whose focus raises the on-screen keyboard over a page nobody has looked at yet (#10281, as the password dialog's close, #10067).
-    const heading = window.matchMedia?.('(pointer: coarse)').matches || isPhoneLayout() ? document.getElementById('team-page-title') : null; // the phone layout counts as a phone whether or not the browser says coarse (#10589)
-    (heading || input)?.focus({ preventScroll: !!heading });
+    // Sent: the page opens on Needs you, where the Board's input is hidden — focus the heading (#16732). Failed: the Board tab is showing and the message box has the unsent text — focus the input so the person can re-send. A touch screen always gets the heading, whose focus does not raise the on-screen keyboard over a page nobody has looked at yet (#10281, #10067).
+    const isPhone = window.matchMedia?.('(pointer: coarse)').matches || isPhoneLayout(); // the phone layout counts as a phone whether or not the browser says coarse (#10589)
+    const heading = document.getElementById('team-page-title');
+    (sent || isPhone ? heading : input || heading)?.focus({ preventScroll: sent || isPhone });
 }
 window.launchTeam = launchTeam;
 
