@@ -124,3 +124,28 @@ func TestTeamCommitFailureLeavesTheIndexAsItWas(t *testing.T) {
 	assert.Equal(t, "tip.js", uncGit(t, dir, "diff", "--cached", "--name-only"), "what the person staged stays staged, nothing else was")
 	assert.Equal(t, "1", uncGit(t, dir, "rev-list", "--count", "HEAD"), "no commit was made")
 }
+
+// #17203 (Security MUST 1): a secret-looking file the person had already staged, and Commit leaves out, is not in the commit: only the listed paths are committed, and it stays staged.
+func TestTeamCommitDoesNotCommitAStagedSecretItLeftOut(t *testing.T) {
+	base, ts := uncommittedServer(t)
+	name, dir := teamWithWork(t, ts)
+	uncGit(t, dir, "add", ".env") // already staged by the person (or an agent)
+	code, body := sendJSON(t, http.MethodPost, base+"/api/teams/detail/"+name+"/commit", map[string]any{"folder": dir, "message": "work"})
+	require.Equal(t, http.StatusOK, code, "%v", body)
+	assert.Equal(t, "tip.js\ntip.test.js", uncGit(t, dir, "show", "--name-only", "--format=", "HEAD"), "the staged .env is not in the commit")
+	assert.Equal(t, ".env", uncGit(t, dir, "diff", "--cached", "--name-only"), "and it is still staged, as it was")
+}
+
+// #17203 (Security MUST 2): file names are literal pathspecs. A new file named "*" must not stage, and so commit, every file (the left-out .env with them).
+func TestTeamCommitTakesFileNamesLiterally(t *testing.T) {
+	base, ts := uncommittedServer(t)
+	name, dir := teamWithWork(t, ts)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "*"), []byte("star\n"), 0o644))
+	code, body := sendJSON(t, http.MethodPost, base+"/api/teams/detail/"+name+"/commit", map[string]any{"folder": dir, "message": "work"})
+	require.Equal(t, http.StatusOK, code, "%v", body)
+	committed := uncGit(t, dir, "show", "--name-only", "--format=", "HEAD")
+	assert.NotContains(t, committed, ".env", "a glob in a file name is not a pattern for the left-out secret")
+	assert.Contains(t, committed, "tip.js")
+	assert.Equal(t, 3, len(strings.Split(committed, "\n")), "the three listed files, nothing else: %q", committed)
+	assert.Contains(t, uncGit(t, dir, "status", "--porcelain"), "?? .env")
+}
