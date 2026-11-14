@@ -119,6 +119,14 @@ const idle = (over = {}) => ({ enabled: true, relaunch_available: true, installe
         await setStatus(idle({ state: 'failed', last_result: { at: '2026-10-19T10:00:00Z', from: '1.4.125', to: '1.4.126', result: 'refused', by: 'local' } }));
         const vt = await ev(`document.querySelector('#update-fail-banner').textContent.replace(/\\s+/g, ' ').trim()`);
         check(`a failed verification has the docs' words (${vt.slice(0, 120)})`, /Coral found an update \(v1\.4\.126\) it could not verify, so it was not installed\. Your version is unchanged\./.test(vt));
+        // #16499: a clean offline rc install (its version is not a plain x.y.z, so the server says state failed) has no update and no refused download: no banner naming "(v)"
+        await setStatus(idle({ installed: null, state: 'failed', last_result: null, staged: null }));
+        const none = await ev(`(() => { const b = document.querySelector('#update-fail-banner'); return { hidden: !b || b.hidden || getComputedStyle(b).display === 'none', text: b ? b.textContent.replace(/\\s+/g, ' ').trim() : '' }; })()`);
+        check(`a failed state with no version and no refused download shows no banner (${none.text.slice(0, 100)})`, none.hidden && !/\(v\)/.test(none.text));
+        // #16522: a refusal that names no version still says so, without a version in the words
+        await setStatus(idle({ installed: null, state: 'failed', last_result: { at: '2026-10-19T10:02:00Z', from: '1.4.125', to: '', result: 'refused', by: 'local' }, staged: null }));
+        const nov = await ev(`(() => { const b = document.querySelector('#update-fail-banner'); return { hidden: !b || b.hidden || getComputedStyle(b).display === 'none', text: b ? b.textContent.replace(/\\s+/g, ' ').trim() : '' }; })()`);
+        check(`a refusal with no version still shows its notice, without "(v)" (${nov.text.slice(0, 120)})`, !nov.hidden && /Coral found an update it could not verify, so it was not installed\./.test(nov.text) && !/\(v\)/.test(nov.text));
         const againShown = async () => ev(`!document.querySelector('#update-fail-banner .update-fail-again').hidden`);
         await ev(`import(${S} + 'update_api.js').then(m => { m.serverHas.check = false; return true; })`); await setStatus(idle({ state: 'failed', last_result: { at: '2026-10-19T10:00:30Z', from: '1.4.125', to: '1.4.126', result: 'refused', by: 'local' } })); // a server without the check route
         check('Try again is not offered when there is no way to check', (await againShown()) === false);

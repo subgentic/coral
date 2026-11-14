@@ -73,7 +73,9 @@ export function failureNotice(s) {
     if (!s || !s.enabled) return null;
     const to = (s.last && s.last.to) || (s.staged && s.staged.version) || '';
     if (s.state === 'failed' || (s.last && s.last.result === 'refused')) {
-        return { kind: 'verify', key: `verify:${to}:${s.last ? s.last.at : ''}`, lead: `Coral found an update (v${to}) it could not verify, so it was not installed.`, rest: ` Your version is unchanged.` }; // the docs' sentence (updates.md)
+        const refused = !!(s.last && s.last.result === 'refused');
+        if (!to && !refused) return null; // state failed with no refused download and no version: a clean offline install whose own version the server cannot read (an rc); "(v)" is not a notice (#16499). A refusal with no version still is one (#16522)
+        return { kind: 'verify', key: `verify:${to}:${s.last ? s.last.at : ''}`, lead: `Coral found an update${to ? ` (v${to})` : ''} it could not verify, so it was not installed.`, rest: ` Your version is unchanged.` }; // the docs' sentence (updates.md)
     }
     if (s.last && s.last.result === 'failed_rolled_back') {
         return { kind: 'rolled', key: `rolled:${to}:${s.last.at}`, lead: `The update to ${to} was undone.`, rest: ` ${s.rollback && rollbackText(s.rollback.reason) ? rollbackText(s.rollback.reason) + ' ' : ''}${s.rollback && s.rollback.restartFailed ? `Coral was stopped by an update that could not restart it, and had to be started again by hand. It is on ${s.installed}.` : `Coral went back to ${s.installed}. Your agents are unaffected.`}` };
