@@ -25,12 +25,14 @@ const { coralReady } = require('./helpers/wait');
         await ev(`document.getElementById('team-page-more').click(); true`);
         await waitFor(`/^Pause team$/.test(document.getElementById('mb-pause-btn')?.textContent.trim() || '')`, 'the item says Pause team', 10000);
         await ev(`document.getElementById('mb-pause-btn').click(); true`);
-        await waitFor(`/^Team paused/.test([...document.querySelectorAll('.toast')].map(t => t.textContent).join(' ').trim())`, 'the toast', 10000);
+        await waitFor(`!!document.getElementById('team-pause-bar') && !document.getElementById('team-pause-bar').hidden`, 'the pause line', 10000); // the line is the one place that says Paused (#16361): no toast, no header word
+        assert.equal(await ev(`[...document.querySelectorAll('.toast')].some(t => /paused/i.test(t.textContent))`), false, 'no toast repeats it');
         assert.equal((await api('GET', `/api/board/${B}/paused`)).body.paused, true, 'the server says paused after ONE click');
         console.log('   ✓');
 
         console.log('2. The header says Paused, the line says since when and how to resume, the item says Resume team');
-        await waitFor(`document.getElementById('team-page-status')?.textContent.trim() === 'Paused'`, 'the header says Paused', 10000);
+        assert.notEqual(await ev(`document.getElementById('team-page-status')?.textContent.trim()`), 'Paused', 'the header does not repeat it');
+        assert.equal(await ev(`(() => { const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n, c = 0; while ((n = w.nextNode())) { const e = n.parentElement; if (/paused/i.test(n.nodeValue) && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden') c++; } return c; })()`), 1, 'Paused is on the page once');
         await waitFor(`!!document.getElementById('team-pause-bar') && !document.getElementById('team-pause-bar').hidden`, 'the pause line', 10000);
         const line = await ev(`document.getElementById('team-pause-bar').textContent`);
         assert.match(line, /^Paused since \d{1,2}:\d{2}.*: agents get new messages when you resume\.\s*Resume team$/, line);
@@ -58,7 +60,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`document.querySelector('#team-pause-bar .team-pause-resume').click(); true`);
         await waitFor(`/^Team resumed/.test([...document.querySelectorAll('.toast')].map(t => t.textContent).join(' ').trim())`, 'the resume toast', 10000);
         assert.equal((await api('GET', `/api/board/${B}/paused`)).body.paused, false);
-        await waitFor(`document.getElementById('team-pause-bar').hidden && document.getElementById('team-page-status').textContent.trim() !== 'Paused'`, 'the header and the line are back to normal', 10000);
+        await waitFor(`document.getElementById('team-pause-bar').hidden`, 'the header and the line are back to normal', 10000);
         await waitFor(`![...document.querySelectorAll('#mb-messages .mb-queued')].length`, 'the mark is gone', 10000);
         await waitFor(`![...document.querySelectorAll('#board-panel-msgs .mb-queued')].length`, 'the dock mark is gone too', 10000);
         assert.equal(await menuItem(), 'Pause team');

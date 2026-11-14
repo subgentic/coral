@@ -1,4 +1,4 @@
-/* The team's pause, as the person sees it (#15331, walk 22): the header says Paused, one line under it says since when and what happens (agents get new messages when you resume) with a Resume button,
+/* The team's pause, as the person sees it (#15331, walk 22): one line under the header says Paused since when and what happens (agents get new messages when you resume) with a Resume button,
  * and the Actions menu item is Pause team / Resume team and says what it did in a toast. It stands on its own: it does not wait for the Board tab to have been opened (its code loads with the Board tab, so a first click
  * from any other tab found nothing to run and did nothing). The truth is the server's: GET /paused answers { paused, since, by_sleep }; POST /pause and /resume change it. A pause that sleep put there is
  * Asleep, not Paused: nothing here draws for it. Loaded on demand (importOnce); zero start bytes. */
@@ -86,6 +86,6 @@ export async function toggleTeamPause(team = state.boardPageProject) {
         const data = await r.json().catch(() => ({}));
         if (!r.ok) { showToast(`Could not ${resume ? 'resume' : 'pause'} the team${data && data.error ? `: ${data.error}` : ''}.`, true); return; }
         await readTeamPause(team, true); // the pause time comes from the server; the live region says what changed
-        showToast(resume ? 'Team resumed: agents get messages again.' : 'Team paused: agents get new messages when you resume.', false, 4000);
+        if (resume) showToast('Team resumed: agents get messages again.', false, 4000); // a pause is said once, by the line under the header (#16361); the line is gone on resume, so the toast says that
     } catch { showToast(`Could not ${resume ? 'resume' : 'pause'} the team (the connection failed).`, true); }
 }

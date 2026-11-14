@@ -242,10 +242,9 @@ function drawStatus(data) {
     // Just woken from here: how many have reported so far, until all have (or two minutes pass), not only "waiting" (#10052).
     const wakingNow = unknown > 0 && !n && waking;
     if (!unknown) stopWaking(S.team);
-    const tp = state.teamPause, paused = tp?.paused && tp.team === S.team; // the person's Pause (#15331): the header says so, with the way out in the line under it (team_pause.js)
-    // every task done, none open, nobody working and nothing needs the person: not the same as "All well" while the team is still at it (walk 21 H2, #15304)
+        // every task done, none open, nobody working and nothing needs the person: not the same as "All well" while the team is still at it (walk 21 H2, #15304)
     const finished = !shown && !unknown && S.counts.tasks === 0 && S.tasksDone > 0 && data.agents.every(a => a.availability !== 'busy' && a.availability !== 'needs_input' && a.availability !== 'waiting');
-    const text = paused ? 'Paused' : uncertainAttention ? 'Checking attention status' : asleep ? 'Asleep' : wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : shown ? `${shown} ${shown === 1 ? 'needs' : 'need'} attention` : unknown ? (unknown === data.agents.length ? 'No agent has sent a first message yet' : `${unknown} of ${data.agents.length} agents have not sent a first message yet`) : finished ? 'Finished: your turn' : 'All well';
+    const text = uncertainAttention ? 'Checking attention status' : asleep ? 'Asleep' : wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : shown ? `${shown} ${shown === 1 ? 'needs' : 'need'} attention` : unknown ? (unknown === data.agents.length ? 'No agent has sent a first message yet' : `${unknown} of ${data.agents.length} agents have not sent a first message yet`) : finished ? 'Finished: your turn' : 'All well';
     // When agents need attention the visible status is a button to the Agents tab (beside the live region, which keeps saying it and is then only for a screen reader: the button's name is not announced twice); "All well" is plain text.
     const b = $('team-page-health');
     if (b) {
@@ -253,7 +252,7 @@ function drawStatus(data) {
         if (shown && !uncertainAttention) { b.replaceChildren(Object.assign(el('span', 'team-status-dot'), {}), document.createTextNode(text)); b.firstChild.setAttribute('aria-hidden', 'true'); b.setAttribute('aria-label', `Team health: ${text}`); }
     }
     if (s.textContent === text) return; // the same words are not said again
-    s.className = `team-page-status ${paused || uncertainAttention || asleep ? 'unknown' : shown ? 'needs sr-only' : unknown ? 'unknown' : 'well'}`; // Asleep takes the neutral dot, as waiting does
+    s.className = `team-page-status ${uncertainAttention || asleep ? 'unknown' : shown ? 'needs sr-only' : unknown ? 'unknown' : 'well'}`; // Asleep takes the neutral dot, as waiting does
     const dot = el('span', 'team-status-dot'); dot.setAttribute('aria-hidden', 'true');
     s.replaceChildren(dot, document.createTextNode(text));
 }

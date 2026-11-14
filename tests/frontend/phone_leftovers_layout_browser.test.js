@@ -35,8 +35,8 @@ const TEAM = `plo-${Date.now() % 100000}`;
             await ev(`document.querySelectorAll('#team-agents-list .team-agent-row')[${idx}].querySelector('button').click(); true`);
             await waitFor(`document.getElementById('launch-agent-title-text').textContent === 'Edit member' && document.getElementById('launch-agent-move-down').getClientRects().length > 0`, `Edit member (${what})`, 6000);
             const [up, down] = [await geom('launch-agent-move-up'), await geom('launch-agent-move-down')];
-            assert.ok(up && down && up[1] === down[1] && Math.abs(up[2] - down[2]) <= 1 && up[0] < down[0], `${what}: Move up and Move down side by side, equal width: ${JSON.stringify([up, down])}`);
-            if (idx === 1) { const rm = await geom('launch-agent-remove'); assert.ok(rm && rm[1] < up[1] && rm[2] > up[2] * 1.8, 'Remove from team has a row of its own above: ' + JSON.stringify([rm, up])); }
+            assert.ok(up && down && up[1] === down[1] && up[0] < down[0] && up[3] >= 44 && down[3] >= 44, `${what}: Move up and Move down side by side, 44 px tall, in the header (#16361): ${JSON.stringify([up, down])}`);
+            if (idx === 1) { const rm = await geom('launch-agent-remove'); assert.ok(rm && rm[1] > up[1], 'Remove from team is in the footer, below Move up and Move down (now in the header): ' + JSON.stringify([rm, up])); }
             await ev(`document.getElementById('launch-agent-cancel').click(); true`);
             await waitFor(`!document.getElementById('launch-modal').hasAttribute('data-member')`, 'closed', 6000);
         }
