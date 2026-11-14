@@ -45,7 +45,7 @@ const WITH_WARNING_BUDGET = 88 + 16; // ST6: the same short help lines. // 60 (+
         assert.ok(wordsWithRow <= WITH_WARNING_BUDGET, `Terminal shows ${wordsWithRow} words with the tools folder warning too, budget ${WITH_WARNING_BUDGET}: ${JSON.stringify(withRow)}`);
         await ev(`document.getElementById('settings-tools-folder-row').hidden = true; true`);
         const note = await ev(`(() => { const p=document.getElementById('tb-fixed'), a=p.closest('.sv-row').querySelector('a.sv-learn'); return {note:p.textContent, shown:!!a.getClientRects().length, href:a.getAttribute('href'), name:a.getAttribute('aria-label')}; })()`);
-        assert.match(note.note, /pty/); assert.match(note.note, /wake next time/); assert.ok(note.shown); assert.equal(note.href, '/docs/settings'); assert.match(note.name, /Terminal backend/);
+        assert.match(note.note, /pty/); assert.match(note.note, /wake next time/); assert.ok(note.shown); assert.equal(note.href, '/docs/settings-system'); assert.match(note.name, /Terminal backend/);
         const detail = await ev(`fetch('/api/agent-docs/settings-system').then(r=>r.text())`);
         assert.match(detail, /no tmux on this system/); assert.match(detail, /resume their conversation/);
         console.log('PASS Settings > Terminal on a pty-only system: a short line, the rest linked in Docs, within the word budget');

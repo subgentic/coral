@@ -29,7 +29,7 @@ const { coralReady } = require('./helpers/wait');
             assert.deepEqual(prov.slice(0, want.length), want, JSON.stringify(prov)); assert.ok(prov.includes('Custom models'), 'Custom models follow the cards');
             await open('agents');
             const names = await rowNames('agents');
-            assert.deepEqual(names.slice(0, 4), ['Custom permission modes', 'Defaults', 'Default permission mode', 'Default working directory'], 'Agents opens with the defaults, no model or CLI rows: ' + JSON.stringify(names));
+            assert.deepEqual(names.slice(0, 5), ['Default agent type', 'Custom permission modes', 'Defaults', 'Default permission mode', 'Default working directory'], 'Agents opens with the defaults, no model or CLI rows: ' + JSON.stringify(names));
             assert.ok(names.includes('Behaviour') && !names.some(n => /CLI path$|Orchestrator|default thinking$/i.test(n)), 'the switches follow, the provider rows are gone: ' + JSON.stringify(names));
             await open('providers');
             await ev(`(() => { for (const id of ['settings-cli-path-claude', 'settings-cli-path-codex', 'settings-cli-path-agy', 'settings-cli-path-pi']) { const e = document.getElementById(id); if (e) e.value = ''; } return true; })()`); // for the picture only (the dialog is closed unsaved): the test server's own folders are not shown

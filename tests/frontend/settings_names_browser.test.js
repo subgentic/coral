@@ -43,7 +43,7 @@ const BASE = require('./test_base').BASE;
         const gen = await ev(`(() => { const i = document.getElementById('settings-check-updates'); const row = i.closest('.sv-row') || i.closest('.settings-row') || i.closest('dd') || i.parentElement.parentElement; const lab = document.getElementById(i.getAttribute('aria-labelledby') || ''); return { label: lab ? lab.textContent.replace(/\\s+/g, ' ').trim() : '', row: row.textContent.replace(/\\s+/g, ' ').trim() }; })()`);
         assert.ok(gen.row.startsWith('Tell me when a new version is out'), 'the switch is named for what it does: ' + JSON.stringify(gen));
         assert.match(gen.row, /Shows a notice in this browser\./, 'the visible line describes the browser notice');
-        assert.equal(await ev(`document.getElementById('settings-check-updates').closest('.sv-row').querySelector('a.sv-learn').getAttribute('href')`), '/docs/settings');
+        assert.equal(await ev(`document.getElementById('settings-check-updates').closest('.sv-row').querySelector('a.sv-learn').getAttribute('href')`), '/docs/settings-system');
         assert.match(await ev(`fetch('/api/agent-docs/settings-system').then(r=>r.json()).then(d=>d.content)`), /Downloading and installing are under Updates/, 'Docs retains where the rest is');
         console.log('PASS Settings names and heading order');
     } finally { await client.close(); }

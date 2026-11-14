@@ -24,7 +24,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.getElementById('settings-accounts-check').getAttribute('aria-label')`), 'Check Claude and Pi sign-in');
         // The full explanation is in Docs; checking sign-in stays here.
         const more = await ev(`(() => { const a = document.getElementById('settings-accounts').closest('.sv-row').querySelector('a.sv-learn'); return a && {href:a.getAttribute('href'),label:a.getAttribute('aria-label')}; })()`);
-        assert.deepEqual(more, {href:'/docs/settings',label:'Learn more about Accounts, in Docs'});
+        assert.deepEqual(more, {href:'/docs/settings-system',label:'Learn more about Accounts, in Docs'});
         assert.match(await ev(`fetch('/api/agent-docs/settings-system').then(r=>r.json()).then(d=>d.content)`), /each CLI's own login/, 'the complete account explanation is retained in Docs');
         const check = async answer => { await ev(`window.__answer = ${JSON.stringify(answer)}; document.getElementById('settings-accounts-check').click(); true`); await waitFor(`document.getElementById('settings-claude-account-status').textContent !== 'Checking...' && document.getElementById('settings-claude-account-status').textContent !== 'Not checked yet'`, 'the answer'); return ev(`document.getElementById('settings-claude-account-status').textContent`); };
         assert.equal(await check({ found: true, signed_in: true }), 'Signed in');
