@@ -23,6 +23,7 @@ const BASE = require('./test_base').BASE;
         await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
     };
     const ASKER = `document.querySelector('#settings-modal .settings-prompts-btn')`; // a button inside Settings that stays there
+    const openAdvanced = () => ev(`(() => { const d = document.getElementById('settings-defaults-advanced'); if (d) d.open = true; return true; })()`); // Edit default prompts sits under the folded Advanced (a details) of Defaults since the regroup (#15910)
     try {
         await Promise.all([Page.enable(), Runtime.enable()]);
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -30,7 +31,8 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE + '/' }); await loaded; await coralReady();
         await ev(`window.showSettingsModal('agents'); true`);
         await waitFor(shown('settings-modal'), 'Settings');
-        await waitFor(`!!${ASKER}`, 'a button inside Settings');
+        await openAdvanced();
+        await waitFor(`!!${ASKER} && ${ASKER}.getClientRects().length > 0`, 'a button inside Settings');
 
         const ask = async () => {
             await ev(`(() => { ${ASKER}.focus(); window.__asked = 0; window.showConfirmModal('Delete them?', 'This cannot be undone.', () => { window.__asked++; }); return true; })()`);
@@ -62,7 +64,7 @@ const BASE = require('./test_base').BASE;
 
         console.log('Settings opening Default prompts: focus is not pulled behind the new dialog');
         await ev(`window.showSettingsModal('agents'); true`);
-        await waitFor(shown('settings-modal'), 'Settings again');
+        await waitFor(shown('settings-modal'), 'Settings again'); await openAdvanced();
         await ev(`${ASKER}.focus(); ${ASKER}.click(); true`); // hides Settings, opens Default prompts
         await waitFor(shown('default-prompts-modal'), 'Default prompts');
         await waitFor(`document.getElementById('default-prompts-modal').contains(document.activeElement)`, 'focus stays in Default prompts');

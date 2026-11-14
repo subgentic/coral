@@ -1,5 +1,5 @@
 // An agent row's menu and its Sleep dialog (#10785, Beta #10775: a first-time user, 13 items to read for Rename, Sleep and Archive; "Put "proj1" to sleep?" named the folder, not the agent, and said nothing of what stops):
-// (1) Rename, Sleep and Archive come first, then both Restart items (#14996, the Operator: they were hidden behind More); Set icon and Session info are under a More group (hidden until More is pressed, as the team menu's); (2) Auto-accept is drawn as a switch;
+// (1) Sleep, Rename and Archive come first (Sleep first since #16371), then both Restart items (#14996, the Operator: they were hidden behind More); Set icon and Session info are under a More group (hidden until More is pressed, as the team menu's); (2) Auto-accept is drawn as a switch;
 // (3) the Sleep dialog names the agent by its name, and says in one line what stops and what stays. At 1280 px; the page's mocked agents.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -23,8 +23,8 @@ const { coralReady } = require('./helpers/wait');
             const group = menu.querySelector('[role=group][hidden], .team-menu-more[hidden]'); const inGroup = group ? [...group.querySelectorAll('.menu-item')].map(txt) : null;
             const auto = menu.querySelector('.auto-accept-menu-item'); return { shown, inGroup, more: [...menu.querySelectorAll('.menu-item')].some(e => txt(e) === 'More'), switchDrawn: !!(auto && auto.querySelector('.menu-switch')) }; })()`);
         const at = w => m.shown.findIndex(x => x.startsWith(w));
-        if (!(at('Rename') >= 0 && at('Rename') < at('Sleep') && at('Sleep') < at('Archive') && at('Archive') >= 0)) problems.push(`Rename, Sleep, Archive come in that order (the menu shows ${JSON.stringify(m.shown)})`);
-        if (at('Rename') > 3 || at('Sleep') > 4 || at('Archive') > 5) problems.push(`they are among the first items (${JSON.stringify(m.shown)})`);
+        if (!(at('Sleep') === 0 && at('Rename') > at('Sleep') && at('Rename') < at('Archive') && at('Archive') >= 0)) problems.push(`Sleep, Rename, Archive come in that order, Sleep first (#16371) (the menu shows ${JSON.stringify(m.shown)})`);
+        if (at('Rename') > 3 || at('Archive') > 5) problems.push(`they are among the first items (${JSON.stringify(m.shown)})`);
         for (const w of ['Set Icon', 'Session Info']) if (at(w) >= 0) problems.push(`"${w}" is under More, not in the first list`);
         if (!(at('Restart, same settings') > at('Archive') && at('Restart with changes') > at('Restart, same settings') && at('Restart with changes') <= 7)) problems.push(`both Restart items are in the first list, right after Archive, without opening More (the menu shows ${JSON.stringify(m.shown)})`);
         if (!(await ev(`(() => { const r = document.querySelector('[data-on-click="agent-restart-same"][data-session-id="w-sid"]'); const prev = r && r.previousElementSibling; return !!prev && prev.matches('hr.overflow-menu-divider'); })()`))) problems.push('a divider sits before the Restart pair, so it is not right under Archive (#14996, UI Accessibility)');
@@ -41,5 +41,5 @@ const { coralReady } = require('./helpers/wait');
         if (d.split(/\s+/).length > 40) problems.push(`and in a line, not a paragraph (${d.split(/\s+/).length} words)`);
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'the agent row menu and Sleep dialog:\n  ' + problems.join('\n  '));
-    console.log('PASS the row menu leads with Rename, Sleep and Archive; Sleep names the agent');
+    console.log('PASS the row menu leads with Sleep, then Rename and Archive; Sleep names the agent');
 })().catch(e => { console.error(e); process.exit(1); });

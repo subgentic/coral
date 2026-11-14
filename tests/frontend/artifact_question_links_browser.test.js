@@ -48,7 +48,7 @@ const nativePolicy = fs.readFileSync(require('node:path').join(__dirname,'../../
    assert.ok(await ev(`window.__originalQuestion===document.querySelector('dialog.inbox-ask-dialog')&&window.__originalQuestion.querySelector('textarea').value==='Keep this draft unchanged.'`),at+': same draft DOM retained');
    assert.ok(await ev(`window.__originalQuestion.contains(document.activeElement)`),at+': focus returns inside the question');
    if(width===1280&&!server)assert.ok(await ev(`window.__originalQuestion.querySelector('.ac-thumb-ready img')?.src===window.__draftImage`),'the uploaded draft picture survives viewer open/close');
-   await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn').click();true`);
+   await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn:not(.btn-quiet)').click();true`);
   }
   await Page.addScriptToEvaluateOnNewDocument({source: `window.__CORAL_APP__=true;window.__nativeExternal=[];window._coralOpenExternal=u=>window.__nativeExternal.push(u);`+nativePolicy});
   await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev);
@@ -67,7 +67,7 @@ const nativePolicy = fs.readFileSync(require('node:path').join(__dirname,'../../
    await waitFor(`!window.__originalQuestion.open && ${kind==='task'?"document.querySelector('#inbox-page .team-task-page')?.textContent.includes('Linked task')":"document.querySelector('#goals-detail-title')?.textContent==='Linked goal'"}`,'real About/'+kind+' page in front',12000);
    await ev(`history.back();true`);await waitFor(`window.__originalQuestion.open`,'Back restores the question',10000);
    assert.equal(await ev(`window.__originalQuestion.querySelector('textarea').value`),'Keep the navigation draft.');
-   await ev(`window.__originalQuestion.querySelector('.inbox-ask-buttons .btn').click();true`);
+   await ev(`window.__originalQuestion.querySelector('.inbox-ask-buttons .btn:not(.btn-quiet)').click();true`);
   }
   // Diff references resolve a hash against the declared team's exact session list.
   const diffHash=await ev(`(async()=>{const sum=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('src/example.js'));return [...new Uint8Array(sum).slice(0,8)].map(b=>b.toString(16).padStart(2,'0')).join('');})()`);
@@ -79,7 +79,7 @@ const nativePolicy = fs.readFileSync(require('node:path').join(__dirname,'../../
   await ev(`document.querySelector('#preview-full-back').click();true`);
   await waitFor(`window.__originalQuestion.open`,'phone diff Back restores question',10000);
   assert.equal(await ev(`window.__originalQuestion.querySelector('textarea').value`),'Keep the navigation draft.');
-  await ev(`window.__originalQuestion.querySelector('.inbox-ask-buttons .btn').click();true`);
+  await ev(`window.__originalQuestion.querySelector('.inbox-ask-buttons .btn:not(.btn-quiet)').click();true`);
   await ev(`(()=>{window.__m.agents['diff-abc123'].msgs.push({type:'assistant',text:'[Open chat file](coral://artifacts/${HEX})'});const original=window.fetch;window.fetch=(u,o)=>String(u).includes('/api/artifacts/${HEX}')?Promise.resolve(new Response('# Chat file preview',{headers:{'Content-Type':'text/markdown'}})):original(u,o);return true;})()`);
   await ev(`window.selectLiveSession('diff-agent','claude','diff-abc123','local').then(()=>true)`);
   await waitFor(`!!document.querySelector('#live-history-messages [data-file-ref="coral://artifacts/${HEX}"]')`,'chat uses its file-reference renderer',10000);
