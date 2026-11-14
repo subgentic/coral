@@ -248,7 +248,7 @@ export function openGroupTable(kind, key, { focus = false } = {}) {
 let heldAt = null, heldEl = null, deferredKind = null, flushTimer = null;
 const holding = () => heldAt !== null && Date.now() - heldAt < 10000 && !!heldEl && heldEl.isConnected && heldEl.getClientRects().length > 0;
 function flushLater() { if (flushTimer !== null) return; flushTimer = setTimeout(() => { flushTimer = null; if (deferredKind === null) return; if (holding()) { flushLater(); return; } const k = deferredKind; deferredKind = null; redrawDeferred(k); }, 300); } // a deferred redraw is not lost if the release never arrives
-function releasePointer() { if (heldAt === null) return; heldAt = null; heldEl = null; const k = deferredKind; deferredKind = null; if (k) setTimeout(() => { if (!holding()) redrawDeferred(k); }, 0); } // after the mouseup and the click of this very press have reached the button that was pressed (a redraw inside pointerup would take it out of the page first)
+function releasePointer() { if (heldAt === null) return; if (heldEl && heldEl.closest && heldEl.closest('.group-table-held')) { heldAt = null; heldEl = null; return; } /* the press was on Show: its click draws the held rows (and keeps what it needs); a redraw queued here would be held again under the resting pointer and bring the pill back (#16649) */ heldAt = null; heldEl = null; const k = deferredKind; deferredKind = null; if (k) setTimeout(() => { if (!holding()) redrawDeferred(k); }, 0); } // after the mouseup and the click of this very press have reached the button that was pressed (a redraw inside pointerup would take it out of the page first)
 if (typeof document !== 'undefined') {
     document.addEventListener('pointerdown', e => { if (e.target instanceof Element && e.target.closest('#group-table-view')) { heldAt = Date.now(); heldEl = e.target; } }, true);
     document.addEventListener('pointerup', releasePointer, true); document.addEventListener('pointercancel', releasePointer, true); window.addEventListener('blur', releasePointer);
@@ -278,7 +278,7 @@ function showHeldNote(n) {
 function leaveList() { hoverOver = false; const k = deferredKind, had = hoverHeldSince !== null; hoverHeldSince = null; document.querySelectorAll('.group-table-held').forEach(n => n.remove()); if (k && had && !holding()) { deferredKind = null; setTimeout(() => refreshGroupTable(k), 0); } }
 if (typeof document !== 'undefined') {
     // Every mouse move says where the pointer is now: a button that was pressed and then replaced (an answered row's choices) sends no pointerout, so the way out is seen on the first move outside the list.
-    document.addEventListener('pointermove', e => { if (!canHover()) return; const inside = e.target instanceof Element && !!e.target.closest('#group-table-view tbody'); if (inside) hoverOver = true; else if (hoverOver) leaveList(); }, true);
+    document.addEventListener('pointermove', e => { if (!canHover()) return; const inside = e.target instanceof Element && !!e.target.closest('#group-table-view tbody, .group-table-held'); /* the held note is part of the list: moving onto its Show button is not leaving (#16649) */ if (inside) hoverOver = true; else if (hoverOver) leaveList(); }, true);
     document.addEventListener('pointerout', e => { if (hoverOver && e.relatedTarget === null) leaveList(); }, true); // the pointer left the window
     window.addEventListener('blur', leaveList);
 }
