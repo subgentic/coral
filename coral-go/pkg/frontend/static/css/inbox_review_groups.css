@@ -70,6 +70,7 @@
     .inbox-review-item:has(> .inbox-meta) { flex-wrap: wrap; row-gap: 2px; }
     .inbox-review-item > .inbox-meta { flex: 1 0 100%; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; color: var(--text-secondary); }
     .inbox-meta > .inbox-pills { margin: 0; }
+    .inbox-meta > .inbox-team { max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* the team (#16752): one short word on the meta line, cut with its name in the tooltip, so a narrow item cell does not wrap it onto a third line */
     .inbox-meta .inbox-review-from { max-width: none; }
 } /* a computer's card: the title is the headline, the meta line is under it (#16678) */
 @media (max-width: 760px) {

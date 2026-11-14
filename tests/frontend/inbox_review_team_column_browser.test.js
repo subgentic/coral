@@ -1,4 +1,4 @@
-// #14142: files for review share the question row's Team cell and sort, including remote series.
+// #14142: files for review share the question row's Team sort, including remote series. #16752: on a computer a file names its team on its meta line (no Team cell for it); a phone's card keeps the cell.
 const assert=require('node:assert/strict');
 const {connect}=require('./agent_view_harness');
 const {coralReady}=require('./helpers/wait');
@@ -21,14 +21,14 @@ const BASE=require('./test_base').BASE;
    const row=name=>`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].find(r=>r.textContent.includes('${name}'))`;
    await waitFor(`!!(${row('local-series.md')})&&!!(${row('remote-series.md')})&&!!(${row('Question')})`,'local/remote series and question');
    for(const name of ['local-series.md','remote-series.md']){
-    const team=await ev(`(${row(name)}).querySelector('[data-key="team"]').textContent.trim()`);
+    const team=await ev(width===1280?`(${row(name)}).querySelector('.inbox-meta .inbox-team').textContent.trim()`:`(${row(name)}).querySelector('[data-key="team"]').textContent.trim()`);
     assert.match(team,/Zulu reviews/,width+': '+name+' has a team');
     if(name==='remote-series.md')assert.match(team,/Laptop/,width+': remote team keeps its computer');
    }
    if(width===1280){
     await ev(`document.querySelector('#group-table-view th[data-key="team"] .dt-sort').click();true`);
     await waitFor(`document.querySelector('#group-table-view th[data-key="team"]')?.getAttribute('aria-sort')==='ascending'`,'Team column really sorted ascending');
-    const order=await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(r=>r.querySelector('[data-key="team"]')?.textContent.trim()).filter(Boolean)`);
+    const order=await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(r=>(r.querySelector('[data-key="team"]')?.textContent.trim()||r.querySelector('.inbox-meta .inbox-team')?.textContent.trim())).filter(Boolean)`);
     assert.equal(order.length,3);assert.match(order[0],/^Alpha questions/,'question team sorts before review teams; treating reviews as empty would reverse this');assert.deepEqual(order,[...order].sort((a,b)=>a.localeCompare(b)),'Team sort includes review rows');
    }
    assert.equal(await ev(`document.documentElement.scrollWidth<=innerWidth`),true,'no horizontal overflow');
