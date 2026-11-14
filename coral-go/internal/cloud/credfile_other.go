@@ -27,6 +27,7 @@ func RemoveWellKnownBootstrap() (bool, error)         { return false, nil }
 func WellKnownBootstrapOffered() bool                 { return false }
 func ReadCredentialFile(string) ([]byte, bool, error) { return nil, false, ErrUnsafeCredentialFile }
 func ReadProofFile(string) ([]byte, error)            { return nil, ErrUnsafeCredentialFile }
+func ReadDeviceKeyFile(string) (string, error)        { return "", ErrUnsafeCredentialFile }
 
 // HeldCredential is not supported on this platform (see above).
 type HeldCredential struct{}

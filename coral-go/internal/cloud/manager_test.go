@@ -48,6 +48,8 @@ type fakeHub struct {
 	ownerUser atomic.Value // string: the owner's hub-user label the enrollment reply names (#5280); unset: none
 	ownerKind atomic.Value // string: the owner_kind the enrollment reply names (#7061); unset: none
 	ownerOrg  atomic.Value // string: the owner_org the enrollment reply names; unset: none
+	verifyEnd atomic.Value // string: appended to the verification_url the start answer names (the link's #p= fragment, #16726); unset: none
+	pairing   atomic.Value // map[string]any: the pairing{} object the poll answer carries (#16726); unset: none
 	signin    atomic.Value // signinFunc: answers Hub sign-in (#3966); unset: not advertised
 	onMode    atomic.Value // func(tunnel.Mode): takes the local mode message (#5918); unset: local_mode/1 is not advertised
 	routeMu   sync.Mutex
@@ -81,7 +83,7 @@ func newFakeHub(t *testing.T) *fakeHub {
 		}
 		json.NewEncoder(w).Encode(map[string]any{
 			"device_code": strings.Repeat("d", 43), "user_code": "ABCD-EFGH",
-			"verification_url": h.srv.URL + "/enroll?code=ABCD-EFGH", "interval": 2, "expires_in": 600,
+			"verification_url": h.srv.URL + "/enroll?code=ABCD-EFGH" + func() string { e, _ := h.verifyEnd.Load().(string); return e }(), "interval": 2, "expires_in": 600,
 		})
 	})
 	mux.HandleFunc("POST /api/enroll/poll", func(w http.ResponseWriter, r *http.Request) {
@@ -117,6 +119,9 @@ func newFakeHub(t *testing.T) *fakeHub {
 		}
 		if o, ok := h.ownerOrg.Load().(string); ok {
 			reply["owner_org"] = o
+		}
+		if p, ok := h.pairing.Load().(map[string]any); ok {
+			reply["pairing"] = p
 		}
 		json.NewEncoder(w).Encode(reply)
 	})

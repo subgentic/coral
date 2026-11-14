@@ -289,6 +289,8 @@ func (h *CloudHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Check bool            `json:"check"`
 		Proof json.RawMessage `json:"proof"`
+		// DevicePK is the owner's device PUBLIC key the command line read from its file (#16726): checked here again, sent to the Hub in the redeem body only.
+		DevicePK string `json:"device_pk"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 32<<10)
 	dec := json.NewDecoder(r.Body)
@@ -305,6 +307,14 @@ func (h *CloudHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 	src := cloud.CredentialSource{Value: []byte(cred)}
 	if len(body.Proof) > 0 && string(body.Proof) != "null" {
 		src.Proof = body.Proof
+	}
+	if body.DevicePK != "" {
+		pk, err := cloud.ParseDeviceKey([]byte(body.DevicePK))
+		if err != nil {
+			errBadRequest(w, "device_pk is not one P-256 public key")
+			return
+		}
+		src.DevicePK = pk
 	}
 	m := h.manager()
 	var res cloud.BootstrapResult

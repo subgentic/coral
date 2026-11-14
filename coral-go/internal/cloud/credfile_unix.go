@@ -405,3 +405,24 @@ func secureTokenDir(dir string) error {
 	}
 	return unix.Fchmod(fd, uint32(st.Mode&0o7777&^0o022))
 }
+
+// ReadDeviceKeyFile reads a device public key file (#16726) with the credential file's checks (a regular file, no link, owned by the user, 0600, in a folder that is theirs, at most 4096 bytes) and
+// removes it after reading, VALID OR NOT: a key file is a hand-off, and one that does not hold a key is not left lying about. A file the checks refuse is left exactly as it was (it may not be the user's to
+// remove). The content is never in an error.
+func ReadDeviceKeyFile(path string) (string, error) {
+	c, err := openCheckedPath(path, maxCredentialFile)
+	if err != nil {
+		return "", err
+	}
+	defer c.close()
+	data, err := readFD(c.fd, maxCredentialFile)
+	if err != nil {
+		return "", err
+	}
+	defer clear(data)
+	pk, perr := ParseDeviceKey(data)
+	if rerr := c.remove(); rerr != nil {
+		return "", rerr
+	}
+	return pk, perr
+}
