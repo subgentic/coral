@@ -86,6 +86,7 @@ function changes(w) {
 /** The numbers of one worktree, as words. */
 function numbers(w, base) {
     if (!base) return changes(w);
+    if (w.is_base) return `the base branch · ${changes(w)}`;
     const where = (w.ahead || w.behind) ? `${w.ahead} ahead, ${w.behind} behind` : 'even with the base';
     return `${where} · ${changes(w)}`;
 }
@@ -135,7 +136,7 @@ function drawRepo(data, currentSid) {
         if (w.quiet) marks.push('no commit in 14 days');
         if (marks.length) row.append(text('div', 'branches-mark', marks.join(' · ')));
         if (w.pr) row.append(text('div', 'branches-meta', prLine(w.pr)));
-        const agents = (w.agents || []).filter(a => !currentSid || a.session_id !== currentSid).map(a => a.name);
+        const agents = (w.agents || []).filter(a => !currentSid || a.session_id !== currentSid).map(a => a.display_name || a.name);
         if (agents.length) row.append(text('div', 'branches-meta', `${currentSid ? 'Agents here' : 'Agents'}: ${agents.join(', ')}`));
         if (w.current && w.changed) row.append(text('div', 'branches-meta', 'The Files tab lists the changes.'));
         list.append(row);

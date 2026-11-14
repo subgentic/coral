@@ -58,6 +58,7 @@ type Worktree struct {
 	NotLocal   bool `json:"not_local,omitempty"`
 	Unreadable bool `json:"unreadable,omitempty"` // its status could not be read
 	Main       bool `json:"main,omitempty"`       // the repository's main worktree (the first git lists)
+	IsBase     bool `json:"is_base,omitempty"`    // this worktree's branch is the base branch itself (ahead/behind vs itself is always 0/0 and not useful)
 
 	// UpstreamGone: the branch's upstream branch was deleted. Quiet: no commit on it for 14 days. Labels only (marks.go).
 	UpstreamGone bool `json:"upstream_gone,omitempty"`
@@ -330,6 +331,7 @@ func (c *Collector) read(ctx context.Context, root string) *Repo {
 		}
 	}
 	refs := c.refs(ctx, root)
+	baseLocal := strings.TrimPrefix(baseName, "origin/")
 	for _, w := range trees {
 		w.tip = w.Head
 		mark(&w, refs, c.now())
@@ -337,6 +339,9 @@ func (c *Collector) read(ctx context.Context, root string) *Repo {
 			w.path = canonical(w.raw)
 		} else {
 			w.NotLocal = true
+		}
+		if w.Branch != "" && w.Branch == baseLocal {
+			w.IsBase = true
 		}
 		if baseTip != "" && w.Head != "" && validSHA(w.Head) {
 			n := c.count(ctx, root, baseTip, w.Head)
