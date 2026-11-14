@@ -254,6 +254,7 @@ function drawStatus(data) {
     }
     if (s.textContent === text) return; // the same words are not said again
     s.className = `team-page-status ${stopped || uncertainAttention || asleep ? 'unknown' : shown ? 'needs sr-only' : unknown ? 'unknown' : 'well'}`; // Asleep takes the neutral dot, as waiting does
+    if (!text) { s.replaceChildren(); return; } // an ended team's empty header has no orphan status dot
     const dot = el('span', 'team-status-dot'); dot.setAttribute('aria-hidden', 'true');
     s.replaceChildren(dot, document.createTextNode(text));
 }

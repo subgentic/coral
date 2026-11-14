@@ -53,7 +53,7 @@ const BASE = require('./test_base').BASE;
             await settle(500);
             check(await ev('window.__statusReads')>before,`${width}/${theme}: Kill refreshes header immediately`);
             check(!await selected(),`${width}/${theme}: Kill exits Select`);
-            check(await ev(`document.getElementById('team-page-status').textContent.trim()===''`),`${width}/${theme}: no redundant stopped header word`);
+            check(await ev(`document.getElementById('team-page-status').textContent.trim()==='' && !document.querySelector('#team-page-status .team-status-dot')`),`${width}/${theme}: no redundant stopped header word`);
             check(await ev(`document.querySelector('#team-tab-agents .team-tab-count').textContent===''`),`${width}/${theme}: no running agent count`);
             await shot(`team-killed-${width}-${theme}`);
         }
