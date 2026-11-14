@@ -1,5 +1,35 @@
 # Release Notes
 
+## v2.0.68 — Custom permission modes, Settings that save as you go, Codex trusting Coral's hooks by default, a computer set up over SSH that starts again, and one look across the dialogs and phone
+
+Task numbers in brackets. Built on v2.0.67 and gated on ci/v2068-gate8 4df09ccee. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **Custom permission modes** (#15950, #15886, #16345, #16388, #16420): name a set of a CLI's own permission flags and pick it as a mode. The mode is a list of explained rows in New agent, the team member dialog and Settings > Defaults; a team member in a custom mode is judged by its own flags, on every Coral Hub path, and wins over the team's flags. Add mode, Update mode and Remove save at once and say Saved, or "Not saved" with the server's reason.
+- **Settings saves each row as it changes** (#15875, #15880): no Apply button; the Docs links, help text, switches and risk notices are shared across the panes, and a risk warning links to its safety summary (#16061, #16084: Settings still opens within its file budget).
+- **Codex trusts Coral's own hooks by default on every OS** (#16008, #16007, #16123, #16128): an unreadable Codex version means the newest behaviour; an unwired switch or a failed settings read is off, and a switch that is off reports not trusted.
+- **A computer set up over SSH** (#15997, #15998, #16021, #16010, #16047): an upgrade stops this install's Coral by its command line, keeps the data folder the running Coral uses, and a stopped Coral starts again from the newest installed release with its kept data folder, backend and port.
+- **Which computer?** (#16397): a Select button at the right of each computer card replaces the radio and Continue.
+- **One look across the dialogs and the phone** (#15815, #15816, #15821, #15827, #15856, #15859, #15889, #15891, #15819, #16233): one control height (32, 36 on a dock's tabs, 44 on touch), filters as one bordered strip, one dialog footer, one goals column order, a team's More menu that scrolls at 200% text, a folder step with one error under its field, and the shared phone header inset for Inbox search.
+
+#### Fixed
+
+- A model you set in New agent stays when a CLI check answers late (#16210, #16404): an older build of the provider cards no longer redraws the form's old Model row.
+- A task link whose task cannot be read says so instead of leaving a blank route, and a stylesheet that never answers no longer keeps a view from drawing (#16403, #16376).
+- A wholly added file in the diff viewer shows the quiet added-line band (#16171).
+- A post or ask with no words is refused, with the way to ask (#16186).
+- A Codex, Antigravity or Pi agent sitting at its input box is not "starting" or "Waiting in the terminal" (#15952).
+- Team page on a phone: the title of a team that is not there takes the header's full width (#16301); the split Send keeps its 44 px on touch (#15821).
+- A tunnel's Close stuck in the WebSocket close handshake is released (#16261).
+
+#### For the team
+
+- The beta and dropboxers tiers are gone from the release pipeline (#15075, #15110); tag a plain vX.Y.Z for a production release.
+- Test and gate work: many Windows and Linux flakes got their cause fixed (#16178, #16176, #16177, #16293, #16280, #16406, #15947).
+
 ## v2.0.67 — Activity that reads like the Inbox, compact Needs you rows on a computer, Codex's own Auto mode, an updater that says what it is doing, and more of a remote computer's work done from the Hub
 
 Task numbers in brackets. Built on v2.0.66 and gated on ci/v2067-gate2c fbabdce6e.
