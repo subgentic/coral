@@ -1,4 +1,4 @@
-// The theme editor and the default prompts follow the written rules (#12897, from #12888 F6): sentence case in their words, and ONE primary action in the editor's footer (Save and apply), Preview a quiet button.
+// The theme editor and the default prompts follow the written rules (#12897, from #12888 F6): sentence case in their words, and ONE primary action in the editor's footer (Save and apply); Preview is an item of its More menu (#15845).
 // At 1440 and 390 px.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -21,7 +21,7 @@ const { coralReady } = require('./helpers/wait');
             const ed = await ev(`(() => { const m = document.getElementById('theme-configurator-modal'); const q = s => [...m.querySelectorAll(s)];
                 return { title: m.querySelector('h3').textContent.trim(), foot: q('.modal-actions .btn').map(b => ({ t: b.textContent.trim(), primary: b.classList.contains('btn-primary') })) }; })()`);
             check(`${tag}: the editor's title is in sentence case`, ed.title === 'Customize theme', ed.title);
-            check(`${tag}: its footer is Cancel, Reset, Preview, Save and apply`, JSON.stringify(ed.foot.map(b => b.t)) === JSON.stringify(['Cancel', 'Reset', 'Preview', 'Save and apply']), JSON.stringify(ed.foot));
+            check(`${tag}: its footer is Delete (Quiet, at the far left), Cancel, Save and apply; Reset, Preview, Import and Export are in More (#15845)`, JSON.stringify(ed.foot.map(b => b.t)) === JSON.stringify(['Delete', 'Cancel', 'Save and apply']), JSON.stringify(ed.foot));
             check(`${tag}: exactly one primary, the last: Save and apply`, ed.foot.filter(b => b.primary).length === 1 && ed.foot[ed.foot.length - 1].primary, JSON.stringify(ed.foot));
             const words = await ev(`[...document.querySelectorAll('#theme-configurator-modal button, #default-prompts-modal button, .settings-theme-btn')].map(b => b.textContent.trim()).filter(Boolean)`);
             check(`${tag}: no button in the editor says Title Case`, words.every(t => !/^[A-Z][a-z]+ [A-Z][a-z]+/.test(t)), JSON.stringify(words));

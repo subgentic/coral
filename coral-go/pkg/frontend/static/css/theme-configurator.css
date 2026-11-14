@@ -125,7 +125,6 @@
 .theme-configurator-content .theme-save-bar select { flex: 0 0 auto; width: auto; }
 @media (max-width: 760px) {
     .theme-configurator-content .theme-toolbar select { flex-basis: 100%; } /* its own line: the four buttons wrap under it */
-    .theme-configurator-content .modal-actions { display: grid; grid-template-columns: 1fr 1fr; } /* four buttons are two rows of two: none is left alone on a second line */
 }
 
 .btn-danger {
@@ -153,3 +152,8 @@
 @keyframes theme-spin {
     to { transform: rotate(360deg); }
 }
+
+/* Customize theme's footer (#15845): Delete is Quiet, alone at the far left (components.css orders it), grey at rest and red only when it is pointed at; Cancel then the one Primary at the right. */
+.theme-configurator-content .modal-actions > .btn-quiet.btn-danger { color: var(--text-secondary); }
+.theme-configurator-content .modal-actions > .btn-quiet.btn-danger:hover, .theme-configurator-content .modal-actions > .btn-quiet.btn-danger:focus-visible { color: var(--error-text); background: rgba(var(--fx-red-rgb), 0.15); }
+.theme-more { position: relative; display: inline-flex; }
