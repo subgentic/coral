@@ -20,10 +20,13 @@ import (
 // reads only its own team's agents.
 
 type fakeBranches struct {
-	repo  branches.Repo
-	own   int
-	dirs  map[string]int // a folder -> the worktree that holds it
-	asked []string
+	repo     branches.Repo
+	own      int
+	dirs     map[string]int    // a folder -> the worktree that holds it
+	asked    []string
+	notFound map[string]bool   // dirs where For returns false
+	states   map[string]string // dir -> "pending" or "done" for ReadState
+	notGit   map[string]bool   // dirs that are not git repos
 }
 
 func (f *fakeBranches) Holds(_ branches.Repo, i int, dir string) bool {
@@ -35,10 +38,17 @@ func (f *fakeBranches) Same(a, b branches.Repo) bool { return a.Base == b.Base }
 
 func (f *fakeBranches) For(dir string) (branches.Repo, int, bool) {
 	f.asked = append(f.asked, dir)
-	if dir == "" {
+	if dir == "" || f.notFound[dir] {
 		return branches.Repo{}, -1, false
 	}
 	return f.repo, f.own, true
+}
+
+func (f *fakeBranches) ReadState(dir string) (string, bool) {
+	if s, ok := f.states[dir]; ok {
+		return s, f.notGit[dir]
+	}
+	return "pending", false
 }
 
 type branchesRig struct {
@@ -185,4 +195,40 @@ func TestTheTeamViewShowsItsAgentsRepositoriesAndOnlyItsOwnTeam(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, code, "an agent of team B")
 	code, _ = get("team-a", asBranchesAgent("aaaaaaaa-0423-4000-8000-000000000002"))
 	assert.Equal(t, http.StatusOK, code, "an agent of team A")
+
+	assert.Equal(t, "done", body["read_state"], "a team with repos is done")
+	assert.Equal(t, false, body["not_git"], "the team's agents are in a git repo")
+}
+
+// #17058: the team branches say 'pending' before the first read and 'not a git folder' after.
+func TestTeamBranchesPendingAndNotGit(t *testing.T) {
+	r := newBranchesRig(t)
+	rt := chi.NewRouter()
+	rt.Get("/api/board/{project}/branches", r.h.TeamBranches)
+	get := func(team string) map[string]any {
+		req := httptest.NewRequest(http.MethodGet, "/api/board/"+team+"/branches", nil)
+		req = asBranchesDashboard(req)
+		rec := httptest.NewRecorder()
+		rt.ServeHTTP(rec, req)
+		var body map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &body)
+		return body
+	}
+
+	r.src.notFound = map[string]bool{"/work/repo": true, "/work/feature": true}
+	body := get("team-a")
+	assert.Equal(t, "pending", body["read_state"], "before any read: pending")
+	assert.Equal(t, false, body["not_git"], "pending is not not-git")
+	assert.Len(t, body["repos"].([]any), 0)
+
+	r.src.states = map[string]string{"/work/repo": "done", "/work/feature": "done"}
+	r.src.notGit = map[string]bool{"/work/repo": true, "/work/feature": true}
+	body = get("team-a")
+	assert.Equal(t, "done", body["read_state"], "after read: done")
+	assert.Equal(t, true, body["not_git"], "no git repo found")
+
+	r.src.states["/work/repo"] = "pending"
+	body = get("team-a")
+	assert.Equal(t, "pending", body["read_state"], "one agent pending keeps it pending")
+	assert.Equal(t, false, body["not_git"], "not done yet: not_git is false")
 }
