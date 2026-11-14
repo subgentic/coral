@@ -57,7 +57,7 @@ const SESSIONS = [
             assert.equal(await ev(`!!document.querySelectorAll('li.session-team-group')[1].querySelector('.board-card-header .agent-icon[title="Team is sleeping"]')`), true, 'the moon on the header');
             assert.equal(await ev(`!!document.querySelectorAll('li.session-team-group')[0].querySelector('.board-card-header .agent-icon[title="Team is sleeping"]')`), false, 'and not on an awake team');
         });
-        await run('a workflow card: its own look, View Run only when it has a run, Kill all for its group', async () => {
+        await run('a workflow card: its own look, View Run only when it has a run, Stop all for its group', async () => {
             const [a, b] = await ev(`[...document.querySelectorAll('li.session-wf-card')].map(li => (${CARD})(li))`);
             assert.ok(a.actions.includes('wf-run-open:7') && a.actions.includes('group-kill:wf:Nightly'), JSON.stringify(a.actions));
             assert.deepEqual(b.actions, ['group-kill:wf:Weekly'], 'a workflow with no run has no View Run: ' + JSON.stringify(b.actions));
@@ -94,11 +94,11 @@ const SESSIONS = [
             assert.equal(await ev(`document.querySelector('li.session-team-group .group-chevron').getAttribute('aria-expanded')`), 'true', 'the card stayed open');
             await ev(`document.body.click(); true`);
         });
-        await run('the team menu shows the six a person uses and keeps the rest under More (#10549): Team settings, Add Agent, Sleep team, Reset team (clear context, near the top: #15373), Save as template, Kill all (the danger group is last, after More, #10282), and Delete team (#10318); More opens the rest and the menu stays open', async () => {
+        await run('the team menu shows the six a person uses and keeps the rest under More (#10549): Team settings, Add Agent, Sleep team, Reset team (clear context, near the top: #15373), Save as template, Stop team (the danger group is last, after More, #10282), and Delete team (#10318); More opens the rest and the menu stays open', async () => {
             const btn = `document.querySelector('li.session-team-group .group-kebab-btn')`;
             await ev(`${btn}.click(); true`); await waitFor(`${btn}.getAttribute('aria-expanded') === 'true'`, 'the menu open');
             const shown = () => ev(`[...document.getElementById(${btn}.getAttribute('aria-controls')).querySelectorAll('.overflow-menu-item')].filter(b => b.getClientRects().length).map(b => { const c = b.cloneNode(true); c.querySelectorAll('.material-icons, svg').forEach(i => i.remove()); return c.textContent.replace(/\\s+/g, ' ').trim(); })`);
-            const six = ['Team settings', 'Add Agent', 'Sleep team', 'Reset team (clear context)', 'Save as template', 'More', 'Kill all', 'Remove team']; // the six, More, then the danger group last (#10282) with Remove team (#10318, #15378)
+            const six = ['Team settings', 'Add Agent', 'Sleep team', 'Reset team (clear context)', 'Save as template', 'More', 'Stop team', 'Remove team']; // the six, More, then the danger group last (#10282) with Remove team (#10318, #15378)
             assert.deepEqual(await shown(), six, 'six and More: ' + JSON.stringify(await shown()));
             const more = `document.querySelector('li.session-team-group [data-on-click="team-menu-more"]')`;
             assert.equal(await ev(`${more}.getAttribute('aria-expanded')`), 'false', 'More starts closed');

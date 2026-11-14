@@ -1,4 +1,4 @@
-// Stopping a team from its page (Beta Tester's pass and Mobile tester's, #10008): the team's page header has a Stop menu with the sidebar row's own words and actions (Sleep team or Wake team, then Reset team and Kill all apart, each asking first),
+// Stopping a team from its page (Beta Tester's pass and Mobile tester's, #10008): the team's page header has a Stop menu with the sidebar row's own words and actions (Sleep team or Wake team, then Reset team and Stop team apart, each asking first),
 // a phone's More has the same items, and Pause board says in words what it does. At 1280 and 390 px; the isolated dev server, a board made through the API, the team's live rows put in the list.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -39,10 +39,10 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             await ev(`document.getElementById('team-page-more').click(); true`);
             await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu opens
             let it = await items(host);
-            check(JSON.stringify(it.map(i => i.text)) === JSON.stringify(['Sleep team', 'Reset team (clear context)', 'Kill all']), `the items are the sidebar row's own words: ${JSON.stringify(it)}`);
+            check(JSON.stringify(it.map(i => i.text)) === JSON.stringify(['Sleep team', 'Reset team (clear context)', 'Stop team']), `the items are the sidebar row's own words: ${JSON.stringify(it)}`);
             check(/^Stops every agent for now; Wake team starts them again$/.test(it[0].hint) && /^Clears every agent's context; each starts in a new chat$/.test(it[1].hint) && /^Ends every agent now; their chats stay in History$/.test(it[2].hint), `each item says in one line what it does (#10357): ${JSON.stringify(it.map(i => i.hint))}`);
             check(it.every(i => i.shown) && (!mobile || it.every(i => i.h >= 44)), `shown (44 px on a phone): ${JSON.stringify(it)}`);
-            check(it[0] && !it[0].danger && !it[1].danger && it[2].danger, 'Kill all is the danger item; Sleep team and Reset team (clear context) are not red at rest (#15373)');
+            check(it[0] && !it[0].danger && !it[1].danger && it[2].danger, 'Stop team is the danger item; Sleep team and Reset team (clear context) are not red at rest (#15373)');
             check(await ev(`document.querySelectorAll('${host} hr.overflow-menu-divider').length >= 1`), 'the danger items are set apart by a rule');
             check(await ev(`(() => { const k = [...document.querySelectorAll('${host} > *')]; const last3 = k.slice(-4); return last3[0].tagName === 'HR' && last3.slice(1).every(e => e.dataset.stop); })()`), 'More ends with a line and then the three stop items (#15856)');
             await shot(`team-stop-menu-${w}`);
@@ -63,8 +63,8 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             await closeDialog(); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the dialog closes
             await ev(`document.getElementById('team-page-more').click(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu opens
             await ev(`document.querySelector('${host} [data-stop="kill"]').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the dialog opens
-            d = await dialogText();
-            check(/Kill team/i.test(d) && /Kill (all \d+ agents|the 1 agent) in "/.test(d) && /stop now\. (Their chats|Its chat) stays? in History\./.test(d) && !/terminate|on board/i.test(d), `Kill all asks first, in plain words, and says what stays (#10371): ${d.slice(0, 300)}`);
+            d = await dialogText(); await shot(`team-stop-confirm-${w}`);
+            check(/Stop team/i.test(d) && /Stop (all \d+ agents|the 1 agent) in "/.test(d) && /(Their processes|Its process) ends? now\. (Their chats|Its chat) stays? in History\./.test(d) && !/terminate|on board/i.test(d), `Stop team asks first, in plain words, and says what stays (#10371): ${d.slice(0, 300)}`);
             await closeDialog(); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the dialog closes
             // a sleeping team says Wake team
             await ev(`T.state.liveSessions = ${JSON.stringify([mk('s1', 'Boss', true), mk('s2', 'Worker', true)])}; T.render.renderLiveSessions(T.state.liveSessions); document.getElementById('team-page-more').click(); true`); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the menu follows the team

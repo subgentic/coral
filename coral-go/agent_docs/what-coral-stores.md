@@ -4,7 +4,7 @@ Coral keeps its data in one folder, `<data dir>` (`~/.coral` unless `CORAL_DATA_
 
 | What | Kept | Cleaned of secrets? | To change it |
 |---|---|---|---|
-| **Terminal logs** (`<data dir>/logs/<agent>_coral_<id>.log`: what an agent's terminal showed) | Kept: Coral does not delete them, also when an agent is killed, slept or archived, on either terminal backend. | Raw on disk. Redacted when Coral Hub serves them (the connector does it); the dashboard on this computer shows them as the terminal showed them. | Settings > Storage and cleanup > **Terminal logs** deletes the logs of agents that have **ended** (their count and size are shown first, you confirm, it is never automatic; the log of a live, sleeping or archived agent is never touched). Or delete a log's file in `<data dir>/logs`. |
+| **Terminal logs** (`<data dir>/logs/<agent>_coral_<id>.log`: what an agent's terminal showed) | Kept: Coral does not delete them, also when an agent is stopped, slept or archived, on either terminal backend. | Raw on disk. Redacted when Coral Hub serves them (the connector does it); the dashboard on this computer shows them as the terminal showed them. | Settings > Storage and cleanup > **Terminal logs** deletes the logs of agents that have **ended** (their count and size are shown first, you confirm, it is never automatic; the log of a live, sleeping or archived agent is never touched). Or delete a log's file in `<data dir>/logs`. |
 | **Board messages and tasks** (`messageboard.db`) | Until you delete the message or the board. Coral never ages them out. | Redacted where Coral's secret rules apply (task text, chat views); not everywhere. | Delete a message (its ×) or the board. |
 | **Sessions, search index, usage** (`sessions.db`, which also holds the search index) | Kept. Events, call metrics and token rollups have their own retention. | Where Coral's secret rules apply; not everywhere. | No single setting; see [settings-system.md](settings-system.md). |
 | **Saved messages** (table `saved_messages` in `sessions.db`: the Operator's bookmarks on chat and board messages, with a one-line snippet) | Until you remove them (the Saved list's **Remove**). | The snippet is redacted when it is saved. | The Saved tab in the dashboard, or see [saved-messages.md](saved-messages.md). Its message keys use the secret in the next row. |
@@ -17,7 +17,7 @@ Coral keeps its data in one folder, `<data dir>` (`~/.coral` unless `CORAL_DATA_
 
 ## Things to know
 
-- **A Kill keeps the terminal log.** Killing an agent ends it; its terminal log stays in `<data dir>/logs`, as it does for Sleep and Archive. Every Kill confirmation says so. To remove a log, delete its file.
+- **Stopping an agent keeps the terminal log.** Stop session ends it; its terminal log stays in `<data dir>/logs`, as it does for Sleep and Archive. Every Stop confirmation says so. To remove a log, delete its file.
 - **Terminal logs are the biggest and the most revealing.** They record what the terminal showed, secrets included. Coral Hub gets them redacted; the dashboard on this computer shows them as the terminal showed them. Treat `<data dir>/logs` like the agents' own terminals.
 - **Board history is a product choice.** Coral keeps your board messages and tasks so a team has a memory; nothing removes them unless you do.
 - **Artifacts are served byte for byte.** Coral cannot hide a token in an artifact: redact a log or a screenshot before you upload it (see [artifacts.md](artifacts.md#limits-images-and-deleting)).

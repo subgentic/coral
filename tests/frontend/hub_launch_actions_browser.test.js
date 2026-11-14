@@ -1,6 +1,6 @@
 // Through the Coral Hub, killing a whole team and deleting a board need Launch on that machine (#3433).
 // The hub-served dashboard (#3443):
-//   1. at Interact, the team menu's "Kill all" is shown disabled with "needs Launch" and the reason,
+//   1. at Interact, the team menu's "Stop team" is shown disabled with "needs Launch" and the reason,
 //      and calling it says why (a toast, no dialog) instead of sending a kill per agent;
 //   2. the board's Delete button is disabled ("Delete (needs Launch)", the reason as its title), and
 //      deleting says why;
@@ -58,7 +58,7 @@ const HUB_PRELOAD = `(() => {
     });
     const team = `@m1/${BOARD}`;
     const killAll = () => ev(`(() => {
-        const b = [...document.querySelectorAll('.overflow-menu-item')].find(x => /Kill all/.test(x.textContent));
+        const b = [...document.querySelectorAll('.overflow-menu-item')].find(x => /Stop team/.test(x.textContent));
         return b ? { disabled: b.disabled, text: b.textContent.replace(/\\s+/g, ' ').trim(), title: b.getAttribute('title') || '', onclick: !!(b.getAttribute('onclick') || b.getAttribute('data-on-click')) } : null;
     })()`);
     const access = mode => ev(`(async () => {
@@ -79,10 +79,10 @@ const HUB_PRELOAD = `(() => {
         await ev(`(() => { for (const n of ['x-one', 'x-two']) window.__m.add(n, 'X', 2, { sleeping: false, server: 'm1', board_project: ${JSON.stringify(BOARD)} });
             T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
 
-        console.log('1. Interact: Kill all disabled, with the reason');
-        await waitFor(`(() => { const b = [...document.querySelectorAll('.overflow-menu-item')].find(x => /Kill all/.test(x.textContent)); return !!b && b.disabled; })()`, 'Kill all disabled at Interact', 8000);
+        console.log('1. Interact: Stop team disabled, with the reason');
+        await waitFor(`(() => { const b = [...document.querySelectorAll('.overflow-menu-item')].find(x => /Stop team/.test(x.textContent)); return !!b && b.disabled; })()`, 'Stop team disabled at Interact', 8000);
         let k = await killAll();
-        assert.match(k.text, /Kill all needs Launch/);
+        assert.match(k.text, /Stop team needs Launch/);
         assert.match(k.title, /^Blocked: Box One needs Launch/, k.title);
         assert.equal(k.onclick, false, 'nothing to click');
         await ev(`(async () => { await T.render.killBoard(${JSON.stringify(team)}); return true; })()`);
@@ -105,12 +105,12 @@ const HUB_PRELOAD = `(() => {
 
         console.log('3. Launch: both as before');
         await access('launch');
-        await waitFor(`(() => { const b = [...document.querySelectorAll('.overflow-menu-item')].find(x => /Kill all/.test(x.textContent)); return !!b && !b.disabled; })()`, 'Kill all enabled at Launch', 8000);
+        await waitFor(`(() => { const b = [...document.querySelectorAll('.overflow-menu-item')].find(x => /Stop team/.test(x.textContent)); return !!b && !b.disabled; })()`, 'Stop team enabled at Launch', 8000);
         k = await killAll();
-        assert.equal(k.text, 'Kill all'); assert.equal(k.onclick, true);
+        assert.equal(k.text, 'Stop team'); assert.equal(k.onclick, true);
         await ev(`(async () => { (await import((window.__coralStatic || '/static/') + 'message_board.js')).selectBoardProject(${JSON.stringify(team)}); return true; })()`);
         await waitFor(`document.getElementById('mb-delete-btn').disabled === false && document.getElementById('mb-delete-btn').textContent === 'Remove team'`, 'Remove team enabled', 5000);
-        console.log('   ✓ Kill all and Delete enabled');
+        console.log('   ✓ Stop team and Delete enabled');
 
         console.log('4. A local dashboard is unchanged');
         await cloudMode(false);
@@ -119,10 +119,10 @@ const HUB_PRELOAD = `(() => {
         await install();
         await ev(`(() => { window.__mode = 'view'; for (const n of ['y-one']) window.__m.add(n, 'Y', 2, { sleeping: false, board_project: 'local-team' });
             T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
-        await waitFor(`[...document.querySelectorAll('.overflow-menu-item')].some(x => /Kill all/.test(x.textContent))`, 'the local team menu', 5000);
+        await waitFor(`[...document.querySelectorAll('.overflow-menu-item')].some(x => /Stop team/.test(x.textContent))`, 'the local team menu', 5000);
         k = await killAll();
-        assert.equal(k.disabled, false, 'never gated locally'); assert.equal(k.text, 'Kill all');
-        console.log('   ✓ local Kill all as before');
+        assert.equal(k.disabled, false, 'never gated locally'); assert.equal(k.text, 'Stop team');
+        console.log('   ✓ local Stop team as before');
 
         console.log('\nAll hub Launch-action checks passed');
     } finally {

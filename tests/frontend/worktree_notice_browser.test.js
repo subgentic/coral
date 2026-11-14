@@ -89,7 +89,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(DOCK_UP, "the single kill's bar", 6000);
             await ev(`document.querySelector('#worktree-dock .worktree-dock-details').click(); true`);
             b = await dock();
-            check(`${tag}: a single agent's kept worktree is the bar with its own path`, b.items.length === 1 && /The agent was killed\. Its worktree was kept/.test(b.items[0].text) && b.items[0].text.includes('/tmp/wt/solo'), JSON.stringify(b.items));
+            check(`${tag}: a single agent's kept worktree is the bar with its own path`, b.items.length === 1 && /The agent was stopped\. Its worktree was kept/.test(b.items[0].text) && b.items[0].text.includes('/tmp/wt/solo'), JSON.stringify(b.items));
             await ev(`document.querySelector('#worktree-dock .worktree-dock-dismiss').click(); true`); await clearAll();
 
             console.log(`${tag}: several kept worktrees are one bar`);

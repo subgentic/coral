@@ -142,7 +142,7 @@ function stopItems() {
     return [
         { key: 'sleep', label: asleep ? 'Wake team' : 'Sleep team', hint: asleep ? 'Starts the sleeping agents again' : 'Stops every agent for now; Wake team starts them again', why, run: () => window.toggleTeamSleep?.(S.team, asleep ? 'wake' : 'sleep') },
         { key: 'reset', label: 'Reset team (clear context)', hint: 'Clears every agent\'s context; each starts in a new chat', why, run: () => window.resetTeam?.(S.team) },
-        { key: 'kill', label: 'Kill all', hint: 'Ends every agent now; their chats stay in History', danger: true, why, run: () => window.killBoard?.(S.team) },
+        { key: 'kill', label: 'Stop team', hint: 'Ends every agent now; their chats stay in History', danger: true, why, run: () => window.killBoard?.(S.team) },
     ];
 }
 /** The team's stop items, last in More under a line (labels follow the team: asleep or not; #15856: Stop agents is no longer a button of its own). */
