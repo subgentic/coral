@@ -20,6 +20,7 @@ import { sectionFocus } from './section_dialog.js';
 import { loadStyles } from './lazy_styles.js';
 import { showTeamAddress } from './team_form.js';
 import { agentForm as folderForm, setAgentNameMode } from './agent_form.js';
+const { checkNewAgentFolder } = await importOnce('./agent_new_folder.js');
 const { _syncACFModelField, getAgentConfig, renderAgentConfigForm, cliWarningOf } = await importOnce('./agent_config_form.js');
 const { _checkPermissionFlag } = await importOnce('./cli_dialogs.js');
 const { _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards } = await importOnce('./team_dialogs.js');
@@ -28,6 +29,9 @@ const { quietFocus } = await importOnce('./quiet_focus.js');
 const { markFieldInvalid, _launchBlocked, _launchOn, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, _syncMobileLaunchSections, _withServerSettings, hideLaunchModal, setLaunchMore, setLaunchStage, LAUNCH_STAGES, launchStages } = await importOnce('./launch_core.js');
 const { wireRecap, syncRecap } = await importOnce('./launch_recap.js');
 const { offerSuggestion, syncSuggestionLine, usesSuggestion } = await importOnce('./folder_suggestion.js');
+
+/** Step 1's folder check (#16351): a new folder typed inside one that exists is made at Launch, as the team dialog's is (create_new_folder); one that cannot be made is said under the field. */
+const _checkAgentFolder = ({ validate = false } = {}) => checkNewAgentFolder({ input: document.getElementById('launch-dir'), line: document.getElementById('launch-dir-new'), server: _effectiveServer(launch.server), validate, invalid: markFieldInvalid });
 
 /** New Agent's three steps (#7391): Next goes from the folder to the persona to the agent (a folder is needed first), Back returns. `arg` is a stage name, "next" or "back" (the old "details" is the persona step). Focus follows, and a screen reader hears which step. */
 function _launchStage(arg) {
@@ -41,6 +45,7 @@ function _launchStage(arg) {
         folderForm()?.validate({ focus: true }); _syncLaunchBlock(); // the folder is flagged under its field, and only there (#15891: not said again above the buttons)
         return;
     }
+    if (cur === 'folder' && to !== 'folder' && !launch.member) _checkAgentFolder(); // a new folder inside one that exists: the next step says Coral makes it; Next itself never waits (#16351)
     const list = document.getElementById('dir-browser'); if (list) list.style.display = 'none'; // display-ok: the folder list is shown and hidden by style.display where it is opened (browser.js)
     const sub = setLaunchStage(to);
     if (to === 'persona' && !launch.member) suggestAgentName(document.getElementById('launch-agent-name-input')); // a role-like name, not the folder's (#11289)
@@ -439,6 +444,7 @@ function _wireDirNote() {
     input.dataset.noteWired = '1';
     input.addEventListener('input', _syncDirNote); input.addEventListener('change', _syncDirNote);
     input.addEventListener('input', () => syncSuggestionLine(input, document.getElementById('launch-dir-suggest'))); input.addEventListener('change', () => syncSuggestionLine(input, document.getElementById('launch-dir-suggest')));
+    input.addEventListener('input', () => { delete input.dataset.createNew; const nl = document.getElementById('launch-dir-new'); if (nl) nl.hidden = true; }); // a new folder is checked again for the path now typed (#16351)
     input.addEventListener('input', _syncLaunchBlock); input.addEventListener('change', _syncLaunchBlock); // Next and Launch say why they are off until there is a folder
     input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); _launchStage('next'); } }); // Enter is Next
 }
@@ -524,6 +530,7 @@ export async function launchSession() {
         return;
     }
 
+    if (launch.mode !== 'terminal' && !launch.member && document.getElementById('launch-dir')?.dataset.createNew !== dir ) await _checkAgentFolder(); // Launch pressed without passing Next (Enter on a later step, a recent folder): the same check, so create_new_folder goes with it
     // Everything below (directory, CLI, defaults) is interpreted on this server.
     const server = _effectiveServer(launch.server);
     if (_launchBlocked(server)) return;
@@ -540,6 +547,7 @@ export async function launchSession() {
 
     const payload = { working_dir: dir, agent_type: type };
     if (launch.mode !== 'terminal' && usesSuggestion(document.getElementById('launch-dir'))) payload.create_dir = true; // the folder Coral suggested: it makes it now (#11258)
+    else if (launch.mode !== 'terminal' && document.getElementById('launch-dir')?.dataset.createNew === dir) payload.create_new_folder = true; // a new folder the person typed, which step 1 said Coral makes (#16351, #12833)
     // Default picked (and Keep Default in "Default mode waits for you") is Default: the form sends no flag for it, which the server cannot tell from "nothing chosen" (that starts in the saved default or Auto), so the request says it (#10362).
     if (launch.mode !== "terminal" && permPick === 'default' && !(flagsStr && _hasPermFlag(flagsStr))) payload.permission_mode = 'default';
     else if (launch.mode !== "terminal" && String(permPick).startsWith('custom:') && !(flagsStr && _hasPermFlag(flagsStr))) payload.permission_mode = permPick; // a custom mode (#15950) is named; the server adds its flags
