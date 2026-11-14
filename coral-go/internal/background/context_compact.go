@@ -254,6 +254,10 @@ func (c *ContextCompact) skipOnce(project string, a AgentInfo, name, reason stri
 	}
 }
 
+// compactMakesNoTurn is true for a CLI whose /compact starts no turn even when it works, so no turn can confirm it (Codex: its session file gets a "compacted" event and the screen says "Context
+// compacted", with no turn in between, #16861). For it Coral says it cannot confirm, not that the CLI refused the command.
+func compactMakesNoTurn(agentType string) bool { return agentType == at.Codex }
+
 // confirm settles a typed command: the agent started a turn after it (the CLI took it), or two minutes passed and it did not.
 func (c *ContextCompact) confirm(project string, a AgentInfo, name string, sig agentSignal, now time.Time) {
 	c.mu.Lock()
@@ -272,6 +276,11 @@ func (c *ContextCompact) confirm(project string, a AgentInfo, name string, sig a
 		c.mu.Lock()
 		delete(c.awaiting, name)
 		c.mu.Unlock()
+		if compactMakesNoTurn(a.AgentType) {
+			c.note(name, "typed at "+sent.Local().Format("15:04")+", Coral cannot confirm it (this CLI shows no turn for it)")
+			c.logger.Info("a compaction was typed and cannot be confirmed: this CLI starts no turn for it", "project", project, "agent", a.DisplayName, "type", a.AgentType, "session", name)
+			return
+		}
 		c.note(name, "typed at "+sent.Local().Format("15:04")+", not taken by the CLI")
 		c.logger.Warn("a compaction was typed but the agent did not start a turn", "project", project, "agent", a.DisplayName, "session", name)
 	}

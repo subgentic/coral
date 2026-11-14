@@ -152,3 +152,19 @@ func TestTheAfterTaskTriggerReadsTheTasksOncePerPass(t *testing.T) {
 	assert.Len(t, h.sent(), 4)
 	_ = naming.SessionName
 }
+
+// #16861 (found in the real Codex run of #15552): Codex's /compact is not a turn, so no turn follows it even when it worked (Codex showed "Context compacted"); the line said "not taken by the
+// CLI" and the log warned that the agent did not start a turn. For Codex the line says the command was typed and that Coral cannot confirm it; nothing is warned, and it is not typed again.
+func TestACodexCompactIsNotSaidToBeRefusedWhenNoTurnFollows(t *testing.T) {
+	h := newCompactHarness(t, true)
+	sn := h.agent("Dev", "s1", "codex", "Dev", 312000, time.Minute)
+	h.run(0)
+	require.Len(t, h.sent(), 1)
+	h.run(compactConfirmWait + time.Second) // idle, as Codex is after a compaction that worked
+	st, ok := h.c.Status(sn)
+	require.True(t, ok)
+	assert.NotContains(t, st.Text, "not taken by the CLI", "Coral cannot see a Codex compaction as a turn, so it does not say the CLI refused it")
+	assert.Contains(t, st.Text, "typed at ")
+	assert.Contains(t, st.Text, "cannot confirm")
+	assert.Len(t, h.sent(), 1, "and it is not typed again")
+}
