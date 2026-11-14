@@ -24,6 +24,7 @@ const KEY_A = fake('abcd', '1234', 'efgh', '567'), KEY_B = fake('zyxw', '9876', 
         <button id="settings-dropbox-takeover" hidden></button>
         <button id="settings-dropbox-recheck" hidden></button>
         <div id="settings-dropbox-note"></div>
+        <div id="settings-dropbox-hubshare" hidden><input type="checkbox" id="settings-dropbox-hubshare-on"></div>
         <div id="settings-dropbox-backup" hidden>
           <div id="settings-dropbox-counts"></div>
           <input type="checkbox" id="settings-dropbox-autosync"><button id="settings-dropbox-autosync-resume" hidden></button><p id="settings-dropbox-autosync-note"></p>
@@ -61,6 +62,35 @@ const KEY_A = fake('abcd', '1234', 'efgh', '567'), KEY_B = fake('zyxw', '9876', 
     assert.match($('settings-dropbox-status').textContent, /Add your Dropbox app key to connect/);
     assert.ok(shown('settings-dropbox-key') && $('settings-dropbox-key-input'), 'no key: the key field is offered');
     assert.ok(!shown('settings-dropbox-connect') && !shown('settings-dropbox-disconnect'));
+
+    // Share through Coral Hub (#16109): the local switch shows once the status is read (connected to Dropbox or not), off unless the server says on,
+    // and a change goes to its own route and shows the saved state; a failed save puts the box back.
+    await status({ app_key_set: false, connected: false, state: 'disconnected' });
+    assert.ok(shown('settings-dropbox-hubshare') && !$('settings-dropbox-hubshare-on').checked, 'hub share: shown with no Dropbox here, off by default');
+    await status({ app_key_set: true, connected: false, state: 'disconnected', hub_share: true });
+    assert.ok($('settings-dropbox-hubshare-on').checked, 'hub share: on when the server says on');
+    await status({ app_key_set: true, connected: false, state: 'disconnected', hub_share: 'true' });
+    assert.ok(!$('settings-dropbox-hubshare-on').checked, 'hub share: only the real true turns it on');
+    {
+        const box = $('settings-dropbox-hubshare-on');
+        answers['/api/cloud/hub-dropbox-share'] = { status: 200, body: {} };
+        calls.length = 0;
+        box.checked = true; box.dispatchEvent(new dom.window.Event('change'));
+        await new Promise(r => setTimeout(r, 20));
+        const put = calls.find(c => c.url === '/api/cloud/hub-dropbox-share');
+        assert.ok(put && put.method === 'PUT' && JSON.parse(put.body).allow === true, 'hub share: PUT {allow:true} to its own route');
+        assert.match($('settings-dropbox-note').textContent, /Saved\. A file can go through Coral Hub when its owner presses Share/);
+        answers['/api/cloud/hub-dropbox-share'] = { status: 500, body: {} };
+        box.checked = false; box.dispatchEvent(new dom.window.Event('change'));
+        await new Promise(r => setTimeout(r, 20));
+        assert.ok(box.checked, 'hub share: a failed save puts the box back');
+        assert.match($('settings-dropbox-note').textContent, /Not changed/);
+        delete answers['/api/cloud/hub-dropbox-share'];
+    }
+    // A refused read shows no stale switch.
+    answers['/api/dropbox/status'] = { status: 403, body: {} };
+    await m.loadDropbox();
+    assert.ok(!shown('settings-dropbox-hubshare'), 'hub share: a refused read hides the switch');
 
     // Signed in with the key an earlier build shipped, none in this build (#15641): paused, said once, with Disconnect and no Connect.
     await status({ app_key_set: false, connected: true, state: 'connected', account_id: 'dbid:AAA', paused_no_key: true });

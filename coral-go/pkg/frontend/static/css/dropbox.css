@@ -11,6 +11,8 @@
 #settings-dropbox .dropbox-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 #settings-modal #settings-dropbox .dropbox-inline label:not(.sec-switch) { display: inline; margin: 0; }
 #settings-dropbox .dropbox-inline input[type="number"] { width: 6em; flex: 0 0 auto; }
+#settings-modal #settings-dropbox .dropbox-inline label.hubshare-check { display: inline-flex; align-items: center; gap: 8px; }
+#settings-modal #settings-dropbox .hubshare-check input[type="checkbox"] { width: auto; margin: 0; flex: 0 0 auto; }
 #settings-dropbox .settings-dropbox-filters p.settings-hint { margin: 4px 0 8px; }
 
 /* Share via Dropbox (#14944): the dialog a file's More actions opens. */

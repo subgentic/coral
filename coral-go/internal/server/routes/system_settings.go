@@ -59,6 +59,7 @@ var hubTrustSettingRoutes = map[string]string{
 	RedactTokensSetting:       "PUT /api/cloud/redact-tokens",
 	HubRelaunchSetting:        "PUT /api/cloud/hub-relaunch",       // #5280
 	CodexTrustHooksSetting:    "PUT /api/system/codex-trust-hooks", // #153
+	HubDropboxShareSetting:    "PUT /api/cloud/hub-dropbox-share",  // #16109
 }
 
 // hubSigninSettingKey: a Sign in with Coral Hub setting (server.HubSigninEnabledSetting and its

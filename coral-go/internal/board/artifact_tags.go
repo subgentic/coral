@@ -284,3 +284,10 @@ func (s *Store) AddArtifactTags(ctx context.Context, boardID, hex string, add []
 	sort.Strings(have)
 	return have, nil
 }
+
+// ArtifactTaggedAnywhere reports whether the object carries the tag on any board. An error means the answer is unknown (Dropbox sharing then sends nothing).
+func (s *Store) ArtifactTaggedAnywhere(ctx context.Context, hex, tag string) (bool, error) {
+	var n int
+	err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM artifact_tags WHERE hex = ? AND tag = ?`, hex, tag)
+	return n > 0, err
+}

@@ -414,6 +414,8 @@ POST /api/dropbox/connect never
 POST /api/dropbox/disconnect never
 POST /api/dropbox/edits/{doc}/promote never
 POST /api/dropbox/edits/{doc}/separate never
+POST /api/dropbox/prepare interact
+POST /api/dropbox/push interact
 POST /api/dropbox/removals/cancel never
 POST /api/dropbox/removals/confirm never
 POST /api/dropbox/remove/{digest} never
@@ -422,10 +424,12 @@ POST /api/dropbox/share-chat/{project} never
 POST /api/dropbox/share-chat/{project}/preview never
 POST /api/dropbox/share/stop/{id} never
 POST /api/dropbox/share/{digest} never
+POST /api/dropbox/shared interact
 POST /api/dropbox/shares/stop-all never
 POST /api/dropbox/switch never
 POST /api/dropbox/takeover never
 POST /api/dropbox/undo/{digest} never
+POST /api/dropbox/upload-anyway/{digest} never
 POST /api/folder-tags/{folderName} never
 POST /api/history-import never
 POST /api/hub-auto-accept launch
@@ -551,6 +555,7 @@ PUT /api/board/{project}/working-mode/presets/{presetID} never
 PUT /api/chief/checks/{checkID} never
 PUT /api/cloud/allow-auto-accept never
 PUT /api/cloud/hub-cross-team never
+PUT /api/cloud/hub-dropbox-share never
 PUT /api/cloud/hub-relaunch never
 PUT /api/cloud/max-mode never
 PUT /api/cloud/redact-tokens never

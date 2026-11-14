@@ -241,7 +241,11 @@ func (h *CloudHandler) DropboxShareInfo(w http.ResponseWriter, r *http.Request) 
 	}
 	cl, access, account, err := b.dropboxAccess(ctx)
 	if err != nil {
-		writeJSON(w, http.StatusOK, map[string]any{"connected": false})
+		out := map[string]any{"connected": false}
+		if h.hubShare != nil {
+			out["hub"] = h.hubShare(ctx, digest, src.data) // no Dropbox here: Share may go through Coral Hub (#16109)
+		}
+		writeJSON(w, http.StatusOK, out)
 		return
 	}
 	acct, err := cl.CurrentAccount(ctx, access)

@@ -164,6 +164,9 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("POST", "/api/board/{project}/cross-team/disable"):                         textHubSwitchOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/board/{project}/cross-team/files/enable"):                    textHubSwitchOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/board/{project}/cross-team/files/disable"):                   textHubSwitchOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/dropbox/prepare"):                                            textHubDropboxOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/dropbox/push"):                                               textHubDropboxOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/dropbox/shared"):                                             textHubDropboxOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/hub-auto-accept"):                                            textHubAutoAcceptOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/analytics/activity"):                                          textActivityOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/chief"):                                                       "through Coral Hub Chief is for the account this computer is linked to only (#11470)",
@@ -198,6 +201,8 @@ const textStarOwnerOnly = "through Coral Hub only the account this computer is l
 const textSavedOwnerOnly = "through Coral Hub the saved messages are for the account this computer is linked to only (#5753)"
 
 const textHubAutoAcceptOwnerOnly = "through Coral Hub only the account this computer is linked to can turn Coral Hub auto-accept on or off; on this computer use Settings > Network and Hub"
+
+const textHubDropboxOwnerOnly = "through Coral Hub only the account this computer is linked to can share a file to Dropbox (#16109)"
 
 const textCommentsOwnerOnly = "through Coral Hub only the account this computer is linked to can comment on artifacts (#7052)"
 

@@ -160,6 +160,12 @@ func (h *CloudHandler) DropboxStatus(w http.ResponseWriter, r *http.Request) {
 			out["edits"] = map[string]any{"open": n, "waiting": d.backup.editsWaitingNow(), "items": d.backup.editRows(r.Context())} // stage 5a: Coral's names, no bytes
 		}
 	}
+	// "Share through Coral Hub" (#16109): the local switch, shown in Settings beside the Dropbox block. Off unless it was turned on here; a failed read says off.
+	if st, err := h.ss.GetSettings(r.Context()); err == nil {
+		out["hub_share"] = HubDropboxShareOn(st)
+	} else {
+		out["hub_share"] = false
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 

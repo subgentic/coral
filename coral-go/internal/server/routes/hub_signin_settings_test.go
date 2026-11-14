@@ -45,7 +45,7 @@ func TestPutSettingsRefusesHubTrustSettings(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 	h := NewSystemHandler(db, nil)
-	keys := []string{MaxModeSetting, AllowHubAutoAcceptSetting, RedactTokensSetting, HubRelaunchSetting, CodexTrustHooksSetting}
+	keys := []string{MaxModeSetting, AllowHubAutoAcceptSetting, RedactTokensSetting, HubRelaunchSetting, CodexTrustHooksSetting, HubDropboxShareSetting}
 	assert.Len(t, hubTrustSettingRoutes, len(keys), "the census: every trust key is listed here")
 	for _, k := range append(keys, "CLOUD_MAX_MODE", " hub_redact_tokens ", " HUB_RELAUNCH_UPDATES ", " Codex_Trust_Coral_Hooks ") {
 		body := fmt.Sprintf(`{"theme":"dark",%q:"launch"}`, k)

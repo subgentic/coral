@@ -22,6 +22,9 @@ type CloudHandler struct {
 	// dbx is the Dropbox sign-in (#14609), set by SetDropbox; nil in a build or test without it.
 	dbx *dropboxRoutes
 
+	// hubShare is the Share dialog's view of Coral Hub sharing (#16109), set by NewHubDropbox; nil: not offered.
+	hubShare func(ctx context.Context, digest string, data []byte) map[string]any
+
 	// OfferAtLaunch is config.OffersCloudConnect (#3459), set by the server.
 	OfferAtLaunch bool
 

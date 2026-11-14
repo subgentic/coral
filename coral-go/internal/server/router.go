@@ -552,6 +552,13 @@ func (s *Server) registerCloud(r *chi.Mux) {
 		dbxBackup.SetChat(s.boardStore.GetMessageByID)                                  // #14944: a board chat's messages, for Share via Dropbox
 	}
 	s.goBackground(func(ctx context.Context) { dbxBackup.Run(ctx, 5*time.Minute) })
+	// Share through Coral Hub (#16109): the Hub calls prepare, push and shared on this computer as the owner (OwnerHubOnly, tier Interact); "Upload anyway" is the owner's click here and never in the tunnel table.
+	hubDropbox := s.cloudHandler.NewHubDropbox(s.cfg.CoralDir(), s.boardStore)
+	r.Post("/api/dropbox/prepare", hubDropbox.Prepare)
+	r.Post("/api/dropbox/push", hubDropbox.Push)
+	r.Post("/api/dropbox/shared", hubDropbox.SharedHint)
+	r.Post("/api/dropbox/upload-anyway/{digest}", hubDropbox.LocalUploadAnyway(s.cloudHandler))
+	r.Put("/api/cloud/hub-dropbox-share", s.cloudHandler.SetHubDropboxShare)
 	r.Post("/api/cloud/disconnect", s.cloudHandler.Disconnect)
 	r.Post("/api/cloud/rekey", s.cloudHandler.Rekey)                   // #3698
 	r.Get("/api/cloud/owner-label", s.cloudHandler.OwnerLabel)         // #6108: is the owner recorded, and who would be
@@ -590,6 +597,13 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	// Where the owner routes read the owner's label recorded at enrolment (#5307).
 	ownerCloud := store.NewCloudStore(s.db, store.NewRemoteServerStore(s.db, s.cfg.CoralDir()))
 	routes.SetHubOwnerLabel(ownerCloud.OwnerUser)
+	hubDropbox.Enrolment = func(ctx context.Context) (string, string, error) { // the Hub's own Share page is opened at the enrolled address only (#16109)
+		c, err := ownerCloud.Get(ctx)
+		if err != nil || c == nil {
+			return "", "", errors.New("not enrolled")
+		}
+		return c.HubURL, c.ServerID, nil
+	}
 	routes.SetHubOwnerRecord(ownerCloud.OwnerRecord) // and what it is enrolled as: a person's or an organisation's (#7061)
 	s.cloudHandler.SetOwnerLabelStore(ownerCloud)    // and where the person at this computer records it when it is missing (#6108)
 	updater := routes.BuildRelaunchUpdater(s.cfg.CoralDir(), func() { s.endForUpdate(endThisServer) })
