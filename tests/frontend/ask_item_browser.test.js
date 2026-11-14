@@ -39,11 +39,11 @@ const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a te
             assert.ok(d.strong && d.items === 2 && d.link === 'https://example.com/board', at + 'the words are rendered Markdown (emphasis, a list, a link): ' + JSON.stringify({ strong: d.strong, items: d.items, link: d.link }));
             assert.ok(!d.pre && !/mono/i.test(d.mono) && !d.raw, at + 'not the bordered monospace box, and no raw @Operator anywhere in it: ' + JSON.stringify({ pre: d.pre, mono: d.mono, raw: d.raw }));
             assert.ok(d.bodyText.includes('Answering or approving it changes nothing') && d.bodyText.includes('the badge'), at + 'the whole question is in the body: ' + d.bodyText.slice(0, 80));
-            assert.ok(d.reply && d.inItem && d.btns.join('|') === 'Close|Dismiss' && d.fits, at + 'the reply field is in the item, with Close and Dismiss (Send reply is under the box, #13148), and it fits: ' + JSON.stringify({ reply: d.reply, btns: d.btns, fits: d.fits }));
+            assert.ok(d.reply && d.inItem && d.btns.join('|') === 'Dismiss, no reply|Close' && d.fits, at + 'the reply field is in the item, with Close and Dismiss (Send reply is under the box, #13148), and it fits: ' + JSON.stringify({ reply: d.reply, btns: d.btns, fits: d.fits }));
             assert.ok(Math.abs(d.cx) <= 2 && Math.abs(d.cy) <= 30, at + 'the dialog opens centered like the other modals: ' + JSON.stringify({ cx: d.cx, cy: d.cy }));
             assert.ok(d.sendRight, at + 'Send reply is under the reply box, not in the footer (#13148)');
             await shot('ask-item-' + w);
-            await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn:not(.btn-primary)').click(); true`);
+            await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-buttons .btn')].find(b => b.textContent.trim() === 'Close').click(); true`);
             await waitFor(`!document.querySelector('dialog.inbox-ask-dialog')`, at + 'Close closes it', 4000);
             // bidi and zero-width characters in the question remain written out in its body (Security's SHOULD on #12143; hidden characters reshape what the Operator reads before deciding)
             const titles = await ev(`import(${S} + 'operator_asks.js').then(m => ({
@@ -58,14 +58,14 @@ const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a te
             await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the second opens', 4000);
             const s = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); return { title: d.querySelector('h2').textContent, body: !!d.querySelector('.inbox-ask-text'), meta: d.querySelector('.inbox-ask-sub').textContent }; })()`);
             assert.ok(s.title === 'Dev · Sprout' && s.body && s.meta, at + 'even a short question lives in the body: ' + JSON.stringify(s));
-            await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn:not(.btn-primary)').click(); true`);
+            await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-buttons .btn')].find(b => b.textContent.trim() === 'Close').click(); true`);
             // HTML in a question is written out as text, never run: no <img onerror>, <script> or handler writes to window (the strict Markdown rendering stays pinned)
             await ev(`document.querySelector('button[aria-label="Answer the question of QA"]').click(); true`);
             await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the hostile question opens', 4000);
             await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: an image that fails to load fires its handler within a few frames; this waits for it
             const hostile = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); return { pwned: typeof window.__pwned, live: d.querySelectorAll('img, script, [onerror], [onmouseover]').length, text: d.textContent }; })()`);
             assert.ok(hostile.pwned === 'undefined' && hostile.live === 0 && hostile.text.includes('<img src=x onerror='), at + 'an <img onerror>, a <script> and an event handler in a question write nothing to window and draw nothing: ' + JSON.stringify({ pwned: hostile.pwned, live: hostile.live }));
-            await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn:not(.btn-primary)').click(); true`);
+            await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-buttons .btn')].find(b => b.textContent.trim() === 'Close').click(); true`);
         }
     } finally { await client.close(); }
     console.log('ask_item_browser: ok');

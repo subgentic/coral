@@ -42,7 +42,8 @@ assert.deepEqual(GF.without({ ...GF.EMPTY, team: 'team-a', driver: 'D' }, 'team'
 GF.saveFilters({ ...GF.EMPTY, team: 'team-b', state: 'done' });
 assert.deepEqual(GF.loadFilters(), { ...GF.EMPTY, team: 'team-b', state: 'done' }, 'what is chosen is kept for the folder');
 GF.saveFilters(GF.EMPTY);
-assert.deepEqual(GF.loadFilters(), GF.EMPTY, 'nothing chosen keeps nothing');
+assert.deepEqual(GF.loadFilters(), { ...GF.EMPTY, state: 'active' }, 'nothing chosen opens on Active, as the team page does (#16371)');
+assert.deepEqual(GF.STATES, ['active', 'blocked', 'proposed', 'done', 'dropped'], 'the same pills as the team page: Active, Blocked, Proposed, Done, Dropped (#16371)');
 console.log('goal_filters: ok');
 
 // #14601 (beta run 3): a finished goal (state done) is under the Done pill and not in All; the pills still count it (withDone).
@@ -53,5 +54,8 @@ console.log('goal_filters: ok');
     assert.equal(GF.matches(fin, { state: '' }, undefined, { withDone: true }), true, 'the pill counts see it');
     assert.equal(GF.matches(goals[0], { state: '' }), true, 'an open goal is in All as before');
     assert.equal(GF.matches(fin, { state: 'active' }), false);
+    const dropped = { ...fin, id: 10, state: 'dropped' };
+    assert.equal(GF.matches(dropped, { state: '' }), false, 'All does not list a dropped goal');
+    assert.equal(GF.matches(dropped, { state: 'dropped' }), true, 'the Dropped pill lists it (#16371)');
     console.log('PASS goal_filters: a finished goal is under Done, not in All');
 }

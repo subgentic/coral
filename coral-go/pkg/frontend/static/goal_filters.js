@@ -5,8 +5,10 @@ import { serverFilter } from './inbox_servers.js';
 import { defineFilters, localMidnight, text } from './filter_model.js';
 import { browserLocal } from './safe_storage.js';
 
-export const STATES = ['active', 'blocked', 'proposed', 'done'];
-export const STATE_LABEL = { active: 'Active', blocked: 'Blocked', proposed: 'Proposed', done: 'Done' };
+export const STATES = ['active', 'blocked', 'proposed', 'done', 'dropped'];
+export const STATE_LABEL = { active: 'Active', blocked: 'Blocked', proposed: 'Proposed', done: 'Done', dropped: 'Dropped' };
+/** The states that are read apart from the open goals (one read each, #14641): the pill's own count waits for them. */
+export const CLOSED = ['done', 'dropped'];
 export const SORTS = ['newest', 'oldest', 'title'];
 export const SORT_LABEL = { newest: 'Recently updated', oldest: 'Least recently updated', title: 'Title' };
 
@@ -29,7 +31,7 @@ export const { EMPTY, clean, isFiltered, isQuery, chips, without } = model;
 export const storageKey = () => 'coral-inbox-goals-filters';
 const kept = model.persist(storageKey);
 /** The filters kept in this browser for the folder, or the empty ones. */
-export const loadFilters = () => ({ ...kept.load('inbox-goals', browserLocal), q: '' });
+export const loadFilters = () => { const f = kept.load('inbox-goals', browserLocal); return { ...f, q: '', state: f.state || 'active' }; }; // opens on Active, as the team page does (#16371); All is a pill away
 export const saveFilters = f => kept.save('inbox-goals', { ...f, q: '' }, browserLocal); // the search words are not kept: a page opened later starts with an empty box
 
 const stamp = g => Date.parse(g.updated_at || g.updatedAt || '') || 0;
@@ -42,7 +44,7 @@ export function matches(g, f, teamOf = x => x.board_id || '', opts = {}) {
         if (!hay.includes(c.q.toLowerCase())) return false;
     }
     if (c.state && String(g.state || '').toLowerCase() !== c.state) return false;
-    if (!c.state && !opts.withDone && String(g.state || '').toLowerCase() === 'done') return false; // a finished goal is under the Done pill, not in All (#14601)
+    if (!c.state && !opts.withDone && CLOSED.includes(String(g.state || '').toLowerCase())) return false; // a finished or dropped goal is under its own pill, not in All (#14601)
     if (c.team && g.board_id !== c.team) return false;
     if (c.driver && g.driver !== c.driver) return false;
     if (c.from && stamp(g) < Date.parse(localMidnight(c.from))) return false;

@@ -6,6 +6,7 @@ import { installDom, importUi } from './helpers/jsdom_env.mjs';
 installDom({ mode: 'local' });
 const asked = [];
 const rows = { '/api/goals?limit=100': [{ id: 1, board_id: 'alpha', title: 'Open one', state: 'active', updated_at: '2026-11-08T10:00:00Z' }],
+    '/api/goals?state=dropped&limit=100': [{ id: 3, board_id: 'alpha', title: 'Dropped one', state: 'dropped', updated_at: '2026-11-08T07:00:00Z' }],
     '/api/goals?state=done&limit=100': [{ id: 2, board_id: 'alpha', title: 'Finished one', state: 'done', updated_at: '2026-11-08T09:00:00Z' }, { id: 1, board_id: 'alpha', title: 'Open one', state: 'active', updated_at: '2026-11-08T10:00:00Z' }] };
 let failDone = false;
 globalThis.fetch = window.fetch = async url => {
@@ -36,4 +37,9 @@ rows['/api/goals?state=done&limit=100'] = Array.from({ length: 100 }, (_, i) => 
 await C.listInboxGoals(true);
 assert.equal(C.doneGoalsCapped(), true, 'a full page of finished goals: there may be more');
 assert.equal(source('inbox_sidebar').includes('Newer goals may be missing when this limit is reached.') && !source('inbox_sidebar').includes('newer ones are not listed'), true, 'the note is conditional: it does not claim known omissions');
+// the Dropped pill (#16371): its own one request
+asked.length = 0;
+got = await C.listInboxGoals('dropped');
+assert.deepEqual(asked.filter(u => u.startsWith('/api/goals')), ['/api/goals?state=dropped&limit=100'], 'the Dropped read is the one dropped-goals request: ' + asked.join(' | '));
+assert.deepEqual(got.map(g => g.title), ['Dropped one']);
 console.log('PASS inbox_goals_done_read: the Done pill has the finished goals');
