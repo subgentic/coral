@@ -91,6 +91,25 @@ func (h *SessionsHandler) NeedsYouAgents(r *http.Request) ([]NeedsYouItem, error
 func needsYouAgentItems(rows []map[string]any, now time.Time) []NeedsYouItem {
 	var out []NeedsYouItem
 	for _, row := range rows {
+		if st, _ := row["stalled_task"].(map[string]any); st != nil {
+			if asleep, _ := row["sleeping"].(bool); !asleep {
+				if gone, _ := row["archived"].(bool); !gone {
+					sid, _ := row["session_id"].(string)
+					name, _ := row["display_name"].(string)
+					if name == "" {
+						name, _ = row["name"].(string)
+					}
+					id, _ := st["task_id"].(int64)
+					team, _ := row["board_project"].(string)
+					at, _ := st["since"].(string)
+					if at = needsYouTime(at); at == "" {
+						at = now.UTC().Format(time.RFC3339Nano)
+					}
+					out = append(out, NeedsYouItem{Kind: "agent", From: needsYouLine(name), Line: "Stopped with task #" + strconv.FormatInt(id, 10) + " in progress", Team: team, ID: "agent:" + sid, At: at, TaskID: id})
+				}
+			}
+			continue // a stalled agent is not waiting for input: its one row is this
+		}
 		if wait, _ := row["waiting_for_input"].(bool); !wait {
 			continue
 		}

@@ -27,7 +27,15 @@ export function dismissAsked(s) {
 export const waitIgnored = s => !!(s && s.wait_ignored);
 
 /* Dismiss never answers a live terminal: retain the active wait until the agent clears it (#14152). */
-export const needsYou = s => (!!s && !s.sleeping && !s.archived && !s.wait_removed && needsInputAttention(s)) || !!askedBefore(s);
+/** An awake agent that holds a task in progress and has taken no turn for the server's bound (#16921): { id, title, since }. Stopped by the person, crashed, out of limit: it is not working, so it needs the person. Strings only: payloads are untrusted. */
+export function stalledOf(s) {
+    const t = s && !s.sleeping && !s.archived && s.stalled_task;
+    const id = t && typeof t === 'object' ? Number(t.task_id) : 0;
+    if (!Number.isSafeInteger(id) || id < 1) return null;
+    return { id, title: typeof t.title === 'string' ? t.title : '', since: typeof t.since === 'string' ? t.since : '' };
+}
+
+export const needsYou = s => (!!s && !s.sleeping && !s.archived && !s.wait_removed && needsInputAttention(s)) || !!askedBefore(s) || !!stalledOf(s);
 
 /** The words that open what it asked: "before Coral restarted" when Coral's stop put it to sleep, else "before it went to sleep" (an operator's Sleep, an ended CLI). */
 export const askedWords = a => `Asked ${a && a.after_restart ? 'before Coral restarted' : 'before it went to sleep'}: ${a ? a.text : ''}`;
@@ -36,6 +44,8 @@ export const askedWords = a => `Asked ${a && a.after_restart ? 'before Coral res
 export function askedRow(s) {
     if (s.waiting_for_input && waitIgnored(s) && !s.sleeping && !s.archived) return { ...s, waiting_summary: `Still waiting in its terminal. ${s.waiting_summary || "Open the agent to continue."}` };
     if (dialogDue(s) && !s.waiting_summary) { const d = dialogOf(s); return { ...s, waiting_summary: DIALOG_WORDS, waiting_kind: 'dialog', waiting_since: new Date(d.since).toISOString() }; } // at a dialog for the set minutes (#11430)
+    const st = stalledOf(s);
+    if (st) return { ...s, waiting_summary: `Stopped with task #${st.id} in progress`, waiting_kind: 'stalled', waiting_since: st.since || undefined };
     const a = askedBefore(s);
     return a ? { ...s, waiting_summary: askedWords(a), waiting_kind: a.kind, waiting_since: a.at } : s;
 }

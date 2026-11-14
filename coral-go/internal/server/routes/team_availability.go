@@ -44,8 +44,10 @@ type availableAgent struct {
 	TaskState    string             `json:"task_state,omitempty"`
 	Tasks        []availabilityTask `json:"tasks"`
 	// OpenTasks is the board tasks assigned to this agent that are pending, in progress or in review, and TaskSince the claim of its task in progress (the earliest when there are several): the team Agents view's Open tasks and Time on current task (#14861).
-	OpenTasks               int                   `json:"open_tasks"`
-	TaskSince               string                `json:"task_since,omitempty"`
+	OpenTasks int    `json:"open_tasks"`
+	TaskSince string `json:"task_since,omitempty"`
+	// IdleSince is when a task_idle agent's turn ended (its state's start), RFC3339: how long it has held its task with no turn going on (#16921). Only on a task_idle row.
+	IdleSince               string                `json:"idle_since,omitempty"`
 	WaitingOn               *board.RegisteredWait `json:"waiting_on,omitempty"`
 	Reminder                bool                  `json:"reminder,omitempty"`
 	ReminderIntervalSeconds int                   `json:"reminder_interval_seconds,omitempty"`
@@ -87,6 +89,23 @@ func (h *SessionsHandler) TeamAvailability(w http.ResponseWriter, r *http.Reques
 func boardStatusCacheable(r *http.Request) bool {
 	q := r.URL.Query().Get("activity")
 	return q != "1" && !strings.EqualFold(q, "true")
+}
+
+// liveStatusAgents is the board's agents that have a live session here, as the status lists them, and the subscribers among them (by subscriber id).
+func (h *SessionsHandler) liveStatusAgents(ctx context.Context, snap *boardStatusSnapshot, name string, includeActivity bool) ([]availableAgent, map[string]bool) {
+	agents := []availableAgent{}
+	seen := map[string]bool{}
+	for _, s := range snap.sessions {
+		sub, subscribed := snap.bySession[s.AgentType+"-"+s.SessionID]
+		if !subscribed && (s.BoardName == nil || *s.BoardName != name) {
+			continue
+		}
+		if subscribed {
+			seen[sub.SubscriberID] = true
+		}
+		agents = append(agents, h.liveAgentStatus(ctx, snap, name, s, sub, subscribed, includeActivity))
+	}
+	return agents, seen
 }
 
 // boardStatusSnapshot is what a board's status is computed from, read once per request.
@@ -135,18 +154,7 @@ func (h *SessionsHandler) teamAvailabilityUncached(w http.ResponseWriter, r *htt
 		serr.write(w)
 		return
 	}
-	agents := []availableAgent{}
-	seen := map[string]bool{}
-	for _, s := range snap.sessions {
-		sub, subscribed := snap.bySession[s.AgentType+"-"+s.SessionID]
-		if !subscribed && (s.BoardName == nil || *s.BoardName != name) {
-			continue
-		}
-		if subscribed {
-			seen[sub.SubscriberID] = true
-		}
-		agents = append(agents, h.liveAgentStatus(ctx, snap, name, s, sub, subscribed, includeActivity))
-	}
+	agents, seen := h.liveStatusAgents(ctx, snap, name, includeActivity)
 	var ended []store.EndedSession
 	if h.ss != nil {
 		ended, _ = h.ss.EndedSessionsOnBoard(ctx, name) // the agents of this team that were ended and not started again: their rows can offer Resume (#15294)
@@ -322,6 +330,13 @@ func (h *SessionsHandler) liveAgentStatus(ctx context.Context, snap *boardStatus
 	a.TaskState = taskStateOf(a.Tasks, a.SubscriberID, personal, snap.underReview)
 	state := DeriveSessionState(input)
 	classifyAvailability(&a, s, snap.live[s.SessionID], subscribed && sub.IsActive != 0, state, len(input.Events) > 0, activeWait)
+	if a.Availability == "task_idle" {
+		if at := state.Since; !at.IsZero() {
+			a.IdleSince = at.UTC().Format(time.RFC3339)
+		} else if at := state.LastEvent; !at.IsZero() {
+			a.IdleSince = at.UTC().Format(time.RFC3339)
+		}
+	}
 	// An agent parked on a wait while its task is in progress isn't idle: it said what it
 	// waits for.
 	if a.TaskState == "active" && activeWait == nil && !state.Working {

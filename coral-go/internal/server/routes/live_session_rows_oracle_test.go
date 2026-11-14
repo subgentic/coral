@@ -71,6 +71,7 @@ func lsrRows(t *testing.T, h *SessionsHandler, old, full bool) string {
 			delete(r, "keep_full_access")       // new in #14061 (the Operator's Full access across restarts, Codex rows only): the old implementation has no such field
 			delete(r, "permission_effective")   // new in #14085 (what the launch really gives an agent next to the mode chosen, agy always, Codex when narrowed): the old implementation has no such field
 			delete(r, "at_dialog")              // new in #11437 (an agent at a prompt, read from its screen by the dialog watcher): the old implementation has no such field; dialog_watch_test.go pins it through the list
+			delete(r, "stalled_task")           // new in #16921 (an agent that stopped holding an in-progress task, from the stalled-task pass): the old implementation has no such field; stalled_tasks_test.go pins it
 			delete(r, "wait_removed")           // new in #14266 (the Operator removed a hidden wait from Needs you): the old implementation has no such field; dismiss_wait_test.go pins it through the list
 		}
 	}

@@ -10,7 +10,9 @@ import { serverFetch, sessionServer } from './server_base.js';
 import { showToast } from './utils.js';
 import { blockedReason, hubBlocked } from './hub_access.js';
 import { resolveSessionIdentity } from './session_state.js';
-import { waitIgnored } from './asked_before_restart.js';
+import { waitIgnored, stalledOf } from './asked_before_restart.js';
+import { build, keyRoute } from './routes.js';
+import { boardTeamKey, keyLabel } from './server_base.js';
 import { openAgent } from './agent_live.js';
 import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
@@ -334,13 +336,44 @@ const viewOnlyWhy = s => (askable(s) ? blockedReason(sessionServer(s), 'interact
 
 /** The actions of a phone Needs you row's ⋯ menu (#137104): the Dismiss of a wait that is no longer true, offered by the rule the desktop row's button follows. */
 export function rowActions(s) {
+    if (s.waiting_kind === 'stalled') { // nothing is waited on: no Dismiss; a phone row has no buttons, so its menu carries the two actions (#16921)
+        const st = stalledOf(s); if (!st) return [];
+        const team = boardTeamKey(sessionServer(s), s.board_project || '');
+        return [{ label: 'Restart', title: 'Restart this agent with its settings; it gets its task again', run: () => restartStalled(s) },
+            ...(s.board_project ? [{ label: 'Reassign', title: 'Open the task to give it to another agent', run: () => importOnce('./nav.js').then(m => m.go(keyRoute('team', team, 'tasks', st.id))) }] : [])];
+    }
     if (s.waiting_for_input && waitIgnored(s)) return canRemoveWait(s) ? [{ label: 'Remove from Needs you', title: REMOVE_WAIT_LINE, help: REMOVE_WAIT_LINE, run: b => removeWait(s, b) }] : [];
     if (!canDismissWait(s, s.waiting_kind)) return []; // every waiting agent's row has one, a sign-in's too (#11946)
     return [{ label: 'Dismiss', title: 'Clear this if the agent is not waiting. Nothing is sent to the agent.', run: b => dismissWait(s, b) }];
 }
 
+/** Restart with the agent's own settings (one tap): selects the agent, then restarts. */
+async function restartStalled(s) {
+    try { const m = await importOnce('./agent_actions.js'); await m.restartSameDirect(s.name, s.agent_type, s.session_id); } catch { showToast(`Could not restart ${resolveSessionIdentity(s)}`, true); }
+}
+
+/** The actions of an agent that stopped with a task in progress (#16921): Restart (it gets its task brief again), the one primary action, and Reassign, which opens the task. Both are one tap; Restart keeps the agent's settings. */
+function stalledCell(s) {
+    const st = stalledOf(s), who = resolveSessionIdentity(s), cell = document.createElement('span'); cell.className = 'inbox-answers inbox-stalled';
+    const restart = document.createElement('button'); restart.type = 'button'; restart.className = 'btn btn-primary btn-small inbox-stalled-restart'; restart.textContent = 'Restart';
+    restart.setAttribute('aria-label', `Restart ${who}, stopped with task ${st.id} in progress`);
+    const stop = e => e.stopPropagation();
+    restart.addEventListener('click', async e => { e.stopPropagation(); restart.disabled = true; try { await restartStalled(s); } finally { restart.disabled = false; } });
+    restart.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') stop(e); });
+    cell.append(restart);
+    const team = boardTeamKey(sessionServer(s), s.board_project || '');
+    if (s.board_project) {
+        const a = document.createElement('a'); a.className = 'btn btn-small inbox-stalled-reassign'; a.textContent = 'Reassign'; a.href = build(keyRoute('team', team, 'tasks', st.id));
+        a.setAttribute('aria-label', `Reassign task ${st.id} from ${who} on ${keyLabel(team)}`); a.title = 'Open the task to give it to another agent';
+        a.addEventListener('click', stop); a.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') stop(e); });
+        cell.append(a);
+    }
+    return cell;
+}
+
 /** The Answer cell of a Needs you row: empty for a review or a run, for a viewer through the Hub, otherwise the one-time choices once they are read. `dismiss: false` leaves the Dismiss to the row's ⋯ menu (a phone's). */
 export function answerCell(s, { dismiss = true } = {}) {
+    if (s.waiting_kind === 'stalled' && stalledOf(s)) return stalledCell(s);
     if (s.waiting_for_input && waitIgnored(s) && !s.sleeping && !s.archived) {
         const cell = document.createElement('span'); cell.className = 'inbox-answers';
         const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-small inbox-open-agent'; button.textContent = 'Open agent';

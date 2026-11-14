@@ -125,7 +125,9 @@ func (h *SessionsHandler) RunDialogWatch(ctx context.Context) {
 			return
 		case <-t.C:
 		}
-		h.dialogPass(ctx, time.Now())
+		now := time.Now()
+		h.dialogPass(ctx, now)
+		h.stalledPass(ctx, now, stalledTaskAfter) // an agent that holds a task and takes no turn (#16921)
 	}
 }
 
