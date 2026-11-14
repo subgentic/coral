@@ -23,4 +23,6 @@
   .launch-recap-command:not(.lrc-open) .lrc-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* the phone's recap is cut to a few lines to leave the form room: with the command in it, it shows all of it and scrolls inside a capped height instead */
   .launch-recap:has(.launch-recap-command) { display: block; -webkit-line-clamp: unset; overflow-y: auto; max-height: 38vh; }
+  /* with the Runs as controls above it the recap is taller than that cap (#15885 + #15951): components.css caps the Runs as recap at 40vh (an id rule), which cuts the command row off: give it room */
+  #launch-recap:has(.runs-as):has(.launch-recap-command) { max-height: 58vh; }
 }
