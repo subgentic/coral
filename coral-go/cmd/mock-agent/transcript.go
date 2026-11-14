@@ -108,6 +108,21 @@ func (t *transcript) Turn(prompt string) error {
 	user["permissionMode"] = "default"
 	lines = append(lines, user)
 
+	// Mid-turn delivery probe (#16464): accept a person without ending the
+	// open MOCK_BUSY turn. Exercise both Claude wire shapes, not API stubs.
+	if os.Getenv("MOCK_AGENT_MIDTURN") == "1" && strings.HasPrefix(prompt, "MIDTURN-") {
+		if strings.HasPrefix(prompt, "MIDTURN-QUEUED ") {
+			enqueue := t.common("queue-operation", start)
+			enqueue["operation"], enqueue["content"] = "enqueue", prompt
+			remove := t.common("queue-operation", start)
+			remove["operation"], remove["deliveryId"], remove["commandUuid"], remove["reason"] = "remove", "probe-delivery", "probe-command", "delivered"
+			attachment := t.common("attachment", start)
+			attachment["attachment"] = map[string]any{"type": "queued_command", "prompt": prompt, "delivery_id": "probe-delivery", "source_uuid": "probe-command", "humanTurn": true, "origin": map[string]any{"kind": "human"}, "commandMode": "prompt", "timestamp": start.UTC().Format(time.RFC3339Nano)}
+			lines = []map[string]any{enqueue, remove, attachment}
+		}
+		return t.append(lines)
+	}
+
 	usage := map[string]any{"input_tokens": 1200 + 10*t.turns, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 9000, "output_tokens": 80, "service_tier": "standard"}
 	tool := (*scriptedTool)(nil)
 	if sr != nil {

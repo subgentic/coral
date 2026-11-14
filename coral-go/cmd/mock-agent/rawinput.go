@@ -113,7 +113,7 @@ func (b *inputBox) holdIfBusy(line string) bool {
 	t := &b.busy
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if !t.active {
+	if !t.active || os.Getenv("MOCK_AGENT_MIDTURN") == "1" {
 		return false
 	}
 	t.queue = append(t.queue, line)
@@ -355,7 +355,7 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 				}
 			})
 		}
-		if !waiting { // a menu that is open is the agent waiting: no Stop until it is answered
+		if !waiting && !(os.Getenv("MOCK_AGENT_MIDTURN") == "1" && box.isBusy()) { // a menu that is open is the agent waiting: no Stop until it is answered
 			events <- func() { hooks.fire("Stop", map[string]any{"stop_hook_active": false}) }
 		}
 	}
