@@ -680,9 +680,13 @@
                                 <div id="settings-dropbox-hubshare" class="settings-dropbox-hubshare" hidden>
                                     <!-- Share through Coral Hub (#16109): local switch, off by default; dropbox_settings.js fills it -->
                                     <div class="dropbox-inline">
-                                        <label class="hubshare-check" for="settings-dropbox-hubshare-on"><input type="checkbox" id="settings-dropbox-hubshare-on" aria-describedby="settings-dropbox-hubshare-desc"> Share through Coral Hub</label>
+                                        <label for="settings-dropbox-hubshare-on" class="sec-switch"><span>Share through Coral Hub</span><input type="checkbox" class="switch" id="settings-dropbox-hubshare-on" aria-describedby="settings-dropbox-hubshare-desc"></label>
                                     </div>
-                                    <p id="settings-dropbox-hubshare-desc" class="settings-hint">When on, a file goes to the Dropbox connected on Coral Hub only when its owner presses Share on it. Nothing is sent by itself. A file marked private or tagged internal is never sent, and a file that looks like it holds a secret waits here for you to press Upload anyway. Off until you turn it on. Changed on this computer only.</p>
+                                    <p id="settings-dropbox-hubshare-desc" class="settings-hint sv-help">Sends only when you press Share. Off by default; this computer only.</p>
+                                    <details class="disclosure sv-fold">
+                                        <summary>Sharing details</summary>
+                                        <p class="settings-hint sv-help">A file goes to the Dropbox connected on Coral Hub. A file marked private or tagged internal is never sent, and a file that looks like it holds a secret waits here for you to press Upload anyway.</p>
+                                    </details>
                                 </div>
                                 <div id="settings-dropbox-delete-confirm" class="settings-dropbox-delete-confirm" hidden></div>
                                 <p id="settings-dropbox-delete-rule" class="settings-hint sv-help" hidden>Deleting a file in Coral removes its Dropbox copy 24 hours later.</p>

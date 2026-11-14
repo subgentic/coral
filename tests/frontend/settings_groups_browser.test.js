@@ -106,7 +106,7 @@ const GROUPS = {
         await ev(`document.getElementById('settings-security').hidden = true; document.getElementById('tb-choice').closest('.sv-row').hidden = true; true`);
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cloud_settings.js'); m.applyCloudSettingsDialog(); return true; })()`);
         const listed = await ev(`[...document.querySelectorAll('#settings-tabs [role=tab]')].filter(t => !t.hidden).map(t => t.id.replace('settings-tab-', ''))`);
-        assert.deepEqual(listed, ['general', 'notifications', 'terminal', 'agents', 'files'], 'groups with no hub setting leave the list: ' + listed);
+        assert.deepEqual(listed, ['general', 'notifications', 'agents', 'files'], 'groups with no hub setting leave the list: ' + listed);
         const opts = await ev(`[...document.querySelectorAll('#settings-group-select option')].filter(o => !o.hidden).map(o => o.value)`);
         assert.deepEqual(opts, listed, 'and the phone selector');
         console.log('   ✓ ' + listed.join(', '));

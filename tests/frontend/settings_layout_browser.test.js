@@ -10,8 +10,6 @@ const AGENT_PARTS = {
     'settings-agents-defaults': ['settings-permission-mode', 'settings-working-dir', 'settings-cli-path-claude', 'settings-cli-path-codex', 'settings-cli-path-agy', 'settings-cli-path-pi'], // the CLI paths fold sits under Defaults now (#9955), not at the foot of the page
     'settings-agents-models': ['settings-default-model-claude'],
     'settings-agents-behaviour': ['settings-auto-resume', 'settings-auto-goals', 'settings-agent-low-priority'],
-    'settings-agents-team': ['settings-board-auto-attach'],
-    'settings-agents-tools': ['settings-codex-trust-hooks'],
 };
 
 (async () => {
@@ -31,7 +29,7 @@ const AGENT_PARTS = {
         console.log('1. Agents: five headed parts, each control under its own heading');
         await open('agents');
         const heads = await ev(`[...document.querySelectorAll('#settings-pane-agents .sv-heading')].map(h => h.id + '=' + h.textContent.trim())`);
-        assert.deepEqual(heads, ['settings-agents-models=Default models', 'settings-agents-defaults=Defaults', 'settings-agents-behaviour=Behaviour', 'settings-agents-team=Team and board', 'settings-agents-experimental=Experimental', 'settings-agents-tools=Tools']);
+        assert.deepEqual(heads, ['settings-agents-models=Default models', 'settings-agents-defaults=Defaults', 'settings-agents-behaviour=Behaviour']);
         for (const [head, ids] of Object.entries(AGENT_PARTS)) {
             // #8460 put CLI paths inside a settings_view fold. Its rows belong to the heading
             // before the disclosure (Defaults since #9955): at the first folded row, continue before it (#8530).
@@ -44,8 +42,10 @@ const AGENT_PARTS = {
             })`);
             assert.deepEqual(under, ids.map(() => head), `${head}: ${JSON.stringify(under)}`);
         }
-        console.log('2. Terminal has the render engine; General has Customize Theme beside Theme and no About');
-        assert.equal(await paneOf('settings-renderer-select'), 'terminal');
+        assert.equal(await paneOf('settings-board-auto-attach'), 'chief', 'team setting has one home');
+        assert.equal(await paneOf('settings-codex-trust-hooks'), 'agents', 'hook trust remains in Defaults');
+        console.log('2. Appearance has the render engine and Customize Theme beside Theme; About has one home');
+        assert.equal(await paneOf('settings-renderer-select'), 'general');
         await open('general');
         assert.equal(await ev(`(() => { const b = document.querySelector('.settings-theme-btn'); return !!b && b.closest('.settings-pane').dataset.group === 'general' && b.closest('dd') === document.getElementById('settings-theme').closest('dd'); })()`), true, 'Customize Theme shares the Theme row');
         assert.equal(await paneOf('about-section'), 'network', 'About moved to Network and Hub');

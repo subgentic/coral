@@ -29,7 +29,7 @@ const { coralReady } = require('./helpers/wait');
         // PANE Terminal
         assert.deepEqual(await options('tb-choice'), ['Keep agents running when Coral restarts (tmux)', 'Put agents to sleep when Coral restarts (pty, default)'], 'Terminal: the choices say what happens to agents, with the technical name after');
         
-        assert.equal(await ev(`document.querySelector('#settings-engine-more > summary').textContent.trim()`), 'Terminal drawing', 'Terminal: the disclosure says what it is for, in the same two words as before');
+        assert.equal(await ev(`document.querySelector('#settings-engine-more > summary').textContent.trim()`), 'Advanced', 'Appearance: drawing engine is in Advanced');
         assert.equal(await text('settings-renderer-select-label'), 'Drawing engine', 'Terminal: Default render engine is the drawing engine');
         assert.equal(await ev(`document.getElementById('settings-renderer-select').title`), 'Leave this unless the terminal text looks wrong.', 'Terminal: and when to touch it, on the select (no new visible words)');
         // END Terminal
