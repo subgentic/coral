@@ -56,7 +56,7 @@ That is the one-time first-launch screen. Click **Skip for now** (or press Escap
 Coral local; it does not come back, and nothing is sent to the hub. The server marks a new
 install `welcome_pending` in its settings and the dashboard clears it with your answer
 (`welcome_choice`: `connected`, `skipped` or `own-hub`), so another browser does not ask
-again. **Settings › Network and Hub › Connect to Coral Hub…** reopens it. It only opens when a hub is
+again. **Settings › Coral Hub and remote access › Connect to Coral Hub…** reopens it. It only opens when a hub is
 configured and Coral was started to offer it (a hub URL passed with `--cloud-url` or
 `CORAL_CLOUD_URL`, or `--cloud-connect prompt` or `auto`; not for the release build's default
 URL alone), and test servers set `CORAL_NO_WELCOME=1` and never show it.
@@ -72,12 +72,12 @@ Release builds offer **https://app.coralhub.dev**; dev builds offer none. `--clo
 `CORAL_CLOUD_URL`, then the build's default. A configured hub is only an address: Coral
 makes no connection to it until you click **Connect** (or run `coral cloud connect`). The
 startup log says which hub it is: `[CLOUD] Coral Hub: https://app.coralhub.dev (nothing is
-sent until this server is connected: Settings > Network and Hub)`.
+sent until this server is connected: Settings > Coral Hub and remote access)`.
 
 ### "This server is enrolled with a different hub" (Coral Hub moved to app.coralhub.dev)
 
 Coral Hub moved from app.coralai.ai to **app.coralhub.dev**. A server enrolled with the old
-host stops connecting after the upgrade and says so in Settings > Network and Hub (Coral never
+host stops connecting after the upgrade and says so in Settings > Coral Hub and remote access (Coral never
 sends its token to a host it wasn't enrolled with, and never follows a redirect to a hub).
 Connect it again, then remove the old entry:
 

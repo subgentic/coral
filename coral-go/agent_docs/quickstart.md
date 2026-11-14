@@ -187,7 +187,7 @@ Coral stops at startup and says so.
 Remote access on its own is **plain HTTP**: the API key, the login cookie and everything
 typed into agent terminals cross the network unencrypted, readable by anyone on it. The
 first-launch question, the startup log (`[startup] WARNING: remote access is on over plain
-HTTP …`) and **Settings > Network and Hub > Remote access** all say so. Pick one of:
+HTTP …`) and **Settings > Coral Hub and remote access > Remote access** all say so. Pick one of:
 
 - **Coral Hub** (recommended away from home): the server connects out to Coral Hub over
   TLS; nothing listens on the network. See [hub.md](hub.md#connecting-a-server-to-coral-hub).
@@ -229,7 +229,7 @@ terminal on the server. For a second instance, pass its `--home` and `--url` to
 `coral open` too.
 
 Coral Hub (app.coralhub.dev, invite-only beta) is optional. A fresh install stays local
-until you choose to connect from Home or **Settings > Network and Hub**, or run
+until you choose to connect from Home or **Settings > Coral Hub and remote access**, or run
 `coral cloud connect`. In the connect flow, approve the link/code and choose the
 hub's access (View, Interact or Launch). See [connecting to Coral Hub](hub.md#connecting-a-server-to-coral-hub).
 
