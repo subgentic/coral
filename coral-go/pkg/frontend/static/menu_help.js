@@ -18,7 +18,7 @@ export const HELP = {
     'Restart with changes': 'Starts a fresh conversation with the settings you choose; the instructions are sent again.',
     'Wake': 'Continues the conversation.',
     'Sleep': 'Stops the terminal. The chat and files stay; Wake continues the conversation.',
-    'Stop session': 'Ends its process now. Its chat stays in History.',
+    'Stop agent': 'Ends its process now. Its chat stays in History.',
 };
 const LABELS = Object.keys(HELP).sort((a, b) => b.length - a.length); // longest first: "Wake Team" before "Wake"
 const NO_HOVER = '(pointer: coarse), (max-width: 639px)'; // the same query as css/menu_help.css

@@ -44,11 +44,11 @@ const NOTE_RESET = 'Their terminal logs are kept.'; // Reset says it in plain wo
             console.log(`   ✓ ${label}: ${d.message}`);
         };
         console.log('Every Kill confirmation says what happens to the terminal log');
-        await asked('Kill session (sidebar row)', `T.render.killSessionDirect('repo', 'claude', 's1')`, 'Stop session');
+        await asked('Kill session (sidebar row)', `T.render.killSessionDirect('repo', 'claude', 's1')`, 'Stop agent');
         // a sleeping or archived row's menu says Remove Agent, so its confirmation does (#15585): nothing runs, so it does not say it terminates anything
         await asked('Remove Agent (sleeping row)', `T.render.killSessionDirect('zz-sleep', 'claude', 's3')`, 'Remove agent', NOTE, ' is not running.');
         await asked('Remove Agent (archived row)', `T.render.killSessionDirect('zz-arch', 'claude', 's4')`, 'Remove agent', NOTE, ' is not running.');
-        await asked('Kill session (agent header)', `T.state.currentSession = { type: 'live', name: 'repo', session_id: 's1', agent_type: 'claude' }; (await import((window.__coralStatic || '/static/') + 'controls.js')).killSession()`, 'Stop session');
+        await asked('Kill session (agent header)', `T.state.currentSession = { type: 'live', name: 'repo', session_id: 's1', agent_type: 'claude' }; (await import((window.__coralStatic || '/static/') + 'controls.js')).killSession()`, 'Stop agent');
         await asked('Kill all Agents (folder)', `T.render.killGroup('repo')`, 'Stop all agents', NOTE_MANY, 'Stop all 2 agents in');
         await asked('Kill Team (one agent)', `T.render.killBoard('team-k')`, 'Stop team', NOTE, 'Stop the 1 agent in "team-k"');
         await asked('Reset team', `window.resetTeam('team-k')`, 'Reset team', NOTE_RESET);

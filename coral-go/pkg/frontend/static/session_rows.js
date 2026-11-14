@@ -234,7 +234,7 @@ ${['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access
             <hr class="overflow-menu-divider overflow-menu-divider-danger">
             <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="agent-kill" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o1}<line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
-                Stop session
+                Stop agent
             </button>`;
     // Archived: no Restart, Rename or reordering (#3030).
     const _archivedMenu = `

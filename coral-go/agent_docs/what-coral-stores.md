@@ -17,7 +17,7 @@ Coral keeps its data in one folder, `<data dir>` (`~/.coral` unless `CORAL_DATA_
 
 ## Things to know
 
-- **Stopping an agent keeps the terminal log.** Stop session ends it; its terminal log stays in `<data dir>/logs`, as it does for Sleep and Archive. Every Stop confirmation says so. To remove a log, delete its file.
+- **Stopping an agent keeps the terminal log.** Stop agent ends it; its terminal log stays in `<data dir>/logs`, as it does for Sleep and Archive. Every Stop confirmation says so. To remove a log, delete its file.
 - **Terminal logs are the biggest and the most revealing.** They record what the terminal showed, secrets included. Coral Hub gets them redacted; the dashboard on this computer shows them as the terminal showed them. Treat `<data dir>/logs` like the agents' own terminals.
 - **Board history is a product choice.** Coral keeps your board messages and tasks so a team has a memory; nothing removes them unless you do.
 - **Artifacts are served byte for byte.** Coral cannot hide a token in an artifact: redact a log or a screenshot before you upload it (see [artifacts.md](artifacts.md#limits-images-and-deleting)).
