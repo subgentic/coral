@@ -39,7 +39,7 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
             // the folder's own number adds the two files (#17329): none of them is a chat, and the sidebar said nothing before
             const entry = await ev(`(() => { const e = ${mobile} ? [...document.querySelectorAll('.view-list select option')].find(o => o.value === 'chats-starred') : document.querySelector('.view-list-item[data-key="chats-starred"]'); return e ? e.textContent.replace(/\\s+/g, ' ').trim() : null; })()`);
             if (!mobile) assert.match(entry, /Starred\D*2\b/, `${label}: the Starred folder counts the two starred files: ` + entry); // a phone's list is a select with no numbers
-            await shot(`starred-files-${label}`);
+            for (const theme of ['light', 'dark']) { await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); true`); await settle(200); await shot(`starred-files-${label}-${theme}`); }
             await ev(`window.switchNavTab('hub-inbox'); true`);
             if (!mobile) { await ev(`document.querySelector('.view-list-item[data-key="saved"]').click(); true`); await waitFor(`(document.getElementById('group-table-title')||{}).textContent === 'Saved messages'`, `${label}: the Saved folder's title is Saved messages`, 8000); }
             console.log(`PASS ${label}`);
