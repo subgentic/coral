@@ -254,9 +254,8 @@ func (h *CloudHandler) refuseCloud(w http.ResponseWriter, r *http.Request, allow
 		// The Settings screen shows this as is, with a copy button for the command
 		// (#3285): connecting is for someone at this computer, never a remote browser.
 		writeJSON(w, http.StatusForbidden, map[string]string{
-			"error":   "Connecting has to happen on the computer running Coral. On that computer, open this dashboard, or run: coral cloud connect",
-			"code":    "local_dashboard_required",
-			"command": "coral cloud connect",
+			"error": "Connecting happens on the computer running Coral. Open Coral on that computer and choose Connect.",
+			"code":  "local_dashboard_required",
 		})
 	} else {
 		errForbidden(w, "Only `coral cloud connect`, run as the user Coral runs as on this computer, can do this")

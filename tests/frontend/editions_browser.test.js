@@ -331,26 +331,21 @@ async function run() {
             await load({ state: 'off', configured: false });
             check(`${label}: a build with no hub configured does not open it`, !(await open()) && (await settings()).welcome_pending === 'True');
             const offText = await ev(`(async () => (await import((window.__coralStatic||'/static/')+'cloud_connect.js')).describe({ state: 'off' }))()`);
-            check(`${label}: not configured: says how to configure it (same text as the CLI)`, /^Coral Hub isn't configured on this computer\. Start Coral with --cloud-url https:\/\/app\.coralhub\.dev .*then run: coral cloud connect$/.test(offText), offText);
+            check(`${label}: not configured: says to open Settings (#16717)`, /^Coral Hub isn't configured on this computer\. Open Settings .* Network and Hub for setup steps\.$/.test(offText), offText);
             await put({ welcome_pending: 'False' });
             await load({}, true);
             await ev(`(async () => (await import((window.__coralStatic||'/static/')+'editions.js')).showHubSetup())()`);
             await until(`/computer running Coral/.test((document.querySelector('#editions-modal [data-cloud="status"]') || {}).textContent || '')`, 'the elsewhere message');
             s = await screen();
-            check(`${label}: from another computer (a 403 without the server's code): connect on the computer running Coral, with the command to copy`, !!s && s.status === 'Connecting has to happen on the computer running Coral. On that computer, run: coral cloud connect' && !s.connect && !s.code && s.command === 'coral cloud connect', JSON.stringify(s));
-            // Headless Chrome has no clipboard: record what would be copied.
-            await ev(`Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async t => { window.__copied = t; } } }); true`);
-            await click('#editions-modal [data-cloud="copy"]');
-            await until(`document.querySelector('#editions-modal [data-cloud="copy"]').textContent === 'Copied'`, 'the copy feedback');
-            check(`${label}: Copy copies the command`, (await ev(`window.__copied`)) === 'coral cloud connect' && (await ev(`document.querySelector('#editions-modal [data-cloud="copy"]').textContent`)) === 'Copied');
+            check(`${label}: from another computer: open Coral there, no command (#16717)`, !!s && s.status === 'Connecting happens on the computer running Coral. Open Coral on that computer and choose Connect.' && !s.connect && !s.code && !s.command, JSON.stringify(s));
             await click('#editions-modal [data-editions="skip"]');
-            // A server with #3285 says it itself (code local_dashboard_required): shown as is.
-            const own = { error: 'Connecting has to happen on the computer running Coral. On that computer, open this dashboard, or run: coral cloud connect', code: 'local_dashboard_required', command: 'coral cloud connect' };
+            // A server with local_dashboard_required also gets the client-side elsewhere text (#16717).
+            const own = { error: 'Connecting happens on the computer running Coral. Open Coral on that computer and choose Connect.', code: 'local_dashboard_required' };
             await load({}, true, own);
             await ev(`(async () => (await import((window.__coralStatic||'/static/')+'editions.js')).showHubSetup())()`);
-            await until(`/open this dashboard/.test((document.querySelector('#editions-modal [data-cloud="status"]') || {}).textContent || '')`, 'the server message');
+            await until(`/computer running Coral/.test((document.querySelector('#editions-modal [data-cloud="status"]') || {}).textContent || '')`, 'the server message');
             s = await screen();
-            check(`${label}: from another computer (#3285 server): its message as is, and its command`, !!s && s.status === own.error && s.command === 'coral cloud connect', JSON.stringify(s));
+            check(`${label}: from another computer (#3285 server): the elsewhere text, no command`, !!s && s.status === own.error && !s.command, JSON.stringify(s));
             await click('#editions-modal [data-editions="skip"]');
 
             // ── Settings > Network and Hub reopens it; closing keeps the stored answer ──

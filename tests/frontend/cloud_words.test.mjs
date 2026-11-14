@@ -23,7 +23,7 @@ console.log('cloud_words: ok');
 // The status sentences of the connect panel (moved here from cloud_connect.js, #8386).
 
 assert.equal(describe({ state: 'off' }), OFF_TEXT);
-assert.ok(OFF_TEXT.includes('cloud-url https://app.coralhub.dev') && OFF_TEXT.endsWith('coral cloud connect'), 'the off sentence names the address to start with and the command to connect');
+assert.ok(OFF_TEXT.includes('Settings') && OFF_TEXT.includes('Network and Hub'), 'the off sentence points to Settings (#16717)');
 assert.equal(describe({ state: 'idle', hub_url: 'https://h.example' }), 'Ready to connect to https://h.example. Nothing is sent until you connect.');
 assert.equal(describe({ state: 'idle', last_error_code: 'hub_unreachable' }), 'Coral could not reach Coral Hub. Check your connection and try again.');
 assert.equal(describe({ state: 'idle', last_error_code: 'rate_limited' }), 'Coral Hub is busy. Try again in a moment.');

@@ -27,13 +27,13 @@ const HUB_OPERATOR_URL = '/api/system/hub-operator';
     launch: 'Also start, stop, sleep, wake and restart agents (one agent or a whole team), browse folders to choose where, pause boards, delete board messages and boards, and turn on auto-accept. Launching runs code on this computer as you.',
 };
 // Said when this page is not the dashboard on the computer running Coral (the cloud routes
-// answer 403): connecting has to happen there.
- const ELSEWHERE_TEXT = 'Connecting has to happen on the computer running Coral. On that computer, run: coral cloud connect';
+// answer 403): connecting has to happen there. No CLI command on the main screen (#16717).
+ const ELSEWHERE_TEXT = 'Connecting happens on the computer running Coral. Open Coral on that computer and choose Connect.';
  const CONNECT_COMMAND = 'coral cloud connect';
-// The command a server with no hub is started with (the OFF_TEXT's first step), with a Copy button beside it (UI audit #5589, finding 21: a command to run in a terminal was text only).
+// The command a server with no hub is started with, shown only in the Advanced fold in Settings (#16717).
  const START_COMMAND = 'coral --cloud-url https://app.coralhub.dev';
-// In Settings the sentence says it once and the row holds the whole sequence, which Copy takes (UI audit #5589); the connect dialog keeps the sentence the command line says too (#3285).
- const OFF_SHORT = "Only needed to use Coral Hub. Skip it otherwise. To use it, start Coral with the Hub address, then connect:"; // says first whether a newcomer needs the two commands at all (Beta Tester, #9955)
+// In Settings the sentence is short; the commands are in an Advanced fold below it (#16717, #5589).
+ const OFF_SHORT = "Only needed to use Coral Hub. Skip it otherwise.";
 const ENROLLED = ['connecting', 'connected', 'retrying', 'revoked', 'key_unreadable', 'upgrade_required'];
 const LIVE = ['enrolling', 'connecting', 'retrying'];
 
@@ -134,14 +134,19 @@ class CloudPanel {
             put(this.part('usercode-spoken'), st.user_code ? `The code is below: ${spellCode(st.user_code)}.` : ''); // read letter by letter; the visible code is hidden from a screen reader so it is not read twice
         }
         const show = (role, on) => { const el = this.part(role); if (el) el.hidden = !on; };
-        // A server with no hub says what to run: the command is in the row, with Copy (a person copies it into a terminal).
+        // A server with no hub: Settings wraps the commands in an Advanced fold; the Connect dialog shows no commands (#16717).
         const startRow = this.part('command-row');
-        if (startRow && st.state === 'off') {
-            const all = this.commandsInRow ? `${START_COMMAND}\n${CONNECT_COMMAND}` : START_COMMAND;
-            show('command-row', true);
+        if (startRow && st.state === 'off' && this.commandsInRow) {
+            this.say(OFF_SHORT);
+            const all = `${START_COMMAND}\n${CONNECT_COMMAND}`;
             put(this.part('command'), all);
             this.command = all;
-            if (this.commandsInRow) this.say(OFF_SHORT);
+            if (!startRow.parentElement?.matches?.('.cloud-advanced')) {
+                const d = document.createElement('details'); d.className = 'cloud-advanced';
+                const s = document.createElement('summary'); s.textContent = 'Advanced: terminal commands';
+                startRow.before(d); d.append(s, startRow);
+            }
+            show('command-row', true);
         }
         else { show('command-row', false); if (this.command && this.command.startsWith(START_COMMAND)) this.command = null; }
         show('connect', st.state === 'idle' || st.state === 'revoked');
@@ -400,21 +405,11 @@ class CloudPanel {
         }
     }
 
-    // Not the dashboard on the computer running Coral. The server says so itself (code
-    // local_dashboard_required, with the command to run there); any other 403 gets the same
-    // sentence, since the cloud routes are refused only off that computer.
+    // Not the dashboard on the computer running Coral: say to open Coral there, no CLI command on screen (#16717).
     elsewhere(body) {
-        const own = body && body.code === 'local_dashboard_required' && body.error;
-        this.say(own ? body.error : ELSEWHERE_TEXT);
-        const command = (own && body.command) || CONNECT_COMMAND;
-        for (const role of ['code', 'connect', 'cancel', 'disconnect', 'mode-row']) { const el = this.part(role); if (el) el.hidden = true; }
-        const row = this.part('command-row');
-        if (row) {
-            row.hidden = false;
-            const c = this.part('command');
-            if (c) c.textContent = command;
-        }
-        this.command = command;
+        this.say(ELSEWHERE_TEXT);
+        for (const role of ['code', 'connect', 'cancel', 'disconnect', 'mode-row', 'command-row']) { const el = this.part(role); if (el) el.hidden = true; }
+        this.command = null;
         this.onState({ state: 'elsewhere' });
     }
 
