@@ -19,7 +19,7 @@ const { getAgentConfig, renderAgentConfigForm, setAgentConfig, resetProviderChoi
 const { markFieldInvalid, _launchBlocked, _launchOn, _onServerSuffix, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, hideLaunchModal, showTeamLaunchFailures } = await importOnce('./launch_core.js');
 const { _syncFlagButtons } = await importOnce('./flag_shortcuts.js');
 const { showSettingsModal } = await importOnce('./settings_dialog.js');
-const { modelName, levelName } = await importOnce('./model_labels.js');
+const { modelName, levelName, defaultModelName } = await importOnce('./model_labels.js');
 const { launchedMode } = await importOnce('./preset_enforcement.js');
 const { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_KEY, GENERATED_TEAM_KEY, _renderTeamTemplateSelector, _syncTemplateMenu, markTeamTemplate, resetTeamTemplatePicker } = await importOnce('./team_templates_ui.js');
 const { showTeamStep, currentTeamStep, TEAM_STEPS } = await importOnce('./team_steps.js');
@@ -59,7 +59,7 @@ function _updateTeamAgentSummary(row) {
     const parts = []; // [text, changed]
     parts.push([typeLabel(type), false]);
     const modelId = config.model || '';
-    parts.push([modelId ? modelName(type, modelId, _effectiveServer(launch.server)) : 'default model', !!modelId && modelId !== _settingsFor(_effectiveServer(launch.server))['default_model_' + type]]);
+    parts.push([modelId ? modelName(type, modelId, _effectiveServer(launch.server)) : defaultModelName(type, _settingsFor(_effectiveServer(launch.server))['default_model_' + type], _effectiveServer(launch.server)).replace(/^Default$/, 'Default model'), !!modelId && modelId !== _settingsFor(_effectiveServer(launch.server))['default_model_' + type]]);
     if (config.thinking) parts.push([`${levelName(config.thinking)} thinking`, true]);
     // What launches (#6425): the member's own Mode, else the team's, is applied; for Codex and Antigravity the capabilities may only narrow it, and with no Mode they decide.
     const acf = acfId ? document.getElementById(acfId) : null;

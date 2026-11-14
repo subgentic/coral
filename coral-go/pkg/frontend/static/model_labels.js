@@ -53,6 +53,12 @@ export function modelName(agentType, modelId, server) {
     return (hit && hit.display_name && (hit.group ? `${hit.display_name} (${hit.group})` : hit.display_name)) || shortModelName(modelId);
 }
 
+/** The one name for the model nobody chose (#16668): "Default", and with the model it runs when Coral knows it, from the Default model setting: "Default: Sonnet 5.5". */
+export function defaultModelName(agentType, defaultId, server) {
+    const name = defaultId ? modelName(agentType, String(defaultId), server) : '';
+    return name ? `Default: ${name}` : 'Default';
+}
+
 /** "Claude · Opus 4.1", or '' when the agent has no model on record. */
 export function modelLabel(agentType, modelId, server) {
     const name = modelName(agentType, modelId, server);

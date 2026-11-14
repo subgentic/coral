@@ -47,7 +47,7 @@ const path = require('node:path');
             await ev(`${SW}.click(); true`);
             await waitFor(confirmShown, `${at}the confirmation`, 6000);
             const words = await ev(`({ title: document.getElementById('confirm-modal-title').textContent, msg: document.getElementById('confirm-modal-message').textContent, yes: document.getElementById('confirm-modal-yes').textContent })`);
-            check(/Run as a hub/.test(words.title) && /controls every computer you add/.test(words.msg) && /Settings > Network and Hub/.test(words.msg) && /Enable on this computer/.test(words.yes), `${at}the confirmation says what it opens and where to lower it: ${JSON.stringify(words)}`);
+            check(/Run as a hub/.test(words.title) && /controls every computer you add/.test(words.msg) && /Settings > Coral Hub and remote access/.test(words.msg) && /Enable on this computer/.test(words.yes), `${at}the confirmation says what it opens and where to lower it: ${JSON.stringify(words)}`);
             await ev(`document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)').click(); true`);
             await waitFor(`!${SW}.checked && !${SW}.disabled`, `${at}Cancel puts the switch back off`, 6000);
             check(await ev(`window.__hub.calls.every(c => c.startsWith('GET')) && window.__hub.saved === false`), `${at}Cancel saves nothing`);

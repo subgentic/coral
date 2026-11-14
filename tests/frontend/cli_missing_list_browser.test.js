@@ -7,7 +7,7 @@ const BASE = require('./test_base').BASE;
 const { install: installNA, stubModels, stubCliChecks } = require('./helpers/new_agent');
 const FIXTURE = require('./fixtures/cli_refusal_sentences.json').cases; // the server's sentences, one copy shared with the Go test (#12364)
 
-const NOTE = (bin, type) => `Found but not used: ~/.local/bin/${bin} is in an agent's working folder: the agent "Security Reviewer" works in ~. Archive that agent (an asleep one counts too) or restart it in a project folder, then check again, so a launch refuses it. Install it somewhere else, or set its path in Settings > CLI paths (the setting cli_path_${type}).`;
+const NOTE = (bin, type) => `Found but not used: ~/.local/bin/${bin} is in an agent's working folder: the agent "Security Reviewer" works in ~. Archive that agent (an asleep one counts too) or restart it in a project folder, then check again, so a launch refuses it. Install it somewhere else, or set its path in Settings > Providers (the setting cli_path_${type}).`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -49,7 +49,7 @@ const NOTE = (bin, type) => `Found but not used: ~/.local/bin/${bin} is in an ag
             check(m.over <= 0, at + 'no sideways page scroll: ' + m.over);
             check(m.actions.join('|') === 'Install Codex|Choose a path|Choose a path|Install OpenCode|Install Hermes', at + 'one action each: ' + JSON.stringify(m.actions));
             check(/^Not used: ~\/\.local\/bin\/agy is inside Security Reviewer's working folder \(~\)\.$/.test(m.lines[1]) && m.lineAgent[1] === true, at + 'the reason is one short line, the agent a link: ' + JSON.stringify([m.lines[1], m.lineAgent[1]]));
-            check(m.whyOpen[1] === false && m.whySummary[1] === 'Why?' && /Archive Security Reviewer/.test(m.steps[1]) && /Settings > CLI paths/.test(m.steps[1]) && !/cli_path_agy|so a launch refuses it/.test(m.lines[1]), at + 'the steps are behind Why?, in plain steps: ' + JSON.stringify([m.whyOpen[1], m.steps[1]]));
+            check(m.whyOpen[1] === false && m.whySummary[1] === 'Why?' && /Archive Security Reviewer/.test(m.steps[1]) && /Settings > Providers/.test(m.steps[1]) && !/cli_path_agy|so a launch refuses it/.test(m.lines[1]), at + 'the steps are behind Why?, in plain steps: ' + JSON.stringify([m.whyOpen[1], m.steps[1]]));
             // Why? opens the steps; Choose a path opens Settings at the CLI paths
             await ev(`document.querySelector('#launch-agent-pick .provider-entry.is-refused .provider-why summary').click(); true`); await settle(200);
             check(await ev(`document.querySelector('#launch-agent-pick .provider-entry.is-refused .provider-why').open === true && document.querySelector('#launch-agent-pick .provider-entry.is-refused .provider-steps').getClientRects().length > 0`), at + 'Why? opens the steps');

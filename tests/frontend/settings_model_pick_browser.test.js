@@ -30,7 +30,7 @@ const { coralReady } = require('./helpers/wait');
             check(await put({ default_model_claude: '' }) === 200, 'nothing saved to start with');
             await open();
             let s = await state('claude');
-            check(s && s.shown && s.first === "The CLI's own default" && s.last === 'Other…' && s.n >= 3 && s.value === '' && !s.inputShown, `a dropdown, own default chosen, the box hidden: ${JSON.stringify(s)}`);
+            check(s && s.shown && s.first === 'Default' && s.last === 'Other…' && s.n >= 3 && s.value === '' && !s.inputShown, `a dropdown, own default chosen, the box hidden: ${JSON.stringify(s)}`);
             if (mobile) check(s && s.h >= 44, `44 px high on a phone: ${s && s.h}`);
             await ev(`document.getElementById('settings-model-pick-claude').scrollIntoView({ block: 'center' }); true`); await shot(`settings-default-models-${w}`);
             // a model from the list sets the value the form saves
@@ -54,7 +54,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.hideSettingsModal(); true`); await open();
             s = await state('claude');
             check(s.value === model && !s.inputShown, `a saved listed model opens on it: ${JSON.stringify(s)}`);
-            for (const p of ['codex', 'agy', 'pi']) { const t = await state(p); check(t && t.shown && t.first === "The CLI's own default" && t.last === 'Other…', `${p} has its dropdown: ${JSON.stringify(t)}`); }
+            for (const p of ['codex', 'agy', 'pi']) { const t = await state(p); check(t && t.shown && t.first === 'Default' && t.last === 'Other…', `${p} has its dropdown: ${JSON.stringify(t)}`); }
             await put({ default_model_claude: '' });
         }
     } finally { await guard.restore().catch(e => console.error('settings restore: ' + (e && e.message))); await client.close(); }

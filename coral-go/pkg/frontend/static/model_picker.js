@@ -4,10 +4,10 @@
  * (.acf-model) remains the form's value: the picker writes it and reads it, so everything that reads the form is unchanged. */
 import { serverFetch } from './server_base.js';
 import { showToast, escapeAttr, escapeHtml } from './utils.js';
-import { readModelsCache, writeModelsCache, clearModelsCache, modelName } from './model_labels.js';
+import { readModelsCache, writeModelsCache, clearModelsCache, modelName, defaultModelName } from './model_labels.js';
 import { familyOf, addCustomModel, addModelForm, probeCanAdd, peekCanAdd } from './custom_model_add.js';
 import { importOnce } from './import_once.js';
-const { _acfServer } = await importOnce('./launch_models.js');
+const { _acfServer, _settingsFor } = await importOnce('./launch_models.js');
 
 const OTHER = '__other';
 const ADD = '__add';
@@ -98,7 +98,7 @@ function fill(container, agentType, data) {
     container._modelList = models;
     if (!models.length) { wrap.hidden = true; input.hidden = false; return; }   // no list: the text box, as before
     container._defaultNamed = !!named;
-    select.innerHTML = `<option value="">${named ? escapeHtml(named.display_name) : 'Default'}</option>`
+    select.innerHTML = `<option value="">${escapeHtml(defaultModelName(agentType, (_settingsFor(_acfServer(container)) || {})['default_model_' + agentType], _acfServer(container)))}</option>` // one name, the CLI's own "Default (recommended)" included (#16668)
         + modelOptions(named ? models.filter(m => m !== named) : models, data && data.groups)
         + `<option value="${escapeAttr(OTHER)}">Other…</option>`
         + (familyOf(agentType) && peekCanAdd(_acfServer(container)) !== false ? `<option value="${escapeAttr(ADD)}">Add a model…</option>` : '');
