@@ -61,12 +61,13 @@ func runCloud(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	fs := flag.NewFlagSet("cloud "+cmd, flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	var ticket, proof *string
+	var ticket, proof, devKey *string
 	force := new(bool)
 	if cmd == "connect" {
 		force = fs.Bool("force", false, "connect again even if this server is already enrolled: its enrollment here is forgotten first (the old entry stays in Coral Hub until you revoke it there)")
 		ticket = fs.String("ticket-file", "", "a one-time Coral Hub credential file (owned by you, mode 0600; removed once the Hub has answered), or - for stdin")
 		proof = fs.String("proof-file", "", "optional proof file from a provider helper (bootstrap credentials only)")
+		devKey = fs.String("device-key-file", "", "optional file with this computer's device PUBLIC key (one line, P-256; owned by you, mode 0600; removed after reading; bootstrap credentials only)")
 	}
 	base := fs.String("url", hooks.CoralBase(), "the running Coral server, on this computer")
 	home := fs.String("home", "", "Coral's data folder, if the server was started with --home (default: CORAL_DATA_DIR or ~/.coral)")
@@ -91,10 +92,10 @@ func runCloud(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return c.disconnect(ctx, stdout)
 	}
 	if *ticket != "" {
-		return c.redeemTicket(ctx, *ticket, *proof, stdin, stdout)
+		return c.redeemTicket(ctx, *ticket, *proof, *devKey, stdin, stdout)
 	}
-	if *proof != "" {
-		fmt.Fprintln(stderr, "coral cloud connect: --proof-file goes with --ticket-file")
+	if *proof != "" || *devKey != "" {
+		fmt.Fprintln(stderr, "coral cloud connect: --proof-file and --device-key-file go with --ticket-file")
 		return 2
 	}
 	tty := isTerminal(os.Stdin) && isTerminal(os.Stdout)
@@ -421,7 +422,7 @@ The most Coral Hub may do on this server:
 // file stays on disk until the Hub has answered: removed when it enrolled or
 // refused the credential, kept when the Hub could not be reached (exit 4: run
 // it again with the same file).
-func (c *cloudClient) redeemTicket(ctx context.Context, ticket, proof string, stdin io.Reader, stdout io.Writer) int {
+func (c *cloudClient) redeemTicket(ctx context.Context, ticket, proof, deviceKey string, stdin io.Reader, stdout io.Writer) int {
 	var out redeemReply
 	if code := c.call(ctx, http.MethodPost, "/api/cloud/redeem", map[string]any{"check": true}, nil, 10*time.Second, &out); code >= 0 {
 		return code
@@ -443,6 +444,14 @@ func (c *cloudClient) redeemTicket(ctx context.Context, ticket, proof string, st
 			return 2
 		}
 		body["proof"] = json.RawMessage(p)
+	}
+	if deviceKey != "" { // the public key only; the file is removed after reading, valid or not (#16726)
+		pk, err := cloud.ReadDeviceKeyFile(deviceKey)
+		if err != nil {
+			fmt.Fprintln(c.stderr, "coral cloud connect: device key file:", err)
+			return 2
+		}
+		body["device_pk"] = pk
 	}
 	var raw []byte
 	var held *cloud.HeldCredential

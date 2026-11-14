@@ -153,6 +153,8 @@ type Manager struct {
 	o  Options
 	hc *http.Client
 
+	devicePK atomic.Pointer[string] // the device public key this Coral redeemed with (#16726); memory only, public
+
 	mu       sync.Mutex
 	redeemMu sync.Mutex // one redeem at a time
 	root     context.Context
@@ -273,6 +275,15 @@ func (m *Manager) Run(ctx context.Context) {
 func (m *Manager) Bootstrap(ctx context.Context, settings *store.SessionStore, hostname string, src CredentialSource) BootstrapResult {
 	m.redeemMu.Lock()
 	defer m.redeemMu.Unlock()
+	res := m.bootstrapOnce(ctx, settings, hostname, src)
+	if res.Status == BootstrapEnrolled && src.DevicePK != "" {
+		pk := src.DevicePK
+		m.devicePK.Store(&pk)
+	}
+	return res
+}
+
+func (m *Manager) bootstrapOnce(ctx context.Context, settings *store.SessionStore, hostname string, src CredentialSource) BootstrapResult {
 	return Bootstrap(ctx, BootstrapOptions{HubURL: m.o.HubURL, Store: m.o.Store, Settings: settings, HTTPClient: m.hc, Hostname: hostname, Logger: m.o.Logger, RecordTerms: m.o.RecordTerms}, src)
 }
 
@@ -280,6 +291,13 @@ func (m *Manager) Bootstrap(ctx context.Context, settings *store.SessionStore, h
 func (m *Manager) PreCheck(ctx context.Context) BootstrapResult {
 	return PreCheck(ctx, m.o.HubURL, m.o.Store)
 }
+
+// deviceKeyStepsBuilt is whether Coral does its part of the device key beyond handing the public key over (step 2: its own key, the signing, the check of the Hub's pairing). While it is false the
+// handshake never offers device_key/1, whatever was redeemed: the Hub's ruling is that the capability is said only when the key exists and steps 1 and 2 are built (#16726).
+const deviceKeyStepsBuilt = false
+
+// offersDeviceKey is tunnel.ClientOptions.DeviceKey.
+func (m *Manager) offersDeviceKey() bool { return deviceKeyStepsBuilt && m.devicePK.Load() != nil }
 
 // Redeem enrolls the running server with a credential handed over by
 // `coral cloud connect --ticket-file` (the server stays the only writer of the
@@ -638,6 +656,7 @@ func (m *Manager) runTunnel(ctx context.Context, gen int) {
 		CoralVersion:  m.o.CoralVersion,
 		LocalMode:     m.currentMode,
 		OwnerKind:     m.ownerKind,
+		DeviceKey:     m.offersDeviceKey,
 		AllowInsecure: config.AllowInsecureCloud,
 		HTTPClient:    m.hc,
 		Backoff:       m.o.Backoff,

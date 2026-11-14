@@ -137,7 +137,7 @@ var ErrHubRequest = errors.New("the Coral Hub rejected the request as malformed 
 // configured origin; the identity is refused unless the Hub names exactly that
 // origin, mode view, and accepted exactly this binary's terms version.
 // redeemID is the attempt series' id (bootstrap credentials).
-func Redeem(ctx context.Context, hc *http.Client, hubURL, credential string, proof []byte, hostname, redeemID string) (*Redeemed, error) {
+func Redeem(ctx context.Context, hc *http.Client, hubURL, credential string, proof []byte, hostname, redeemID, devicePK string) (*Redeemed, error) {
 	body := map[string]any{"eula_version": terms.EULAVersion}
 	if h := cleanInfo(hostname, 64); h != "" {
 		body["hostname"] = h
@@ -146,11 +146,16 @@ func Redeem(ctx context.Context, hc *http.Client, hubURL, credential string, pro
 	if strings.HasPrefix(credential, "chb_") {
 		path = bootstrapEnrollPath
 		body["redeem_id"] = redeemID
+		if devicePK != "" {
+			body["device_pk"] = devicePK // the owner's device PUBLIC key (#16726): only here, never in a ticket exchange, never from a Hub answer
+		}
 		if len(proof) > 0 {
 			body["proof"] = json.RawMessage(proof) // unchanged, never logged
 		}
 	} else if len(proof) > 0 {
 		return nil, errors.New("a proof file goes only with a bootstrap credential (chb_)")
+	} else if devicePK != "" {
+		return nil, errors.New("a device key goes only with a bootstrap credential (chb_)")
 	}
 	b, err := json.Marshal(body)
 	if err != nil {

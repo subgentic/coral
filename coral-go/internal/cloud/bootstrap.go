@@ -119,6 +119,9 @@ type CredentialSource struct {
 	Value     []byte // already read and removed by the caller (the CLI's file or stdin)
 	ProofFile string
 	Proof     []byte // already read and validated by the caller
+	// DeviceKeyFile names the owner's device public key file (#16726), read once and removed (valid or not); DevicePK is the key already read and checked by the caller (the command line). Both are the PUBLIC key.
+	DeviceKeyFile string
+	DevicePK      string
 }
 
 func (s CredentialSource) offered() bool { return s.WellKnown || s.File != "" || s.Value != nil }
@@ -203,6 +206,18 @@ func bootstrap(ctx context.Context, o BootstrapOptions, src CredentialSource) Bo
 		}
 	}
 
+	devicePK := src.DevicePK
+	if src.DeviceKeyFile != "" {
+		if devicePK, err = ReadDeviceKeyFile(src.DeviceKeyFile); err != nil {
+			return BootstrapResult{Status: BootstrapUnsafeFile, Detail: "device key file: " + err.Error(), NotTmpfs: notTmpfs}
+		}
+	}
+	if devicePK != "" {
+		if devicePK, err = ParseDeviceKey([]byte(devicePK)); err != nil {
+			return BootstrapResult{Status: BootstrapUnsafeFile, Detail: "device key: " + err.Error(), NotTmpfs: notTmpfs}
+		}
+	}
+
 	// 3. Redeem, retrying only what may succeed later, with ONE redeem id for the
 	// whole series: after a lost response the Hub recognises the retry and
 	// returns the same identity (design 5.7).
@@ -210,7 +225,7 @@ func bootstrap(ctx context.Context, o BootstrapOptions, src CredentialSource) Bo
 	var r *Redeemed
 	reached := false // an earlier attempt may have reached the Hub (its answer was lost)
 	for attempt := 1; ; attempt++ {
-		r, err = Redeem(ctx, o.HTTPClient, o.HubURL, cred, proof, o.Hostname, redeemID)
+		r, err = Redeem(ctx, o.HTTPClient, o.HubURL, cred, proof, o.Hostname, redeemID, devicePK)
 		var later *RetryAfterError
 		if !errors.As(err, &later) || attempt >= o.Attempts {
 			break
