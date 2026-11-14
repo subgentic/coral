@@ -5,6 +5,7 @@
  * Its own policy (header and meta) blocks every request; the file's HTML is posted into it ONCE, after Coral has hashed the bytes it fetched and found them equal to the
  * digest that was trusted. Any other answer (a failed read of the trust, a different hash, a file over 2 MiB, no way to hash) leaves scripts OFF, with the plain preview. */
 import { serverFetch } from './server_base.js';
+import { isPhoneLayout } from './phone_layout.js';
 
 export const MAX_SCRIPT_HTML_BYTES = 2 * 1024 * 1024;
 const HOST_URL = '/static/artifact_host.html';
@@ -156,8 +157,16 @@ export function drawOffer(wrapper, { hex, server, onTrusted, fetchFn = serverFet
         row.append(box);
         go.focus();
     });
+    // The offer is a button on the notice's own line, not a row of its own: a row above the frame took 60 px of an HTML file's preview (artifact_viewer_slim_footer: the frame fell under 75% of the dialog, #14916).
+    // When the notice is hidden the button moves to its own slim row so it stays reachable (#16735). A phone keeps the row: its notice is folded behind the header's Sandboxed chip.
     const notice = wrapper.querySelector('.artifact-linked-notice');
-    row.append(ask);
-    if (notice) notice.after(row); else wrapper.prepend(row);
+    if (notice && !isPhoneLayout()) {
+        if (notice.hidden) { row.append(ask); notice.after(row); }
+        else {
+            notice.append(ask);
+            const mo = new MutationObserver(() => { if (notice.hidden && ask.parentNode === notice) { row.append(ask); if (!row.isConnected) notice.after(row); } });
+            mo.observe(notice, { attributes: true, attributeFilter: ['hidden'] });
+        }
+    } else if (notice) { row.append(ask); notice.after(row); } else { row.append(ask); wrapper.prepend(row); }
     return row;
 }

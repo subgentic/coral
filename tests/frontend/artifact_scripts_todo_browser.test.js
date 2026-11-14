@@ -95,10 +95,7 @@ const HEX = crypto.createHash('sha256').update(TODO_HTML).digest('hex');
             await sleep(50);
         }
         assert.equal(await childFrame(`document.body.getAttribute('data-ready')`), 'true', 'the todo page loaded and ran its script');
-        // the frame's localStorage works (the shim)
-        const storageWorks = await childFrame(`(() => { try { localStorage.setItem('test', 'hello'); return localStorage.getItem('test'); } catch(e) { return 'ERROR: ' + e.message; } })()`);
-        assert.equal(storageWorks, 'hello', 'localStorage works inside the sandboxed frame via the shim');
-        // add an item through the todo page's UI
+        // add an item through the todo page's UI (the page's own script uses localStorage via the shim; the probe reads the DOM, not window.localStorage, because createIsolatedWorld has its own window)
         await childFrame(`(() => { document.getElementById('inp').value = 'Buy milk'; document.getElementById('add').click(); return true; })()`);
         await sleep(100);
         const items = await childFrame(`document.querySelectorAll('#list li').length`);
