@@ -350,8 +350,12 @@ export function _fillTerminalAndBrowserPrefs(s) {
             desktopCheck.dataset.bound = "1";
             desktopCheck.addEventListener("change", async () => {
                 if (desktopCheck.checked) {
-                    desktopCheck.checked = await enableDesktopNotify();
-                    say(desktopCheck.checked ? "" : (blockedText() || "Alerts need your permission: choose Allow when the browser asks, then turn this on again."));
+                    desktopCheck.checked = false; // off while the browser asks: the person must not see ON before permission is granted (#16839)
+                    paintAlertKinds();
+                    say("Waiting for your browser’s permission…");
+                    const granted = await enableDesktopNotify();
+                    desktopCheck.checked = granted;
+                    say(granted ? "" : (blockedText() || "Alerts need your permission: choose Allow when the browser asks, then turn this on again."));
                 } else {
                     disableDesktopNotify();
                     say("");
