@@ -312,8 +312,8 @@ export function chatsSpec(key, ctx) {
     SA.ensureStarredArtifacts(() => { ctx.redraw?.(); ctx.nav?.(); }); // the page and the folder's number beside it
     const chatsNode = spec.node;
     const alone = !spec.rows.length && (SA.hasStarredArtifacts() || SA.starredFileCount() > 0); // starred artifacts and no starred chat: the page is the artifacts, not the chats' empty line
-    const arts = SA.starredArtifactCount(); // the header counts what the page lists: the chats read (or the counts, when more) and the starred artifacts (#10485)
-    return { ...spec, count: spec.count == null || arts == null ? null : spec.count + arts, signature: spec.signature + SA.starredArtifactsSignature() + SA.starredFilesSignature(), ...(alone ? { empty: undefined } : {}),
+    const arts = SA.starredArtifactCount(); // the header counts what the page lists: the chats read (or the counts, when more), the starred artifacts (#10485) and the files starred in an agent's Files panel (#17329)
+    return { ...spec, count: spec.count == null || arts == null ? null : spec.count + arts + SA.starredFileCount(), signature: spec.signature + SA.starredArtifactsSignature() + SA.starredFilesSignature(), ...(alone ? { empty: undefined } : {}),
         node: () => {
             const wrap = DT.el('div', 'inbox-starred-folder');
             if (spec.rows.length || !(SA.hasStarredArtifacts() || SA.starredFileCount() > 0)) wrap.append(chatsNode()); // with no starred chat, the artifacts stand alone; with nothing at all, the chat table says "Nothing starred yet"
