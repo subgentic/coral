@@ -50,6 +50,7 @@ const base=require('./test_base').BASE;
  assert.match(await ev(`document.getElementById('tmux-check-message').textContent`),/Agents cannot start/);
  assert.match(await ev(`document.getElementById('tmux-banner-pty').textContent`),/switch to PTY in Settings/,'the banner offers the pty alternative');
  assert.equal(await ev(`document.getElementById('tmux-banner-pty').hidden`),false,'the pty offer is visible');
+ assert.equal(await ev(`(() => { let called = null; const orig = window.showSettingsModal; window.showSettingsModal = g => { called = g; }; document.querySelector('#tmux-banner-pty .btn-link').click(); window.showSettingsModal = orig; return called; })()`), 'terminal', 'the banner Settings link opens the terminal group');
  await ev(`window.statusData.tmux_available=true`);await click('#tmux-check-again');assert.equal(await ev(`document.getElementById('tmux-missing-banner').style.display`),'none');
  await ev(`window.statusData={startup_complete:true,tmux_available:false,tmux_required:false,effective_backend:'pty'};window.checks.checkTmux(true)`);await settle();assert.equal(await ev(`document.getElementById('tmux-missing-banner').style.display`),'none','PTY is not blocked by missing tmux');
  await ev(`window.statusMode='http';window.checks.checkTmux(true)`);await settle();assert.match(await ev(`document.getElementById('tmux-check-message').textContent`),/HTTP 502/);
