@@ -29,7 +29,7 @@ const { coralReady, nextFrame } = require('./helpers/wait');
         // scrolled to the very top and the very bottom of the question it stays in view
         for (const to of [0, 100000]) { await ev(`document.querySelector('dialog.inbox-ask-dialog[open]').scrollTop = ${to}; true`); await nextFrame(ev); m = await probe(); assert.ok(m.inView && m.hit, `Send reply stays in view at scrollTop ${to}: ` + JSON.stringify(m)); }
         // and it is the first action: it comes before Close and Dismiss
-        const order = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog[open]'), n = [...d.querySelectorAll('button')]; const at = t => n.findIndex(b => b.textContent.trim() === t); return { send: n.findIndex(b => b.classList.contains('inbox-ask-send')), close: at('Close'), dismiss: at('Dismiss') }; })()`);
+        const order = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog[open]'), n = [...d.querySelectorAll('button')]; const at = t => n.findIndex(b => b.textContent.trim() === t); return { send: n.findIndex(b => b.classList.contains('inbox-ask-send')), close: at('Close'), dismiss: at('Dismiss, no reply') }; })()`);
         assert.ok(order.send >= 0 && order.send < order.close && order.send < order.dismiss, 'Send reply comes before Close and Dismiss: ' + JSON.stringify(order));
         await ev(`document.querySelector('dialog.inbox-ask-dialog[open] .inbox-ask-send').click(); true`);
         await waitFor(`window.__replies.length > 0`, 'a tap on Send reply sends the reply');
