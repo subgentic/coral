@@ -139,7 +139,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(post.path, '/api/board/crew-1/messages'); delete post.path;
         assert.deepEqual(post, { subscriber_id: 'Operator', as: 'Operator', content: '@' + leadName + ' Build the login page.' }, 'to the Orchestrator, else the first member');
         await waitFor(`T.state.selectedTeam === 'crew-1'`, 'the launched team is opened');
-        assert.equal(await ev(`document.activeElement?.id`), 'team-page-title', 'a sent launch focuses the heading, not the hidden Board input (#16732)');
+        await waitFor(`document.activeElement?.id === 'team-page-title'`, 'a sent launch focuses the heading, not the hidden Board input (#16732)');
         assert.equal(await ev(`document.getElementById('team-goal').value`), 'Build the login page.', 'the field keeps what was typed until the dialog is opened again');
         // The first task that could not be sent (the board answers 500) is not lost: it waits in the board's message box, with a toast, to send again.
         await openTeam();
