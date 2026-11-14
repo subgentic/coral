@@ -260,4 +260,10 @@ func TestReadStatePendingThenDoneForGitAndNonGitFolders(t *testing.T) {
 	st, ng = c.ReadState(nonGit)
 	assert.Equal(t, "done", st, "the non-git folder is done")
 	assert.True(t, ng, "it is not a git repository")
+
+	// A non-git folder removed from the team is pruned from the cache.
+	c.Observe(context.Background(), []string{feature})
+	st, ng = c.ReadState(nonGit)
+	assert.Equal(t, "pending", st, "after the folder leaves the team: pending again (pruned)")
+	assert.False(t, ng)
 }

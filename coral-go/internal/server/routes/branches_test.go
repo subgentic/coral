@@ -231,4 +231,17 @@ func TestTeamBranchesPendingAndNotGit(t *testing.T) {
 	body = get("team-a")
 	assert.Equal(t, "pending", body["read_state"], "one agent pending keeps it pending")
 	assert.Equal(t, false, body["not_git"], "not done yet: not_git is false")
+
+	// One agent found, the other pending: repos are returned alongside read_state "pending".
+	r.src.notFound = map[string]bool{"/work/feature": true}
+	r.src.states = map[string]string{"/work/feature": "pending"}
+	r.src.notGit = nil
+	r.src.dirs = map[string]int{"/work/repo": 0}
+	body = get("team-a")
+	assert.Equal(t, "pending", body["read_state"], "one pending member: pending")
+	assert.Equal(t, false, body["not_git"])
+	repos := body["repos"].([]any)
+	require.Len(t, repos, 1, "the found repo is returned alongside pending")
+	raw, _ := json.Marshal(repos[0])
+	assert.Contains(t, string(raw), `"name":"dev-a"`, "the found agent is on its worktree")
 }
