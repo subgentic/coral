@@ -167,8 +167,11 @@ func TestPinCreateTaskGoalRules(t *testing.T) {
 	_, err = s.CreateTaskWithOpts(ctx, "team", "x", "", "medium", "Lead", &CreateTaskOpts{GoalID: &otherBoard.ID})
 	require.ErrorIs(t, err, ErrGoalNotFound, "a goal of another board")
 	_, err = s.CreateTaskWithOpts(ctx, "team", "x", "", "medium", "Lead", &CreateTaskOpts{GoalID: &closed.ID})
-	require.ErrorIs(t, err, ErrGoalClosed)
-	assert.Equal(t, before, taskCount(t, s), "a refused goal stores nothing")
+	require.NoError(t, err, "adding a task reopens a closed goal")
+	got, err := s.GetGoal(ctx, "team", closed.ID)
+	require.NoError(t, err)
+	assert.Equal(t, GoalActive, got.State)
+	assert.Equal(t, before+1, taskCount(t, s), "only the foreign goal was refused")
 
 	linked, err := s.CreateTaskWithOpts(ctx, "team", "linked", "", "medium", "Lead", &CreateTaskOpts{GoalID: &open.ID})
 	require.NoError(t, err)
