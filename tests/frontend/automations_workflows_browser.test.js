@@ -64,7 +64,7 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             await ev(`window.openAutomationsFolder('workflows'); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 3`, at + 'the three workflows in the folder', 10000);
             assert.equal(await pathname(), '/automations/workflows', at + "the address is the folder's");
-            const folderWords = mobile ? `[...document.querySelectorAll('#group-table-view .view-list-select option')].map(o => o.textContent.trim())` : `[...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`;
+            const folderWords = mobile ? `[...document.querySelectorAll('#group-table-view .view-list-select option')].map(o => o.textContent.trim())` : `[...document.querySelectorAll('.view-list-item')].map(b => ((() => { const c = b.cloneNode(true); c.querySelectorAll('.view-list-icon').forEach(i => i.remove()); return c.textContent; })()).trim().replace(/\\s+/g, ' '))`;
             assert.deepEqual(await ev(folderWords), mobile ? ['Running now (0)', 'Failed (1)', 'Recent runs (0)', 'Jobs (0)', 'Workflows (3)', 'Queue (experimental) (0)'] : ['Running now0', 'Failed1', 'Recent runs0', 'Jobs0', 'Workflows3', 'Queue (experimental)0'], at + 'the folder list has Workflows with its count');
             assert.deepEqual(await names(), ['lint-and-fix', 'nightly-build', 'old-deploy'], at + 'by name (a workflow has no next run)');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view table th')].map(h => h.querySelector('.dt-sort > span, .dt-head-text').textContent)`), ['Workflow', 'Steps', 'Last run', 'Used by'], at + 'the columns');

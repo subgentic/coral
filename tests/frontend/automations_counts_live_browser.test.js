@@ -24,7 +24,7 @@ const STUB = `(() => {
 
 (async () => {
     const { Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const folders = () => ev(`[...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`);
+    const folders = () => ev(`[...document.querySelectorAll('.view-list-item')].map(b => ((() => { const c = b.cloneNode(true); c.querySelectorAll('.view-list-icon').forEach(i => i.remove()); return c.textContent; })()).trim().replace(/\\s+/g, ' '))`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 820, deviceScaleFactor: 1, mobile: false });
@@ -33,11 +33,11 @@ const STUB = `(() => {
         // a run is going (the live tick), and the runs were read a moment ago (so the 30 s throttle would hold the next read)
         const run = { id: 77, job_id: 1, job_name: 'nightly-build-job', status: 'running', scheduled_at: new Date().toISOString(), started_at: new Date().toISOString(), trigger_type: 'cron', session_id: 'sess-77' };
         await ev(`import(${S} + 'live_jobs.js').then(m => { m.renderLiveJobs([${JSON.stringify(run)}]); return true; })`);
-        await waitFor(`/Running now ?1/.test([...document.querySelectorAll('.view-list-item')].map(b => b.textContent.replace(/\\s+/g, ' ')).join('|'))`, 'Running now 1', 5000);
+        await waitFor(`/Running now ?1/.test([...document.querySelectorAll('.view-list-item')].map(b => ((() => { const c = b.cloneNode(true); c.querySelectorAll('.view-list-icon').forEach(i => i.remove()); return c.textContent; })()).replace(/\\s+/g, ' ')).join('|'))`, 'Running now 1', 5000);
         assert.ok((await folders()).some(f => /^Recent runs ?0?$/.test(f)), `Recent runs has nothing yet: ${JSON.stringify(await folders())}`);
         // the run ends: the server has it finished and unread; the tick says nothing is running
         await ev(`window.__runs = [{ id: 77, job_id: 1, job_name: 'nightly-build-job', status: 'completed', scheduled_at: new Date().toISOString(), started_at: new Date().toISOString(), finished_at: new Date().toISOString(), trigger_type: 'cron' }]; import(${S} + 'live_jobs.js').then(m => { m.renderLiveJobs([]); return true; })`);
-        await waitFor(`/Recent runs ?1\\b/.test([...document.querySelectorAll('.view-list-item')].map(b => b.textContent.replace(/\\s+/g, ' ')).join('|'))`, 'Recent runs 1 within 2 s, not at the next 30 s read', 2500);
+        await waitFor(`/Recent runs ?1\\b/.test([...document.querySelectorAll('.view-list-item')].map(b => ((() => { const c = b.cloneNode(true); c.querySelectorAll('.view-list-icon').forEach(i => i.remove()); return c.textContent; })()).replace(/\\s+/g, ' ')).join('|'))`, 'Recent runs 1 within 2 s, not at the next 30 s read', 2500);
         const after = await folders();
         assert.ok(!after.some(f => /^Running now\s*[1-9]/.test(f)), `Running now is down: ${JSON.stringify(after)}`);
         console.log('PASS Automations counts follow a run');
