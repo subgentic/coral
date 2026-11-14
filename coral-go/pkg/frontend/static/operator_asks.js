@@ -32,6 +32,8 @@ export function plainMarkdown(text) {
 /** A row only previews: the text is cut to this many characters BEFORE the Markdown marks are dropped (that pass is quadratic on adversarial text: 20 KB took 250 ms a row, #12152), and the marks are written after. */
 const PREVIEW_IN = 500;
 const previewText = a => markHidden(String((a && a.text) == null ? '' : a.text).slice(0, PREVIEW_IN), { strict: true });
+/** White space collapsed WITHIN a line, the lines themselves kept (empty ones dropped): a numbered ask ("1. ... 2. ...", one step to a line) is read one step to a line in its row (#16659); the row's CSS is white-space: pre-line. */
+const byLines = text => String(text).split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
 /** A question as one line of a row: hidden characters written out, Markdown marks dropped, white space collapsed, cut after marking so a mark is never split. */
 export function askLine(a) {
     const one = plainMarkdown(previewText(a)).replace(/\s+/g, ' ').trim();
@@ -39,7 +41,7 @@ export function askLine(a) {
 }
 /** A question as a row says it (#14574, Beta run 3): all of the preview (the first PREVIEW_IN characters, Markdown marks dropped, white space collapsed) so the row wraps it and an inbox-only person reads it where it stands; a question longer than the preview ends in an ellipsis, and Answer opens it whole. */
 export function askFull(a) {
-    const one = plainMarkdown(previewText(a)).replace(/\s+/g, ' ').trim();
+    const one = byLines(plainMarkdown(previewText(a)));
     return String((a && a.text) == null ? '' : a.text).length > PREVIEW_IN ? `${one.trimEnd()}\u2026` : one;
 }
 /** The whole question, hidden characters written out, line breaks kept. */
@@ -48,7 +50,7 @@ export const askWhole = a => markHidden(a && a.text, { strict: true });
 export const askIsLong = a => String((a && a.text) == null ? '' : a.text).length > PREVIEW_IN;
 /** The question as an opened row says it (#14617): ALL the words the Operator's list carries (up to 4096 characters), white space collapsed as the preview's is; a question the server itself cut says so after it. */
 export function askOpened(a) {
-    const one = plainMarkdown(askWhole(a)).replace(/\s+/g, ' ').trim();
+    const one = byLines(plainMarkdown(askWhole(a)));
     return a && a.cut ? `${one} \u2026 (cut: the board has the rest)` : one;
 }
 /** A stable id of one question among the rows. */
