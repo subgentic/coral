@@ -142,6 +142,8 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 } /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
 
 .send-menu-item { white-space: nowrap; }
+.send-menu-text { display: flex; flex-direction: column; }
+.send-menu-note { font-size: var(--fs-sm); color: var(--text-muted); } /* what the item does, in words (walk 51, #17152) */
 
 .send-menu-hint {
     margin-left: auto;
