@@ -28,7 +28,7 @@ const (
 )
 
 // needsYouKinds are the kinds an item can be (the keys of the answer's counts), the values ?kind= takes.
-var needsYouKinds = map[string]bool{"agent": true, "question": true, "wait": true, "proposal": true, "review": true, "goal_done": true, "skill": true}
+var needsYouKinds = map[string]bool{"agent": true, "question": true, "wait": true, "proposal": true, "review": true, "goal_done": true, "goal_closed": true, "skill": true}
 
 // needsYouNotIncluded names what the Inbox counts that this read cannot see. A consumer must treat a word it does not know as informational (a later release may name more), never as an error: it means "this read does not cover that", not that the answer is invalid. A read that fails (refused, 404) is a different thing from an empty answer and must be shown as an incomplete list.
 var needsYouNotIncluded = []string{"failed_runs", "welcome", "unrecorded_agents"}
@@ -174,7 +174,7 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 	// ?kind=<kind> (#13834): only that kind's items are listed (count and counts stay the whole answer's, true), so a Hub's shell can read the skill rows without paging past newer questions. One of the kinds in counts; anything else is 400.
 	kind := r.URL.Query().Get("kind")
 	if kind != "" && !needsYouKinds[kind] {
-		errBadRequest(w, "kind is one of agent, question, wait, proposal, review, goal_done, skill")
+		errBadRequest(w, "kind is one of agent, question, wait, proposal, review, goal_done, goal_closed, skill")
 		return
 	}
 	items, unread, muted, err := h.needsYouItems(r)
@@ -182,7 +182,7 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "could not read the boards")
 		return
 	}
-	ans := needsYouAnswer{Count: len(items), Counts: map[string]int{"agent": 0, "question": 0, "wait": 0, "proposal": 0, "review": 0, "goal_done": 0, "skill": 0}, Items: []NeedsYouItem{}, NotIncluded: needsYouNotIncluded, Unread: unread}
+	ans := needsYouAnswer{Count: len(items), Counts: map[string]int{"agent": 0, "question": 0, "wait": 0, "proposal": 0, "review": 0, "goal_done": 0, "goal_closed": 0, "skill": 0}, Items: []NeedsYouItem{}, NotIncluded: needsYouNotIncluded, Unread: unread}
 	if len(muted) > 0 {
 		ans.Muted = muted
 	}
@@ -467,11 +467,17 @@ func (h *BoardHandler) needsYouItems(r *http.Request) (items []NeedsYouItem, unr
 	if h.commentNews != nil {
 		goalNews, _ = h.commentNews(ctx)
 	}
+	dismissedClosed := h.goalClosedDismissedSet(ctx)
 	for _, p := range projects {
 		if gi, err := h.goalDoneItems(ctx, p.Project, hiddenGoals, readGoals, goalNews); err != nil {
 			unread = appendOnce(unread, "goals")
 		} else {
 			items = append(items, gi...)
+		}
+		if gc, err := h.goalClosedItems(ctx, p.Project, dismissedClosed); err != nil {
+			unread = appendOnce(unread, "goals")
+		} else {
+			items = append(items, gc...)
 		}
 	}
 

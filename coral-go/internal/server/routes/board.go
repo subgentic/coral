@@ -90,6 +90,8 @@ type BoardHandler struct {
 	goalDoneRead func(ctx context.Context) []string
 	// goalDoneEdit edits one of the two saved lists atomically (#13834): the key, the cap and the edit.
 	goalDoneEdit func(ctx context.Context, key string, max int, edit func([]string) []string) ([]string, error)
+	// goalClosedDismissed reads the goals-closed-by-agent the Operator dismissed from Needs you (goal_closed_dismissed, #16781); nil: none.
+	goalClosedDismissed func(ctx context.Context) []string
 	// commentNews says, per artifact id, how many replies agents left in the Operator's comment threads that the Operator has not opened (#12026); nil: none.
 	commentNews func(ctx context.Context) (map[string]int, error)
 	// listEdits limits how often one owner session edits a board's list (#5508).
