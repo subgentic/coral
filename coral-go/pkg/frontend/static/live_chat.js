@@ -116,6 +116,16 @@ document.addEventListener("click", async (e) => {
     flashCopied(btn);
 });
 
+// #16701: on a touch device, tap a reply bubble to reveal its copy button; tap elsewhere to hide it.
+if (matchMedia("(hover: none)").matches) {
+    document.addEventListener("click", (e) => {
+        const bubble = e.target.closest && e.target.closest(".chat-bubble.assistant");
+        for (const old of document.querySelectorAll(".chat-bubble.copy-revealed")) {
+            if (old !== bubble) old.classList.remove("copy-revealed");
+        }
+        if (bubble && !bubble.classList.contains("copy-revealed")) bubble.classList.add("copy-revealed");
+    });
+}
 
 // The intent: pointer over, touch or keyboard focus on the Terminal button (it exists in the page from the start).
 for (const type of ["pointerover", "touchstart", "focusin"]) {

@@ -1340,6 +1340,28 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
         opacity: 0.6;
     }
 }
+/* #16701: on a phone (narrow prose + no hover device) the below-bubble copy icon
+   overlaps the next row. Move it inside the bubble and hide until tap or focus. */
+@media (max-width: 767px) and (hover: none) {
+    .chat-prose.chat-messages .chat-bubble.assistant .chat-copy-btn {
+        top: 6px;
+        right: 6px;
+        margin-top: 0;
+        opacity: 0;
+        pointer-events: none;
+    }
+    .chat-prose.chat-messages .chat-bubble.assistant:hover .chat-copy-btn,
+    .chat-prose.chat-messages .chat-bubble.assistant.copy-revealed .chat-copy-btn,
+    .chat-prose.chat-messages .chat-bubble.assistant:focus-within .chat-copy-btn,
+    .chat-prose.chat-messages .chat-bubble.assistant .chat-copy-btn:focus-visible {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .chat-prose.chat-messages .chat-bubble.assistant .chat-copy-btn.copied {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
 
 /* Code blocks in chat: a wrapper holds the copy button in the corner so it
    stays put while the block scrolls sideways. The wrapper takes the block's
