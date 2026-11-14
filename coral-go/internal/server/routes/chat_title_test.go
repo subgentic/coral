@@ -23,6 +23,9 @@ func TestChatTitle(t *testing.T) {
 		{"emphasis that wraps words goes", "", "Make **this** work and *that* too, ~~not~~ now", "", "a", "Make this work and that too, not now"},
 		{"a list bullet and a quote go", "", "- first item", "", "a", "first item"},
 		{"only the launch prompt: the agent's name", "", launch, "Lead", "lead-1", "Lead"},
+		{"a goal hand-off typed by Coral is short words, not the sentence (#16632)", "", typedGoalDriverNudge(2), "Lead", "lead-1", "Drive goal #2"},
+		{"so is the new-goal nudge", "", typedNewGoalNudge(14), "Orchestrator", "orch", "New goal #14"},
+		{"a person's own words about a goal stay", "", "You now drive goal #2 because I said so", "Lead", "lead-1", "You now drive goal #2 because I said so"},
 		{"no display name: the agent name", "", "", "", "lead-1", "lead-1"},
 		{"a long message is cut to one line", "", strings.Repeat("word ", 60), "", "a", strings.TrimSpace(strings.Repeat("word ", 24)) + "…"},
 	}
