@@ -50,3 +50,17 @@ assert.equal(activityParts({action:'answer',item_kind:'question',title:'@Operato
 assert.equal(activityParts({action:'answer',item_kind:'question',title:'Ask @Operator about release',asker:'Lead'},words).on,'Ask @Operator about release');
 assert.deepEqual(activityParts({action:'file_tags',item_kind:'file',title:'plan.md'},words),{did:'Changed the tags',on:'plan.md',detail:''});
 assert.deepEqual(activityParts({action:'file_share',item_kind:'file',title:'plan.md'},words),{did:'Shared',on:'plan.md',detail:''});
+
+// #16088: an answer to an agent's question (a Claude multiple-choice question, a Codex dialog such as "Trust all and continue") reads as an answer to that agent's question and is filed under Answers; only a request to use a tool is a permission.
+{
+    const F = await import('../../coral-go/pkg/frontend/static/operator_activity_filters.js');
+    const claude = { action: 'prompt_answer', item_kind: 'agent', item_id: 'coral-hub', note: "On that group's own Coral" };
+    const codex = { action: 'prompt_answer', item_kind: 'agent', item_id: 'coral-go', note: 'Trust all and continue' };
+    for (const row of [claude, codex]) {
+        assert.equal(activityParts(row, r => r.item_id).did, 'Answered');
+        assert.equal(activityParts(row, r => r.item_id).on, `${row.item_id}’s question`);
+        assert.ok(F.inKind(row, 'answers'), 'filed under Answers');
+        assert.ok(!(F.inKind(row, 'permissions')), 'not under Permissions');
+    }
+    for (const action of ['prompt_allow', 'prompt_reject']) assert.ok(F.inKind({ action }, 'permissions'), action + ' stays under Permissions');
+}

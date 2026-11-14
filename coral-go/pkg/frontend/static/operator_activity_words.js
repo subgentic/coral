@@ -32,7 +32,7 @@ export function activityParts(row, itemWords) {
     }
     if (row.action === 'prompt_allow') return mk('Allowed', `${who}’s permission request`, note);
     if (row.action === 'prompt_reject') return mk('Refused', `${who}’s permission request`, note);
-    if (row.action === 'prompt_answer') return mk('Answered', `${who}’s permission prompt`, note);
+    if (row.action === 'prompt_answer') return mk('Answered', `${who}’s question`, note);
     if (TASK_DID[row.action]) return mk(TASK_DID[row.action], `task #${row.item_id}${row.title ? ` ${row.title}` : ''}`, note);
     if (row.action === 'file_tags' && row.title) return mk('Changed the tags', obj, note);
     if (row.action === 'file_share') return mk('Shared', obj, note);

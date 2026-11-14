@@ -28,8 +28,8 @@ export const KINDS = ['decisions', 'answers', 'permissions', 'files', 'words'];
 export const KIND_LABEL = { decisions: 'Decisions', answers: 'Answers', permissions: 'Permissions', files: 'Files and tasks', words: 'Words sent' };
 const KIND_TEST = {
     decisions: r => !!DECISION_LABEL[decisionOf(r)] || ['goal_close', 'task_complete', 'task_cancel', 'goal_review'].includes(r.action), // Answered, Allowed, Denied, Approved, Closed, Completed and the like
-    answers: r => r.action === 'answer' || r.action === 'proposal',
-    permissions: r => /^prompt_/.test(r.action || ''),
+    answers: r => r.action === 'answer' || r.action === 'proposal' || r.action === 'prompt_answer', // an agent's question answered (#16088)
+    permissions: r => r.action === 'prompt_allow' || r.action === 'prompt_reject', // a request to use a tool, allowed or refused: not a question's answer (#16088)
     files: r => ['file', 'task', 'goal'].includes(r.item_kind) && r.action !== 'chat_send',
     words: r => ['message', 'chat_send', 'task_reply'].includes(r.action),
 };
