@@ -54,8 +54,8 @@ func BenchmarkTaskListScale(b *testing.B) {
 	b.Run("totals_grouped", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if o, d, err := s.taskListTotals(ctx, "team"); err != nil || o != 1500 || d != 3500 {
-				b.Fatal(o, d, err)
+			if o, d, tot, err := s.taskListTotals(ctx, "team"); err != nil || o != 1500 || d != 3500 || tot != 5000 {
+				b.Fatal(o, d, tot, err)
 			}
 		}
 	})

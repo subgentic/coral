@@ -14,7 +14,7 @@ assert.equal(W.stateWord(null), '');
 assert.equal(W.taskStateWord('completed'), 'Done'); assert.equal(W.taskStateWord('skipped'), 'Done');
 assert.equal(W.taskStateWord('in_progress'), 'Active'); assert.equal(W.taskStateWord('review_pending'), 'Active');
 assert.equal(W.taskStateWord('blocked'), 'Blocked'); assert.equal(W.taskStateWord('parked'), 'Blocked');
-assert.equal(W.taskStateWord('pending'), 'Queued'); assert.equal(W.taskStateWord('draft'), 'Queued');
+assert.equal(W.taskStateWord('pending'), 'Queued'); assert.equal(W.taskStateWord('draft'), 'Draft');
 assert.equal(W.taskStateWord('some_new_state'), 'Some new state');
 assert.deepEqual(W.rollupShares({ done: 5, active: 2, blocked: 1, queued: 2 }), { done: 0.5, active: 0.2, blocked: 0.1 });
 assert.deepEqual(W.rollupShares({}), { done: 0, active: 0, blocked: 0 });

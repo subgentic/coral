@@ -30,7 +30,7 @@ const { loadSafeMarkdown } = await importOnce('./vendor_loader.js');
 
 const PAGE = 50;
 const REREAD_PAGES = 5; // a refresh reads at most this many loaded pages again: a person who scrolled a big board to its end does not make 30 requests every 10 s (#9121); the pages beyond are dropped, Load more fetches them again
-const FILTERS = [['open', 'Open'], ['all', 'All'], ['queued', 'Queued'], ['active', 'In progress'], ['blocked', 'Blocked'], ['review', 'In review'], ['needs_review', 'Needs review'], ['done', 'Done']];
+const FILTERS = [['open', 'Open'], ['all', 'All'], ['queued', 'Queued'], ['active', 'In progress'], ['blocked', 'Blocked'], ['review', 'In review'], ['needs_review', 'Needs review'], ['draft', 'Draft'], ['done', 'Done']];
 const PHONE = matchMedia('(max-width: 760px)'); // the team page's phone layout (team_page.css)
 /** The empty page says what to do next: the New task button, and the team's Orchestrator when it has one (it makes the tasks the person asks for; #10371). */
 function noTasksYet() {
@@ -42,10 +42,10 @@ const emptyQuery = () => ({ rows: [], phase: 0, cursor: '', total: null, doneTot
 // Hide completed (the old tab's toggle, same stored key): the Open chip, chosen until the person picks All; kept in this browser (#7453).
 const HIDE_KEY = 'coral-hide-completed';
 const startFilter = () => (browserLocal.get(HIDE_KEY) === 'false' ? 'all' : 'open');
-const model = { dt: DT.tableState(), choices: null, project: '', filters: { ...TF.EMPTY }, q: emptyQuery(), seq: 0, moreLoaded: false, extraPages: 0, rows: [], cursor: '', totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' };
+const model = { dt: DT.tableState(), choices: null, project: '', filters: { ...TF.EMPTY }, q: emptyQuery(), seq: 0, moreLoaded: false, extraPages: 0, rows: [], cursor: '', totalOpen: null, totalDone: null, total: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' };
 let root = null, hooks = {};
 const say = (t) => { const s = root && root.querySelector('.team-tasks-status'); if (s) { s.textContent = ''; s.textContent = t; } };
-const bucket = (t) => { const w = taskStatusWord(t.status, t.review_requested, isParked(t)); return { 'Queued': 'queued', 'Waiting': 'queued', 'In progress': 'active', 'Blocked': 'blocked', 'In review': 'review', 'Done': 'done' }[w] || 'queued'; };
+const bucket = (t) => { const w = taskStatusWord(t.status, t.review_requested, isParked(t)); return { 'Queued': 'queued', 'Waiting': 'queued', 'In progress': 'active', 'Blocked': 'blocked', 'In review': 'review', 'Draft': 'draft', 'Done': 'done' }[w] || 'queued'; };
 const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
 async function readJson(path) {
@@ -91,9 +91,10 @@ export async function loadTasks() {
         model.cursor = cursor;
         model.totalOpen = Number.isFinite(json.total_open) ? json.total_open : null;
         model.totalDone = Number.isFinite(json.total_completed) ? json.total_completed : null;
+        model.total = Number.isFinite(json.total) ? json.total : null;
         model.failed = '';
         await refreshGoalTitles(project).catch(() => {});
-        const shownOpen = TF.isQuery(model.filters) ? (model.totalOpen != null ? model.totalOpen : model.rows.filter(t => bucket(t) !== 'done').length) : counts().open; // the tab says what the list's Open says (#12248)
+        const shownOpen = counts().open; // the tab says what the list's Open pill says: pending + in progress + in review (#12248, #16686)
         state.teamTasksOpen = { team: String(project || ''), n: shownOpen }; // what the tab says too: the page's counts poll reads it (#12248)
         hooks.onCount?.(shownOpen);
     } catch (e) {
@@ -213,18 +214,17 @@ async function loadChoices() {
 }
 const rowsNow = () => (TF.isQuery(model.filters) ? model.q.rows : model.rows);
 
-// The Open view also keeps a task that finished today, so what an agent just did is not behind Show all (#10604): its result is the first thing a person looks for.
-const sameDay = iso => { const d = new Date(iso), n = new Date(); return !Number.isNaN(d.getTime()) && d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate(); };
-const doneToday = t => bucket(t) === 'done' && t.status === 'completed' && !!t.completed_at && sameDay(t.completed_at); // a task that was done, not one cancelled or skipped (also Done, status skipped): it has no result to look for, and the person who cancelled it expects it gone from Open
-
 const counts = () => {
-    const c = { open: 0, all: 0, queued: 0, active: 0, blocked: 0, review: 0, needs_review: 0, done: 0 };
+    const c = { open: 0, all: 0, queued: 0, active: 0, blocked: 0, review: 0, draft: 0, needs_review: 0, done: 0 };
     for (const t of rowsNow()) { c.all++; c[bucket(t)]++; if (needsReview(t)) c.needs_review++; }
     if (!TF.isQuery(model.filters)) {
-        if (model.totalOpen != null && model.totalDone != null) c.all = model.totalOpen + model.totalDone;
+        if (model.total != null) c.all = model.total;
         if (model.totalDone != null) c.done = model.totalDone;
+        if (model.totalOpen != null) c.open = model.totalOpen;
+        else c.open = c.queued + c.active + c.review;
+    } else {
+        c.open = c.queued + c.active + c.review;
     }
-    c.open = c.all - c.done + rowsNow().filter(doneToday).length; // Open and the tasks finished today
     return c;
 };
 
@@ -254,7 +254,8 @@ function draw() {
     if (model.loading) body.append(el('p', 'goals-note', 'Loading tasks…'));
     else if (!all.length) { if (!failed) { const e = el('div', 'empty-state empty-state-tight'); e.append(el('p', 'empty-state-line', query && TF.isFiltered(model.filters) ? 'No tasks match this search.' : noTasksYet())); body.append(e); } }
     else {
-        const shown = all.filter(t => (model.filter === 'all' || (model.filter === 'needs_review' ? needsReview(t) : model.filter === 'open' ? bucket(t) !== 'done' || doneToday(t) : bucket(t) === model.filter)));
+        const OPEN_BUCKETS = { queued: 1, active: 1, review: 1 };
+        const shown = all.filter(t => (model.filter === 'all' || (model.filter === 'needs_review' ? needsReview(t) : model.filter === 'open' ? !!OPEN_BUCKETS[bucket(t)] : bucket(t) === model.filter)));
         if (!shown.length) {
             const e = el('div', 'empty-state empty-state-tight'); e.append(el('p', 'empty-state-line', 'No tasks match this filter.'), btn('btn empty-state-action', 'Show all', () => { model.filter = 'all'; draw(); })); body.append(e);
         } else {
@@ -270,7 +271,8 @@ function draw() {
             row.querySelectorAll('.dt-select-toggle').forEach(b => b.remove());
             if (phone) { const bleed = el('div', 'goals-bleed'); bleed.append(t.el); body.append(bleed); } else body.append(t.el); // a phone: no Select button, a long press selects; the rows run to the screen's edges
         }
-        const openLeft = !query && !!model.cursor && model.totalOpen != null && model.rows.filter(t => bucket(t) !== 'done').length < model.totalOpen; // more open tasks than the pages loaded (#9121)
+        const nonDone = model.total != null && model.totalDone != null ? model.total - model.totalDone : null;
+        const openLeft = !query && !!model.cursor && nonDone != null && model.rows.filter(t => bucket(t) !== 'done').length < nonDone; // more non-done tasks than the pages loaded (#9121)
         if (query ? queryHasMore() : (model.cursor && (openLeft || model.filter === 'all' || model.filter === 'done'))) body.append(btn('btn goals-more', model.loadingMore ? 'Loading…' : (query ? 'Load more' : openLeft ? 'Load more open tasks' : 'Load more done tasks'), loadMore));
         if (model.moreFailed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, model.moreFailed)); body.append(f); }
     }
