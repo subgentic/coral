@@ -2167,53 +2167,10 @@ div.overflow-menu-note { margin: 0; padding: 6px 12px 2px; } /* a row menu's fir
     display: none;
 }
 
-.team-wizard-subtitle {
-    margin: 10px 0 0;
-    font-size: var(--fs-md);
-    line-height: var(--lh-body);
-    color: var(--text-secondary);
-}
-
 .team-wizard-body {
     display: flex;
     flex-direction: column;
     gap: 14px;
-}
-
-.team-wizard-intro {
-    display: flex;
-    align-items: flex-start;
-    gap: 14px;
-    padding: 14px 16px;
-    border-radius: 14px;
-    border: 1px solid rgba(var(--accent-rgb), 0.14);
-    background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.08), rgba(var(--accent-rgb), 0.02));
-}
-
-.team-wizard-intro-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: var(--radius-xl);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(var(--accent-rgb), 0.12);
-    color: var(--accent);
-    flex-shrink: 0;
-}
-
-.team-wizard-intro strong {
-    display: block;
-    margin-bottom: 4px;
-    font-size: var(--fs-lg);
-    color: var(--text-primary);
-}
-
-.team-wizard-intro p {
-    margin: 0;
-    font-size: var(--fs-base);
-    line-height: var(--lh-body);
-    color: var(--text-secondary);
 }
 
 .team-wizard-body textarea {
@@ -2223,7 +2180,7 @@ div.overflow-menu-note { margin: 0; padding: 6px 12px 2px; } /* a row menu's fir
 }
 
 .team-wizard-error {
-    min-height: 5.5rem;
+    min-height: 3rem;
     box-sizing: border-box;
     padding: 12px 14px;
     border-radius: var(--radius-ml);
@@ -2235,6 +2192,7 @@ div.overflow-menu-note { margin: 0; padding: 6px 12px 2px; } /* a row menu's fir
 }
 
 .team-wizard-error-quiet { visibility: hidden; }
+.team-wizard-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .team-wizard-note { color: var(--text-primary); background: var(--bg-secondary); border-color: var(--border); } /* what the sample will add, said before it replaces the members: a note, not an error (#10658) */
 
 .generated-team-banner { margin: 12px 0; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */
@@ -3444,7 +3402,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-tab[hidden] { display: none; }
 .settings-tab .material-icons { font-size: var(--icon-size); flex: none; }
 .menu-item-state { display: block; font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-primary); } /* muted was 4.1:1 and secondary 4.4:1 on the hovered row (4.5 needed): the team start menu's state words */
-.team-start-lead, .team-goal-state { margin: 0 0 10px; color: var(--text-secondary); font-size: var(--fs-sm); } /* the lines Coral adds to step 3 are the help text's size, not the dialog's body (#11401) */
+.team-goal-state { margin: 0 0 10px; color: var(--text-secondary); font-size: var(--fs-sm); } /* the lines Coral adds to step 3 are the help text's size, not the dialog's body (#11401) */
 .launch-stage-sub .team-sub-path { all: unset; font-weight: var(--fw-strong); color: var(--text-primary); cursor: pointer; text-decoration: underline dotted; overflow-wrap: anywhere; }
 .launch-stage-sub .team-sub-path:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .launch-stage-sub span.team-sub-path { cursor: default; text-decoration: none; } /* the whole path, nothing to open (#11482 gate) */
@@ -3785,10 +3743,29 @@ li:has(> .row-btn:focus-visible) { outline: 2px solid var(--accent); outline-off
 .launch-page-agent { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .launch-page-agent .launch-shell { flex: 1; min-height: 0; }
 .launch-wizard[data-stage="folder"] .launch-page-agent { display: none; }
-.launch-wizard:not([data-stage="folder"]) .launch-page-folder { display: none; }
+.launch-wizard:not([data-stage="folder"]):not([data-stage="page"]) .launch-page-folder { display: none; }
 .launch-wizard[data-stage="persona"] :is(.launch-shell .settings-nav, .launch-shell .settings-pane) { display: none; }
 .launch-wizard[data-stage="agent"] .acf-persona-page { display: none; }
 .launch-wizard .acf-persona-page { padding: 0; }
+/* LA1b (#15911): New agent is one page: Folder, Persona (the name and the instructions under a switch), Runs as (the line above the footer), More options (the tabs). The switches are empty details: what they open is shown by :has, so no field moves. */
+.launch-wizard:not([data-stage="page"]) .launch-page-toggle { display: none; }
+.launch-wizard[data-stage="page"] .launch-page-agent { flex: none; }
+.launch-wizard[data-stage="page"] :is(.launch-shell, .settings-panes, .sd-acf) { display: contents; }
+.launch-wizard[data-stage="page"] .launch-stage-sub { display: none; }
+.launch-wizard[data-stage="page"] :is(#launch-persona-top .launch-optional) { display: none; } /* the whole persona block is optional: said once by the page, not on each field */
+.launch-wizard[data-stage="page"] .launch-page-folder { padding-bottom: 8px; }
+.launch-wizard[data-stage="page"] .launch-persona-top { padding: 0; }
+.launch-wizard[data-stage="page"] .acf-persona-page { order: 2; padding: 4px 24px 0; }
+.launch-wizard[data-stage="page"] .settings-tabs { display: flex; flex-direction: row; gap: 4px; overflow-x: auto; }
+@media (max-width: 767px), (pointer: coarse) { .launch-wizard[data-stage="page"] .settings-tab { min-height: var(--control-touch-height, 44px); } } /* the Agent, Permissions and Advanced tabs are 44 px targets on a phone (phone_targets_census_b) */
+.launch-wizard[data-stage="page"] .settings-nav { width: auto; border: 0; background: none; padding: 0; }
+.launch-wizard[data-stage="page"] #launch-more-options { order: 3; margin: 0 24px; }
+.launch-wizard[data-stage="page"] .launch-page-toggle > summary { padding-block: 8px; }
+.launch-wizard[data-stage="page"] .settings-nav, .launch-wizard[data-stage="page"] .settings-pane, .launch-wizard[data-stage="page"] #launch-advanced-extra { order: 4; margin-inline: 24px; }
+.launch-wizard[data-stage="page"]:not(:has(#launch-persona-more[open])) :is(#agent-name-host, .acf-prompt-host) { display: none; }
+.launch-wizard[data-stage="page"]:not(:has(#launch-more-options[open])) :is(.settings-nav, .settings-pane, #launch-advanced-extra) { display: none; }
+.launch-wizard[data-stage="page"] > .modal-actions { border-top: 0; justify-content: flex-end; }
+.launch-wizard[data-stage="page"] > .modal-actions #launch-agent-cancel { margin-right: 0; }
 .launch-wizard .settings-panes { padding: 20px 24px; overflow: auto; scrollbar-gutter: stable; }
 #launch-modal[data-agent-stage="persona"] .launch-server-row, #launch-modal[data-agent-stage="agent"] .launch-server-row { display: none !important; } /* the machine is a step 1 choice; its row is set by style where it is drawn (launch_dialog.js) */
 .launch-field-head, .acf-pick-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; margin: 0 0 6px; font-size: var(--fs-md); font-weight: var(--fw-medium); } /* the field label style of every form: 13/500 (UI/UX on #8401) */
@@ -3934,17 +3911,16 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 @container (max-width: 40em) { .launch-note-slot { min-height: 3.8em; } }
 @container (max-width: 17em) { .launch-note-slot { min-height: 5.6em; } }
 /* ── New team, three steps (#7407): the New Agent shell with the team's own pages ─────────────────────────────────────────────────────────────── */
-.team-wizard[data-stage="team"] .team-page:not(.team-page-team), .team-wizard[data-stage="members"] .team-page:not(.team-page-members), .team-wizard[data-stage="start"] .team-page:not(.team-page-start) { display: none; }
-.team-wizard .team-page { padding: 20px 24px; }
-.team-wizard .team-page-start { flex: 1; min-height: 0; display: flex; padding: 0; }
-.team-wizard .team-page-start.team-page { display: flex; }
-.team-wizard[data-stage="team"] .team-page-start, .team-wizard[data-stage="members"] .team-page-start { display: none; }
-.team-page-start .launch-shell, #team-start-host { flex: 1; min-width: 0; min-height: 0; display: flex; } /* step 3 is one settings_view (#8455): it fills the page the way the tab shell did */
+.team-wizard[data-stage="team"] .team-page:not(.team-page-team), .team-wizard[data-stage="members"] .team-page:not(.team-page-members) { display: none; }
+.team-more-options:has(#team-skills-row[hidden]) { display: none; }
+.team-wizard .team-page { padding: 12px 24px; }
+#team-start-host { min-width: 0; } /* LT1: the first task, Workflow and More options are one form on step 1 (it was step 3's page, #8455) */
+#team-start-host textarea#team-goal { min-height: 2.5rem; } /* the first task is a line or two (it grows by hand): a 6rem box made step 1 taller than a 720 px dialog (#16298) */
 .team-page-team .dir-input-row input { flex: 1; }
 .team-field-hint:empty { display: none; }
 #team-panel-team #btn-browse-team, #launch-step-agent #btn-browse { width: auto; justify-self: start; align-self: flex-start; } /* Browse is its own size under the folder, not the field's width */
-.launch-wizard > .modal-actions #launch-team-cancel { margin-right: auto; }
-#launch-modal[data-team-stage="members"] .launch-server-row, #launch-modal[data-team-stage="start"] .launch-server-row { display: none !important; } /* the machine is a step 1 choice */
+.launch-wizard > .modal-actions #launch-team-back { margin-right: auto; } /* LT1 (4.8): Back at the left as Quiet; Cancel, then Next or Launch team, at the right */
+#launch-modal[data-team-stage="members"] .launch-server-row { display: none !important; } /* the machine is a step 1 choice */
 .launch-recap.launch-recap-warn { color: var(--warning-text, var(--warning)); }
 .launch-recap.launch-recap-error { color: var(--sv-error-color); }
 #team-recap:empty { display: none; }
@@ -3952,9 +3928,14 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-template-pick { flex: 1 1 12rem; min-width: min(12rem, 100%); }
 .team-template-pick select { width: 100%; }
 .team-more-wrap { position: relative; flex: none; }
-.team-allworkers { margin: 0 0 14px; }
+.team-allworkers { margin: 0 0 14px; display: flex; flex-wrap: wrap; gap: 8px; }
 .team-allworkers[hidden] { display: none; }
-.team-allworkers select { min-width: 0; max-width: 100%; width: min(12em, 100%); }
+.team-ra-field { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 9em; }
+.team-ra-field[hidden] { display: none; }
+.team-ra-cap { font-size: var(--fs-sm); color: var(--text-secondary); }
+.team-allworkers select { min-width: 0; max-width: 100%; width: 100%; }
+.team-ra-orch { flex-basis: 100%; margin: 0; }
+.team-agent-differs { color: var(--warning-text); }
 /* The state as a dot beside the agent's name, only where the one-line row has dropped its Status column (a phone at 200% text, under 16 rem): green working or ready, amber needs you, grey asleep or ended; its word is its name and its tooltip (#9588). */
 .team-agent-dot { display: none; flex: none; width: 0.5rem; height: 0.5rem; margin-inline-end: 6px; border-radius: 50%; background: var(--text-muted); vertical-align: middle; }
 .team-agent-dot-ok { background: var(--success); }
@@ -3990,7 +3971,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-agents-footer { margin-top: 10px; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .team-wizard .team-page { padding: 16px; }
-    .team-wizard .team-page-start { padding: 0; }
     .team-agent-open { grid-template-columns: 1fr auto; row-gap: 2px; }
     .team-agent-summary { grid-column: 1 / -1; order: 3; }
     .team-agent-badge { display: block; width: max-content; margin: 4px 0 0; }

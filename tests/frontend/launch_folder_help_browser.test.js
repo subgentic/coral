@@ -42,10 +42,8 @@ const { coralReady } = require('./helpers/wait');
             await shot(Page, `folder-recents-${w}`);
             await ev(`document.querySelector('#launch-dir-recents button:nth-of-type(2)').click(); true`);
             assert.equal(await ev(`document.getElementById('launch-dir').value`), '/work/three', `${at}: a button fills the folder`);
-            assert.equal(await ev(`document.getElementById('launch-step-agent').dataset.stage`), 'folder', `${at}: and stays on step 1 (Next is the person's)`);
-            await ev(`document.getElementById('launch-agent-next').click(); true`);
-            await waitFor(`document.getElementById('launch-step-agent').dataset.stage === 'persona'`, `${at}: Next`, 4000);
-            assert.equal(await ev(vis('#launch-dir-recents')), false, `${at}: the buttons are not in step 2`);
+            assert.equal(await ev(`document.getElementById('launch-step-agent').dataset.stage`), 'page', `${at}: and the dialog stays the one page (the button only fills the folder)`);
+            assert.equal(await ev(vis('#launch-dir-recents')), true, `${at}: the buttons stay on the page`);
             await ev(`window.hideLaunchModal(); true`);
         }
         console.log('launch_folder_help: ok');

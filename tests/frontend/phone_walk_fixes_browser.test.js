@@ -16,7 +16,7 @@ const { coralReady } = require('./helpers/wait');
         await require('./helpers/new_agent').stubCliChecks(ev); // every provider's CLI is found: a provider card has a radio only for one this computer has (#11235)
         await ev(`(async () => { await window.showLaunchModal(); document.querySelector('#launch-step-chooser [data-arg="agent"]').click(); return true; })()`);
         await waitFor(`getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none' && !!document.getElementById('launch-agent-next')`, 'the folder step', 8000);
-        await ev(`(() => { const i = document.getElementById('launch-dir'); if (!i.value) i.value = '/tmp'; document.getElementById('launch-agent-next').click(); document.getElementById('launch-agent-next').click(); return true; })()`); // step 3 (#7391)
+        await ev(`(() => { const i = document.getElementById('launch-dir'); if (!i.value) i.value = '/tmp'; window._launchStage('agent'); return true; })()`); // step 3 (#7391)
         await waitFor(`!document.getElementById('launch-agent-pick').hidden && getComputedStyle(document.getElementById('launch-agent-pick')).display !== 'none'`, 'the agent choice', 8000);
     };
     const section = name => name === 'workspace' ? ev(`window._launchStage('persona'); true`) : ev(`import(${S} + 'section_dialog.js').then(m => { window._launchStage('agent'); const shell = document.querySelector('#launch-step-agent .settings-shell'); m.showSection(shell, ${JSON.stringify(name)}); return true; })`); // the persona is step 2, the sections are step 3 (#7391)

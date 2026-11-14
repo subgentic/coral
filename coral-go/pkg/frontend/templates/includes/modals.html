@@ -126,8 +126,10 @@
                                 </div>
                             </details>
                         </div>
+                        <details class="disclosure launch-page-toggle" id="launch-persona-more"><summary>Name and instructions</summary></details><!-- LA1b (#15911): only a switch: CSS shows the name and the instructions under it when it is open (they stay where the staged dialogs have them) -->
                         <div id="agent-name-host"></div>
                     </div>
+                    <details class="disclosure launch-page-toggle" id="launch-more-options"><summary>More options</summary></details><!-- LA1b: the tabs (Agent, Permissions, Advanced) show when it is open -->
                     <div id="launch-agent-provider" class="launch-agent-provider">
                         <div class="launch-field-head"><span id="launch-agent-pick-label">Provider</span></div>
                         <div id="launch-agent-pick" class="launch-agent-pick" role="radiogroup" aria-labelledby="launch-agent-pick-label" hidden></div>
@@ -230,23 +232,20 @@
                 </div>
             </div>
 
-            <!-- Step 2c: Agent Team form (#7407): three steps in the one fixed-size dialog: 1 Name and where it launches, 2 Members, 3 Start and team settings (tabs Start, Workflow, Health check, Messaging) -->
+            <!-- Step 2c: Agent Team form (#7407): two steps in the one fixed-size dialog (LT1): 1 Team (name, where it launches, the first task, Workflow, More options: Health check, Messaging), 2 Members (Everyone runs as, More options: skills) -->
             <div id="launch-step-team" class="launch-modal-step launch-wizard team-wizard" style="display:none" data-stage="team">
                 <div class="sd-step-header">
                     <div class="sd-step-title-row">
                         <button class="launch-back-btn" data-on-click="m-select-launch-type" data-arg="back" title="Back" aria-label="Back to the choices">&larr;</button>
                         <h3 id="launch-team-title"><span id="launch-team-title-text">New team</span></h3>
                     </div>
-                    <p id="team-stage-sub" class="sd-sub launch-stage-sub">Step 1 of 3: Your team</p>
+                    <p id="team-stage-sub" class="sd-sub launch-stage-sub">Step 1 of 2: Your team</p>
                 </div>
-                <p class="sr-only" id="team-step-live" role="status">Step 1 of 3</p>
+                <p class="sr-only" id="team-step-live" role="status">Step 1 of 2</p>
                 <div class="settings-modal-body team-steps-body">
                     <section class="launch-page team-page team-page-team" id="team-panel-team" data-page="team" aria-label="Name and where it launches">
                         <div id="team-form-host" data-coral-root="{{ .CoralRoot }}"></div>
-                        <div class="form-row" id="team-skills-row" hidden>
-                            <span class="form-label" id="team-skills-label">Skills for every member <span class="launch-optional">optional</span></span>
-                            <div id="team-skills-host" role="group" aria-labelledby="team-skills-label"></div>
-                        </div>
+                        <div id="team-start-host"></div><!-- LT1: the first task, Workflow and, under More options, Health check and Messaging: step 3 folded into step 1 -->
                         <div id="team-form-parts" hidden>
                             <div id="team-board-name-hint" class="team-field-hint"></div>
                             <button class="btn" id="btn-browse-team" data-on-click="m-toggle-browser" data-browser="launch-team-dir dir-browser-team browser-list-team browser-current-path-team">Browse</button>
@@ -274,7 +273,7 @@
                                 <input type="search" id="team-template-search" class="team-template-search" aria-label="Search templates" placeholder="Search templates" autocomplete="off" data-on-input="team-template-filter" hidden>
                                 <select id="team-template-select" data-on-change="team-template-select"></select>
                             </div>
-                            <button type="button" class="btn" id="team-describe" data-on-click="m-show-team-wizard-modal">Describe your team</button><!-- the AI draft is a choice beside the templates, not behind More (#10314) -->
+                            <button type="button" class="btn" id="team-describe" aria-expanded="false" aria-controls="team-wizard-panel" data-on-click="m-show-team-wizard-modal">Describe your team</button><!-- the AI draft is a choice beside the templates, not behind More (#10314) -->
                             <div class="team-more-wrap">
                                 <button type="button" class="btn" id="team-template-more" aria-haspopup="menu" aria-expanded="false" aria-controls="team-template-menu" data-on-click="team-menu">More</button>
                                 <div class="menu team-menu" id="team-template-menu" role="menu" aria-label="Template options" hidden>
@@ -286,15 +285,23 @@
                                 <input type="file" id="team-folder-input" webkitdirectory directory multiple style="display:none" data-on-change="m-handle-team-folder-import">
                             </div>
                         </div>
-                        <div class="team-allworkers" id="team-allworkers">
-                            <select id="team-set-all" aria-label="Set all workers to" data-on-change="team-set-all">
-                                <option value="">Choose a provider</option>
-                                <option value="claude">Claude</option>
-                                <option value="agy">Antigravity</option>
-                                <option value="codex">Codex</option>
-                                <option value="pi">Pi</option>
-                            </select>
-                            <select id="team-set-all-model" aria-label="Set all workers' model" data-on-change="team-set-all-model" data-on-mousedown="team-set-all-models" hidden></select>
+                        <div class="team-wizard-body team-wizard-panel" id="team-wizard-panel" role="group" aria-labelledby="team-describe" hidden>
+                            <p id="team-wizard-title" class="sv-help">Say what the team should do and, if you like, who should be on it. Coral drafts the members; you change any of them before anything starts.</p>
+                            <label class="sr-only" for="team-wizard-directive">Describe your team</label>
+                            <textarea id="team-wizard-directive" rows="5" placeholder="For example: Build a launch plan for a developer tool aimed at small engineering teams. I want an orchestrator, a product strategist, a marketer and a copywriter."></textarea>
+                            <div id="team-wizard-error" class="team-wizard-error team-wizard-error-quiet" role="alert"></div><!-- its room is always kept (hidden while empty): an error appearing must not move Generate and Try a sample (#10517) -->
+                            <div class="team-wizard-actions">
+                                <button type="button" class="btn" id="team-wizard-cancel" data-on-click="m-hide-team-wizard-modal">Cancel</button>
+                                <button type="button" id="team-wizard-test-btn" class="btn" data-on-click="m-test-team-wizard" title="Fills the member list with a sample team of three; nothing is generated and no model is called.">Try a sample</button>
+                                <button type="button" id="team-wizard-generate-btn" class="btn btn-primary" data-on-click="m-generate-team-from-wizard">Generate team</button>
+                            </div>
+                        </div>
+                        <div class="team-allworkers team-runs-as" id="team-allworkers" role="group" aria-label="Everyone runs as">
+                            <label class="team-ra-field"><span class="team-ra-cap">Provider</span><select id="team-set-all" aria-label="Everyone's provider" data-on-change="team-set-all"></select></label>
+                            <label class="team-ra-field"><span class="team-ra-cap">Model</span><select id="team-set-all-model" aria-label="Everyone's model" data-on-change="team-set-all-model" data-on-mousedown="team-set-all-models"></select></label>
+                            <label class="team-ra-field" hidden><span class="team-ra-cap">Thinking</span><select id="team-set-all-thinking" aria-label="Everyone's thinking level" data-on-change="team-set-all-thinking"></select></label>
+                            <label class="team-ra-field"><span class="team-ra-cap">Mode</span><select id="team-set-all-mode" aria-label="Everyone's permission mode" data-on-change="team-set-all-mode"></select></label>
+                            <p class="settings-hint team-ra-orch" id="team-orch-runs" hidden></p>
                         </div>
                         <p class="team-agents-count" id="team-agents-count" aria-live="polite"></p>
                         <p class="sr-only" id="team-agents-live" role="status"></p>
@@ -311,9 +318,12 @@
                             </div>
                         </div>
                         </div>
-                    </section>
-                    <section class="launch-page team-page team-page-start" id="team-panel-start" data-page="start" aria-label="Start and team settings">
-                        <div id="team-start-host"></div>
+                        <details class="disclosure team-more-options" id="team-members-more"><summary>More options</summary>
+                        <div class="form-row" id="team-skills-row" hidden>
+                            <span class="form-label" id="team-skills-label">Skills for every member <span class="launch-optional">optional</span></span>
+                            <div id="team-skills-host" role="group" aria-labelledby="team-skills-label"></div>
+                        </div>
+                        </details>
                     </section>
                 </div>
                 <div hidden aria-hidden="true">
@@ -325,8 +335,8 @@
                 <div id="team-tmux-slot" class="launch-cli-slot"></div>
                 <p id="team-recap" class="launch-recap" role="status" aria-live="polite"></p>
                 <div class="modal-actions">
+                    <button class="btn btn-quiet" id="launch-team-back" data-on-click="team-step-back" hidden>Back</button>
                     <button class="btn" id="launch-team-cancel" data-on-click="m-hide-launch-modal">Cancel</button>
-                    <button class="btn" id="launch-team-back" data-on-click="team-step-back" hidden>Back</button>
                     <button class="btn btn-primary" id="launch-team-next" data-on-click="team-step-next">Next</button>
                     <button class="btn btn-primary" id="launch-team-go" data-on-click="m-launch-team" hidden>Launch team</button>
                 </div>
@@ -378,35 +388,6 @@
             <div class="modal-actions modal-footer">
                 <button class="btn" data-on-click="m-hide-save-template-modal">Cancel</button>
                 <button class="btn btn-primary" data-on-click="m-confirm-save-template">Save</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="team-wizard-modal" class="modal" role="dialog" aria-labelledby="team-wizard-title" aria-modal="true" style="display:none">
-        <div class="modal-content dlg-flow">
-            <div class="modal-header">
-                <h3 id="team-wizard-title">Describe your team</h3>
-                <p class="team-wizard-subtitle">Say what the team should do and, if you like, who should be on it. Coral drafts the members; you review and edit each one before anything starts.</p>
-            </div>
-            <div class="modal-body team-wizard-body">
-                <div class="team-wizard-intro">
-                    <div class="team-wizard-intro-icon">
-                        <span class="material-icons" aria-hidden="true">auto_awesome</span>
-                    </div>
-                    <div>
-                        <strong>AI team builder</strong>
-                        <p>The draft opens on the Members step, where you can change anything.</p>
-                    </div>
-                </div>
-                <label for="team-wizard-directive">Describe your team
-                    <textarea id="team-wizard-directive" rows="7" placeholder="For example: Build a launch plan for a developer tool aimed at small engineering teams. I want an orchestrator, a product strategist, a marketer and a copywriter."></textarea>
-                </label>
-                <div id="team-wizard-error" class="team-wizard-error team-wizard-error-quiet" role="alert"></div><!-- its room is always kept (hidden while empty): an error appearing must not move Generate and Try a sample (#10517) -->
-            </div>
-            <div class="modal-actions modal-footer">
-                <button class="btn" data-on-click="m-hide-team-wizard-modal">Cancel</button>
-                <button id="team-wizard-test-btn" class="btn" data-on-click="m-test-team-wizard" title="Fills the Members step with a sample team of three; nothing is generated and no model is called.">Try a sample</button>
-                <button id="team-wizard-generate-btn" class="btn btn-primary" data-on-click="m-generate-team-from-wizard">Generate team</button>
             </div>
         </div>
     </div>

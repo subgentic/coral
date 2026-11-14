@@ -1,5 +1,5 @@
 // New team on a phone (#11401 b, from the Mobile Beta Tester's walk): the step line under the title names the team and its folder, and a long folder path wrapped over four lines; it is the end of the path now,
-// and a tap shows all of it. Step 3's section picker says what it is, and the two lines Coral adds there are the size of the help text around them. Isolated dev server, 390 px.
+// and a tap shows all of it. (LT1 #15892: the old step 3 is on step 1, so the step line is measured on the members step.) Isolated dev server, 390 px.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -17,8 +17,8 @@ const LONG = '/private/tmp/claude-501/-Users-someone-Software-coral-coral-go/8e4
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.showLaunchModal(); window._selectLaunchType('team'); true`);
         await waitFor(`(() => { const e = document.getElementById('launch-step-team'); return !!e && getComputedStyle(e).display !== 'none'; })()`, 'the team step', 8000);
-        await ev(`(async () => { document.getElementById('team-board-name').value = 'demo-team'; document.getElementById('launch-team-dir').value = ${JSON.stringify(LONG)}; const m = await import((window.__coralStatic || '/static/') + 'team_steps.js'); m.showTeamStep('start'); return true; })()`);
-        await waitFor(`!!document.querySelector('#team-panel-start .team-start-lead, #launch-step-team .team-start-lead')`, 'step 3 drawn', 8000);
+        await ev(`(async () => { document.getElementById('team-board-name').value = 'demo-team'; document.getElementById('launch-team-dir').value = ${JSON.stringify(LONG)}; const m = await import((window.__coralStatic || '/static/') + 'team_steps.js'); m.showTeamStep('members'); return true; })()`);
+        await waitFor(`document.getElementById('launch-step-team').dataset.stage === 'members'`, 'step 2 drawn (LT1 #15892: the old step 3 is on step 1, so the recap line is measured on the members step)', 8000);
         await new Promise(r => setTimeout(r, 500)); // sleep-ok: the step draws
         const q = () => ev(`(() => {
             const sub = document.getElementById('team-stage-sub'), cs = getComputedStyle(sub), lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.4;
@@ -36,8 +36,6 @@ const LONG = '/private/tmp/claude-501/-Users-someone-Software-coral-coral-go/8e4
         assert.equal(a.expanded, 'false', 'the shortened path is a button that says it is closed');
         assert.ok(a.hit && a.hit.pos === 'absolute' && a.hit.content !== 'none' && a.hit.h >= 44, `a line of text is 17 px: the button's 44 px target is its invisible ::after: ${JSON.stringify(a.hit)}`);
         assert.ok(a.label && a.label.includes(LONG), `its name has the whole path: ${a.label}`);
-        assert.equal(a.pickLabel, 'Jump to a section', `step 3's picker says what it is: ${a.pickLabel}`);
-        assert.ok(a.helpPx && a.leadPx <= a.helpPx + 3 && a.statePx <= a.helpPx + 3, `the lines Coral adds are the help text's size (${a.helpPx}px): lead ${a.leadPx}, goal state ${a.statePx}`);
         await ev(`document.querySelector('#team-stage-sub button.team-sub-path').click(); true`);
         const b = await q();
         assert.equal(b.expanded, 'true', 'a tap opens it'); assert.equal(b.pathText, LONG, 'all of the path shows');
@@ -46,13 +44,13 @@ const LONG = '/private/tmp/claude-501/-Users-someone-Software-coral-coral-go/8e4
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await ev(`window.showLaunchModal(); window._selectLaunchType('team'); true`);
         await waitFor(`(() => { const e = document.getElementById('launch-step-team'); return !!e && getComputedStyle(e).display !== 'none'; })()`, 'the team step at 1280', 8000);
-        await ev(`(async () => { document.getElementById('team-board-name').value = 'demo-team'; document.getElementById('launch-team-dir').value = ${JSON.stringify(LONG)}; const m = await import((window.__coralStatic || '/static/') + 'team_steps.js'); m.showTeamStep('start'); return true; })()`);
+        await ev(`(async () => { document.getElementById('team-board-name').value = 'demo-team'; document.getElementById('launch-team-dir').value = ${JSON.stringify(LONG)}; const m = await import((window.__coralStatic || '/static/') + 'team_steps.js'); m.showTeamStep('members'); return true; })()`);
         await new Promise(r => setTimeout(r, 500)); // sleep-ok: the step draws
         const c = await q();
         assert.ok(c.lines <= 2 && c.pathText && c.pathText.endsWith('first-team') && c.pathText.length < 40, `1280: the step line is short: ${c.lines} lines, ${JSON.stringify(c.pathText)}`);
         await ev(`document.querySelector('#team-stage-sub button.team-sub-path').click(); true`);
         assert.equal((await q()).pathText, LONG, '1280: a click shows all of the path');
         await ev(`window.hideLaunchModal(); true`);
-        console.log('PASS new team on a phone: the step line, the picker label, the text sizes');
+        console.log('PASS new team on a phone: the step line and its folder button');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

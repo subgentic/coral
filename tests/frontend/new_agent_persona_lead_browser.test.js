@@ -16,8 +16,8 @@ const { coralReady } = require('./helpers/wait');
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installNA(ev); await stubModels(ev);
             await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app'])); true`);
             await openNewAgent(ev, waitFor);
-            await ev(`(() => { const e = window.__na.find('input', ${N.folder}); e.value = '/work/payments-app'; e.dispatchEvent(new Event('input', { bubbles: true })); window.__na.find('button', ${N.next}).click(); return true; })()`);
-            await waitFor(`/Step 2 of 3/.test(window.__na.dialog().textContent)`, `${label}: step 2`, 6000);
+            await ev(`(() => { const e = window.__na.find('input', ${N.folder}); e.value = '/work/payments-app'; e.dispatchEvent(new Event('input', { bubbles: true })); window.__na.next(); return true; })()`);
+            
             const r = await ev(`(() => { const top = document.getElementById('launch-persona-top'); const lead = top.querySelector('.launch-persona-lead'), sel = top.querySelector('select');
                 const vis = e => !!e && e.checkVisibility({ contentVisibilityAuto: true, visibilityProperty: true }); const d = top.querySelector('details.persona-files');
                 return { lead: lead && lead.textContent.trim(), leadAbove: !!lead && !!sel && !!(lead.compareDocumentPosition(sel) & Node.DOCUMENT_POSITION_FOLLOWING), more: d && d.querySelector('summary').textContent.trim(), open: d && d.open,

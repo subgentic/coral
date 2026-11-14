@@ -29,8 +29,8 @@ function _syncMobileLaunchSections(step) {
 /** New Agent's three steps (#7391, UI/UX's v4): the folder (and the machine), the persona, the agent. `data-stage` on the step says which one, and CSS shows what belongs to it; the machine row above the dialog is only for the first. */
 export const LAUNCH_STAGES = ['folder', 'persona', 'agent'];
 /** The stages this dialog goes through: Add agent (#7778) knows the folder, so it starts at the persona and has two steps. */
-export const launchStages = () => ((launch.addTo && launch.addTo.skipFolder) || launch.member ? LAUNCH_STAGES.slice(1) : LAUNCH_STAGES); // a member has no folder of its own either (#7861)
-const STAGE_NAMES = { folder: 'Where it launches', persona: 'Persona', agent: 'The agent' };
+export const launchStages = () => ((launch.addTo && launch.addTo.skipFolder) || launch.member ? LAUNCH_STAGES.slice(1) : ['page']); // LA1b (#15911): a new agent is ONE page (the folder, the persona, Runs as, More options); a member or an agent added to a team keeps its two steps (LT2 moves them) // a member has no folder of its own either (#7861)
+const STAGE_NAMES = { page: '', folder: 'Where it launches', persona: 'Persona', agent: 'The agent' };
 export function setLaunchStage(stage) {
     const stages = launchStages();
     if (!stages.includes(stage)) stage = stages[0];
@@ -39,15 +39,17 @@ export function setLaunchStage(stage) {
     step.dataset.stage = stage;
     const modal = document.getElementById("launch-modal");
     if (modal) { modal.setAttribute('data-agent-stage', stage); modal.toggleAttribute('data-all-optional', stage === 'persona' && !launch.member); }
+    const page = stage === 'page';
+    for (const id of ['launch-persona-more', 'launch-more-options']) { const d = document.getElementById(id); if (d && !page) d.open = true; } // the staged dialogs show everything of their step: the switches are for the page
     const n = stages.indexOf(stage) + 1, total = stages.length;
     const allOptional = stage === 'persona' && !launch.member; // a member's role is required: its step is not "all optional"
-    const sub = launch.member ? STAGE_NAMES[stage] : `Step ${n} of ${total}: ${STAGE_NAMES[stage]}${allOptional ? ', all optional' : ''}`; // a member dialog is one step of the team wizard (3 steps): it names its page and never counts its own two (#15143) // the folder is said once, in the footer's recap (#10835)
+    const sub = page ? '' : launch.member ? STAGE_NAMES[stage] : `Step ${n} of ${total}: ${STAGE_NAMES[stage]}${allOptional ? ', all optional' : ''}`; // a member dialog is one step of the team wizard (3 steps): it names its page and never counts its own two (#15143) // the folder is said once, in the footer's recap (#10835)
     const subEl = document.getElementById("launch-stage-sub");
     if (subEl) subEl.textContent = sub;
     const back = document.getElementById("launch-agent-back"), next = document.getElementById("launch-agent-next"), go = document.getElementById("launch-agent-go"), save = document.getElementById("launch-agent-save");
-    if (back) back.hidden = stage === stages[0];
-    if (next) next.hidden = stage === 'agent';
-    if (go) go.hidden = !!launch.member || !(stage === 'agent' || launchFlags.launchFromAnyStep); // a member is saved into the team form, not launched (#7861)
+    if (back) back.hidden = page || stage === stages[0];
+    if (next) next.hidden = page || stage === 'agent';
+    if (go) go.hidden = !!launch.member || !(page || stage === 'agent' || launchFlags.launchFromAnyStep); // a member is saved into the team form, not launched (#7861)
     if (save) save.hidden = !launch.member || stage !== 'agent';
     const rm = document.getElementById("launch-agent-remove");
     if (rm) { rm.hidden = !launch.member?.row || stage !== 'agent'; rm.style.visibility = String(launch.member?.value?.name || '').trim().toLowerCase() === 'orchestrator' ? 'hidden' : ''; } // Edit member only; the Orchestrator is not removed (#10836), but its slot stays (hidden, out of the Tab order) so Save member never changes places with Remove from team (walk 10 H4)
@@ -59,9 +61,17 @@ export function setLaunchStage(stage) {
     return sub;
 }
 /** The old name for "go to the agent's sections (true) or back to the folder (false)": a field that needs a section revealed opens step 3 (a rejected board name, a flag). */
-export function setLaunchMore(open) { setLaunchStage(open ? 'agent' : 'folder'); }
+export function setLaunchMore(open) {
+    if (launchStages()[0] === 'page') { // one page: "More options" opens or closes (closing also closes the persona's name and instructions: the page opens as it started)
+        setLaunchStage('page');
+        const more = document.getElementById('launch-more-options'); if (more) more.open = !!open;
+        if (!open) { const p = document.getElementById('launch-persona-more'); if (p) p.open = false; }
+        return;
+    }
+    setLaunchStage(open ? 'agent' : 'folder');
+}
 // A field that is about to take the focus (a rejected board name, say) opens step 3 when it sits inside (section_dialog.js revealField).
-document.addEventListener("sd-more-open", e => { if (e.target.closest && e.target.closest("#launch-step-agent")) setLaunchStage('agent'); });
+document.addEventListener("sd-more-open", e => { if (e.target.closest && e.target.closest("#launch-step-agent")) { if (launchStages()[0] === 'page') { const m = document.getElementById('launch-more-options'); if (m) m.open = true; } else setLaunchStage('agent'); } });
 
 function _showLaunchStep(step) {
     document.getElementById("launch-modal")?.setAttribute('aria-labelledby', step === 'agent' ? 'launch-agent-title-text' : step === 'team' ? 'launch-team-title-text' : 'launch-title'); // the three steps are "New agent" or "New team"; the chooser keeps its own title
