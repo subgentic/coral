@@ -193,6 +193,7 @@ export async function loadModelPicker(container, agentType) {
  *  field's dirty flag: a later provider switch still resets a listed model to the new provider's default, as before (a typed custom id is what dirty keeps, #11404). */
 function markChosen(container) {
     container.dataset.acfChosenFetch = container.dataset.acfFetchSeq || '';
+    container.dataset.acfModelDirty = 'true'; // and the box is theirs from now on: a later sync of the form (a re-check of the CLI, a second default fetch with a newer sequence number) put a picked model back to Default, so Edit member could not be set to Haiku (#16648). A provider switch still keeps it per provider (keepModelPerProvider, #11786)
 }
 
 function openAdd(container) {
