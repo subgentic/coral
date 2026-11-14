@@ -41,7 +41,9 @@ export async function showTeamSettingsPage(team, options = {}) {
     const opts = settingsViewOptions(st);
     st.view = mountSettingsView(st.page, opts);
     groupRows(st.page, opts.groups); // the large headings and the rails (#15058)
-    st.page.querySelector('.sv-shell')?.before(searchBox(st.page, { label: 'Search team settings', placeholder: 'Search team settings' }));
+    const search = searchBox(st.page, { label: 'Search team settings', placeholder: 'Search team settings' });
+    const head = st.page.closest('.team-settings-modal')?.querySelector('.modal-header'); // in the dialog the box is a compact one at the header's right, on the title's row (#16542); drawn on a page it stays above the form
+    if (head) { head.classList.add('has-search'); head.append(search); } else st.page.querySelector('.sv-shell')?.before(search);
     wirePage(st);
     wireModeRow(st);
     wireApproval(st.view, st.host);
