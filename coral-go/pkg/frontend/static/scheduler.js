@@ -407,6 +407,11 @@ registerActions({
         const sid = uuidOf(el.dataset.sessionId); if (!sid) return;
         const jobId = selectedJobId, job = scheduledJobs.find(j => j.id === jobId);
         const opened = await window.selectHistorySession(sid);
+        if (opened === false) { // the run has no saved chat to open (a run still going, or one whose chat was not kept): the chat page is already up and would say 'Loading chat…' for good (#16770, walk 32 F1), so go back to the job and say why
+            window.switchNavTab?.('automations'); if (jobId) selectScheduledJob(jobId);
+            showToast(`${job ? `${job.name}: ` : ''}this run has no chat to show${job ? '' : ' yet'}. If it is still running, its result appears here when it ends.`, true);
+            return;
+        }
         const back = document.getElementById('history-back'); // the way back is the job it came from, not All chats (#10378)
         if (opened !== false && job && back) { back.hidden = false; back.textContent = `\u2190 ${job.name}`; back.setAttribute('data-on-click', 'job-result-back'); back.dataset.jobId = String(jobId); }
         const phoneBack = document.querySelector('.mobile-history-back'); // a phone shows its own back control, not that one (#10578)
