@@ -18,6 +18,7 @@ assert.equal(W.taskStateWord('pending'), 'Queued'); assert.equal(W.taskStateWord
 assert.equal(W.taskStateWord('some_new_state'), 'Some new state');
 assert.deepEqual(W.rollupShares({ done: 5, active: 2, blocked: 1, queued: 2 }), { done: 0.5, active: 0.2, blocked: 0.1 });
 assert.deepEqual(W.rollupShares({}), { done: 0, active: 0, blocked: 0 });
+assert.equal(W.doneShare({ done: 0, active: 2, blocked: 0, queued: 2 }), 0, 'the bar is empty for 0 of 4 done, whatever is in progress (#16629)'); assert.equal(W.doneShare({ done: 4 }), 1); assert.equal(W.doneShare({ done: 1, active: 1, queued: 2 }), 0.25); assert.equal(W.doneShare({}), 0);
 assert.equal(W.filterAnnouncement('blocked', 1), 'Showing 1 blocked goal'); assert.equal(W.filterAnnouncement('active', 2), 'Showing 2 active goals');
 assert.equal(W.filterAnnouncement('all', 5), 'Showing all 5 goals'); assert.equal(W.filterAnnouncement('all', 1), 'Showing all 1 goal');
 assert.equal(W.filterAnnouncement('dropped', 0), 'No dropped goals'); assert.equal(W.filterAnnouncement('all', 0), 'No goals yet');
