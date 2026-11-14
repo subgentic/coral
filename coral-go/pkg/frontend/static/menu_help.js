@@ -12,13 +12,13 @@ export const HELP = {
     'Save as Template': "Saves this team's agents, instructions and settings as a template to launch again. Chats, messages and goals are not saved.",
     'More': "Shows the team's other actions.",
     'Reset Team': 'Stops each agent and starts it again from its first instructions in a new chat, so its context is cleared. Old chats stay in History; the board, tasks, goals and files are kept.',
-    'Stop agents': "Stops every agent in the team now. Chats stay in History; the board, tasks and goals are kept. A Hermes agent's conversation is deleted with it.",
+    'Stop agents': "Ends every agent's process in the team now. Chats stay in History; the board, tasks and goals are kept. A Hermes agent's conversation is deleted with it.",
     'Remove team': "Deletes the team for good: its messages, tasks, goals, members, reminders, settings and more; the dialog lists everything. Chats stay in History and files are not touched. Only when no agent is running.",
     'Restart, same settings': 'Starts a fresh conversation with the same settings; the instructions are sent again.',
     'Restart with changes': 'Starts a fresh conversation with the settings you choose; the instructions are sent again.',
     'Wake': 'Continues the conversation.',
     'Sleep': 'Stops the terminal. The chat and files stay; Wake continues the conversation.',
-    'Kill session': 'Stops it now. Its chat stays in History.',
+    'Stop session': 'Ends its process now. Its chat stays in History.',
 };
 const LABELS = Object.keys(HELP).sort((a, b) => b.length - a.length); // longest first: "Wake Team" before "Wake"
 const NO_HOVER = '(pointer: coarse), (max-width: 639px)'; // the same query as css/menu_help.css

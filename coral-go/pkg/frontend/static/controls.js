@@ -577,7 +577,7 @@ export async function killSession() {
 
     const cur = state.currentSession;
     const who = agentWords(cur, resolveSessionIdentity(cur)).label; // the agent by its role and team, not the folder it works in (#10139)
-    window.showConfirmModal('Kill session', `Kill ${who}? This will terminate the agent. ${whatStaysKill([cur])} ${cur.git_state && cur.git_state.is_worktree ? worktreeConfirmWords(cur.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => {
+    window.showConfirmModal('Stop session', `Stop ${who}? This ends the agent's process. ${whatStaysKill([cur])} ${cur.git_state && cur.git_state.is_worktree ? worktreeConfirmWords(cur.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => {
         try {
             const killed = state.currentSession;
             const result = await killLiveSession(killed, currentServer());
@@ -586,7 +586,7 @@ export async function killSession() {
                 showToast(result.error, true);
             } else {
                 if (result.changes_artifact_error) {
-                    showToast(`Killed, but changes.diff could not be saved: ${result.changes_artifact_error}`, true);
+                    showToast(`Stopped, but changes.diff could not be saved: ${result.changes_artifact_error}`, true);
                 } else {
                     showToast(agentWords(killed, resolveSessionIdentity(killed)).label + ' ended');
                 }
@@ -597,10 +597,10 @@ export async function killSession() {
                 showView("welcome-screen");
             }
         } catch (e) {
-            showToast("Failed to kill session", true);
+            showToast("Failed to stop session", true);
             console.error("killSession exception:", e);
         }
-    }, undefined, { label: 'Kill session', danger: true });
+    }, undefined, { label: 'Stop session', danger: true });
 }
 
 // ── Goal editing ───────────────────────────────────────────────────────────
