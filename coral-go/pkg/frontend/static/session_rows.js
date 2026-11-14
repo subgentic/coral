@@ -147,6 +147,7 @@ ${_archiveItem}            <button class="menu-item overflow-menu-item" data-on-
                 ${SVGO.o0}<path d="M3.5 2v4h4"/><path d="M3.5 6A5.5 5.5 0 1 1 2.5 8"/></svg>
                 Restart with changes…
             </button>
+            <div class="overflow-menu-note" role="note">Restart starts a new conversation. Sleep and Wake keep the old one.</div>
             <button class="menu-item overflow-menu-item" data-on-click="agent-rename" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o1}<path d="M11.5 1.5l3 3L5 14H2v-3z"/></svg>
                 Rename
@@ -204,6 +205,7 @@ ${['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access
                 ${SVGO.o0}<path d="M3.5 2v4h4"/><path d="M3.5 6A5.5 5.5 0 1 1 2.5 8"/></svg>
                 Restart with changes…
             </button>
+            <div class="overflow-menu-note" role="note">Restart starts a new conversation. Sleep and Wake keep the old one.</div>
             ${autoAcceptMenuItem(s)}
             ${!instructionsOffered(s, isCloud()) ? '' : `<button class="menu-item overflow-menu-item" data-on-click="agent-instructions" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" title="What this agent is told each time it starts; saved now, used at its next restart">
                 ${SVGO.o0}${_mk0}`}

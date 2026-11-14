@@ -481,7 +481,7 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 		BoardName:       p.board,
 		BoardLabel:      h.boardLabel(p.board),
 		Role:            naming.SubscriberID(p.displayName, p.agentType),
-		Prompt:          p.prompt,
+		Prompt:          withRestartBrief(p.prompt, h.restartBrief(ctx, p)), // the task it held, for this launch only (#16893)
 		PromptOverrides: promptOverrides(userSettings),
 		BoardType:       p.boardType,
 		Capabilities:    p.caps,
