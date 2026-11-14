@@ -25,6 +25,7 @@ const DefaultOrchestratorSystemPrompt = "Post a message with coral-board post \"
 	"  coral-board peek \"Agent Name\"           — see the last 30 lines of their terminal\n" +
 	"  coral-board peek \"Agent Name\" --lines 50 — see more lines\n" +
 	"Use this to monitor progress, diagnose stuck agents, or verify work before asking for a status update.\n\n" +
+	"To find something said before (a decision, a how-to, who did what), run coral-board search \"<words>\" --sort newest (board messages) or coral-agent history search \"<words>\" (chat history) first; do not grep logs or transcripts.\n\n" +
 	"Use coral-board post for general conversation, discussion, status updates, and questions. " +
 	"Use coral-board task for specific, defined work assignments. When creating tasks, be very specific in the --body detail — " +
 	"include exact file paths, line numbers, what to change, acceptance criteria, and any context the assignee needs.\n" +
@@ -41,6 +42,7 @@ const DefaultWorkerSystemPrompt = "Post a message with coral-board post \"@all <
 	"then STOP and wait. Do NOT poll the message board in a loop. Coral will notify you when there are new messages.\n\n" +
 	DefaultBoardPostingGuidance + "\n\n" +
 	"Whenever you are waiting for a teammate, orchestrator review, task dependency, or commit: run coral-board wait --from \"Agent Name\" (or --task <id>, --commit <hash>) and STOP YOUR TURN IMMEDIATELY. Never run sleep, polling loops, or wait in code. Coral will automatically notify and wake you up when the event occurs.\n\n" +
+	"To find something said before (a decision, a how-to, who did what), run coral-board search \"<words>\" --sort newest (board messages) or coral-agent history search \"<words>\" (chat history) first; do not grep logs or transcripts.\n\n" +
 	"You can check for assigned tasks with coral-board task list or coral-board task claim. " +
 	"When you finish a task, mark it complete: coral-board task complete <id> --message \"what was done\"\n" +
 	DefaultTaskWorkflowGuidance
@@ -73,6 +75,8 @@ When posting messages to specific agents, you MUST @mention them by name (e.g. @
 
 You can peek at any agent's terminal to check their progress: coral-board peek "Agent Name". Use this when you need to check on an agent's work without waiting for them to post.
 
+To find something said before (a decision, a how-to, who did what), run coral-board search "<words>" --sort newest (board messages) or coral-agent history search "<words>" (chat history) first; do not grep logs or transcripts.
+
 Goals: a goal is ONE outcome a person can check: never a release, a team or a theme ("the UI list" is too broad; "the Messages tab loads earlier messages on scroll-up" is a goal). Give it a done-when a person can verify and a driver; expect 2 to 15 tasks. Make a new goal when a request has its own outcome, brings in a new agent or will take several tasks; small one-off fixes sit on no goal or on a short-lived "fixes" goal. Close a goal when its done-when is met and split one that grows past its outcome (coral-board goal add --help).
 
 Use coral-board post for general conversation, discussion, status updates, and questions. Use coral-board task for specific, defined work assignments. When creating tasks, be very specific in the --body detail — include exact file paths, line numbers, what to change, acceptance criteria, and any context the assignee needs.
@@ -95,6 +99,8 @@ const DefaultWorkerActionPrompt = `IMPORTANT: You were automatically joined to m
 CRITICAL: Do NOT poll or loop on 'coral-board read' and NEVER run sleep loops or wait in code. Coral will automatically notify you (as a user message) when new messages arrive — only run 'coral-board read' after receiving a notification. Whenever you must wait for Orchestrator review, a teammate reply, or a task dependency, run 'coral-board wait --from "<name>"' (or '--task <id>') and STOP YOUR TURN IMMEDIATELY. Coral will wake you up via terminal notification when the event occurs.
 
 Only the Operator or orchestrator creates or reassigns shared tasks. Keep ownership through corrections and request additional assignments from the orchestrator. Personal planning is unchanged.
+
+To find something said before (a decision, a how-to, who did what), run coral-board search "<words>" --sort newest (board messages) or coral-agent history search "<words>" (chat history) first; do not grep logs or transcripts.
 
 You can check for assigned tasks with coral-board task list or coral-board task claim. When you finish a task, mark it complete: coral-board task complete <id> --message "what was done"` + "\n\n" + DefaultBoardPostingGuidance
 
