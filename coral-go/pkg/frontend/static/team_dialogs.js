@@ -703,7 +703,7 @@ function _pickTeamTemplate(name) {
     _loadTeamTemplate(name);
 }
 
-/** Set all workers to a provider (#7407): every member whose role is not the Orchestrator takes it, and their Model and Thinking go back to the provider's defaults; Mode, role and prompt stay. */
+/** Set all workers to a provider (#7407): every worker takes it; Model and Thinking reset only when the provider changes. Mode, role and prompt stay. */
 function _setAllWorkers(type) {
     const sel = document.getElementById('team-set-all');
     if (!type) return;
@@ -711,14 +711,14 @@ function _setAllWorkers(type) {
     for (const row of teamRows()) {
         if (isOrchestrator(rowRole(row))) continue;
         row.dataset.followsTeamType = '';
-        resetProviderChoices(row.dataset.acfId, type);
+        if (getAgentConfig(row.dataset.acfId).agentType !== type) resetProviderChoices(row.dataset.acfId, type);
         n++;
     }
     if (sel) sel.value = '';
     const label = [...(document.getElementById('team-agent-type')?.options || [])].find(o => o.value === type)?.textContent.replace(/ \(.*\)$/, '') || type;
     _clearTeamUndo();
     const line = document.getElementById('team-undo');
-    if (line) line.textContent = `Set ${n} ${n === 1 ? 'worker' : 'workers'} to ${label}. Pick a model for them below.`;
+    if (line) line.textContent = `Set ${n} ${n === 1 ? 'worker' : 'workers'} to ${label}. Existing models stay when the provider is unchanged.`;
     document.getElementById('team-set-all-model')?.setAttribute('hidden', ''); setTimeout(_fillAllModels, 800); // the new provider's list arrives a moment after the change
     _syncTeamMembers();
 }
