@@ -1,4 +1,4 @@
-// One table (#7743, the operator: "a styling change is one token or one rule"): no stylesheet but css/data_table.css styles a table, a row, a cell or a header, and no module but data_table.js builds table markup.
+// One table (#7743, the operator: "a styling change is one token or one rule"): only css/data_table.css and its lazy goal-card slice css/data_table_goals.css style a table, a row, a cell or a header, and no module but data_table.js builds table markup.
 // The surfaces that have not moved to the component yet are counted in data_table_baseline.json: a file may have at most its count, the baseline only goes down (a file below it fails until it is lowered with
 // `node data_table_census.test.mjs --update`), and a new file is never allowed. The component's own classes (dt-*) outside data_table.css, and any new count, fail at once.
 // What is counted is in helpers/data_table_scan.mjs (and tested by data_table_scan.test.mjs): every spelling of a table in a stylesheet and in a module, the h() builder of cloud_servers.js included, so zero means zero.
@@ -21,7 +21,7 @@ const exempt = { css: {}, js: {} };
 const bad = [];
 let exemptRules = 0;
 for (const f of fs.readdirSync(path.join(STATIC, 'css')).filter(n => n.endsWith('.css'))) {
-    if (f === 'data_table.css') continue;
+    if (f === 'data_table.css' || f === 'data_table_goals.css') continue; // one component; Goals loads its card rules lazily to keep start CSS flat (#15833)
     const { n, own, exempted } = cssCount(fs.readFileSync(path.join(STATIC, 'css', f), 'utf8'), EXEMPT_SELECTORS, EXEMPT_OWN);
     if (exempted) exemptRules += exempted;
     for (const sel of own) bad.push(`css/${f}: a rule styles the component's own class outside data_table.css: ${sel}`);

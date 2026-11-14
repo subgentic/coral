@@ -431,10 +431,6 @@
 .dt-box.dt-wrap-mail .dt-mail-title { max-width: 100%; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; } /* wrapMail: the title and the second line are whole (#14423) */
 .dt-box.dt-wrap-mail .dt-mail-ask { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 .dt-mail-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.dt-mail-open[data-goal-id] { flex-direction: column; align-items: stretch; gap: 2px; } /* a goal's row on a phone (#15343, the operator): the title has the whole row (two lines), the outcome two lines, and the state and task count sit under them, not in a column that left the title 15 characters */
-.dt-mail-open[data-goal-id] .dt-mail-text { flex: none; }
-.dt-mail-open[data-goal-id] :is(.dt-mail-title, .dt-mail-ask) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; max-width: 100%; overflow: hidden; white-space: normal; overflow-wrap: anywhere; }
-.dt-mail-open[data-goal-id] .dt-mail-side { align-items: flex-start; }
 .dt-mail-time { font-size: var(--fs-base); color: var(--table-tertiary-color); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dt-mail-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .dt-mail-dot.dt-mail-attention { background: var(--warning); }

@@ -63,6 +63,7 @@ function _teamWorktreeSentence(sessions) {
 }
 
 export async function killBoard(boardName) {
+    document.dispatchEvent(new CustomEvent('coral:team-action', { detail: { team: boardName } }));
     const boardSessions = state.liveSessions.filter(s => inTeam(s, boardName));
     if (!boardSessions.length) return;
     // Through the Coral Hub a whole team needs Launch (#3433, #3443): say why (a toast, as Delete
@@ -191,6 +192,7 @@ export function teamWakeFailureWords(team, failed) {
 }
 
 export function toggleTeamSleep(boardName, action) {
+    document.dispatchEvent(new CustomEvent('coral:team-action', { detail: { team: boardName } }));
     const doIt = async () => {
         try {
             const resp = await teamFetch(boardName, n => `/api/sessions/live/team/${encodeURIComponent(n)}/${action}`, { method: 'POST' });

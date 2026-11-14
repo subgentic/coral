@@ -1,5 +1,5 @@
 // #11549 (the operator, from a phone; replaces #10604's and #11224's row chip): a row of the team's Goals tab has no Close goal button (closing is on the goal's own page, where the person can see what it did);
-// on a phone a long title gets two lines instead of one cut line, and a second line under it says the tasks, '2 done · 1 left'; a computer keeps the Tasks column and no second line.
+// #15833: phone cards prefix the title with #ID, allow two title lines, and put state/task counts below; desktop keeps its Tasks column.
 // A real board on the isolated dev server (removed again), at 1280, 390, 320 and 390 at 200% text.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -33,14 +33,15 @@ const B = 'goal-ready-' + Date.now().toString(36);
             await ev(`window.switchNavTab('agents'); window.openTeamPage(${JSON.stringify(B)}, { tab: 'goals' }); true`);
             await waitFor(`document.querySelectorAll('#team-panel-goals tbody tr.dt-row').length >= 2`, `${w}: the goals`, 20000);
             if (big) { await ev(`document.documentElement.style.fontSize = '32px'; true`); await new Promise(r => setTimeout(r, 400)); } // sleep-ok: layout settles after the text size changes
-            const rows = await ev(`[...document.querySelectorAll('#team-panel-goals tbody tr.dt-row')].map(r => { const p = r.querySelector('.dt-primary'), sub = r.querySelector('.goals-row-tasks'), rg = document.createRange(), lines = (rg.selectNodeContents(p), new Set([...rg.getClientRects()].filter(q => q.width > 0).map(q => Math.round(q.top))).size), subShown = !!sub && getComputedStyle(sub).display !== 'none';
-                return { title: p.textContent.trim(), chips: r.querySelectorAll('button.goals-ready-close').length, text: r.textContent.replace(/\\s+/g, ' '), lines, clipped: p.scrollWidth > p.clientWidth + 1 || p.scrollHeight > p.clientHeight + 1, clamp: getComputedStyle(p).webkitLineClamp, sub: subShown ? sub.textContent.trim() : null, progress: !!r.querySelector('.dt-progress-text') && getComputedStyle(r.querySelector('.dt-progress-text')).display !== 'none' }; })`);
+            const rows = await ev(`[...document.querySelectorAll('#team-panel-goals tbody tr.dt-row')].map(r => { const p = r.querySelector('.dt-mail-title') || r.querySelector('.dt-primary'), sub = r.querySelector('.goals-row-tasks'), rg = document.createRange(), lines = (rg.selectNodeContents(p), new Set([...rg.getClientRects()].filter(q => q.width > 0).map(q => Math.round(q.top))).size), subShown = !!sub && getComputedStyle(sub).display !== 'none';
+                return { title: p.textContent.trim().replace(/^#\\d+\\s+/, ''), numbered: /^#\\d+ /.test(p.textContent), chips: r.querySelectorAll('button.goals-ready-close').length, text: r.textContent.replace(/\\s+/g, ' '), lines, clipped: p.scrollWidth > p.clientWidth + 1 || p.scrollHeight > p.clientHeight + 1, clamp: getComputedStyle(p).webkitLineClamp, sub: subShown ? sub.textContent.trim() : null, progress: !!r.querySelector('.dt-progress-text') && getComputedStyle(r.querySelector('.dt-progress-text')).display !== 'none' }; })`);
             const by = t => rows.find(r => r.title.startsWith(t));
             const done = by('Ship the pilot'), long = by('A long goal'), open = by('Keep going');
             assert.ok(done && long && open, `${w}: the goals are listed: ${JSON.stringify(rows)}`);
             for (const r of rows) assert.equal(r.chips, 0, `${w}: no Close goal button on a row (closing is on the goal's page): ${JSON.stringify(r)}`);
             assert.ok(!/Close goal/.test(rows.map(r => r.text).join(' ')), `${w}: no row says Close goal`);
-            if (mobile) { // the shared phone form (#12230): a two-line row (the goal, its outcome), the state and the task count (done/all) at the right; a long title is one cut line
+            if (mobile) { // #15833: a numbered, two-line title above state and done/all, without the outcome line
+                assert.ok(rows.every(r => r.numbered && r.clamp === '2'), `${w}: numbered titles allow two lines: ${JSON.stringify(rows)}`);
                 assert.match(done.text, /2\/2/, `${w}: a finished goal says its tasks, done of all: ${JSON.stringify(done)}`);
                 assert.match(open.text, /0\/1/, `${w}: an open goal says done of all: ${JSON.stringify(open)}`);
                 assert.match(long.text, /1\/1/, `${w}: ${JSON.stringify(long)}`);
@@ -56,6 +57,6 @@ const B = 'goal-ready-' + Date.now().toString(36);
             await waitFor(`document.querySelectorAll('#team-panel-goals tbody tr.dt-row').length >= 2`, `${w}: back on the list`, 8000);
             if (big) await ev(`document.documentElement.style.fontSize = ''; true`);
         }
-        console.log('\nPASS a goal whose tasks are all done offers to be closed from its row');
+        console.log('\nPASS goal cards preserve state, task counts and opening at desktop/phone/200% text');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

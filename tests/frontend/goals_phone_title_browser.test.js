@@ -1,5 +1,5 @@
-// The phone Goals list gives a goal's title the whole row (#15343, the operator: "more room for the initial title, 2 lines for the description"): the state and task count ('Active · 118/158') no longer take
-// a column beside the title, so a long title shows at least 30 characters, may take a second line, and the outcome under it has two lines before its ellipsis. 390 px as touch, on the team page and in the Inbox; 1280 is unchanged.
+// Phone goal cards keep a full-width, two-line numbered title and one state/progress line (#15833).
+// Team and Inbox at 390 px as touch; the desktop table is checked at 1280.
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
@@ -13,7 +13,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
     const probe = `(() => { const r = [...document.querySelectorAll('ROOT tbody tr')].find(x => x.textContent.includes('first task')), t = r.querySelector('.dt-mail-title'), a = r.querySelector('.dt-mail-ask'), s = r.querySelector('.dt-mail-time'), text = r.querySelector('.dt-mail-text'), rect = e => e.getBoundingClientRect();
         const lines = e => Math.round(rect(e).height / parseFloat(getComputedStyle(e).lineHeight));
         const range = document.createRange(); range.selectNodeContents(t); const shown = (() => { let n = 0; const cs = getComputedStyle(t); const lh = parseFloat(cs.lineHeight) || 16; const rects = [...range.getClientRects()]; return { rects: rects.length, tW: Math.round(rect(t).width), textW: Math.round(rect(text).width) }; })();
-        return { tW: shown.tW, textW: shown.textW, tLines: lines(t), aLines: lines(a), tClamp: getComputedStyle(t).webkitLineClamp, aClamp: getComputedStyle(a).webkitLineClamp, aOver: a.scrollHeight > a.clientHeight + 1, side: s.textContent.trim(), titleVisible: Math.floor(rect(t).width / 7.2), sideTop: Math.round(rect(s).top), askBottom: Math.round(rect(a).bottom), titleCut: t.scrollHeight > t.clientHeight + 1 }; })()`;
+        return { tW: shown.tW, textW: shown.textW, tLines: lines(t), hasOutcome: !!a, tClamp: getComputedStyle(t).webkitLineClamp, side: s.textContent.trim(), titleVisible: Math.floor(rect(t).width / 7.2), sideTop: Math.round(rect(s).top), titleBottom: Math.round(rect(t).bottom), titleCut: t.scrollHeight > t.clientHeight + 1 }; })()`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
@@ -30,8 +30,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
             check(m.tW >= m.textW - 12, at + 'the title takes the whole text column: ' + JSON.stringify(m));
             check(m.titleVisible >= 30 || m.tW >= 216, at + 'the title shows at least 30 characters: ' + JSON.stringify(m));
             check(m.tLines <= 2 && m.tClamp === '2', at + 'the title is at most two lines: ' + JSON.stringify(m));
-            check(m.aLines === 2 && m.aClamp === '2' && m.aOver, at + 'the description has two lines and ends in an ellipsis: ' + JSON.stringify(m));
-            check(/^Active/.test(m.side) && m.sideTop >= m.askBottom - 2, at + 'the state sits under the description, not beside the title: ' + JSON.stringify(m));
+            check(!m.hasOutcome, at + 'the compact card omits the outcome preview: ' + JSON.stringify(m));
+            check(/^Active/.test(m.side) && m.sideTop >= m.titleBottom - 2, at + 'the state sits under the title: ' + JSON.stringify(m));
         }
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await Page.navigate({ url: BASE + '/team/' + B + '/goals' }); await Page.loadEventFired(); await install(); await coralReady(ev);

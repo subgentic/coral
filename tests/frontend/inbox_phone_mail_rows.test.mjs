@@ -35,9 +35,9 @@ try {
     folderButtons().find(b => /Goals/.test(b.textContent)).click(); await settle(500);
     const row = document.querySelector('#group-table-view .dt-mailed');
     assert.ok(row, 'Goals is mail rows on a phone');
-    assert.equal(row.querySelector('.dt-mail-title').textContent, 'Ship the Hub');
-    assert.equal(row.querySelector('.dt-mail-ask').textContent, 'The Hub is live', 'the outcome is the row\'s second line (#12230)');
-    assert.equal(row.querySelector('.dt-mail-time').textContent, 'Active \u00b7 1/2', 'with its state and task count');
+    assert.equal(row.querySelector('.dt-mail-title').textContent, '#7 Ship the Hub');
+    assert.equal(row.querySelector('.dt-mail-ask'), null, 'the compact goal card omits the outcome preview (#15833)');
+    assert.match(row.querySelector('.dt-mail-time').textContent, /^Active \u00b7 1\/2 \u00b7 (?:Alpha team|alpha-team)$/, 'state and progress come before the team');
     assert.equal(row.querySelector('.dt-mail-avatar').textContent, 'flag');
     // the other two folders carry their rows' spec
     const sidebar = read('static/inbox_sidebar.js'), arts = read('static/team_artifacts_page.js');
