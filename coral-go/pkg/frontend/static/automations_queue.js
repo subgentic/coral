@@ -25,14 +25,21 @@ export const queueUnavailable = () => unavailable;
 export const queueLoaded = () => loaded;
 /** When the shown queue was last read from the computer chosen (ms), or 0 when it has not been. */
 export const queueReadAt = () => (machine === 'local' ? (loaded ? Date.now() : 0) : (lastRead.get(machine) || { at: 0 }).at);
+/** Puts every armed Kick back to 'Kick' (its timer cleared): used when the computer shown changes. */
+function disarmKicks() {
+    for (const b of document.querySelectorAll('.queue-sure')) { clearTimeout(Number(b.dataset.sure)); delete b.dataset.sure; b.classList.remove('queue-sure'); b.textContent = 'Kick'; b.removeAttribute('aria-label'); }
+}
 export function setQueueMachine(id) {
     const next = !id || id === 'local' ? 'local' : String(id);
     if (next === machine) return;
     machine = next; reading = null; unavailable = ''; denied = false;
+    disarmKicks(); // #16141: a Kick waiting for its second press belongs to the table being left; the draw keeps an armed table, so it is disarmed here and the other computer's table can be drawn
     const kept = machine === 'local' ? null : lastRead.get(machine);
     resources = kept ? kept.resources : []; loaded = !!kept;
     emit(); refreshQueue();
 }
+const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
+const objs = v => (Array.isArray(v) ? v.filter(isObj) : []);
 let unavailable = '', resources = [], loaded = false, denied = false, timer = 0, tickTimer = 0, listeners = new Set(), wanted = false, reading = null, pendingFocus = null;
 const TICK_MS = (typeof window !== 'undefined' && Number(window.__queueTickMs)) || 30000; // the lease and the wait are said again at least this often, with no data change (#13651)
 
@@ -68,7 +75,7 @@ export async function refreshQueue() {
             const body = await r.json();
             if (asked !== machine) return;
             if (!Array.isArray(body && body.resources)) { unavailable = asked === 'local' ? '' : 'Answered with something that is not a queue.'; if (was !== unavailable) emit(); return; } // not a list: never "nothing waiting"
-            const next = body.resources;
+            const next = body.resources.filter(isObj).map(r => ({ ...r, holders: objs(r.holders), queue: objs(r.queue) })); // #16141: a linked computer's answer is not trusted as to the shape of its elements: what is not an object is skipped
             const same = loaded && !was && JSON.stringify(next) === JSON.stringify(resources);
             resources = next; loaded = true;
             if (asked !== 'local') lastRead.set(asked, { resources: next, at: Date.now() });
