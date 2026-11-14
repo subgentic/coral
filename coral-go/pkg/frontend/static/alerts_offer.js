@@ -4,6 +4,7 @@
  * Notifications is always there afterwards. */
 import { browserLocal } from './safe_storage.js';
 import { loadStyles } from './lazy_styles.js';
+import { pollEvery } from './overload.js';
 import { showToast, announceNotice } from './notifications.js';
 import { desktopNotifySupported, desktopNotifyEnabled, desktopNotifyBlocked, enableDesktopNotify } from './desktop_notify.js';
 
@@ -45,12 +46,12 @@ function showWhenStill() {
     let last = Date.now(); const t0 = last, mark = () => { last = Date.now(); };
     const ev = ['pointermove', 'pointerdown', 'keydown', 'wheel'];
     ev.forEach(e => document.addEventListener(e, mark, { passive: true, capture: true }));
-    const timer = setInterval(() => {
+    const timer = pollEvery(() => {
         const now = Date.now();
         if (now - last < STILL_MS && now - t0 < STILL_MAX_MS) return;
         clearInterval(timer); ev.forEach(e => document.removeEventListener(e, mark, { capture: true }));
         if (!document.hidden || now - t0 >= STILL_MAX_MS) showOfferBanner(); else document.addEventListener('visibilitychange', () => showOfferBanner(), { once: true });
-    }, 100);
+    }, 100); // pollEvery: it waits while the tab is hidden, so the strip is never drawn unseen
 }
 
 const OFFER = 'Get an alert when an agent needs you or finishes a reply while you are in another tab?';

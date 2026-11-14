@@ -17,7 +17,7 @@ const BASE = require('./test_base').BASE;
         const top = () => ev(`Math.round(document.querySelector('main, .main-content, #main-content, body').getBoundingClientRect().top + (document.querySelector('.view-list-item, button')?.getBoundingClientRect().top || 0))`);
         const before = await top();
         await ev(`import(${MOD} + 'alerts_offer.js').then(m => m.offerAlertsAfterLaunch())`);
-        for (let i = 0; i < 15; i++) { await ev(`document.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))`); await new Promise(r => setTimeout(r, 200)); }
+        for (let i = 0; i < 15; i++) { await ev(`document.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))`); await new Promise(r => setTimeout(r, 200)); /* sleep-ok: the pointer keeps moving at a human's pace */ }
         assert.equal(await ev(`!!document.getElementById('alerts-offer-banner')`), false, 'no offer while the pointer is moving');
         assert.equal(await top(), before, 'nothing on the page moved while the pointer was moving');
         await waitFor(`!!document.getElementById('alerts-offer-banner')`, 'the offer comes once the pointer is still', { timeout: 6000 });
