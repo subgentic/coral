@@ -77,7 +77,7 @@ func (h *SessionsHandler) flushHeldComments(ctx context.Context, now time.Time) 
 	if h.ss == nil || h.bs == nil || h.ts == nil {
 		return
 	}
-	asks, err := h.ss.HeldAsks(ctx, now, commentHoldBatch)
+	asks, err := h.ss.HeldAsks(ctx, commentHoldBatch)
 	if err != nil || len(asks) == 0 {
 		return
 	}
@@ -135,7 +135,7 @@ func (h *SessionsHandler) flushHeldComments(ctx context.Context, now time.Time) 
 		if !system {
 			h.operatorPosted(first.Board, msg)
 		}
-		if _, err := h.ss.ReleaseHeldAsks(ctx, ids); err != nil {
+		if _, err := h.ss.ReleaseHeldAsks(ctx, ids, now); err != nil {
 			slog.Warn("[artifact comments] a held comment's hold was not cleared", "error", err)
 		}
 		notify[first.Board] = true

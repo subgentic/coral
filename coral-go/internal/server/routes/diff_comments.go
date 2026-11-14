@@ -305,7 +305,18 @@ func (h *SessionsHandler) deliverDiffComment(r *http.Request, caller commentCall
 	}
 	where := fmt.Sprintf("%s, lines %s on %s of your changes (%s)", cleanSendText(anchor.Path), lines, side, diffLink(team, sid, hash))
 	msg := sendMessageOf(sendOnDiff, title, sendAuthorOperator, where, sendReplyCommand(id, rootID), text, snippet, names, commentPictureLinks(c.ImagesJSON)...)
-	if _, err := h.postCommentMessage(ctx, team, msg); err != nil {
+	ls, _ := h.ss.GetLiveSession(ctx, sid)
+	var held bool
+	if ls != nil { // a busy uploader gets the comment when it is free (#14860, #16850)
+		_, held, err = h.holdOrPost(ctx, ls, &owner, team, rootID, msg, false, true)
+	} else {
+		_, err = h.postCommentMessage(ctx, team, msg)
+	}
+	if held {
+		slog.Info("[diff comments] the Operator's comment held for a busy agent", "board", team, "comment", c.ID, "agent", title)
+		return autoDelivery{Queued: title}
+	}
+	if err != nil {
 		slog.Warn("[diff comments] message not posted", "board", team, "error", err)
 		_ = h.ss.CloseArtifactAsk(ctx, rootID, sid, time.Now())
 		return autoDelivery{Reason: "failed"}
