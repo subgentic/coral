@@ -158,8 +158,8 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         check('the line says agents now stop on quit and where to keep them running', notice === 'info Agents now stop when you quit Coral. To keep them running, choose tmux in Settings > Terminal. Got it', notice);
         await ev(`document.querySelector('#default-notice-banner .default-notice-link').click(); true`);
         await until(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'Settings from the link');
-        await until(`!!document.getElementById('settings-pane-terminal') && !document.getElementById('settings-pane-terminal').hidden`, 'the Terminal tab');
-        check('its link opens Settings on the Terminal tab', await ev(`!!document.getElementById('settings-pane-terminal') && !document.getElementById('settings-pane-terminal').hidden && getComputedStyle(document.getElementById('settings-pane-terminal')).display !== 'none'`));
+        await until(`!!document.getElementById('settings-pane-agents') && !document.getElementById('settings-pane-agents').hidden`, 'the Terminal tab');
+        check('its link opens Settings on the Terminal tab', await ev(`!!document.getElementById('settings-pane-agents') && !document.getElementById('settings-pane-agents').hidden && getComputedStyle(document.getElementById('settings-pane-agents')).display !== 'none'`));
         await ev(`window.hideSettingsModal(); window.__tbCalls.length = 0; document.getElementById('default-notice-dismiss').click(); true`);
         await until(`document.getElementById('default-notice-banner').hidden`, 'the notice dismissed');
         check('after Got it, focus is on the Agents search box, not the page body', await ev(`document.activeElement && document.activeElement.id === 'agent-search-input'`), await ev(`document.activeElement ? document.activeElement.tagName + '#' + document.activeElement.id : 'none'`));

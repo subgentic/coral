@@ -107,7 +107,7 @@ const BASE = require('./test_base').BASE;
   assert.deepEqual(await ev(`window.__specialWrites`),[{path:'/api/system/database-security',body:{mode:'key_file'}}]);
   assert.equal(await ev(`document.getElementById('settings-database-encryption').disabled`),false,'select unlocks after the request');
   assert.match(await ev(`document.getElementById('settings-database-encryption-status').textContent`),/Saved: key_file/);
-  await ev(`document.getElementById('settings-tab-terminal').click();true`);
+  await ev(`document.getElementById('settings-tab-agents').click(); document.getElementById('settings-defaults-advanced').open = true;true`);
   await waitFor(`document.getElementById('tb-choice').value==='tmux'`,'backend loaded');
   const chooseBackend=()=>ev(`(() => {const e=document.getElementById('tb-choice');e.focus();e.value='pty';e.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
   await chooseBackend();await waitFor(`document.getElementById('confirm-modal').style.display==='flex'`,'backend asks on change');

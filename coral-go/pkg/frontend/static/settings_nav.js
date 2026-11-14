@@ -27,6 +27,7 @@ const setScreen = screen => modalEl()?.setAttribute('data-screen', screen);
 /** Opens the pane for a group; an unknown or empty group opens the first one. Returns the group shown. */
 function showSettingsGroup(id, { focus = false, remember = true } = {}) {
     if (id === 'needs-you') id = 'notifications';
+    if (id === 'terminal') id = 'agents'; // old backend links now open Defaults (#15910)
     const list = shown();
     const pane = list.find(p => p.dataset.group === id) || list[0];
     if (!pane) return null;

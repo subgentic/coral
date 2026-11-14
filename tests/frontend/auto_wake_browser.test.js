@@ -98,7 +98,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await until(`!!document.getElementById('tb-autowake-on').closest('.sv-row').querySelector('.settings-wake-warning')`, 'the bypass note, which settings_risks.js appends to the row after it is drawn (#16234)', 8000);
         const row = await ev(`({ on: document.getElementById('tb-autowake-on').checked, cap: document.getElementById('tb-autowake-cap').value,
             text: document.getElementById('tb-autowake-on').closest('.sv-row').textContent.replace(/\\s+/g, ' ') })`);
-        await ev(`document.getElementById('settings-tab-terminal').click(); true`);
+        await ev(`document.getElementById('settings-tab-agents').click(); document.getElementById('settings-defaults-advanced').open = true; true`);
         await until(`document.getElementById('tb-autowake-on').getClientRects().length > 0`, 'the Terminal tab open');
         const edge = await ev(`(() => { const a = document.getElementById('tb-autowake-on').closest('.sv-row'), c = document.getElementById('tb-autowake-on').getBoundingClientRect(); return { fromEdge: Math.round(a.getBoundingClientRect().right - c.right), first: a.firstElementChild.tagName === 'DIV' && /Wake agents/.test(a.firstElementChild.textContent) ? 'SPAN' : a.firstElementChild.tagName }; })()`);
         check('Wake agents after a restart: the label first, its switch at the far end like every other row (#7636)', edge.fromEdge < 12 && edge.first === 'SPAN', JSON.stringify(edge));

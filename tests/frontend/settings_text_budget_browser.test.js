@@ -12,8 +12,8 @@ const { coralReady } = require('./helpers/wait');
 // Keep the old section budgets plus the words in those authored lines (HELP_LINES /
 // HINTS); long explanations remain in Docs and never inflate the dialog.
 // Notifications includes the existing Inbox block; retain an allowance of 180 words for its labels/help and team notice.
-const BEFORE = { 'Coral Hub and remote access':186, Defaults:269, 'Storage and backup':151, Terminal:70, Appearance:39, Notifications:72+180, 'Files and Git':40, 'Security and privacy':59 };
-const HELP_WORDS = { 'Coral Hub and remote access':80, Defaults:73, 'Storage and backup':21, Terminal:16, Appearance:6, 'Files and Git':8, 'Security and privacy':17 };
+const BEFORE = { 'Coral Hub and remote access':186, Defaults:269, 'Storage and backup':151, Updates:20, 'Teams and Chief':80, Appearance:80, Notifications:72+180, 'Files and Git':40, 'Security and privacy':59 };
+const HELP_WORDS = { 'Coral Hub and remote access':80, Defaults:73, 'Storage and backup':21, Updates:6, 'Teams and Chief':12, Appearance:22, 'Files and Git':8, 'Security and privacy':17 };
 const BUDGET = Object.fromEntries(Object.entries(BEFORE).map(([k,v])=>[k,v+(HELP_WORDS[k]||0)]));
 
 (async () => {
@@ -36,14 +36,14 @@ const BUDGET = Object.fromEntries(Object.entries(BEFORE).map(([k,v])=>[k,v+(HELP
         await ev(`document.getElementById('settings-tab-general').click(); true`);
         await waitFor(`!!document.querySelector('#settings-pane-general:not([hidden])')`, 'General open', 6000);
         const seen = id => ev(`(() => { const e = document.getElementById(${JSON.stringify(id)}); return !!e && e.checkVisibility({ checkVisibilityCSS: true }); })()`);
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#settings-pane-general select')].filter(e => e.checkVisibility({ checkVisibilityCSS: true })).slice(0, 2).map(e => e.id)`), ['settings-theme', 'settings-agent-type'], 'Theme, then Default agent type');
-        // the render engine is a Terminal setting (#7040), behind a disclosure of its own
-        await ev(`document.getElementById('settings-tab-terminal').click(); true`);
-        await waitFor(`!!document.querySelector('#settings-pane-terminal:not([hidden])')`, 'Terminal open', 6000);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#settings-pane-general select')].filter(e => e.checkVisibility({ checkVisibilityCSS: true })).slice(0, 2).map(e => e.id)`), ['settings-theme', 'settings-terminal-font-size'], 'Theme, then terminal display');
+        // ST2b: drawing engine is in Appearance Advanced.
+        await ev(`document.getElementById('settings-tab-general').click(); true`);
+        await waitFor(`!!document.querySelector('#settings-pane-general:not([hidden])')`, 'Terminal open', 6000);
         assert.equal(await seen('settings-renderer-select'), false, 'the render engine is not shown until its disclosure opens');
-        await ev(`document.querySelector('#settings-pane-terminal .settings-engine-more > summary').click(); true`);
+        await ev(`document.querySelector('#settings-pane-general .settings-engine-more > summary').click(); true`);
         assert.equal(await seen('settings-renderer-select'), true, 'and is there when it does');
-        await ev(`document.querySelector('#settings-pane-terminal .settings-engine-more').open = false; true`);
+        await ev(`document.querySelector('#settings-pane-general .settings-engine-more').open = false; true`);
         await ev(`document.getElementById('settings-tab-general').click(); true`);
         await waitFor(`!!document.querySelector('#settings-pane-general:not([hidden])')`, 'General open again', 6000);
         const groups = await ev(`[...document.querySelectorAll('#settings-tabs [role=tab]')].map(b => ({ id: b.id, name: b.querySelector('.settings-tab-name').textContent.trim() }))`);

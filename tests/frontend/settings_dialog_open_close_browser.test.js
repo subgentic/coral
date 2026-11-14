@@ -35,11 +35,11 @@ const SAVED = { theme: 'light', default_agent_type: 'codex', default_working_dir
             assert.deepEqual(v, { dir: '/work/saved', agent: 'codex', font: '16', bars: false, fit: true, notify: true, theme: 'light' }, JSON.stringify(v));
         });
         await run('opens on the group asked for with focus inside, and remembers the last group', async () => {
-            await ev(`window.hideSettingsModal(); true`); await open('terminal'); assert.equal(await group(), 'terminal');
+            await ev(`window.hideSettingsModal(); true`); await open('terminal'); assert.equal(await group(), 'agents');
             await waitFor(`document.getElementById('settings-modal').contains(document.activeElement)`, 'focus is inside the dialog (it moves in on the frame after the open)', 5000);
-            assert.equal(await ev(`document.getElementById('settings-tab-terminal').getAttribute('aria-selected')`), 'true');
-            await ev(`document.getElementById('settings-tab-terminal').click(); true`);
-            await ev(`window.hideSettingsModal(); true`); await open(); assert.equal(await group(), 'terminal', 'no group asked for: the last one chosen');
+            assert.equal(await ev(`document.getElementById('settings-tab-agents').getAttribute('aria-selected')`), 'true');
+            await ev(`document.getElementById('settings-tab-agents').click(); true`);
+            await ev(`window.hideSettingsModal(); true`); await open(); assert.equal(await group(), 'agents', 'no group asked for: the last one chosen');
             await open('files'); assert.equal(await group(), 'files', 'a group asked for while open switches to it');
         });
         await run('Cancel closes it, sends nothing and gives focus back to what opened it', async () => {

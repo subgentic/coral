@@ -55,7 +55,7 @@ const DATABASE = 'The sessions database is damaged (page 12 is corrupt). Stop Co
         await waitFor(`!!document.getElementById('agent-search-input')`, 'the page', 15000);
         await ev(`(async () => { await window.showSettingsModal('files'); return true; })()`);
         await waitFor(`!!document.getElementById('settings-tools-folder-row')`, 'the row');
-        await ev(`document.getElementById('settings-tab-terminal').click(); true`); // the row is in the Terminal group
+        await ev(`document.getElementById('settings-tab-agents').click(); document.getElementById('settings-defaults-advanced').open = true; true`); // the row is in the Terminal group
         await waitFor(`(() => { const p = document.querySelector('#settings-modal .settings-pane:not([hidden])'); return !!p && p.dataset.group === 'terminal'; })()`, 'the Terminal group', 5000);
         const row = await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'settings_core.js'); m.renderToolsFolderStatus({ tools_folder: { path: 'C:\\\\Users\\\\someone\\\\Coral\\\\tools', writable_by: ['Users', 'Everyone'] } });
             const r = document.getElementById('settings-tools-folder-row'), s = document.getElementById('settings-tools-folder-status'); const b = s.getBoundingClientRect();
