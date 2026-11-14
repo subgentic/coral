@@ -1,7 +1,7 @@
 /* Run scripts in an HTML file's preview, only when the person says so (#14730, design v3). Loaded on demand (importOnce) by artifact_preview.js for the single-artifact viewer.
  *
  * Trust is one exact version of the file (its digest), kept on the computer that holds it (GET/PUT/DELETE /api/artifacts/{digest}/trust-preview, owner only). The page that
- * runs is artifact_host.html in a frame with sandbox="allow-scripts" and nothing else: no same-origin access, no cookies, no storage, no popups, no forms, no device (allow="").
+ * runs is artifact_host.html in a frame with sandbox="allow-scripts" and nothing else: no same-origin access, no cookies, no popups, no forms, no device (allow=""); an in-memory storage shim stands in for localStorage/sessionStorage (lost when the frame is removed).
  * Its own policy (header and meta) blocks every request; the file's HTML is posted into it ONCE, after Coral has hashed the bytes it fetched and found them equal to the
  * digest that was trusted. Any other answer (a failed read of the trust, a different hash, a file over 2 MiB, no way to hash) leaves scripts OFF, with the plain preview. */
 import { serverFetch } from './server_base.js';
@@ -118,7 +118,7 @@ function scriptFrame(html, name, { onNavigated }) {
 
 /** Draw the file with its scripts running, under a bar OUTSIDE the frame that says so and holds Turn off. `turnOff()` is called when the person turns it off (after the record is deleted). */
 export function drawScripted(wrapper, { html, name, turnOff, line }) {
-    const strip = bar('artifact-scripts-bar', 'Scripts are on for this version of the file. Coral limits what they can reach: no web requests, no cookies, no files. Preview only: styles and scripts from the folder are not loaded. ');
+    const strip = bar('artifact-scripts-bar', 'Scripts are on for this version of the file. Coral limits what they can reach: no web requests, no cookies, no files, and nothing it stores is kept after the preview closes. Preview only: styles and scripts from the folder are not loaded. ');
     strip.setAttribute('role', 'status');
     const off = button('Turn off', 'artifact-scripts-off', () => { off.disabled = true; turnOff(); });
     strip.append(off);
@@ -142,7 +142,7 @@ export function drawOffer(wrapper, { hex, server, onTrusted, fetchFn = serverFet
         const box = document.createElement('div');
         box.className = 'artifact-scripts-sure'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Run scripts in this file');
         const words = document.createElement('p');
-        words.textContent = 'This file can run scripts. They can draw and animate. Coral limits what they can reach: no web requests, no cookies, no files. Do not trust a file you would not open.';
+        words.textContent = 'This file can run scripts. They can draw and animate. Coral limits what they can reach: no web requests, no cookies, no files, and nothing it stores is kept after the preview closes. Do not trust a file you would not open.';
         const msg = document.createElement('p'); msg.className = 'artifact-scripts-msg'; msg.setAttribute('role', 'status');
         const go = button('Run scripts', 'btn-primary artifact-scripts-go', async () => {
             go.disabled = true;

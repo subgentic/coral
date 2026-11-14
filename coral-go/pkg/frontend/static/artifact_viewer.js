@@ -436,7 +436,9 @@ export function openArtifactViewer(hex, opts = {}) {
     const wasOpen = !d.hidden;
     body.replaceChildren(Object.assign(document.createElement('div'), { className: 'inline-preview-loading', textContent: 'Loading...' })); // the title, the version and the review target are the new version's: the old text does not stay under them while the new bytes arrive (#15636)
     setContentPending(d, true);
-    if (!d._sandboxWatch) { d._sandboxWatch = true; new MutationObserver(() => { if (body.querySelector('.artifact-linked-notice:not([data-sandbox-synced])')) syncSandbox(d, body); }).observe(body, { childList: true, subtree: true }); } // the banner and the header's Sandboxed chip appear together, not when the whole render ends: before, a slow render showed the banner (or flashed it for a viewer who had seen it) with no chip (#14988)
+    if (d._sandboxObserver) d._sandboxObserver.disconnect();
+    d._sandboxObserver = new MutationObserver(() => { if (body.querySelector('.artifact-linked-notice:not([data-sandbox-synced])')) syncSandbox(d, body); });
+    d._sandboxObserver.observe(body, { childList: true, subtree: true }); // the banner and the header's Sandboxed chip appear together, not when the whole render ends: before, a slow render showed the banner (or flashed it for a viewer who had seen it) with no chip (#14988)
     if (!d._sandboxRedraw) { d._sandboxRedraw = true; body.addEventListener('coral-preview-redrawn', () => { syncSandbox(d, body); syncScripts(d, body); }); } // scripts turned on or off (#14730) change which banner is there
     if (typeof opts.onClose === 'function') _onClose = opts.onClose;
     else if (!wasOpen) _onClose = null;
@@ -580,6 +582,7 @@ export async function openBundledDocument({ title, url, name, onOpened }) {
     _gen++;
     _dialog.hidden = true;
     _comments?.close();
+    if (_dialog._sandboxObserver) { _dialog._sandboxObserver.disconnect(); _dialog._sandboxObserver = null; }
     _dialog.querySelector('.artifact-viewer-body').replaceChildren(); // stop media, drop frames
     const back = _returnFocus;
     _returnFocus = null;

@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; frame-src about:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <!-- The trusted HOST of an HTML file the person chose to run scripts for (#14730, design v3). Loaded by URL (/artifact_host.html) so its own
      response headers govern it (see artifactHostCSP in internal/server): default-src 'none', script-src 'unsafe-inline', frame-src about:,
-     sandbox allow-scripts. The dashboard frames it with sandbox="allow-scripts" (an opaque origin: no cookies, no storage, no access to Coral)
+     sandbox allow-scripts. The dashboard frames it with sandbox="allow-scripts" (an opaque origin: no cookies, no access to Coral; an in-memory storage shim stands in for localStorage/sessionStorage)
      and posts the file's HTML ONCE; the host runs it in a child frame that can neither navigate nor make a request.
      No bridge: the only things that cross are the HTML in (once) and one clamped whole number out (the page's height, so the frame can fit). -->
 <style>html,body{margin:0;height:100%}iframe{border:0;width:100%;height:100%;display:block;background:#fff}</style></head>
