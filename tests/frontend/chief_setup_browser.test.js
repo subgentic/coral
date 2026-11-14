@@ -35,7 +35,7 @@ const SID = '11111111-2222-4333-8444-555555555555';
             await ev(STUB);
             await ev(`(async () => { await window.showSettingsModal('chief'); return true; })()`);
             await waitFor(`!!document.querySelector('${host} .sv[data-ready]')`, at + 'the Chief screen', 10000);
-            assert.equal(await ev(`document.getElementById('settings-tab-chief') && document.getElementById('settings-tab-chief').textContent.replace('chat', '').trim()`), 'Chief', at + 'the Settings dialog has a Chief tab');
+            assert.equal(await ev(`document.getElementById('settings-tab-chief') && document.getElementById('settings-tab-chief').textContent.replace('chat', '').trim()`), 'Teams and Chief', at + 'the Settings dialog has a Teams and Chief tab (#16608)');
             const labels = await ev(`[...document.querySelectorAll('${host} .sv-row .sv-label, ${host} .sv-row label')].map(l => l.textContent.trim()).filter(Boolean).slice(0, 12)`);
             for (const want of ['Name', 'Avatar colour', 'Avatar letter', 'Which agent', 'Its model', 'Team it fronts', 'Serve the Chief page']) assert.ok(labels.some(l => l.startsWith(want)), at + `a row says "${want}": ${JSON.stringify(labels)}`);
             const teamOpts = await ev(`[...document.querySelectorAll('${host} select[name=chief_fronts] option')].map(o => o.textContent.trim())`); // the team's name, never its board id (#12172)
