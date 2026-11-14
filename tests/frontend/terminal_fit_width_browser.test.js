@@ -165,7 +165,7 @@ async function openTab({ contextId, width, height, mobile, fakeHubView = false, 
     const phoneExpected = !!mobile && (width <= 767 || (height <= 500 && width <= 950));
     await waitFor(`(() => { const d = { coarse: matchMedia('(pointer: coarse)').matches, w: innerWidth, h: innerHeight, phone: matchMedia('(max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px)').matches }; return d.coarse === ${!!mobile} && d.w === ${width} && d.h === ${height} && d.phone === ${phoneExpected} ? d : false; })()`, 'the emulated device (pointer, window size and the phone query)', 5000);
     const metrics = (w, h) => Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: dpr, mobile });
-    return { ev, waitFor, load, close, metrics };
+    return { ev, waitFor, load, close, metrics, front: () => Page.bringToFront() };
 }
 
 // Shows agent `a` in the terminal view and waits until the xterm renders the pane (cols x rows).
@@ -225,6 +225,25 @@ function assertFits(v, what) {
             await tab.close(); tabs.pop();
         }
 
+        console.log('0b. A 200-column pane with no choice made: the phone keeps a readable font and scrolls (#16365); pressing Fit goes down to the minimum');
+        const wide = { cols: 200, rows: 50 };
+        setPane(A.name, wide.cols, wide.rows);
+        {
+            const ctx = await newContext(); contexts.push(ctx);
+            const fresh = await openTab({ contextId: ctx, width: 390, height: 844, mobile: true, fitDefault: true });
+            tabs.push(fresh);
+            let w0 = await show(fresh, A, wide);
+            w0 = await settled(fresh, 'the toggle shown', 'v.btn && v.btn.shown');
+            assert.equal(w0.font, PHONE_BASE, `a pane that needs under 8 px is not shrunk by default: the phone's own ${PHONE_BASE} px (${JSON.stringify(w0)})`);
+            assert.ok(w0.scrolls, 'and scrolls sideways');
+            assert.equal(w0.btn.pressed, 'false'); assert.equal(w0.btn.label, 'Fit the terminal to the screen width');
+            assert.equal(await fresh.ev(`localStorage.getItem('coral-terminal-fit-width')`), null, 'declining stores nothing');
+            await click(fresh);
+            w0 = await settled(fresh, 'the minimum font on request', `v.font === ${MIN_FONT} && v.btn.pressed === 'true'`);
+            await fresh.close(); tabs.pop();
+        }
+        setPane(A.name, narrow.cols, narrow.rows);
+
         console.log('1. A phone on an 80-column pane');
         let v = await show(phone, A, narrow);
         assert.equal(v.following, true, 'the phone renders the pane at its size');
@@ -253,7 +272,6 @@ function assertFits(v, what) {
         console.log(`   ✓ ${v.font} px after a reload`);
 
         console.log('3. A 200-column pane stops at the minimum and scrolls');
-        const wide = { cols: 200, rows: 50 };
         setPane(A.name, wide.cols, wide.rows);
         await phone.load();
         await show(phone, A, wide);
@@ -278,6 +296,7 @@ function assertFits(v, what) {
         // A terminal agent has no transcript, so it never gets the chat view: set the class the chat
         // view puts on the wrapper (live_chat.js applyLiveViewMode).
         const chat = on => phone.ev(`document.getElementById('capture-wrapper').classList.toggle('chat-mode', ${on}); true`);
+        // The toggle hides when the container is hidden (the chat view). It used to hide only when the next pane update ran _applyFitWidth, so it stayed for a while: 2 runs in 8 timed out here (#16365).
         await chat(true);
         v = await settled(phone, 'the toggle hidden in chat', 'v.btn && !v.btn.shown');
         await chat(false);

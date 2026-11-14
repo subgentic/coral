@@ -53,7 +53,10 @@ const MIN_FIT_FONT_PHONE = 7; // a phone that asked to see every column of a pan
 const _minFitFont = () => (_isPhoneWidth() ? MIN_FIT_FONT_PHONE : MIN_FIT_FONT);
 let _baseFont = DESKTOP_FONT; // the font size from Settings (or this window's default), used whenever not fitting
 let _fitChoice = (() => { try { const v = browserLocal.get(FIT_WIDTH_KEY); return v === '1' ? true : v === '0' ? false : null; } catch { return null; } })(); // null: the person has not chosen
-const _fitOn = () => (_fitChoice === null ? _isPhoneWidth() : _fitChoice);
+const AUTO_FIT_MIN_FONT = 8;  // the default fit (no choice made) is only for a pane that fits at a size a person can read: a 211-column pane would need about 4 px, so the phone keeps its own font and scrolls sideways (#16365); pressing the toggle is a choice and goes down to MIN_FIT_FONT_PHONE
+let _autoDeclined = false;    // the default fit found the pane too wide to read whole, for the size it was last applied at
+const _fitWanted = () => (_fitChoice === null ? _isPhoneWidth() : _fitChoice);
+const _fitOn = () => _fitWanted() && !(_fitChoice === null && _autoDeclined);
 
 function _fitButton() {
     return document.getElementById('terminal-fit-width-btn');
@@ -80,7 +83,8 @@ function _setFont(size) {
 // Applies the fit-to-width font, or the Settings font, and shows the toggle when it can help.
 function _applyFitWidth() {
     if (!terminal) { _updateFitButton(false); return; }
-    if (!_following || !_fitOn()) {
+    _autoDeclined = false;
+    if (!_following || !_fitWanted()) {
         _setFont(_baseFont);
         _updateFitButton(_following && _overflowsAtBase());
         return;
@@ -102,6 +106,10 @@ function _applyFitWidth() {
         _setFont(size + 0.5);
         if (_screenWidth() > avail) { _setFont(size); break; }
         size += 0.5;
+    }
+    if (_fitChoice === null && size < Math.min(AUTO_FIT_MIN_FONT, _baseFont)) { // too wide to read whole: leave it at full size, the person can still press the toggle
+        _autoDeclined = true;
+        _setFont(_baseFont);
     }
     _updateFitButton(true);
 }
@@ -695,10 +703,12 @@ function _watchContainerSize(containerEl) {
                     const b = terminal.buffer.active;
                     _bottomWhenHidden = b.viewportY >= b.baseY;
                 }
+                _updateFitButton(false); // nothing is drawn to fit (the chat view): no toggle until it is shown again (#16365)
                 return;
             }
             const wasBottom = _bottomWhenHidden;
             _bottomWhenHidden = null;
+            if (terminal && _following) _applyFitWidth(); // shown again: the toggle and font follow the pane
             if (fitAddon && !_panelDragging) _sizeLocal(true);
             if (wasBottom && terminal) requestAnimationFrame(() => { if (terminal) terminal.scrollToBottom(); });
             requestAnimationFrame(revealCursor); // the window changed size: the prompt stays in view while following
