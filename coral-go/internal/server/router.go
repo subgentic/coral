@@ -341,6 +341,7 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 // registerSessions: the live-session, agent task, note, event and WebSocket routes.
 func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	sessHandler := h.sess
+	hubTarget := routes.HubTargetGuard(s.ownHubServerID) // typing into an agent through the hub: the hub names the server it routed to, and it must be this one (#16032)
 	// Live sessions
 	r.Get("/api/sessions/resolve", sessHandler.ResolveByPIDs)
 	r.Get("/api/sessions/live", sessHandler.List)
@@ -365,21 +366,21 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/sessions/live/{name}/search-files", sessHandler.SearchFiles)
 	r.Get("/api/sessions/live/{name}/git", sessHandler.Git)
 	r.Get("/api/sessions/live/{name}/branches", sessHandler.Branches)
-	r.Post("/api/sessions/live/{name}/send", sessHandler.Send)
+	r.With(hubTarget).Post("/api/sessions/live/{name}/send", sessHandler.Send)
 	r.Delete("/api/sessions/live/{name}/held/{id}", sessHandler.CancelHeld)
-	r.With(routes.RefuseSignInLink).Post("/api/sessions/live/{name}/goal", sessHandler.RequestGoal)
+	r.With(routes.RefuseSignInLink, hubTarget).Post("/api/sessions/live/{name}/goal", sessHandler.RequestGoal)
 	s.goalMetrics = routes.NewGoalMetricsHandler(s.db)
 	r.Get("/api/goals/metrics", s.goalMetrics.Metrics)
 	callMetrics := routes.NewCallMetricsHandler(s.db)
 	r.Post("/api/call-metrics", callMetrics.Record)
 	r.Get("/api/call-metrics/summary", callMetrics.Summary)
-	r.Post("/api/sessions/live/{name}/keys", sessHandler.Keys)
+	r.With(hubTarget).Post("/api/sessions/live/{name}/keys", sessHandler.Keys)
 	r.Post("/api/sessions/live/{name}/resize", sessHandler.Resize)
-	r.Post("/api/sessions/live/{name}/kill", sessHandler.Kill)
+	r.With(hubTarget).Post("/api/sessions/live/{name}/kill", sessHandler.Kill)
 	r.Get("/api/sessions/live/{name}/waiting", sessHandler.ListWaiting)             // what waits for the agent: its unread board messages and the last send not typed (#7727)
 	r.Post("/api/sessions/live/{name}/waiting/send", sessHandler.SendWaitingNow)    // Send now (#7727)
 	r.Post("/api/sessions/live/{name}/waiting/dismiss", sessHandler.DismissWaiting) // Dismiss: mark the listed messages read for the agent without typing anything (#12713)
-	r.Post("/api/sessions/live/{name}/restart", sessHandler.Restart)
+	r.With(hubTarget).Post("/api/sessions/live/{name}/restart", sessHandler.Restart)
 	r.Post("/api/sessions/live/{name}/model", sessHandler.SwitchModel) // the live model and thinking-level switch (#4969)
 	r.Post("/api/sessions/live/{name}/resume", sessHandler.Resume)
 	r.Post("/api/sessions/live/{name}/notices/pause", sessHandler.PauseNotices)   // hold Coral's notices to one agent (#11387): the Operator's, the owner's through the Hub
@@ -412,12 +413,12 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 
 	// Team sleep/wake
 	r.Get("/api/sessions/live/team/{boardName}/sleep-status", sessHandler.SleepStatus)
-	r.Post("/api/sessions/live/team/{boardName}/sleep", sessHandler.Sleep)
-	r.Post("/api/sessions/live/team/{boardName}/wake", sessHandler.Wake)
+	r.With(hubTarget).Post("/api/sessions/live/team/{boardName}/sleep", sessHandler.Sleep)
+	r.With(hubTarget).Post("/api/sessions/live/team/{boardName}/wake", sessHandler.Wake)
 
 	// Individual session sleep/wake
-	r.Post("/api/sessions/live/{sessionID}/sleep", sessHandler.SleepSession)
-	r.Post("/api/sessions/live/{sessionID}/wake", sessHandler.WakeSession)
+	r.With(hubTarget).Post("/api/sessions/live/{sessionID}/sleep", sessHandler.SleepSession)
+	r.With(hubTarget).Post("/api/sessions/live/{sessionID}/wake", sessHandler.WakeSession)
 	r.Get("/api/sessions/live/{sessionID}/agent-candidate", sessHandler.AgentCandidate) // #391: Operator only (operatorOnlyRoutes)
 	r.Post("/api/sessions/live/{sessionID}/record-agent", sessHandler.RecordAgent)
 	r.Post("/api/sessions/record-agents", sessHandler.RecordAgents)
@@ -487,8 +488,8 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.With(routes.RedactSignInLink).Post("/api/sessions/live/{name}/events", sessHandler.CreateEvent)
 	r.With(routes.RedactSignInLink).Post("/api/sessions/live/{name}/turn-end", sessHandler.TurnEndHandoff)
 	r.With(routes.RedactSignInLink).Post("/api/sessions/live/{name}/pending-tool", sessHandler.SetPendingTool)
-	r.Post("/api/sessions/live/{name}/answer-prompt", sessHandler.AnswerPrompt)
-	r.Post("/api/sessions/live/{name}/dismiss-wait", sessHandler.DismissWait)
+	r.With(hubTarget).Post("/api/sessions/live/{name}/answer-prompt", sessHandler.AnswerPrompt)
+	r.With(hubTarget).Post("/api/sessions/live/{name}/dismiss-wait", sessHandler.DismissWait)
 	r.Post("/api/sessions/live/{name}/auto-sleep", sessHandler.AutoSleepOpt)
 	r.Post("/api/sessions/live/{name}/keep-full-access", sessHandler.KeepFullAccessOpt)
 	r.Get("/api/launch-disclosure", sessHandler.GetLaunchDisclosure)                                          // #14353: the first-launch notice, owner only
@@ -968,4 +969,13 @@ func stampAt(o *routes.IdentityObserver) string {
 		return at.Format(time.RFC3339)
 	}
 	return ""
+}
+
+// ownHubServerID is this computer's Coral Hub server id, "" when it is not linked to a hub.
+func (s *Server) ownHubServerID(ctx context.Context) (string, error) {
+	c, err := store.NewCloudStore(s.db, store.NewRemoteServerStore(s.db, s.cfg.CoralDir())).Get(ctx)
+	if err != nil || c == nil {
+		return "", err
+	}
+	return c.ServerID, nil
 }

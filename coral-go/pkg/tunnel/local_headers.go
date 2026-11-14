@@ -99,6 +99,15 @@ func ForwardsHubServer(method, decodedPath string) bool {
 	return method == http.MethodPost && hubServerRoute.MatchString(decodedPath)
 }
 
+// hubTargetRoute is where X-Coral-Hub-Server means "the server this request was routed to" (#16032): the routes that act on one agent (type into it, set its goal, kill, restart, sleep, wake, dismiss its wait; #16074 added all but the first three). The hub routes by server id alone, so two computers that
+// share an agent name could be mixed up; the server checks the id the hub names against its own (HubTargetGuard).
+var hubTargetRoute = regexp.MustCompile(`^/api/sessions/live/(?:[^/]+/(?:send|keys|answer-prompt|goal|kill|restart|dismiss-wait|sleep|wake)|team/[^/]+/(?:sleep|wake))$`)
+
+// ForwardsHubTarget reports whether X-Coral-Hub-Server is forwarded as the routed-to server id: a POST to one of those agent routes (or a team's sleep or wake), and nothing else.
+func ForwardsHubTarget(method, decodedPath string) bool {
+	return method == http.MethodPost && hubTargetRoute.MatchString(decodedPath)
+}
+
 // HubSourceTeamHeader names the sending team (its generated board id, b- and ten characters) of a relayed cross-team message or file (#5572). The hub sets it from the link pair, overwriting any
 // value a sending Coral supplied; it is forwarded only where X-Coral-Hub-Server is, and the server trusts it exactly like that header: only on a request this connector stamped.
 const HubSourceTeamHeader = "X-Coral-Hub-Source-Team"
@@ -153,7 +162,7 @@ func scrub(h http.Header, method, decodedPath string) http.Header {
 	if !ForwardsIdempotencyKey(method, decodedPath) {
 		out.Del(IdempotencyKeyHeader)
 	}
-	if !ForwardsHubServer(method, decodedPath) {
+	if !ForwardsHubServer(method, decodedPath) && !ForwardsHubTarget(method, decodedPath) {
 		out.Del(HubServerHeader)
 	}
 	if !ForwardsHubNotice(method, decodedPath) {
