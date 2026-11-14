@@ -120,13 +120,12 @@ const { removeBoards } = require('./helpers/board_cleanup');
         // ── The open tasks first, then the done ones, as pages of one list ──
         await ev(`window.__searchBeforePaging = document.getElementById('tk-search'); true`);
         await type('gamma');
-        // Three open matches leave the footer in view, so it automatically loads the
-        // first done page. Clicking twice raced that load and clicked a removed button.
-        await settle(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 53`, 'automatic first done page');
+        // A search is ONE request across every status (#16702: a Done task must show in the results at once), so the first page is the first 50 of all 63 matches, still open first; Load more pages the rest.
+        await settle(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 50`, 'the first page of the search');
         s = await snap();
-        check('gamma automatically loads the first 50 done after its three open tasks', s.count === '63 of 66' && s.statuses.slice(0, 3).every(x => x !== 'Done') && s.statuses.slice(3).every(x => x === 'Done') && /Showing 53 of 63/.test(s.more || ''), JSON.stringify([s.count, s.statuses.length, s.more]));
-        check('automatic paging keeps the same search input, its text and keyboard focus', await ev(`document.getElementById('tk-search') === window.__searchBeforePaging && document.activeElement === window.__searchBeforePaging && window.__searchBeforePaging.value === 'gamma'`));
-        await ev(`document.querySelector('#board-task-list .dt-foot').scrollIntoView({ block: 'end' }); true`);
+        check('gamma is one list of its 63 matches: the first 50, its three open tasks first, Load more offers the rest', s.count === '63 of 66' && s.statuses.length === 50 && s.statuses.slice(0, 3).every(x => x !== 'Done') && s.statuses.slice(3).every(x => x === 'Done') && /Showing 50 of 63/.test(s.more || ''), JSON.stringify([s.count, s.statuses.length, s.more]));
+        check('paging keeps the same search input, its text and keyboard focus', await ev(`document.getElementById('tk-search') === window.__searchBeforePaging && document.activeElement === window.__searchBeforePaging && window.__searchBeforePaging.value === 'gamma'`));
+        await ev(`document.querySelector('#board-task-list .dt-more').click(); true`);
         await settle(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 63`, 'every match');
         s = await snap();
         check('and the last page: all 63, each once, no button', new Set(s.ids).size === 63 && s.more === null, JSON.stringify([s.ids.length, new Set(s.ids).size, s.more]));
