@@ -1,5 +1,5 @@
 // The robot "Copy for an agent" on the screens #15063 left (#15152): the agent page, the Needs you list, Saved, the Merge queue working mode, and each section of the main Settings (Notifications and
-// Network and Hub point at their own docs topic). Each is a 'Copy for an agent' icon that copies the screen's line and where in the agent docs to read. The Hub's Computers page has the same
+// Coral Hub and remote access point at their own docs topic). Each is a 'Copy for an agent' icon that copies the screen's line and where in the agent docs to read. The Hub's Computers page has the same
 // robot (cloud_server_view.js); it needs a Hub session, so it is pinned by agent_doc_map.test.mjs (the topic) and not driven here. Real board on the isolated dev server (removed again); the clipboard is a stand-in. 1280 and 390 px.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -58,9 +58,9 @@ const { coralReady } = require('./helpers/wait');
             console.log(`${at}5. The main Settings sections`);
             await load('/');
             await ev(`(async () => { await window.showSettingsModal('network'); return true; })()`);
-            await has('#settings-modal .settings-pane[data-group="network"] > .agent-copy-hrow > .agent-copy', at, 'the robot on Network and Hub');
-            await robot('#settings-modal .settings-pane[data-group="network"] > .agent-copy-hrow > .agent-copy', 'Network and Hub');
-            assert.match(await press('#settings-modal .settings-pane[data-group="network"] > .agent-copy-hrow > .agent-copy', at, 'the Network and Hub line'), /Network and Hub[\s\S]*\nDocs: coral-agent docs hub, section “Registry \(hub only\)”$/);
+            await has('#settings-modal .settings-pane[data-group="network"] > .agent-copy-hrow > .agent-copy', at, 'the robot on Coral Hub and remote access');
+            await robot('#settings-modal .settings-pane[data-group="network"] > .agent-copy-hrow > .agent-copy', 'Coral Hub and remote access');
+            assert.match(await press('#settings-modal .settings-pane[data-group="network"] > .agent-copy-hrow > .agent-copy', at, 'the Coral Hub and remote access line'), /Coral Hub and remote access[\s\S]*\nDocs: coral-agent docs hub, section “Registry \(hub only\)”$/);
             const panes = await ev(`[...document.querySelectorAll('#settings-modal .settings-pane[data-group]')].filter(p => p.dataset.group !== 'general' && !p.querySelector(':scope > .agent-copy-hrow > .agent-copy')).map(p => p.dataset.group)`);
             assert.deepEqual(panes, [], at + 'every section but General has one (General has a labelled button, #15993): ' + panes);
             await ev(`(async () => { await window.showSettingsModal('notifications'); return true; })()`);
