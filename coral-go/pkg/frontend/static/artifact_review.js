@@ -212,8 +212,8 @@ export function attachReview(d, { reload }) {
             <span class="artifact-review-error" role="alert"></span>
             <p class="artifact-review-pending" role="status" hidden></p>
             <button type="button" class="btn artifact-review-cancel">Cancel</button>
-            <button type="submit" class="btn">Send request</button>
-            <button type="button" class="btn btn-primary artifact-review-approve-note">Approve with comment</button>
+            <button type="submit" class="btn btn-primary">Send request</button>
+            <button type="button" class="btn artifact-review-approve-note">Approve with comment</button>
         </form>`;
     d.querySelector('.artifact-viewer-header').after(bar); // the change-request form, under the header (not a box inside its row, which squeezed the name to 'RE…', walk 3 N21)
     // the review's controls are on the viewer's one header row (#12223): its status beside the version chip, Approve and Request changes at the right, Approve with a note in the ⋯ menu

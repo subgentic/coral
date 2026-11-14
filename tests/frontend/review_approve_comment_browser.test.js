@@ -42,6 +42,9 @@ const { coralReady } = require('./helpers/wait');
                 check(`${w}: the request button and Approve with comment are side by side, one row` + (w > 768 ? ' with Cancel' : ', Cancel under them'), g.ap.t === g.send.t && (w > 768 ? g.send.t === g.cancel.t : g.cancel.t >= g.send.b - 1), JSON.stringify(g));
                 check(`${w}: they are right-aligned and at normal size (as tall as the toolbar's buttons)`, g.ap.r >= g.form.r - 20 && g.ap.h >= g.tb.h - 2 && g.send.h >= g.tb.h - 2, JSON.stringify(g));
                 if (w > 768) check(`${w}: the form is below the toolbar`, g.form.t >= Math.max(before.approve.b, before.changes.b) - 1, JSON.stringify(g)); /* on a phone the toolbar is the footer */
+                // in the Request changes form the one primary is Send request: an accidental Enter or tap must not approve (#16909, walk 41 F2)
+                const prim = await ev(`({ send: document.querySelector('.artifact-review-form button[type=submit]').classList.contains('btn-primary'), approve: document.querySelector('.artifact-review-form .artifact-review-approve-note').classList.contains('btn-primary') })`);
+                check(`${w}: Send request is the form's primary and Approve with comment is not`, prim.send && !prim.approve, JSON.stringify(prim));
                 await ev(`(() => { const t = document.getElementById('artifact-review-text'); t.value = 'Almost: fix the date.'; t.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
                 await ev(`document.querySelector('.artifact-review-form .artifact-review-approve-note').click(); true`);
                 await waitFor(`(window.__posts || []).length > 0`, 'the approval is sent', 5000);
