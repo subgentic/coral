@@ -188,7 +188,7 @@ function adoptBoardActions() {
     const pause = $('mb-pause-btn');
     if (pause && !$('mb-pause-note')) { const n = el('span', 'menu-note', /^Resume/.test(pause.textContent) ? 'Agents get messages again when you resume.' : 'Agents stop receiving new messages until you resume.'); n.id = 'mb-pause-note'; pause.after(n); pause.setAttribute('aria-describedby', 'mb-pause-note'); }
     for (const id of BOARD_ACTIONS) { const b = $(id); if (b) b.style.display = ''; } // display-ok: the holder's markup hides these with an inline display:none, which message_board.js clears the same way
-    const sel = $('mb-select-btn'); if (sel) sel.hidden = S.tab !== 'messages';
+    const sel = $('mb-select-btn'); if (sel) { sel.hidden = false; sel.disabled = S.tab !== 'messages'; if (sel.disabled) sel.setAttribute('aria-disabled', 'true'); else sel.removeAttribute('aria-disabled'); }
 }
 function releaseBoardActions() {
     const home = $('mb-more-menu'); if (!home) return;
