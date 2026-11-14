@@ -192,17 +192,20 @@ func (h *SessionsHandler) TeamCommit(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "That folder is not one this team works in.")
 		return
 	}
-	changed, added, _, err := gitutil.Uncommitted(ctx, folder)
+	changed, added, renamedFrom, _, err := gitutil.UncommittedRenames(ctx, folder)
 	if err != nil {
 		errBadRequest(w, "git could not read that folder")
 		return
 	}
-	var paths []string
+	var paths, oldNames []string
 	for _, p := range append(changed, added...) {
 		if !body.IncludeSecretLike && secretLikeName(p) {
 			continue
 		}
 		paths = append(paths, p)
+		if old := renamedFrom[p]; old != "" { // a staged rename: the old name's removal is part of the same change (committed with it; git add has nothing to stage for a name that is already gone)
+			oldNames = append(oldNames, old)
+		}
 	}
 	if len(paths) == 0 {
 		writeError(w, http.StatusConflict, "nothing_to_commit", "There is nothing to commit in that folder.")
@@ -240,6 +243,7 @@ func (h *SessionsHandler) TeamCommit(w http.ResponseWriter, r *http.Request) {
 	// Only the listed paths are committed (commit -- paths, taken literally): a file already staged that is not listed (a secret-looking one left out) stays staged and is not in the commit.
 	args = append(args, "--literal-pathspecs", "-c", "commit.gpgsign=false", "commit", "-m", msg, "--")
 	args = append(args, paths...)
+	args = append(args, oldNames...)
 	if out, err := gitutil.Command(ctx, folder, args...).CombinedOutput(); err != nil {
 		undo()
 		commitFailed(w, "git could not make the commit", out)

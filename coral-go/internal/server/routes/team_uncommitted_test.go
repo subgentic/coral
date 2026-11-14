@@ -149,3 +149,15 @@ func TestTeamCommitTakesFileNamesLiterally(t *testing.T) {
 	assert.Equal(t, 3, len(strings.Split(committed, "\n")), "the three listed files, nothing else: %q", committed)
 	assert.Contains(t, uncGit(t, dir, "status", "--porcelain"), "?? .env")
 }
+
+// #17284 (QA, Security INFO): a staged rename lists only its new path; the commit lists the old name too, so the removal is in the commit and not left staged behind it.
+func TestTeamCommitOfAStagedRenameIncludesTheOldName(t *testing.T) {
+	base, ts := uncommittedServer(t)
+	name, dir := teamWithWork(t, ts)
+	uncGit(t, dir, "mv", "tip.js", "tip2.js")
+	code, body := sendJSON(t, http.MethodPost, base+"/api/teams/detail/"+name+"/commit", map[string]any{"folder": dir, "message": "work"})
+	require.Equal(t, http.StatusOK, code, "%v", body)
+	assert.Empty(t, uncGit(t, dir, "diff", "--cached", "--name-only"), "nothing is left staged behind the commit")
+	assert.Contains(t, uncGit(t, dir, "show", "--name-status", "--format=", "HEAD"), "tip.js", "the old name's removal is in the commit")
+	assert.NotContains(t, uncGit(t, dir, "status", "--porcelain"), "tip.js")
+}
