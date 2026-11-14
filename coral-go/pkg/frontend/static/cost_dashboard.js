@@ -336,6 +336,7 @@ export async function _refreshCostDashboard({ force = false } = {}) {
     _refreshCalendarCost(); // Today and This month beside Total cost (#10521)
     _refreshCallMetrics(period, hoursAgo); // the calls view follows the range too, with the page's own refresh (#7719)
     syncEfficiency(period);
+    importOnce('./analytics_servers.js').then(m => m.showByComputer(document.getElementById('cost-by-computer'), sinceParam, period)).catch(e => console.error('[cost-dashboard] by computer:', e)); // this computer and each linked one (#16017): its own read, its own errors
     showSpend(document.getElementById('cost-spend'), period, document.getElementById('cost-task-time'), force); // tokens per commit and task time, one team (#7526, #7530): its own read, its own errors
 
     try {

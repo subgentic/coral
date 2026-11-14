@@ -8,6 +8,12 @@
    "covered_by": "analytics (live: agent)"
   },
   {
+   "file": "analytics_servers.js",
+   "calls": 1,
+   "surface": "Analytics Overview: By computer",
+   "covered_by": "analytics"
+  },
+  {
    "file": "analytics_efficiency.js",
    "calls": 2,
    "surface": "Analytics: Tokens per commit, task time",
