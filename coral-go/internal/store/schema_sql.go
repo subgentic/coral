@@ -192,6 +192,10 @@ CREATE TABLE IF NOT EXISTS artifact_comment_asks (
 	seen_at       TEXT,
 	nudged_at     TEXT,
 	read_at       TEXT,
+	queued_at     TEXT,
+	queued_msg    TEXT NOT NULL DEFAULT '',
+	queued_now    INTEGER NOT NULL DEFAULT 0,
+	queued_system INTEGER NOT NULL DEFAULT 0,
 	UNIQUE (comment_id, agent_session)
 );
 CREATE INDEX IF NOT EXISTS idx_artifact_comment_asks_artifact ON artifact_comment_asks(artifact_id);

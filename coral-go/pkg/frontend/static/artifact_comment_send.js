@@ -15,12 +15,13 @@ const RESULT_WORDS = {
     unavailable: 'Not running',
     not_on_board: 'Not on this board',
     paused: 'The board is paused',
+    queued: "Busy: it gets this when it is free",
     failed: 'Could not be asked: try again',
 };
 export const resultWords = (r) => RESULT_WORDS[r.state] || r.reason || 'Not asked';
 
 /** Where an agent's ask stands (#14129, the Operator: 'tell me when the agent has read the message'): replied (it answered in the thread), read (the server saw the agent's OWN read call return the thread or the message that delivered the comment: read_at, with its time; an older server's 'seen' alone is read without a time) or sent. Never 'unread': an absent read_at is unknown. */
-export const askState = k => (k.replies > 0 ? 'replied' : (k.readAt || k.seen) ? 'read' : 'sent');
+export const askState = k => (k.replies > 0 ? 'replied' : (k.readAt || k.seen) ? 'read' : k.queued ? 'queued' : 'sent'); // queued: the agent is busy, the comment is held until it is free (#14860)
 
 /** What an agent with an open ask into this thread is called in the picker: asked, how many times it has replied, whether it has seen the thread and whether it was reminded. */
 export const askedWords = (k) => (k.replies > 0 ? `Already asked, ${k.replies} repl${k.replies === 1 ? 'y' : 'ies'} so far` : 'Already asked') + (k.seen ? `, seen by ${k.agent}` : '') + (k.nudged ? ', reminded' : ''); // seen: the agent read the thread; nudged: Coral typed it ONE reminder (#11722)
@@ -93,7 +94,7 @@ export function buildSendBlock(x) {
             const res = x.results && x.results.find(r => r.agent.toLowerCase() === a.role.toLowerCase());
             const why = res ? resultWords(res) : (asked || (!a.can ? a.why : ''));
             if (why) {
-                const s = el('span', 'ac-ask-state' + (res && res.state === 'sent' ? ' ac-ask-sent' : ''), why); s.id = `ac-ask-why-${x.id}-${list.children.length}`;
+                const s = el('span', 'ac-ask-state' + (res && (res.state === 'sent' || res.state === 'queued') ? ' ac-ask-sent' : ''), why); s.id = `ac-ask-why-${x.id}-${list.children.length}`;
                 li.append(s); li.dataset.state = res ? res.state : (asked ? 'asked' : 'unavailable');
                 cb.setAttribute('aria-describedby', s.id);
             } else if (off && full && !x.results) cb.setAttribute('aria-describedby', `ac-ask-cap-${x.id}`);
@@ -101,6 +102,12 @@ export function buildSendBlock(x) {
         }
         box.append(list);
         if (full && !x.results) { const cap = el('p', 'ac-ask-note', `Up to ${MAX_AGENTS} agents at a time.`); cap.id = `ac-ask-cap-${x.id}`; box.append(cap); }
+    }
+    if (!x.results && x.onNow && box.querySelector('input[type="checkbox"]')) { // "Now" (#14860): a comment waits for a busy agent (mid-turn or with a task); this one waits only for the end of its turn, never typed mid-turn
+        const nowLabel = el('label', 'ac-ask-now'); const nowBox = document.createElement('input'); nowBox.type = 'checkbox'; nowBox.checked = !!x.now; nowBox.disabled = !!x.busy;
+        nowBox.addEventListener('change', () => x.onNow(nowBox.checked));
+        nowLabel.append(nowBox, el('span', '', 'Deliver now, even if the agent has a task (it still waits for the end of its turn)'));
+        box.append(nowLabel);
     }
     const err = el('p', 'ac-error', x.error || ''); err.setAttribute('role', 'alert'); err.hidden = !x.error; box.append(err);
     const row = el('div', 'ac-composer-row');

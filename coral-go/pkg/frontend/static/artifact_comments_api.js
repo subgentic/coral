@@ -13,11 +13,11 @@ function normalizeComment(c) {
         atS: typeof c.at_s === 'number' && Number.isFinite(c.at_s) ? c.at_s : null, endS: typeof c.end_s === 'number' && Number.isFinite(c.end_s) ? c.end_s : null,
         id: c.id, parentId: c.parent_id == null ? null : c.parent_id, anchor: c.anchor || { whole: true }, body: String(c.body == null ? '' : c.body),
         authorId: who.subject || '', authorName: who.name || '', authorKind: who.kind || '',
-        createdAt: c.created_at || '', editedAt: c.edited_at || '', resolved: !!c.resolved_at, resolvedBy: c.resolved_by ? (c.resolved_by.subject || '') : '', deleted: !!c.deleted, mine: !!c.mine, sentTo: String(c.sent_to || ''), notDelivered: String(c.not_delivered || ''), // why the owner's comment reached no agent when it should have (#15034), on the answer to its creation only
+        createdAt: c.created_at || '', editedAt: c.edited_at || '', resolved: !!c.resolved_at, resolvedBy: c.resolved_by ? (c.resolved_by.subject || '') : '', deleted: !!c.deleted, mine: !!c.mine, sentTo: String(c.sent_to || ''), queuedFor: String(c.queued_for || ''), notDelivered: String(c.not_delivered || ''), // why the owner's comment reached no agent when it should have (#15034), on the answer to its creation only
          // sentTo: the agents the owner's new comment or reply was sent to on its own (#12203), on the answer to its creation only
        
         can: { reply: !!can.reply, edit: !!can.edit, delete: !!can.delete, resolve: !!can.resolve },
-        asks: Array.isArray(c.asks) ? c.asks.map(k => ({ agent: String(k.agent || ''), open: !!k.open, replies: Math.max(0, Number(k.replies) || 0), seen: !!k.seen, limitReached: !!k.limit_reached, readAt: typeof k.read_at === 'string' ? k.read_at : '', nudged: !!k.nudged })) : [], // the agents asked into this thread, on the owner's list only (#6462)
+        asks: Array.isArray(c.asks) ? c.asks.map(k => ({ agent: String(k.agent || ''), open: !!k.open, replies: Math.max(0, Number(k.replies) || 0), seen: !!k.seen, limitReached: !!k.limit_reached, readAt: typeof k.read_at === 'string' ? k.read_at : '', nudged: !!k.nudged, queued: !!k.queued })) : [], // the agents asked into this thread, on the owner's list only (#6462)
         // the artifact (version) the comment was written on, and, read with series=1 for a later version, where its text stands in the version on show: found, ambiguous, gone or unchecked (#6459)
         images: Array.isArray(c.images) ? c.images.map(i => ({ hex: String((i && i.hex) || ''), name: String((i && i.name) || ''), contentType: String((i && i.content_type) || '') })).filter(i => /^[0-9a-f]{64}$/.test(i.hex)) : [], // the pictures the comment carries, in the order they were sent (#11651)
         artifactId: c.artifact_id || '', version: c.version == null ? null : c.version, fromVersion: c.from_version == null ? null : c.from_version, carried: c.carried || '',
@@ -74,8 +74,8 @@ export const setLocked = (hex, server, locked) => requestJson(locked ? 'PUT' : '
 
 /** Send to agent (#6357, #6456): ask 1 to 10 agents of the comment's board into its thread; the server posts one board message to each from the owner. `agents` are the names the board knows them by (their roles).
  *  Resolves { ok, status, results: [{agent, state, reason}], error }: a 409 with results (nobody was asked) is an answer to show, not a throw. Local only: through Coral Hub the route is refused, and the UI never offers it there. */
-export async function sendComment(hex, server, id, agents) {
-    const resp = await fetch(`${base(hex, server)}/${id}/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agents }) });
+export async function sendComment(hex, server, id, agents, now = false) {
+    const resp = await fetch(`${base(hex, server)}/${id}/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(now ? { agents, now: true } : { agents }) });
     let data = {};
     try { data = await resp.json(); } catch { /* an answer that is not JSON has no results */ }
     const results = Array.isArray(data.results) ? data.results.map(r => ({ agent: String(r.agent || ''), state: String(r.state || ''), reason: String(r.reason || '') })) : [];

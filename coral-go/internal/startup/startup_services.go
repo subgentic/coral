@@ -210,6 +210,7 @@ func startIndexingServices(ctx context.Context, cfg *config.Config, srv *server.
 
 	// An artifact comment relayed to an agent that it only answered on the board gets one reminder to answer in the thread (#11722).
 	safeGo(ctx, "comment_reply_nudges", func() { srv.RunCommentReplyNudges(ctx) })
+	safeGo(ctx, "comment_holds", func() { srv.RunCommentHolds(ctx) }) // a comment for a busy agent waits until it is free (#14860)
 
 	// An agent idle past the Operator's minutes is put to sleep, and any delivery wakes it (#12111, Settings > auto_sleep).
 	safeGo(ctx, "auto_sleep", func() { srv.RunAutoSleep(ctx) })

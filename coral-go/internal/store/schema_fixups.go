@@ -41,6 +41,11 @@ var columnMigrations = []struct {
 	{"artifact_comment_asks", "nudged_at", "TEXT"},
 	// When the asked agent first read, with coral-board read, the board message that delivered the comment to it (#14130); NULL: not yet. The thread shows the earlier of this and seen_at.
 	{"artifact_comment_asks", "read_at", "TEXT"},
+	// A comment held for an agent that is busy (#14860): when it was held (NULL: not held), the board message text to post when the agent is free (several for one thread are joined), and whether the Operator said "now" (delivered at the next idle prompt even during a task, never mid-turn).
+	{"artifact_comment_asks", "queued_at", "TEXT"},
+	{"artifact_comment_asks", "queued_msg", "TEXT NOT NULL DEFAULT ''"},
+	{"artifact_comment_asks", "queued_now", "INTEGER NOT NULL DEFAULT 0"},
+	{"artifact_comment_asks", "queued_system", "INTEGER NOT NULL DEFAULT 0"}, // 1: the held message is posted as Coral's own notice (the auto delivery), 0: as the Operator (Send to agent)
 	// When the Operator removed this agent's ignored wait from Needs you (#14266): the request the row names is out of /api/needs-you and its count; NULL: ignored only, still listed.
 	{"agent_wait_ignored", "removed_at", "TEXT"},
 	// The secret a self-hosted hub signs its owner stamps for this remote with (#11378): a "v1:" envelope under the master key like api_key, with its own AAD; "" when none. Set only by SetOwnerSecret.

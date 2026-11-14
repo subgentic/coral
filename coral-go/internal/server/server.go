@@ -473,6 +473,15 @@ func (s *Server) RunCommentReplyNudges(ctx context.Context) {
 	s.sessHandler.RunCommentReplyNudges(ctx)
 }
 
+// RunCommentHolds posts the comments held for busy agents once they are free (#14860). It blocks until ctx is done.
+func (s *Server) RunCommentHolds(ctx context.Context) {
+	if s.sessHandler == nil {
+		<-ctx.Done()
+		return
+	}
+	s.sessHandler.RunCommentHolds(ctx)
+}
+
 // AutoWakeAfterRestart wakes the agents that were running when this pty Coral last stopped
 // (#3636); startup calls it once, on pty.
 func (s *Server) AutoWakeAfterRestart(ctx context.Context) {
