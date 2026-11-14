@@ -25,6 +25,9 @@
       up({ type: 'coral-artifact-height', height: Math.max(0, Math.min(MAX_HEIGHT, Math.floor(m.height))) });
     }
   });
+  // In-memory Storage shim: the child frame has an opaque origin (sandbox without allow-same-origin), so real localStorage/sessionStorage throw SecurityError.
+  // This shim replaces them with in-memory objects that implement the Storage interface. Data lives only in JS memory and is lost when the frame is removed.
+  var STORAGE_SHIM = '<script>(function(){function S(){var d={};this.getItem=function(k){return d.hasOwnProperty(String(k))?d[String(k)]:null};this.setItem=function(k,v){d[String(k)]=String(v)};this.removeItem=function(k){delete d[String(k)]};this.clear=function(){d={}};Object.defineProperty(this,"length",{get:function(){return Object.keys(d).length}});this.key=function(n){var ks=Object.keys(d);return n>=0&&n<ks.length?ks[n]:null}}try{localStorage.length}catch(e){Object.defineProperty(window,"localStorage",{value:new S,configurable:!1})}try{sessionStorage.length}catch(e){Object.defineProperty(window,"sessionStorage",{value:new S,configurable:!1})}})()<\/script>';
   function start(html) {
     var f = document.createElement('iframe');
     f.setAttribute('sandbox', 'allow-scripts');
@@ -33,7 +36,7 @@
     f.referrerPolicy = 'no-referrer';
     // A document can navigate ITSELF; this host's CSP (frame-src about:) forbids it, and a second load removes the frame.
     f.addEventListener('load', function () { if (++loads > 1) { f.remove(); child = null; up({ type: 'coral-artifact-navigated' }); } });
-    f.srcdoc = '<!doctype html><meta http-equiv="Content-Security-Policy" content="' + CHILD_CSP + '">' + html;
+    f.srcdoc = '<!doctype html><meta http-equiv="Content-Security-Policy" content="' + CHILD_CSP + '">' + STORAGE_SHIM + html;
     child = f;
     document.body.appendChild(f);
   }

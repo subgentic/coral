@@ -157,10 +157,16 @@ export function drawOffer(wrapper, { hex, server, onTrusted, fetchFn = serverFet
         row.append(box);
         go.focus();
     });
-    // The offer is a button on the notice's own line, not a row of its own: a row above the frame took 60 px of an HTML file's preview (artifact_viewer_slim_footer: the frame fell under 75% of the dialog, #14916). The confirmation is the
-    // row, and only while it is open. With no notice the button is the row's, as before.
+    // The offer is a button on the notice's own line, not a row of its own: a row above the frame took 60 px of an HTML file's preview (artifact_viewer_slim_footer: the frame fell under 75% of the dialog, #14916).
+    // When the notice is hidden the button moves to its own slim row so it stays reachable (#16735). A phone keeps the row: its notice is folded behind the header's Sandboxed chip.
     const notice = wrapper.querySelector('.artifact-linked-notice');
-    // (A phone keeps the row: its notice is folded behind the header's Sandboxed chip, and the offer must stay in view.)
-    if (notice && !isPhoneLayout()) notice.append(ask); else if (notice) { row.append(ask); notice.after(row); } else { row.append(ask); wrapper.prepend(row); }
+    if (notice && !isPhoneLayout()) {
+        if (notice.hidden) { row.append(ask); notice.after(row); }
+        else {
+            notice.append(ask);
+            const mo = new MutationObserver(() => { if (notice.hidden && ask.parentNode === notice) { row.append(ask); if (!row.isConnected) notice.after(row); } });
+            mo.observe(notice, { attributes: true, attributeFilter: ['hidden'] });
+        }
+    } else if (notice) { row.append(ask); notice.after(row); } else { row.append(ask); wrapper.prepend(row); }
     return row;
 }
