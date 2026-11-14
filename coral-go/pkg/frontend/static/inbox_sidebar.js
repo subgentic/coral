@@ -843,7 +843,7 @@ async function readGoals() {
         if (ok && !finished) { openAt = Date.now(); followWithDone = wantsDone; } // a page opened on Done read the open goals first: the finished ones follow at once
         if (ok) { const isDone = g => String(g.state || '').toLowerCase() === 'done'; goals = finished ? [...goals.filter(g => !isDone(g)), ...read] : [...read, ...goals.filter(isDone)]; } // one read per gap: the other kind stays as the last read left it
         else if (!goals.length) goals = [];
-    } catch { goals = []; ok = false; }
+    } catch { ok = false; } // a read that throws keeps the last open goals: the badge does not drop to 0 and come back (#16631)
     if (!isCloud()) try { // Local hidden state lives in this computer's settings; Hub goals carry per-computer done_state.
         const r = await fetch('/api/settings');
         if (r.ok) { const saved = (await r.json()).settings || {}; state.settings = { ...(state.settings || {}), [GOAL_DONE_SETTING]: saved[GOAL_DONE_SETTING] || '' }; }
@@ -922,7 +922,7 @@ const BOARD_ITEM = 'board:';
 const boardSection = () => (isPhoneLayout() && boardList.length ? [{ title: 'Boards', items: boardList.map(b => ({ key: BOARD_ITEM + b.key, label: b.label })) }] : []);
 /** What the folder list shows as current: on a phone an open board is its own entry of the Boards group (the folder it belongs to elsewhere is Board history). */
 const navCurrent = () => (isPhoneLayout() && page?.kind === BOARDS_SUB ? BOARD_ITEM + page.project : pageGroup());
-const FOLDER_TIPS = { needs: 'Agents waiting for you: a question, a permission or a review', tasks: 'Tasks assigned to you', goals: 'The open goals of your teams', saved: 'Messages you saved for later', artifacts: 'Files agents shared', activity: 'What you did in Needs you' }; // one line each (#10074)
+const FOLDER_TIPS = { needs: 'Agents waiting for you: a question, a permission or a review', tasks: 'Tasks assigned to you, not the ones your agents work on (those are on each team\u2019s page and goal)', goals: 'The open goals of your teams', saved: 'Messages you saved for later', artifacts: 'Files agents shared', activity: 'What you did in Needs you' }; // one line each (#10074)
 // The Needs you number is the unread ones, and when the list holds more (read files are listed, not counted: #9277) it says so as the kind pills do, "1 of 4" (#12789, the Operator: "Needs you 0" over a table of read files). The welcome items are listed and never counted (#11622): they do not make it "0 of 5" on a new install.
 // #13979 (Hub beta: "0 of 1" meant nothing to a person, and the Operator kept the unread number): the badge is the unread count alone; when the list holds more, its tooltip and its spoken name say "1 unread, 4 in the list".
 const needsCountWords = () => { const unread = countOf('needs'), listed = allNeeds().filter(s => !s.welcome).length; return listed > unread ? `${unread} unread, ${listed} in the list` : ''; };
