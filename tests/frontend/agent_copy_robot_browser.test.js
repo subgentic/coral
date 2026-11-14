@@ -69,7 +69,9 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(await ev(`!!document.querySelector('#settings-pane-updates .agent-copy, #settings-pane-agents .agent-copy')`), at + 'the other sections keep their robot');
             await clip(); await ev(`document.querySelector('#settings-pane-general .settings-copy-last button').click(); true`);
             await waitFor(`window.__copied.length === 1`, `${at}General's line copied`, 8000);
-            assert.match(await ev(`window.__copied[0]`), /General/, at + 'names the section');
+            const genTitle = await ev(`document.getElementById('settings-pane-general').dataset.title`);
+            assert.ok(genTitle, at + 'the section has a title');
+            assert.ok((await ev(`window.__copied[0]`)).includes(`\u201c${genTitle}\u201d section`), at + 'names the section by its own title: ' + genTitle);
         }
         console.log('PASS agent copy robot');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
