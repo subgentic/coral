@@ -181,14 +181,14 @@ function buildMore() {
     document.addEventListener('keydown', (e) => { if (moreOpen && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); set(false, { focus: true }); } }, true);
     document.addEventListener('click', (e) => { if (moreOpen && !menu.contains(e.target) && !b.contains(e.target)) set(false); });
 }
-const BOARD_ACTIONS = ['mb-select-btn', 'mb-export-btn', 'mb-pause-btn', 'mb-delete-btn'];
+const BOARD_ACTIONS = ['mb-export-btn', 'mb-pause-btn', 'mb-select-btn', 'mb-delete-btn'];
 function adoptBoardActions() {
     const menu = $('team-page-more-menu'); if (!menu) return;
     for (const id of BOARD_ACTIONS) { const b = $(id); if (b && b.parentElement !== menu) { b.dataset.home = b.parentElement ? b.parentElement.id : ''; menu.append(b); } }
     const pause = $('mb-pause-btn');
     if (pause && !$('mb-pause-note')) { const n = el('span', 'menu-note', /^Resume/.test(pause.textContent) ? 'Agents get messages again when you resume.' : 'Agents stop receiving new messages until you resume.'); n.id = 'mb-pause-note'; pause.after(n); pause.setAttribute('aria-describedby', 'mb-pause-note'); }
     for (const id of BOARD_ACTIONS) { const b = $(id); if (b) b.style.display = ''; } // display-ok: the holder's markup hides these with an inline display:none, which message_board.js clears the same way
-    const sel = $('mb-select-btn'); if (sel) { sel.hidden = false; sel.disabled = S.tab !== 'messages'; if (sel.disabled) sel.setAttribute('aria-disabled', 'true'); else sel.removeAttribute('aria-disabled'); }
+    const sel = $('mb-select-btn'); if (sel) sel.hidden = S.tab !== 'messages';
 }
 function releaseBoardActions() {
     const home = $('mb-more-menu'); if (!home) return;
