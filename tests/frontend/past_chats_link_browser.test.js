@@ -10,7 +10,7 @@ const { coralReady } = require('./helpers/wait');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
+        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await ev(`localStorage.setItem('coral.inbox.tab', 'saved'); true`); /* the folder last on screen was Saved (walk 51, #17196 item 7) */ await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev);
         await ev(`window.__m.add('past-bot', 'A', 2, { sleeping: false }); true`);
         await ev(`(() => { T.state.liveSessions = [window.__m.entry(window.__m.agents['past-bot-id'])]; T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
@@ -25,6 +25,9 @@ const { coralReady } = require('./helpers/wait');
         await new Promise(r => setTimeout(r, 1500)); // sleep-ok: the folder's table draws after the tab switch
         await shot('past-chats-opened');
         assert.ok(await ev(`[...document.querySelectorAll('h1, h2')].some(e => e.offsetParent && /^All chats/.test(e.textContent.trim()))`), 'the page is titled All chats');
+        const cur = await ev(`[...document.querySelectorAll('#hub-inbox-pane [aria-current], .view-list [aria-current], .sidebar-rail-folder[aria-current]')].filter(e => e.offsetParent).map(e => e.textContent.trim().replace(/\\s+/g, ' ')).join('|')`);
+        console.log('current folders: ' + JSON.stringify(cur));
+        assert.ok(cur && !/Saved/.test(cur), 'only All chats is current, not Saved too: ' + JSON.stringify(cur));
         console.log('PASS Past chats opens All chats');
     } finally { await client.close(); }
 })().catch(e => { console.error(e.message); process.exitCode = 1; });
