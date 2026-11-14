@@ -77,6 +77,15 @@ function suggestAgentName(input) {
     input.dataset.suggestedName = `Agent ${n}`; input.placeholder = `Agent ${n}`;
 }
 
+/** Sets both Backend selects (Terminal step, New agent's hidden one) to what the server runs: a pty server must not show tmux (#16409). Nothing changes if the status does not answer. */
+function _preselectBackend() {
+    fetch('/api/system/terminal-backend').then(r => r.ok ? r.json() : null).then(st => {
+        const b = st && (st.forced ? st.running : (st.next || st.running));
+        if (b !== 'tmux' && b !== 'pty') return;
+        for (const id of ['launch-terminal-backend', 'launch-backend']) { const sel = document.getElementById(id); if (sel && [...sel.options].some(o => o.value === b)) sel.value = b; }
+    }).catch(() => {});
+}
+
 function _selectLaunchType(type) {
     if (type === "back" && launch.member) { window.cancelTeamMember?.(); return; } // the arrow on a member goes back to the team form (#7861)
     if (type === "back" && document.getElementById('launch-step-agent')?.dataset.stage === 'details' && document.getElementById('launch-step-agent').style.display !== 'none') { _launchStage('folder'); return; } // the arrow goes back one step first
@@ -91,6 +100,7 @@ function _selectLaunchType(type) {
     wireEnterAdvances(document.getElementById('launch-step-agent')); wireEnterAdvances(document.getElementById('launch-step-team')); // Enter in a single-line field is Next, and Launch on the last step (#11289)
     { const ti = document.getElementById('launch-team-instead'); if (ti) ti.hidden = !!(launch.member || launch.addTo); } // the way to a team from the agent's first step: not for a team's own member or an agent added to a team
     _showLaunchStep(type);
+    _preselectBackend(); // the Backend select starts on the backend this server runs, not on its first option (#16409)
     if (type === "agent") {
         if (!launch.addTo && !launch.member) { // New Agent: its own title and no team (Add agent and a member set both below, #7778, #7861)
             document.getElementById('launch-modal')?.removeAttribute('data-add-to');
