@@ -36,8 +36,8 @@ export async function killGroup(groupName) {
     if (!groupSessions.length) return;
 
     showConfirmModal(
-        "Kill all agents",
-        `Kill ${killCount(groupSessions.length).agents} in "${groupName.startsWith('wf:') ? groupName.slice(3) : keyLabel(groupName)}"? ${groupSessions.length === 1 ? 'It' : 'They'} stop${groupSessions.length === 1 ? 's' : ''} now. ${whatStaysKill(groupSessions)} ${killCount(groupSessions.length).note}`,
+        "Stop agents",
+        `Stop ${killCount(groupSessions.length).agents} in "${groupName.startsWith('wf:') ? groupName.slice(3) : keyLabel(groupName)}"? ${groupSessions.length === 1 ? 'It' : 'They'} stop${groupSessions.length === 1 ? 's' : ''} now. ${whatStaysKill(groupSessions)} ${killCount(groupSessions.length).note}`,
         async () => {
             const release = await importOnce('./kill_pending.js').then(m => m.markStopping(groupSessions)); // every row says Stopping... from the click, not only the one being killed now (#15431)
             const failed = [];
@@ -52,7 +52,7 @@ export async function killGroup(groupName) {
             }
             release(failed);
             dropKilledRows(groupSessions);
-        }, undefined, { label: 'Kill all', danger: true }
+        }, undefined, { label: 'Stop agents', danger: true }
     );
 }
 

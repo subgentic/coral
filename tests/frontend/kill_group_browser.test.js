@@ -45,6 +45,7 @@ const BASE = require('./test_base').BASE;
         assert.ok(found, `Kill all for group ${group} is in its menu`);
         await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'confirm');
         const message = await ev(`document.getElementById('confirm-modal-message').textContent`);
+        { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/folder-stop-confirm-${group.replace(/[^a-z0-9]/gi, '_')}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
         await ev(`document.getElementById('confirm-modal-yes').click()`);
         await sleep(300);
         const kills = (await reqs()).filter(r => r.kind === 'kill').map(r => ({ sid: JSON.parse(r.body).session_id, remote: r.remote }));
@@ -64,7 +65,7 @@ const BASE = require('./test_base').BASE;
         await seed();
         let r = await killAll('repo');
         assert.deepEqual(r.kills.map(k => k.sid).sort(), ['s1', 's2'], `killed exactly the standalone agents shown in 'repo' (got ${JSON.stringify(r.kills)})`);
-        assert.match(r.message, /Kill all 2 agents in/, `the confirm counts what will be killed: ${r.message}`);
+        assert.match(r.message, /Stop all 2 agents in/, `the confirm counts what will be killed: ${r.message}`);
         assert.deepEqual(await remaining(), ['a1', 'o1', 'r1', 't1', 'w1'], 'team, workflow, archived, remote and other-folder agents are untouched');
         assert.ok(await ev(`!!document.querySelector('#live-sessions-list li[data-session-id="t1"]')`), 'the team agent is still listed');
         console.log('   ✓ killed s1, s2; kept t1 (team), w1 (workflow), a1 (archived), r1 (remote), o1');
@@ -73,7 +74,7 @@ const BASE = require('./test_base').BASE;
         await seed();
         r = await killAll('@qa-remote-1/repo');
         assert.deepEqual(r.kills, [{ sid: 'r1', remote: 'qa-remote-1' }], `only the remote agent, through /api/remote (got ${JSON.stringify(r.kills)})`);
-        assert.match(r.message, /Kill the 1 agent in/, `one agent: no plural: ${r.message}`);
+        assert.match(r.message, /Stop the 1 agent in/, `one agent: no plural: ${r.message}`);
         console.log('   ✓ remote repo: killed r1 only, via /api/remote/qa-remote-1');
 
         console.log('3. A workflow group kills its workflow\'s agents');
@@ -103,7 +104,7 @@ const BASE = require('./test_base').BASE;
         assert.ok(nested.killTeam, 'its team section offers Kill Team');
         r = await killAll('repo');
         assert.deepEqual(r.kills.map(k => k.sid).sort(), ['s1', 's2', 'w1'], `folder Kill all: standalone and workflow agents in the folder (got ${JSON.stringify(r.kills)})`);
-        assert.match(r.message, /Kill all 3 agents in/, `the confirm counts what will be killed: ${r.message}`);
+        assert.match(r.message, /Stop all 3 agents in/, `the confirm counts what will be killed: ${r.message}`);
         assert.deepEqual(await remaining(), ['a1', 'o1', 'r1', 't1'], 'team member, archived, remote and other-folder agents are untouched');
         console.log('   ✓ killed s1, s2, w1; kept t1 (team, has Kill Team), a1, r1, o1');
 
