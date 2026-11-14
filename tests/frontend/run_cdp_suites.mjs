@@ -225,11 +225,23 @@ const suites = classifySuites(here);
   if (bad.length) { console.error(bad.join('\n')); process.exit(2); }
 }
 
+// CORAL_CDP_PORT_RANGE=lo-hi keeps every port the runner picks inside that range (a shared box such as frontier
+// allows only 9500-9599). Unset, the OS picks any free port, as before.
+const portRange = (() => {
+  const m = /^(\d+)-(\d+)$/.exec(process.env.CORAL_CDP_PORT_RANGE || '');
+  return m && +m[1] <= +m[2] ? [+m[1], +m[2]] : null;
+})();
+const tryPort = port => new Promise((res, rej) => {
+  const s = net.createServer(); s.on('error', rej);
+  s.listen(port, '127.0.0.1', () => { const q = s.address().port; s.close(() => res(q)); });
+});
 const freePort = async () => {
-  for (;;) {
-    const p = await new Promise((res, rej) => {
-      const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const q = s.address().port; s.close(() => res(q)); }); s.on('error', rej);
-    });
+  for (let tries = 0; ; tries++) {
+    let p;
+    if (portRange) {
+      if (tries > 4 * (portRange[1] - portRange[0] + 1)) throw new Error(`no free port in CORAL_CDP_PORT_RANGE ${portRange.join('-')}`);
+      try { p = await tryPort(portRange[0] + Math.floor(Math.random() * (portRange[1] - portRange[0] + 1))); } catch { continue; }
+    } else p = await tryPort(0);
     if (!PROD_PORTS.includes(p)) return p; // never a production Coral port, even by chance
   }
 };
@@ -608,7 +620,9 @@ async function startShard(n, gen = 0, strict = false, backend = MAIN_BACKEND) {
   // Port 0: Chrome picks a free DevTools port itself and writes it to <profile>/DevToolsActivePort, so the
   // port read back is the one this Chrome bound (no race with other shards or processes).
   const profile = path.join(dir, 'profile');
-  const chromeArgs = ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+  // With CORAL_CDP_PORT_RANGE the DevTools port is picked inside the range too (a small race, opt-in); otherwise 0.
+  const chromePort = portRange ? await freePort() : 0;
+  const chromeArgs = ['--headless=new', `--remote-debugging-port=${chromePort}`, `--user-data-dir=${profile}`,
     '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1400,900', // the desktop a suite names has a mouse (hover, a fine pointer) on any machine: a headless Chrome on a build server has no pointing device and reports no hover and no pointer, so a control shown only on (hover: hover) and (pointer: fine) was drawn at rest there (#9673). CDP_NO_HOVER=1 is that machine, to see how a suite does on it; a suite that wants touch turns touch emulation on.
     ...(process.env.CDP_NO_HOVER ? ['--blink-settings=primaryHoverType=1,availableHoverTypes=1,primaryPointerType=1,availablePointerTypes=1'] : ['--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4']),
     ...(process.env.CI ? ['--no-sandbox', '--disable-dev-shm-usage'] : []),
@@ -624,7 +638,7 @@ async function startShard(n, gen = 0, strict = false, backend = MAIN_BACKEND) {
   let chromeExit = null;
   chrome.on('exit', (code, sig) => { chromeExit = `exit code ${code} signal ${sig}`; });
   chrome.on('error', e => { chromeExit = `could not start ${chromePath}: ${e.message}`; });
-  let cdp = 0;
+  let cdp = chromePort; // 0 until read back from DevToolsActivePort; a port we chose (CORAL_CDP_PORT_RANGE) is known already, Chrome writes no file for it
   try {
     const portFile = path.join(profile, 'DevToolsActivePort');
     for (const end = Date.now() + 60000; !cdp; await sleep(100)) {
