@@ -34,7 +34,7 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`document.querySelector('#settings-modal #settings-tab-agents').click(); true`);
                 await new Promise(r => setTimeout(r, 300)); // sleep-ok: the section opens
                 s = await state();
-                check(s.screen === 'pane' && s.pane && s.back && s.tabs === 0 && s.title === 'Agents', `a tap opens the section with a back row, the list is gone: ${JSON.stringify(s)}`);
+                check(s.screen === 'pane' && s.pane && s.back && s.tabs === 0 && s.title === 'Defaults', `a tap opens the section with a back row, the list is gone: ${JSON.stringify(s)}`);
                 await shot('settings-phone-section');
                 await ev(`document.querySelector('#settings-modal .settings-back').click(); true`);
                 await new Promise(r => setTimeout(r, 300)); // sleep-ok: back to the list
@@ -44,7 +44,7 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`window.hideSettingsModal(); window.showSettingsModal('agents'); true`);
                 await new Promise(r => setTimeout(r, 500)); // sleep-ok: the dialog fills
                 s = await state();
-                check(s.screen === 'pane' && s.pane && s.back && s.title === 'Agents', `a section asked for opens straight on it, with the way back: ${JSON.stringify(s)}`);
+                check(s.screen === 'pane' && s.pane && s.back && s.title === 'Defaults', `a section asked for opens straight on it, with the way back: ${JSON.stringify(s)}`);
             } else {
                 check(s.tabs >= 6 && s.pane && !s.select && !s.back, `the rail and a section, no back row, no dropdown: ${JSON.stringify(s)}`);
                 await shot('settings-desktop');

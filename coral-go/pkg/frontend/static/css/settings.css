@@ -67,6 +67,7 @@
 #settings-modal .settings-nav-label { margin: 14px 10px 4px; color: var(--text-secondary); font-size: var(--fs-sm); font-weight: var(--fw-strong); }
 #settings-modal .settings-nav-label:first-child { margin-top: 4px; }
 #settings-modal .settings-inbox-block { margin-top: 20px; }
+#settings-modal .settings-inbox-block h5 { font: var(--dlg-section); }
 
 @media (max-width: 767px) {
     #settings-modal .settings-tab-name[data-sub] { display: flex; flex-direction: column; align-items: flex-start; }

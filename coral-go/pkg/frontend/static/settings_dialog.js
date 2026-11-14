@@ -1,3 +1,4 @@
+const { buildSettingsGroupLabels } = await importOnce('./settings_group_labels.js');
 /* Moved out of modals.js as it was (#4684): The Settings dialog: its sections, the API key, storage, database encryption, filling and saving it. No behaviour change. */
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
@@ -70,6 +71,7 @@ export async function showSettingsModal(group) {
 
     openSettingsGroup(typeof group === 'string' ? group : undefined); // the group last used here, or the one asked for
     const modalEl = document.getElementById('settings-modal');
+    buildSettingsGroupLabels(modalEl);
     wireSettingsRisks(modalEl);
     wireSettingsAutosave(modalEl);
     setPayloadAtOpen(payloadNow());
