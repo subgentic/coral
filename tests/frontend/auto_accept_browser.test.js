@@ -13,8 +13,25 @@ const BASE = require('./test_base').BASE;
 (async () => {
     const client = await CDP({ port: Number(process.env.CDP_PORT || 9222) });
     const { Page, Runtime, Input, Emulation } = client;
+    let step10 = false;
+    const step10Timings = [];
     const ev = async expression => {
-        const result = await Runtime.evaluate({ expression, returnByValue: true, awaitPromise: true });
+        const started = Date.now();
+        let timer;
+        const label = expression.includes('buildAllLazy') ? 'build lazy Settings controls' :
+            expression.includes('out.never') ? 'last-changed labels' :
+            expression.includes('__redactPuts =') ? 'token-redaction controls' : 'Settings evaluation';
+        // The outer deadline also catches a stalled CDP command or renderer. Individual browser awaits below name the operation.
+        const request = Runtime.evaluate({ expression, returnByValue: true, awaitPromise: true });
+        let result;
+        try {
+            result = step10 ? await Promise.race([request, new Promise((_, reject) => {
+                timer = setTimeout(() => reject(new Error(`step 10 ${label}: still pending after ${Date.now() - started}ms`)), 45000);
+            })]) : await request;
+        } finally {
+            clearTimeout(timer);
+            if (step10) step10Timings.push(Date.now() - started);
+        }
         if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails));
         return result.result.value;
     };
@@ -204,8 +221,27 @@ const BASE = require('./test_base').BASE;
         console.log('   ✓ 1 hour preselected, no "No time limit"');
 
         console.log('10. Settings: "Coral Hub can turn on auto-accept" shows only with Launch, on by default, saves locally');
+        step10 = true;
+        await ev(`(() => {
+            window.__aaAwaitTimings = [];
+            let sequence = 0;
+            window.__aaAwait = async (name, promise) => {
+                name = (++sequence) + ' ' + name;
+                const started = performance.now();
+                let timer;
+                try {
+                    return await Promise.race([promise, new Promise((_, reject) => {
+                        timer = setTimeout(() => reject(new Error('step 10 ' + name + ': still pending after ' + Math.round(performance.now() - started) + 'ms')), 30000);
+                    })]);
+                } finally {
+                    clearTimeout(timer);
+                    window.__aaAwaitTimings.push(name + '=' + Math.round(performance.now() - started) + 'ms');
+                }
+            };
+            return true;
+        })()`);
         const cloudRow = await ev(`(async () => {
-            await window.__coral.buildAllLazy(); // Settings is built on first open (#4500)
+            await window.__aaAwait('build lazy Settings controls', window.__coral.buildAllLazy()); // Settings is built on first open (#4500)
             if (!document.getElementById('settings-cloud-allow-auto-accept')) return 'missing';
             const real = window.fetch;
             window.__cloudPuts = [];
@@ -217,17 +253,17 @@ const BASE = require('./test_base').BASE;
                 if (u.endsWith('/api/cloud/allow-auto-accept')) { const body = JSON.parse(opts.body); window.__cloudPuts.push({ method: opts.method, body }); st.allow_hub_auto_accept = body.allow; return new Response(JSON.stringify(st), { headers: { 'Content-Type': 'application/json' } }); }
                 return real(url, opts);
             };
-            const cc = await import(${S}+'cloud_connect.js');
+            const cc = await window.__aaAwait('import cloud_connect.js', import(${S}+'cloud_connect.js'));
             cc.initCloudConnect();
-            await cc.loadCloudStatus();
+            await window.__aaAwait('load cloud status', cc.loadCloudStatus());
             const box = document.getElementById('settings-cloud-allow-auto-accept');
             const row = document.getElementById('settings-cloud-auto-accept-row');
             const interact = { shown: !row.hidden };
             window.__setCloud({ max_mode: 'launch' });
-            await cc.loadCloudStatus();
+            await window.__aaAwait('load cloud status', cc.loadCloudStatus());
             const launch = { shown: !row.hidden, checked: box.checked };
             window.__setCloud({ allow_hub_auto_accept: undefined });
-            await cc.loadCloudStatus();
+            await window.__aaAwait('load cloud status', cc.loadCloudStatus());
             launch.defaultChecked = box.checked;
             box.checked = false; box.dispatchEvent(new Event('change'));
             return { interact, launch };
@@ -241,9 +277,9 @@ const BASE = require('./test_base').BASE;
 
         // Who last changed it (#5847): status allow_hub_auto_accept_changed {by, user, at}, beside the switch, said in words, nothing before a change
         const lines = await ev(`(async () => {
-            const cc = await import(${S}+'cloud_connect.js');
+            const cc = await window.__aaAwait('import cloud_connect.js', import(${S}+'cloud_connect.js'));
             const line = document.getElementById('settings-cloud-auto-accept-changed'), box = document.getElementById('settings-cloud-allow-auto-accept');
-            const read = async next => { window.__setCloud({ max_mode: 'launch', allow_hub_auto_accept_changed: undefined, ...next }); await cc.loadCloudStatus(); return { text: line.textContent, shown: !line.hidden }; };
+            const read = async next => { window.__setCloud({ max_mode: 'launch', allow_hub_auto_accept_changed: undefined, ...next }); await window.__aaAwait('load cloud status', cc.loadCloudStatus()); return { text: line.textContent, shown: !line.hidden }; };
             const out = {};
             out.never = await read({ allow_hub_auto_accept: true });
             out.hubOn = await read({ allow_hub_auto_accept: true, allow_hub_auto_accept_changed: { by: 'hub', user: 'hub-user-3f2a', at: '2026-10-21T20:15:00Z' } });
@@ -282,15 +318,15 @@ const BASE = require('./test_base').BASE;
                 }
                 return prev(url, opts);
             };
-            const cc = await import(${S}+'cloud_connect.js');
+            const cc = await window.__aaAwait('import cloud_connect.js', import(${S}+'cloud_connect.js'));
             window.__setCloud({ redact_tokens: undefined });
-            await cc.loadCloudStatus();
+            await window.__aaAwait('load cloud status', cc.loadCloudStatus());
             const byDefault = box.checked;
             window.__setCloud({ redact_tokens: false });
-            await cc.loadCloudStatus();
+            await window.__aaAwait('load cloud status', cc.loadCloudStatus());
             const off = box.checked;
             window.__setCloud({ redact_tokens: true });
-            await cc.loadCloudStatus();
+            await window.__aaAwait('load cloud status', cc.loadCloudStatus());
             box.checked = false; box.dispatchEvent(new Event('change'));
             return { byDefault, off, describedBy: box.getAttribute('aria-describedby') };
         })()`);
@@ -299,6 +335,9 @@ const BASE = require('./test_base').BASE;
         await waitFor(`window.__redactPuts.length === 1`, 'the local PUT');
         assert.deepEqual(await ev(`window.__redactPuts[0]`), { method: 'PUT', body: { redact: false } });
         console.log('   ✓ on by default (also when the server does not say); PUT /api/cloud/redact-tokens {redact}');
+
+        const awaitTimings = await ev('window.__aaAwaitTimings');
+        step10 = false;
 
         console.log('11. A refused enable says why, in words (403 codes)');
         const refusals = await ev(`(async () => {
@@ -369,6 +408,8 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`window.__popPuts[1].on`), false);
         console.log('   ✓ switch in the popout header: asks, enables, AUTO, turns off');
 
+        console.log('step 10 awaits: ' + awaitTimings.join(', '));
+        console.log('step 10 CDP evaluations (ms): ' + step10Timings.join(', '));
         console.log('PASS auto_accept_browser');
     } finally {
         await guard.restore().catch(e => console.error('settings restore: ' + (e && e.message)));
