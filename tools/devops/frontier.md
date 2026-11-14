@@ -14,13 +14,14 @@ lease), run and release in one command, and post START/END naming frontier.
 
 ## Setup
 
-No installs. Copy Node into your run folder (a copy, no junctions):
-`xcopy /e /i /q D:\coral-team-cache\tools\node D:\coral-link-runs\<run>\node`.
+No installs. Read `D:\coral-link-runs\README.txt` first. Node is used from the shared
+folder via PATH (no copy needed). At most 2 runs at once (`frontier-go` slots count).
+`node_modules` must be copied in, never junctioned (Windows refuses it on this box).
 
 ## Environment for every run
 
 ```bat
-set PATH=D:\coral-link-runs\<run>\node;C:\Program Files\Git\cmd;C:\Program Files\Go\bin;%PATH%
+set PATH=D:\coral-team-cache\tools\node;C:\Program Files\Git\cmd;C:\Program Files\Go\bin;%PATH%
 set GOCACHE=D:\coral-link-runs\<run>\gocache
 set GOTMPDIR=D:\coral-link-runs\<run>\gotmp
 set GOPATH=D:\coral-link-runs\<run>\gopath
@@ -29,6 +30,8 @@ set npm_config_cache=D:\coral-link-runs\<run>\npm-cache
 set TEMP=D:\coral-link-runs\<run>\tmp
 set TMP=D:\coral-link-runs\<run>\tmp
 set CORAL_TELEMETRY_DISABLED=1
+set CORAL_CDP_PORT_RANGE=9500-9599
+set CHROME=C:\Program Files\Google\Chrome\Application\chrome.exe
 set CHROME_BIN=C:\Program Files\Google\Chrome\Application\chrome.exe
 ```
 

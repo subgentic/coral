@@ -225,11 +225,23 @@ const suites = classifySuites(here);
   if (bad.length) { console.error(bad.join('\n')); process.exit(2); }
 }
 
+// CORAL_CDP_PORT_RANGE=lo-hi keeps every port the runner picks inside that range (a shared box such as frontier
+// allows only 9500-9599). Unset, the OS picks any free port, as before.
+const portRange = (() => {
+  const m = /^(\d+)-(\d+)$/.exec(process.env.CORAL_CDP_PORT_RANGE || '');
+  return m && +m[1] <= +m[2] ? [+m[1], +m[2]] : null;
+})();
+const tryPort = port => new Promise((res, rej) => {
+  const s = net.createServer(); s.on('error', rej);
+  s.listen(port, '127.0.0.1', () => { const q = s.address().port; s.close(() => res(q)); });
+});
 const freePort = async () => {
-  for (;;) {
-    const p = await new Promise((res, rej) => {
-      const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const q = s.address().port; s.close(() => res(q)); }); s.on('error', rej);
-    });
+  for (let tries = 0; ; tries++) {
+    let p;
+    if (portRange) {
+      if (tries > 4 * (portRange[1] - portRange[0] + 1)) throw new Error(`no free port in CORAL_CDP_PORT_RANGE ${portRange.join('-')}`);
+      try { p = await tryPort(portRange[0] + Math.floor(Math.random() * (portRange[1] - portRange[0] + 1))); } catch { continue; }
+    } else p = await tryPort(0);
     if (!PROD_PORTS.includes(p)) return p; // never a production Coral port, even by chance
   }
 };
