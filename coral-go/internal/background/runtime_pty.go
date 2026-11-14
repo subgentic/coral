@@ -45,7 +45,13 @@ func (r *PTYRuntime) SpawnAgent(ctx context.Context, name, workDir, logFile, com
 		sessionID = name
 	}
 
-	return r.backend.Spawn(name, agentType, workDir, sessionID, command, 200, 50)
+	if err := r.backend.Spawn(name, agentType, workDir, sessionID, command, 200, 50); err != nil {
+		return err
+	}
+	if command != "" {
+		r.backend.AdoptAgent(name) // the agent's process is recorded when it appears, as a dashboard launch does: without it the gate refuses the run's first prompt as "not recorded" (#17250)
+	}
+	return nil
 }
 
 func (r *PTYRuntime) SendInput(ctx context.Context, o terminalinput.Origin, name, text string) error {

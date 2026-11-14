@@ -604,6 +604,10 @@ func (s *JobScheduler) launchAndWatch(runID int64, job store.ScheduledJob, rc ru
 		exitReason = startCommandFailedCode
 		s.store.UpdateScheduledRun(ctx, runID, map[string]interface{}{"error_msg": ptymanager.ErrStartCommand.Error(), "error_code": startCommandFailedCode})
 	}
+	if status == "failed" && errors.Is(launchErr, ErrPromptNotDelivered) { // the agent is up but its prompt was never typed: Failed, with the reason (#17250)
+		exitReason = promptNotDeliveredCode
+		s.store.UpdateScheduledRun(ctx, runID, map[string]interface{}{"error_msg": launchErr.Error() + ".", "error_code": promptNotDeliveredCode})
+	}
 	if status == "completed" && s.exitedBeforeStarting(ctx, runID, job, time.Now().UTC().Format(store.ISOFormat), startedAt) {
 		status, exitReason = "failed", agentExitedEarlyCode // the sentence is in error_msg (exitedBeforeStarting)
 	}
@@ -642,6 +646,9 @@ func (s *JobScheduler) SetLastEventType(fn func(ctx context.Context, sessionID s
 func reportsEvents(agentType string) bool {
 	return agentType == "claude" || agentType == "codex" || agentType == ""
 }
+
+// promptNotDeliveredCode is the run's fixed error_code when its agent started but Coral could not type the prompt into it (#17250).
+const promptNotDeliveredCode = "prompt_not_delivered"
 
 // startCommandFailedCode is the run's fixed error_code when Coral could not hand the agent its start command (#6978).
 const startCommandFailedCode = "start_command_failed"

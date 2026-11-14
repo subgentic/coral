@@ -397,6 +397,23 @@ func TestRunWhoseStartCommandCouldNotBeHandedOverFailsWithAPlainReasonAndCode(t 
 	assert.Equal(t, "start_command_failed", *r.ErrorCode)
 }
 
+// A run whose agent started but whose first prompt could not be typed ends Failed with the reason and a fixed code, not "Running" for ever at an empty prompt (#17250, walk 58).
+func TestRunWhosePromptCouldNotBeTypedFailsWithTheReasonAndCode(t *testing.T) {
+	e := newExitEnv(t, "exit-prompt-not-typed")
+	e.launch(t, func(context.Context) error {
+		return fmt.Errorf("%w: the agent's process is not recorded", ErrPromptNotDelivered)
+	})
+	e.s.launchAndWatch(e.runID, store.ScheduledJob{AgentType: "claude"}, runConfig{})
+	r := e.run(t)
+	assert.Equal(t, "failed", r.Status)
+	require.NotNil(t, r.ExitReason)
+	assert.Equal(t, "prompt_not_delivered", *r.ExitReason)
+	require.NotNil(t, r.ErrorCode)
+	assert.Equal(t, "prompt_not_delivered", *r.ErrorCode)
+	require.NotNil(t, r.ErrorMsg)
+	assert.Equal(t, "Coral could not type the prompt into the agent: the agent's process is not recorded.", *r.ErrorMsg)
+}
+
 // idleShellRuntime is a runtime whose terminal is at an idle shell (the CLI never ran).
 type idleShellRuntime struct{ *killRecorder }
 

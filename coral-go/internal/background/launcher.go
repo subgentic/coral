@@ -3,6 +3,7 @@
 package background
 
 import (
+	"errors"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -276,9 +277,14 @@ var (
 	promptPollEvery    = 250 * time.Millisecond
 )
 
+// ErrPromptNotDelivered: the first prompt of a job's agent could not be typed into its terminal (its program never took the foreground, or the gate held the text until the wait ran out). The run ends Failed with
+// this as its reason, not "Running" for ever at an empty prompt (#17250, walk 58).
+var ErrPromptNotDelivered = errors.New("Coral could not type the prompt into the agent")
+
 // SendPrompt sends a prompt to an agent session after a delay for initialization.
 // The CLI is typed into a shell at launch, so the prompt is sent only once the CLI
 // is in the foreground: typed into the shell, it would run as a command (#3219).
+// It returns ErrPromptNotDelivered (with the reason) when the prompt was not typed: the caller must not take silence for delivery (#17250).
 func (l *AgentLauncher) SendPrompt(ctx context.Context, sessionID, sessionName, agentType, prompt string) error {
 	// Wait for agent to initialize
 	select {
@@ -293,7 +299,7 @@ func (l *AgentLauncher) SendPrompt(ctx context.Context, sessionID, sessionName, 
 		}
 		if time.Now().After(deadline) {
 			l.logger.Warn("agent CLI is not running in its terminal; prompt not sent", "session", sessionID[:8])
-			return nil
+			return fmt.Errorf("%w: its program never started in the terminal", ErrPromptNotDelivered)
 		}
 		select {
 		case <-time.After(promptPollEvery):
@@ -305,22 +311,44 @@ func (l *AgentLauncher) SendPrompt(ctx context.Context, sessionID, sessionName, 
 	// Through the automated-input gate (#3431), and only once the agent shows
 	// its normal input box: a freshly started CLI may be on its trust-this-folder
 	// screen or a login or model picker, and the prompt plus Enter would answer
-	// it. Held until the user deals with that screen.
-	if _, err := deliverAutomated(ctx, l.runtime, l.logger, sessionName, agentType, sessionID, prompt, "initial prompt", ptymanager.InputBoxKnown(agentType), false); err != nil {
-		l.logger.Warn("prompt send failed", "session", sessionID[:8], "error", err)
+	// it. Held until the user deals with that screen. A send the gate skips (a send of a person in flight, a
+	// terminal that is not yet known to run the agent) is asked again until the wait runs out.
+	for deadline := time.Now().Add(promptStartWait); ; {
+		skipped, err := deliverAutomated(ctx, l.runtime, l.logger, sessionName, agentType, sessionID, prompt, "initial prompt", ptymanager.InputBoxKnown(agentType), false)
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			l.logger.Warn("prompt send failed", "session", sessionID[:8], "error", err)
+			return fmt.Errorf("%w: %v", ErrPromptNotDelivered, err)
+		}
+		if !skipped {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			why := "the terminal did not take it"
+			if sk, ok := ptymanager.SkippedOf(sessionName); ok && sk.Why != "" {
+				why = sk.Why
+			}
+			l.logger.Warn("prompt not typed; the run is failed", "session", sessionID[:8], "why", why)
+			return fmt.Errorf("%w: %s", ErrPromptNotDelivered, why)
+		}
+		select {
+		case <-time.After(promptPollEvery):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
-
-	return nil
 }
 
-// startPromptDelivery sends prompt in the background and returns a channel that closes when the
+// startPromptDelivery sends prompt in the background and returns a channel that gets the delivery's outcome (nil when it was typed) and closes when the
 // delivery is over. It runs on ctx, so cancelling ctx (the run ended) ends it too.
-func (l *AgentLauncher) startPromptDelivery(ctx context.Context, sessionID, sessionName, agentType, prompt string) <-chan struct{} {
-	done := make(chan struct{})
+func (l *AgentLauncher) startPromptDelivery(ctx context.Context, sessionID, sessionName, agentType, prompt string) <-chan error {
+	done := make(chan error, 1)
 	go func() {
 		defer safego.Recover("background/launcher:startPromptDelivery")
 		defer close(done)
-		_ = l.SendPrompt(ctx, sessionID, sessionName, agentType, prompt)
+		done <- l.SendPrompt(ctx, sessionID, sessionName, agentType, prompt)
 	}()
 	return done
 }
@@ -348,12 +376,29 @@ func (l *AgentLauncher) BuildSchedulerLaunchFn(schedStore *store.ScheduleStore) 
 
 		// Send prompt to the agent after delay, on the run's own context: when the run ends the
 		// delivery (and an initial prompt held for a screen nobody answers) ends with it (#3999).
-		if !oneShot { // a one-shot run has its prompt on the command line
-			l.startPromptDelivery(ctx, result.SessionID, result.SessionName, job.AgentType, job.Prompt)
+		var promptDone <-chan error // nil for a one-shot run: its prompt is on the command line
+		if !oneShot {
+			promptDone = l.startPromptDelivery(ctx, result.SessionID, result.SessionName, job.AgentType, job.Prompt)
 		}
 
-		// Monitor the tmux session — return when agent finishes or context expires
-		return l.watchSession(ctx, result.SessionName)
+		// Monitor the tmux session — return when agent finishes or context expires. A prompt that could not be typed ends the run now, Failed, with its reason: the agent sits at an empty prompt for ever otherwise (#17250).
+		wctx, stop := context.WithCancel(ctx)
+		defer stop()
+		watched := make(chan error, 1)
+		go func() { watched <- l.watchSession(wctx, result.SessionName) }()
+		for {
+			select {
+			case err := <-promptDone:
+				promptDone = nil
+				if errors.Is(err, ErrPromptNotDelivered) {
+					stop()
+					<-watched
+					return err
+				}
+			case err := <-watched:
+				return err
+			}
+		}
 	}
 }
 

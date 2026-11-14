@@ -65,6 +65,7 @@ func (r *TmuxRuntime) SpawnAgent(ctx context.Context, name, workDir, logFile, co
 			_ = r.client.KillSessionOnly(ctx, name, agentType, "") // not left at an idle shell, "running" until its deadline (#6978)
 			return ptymanager.ErrStartCommand
 		}
+		r.client.AdoptAgentAfterLaunch(name, target) // the agent's process is recorded when it appears, as a dashboard launch does: without it the gate refuses the run's first prompt as "not recorded" (#17250)
 	}
 
 	return nil

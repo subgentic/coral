@@ -234,7 +234,8 @@ func TestLauncherPromptNeverTypedIntoAShell(t *testing.T) {
 	l := newTestLauncher(t, rt, nil, 0)
 	name := FormatSessionName("claude", testUUID)
 	rt.set(name, "zsh") // the CLI never starts
-	require.NoError(t, l.SendPrompt(context.Background(), testUUID, name, "claude", "do the task"))
+	err := l.SendPrompt(context.Background(), testUUID, name, "claude", "do the task")
+	require.ErrorIs(t, err, ErrPromptNotDelivered, "a prompt that was not typed is said, not taken for delivered (#17250)")
 	assert.Equal(t, 0, rt.sentTo(name), "the prompt is not typed into the shell")
 	assert.Greater(t, rt.idleCalls(), 1, "it looked until its wait ran out")
 }
