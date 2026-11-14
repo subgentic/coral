@@ -68,7 +68,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             // the folder page's header is one row, the title and its count (a1a3310bb): the first h2 on a phone is a hidden list title, so the header is read
             const counts = await ev(`({ title: (document.querySelector('.inbox-folder-head') || document.querySelector('.group-table-title, .inbox-group-title, h2') || {}).textContent, pill: [...document.querySelectorAll('button')].filter(b => /^Open \\d/.test(b.textContent.trim())).map(b => b.textContent.trim()), side: (document.querySelector('.view-list-item[data-key="saved"]') || {}).textContent })`);
             check(!mobile ? /^Open 1$/.test((counts.pill || [])[0] || '') : true, at + 'the Open pill counts the saved file: ' + JSON.stringify(counts));
-            check(/Saved\s*1/.test(String(counts.title).replace(/\s+/g, ' ')) || !!(await ev(`/Saved\\s*1\\b/.test(document.querySelector('#inbox-page, #group-table-view')?.closest('main, section, div')?.textContent.slice(0, 400) || document.body.textContent.slice(0, 600))`)), at + 'the title count includes the saved file: ' + JSON.stringify(counts));
+            check(/Saved messages\s*1/.test(String(counts.title).replace(/\s+/g, ' ')) || !!(await ev(`/Saved messages\\s*1\\b/.test(document.querySelector('#inbox-page, #group-table-view')?.closest('main, section, div')?.textContent.slice(0, 400) || document.body.textContent.slice(0, 600))`)), at + 'the title count includes the saved file: ' + JSON.stringify(counts));
             await shot(`saved-files-${w}`);
             // Move to Needs you
             await ev(`document.querySelector('.saved-files button[aria-label="More actions for plan-1.md"]').click(); true`);
