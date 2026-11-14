@@ -192,6 +192,7 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 		"artifacts_rev": artifactsRev,
 		"artifacts":     sel.page, "limit": limit, "offset": sel.start, "has_more": sel.hasMore, "truncated": truncated || cut,
 		"total": sel.total, "all": all, "teams": refs,
+		"filtered_truncated": (truncated || cut) && tq.restricts(), // a filtered list whose scan was cut may miss matches in the part not read, however short it is (#16564)
 	}
 	if tq.starredFirst {
 		resp["starred_total"] = sel.starredTotal

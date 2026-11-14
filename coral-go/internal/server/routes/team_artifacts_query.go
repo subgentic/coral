@@ -466,6 +466,16 @@ func parseArtifactTime(s string) (time.Time, bool) {
 }
 
 // cheapMatch applies the filters that need no file system: origin, by, board, kept and the time range.
+// restricts reports whether the query leaves out any row a plain list would hold: a search, a kind, an origin, an uploader, a board, a bookmark, a read or waiting state, tags, a goal or task,
+// a time window, exact digests or a team restriction. Sorting, paging and the facets alone do not.
+func (q *teamArtifactQuery) restricts() bool {
+	if q == nil {
+		return false
+	}
+	return q.q != "" || len(q.kinds) > 0 || len(q.origins) > 0 || len(q.by) > 0 || len(q.boards) > 0 || q.kept != nil || q.waiting != nil || q.muted != nil || q.read != nil ||
+		q.starred != nil || len(q.digests) > 0 || len(q.tags) > 0 || q.goal != 0 || q.task != 0 || q.since != nil || q.until != nil || len(q.teams) > 0
+}
+
 func (q *teamArtifactQuery) cheapMatch(it teamArtifact, kept map[string]bool, starred map[string]starInfo) bool {
 	if len(q.origins) > 0 {
 		o, ok := teamArtifactOrigin(it), false
@@ -1052,6 +1062,9 @@ func (h *BoardHandler) queryTeamArtifacts(w http.ResponseWriter, r *http.Request
 		"artifacts_rev": artifactsRev,
 		"project":       project, "artifacts": sel.page, "limit": limit, "offset": sel.start,
 		"has_more": sel.hasMore, "truncated": truncated, "total": sel.total, "all": all,
+		// filtered_truncated is true when this is a FILTERED list and the scan behind it was cut: the scan reads a team's newest tasks that hold artifacts before the filter, so rows that match
+		// the filter in older tasks are unknown, however short the matched list is (#16564). A list with no filter on says it with truncated alone.
+		"filtered_truncated": truncated && q.restricts(),
 	}
 	if sel.next != "" {
 		resp["next_cursor"] = sel.next
