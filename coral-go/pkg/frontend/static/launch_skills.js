@@ -11,6 +11,13 @@ const generation = new Map(); // row id -> the latest mount: an answer that arri
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
+/** The newest version of each skill by name, in the order the names first appear: an older version of a skill the person can pick is not another thing to choose. */
+function newestOnly(list) {
+    const best = new Map();
+    for (const s of list) { const have = best.get(s.name); if (!have || Number(s.version) > Number(have.version)) best.set(s.name, s); }
+    return [...best.values()];
+}
+
 /** The ids ticked in the row ('launch-skills' or 'team-skills'), none when the row is hidden. */
 export function launchSkillIds(rowId) {
     const row = document.getElementById(`${rowId}-row`);
@@ -29,6 +36,7 @@ export async function mountLaunchSkills(rowId, local) {
     let list = [];
     try { list = (await requestJson('GET', '/api/skills?status=approved')).skills; } catch { if (generation.get(rowId) === mine) say('Skills could not be read from this computer, so none can be chosen now.'); return; }
     if (!Array.isArray(list)) { if (generation.get(rowId) === mine) say('Skills could not be read from this computer, so none can be chosen now.'); return; }
+    list = newestOnly(list); // one row per skill, its newest approved version (#15890: using-coral v1, v2 and v3 were three rows)
     if (!list.length || generation.get(rowId) !== mine) return;
     const chosen = picked.get(rowId);
     const search = el('input', 'skills-pick-search'); search.type = 'search'; search.placeholder = 'Search skills'; search.setAttribute('aria-label', 'Search skills');
