@@ -66,8 +66,14 @@
 .inbox-pills { display: inline-flex; flex-wrap: wrap; gap: 4px 6px; margin-inline-start: 8px; vertical-align: middle; } /* the goal and task pills of a review (#16576) */
 .inbox-pill { position: relative; cursor: pointer; font-family: inherit; display: inline-block; min-height: 0; min-width: 0; padding: 0 8px; border-radius: 999px; background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-secondary); font-size: var(--fs-sm); white-space: nowrap; text-decoration: none; }
 .inbox-pill:hover { color: var(--text-primary); border-color: var(--text-secondary); }
-@media (min-width: 761px) { .inbox-review-item:has(> .inbox-pills) { flex-wrap: wrap; } .inbox-review-item > .inbox-pills { flex: 1 0 100%; margin: 2px 0 0; } } /* a computer's card: the pills sit under the title line, so the title keeps its width */
+@media (min-width: 761px) {
+    .inbox-review-item:has(> .inbox-meta) { flex-wrap: wrap; row-gap: 2px; }
+    .inbox-review-item > .inbox-meta { flex: 1 0 100%; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; color: var(--text-secondary); }
+    .inbox-meta > .inbox-pills { margin: 0; }
+    .inbox-meta .inbox-review-from { max-width: none; }
+} /* a computer's card: the title is the headline, the meta line is under it (#16678) */
 @media (max-width: 760px) {
-    .inbox-review-item.inbox-agent-first > .inbox-pills { grid-area: pills; margin: 4px 0 0; }
+    .inbox-review-item.inbox-agent-first > .inbox-pills { grid-area: pills; margin: 8px 0 0; }
 } /* a phone card: the pills are a line of their own under the title, so the title and the age keep their place (#16576) */
-.inbox-pill::after { content: ""; position: absolute; inset: -12px -6px; } /* a small pill, with a 44 px target drawn around it (#16576) */
+.inbox-pill::after { content: ""; position: absolute; inset: -8px -6px -14px; } /* a small pill, with a 44 px target drawn around it (#16576) */
+.inbox-kind { color: var(--text-muted); } /* the kind label at the start of the meta line (#16678) */

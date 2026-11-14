@@ -1,6 +1,6 @@
 // A phone's Needs you review and question rows (#13829, the Operator on #13795/#13818: "too bunched"; replaces #13795's title-first layout): line one is the agent's name (strong), line two the ask (two lines at most, whole)
 // with the time since at its right; the kind's words ("For review", "Needs your answer"), the Goal and the Task are not drawn, and the Waiting column is not drawn twice. A long ask and a long sender at 320, 390 and 430.
-// The computer's table (1280) is as it was: the sender before the name, the Waiting column, the kind's words. The artifacts and the question are stubbed. Isolated dev server.
+// The computer's table (1280) keeps its columns: the title first and the sender under it (the meta line, #16678), the Waiting column, the kind's words. The artifacts and the question are stubbed. Isolated dev server.
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -60,7 +60,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 check(!short.fromCut, `${at}a short sender is whole: ${JSON.stringify(short)}`);
                 check(!(await ev(`document.documentElement.scrollWidth > innerWidth + 1`)), at + 'no sideways scroll');
             } else {
-                check(long && long.fromRight <= long.nameLeft + 4 && long.nameTop <= long.fromTop + 8 && !long.waitShown && long.kindWords >= 1, `${at}the computer's table is as it was (the sender before the name, no second wait, the kind's words): ${JSON.stringify(long)}`);
+                check(long && long.fromTop >= long.nameBottom - 2 && !long.waitShown && long.kindWords >= 1, `${at}the computer's table: the title first, the sender on the meta line under it (#16678), no second wait, the kind's words: ${JSON.stringify(long)}`);
             }
             await shot(`needs-phone-row-${w}`);
         }

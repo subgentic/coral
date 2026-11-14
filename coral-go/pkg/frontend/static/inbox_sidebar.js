@@ -1370,7 +1370,9 @@ wrap.append(sender, name); if (tags.childNodes.length) wrap.append(tags); if (pi
 wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWords(s.review)}` : ''}${readWords}`), ...waitMark(s)); return wrap;
     }
     const ver = DT.el('span', 'inbox-review-version', versionOf(s.review) > 1 ? ` · version ${versionOf(s.review)}` : ''); ver.hidden = !(versionOf(s.review) > 1);
-    wrap.append(sender, name, ver, ...(earlierWords(s.review) ? [earlierLink(s)] : []), ...(pills.childNodes.length ? [pills] : []), DT.el('span', 'sr-only', readWords), ...waitMark(s)); return wrap;
+    const meta = DT.el('span', 'inbox-meta'); // the headline is the subject; under it the kind, the sender and the file's own words, then the pills; the team stays in its own column (#16678, Option B)
+    meta.append(DT.el('span', 'inbox-kind', 'For review'), sender, ver, ...(earlierWords(s.review) ? [earlierLink(s)] : []), ...(pills.childNodes.length ? [pills] : []));
+    wrap.append(name, meta, DT.el('span', 'sr-only', readWords), ...waitMark(s)); return wrap;
 } if (isPhoneLayout()) { const f = DT.primaryButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); f.classList.add('inbox-review-from'); Object.assign(f.dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); const row = phoneRow(s, f, agentAskWords(s), [], true); if (agentAskIsLong(s)) row.append(...agentAskControls(s)); return row; }
   const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; })(s)) },
                 ...(rows.some(s => s.proposal) && !oneLineNeeds ? [{ key: 'asks', label: rows.some(x => x.proposal) ? 'What was asked' : 'Waiting for', ...(rows.some(x => x.proposal) ? (rows.some(s => s.review || s.operatorAsk) ? { lineGrow: true, min: 18, share: 1 } : { lineGrow: true, min: 22, share: 4 }) : { width: 'content', max: 20, drop: 2 }), line: 2, cell: s => {

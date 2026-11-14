@@ -54,6 +54,11 @@ const { coralReady } = require('./helpers/wait');
                 assert.deepEqual(await pillsOf('04'), ['Goal #8', 'Task #12'], 'the Docs sweep file has its goal and task pills');
                 assert.deepEqual(await pillsOf('05'), ['Task #13'], 'a file with a task and no goal has only the task pill');
                 assert.deepEqual(await pillsOf('10'), [], 'a file with neither has no pill');
+                // the card's anatomy (#16678, Option B): the subject is the headline, with the kind, the sender and the pills on a meta line under it (a computer's card)
+                if (width >= 768) {
+                    const anat = await ev(`(() => { const r = ${row('Review file 01.txt')}, name = r.querySelector('.inbox-review-name'), meta = r.querySelector('.inbox-meta'); if (!name || !meta) return null; const n = name.getBoundingClientRect(), m = meta.getBoundingClientRect(); return { kind: meta.querySelector('.inbox-kind') && meta.querySelector('.inbox-kind').textContent, from: !!meta.querySelector('.inbox-review-from'), pills: meta.querySelectorAll('.inbox-pill').length, under: m.top >= n.bottom - 1, nameFirst: name.compareDocumentPosition(meta) & Node.DOCUMENT_POSITION_FOLLOWING ? true : false }; })()`);
+                    assert.ok(anat && anat.kind === 'For review' && anat.from && anat.pills === 2 && anat.under && anat.nameFirst, 'the card has the title, then a meta line with the kind, the sender and the pills: ' + JSON.stringify(anat));
+                }
                 // the Filters panel's Goal field
                 await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').click(); true`);
                 await waitFor(`!document.querySelector('.inbox-folder-toolbar .list-bar-menu').hidden`, 'the Filters panel', 6000);
