@@ -25,16 +25,16 @@ const BASE = require('./test_base').BASE;
    await ev(`(() => {const n=document.getElementById('team-board-name');n.value='folder-check';n.dispatchEvent(new Event('input',{bubbles:true}));return true;})()`);
    await setDir('/home/test/Coral/folder-check',true);
    let v=await inspect();
-   if(v.toggle||!v.line||v.text!=='Coral creates this folder and trusts it for the team') failures.push(`${width}: suggested missing folder: ${JSON.stringify(v)}`);
+   if(v.toggle||!v.line||v.text!=='Coral creates this folder and trusts it for the team. A Claude agent may still ask once.') failures.push(`${width}: suggested missing folder: ${JSON.stringify(v)}`);
    await ev(`import((window.__coralStatic||'/static/')+'team_dialogs.js').then(m=>m.teamStepMove(-1))`);
    await setDir('/work/new-team',false);
    v=await inspect();
-   if(v.toggle||!v.line||v.text!=='Coral creates this folder and trusts it for the team') failures.push(`${width}: typed new folder: ${JSON.stringify(v)}`);
+   if(!v.toggle||v.line||!v.warning.includes('Coral will not trust /work/new-team unless this is on')||!(await ev(`document.getElementById('launch-team-dir-new').textContent==='Coral creates this folder.'`))) failures.push(`${width}: typed new folder: ${JSON.stringify(v)}`);
    await ev(`import((window.__coralStatic||'/static/')+'team_dialogs.js').then(m=>m.teamStepMove(-1))`);
    await ev(`document.getElementById('launch-team-dir').scrollIntoView({block:'center'});true`);await shot(`team-new-folder-${width}`);
    await setDir('/work/existing',false); v=await inspect();
    if(!v.toggle||v.line||!v.warning.includes('Coral will not trust /work/existing unless this is on')) failures.push(`${width}: existing folder: ${JSON.stringify(v)}`);
   }
-  assert.deepEqual(failures,[]);console.log('PASS missing suggested/typed folders explain trust; edited existing folder keeps consent');
+  assert.deepEqual(failures,[]);console.log('PASS suggested missing folder explains trust; typed new and existing folders keep consent');
  } finally {await client.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

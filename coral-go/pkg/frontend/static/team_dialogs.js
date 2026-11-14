@@ -356,7 +356,7 @@ async function _checkNewTeamFolder({ validate = false } = {}) {
         if (parentData.entries.includes(m[2])) return refuse('This folder exists but cannot be read. Choose an accessible folder.');
     } catch { return refuse('The folder could not be checked. Check the computer and try again.'); }
     input.dataset.createNew = dir;
-    line.textContent = `${m[2]} does not exist yet. Coral creates it inside ${parent} when you launch the team.`;
+    line.textContent = 'Coral creates this folder.';
     line.hidden = false;
     teamForm()?.refresh();
     return true;

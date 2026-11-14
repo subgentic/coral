@@ -66,7 +66,7 @@ export function trustTicked() {
 /** True when the suggested folder is known to be there already: Coral makes none then, so it trusts nothing without the person's tick (#11889). */
 export function suggestionExists(input) { return !!input && input.dataset.exists === input.value.trim(); }
 
-const folderWillBeCreated = d => !!d && !!d.value.trim() && ((usesSuggestion(d) && !suggestionExists(d)) || d.dataset.createNew === d.value.trim());
+const folderWillBeCreated = d => !!d && usesSuggestion(d) && !suggestionExists(d);
 
 /** Ask the machine whether the suggested folder exists and redraw the trust rows: the line "Coral will ... trust it for them" is for a folder Coral makes, not one that was already there. */
 export async function syncSuggestionExists() {
@@ -137,7 +137,7 @@ function mount(modal) {
             live: [{ id: 'btn-browse-team', wide: true, describes: false }, { id: 'launch-team-dir-recents', wide: true, describes: false }, { id: 'launch-team-dir-suggest', describes: false }, { id: 'launch-team-dir-new', describes: true }, { id: 'dir-browser-team', wide: true, describes: false }] },
         // Trusting the folder (#11889): a folder Coral makes is trusted for the agents that ask, and says so; an existing folder is trusted only when the person ticks it, naming the path. Neither shows through Coral Hub
         // (the server ignores the tick there). The server decides what it may trust: this is what is said and what is sent.
-        { key: 'trustLine', type: 'custom', wide: true, label: ' ', render: slot => { const p = document.createElement('p'); p.id = 'launch-team-trust-line'; p.className = 'sv-help'; p.textContent = 'Coral creates this folder and trusts it for the team'; slot.append(p); },
+        { key: 'trustLine', type: 'custom', wide: true, label: ' ', render: slot => { const p = document.createElement('p'); p.id = 'launch-team-trust-line'; p.className = 'sv-help'; p.textContent = 'Coral creates this folder and trusts it for the team. A Claude agent may still ask once.'; slot.append(p); },
             visibleWhen: () => { const d = document.getElementById('launch-team-dir'); return !isHub() && folderWillBeCreated(d); } },
         { key: 'trust', type: 'toggle', id: 'launch-team-trust', label: 'Trust this folder: its settings and tools can run', default: true, help: 'Its settings, hooks and tools can run without each CLI asking.',
             helpOf: () => { const f = document.getElementById('launch-team-dir')?.value.trim() || 'this folder'; // off: say plainly what that means, so a typed folder is not taken for one Coral trusts (#12413)

@@ -54,7 +54,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         console.log('A folder Coral makes says it will trust it, and has no switch');
         await open(); await setDir('/home/p/Coral/proj', true);
         assert.equal(await visible('launch-team-trust-line'), true, 'the line shows');
-        assert.equal(await ev(`document.getElementById('launch-team-trust-line').textContent`), 'Coral creates this folder and trusts it for the team');
+        assert.equal(await ev(`document.getElementById('launch-team-trust-line').textContent`), 'Coral creates this folder and trusts it for the team. A Claude agent may still ask once.');
         assert.equal(await visible('launch-team-trust'), false, 'no switch for a folder Coral makes');
         let sent = await go();
         assert.equal(sent.create_dir, true); assert.equal(sent.trust_folder, undefined, 'the made folder is trusted by the server, not asked for');
