@@ -14,14 +14,14 @@ const BASE=require('./test_base').BASE;
   assert.equal((await api('POST',`/goals/${id}/close`,{subscriber_id:'Operator',reason:'Finished',state:'done'})).status,200);
   for(const width of [1280,390]) {
    await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
-   await ev(`import((window.__coralStatic||'/static/')+'task_create.js').then(m=>m.showCreateTaskModal({project:'${B}'})).then(()=>true)`);
+   await ev(`Promise.resolve(window.showCreateTaskModal({project:'${B}'})).then(()=>true)`);
    await waitFor(`!!document.querySelector('#create-task-goal option[value="${id}"]')`,'closed goal offered');
    const choice=await ev(`document.querySelector('#create-task-goal option[value="${id}"]').textContent`);assert.match(choice,/closed.*reopen/i);
    assert.equal(await ev(`document.getElementById('create-task-goal').value`),'','a sole closed goal is never selected by default');
-   await ev(`import((window.__coralStatic||'/static/')+'task_create.js').then(m=>m.hideCreateTaskModal()).then(()=>true)`);
+   await ev(`window.hideCreateTaskModal();true`);
    assert.equal((await api('GET',`/goals/${id}`)).json.state,'done','cancel does not reopen');
   }
-  await ev(`import((window.__coralStatic||'/static/')+'task_create.js').then(m=>m.showCreateTaskModal({project:'${B}'})).then(()=>true)`);
+  await ev(`Promise.resolve(window.showCreateTaskModal({project:'${B}'})).then(()=>true)`);
   await ev(`document.getElementById('create-task-goal').value='${id}';document.getElementById('create-task-title').value='Additional work';document.getElementById('create-task-submit').click();true`);
   await waitFor(`document.getElementById('create-task-modal').style.display==='none'`,'task created');
   assert.equal((await api('GET',`/goals/${id}`)).json.state,'active','successful task creation reopens');
