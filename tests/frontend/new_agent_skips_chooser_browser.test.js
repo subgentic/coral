@@ -1,4 +1,4 @@
-// LA4 (#15888): "New agent" opens the one-page form, not the four-card chooser (the review's 5.3 point 1). The sidebar's New agent button and Alt+N open the form; the chooser stays one step back, behind the form's arrow. At 1280 and 390
+// LA4 (#15888): "New agent" opens the one-page form, not the four-card chooser (the review's 5.3 point 1). The sidebar's New agent button and Alt+N open the form; the chooser stays one step back, behind the form's arrow. At 1440 and 390
 // (200% text), dark and light. Against the isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -15,7 +15,7 @@ const { coralReady } = require('./helpers/wait');
     const close = async () => { await ev(`window.hideLaunchModal && window.hideLaunchModal(); true`); await waitFor(`!document.getElementById('launch-modal') || getComputedStyle(document.getElementById('launch-modal')).display === 'none'`, 'the dialog closes', 4000); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [w, h, mobile, big] of [[1280, 800, false, false], [390, 844, true, true]]) {
+        for (const [w, h, mobile, big] of [[1440, 900, false, false], [390, 844, true, true]]) {
             const tag = `${w}px${big ? ' at 200% text' : ''}`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Emulation.setTouchEmulationEnabled({ enabled: mobile });
