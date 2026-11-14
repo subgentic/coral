@@ -34,9 +34,13 @@ export function toggleSidebarKebab(btn, event) {
         // Measured hidden; the tablet drawer (#15258) transforms and clips, so its box is the window
         menu.style.visibility = 'hidden';
         menu.style.display = 'block';
-        const r = btn.getBoundingClientRect(), h = menu.offsetHeight, w = menu.offsetWidth, sb = menu.closest('.tablet-open');
+        const r = btn.getBoundingClientRect(), sb = menu.closest('.tablet-open');
         const x = sb ? sb.getBoundingClientRect() : new DOMRect(0, 0, innerWidth, innerHeight);
-        menu.style.top = Math.max(4, (r.bottom + h > x.bottom ? r.top - h : r.bottom + 2) - x.top) + 'px';
+        // A menu longer than the screen scrolls inside it and never runs past its edge: a phone's row menu is 16 items (#17333), and Stop at the foot must be reachable.
+        menu.style.maxHeight = Math.max(120, Math.min(x.height, innerHeight) - 16) + 'px'; menu.style.overflowY = 'auto';
+        const h = menu.offsetHeight, w = menu.offsetWidth;
+        const want = r.bottom + h > x.bottom ? r.top - h : r.bottom + 2;
+        menu.style.top = Math.max(8, Math.min(want - x.top, Math.min(x.height, innerHeight) - h - 8)) + 'px';
         menu.style.left = Math.min(r.left - x.left, x.width - w - 8) + 'px';
         menu.style.visibility = '';
         // Every item is a menu item for a screen reader (the row menus are marked as they are drawn).
