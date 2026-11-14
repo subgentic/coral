@@ -7,6 +7,7 @@ const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const settingsGuard = await require('./helpers/settings_guard').guardSettings();
     const found = [];
     const check = (ok, msg) => { if (!ok) found.push(msg); };
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
@@ -60,7 +61,7 @@ const { coralReady } = require('./helpers/wait');
             const after = await folderCount(), chipsAfter = await pills();
             check(after.every(c => c === '0' || c === '' || c == null) && !chipsAfter.some(c => /^Welcome/.test(c)), `${tag}: the count and the Welcome pill go with them: ` + JSON.stringify([after, chipsAfter]));
         }
-    } finally { await client.close(); }
+    } finally { await settingsGuard.restore(); await client.close(); }
     if (found.length) { console.error(found.join('\n')); process.exit(1); }
     console.log('inbox_welcome_counts_browser: ok');
 })().catch(e => { console.error(e); process.exit(1); });
