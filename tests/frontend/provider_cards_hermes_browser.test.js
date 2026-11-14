@@ -20,7 +20,7 @@ const WHY = "Hermes isn't offered on Windows yet: it has not been tried with Cor
     };
     const cardsOf = () => ev(`(() => { const g = document.getElementById('launch-agent-pick'), c = [...g.querySelectorAll('.provider-card')].find(x => x.dataset.type === 'hermes'); return {
         radios: [...g.querySelectorAll('input[type=radio]')].map(r => r.value), card: c ? { missing: c.classList.contains('is-missing'), mark: c.querySelector('.provider-mark')?.textContent, name: c.querySelector('.provider-name')?.textContent, link: c.querySelector('a.provider-install')?.getAttribute('href') || null } : null,
-        option: !!document.querySelector('#launch-agent-acf .acf-agent-type option[value="hermes"]'), line: g.querySelector('.provider-unsupported')?.textContent || null, sideways: document.scrollingElement.scrollWidth > innerWidth + 1 }; })()`);
+        option: !!document.querySelector('#launch-agent-acf .acf-agent-type option[value="hermes"]'), line: g.querySelector('.provider-unsupported')?.textContent || null, setup: [...g.querySelectorAll('button')].some(b => /^Set up another provider$/.test(b.textContent)), sideways: document.scrollingElement.scrollWidth > innerWidth + 1 }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
@@ -41,11 +41,11 @@ const WHY = "Hermes isn't offered on Windows yet: it has not been tried with Cor
                     await waitFor(`document.querySelector('#launch-agent-acf .acf-agent-type').value === 'hermes'`, tag + 'picking Hermes sets the form\'s agent', 4000);
                     assert.equal(await ev(`import(${S} + 'agent_config_form.js').then(m => m.getAgentConfig('launch-agent-acf').agentType)`), 'hermes', tag + 'what Launch sends');
                 } else if (mode === 'missing') {
-                    assert.ok(c.card && c.card.missing && c.card.link === 'https://example.invalid/install/hermes', tag + 'under Not installed with the server\'s install link: ' + JSON.stringify(c.card));
-                    assert.ok(!c.radios.includes('hermes'), tag + 'no radio'); assert.equal(c.line, null, tag + 'not the unsupported line');
+                    assert.equal(c.card, null, tag + 'no segment: the dialog does not list what is missing (#15887): ' + JSON.stringify(c.card));
+                    assert.ok(!c.radios.includes('hermes'), tag + 'no radio'); assert.equal(c.line, null, tag + 'not the unsupported line'); assert.equal(c.setup, true, tag + 'one link, Set up another provider');
                 } else {
                     assert.equal(c.card, null, tag + 'no card at all: ' + JSON.stringify(c)); assert.ok(!c.radios.includes('hermes'), tag + 'no radio');
-                    assert.equal(c.option, false, tag + 'no option in the form\'s select'); assert.equal(c.line, WHY, tag + 'one line says why');
+                    assert.equal(c.option, false, tag + 'no option in the form\'s select'); assert.equal(c.line, null, tag + 'the reason is Settings\', not a line in the dialog (#15887)'); assert.equal(c.setup, true, tag + 'one link, Set up another provider');
                     assert.deepEqual(c.radios, ['claude', 'codex', 'agy', 'pi', 'opencode'], tag + 'the other five are untouched');
                 }
             }

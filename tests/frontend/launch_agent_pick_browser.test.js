@@ -20,7 +20,7 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`!document.getElementById('launch-agent-pick').hidden && getComputedStyle(document.getElementById('launch-agent-pick')).display !== 'none'`, 'the agent choice', 8000);
         if (probed) await waitFor(`document.getElementById('launch-agent-pick').dataset.probed === '1'`, 'the CLI checks answered', 8000);
     };
-    const state = () => ev(`(() => { const g = document.getElementById('launch-agent-pick'); const sel = document.querySelector('#launch-agent-acf .acf-agent-type'); return { cards: [...g.querySelectorAll('.provider-card:not(.is-missing) .provider-name')].map(l => l.textContent.trim()), missing: [...g.querySelectorAll('.provider-missing .provider-name')].map(l => l.textContent.trim()), links: [...g.querySelectorAll('.provider-missing a')].map(a => [a.textContent.trim(), a.getAttribute('href'), a.target]), radios: g.querySelectorAll('.provider-missing input').length, checked: (g.querySelector('input:checked') || {}).value || null, select: sel.value, inMore: !!g.closest('#launch-agent-more'), shown: g.getClientRects().length > 0, role: g.getAttribute('role'), name: (document.getElementById(g.getAttribute('aria-labelledby')) || {}).textContent }; })()`);
+    const state = () => ev(`(() => { const g = document.getElementById('launch-agent-pick'); const sel = document.querySelector('#launch-agent-acf .acf-agent-type'); return { cards: [...g.querySelectorAll('.provider-card:not(.is-missing) .provider-name')].map(l => l.textContent.trim()), setup: [...g.querySelectorAll('button')].some(b => /^Set up another provider$/.test(b.textContent)), links: [...g.querySelectorAll('a')].length, radios: g.querySelectorAll('.provider-missing input').length, checked: (g.querySelector('input:checked') || {}).value || null, select: sel.value, inMore: !!g.closest('#launch-agent-more'), shown: g.getClientRects().length > 0, role: g.getAttribute('role'), name: (document.getElementById(g.getAttribute('aria-labelledby')) || {}).textContent }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
@@ -34,8 +34,8 @@ const { coralReady } = require('./helpers/wait');
             await open();
             let s = await state();
             check(`${tag}: the provider choice is in the third step, not behind a disclosure, a named radio group`, s.shown && !s.inMore && s.role === 'radiogroup' && s.name === 'Provider', JSON.stringify([s.shown, s.inMore, s.role, s.name]));
-            check(`${tag}: the installed providers are the cards, first; the others are under Not installed`, JSON.stringify(s.cards) === JSON.stringify(['Codex', 'Pi']) && JSON.stringify(s.missing) === JSON.stringify(['Claude', 'Antigravity', 'OpenCode', 'Hermes']), JSON.stringify([s.cards, s.missing]));
-            check(`${tag}: a provider that is not installed has an Install link (a new tab) and no radio`, s.radios === 0 && s.links.length === 4 && s.links.every(l => /^Install /.test(l[0]) && /^https?:/.test(l[1]) && l[2] === '_blank'), JSON.stringify([s.radios, s.links]));
+            check(`${tag}: the installed providers are the cards, first; the others are not in the dialog, one link says where they are set up`, JSON.stringify(s.cards) === JSON.stringify(['Codex', 'Pi']) && s.setup, JSON.stringify([s.cards, s.missing]));
+            check(`${tag}: a provider that is not installed has no segment and no install link in the dialog; one link, Set up another provider (#15887)`, s.radios === 0 && s.links === 0 && s.setup, JSON.stringify([s.radios, s.links]));
             check(`${tag}: with no default chosen and Claude missing, the first installed provider is selected (the form's select agrees)`, s.checked === 'codex' && s.select === 'codex', JSON.stringify([s.checked, s.select]));
             // choosing in the third step drives the form
             await ev(`document.querySelector('#launch-agent-pick input[value="pi"]').click(); true`);
@@ -47,8 +47,8 @@ const { coralReady } = require('./helpers/wait');
             s = await state();
             check(`${tag}: changing the form's agent select moves the choice here`, s.checked === 'codex', JSON.stringify([s.checked, s.select]));
             // each card is a real target
-            const sizes = await ev(`[...document.querySelectorAll('#launch-agent-pick .provider-card-head, #launch-agent-pick .provider-install')].map(l => { const b = l.getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; })`);
-            check(`${tag}: ${mobile ? 'each card and link is 44 px high' : 'each card and link is a clear target'}`, sizes.length === 6 && sizes.every(z => z[1] >= (mobile ? 44 : 28)), JSON.stringify(sizes));
+            const sizes = await ev(`[...document.querySelectorAll('#launch-agent-pick .provider-card-head, #launch-agent-pick .provider-setup')].map(l => { const b = l.getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; })`);
+            check(`${tag}: ${mobile ? 'each card and link is 44 px high' : 'each card and link is a clear target'}`, sizes.length === 3 && sizes.every(z => z[1] >= (mobile ? 44 : 28)), JSON.stringify(sizes));
             const fits = await ev(`(() => { const r = document.getElementById('launch-agent-pick').getBoundingClientRect(); return r.right <= innerWidth + 1 && r.left >= 0; })()`);
             check(`${tag}: it fits the screen`, fits);
             // everything installed: the default order, Claude selected, no Not installed section
@@ -56,19 +56,19 @@ const { coralReady } = require('./helpers/wait');
             await stub(['claude', 'codex', 'agy', 'pi', 'opencode', 'hermes']);
             await open();
             s = await state();
-            check(`${tag}: everything installed: the usual order, Claude selected, no Not installed section`, JSON.stringify(s.cards) === JSON.stringify(['Claude', 'Codex', 'Antigravity', 'Pi', 'OpenCode', 'Hermes']) && s.missing.length === 0 && s.checked === 'claude', JSON.stringify([s.cards, s.missing, s.checked]));
+            check(`${tag}: everything installed: the usual order, Claude selected, no Not installed section`, JSON.stringify(s.cards) === JSON.stringify(['Claude', 'Codex', 'Antigravity', 'Pi', 'OpenCode', 'Hermes']) && !s.setup && s.checked === 'claude', JSON.stringify([s.cards, s.setup, s.checked]));
             await ev(`window.hideLaunchModal(); true`);
             // a CLI check that fails: all four are cards, none is said to be missing, the default stays
             await ev(`(() => { const real = window.__realFetch; window.fetch = async (u, o = {}) => { if (/cli-check/.test(String(u))) return new Response('x', { status: 500 }); return real(u, o); }; return true; })()`);
             await open();
             s = await state();
-            check(`${tag}: when the check cannot answer, nothing is called missing and Claude stays the default`, s.missing.length === 0 && s.cards.length === 6 && s.checked === 'claude', JSON.stringify([s.cards, s.missing, s.checked]));
+            check(`${tag}: when the check cannot answer, nothing is called missing and Claude stays the default`, !s.setup && s.cards.length === 6 && s.checked === 'claude', JSON.stringify([s.cards, s.setup, s.checked]));
             await ev(`window.hideLaunchModal(); true`);
             // the probes are slow (1 s): the four cards are there at once and usable; a late answer moves the missing ones and does not undo a choice (#8024)
             await stub(['codex', 'pi'], 1000);
             const t0 = Date.now(); await open(false);
             s = await state();
-            check(`${tag}: slow CLI checks: the group is shown at once, six cards in the usual order, none under Not installed yet`, Date.now() - t0 < 900 && JSON.stringify(s.cards) === JSON.stringify(['Claude', 'Codex', 'Antigravity', 'Pi', 'OpenCode', 'Hermes']) && s.missing.length === 0 && s.checked === 'claude', JSON.stringify([Date.now() - t0, s.cards, s.missing, s.checked]));
+            check(`${tag}: slow CLI checks: the group is shown at once, six cards in the usual order, none under Not installed yet`, Date.now() - t0 < 900 && JSON.stringify(s.cards) === JSON.stringify(['Claude', 'Codex', 'Antigravity', 'Pi', 'OpenCode', 'Hermes']) && !s.setup && s.checked === 'claude', JSON.stringify([Date.now() - t0, s.cards, s.setup, s.checked]));
             const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
             await shot(`agent-pick-at-once-${w}`);
             await ev(`(() => { const sel = document.querySelector('#launch-agent-acf .acf-agent-type'); sel.value = 'agy'; sel.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); // a person chooses Antigravity, which the late answer says is missing
@@ -79,14 +79,14 @@ const { coralReady } = require('./helpers/wait');
                 return { labelLeft: Math.round(label.getBoundingClientRect().left), btnRight: Math.round(wr.right - btn.getBoundingClientRect().right), sameLine: Math.abs(mid(label) - mid(btn)) < 12, helpBelow: help.every(h => h.getBoundingClientRect().top >= label.getBoundingClientRect().bottom - 1), helps: help.length }; })()`);
             check(`${tag}: the install help is a row (Restart's): the status at the left edge, the button at the right end, the link and the command under them`, (col.sameLine || tag === '390px') && col.btnRight <= 6 && col.helps >= 1 && col.helpBelow, JSON.stringify(col));
             s = await state();
-            check(`${tag}: the late answers move the missing ones under Not installed and leave the choice a person made (the form's select stays on Antigravity)`, s.select === 'agy' && JSON.stringify(s.missing) === JSON.stringify(['Claude', 'Antigravity', 'OpenCode', 'Hermes']) && s.checked === null, JSON.stringify([s.checked, s.select, s.missing]));
+            check(`${tag}: the late answers move the missing ones under Not installed and leave the choice a person made (the form's select stays on Antigravity)`, s.select === 'agy' && s.setup && s.checked === null, JSON.stringify([s.checked, s.select, s.setup]));
             await ev(`window.hideLaunchModal(); true`);
             // nobody chose: the late answers put the installed first and select the first installed one (Claude is missing)
             await stub(['codex', 'pi'], 600);
             await open(false);
             await waitFor(`document.getElementById('launch-agent-pick').dataset.probed === '1'`, 'the late answers', 8000);
             s = await state();
-            check(`${tag}: nobody chose: the late answers order the installed first and start on Codex`, JSON.stringify(s.cards) === JSON.stringify(['Codex', 'Pi']) && JSON.stringify(s.missing) === JSON.stringify(['Claude', 'Antigravity', 'OpenCode', 'Hermes']) && s.checked === 'codex', JSON.stringify([s.cards, s.missing, s.checked]));
+            check(`${tag}: nobody chose: the late answers order the installed first and start on Codex`, JSON.stringify(s.cards) === JSON.stringify(['Codex', 'Pi']) && s.setup && s.checked === 'codex', JSON.stringify([s.cards, s.setup, s.checked]));
             await ev(`window.hideLaunchModal(); true`);
             // the person typed a model for the default agent before the late answers came (#16210, the Windows dialog_requests_golden flake): the answers must not move the provider under it and wipe the model
             await stub(['codex', 'pi'], 600);

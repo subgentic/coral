@@ -9,11 +9,9 @@ import { modelName } from './model_labels.js';
 import { copyText } from './utils.js';
 import { loadStyles } from './lazy_styles.js';
 import { el } from './dom_el.js';
-const { buildMissingList } = await importOnce('./cli_missing_list.js'); // the list of agents this computer cannot use yet (#12364)
 
 await loadStyles('provider_cards.css'); // the cards' rules are not in the start's stylesheet: they arrive before the first card is drawn (#11403)
 const { _getDefaultModels } = await importOnce('./launch_models.js');
-const { CLI_INSTALL_INSTRUCTIONS } = await importOnce('./cli_check.js');
 
 const TYPES = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi'], ['opencode', 'OpenCode'], ['hermes', 'Hermes']];
 const ALIAS = { gemini: 'agy', antigravity: 'agy' };
@@ -147,7 +145,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
         group.replaceChildren(hold);
         cards.clear(); bodies.clear();
         const offered = TYPES.filter(([t]) => !state.get(t).why), installed = offered.filter(([t]) => state.get(t).found !== false), missing = offered.filter(([t]) => state.get(t).found === false);
-        const strip = el('div', 'provider-tabs'), panel = el('div', 'provider-panel'); // folder tabs across the top, one per agent; the open tab joins its panel, which holds that agent's Model and Thinking
+        const strip = el('div', 'provider-strip'), panel = el('div', 'provider-panel'); // folder tabs across the top, one per agent; the open tab joins its panel, which holds that agent's Model and Thinking
         for (const [type, label] of installed) {
             const head = el('label', 'provider-card provider-card-head'); head.dataset.type = type;
             const input = el('input'); input.type = 'radio'; input.name = `${group.id}-radios`; input.value = type;
@@ -163,25 +161,13 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
             if (type === signin.type) body.prepend(signinBox());
             strip.append(head); panel.append(body); cards.set(type, head); bodies.set(type, body);
         }
-        const wrap = el('div', 'provider-tabs-wrap'), edge = el('button', 'provider-strip-edge'); edge.type = 'button'; edge.hidden = true; edge.tabIndex = -1; edge.setAttribute('aria-hidden', 'true'); edge.setAttribute('aria-label', 'Scroll tabs'); // the arrow keys move between the tabs: the chevron is for a finger, and only scrolls
-        edge.addEventListener('click', () => strip.scrollBy({ left: Math.max(96, strip.clientWidth * 0.6), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }));
-        const more = () => { edge.hidden = !(strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 2); };
-        strip.addEventListener('scroll', more, { passive: true }); new ResizeObserver(more).observe(strip);
-        wrap.append(strip, edge); group.append(wrap, panel); more();
-        if (missing.length) { // the agents this computer cannot use yet: one list, aligned columns (#12364)
-            const chooseHandler = async type => { // Settings > Agents with the CLI paths open and that CLI's field in it, as the launch dialog's Set path does
-                await window.showSettingsModal?.('agents');
-                const paths = document.getElementById('settings-cli-paths'); if (paths) paths.open = true;
-                const input = document.getElementById(`settings-cli-path-${({ agy: 'agy', antigravity: 'agy', gemini: 'agy' })[type] || type}`); if (input) { input.scrollIntoView({ block: 'center' }); input.focus(); }
-            };
-            const sec = buildMissingList({ idPrefix: group.id, rows: missing.map(([type, label]) => ({ type, label, mark: MARKS[type] || label[0], refused: state.get(type).refused, url: state.get(type).url || (CLI_INSTALL_INSTRUCTIONS[type] || {}).url || '' })), onChoosePath: chooseHandler });
-            for (const li of sec.querySelectorAll('li[data-type]')) cards.set(li.dataset.type, li);
-            group.append(sec);
-        }
-        for (const [type] of TYPES) { // an agent this computer's OS does not offer is no card and no option: one line says why
-            const why = state.get(type).why; if (!why) continue;
-            select.querySelector(`option[value="${type}"]`)?.remove();
-            const line = el('p', 'provider-unsupported sv-hint', why); line.dataset.type = type; group.append(line);
+        group.append(strip, panel);
+        // What this computer lacks is not told here (#15887): the reasons, the paths and the install links live in Settings. One link opens them, and shows only when some provider is not usable.
+        if (missing.length || TYPES.some(([t]) => state.get(t).why)) {
+            for (const [type] of TYPES) if (state.get(type).why) select.querySelector(`option[value="${type}"]`)?.remove(); // an agent this computer's OS does not offer is no option
+            const more = el('button', 'provider-setup', 'Set up another provider'); more.type = 'button';
+            more.addEventListener('click', () => window.showSettingsModal?.('agents')); // Settings > Providers once it exists (ST4); until then the section that holds the CLI paths
+            group.append(more);
         }
         sync();
         renderSignin();

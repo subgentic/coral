@@ -31,6 +31,7 @@ const GROUPED = `(() => { const R = window.fetch; window.fetch = (u, o = {}) => 
             await openNewAgent(ev, waitFor); await toAgentStep();
             const cards = await ev(`(() => { const g = document.getElementById('launch-agent-pick'); return { radios: [...g.querySelectorAll('input[type=radio]')].map(r => r.value), cards: [...g.querySelectorAll('.provider-card')].map(c => ({ type: c.dataset.type, missing: c.classList.contains('is-missing'), mark: (c.querySelector('.provider-mark') || {}).textContent, name: (c.querySelector('.provider-name') || {}).textContent, status: (c.querySelector('.provider-status') || {}).textContent || null, link: (c.querySelector('a.provider-install') || {}).href || null })) }; })()`);
             const oc = cards.cards.find(c => c.type === 'opencode');
+            if (missing.length) { assert.equal(oc, undefined, 'a CLI that is not found is no segment (#15887)'); assert.ok(!cards.radios.includes('opencode'), 'and no radio'); continue; }
             assert.ok(oc, `an OpenCode card exists: ${JSON.stringify(cards)}`);
             assert.equal(oc.mark, 'O', 'its badge is O, a letter no other card uses'); assert.equal(oc.name, 'OpenCode');
             if (!missing.length) {
