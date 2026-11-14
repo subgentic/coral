@@ -74,7 +74,7 @@ const HINTS = {
     'Let Coral Hub change cross-team settings': 'Allow Coral Hub to change how teams communicate.',
     'Hide tokens from view-only hub users': 'Redacts recognised credentials before sharing output with read-only viewers.',
     'Let Coral Hub act as the Operator': 'Allow Coral Hub users to make Operator decisions here.',
-    'Agent tools folder': "Where agents get coral-board and Coral's hooks.",
+    'Agent tools folder': "Where agents get coral-board and hooks.",
 };
 function docsHint(holder, name, original = null) {
     const p = original || document.createElement('p'); p.hidden = false; p.classList.add('sv-help', 'settings-hint-line');

@@ -56,7 +56,7 @@ const { coralReady } = require('./helpers/wait');
 
         // PANE Network
         assert.match(await row('settings-remote-access-enabled'), /Lets other devices control agents and read files as you do; unencrypted unless TLS is on\./, 'Network and Hub: Remote access says its risk before the switch, in the visible line');
-        assert.equal(await ev(`document.getElementById('settings-remote-access-enabled').closest('.sv-row').querySelector('a.sv-learn').getAttribute('href')`), '/docs/settings-system', 'the full explanation is linked in Docs');
+        assert.equal(await ev(`document.getElementById('settings-remote-access-enabled').closest('.sv-row').querySelector('a.sv-learn').getAttribute('href')`), '/docs/settings', 'the full explanation is linked in Docs');
         assert.match(await row('settings-hub-mode-enabled'), /Adds a Computers tab; whoever signs in here controls every computer you add\./, 'Network and Hub: Manage other computers says its risk before the switch');
         // END Network
         console.log('PASS Settings tour words');

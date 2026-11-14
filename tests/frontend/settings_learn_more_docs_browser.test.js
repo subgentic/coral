@@ -34,12 +34,12 @@ const BASE = require('./test_base').BASE;
         const chief = await ev(`[...document.querySelectorAll('#docs-nav-list [data-doc]')].filter(b => /^Chief\\b/.test(b.textContent.trim())).map(b => b.dataset.doc)`);
         assert.equal(chief.length, 1, `the docs sidebar lists Chief once: ${JSON.stringify(chief)}`);
         // following a link opens Docs at the setting's section
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); // a fresh page: Settings is followed from another page, as a person reaches it
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); // a fresh page: Settings is followed from another page, as a person reaches it
         await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(async s => { const d = await fetch('/api/settings').then(r => r.json()); s.state.settings = d.settings; return true; })`);
-        await ev(`import((window.__coralStatic || '/static/') + 'modals.js').then(m => m.showSettingsModal('general')).then(() => true)`);
+        await ev(`window.showSettingsModal('general'); true`);
         await waitFor(`!!document.querySelector('#settings-modal[open]') || document.querySelector('#settings-modal')?.getClientRects().length > 0`, 'Settings is open');
         await waitFor(`[...document.querySelectorAll('#settings-modal a.sv-learn[href^="/docs/"]')].some(a => a.getClientRects().length > 0)`, 'a link is on screen');
-        const pick = await ev(`(() => { const a = [...document.querySelectorAll('#settings-modal a.sv-learn[href^="/docs/"]')].find(x => x.getClientRects().length > 0 && !x.getAttribute('href').endsWith('how-do-i')); a.id = 'pick-learn'; return { topic: decodeURIComponent(a.getAttribute('href').slice(6)), answer: a.dataset.answer }; })()`);
+        const pick = await ev(`(() => { const a = [...document.querySelectorAll('#settings-modal a.sv-learn[href^="/docs/"]')].filter(x => x.getClientRects().length > 0 && !x.getAttribute('href').endsWith('how-do-i')).pop(); a.id = 'pick-learn'; return { topic: decodeURIComponent(a.getAttribute('href').slice(6)), answer: a.dataset.answer }; })()`);
         await ev(`document.getElementById('pick-learn').click(); true`);
         await waitFor(`location.pathname === '/docs/${pick.topic}' && [...document.querySelectorAll('#docs-content h2, #docs-content h3')].some(h => h.textContent.trim() === ${JSON.stringify(pick.answer)})`, 'the section opens in Docs', 12000);
         await shot('settings-learn-more-docs-1280');
