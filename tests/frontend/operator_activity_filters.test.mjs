@@ -24,4 +24,28 @@ assert.equal(AF.isFiltered({ ...AF.EMPTY, sort: 'oldest' }), false, 'the order a
 AF.setTeamNames(new Map([['beta', 'Beta team']]));
 assert.ok(AF.chips({ ...AF.EMPTY, team: 'beta' }).some(c => /Team: Beta team/.test(c.label || c.text || String(c))), 'the team chip says the name');
 assert.ok(AF.ACTIONS.includes('undone') && AF.ACTIONS.includes('goal_close'));
-console.log('PASS operator_activity_filters: search, team, action, since, order');
+// Kind chips are exclusive: each row has exactly one primary kind, so the sum equals the total (#16825)
+const kindRows = [
+    row(10, { action: 'answer', item_kind: 'question', title: 'Pick a database' }), // answers (not decisions, even though it is a decision)
+    row(11, { action: 'prompt_answer', item_kind: 'agent', title: 'sudo' }), // permissions (not decisions)
+    row(12, { action: 'prompt_allow', item_kind: 'agent', title: 'deploy' }), // permissions (not decisions)
+    row(13, { action: 'approve', item_kind: 'file', title: 'spec.md' }), // files (not decisions: item_kind is file)
+    row(14, { action: 'message', item_kind: 'agent', title: 'hello' }), // words
+    row(15, { action: 'deny', item_kind: 'file', title: 'draft.md' }), // files (item_kind is file, even though deny is a decision)
+    row(16, { action: 'task_complete', item_kind: 'task', title: 'build' }), // files (item_kind is task)
+    row(17, { action: 'skill_approve', item_kind: 'skill', title: 'linter' }), // decisions (skill_approve is a decision, item_kind is skill — not files, answers or permissions)
+    row(18, { action: 'goal_close', item_kind: 'goal', title: 'Ship v2' }), // files (item_kind is goal)
+];
+const kindCount = k => kindRows.filter(r => AF.inKind(r, k)).length;
+const total = kindRows.length;
+const chipSum = AF.KINDS.reduce((sum, k) => sum + kindCount(k), 0);
+assert.equal(chipSum, total, `the kind chips add to the total (${chipSum} vs ${total}): no row in two kinds`);
+assert.ok(AF.inKind(kindRows[0], 'answers'), 'an answer is in Answers');
+assert.ok(!AF.inKind(kindRows[0], 'decisions'), 'an answer is NOT in Decisions (exclusive)');
+assert.ok(AF.inKind(kindRows[1], 'permissions'), 'a prompt_answer is in Permissions');
+assert.ok(!AF.inKind(kindRows[1], 'decisions'), 'a prompt_answer is NOT in Decisions');
+assert.ok(AF.inKind(kindRows[3], 'files'), 'an approve of a file is in Files');
+assert.ok(!AF.inKind(kindRows[3], 'decisions'), 'an approve of a file is NOT in Decisions');
+assert.ok(AF.inKind(kindRows[4], 'words'), 'a message is in Words');
+assert.ok(AF.inKind(kindRows[7], 'decisions'), 'a skill_approve is in Decisions (no more specific kind)');
+console.log('PASS operator_activity_filters: search, team, action, since, order, exclusive kinds');
