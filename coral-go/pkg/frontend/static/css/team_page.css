@@ -510,3 +510,17 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
 
 /* The Artifacts tab's files strip: its space is held, unseen, until the real strip replaces it, so the table does not jump down (#15618). */
 .team-files-strip-reserve { visibility: hidden; }
+
+/* The line about work left uncommitted (#17203) */
+.team-uncommitted { padding: 8px 0; display: flex; flex-direction: column; gap: 8px; }
+.team-uncommitted[hidden] { display: none; }
+.team-uncommitted-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.team-uncommitted-words { font-size: var(--fs-md); }
+.team-uncommitted-files { margin: 6px 0 0; padding: 0 0 0 16px; max-height: 180px; overflow: auto; font-family: var(--font-mono); font-size: var(--fs-sm, 12px); white-space: pre; }
+.team-uncommitted-files[hidden], .team-uncommitted-form[hidden] { display: none; }
+.team-uncommitted-form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; max-width: 640px; }
+.team-uncommitted-message { width: 100%; font: inherit; }
+.team-uncommitted-note { margin: 0; color: var(--text-muted, inherit); font-size: var(--fs-sm, 12px); }
+.team-uncommitted-error { margin: 0; color: var(--error-text); }
+.team-uncommitted-output { margin: 0; max-height: 160px; overflow: auto; font-size: var(--fs-sm, 12px); white-space: pre-wrap; }
+.team-uncommitted-acts { display: flex; gap: 8px; }
