@@ -36,14 +36,14 @@ const NOTIFICATIONS_FIELDS = [
 const INBOX_FIELDS = [
     { key: 'inbox_always', type: 'notice', render: slot => { const p = document.createElement('p'); p.id = 'settings-inbox-always'; p.className = 'sv-help'; p.textContent = 'Questions and decisions always reach you: an agent waiting on a question, a permission or a plan, a goal or task proposal, a goal that looks done.'; slot.append(p); } },
     { key: 'inbox_kind_file', type: 'toggle', id: 'settings-inbox-file', label: 'Files for review', help: 'A file an agent wants you to read, approve or send back.', default: true },
-    { key: 'inbox_kind_done', type: 'toggle', id: 'settings-inbox-done', label: 'Finished requests', help: '"Done. Does it work for you?" when a request of yours is finished, with what changed.', default: true },
+    { key: 'inbox_kind_done', type: 'toggle', id: 'settings-inbox-done', label: 'Finished requests', help: 'A note that a request of yours is finished, with what changed.', default: true },
     { key: 'inbox_advanced', type: 'heading', advanced: true, label: 'Advanced' },
     { key: 'inbox_kind_release', type: 'toggle', id: 'settings-inbox-release', label: 'Release summaries', help: 'One page per release: what is new for you and the known issues.', default: true },
     { key: 'inbox_kind_decided', type: 'toggle', id: 'settings-inbox-decided', label: 'Decisions made for you', help: 'What the Orchestrator decided on your behalf, once a day.', default: true },
-    { key: 'inbox_kind_digest', type: 'toggle', id: 'settings-inbox-digest', label: 'Daily digest', help: 'What landed, what is blocked and what waits for you. Coral writes it from the board.', default: true },
+    { key: 'inbox_kind_digest', type: 'toggle', id: 'settings-inbox-digest', label: 'Daily digest', help: 'What landed, what is blocked and what waits for you, written from the board.', default: true },
     { key: 'inbox_teams_title', type: 'heading', id: 'settings-inbox-teams-title', label: 'Included teams' },
     { key: 'inbox_teams', type: 'notice', render: slot => { const p = document.createElement('p'); p.className = 'sv-help'; p.textContent = 'The switches above apply to every team except those you pick under Except. Questions and decisions always reach you.'; const host = document.createElement('div'); host.id = 'settings-inbox-teams'; host.className = 'settings-inbox-teams'; slot.append(p, host); } },
-    { key: 'inbox_digest_time', type: 'text', id: 'settings-inbox-digest-time', label: 'Time of the daily items', help: 'When the digest is made and the Orchestrator is asked for the day\'s decisions. Hours and minutes, 24 hours.', default: '09:00', attrs: { inputmode: 'numeric', maxlength: '5', placeholder: '09:00', pattern: '([01][0-9]|2[0-3]):[0-5][0-9]', 'aria-label': 'Time of the daily items, HH:MM' } },
+    { key: 'inbox_digest_time', type: 'text', id: 'settings-inbox-digest-time', label: 'Time of the daily items', help: 'When the digest is made and the day\'s decisions are asked for, in 24-hour time.', default: '09:00', attrs: { inputmode: 'numeric', maxlength: '5', placeholder: '09:00', pattern: '([01][0-9]|2[0-3]):[0-5][0-9]', 'aria-label': 'Time of the daily items, HH:MM' } },
     { key: 'inbox_muted', type: 'notice', render: slot => { const p = document.createElement('p'); p.id = 'settings-inbox-muted'; p.className = 'sv-help'; p.setAttribute('role', 'status'); p.hidden = true; slot.append(p); } },
 ];
 

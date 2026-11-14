@@ -7,10 +7,10 @@ import { importOnce, loadedModule } from './import_once.js';
 
 export const INBOX_KINDS = [
     { kind: 'file', key: 'inbox_kind_file', id: 'settings-inbox-file', label: 'Files for review', help: 'A file an agent wants you to read, approve or send back.' },
-    { kind: 'done', key: 'inbox_kind_done', id: 'settings-inbox-done', label: 'Finished requests', help: '"Done. Does it work for you?" when a request of yours is finished, with what changed.' },
+    { kind: 'done', key: 'inbox_kind_done', id: 'settings-inbox-done', label: 'Finished requests', help: 'A note that a request of yours is finished, with what changed.' },
     { kind: 'release', key: 'inbox_kind_release', id: 'settings-inbox-release', label: 'Release summaries', help: 'One page per release: what is new for you and the known issues.' },
     { kind: 'decided', key: 'inbox_kind_decided', id: 'settings-inbox-decided', label: 'Decisions made for you', help: 'What the Orchestrator decided on your behalf, once a day.' },
-    { kind: 'digest', key: 'inbox_kind_digest', id: 'settings-inbox-digest', label: 'Daily digest', help: 'What landed, what is blocked and what waits for you. Coral writes it from the board.' },
+    { kind: 'digest', key: 'inbox_kind_digest', id: 'settings-inbox-digest', label: 'Daily digest', help: 'What landed, what is blocked and what waits for you, written from the board.' },
 ];
 
 const teamsHost = () => document.getElementById('settings-inbox-teams');
