@@ -157,6 +157,9 @@ func downloadArtifactOpts(base, ref, output string, force bool) (string, error) 
 			return "", fmt.Errorf("the folder %s does not exist; create it or choose another --output", dir)
 		}
 	}
+	if output == "" {
+		dir = agentAttachmentsDir() // an agent's own folder, so reading the file is never a request for a path outside it (#17332)
+	}
 	f, err := os.CreateTemp(dir, "coral-artifact-*"+ext)
 	if err != nil {
 		// A read-only sandbox lets the agent read the stored file but not write a copy: after the same SHA-256 proof, the stored file's own path is the answer (it has no extension).
@@ -288,4 +291,27 @@ func verifyObject(path, id string) error {
 		return fmt.Errorf("artifact SHA-256 mismatch")
 	}
 	return nil
+}
+
+// agentAttachmentsDir is where a Coral agent's download with no --output goes: .coral-attachments in the folder it works in, which ignores itself (a .gitignore of "*"), so the agent's CLI
+// reads the file inside its own folder and a commit never picks it up. Empty (the system temp folder, as before) outside an agent session or when the folder cannot be made (#17332, walk 63 F1).
+func agentAttachmentsDir() string {
+	if os.Getenv("CORAL_SESSION_NAME") == "" {
+		return ""
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	dir := filepath.Join(wd, ".coral-attachments")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return ""
+	}
+	ignore := filepath.Join(dir, ".gitignore")
+	if _, err := os.Stat(ignore); err != nil {
+		if err := os.WriteFile(ignore, []byte("*\n"), 0o644); err != nil {
+			return ""
+		}
+	}
+	return dir
 }
