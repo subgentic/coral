@@ -17,7 +17,7 @@ const { coralReady } = require('./helpers/wait');
             await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
             await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`T.state.liveSessions = [{ session_id: 'a1', name: 'first-agent', display_name: 'first-agent', working_directory: '/work/shop', agent_type: 'claude' }, { session_id: 'b1', name: 'w1', display_name: 'w1', board_project: 'alpha', working_directory: '/work/team-dir' }, { session_id: 'b2', name: 'w2', display_name: 'w2', board_project: 'alpha', working_directory: '/work/team-dir/' }]; true`);
-            await ev(`window.showLaunchModal(); window._selectLaunchType('team'); true`);
+            await ev(`(async () => { await window.showLaunchModal(); window._selectLaunchType('team'); return true; })()`);
             await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step', 8000);
             const fill = v => ev(`(() => { const e = document.getElementById('launch-team-dir'); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             const line = () => ev(`(() => { const l = document.getElementById('launch-team-dir-shared'); return l ? { shown: !l.hidden && l.getClientRects().length > 0, text: l.textContent } : null; })()`);
