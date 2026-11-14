@@ -561,6 +561,7 @@ export async function openTeamPage(team, opts = {}) {
     $('team-page-back-agent').hidden = !backTo;
     if (backTo) $('team-page-back-agent').textContent = `\u2190 Back to ${backTo.display_name || backTo.name}`;
     drawHeader();
+    importOnce('./team_linked_teams.js').then(m => m.drawLinkedTeams($('team-page-links'), team)).catch(e => console.error('linked teams', e)); // #16011: the team's links to other computers, when a Hub is linked
     drawMissing(missing.get(team) === true);
     if (changed && !missing.has(team)) teamIsMissing(team).then(gone => { if (gone && S.team === team) { drawMissing(true); drawStatus(null); } });
     if (S.item) closeItem(false);
