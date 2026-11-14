@@ -681,6 +681,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Post("/api/system/telemetry/acknowledge", trackHandler.AcknowledgeTelemetryDisclosure)
 	r.Get("/api/system/update-check", sysHandler.UpdateCheck)
 	r.Get("/api/system/cli-check", sysHandler.CLICheck)
+	r.Post("/api/system/cli-signin", sysHandler.CLISignIn)
 	r.Get("/api/system/qr", sysHandler.QRCode)
 	r.Get("/api/system/network-info", sysHandler.NetworkInfo)
 	r.Get("/api/filesystem/list", sysHandler.ListFilesystem)

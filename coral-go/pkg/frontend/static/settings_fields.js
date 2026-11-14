@@ -1,4 +1,5 @@
 import { importOnce } from './import_once.js';
+import { isCloud } from './server_base.js';
 const { TERMINAL_BACKEND_IDS, backendHint } = await importOnce('./terminal_backend.js');
 export { TERMINAL_BACKEND_IDS, backendHint };
 /* The main Settings' rows as fields (#7744, #7838): each group of the Settings dialog is a list of fields drawn by settings_view (the same rows as the team Settings), into the pane's own host. The ids are the contract
@@ -193,20 +194,34 @@ const apiKeyLine = slot => {
     line.append(input, show, copy, qr); slot.append(line);
 };
 
-// The agents' CLI accounts, one row (#10526 Claude, #11293 Pi, #11320): who the agents sign in as is each CLI's own login, so Check asks the CLIs (GET /api/system/cli-check?type=<cli>&signin=1) and each line says signed in,
-// not signed in, or that it could not tell. A line per provider, one Learn more and one Check for all (the row was two, with two of each, and the pane's word budget was over). Pi signs in per provider and says which one.
-const ACCOUNTS = [{ cli: 'claude', name: 'Claude', notSignedIn: 'run claude auth login in a terminal' }, { cli: 'pi', name: 'Pi', notSignedIn: 'start pi and run /login' }];
+// The agents' CLI accounts, one row (#10526 Claude, #11293 Pi, #11320, #16714 Sign in buttons): who the agents sign in as is each CLI's own login, so Check asks the CLIs
+// (GET /api/system/cli-check?type=<cli>&signin=1) and each line says signed in, not signed in, or that it could not tell. A line per provider, one Check for all. Where the CLI
+// has a supported local login (Claude: claude auth login), a Sign in button starts it on this computer (POST /api/system/cli-signin?type=<cli>); through the Hub (isCloud) the
+// button is not shown and the text says to sign in on the computer. Pi's login is interactive (start pi and run /login), so it gets the instruction text, not a button.
+const ACCOUNTS = [{ cli: 'claude', name: 'Claude', canSignIn: true }, { cli: 'pi', name: 'Pi', canSignIn: false, notSignedIn: 'start pi and run /login' }];
 const accountsLines = slot => {
     const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+    const cloud = isCloud();
     const lines = ACCOUNTS.map(a => {
         const line = mk('div', 'sv-ctl-line account-line'), status = mk('span', 'settings-hint');
         status.id = `settings-${a.cli}-account-status`; status.setAttribute('role', 'status');
-        line.append(mk('span', 'account-name', a.name), status); slot.append(line);
-        return { ...a, status };
+        const signIn = mk('button', 'btn btn-small'); signIn.type = 'button'; signIn.textContent = 'Sign in';
+        signIn.setAttribute('aria-label', `Sign in to ${a.name}`); signIn.hidden = true;
+        signIn.addEventListener('click', async () => {
+            signIn.disabled = true; status.textContent = 'Starting sign-in...';
+            try {
+                const r = await fetch(`/api/system/cli-signin?type=${a.cli}`, { method: 'POST', cache: 'no-store' });
+                const j = r.ok ? await r.json() : {};
+                status.textContent = j.started ? 'Sign-in started: complete it in the browser that opened, then Check' : j.message || 'Could not start sign-in';
+            } catch { status.textContent = 'Could not start sign-in'; }
+            signIn.disabled = false;
+        });
+        line.append(mk('span', 'account-name', a.name), status, signIn); slot.append(line);
+        return { ...a, status, signIn };
     });
     const row = mk('div', 'sv-ctl-line'), check = mk('button', 'btn btn-small', 'Check');
     check.type = 'button'; check.id = 'settings-accounts-check'; check.setAttribute('aria-label', 'Check Claude and Pi sign-in');
-    let busy = false; // not disabled while it asks: a disabled button drops the keyboard to the page (#11323)
+    let busy = false;
     check.addEventListener('click', async () => {
         if (busy) return;
         busy = true; check.setAttribute('aria-disabled', 'true');
@@ -215,7 +230,9 @@ const accountsLines = slot => {
             let signedIn, provider = '';
             try { const r = await fetch(`/api/system/cli-check?type=${a.cli}&signin=1&source=settings_check`, { cache: 'no-store' }); if (r.ok) { const d = await r.json(); signedIn = d.signed_in; provider = typeof d.provider === 'string' ? d.provider : ''; } } catch { /* said as could not tell */ }
             const to = provider ? ` to ${provider}` : '';
-            a.status.textContent = signedIn === true ? `Signed in${to}` : signedIn === false ? `Not signed in${to}: ${a.notSignedIn}` : `Could not tell if ${a.name} is signed in`;
+            if (signedIn === true) { a.status.textContent = `Signed in${to}`; a.signIn.hidden = true; }
+            else if (signedIn === false) { a.status.textContent = cloud ? `Not signed in${to} (sign in on the computer that runs Coral)` : a.canSignIn ? `Not signed in${to}` : `Not signed in${to}: ${a.notSignedIn}`; a.signIn.hidden = cloud || !a.canSignIn; }
+            else { a.status.textContent = `Could not tell if ${a.name} is signed in`; }
         }));
         busy = false; check.removeAttribute('aria-disabled');
     });
@@ -225,7 +242,7 @@ const accountsLines = slot => {
 export const SECURITY_FIELDS = [
     { key: 'security_access_title', type: 'heading', id: 'settings-security-access-title', label: 'Access' },
     { key: 'api_key', type: 'custom', id: 'settings-api-key-group', label: 'Coral API key', render: slot => apiKeyLine(slot) },
-    { key: 'accounts', type: 'custom', id: 'settings-accounts', label: 'Accounts', help: moreOnly("Agents sign in through each CLI's own login, not a key stored in Coral. Check asks Claude and Pi now; Pi signs in per provider and says which one."), render: slot => accountsLines(slot) },
+    { key: 'accounts', type: 'custom', id: 'settings-accounts', label: 'Accounts', help: moreOnly("Agents sign in through each CLI's own login, not a key stored in Coral. Sign in starts the login on this computer (Claude opens a browser); Check asks the CLIs now. Pi signs in per provider and says which one."), render: slot => accountsLines(slot) },
     live('settings-security'),
     { key: 'security_data_title', type: 'heading', id: 'settings-security-data-title', label: 'Data and privacy' },
     { key: 'database_encryption', type: 'select', id: 'settings-database-encryption', labelId: 'settings-database-encryption-label', label: 'Database encryption', live: ['settings-database-encryption-status'], visibleWhen: () => { const e = document.getElementById('settings-database-encryption'); return !e || e.dataset.unsupported !== '1'; }, disabledWhen: () => { const e = document.getElementById('settings-database-encryption'); return !!e && e.dataset.locked === '1'; },
