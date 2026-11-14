@@ -5,6 +5,7 @@ import { showToast } from './utils.js';
 import { showConfirmModal } from './confirm_dialog.js';
 import { announceNotice } from './notifications.js';
 import { browserLocal } from './safe_storage.js';
+import { isPhoneLayout } from './phone_layout.js';
 let readGeneration = 0;
 const HINT_KEY = 'coral-launch-notice'; // "p|57" or "d|73": this browser last saw the notice unseen, on a phone-sized or a wider screen, at that height (theme_init.js reserves its row before first paint)
 const hint = {
@@ -29,7 +30,7 @@ async function acknowledge(server, disclosure) {
     const response = await serverFetch(server, '/api/launch-disclosure/ack', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: disclosure.id }) });
     const answer = await response.json().catch(() => null);
     if (!response.ok || answer?.id !== disclosure.id || answer.seen !== true) throw new Error('Could not record that you have read this. Nothing was launched. Try again.');
-    if (normServer(server) === 'local') { readGeneration++; document.getElementById('launch-disclosure-banner')?.remove(); hint.clear(); hint.release(); }
+    if (normServer(server) === 'local') { readGeneration++; document.getElementById('launch-disclosure-banner')?.remove(); shown = null; hint.clear(); hint.release(); }
 }
 export async function confirmLaunchDisclosure(server, disclosure) {
     if (!valid(disclosure) || disclosure.seen !== false) { showToast('The launch disclosure could not be read. Nothing was launched.', true); return false; }
@@ -37,6 +38,27 @@ export async function confirmLaunchDisclosure(server, disclosure) {
     if (!accepted) return false;
     try { await acknowledge(server, disclosure); return true; }
     catch (error) { showToast(error.message, true); return false; }
+}
+
+// Where the notice sits (#16460): the global strip under the top bar, except on a phone's Inbox, where it is in the pane, under the pane's own heading (after .inbox-folder-toolbar) and above the list.
+// It is ONE element moved in and out: the pane is rebuilt on every redraw (which drops what is in it), so a watcher puts it back, and a tab or a rotation moves it to the strip or the pane.
+let shown = null, watching = false;
+export function placeNotice() {
+    const banner = shown;
+    if (!banner) return;
+    const inbox = isPhoneLayout() && document.body.getAttribute('data-nav-tab') === 'hub-inbox';
+    const bar = inbox ? document.querySelector('#group-table-view > .inbox-folder-toolbar') : null;
+    if (bar) { if (bar.nextElementSibling !== banner) bar.after(banner); return; }
+    if (inbox && banner.parentElement?.id === 'group-table-view') return; // the pane is between redraws: it stays where it is until the heading is back
+    const after = document.getElementById('local-auth-banner') || document.querySelector('header.top-bar');
+    if (after) { if (after.nextElementSibling !== banner) after.after(banner); } else if (banner.parentElement !== document.body) document.body.prepend(banner);
+}
+function watchPlace() {
+    if (watching) return; watching = true;
+    const again = () => placeNotice();
+    new MutationObserver(again).observe(document.body, { attributes: true, attributeFilter: ['data-nav-tab'] });
+    const view = document.getElementById('group-table-view'); if (view) new MutationObserver(again).observe(view, { childList: true });
+    window.matchMedia?.('(max-width: 767px)').addEventListener?.('change', again);
 }
 export async function refreshLaunchDisclosure() {
     if (isCloud() || document.body.classList.contains('popout-mode')) { hint.release(); return; }
@@ -52,10 +74,10 @@ export async function refreshLaunchDisclosure() {
             line.textContent = disclosure.text;
         }
         const previous = document.getElementById('launch-disclosure-banner');
-        if (disclosure.seen === true) { previous?.remove(); hint.clear(); hint.release(); return; }
+        if (disclosure.seen === true) { previous?.remove(); shown = null; hint.clear(); hint.release(); return; }
         if (disclosure.seen === false && previous?.dataset.disclosureId === disclosure.id) { hint.set(previous.getBoundingClientRect().height); return; } // already drawn (an earlier read): the hint is kept as it is
         if (disclosure.seen !== false) return;
-        previous?.remove();
+        previous?.remove(); shown = null;
         const banner = document.createElement('div'); banner.id = 'launch-disclosure-banner'; banner.dataset.disclosureId = disclosure.id; banner.className = 'notice notice-info notice-bar notice-compact'; banner.setAttribute('role', 'note');
         const { section, body } = disclosureSection('launch-disclosure-body', headline, disclosure);
         const summary = section.querySelector('summary');
@@ -74,10 +96,9 @@ export async function refreshLaunchDisclosure() {
         });
         summary.append(dismiss);
         body.append(button); banner.append(section);
-        const after = document.getElementById('local-auth-banner') || document.querySelector('header.top-bar');
-        if (after) after.after(banner); else document.body.prepend(banner);
+        shown = banner; placeNotice();
         window.dispatchEvent(new Event('coral:launch-disclosure-shown'));
-        hint.release(); hint.set(banner.getBoundingClientRect().height); // the notice now holds the room; the next load reserves it from the start
+        watchPlace(); hint.release(); hint.set(banner.getBoundingClientRect().height); // the notice now holds the room; the next load reserves it from the start
         announceNotice(headline);
     } catch { hint.release(); /* no unauthenticated or network failure is an acknowledgement; the room that was reserved for it is given back */ }
 }
