@@ -17,9 +17,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/hubowner"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // #13976: Request changes in one call. The decision carries the Operator's words (text): this computer records the decision, makes the thread comment and tells the uploader, in one step or not at all.
@@ -513,4 +515,32 @@ func TestASleepingUploaderIsToldAndTheAnswerSaysItWillReadItOnWaking(t *testing.
 		assert.Len(t, e.messages(t), c.wantNotices, c.name)
 		assert.Len(t, e.comments(t), 1, c.name+": the words are in the thread whatever became of the notice")
 	}
+}
+
+// #16749: the Hub's owner pressing Request changes with words was refused owner_only ("only the person at this computer can decide on an artifact"). The decision route passed the owner checks, but the words' half asked
+// the comment caller, which knew the Hub's owner only on the comment routes: on the review route it was a plain Hub caller. The owner, by the same stamp, marker and enrolled label as everywhere, is the owner here too;
+// anyone else through the Hub still gets owner_only and nothing is written.
+func TestTheHubsOwnerRequestChangesWithWordsIsTheOwner(t *testing.T) {
+	c := newChangesEnv(t)
+	withLabel(t, cmtHubUser, nil)
+	viaHub := func(user, role string) *http.Request {
+		req := httptest.NewRequest(http.MethodPost, "/api/board/alpha/artifacts/"+c.id+"/review", nil)
+		req.Header.Set(testDashboardHeader, "1")
+		req.Header.Set(tunnel.ViaHeader, cloud.ViaSecret())
+		req.Header.Set(tunnel.HubUserHeader, user)
+		if role != "" {
+			req.Header.Set(tunnel.HubRoleHeader, role)
+		}
+		return req
+	}
+	for name, req := range map[string]*http.Request{"a hub viewer": viaHub(cmtHubUser, ""), "another hub user than the enrolled one": viaHub(cmtHubTwo, "owner")} {
+		_, err := c.sh.ChangeRequestWords(req, "alpha", c.id, "Use 5,000 rows.")
+		var ce *changeWordsError
+		require.ErrorAs(t, err, &ce, name)
+		assert.Equal(t, "owner_only", ce.Code, name)
+	}
+	assert.Empty(t, c.comments(t), "nothing was written for a non-owner")
+	_, err := c.sh.ChangeRequestWords(viaHub(cmtHubUser, "owner"), "alpha", c.id, "Use 5,000 rows.")
+	require.NoError(t, err, "the Hub's owner may ask for changes with words")
+	assert.Len(t, c.comments(t), 1, "their words are the thread comment")
 }
