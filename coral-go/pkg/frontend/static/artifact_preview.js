@@ -135,12 +135,12 @@ function _renderManifest(body, manifest, filename, ctx, server) {
     });
 }
 
-function _renderSandboxed(body, { url, content, name, isStale }) {
+function _renderSandboxed(body, { url, content, name, isStale, scriptsHint }) {
     const wrapper = document.createElement('div');
     wrapper.className = 'artifact-linked-preview';
     const note = document.createElement('p');
     note.className = 'artifact-linked-notice notice notice-info notice-bar';
-    note.textContent = url
+    if (scriptsHint) { note.className = 'artifact-linked-notice notice notice-warn notice-bar'; note.textContent = scriptsHint; } else note.textContent = url
         ? 'Linked preview: scripts and interactive features are disabled. Some sites block embedding; if the preview stays blank, use Open link.'
         : 'HTML preview: scripts and external resources are disabled. Download the file for the original.';
     const frame = document.createElement('iframe');
@@ -294,7 +294,11 @@ async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
             const content = await _readText(resp, MAX_ARTIFACT_PREVIEW_BYTES, ctx.signal);
             if (ctx.isStale()) return;
             if (isHTML) {
-                _renderSandboxed(body, { content, name: filename, isStale: ctx.isStale });
+                // A page that draws itself with scripts looks empty with them off (walk 24, #16549): where Coral will offer to run them (the viewer, below) the offer says so; everywhere else the banner does, with the way to run them.
+                const offered = !!(options.scripts && opened && !isCloud());
+                const scriptsHint = !offered && /<script[\s>]/i.test(content)
+                    ? (options.scripts ? 'This page needs scripts to show its content, and they are off here: Coral cannot run a file’s scripts through the Hub.' : 'This page needs scripts to show its content, and they are off in this preview. Press Open, then Run scripts…, to see it as intended.') : '';
+                _renderSandboxed(body, { content, name: filename, isStale: ctx.isStale, scriptsHint });
                 rendered = true;
                 // Scripts: only in the single-artifact viewer (it passes options.scripts), for a stored file, on a computer that is not the Hub (#14730: its host header is not live there yet).
                 if (options.scripts && opened && !isCloud() && !ctx.isStale()) await _scriptsFor(body, { hex: opened[1], content, name: filename, server: source.server, board: options.board || '', ctx });
