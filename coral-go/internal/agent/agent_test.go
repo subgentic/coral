@@ -402,11 +402,11 @@ func TestDefaultPromptsNameSearch(t *testing.T) {
 		"orchestrator action": DefaultOrchestratorActionPrompt,
 		"worker action":       DefaultWorkerActionPrompt,
 	} {
-		if !strings.Contains(prompt, "coral-board search") {
-			t.Errorf("%s prompt missing coral-board search", name)
+		if !strings.Contains(prompt, `coral-board search "<words>" --sort newest`) {
+			t.Errorf("%s prompt missing coral-board search command", name)
 		}
-		if !strings.Contains(prompt, "history search") {
-			t.Errorf("%s prompt missing history search", name)
+		if !strings.Contains(prompt, `coral-agent history search "<words>"`) {
+			t.Errorf("%s prompt missing coral-agent history search command", name)
 		}
 	}
 }
