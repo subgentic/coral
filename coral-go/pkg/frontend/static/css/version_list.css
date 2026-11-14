@@ -5,3 +5,4 @@
 .version-list-name { font-weight: var(--fw-strong); }
 .version-list-who { flex: 1 1 10rem; min-width: 0; overflow-wrap: anywhere; }
 .version-list-actions { display: flex; gap: 0.5rem; margin-left: auto; }
+dialog.modal-content.version-list-dialog { position: fixed; inset: 0; margin: auto; height: fit-content; max-height: calc(100dvh - 32px); overflow: auto; box-sizing: border-box; } /* centred like the other dialogs: it had no placement, so it sat in the window's top-left over the header (#16824) */
