@@ -22,7 +22,7 @@ import (
 type fakeBranches struct {
 	repo     branches.Repo
 	own      int
-	dirs     map[string]int    // a folder -> the worktree that holds it
+	dirs     map[string]int // a folder -> the worktree that holds it
 	asked    []string
 	notFound map[string]bool   // dirs where For returns false
 	states   map[string]string // dir -> "pending" or "done" for ReadState
