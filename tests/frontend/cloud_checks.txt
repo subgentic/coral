@@ -193,6 +193,7 @@ node local_store.test.mjs
 node raw_keys.test.mjs
 node cloud_words.test.mjs
 node goal_filters.test.mjs
+node goal_inbox_fixes.test.mjs
 node inbox_goals_done_read.test.mjs
 node chat_filters.test.mjs
 node coral_notice_fixture.test.mjs
