@@ -5,6 +5,7 @@ const { openSettingsGroup } = await importOnce('./settings_nav.js');
 const choices = [
     { id: 'settings-permission-mode', value: 'bypassPermissions', label: 'Bypass permissions', text: 'Claude’s permission checks are off. Claude can run tools without asking.' },
     { id: 'settings-permission-mode', value: 'dontAsk', label: "Don't ask", text: 'Claude’s permission questions are off. Tools that need permission are denied instead of asking.' },
+    { id: 'settings-codex-trust-hooks', label: "Skip Codex's review of Coral's hooks", quiet: true },
     { id: 'settings-remote-access-enabled', label: 'Remote access', text: 'Access is no longer limited to this computer. Other devices can control agents and read files after signing in.' },
     { id: 'settings-cloud-hub-operator', label: 'Let Coral Hub act as the Operator', text: 'Operator decisions are no longer limited to this computer. Coral Hub users with permission can make them here.' },
     { id: 'sec-hub-enabled', label: 'Let Coral Hub sign in here', text: 'Local sign-in is no longer required. Your linked Coral Hub account can sign in with full control.' },
@@ -13,6 +14,8 @@ const choices = [
 const get = e => e.type === 'checkbox' ? e.checked : e.value;
 const put = (e,v) => { if (e.type === 'checkbox') e.checked = v; else e.value = v; };
 const active = (c,v) => c.value ? v === c.value : v === true;
+// Hidden by its own row or card (the Hub row with no Hub link), not merely by another tab being shown.
+function hiddenInPane(e) { for (let n = e; n && !n.classList?.contains('settings-pane'); n = n.parentElement) if (n.hidden) return true; return false; }
 function text(e,t) { if (e.textContent !== t) e.textContent = t; }
 export function wireSettingsRisks(modal) {
     if (modal.dataset.risks) { modal.dispatchEvent(new Event('coral-refresh-risks')); return; }
@@ -27,12 +30,14 @@ export function wireSettingsRisks(modal) {
         const enabled = [];
         for (const id of new Set(choices.map(c=>c.id))) {
             const e = document.getElementById(id); if (!e) continue;
+            if (hiddenInPane(e)) continue; // a switch Settings does not show (the Hub row with no Hub link) is not a check that is off
             if (!pending.has(e)) previous.set(e,get(e));
             const c = choices.find(c=>c.id===id && active(c,get(e)));
             const row = e.closest('.sv-row,.settings-cloud-switch-row,.sec-switch'); if (!row) continue;
+            if (choices.find(x=>x.id===id).quiet) { if (c) enabled.push(c); continue; } // listed and counted, but an ordinary default: no warning, no confirmation
             let note = row.querySelector('.settings-risk-warning');
             if (!note) { note = document.createElement('p'); note.className='settings-risk-warning'; note.id=`${id}-risk`; (row.querySelector('.sv-text') || row).append(note); const desc=e.getAttribute('aria-describedby'); e.setAttribute('aria-describedby',[desc,note.id].filter(Boolean).join(' ')); }
-            note.hidden = !c; text(note,c ? `⚠ ${c.text}` : '');
+            if (note.hidden !== !c) note.hidden = !c; text(note,c ? `⚠ ${c.text}` : '');
             if(c) enabled.push(c);
         }
         const signature = enabled.map(c=>c.label).join('|');
@@ -46,12 +51,12 @@ export function wireSettingsRisks(modal) {
             }
         }
         const wake=document.getElementById('tb-autowake-on'),row=wake?.closest('.sv-row');
-        if(row) { let note=row.querySelector('.settings-wake-warning'); if(!note){note=document.createElement('p');note.className='settings-risk-warning settings-wake-warning';note.textContent='⚠ Wakes with saved permissions, including bypass.';row.append(note);}note.hidden=!wake.checked;const hint=row.querySelector('.sv-help-text');if(hint)hint.hidden=wake.checked; }
+        if(row) { let note=row.querySelector('.settings-wake-warning'); if(!note){note=document.createElement('p');note.className='settings-risk-warning settings-wake-warning';note.textContent='⚠ Wakes with saved permissions, including bypass.';row.append(note);}if(note.hidden!==!wake.checked)note.hidden=!wake.checked;const hint=row.querySelector('.sv-help-text');if(hint&&hint.hidden!==wake.checked)hint.hidden=wake.checked; }
     }
     modal.addEventListener('change',event=>{
         const e=event.target;if(e.dataset.saving==='1')return;if(accepted.has(e)){accepted.delete(e);return;}
         const want=get(e),c=choices.find(c=>c.id===e.id&&active(c,want));
-        if(!c||want===previous.get(e))return;
+        if(!c||c.quiet||want===previous.get(e))return;
         event.stopImmediatePropagation();event.preventDefault();
         const before=previous.has(e)?previous.get(e):(e.type==='checkbox'?false:'');
         pending.add(e);put(e,before);
@@ -61,6 +66,6 @@ export function wireSettingsRisks(modal) {
     },true);
     modal.addEventListener('focusin',event=>{if(choices.some(c=>c.id===event.target.id)&&!pending.has(event.target))previous.set(event.target,get(event.target));});
     modal.addEventListener('coral-refresh-risks',refresh);
-    new MutationObserver(refresh).observe(modal,{subtree:true,childList:true,attributes:true,attributeFilter:['checked','disabled','data-shown','data-saved']});
+    new MutationObserver(refresh).observe(modal,{subtree:true,childList:true,attributes:true,attributeFilter:['checked','disabled','hidden','data-shown','data-saved']});
     modal.addEventListener('change',refresh); refresh();
 }
