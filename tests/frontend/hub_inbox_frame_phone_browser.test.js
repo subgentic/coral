@@ -7,7 +7,7 @@ const { connect } = require('./agent_view_harness');
 const { framesJs } = require('./helpers/wait');
 const { setupHubWorld, BASE } = require('./helpers/hub_world');
 
-const NAMES = { needs: 'Needs you', tasks: 'Tasks', saved: 'Saved' };
+const NAMES = { needs: 'Needs you', tasks: 'Tasks', saved: 'Saved messages' };
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor } = await connect();

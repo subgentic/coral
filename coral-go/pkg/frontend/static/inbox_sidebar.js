@@ -1150,7 +1150,7 @@ async function openDockSavedSheet(id, opener) {
         key: `saved:${id}`, title: f.title, sub: [f.said ? `Said ${f.said}` : '', `Saved ${f.saved}`, f.state, f.serverName].filter(Boolean).join(' · '),
         host: $('agentic-saved-detail-pane'), opener, actions,
         body: doc => {
-            const link = el('button', 'back-link', '\u2190 Saved'); link.type = 'button'; link.addEventListener('click', back);
+            const link = el('button', 'back-link', '\u2190 Saved messages'); link.type = 'button'; link.addEventListener('click', back);
             snippetEl = el('p', 'inbox-saved-snippet', f.snippet || '(no text)');
             doc.append(link, snippetEl);
             if (cannotOpen && f.why) doc.append(el('p', 'inbox-saved-why', f.why));

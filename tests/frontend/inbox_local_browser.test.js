@@ -126,7 +126,7 @@ const hex = i => i.toString(16).padStart(20, '0');
             await openSavedFolder(ev);
             await rowsShown('All saved', 'the Inbox at Saved');
             s = await state();
-            check(`${dev}: home: the Inbox's Saved folder is the Inbox at Saved for later, the Inbox tab current`, s.inbox && s.saved && s.navActive === 'hub-inbox' && s.heading === 'Saved', JSON.stringify([s.inbox, s.saved, s.navActive]));
+            check(`${dev}: home: the Inbox's Saved folder is the Inbox at Saved for later, the Inbox tab current`, s.inbox && s.saved && s.navActive === 'hub-inbox' && s.heading === 'Saved messages', JSON.stringify([s.inbox, s.saved, s.navActive]));
             await ev(`document.activeElement && document.activeElement.blur(); true`);
             await key('Escape', 27);
             await settle(`document.querySelector('.top-nav-tab.active').dataset.arg === 'agents'`, 'Escape leaves');
@@ -155,7 +155,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         await ev(`document.querySelector('#saved-jumpbar .btn').click(); true`);
         await rowsShown('All saved', 'back on the Inbox');
         s = await state();
-        check('"Back to Saved" returns to the Inbox (everything), not to a scoped list in the sidebar', s.inbox && s.navActive === 'hub-inbox' && s.uiIn === 'agentic-panel-saved' && s.heading === 'Saved' && s.rows.length === 7, JSON.stringify([s.inbox, s.navActive, s.uiIn, s.heading, s.rows.length]));
+        check('"Back to Saved" returns to the Inbox (everything), not to a scoped list in the sidebar', s.inbox && s.navActive === 'hub-inbox' && s.uiIn === 'agentic-panel-saved' && s.heading === 'Saved messages' && s.rows.length === 7, JSON.stringify([s.inbox, s.navActive, s.uiIn, s.heading, s.rows.length]));
         // the More menu on a saved item (#6580): a named disclosure, Remove inside it as a menu item, Escape back to its button, Tab or a click elsewhere closes it
         // the More menu on a saved message's page (#6580): a named disclosure, Remove inside it as a menu item, Escape back to its button, Tab or a click elsewhere closes it
         await ev(`${LINK}.click(); true`);
@@ -210,7 +210,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         await openSavedFolder(ev);
         await settle(`document.getElementById('group-table-view').getClientRects().length > 0 && document.querySelectorAll('#group-table-view tbody .dt-primary').length === 6`, 'the Inbox at everything');
         s = await state();
-        check('an agent\'s page: the Inbox\'s Saved folder is all of it', s.inbox && s.saved && s.uiIn === 'agentic-panel-saved' && s.navActive === 'hub-inbox' && s.heading === 'Saved' && s.rows.length === ALL_ROWS.length && ALL_ROWS.every(r => s.rows.some(x => x.includes(r))), JSON.stringify([s.inbox, s.uiIn, s.navActive, s.heading, s.rows]));
+        check('an agent\'s page: the Inbox\'s Saved folder is all of it', s.inbox && s.saved && s.uiIn === 'agentic-panel-saved' && s.navActive === 'hub-inbox' && s.heading === 'Saved messages' && s.rows.length === ALL_ROWS.length && ALL_ROWS.every(r => s.rows.some(x => x.includes(r))), JSON.stringify([s.inbox, s.uiIn, s.navActive, s.heading, s.rows]));
         await shot('inbox-from-agent-desktop');
         await ev(`window.switchNavTab('agents'); true`);   // leaving the Inbox shows the agent's page again
         await settle(`document.querySelector('.top-nav-tab.active')?.dataset.arg === 'agents' && !document.getElementById('nav-tab-hub-inbox').classList.contains('active')`, 'back on the agent');
@@ -226,7 +226,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         await openSavedFolder(ev);
         await settle(`document.getElementById('group-table-view').getClientRects().length > 0 && document.querySelectorAll('#group-table-view tbody .dt-primary').length === 6`, 'the Inbox at everything, from a team');
         s = await state();
-        check('a team\'s page: the Inbox\'s Saved folder is everything too', s.inbox && s.uiIn === 'agentic-panel-saved' && s.heading === 'Saved' && s.rows.length === 6, JSON.stringify([s.inbox, s.uiIn, s.heading, s.rows.length]));
+        check('a team\'s page: the Inbox\'s Saved folder is everything too', s.inbox && s.uiIn === 'agentic-panel-saved' && s.heading === 'Saved messages' && s.rows.length === 6, JSON.stringify([s.inbox, s.uiIn, s.heading, s.rows.length]));
         await ev(`window.switchNavTab('agents'); true`);
         await settle(`!document.getElementById('nav-tab-hub-inbox').classList.contains('active')`, 'back on the team page');
         await ev(`window.exitTeamPage({ force: true }); window.selectLiveSession('', '', '', 'local'); true`);

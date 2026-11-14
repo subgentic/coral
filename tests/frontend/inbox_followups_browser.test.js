@@ -89,7 +89,7 @@ const AGENTS = (waiting) => waiting ? [
                 await click('the message', `#group-table-view .dt-primary[data-id="${id}"]`); await settle(500);
                 assert.equal((await active()).cls.includes('wf-item-title'), true, 'a message page starts at its title');
                 await escape(); await settle(500);
-                assert.equal(await ev(`document.querySelector('#group-table-title').textContent`), 'Saved', 'back at the Saved table');
+                assert.equal(await ev(`document.querySelector('#group-table-title').textContent`), 'Saved messages', 'back at the Saved table');
                 const a = await active(); assert.equal(a.data.id, id, 'with the focus on that message (' + JSON.stringify(a) + ')');
                 assert.equal(await ev(`document.body.getAttribute('data-nav-tab')`), 'hub-inbox', 'still in the Inbox');
             });

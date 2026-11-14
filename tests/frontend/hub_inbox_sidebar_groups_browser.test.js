@@ -30,7 +30,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         console.log('1. Local: Needs attention (Needs you, Tasks, Goals, Saved), Files (Artifacts), History (Activity)');
         await open();
         const local = await sidebar();
-        assert.deepEqual(local, ['Needs attention', 'Needs you', 'Tasks', 'Goals', 'Saved', 'Files', 'Artifacts', 'History', 'Activity'], JSON.stringify(local));
+        assert.deepEqual(local, ['Needs attention', 'Needs you', 'Tasks', 'Goals', 'Saved messages', 'Files', 'Artifacts', 'History', 'Activity'], JSON.stringify(local));
         await shot('hub-inbox-sidebar-local');
         console.log('   ✓');
 
@@ -38,7 +38,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false, inbox: 'native' });
         await open();
         const hub = await sidebar();
-        assert.deepEqual(hub, ['Needs attention', 'Needs you', 'Tasks', 'Goals', 'Saved', 'Files', 'Artifacts'], JSON.stringify(hub));
+        assert.deepEqual(hub, ['Needs attention', 'Needs you', 'Tasks', 'Goals', 'Saved messages', 'Files', 'Artifacts'], JSON.stringify(hub));
         assert.ok(!hub.includes('Saved for later'), 'the word is Saved, as on a computer');
         await shot('hub-inbox-sidebar-hub');
         console.log('   ✓');
