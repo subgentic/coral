@@ -145,16 +145,20 @@ function stopItems() {
         { key: 'kill', label: 'Kill all', hint: 'Ends every agent now; their chats stay in History', danger: true, why, run: () => window.killBoard?.(S.team) },
     ];
 }
-/** The team's stop items, last in More under a line (labels follow the team: asleep or not; #15856: Stop agents is no longer a button of its own). */
+/** The team's stop items, last in More under a line (labels follow the team: asleep or not; #15856: Stop agents is no longer a button of its own). Non-danger items (Sleep, Reset) sit above a danger divider; danger items (Kill all) and the board's Remove team sit below it (#16630). */
 function syncStop() {
     const host = $('team-page-more-menu'); if (!host) return;
     for (const old of host.querySelectorAll('[data-stop], .team-more-stop-sep')) old.remove();
     const r = el('hr', 'overflow-menu-divider team-more-stop-sep'); r.dataset.stop = 'sep'; host.append(r);
-    for (const it of stopItems()) {
+    const items = stopItems();
+    let dangerSep = false;
+    for (const it of items) {
+        if (it.danger && !dangerSep) { const d = el('hr', 'overflow-menu-divider overflow-menu-divider-danger team-more-stop-sep'); d.dataset.stop = 'dsep'; host.append(d); dangerSep = true; }
         const b = el('button', `menu-item team-more-stop${it.danger ? ' menu-item-danger' : ''}`); const label = el('span', 'menu-item-text', it.label); if (it.hint && !it.why) label.append(el('span', 'menu-item-hint', it.hint)); b.append(label); b.type = 'button'; b.dataset.stop = it.key;
         if (it.why) { b.disabled = true; b.setAttribute('aria-disabled', 'true'); b.append(' ', el('span', 'overflow-menu-note', it.why)); } b.addEventListener('click', () => { if (it.why) return; importOnce('./menu_button.js').then(x => x.closeMenus()); it.run(); });
         host.append(b);
     }
+    const del = $('mb-delete-btn'); if (del && del.parentElement === host) host.append(del);
 }
 
 function buildMore() {
@@ -181,10 +185,10 @@ const BOARD_ACTIONS = ['mb-select-btn', 'mb-export-btn', 'mb-pause-btn', 'mb-del
 function adoptBoardActions() {
     const menu = $('team-page-more-menu'); if (!menu) return;
     for (const id of BOARD_ACTIONS) { const b = $(id); if (b && b.parentElement !== menu) { b.dataset.home = b.parentElement ? b.parentElement.id : ''; menu.append(b); } }
-    const pause = $('mb-pause-btn'); // what Pause board does, in words under it (Mobile tester, #10008): a title is no help on a phone
+    const pause = $('mb-pause-btn');
     if (pause && !$('mb-pause-note')) { const n = el('span', 'menu-note', /^Resume/.test(pause.textContent) ? 'Agents get messages again when you resume.' : 'Agents stop receiving new messages until you resume.'); n.id = 'mb-pause-note'; pause.after(n); pause.setAttribute('aria-describedby', 'mb-pause-note'); }
     for (const id of BOARD_ACTIONS) { const b = $(id); if (b) b.style.display = ''; } // display-ok: the holder's markup hides these with an inline display:none, which message_board.js clears the same way
-    const sel = $('mb-select-btn'); if (sel) sel.hidden = S.tab !== 'messages'; // selecting messages is the Messages tab's
+    const sel = $('mb-select-btn'); if (sel) sel.hidden = S.tab !== 'messages';
 }
 function releaseBoardActions() {
     const home = $('mb-more-menu'); if (!home) return;

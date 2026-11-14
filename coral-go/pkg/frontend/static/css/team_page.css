@@ -502,11 +502,8 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
 .team-task-page .task-jump { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .team-task-page .task-jump-role { color: var(--text-secondary); }
 @media (pointer: coarse), (max-width: 767px) { .team-task-page .task-jump-btn { min-height: var(--control-touch-height, 44px); } }
-/* Give each destructive team action its own boundary; the menu still scrolls on phones. */
-:is(#team-page-more-menu) > :is([data-stop="kill"], #mb-delete-btn) {
-    margin-top: 12px;
-    border-top: 1px solid var(--border);
-}
+/* The danger divider (the HR before Kill all, #16630) separates the group visually; pad it. */
+:is(#team-page-more-menu) > hr.overflow-menu-divider-danger { margin-top: 8px; }
 
 /* The Artifacts tab's files strip: its space is held, unseen, until the real strip replaces it, so the table does not jump down (#15618). */
 .team-files-strip-reserve { visibility: hidden; }
