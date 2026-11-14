@@ -12,16 +12,18 @@ import { refreshTeamAvailability, remindAgent, stopAgentReminder } from './team_
 const { openRemindDialog, REPEATS } = await importOnce('./team_remind_dialog.js');
 const { searchChip, readSearchLevels, openSearchAccess } = await importOnce('./search_access.js'); // how far an agent's chat search reaches (#11048)
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
-const { rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
+const { rowFocusTarget, el } = await importOnce('./team_table.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
 
 const DT = await importOnce('./data_table.js');
+const { statusMark } = await importOnce('./status_mark.js'); // lazy like this page: a lazy module is loaded through importOnce (import_hygiene)
 const { mountAgentReviewSettings } = await importOnce('./agent_review_settings.js');
 let agentsTableState = DT.tableState();
 
-const WORD = { available: 'Free', busy: 'Busy', task_idle: 'Task assigned, idle', queued: 'Queued', waiting: 'Waiting for work', needs_input: 'Needs input', sleeping: 'Sleeping', archived: 'Archived', offline: 'Ended', unknown: 'Not reported', unavailable: 'Unavailable' };
 // The chips: the statuses people look for first; any other status that has agents gets its own chip after them.
-const FIRST = ['available', 'busy', 'queued', 'sleeping', 'offline'];
-const CHIP_WORD = { available: 'Free', task_idle: 'Has a task' }; // an idle agent with a task, started or not: its row says which ("Working on #1" or "Task assigned, idle"), so the filter does not repeat one of the two
+// One word for a working agent (#15830, design guidelines 4.5): Working covers busy and an idle agent whose task is started; the task number is in Doing. The strip keeps four (All, Working, Has a task, Sleeping); the other states are in a More select beside it.
+const STRIP = ['working', 'has_task', 'sleeping'], MORE = ['available', 'queued', 'waiting', 'needs_input', 'offline', 'unavailable', 'unknown', 'archived'];
+const BUCKET_WORD = { working: 'Working', has_task: 'Has a task', available: 'Free', queued: 'Queued', waiting: 'Waiting for work', needs_input: 'Needs input', sleeping: 'Sleeping', offline: 'Ended', archived: 'Archived', unavailable: 'Unavailable', unknown: 'Not reported' };
+const MARK = { working: 'working', needs_input: 'waiting', sleeping: 'sleeping', offline: 'done', unavailable: 'failed' }; // any other state is the grey hollow dot
 const CLASS = { available: 'goal-state-done', busy: 'goal-state-active', needs_input: 'goal-state-blocked', unavailable: 'team-state-bad' }; // the colours of the goals' own states; Sleeping and the rest stay quiet
 const PROVIDER = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', antigravity: 'Antigravity', gemini: 'Antigravity', pi: 'Pi', terminal: 'Terminal' };
 
@@ -34,7 +36,9 @@ const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type 
 
 // One status per agent (#10603, the Beta tester): an agent that is idle with a task already in progress is working on it, not "Task assigned, idle" beside "#1 in progress".
 const startedTask = (a) => (a.tasks || []).find(t => t.status === 'in_progress');
-const statusWord = (a) => (a.availability === 'task_idle' && startedTask(a) ? `Working on #${Number(startedTask(a).id)}` : WORD[a.availability] || 'Not reported');
+const bucket = (a) => { const v = a.availability || 'unknown'; return v === 'busy' || (v === 'task_idle' && startedTask(a)) ? 'working' : v === 'task_idle' ? 'has_task' : v; }; // exclusive: every agent is in one, so the counts add up
+const statusWord = (a) => BUCKET_WORD[bucket(a)] || 'Not reported';
+const statusNode = (a) => statusMark(MARK[bucket(a)] || 'idle', statusWord(a)); // the shared mark: a shape and a word, no blue
 // dropAt is one of the steps data_table.css has (62, 52, 36, 28, 20, 16): 32 and 33 had no rule, so those two columns never gave way and a phone's Status chip and row broke (#14903). Open tasks and Time on current task (#14861, the Operator): the tasks assigned to the agent that are pending, in progress or in review (a link to the Tasks tab filtered to the agent), and how long it has had its task in progress (since the claim; a dash with none).
 const openTasksOf = (a) => Number(a.open_tasks) || 0;
 const claimedAt = (a) => { const t = a.task_since && a.availability !== 'sleeping' ? Date.parse(a.task_since) : NaN; return Number.isFinite(t) ? t : null; }; // a sleeping agent shows no running clock: a dash, not a time that keeps counting (walk 16 M10)
@@ -62,9 +66,10 @@ const doingOf = (a) => (a.tasks && a.tasks.length ? taskLine(a.tasks[0], a) + (a
 /** The statuses with at least one agent, in the order of the chips, with their counts. */
 function chipCounts(agents) {
     const count = {};
-    for (const a of agents) count[a.availability || 'unknown'] = (count[a.availability || 'unknown'] || 0) + 1;
-    const keys = [...FIRST, ...Object.keys(count).filter(k => !FIRST.includes(k))].filter(k => count[k] || k === 'available');
-    return [['all', 'All', agents.filter(a => a.availability !== 'archived').length], ...keys.map(k => [k, CHIP_WORD[k] || WORD[k] || k, count[k] || 0])];
+    for (const a of agents) count[bucket(a)] = (count[bucket(a)] || 0) + 1;
+    const row = k => ({ key: k, label: BUCKET_WORD[k] || k, count: count[k] || 0 });
+    const extra = Object.keys(count).filter(k => !STRIP.includes(k) && !MORE.includes(k)); // a state this page does not know yet still has a place
+    return { strip: [{ key: 'all', label: 'All', count: agents.filter(a => a.availability !== 'archived').length }, ...STRIP.map(row)], more: [...MORE, ...extra].filter(k => count[k] || k === 'available').map(row) };
 }
 
 // ── the tab ──────────────────────────────────────────────────────────────
@@ -175,7 +180,7 @@ function sidebarIndex(a) {
 }
 function visibleAgents() {
     const all = (model.data && model.data.agents) || [];
-    const byState = model.filter === 'all' ? all.filter(a => a.availability !== 'archived') : all.filter(a => (a.availability || 'unknown') === model.filter);
+    const byState = model.filter === 'all' ? all.filter(a => a.availability !== 'archived') : all.filter(a => bucket(a) === model.filter);
     const q = model.search.trim().toLowerCase();
     const shown = q ? byState.filter(a => `${a.name || ''} ${a.role || ''}`.toLowerCase().includes(q)) : byState;
     return [...shown].sort((x, y) => (isOrchestrator(y) - isOrchestrator(x)) || (rank(x) - rank(y)) || (sidebarIndex(x) - sidebarIndex(y)));
@@ -184,12 +189,12 @@ function visibleAgents() {
 function drawChips(host) {
     const agents = (model.data && model.data.agents) || [];
     const chips = chipCounts(agents);
-    if (!chips.some(c => c[0] === model.filter)) model.filter = 'all';
+    if (model.filter !== 'all' && ![...chips.strip, ...chips.more].some(c => c.key === model.filter)) model.filter = 'all';
     // The one toolbar line (#7717): the search field and the status pills (one compact select when they do not fit); Add agent stays in the page header.
     host.append(Toolbar.build({
         id: 'team-agents-search', label: 'Search agents', placeholder: 'Search agents', value: model.search,
         onSearch: text => { model.search = text; draw(); },
-        pills: { label: 'Show agents that are', current: model.filter, items: chips.map(([key, word, n]) => ({ key, label: word, count: n })),
+        pills: { label: 'Show agents that are', current: model.filter, items: chips.strip, more: chips.more,
             onPick: key => { model.filter = key; draw(); root.querySelector(`.goals-chip[data-filter="${key}"]`)?.focus({ preventScroll: true }); say(`Showing ${visibleAgents().length} agent${visibleAgents().length === 1 ? '' : 's'}`); } },
     }));
 }
@@ -215,7 +220,7 @@ function draw() {
         columns: [
             { key: 'agent', label: 'Agent', primary: true, width: 'grow', line: 1, field: 'name', sort: true,
                 cell: ag => { const b = DT.primaryButton('', ''); b.append(DT.avatar(ag.name)); const dot = el('span', `team-agent-dot team-agent-dot-${ag.availability === 'available' || ag.availability === 'busy' ? 'ok' : ag.availability === 'needs_input' ? 'ask' : 'quiet'}`); dot.setAttribute('aria-hidden', 'true'); dot.title = statusWord(ag); b.prepend(dot); b.append(el('span', 'team-agent-state sr-only', `, ${statusWord(ag)}`)); if (ag.availability === 'needs_input' || ag.availability === 'unavailable') { const ask = DT.chip(statusWord(ag), CLASS[ag.availability]); ask.classList.add('team-agent-ask'); ask.setAttribute('aria-hidden', 'true'); b.append(ask); } return b; } }, // the state as a dot by the name where the Status column has given way (a phone); a state that asks something of a person also keeps its word there, as a chip the dot already names for a screen reader (#9713)
-            { key: 'status', label: 'Status', line: 2, width: '11rem', dropAt: 28, sort: true, sortValue: statusWord, cell: ag => DT.chip(statusWord(ag), CLASS[ag.availability]) },
+            { key: 'status', label: 'Status', line: 2, width: '11rem', dropAt: 28, sort: true, sortValue: statusWord, cell: ag => statusNode(ag) },
             { key: 'doing', label: 'Doing', line: 2, width: '18rem', dropAt: 52, sort: true, sortValue: doingOf, cell: ag => { const t = doingOf(ag), span = el('span', null, t); if (t) span.title = t; return span; } }, // one line a row (Goal #79): the whole line is the tooltip
             { key: 'open', label: 'Open tasks', line: 2, width: '6rem', dropAt: 36, sort: true, align: 'end', sortValue: openTasksOf, cell: ag => { const n = openTasksOf(ag); if (!n) return '0'; const link = DT.link(String(n), () => importOnce('./nav.js').then(nav => importOnce('./routes.js').then(r => nav.go(r.keyRoute('team', model.team, 'tasks', null, new URLSearchParams({ agent: ag.name }).toString()))))); link.setAttribute('aria-label', `${n} open ${n === 1 ? 'task' : 'tasks'}: ${ag.name}`); return link; } },
             { key: 'onTask', label: 'Time on task', line: 2, width: '6.75rem', dropAt: 36, sort: true, align: 'end', sortValue: ag => claimedAt(ag) === null ? 0 : Date.now() - claimedAt(ag), blankLast: ag => claimedAt(ag) === null, cell: ag => { const w = onTaskWords(ag); if (w) return w; const none = el('span', null, '\u2014'); none.setAttribute('role', 'img'); none.setAttribute('aria-label', 'none'); return none; } }, // a row with no task is last under either order; its dash is named "none" for a screen reader
@@ -286,7 +291,7 @@ export function renderAgentPage(host, agent, ctx) {
     const page = el('div', 'goals-page goals-table-page team-agent-page');
     const status = el('div', 'team-agents-status sr-only'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
     const h = el('h2', 'goals-detail-title', agent.name); h.tabIndex = -1; h.id = 'team-agent-title';
-    const line = el('div', 'goals-detail-line'); line.append(stateChip(statusWord(agent), CLASS[agent.availability]));
+    const line = el('div', 'goals-detail-line'); line.append(statusNode(agent));
     const dl = el('dl', 'facts goals-facts');
     fact(dl, 'Provider', providerOf(agent));
     fact(dl, 'Role', agent.role);

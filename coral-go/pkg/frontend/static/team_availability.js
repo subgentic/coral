@@ -139,7 +139,7 @@ export function showTeamAvailability(team) {
             const data = await refreshTeamAvailability(team, true);
             if (!data) throw new Error('Availability could not be loaded.');
             if (!dialog.isConnected) return;
-            const labels = {available:'Free',busy:'Busy',task_idle:'Task assigned · idle',queued:'Queued',waiting:'Waiting for work',needs_input:'Needs input',sleeping:'Sleeping',offline:'Offline',unknown:'Not reported',unavailable:'Unavailable'};
+            const labels = {available:'Free',busy:'Working',task_idle:'Task assigned · idle',queued:'Queued',waiting:'Waiting for work',needs_input:'Needs input',sleeping:'Sleeping',offline:'Offline',unknown:'Not reported',unavailable:'Unavailable'};
             const tasks = items => items.map(t => `<li><span>${escapeHtml(t.scope)} #${Number(t.id)} · ${escapeHtml(t.status.replaceAll('_',' '))}</span>${escapeHtml(t.title)}</li>`).join('');
             const teamAgents = (state.liveSessions || []).filter(s => inTeam(s, team));
             const directory = teamAgents.find(s => s.working_directory)?.working_directory || '';
@@ -151,7 +151,7 @@ export function showTeamAvailability(team) {
                 ${data.unassigned_tasks.length ? `<section class="availability-unassigned"><h3>Unassigned work</h3><ul>${tasks(data.unassigned_tasks)}</ul></section>` : ''}
                 <section class="availability-health"><h3>Board health</h3><ul>${(data.health_report || []).map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></section>
                 <p class="availability-note">Updated ${escapeHtml(new Date(data.observed_at).toLocaleTimeString())}</p>`;
-            if (manual) { const free = data.summary.available || 0, busy = data.summary.busy || 0; status.textContent = `Team view updated: ${data.agents.length} agent${data.agents.length === 1 ? '' : 's'}, ${free} free, ${busy} busy.`; }
+            if (manual) { const free = data.summary.available || 0, busy = data.summary.busy || 0; status.textContent = `Team view updated: ${data.agents.length} agent${data.agents.length === 1 ? '' : 's'}, ${free} free, ${busy} working.`; }
             content.querySelectorAll('.availability-agent').forEach((card, index) => {
                 const agent = data.agents[index];
                 if (!agent) return;

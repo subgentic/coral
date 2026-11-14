@@ -6,7 +6,7 @@
  *
  *   build({ label, placeholder, value, onSearch, pills, action })  -> the row element (a search field, the pills, the action)
  *   adopt(row, { pills, chips, action })                           -> puts the pills, the chips of the filters that are on and the action into a list bar's `.list-bar-search-row`
- *   pills: { label, items: [{ key, label, count }], current, onPick(key) }                                       */
+ *   pills: { label, items: [{ key, label, count }], more?: [{ key, label, count }], current, onPick(key) }                                       */
 import { revealSideways } from './reveal_sideways.js';
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; };
 
@@ -22,6 +22,19 @@ function pillElements(p) {
         b.addEventListener('click', () => p.onPick(it.key));
         group.append(b);
         const o = el('option', null, text); o.value = it.key; o.selected = p.current === it.key; select.append(o);
+    }
+    // more (#15830): the states the strip does not show, as one select after the pills (and the same options at the end of the compact select); it says the state when one of them is the view
+    if (p.more && p.more.length) {
+        const m = el('select', 'field list-bar-select team-tb-more'); m.setAttribute('aria-label', `${p.label}: other states`);
+        const none = el('option', null, 'More'); none.value = ''; m.append(none);
+        for (const it of p.more) {
+            const text = `${it.label} ${it.count}`;
+            const o = el('option', null, text); o.value = it.key; o.selected = p.current === it.key; m.append(o);
+            const c = el('option', null, text); c.value = it.key; c.selected = p.current === it.key; select.append(c);
+        }
+        m.dataset.on = String(p.more.some(it => it.key === p.current));
+        m.addEventListener('change', () => { if (m.value) p.onPick(m.value); });
+        group.append(m);
     }
     select.addEventListener('change', () => p.onPick(select.value));
     return [group, select];
