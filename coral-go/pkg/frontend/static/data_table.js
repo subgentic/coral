@@ -212,7 +212,7 @@ const mailCell = (m, label, open, pick, showTeam = false, gap = false) => { // o
     if (m.live) { const dot = el('span', 'dt-mail-live'); dot.setAttribute('role', 'img'); dot.setAttribute('aria-label', m.live); dot.title = m.live; line.append(dot); } // a live chat's state: a dot after the title (names stay in one column), its word the label (Active now) (#9740)
     text.append(line);
     if (m.ask) { text.classList.add('dt-mail-two'); const ask = el('span', 'dt-mail-ask'); if (m.askTag) ask.append(tag(m.ask)); else ask.textContent = m.ask; tipIf(ask, m.ask, () => ask.scrollHeight > ask.clientHeight || ask.scrollWidth > ask.clientWidth); text.append(ask); } // the whole ask is the line's title, so a cut one can be read (#9495)
-    const side = el('span', 'dt-mail-side'); side.append(el('span', 'dt-mail-time', m.time || ''));
+    const side = el('span', 'dt-mail-side'); { const t = el('span', 'dt-mail-time'); if (m.timeNode) t.append(m.timeNode); t.append(m.time || ''); side.append(t); } // timeNode: a status mark before the words (a phone's Goals row, #16422)
     if (m.mark) { const dot = el('span', `dt-mail-dot dt-mail-${m.mark}`); dot.setAttribute('aria-hidden', 'true'); side.append(dot); }
     else if (m.unread) { const dot = el('span', 'dt-mail-dot dt-mail-new'); dot.append(el('span', 'sr-only', 'Unread')); side.append(dot); } // the dot is the signal, the 600 only reinforces it, and neither is colour alone
     body.append(text, ' ', side);
@@ -732,7 +732,7 @@ export function dataTable(cfg) {
         if (cfg.empty.hint) e.append(el('p', 'empty-state-hint', cfg.empty.hint));
         if (cfg.empty.action) e.append(button('btn', cfg.empty.action.label, cfg.empty.action.run));
         box.replaceChildren(e);
-    } else if (cfg.footer && !(cfg.footer.auto && !cfg.footer.more)) { // footer.auto (#7937): a count line that says all rows are shown says nothing, so with nothing more to load the footer is not drawn
+    } else if (cfg.footer && !(cfg.footer.auto && !cfg.footer.more && !cfg.footer.keep)) { // footer.auto (#7937): a count line that says all rows are shown says nothing, so with nothing more to load the footer is not drawn
         const foot = el('div', 'dt-foot'); foot.append(el('span', 'dt-foot-text', cfg.footer.text || ''));
         if (cfg.footer.more) {
             const m = button('btn dt-more', cfg.footer.more.busy ? 'Loading…' : cfg.footer.more.label, cfg.footer.more.run); if (cfg.footer.more.busy) m.setAttribute('aria-busy', 'true'); foot.append(m);

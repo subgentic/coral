@@ -14,6 +14,9 @@ const { statusMark } = await importOnce('./status_mark.js');
 const MARK = { active: 'working', blocked: 'waiting', proposed: 'idle', done: 'done', dropped: 'sleeping', failed: 'failed' };
 const markOf = state => { const key = String(state || '').toLowerCase(); return Object.hasOwn(MARK, key) ? MARK[key] : 'idle'; }; // an own key only: a Hub-supplied state of 'constructor' or '__proto__' is an unknown state, not a function on the prototype (#15946)
 
+/** A goal's state mark for a place that is not a column (a phone's row, #16422). */
+export const goalStateMark = g => statusMark(MARK[String(g.state || '').toLowerCase()] || 'idle', W.stateWord(g));
+
 export function goalColumns(ctx = {}, keys = ['goal', 'state', 'team', 'progress', 'updated']) {
     const total = g => W.allTasksOf(g.rollup || {});
     const done = g => Number(g.rollup?.done) || 0;
