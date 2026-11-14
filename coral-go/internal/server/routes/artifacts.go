@@ -582,6 +582,9 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		}
 		fileID, fileVersion = plan.id, plan.stamp.Version
 		slog.Info("[artifacts] a new version", "series", plan.id, "version", plan.stamp.Version, "digest", hexID, "session", sid) // one audit line per version: who, which series, which digest, no content
+		if team, who, _ := uploaderOf(sid); who != "" {
+			h.recordFileActivity(r, board.ActFileVersion, team, plan.id, meta.Name, who, fmt.Sprintf("version %d", plan.stamp.Version))
+		}
 	}
 	if fileID != "" {
 		reply["file_id"], reply["version_line"] = fileID, versionLine(fileVersion, meta.Name, fileID)
