@@ -36,7 +36,7 @@ const BASE = require('./test_base').BASE;
             await ev(`window.hideConfirmModal();true`);
             for (const action of [`window.toggleTeamSleep(${JSON.stringify(B)},'sleep')`, `window.resetTeam(${JSON.stringify(B)})`, `(await import((window.__coralStatic||'/static/')+'message_board.js')).deleteTeam(${JSON.stringify(B)})`]) {
                 await select();
-                await ev(`(async()=>{${action};return true;})()`);
+                await ev(`(async()=>{await ${action};return true;})()`);
                 check(!await selected(),`${width}/${theme}: ${action} exits Select`);
                 await ev(`window.hideConfirmModal();true`);
             }

@@ -6,8 +6,7 @@ import { state } from './state.js';
 import { loadLiveSessions } from './api.js';
 import { restartSession, restartStage, hideRestartModal, confirmRestart, editGoal, refreshGoal } from './controls.js';
 import { selectLiveSession, selectHistorySession, editAndResubmit, renameAgent, editInstructions, setAgentIcon, toggleChatFlag } from './sessions.js';
-import { RESET_LOG_NOTE, toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, setKeepFullAccess, sleepTerminalGone, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, restartSameDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, filterLiveAgents, syncDisplayMenu, agentSearchKey, toggleShowServer, toggleGroupByServer, toggleRowLine, groupHeaderKey, teamHeaderKey } from './render.js';
-import { whatStaysReset } from './agent_words.js';
+import { toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, setKeepFullAccess, sleepTerminalGone, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, restartSameDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, filterLiveAgents, syncDisplayMenu, agentSearchKey, toggleShowServer, toggleGroupByServer, toggleRowLine, groupHeaderKey, teamHeaderKey } from './render.js';
 import { toggleBrowser, browserNavigateTo, browserNavigateUp, browserSelectRecent, browserUse } from './browser.js';
 import { toggleAgenticPanel, toggleSidebarRail, focusSidebarSearch } from './sidebar.js';
 import { connectTerminalWs, disconnectTerminalWs } from './xterm_renderer.js';
@@ -20,12 +19,11 @@ import { activateCustomView } from './custom_views.js';
 import { popoutRetry } from './popout.js';
 import { setLiveViewMode, showTerminalView, showChatView } from './live_chat.js';
 import { switchAgenticTab } from './agentic_state.js';
-import { copyBranchName, showToast } from './utils.js';
+import { copyBranchName } from './utils.js';
 import { showFolderTagDropdown, addFolderTag, removeFolderTag, createAndAddFolderTag } from './folder_tags.js';
 import { pinFolder, unpinFolder, showOpenFolderModal, hideOpenFolderModal, submitOpenFolder } from './pinned_folders.js';
 import { checkForUpdates, dismissUpdateToast } from './update_check.js';
-import { teamFetch, keyLabel, nativeInbox, inTeam } from './server_base.js';
-import { keepResetNote } from './codex_mode.js';
+import { nativeInbox } from './server_base.js';
 import { showServersModal } from './servers.js';
 import { toggleAllGroups } from './group_collapse.js';
 import { toggleAllGroupFolds } from './sidebar_groups.js';
@@ -362,22 +360,7 @@ Object.assign(window, {
     switchNavTab,
 });
 
-function resetTeam(boardName) {
-    document.dispatchEvent(new CustomEvent('coral:team-action', { detail: { team: boardName } }));
-    showConfirmModal('Reset team', `Reset all agents in "${keyLabel(boardName)}"? Each one stops and starts again from its first instructions, in a new chat. ${whatStaysReset((state.liveSessions || []).filter(s => inTeam(s, boardName)))}${keepResetNote((state.liveSessions || []).filter(s => inTeam(s, boardName) && s.keep_full_access === true).length)} ${RESET_LOG_NOTE}`, async () => {
-        try {
-            const resp = await teamFetch(boardName, n => `/api/sessions/live/team/${encodeURIComponent(n)}/reset`, { method: 'POST' });
-            if (resp.ok) {
-                showToast(`Team "${keyLabel(boardName)}" is resetting...`);
-            } else {
-                const data = await resp.json().catch(() => ({}));
-                showToast(data.error || 'Reset failed', true);
-            }
-        } catch {
-            showToast('Reset failed', true);
-        }
-    }, undefined, { label: 'Reset team', danger: true });
-}
+function resetTeam(boardName) { return importOnce('./team_reset.js', 'Reset team').then(m => m.resetTeam(boardName)); }
 
 window.toggleSendMenu = function(btn, event) {
     const menu = btn.parentElement.querySelector('.send-btn-menu');

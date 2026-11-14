@@ -1466,7 +1466,7 @@ registerGroupSource('hub-inbox', {
                         go({ ...folderRoute, id: g.board_id, item: g.id });
                     },
                     oneLine: true, resize: true, sortBar: false,
-                    mail: g => ({ lead: { icon: 'flag', square: true, name: g.state }, title: `#${g.id} ${g.title}`, data: { goalId: String(g.id) }, team: goalTeam(g), state: GW.stateWord(g), time: `${GW.stateWord(g)}${looksDone(g) ? ', all tasks done' : ''}${GW.allTasksOf(g.rollup) ? ` \u00b7 ${(g.rollup || {}).done || 0}/${GW.allTasksOf(g.rollup)}` : ''}` }), // a phone's row (#9583): a flag, the goal, its outcome, when it moved; "all tasks done" when every task is done (#16635)
+                    mail: g => ({ lead: { icon: 'flag', square: true, name: g.state }, title: `#${g.id} ${g.title}`, data: { goalId: String(g.id) }, state: GW.stateWord(g), time: `${GW.stateWord(g)}${looksDone(g) ? ', all tasks done' : ''}${GW.allTasksOf(g.rollup) ? ` \u00b7 ${(g.rollup || {}).done || 0}/${GW.allTasksOf(g.rollup)}` : ''}${g.new_comments > 0 ? ' \u00b7 New comments' : ''} \u00b7 ${goalTeam(g)}` }), // a phone's row (#9583): a flag, the goal, its outcome, when it moved; "all tasks done" when every task is done (#16635)
                     columns: GC.goalColumns({ teamOf: goalTeam }, ['goal', 'state', 'team', 'progress', 'updated']).flatMap(c => c.key === 'team' ? [...serverColumns().map(x => ({ ...x, width: '8rem', dropAt: 52 })), c] : [c]) }); if (phone) setTimeout(mountBar, 0); return table.el; } };
         }
         if (key === 'artifacts') return IA.artifactsSpec();
