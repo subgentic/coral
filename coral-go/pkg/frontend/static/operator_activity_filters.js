@@ -33,7 +33,7 @@ const KIND_TEST = {
     files: r => ['file', 'task', 'goal'].includes(r.item_kind) && r.action !== 'chat_send',
     words: r => ['message', 'chat_send', 'task_reply'].includes(r.action),
 };
-const primaryKind = r => { for (const k of ['words', 'answers', 'permissions', 'files', 'decisions']) if (KIND_TEST[k]?.(r)) return k; return ''; };
+const primaryKind = r => { for (const k of ['words', 'answers', 'permissions', 'files', 'decisions']) if (KIND_TEST[k]?.(r)) return k; return 'decisions'; };
 export const inKind = (r, k) => !k || primaryKind(r) === k;
 
 export const NO_GOAL = 'No goal';
