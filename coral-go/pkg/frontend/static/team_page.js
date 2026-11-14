@@ -548,6 +548,7 @@ export async function openTeamPage(team, opts = {}) {
     }
     if (!hasBoardLabel(team)) importOnce('./board_fetch.js').then(m => m.fetchProjects()).then(() => S.team === team && drawHeader(), () => {});
     state.selectedTeam = team; // the team on screen (the sidebar marks its row; the panels moved in read it)
+    if (changed && state.liveSessions?.length) renderLiveSessions(state.liveSessions); // the sidebar marks the new team's row (#16669)
     state.boardPageProject = team;
     state.currentBoardServer = splitKey(team).server;
     showView('team-page-view');
