@@ -585,6 +585,7 @@ export async function openTeamPage(team, opts = {}) {
         for (const t of ['goals', 'tasks', 'artifacts', 'agents', 'knowledge']) { const p = panel(t); p.removeAttribute('data-built'); p.replaceChildren(); }
         drawCounts(); drawStatus(null);
         $('team-pause-bar')?.toggleAttribute('hidden', true); // the last team's pause line
+        const un = $('team-page-uncommitted'); if (un) { un.replaceChildren(); un.hidden = true; } // the last team's uncommitted line
     }
     backTo = opts.backTo || (changed ? null : backTo);
     $('team-page-back-agent').hidden = !backTo;
@@ -596,6 +597,7 @@ export async function openTeamPage(team, opts = {}) {
     if (S.item) closeItem(false);
     if (!opts.silent) note(keyRoute('team', team, tab, opts.item || null), { replace: !!opts.replace, from: opts.from || '' });
     startCounts();
+    importOnce('./team_uncommitted.js').then(m => m.refreshUncommitted(team)).catch(() => {}); // work an agent left uncommitted (#17203)
     await goTab(tab, { item: opts.item || 0 });
     return true;
 }
