@@ -703,10 +703,12 @@ function _watchContainerSize(containerEl) {
                     const b = terminal.buffer.active;
                     _bottomWhenHidden = b.viewportY >= b.baseY;
                 }
+                _updateFitButton(false); // nothing is drawn to fit (the chat view): no toggle until it is shown again (#16365)
                 return;
             }
             const wasBottom = _bottomWhenHidden;
             _bottomWhenHidden = null;
+            if (terminal && _following) _applyFitWidth(); // shown again: the toggle and font follow the pane
             if (fitAddon && !_panelDragging) _sizeLocal(true);
             if (wasBottom && terminal) requestAnimationFrame(() => { if (terminal) terminal.scrollToBottom(); });
             requestAnimationFrame(revealCursor); // the window changed size: the prompt stays in view while following
