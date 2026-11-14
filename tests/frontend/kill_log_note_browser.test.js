@@ -50,7 +50,7 @@ const NOTE_RESET = 'Their terminal logs are kept.'; // Reset says it in plain wo
         await asked('Remove Agent (archived row)', `T.render.killSessionDirect('zz-arch', 'claude', 's4')`, 'Remove agent', NOTE, ' is not running.');
         await asked('Kill session (agent header)', `T.state.currentSession = { type: 'live', name: 'repo', session_id: 's1', agent_type: 'claude' }; (await import((window.__coralStatic || '/static/') + 'controls.js')).killSession()`, 'Kill session');
         await asked('Kill all Agents (folder)', `T.render.killGroup('repo')`, 'Kill all agents', NOTE_MANY, 'Kill all 2 agents in');
-        await asked('Kill Team (one agent)', `T.render.killBoard('team-k')`, 'Kill team', NOTE, 'Kill the 1 agent in "team-k"');
+        await asked('Kill Team (one agent)', `T.render.killBoard('team-k')`, 'Stop agents', NOTE, 'Stop the 1 agent in "team-k"');
         await asked('Reset team', `window.resetTeam('team-k')`, 'Reset team', NOTE_RESET);
         assert.ok(!(await ev(`document.getElementById('confirm-modal-message').textContent`)).includes('logs folder'), 'Reset does not name the logs folder of the data folder');
         // Sleep team says what Reset says: the chats stay (#10549, the Desktop tester)

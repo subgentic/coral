@@ -71,8 +71,8 @@ export async function killBoard(boardName) {
     if (blocked) { showToast(blocked, true); return; }
 
     showConfirmModal(
-        "Kill team",
-        `Kill ${killCount(boardSessions.length).agents} in "${keyLabel(boardName)}"? ${boardSessions.length === 1 ? 'It' : 'They'} stop${boardSessions.length === 1 ? 's' : ''} now. ${whatStaysKill(boardSessions)} ${_teamWorktreeSentence(boardSessions)}${killCount(boardSessions.length).note}`,
+        "Stop agents",
+        `Stop ${killCount(boardSessions.length).agents} in "${keyLabel(boardName)}"? ${boardSessions.length === 1 ? 'It' : 'They'} stop${boardSessions.length === 1 ? 's' : ''} now. ${whatStaysKill(boardSessions)} ${_teamWorktreeSentence(boardSessions)}${killCount(boardSessions.length).note}`,
         async () => {
             // The whole team through the team route, so the team is marked stopped as an API kill does (its worktree is then not "in use" in the kept-worktrees list); its one answer carries the worktree.
             let worktree = null;
@@ -87,7 +87,7 @@ export async function killBoard(boardName) {
             }
             showWorktreeNotice(worktree); // an error is an alert, the rest a status; a kept one stays on screen with its path (#6818)
             dropKilledRows(boardSessions);
-        }, undefined, { label: 'Kill team', danger: true }
+        }, undefined, { label: 'Stop agents', danger: true }
     );
 }
 

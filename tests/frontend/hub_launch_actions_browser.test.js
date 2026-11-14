@@ -58,7 +58,7 @@ const HUB_PRELOAD = `(() => {
     });
     const team = `@m1/${BOARD}`;
     const killAll = () => ev(`(() => {
-        const b = [...document.querySelectorAll('.overflow-menu-item')].find(x => /Kill all/.test(x.textContent));
+        const b = [...document.querySelectorAll('.overflow-menu-item')].find(x => /Stop agents/.test(x.textContent));
         return b ? { disabled: b.disabled, text: b.textContent.replace(/\\s+/g, ' ').trim(), title: b.getAttribute('title') || '', onclick: !!(b.getAttribute('onclick') || b.getAttribute('data-on-click')) } : null;
     })()`);
     const access = mode => ev(`(async () => {
@@ -80,9 +80,9 @@ const HUB_PRELOAD = `(() => {
             T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
 
         console.log('1. Interact: Kill all disabled, with the reason');
-        await waitFor(`(() => { const b = [...document.querySelectorAll('.overflow-menu-item')].find(x => /Kill all/.test(x.textContent)); return !!b && b.disabled; })()`, 'Kill all disabled at Interact', 8000);
+        await waitFor(`(() => { const b = [...document.querySelectorAll('.overflow-menu-item')].find(x => /Stop agents/.test(x.textContent)); return !!b && b.disabled; })()`, 'Stop agents disabled at Interact', 8000);
         let k = await killAll();
-        assert.match(k.text, /Kill all needs Launch/);
+        assert.match(k.text, /Stop agents needs Launch/);
         assert.match(k.title, /^Blocked: Box One needs Launch/, k.title);
         assert.equal(k.onclick, false, 'nothing to click');
         await ev(`(async () => { await T.render.killBoard(${JSON.stringify(team)}); return true; })()`);
@@ -105,9 +105,9 @@ const HUB_PRELOAD = `(() => {
 
         console.log('3. Launch: both as before');
         await access('launch');
-        await waitFor(`(() => { const b = [...document.querySelectorAll('.overflow-menu-item')].find(x => /Kill all/.test(x.textContent)); return !!b && !b.disabled; })()`, 'Kill all enabled at Launch', 8000);
+        await waitFor(`(() => { const b = [...document.querySelectorAll('.overflow-menu-item')].find(x => /Stop agents/.test(x.textContent)); return !!b && !b.disabled; })()`, 'Stop agents enabled at Launch', 8000);
         k = await killAll();
-        assert.equal(k.text, 'Kill all'); assert.equal(k.onclick, true);
+        assert.equal(k.text, 'Stop agents'); assert.equal(k.onclick, true);
         await ev(`(async () => { (await import((window.__coralStatic || '/static/') + 'message_board.js')).selectBoardProject(${JSON.stringify(team)}); return true; })()`);
         await waitFor(`document.getElementById('mb-delete-btn').disabled === false && document.getElementById('mb-delete-btn').textContent === 'Remove team'`, 'Remove team enabled', 5000);
         console.log('   ✓ Kill all and Delete enabled');
@@ -119,9 +119,9 @@ const HUB_PRELOAD = `(() => {
         await install();
         await ev(`(() => { window.__mode = 'view'; for (const n of ['y-one']) window.__m.add(n, 'Y', 2, { sleeping: false, board_project: 'local-team' });
             T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
-        await waitFor(`[...document.querySelectorAll('.overflow-menu-item')].some(x => /Kill all/.test(x.textContent))`, 'the local team menu', 5000);
+        await waitFor(`[...document.querySelectorAll('.overflow-menu-item')].some(x => /Stop agents/.test(x.textContent))`, 'the local team menu', 5000);
         k = await killAll();
-        assert.equal(k.disabled, false, 'never gated locally'); assert.equal(k.text, 'Kill all');
+        assert.equal(k.disabled, false, 'never gated locally'); assert.equal(k.text, 'Stop agents');
         console.log('   ✓ local Kill all as before');
 
         console.log('\nAll hub Launch-action checks passed');

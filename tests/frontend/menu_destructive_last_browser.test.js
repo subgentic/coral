@@ -36,7 +36,7 @@ const { coralReady } = require('./helpers/wait');
             await shot(`menu-agent-${w}`);
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); document.body.click(); true`);
             const team = await check('the team menu', `document.querySelector('.session-team-group [data-on-click="kebab-toggle"], .board-card-header [data-on-click="kebab-toggle"]').click(); true`);
-            assert.ok(team.danger.some(x => /Kill all/.test(x)), `${w}: Kill all is in it: ${JSON.stringify(team.danger)}`);
+            assert.ok(team.danger.some(x => /Stop agents/.test(x)), `${w}: Stop agents is in it: ${JSON.stringify(team.danger)}`);
             await shot(`menu-team-${w}`);
         }
         console.log('\nPASS the destructive items are a separated last group with room above, in the agent and team menus');
