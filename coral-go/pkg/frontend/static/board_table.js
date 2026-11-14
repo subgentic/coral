@@ -218,7 +218,7 @@ export function refreshAsk(row, m) {
 function fillReplies(row) {
     const holder = row.querySelector(':scope > .mb-row-replies');
     if (!holder) return;
-    const kids = row.parentElement ? [...row.parentElement.querySelectorAll(`:scope > .mb-message[data-reply-to="${CSS.escape(row.dataset.messageId)}"]`)] : [];
+    const kids = row.parentElement ? [...row.parentElement.querySelectorAll(`:scope > .mb-message[data-reply-to="${CSS.escape(row.dataset.messageId)}"]:not(.mb-thread-reply)`)] : [];
     holder.replaceChildren();
     holder.hidden = !kids.length;
     if (!kids.length) return;

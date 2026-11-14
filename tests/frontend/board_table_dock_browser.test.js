@@ -55,7 +55,7 @@ const BASE = require('./test_base').BASE;
         const o = await ev(`(() => { const r = ${ROWS}[1]; return { exp: r.querySelector('.mb-row-toggle').getAttribute('aria-expanded'), tags: r.querySelector(':scope > .mb-row-tags-open').getClientRects().length > 0, body: r.querySelector('.mb-message-body').getClientRects().length > 0, controls: r.querySelector('.mb-row-toggle').getAttribute('aria-controls') === r.querySelector('.mb-message-body').id, buttons: [...r.querySelectorAll('.mb-row-actions button')].map(b => b.textContent + ':' + Math.round(b.getBoundingClientRect().height)), replies: r.querySelector('.mb-row-replies').textContent }; })()`);
         assert.equal(o.exp, 'true'); assert.ok(o.tags && o.body && o.controls, JSON.stringify(o));
         assert.deepEqual(o.buttons.map(b => b.split(':')[0]), ['Open task #7757', 'Reply', 'Copy link']); assert.ok(o.buttons.every(b => +b.split(':')[1] >= 44), 'folded buttons are 44 px: ' + o.buttons);
-        assert.ok(/Replies \(1\)/.test(o.replies));
+        assert.equal(o.replies.trim(), '', 'threaded replies are already indented below, not repeated inside the parent (#16704)');
         await shot('dock-table-open-default-dark');
 
         console.log('Six marks: the open message in the dock shows every one');

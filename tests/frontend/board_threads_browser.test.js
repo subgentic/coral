@@ -40,6 +40,20 @@ const BASE = require('./test_base').BASE;
             assert.deepEqual(await order(), [`${q1}`, `${r1}r`, `${q2}`, `${m3}`], 'rows in thread order');
             await shot(`board-threads-${w}`);
 
+            // #16704 bug 2: expanding the parent must not duplicate the reply (it is already an indented row).
+            console.log(`${w} px: expanding a parent with a threaded reply shows it once, not twice`);
+            await ev(`document.querySelector('#mb-messages > .mb-message[data-message-id="${q1}"] .mb-row-toggle').click(); true`); await settle(200);
+            const dup = await ev(`(() => {
+                const parent = document.querySelector('#mb-messages > .mb-message[data-message-id="${q1}"]');
+                const repliesSection = parent.querySelector(':scope > .mb-row-replies');
+                const repliesVisible = repliesSection && !repliesSection.hidden && repliesSection.textContent.trim().length > 0;
+                const indentedRow = document.querySelector('#mb-messages > .mb-message.mb-thread-reply[data-reply-to="${q1}"]');
+                return { repliesVisible, indentedRowExists: !!indentedRow };
+            })()`);
+            assert.equal(dup.indentedRowExists, true, 'the reply is an indented row');
+            assert.equal(dup.repliesVisible, false, 'no Replies section when the replies are already threaded below: ' + JSON.stringify(dup));
+            await ev(`document.querySelector('#mb-messages > .mb-message[data-message-id="${q1}"] .mb-row-toggle').click(); true`); await settle(100); // close it
+
             console.log(`${w} px: Reply shows the strip; the post carries reply_to though the typed name is deleted`);
             await ev(`(() => { const row = document.querySelector('#mb-messages > .mb-message[data-message-id="${q2}"]'); row.querySelector('.mb-row-toggle').click(); return true; })()`); await settle(200);
             await ev(`document.querySelector('#mb-messages > .mb-message[data-message-id="${q2}"] .mb-row-actions').querySelectorAll('button').forEach(b => { if (b.textContent === 'Reply') b.click(); }); true`); await settle(200);

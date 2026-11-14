@@ -2,6 +2,7 @@ package board
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -225,4 +226,24 @@ func TestAReplyToOneQuestionClosesOnlyThatQuestion(t *testing.T) {
 	askPost(t, s, ctx, "Dev A", "@Lead answering the rest", false, 0)
 	assert.Empty(t, askOf(t, s, ctx, q1.ID).Open)
 	assert.Empty(t, askOf(t, s, ctx, q3.ID).Open)
+}
+
+// #16704: a reply to an intra-board message carries a reply_with line that tells the reading agent how to answer in the same thread.
+func TestAnIntraBoardReplyCarriesAReplyWithLine(t *testing.T) {
+	s, ctx := askBoard(t)
+	root := askPost(t, s, ctx, "Lead", "What is the status of the parser?", false, 0)
+	reply := askPost(t, s, ctx, "Dev A", "Still working on it.", false, root.ID)
+
+	msgs, err := s.ListMessages(ctx, "alpha", 50, 0, 0)
+	require.NoError(t, err)
+	by := map[int64]Message{}
+	for _, m := range msgs {
+		by[m.ID] = m
+	}
+	assert.Empty(t, by[root.ID].ReplyWith, "the root message is not a reply: no reply_with")
+	assert.Contains(t, by[reply.ID].ReplyWith, fmt.Sprintf("--reply-to %d", reply.ID), "the reply tells the reader how to answer in the thread")
+
+	one, err := s.GetMessageByID(ctx, "alpha", reply.ID)
+	require.NoError(t, err)
+	assert.Contains(t, one.ReplyWith, "--reply-to")
 }

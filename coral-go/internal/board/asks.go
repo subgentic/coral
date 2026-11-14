@@ -393,6 +393,9 @@ func (s *Store) fillAsks(ctx context.Context, project string, msgs []Message) er
 		if to, ok := replyBy[msgs[i].ID]; ok {
 			t := to
 			msgs[i].ReplyTo = &t
+			if msgs[i].ReplyWith == "" {
+				msgs[i].ReplyWith = fmt.Sprintf("To answer in this thread: coral-board post --reply-to %d \"...\"", msgs[i].ID)
+			}
 		}
 		a, ok := askBy[msgs[i].ID]
 		if !ok {
