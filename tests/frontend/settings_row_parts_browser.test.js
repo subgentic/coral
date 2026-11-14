@@ -28,7 +28,7 @@ const BASE = require('./test_base').BASE;
      const share = await ev(`(() => { const row=document.getElementById('settings-dropbox-hubshare'), hint=row.querySelector('#settings-dropbox-hubshare-desc'), details=row.querySelector('details'); return {shown:!row.hidden, rule:hint.textContent.trim(), visible:hint.getClientRects().length>0, closed:!details.open, safety:details.textContent}; })()`);
      assert.equal(share.shown,true);
      assert.equal(share.visible,true,'Share-only consent stays visible without opening details');
-     assert.equal(share.rule,'Sends only when you press Share. Off by default; this computer only.');
+     assert.equal(share.rule,'Private and secret-looking files are never sent. Only when you press Share.');
      assert.equal(share.closed,true);
      assert.match(share.safety,/private or tagged internal is never sent/);
      assert.match(share.safety,/secret waits here for you to press Upload anyway/);
