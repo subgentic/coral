@@ -21,6 +21,7 @@ const COMMENTS = [
     { id: 10, parent_id: null, anchor: { whole: true }, body: 'Sent to an agent that is asleep (#15155).', asks: [ASK('Writer K')] },
     { id: 11, parent_id: null, anchor: { whole: true }, body: 'Reopened after its ask ran out (#15239).', asks: [ASK('Writer M', { open: false, seen: true, read_at: ago(40 * 60000) })] },
     { id: 9, parent_id: null, anchor: { whole: true }, body: 'The agent used all its replies this turn (#15034).', asks: [ASK('Writer J', { seen: true, replies: 5, limit_reached: true, read_at: ago(6 * 60000) })] },
+    { id: 12, parent_id: null, anchor: { whole: true }, body: 'Agent replied twice, then the operator will write again (#16864).', asks: [ASK('Writer L', { seen: true, replies: 2, read_at: ago(10 * 60000) })] },
 ].map(c => ({ ...c, author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: ago(20 * 60000) }));
 
 (async () => {
@@ -55,7 +56,14 @@ const COMMENTS = [
             // the server's real stamp (#14130, Backend Dev's JSON): six fractional digits and +00:00, not the milliseconds and Z of an ISO string from a browser
             check(l8 && l8.text === 'Read by Writer I, 4 minutes ago' && l8.times.length === 1 && /\.\d{6}\+00:00$/.test(l8.times[0]), `${at}read_at as the server writes it (microseconds, +00:00) is read and shown with its time: ` + JSON.stringify(l8));
             // one comment sent to several agents, each in its own state, in the server's order
-            check(l7 && l7.text === 'Sent to Writer F (asked about this thread before); Read by Writer G, 5 minutes ago; Writer H replied' && l7.names.includes('Writer F') && l7.names.includes('Writer G') && l7.names.includes('Writer H'), `${at}one comment sent to three agents says each agent's own state (sent / read with its time / replied): ` + JSON.stringify(l7));
+            check(l7 && l7.text === 'Sent to Writer F; Read by Writer G, 5 minutes ago; Writer H replied' && l7.names.includes('Writer F') && l7.names.includes('Writer G') && l7.names.includes('Writer H'), `${at}one comment sent to three agents says each agent's own state: a first ask with no activity says just "Sent to" (#16864 F27), read with its time, replied: ` + JSON.stringify(l7));
+            // F29 (#16864): an agent that replied is never downgraded to "not read yet" when the operator writes a follow-up
+            const l12 = await line(12);
+            check(l12 && /Writer L replied \(2 times\)/.test(l12.text), `${at}before the follow-up, the replied agent says replied: ` + JSON.stringify(l12));
+            await ev(`window.__cs.push({ id: 13, parent_id: 12, anchor: null, body: 'Follow-up after replies.', author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: new Date().toISOString(), deleted: false, mine: true, asks: [] }); window.__cs.find(c => c.id === 12).asks[0].nudged = true; true`);
+            await waitFor(`/reminded/.test((document.querySelector('#artifact-viewer .ac-card[data-id="12"] .ac-ask-status')?.textContent || ''))`, `${at}the poll redraws comment 12 with the owner's follow-up in the thread (nudged is the sync signal)`, 8000);
+            const l12post = await line(12);
+            check(l12post && /Writer L replied/.test(l12post.text) && !/not read/.test(l12post.text), `${at}an agent that replied stays "replied" after the operator writes a follow-up: replied is never downgraded (#16864 F29): ` + JSON.stringify(l12post));
             // the three move on independently: F reads it, G replies
             await ev(`const c7 = window.__cs.find(c => c.id === 7); c7.asks[0].read_at = new Date().toISOString(); c7.asks[1].replies = 2; true`);
             await waitFor(`(document.querySelector('#artifact-viewer .ac-card[data-id="7"] .ac-ask-status')?.textContent || '').replace(/\\s+/g, ' ').trim() === 'Read by Writer F, just now; Writer G replied (2 times); Writer H replied'`, `${at}each of the three agents moves on by itself`, 8000);

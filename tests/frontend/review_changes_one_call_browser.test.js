@@ -12,7 +12,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
     const failures = [];
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const mode of ['one', 'older', 'older-comment-refused', 'older-comment-lost', 'older-send-refused', 'older-send-lost', 'older-send-lost-file', 'older-send-lost-words', 'pictures', 'in-progress', 'not-delivered', 'already-sent', 'hub', 'held-close', 'held-switch', 'text-not-kept', 'unsupported-images', 'other-refusal', 'cloud', 'cloud-older', 'too-long']) {
+        for (const mode of ['one', 'older', 'older-comment-refused', 'older-comment-lost', 'older-send-refused', 'older-send-lost', 'older-send-lost-file', 'older-send-lost-words', 'pictures', 'in-progress', 'not-delivered', 'already-sent', 'hub', 'held-close', 'held-switch', 'text-not-kept', 'unsupported-images', 'other-refusal', 'cloud', 'cloud-older', 'too-long', 'saved']) {
             try {
                 if (mode === 'cloud' || mode === 'cloud-older') await setupHubWorld({ client, Page, Emulation, width: 1280, height: 900, mobile: false, inbox: true, hubFeed: true });
                 await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
@@ -23,7 +23,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                     state.hub = true; state.serversKnown = true; state.servers = [{id:'review-box',status:'online',owner_stamp:true}];
                     const real = window.fetch, json = (body,status=200) => Promise.resolve(Response.json(body,{status}));
                     window.__writes = []; window.__stateReads = 0; window.__reloads = 0;
-                    const row = {id:'${HEX}',uri:'coral://artifacts/${HEX}',board_id:'alpha',name:'Plan.md',produced_by:'Writer A',available:true,tags:['for review']};
+                    const row = {id:'${HEX}',uri:'coral://artifacts/${HEX}',board_id:'alpha',name:'Plan.md',produced_by:'Writer A',available:true,tags:['for review',...(mode==='saved'?['saved']:[])]};
                     const prefix = server === 'local' ? '' : '/api/remote/review-box';
                     window.fetch = (input,opts={}) => {
                         const u = new URL(String(input),location.href), path = u.pathname, method = opts.method || 'GET';
@@ -136,7 +136,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                 } else {
                     await waitFor(`window.__reloads === 1`, mode + ' finishes');
                     const writes = await ev(`window.__writes`);
-                    if (['one', 'not-delivered', 'already-sent', 'hub', 'cloud'].includes(mode)) {
+                    if (['one', 'not-delivered', 'already-sent', 'hub', 'cloud', 'saved'].includes(mode)) {
                         assert.equal(writes.length,1,mode+' is one call');
                         assert.ok(writes[0].path.endsWith('/review')); assert.equal(writes[0].body.text,'Keep these exact words.');
                         assert.equal(writes[0].body.decision,'changes');
@@ -165,6 +165,8 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                         const toast=await ev(`[...document.querySelectorAll('.toast')].map(t=>t.textContent).join(' ')`);
                         assert.match(toast,/Writer A.*not.*told/i); assert.match(toast,/agent unavailable/i); assert.match(toast,/words are in the thread/i); assert.doesNotMatch(toast,/was asked/);
                     }
+                    if (mode === 'saved') assert.equal(await ev(`[...document.querySelectorAll('.toast')].some(t=>/Moved out of Saved/.test(t.textContent))`),true,'a saved item\'s changes-requested toast says it moved out of Saved (#16864 F16)');
+                    if (mode === 'one') assert.equal(await ev(`[...document.querySelectorAll('.toast')].some(t=>/Moved out of Saved/.test(t.textContent))`),false,'a non-saved item does not mention Saved');
                 }
                 console.log('PASS '+mode);
             } catch (e) { failures.push(mode+': '+e.message); console.error(failures.at(-1)); }

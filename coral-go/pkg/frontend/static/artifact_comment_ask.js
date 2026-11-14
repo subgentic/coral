@@ -38,9 +38,9 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
     function statusNow(id) {
         const m = new Map();
         const c = st.data && st.data.comments.find(x => x.id === id);
-        for (const k of (c && c.asks) || []) if (k.open && k.agent) { m.set(k.agent.toLowerCase(), { k, words: askUi.askedWords(k) }); names.set(k.agent.toLowerCase(), k.agent); }
+        for (const k of (c && c.asks) || []) if (k.open && k.agent) { m.set(k.agent.toLowerCase(), { k, words: askUi.askState(k) === 'sent' ? '' : askUi.askedWords(k) }); names.set(k.agent.toLowerCase(), k.agent); } // 'sent' with no activity: empty words so the status line says just "Sent to X", not "(asked about this thread before)" (#16864)
         for (const [role, words] of askedOf(id)) { const cur = m.get(role); if (!cur || askUi.askState(cur.k) === 'sent') m.set(role, { k: cur ? cur.k : null, words }); }
-        if (!m.size) for (const k of (c && c.asks) || []) if (k.agent) { m.set(k.agent.toLowerCase(), { k, words: askUi.askedWords(k) }); names.set(k.agent.toLowerCase(), k.agent); } // nobody has it open: asks that ran out (the thread was resolved and reopened, or the window passed) still say it was sent, never "Not sent to an agent yet" for a comment that was (#15239, walk 10 M9)
+        if (!m.size) for (const k of (c && c.asks) || []) if (k.agent) { m.set(k.agent.toLowerCase(), { k, words: askUi.askState(k) === 'sent' ? '' : askUi.askedWords(k) }); names.set(k.agent.toLowerCase(), k.agent); } // nobody has it open: asks that ran out (the thread was resolved and reopened, or the window passed) still say it was sent, never "Not sent to an agent yet" for a comment that was (#15239, walk 10 M9)
         return m;
     }
     /** The line under a comment that says where an agent has it (#14129): Sent to A, then Read by A (with the time the server saw its own read call return the comment), then A replied; at rest, and again as soon as a send answers (#12112: it kept saying "Not sent to an agent yet" beside "Asked just now"). Each name as written, a button to the agent's chat (#12168). */
@@ -55,7 +55,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
             let state = s.k ? askUi.askState(s.k) : 'sent';
             if (link.tagName === 'BUTTON' && s.k && s.k.replies > 0) link.tabIndex = -1; // its reply in this thread has the one Tab stop for the agent; this one stays a click (#15174: Open Orchestrator twice in a row)
             const newestMine = !!newest && newest.mine, readNewest = !!s.k && !!s.k.readAt && (!newest || !(Date.parse(newest.createdAt) > Date.parse(s.k.readAt)));
-            if (s.k && newestMine && newest !== top && state !== 'sent') state = readNewest ? 'read' : 'unread'; // the newest message is yours: replied or read earlier says nothing of it until the agent has read it
+            if (s.k && newestMine && newest !== top && state === 'read') state = readNewest ? 'read' : 'unread'; // the newest message is yours and the agent read an earlier one: unread until it reads THIS one; 'replied' is never downgraded — a reply is a stronger signal (#16864)
             if (state === 'replied') p.append(link, ` replied${s.k.replies > 1 ? ` (${s.k.replies} times)` : ''}`);
             else if (state === 'read') {
                 p.append('Read by ', link);
@@ -70,7 +70,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
                     p.append(' ', wake);
                 }
             }
-            if (s.k && s.k.nudged && state !== 'sent') p.append(', reminded');
+            if (s.k && s.k.nudged) p.append(', reminded'); // always: the old code piped nudge through askedWords for 'sent' state; now that 'sent' has empty words (#16864 F27) the universal line handles it
             if (s.k && s.k.limitReached) p.append('. The agent has reached its reply limit here'); // until the Operator writes again (#15034)
         });
     };
