@@ -1,0 +1,199 @@
+{
+ "about": "Today's breaks of the design guidelines (corner radius, fixed control height, two primary buttons), per file with a count. Fixing one lowers the count here (design_guideline_census.test.mjs); a new one fails the test.",
+ "files": {
+  "coral-go/pkg/frontend/static/artifact_review.js": {
+   "btn-primary written in a dialog module": 3
+  },
+  "coral-go/pkg/frontend/static/board_export_render.js": {
+   "radius: inline 10px": 1
+  },
+  "coral-go/pkg/frontend/static/css/acf_full_access.css": {
+   "height: .settings-pane label.acf-use-full-access > input { height: 1rem }": 1
+  },
+  "coral-go/pkg/frontend/static/css/agentic.css": {
+   "height: .activity-chart-mode button { min-height: 24px }": 1,
+   "height: .task-completion-form textarea { min-height: 72px }": 1,
+   "radius: 14px 14px 0 0": 1,
+   "radius: 22px": 1,
+   "radius: 2px": 2,
+   "radius: 999px": 3
+  },
+  "coral-go/pkg/frontend/static/css/analytics_tabs.css": {
+   "radius: 2px": 1
+  },
+  "coral-go/pkg/frontend/static/css/artifact-comments.css": {
+   "height: .ac-ask .ac-ask-label input[type=\"checkbox\"] { height: 16px }": 1,
+   "radius: 999px": 1
+  },
+  "coral-go/pkg/frontend/static/css/artifact_viewer_header.css": {
+   "height: .artifact-review-form textarea { min-height: 3.25em }": 1,
+   "radius: 999px": 1
+  },
+  "coral-go/pkg/frontend/static/css/base.css": {
+   "radius: 2px": 1
+  },
+  "coral-go/pkg/frontend/static/css/board_table.css": {
+   "radius: 999px": 1
+  },
+  "coral-go/pkg/frontend/static/css/chat.css": {
+   "radius: 18px": 1,
+   "radius: 20px 20px 20px 6px": 1,
+   "radius: 20px 20px 6px 20px": 1,
+   "radius: 2px": 2,
+   "radius: 5px": 1,
+   "radius: 999px": 2
+  },
+  "coral-go/pkg/frontend/static/css/cm_shadow.css": {
+   "radius: 2px": 2
+  },
+  "coral-go/pkg/frontend/static/css/command-pane.css": {
+   "height: #board-chat-input-pane textarea { min-height: 2.75rem }": 1,
+   "height: .model-chip { min-height: 28px }": 1,
+   "height: .model-chip-note:empty { height: 1px }": 1,
+   "height: :is(#command-pane, #board-chat-input-pane) textarea { min-height: 2.75rem }": 1,
+   "radius: 0 16px 16px 0": 1,
+   "radius: 0 22px 22px 0": 1,
+   "radius: 16px": 3,
+   "radius: 16px 0 0 16px": 1,
+   "radius: 22px 0 0 22px": 1,
+   "radius: 999px": 1
+  },
+  "coral-go/pkg/frontend/static/css/components.css": {
+   "height: #launch-agent-pick .launch-agent-opt input { height: 1px }": 1,
+   "height: #settings-modal .sec-switch input[type=\"checkbox\"] { height: 16px }": 1,
+   "height: .btn-icon.btn-xs { height: max(24px, calc(var(--fs-lg) + 10px)) }": 1,
+   "height: .btn-icon.btn-xs { min-height: max(24px, calc(var(--fs-lg) + 10px)) }": 2,
+   "height: .jumpbar .btn { min-height: 26px }": 1,
+   "height: .sd-modal-content .settings-pane textarea.acf-prompt { min-height: 16rem }": 1,
+   "height: .sd-modal-content.restart-wizard-content .acf-persona-page textarea.ac { min-height: 16rem }": 1,
+   "height: .tag-dropdown-create input[type=\"color\"] { height: 28px }": 1,
+   "height: .team-wizard-body textarea { min-height: 120px }": 1,
+   "height: input.check { height: 16px }": 1,
+   "height: input.switch { height: 1.4rem }": 1,
+   "height: input.switch::before { height: calc(1.4rem - 8px) }": 1,
+   "radius: 14px": 1,
+   "radius: 19px": 1,
+   "radius: 1rem": 1,
+   "radius: 22px": 2,
+   "radius: 2px": 1,
+   "radius: 999px": 3
+  },
+  "coral-go/pkg/frontend/static/css/data_table.css": {
+   "height: .dt-box.dt-folded.dt-selecting .dt-check input { height: 24px }": 1,
+   "radius: 1px": 1,
+   "radius: 2px": 1,
+   "radius: 999px": 2
+  },
+  "coral-go/pkg/frontend/static/css/diff-comments.css": {
+   "radius: 7px": 1
+  },
+  "coral-go/pkg/frontend/static/css/docs.css": {
+   "radius: 2px": 1
+  },
+  "coral-go/pkg/frontend/static/css/goal_editor.css": {
+   "height: .goal-editor .ac-thumb .btn-small { height: 24px }": 1,
+   "height: .goal-editor .goals-form-body > input#goal-new-done { min-height: 40px }": 1,
+   "height: .goal-scope select { min-height: 28px }": 1,
+   "radius: 15px": 1,
+   "radius: 16px": 2
+  },
+  "coral-go/pkg/frontend/static/css/goals.css": {
+   "radius: 22px": 1,
+   "radius: 999px": 1
+  },
+  "coral-go/pkg/frontend/static/css/history.css": {
+   "radius: 2px": 1,
+   "radius: 5px": 1
+  },
+  "coral-go/pkg/frontend/static/css/inbox_answer.css": {
+   "radius: 999px": 1
+  },
+  "coral-go/pkg/frontend/static/css/inbox_review_groups.css": {
+   "height: .inbox-group-review-toggle input { height: 18px }": 1
+  },
+  "coral-go/pkg/frontend/static/css/layout.css": {
+   "radius: 11px": 2,
+   "radius: 14px": 1,
+   "radius: 7px": 1,
+   "radius: 999px": 1
+  },
+  "coral-go/pkg/frontend/static/css/mobile.css": {
+   "height: .command-pane textarea { height: 3rem }": 1,
+   "height: .command-pane textarea { min-height: 2.25rem }": 1,
+   "height: .command-pane textarea { min-height: 3rem }": 1,
+   "height: .nav-more-menu.nav-drawer > button, .nav-more-menu.nav-drawer > a, .na { min-height: 48px }": 1,
+   "radius: 0 16px 16px 0": 1,
+   "radius: 14px": 1,
+   "radius: 16px": 2,
+   "radius: 18px": 2,
+   "radius: 20px": 1,
+   "radius: 24px": 3,
+   "radius: 26px": 1
+  },
+  "coral-go/pkg/frontend/static/css/output.css": {
+   "radius: 2px": 3
+  },
+  "coral-go/pkg/frontend/static/css/pictures.css": {
+   "height: .artifact-review-form textarea { min-height: 4.5em }": 1,
+   "height: .inbox-ask-subjects .btn { min-height: 28px }": 1
+  },
+  "coral-go/pkg/frontend/static/css/provider_cards.css": {
+   "height: .provider-tabs .provider-card-head input { height: 1px }": 1
+  },
+  "coral-go/pkg/frontend/static/css/session.css": {
+   "height: .hub-readonly-chip:empty { height: 1px }": 1,
+   "radius: 11px": 1,
+   "radius: 14px": 1,
+   "radius: 2px": 1,
+   "radius: 5px": 1
+  },
+  "coral-go/pkg/frontend/static/css/settings.css": {
+   "height: #settings-modal .settings-pane .settings-inbox-team input[type=\"checkb { height: 18px }": 1
+  },
+  "coral-go/pkg/frontend/static/css/settings_view.css": {
+   "height: .sv .sv-choice > input { height: 16px }": 1,
+   "height: .sv .sv-choice > input[type=\"checkbox\"]:checked::after { height: 8px }": 1
+  },
+  "coral-go/pkg/frontend/static/css/short_screen.css": {
+   "height: .alerts-offer-banner .btn { min-height: 28px }": 1
+  },
+  "coral-go/pkg/frontend/static/css/skills.css": {
+   "height: .skills-pick-label input[type=checkbox] { height: 20px }": 1
+  },
+  "coral-go/pkg/frontend/static/css/team_bar_needs.css": {
+   "radius: 22px": 1
+  },
+  "coral-go/pkg/frontend/static/css/team_page.css": {
+   "height: .team-task-form textarea, .task-completion-form textarea { min-height: 104px }": 1,
+   "radius: 22px": 2
+  },
+  "coral-go/pkg/frontend/static/css/theme-configurator.css": {
+   "radius: 2px": 1
+  },
+  "coral-go/pkg/frontend/static/css/touch.css": {
+   "height: .list-bar-kept input[type=\"checkbox\"] { height: 1.5rem }": 1
+  },
+  "coral-go/pkg/frontend/static/css/updates.css": {
+   "radius: 999px": 1
+  },
+  "coral-go/pkg/frontend/static/css/variables.css": {
+   "radius: --radius-ml = 10px": 1,
+   "radius: --radius-xs = 3px": 1
+  },
+  "coral-go/pkg/frontend/static/dropbox_share.js": {
+   "btn-primary written in a dialog module": 5
+  },
+  "coral-go/pkg/frontend/static/editions.js": {
+   "btn-primary written in a dialog module": 3
+  },
+  "coral-go/pkg/frontend/static/goal_operator_dialogs.js": {
+   "btn-primary written in a dialog module": 2
+  },
+  "coral-go/pkg/frontend/static/goal_view.js": {
+   "btn-primary written in a dialog module": 4
+  },
+  "coral-go/pkg/frontend/static/platform/native.js": {
+   "radius: inline 3px": 1
+  }
+ }
+}
