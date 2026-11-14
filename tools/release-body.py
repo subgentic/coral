@@ -6,7 +6,7 @@ must land before the tag. An @name outside a code span or fence would link (and 
 import re
 import sys
 
-SKIP = re.compile(r"(`[^`]*`|https?://[^\s)>\"']+)")  # a code span or a URL (a Mastodon address holds an @name that is no mention) is left alone
+SKIP = re.compile(r"(`[^`]*`|https?://[^\s)>,;<\"']+)")  # a code span or a URL (a Mastodon address holds an @name that is no mention) is left alone
 MENTION = re.compile(r"(?<![A-Za-z0-9_@])@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:/[A-Za-z0-9_](?:[A-Za-z0-9_.-]*[A-Za-z0-9_])?)?")
 
 
