@@ -15,8 +15,29 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B });
-        for (const t of ['Ship the pilot', 'Fix the phone Goals list', 'Write the docs']) check((await api('POST', '/goals', { subscriber_id: 'Operator', title: t, outcome: 'The outcome of ' + t + ' in one line, which is long enough to be cut on a phone.', done_when: 'it is done' })).status === 201, 'made goal ' + t);
+        for (const t of ['Ship the pilot with a clear phone goal list and room for a two-line title', 'Fix the phone Goals list', 'Write the docs']) check((await api('POST', '/goals', { subscriber_id: 'Operator', title: t, outcome: 'The outcome of ' + t + ' in one line, which is long enough to be cut on a phone.', done_when: 'it is done' })).status === 201, 'made goal ' + t);
+        check((await api('POST', '/tasks', { created_by: 'Boss', title: 'Prepare pilot', goal_id: 1 })).status === 201, 'made task progress for the long-title goal');
         const setReq = await api('PUT', '/settings', { subscriber_id: 'Operator', require_goal: true }); check(setReq.status < 300, 'the board requires a goal: ' + setReq.status);
+        // #15833: the same quiet goal card in Team and Inbox, narrow phones and large text.
+        for (const place of ['team', 'inbox']) for (const w of [320, 390]) for (const theme of ['light', 'dark']) for (const zoom of [100, 200]) {
+            const at = `${place} ${w}px ${theme} ${zoom}%`;
+            await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile: true });
+            await Page.navigate({ url: BASE + '/team/' + B + '/goals' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+            if (place === 'inbox') {
+                await ev(`window.switchNavTab('hub-inbox');true`);
+                await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('goals')).then(()=>true)`);
+            }
+            const scope = place === 'team' ? P : '#group-table-view';
+            await waitFor(`document.querySelectorAll('${scope} tbody tr').length >= 3`, at + ' rows');
+            await ev(`document.documentElement.setAttribute('data-theme','${theme}');document.documentElement.style.fontSize='${zoom}%';true`);
+            if (zoom === 200) await ev(`document.querySelector('${scope} tr:has(.dt-mail-open[data-goal-id="1"])').scrollIntoView({block:'center'});true`);
+            await ev(framesJs(6));
+            const card = await ev(`(()=>{const row=document.querySelector('${scope} tr:has(.dt-mail-open[data-goal-id="1"])'), body=row.querySelector('.dt-mail-open'), title=row.querySelector('.dt-mail-title'), meta=row.querySelector('.dt-mail-time'), icon=row.querySelector('.dt-mail-avatar:not(.dt-mail-tick)'), style=getComputedStyle(icon), rect=e=>e.getBoundingClientRect();return {title:title.textContent,number:getComputedStyle(title,'::before').content,meta:meta.textContent,titleAlign:getComputedStyle(title).textAlign,metaAlign:getComputedStyle(meta).textAlign,left:[rect(title).left,rect(meta).left],stacked:rect(meta).top>=rect(title).bottom-1,iconColor:style.color,neutral:getComputedStyle(row).getPropertyValue('--text-secondary').trim(),bg:style.backgroundColor,ask:!!row.querySelector('.dt-mail-ask'),overflow:document.documentElement.scrollWidth>innerWidth+1,clamp:getComputedStyle(title).webkitLineClamp};})()`);
+            check(card.titleAlign !== 'center' && card.metaAlign !== 'center' && Math.abs(card.left[0]-card.left[1])<2 && card.stacked, at+' left-aligned title and metadata: '+JSON.stringify(card));
+            check(card.bg === 'rgba(0, 0, 0, 0)' && card.iconColor === await ev(`getComputedStyle(document.querySelector('${scope}')).getPropertyValue('--text-secondary').trim().startsWith('#') ? (()=>{const e=document.createElement('span');e.style.color='var(--text-secondary)';document.body.append(e);const c=getComputedStyle(e).color;e.remove();return c})() : getComputedStyle(document.querySelector('${scope}')).getPropertyValue('--text-secondary').trim()`), at+' grey icon with no tile: '+JSON.stringify(card));
+            check(!card.ask && card.clamp === '2' && !card.overflow && /^Active/.test(card.meta) && /0\/1/.test(card.meta) && /^#\d+ /.test(card.title), at+' number before two-line title and one state/progress line: '+JSON.stringify(card));
+            if (process.env.CORAL_SCREENSHOT_DIR) { const fs=require('node:fs'),d=process.env.CORAL_SCREENSHOT_DIR;fs.mkdirSync(d,{recursive:true});fs.writeFileSync(`${d}/${place}-${w}-${theme}-${zoom}.png`,Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64')); }
+        }
         for (const [w, mobile] of [[390, true], [430, true], [1280, false]]) {
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -35,7 +56,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 check(new Set(m.tops).size === 1, at + 'the search, the filter and New goal are one line: ' + JSON.stringify(m.tops));
                 check(m.addW <= 48 && m.addLabel === 'New goal' && m.addText !== 'New goal', at + 'New goal is a compact icon button with its name: ' + JSON.stringify([m.addW, m.addLabel, m.addText]));
                 const two = await ev(`(() => { const r = document.querySelector('${P} tbody tr'); const ask = r.querySelector('.dt-mail-ask'), title = r.querySelector('.dt-mail-title'), side = r.querySelector('.dt-mail-time'); return { ask: ask ? ask.textContent : null, title: title.textContent, side: side.textContent, stacked: !!ask && ask.getBoundingClientRect().top >= title.getBoundingClientRect().bottom - 2 }; })()`);
-                check(!!two.ask && two.stacked && /^The outcome of /.test(two.ask), at + 'a row is two lines: the goal, then its one-line outcome: ' + JSON.stringify(two));
+                check(!two.ask, at + 'the row omits the outcome preview: ' + JSON.stringify(two));
                 check(/^Active/.test(two.side), at + 'and the state (and the task count, when it has tasks) is on the right: ' + JSON.stringify(two.side));
                 const note = await ev(`(() => { const n = document.querySelector('${P} .goals-require'); return n ? { text: n.textContent.trim(), title: n.title, h: Math.round(n.getBoundingClientRect().height) } : null; })()`);
                 check(!!note && /^info\s*Goal required here$/.test(note.text) && /refused on this board/.test(note.title) && note.h <= 24, at + 'the notice is one quiet line, the sentence on its tooltip: ' + JSON.stringify(note));
@@ -73,7 +94,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 3`, at + 'the goal rows', 15000);
             await ev(framesJs(6));
             const g = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr'), ask = r.querySelector('.dt-mail-ask'), title = r.querySelector('.dt-mail-title'); return { ask: ask ? ask.textContent : null, stacked: !!ask && ask.getBoundingClientRect().top >= title.getBoundingClientRect().bottom - 2, side: r.querySelector('.dt-mail-time').textContent }; })()`);
-            check(!!g.ask && g.stacked && /^The outcome of /.test(g.ask), at + 'a row is two lines, the goal then its outcome: ' + JSON.stringify(g));
+            check(!g.ask, at + 'the row omits the outcome preview: ' + JSON.stringify(g));
             check(/^Active/.test(g.side), at + 'with the state on the right: ' + g.side);
             const at2 = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr .dt-mail-title').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
             const tt = type => client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x: at2.x, y: at2.y, id: 1 }] });
