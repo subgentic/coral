@@ -83,6 +83,7 @@ jobs:
           bash tests/release/release_cadence_test.sh    # the cadence table (#5559); a stand-in gh, no network
           bash tests/release/release_notes_edits_test.sh   # lines removed from a published body on purpose; no network
           bash tests/release/release_body_test.sh   # the release page body is the tag's RELEASE_NOTES.md section, no @mentions (#16503); no network
+          bash tests/release/verify_notes_from_main_test.sh   # a tag whose notes commit landed after it: the notes come from the main commit that names it (#16503); a stand-in gh, no network
           bash tests/release/staple_retry_test.sh   # the macOS staple's retries and its guards (#12721); a stand-in xcrun, no network
           bash tests/release/notes_commit_test.sh   # the notes commit's Gated-commit and optional Accepted-red trailers, validated as the release reads them (#8667); a throwaway repository
           python3 tests/release/windows_build_census_test.py   # windows-tests' package build is release.yml's Windows build: same tags and programs (#5886)

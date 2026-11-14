@@ -21,6 +21,7 @@ tools/release-body.py | release-only | builds the release page body from the tag
 tests/release/release_code_test.py | dryrun | the release code's TOTP check
 tests/release/release_homes_test.sh | dryrun | a tag is checked against the repository that built it (tools/release-homes.sh)
 tests/release/release_notes_edits_test.sh | dryrun | lines removed from a published body on purpose
+tests/release/verify_notes_from_main_test.sh | dryrun | a tag whose notes commit landed after it reads the notes from the main commit that names it (#16503)
 tests/release/release_provenance.py | dryrun | the gates were green on this exact code (the dry run prints the provenance line)
 tests/release/release_provenance_test.py | dryrun | the provenance reader itself
 tests/release/require_cosign_test.sh | dryrun | the release checks need the pinned cosign: a missing or unpinned one stops after-release.sh and finish-release.sh
