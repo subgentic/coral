@@ -46,7 +46,7 @@ export function scheduleFolderTrust(event) {
             if (response.ok) result = await response.json();
         } catch { /* unchecked stays off */ }
         if (generation !== _trustGeneration || d.value.trim() !== dir) return;
-        if (result?.refused) { _trustNote = result.refused; _view?.refresh(); return; }
+        if (result?.refused) { _trustNote = result.refused; _trustFor = ''; _defaultUsed = true; _view?.set('trust', false); _view?.refresh(); return; }
         const names = ['.claude/settings.json', '.claude/settings.local.json', '.mcp.json', '.codex/config.toml'];
         const checked = result?.checked === true && result.files && names.every(name => typeof result.files[name] === 'boolean');
         const found = checked ? names.filter(name => result.files[name]) : [];
@@ -135,11 +135,11 @@ function mount(modal) {
             live: [{ id: 'btn-browse-team', wide: true, describes: false }, { id: 'launch-team-dir-recents', wide: true, describes: false }, { id: 'launch-team-dir-suggest', describes: false }, { id: 'launch-team-dir-new', describes: true }, { id: 'dir-browser-team', wide: true, describes: false }] },
         // Trusting the folder (#11889): a folder Coral makes is trusted for the agents that ask, and says so; an existing folder is trusted only when the person ticks it, naming the path. Neither shows through Coral Hub
         // (the server ignores the tick there). The server decides what it may trust: this is what is said and what is sent.
-        { key: 'trustLine', type: 'custom', wide: true, label: ' ', render: slot => { const p = document.createElement('p'); p.id = 'launch-team-trust-line'; p.className = 'sv-help'; p.textContent = 'Coral will start these agents in this folder and trust it for them. A Claude agent may still ask once.'; slot.append(p); },
+        { key: 'trustLine', type: 'custom', wide: true, label: ' ', render: slot => { const p = document.createElement('p'); p.id = 'launch-team-trust-line'; p.className = 'sv-help'; p.textContent = 'Coral will start these agents in this folder and try to record trust in their existing settings. Agents may still ask; you can answer together in Needs you.'; slot.append(p); },
             visibleWhen: () => { const d = document.getElementById('launch-team-dir'); return !isHub() && usesSuggestion(d) && !suggestionExists(d); } },
-        { key: 'trust', type: 'toggle', id: 'launch-team-trust', label: 'Trust this folder: its settings and tools can run', default: true, help: 'Its settings, hooks and tools can run without each CLI asking.',
+        { key: 'trust', type: 'toggle', id: 'launch-team-trust', label: 'Trust this folder: its settings and tools can run', default: true, help: 'Coral tries to record trust in existing CLI settings. Agents may still ask.',
             helpOf: () => { const f = document.getElementById('launch-team-dir')?.value.trim() || 'this folder'; // off: say plainly what that means, so a typed folder is not taken for one Coral trusts (#12413)
-                return (_trustNote ? _trustNote + ' ' : '') + (document.getElementById('launch-team-trust')?.checked ? 'On, ' + f + " is trusted for the team's agents, so settings, tools and hooks in it run with no question. Untick to let each agent’s CLI ask about the folder."
+                return (_trustNote ? _trustNote + ' ' : '') + (document.getElementById('launch-team-trust')?.checked ? 'On, ' + f + " will be trusted where the CLI already has settings. Agents may still ask; answer together in Needs you. Untick to leave trust to each agent."
                     : 'Coral will not trust ' + f + " unless this is on, so each agent's CLI asks about the folder when it starts."); },
             visibleWhen: () => { const d = document.getElementById('launch-team-dir'); return !isHub() && !!(d && d.value.trim() && (!usesSuggestion(d) || suggestionExists(d))); } },
         { key: 'server', type: 'text', id: 'team-board-server', label: "Another computer's address", placeholder: 'e.g. http://remote-computer:8420' },
