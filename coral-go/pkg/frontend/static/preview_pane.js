@@ -359,6 +359,13 @@ function _closeTabNow(tabId) {
     onPreviewClose?.();
 }
 
+/** Close the preview pane's tab for this artifact hex, if one is open: the full viewer takes over (#16737). */
+export function closeArtifactTab(hex) {
+    const uri = `coral://artifacts/${hex}`;
+    const tab = _tabs.find(t => t.kind === 'artifact' && (t.artifactKey === uri || t.filepath === uri));
+    if (tab) _closeTabNow(tab.id);
+}
+
 export function closeAllTabs() {
     _clearTaskPreview();
     _destroyEditor();

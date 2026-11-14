@@ -76,6 +76,8 @@ function setFullScreen(d, on, remember = false) {
     button.setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen');
     button.title = on ? 'Exit full screen (Esc)' : 'Full screen';
     button.textContent = on ? '⤡' : '⤢';
+    const fsItem = d.querySelector('.artifact-viewer-fullscreen-item');
+    if (fsItem) fsItem.textContent = on ? 'Exit full screen' : 'Full screen';
     if (remember && _layoutType) browserLocal.set('coral-artifact-fullscreen:' + _layoutType, String(on));
 }
 function escapeViewer(d) {
@@ -122,6 +124,7 @@ function _build() {
                     <button type="button" class="menu-item artifact-viewer-copy-id" role="menuitem" title="The id of this version only">Copy version ID</button>
                     <button type="button" class="menu-item artifact-viewer-agent-item" role="menuitem" title="Copies a line to paste to an agent: this file and where in the docs to read">Copy for an agent</button>
                     <button type="button" class="menu-item artifact-viewer-scripts-item" role="menuitem" hidden>Run scripts…</button>
+                    <button type="button" class="menu-item artifact-viewer-fullscreen-item" role="menuitem">Full screen</button>
                     <a class="menu-item artifact-viewer-newtab" role="menuitem" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
                     <button type="button" class="menu-item artifact-viewer-dropbox-share" role="menuitem" hidden>Share via Dropbox…</button>
                     <a class="menu-item artifact-viewer-download" role="menuitem" rel="noopener noreferrer" download>Download</a>
@@ -154,6 +157,7 @@ function _build() {
     const flipFrom = () => { const on = !fromEl.classList.contains('is-open'); fromEl.classList.toggle('is-open', on); fromEl.setAttribute('aria-expanded', String(on)); };
     fromEl.addEventListener('click', flipFrom); fromEl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipFrom(); } });
     d.querySelector('.artifact-viewer-fullscreen').addEventListener('click', () => setFullScreen(d, !d.classList.contains('av-fullscreen'), true));
+    d.querySelector('.artifact-viewer-fullscreen-item').addEventListener('click', () => setFullScreen(d, !d.classList.contains('av-fullscreen'), true));
     const more = d.querySelector('.artifact-viewer-more'), menu = d.querySelector('.artifact-viewer-menu');
     more.addEventListener('click', async (e) => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(more); });
     d.querySelector('.artifact-viewer-agent-item').addEventListener('click', () => { const hex = _hex, name = d.querySelector('.artifact-viewer-title')?.firstChild?.textContent || ''; importOnce('./agent_doc_map.js').then(m => navigator.clipboard.writeText(m.agentCopyText('artifact', `Artifact${name ? ` \u201c${name.trim()}\u201d` : ''}: coral://artifacts/${hex}`))).then(() => showToast('Copied: paste it to an agent'), () => showToast('Could not copy', true)); }); // the robot's line (#15063): the viewer's header has no room for one more icon, so it is in the menu
@@ -441,6 +445,7 @@ export function openArtifactViewer(hex, opts = {}) {
     if (typeof opts.onClose === 'function') _onClose = opts.onClose;
     else if (!wasOpen) _onClose = null;
     d.hidden = false;
+    importOnce('./preview_pane.js').then(m => { if (m.closeArtifactTab) m.closeArtifactTab(hex); }).catch(() => {}); // one view: the preview pane's tab for the same artifact closes when the full viewer opens (#16737)
     syncTitleExpand(d);
     if (!wasOpen && isPhoneLayout()) document.querySelectorAll('#toast-host > .toast:not(.error):not(.has-action)').forEach(t => t.remove()); // a plain toast was announced and sat over the viewer's header and versions at the top of a phone (#11621)
     if (!wasOpen && isPhoneLayout() && !_overlay) _overlay = pushOverlay(() => closeArtifactViewer({ popped: true })); // Back closes it, above the preview's full screen, under its comments sheet
@@ -471,7 +476,7 @@ export function openArtifactViewer(hex, opts = {}) {
     if (chips.children.length) _details.add(chips);
     _lineChip = null;
     // Every open sets the line afresh: a caller's valid id and line (bound to its hex, computer and team), else NONE. An earlier open's line never survives into one that carries none (the same digest from another team, a plain reopen).
-    _line = fileIdOf({ file_id: opts.fileId }) && opts.versionLine ? { hex: opts.lineHex, fileId: opts.fileId, versionLine: opts.versionLine } : null;
+    _line = !opts.openLatest && fileIdOf({ file_id: opts.fileId }) && opts.versionLine ? { hex: opts.lineHex, fileId: opts.fileId, versionLine: opts.versionLine } : null; // openLatest: the caller's line is for the row's version, not the newest; the bar will set _barLine with the shown version's line (#16737)
     paintLine(d);
     readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { _details.add(readersBlock(hex, opts.server, _details)); if (opts.sourceNamed) _details.add(privateBlock(hex, opts.server, _details)); _details.add(dropboxBlock(hex, opts.server, _details)); } }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
