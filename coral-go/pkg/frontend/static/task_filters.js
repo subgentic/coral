@@ -53,7 +53,7 @@ export const saveFilters = kept.save;
 /** What the open-first order asks for, as the server has no such sort: the open tasks, then the done ones (null for a choice of status: one request is enough). */
 export function phases(f) {
     const c = clean(f);
-    if (c.sort !== 'open' || c.status) return null;
+    if (c.sort !== 'open' || c.status || c.q) return null;
     return [OPEN_STATUSES, DONE_STATUSES];
 }
 

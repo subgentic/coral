@@ -36,9 +36,9 @@ const { pathToFileURL } = require('node:url');
     assert.deepEqual(m.toParams({ ...m.EMPTY, q: 'x' }, 'b', { statuses: m.OPEN_STATUSES, limit: 1 }).filter(([k]) => k === 'status').map(([, v]) => v), m.OPEN_STATUSES);
     assert.equal(m.toParams({ ...m.EMPTY, q: 'x' }, 'b', { limit: 1 }).find(([k]) => k === 'limit')[1], '1');
 
-    // phases: the open-first order with no status chosen is the open tasks, then the done ones; a chosen status or any other order is one request.
+    // phases: the open-first order with no status chosen is the open tasks, then the done ones; a chosen status, a search or any other order is one request.
     assert.deepEqual(m.phases(m.EMPTY), [m.OPEN_STATUSES, m.DONE_STATUSES]);
-    assert.deepEqual(m.phases({ ...m.EMPTY, q: 'x' }), [m.OPEN_STATUSES, m.DONE_STATUSES]);
+    assert.equal(m.phases({ ...m.EMPTY, q: 'x' }), null); // #16702: a search queries all statuses in one request so that Done tasks appear
     assert.equal(m.phases({ ...m.EMPTY, status: 'blocked' }), null);
     assert.equal(m.phases({ ...m.EMPTY, sort: 'newest' }), null);
     assert.deepEqual([m.OPEN_STATUSES, m.DONE_STATUSES].flat().sort(), ['blocked', 'completed', 'draft', 'in_progress', 'pending', 'review_pending', 'skipped']); // every status the server has
