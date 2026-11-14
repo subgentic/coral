@@ -32,7 +32,7 @@ const { coralReady } = require('./helpers/wait');
                 return m;
             };
             const agent = await check('the agent row menu', `document.querySelector('.session-group-item [data-on-click="kebab-toggle"]').click(); true`);
-            assert.ok(agent.danger.some(x => /Stop session/.test(x)), `${w}: Stop session is in it: ${JSON.stringify(agent.danger)}`);
+            assert.ok(agent.danger.some(x => /Stop agent/.test(x)), `${w}: Stop agent is in it: ${JSON.stringify(agent.danger)}`);
             await shot(`menu-agent-${w}`);
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); document.body.click(); true`);
             const team = await check('the team menu', `document.querySelector('.session-team-group [data-on-click="kebab-toggle"], .board-card-header [data-on-click="kebab-toggle"]').click(); true`);

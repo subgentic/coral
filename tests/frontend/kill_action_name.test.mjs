@@ -1,4 +1,4 @@
-// One name for ending an agent (#15371, user feedback: 'Stop session' in some places, 'Remove agent' in others). The row menu's item and its confirm are Kill Session / Kill session
+// One name for ending an agent (#15371, user feedback: 'Stop agent' in some places, 'Remove agent' in others). The row menu's item and its confirm are Kill Session / Kill session
 // everywhere (the same words as the docs, Kill All and Kill Team); 'Remove Agent' is not a label of any button. This reads every module: each agent-kill menu item says Kill Session,
 // and no module draws a button or menu item named Remove Agent, except the menus of a sleeping or archived agent (#15399): nothing runs there, so 'Kill Session' read as ending a live process; they say Remove Agent.
 import fs from 'node:fs';
@@ -19,7 +19,7 @@ for (const f of fs.readdirSync(STATIC).filter(n => n.endsWith('.js'))) {
         const label = body.replace(/<[^>]*>/g, ' ').replace(/\$\{[^}]*\}/g, ' ').replace(/\s+/g, ' ').trim();
         const idle = /\$\{_mk\d+\}/.test(m[1]); // the sleeping and archived menus keep theirs in a constant (the live menu's item is written out)
         if (idle) { idleItems++; if (!/(^|\s)Remove Agent$/.test(label)) bad.push(`${f}: a sleeping or archived agent's menu item is labelled "${label.slice(-40)}", not Remove Agent`); }
-        else if (!/(^|\s)Stop [Ss]ession$/.test(label)) bad.push(`${f}: an agent-kill menu item is labelled "${label.slice(-40)}", not Stop session`); // menus are sentence case since #15286: 'Stop session' is the same name
+        else if (!/(^|\s)Stop [Aa]gent$/.test(label)) bad.push(`${f}: an agent-kill menu item is labelled "${label.slice(-40)}", not Stop agent`); // menus are sentence case since #15286: 'Stop agent' is the same name
     }
 }
 assert.equal(idleItems, 2, 'the sleeping and archived menus each say Remove Agent');
