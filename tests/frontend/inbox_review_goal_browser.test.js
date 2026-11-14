@@ -1,4 +1,4 @@
-// #8917, then #11719: a for-review row in Needs you no longer shows its goal roll-up (the approved three-line row: no goal, no task link, no Goal column); the Filters panel's Goal field still narrows the list and its chip says the goal. Real isolated team; only artifact storage is mocked (as inbox_artifact_review_browser).
+// #8917, then #11719: a for-review row in Needs you no longer shows its goal roll-up (the approved three-line row: no goal link, no task link, no Goal column); since #16576 (the Operator's Option B) it carries a goal pill and a task pill, only where the file has one; the Filters panel's Goal field still narrows the list and its chip says the goal. Real isolated team; only artifact storage is mocked (as inbox_artifact_review_browser).
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -48,6 +48,12 @@ const { coralReady } = require('./helpers/wait');
                 // the row has no goal, no task link and no Goal column (the operator's approved row, #11719): they are in the opened file and in the Filters
                 const gone = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view tbody tr')]; return { rows: rows.length, goalCells: rows.filter(r => r.querySelector('.inbox-review-goal, [data-goal-link], [data-task-link]')).length, noGoalText: rows.filter(r => /No goal/.test(r.textContent)).length, goalHead: [...document.querySelectorAll('#group-table-view th')].filter(h => getComputedStyle(h).display !== 'none').some(h => h.textContent.replace(/[\u2191\u2193\u2195]/g, '').trim() === 'Goal') }; })()`);
                 assert.ok(gone.rows >= 9 && gone.goalCells === 0 && gone.noGoalText === 0 && !gone.goalHead, 'a review row shows no goal, task link or Goal column: ' + JSON.stringify(gone));
+                // the card's pills (#16576, the Operator's Option B): a goal pill and a task pill only where the file really has one
+                const pillsOf = n => ev(`(() => { const r = ${row('Review file ' + n + '.txt')}; return r ? [...r.querySelectorAll('.inbox-pill')].map(p => p.textContent) : null; })()`);
+                assert.deepEqual(await pillsOf('01'), ['Goal #7', 'Task #11'], 'a file with a goal and a task has both pills');
+                assert.deepEqual(await pillsOf('04'), ['Goal #8', 'Task #12'], 'the Docs sweep file has its goal and task pills');
+                assert.deepEqual(await pillsOf('05'), ['Task #13'], 'a file with a task and no goal has only the task pill');
+                assert.deepEqual(await pillsOf('10'), [], 'a file with neither has no pill');
                 // the Filters panel's Goal field
                 await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').click(); true`);
                 await waitFor(`!document.querySelector('.inbox-folder-toolbar .list-bar-menu').hidden`, 'the Filters panel', 6000);
