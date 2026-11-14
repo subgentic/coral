@@ -244,7 +244,8 @@ function drawStatus(data) {
     if (!unknown) stopWaking(S.team);
         // every task done, none open, nobody working and nothing needs the person: not the same as "All well" while the team is still at it (walk 21 H2, #15304)
     const finished = !shown && !unknown && S.counts.tasks === 0 && S.tasksDone > 0 && data.agents.every(a => a.availability !== 'busy' && a.availability !== 'needs_input' && a.availability !== 'waiting');
-    const text = uncertainAttention ? 'Checking attention status' : asleep ? 'Asleep' : wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : shown ? `${shown} ${shown === 1 ? 'needs' : 'need'} attention` : unknown ? (unknown === data.agents.length ? 'No agent has sent a first message yet' : `${unknown} of ${data.agents.length} agents have not sent a first message yet`) : finished ? 'Finished: your turn' : 'All well';
+    const stopped = !live.length && !shown && data.agents.every(a => ['offline', 'archived'].includes(a.availability));
+    const text = stopped ? '' : uncertainAttention ? 'Checking attention status' : asleep ? 'Asleep' : wakingNow ? `Waking the team: ${data.agents.length - unknown} of ${data.agents.length} agents have sent their first message.` : shown ? `${shown} ${shown === 1 ? 'needs' : 'need'} attention` : unknown ? (unknown === data.agents.length ? 'No agent has sent a first message yet' : `${unknown} of ${data.agents.length} agents have not sent a first message yet`) : finished ? 'Finished: your turn' : 'All well';
     // When agents need attention the visible status is a button to the Agents tab (beside the live region, which keeps saying it and is then only for a screen reader: the button's name is not announced twice); "All well" is plain text.
     const b = $('team-page-health');
     if (b) {
@@ -252,7 +253,7 @@ function drawStatus(data) {
         if (shown && !uncertainAttention) { b.replaceChildren(Object.assign(el('span', 'team-status-dot'), {}), document.createTextNode(text)); b.firstChild.setAttribute('aria-hidden', 'true'); b.setAttribute('aria-label', `Team health: ${text}`); }
     }
     if (s.textContent === text) return; // the same words are not said again
-    s.className = `team-page-status ${uncertainAttention || asleep ? 'unknown' : shown ? 'needs sr-only' : unknown ? 'unknown' : 'well'}`; // Asleep takes the neutral dot, as waiting does
+    s.className = `team-page-status ${stopped || uncertainAttention || asleep ? 'unknown' : shown ? 'needs sr-only' : unknown ? 'unknown' : 'well'}`; // Asleep takes the neutral dot, as waiting does
     const dot = el('span', 'team-status-dot'); dot.setAttribute('aria-hidden', 'true');
     s.replaceChildren(dot, document.createTextNode(text));
 }
@@ -308,12 +309,16 @@ async function readCounts() {
     const t = tasks.value;
     if (t && Number.isFinite(t.total_completed)) S.tasksDone = t.total_completed; // for the header's Finished state (#15304)
     if (t && Number.isFinite(t.total_open)) S.counts.tasks = (state.teamTasksOpen && state.teamTasksOpen.team === String(team) && Number.isFinite(state.teamTasksOpen.n) ? state.teamTasksOpen.n : t.total_open + (t.completed_since || 0)); // the list's own Open count when it has been read, so the tab and the list agree (#12248)
-    if (avail.value && Array.isArray(avail.value.agents)) S.counts.agents = avail.value.agents.filter(a => a.availability !== 'archived').length; // as the sidebar group counts them (#10164)
+    if (avail.value && Array.isArray(avail.value.agents)) {
+        const live = (state.liveSessions || []).filter(s => inTeam(s, team) && !s.archived);
+        S.counts.agents = live.length || avail.value.agents.filter(a => !['archived', 'offline'].includes(a.availability)).length; // the sidebar's live count; ended members stay in the Agents table (#16360)
+    }
     const k = kn.value;
     if (k && k.exists) S.counts.knowledge = ((k.index ? 1 : 0) + (Array.isArray(k.agents) ? k.agents.length : 0)) || null;
     drawStatus(avail.value);
     drawCounts();
 }
+window.addEventListener('kill', () => { if (currentTeamPage()) readCounts(); }); // Kill all updates the header and counts with the sidebar (#16360).
 // A Wake or a Sleep from here: the status is read and drawn at once, not at the next poll (#10359).
 function syncNeedsCount() {
     if (!S.team || !currentTeamPage()) return;

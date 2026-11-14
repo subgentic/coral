@@ -77,6 +77,7 @@ export async function readTeamPause(team = state.boardPageProject, say = false) 
 /** Pause or resume the team on screen, and say it. A team asleep is woken instead (its pause is sleep's own). */
 export async function toggleTeamPause(team = state.boardPageProject) {
     if (!team) return;
+    document.dispatchEvent(new CustomEvent('coral:team-action', { detail: { team } }));
     await readTeamPause(team); // read first, every time: a click acts on the server's pause, not on a copy gone stale (and a first click is never lost for want of one)
     const p = state.teamPause;
     if (p && p.bySleep) { (await importOnce('./team_actions.js')).toggleTeamSleep(team, 'wake'); return; }
