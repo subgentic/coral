@@ -9,19 +9,20 @@ The box is the Windows team's. Their live Coral runs on port 8450 with data in
 never `~\.coral`, never a copy of a `sessions.db`. Do not touch `D:\coral-team-cache`.
 
 Use it for Go packages, anything Windows-specific (paths, process handling) and,
-since Node is installed, a CDP browser suite. Claim `frontier-go` (2 slots, 45 min
+since Node is installed, a CDP browser suite. Claim `frontier-go` (4 slots, 45 min
 lease), run and release in one command, and post START/END naming frontier.
 
 ## Setup
 
 No installs. Read `D:\coral-link-runs\README.txt` first. Node is used from the shared
-folder via PATH (no copy needed). At most 2 runs at once (`frontier-go` slots count).
+folder via PATH (no copy needed). At most 4 runs at once (`frontier-go` has 4 slots, browser runs included). Every Go run sets
+`GOMAXPROCS=8`; chase a timing flake with that test running alone.
 `node_modules` must be copied in, never junctioned (Windows refuses it on this box).
 
 ## Environment for every run
 
 ```bat
-set PATH=D:\coral-team-cache\tools\node;C:\Program Files\Git\cmd;C:\Program Files\Go\bin;%PATH%
+set PATH=C:\Program Files\Git\bin;D:\coral-team-cache\tools\node;C:\Program Files\Git\cmd;C:\Program Files\Go\bin;%PATH%
 set GOCACHE=D:\coral-link-runs\<run>\gocache
 set GOTMPDIR=D:\coral-link-runs\<run>\gotmp
 set GOPATH=D:\coral-link-runs\<run>\gopath
@@ -29,11 +30,16 @@ set GOMODCACHE=D:\coral-link-runs\<run>\gopath\pkg\mod
 set npm_config_cache=D:\coral-link-runs\<run>\npm-cache
 set TEMP=D:\coral-link-runs\<run>\tmp
 set TMP=D:\coral-link-runs\<run>\tmp
+set GOMAXPROCS=8
 set CORAL_TELEMETRY_DISABLED=1
 set CORAL_CDP_PORT_RANGE=9500-9599
 set CHROME=C:\Program Files\Google\Chrome\Application\chrome.exe
 set CHROME_BIN=C:\Program Files\Google\Chrome\Application\chrome.exe
 ```
+
+`C:\Program Files\Git\bin` must come first: the `bash` on the box's PATH is WSL's, and the
+runner's `tools/sync-agent-docs.sh` step fails under it. `CORAL_CDP_PORT_RANGE` keeps the
+runner's server and Chrome DevTools ports inside 9500-9599.
 
 Test servers: `CORAL_DATA_DIR` under `D:\coral-link-runs\<run>\data`, `--cloud-url off`,
 `--no-browser`, a non-default port. Never `%USERPROFILE%\.coral`.
@@ -59,6 +65,9 @@ npm --prefix tests\frontend ci
 npm --prefix tests\frontend run test:cloud
 node tests\frontend\run_cdp_suites.mjs --only <suite>_browser --retries 0
 ```
+
+Proven 2026-11-14 at `devops-16793`: `test:cloud` exit 0, `settings_cli_paths_browser`
+PASS (3.9 s) with server :9574 and Chrome :9591.
 
 A RETRY, FLAKY or TIMEOUT line is red, as everywhere.
 
