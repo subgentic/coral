@@ -27,12 +27,12 @@ const AQ = await importOnce('./automations_queue.js'); // the Queue folder: this
 
 const $ = id => document.getElementById(id);
 const FOLDERS = [
-    { key: 'running', label: 'Running now', noun: ['run', 'runs'], search: 'Search what is running', attention: true },
-    { key: 'failed', label: 'Failed', noun: ['item', 'items'], search: 'Search what failed', attention: true },
-    { key: 'recent', label: 'Recent runs', noun: ['run', 'runs'], search: 'Search recent runs', attention: true },
-    { key: 'jobs', label: 'Jobs', noun: ['job', 'jobs'], search: 'Search jobs' },
-    { key: 'workflows', label: 'Workflows', noun: ['workflow', 'workflows'], search: 'Search workflows' },
-    { key: 'queue', label: 'Queue (experimental)', noun: ['entry', 'entries'], search: 'Search the queue', resources: true },
+    { key: 'running', label: 'Running now', noun: ['run', 'runs'], search: 'Search what is running', attention: true, icon: 'play_arrow' },
+    { key: 'failed', label: 'Failed', noun: ['item', 'items'], search: 'Search what failed', attention: true, icon: 'error_outline' },
+    { key: 'recent', label: 'Recent runs', noun: ['run', 'runs'], search: 'Search recent runs', attention: true, icon: 'history' },
+    { key: 'jobs', label: 'Jobs', noun: ['job', 'jobs'], search: 'Search jobs', icon: 'schedule' },
+    { key: 'workflows', label: 'Workflows', noun: ['workflow', 'workflows'], search: 'Search workflows', icon: 'account_tree' },
+    { key: 'queue', label: 'Queue (experimental)', noun: ['entry', 'entries'], search: 'Search the queue', resources: true, icon: 'queue' },
 ];
 const folderOf = key => FOLDERS.find(f => f.key === key) || null;
 const routeOf = (folder, id, run) => ({ view: 'automations', folder, ...(id ? { id } : {}), ...(run ? { run } : {}) });
@@ -71,9 +71,9 @@ const usedByWords = i => (i.usedBy ? `${i.usedBy} job${i.usedBy === 1 ? '' : 's'
 const countOf = key => (key === 'recent' ? AR.unreadCount() : key === 'queue' ? AQ.queueCount() : ITEMS[key]().length); // Recent runs counts the runs not opened yet, the others their rows
 
 // ── The folders ──────────────────────────────────────────────────────────
-const sections = () => [{ title: 'Needs attention', items: FOLDERS.filter(f => f.attention).map(f => ({ key: f.key, label: f.label, count: countOf(f.key), alert: f.key === 'failed' })) },
-    { title: 'Library', items: FOLDERS.filter(f => !f.attention && !f.resources).map(f => ({ key: f.key, label: f.label, count: countOf(f.key) })) },
-    { title: 'Resources', items: FOLDERS.filter(f => f.resources).map(f => ({ key: f.key, label: f.label, count: countOf(f.key) })) }];
+const sections = () => [{ title: 'Needs attention', items: FOLDERS.filter(f => f.attention).map(f => ({ key: f.key, label: f.label, icon: f.icon, count: countOf(f.key), alert: f.key === 'failed' })) },
+    { title: 'Library', items: FOLDERS.filter(f => !f.attention && !f.resources).map(f => ({ key: f.key, label: f.label, icon: f.icon, count: countOf(f.key) })) },
+    { title: 'Resources', items: FOLDERS.filter(f => f.resources).map(f => ({ key: f.key, label: f.label, icon: f.icon, count: countOf(f.key) })) }];
 function renderNav(force = false) {
     const list = $('automations-nav-list');
     if (!list) return;
@@ -84,6 +84,7 @@ function renderNav(force = false) {
     if (folders && list.contains(folders)) VL.update(folders, { sections: sections(), current: folder });
     else { folders = VL.build({ id: 'automations-folders', label: 'Automations folders', sections: sections(), current: folder, onPick: pickFolder }); list.replaceChildren(folders); }
     setHidden(document.querySelector('.sidebar-header[data-header="automations"] [data-group-toggle]'), true); // folders do not fold: the collapse-all button has nothing to fold
+    importOnce('./sidebar_folder_rail.js').then(m => m.drawFolderRail('automations', 'Automations', sections().flatMap(s => s.items), folder, pickFolder)).catch(() => {}); // the collapsed rail's icons (#15820)
     refreshGroupTable('automations');
 }
 function pickFolder(key) { if (folderOf(key)) go(routeOf(key)); }
