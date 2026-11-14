@@ -11,7 +11,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
     const { client, Page, Emulation, ev, waitFor } = await connect();
     const shot = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const S = `(window.__coralStatic || '/static/')`;
-    const GROUP_TITLES = ['Needs attention', 'Files', 'History'];
+    const GROUP_TITLES = ['Your Inbox', 'Your teams'];
     // the sidebar's first groups as [title, name, name, title, name ...], up to the first group that is not one of the three (the chat folders and boards follow)
     const sidebar = () => ev(`(() => { const nav = [...document.querySelectorAll('nav.view-list-nav')].find(n => [...n.querySelectorAll('.view-list-name')].some(e => e.textContent === 'Needs you')); if (!nav) return null;
         const out = []; for (const e of nav.querySelectorAll('.view-list-title, .view-list-name')) { if (e.classList.contains('view-list-title') && !${JSON.stringify(GROUP_TITLES)}.includes(e.textContent.trim())) break; out.push(e.textContent.trim()); } return out; })()`);
@@ -30,7 +30,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         console.log('1. Local: Needs attention (Needs you, Tasks, Goals, Saved), Files (Artifacts), History (Activity)');
         await open();
         const local = await sidebar();
-        assert.deepEqual(local, ['Needs attention', 'Needs you', 'Tasks', 'Goals', 'Saved', 'Files', 'Artifacts', 'History', 'Activity'], JSON.stringify(local));
+        assert.deepEqual(local, ['Your Inbox', 'Needs you', 'Saved for later', 'Activity', 'Your teams', 'Goals', 'Tasks', 'Artifacts'], JSON.stringify(local));
         await shot('hub-inbox-sidebar-local');
         console.log('   ✓');
 
@@ -38,8 +38,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false, inbox: 'native' });
         await open();
         const hub = await sidebar();
-        assert.deepEqual(hub, ['Needs attention', 'Needs you', 'Tasks', 'Goals', 'Saved', 'Files', 'Artifacts'], JSON.stringify(hub));
-        assert.ok(!hub.includes('Saved for later'), 'the word is Saved, as on a computer');
+        assert.deepEqual(hub, ['Your Inbox', 'Needs you', 'Saved for later', 'Your teams', 'Goals', 'Tasks', 'Artifacts'], JSON.stringify(hub));
+        assert.ok(hub.includes('Saved for later'), 'the label matches the local sidebar');
         await shot('hub-inbox-sidebar-hub');
         console.log('   ✓');
 

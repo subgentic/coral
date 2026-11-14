@@ -42,7 +42,7 @@ const fs = require('node:fs');
                 await waitFor(`!!document.querySelector('#nav-more-menu .nav-drawer-folder')`, 'the drawer', 8000);
                 let d = await drawer();
                 const names = d.rows.map(r => r.label);
-                check(`${label}: the drawer lists every Inbox folder: Needs you, Tasks, Goals, Saved, Artifacts, Activity, the chats`, ['Needs you', 'Tasks', 'Goals', 'Saved', 'Artifacts', 'Activity', 'All chats'].every(n => names.includes(n)), JSON.stringify(names));
+                check(`${label}: the drawer lists every Inbox folder: Needs you, Tasks, Goals, Saved, Artifacts, Activity, the chats`, ['Needs you', 'Saved for later', 'Activity', 'Goals', 'Tasks', 'Artifacts', 'All chats'].every(n => names.includes(n)), JSON.stringify(names));
                 check(`${label}: the open folder is marked, alone`, d.rows.filter(r => r.current).map(r => r.label).join() === 'Needs you', JSON.stringify(d.rows.filter(r => r.current)));
                 check(`${label}: Needs you shows its count`, /2/.test((d.rows.find(r => r.label === 'Needs you') || {}).count), JSON.stringify(d.rows.find(r => r.label === 'Needs you')));
                 const semantics = await ev(`(() => { const m = document.getElementById('nav-more-menu'); return { headings: [...m.querySelectorAll('.nav-drawer-head, .nav-drawer-group')].map(h => ({ role: h.getAttribute('role'), focus: h.tabIndex })), names: [...m.querySelectorAll('.nav-drawer-folder')].filter(b => b.querySelector('.nav-drawer-count')).map(b => ({ label: b.querySelector('.nav-drawer-label').textContent, name: b.getAttribute('aria-label') })) }; })()`);

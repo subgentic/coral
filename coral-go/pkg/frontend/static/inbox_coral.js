@@ -88,14 +88,14 @@ export async function artifactLinkPolicy(text, server) { // server: the one the 
 /** The adapter for this Coral (the Operator's own, on this computer). */
 export const coralInboxAdapter = {
     contract: INBOX_CONTRACT,
-    async listTasks() {
+    async listTasks({ all = false } = {}) {
         const hub = isCloud() && nativeTasks();
-        const q = new URLSearchParams({ ...(hub ? {} : { assigned_to: 'Operator' }), fields: FIELDS + (hub ? ',assigned_to,parked_reason,parked_until' : ''), sort: 'updated_at', order: 'desc', limit: '100' });
-        for (const s of [...OPEN_STATUSES, ...(hub ? ['draft'] : [])]) q.append('status', s);
+        const q = new URLSearchParams({ ...(hub || all ? {} : { assigned_to: 'Operator' }), fields: FIELDS + (hub || all ? ',assigned_to,parked_reason,parked_until' : ''), sort: 'updated_at', order: 'desc', limit: '100' });
+        for (const s of all ? [] : [...OPEN_STATUSES, ...(hub ? ['draft'] : [])]) q.append('status', s);
         let rows = await inboxRows(`/api/board/tasks?${q}`, 'tasks', hub);
         taskReadFailed = !!inboxRows.failed;
         tasksCapped = Object.values(rows.reduce((out, row) => (out[row.server] = (out[row.server] || 0) + 1, out), {})).some(n => n >= 100);
-        if (hub) rows = rows.filter(t => String(t.assigned_to || '').replace(/^@/, '').toLowerCase() === 'operator' || t.status === 'review_pending');
+        if (hub && !all) rows = rows.filter(t => String(t.assigned_to || '').replace(/^@/, '').toLowerCase() === 'operator' || t.status === 'review_pending');
         for (const task of rows) if (hub) rememberReply(task.board_id, task);
         return rows.map(t => ({ id: t.id, server: t.server, project: t.board_id, board: t.board_label || keyLabel(t.board_id), title: t.title, priority: t.priority, status: t.status,
             assigned_to: t.assigned_to, parked_reason: t.parked_reason, parked_until: t.parked_until, created_by: t.created_by, created_at: t.created_at, updated_at: t.updated_at, revision: t.revision, artifact_count: t.artifact_count,

@@ -22,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const original = window.fetch; window.fetch = (url, options) => {
             const u = new URL(String(url), location.href);
-            if (u.pathname === '/api/board/tasks' && u.searchParams.get('assigned_to') === 'Operator') return Promise.resolve(new Response(JSON.stringify({ tasks: ${JSON.stringify(tasks)} }), { headers: { 'Content-Type': 'application/json' } }));
+            if (u.pathname === '/api/board/tasks') return Promise.resolve(new Response(JSON.stringify({ tasks: ${JSON.stringify(tasks)} }), { headers: { 'Content-Type': 'application/json' } }));
             return original(url, options);
         }; })();` });
         for (const width of [1280, 390]) {

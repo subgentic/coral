@@ -25,11 +25,11 @@ const BOARD = `qa-forme-${Date.now() % 100000}`;
         await waitFor(`document.querySelector('.top-nav-tab.active')?.dataset.arg === 'hub-inbox'`, 'the Inbox tab', { timeout: 8000 });
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`);
         await waitFor(`document.getElementById('group-table-view')?.dataset.group === 'hub-inbox:tasks'`, 'the Tasks folder', { timeout: 8000 });
-        const t = await ev(`(() => { const v = document.getElementById('group-table-view'); return { text: v.textContent.replace(/\\s+/g, ' '), line: (v.querySelector('.empty-state-line, .empty-state') || {}).textContent || '', hint: (v.querySelector('.empty-state-hint') || {}).textContent || '', rows: v.querySelectorAll('tbody .dt-primary').length }; })()`);
-        assert.equal(t.rows, 0, 'a task assigned to the Orchestrator is not one assigned to the Operator: ' + JSON.stringify(t));
-        assert.doesNotMatch(t.text, /to you or to your agents/, 'the empty state does not promise the agents\' tasks: ' + t.text);
-        assert.match(t.text, /No tasks assigned to you/, 'it says what the folder holds: ' + t.text);
-        assert.match(t.text, /team's Tasks tab/, 'and where the agents\' tasks are: ' + t.text);
-        console.log('PASS Inbox > Tasks says it lists the tasks assigned to you, and points to the team\'s Tasks tab for the agents\'');
+        await waitFor(`document.getElementById('group-table-view')?.textContent.includes('Say hello to the team')`, 'agent task in the shared Inbox');
+        const text = await ev(`document.getElementById('group-table-view').textContent`);
+        assert.match(text, /Say hello to the team/, 'tasks assigned to agents are included');
+        await ev(`[...document.querySelectorAll('#group-table-view button')].find(b => b.textContent.includes('Assigned to me')).click();true`);
+        await waitFor(`!document.getElementById('group-table-view')?.textContent.includes('Say hello to the team')`, 'Assigned to me excludes agent task');
+        console.log('PASS Inbox Tasks includes agent tasks; Assigned to me keeps the owner-only view');
     } finally { await removeBoards(ev, [BOARD]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e && e.message || e); process.exit(1); });

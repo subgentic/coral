@@ -70,10 +70,10 @@ const AGENTS = (waiting) => waiting ? [
             await setAgents(true);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`!document.querySelector('${pane}').hidden && document.querySelectorAll('${attn}').length === 4`, at + 'the Inbox pane', 10000);
-            await waitFor(`document.querySelector('${pane} .view-list-item[data-key="tasks"] .view-list-count').textContent === '3' && document.querySelector('${pane} .view-list-item[data-key="saved"] .view-list-count').textContent === '2'`, at + 'the counts', 10000);
+            await waitFor(`document.querySelector('${pane} .view-list-item[data-key="saved"] .view-list-count').textContent === '2'`, at + 'the counts', 10000);
 
-            assert.deepEqual(await ev(`[...document.querySelectorAll('${attn} .view-list-name')].map(e => e.textContent)`), ['Needs you', 'Tasks', 'Goals', 'Saved'], at + 'the folders (#7785)');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('${attn} .view-list-count')].map(e => e.textContent)`), ['2', '3', '0', '2'], at + 'with their counts (Goals has its own now: none open in this world)');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${attn} .view-list-name')].map(e => e.textContent)`), ['Needs you', 'Saved for later', 'Goals', 'Tasks'], at + 'the folders (#7785)');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${attn} .view-list-count')].map(e => e.textContent)`), ['2', '2', '0'], at + 'with their counts (Goals has its own now: none open in this world)');
             assert.equal(await ev(`document.querySelectorAll('${pane} li.sb-row, ${pane} .sgroup-header').length`), 0, at + 'the pane lists folders only: the rows are the table\'s');
             if (!mobile) assert.equal(await ev(`Math.round(document.querySelector('${pane} .view-list-item').getBoundingClientRect().height) >= 36`), true, at + 'a folder is at least 36 px high');
             if (!mobile) assert.deepEqual(await ev(`(() => { const t = document.querySelector('${pane} .view-list-title'), n = document.querySelector('${pane} .view-list-item .view-list-icon'); const left = e => { const r = document.createRange(); r.selectNodeContents(e); return Math.round(r.getBoundingClientRect().left); }; return [left(t), left(n)]; })()`).then(([t, n]) => Math.abs(t - n) <= 1), true, at + 'the section title starts at the folders\' icon column (#8866)');
@@ -129,7 +129,7 @@ const AGENTS = (waiting) => waiting ? [
             assert.equal(await ev(`document.querySelector('${pane} .sidebar-search-input').getAttribute('aria-label')`), 'Search tasks', at + 'the search is named for Tasks now');
             // the one task row (#7737): a table on a desktop (State, Task, Team, Updated), the two-line column on a phone; one word set for the state (the Inbox's "Open" is Queued)
             const wide = await ev(`!document.querySelector('#group-table-view .dt-box').classList.contains('dt-folded')`);
-            if (wide) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th')].map(h => h.textContent.replace(/[↑↓↕]/g, '').trim()).filter(Boolean)`), ['State', 'Task', 'Team', 'Updated'], at + 'State, Task, Team, Updated (no Priority, #8784)');
+            if (wide) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th')].map(h => h.textContent.replace(/[↑↓↕]/g, '').trim()).filter(Boolean)`), ['State', 'Task', 'Who', 'Team', 'Updated'], at + 'State, Task, Team, Updated (no Priority, #8784)');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr')].map(r => [r.querySelector('.dt-primary').textContent, r.querySelector('.dt-state').textContent, getComputedStyle(r.querySelector('td[data-key="team"]')).display === 'none' ? '' : r.querySelector('td[data-key="team"]').textContent].join('|'))`),
                 wide ? ['Review the release plan|Queued|team-a', 'Write the release notes|In progress|team-a', 'Check the installer|Blocked|team-b'] : ['Review the release plan|Queued|', 'Write the release notes|In progress|', 'Check the installer|Blocked|'], at + 'rows in order, with no Priority column (#8784)');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the tasks table is on the scale');
