@@ -20,14 +20,19 @@ const { coralReady } = require('./helpers/wait');
             await coralReady(ev, 'startup', 'liveList', 'settings');
             const open = async group => { await ev(`(async () => { await window.showSettingsModal(${JSON.stringify(group)}); return true; })()`); await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'Settings'); };
 
-            console.log(`1. (${w}) Agents: defaults, models, switches, then the CLI paths`);
+            console.log(`1. (${w}) Providers: a card each, model, thinking, then the Advanced fold; Agents: defaults, then the switches`);
+            await open('providers');
+            const rowNames = pane => ev(`[...document.querySelectorAll('#settings-pane-${pane} .sv-row, #settings-pane-${pane} .prov-card-title')].map(r => { const c = (r.querySelector('.sv-label, .sv-heading, dt label, dt') || (r.matches('.prov-card-title') ? r : document.createElement('i'))).cloneNode(true); return c.textContent.trim().replace(/\\s+/g, ' ').slice(0, 40); })`).then(l => l.filter(Boolean)); // fields, headings, card titles and the live parts, in page order
+            const prov = await rowNames('providers');
+            const rows = ['Default model', 'Default thinking', 'Orchestrator model', 'Orchestrator thinking', 'CLI path'];
+            const want = ['Claude', ...rows, 'Codex', ...rows, 'Antigravity', ...rows, 'Pi', ...rows];
+            assert.deepEqual(prov.slice(0, want.length), want, JSON.stringify(prov)); assert.ok(prov.includes('Custom models'), 'Custom models follow the cards');
             await open('agents');
-            const names = await ev(`[...document.querySelectorAll('#settings-pane-agents .sv-row')].map(r => { const c = (r.querySelector('.sv-label, .sv-heading, dt label, dt') || document.createElement('i')).cloneNode(true); return c.textContent.trim().replace(/\\s+/g, ' ').slice(0, 40); })`).then(l => l.filter(Boolean)); // fields, headings and the live parts (Custom models, CLI paths) in page order
-            assert.deepEqual(names.slice(0, 26), ['Default models', 'Claude', 'Codex', 'Antigravity', 'Pi', 'Custom models', 'Custom permission modes', 'Defaults', 'Default permission mode', 'Default working directory', 'Default thinking', 'Codex default thinking', 'Antigravity default thinking', 'Pi default thinking', 'Claude Orchestrator model', 'Claude Orchestrator thinking', 'Codex Orchestrator model', 'Codex Orchestrator thinking', 'Antigravity Orchestrator model', 'Antigravity Orchestrator thinking', 'Pi Orchestrator model', 'Pi Orchestrator thinking', 'Claude CLI path', 'Codex CLI path', 'Antigravity CLI path', 'Pi CLI path'], JSON.stringify(names)); // Default models open the tab (#10526); a thinking row for every CLI that takes levels and the Orchestrator's model and thinking for each (#13899); the CLI paths fold sits under Defaults (#9955); Custom permission modes sits after Custom models (#15950)
-            const cli = names.findIndex(n => /CLI path$/.test(n)); // the CLI paths are four fields now (Claude, Codex, Antigravity, Pi), not one live part
-            assert.ok(cli === 22 && names.slice(cli, cli + 4).every(n => /CLI path$/.test(n)) && !names.slice(cli + 4).some(n => /CLI path$/.test(n)), 'the CLI paths come right under Defaults, no longer last (#9955): ' + JSON.stringify(names));
-            assert.ok(names.slice(cli + 4).length >= 4 && names.slice(cli + 4).includes('Behaviour') && names.slice(cli + 4).every(n => !/CLI path$/.test(n)), 'the models and the switches come after the paths: ' + JSON.stringify(names));
-            await ev(`(() => { for (const id of ['settings-working-dir', 'settings-cli-path-claude', 'settings-cli-path-codex', 'settings-cli-path-agy', 'settings-cli-path-pi']) { const e = document.getElementById(id); if (e) e.value = id === 'settings-working-dir' ? '/work/project' : ''; } return true; })()`); // for the picture only (the dialog is closed unsaved): the test server's own folders are not shown
+            const names = await rowNames('agents');
+            assert.deepEqual(names.slice(0, 4), ['Custom permission modes', 'Defaults', 'Default permission mode', 'Default working directory'], 'Agents opens with the defaults, no model or CLI rows: ' + JSON.stringify(names));
+            assert.ok(names.includes('Behaviour') && !names.some(n => /CLI path$|Orchestrator|default thinking$/i.test(n)), 'the switches follow, the provider rows are gone: ' + JSON.stringify(names));
+            await open('providers');
+            await ev(`(() => { for (const id of ['settings-cli-path-claude', 'settings-cli-path-codex', 'settings-cli-path-agy', 'settings-cli-path-pi']) { const e = document.getElementById(id); if (e) e.value = ''; } return true; })()`); // for the picture only (the dialog is closed unsaved): the test server's own folders are not shown
             await shot('agents-order', w);
             await ev(`window.hideSettingsModal(true); true`); // the folders above were edited for the picture: this close discards them
 

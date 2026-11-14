@@ -231,15 +231,15 @@ export function _fillApiKey() {
 
 /** The CLI paths are the way out of "command not found": when Coral cannot find the default agent's CLI the disclosure is already open, with the fields on screen (#7041). Silent on any failure. */
 function openCliPathsWhenMissing(type) {
-    const details = document.querySelector('#settings-modal #settings-cli-paths');
+    const key = { gemini: 'agy', antigravity: 'agy' }[type] || type;
+    const details = document.querySelector(`#settings-modal #settings-provider-advanced-${key}`);
     if (!details || details.open) return;
     fetch(`/api/system/cli-check?type=${encodeURIComponent(type)}`).then(r => r.ok ? r.json() : null).then(d => {
         if (!d || typeof d.found !== 'boolean') return;
-        if (!d.found) details.open = true;
+        if (!d.found) { details.open = true; const card = document.getElementById(`settings-provider-${key}`); if (card && card.dataset.state !== 'installed') card.dataset.state = 'setup'; } // the default agent's CLI is the way out of "command not found": its card stays open
         const sum = details.querySelector(':scope > summary'); if (!sum) return;
-        const name = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', gemini: 'Antigravity', pi: 'Pi' }[type] || type;
         let note = sum.querySelector('.sv-fold-note'); if (!note) { note = document.createElement('span'); note.className = 'sv-fold-note'; sum.append(note); }
-        note.textContent = ` · ${name} ${d.found ? 'found' : 'not found'}`; // the closed row says it, so nobody has to open it to know (#9955)
+        note.textContent = ` · CLI ${d.found ? 'found' : 'not found'}`; // the closed row says it, so nobody has to open it to know (#9955)
     }).catch(() => {});
 }
 
@@ -277,7 +277,8 @@ export function _fillCliAndModels(s) {
     const picks = () => importOnce('./settings_model_pick.js').then(m => m.syncModelPicks()).catch(() => {}); // each box is a dropdown of the models with Other… behind it (#10000)
     picks();
     // On the hub the Default Models rows are hidden (machine settings), and the hub has no model catalog of its own to ask.
-    if (!isCloud()) whenPaneShown('settings-pane-agents', 'custommodels', () => importOnce('./custom_models.js').then(m => m.initCustomModels()).catch(() => {})); // the custom models list (#5480): hidden when this server has no such route
+    if (!isCloud()) whenPaneShown('settings-pane-providers', 'providercards', () => importOnce('./settings_providers.js').then(m => m.initProviderCards()).catch(() => {})); // the cards of providers this computer does not have fold to one line (ST4)
+    if (!isCloud()) whenPaneShown('settings-pane-providers', 'custommodels', () => importOnce('./custom_models.js').then(m => m.initCustomModels()).catch(() => {})); // the custom models list (#5480): hidden when this server has no such route
     if (!isCloud()) importOnce('./custom_modes.js').then(m => m.initCustomModes()).catch(() => {}); // the custom permission modes (#15950): hidden when this server has no such route
     if (!isCloud()) _getAgentModels().then(models => {
         // _getAgentModels swallows errors and resolves with {} on failure; on
