@@ -55,6 +55,7 @@ func (h *SessionsHandler) ResetTeam(w http.ResponseWriter, r *http.Request) {
 		Thinking       *string
 		Tools          *string
 		PermissionMode *string
+		LiveMode       string // the mode the agent is in now when Shift+Tab changed it inside Claude, else "" (liveClaudeMode, #16523)
 		OldSessionID   string // the session being replaced: the Operator's keep-Full-access choice moves from it to the new one (#14085)
 		KeepFull       bool
 	}
@@ -71,7 +72,13 @@ func (h *SessionsHandler) ResetTeam(w http.ResponseWriter, r *http.Request) {
 				dn = metaName
 			}
 		}
+		var storedFlags []string
+		if s.Flags != nil && *s.Flags != "" {
+			json.Unmarshal([]byte(*s.Flags), &storedFlags)
+		}
+		liveMode := h.liveClaudeMode(s, ptr.Value(s.PermissionMode), storedFlags)
 		configs = append(configs, agentConfig{
+			LiveMode:       liveMode,
 			DisplayName:    dn,
 			WorkingDir:     s.WorkingDir,
 			AgentType:      s.AgentType,
@@ -163,7 +170,11 @@ func (h *SessionsHandler) ResetTeam(w http.ResponseWriter, r *http.Request) {
 			storedPermMode = *cfg.PermissionMode
 		}
 		cleanFlags := stripAgentPermissionFlags(flags)
-		if carried, _ := agent.SplitPermissionFlags(flags); caps.IsEmpty() && len(carried) > 0 {
+		if caps.IsEmpty() && cfg.LiveMode != "" {
+			storedPermMode = cfg.LiveMode // Shift+Tab inside Claude changed the mode: the team starts again in the mode it was in (#16523)
+			cleanFlags = append(cleanFlags, agent.PermissionFlagsForAgent(cfg.AgentType, storedPermMode)...)
+			log.Printf("[reset-team] agent %s was in %s when reset: it starts in that mode", displayName, cfg.LiveMode)
+		} else if carried, _ := agent.SplitPermissionFlags(flags); caps.IsEmpty() && len(carried) > 0 {
 			cleanFlags = append(cleanFlags, carried...) // what the agent was started with, as it was (#6423)
 		} else if caps.IsEmpty() && storedPermMode != "" && storedPermMode != "default" {
 			cleanFlags = append(cleanFlags, agent.PermissionFlagsForAgent(cfg.AgentType, storedPermMode)...)
