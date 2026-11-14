@@ -312,3 +312,6 @@ const GoalDoneRead = "goal_done_read"
 
 // GoalDoneQuietMinutes is the setting for how long a goal whose tasks are all done waits after its latest task completion before it is the Operator's "Goal looks done" item (#12161): 15 by default, 0 for none.
 const GoalDoneQuietMinutes = "goal_done_quiet_minutes"
+
+// GoalClosedDismissed is the setting that lists the goals-closed-by-agent the Operator dismissed from Needs you (#16781): each entry is "team|goalID|closed_at".
+const GoalClosedDismissed = "goal_closed_dismissed"

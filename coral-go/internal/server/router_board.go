@@ -90,6 +90,13 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 		}
 		return routes.GoalDoneReadFrom(st)
 	})
+	boardHandler.SetGoalClosedDismissed(func(ctx context.Context) []string {
+		st, err := sessStore.GetSettings(ctx)
+		if err != nil {
+			return nil
+		}
+		return routes.GoalClosedDismissedFrom(st)
+	})
 	boardHandler.SetInboxSettings(func(ctx context.Context) (map[string]string, error) { // the switches of what reaches Needs you (#12144)
 		return sessStore.GetSettings(ctx)
 	})
