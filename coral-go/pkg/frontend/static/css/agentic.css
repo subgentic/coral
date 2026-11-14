@@ -1965,7 +1965,7 @@ body.panel-dragging .agentic-state {
 /* The collapsible list bar (#5293): the agents tab's pattern: the search, the count, one icon for Filters and Sort (a dot on it while anything is on) and, for the artifact lists, one for expand or collapse all */
 .list-bar-toggle, .list-bar-expand-all { position: relative; flex: none; }
 .list-bar-toggle .material-icons { font-size: var(--icon-size); }
-.list-bar-toggle-labeled { display: inline-flex; align-items: center; gap: 4px; padding: 0 8px; }
+.list-bar-toggle-labeled { display: inline-flex; align-items: center; gap: 4px; padding: 0 8px; margin: 0; }
 .list-bar-toggle-labeled .material-icons { font-size: var(--icon-size); }
 .list-bar-toggle-text { font-size: var(--fs-sm); white-space: nowrap; }
 .list-bar-collapsible .list-bar-search-wrap { flex: 1 1 8em; min-width: 0; }

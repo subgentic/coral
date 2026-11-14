@@ -123,7 +123,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         assert.equal((await doneRows()).length, 1, 'listed once');
         assert.ok(await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).classList.contains('dt-read')`), 'the opened row is drawn read (needsUnread, QA #11983)');
         assert.equal(await ev(`(document.querySelector('${T} .session-group-count') || {}).textContent`), '0', 'the heading counts what the badge counts: nothing unread (needsUnread)');
-        assert.ok(await ev(`[...document.querySelectorAll('button.goals-chip')].some(e => /^All 0 of 1$/.test(e.textContent.trim()))`), 'the All pill says 0 unread of the 1 listed (needsUnread)');
+        assert.ok(await ev(`[...document.querySelectorAll('button.goals-chip')].some(e => /^All 1$/.test(e.textContent.trim()))`), 'the All pill says 1 (every visible row, #16734)');
         const readSaved = JSON.parse((await root('GET', '/api/settings')).json.settings.goal_done_read);
         assert.equal(readSaved.length, 1);
         assert.match(readSaved[0], new RegExp(`^${B}\\|${gid}\\|2\\|\\d{4}-\\d\\d-\\d\\dT`), 'kept on the machine at the total and the last change it was opened at: ' + readSaved[0]);
