@@ -25,7 +25,7 @@ func TestHubAutoAcceptDefaultsOnAndAnExplicitOffStaysOff(t *testing.T) {
 	assert.True(t, HubAutoAcceptAllowed(map[string]string{}), "a fresh install: on")
 	assert.False(t, HubAutoAcceptAllowed(map[string]string{AllowHubAutoAcceptSetting: "false"}), "the owner turned it off: it stays off")
 	assert.True(t, HubAutoAcceptAllowed(map[string]string{AllowHubAutoAcceptSetting: "true"}), "turned on")
-	assert.Contains(t, hubAutoAcceptOff, "Settings > Network and Hub", "the refusal says where the switch is")
+	assert.Contains(t, hubAutoAcceptOff, "Settings > Coral Hub and remote access", "the refusal says where the switch is")
 	assert.Contains(t, hubAutoAcceptOff, `"Coral Hub can turn on auto-accept"`)
 }
 
