@@ -7,7 +7,7 @@ const { connect } = require('./agent_view_harness');
 const { install: installNA, N, openNewAgent, stubModels } = require('./helpers/new_agent');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
-const WORD_BUDGET = Number(process.env.PERSONA_WORD_BUDGET || 52); // 42 before #15951's start command line ("Start command", Copy and the command: seven visible words at 1280, ten at 390 where "Show full command" is shown too) joined the recap: it is the Operator's ask and a command, not prose, so the budget grew by exactly its words at the wider count; 38 before #15719's flags line ("Adds ... to the command.", four words) joined the step: that line is the Operator's ask, so the budget grew by exactly its words;
+const WORD_BUDGET = Number(process.env.PERSONA_WORD_BUDGET || 53); // 53 on the one-page New agent (#15911, merged with #16942's start command words): the whole page is counted, at its widest 390 px, 50 at 1280; the 52 below was the three-step Persona step's, one word fewer. 42 before #15951's start command line ("Start command", Copy and the command: seven visible words at 1280, ten at 390 where "Show full command" is shown too) joined the recap: it is the Operator's ask and a command, not prose, so the budget grew by exactly its words at the wider count; 38 before #15719's flags line ("Adds ... to the command.", four words) joined the step: that line is the Operator's ask, so the budget grew by exactly its words;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
