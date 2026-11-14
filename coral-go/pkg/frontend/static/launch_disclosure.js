@@ -1,11 +1,17 @@
 /* The launch-default disclosure is owned by the viewed computer. Only its owner
  * may acknowledge it; a dialog refusal starts nothing until that write succeeds. */
-import { serverFetch, normServer, isCloud } from './server_base.js';
+import { serverFetch, normServer, isCloud, sessionServer } from './server_base.js';
 import { showToast } from './utils.js';
 import { showConfirmModal } from './confirm_dialog.js';
 import { announceNotice } from './notifications.js';
 import { browserLocal } from './safe_storage.js';
+import { state } from './state.js';
 let readGeneration = 0;
+const hasLocalAgent = () => (state.liveSessions || []).some(session => sessionServer(session) === 'local');
+let bannerEligible = hasLocalAgent();
+window.addEventListener('coral:live-list-rendered', () => {
+    if (hasLocalAgent() !== bannerEligible) refreshLaunchDisclosure();
+});
 const HINT_KEY = 'coral-launch-notice'; // "p|57" or "d|73": this browser last saw the notice unseen, on a phone-sized or a wider screen, at that height (theme_init.js reserves its row before first paint)
 const hint = {
     set(px) { browserLocal.set(HINT_KEY, `${window.innerWidth <= 600 ? 'p' : 'd'}|${Math.max(0, Math.min(999, Math.round(px)))}`); }, // storage that is blocked just means no reserved row
@@ -40,6 +46,7 @@ export async function confirmLaunchDisclosure(server, disclosure) {
 }
 export async function refreshLaunchDisclosure() {
     if (isCloud() || document.body.classList.contains('popout-mode')) { hint.release(); return; }
+    bannerEligible = hasLocalAgent();
     const generation = ++readGeneration;
     try {
         const response = await serverFetch('local', '/api/launch-disclosure', { cache: 'no-store' });
@@ -52,7 +59,7 @@ export async function refreshLaunchDisclosure() {
             line.textContent = disclosure.text;
         }
         const previous = document.getElementById('launch-disclosure-banner');
-        if (disclosure.seen === true) { previous?.remove(); hint.clear(); hint.release(); return; }
+        if (!hasLocalAgent() || disclosure.seen === true) { previous?.remove(); hint.clear(); hint.release(); return; }
         if (disclosure.seen === false && previous?.dataset.disclosureId === disclosure.id) { hint.set(previous.getBoundingClientRect().height); return; } // already drawn (an earlier read): the hint is kept as it is
         if (disclosure.seen !== false) return;
         previous?.remove();

@@ -16,6 +16,10 @@ const BASE=require('./test_base').BASE;
    assert.equal(got[0].text,'New agent','Start your first agent is first');assert.deepEqual(got.filter(a=>a.primary).map(a=>a.text),['New agent'],'one primary action');
    await ev(`import((window.__coralStatic||'/static/')+'launch_disclosure.js').then(m=>m.refreshLaunchDisclosure()).then(()=>true)`);
    assert.equal(await ev(`!!document.getElementById('launch-disclosure-banner')`),false,'no auto-mode banner without any agents');
+   await ev(`window.T.state.liveSessions=[{session_id:'qa-agent',name:'First agent',server:'local'}];window.dispatchEvent(new Event('coral:live-list-rendered'));true`);
+   await waitFor(`!!document.getElementById('launch-disclosure-banner')`,'notice available after first agent');
+   await ev(`window.T.state.liveSessions=[];window.dispatchEvent(new Event('coral:live-list-rendered'));true`);
+   await waitFor(`!document.getElementById('launch-disclosure-banner')`,'notice removed without local agents');
    await ev(`document.querySelector('#group-table-view .inbox-welcome-actions .inbox-main-action').click();true`);
    await waitFor(`document.getElementById('launch-modal')?.getClientRects().length>0`,'New agent opens launch');await ev(`window.hideLaunchModal();true`);
   }

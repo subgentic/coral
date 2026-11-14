@@ -639,7 +639,7 @@ function goalDoneActions(g) {
 /** A welcome item's actions (#11443): its own action, and a quiet Dismiss for all but the welcome itself. */
 function welcomeActions(w) {
     const box = DT.el('div', 'inbox-review-actions inbox-welcome-actions');
-    const go = DT.el('button', 'btn btn-small btn-primary', w.go); go.type = 'button';
+    const go = DT.el('button', `btn btn-small ${w.id === 'agent' ? 'btn-primary' : 'btn-quiet'}`, w.go); go.type = 'button';
     go.classList.add('inbox-main-action'); go.setAttribute('aria-label', `${w.go}: ${w.title}`);
     go.addEventListener('click', () => (w.run ? w.run() : runWelcome(w.id)));
     box.append(go);
