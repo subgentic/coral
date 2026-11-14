@@ -28,7 +28,12 @@ workflow runs, see [Workflows](workflows.md).
 2. Read the body, `workflow.instructions`, required outputs, and upstream
    artifacts returned by the claim. Claim records the prerequisite results.
 3. Use your judgment to accomplish the task and preserve the relevant evidence.
-4. Complete with `--message`; use `--outcome failed` when the work is
+4. Upload every finished deliverable the person will look at (`coral-agent
+   artifact upload <file>`) and post its `coral://` link. Upload the thing
+   itself (the `index.html`, the report), not only a message about it. When
+   the goal asks for review, tag it `--tag "for review" --question "..."`. See
+   [Upload your finished deliverables](artifacts.md#upload-your-finished-deliverables).
+5. Complete with `--message`; use `--outcome failed` when the work is
    unsuccessful. If outputs are required, provide them with `--artifacts`
    using inline content or durable links.
 

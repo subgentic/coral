@@ -15,6 +15,20 @@ Uploading a file lists it in your own **Artifacts** tab right away, and, if you 
 
 Publish with Coral, not on claude.ai: if you publish an artifact on claude.ai (an Artifact tool call, or a claude.ai/artifact link in your reply or a board post), Coral types one reminder into your terminal, once per artifact, to make a Coral artifact instead and post its `coral://` link. It is only a reminder; Coral uploads and posts nothing for you.
 
+## Upload your finished deliverables
+
+When you build something the person will use — an app, a page, a report, a document — upload the main file with `coral-agent artifact upload <file>` and post its `coral://` link on the board. Upload the thing itself (the `index.html`, the `summary.md`, the document), not only a description of it: the person opens and reviews the deliverable, not a message about it. A finished deliverable is shared this way when it is done, without being asked.
+
+**When the goal asks for review**, tag the deliverable "for review" so it appears in the person's Needs you:
+
+```sh
+coral-agent artifact upload index.html \
+  --tag "for review" \
+  --question "Approve the dashboard page?"
+```
+
+Every output the person will look at is uploaded: if the team built a chart page and a summary document, both are uploaded, and every one the goal names for review is tagged. A file that stays only in the changed-files panel is invisible to the person viewing through Coral Hub, and the Artifacts tab is empty until you upload. (The Artifacts tab's empty state tells the person to ask you: "An agent shares a file when it finishes a task with one; you can ask an agent to share a file as an artifact." Do not wait for that ask.)
+
 ## Publish an artifact
 
 1. Upload the file. Coral stores it and returns a durable URI:
