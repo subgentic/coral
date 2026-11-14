@@ -1,8 +1,9 @@
 /* The Branches tab (goal #11): the worktrees of the repository the agent works in, and on a team's page those of every repository its agents work in. Read-only, from the git poller's snapshot
  * (GET .../branches, GET /api/board/<team>/branches: no git runs for this page). Every text from the repository or GitHub (a branch name, the base, the remote) is set with textContent;
  * nothing is a link, and no folder path is shown. A tab reads only while it is open. */
+import { importOnce } from './import_once.js';
 import { state } from './state.js';
-import { serverFetch, serverForSession, boardFetch } from './server_base.js';
+import { serverFetch, serverForSession, boardFetch, splitKey } from './server_base.js';
 import { emptyState } from './dom_write.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('branches.css');
@@ -37,7 +38,7 @@ export async function loadBranches() {
     const overdue = notYet && Date.now() - waiting.since > FIRST_READ_LIMIT_MS;
     if (!data || data.available === false) emptyState(el, 'Branches are not available from this computer.');
     else if (!data.found) emptyState(el, waitingText(overdue));
-    else el.replaceChildren(drawRepo(data, s.session_id));
+    else el.replaceChildren(drawRepo(data, s.session_id, s.board_project || '', serverForSession(s.name, s.session_id)));
     // past the limit the folder is likely not a repository: ask once a minute, so an open tab on it does not start a pass every 15 s (Security's INFO on #531)
     timer = setTimeout(loadBranches, notYet && !overdue ? FIRST_READ_STEPS[Math.min(waiting.tries++, FIRST_READ_STEPS.length - 1)] : REFRESH_MS);
 }
@@ -68,7 +69,7 @@ export async function showTeamBranches(host, team) {
         ? "No branches are available for this team's agents. Check that their folders are Git repositories."
         : overdue ? "Reading the repositories is taking longer than expected. You can use the other tabs while Coral keeps checking."
         : "Reading the repositories… You can use the other tabs while Coral checks.");
-    else host.replaceChildren(...data.repos.map(r => drawRepo(r, '')));
+    else host.replaceChildren(...data.repos.map(r => drawRepo(r, '', splitKey(team).name, splitKey(team).server)));
     // past the limit, ask once a minute like the agent's tab, so a page left open on folders that are not repositories does not start a pass every 15 s (Security's INFO on #531)
     teamTimer = setTimeout(() => { if (host.isConnected && host.offsetParent !== null) showTeamBranches(host, team); }, none && !notGit && !overdue ? FIRST_READ_MS : REFRESH_MS);
 }
@@ -116,7 +117,7 @@ function prLine(pr) {
 }
 
 /** One repository's section: its remote and base, then a row per worktree. currentSid marks the asking agent's own worktree ('' on the team's page). */
-function drawRepo(data, currentSid) {
+function drawRepo(data, currentSid, team, server) {
     const box = document.createElement('section');
     box.className = 'branches-repo';
     if (data.remote) box.append(text('h3', 'branches-remote', `${data.remote.host}/${data.remote.owner}/${data.remote.name}`));
@@ -134,7 +135,20 @@ function drawRepo(data, currentSid) {
         const title = text('div', 'branches-name', name);
         if (w.current) title.append(' ', text('span', 'branches-mark', 'this agent'));
         if (w.main) title.append(' ', text('span', 'branches-mark', 'main worktree'));
-        row.append(title, text('div', 'branches-meta', numbers(w, data.base)));
+        row.append(title);
+        const members = [...(w.agents || [])];
+        if (w.current && !members.some(a => a.session_id === currentSid) && state.currentSession?.session_id === currentSid) members.unshift(state.currentSession);
+        const detail = text(members.length ? 'button' : 'div', members.length ? 'btn btn-small branches-changes' : 'branches-meta', numbers(w, data.base));
+        if (members.length) {
+            detail.type = 'button'; detail.setAttribute('aria-label', `View changes on ${name}: ${numbers(w, data.base)}`);
+            detail.addEventListener('click', async () => {
+                detail.disabled = true;
+                try { const m = await importOnce('./branch_changes.js'); m.openBranchChanges(w, members, team, server); }
+                catch { detail.textContent = 'Could not open changes. Try again.'; }
+                finally { detail.disabled = false; }
+            });
+        }
+        row.append(detail);
         const marks = [];
         if (w.nothing_to_merge) marks.push('no commits left to merge');
         if (w.upstream_gone) marks.push('upstream branch deleted');
