@@ -18,6 +18,7 @@ type BranchesSource interface {
 	For(dir string) (branches.Repo, int, bool)
 	Holds(repo branches.Repo, i int, dir string) bool
 	Same(a, b branches.Repo) bool // the same repository (the team view groups by it)
+	ReadState(dir string) (state string, notGit bool)
 }
 
 // SetBranches wires the snapshot in.
@@ -71,7 +72,11 @@ func (h *SessionsHandler) Branches(w http.ResponseWriter, r *http.Request) {
 	dir := h.resolveWorkdir(agentCtx(r), name, agentType, sessionID)
 	repo, own, ok := h.branches.For(dir)
 	if dir == "" || !ok {
-		writeJSON(w, http.StatusOK, map[string]any{"available": true, "found": false})
+		rs, ng := "pending", false
+		if dir != "" {
+			rs, ng = h.branches.ReadState(dir)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"available": true, "found": false, "read_state": rs, "not_git": ng})
 		return
 	}
 	rows := make([]branchWorktree, len(repo.Worktrees))
@@ -124,14 +129,26 @@ func (h *SessionsHandler) TeamBranches(w http.ResponseWriter, r *http.Request) {
 		rows []branchWorktree
 	}
 	var sections []*section
+	readState := "done"
+	anyDir := false
+	allNotGit := true
 	for _, ls := range lives {
 		if ls.IsArchived == 1 || ls.WorkingDir == "" || ls.BoardName == nil || *ls.BoardName != project {
 			continue
 		}
+		anyDir = true
 		repo, own, ok := h.branches.For(ls.WorkingDir)
 		if !ok || own < 0 {
+			st, ng := h.branches.ReadState(ls.WorkingDir)
+			if st == "pending" {
+				readState = "pending"
+			}
+			if !ng {
+				allNotGit = false
+			}
 			continue
 		}
+		allNotGit = false
 		var sec *section
 		for _, s := range sections {
 			if h.branches.Same(s.repo, repo) {
@@ -155,5 +172,6 @@ func (h *SessionsHandler) TeamBranches(w http.ResponseWriter, r *http.Request) {
 		out = append(out, map[string]any{"base": s.repo.Base, "more": s.repo.More, "unreadable": s.repo.Unreadable, "remote": s.repo.Remote, "remote_unknown": s.repo.RemoteUnknown,
 			"pr_note": s.repo.PRNote, "at": s.repo.At.UTC().Format(time.RFC3339), "worktrees": s.rows})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"available": true, "repos": out})
+	notGit := anyDir && allNotGit && readState == "done"
+	writeJSON(w, http.StatusOK, map[string]any{"available": true, "repos": out, "read_state": readState, "not_git": notGit})
 }
