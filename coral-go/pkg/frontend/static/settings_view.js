@@ -255,13 +255,19 @@ export function mountSettingsView(host, spec) {
         root.classList.add('sv-flat'); // rows only (no nav, no bar): folded by the pane's own width
         const body = node('div', 'sv-body');
         let set = null; // see pane(): a field with fieldset: 'Name' starts a group
+        let card = null; // a heading with card: true starts a card (see below)
         let fold = null; // a heading with fold: true starts a disclosure (closed) that holds the rows after it, up to the next heading: a form's optional part
         for (const g of groups) for (const field of g.fields || []) {
             if (!field.key) continue;
-            if (field.type === 'heading' && field.fold) { fold = node('details', 'disclosure sv-fold'); if (field.id) fold.id = field.id; fold.append(node('summary', '', field.label)); folds.push(fold); body.append(fold); continue; }
-            if (field.type === 'heading') { fold = null; set = null; }
-            if (field.fieldset) { set = node('fieldset', 'sv-fieldset'); set.append(node('legend', 'sv-legend', field.fieldset)); (fold || body).append(set); }
-            const rec = buildRow(field, g); fields.set(field.key, rec); (set || fold || body).append(rec.row);
+            if (field.type === 'heading' && field.card) { // a card (Settings > Providers): a section with its own title that holds the rows after it, and any folds, up to the next card or heading
+                card = node('section', 'prov-card'); if (field.id) card.id = field.id; if (field.provider) card.dataset.provider = field.provider;
+                const head = node('div', 'prov-card-head'); head.append(node('h5', 'prov-card-title', field.label)); card.append(head);
+                fold = null; set = null; body.append(card); continue;
+            }
+            if (field.type === 'heading' && field.fold) { fold = node('details', 'disclosure sv-fold'); if (field.id) fold.id = field.id; fold.append(node('summary', '', field.label)); folds.push(fold); (card || body).append(fold); continue; }
+            if (field.type === 'heading') { fold = null; set = null; card = null; }
+            if (field.fieldset) { set = node('fieldset', 'sv-fieldset'); set.append(node('legend', 'sv-legend', field.fieldset)); (fold || card || body).append(set); }
+            const rec = buildRow(field, g); fields.set(field.key, rec); (set || fold || card || body).append(rec.row);
         }
         inner.append(body);
     } else {

@@ -583,7 +583,7 @@
                 <div class="settings-row" id="settings-tools-folder-row" hidden>
                 <dt class="toggle-dt">
                     <span>Agent tools folder</span>
-                    <span class="toggle-desc">Where agents get coral-board and Coral's hooks.</span>
+                    <span class="toggle-desc">Where agents get coral-board and hooks.</span>
                 </dt>
                 <dd>
                     <div id="settings-tools-folder-status" class="settings-hint sv-help" role="status" data-state="warn"></div>
@@ -613,7 +613,7 @@
                         <div id="settings-inbox-rows"></div>
                     </section>
                     </section>
-                    <section class="settings-pane" id="settings-pane-agents" data-group="agents" data-icon="smart_toy" data-title="Defaults" data-nav-group="Agents" data-hint="Models and agent behaviour" role="tabpanel" aria-labelledby="settings-tab-agents" tabindex="-1" hidden>
+                    <section class="settings-pane" id="settings-pane-agents" data-group="agents" data-icon="smart_toy" data-title="Defaults" data-nav-group="Agents" data-hint="How agents start and behave" role="tabpanel" aria-labelledby="settings-tab-agents" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Defaults</h4>
                         <div id="settings-agents-rows" data-coral-root="{{ .CoralRoot }}"></div>
                         <!-- the live parts of this group (filled by settings_dialog.js, shown or hidden by it) sit here until the rows are drawn, then settings_fields.js moves each into place -->
@@ -628,6 +628,10 @@
                         </button>
                         </div>
                         </div>
+                    </section>
+                    <section class="settings-pane" id="settings-pane-providers" data-group="providers" data-icon="psychology" data-title="Providers" data-nav-group="Agents" data-hint="Models and CLI paths" role="tabpanel" aria-labelledby="settings-tab-providers" tabindex="-1" hidden>
+                        <h4 class="settings-pane-title">Providers</h4>
+                        <div id="settings-providers-rows"></div>
                     </section>
                     <section class="settings-pane" id="settings-pane-chief" data-group="chief" data-icon="chat" data-title="Teams and Chief" data-nav-group="Agents" data-hint="Chief and team controls" role="tabpanel" aria-labelledby="settings-tab-chief" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Teams and Chief</h4>

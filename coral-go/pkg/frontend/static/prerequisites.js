@@ -21,15 +21,16 @@ function blocksLaunch(element, on) {
     element.dispatchEvent(new CustomEvent('cli-blocks-launch', { bubbles: true }));
 }
 const PATH_FIELD = { claude: 'claude', codex: 'codex', pi: 'pi', agy: 'agy', antigravity: 'agy', gemini: 'agy' }; // the Settings field of each CLI (one for Antigravity and Gemini)
-/** A 'Set path' button for a launch that a missing CLI blocks (Mobile and Desktop testers, #10013): it opens Settings > Agents with the CLI paths open and that CLI's field in it, and when Settings is closed again `onClosed` runs (the check again), so the person is back in the dialog with the blocker gone or still named. */
+/** A 'Set path' button for a launch that a missing CLI blocks (Mobile and Desktop testers, #10013): it opens Settings > Providers with that provider's card open and that CLI's field in it, and when Settings is closed again `onClosed` runs (the check again), so the person is back in the dialog with the blocker gone or still named. */
 export function cliPathButton(type, onClosed, stillBlocked = () => false) {
     const field = PATH_FIELD[String(type).toLowerCase()];
     if (!field) return null;
     const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-small btn-primary cli-set-path';
     b.textContent = 'Set path'; b.setAttribute('aria-label', `Set the ${type} CLI path in Settings`);
     b.addEventListener('click', async () => {
-        await window.showSettingsModal?.('agents');
-        const paths = document.getElementById('settings-cli-paths'); if (paths) paths.open = true;
+        await window.showSettingsModal?.('providers');
+        const card = document.getElementById(`settings-provider-${field}`); if (card && card.dataset.state === 'missing') card.dataset.state = 'setup';
+        const paths = document.getElementById(`settings-provider-advanced-${field}`); if (paths) paths.open = true;
         const input = document.getElementById(`settings-cli-path-${field}`); if (input) { input.scrollIntoView({ block: 'center' }); input.focus(); }
         const modal = document.getElementById('settings-modal'); if (!modal || !onClosed) return;
         const watch = new MutationObserver(() => {

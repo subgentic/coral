@@ -9,7 +9,8 @@ const BASE = require('./test_base').BASE;
 
 const GROUPS = {
     general: ['settings-theme', 'settings-group-by-team', 'settings-show-scrollbars', 'settings-terminal-font-size', 'settings-terminal-scrollback', 'settings-fit-pane-width', 'settings-renderer-select'], // ST2b: display controls in Appearance; backend controls in Defaults Advanced.
-    agents: ['settings-permission-mode', 'settings-working-dir', 'settings-cli-path-claude', 'settings-default-model-claude', 'settings-auto-resume', 'settings-auto-goals', 'settings-agent-low-priority', 'settings-agent-type', 'tb-choice'],
+    agents: ['settings-permission-mode', 'settings-working-dir', 'settings-auto-resume', 'settings-auto-goals', 'settings-agent-low-priority', 'settings-agent-type', 'tb-choice'],
+    providers: ['settings-cli-path-claude', 'settings-default-model-claude', 'settings-orchestrator-model-codex'],
     notifications: ['settings-notify-needs-input', 'settings-desktop-notify', 'settings-alert-needs-input', 'settings-alert-reply', 'settings-alert-sound'],
     files: ['settings-file-search-mode', 'settings-file-search-limit', 'settings-git-diff-mode', 'settings-git-poll-interval'],
     cleanup: ['settings-artifact-store-max', 'settings-received-max', 'settings-prune-days', 'settings-retention-enabled', 'settings-terminal-logs-delete'],
@@ -35,12 +36,12 @@ const GROUPS = {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
 
-        console.log('1. Nine groups; each control is in its own group and none is lost');
+        console.log('1. Ten groups; each control is in its own group and none is lost');
         await open('cleanup');
         assert.deepEqual(await shownGroup(), ['cleanup'], 'the group asked for is the one shown');
         await waitFor(`document.activeElement && document.activeElement.id === 'settings-tab-cleanup'`, "focus on the open group's tab, not the first tab");
         const tabs = await ev(`[...document.querySelectorAll('#settings-tabs [role=tab]')].map(t => ({ id: t.id, name: t.querySelector('.settings-tab-name').textContent.trim(), sel: t.getAttribute('aria-selected'), ctl: t.getAttribute('aria-controls'), ti: t.tabIndex }))`);
-        assert.deepEqual(tabs.map(t => t.name), ['Appearance','Notifications','Defaults','Teams and Chief','Updates','Storage and backup','Files and Git','Security and privacy','Coral Hub and remote access']);
+        assert.deepEqual(tabs.map(t => t.name), ['Appearance','Notifications','Defaults','Providers','Teams and Chief','Updates','Storage and backup','Files and Git','Security and privacy','Coral Hub and remote access']);
         assert.deepEqual(tabs.filter(t => t.sel === 'true').map(t => t.id), ['settings-tab-cleanup'], 'one tab selected');
         assert.deepEqual(tabs.filter(t => t.ti === 0).map(t => t.id), ['settings-tab-cleanup'], 'only the selected tab is in the Tab order');
         for (const [g, ids] of Object.entries(GROUPS)) {
@@ -48,8 +49,8 @@ const GROUPS = {
             assert.deepEqual(where, ids.map(() => g), `${g}: every control sits in its pane ${JSON.stringify(where)}`);
         }
         const names = await ev(`[...document.querySelectorAll('#settings-modal .settings-pane')].map(p => document.getElementById(p.getAttribute('aria-labelledby')) ? p.dataset.group : 'unlabelled:' + p.dataset.group)`);
-        assert.equal(names.length, 9); assert.ok(names.every(n => !n.startsWith('unlabelled')), 'each pane is named by its tab: ' + names);
-        console.log('   ✓ 9 sections including update notices, controls where they belong');
+        assert.equal(names.length, 10); assert.ok(names.every(n => !n.startsWith('unlabelled')), 'each pane is named by its tab: ' + names);
+        console.log('   ✓ 10 sections including Providers and update notices, controls where they belong');
 
         console.log('2. The tab list: click, arrow keys, Home and End; the last group is remembered');
         await ev(`document.getElementById('settings-tab-notifications').click(); true`);

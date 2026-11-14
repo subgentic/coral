@@ -36,13 +36,13 @@ const NOTIFICATIONS_FIELDS = [
 const INBOX_FIELDS = [
     { key: 'inbox_always', type: 'notice', render: slot => { const p = document.createElement('p'); p.id = 'settings-inbox-always'; p.className = 'sv-help'; p.textContent = 'Questions and decisions always reach you: an agent waiting on a question, a permission or a plan, a goal or task proposal, a goal that looks done.'; slot.append(p); } },
     { key: 'inbox_kind_file', type: 'toggle', id: 'settings-inbox-file', label: 'Files for review', help: 'A file an agent wants you to read, approve or send back.', default: true },
-    { key: 'inbox_kind_done', type: 'toggle', id: 'settings-inbox-done', label: 'Finished requests', help: '"Done. Does it work for you?" when a request of yours is finished, with what changed.', default: true },
+    { key: 'inbox_kind_done', type: 'toggle', id: 'settings-inbox-done', label: 'Finished requests', help: 'A note that a request of yours is finished, with what changed.', default: true },
     { key: 'inbox_kind_release', type: 'toggle', id: 'settings-inbox-release', label: 'Release summaries', help: 'One page per release: what is new for you and the known issues.', default: true },
     { key: 'inbox_kind_decided', type: 'toggle', id: 'settings-inbox-decided', label: 'Decisions made for you', help: 'What the Orchestrator decided on your behalf, once a day.', default: true },
-    { key: 'inbox_kind_digest', type: 'toggle', id: 'settings-inbox-digest', label: 'Daily digest', help: 'What landed, what is blocked and what waits for you. Coral writes it from the board.', default: true },
+    { key: 'inbox_kind_digest', type: 'toggle', id: 'settings-inbox-digest', label: 'Daily digest', help: 'What landed, what is blocked and what waits for you, written from the board.', default: true },
     { key: 'inbox_teams_title', type: 'heading', id: 'settings-inbox-teams-title', label: 'Included teams' },
-    { key: 'inbox_teams', type: 'notice', render: slot => { const p = document.createElement('p'); p.className = 'sv-help'; p.textContent = 'The switches above apply to the teams ticked here. A team you untick has its optional kinds muted; its questions and decisions still reach you.'; const host = document.createElement('div'); host.id = 'settings-inbox-teams'; host.className = 'settings-inbox-teams'; slot.append(p, host); } },
-    { key: 'inbox_digest_time', type: 'text', id: 'settings-inbox-digest-time', label: 'Time of the daily items', help: 'When the digest is made and the Orchestrator is asked for the day\'s decisions. Hours and minutes, 24 hours.', default: '09:00', attrs: { inputmode: 'numeric', maxlength: '5', placeholder: '09:00', pattern: '([01][0-9]|2[0-3]):[0-5][0-9]', 'aria-label': 'Time of the daily items, HH:MM' } },
+    { key: 'inbox_teams', type: 'notice', render: slot => { const p = document.createElement('p'); p.className = 'sv-help'; p.textContent = 'The switches above apply to the teams ticked here; a team you untick has its optional kinds muted.'; const host = document.createElement('div'); host.id = 'settings-inbox-teams'; host.className = 'settings-inbox-teams'; slot.append(p, host); } },
+    { key: 'inbox_digest_time', type: 'text', id: 'settings-inbox-digest-time', label: 'Time of the daily items', help: 'When the digest is made and the day\'s decisions are asked for, in 24-hour time.', default: '09:00', attrs: { inputmode: 'numeric', maxlength: '5', placeholder: '09:00', pattern: '([01][0-9]|2[0-3]):[0-5][0-9]', 'aria-label': 'Time of the daily items, HH:MM' } },
     { key: 'inbox_muted', type: 'notice', render: slot => { const p = document.createElement('p'); p.id = 'settings-inbox-muted'; p.className = 'sv-help'; p.setAttribute('role', 'status'); p.hidden = true; slot.append(p); } },
 ];
 
@@ -113,12 +113,30 @@ const moreOnly = (text, more) => ({ text: '', more: more ? `${text} ${more}` : t
 const CLI_NAMES = { agy: ' (Antigravity)', pi: ' (the Pi coding agent)' }; // what the program is where the command's name does not say (#10481, Beta); the field asks for its full path (#10735)
 const cliPath = (type, label) => ({ key: `cli_path_${type}`, type: 'path', id: `settings-cli-path-${type}`, label: `${label} CLI path`, placeholder: `Full path, e.g. ${/^win/i.test(navigator.userAgentData?.platform || navigator.platform) ? `C:\\Program Files\\${type}\\${type}.exe` : `/usr/local/bin/${type}`}${CLI_NAMES[type] || ''}`, live: [`cli-result-${type}`], setup: el => el.classList.add('settings-mono-input') });
 
-const AGENTS_FIELDS = host => [
-    { key: 'default_models', type: 'heading', id: 'settings-agents-models', label: 'Default models', help: 'Pick one, or type any model id.' },
-    modelRow('claude', 'Claude'), modelRow('codex', 'Codex'), modelRow('agy', 'Antigravity'), modelRow('pi', 'Pi'),
+const claudeThinking = { key: 'default_thinking_claude', type: 'select', id: 'settings-default-thinking-claude', label: 'Default thinking', options: THINKING_OPTIONS, attrs: { 'aria-label': 'Claude default thinking' },
+    help: moreOnly('How hard Claude thinks before it answers, when a launch does not say.', 'How much Claude thinks before it answers, for agents launched with no choice of their own. A model that does not take a level uses the nearest one it does.') };
+
+// Settings > Providers (ST4): one card per provider, the rows that used to be spread over Defaults. A provider that is not installed folds to one line, "Set up Codex" (settings_providers.js, which draws it after the check of that CLI answers); every row keeps its id.
+const PROVIDER_CARDS = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi']];
+const providerCard = (type, name) => [
+    { key: `provider_${type}`, type: 'heading', card: true, provider: type, id: `settings-provider-${type}`, label: name },
+    { ...modelRow(type, name), label: 'Default model', help: moreOnly(type === 'claude' ? 'Pick one, or type any model id.' : 'Pick one, or type any model id; leave it blank for the CLI\'s own.') },
+    type === 'claude' ? { ...claudeThinking, label: 'Default thinking' } : { ...workersThinking(type, name), label: 'Default thinking', options: thinkingOptions(type, 'Default (recommended)') },
+    { key: `provider_advanced_${type}`, type: 'heading', fold: true, id: `settings-provider-advanced-${type}`, label: 'Advanced (3)' },
+    { ...orchestratorModel(type, name), label: 'Orchestrator model' },
+    { ...orchestratorThinking(type, name), label: 'Orchestrator thinking' },
+    { ...cliPath(type, name), label: 'CLI path' },
+];
+const PROVIDERS_FIELDS = [
     { key: 'default_models_notice', type: 'notice', render: slot => { slot.innerHTML = '<span id="settings-default-models-notice" class="settings-hint" role="status"></span>'; } },
+    ...PROVIDER_CARDS.flatMap(([type, name]) => providerCard(type, name)),
+    { key: 'providers_tools', type: 'heading', id: 'settings-providers-tools', label: 'Custom models' },
     { key: 'custom_models', type: 'custom', id: 'settings-custom-models', wide: true, label: 'Custom models', help: moreOnly('Model ids are passed to the CLI as they are written here.', "They appear in every model picker, including the one that switches a running agent's model."), // the list and its form: custom_models.js draws them and shows the row once the server has the route
         render: slot => slot.classList.add('settings-custom-models') },
+    live('verify-all-btn'),
+];
+
+const AGENTS_FIELDS = host => [
     { key: 'custom_modes', type: 'custom', id: 'settings-custom-modes', wide: true, label: 'Custom permission modes', help: moreOnly('A mode is the flags the CLI is started with, one per line.', 'Custom modes appear after the built-in ones wherever a permission mode is chosen. Coral only accepts the permission flags of each CLI, and checks them again at every launch.'), // the list and its form: custom_modes.js draws them and shows the row once the server has the route (#15950)
         render: slot => slot.classList.add('settings-custom-models') },
     { key: 'agents_defaults', type: 'heading', id: 'settings-agents-defaults', label: 'Defaults' },
@@ -126,17 +144,6 @@ const AGENTS_FIELDS = host => [
         help: { text: 'Everything; safety checks on Claude only.', about: 'Default permission mode', docs: { topic: 'how-do-i', answer: 'What the permission modes allow' } }, helpTextClass: 'perm-mode-desc',
         setup: el => { el.setAttribute('data-on-change', 'm-perm-mode-describe'); const warn = document.createElement('span'); warn.className = 'perm-mode-warn sv-help'; warn.hidden = true; warn.textContent = 'Agents cannot start workers in this mode.'; el.closest('.sv-row').querySelector('.sv-text').append(warn); } }, // the line under the select is the chosen mode's meaning, said once; the three modes side by side are the row's More (#10266, after #10000)
     { key: 'working_dir', type: 'text', id: 'settings-working-dir', label: 'Default working directory', help: moreOnly('The folder a new agent starts in.'), placeholder: host.dataset.coralRoot || '', attrs: { 'data-coral-root': host.dataset.coralRoot || '' } },
-    { key: 'default_thinking_claude', type: 'select', id: 'settings-default-thinking-claude', label: 'Default thinking', options: THINKING_OPTIONS, attrs: { 'aria-label': 'Claude default thinking' },
-        help: moreOnly('How hard Claude thinks before it answers, when a launch does not say.', 'How much Claude thinks before it answers, for agents launched with no choice of their own. A model that does not take a level uses the nearest one it does.') },
-    workersThinking('codex', 'Codex'), workersThinking('agy', 'Antigravity'), workersThinking('pi', 'Pi'),
-    // The Orchestrator's own defaults (#13899): its model and thinking level, when it should not start like the workers; empty means the same as the workers. Gemini and terminal agents have no thinking levels, so no row.
-    { key: 'orchestrator_defaults', type: 'heading', id: 'settings-orchestrator-defaults', label: 'Orchestrator defaults', fold: true },
-    orchestratorModel('claude', 'Claude'), orchestratorThinking('claude', 'Claude'), orchestratorModel('codex', 'Codex'), orchestratorThinking('codex', 'Codex'),
-    orchestratorModel('agy', 'Antigravity'), orchestratorThinking('agy', 'Antigravity'), orchestratorModel('pi', 'Pi'), orchestratorThinking('pi', 'Pi'),
-    // the CLI paths: a closed disclosure of four path fields, each with its verify result under it, and Verify All (#8460); the dialog opens it when the default agent's CLI is missing (openCliPathsWhenMissing), which also says on the closed row whether the default CLI was found; it sits under Defaults, not at the foot of the page, where a person whose agent will not start looks (#9955)
-    { key: 'cli_paths', type: 'heading', id: 'settings-cli-paths', label: 'CLI paths (empty uses PATH)', fold: true },
-    cliPath('claude', 'Claude'), cliPath('codex', 'Codex'), cliPath('agy', 'Antigravity'), cliPath('pi', 'Pi'),
-    live('verify-all-btn'),
     { key: 'agents_behaviour', type: 'heading', id: 'settings-agents-behaviour', label: 'Behaviour' },
     { key: 'auto_resume', type: 'toggle', id: 'settings-auto-resume', label: 'Resume after API errors', help: moreOnly('Wakes an agent again after a rate limit or API error.', "When an agent's CLI stops on a rate limit, an overload or another API error, Coral wakes it again after about 2, then 5, then 15 minutes, and stops trying after the third. Waking the agent yourself starts the count again.") },
     { key: 'auto_sleep', type: 'toggle', id: 'settings-auto-sleep', label: 'Auto-sleep' }, // no help line: the Agents tab is at its word budget; what it does is in the release notes and the line Coral posts the first time it sleeps one (#12111)
@@ -284,12 +291,12 @@ export function drawSettingsGroups(modal, mount) {
     const defaultFields = agents.filter(f => !TEAM_KEYS.has(f.key) && !ADVANCED_KEYS.has(f.key));
     const agentAdvanced = agents.filter(f => ADVANCED_KEYS.has(f.key) && f.type !== 'heading');
     for (const [hostId, fields] of [['settings-general-rows', [...general, ...display, live('settings-engine-more')]],
-        ['settings-updates-rows', [checkUpdates]], ['settings-team-rows', pick(agents, TEAM_KEYS)], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-inbox-rows', INBOX_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-agents-rows', [defaultType, ...defaultFields, advanced('settings-defaults-advanced'), ...agentAdvanced, ...TERMINAL_BACKEND_FIELDS, live('settings-tools-folder-dl')]], ['settings-cleanup-rows', CLEANUP_FIELDS], ['settings-security-rows', SECURITY_FIELDS], ['settings-network-rows', NETWORK_FIELDS]]) {
+        ['settings-updates-rows', [checkUpdates]], ['settings-team-rows', pick(agents, TEAM_KEYS)], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-inbox-rows', INBOX_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-agents-rows', [defaultType, ...defaultFields, advanced('settings-defaults-advanced'), ...agentAdvanced, ...TERMINAL_BACKEND_FIELDS, live('settings-tools-folder-dl')]], ['settings-providers-rows', PROVIDERS_FIELDS], ['settings-cleanup-rows', CLEANUP_FIELDS], ['settings-security-rows', SECURITY_FIELDS], ['settings-network-rows', NETWORK_FIELDS]]) {
         const host = modal.querySelector(`#${hostId}`);
         if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields: (typeof fields === 'function' ? fields(host) : fields).map(field => {
             if (!field.help?.more) return field;
             return { ...field, help: { ...field.help, text: field.help.text || HELP_LINES[field.key], more: undefined, docs: { topic: 'settings-system', answer: field.label } } };
         }) });
-        for (const id of hostId === 'settings-agents-rows' ? [...TERMINAL_BACKEND_IDS, 'settings-custom-models', 'settings-custom-modes'] : []) host.querySelector(`#${id}`)?.closest('.sv-row')?.setAttribute('hidden', ''); // until the module that fills them has read its status
+        for (const id of hostId === 'settings-agents-rows' ? [...TERMINAL_BACKEND_IDS, 'settings-custom-modes'] : hostId === 'settings-providers-rows' ? ['settings-custom-models'] : []) host.querySelector(`#${id}`)?.closest('.sv-row')?.setAttribute('hidden', ''); // until the module that fills them has read its status
     }
 }
