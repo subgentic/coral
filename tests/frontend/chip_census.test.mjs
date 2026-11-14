@@ -11,7 +11,7 @@ const CSS = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 
 const FAMILY = new Set(['chip', 'chip-tag', 'chip-count', 'chip-caps']);
 const NOT_CHIPS = {
     // controls: the button family's sizes (#9096)
-    'goals-chip': 'a filter toggle button', 'update-pill': 'a button', 'list-bar-chips': 'the row that holds the list bar chips', 'model-chip': 'the model menu button',
+    'goals-chip': 'a filter toggle button', 'inbox-pill': 'a button that opens the goal or task of a review card (#16576)', 'update-pill': 'a button', 'list-bar-chips': 'the row that holds the list bar chips', 'model-chip': 'the model menu button',
     'model-chip-add-field': 'a field in the model menu', 'model-chip-add-help': 'help text in the model menu', 'model-chip-head': 'a heading in the model menu',
     'model-chip-item': 'a row of the model menu', 'model-chip-note': 'a note in the model menu',
     'folder-tag-dropdown': 'a dropdown', 'tag-dropdown-header': 'a dropdown heading', 'hf-tag-remove': 'a remove button',

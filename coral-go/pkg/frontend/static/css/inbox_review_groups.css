@@ -35,7 +35,9 @@
 
 #group-table-view .inbox-needs-results { max-width: 80rem; } /* a line of the table is not the width of a 1920 px screen: Time sat 1400 px from the title (#15339, walk 23 L17) */
 
-.inbox-wait-long { color: var(--warning-text); } /* a question waiting 5 minutes or more reads in amber (#15297) */
+.inbox-age { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-secondary); white-space: nowrap; } /* the age pill (#16576): neutral under 1 hour */
+.inbox-age-amber { color: var(--warning-text); border-color: var(--warning-text); } /* from 1 hour */
+.inbox-age-red { color: var(--error-text); border-color: var(--error-text); } /* from 1 day */
 
 /* The collapsed Inbox rail: one icon per folder with its count, in place of the agents' avatars (#15347) */
 .sidebar-rail-inbox { display: none; }
@@ -60,3 +62,12 @@
 }
 @media (max-width: 767px) { #group-table-view .list-bar-bar:has(> .tb-low) { top: calc(-1 * var(--sel-up, 0px) - var(--space-2xl)); } } /* the bar sticks (data_table.css) with its head, search and filters scrolled off above: only the actions line stays at the top of the screen (#15632; --sel-up is that line's offset in the bar, set by mountSelection) */
 @media (max-width: 767px) { #group-table-view .gt-toolbar.tb-low > :not(.btn-icon, .inbox-folder-head, .list-bar-count, .team-tb-selection) { display: revert; } #group-table-view .gt-toolbar.tb-low > .btn-icon { display: inline-flex; } #group-table-view .gt-toolbar.tb-low > .inbox-folder-head { display: flex; } } /* the phone's selecting row keeps its head, search and icons (#15540) */
+
+.inbox-pills { display: inline-flex; flex-wrap: wrap; gap: 4px 6px; margin-inline-start: 8px; vertical-align: middle; } /* the goal and task pills of a review (#16576) */
+.inbox-pill { position: relative; cursor: pointer; font-family: inherit; display: inline-block; min-height: 0; min-width: 0; padding: 0 8px; border-radius: 999px; background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-secondary); font-size: var(--fs-sm); white-space: nowrap; text-decoration: none; }
+.inbox-pill:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+@media (min-width: 761px) { .inbox-review-item:has(> .inbox-pills) { flex-wrap: wrap; } .inbox-review-item > .inbox-pills { flex: 1 0 100%; margin: 2px 0 0; } } /* a computer's card: the pills sit under the title line, so the title keeps its width */
+@media (max-width: 760px) {
+    .inbox-review-item.inbox-agent-first > .inbox-pills { grid-area: pills; margin: 4px 0 0; }
+} /* a phone card: the pills are a line of their own under the title, so the title and the age keep their place (#16576) */
+.inbox-pill::after { content: ""; position: absolute; inset: -12px -6px; } /* a small pill, with a 44 px target drawn around it (#16576) */
