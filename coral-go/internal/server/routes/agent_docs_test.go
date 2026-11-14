@@ -227,18 +227,18 @@ func TestNewcomerPagesHaveNoSourcePathsOrAgentFlags(t *testing.T) {
 	}
 }
 
-// #10093 v2 (Beta tester): the steps name the real controls. The row menu has Sleep, Archive and Kill session, and Remove Agent for an idle one, and the phone dialog is "Use on your phone" with Enable, a QR once it is on, and Use Coral Hub instead.
+// #10093 v2 (Beta tester): the steps name the real controls. The row menu has Sleep, Archive and Stop, and Remove Agent for an idle one, and the phone dialog is "Use on your phone" with Enable, a QR once it is on, and Use Coral Hub instead.
 func TestHowDoIStepsNameTheRealControls(t *testing.T) {
 	b, err := os.ReadFile(filepath.Join("..", "..", "..", "agent_docs", "how-do-i.md"))
 	require.NoError(t, err)
 	text := strings.ReplaceAll(string(b), "\r\n", "\n")
 	assert.Contains(t, text, "**Remove Agent**", "an idle agent's menu has Remove Agent (#15399)")
-	for _, want := range []string{"**Sleep**", "**Archive**", "**Kill session**", "**Use on your phone**", "**Enable**", "**Use Coral Hub instead**"} {
+	for _, want := range []string{"**Sleep**", "**Archive**", "**Stop**", "**Use on your phone**", "**Enable**", "**Use Coral Hub instead**"} {
 		assert.Contains(t, text, want)
 	}
 	rows, err := os.ReadFile(filepath.Join("..", "..", "..", "pkg", "frontend", "static", "session_rows.js"))
 	require.NoError(t, err)
-	for _, item := range []string{"Sleep", "Archive", "Kill session"} {
+	for _, item := range []string{"Sleep", "Archive", "Stop"} {
 		assert.Contains(t, string(rows), "\n                "+item+"\n", "the row menu really has "+item)
 	}
 }

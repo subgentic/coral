@@ -19,7 +19,7 @@ const AGENT_WORDS = {
     'Restart, same settings': 'Starts a fresh conversation with the same settings; the instructions are sent again.',
     'Restart with changes': 'Starts a fresh conversation with the settings you choose; the instructions are sent again.',
     'Sleep': 'Stops the terminal. The chat and files stay; Wake continues the conversation.',
-    'Kill session': 'Stops it now. Its chat stays in History.',
+    'Stop': 'Stops it now. Its chat stays in History.',
 };
 
 (async () => {

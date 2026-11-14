@@ -16,12 +16,12 @@ export function killAllItem(boardName) {
     if (blocked) {
         return `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger overflow-menu-blocked" disabled aria-disabled="true" title="${escapeAttr(blocked)}">
                     ${icon}
-                    Kill all <span class="overflow-menu-note">needs Launch</span>
+                    Stop all <span class="overflow-menu-note">needs Launch</span>
                 </button>`;
     }
     return `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="team-kill" data-board="${escapeAttr(boardName)}">
                     ${icon}
-                    Kill all
+                    Stop all
                 </button>`;
 }
 

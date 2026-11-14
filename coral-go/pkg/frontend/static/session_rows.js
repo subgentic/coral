@@ -186,15 +186,6 @@ ${_archiveItem}            <button class="menu-item overflow-menu-item" data-on-
                 ${SVGO.o0}<path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
                 Sleep
             </button>
-            <button class="menu-item overflow-menu-item" data-on-click="agent-auto-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="${escapeAttr(s.auto_sleep_off ? 'on' : 'off')}">
-                ${SVGO.o0}<path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/><path d="M3 3l10 10"/></svg>
-                ${s.auto_sleep_off ? 'Allow auto-sleep' : "Don't auto-sleep"}
-            </button>
-${['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access === 'boolean' ? (() => { const k = keepMenuItem(s); return `            <button class="menu-item overflow-menu-item" data-on-click="agent-keep-full-access" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="${escapeAttr(k.mode)}">
-                ${SVGO.o0}<path d="M8 2l5 2v4c0 3-2 5-5 6-3-1-5-3-5-6V4z"/></svg>
-                ${escapeHtml(k.label)}
-            </button>
-`; })() : ''}${_archiveItem}
             <hr class="overflow-menu-divider">
             <button class="menu-item overflow-menu-item" data-on-click="agent-restart-same" title="Starts a fresh conversation; the instructions are sent again" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o0}<path d="M3.5 2v4h4"/><path d="M3.5 6A5.5 5.5 0 1 1 2.5 8"/></svg>
@@ -204,16 +195,24 @@ ${['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access
                 ${SVGO.o0}<path d="M3.5 2v4h4"/><path d="M3.5 6A5.5 5.5 0 1 1 2.5 8"/></svg>
                 Restart with changes…
             </button>
-            ${autoAcceptMenuItem(s)}
-            ${!instructionsOffered(s, isCloud()) ? '' : `<button class="menu-item overflow-menu-item" data-on-click="agent-instructions" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" title="What this agent is told each time it starts; saved now, used at its next restart">
-                ${SVGO.o0}${_mk0}`}
             <button class="menu-item overflow-menu-item" data-local-only data-on-click="agent-attach" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o0}<polyline points="4,4 8,8 4,12"/><line x1="9" y1="12" x2="13" y2="12"/></svg>
                 Attach
             </button>
             <button class="menu-item overflow-menu-item" type="button" data-on-click="team-menu-more" aria-expanded="false" aria-controls="agent-more-${escapeAttr(sid)}">More</button>
             <div id="agent-more-${escapeAttr(sid)}" class="team-menu-more" role="group" aria-label="More for ${escapeAttr(s.display_name || s.name)}" hidden>
-            <button class="menu-item overflow-menu-item" data-on-click="agent-icon" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-auto-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="${escapeAttr(s.auto_sleep_off ? 'on' : 'off')}">
+                ${SVGO.o0}<path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/><path d="M3 3l10 10"/></svg>
+                ${s.auto_sleep_off ? 'Allow auto-sleep' : "Don't auto-sleep"}
+            </button>
+${['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access === 'boolean' ? (() => { const k = keepMenuItem(s); return `            <button class="menu-item overflow-menu-item" data-on-click="agent-keep-full-access" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="${escapeAttr(k.mode)}">
+                ${SVGO.o0}<path d="M8 2l5 2v4c0 3-2 5-5 6-3-1-5-3-5-6V4z"/></svg>
+                ${escapeHtml(k.label)}
+            </button>
+`; })() : ''}            ${autoAcceptMenuItem(s)}
+            ${!instructionsOffered(s, isCloud()) ? '' : `<button class="menu-item overflow-menu-item" data-on-click="agent-instructions" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" title="What this agent is told each time it starts; saved now, used at its next restart">
+                ${SVGO.o0}${_mk0}`}
+${_archiveItem}            <button class="menu-item overflow-menu-item" data-on-click="agent-icon" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o0}<circle cx="8" cy="8" r="6.5"/><path d="M5.5 9.5c0 0 1 1.5 2.5 1.5s2.5-1.5 2.5-1.5"/><circle cx="6" cy="6.5" r="0.5" fill="currentColor" stroke="none"/><circle cx="10" cy="6.5" r="0.5" fill="currentColor" stroke="none"/></svg>
                 Set Icon
             </button>
@@ -221,7 +220,6 @@ ${['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access
                 ${SVGO.o1}<circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r="0.5" fill="currentColor" stroke="none"/></svg>
                 Session Info
             </button>
-            </div>
             <hr class="overflow-menu-divider">
             <button class="menu-item overflow-menu-item" data-on-click="agent-move" data-session-id="${escapeAttr(sid)}" data-dir="up">
                 ${SVGO.o2}<path d="M8 3v10M4 7l4-4 4 4"/></svg>
@@ -231,10 +229,11 @@ ${['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access
                 ${SVGO.o2}<path d="M8 13V3M4 9l4 4 4-4"/></svg>
                 Move Down
             </button>
+            </div>
             <hr class="overflow-menu-divider overflow-menu-divider-danger">
             <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="agent-kill" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o1}<line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
-                Kill session
+                Stop
             </button>`;
     // Archived: no Restart, Rename or reordering (#3030).
     const _archivedMenu = `

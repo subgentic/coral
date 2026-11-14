@@ -1,7 +1,7 @@
 // Every confirm dialog names its choice (#9318): a question that loses something (a delete, a kill, a discard) passes { danger: true } and gets the danger button; one that loses nothing
 // (a sleep, an archive, a paste, a restart) passes { danger: false } and gets the primary. The dialog's default is the primary, so a caller that forgets would be a destructive question in the
 // plain style: this census reads every call of showConfirmModal (and the wrappers confirmWith and this.confirm) and fails on one with no `danger` in its arguments. A danger question's button
-// says what it does (Delete panel, Kill session, Paste and run), never Yes: every call passes a label, a danger one and a plain one alike (Sleep agent, Archive, Restart on tmux; confirmWith takes its label as the
+// says what it does (Delete panel, Stop, Paste and run), never Yes: every call passes a label, a danger one and a plain one alike (Sleep agent, Archive, Restart on tmux; confirmWith takes its label as the
 // third argument), so no question is answered with Yes (#9413: the sleep, archive and team-sleep questions still were).
 import fs from 'node:fs';
 import path from 'node:path';

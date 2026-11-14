@@ -1,7 +1,7 @@
 // A worktree a stop kept stays on screen as one compact bar (#6818, #6859, #6943: the desktop's floating toast was 422 px tall at 200% text and covered the top bar and Settings' Save and Cancel, so the
 // notice is the bar of worktree_dock.js on every layout): "Worktree kept" with Copy path, Details and a x on one line, the words behind Details, announced once (a status; an alert when the worktree could not
 // be removed), focus to its first button after the person's own Kill and back to the Agents list on dismiss, several as one "N worktrees kept" whose x says "Dismiss all N worktree notices"; a removal is a short
-// toast. The real Kill Team and Kill session flows on a desktop window at 100% and 200% text; the bar never overlaps the top bar or Settings' Save and Cancel. The kill answers are the page's fetch (Backend's
+// toast. The real Stop team and Stop flows on a desktop window at 100% and 200% text; the bar never overlaps the top bar or Settings' Save and Cancel. The kill answers are the page's fetch (Backend's
 // #6701 shape). The phone's layout is worktree_dock_browser. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -85,7 +85,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`localStorage.clear(); T.state.liveSessions = []; window.__m.agents = {};
                 window.__m.add('solo', 'K', 3, { sleeping: false, session_id: 'o1' }); T.state.liveSessions.forEach(s => { s.branch = 'coral-team/solo'; s.git_state = { is_worktree: true }; });
                 T.render.renderLiveSessions(T.state.liveSessions); window.__answer = ${JSON.stringify({ ok: true, worktree: { state: 'kept', path: '/tmp/wt/solo', branch: 'coral-team/solo', reason: 'it has uncommitted changes' } })}; T.render.killSessionDirect('solo', 'claude', 'o1'); true`);
-            await waitFor(open, 'the Kill session confirmation', 8000); await ev(`document.getElementById('confirm-modal-yes').click(); true`);
+            await waitFor(open, 'the Stop confirmation', 8000); await ev(`document.getElementById('confirm-modal-yes').click(); true`);
             await waitFor(DOCK_UP, "the single kill's bar", 6000);
             await ev(`document.querySelector('#worktree-dock .worktree-dock-details').click(); true`);
             b = await dock();

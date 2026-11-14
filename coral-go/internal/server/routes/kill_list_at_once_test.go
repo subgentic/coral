@@ -100,7 +100,7 @@ func TestAKillWhoseTerminalWillNotEndSaysSoAndOneAlreadyGoneIsOk(t *testing.T) {
 			assert.Equal(t, c.status, resp.StatusCode)
 			assert.Equal(t, c.ok, out["ok"])
 			if !c.ok {
-				assert.Contains(t, out["error"], "Kill failed")
+				assert.Contains(t, out["error"], "Stop failed")
 				assert.NotContains(t, out["error"], "exit 1", "the raw error is logged, not shown")
 			} else {
 				assert.NotContains(t, out, "error")

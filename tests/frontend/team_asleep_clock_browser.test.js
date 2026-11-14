@@ -1,5 +1,5 @@
 // A sleeping team (walk 16 H5 and M10, walk 17 L17, #15286): the Time on task clock of a sleeping agent shows no running time (a dash, not a "5 m" that keeps counting), and a danger item of a menu
-// (Kill session, Reset team, Kill all) is the menu's own colour at rest and red only under the pointer. The isolated dev server; the module is imported and the rule read from the page's own sheets.
+// (Stop, Reset team, Stop all) is the menu's own colour at rest and red only under the pointer. The isolated dev server; the module is imported and the rule read from the page's own sheets.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;

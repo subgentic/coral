@@ -152,7 +152,7 @@ func main() {
 			fmt.Printf("  %s\n", tc.AttachCommand(sn))
 		}
 		fmt.Println()
-		fmt.Println("Kill all agents:")
+		fmt.Println("Stop all agents:")
 		socketFlag := ""
 		if tc.SocketPath != "" {
 			socketFlag = fmt.Sprintf("-S %s ", tc.SocketPath)

@@ -61,7 +61,7 @@ const SESSIONS = [
             assert.deepEqual(await rows(), ['sid-1', 'sid-2', 'sid-3', 'sid-4'], `${w}: all four agents listed`);
 
             await shot(`before-${w}`);
-            // One agent: its menu's Kill session, then the dialog's confirm.
+            // One agent: its menu's Stop, then the dialog's confirm.
             await ev(`document.querySelector('.session-group-item[data-session-id="sid-1"] .sidebar-kebab-btn').click()`);
             await waitFor(`!!document.querySelector('.session-group-item[data-session-id="sid-1"] [data-on-click="agent-kill"]')`, `${w}: the agent's menu`);
             assert.equal(await ev(`!!document.querySelector('.session-group-item[data-session-id="sid-1"] [data-on-click="agent-dismiss"], .session-group-item[data-session-id="sid-1"] [data-on-click="agent-history"]')`), false, `${w}: the menu has no Dismiss or History item`);
