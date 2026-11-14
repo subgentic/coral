@@ -60,6 +60,11 @@ const { coralReady } = require('./helpers/wait');
                 assert.equal(await badge(), '4', 'the file with new comments counts again, once: ' + await badge());
                 assert.ok(await marker('Decided file.txt'), 'a file the Operator already approved comes back as its own row, marked');
                 assert.ok(await marker('Replied file.txt'), 'its row says New comments');
+                // #16399 (Beta Tester): an approved file's new comment is to be read, not reviewed again: the row says Approved (not For review) and offers no Approve or Request changes; a file still waiting says For review and does
+                const rowInfo = name => ev(`(() => { const r = ${row(name)}, m = r.querySelector('.inbox-review-metadata'); return { metaSaysReview: m ? /For review/.test(m.textContent) : false, metaSaysApproved: m ? /Approved/.test(m.textContent) : null, review: /For review/.test(r.textContent), approve: !!r.querySelector('[data-slot=approve]'), changes: !!r.querySelector('[data-slot=changes]') }; })()`); // a phone's card may not draw the metadata line: then only the buttons are checked
+                const decided = await rowInfo('Decided file.txt'), waiting = await rowInfo('Replied file.txt');
+                assert.ok(!decided.metaSaysReview && decided.metaSaysApproved !== false && !decided.approve && !decided.changes, 'an approved file with a new comment says Approved (not For review) in its line, and asks for no new decision: ' + JSON.stringify(decided));
+                assert.ok(waiting.review && waiting.approve && waiting.changes && !waiting.metaSaysApproved, 'a file still waiting for review keeps For review, Approve and Request changes: ' + JSON.stringify(waiting));
                 assert.ok(!(await marker('Quiet file.txt')), 'a file with no news carries no marker');
                 assert.ok(await ev(`(() => { const r = ${row('Replied file.txt')}; return r.classList.contains('dt-unread') && !r.classList.contains('dt-read') && /unread/.test(r.querySelector('.inbox-review-item .sr-only').textContent); })()`), 'the row is unread again');
                 assert.equal(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].filter(r => /Replied file/.test(r.textContent)).length`), 1, 'one row, not a second item');

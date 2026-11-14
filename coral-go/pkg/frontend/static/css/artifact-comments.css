@@ -22,6 +22,7 @@
 .artifact-viewer-header .ac-toggle:not([hidden]) { display: inline-flex; align-items: center; }
 @media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) { .artifact-viewer-header .ac-toggle:not([hidden]) { min-height: 28px; } }
 @media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) { .artifact-viewer-main > .ac-panel:not(.ac-sheet-open) { display: none; } }
+.ac-hint[hidden] { display: block !important; visibility: hidden; } /* the Approve hint keeps its line when the file stops waiting while a comment is typed: the Comment button must not move up under the pointer (#16399) */
 .ac-note { margin: 0; padding: 6px 10px; border-radius: var(--radius-md); background: var(--bg-tertiary); color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); }
 .ac-list { display: flex; flex-direction: column; gap: var(--space-sm); list-style: none; margin: 0; padding: 0; }
 /* A thread is one card (Docs, Paper): the quoted text, then an entry per comment and reply, the reply box at the foot. The current card is raised. */

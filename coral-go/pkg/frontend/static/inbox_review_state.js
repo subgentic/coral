@@ -11,3 +11,7 @@ export function reviewChangeLabels(row) {
     if (Number.isSafeInteger(comments) && comments > 0) labels.push(`${comments} new comment${comments === 1 ? '' : 's'}`);
     return labels;
 }
+
+/** A file the Operator already decided (approved or denied) that has agent replies in the Operator's thread: it is in Needs you only so the reply is seen (#12097); it is not a request to review again (#16399). */
+export const decidedWithNews = row => row?.new_comments > 0 && !!row.tags && (row.tags.includes('approved') || row.tags.includes('denied')) && !row.tags.includes('for review');
+export const decidedWord = row => (row?.tags?.includes('denied') ? 'Denied' : 'Approved');
