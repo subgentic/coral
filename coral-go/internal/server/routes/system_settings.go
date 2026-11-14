@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -128,7 +129,26 @@ func (h *SystemHandler) PutSettings(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+	if r.Header.Get(AutoSaveHeader) == "" {
+		noteSettingChange(r, values)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// noteSettingChange asks for a "Changed settings" row naming the settings saved (their names, never their values: a value may be a path or a secret), unless the request already asked for an inbox_hide row (#16972).
+func noteSettingChange(r *http.Request, values map[string]string) {
+	if p, _ := r.Context().Value(activityPendingKey{}).(*activityPending); p != nil && p.set {
+		return
+	}
+	names := make([]string, 0, len(values))
+	for k := range values {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	if len(names) == 0 {
+		return
+	}
+	noteActivity(r, board.ActSettingChange, "setting", names[0], "", "", strings.Join(names, ", "))
 }
 
 // normalizeSettingTypes: a setting is a string, a boolean or a number (Security's #4431 SHOULD 1). null is empty, as

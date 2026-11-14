@@ -19,6 +19,8 @@ import (
 
 // activityByHandler: the handler writes the row itself (in the store transaction of the decision, after the post, or by asking the recorder), for a person only.
 var activityByHandler = map[string]string{
+	"POST /api/sessions/live/{sessionID}/sleep":                           "one agent put to sleep (agent_sleep), after it happened (#16972)",
+	"POST /api/sessions/live/{sessionID}/wake":                            "one agent woken (agent_wake), after it worked (#16972)",
 	"POST /api/sessions/live/{name}/keep-full-access":                     "the Operator turned keep-Full-access-on-restart on or off for a Codex agent (keep_full_access, #14061): the handler asks the recorder for the row, the note says on or off",
 	"DELETE /api/board/{project}/artifacts/{id}/review":                   "take out of review (unsend_review)",
 	"POST /api/artifacts/{id}/opened":                                     "the version of a series the Operator opened (#13910): the Operator's own reading state, kept so a row can say New version; it is not a decision, so no Activity row",
@@ -39,7 +41,7 @@ var activityByHandler = map[string]string{
 	"POST /api/system/update/relaunch":                                    "the Hub owner's relaunch (hub_update_relaunch)",
 	"PUT /api/board/{project}/artifacts/{id}/review":                      "send for review (send_review)",
 	"PUT /api/board/{project}/artifacts/{id}/tags":                        "the Mark read and Mark unread buttons and the tag editor: the handler asks the recorder for a row by the page's X-Coral-Click header (read or tags); opening a file marks it read with no header, and is not a click",
-	"PUT /api/settings":                                                   "a goal-looks-done Dismiss or Not yet and a welcome item's Dismiss: the handler asks the recorder for an inbox_hide row when one of those settings is written",
+	"PUT /api/settings":                                                   "a goal-looks-done Dismiss or Not yet and a welcome item's Dismiss (inbox_hide), or any other save by a person: setting_change, naming the settings and never their values; the page's own saves (X-Coral-Auto-Save) write nothing (#16972)",
 }
 
 // activityGaps: Inbox or chat actions that write no row yet. Empty since #13609 slice 2; a gap found later is listed here with why, and leaves when its row is written and tested.
@@ -241,9 +243,7 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/sessions/live/{sessionID}/archive":                          "an agent's own page: its controls, notes and tasks, not the Inbox",
 	"POST /api/sessions/live/{sessionID}/record-agent":                     "an agent's own page: its controls, notes and tasks, not the Inbox",
 	"POST /api/sessions/live/{sessionID}/refresh-hooks":                    "an agent's own page: its controls, notes and tasks, not the Inbox",
-	"POST /api/sessions/live/{sessionID}/sleep":                            "an agent's own page: its controls, notes and tasks, not the Inbox",
 	"POST /api/sessions/live/{sessionID}/unarchive":                        "an agent's own page: its controls, notes and tasks, not the Inbox",
-	"POST /api/sessions/live/{sessionID}/wake":                             "an agent's own page: its controls, notes and tasks, not the Inbox",
 	"POST /api/skills":                                                     "the Skills tab",
 	"POST /api/skills/{id}/approve":                                        "the Skills tab",
 	"POST /api/skills/{id}/reject":                                         "the Skills tab",

@@ -28,6 +28,8 @@ var hubStampNotNeeded = map[string]string{
 	"POST /api/system/update/check-hub":               "the Hub owner's update check: it changes the computer itself (its own owner route)",
 	"POST /api/system/update/relaunch":                "the Hub owner's relaunch: it changes the computer itself (its own owner route)",
 	"PUT /api/settings":                               "this computer's settings (the Dismiss of a banner is local to its dashboard)",
+	"POST /api/sessions/live/{sessionID}/sleep":       "a Sleep by the Hub owner is not stamped, so it writes no Activity row on the remote; the stamp list is Security's to widen (#13694 tiers, a count pin); the person at this computer's own click writes one (#16972)",
+	"POST /api/sessions/live/{sessionID}/wake":        "a Wake by the Hub owner is not stamped, so it writes no Activity row on the remote; the stamp list is Security's to widen (#13694 tiers, a count pin); the person at this computer's own click writes one (#16972)",
 	"POST /api/sessions/live/{name}/keep-full-access": "the Hub owner's set or clear is allowed (owner-refuse, Launch) but not stamped, so it writes no Activity row on the remote: the stamp list is Security's to widen (#13694 tiers, a count pin); the person at this computer's own click does write one (#14061)",
 }
 

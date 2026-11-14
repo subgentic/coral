@@ -191,7 +191,7 @@ var activityActions = map[string]bool{
 	board.ActPromptAnswer: true, board.ActPromptAllow: true, board.ActPromptReject: true, board.ActWaitDismiss: true, board.ActWaitSend: true, board.ActMessage: true,
 	board.ActMarkUnread: true, board.ActFileTags: true, board.ActFileStar: true, board.ActFileUnstar: true, board.ActFileKeep: true, board.ActPreviewTrust: true, board.ActPreviewUntrust: true, board.ActFileRelease: true, board.ActFileDelete: true, board.ActFileShare: true, board.ActFileEdit: true, board.ActFileEditSend: true,
 	board.ActSavedAdd: true, board.ActSavedUpdate: true, board.ActSavedRemove: true, board.ActChatFlag: true, board.ActChatSend: true, board.ActRunSeen: true, board.ActAgentsRecord: true, board.ActKeepFullAccess: true,
-	board.ActGoalCreate: true, board.ActGoalEdit: true, board.ActGoalDriver: true, board.ActGoalMove: true, board.ActGoalRequestAdd: true, board.ActGoalRequestNo: true, board.ActInboxHide: true,
+	board.ActGoalCreate: true, board.ActGoalEdit: true, board.ActGoalDriver: true, board.ActGoalMove: true, board.ActGoalRequestAdd: true, board.ActGoalRequestNo: true, board.ActInboxHide: true, board.ActAgentSleep: true, board.ActAgentWake: true, board.ActSettingChange: true,
 	board.ActSkillApprove: true, board.ActSkillReject: true, board.ActSkillRemove: true, board.ActSkillImport: true, board.ActSkillScriptsAck: true, board.ActSkillSecretAck: true,
 }
 
