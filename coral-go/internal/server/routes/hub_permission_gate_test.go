@@ -171,7 +171,7 @@ func TestHubLaunchesThatSkipPermissionPrompts(t *testing.T) {
 			}
 			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &refusal))
 			assert.Contains(t, refusal.Error, "Coral Hub can turn on auto-accept", "the refusal says where to turn it on")
-			assert.Contains(t, refusal.Error, "Settings > Network and Hub", "the refusal says where to turn it on")
+			assert.Contains(t, refusal.Error, "Settings > Coral Hub and remote access", "the refusal says where to turn it on")
 			assert.Equal(t, before, len(term.sentCommands()), "nothing started")
 			passed(call("local", tc.skips), "from this computer: unchanged")
 			passed(call("hub", tc.safe), "choices that keep the prompts need no switch")
@@ -189,14 +189,14 @@ func TestHubLaunchesThatSkipPermissionPrompts(t *testing.T) {
 // owner can follow it.
 func TestHubAutoAcceptOffSaysWhereToTurnItOn(t *testing.T) {
 	for file, labels := range map[string][]string{
-		"../../../pkg/frontend/templates/includes/modals.html": {"Network and Hub", "Coral Hub can turn on auto-accept"},
+		"../../../pkg/frontend/templates/includes/modals.html": {"Coral Hub and remote access", "Coral Hub can turn on auto-accept"},
 		"../../../pkg/frontend/static/editions.js":             {"Coral Hub can turn on auto-accept"},
 	} {
 		b, err := os.ReadFile(file)
 		require.NoError(t, err)
 		for _, label := range labels {
 			assert.Contains(t, string(b), label, file)
-			if label == "Network and Hub" {
+			if label == "Coral Hub and remote access" {
 				assert.Contains(t, hubAutoAcceptOff, "Settings > "+label)
 				continue
 			}
