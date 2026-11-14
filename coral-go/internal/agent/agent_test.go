@@ -1916,3 +1916,12 @@ func TestAgy_ExplicitModeIsAppliedAndCapabilitiesOnlyNarrowIt(t *testing.T) {
 		}
 	}
 }
+
+// #17284 (part 3 of #17203): the default Orchestrator prompt says to tell the person when finished work is left uncommitted, and not to commit unasked.
+func TestOrchestratorPromptSaysToReportUncommittedWork(t *testing.T) {
+	for _, want := range []string{"git status", "left uncommitted", "do not commit unless asked"} {
+		if !strings.Contains(DefaultOrchestratorSystemPrompt, want) {
+			t.Errorf("orchestrator prompt missing %q", want)
+		}
+	}
+}
