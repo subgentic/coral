@@ -80,3 +80,6 @@
 
 /* An opened question (#16680): its points and choices each on a line of their own (the words carry the breaks), and a line of words no wider than about 90 characters. */
 .inbox-ask-words, .inbox-agent-ask > .inbox-ask-whole { display: block; white-space: pre-line; max-width: 90ch; }
+.inbox-group-extra { display: inline-flex; align-items: baseline; gap: 10px; margin-inline-start: 8px; font-weight: var(--fw-regular); }
+.inbox-group-count { color: var(--text-muted); }
+.inbox-group-more { margin: 4px 0 4px 3.5rem; }

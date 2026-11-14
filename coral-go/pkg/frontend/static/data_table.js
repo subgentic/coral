@@ -589,8 +589,11 @@ export function dataTable(cfg) {
         const list = sortedRows();
         const cols = columns.length + (sel ? 1 : 0);
         let lastGroup = null, lastParent = null;
+        const totals = new Map(), shownIn = new Map(); let moreFor = null; // a group with a limit shows its first rows; Show more opens the rest (#16814)
+        if (cfg.groupLimited && cfg.groupBy && (!st.sort || cfg.groupSorted)) for (const r of list) { const g = cfg.groupBy(r); if (g && g.limit) totals.set(g.key, (totals.get(g.key) || 0) + 1); }
+        const flushMore = () => { const g = moreFor; moreFor = null; const node = g && g.more ? g.more(totals.get(g.key) || 0) : null; if (!node) return; const fr = el('tr', 'dt-group-foot'); fr.setAttribute('role', 'row'); const fc = el('td', null); fc.colSpan = cols; fc.setAttribute('role', 'cell'); fc.append(node); fr.append(fc); tbody.append(fr); };
         const groupHead = g => { const gr = el('tr', g.level === 'task' ? 'dt-group dt-group-task' : 'dt-group'); gr.setAttribute('role', 'row'); const gh = el('th', null); gh.colSpan = cols; gh.scope = 'rowgroup'; gh.setAttribute('role', 'rowheader'); // a group with onToggle (a task's items, #14441) is one button that opens and shuts them
-            if (g.onToggle) { const b = el('button', 'dt-group-toggle'); b.type = 'button'; b.setAttribute('aria-expanded', String(g.open !== false)); const words = el('span', 'dt-group-words', g.label); b.append(words); if (g.chip) b.append(el('span', 'chip chip-tag dt-group-chip', g.chip)); b.dataset.groupKey = g.key; b.dataset.groupControl = 'toggle'; groupActions.set(`${g.key}|toggle`, g.onToggle); if (!g.onStory) gh.append(b); else { const sb = el('button', 'btn btn-small btn-quiet dt-group-story', 'Story'); sb.type = 'button'; sb.setAttribute('aria-pressed', String(!!g.storyOpen)); sb.setAttribute('aria-label', `Story of ${String(g.label).split('\n')[0]}`); sb.dataset.groupKey = g.key; sb.dataset.groupControl = 'story'; groupActions.set(`${g.key}|story`, g.onStory); const bar = el('div', 'dt-group-pair'); bar.append(b, sb); gh.append(bar); } } else gh.textContent = g.label; // a heading with onStory has a second control, its own: the story of the task (#14444)
+            if (g.onToggle) { const b = el('button', 'dt-group-toggle'); b.type = 'button'; b.setAttribute('aria-expanded', String(g.open !== false)); const words = el('span', 'dt-group-words', g.label); b.append(words); if (g.chip) b.append(el('span', 'chip chip-tag dt-group-chip', g.chip)); b.dataset.groupKey = g.key; b.dataset.groupControl = 'toggle'; groupActions.set(`${g.key}|toggle`, g.onToggle); if (!g.onStory) gh.append(b); else { const sb = el('button', 'btn btn-small btn-quiet dt-group-story', 'Story'); sb.type = 'button'; sb.setAttribute('aria-pressed', String(!!g.storyOpen)); sb.setAttribute('aria-label', `Story of ${String(g.label).split('\n')[0]}`); sb.dataset.groupKey = g.key; sb.dataset.groupControl = 'story'; groupActions.set(`${g.key}|story`, g.onStory); const bar = el('div', 'dt-group-pair'); bar.append(b, sb); gh.append(bar); } } else gh.textContent = g.label; if (g.headExtra) gh.append(' ', g.headExtra(totals.get(g.key) || 0)); /* the space keeps the label a word of its own in the heading's text */ // a heading with onStory has a second control, its own: the story of the task (#14444)
             gr.append(gh); tbody.append(gr);
             if (g.story && g.storyOpen) { const sr = el('tr', 'dt-story-row'); sr.setAttribute('role', 'row'); const sc = el('td', null); sc.colSpan = cols; sc.setAttribute('role', 'cell'); sc.append(g.story()); sr.append(sc); tbody.append(sr); } }; // the story is a second row under the heading, above the items, only while it is on
         const mails = mailOn() ? list.map(r => cfg.mail(r)) : null, gap = !!mails && mails.some(m => m.actions && m.actions.length); // a list with a ⋯ on any row reserves its 44 px on every row, so the times line up (#137104)
@@ -598,11 +601,12 @@ export function dataTable(cfg) {
             if (cfg.groupBy && (!st.sort || cfg.groupSorted)) { // the rows come in the caller's order: a divider where their group changes (a day), none once the person has sorted
                 const g = cfg.groupBy(r);
                 if (g && g.key !== lastGroup) {
-                    lastGroup = g.key;
+                    flushMore(); lastGroup = g.key;
                     if (g.parent) { if (g.parent.key !== lastParent) { lastParent = g.parent.key; groupHead(g.parent); } } else lastParent = g.key; // a group inside another: the outer heading once, before its first inner group
                     groupHead(g);
                 }
                 if (g && g.open === false) return; // a shut group shows its heading only
+                if (g && g.limit) { moreFor = g; const n = shownIn.get(g.key) || 0; if (!g.expanded && n >= g.limit) return; shownIn.set(g.key, n + 1); } // the rows past its limit stay out until it is expanded
             }
             const k = keyOf(r), tr = el('tr', 'dt-row'); tr.setAttribute('role', 'row'); tr.dataset.key = k;
             if (cfg.unread && cfg.unread(r)) tr.classList.add('dt-unread'); // a desktop row the person has not opened since it changed (#9687)
@@ -649,6 +653,7 @@ export function dataTable(cfg) {
             if (dr) tbody.append(dr);
             if (cfg.decorate) cfg.decorate(r, tr, dr); // the surface's own hooks on a row it owns (an id, a class a deep link reads, a key handler): called again whenever the rows are drawn again, a sort included
         });
+        flushMore();
         syncEmptyColumns();
         applyWidths();
         syncSelection(true);
