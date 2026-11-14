@@ -1122,7 +1122,7 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	h.kickWS()                     // every screen showing the card takes the answer now
 	h.forgetDialog(body.SessionID) // the prompt was answered: it is not a dialog the agent is stuck at (#11437); the next pass reads the screen again
 	// One line on success too (#16398: a report that an answer "changed nothing" had no log to show whether it reached the terminal): who, which option, how it was sent, never the question or any typed text.
-	slog.Info("answer-prompt sent", "session", name, "agent_type", body.AgentType, "session_id", body.SessionID, "n", body.N, "label", opt.Label, "by", map[bool]string{true: "arrows", false: "digit"}[byArrows], "trust_folder", body.TrustFolder != "" && isTrustYes(screen, opt))
+	slog.Info("answer-prompt sent", "session", name, "agent_type", body.AgentType, "session_id", body.SessionID, "n", body.N, "kind", answerKind(screen, opt, body.TrustFolder != ""), "by", map[bool]string{true: "arrows", false: "digit"}[byArrows], "trust_folder", body.TrustFolder != "" && isTrustYes(screen, opt))
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "answered": opt.Label, "at": at})
 }
 
@@ -1439,6 +1439,21 @@ var allowLabel = regexp.MustCompile(`(?i)^(yes|allow|approve|proceed|run)\b`)
 
 // optionIsReject says whether answering this option refuses the request. Where the option has a kind (it is the approval table's approve-once option, or one of an opencode card's own answers) the KIND decides:
 // an option that allows is not a reject whatever its words begin with. Only an option with no kind is judged by its label (^(no|reject|deny|cancel)\b: "None" and "Nothing" are not rejects). Security's #11399 INFO 5.
+// answerKind is the option's kind for the log line: one of a fixed set, never its words (an option can name a folder or a command, "Yes, allow reading from <dir>", #16440).
+func answerKind(screen promptScreen, opt promptOption, trustAsked bool) string {
+	switch {
+	case trustAsked && isTrustYes(screen, opt):
+		return "trust"
+	case opt.Kind == "allow_once" || opt.Kind == "allow_always":
+		return "allow"
+	case optionIsReject(opt):
+		return "deny"
+	case strings.HasPrefix(strings.ToLower(strings.TrimSpace(opt.Label)), "yes"):
+		return "allow"
+	}
+	return "other"
+}
+
 func optionIsReject(o promptOption) bool {
 	switch o.Kind {
 	case "reject":
