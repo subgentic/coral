@@ -70,9 +70,9 @@ export function folderCount(key, c = counts) {
 /** A folder's unread chats (undefined at none, and for a folder this count cannot tell: With notes, a tag): the number beside the folder in the sidebar and the drawer (UI/UX #9687); the table's heading keeps the total. */
 const folderUnread = key => (unread && unread[key]) || undefined;
 
-/** The view list's sections for the chat folders: the number beside a folder is its unread chats, its total is the tooltip (a folder with none unread shows no number). */
+/** Active now shows its agent-chat total, matching the rows it represents (#16644). Other chat folders show unread counts, with their total in the tooltip. */
 export function chatSections(c = counts) {
-    const item = (key, label) => ({ key, label, count: folderUnread(key), total: shownCount(key, c), unread: true });
+    const item = (key, label) => ({ key, label, count: key === 'chats-active' ? shownCount(key, c) : folderUnread(key), total: shownCount(key, c), unread: key !== 'chats-active' });
     const out = [{ title: 'Chats', items: FOLDERS.map(f => item(f.key, f.label)) },
         { title: 'By CLI', items: CLIS.map(([t, label]) => item(`chats-cli-${t}`, label)) }];
     const tags = (c && c.tags) || [];
@@ -99,14 +99,14 @@ async function loadUnread() {
         const replies = settled.filter(r => r.status === 'fulfilled').map(r => r.value); // a computer that does not answer must not blank the others' numbers
         if (!replies.length && settled.length) return;
         const rows = replies.flat().filter(s => chatUnread(s));
-        const next = { chats: rows.filter(s => !isGroup(s)).length, 'chats-group': rows.filter(isGroup).length, 'chats-starred': rows.filter(s => s.starred).length, 'chats-active': rows.filter(s => s.active).length, 'chats-archived': rows.filter(s => s.archived).length };
+        const next = { chats: rows.filter(s => !isGroup(s)).length, 'chats-group': rows.filter(isGroup).length, 'chats-starred': rows.filter(s => s.starred).length, 'chats-active': rows.filter(s => !isGroup(s) && s.active).length, 'chats-archived': rows.filter(s => s.archived).length };
         for (const [t] of CLIS) { const types = t === 'agy' ? ['agy', 'antigravity', 'gemini'] : [t]; next[`chats-cli-${t}`] = rows.filter(s => !isGroup(s) && types.includes(s.source_type)).length; }
         unread = next;
     } catch { /* the folders keep their last numbers */ }
 }
 
 /** The folders a chat row is in, for the unread numbers. */
-const foldersOf = s => [isGroup(s) ? 'chats-group' : 'chats', ...(s.starred ? ['chats-starred'] : []), ...(s.active ? ['chats-active'] : []), ...(s.archived ? ['chats-archived'] : []),
+const foldersOf = s => [isGroup(s) ? 'chats-group' : 'chats', ...(s.starred ? ['chats-starred'] : []), ...(!isGroup(s) && s.active ? ['chats-active'] : []), ...(s.archived ? ['chats-archived'] : []),
     ...(isGroup(s) ? [] : CLIS.filter(([t]) => (t === 'agy' ? ['agy', 'antigravity', 'gemini'] : [t]).includes(s.source_type)).map(([t]) => `chats-cli-${t}`))];
 const bump = (keys, by) => { if (unread) for (const k of keys) unread[k] = Math.max(0, (unread[k] || 0) + by); };
 /** A chat was opened from the Inbox: marked read, and the numbers of the folders it is in go down by one, in memory, with no request (#9703). */

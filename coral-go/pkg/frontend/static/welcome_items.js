@@ -46,6 +46,7 @@ export const finished = () => { const d = doneList(); for (const id of WELCOME_I
 /** The welcome rows of Needs you (the Inbox draws them like a failed run: an item with its own actions), none when they are off. */
 export function welcomeRows() {
     if (!welcomeOn()) return [];
+    syncWelcome(); // A milestone hidden by this render must stay done if the next live snapshot is empty.
     if (!finished().has('team')) readTeams();
     const d = finished();
     return WELCOME_IDS.filter(id => !d.has(id)).map(id => ({ welcome: { id, ...WELCOME[id] }, session_id: `welcome:${id}`, display_name: WELCOME[id].title, board_project: '', server: '', waiting_kind: 'welcome', waiting_summary: WELCOME[id].text, waiting_since: '' }));
