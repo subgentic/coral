@@ -44,4 +44,20 @@ ok "and writes no body" "$([ -e "$D/o2.md" ] && echo yes || echo no)" no
 printf '## v3.0.0 — empty\n\n## v2.0.1 — x\n' > "$D/e.md"
 python3 -I "$S" 3.0.0 "$D/e.md" "$D/o3.md" >/dev/null 2>&1; ok "an empty section fails" "$?" 1
 ok "the real notes build for the newest release" "$(python3 -I "$S" "$(grep -m1 -o '^## v[0-9.]*' "$root/RELEASE_NOTES.md" | cut -c5-)" "$root/RELEASE_NOTES.md" "$D/real.md" >/dev/null 2>&1; echo $?)" 0
+# #16506: an @name right after a link's ")" or an HTML tag's ">" or a "." is a mention too; a URL's own @name and an address are left alone
+printf '## v4.0.0 — shapes\n\n[l](http://x.y/a)@eve and <i>@fay</i> and end.@dave and https://mastodon.social/@user and mail a@b.com\n' > "$D/s.md"
+python3 -I "$S" 4.0.0 "$D/s.md" "$D/so.md" >/dev/null 2>&1; ok "the shapes build" "$?" 0
+ok "an @name after a link is put in a code span" "$(grep -c ')`@eve`' "$D/so.md")" 1
+ok "an @name after an HTML tag is put in a code span" "$(grep -c '<i>`@fay`</i>' "$D/so.md")" 1
+ok "an @name after a full stop is put in a code span" "$(grep -c 'end.`@dave`' "$D/so.md")" 1
+ok "a URL's @name and an address are left alone" "$(grep -c 'https://mastodon.social/@user and mail a@b.com' "$D/so.md")" 1
+# the post-check has its own, wider pattern: fed text the wrapper did not treat, it refuses each shape
+cat > "$D/pc.py" <<'P'
+import importlib.util, sys
+sp = importlib.util.spec_from_file_location("rb", sys.argv[1]); m = importlib.util.module_from_spec(sp); sp.loader.exec_module(m)
+for t in ["[l](u)@eve", "<i>@fay</i>", "end.@dave", "(@gus)", "plain @hal"]:
+    print(len(m.bare_mentions([t])), end=" ")
+print(len(m.bare_mentions(["`@in code` https://x.y/@u a@b.com"])))
+P
+ok "the post-check refuses each shape on its own and passes code, a URL and an address" "$(python3 -I "$D/pc.py" "$S")" "1 1 1 1 1 0"
 exit "$fail"
