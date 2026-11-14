@@ -37,7 +37,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await ev(`(() => { const f = { id: 11, job_id: 7, status: 'failed', error_msg: 'agent did not start', started_at: new Date().toISOString(), finished_at: new Date().toISOString() }; window.__last = f; window.__runs = [f]; return true; })()`);
         await waitFor(`!/waiting to start/i.test(document.getElementById('scheduler-detail')?.textContent || '')`, 'the page follows the run past "waiting to start" without a reload', 9000);
         assert.match(await detail(), /failed/i, 'and says it failed: ' + (await detail()).slice(0, 300));
-        const failedCount = await ev(`(document.querySelector('.view-list-item[data-key="failed"]')?.textContent || '').replace(/\\s+/g, ' ').trim()`);
+        const failedCount = await ev(`(() => { const c = document.querySelector('.view-list-item[data-key="failed"]')?.cloneNode(true); if (c) c.querySelectorAll('.view-list-icon').forEach(i => i.remove()); return c ? c.textContent : ''; })().replace(/\\s+/g, ' ').trim()`);
         assert.match(failedCount, /^Failed\s*1$/, 'the sidebar counts the failed run: ' + failedCount);
         console.log('PASS Run now: the page and the sidebar follow the run to Failed');
     } finally { await client.close(); }
