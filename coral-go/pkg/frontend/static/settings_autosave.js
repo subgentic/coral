@@ -68,7 +68,13 @@ export function wireSettingsAutosave(modal) {
     modal.dataset.autosave = '1';
     // Focus/pointer snapshots include controls loaded asynchronously after the dialog opens.
     for (const type of ['focusin','pointerdown']) modal.addEventListener(type,e => { if (eligible(e.target) && e.target.dataset.saving !== '1' && (type !== 'pointerdown' || e.target !== document.activeElement)) remember(e.target); });
-    modal.addEventListener('change', e => { if (eligible(e.target) && !textField(e.target)) persist(e.target); });
+    // A model dropdown only sets the text box the form reads; the box is the control that saves (the dropdown itself has no value of its own in the payload, so saving it found nothing changed: Haiku went back to the CLI's default, #16667)
+    const boxOf = e => e.classList.contains('settings-model-pick') ? document.getElementById(e.id.replace('settings-model-pick-', 'settings-default-model-')) : null;
+    modal.addEventListener('change', e => {
+        const box = boxOf(e.target);
+        if (box) { if (e.target.value !== '__other__') persist(box); return; }
+        if (eligible(e.target) && !textField(e.target)) persist(e.target);
+    });
     modal.addEventListener('focusout', e => { if (eligible(e.target) && textField(e.target)) persist(e.target); });
     modal.addEventListener('keydown', e => { if (e.key === 'Enter' && eligible(e.target) && textField(e.target) && e.target.tagName !== 'TEXTAREA') { e.preventDefault(); persist(e.target); } });
 }
