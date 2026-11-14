@@ -46,8 +46,15 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await ev(`getComputedStyle(document.getElementById('inbox-page')).display !== 'none'`), true, 'the Inbox goal is on screen');
         assert.equal(await ev(`document.activeElement === document.querySelector('#inbox-page #goals-detail-title')`), false, 'Inbox goal: the heading does not take the focus (no ring round plain words, #7404; #8571)');
         assert.equal(await ev(`document.querySelector('#inbox-page .goal-head-actions .task-more-menu .goal-team-link')?.textContent.trim()`), 'Open on team page', 'the way to the team page is an item in the goal header\'s More menu (#15832)');
+        // #16260 (QA on #15832): the item is a real link, so Cmd/Ctrl-click and middle-click open the team page in a new tab; a plain click still closes the menu and goes there here.
+        const li = await ev(`(() => { const a = document.querySelector('#inbox-page .goal-team-link'); return { tag: a.tagName, role: a.getAttribute('role'), href: a.getAttribute('href') }; })()`);
+        assert.deepEqual([li.tag, li.role], ['A', 'menuitem'], 'Open on team page is a link with the menuitem role: ' + JSON.stringify(li));
+        assert.ok(li.href.includes(B) && li.href.includes(String(G)) && li.href.includes('goals'), 'with the team page as its href: ' + li.href);
+        await ev(`window.__modClick = null; document.querySelector('#inbox-page .goal-team-link').addEventListener('click', e => { window.__modClick = { defaultPrevented: e.defaultPrevented, path: location.pathname }; e.preventDefault(); }, { once: true }); document.querySelector('#inbox-page .goal-team-link').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true })); true`);
+        assert.equal(await ev(`location.pathname`), inboxGoal, 'a Ctrl-click does not navigate here (the browser opens it elsewhere)');
         await ev(`document.querySelector('#inbox-page .goal-team-link').click(); true`);
         await landed('Goals folder: Open on team page');
+        assert.equal(await ev(`[...document.querySelectorAll('.task-more-menu')].every(m => m.hidden)`), true, 'a plain click closed the menu');
         console.log('   ✓');
 
         console.log('2. A Needs you row\'s Goal');
