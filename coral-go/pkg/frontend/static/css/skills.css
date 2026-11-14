@@ -40,3 +40,6 @@
     .skills-pick-flag { grid-area: 3 / 2; }
     .skills-pick-summary { padding: 10px 0; }
 }
+
+/* Phone list icons use the neutral Skills symbol rather than name-hashed tiles. */
+.skills-view .skill-list-icon { color: var(--text-secondary); background: transparent !important; width: 40px; height: 40px; }
