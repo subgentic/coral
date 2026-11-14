@@ -1,5 +1,5 @@
 // New Agent is one page (#15911, LA1b of the Settings and New agent redesign; it was three steps, #7374): Folder (Recent: chips, Machine only with several machines), Persona first, a closed 'Name and instructions', a closed 'More options' (tabs Agent, Permissions, Advanced),
-// the Runs as line above the footer, Cancel leftmost and Launch the rightmost. No Back and no Next: the page is what Next used to open. Controls are found by role and accessible name (helpers/new_agent.js), never by id.
+// the Runs as line above the footer, Cancel beside Launch at the right (#16361) and Launch the rightmost. No Back and no Next: the page is what Next used to open. Controls are found by role and accessible name (helpers/new_agent.js), never by id.
 // Written failing-first by QA for the three-step redesign (#7392); rewritten for the one page. 1280 and 390 px, isolated dev server.
 // 1280 and 390 px, isolated dev server.
 const assert = require('node:assert/strict');
@@ -17,7 +17,7 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
     const has = async (sel, rx) => ev(`!!window.__na.find(${JSON.stringify(sel)}, ${rx})`);
     const btn = (rx) => ev(`(() => { const e = window.__na.find('button', ${rx}); return e ? window.__na.box(e) : null; })()`);
     const reopen = async () => { await ev(`window.hideLaunchModal && window.hideLaunchModal(); true`); await openNewAgent(ev, waitFor); };
-    // Cancel is the first and leftmost footer control, the primary one the rightmost, both at the footer's one row.
+    // Cancel sits at the right with the primary, like every dialog (#15816, #16361): Back (when there is one) first, then Cancel, the primary one the rightmost, all on the footer's one row. The one page has no Back.
     const footerOrder = async (primary, label) => {
         const b = await ev(`window.__na.buttons()`);
         const cancel = b.find(x => N.cancel.test(x.name)), prim = b.find(x => primary.test(x.name));
@@ -83,7 +83,7 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             assert.ok(!(await has('select', /computer|machine|server/i)), 'no machine select with this computer alone');
             assert.ok(await ev(`getComputedStyle(document.getElementById('launch-step-computer')).display === 'none'`), 'and no Which computer? step with this computer alone');
         });
-        await S.run('footer: Cancel leftmost, Launch rightmost, one row', async () => { await reopen(); await setFolder('/work/payments-app'); await footerOrder(N.launch, 'the page'); });
+        await S.run('footer: Cancel then Launch together at the right, one row', async () => { await reopen(); await setFolder('/work/payments-app'); await footerOrder(N.launch, 'the page'); });
         await S.run('the persona comes first, then Name and instructions (closed: the name and the instructions show when it opens, in that order)', async () => {
             await reopen(); await setFolder('/work/payments-app');
             assert.ok(await has('select', N.persona), 'persona is on the page');
@@ -140,7 +140,7 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             await waitFor(`!window.__na.dialog()`, 'Cancel closes the dialog', 4000);
         });
 
-        // phone: every footer button is 44 px tall, Cancel at the left, Cancel and Launch as a pair at the right (LA1b)
+        // phone: every footer button is 44 px tall, Cancel beside the primary at the right (#16361, LA1b)
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installNA(ev);
         await S.run('on a phone: the footer buttons are at least 44 px tall, Cancel and Launch together at the right of the footer, no sideways scroll, with More options closed and open', async () => {
