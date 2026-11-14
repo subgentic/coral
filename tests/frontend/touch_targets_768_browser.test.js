@@ -1,4 +1,4 @@
-// Touch targets on a tablet in portrait (walk 61, #17308): at 768 x 1024 with a coarse pointer every visible control that is a button, link, field or summary is at least 44 x 44 CSS px, on the tabs of the dashboard
+// Touch targets on a tablet, portrait and landscape (walk 61, #17308): at 768x1024 and 1024x768, as a mobile device and as touch emulation alone, with a coarse pointer every visible control that is a button, link, field or summary is at least 44 x 44 CSS px, on the tabs of the dashboard
 // (Agents, Inbox, Automations, Analytics) with the sign-in banner and the launch notice showing. Walk 61 measured: the sidebar toggle 30, Home and Settings 32, the banner close 32, Turn on alerts 32 tall, Search agents 36,
 // notes, collapse-all and hide-sidebar 36, the sidebar chevrons and the health gear 24, the top nav 40. A mouse keeps the desktop sizes (touch_targets_browser).
 const assert = require('node:assert/strict');
@@ -29,17 +29,21 @@ const UNDERSIZED = `(() => {
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const out = {};
+    const out = {}, media = [];
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Emulation.setDeviceMetricsOverride({ width: 768, height: 1024, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
-        for (const tab of ['agents', 'hub-inbox', 'automations', 'tokens']) {
-            await ev(`window.switchNavTab(${JSON.stringify(tab)}); true`); await ev(framesJs(20));
-            out[tab] = await ev(UNDERSIZED);
+        for (const [w, h, mobile] of [[768, 1024, true], [1024, 768, true], [1024, 768, false], [768, 1024, false]]) {
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: true });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
+            const mq = await ev(`[matchMedia('(pointer: coarse)').matches, matchMedia('(any-pointer: coarse)').matches, matchMedia('(hover: none)').matches].join()`);
+            media.push(`${w}x${h} ${mobile ? 'mobile' : 'touch-only'}: pointer:coarse,any-pointer:coarse,hover:none = ${mq}`);
+            for (const tab of ['agents', 'hub-inbox', 'automations', 'tokens']) {
+                await ev(`window.switchNavTab(${JSON.stringify(tab)}); true`); await ev(framesJs(20));
+                out[`${w}x${h}${mobile ? ' mobile' : ' touch-only'} [coarse,any,hover:none=${mq}] ${tab}`] = await ev(UNDERSIZED);
+            }
         }
     } finally { await client.close(); }
     const all = Object.entries(out).flatMap(([tab, l]) => l.map(x => tab + ': ' + x));
-    assert.deepEqual(all, [], 'controls under 44 px at 768 x 1024 touch:\n  ' + all.join('\n  '));
-    console.log('PASS every control is 44 px at 768 x 1024 touch');
+    assert.deepEqual(all, [], 'controls under 44 px at 768x1024 / 1024x768 touch:\n  ' + all.join('\n  '));
+    console.log('PASS every control is 44 px at 768x1024 and 1024x768, mobile and touch-only | ' + media.join(' | '));
 })().catch(e => { console.error(e.message); process.exit(1); });
