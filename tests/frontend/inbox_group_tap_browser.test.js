@@ -7,6 +7,7 @@ const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_notice');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -19,7 +20,7 @@ const BASE = require('./test_base').BASE;
             const at = `${w}: `;
             const snap = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/group-tap-${name}-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, BASE + '/'); /* the unseen first-run notice sits in the phone Inbox pane now (#16460) and shifts what these measure: acked on the test server */ await install(); await coralReady(ev, 'startup', 'settings');
             await ev(`fetch('/api/board/${team}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Dev', job_title: 'Developer' }) }).then(r => r.status)`);
             await ev(`(() => { const original = window.fetch.bind(window), json = b => Promise.resolve(Response.json(b)), hex = n => n.toString(16).padStart(64, '0');
                 const file = (n, name, goal, task) => ({ id: hex(n), name, uri: 'coral://artifacts/' + hex(n), produced_by: 'Developer', session_id: 'p' + n, created_at: new Date(Date.now() - n * 60000).toISOString(), media_type: 'text/markdown', available: true, tags: ['for review'], goal_id: goal || null, goal_title: goal ? 'Threaded Needs you' : '', task_id: task || null, task_title: task === 11 ? 'Build the story' : task === 12 ? 'Write the docs' : '', series_id: 's' + n, version: 1 });
@@ -55,7 +56,12 @@ const BASE = require('./test_base').BASE;
             const heading = n => `[...document.querySelectorAll('.dt-group-task')].find(tr => tr.textContent.includes('Task #${n}'))`;
             const place = async (n, which) => {
                 const sel = which === 'story' ? '.dt-group-story' : '.dt-group-toggle';
-                await ev(`(() => { const h = ${heading(n)}, b = h && h.querySelector(${JSON.stringify(sel)}); if (b) b.scrollIntoView({ block: 'center', behavior: 'instant' }); return !!b; })()`);
+                await ev(`(() => { const h = ${heading(n)}, b = h && h.querySelector(${JSON.stringify(sel)}); if (!b) return false; b.scrollIntoView({ block: 'center', behavior: 'instant' });
+                    // the two headings are measured with no scrolling between them, so centre the pair, not the one: with a few rows between them (a phone's cards are tall) the other would sit under the sticky header
+                    const o = ${heading(n === 11 ? 12 : 11)}, ob = o && o.querySelector(${JSON.stringify(sel)}); if (ob) { let sc = b.parentElement; while (sc && !(sc.scrollHeight > sc.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement; sc = sc || document.scrollingElement;
+                        const top = Math.min(b.getBoundingClientRect().top, ob.getBoundingClientRect().top), bottom = Math.max(b.getBoundingClientRect().bottom, ob.getBoundingClientRect().bottom), head = (document.querySelector('.main-content') || document.body).getBoundingClientRect().top;
+                        sc.scrollBy(0, (top + bottom) / 2 - (Math.max(head, 0) + innerHeight) / 2); }
+                    return true; })()`);
                 let last = '', same = 0, q = null;
                 for (let i = 0; i < 60 && same < 3; i++) {
                     await new Promise(r => setTimeout(r, 50)); // sleep-ok: the layout settles (the table draws again a moment after a toggle)
@@ -127,7 +133,7 @@ const BASE = require('./test_base').BASE;
             check(await waitFor(`${heading(11)}.querySelector('.dt-group-story').getAttribute('aria-pressed') === 'true'`, 'enter story', 4000).then(() => true, () => false), `${at}Enter turns the story on (and only once: no double toggle)`);
             check(await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`) <= 0, `${at}no sideways scroll`);
         }
-    } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
+    } finally { try { await restoreLaunchNotice(ev); } catch (e) {} await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
     if (failures.length) { console.error('FAIL\n  ' + failures.join('\n  ')); process.exit(1); }
     console.log('PASS a single tap on a task heading and on Story takes the first time, with the row or the whole table replaced between press and lift, at 1280 and 390');
 })().catch(e => { console.error(e); process.exit(1); });
