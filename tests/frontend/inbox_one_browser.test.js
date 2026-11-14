@@ -110,18 +110,18 @@ const AGENTS = (waiting) => waiting ? [
             assert.ok(needsBar && needsBar.chips === 0 && !needsBar.action, at + 'the page has the toolbar line: the search field, no chips and no create action on Needs you (#7723): ' + JSON.stringify(needsBar));
             // the title and its count are the first thing of the toolbar's one row, not a row of their own (#8700; inbox_header_browser measures the line)
             assert.equal(await ev(`(() => { const row = document.querySelector('#group-table-view .inbox-folder-toolbar .list-bar-search-row'); return !!row && row.firstElementChild.classList.contains('inbox-folder-head') && row.firstElementChild.querySelector('#group-table-title') !== null && !document.querySelector('#group-table-view .group-table-head'); })()`), true, at + 'the title is in the toolbar row, with no row of its own');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th:not(.dt-check)')].map(h => [h.textContent.replace(/[\u2191\u2193\u2195]/g, '').trim(), h.getAttribute('scope')])`), [['Item', 'col'], ['CLI', 'col'], ['Folder', 'col'], ['Team', 'col'], ['Goal', 'col'], ['Waiting', 'col'], ['Actions', 'col']], at + 'Item (the agent, with a card choices in its row, #10400, #12701), CLI, Folder (the rows have one), Team, Goal because a row has one, how long it Waits, and the row Actions (#12701); no Waiting for column when no row has a question');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.querySelector('.dt-primary').textContent.trim() + '|' + r.querySelector('td[data-key="team"]').textContent.trim())`), ['Agent Two|team-b', 'Agent One|team-a'], at + 'a row per waiting agent, with its team, the one that has waited least first (newest first, #11552)');
-            assert.equal(await ev(`document.querySelector('#group-table-view tbody tr .dt-link').textContent`), 'Ship 169', at + "the goal's cell opens the goal");
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th:not(.dt-check):not([scope=rowgroup])')].map(h => [h.textContent.replace(/[\u2191\u2193\u2195]/g, '').trim(), h.getAttribute('scope')])`), [['Item', 'col'], ['CLI', 'col'], ['Folder', 'col'], ['Team', 'col'], ['Goal', 'col'], ['Waiting', 'col'], ['Actions', 'col']], at + 'Item (the agent, with a card choices in its row, #10400, #12701), CLI, Folder (the rows have one), Team, Goal because a row has one, how long it Waits, and the row Actions (#12701); no Waiting for column when no row has a question');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].map(r => r.querySelector('.dt-primary').textContent.trim() + '|' + r.querySelector('td[data-key="team"]').textContent.trim())`), ['Agent Two|team-b', 'Agent One|team-a'], at + 'a row per waiting agent, with its team, the one that has waited least first (newest first, #11552)');
+            assert.equal(await ev(`document.querySelector('#group-table-view tbody tr:not(.dt-group) .dt-link').textContent`), 'Ship 169', at + "the goal's cell opens the goal");
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#group-table-title')), c = getComputedStyle(document.querySelector('#group-table-view .inbox-folder-head .session-group-count')); return [t.fontSize, t.fontWeight, c.fontSize, c.fontWeight]; })()`), ['20px', '700', '11px', '600'], at + 'the title is 20/700, its count 11/600');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the table is on the scale');
             await shot(`inbox-one-needs-${w}`);
 
             // the search names its group and narrows it
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = 'two'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'the search narrows Needs you', 5000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 1`, at + 'the search narrows Needs you', 5000);
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'cleared', 5000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2`, at + 'cleared', 5000);
 
             // Tasks
             await ev(`window.switchNavTab('hub-inbox'); document.querySelector('${pane} .view-list-item[data-key="tasks"]').click(); true`);
@@ -130,7 +130,7 @@ const AGENTS = (waiting) => waiting ? [
             // the one task row (#7737): a table on a desktop (State, Task, Team, Updated), the two-line column on a phone; one word set for the state (the Inbox's "Open" is Queued)
             const wide = await ev(`!document.querySelector('#group-table-view .dt-box').classList.contains('dt-folded')`);
             if (wide) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th')].map(h => h.textContent.replace(/[↑↓↕]/g, '').trim()).filter(Boolean)`), ['State', 'Task', 'Team', 'Updated'], at + 'State, Task, Team, Updated (no Priority, #8784)');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr')].map(r => [r.querySelector('.dt-primary').textContent, r.querySelector('.dt-state').textContent, getComputedStyle(r.querySelector('td[data-key="team"]')).display === 'none' ? '' : r.querySelector('td[data-key="team"]').textContent].join('|'))`),
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')].map(r => [r.querySelector('.dt-primary').textContent, r.querySelector('.dt-state').textContent, getComputedStyle(r.querySelector('td[data-key="team"]')).display === 'none' ? '' : r.querySelector('td[data-key="team"]').textContent].join('|'))`),
                 wide ? ['Review the release plan|Queued|team-a', 'Write the release notes|In progress|team-a', 'Check the installer|Blocked|team-b'] : ['Review the release plan|Queued|', 'Write the release notes|In progress|', 'Check the installer|Blocked|'], at + 'rows in order, with no Priority column (#8784)');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the tasks table is on the scale');
             await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
@@ -148,7 +148,7 @@ const AGENTS = (waiting) => waiting ? [
 
             // Saved
             await ev(`document.querySelector('${pane} .view-list-item[data-key="saved"]').click(); true`);
-            await waitFor(`document.querySelector('#group-table-title').textContent === 'Saved' && document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'Saved opens its table', 10000);
+            await waitFor(`document.querySelector('#group-table-title').textContent === 'Saved' && document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2`, at + 'Saved opens its table', 10000);
             assert.equal(await ev(`document.querySelector('${pane} .sidebar-search-input').getAttribute('aria-label')`), 'Search saved messages', at + 'the search says it is for saved messages');
             assert.equal(await ev(`document.querySelector('${pane} [data-display-button]').hidden`), false, at + 'Display options is there for Saved');
             const savedBar = await ev(`(() => { const b = document.querySelector('#group-table-view .gt-toolbar'), s = b.querySelector('.gt-search, input[type=search]'); return { w: Math.round(s.getBoundingClientRect().width), left: Math.round(s.getBoundingClientRect().left), chipsOnLine: b.querySelectorAll('.group-chip, .team-tb-pills .goals-chip').length, chipsInHead: document.querySelectorAll('#group-table-view .group-table-head ~ .group-table-chips, #group-table-view .group-table-head .group-chip').length, label: s.getAttribute('aria-label') }; })()`);
@@ -186,21 +186,21 @@ const AGENTS = (waiting) => waiting ? [
             await ev(`document.querySelector('${pane} [data-display-button]').click(); true`);
             // Done moves a row to the Done chip, and Reopen brings it back
             await ev(`document.querySelector('#group-table-view tbody .dt-quiet').click(); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'Done moves the row out of Open', 8000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 1`, at + 'Done moves the row out of Open', 8000);
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].map(c => c.textContent.replace(/\\s+/g, ' ').trim())`), ['Open 1', 'Done 2'], at + 'the counts follow');
             assert.equal(await ev(`document.getElementById('inbox-live').textContent`), 'Marked done', at + 'a polite line says so');
             await ev(`document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')[1].click(); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2 && document.querySelector('#group-table-view tbody .dt-quiet').textContent === 'Reopen'`, at + 'the Done chip lists them, with Reopen', 8000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2 && document.querySelector('#group-table-view tbody .dt-quiet').textContent === 'Reopen'`, at + 'the Done chip lists them, with Reopen', 8000);
             await ev(`document.querySelector('#group-table-view tbody .dt-quiet').click(); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'Reopen takes it out of Done', 8000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 1`, at + 'Reopen takes it out of Done', 8000);
             await ev(`document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')[0].click(); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'back on Open with both', 8000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2`, at + 'back on Open with both', 8000);
             // the search is the server's, and the table says so
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = 'rollback'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1 && /every saved message/.test(document.querySelector('#group-table-view .group-table-note').textContent)`, at + 'the search narrows Saved and says it covers all', 8000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 1 && /every saved message/.test(document.querySelector('#group-table-view .group-table-note').textContent)`, at + 'the search narrows Saved and says it covers all', 8000);
             assert.ok((await ev(`window.__savedQs`)).some(q => /q=rollback/.test(q)), at + 'the server did the matching');
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'cleared', 8000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2`, at + 'cleared', 8000);
 
             // the group on screen is kept in this browser, and a newly waiting agent is still announced while Saved is shown
             assert.equal(await ev(`localStorage.getItem('coral.inbox.tab')`), 'saved', at + 'the group last on screen is remembered');
@@ -224,7 +224,7 @@ const AGENTS = (waiting) => waiting ? [
             assert.equal(await ev(`[...document.querySelectorAll('#inbox-page .wf-more-menu button')].some(b => b.getClientRects().length > 0)`), false, at + 'Remove is not on the page until More opens');
             await ev(`document.querySelector('#inbox-page .wf-more > .btn').click(); true`);
             await ev(`[...document.querySelectorAll('#inbox-page .wf-more-menu button')].find(b => /Remove/.test(b.textContent)).click(); true`);
-            await waitFor(`document.getElementById('group-table-view').checkVisibility() && document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'Remove takes it from the list and returns to the table', 8000);
+            await waitFor(`document.getElementById('group-table-view').checkVisibility() && document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 1`, at + 'Remove takes it from the list and returns to the table', 8000);
             assert.equal(await ev(`document.querySelector('${pane} .view-list-item[data-key="saved"] .view-list-count').textContent`), '1', at + "and the folder's count");
 
             // nothing waiting: one empty line

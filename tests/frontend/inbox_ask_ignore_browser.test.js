@@ -28,7 +28,7 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
                     return orig(u, o); }; return true; })()`);
             await installGuard(ev);
             await ev(`window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 3`, at + 'three rows of Needs you', 10000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 3`, at + 'three rows of Needs you', 10000);
             const ignores = await ev(`[...document.querySelectorAll('${T} button[aria-label^="Dismiss the question of"]')].map(b => b.getAttribute('aria-label'))`);
             if (mobile) { // a phone row has no Dismiss button (#11642): Dismiss is in its three-dot menu, so the two asks have a menu and the wait has none
                 const menus = await ev(`[...document.querySelectorAll('${T} .inbox-row-more-toggle')].map(b => b.getAttribute('aria-label')).sort()`);
@@ -47,7 +47,7 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
             check((await reached(ev)).length === 0, at + 'nothing was posted to the board: ' + JSON.stringify(await reached(ev)));
             const toast = await ev(`(() => { const t = [...document.querySelectorAll('.toast')].find(x => /Dismissed "Which port should the test server use.*from Lead/.test(x.textContent)); return t ? { undo: !!([...t.querySelectorAll('button')].find(b => b.textContent.trim() === 'Undo')) } : null; })()`);
             check(!!toast && toast.undo, at + 'a toast says it, with Undo: ' + JSON.stringify(toast));
-            check(await ev(`document.querySelectorAll('${T} tbody tr').length === 2`), at + 'two rows are left');
+            check(await ev(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 2`), at + 'two rows are left');
             await ev(`[...document.querySelectorAll('.toast')].find(x => /Dismissed "Which port should the test server use.*from Lead/.test(x.textContent)).querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); }); true`);
             await waitFor(`!!document.querySelector('${T} button[aria-label="Answer the question of Lead"]')`, at + 'Undo brings the question back', 8000).catch(() => {});
             const all = await ev(`window.__calls`);

@@ -35,7 +35,8 @@ const BASE = require('./test_base').BASE;
             await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr.dt-row').length >= 10`, `${at}the ten items`, 20000);
             const setMode = (cls, value) => ev(`(()=>{const s=document.querySelector('${cls} select');s.value='${value}';s.dispatchEvent(new Event('change',{bubbles:true}))})(); true`);
-            const counts = () => ev(`({ goals: document.querySelectorAll('.inbox-needs-results .dt-group:not(.dt-group-task)').length, tasks: document.querySelectorAll('.dt-group-task').length, rows: document.querySelectorAll('#group-table-view tbody tr.dt-row').length })`);
+            const counts = () => ev(`({ goals: [...document.querySelectorAll('.inbox-needs-results .dt-group:not(.dt-group-task)')].filter(g => !/^(Needs your answer|Review|Looks done)\\b/.test(g.textContent.trim())).length, // the kind headings (#16679) are not goal headings
+                 tasks: document.querySelectorAll('.dt-group-task').length, rows: document.querySelectorAll('#group-table-view tbody tr.dt-row').length })`);
             const panel = async open => { const isOpen = await ev(`!!document.querySelector('.inbox-group-review-toggle') && document.querySelector('.inbox-group-review-toggle').getClientRects().length > 0`); if (isOpen !== open) await ev(`document.getElementById('inbox-needs-toggle').click(); true`); };
             // the option: in the Filters panel, named Group by, three choices, None by default
             await panel(true);

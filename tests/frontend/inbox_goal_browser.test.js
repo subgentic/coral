@@ -27,10 +27,10 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`(window.__qaState && window.__qaState.liveSessions || []).length === 2`, 'two agents in the live list', 8000);
         await ev(`window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.updateInboxTab()); document.getElementById('nav-tab-hub-inbox').click(); true`);
         await ev(`window.switchNavTab('hub-inbox'); true`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'two agents waiting', 10000);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2`, 'two agents waiting', 10000);
 
         console.log('1. Needs you: the agent with a goal has a quiet "Goal: <title>" link under its row, the other has none');
-        const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(tr => ({ name: tr.querySelector('.dt-primary').textContent, goal: (tr.querySelector('.dt-link') || {}).textContent || '', aria: (tr.querySelector('.dt-link') || {}).ariaLabel || '' }))`);
+        const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].map(tr => ({ name: tr.querySelector('.dt-primary').textContent, goal: (tr.querySelector('.dt-link') || {}).textContent || '', aria: (tr.querySelector('.dt-link') || {}).ariaLabel || '' }))`);
         assert.deepEqual(rows.map(r => [r.name, r.goal]).sort(), [['fe', 'Ship the new installer'], ['qa', '']]);
         assert.equal(rows.find(r => r.name === 'fe').aria, 'Goal: Ship the new installer', 'the cell button says which goal it is');
         assert.equal(await ev(`document.querySelectorAll('#group-table-view .dt-link').length`), 1);
@@ -51,7 +51,7 @@ const { coralReady } = require('./helpers/wait');
         console.log('3. an opened task in the Inbox shows the same link when its row carries a goal, and nothing when it has none');
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('tasks')); true`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'two tasks', 10000);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2`, 'two tasks', 10000);
         const links = [];
         for (const title of ['Pick the icon', 'Sign the installer']) { // the one with a goal last: its page stays open for the look below
             await ev(`[...document.querySelectorAll('#group-table-view .dt-primary')].find(b => b.textContent === ${JSON.stringify(title)}).click(); true`);
@@ -59,7 +59,7 @@ const { coralReady } = require('./helpers/wait');
             links.push(await ev(`({ t: document.querySelector('#team-task-title').textContent.replace(/^#\\d+ /, ''), g: ([...document.querySelectorAll('#inbox-page .goals-facts dt')].find(x => x.textContent === 'Goal')?.nextElementSibling.querySelector('button') || {}).textContent || '' })`));
             if (title === 'Sign the installer') break;
             await ev(`document.querySelector('#inbox-page .goals-back').click(); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'back at the table', 8000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2`, 'back at the table', 8000);
         }
         assert.deepEqual(links.sort((a, b) => a.t.localeCompare(b.t)), [{ t: 'Pick the icon', g: '' }, { t: 'Sign the installer', g: 'Ship the new installer' }]);
         assert.equal(await ev(`location.pathname`), `/inbox/tasks/${B}/${t1.json.id}`, 'Inbox task row stays in the Inbox');

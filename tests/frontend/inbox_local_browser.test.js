@@ -32,7 +32,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         const gt = vis('group-table-view') && /^hub-inbox:/.test(document.getElementById('group-table-view').dataset.group); // a group's table or an item's page, both the Inbox's own
         return { dockHeading: (document.getElementById('saved-ui')?.getAttribute('aria-label') || ''), dockRows: [...document.querySelectorAll('#saved-table tbody .dt-primary')].map(r => r.textContent.replace(/^[^,]*, /, '')).sort(), inbox: vis('inbox-view') || gt, local: vis('inbox-local') || gt, frame: !!document.getElementById('inbox-frame'), saved: vis('group-table-view') && document.getElementById('group-table-view').dataset.group === 'hub-inbox:saved', uiIn: ui && (ui.parentElement.id), heading: (document.getElementById('group-table-title') || {}).textContent,
             rows: document.getElementById('group-table-view').dataset.group === 'hub-inbox:saved' ? [...document.querySelectorAll('#group-table-view tbody .dt-primary')].map(r => r.textContent).sort() : [],
-            needs: document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' ? [...document.querySelectorAll('#group-table-view tbody tr')].map(b => b.textContent.replace(/\\s+/g, ' ').trim()) : [], needsEmpty: document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && /You are all caught up/.test(document.getElementById('group-table-view').textContent),
+            needs: document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' ? [...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].map(b => b.textContent.replace(/\\s+/g, ' ').trim()) : [], needsEmpty: document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && /You are all caught up/.test(document.getElementById('group-table-view').textContent),
             navActive: document.querySelector('.top-nav-tab.active') && document.querySelector('.top-nav-tab.active').dataset.arg, tabs, navBadge: (document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || '', navLabel: document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label'),
             dockShown: !!dock && getComputedStyle(dock).display !== 'none' && dock.getClientRects().length > 0 && !dock.classList.contains('collapsed') || (!!dock && dock.classList.contains('mobile-panel-overlay')), dockHasSavedTab: vis('agentic-tab-saved'),
             over: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
@@ -216,7 +216,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         await settle(`document.querySelector('.top-nav-tab.active')?.dataset.arg === 'agents' && !document.getElementById('nav-tab-hub-inbox').classList.contains('active')`, 'back on the agent');
         check('leaving the Inbox goes back to the agent\'s page', (await ev(`document.getElementById('session-name')?.textContent || ''`)).includes('QA Alpha'), await ev(`document.getElementById('session-name')?.textContent || ''`));
         await openDockSaved();
-        await settle(`document.getElementById('saved-ui').getAttribute('aria-label') === 'Saved: QA Alpha' && document.querySelectorAll('#saved-table tbody tr').length > 0`, 'the agent panel');
+        await settle(`document.getElementById('saved-ui').getAttribute('aria-label') === 'Saved: QA Alpha' && document.querySelectorAll('#saved-table tbody tr:not(.dt-group)').length > 0`, 'the agent panel');
         s = await state();
         check('the dock\'s Saved tab on the same page is still the agent\'s: scoped, in the right sidebar', !s.inbox && s.uiIn === 'agentic-panel-saved' && s.dockShown && s.dockHeading === 'Saved: QA Alpha' && JSON.stringify(s.dockRows) === JSON.stringify(['qa-a chat', 'team-a board, by the QA Engineer']), JSON.stringify([s.inbox, s.uiIn, s.dockShown, s.dockHeading, s.dockRows]));
         await settle(`document.getElementById('nav-tab-hub-inbox-badge')?.textContent === '1' && document.getElementById('saved-tab-count')?.textContent === '2'`, 'the Inbox tab badge and the Saved tab count'); s = await state(); // the counts arrive after the panel is drawn: wait for them (#15947)
@@ -236,7 +236,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         await rowsShown('All saved', 'the Inbox');
         await ev(`window.switchNavTab('agents'); window.selectLiveSession('FE Alpha', 'claude', 'fe-a-id', 'local'); true`);
         await openDockSaved();
-        await settle(`document.getElementById('saved-ui').getAttribute('aria-label') === 'Saved: FE Alpha' && document.querySelectorAll('#saved-table tbody tr').length === 1`, 'the next agent');
+        await settle(`document.getElementById('saved-ui').getAttribute('aria-label') === 'Saved: FE Alpha' && document.querySelectorAll('#saved-table tbody tr:not(.dt-group)').length === 1`, 'the next agent');
         s = await state();
         check('after the Inbox, an agent\'s panel has the list again (it was moved back)', s.uiIn === 'agentic-panel-saved' && s.dockShown && s.dockRows.join() === 'fe-a chat', JSON.stringify([s.uiIn, s.dockShown, s.dockRows]));
     } catch (e) {

@@ -32,7 +32,7 @@ const { coralReady } = require('./helpers/wait');
         // some agents wait before the Inbox is ever opened, and the Inbox is opened with them waiting
         await setWaiting(['qa-b-id']);
         await nav('hub-inbox');
-        await settle(`document.querySelector('.top-nav-tab.active')?.dataset.arg === 'hub-inbox' && !document.getElementById('inbox-local').hidden && document.querySelectorAll('#group-table-view tbody tr').length === 1`, 'the Inbox with one agent waiting');
+        await settle(`document.querySelector('.top-nav-tab.active')?.dataset.arg === 'hub-inbox' && !document.getElementById('inbox-local').hidden && document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 1`, 'the Inbox with one agent waiting');
         await ev(`window.__said = []; new MutationObserver(() => { const t = document.getElementById('inbox-live').textContent; if (t) window.__said.push(t); }).observe(document.getElementById('inbox-live'), { childList: true }); true`);
         check('the live region is a polite status region, there before it speaks', await ev(`(() => { const l = document.getElementById('inbox-live'); return l.getAttribute('role') === 'status' && l.getAttribute('aria-live') === 'polite'; })()`));
         check('an agent already waiting when the Inbox opens is listed but not announced', (await said()).length === 0, JSON.stringify(await said()));
@@ -71,7 +71,7 @@ const { coralReady } = require('./helpers/wait');
         check('nothing is said while the Inbox is not shown (a toast and the badge carry it there)', (await said()).length === 3, JSON.stringify(await said()));
         await setWaiting(['qa-a-id', 'fe-a-id', 'qa-b-id']);
         await nav('hub-inbox');
-        await settle(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, 'the Inbox with three waiting');
+        await settle(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 3`, 'the Inbox with three waiting');
         check('opening the Inbox lists them all and announces none of them', (await said()).length === 3, JSON.stringify(await said()));
         await setWaiting(['qa-a-id', 'fe-a-id']);
         await setWaiting(['qa-a-id', 'fe-a-id', 'qa-b-id']);

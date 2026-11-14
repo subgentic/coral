@@ -10,7 +10,7 @@ const { coralReady } = require('./helpers/wait');
     const failures = [];
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const S = `(window.__coralStatic || '/static/')`, T = '#group-table-view';
-    const rowNames = () => ev(`[...document.querySelectorAll('${T} tbody tr')].map(r => (r.textContent.match(/bulk-0\\d/) || [''])[0])`);
+    const rowNames = () => ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].map(r => (r.textContent.match(/bulk-0\\d/) || [''])[0])`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [width, mobile] of [[1280, false], [390, true]]) {
@@ -35,21 +35,21 @@ const { coralReady } = require('./helpers/wait');
             await ev(`fetch('/api/board/bulk/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Writer', job_title: 'W' }) }).then(r => r.status)`);
             await ev(`localStorage.removeItem('coral-inbox-needs-filters'); window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 3`, `${at}three review rows`, 15000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length >= 3`, `${at}three review rows`, 15000);
             // a desktop's table has its checkbox column (and Select all in the header) as the tasks table does; a phone selects by a long press (the first checkbox tap here)
             if (!mobile) await waitFor(`document.querySelectorAll('${T} tbody .dt-check input').length >= 3 && !!document.querySelector('${T} thead .dt-check-all')`, `${at}a checkbox per row and Select all in the header`, 8000);
-            const pick = (n, shift) => ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr')].find(r => /${n}/.test(r.textContent)), box = row.querySelector('button[role="checkbox"], .dt-check input'); box.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: ${!!shift} })); return true; })()`);
+            const pick = (n, shift) => ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(r => /${n}/.test(r.textContent)), box = row.querySelector('button[role="checkbox"], .dt-check input'); box.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: ${!!shift} })); return true; })()`);
             await pick('bulk-01');
-            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(r => /bulk-01/.test(r.textContent) && (r.querySelector('[aria-checked="true"]') || r.querySelector('.dt-check input:checked')))`, `${at}bulk-01 is selected`, 6000);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].some(r => /bulk-01/.test(r.textContent) && (r.querySelector('[aria-checked="true"]') || r.querySelector('.dt-check input:checked')))`, `${at}bulk-01 is selected`, 6000);
             await pick('bulk-03', true); // a shift-click selects the range between
             await waitFor(`!!document.querySelector('.dt-bar') && /3 selected/.test(document.querySelector('.dt-bar').textContent)`, `${at}the range: 3 selected in the bar`, 8000);
             await pick('bulk-02'); // one off again
             await waitFor(`/2 selected/.test(document.querySelector('.dt-bar')?.textContent || '')`, `${at}2 selected after unticking one`, 6000);
             await ev(`[...document.querySelectorAll('.dt-bar button')].find(b => (b.getAttribute('aria-label') || b.textContent).trim().startsWith('Dismiss')).click(); true`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 1`, `${at}the two dismissed files leave Needs you`, 10000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 1`, `${at}the two dismissed files leave Needs you`, 10000);
             await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Dismissed 2/.test(t.textContent) && [...t.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo'))`, `${at}the notice says Dismissed 2, with Undo`, 8000);
             await ev(`[...document.querySelectorAll('.toast')].filter(t => /Dismissed 2/.test(t.textContent)).forEach(t => t.querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); })); true`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 3`, `${at}Undo brings both back`, 9000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 3`, `${at}Undo brings both back`, 9000);
             check(JSON.stringify((await rowNames()).sort()) === JSON.stringify(['bulk-01', 'bulk-02', 'bulk-03']), `${at}the three files are the rows: ` + JSON.stringify(await rowNames()));
             await pick('bulk-02');
             await waitFor(`/1 selected/.test(document.querySelector('.dt-bar')?.textContent || '')`, `${at}one selected again`, 6000);
@@ -58,7 +58,7 @@ const { coralReady } = require('./helpers/wait');
             if (!mobile) { // Escape is a keyboard's (a phone's rows have no checkbox to focus)
                 await pick('bulk-02');
                 await waitFor(`/1 selected/.test(document.querySelector('.dt-bar')?.textContent || '')`, `${at}one selected again, for Escape`, 6000);
-                await ev(`document.querySelector('${T} tbody tr .dt-check input, ${T} tbody tr [role=checkbox]').focus(); true`);
+                await ev(`document.querySelector('${T} tbody tr:not(.dt-group) .dt-check input, ${T} tbody tr:not(.dt-group) [role=checkbox]').focus(); true`);
                 await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
                 await waitFor(`!document.querySelector('.dt-bar') || document.querySelector('.dt-bar').hidden || !document.querySelector('.dt-bar').isConnected`, `${at}Escape leaves the selection: no bar`, 6000);
             }

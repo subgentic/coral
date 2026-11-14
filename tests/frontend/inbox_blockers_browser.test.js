@@ -23,7 +23,7 @@ AGENTS[0].waits_on_this = { count: 2, top_title: 'Ship the build', priority: 'lo
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const T = '#group-table-view';
-    const rowsOf = () => ev(`[...document.querySelectorAll('${T} tbody tr')].map(tr => ({ text: tr.textContent.replace(/\\s+/g, ' ').trim() }))`);
+    const rowsOf = () => ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].map(tr => ({ text: tr.textContent.replace(/\\s+/g, ' ').trim() }))`);
     const order = rows => AGENTS.map(a => a.display_name).map(n => [n, rows.findIndex(r => r.text.includes(n))]).sort((x, y) => x[1] - y[1]).map(x => x[0]);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -36,7 +36,7 @@ AGENTS[0].waits_on_this = { count: 2, top_title: 'Ship the build', priority: 'lo
             await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); state.liveSessions = ${JSON.stringify(AGENTS)}; m.updateInboxTab(); return true; })()`);
             await ev(`localStorage.removeItem('coral-inbox-needs-filters'); window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 3`, at + 'the three waiting agents', 10000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 3`, at + 'the three waiting agents', 10000);
             await waitFor(`/wait on this|Blocks \\d/.test(document.querySelector('${T}').textContent)`, at + 'the blockers phrase', 10000);
             let rows = await rowsOf();
             check(order(rows).join() === 'Frontend Dev,Docs Writer,Backend Dev', at + 'the default is newest first (#11552): the one that has waited least is first: ' + JSON.stringify(order(rows)));
@@ -60,11 +60,11 @@ AGENTS[0].waits_on_this = { count: 2, top_title: 'Ship the build', priority: 'lo
             const sel = await ev(`(() => { const s = ${sortSel}; return s ? { value: s.value, options: [...s.options].map(o => o.textContent.trim()) } : null; })()`);
             check(!!sel && sel.options[0] === 'Waiting least' && sel.options.includes('Blocking first') && sel.value === 'newest', at + 'Waiting least (newest first) is the first choice and the one on, Blocking first is still a choice: ' + JSON.stringify(sel));
             await ev(`(() => { const s = ${sortSel}; s.value = 'oldest'; s.dispatchEvent(new Event('input', { bubbles: true })); s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            await waitFor(`(() => { const t = [...document.querySelectorAll('${T} tbody tr')].map(r => r.textContent); return t.length === 3 && t[0].includes('Backend Dev'); })()`, at + 'Waiting longest puts the oldest first', 6000).catch(() => {});
+            await waitFor(`(() => { const t = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].map(r => r.textContent); return t.length === 3 && t[0].includes('Backend Dev'); })()`, at + 'Waiting longest puts the oldest first', 6000).catch(() => {});
             rows = await rowsOf();
             check(order(rows).join() === 'Backend Dev,Docs Writer,Frontend Dev', at + 'Waiting longest is the old order: ' + JSON.stringify(order(rows)));
             await ev(`(() => { const s = ${sortSel}; s.value = 'blockers'; s.dispatchEvent(new Event('input', { bubbles: true })); s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            await waitFor(`(() => { const t = [...document.querySelectorAll('${T} tbody tr')].map(r => r.textContent); return t.length === 3 && t[0].includes('Frontend Dev') && t[1].includes('Backend Dev'); })()`, at + 'Blocking first puts the blocker first, then the longest waiting', 6000).catch(() => {});
+            await waitFor(`(() => { const t = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].map(r => r.textContent); return t.length === 3 && t[0].includes('Frontend Dev') && t[1].includes('Backend Dev'); })()`, at + 'Blocking first puts the blocker first, then the longest waiting', 6000).catch(() => {});
             rows = await rowsOf();
             check(order(rows).join() === 'Frontend Dev,Backend Dev,Docs Writer', at + 'a picked Blocking first still orders blockers first: ' + JSON.stringify(order(rows)));
             const kept = await ev(`JSON.parse(localStorage.getItem('coral-inbox-needs-filters') || '{}').sort`);
@@ -84,11 +84,11 @@ AGENTS[0].waits_on_this = { count: 2, top_title: 'Ship the build', priority: 'lo
                 return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(r => r.textContent.includes('checkout-mockup.html'))`, at + 'the for-review row', 15000);
-            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(r => r.textContent.includes('checkout-mockup.html') && /waits? on this/.test(r.textContent))`, at + 'the review row says what waits on it', 10000).catch(() => {});
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].some(r => r.textContent.includes('checkout-mockup.html'))`, at + 'the for-review row', 15000);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].some(r => r.textContent.includes('checkout-mockup.html') && /waits? on this/.test(r.textContent))`, at + 'the review row says what waits on it', 10000).catch(() => {});
             const rv = (await rowsOf()).find(r => r.text.includes('checkout-mockup.html'));
             check(!!rv && rv.text.includes('High priority: “Tag<U+202E> batch-88” waits on this') && !rv.text.includes('\u202e'), at + 'a for-review file says the one task it holds up, a high-priority one, with its title\'s hidden character written out, not drawn: ' + (rv && rv.text));
-            check(await ev(`[...document.querySelectorAll('${T} tbody tr')].filter(tr => tr.textContent.includes('checkout-mockup.html')).some(tr => [...tr.querySelectorAll('.inbox-blocks')].some(e => e.getBoundingClientRect().width > 0 && e.offsetParent !== null && /wait/.test(e.textContent)))`), at + 'the phrase is on screen, not only in a hidden cell');
+            check(await ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].filter(tr => tr.textContent.includes('checkout-mockup.html')).some(tr => [...tr.querySelectorAll('.inbox-blocks')].some(e => e.getBoundingClientRect().width > 0 && e.offsetParent !== null && /wait/.test(e.textContent)))`), at + 'the phrase is on screen, not only in a hidden cell');
             await shot(`inbox-blockers-review-${w}`);
             check(!(await ev(`document.documentElement.scrollWidth > innerWidth + 1`)), at + 'the review row: no sideways scroll');
         }

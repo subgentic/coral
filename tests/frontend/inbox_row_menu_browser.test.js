@@ -37,7 +37,7 @@ const AGENTS = [
             await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); state.liveSessions = ${JSON.stringify(AGENTS)}; window.__inboxTab = m; window.__state = state; m.updateInboxTab(); return true; })()`);
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} .dt-table tbody tr').length === 3 && document.querySelector('${T}').getClientRects().length > 0`, at + 'the three waiting agents', 10000);
+            await waitFor(`document.querySelectorAll('${T} .dt-table tbody tr:not(.dt-group)').length === 3 && document.querySelector('${T}').getClientRects().length > 0`, at + 'the three waiting agents', 10000);
             // The list redraws four times in the first ~25 ms after its rows appear (late data), and a tap in that burst lands on a row that is then replaced (#14630): wait until it has been still for 300 ms.
             await ev(`window.__rowChange = performance.now(); new MutationObserver(() => { window.__rowChange = performance.now(); }).observe(document.querySelector('${T}'), { childList: true, subtree: true }); true`);
             await waitFor(`performance.now() - window.__rowChange >= 300`, at + 'the list is still', 6000);

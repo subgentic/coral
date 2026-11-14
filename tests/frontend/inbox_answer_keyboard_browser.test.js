@@ -40,11 +40,11 @@ const { coralReady } = require('./helpers/wait');
             try { await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && document.querySelectorAll('#group-table-view .inbox-answer').length === 4`, `${w}: the row's two choices`, 10000); } catch (e) { await shot(`inbox-answer-fail-${w}`); throw new Error(e.message + ' ' + await ev(`JSON.stringify([document.getElementById('group-table-view').dataset.group, document.getElementById('group-table-view').innerText.slice(0, 200), document.querySelectorAll('.inbox-answer').length])`)); }
             await waitFor(`(() => { const b = document.querySelector('#group-table-view .inbox-answer'); if (!b) return false; if (window.__seen !== b) { window.__seen = b; window.__seenAt = performance.now(); return false; } return performance.now() - window.__seenAt > 500; })()`, `${w}: the table has settled (the same choice for half a second)`, 8000);
             // (1) names: the choice and the agent
-            const names = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => [...r.querySelectorAll('button')].map(b => b.getAttribute('aria-label') || b.textContent.trim()))`);
+            const names = await ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].map(r => [...r.querySelectorAll('button')].map(b => b.getAttribute('aria-label') || b.textContent.trim()))`);
             const want = [['Open qa', 'Answer Red for qa', 'Answer Blue for qa', 'Dismiss the wait of qa'], ['Open dev', 'Answer Red for dev', 'Answer Blue for dev', 'Dismiss the wait of dev']]; // the Dismiss (#11352) is last in the row; a phone's row does not draw it (the agent's card has it)
             if (JSON.stringify(names) !== JSON.stringify(want)) problems.push(`${w}: each button's name says the agent and the choice, in reading order: ${JSON.stringify(names)}`);
             // (2) Tab order: from the first choice through the row and on to the next row's
-            await ev(`document.querySelector('#group-table-view tbody tr .dt-primary').focus(); true`);
+            await ev(`document.querySelector('#group-table-view tbody tr:not(.dt-group) .dt-primary').focus(); true`);
             const where = () => ev(`(() => { const a = document.activeElement; return !a || a === document.body ? 'the page (nothing)' : (a.getAttribute('aria-label') || a.textContent.trim()).slice(0, 40); })()`);
             const order = [await where()];
             const dismissShown = w >= 768; // a phone's row stays one line: its Dismiss is not drawn there (#11352)
@@ -59,7 +59,7 @@ const { coralReady } = require('./helpers/wait');
             if (!/^Open qa$/.test(afterAnswer)) problems.push(`${w}: after answering, the keyboard is on the row's Open (it is on ${afterAnswer})`);
             // (4) the agent stops waiting: the row leaves, the keyboard goes to the next row's first control
             await ev(`window.__done = ['qa-id']; window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.updateInboxTab()); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, `${w}: the row leaves`, 8000); await sleep(800); // sleep-ok: the answer, the announcement and the redraw come a moment after the key
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 1`, `${w}: the row leaves`, 8000); await sleep(800); // sleep-ok: the answer, the announcement and the redraw come a moment after the key
             const afterLeave = await where();
             if (!/^Open dev$/.test(afterLeave)) problems.push(`${w}: when the row leaves, the keyboard goes to the next row's first control (it is on ${afterLeave})`);
             // (5) a question that changed: said, and the keyboard is on a choice of the redrawn row

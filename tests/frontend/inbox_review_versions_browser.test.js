@@ -18,7 +18,7 @@ const YES = "(()=>{const m=document.getElementById('confirm-modal');if(m&&getCom
     const T = '#group-table-view';
     const S = `(window.__coralStatic || '/static/')`;
     const hex = n => n.toString(16).padStart(64, '0');
-    const rowsOf = () => ev(`[...document.querySelectorAll('${T} tbody tr')].map(tr => ({ text: tr.textContent.replace(/\\s+/g, ' ').trim(), id: (tr.querySelector('[data-review-artifact]') || {}).dataset ? tr.querySelector('[data-review-artifact]').dataset.reviewArtifact : '' }))`);
+    const rowsOf = () => ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].map(tr => ({ text: tr.textContent.replace(/\\s+/g, ' ').trim(), id: (tr.querySelector('[data-review-artifact]') || {}).dataset ? tr.querySelector('[data-review-artifact]').dataset.reviewArtifact : '' }))`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true]]) {
@@ -45,7 +45,7 @@ const YES = "(()=>{const m=document.getElementById('confirm-modal');if(m&&getCom
                 return true; })()`);
             await ev(`localStorage.removeItem('coral-inbox-needs-filters'); window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 6`, at + 'the review rows', 15000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length >= 6`, at + 'the review rows', 15000);
             let rows = await rowsOf();
             check(rows.length === 6, at + 'nine uploads are six rows: the four versions of design.md are one, notes.md is one, design.md of another uploader is one, two whose fields would run together with a | are two, and the same uploader and name on ANOTHER team is its own: ' + JSON.stringify(rows.map(r => r.text.slice(0, 60))));
             const design = rows.find(r => r.id === hex(4));
@@ -57,7 +57,7 @@ const YES = "(()=>{const m=document.getElementById('confirm-modal');if(m&&getCom
             await shot(`inbox-review-versions-${w}`);
             if (!mobile) {
                 // "3 earlier versions" is a link: the list of v1 to v4, oldest first, the newest marked, with Open and (the uploader being known) Restore, which asks first (#15285)
-                await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => tr.querySelector('[data-review-artifact="${hex(4)}"]')).querySelector('button.inbox-review-earlier').click(); true`);
+                await ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(tr => tr.querySelector('[data-review-artifact="${hex(4)}"]')).querySelector('button.inbox-review-earlier').click(); true`);
                 await waitFor(`!!document.querySelector('.version-list-dialog[open] .version-list-entry')`, at + 'the version list opens', 10000);
                 const items = await ev(`[...document.querySelectorAll('.version-list-dialog[open] .version-list-entry')].map(li => ({ n: li.dataset.version, name: li.querySelector('.version-list-name').textContent, current: li.getAttribute('aria-current') === 'true', who: li.querySelector('.version-list-who').textContent, open: !!li.querySelector('.version-list-open'), restore: !!li.querySelector('.version-list-restore') }))`);
                 check(items.length === 4 && items.map(i => i.n).join() === '1,2,3,4' && items[3].current && /newest/.test(items[3].name) && !items[0].current, at + 'v1 to v4, oldest first, the newest marked: ' + JSON.stringify(items));
@@ -91,22 +91,22 @@ const YES = "(()=>{const m=document.getElementById('confirm-modal');if(m&&getCom
                 await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
             }
             // Approve the newest version of design.md: one review, for the newest; the three before it are settled by the tags route, with the other tags kept
-            await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => tr.querySelector('[data-review-artifact="${hex(4)}"]')).querySelector('button[aria-label^="Approve"]').click(); ${YES}`);
+            await ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(tr => tr.querySelector('[data-review-artifact="${hex(4)}"]')).querySelector('button[aria-label^="Approve"]').click(); ${YES}`);
             await waitFor(`window.__rv.calls.filter(c => c.route === 'tags').length >= 3`, at + 'the earlier versions are settled', 10000).catch(() => {});
             const calls = await ev(`window.__rv.calls`);
             const reviews = calls.filter(c => c.route === 'review'), tagsCalls = calls.filter(c => c.route === 'tags');
             check(reviews.length === 1 && reviews[0].id === hex(4) && reviews[0].body.decision === 'approve', at + 'one review, of the newest version: ' + JSON.stringify(reviews));
             check(tagsCalls.length === 3 && [hex(1), hex(2), hex(3)].every(id => tagsCalls.some(c => c.id === id && !c.body.tags.includes('for review') && c.body.tags.includes('internal'))), at + 'each earlier version loses only its "for review" tag: ' + JSON.stringify(tagsCalls));
             check(calls.every(c => c.team === team && c.id !== hex(9)), at + "approving one team's design.md writes nothing to the other team's copy: " + JSON.stringify(calls.filter(c => c.id === hex(9))));
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 5`, at + 'the design row is gone', 10000).catch(() => {});
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 5`, at + 'the design row is gone', 10000).catch(() => {});
             await ev(`import(${S} + 'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true)`); await ev(`new Promise(r => setTimeout(r, 600))`); // sleep-ok: the list is read again; none of the earlier versions comes back
             rows = await rowsOf();
             check(rows.length === 5 && rows.some(r => r.id === hex(9)) && !rows.some(r => [hex(1), hex(2), hex(3), hex(4)].includes(r.id)), at + 'after a fresh read no version of design.md is back: ' + JSON.stringify(rows.map(r => r.text.slice(0, 50))));
 
             // one of the writes fails: the newest is approved, the person is told, and that version stays (it is the newest left)
             await ev(`(() => { const st = window.__rv; for (const a of st.items) if (a.name === 'design.md' && a.session_id === 's1') a.tags = ['for review', 'internal']; st.calls = []; st.failTags = '${hex(2)}'; return import(${S} + 'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true); })()`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 6`, at + 'the versions are back for the second case', 10000);
-            await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => tr.querySelector('[data-review-artifact="${hex(4)}"]')).querySelector('button[aria-label^="Approve"]').click(); ${YES}`);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 6`, at + 'the versions are back for the second case', 10000);
+            await ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(tr => tr.querySelector('[data-review-artifact="${hex(4)}"]')).querySelector('button[aria-label^="Approve"]').click(); ${YES}`);
             await waitFor(`/could not be cleared/.test(document.body.innerText)`, at + 'the person is told an earlier version could not be cleared', 10000).catch(() => {});
             await ev(`import(${S} + 'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true)`); await ev(`new Promise(r => setTimeout(r, 600))`); // sleep-ok: the list is read again
             rows = await rowsOf();

@@ -27,22 +27,22 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`fetch('/api/board/sel/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Writer', job_title: 'W' }) }).then(r => r.status)`);
         await ev(`localStorage.removeItem('coral-inbox-needs-filters'); window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-        await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 3`, 'three review rows', 15000);
+        await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length >= 3`, 'three review rows', 15000);
 
         // a row that opens on a click is not selectable
-        const sel = await ev(`(() => { const td = document.querySelector('${T} tbody tr td'); const cs = getComputedStyle(td); return { userSelect: cs.userSelect || cs.webkitUserSelect, row: getComputedStyle(td.parentElement).userSelect }; })()`);
+        const sel = await ev(`(() => { const td = document.querySelector('${T} tbody tr:not(.dt-group) td'); const cs = getComputedStyle(td); return { userSelect: cs.userSelect || cs.webkitUserSelect, row: getComputedStyle(td.parentElement).userSelect }; })()`);
         check(sel.userSelect === 'none' && sel.row === 'none', 'the cells of a row that opens on a click are not text to select: ' + JSON.stringify(sel));
 
         // a selection across the cells (a drag that went over them, or a select-all) is cleared when the list is drawn again
         await ev(`(() => { const s = getSelection(), body = document.querySelector('${T} tbody'); s.removeAllRanges(); const r = document.createRange(); r.selectNodeContents(body); s.addRange(r); return true; })()`);
         await ev(`(() => { window.__items = window.__items.slice(1); return import(${S} + 'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true); })()`); // an item has been dealt with elsewhere: the list is drawn again with two rows
-        await waitFor(`document.querySelectorAll('${T} tbody tr').length === 2`, 'the list is drawn again with two rows', 10000);
+        await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 2`, 'the list is drawn again with two rows', 10000);
         await ev(framesJs(6));
         const kept = await ev(`(() => { const s = getSelection(); return { collapsed: s.isCollapsed, text: String(s).length, inTable: !!(s.anchorNode && document.querySelector('${T}').contains(s.anchorNode)) }; })()`);
         check(kept.collapsed || !kept.inTable, 'after the list is drawn again no selection is left inside it: ' + JSON.stringify(kept));
 
         // and a real click opens the row
-        const r = await ev(`(() => { const b = document.querySelector('${T} tbody tr .inbox-review-name').getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
+        const r = await ev(`(() => { const b = document.querySelector('${T} tbody tr:not(.dt-group) .inbox-review-name').getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
         await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: r.x, y: r.y }); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: r.x, y: r.y, button: 'left', buttons: 1, clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: r.x, y: r.y, button: 'left', buttons: 0, clickCount: 1 });
         await ev(framesJs(10));
         check(await ev(`!!document.querySelector('.artifact-viewer-close, .artifact-viewer')`), 'a real click on the row opens it after the selection and the redraw');

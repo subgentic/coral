@@ -33,15 +33,15 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await ev(`import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 2`, at + 'one row for the three versions and one for the question', 15000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 2`, at + 'one row for the three versions and one for the question', 15000);
             await ev(framesJs(4));
             await shot(`needs-phone-walk-${w}`);
-            const m = await ev(`(() => { const rows = [...document.querySelectorAll('${T} tbody tr')], plan = rows.find(r => r.textContent.includes('plan.md')), ask = rows.find(r => r.textContent.includes('Which port')), q = (tr, s) => tr.querySelector(s), box = tr => tr.getBoundingClientRect(), from = q(plan, '.inbox-review-from'), earlier = q(plan, '.inbox-review-earlier'), item = q(plan, '.inbox-review-item');
+            const m = await ev(`(() => { const rows = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')], plan = rows.find(r => r.textContent.includes('plan.md')), ask = rows.find(r => r.textContent.includes('Which port')), q = (tr, s) => tr.querySelector(s), box = tr => tr.getBoundingClientRect(), from = q(plan, '.inbox-review-from'), earlier = q(plan, '.inbox-review-earlier'), item = q(plan, '.inbox-review-item');
                 return { from: from.textContent.replace(/\\s*\\u00b7$/, ''), fromCut: from.scrollWidth > from.clientWidth + 1, fromW: Math.round(from.getBoundingClientRect().width),
                     earlier: earlier ? earlier.textContent.replace(/\\s+/g, ' ').trim() : null, earlierSeen: earlier ? earlier.getBoundingClientRect().right <= item.getBoundingClientRect().right + 1 && earlier.getBoundingClientRect().width > 0 : false,
                     askText: ask.textContent.replace(/\\s+/g, ' '), askCount: (ask.textContent.match(/Which port should the test server use\\?/g) || []).length }; })()`);
             if (w <= 760) {
-            const said = await ev(`(() => { const plan = [...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes('plan.md')), v = plan.querySelector('.inbox-review-version'), sr = [...plan.querySelectorAll('.sr-only')].map(e => e.textContent).join(' '); return { badge: v ? v.textContent.trim() : null, srEarlier: /2 earlier versions/.test(sr), badgeSeen: !!v && v.getBoundingClientRect().width > 0 && v.getBoundingClientRect().right <= plan.getBoundingClientRect().right + 1 }; })()`);
+            const said = await ev(`(() => { const plan = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(r => r.textContent.includes('plan.md')), v = plan.querySelector('.inbox-review-version'), sr = [...plan.querySelectorAll('.sr-only')].map(e => e.textContent).join(' '); return { badge: v ? v.textContent.trim() : null, srEarlier: /2 earlier versions/.test(sr), badgeSeen: !!v && v.getBoundingClientRect().width > 0 && v.getBoundingClientRect().right <= plan.getBoundingClientRect().right + 1 }; })()`);
             check(said.badge === 'v3' && said.badgeSeen && said.srEarlier, at + 'the row of three versions shows v3 on line one and says "2 earlier versions" to a screen reader (#13911: three lines at most): ' + JSON.stringify(said));
             } else {
             check(m.earlier === '· 2 earlier versions' || /2 earlier versions/.test(String(m.earlier)), at + 'the row of three versions says "2 earlier versions": ' + JSON.stringify(m));

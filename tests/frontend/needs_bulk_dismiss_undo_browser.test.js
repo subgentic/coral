@@ -10,7 +10,7 @@ const { coralReady } = require('./helpers/wait');
     const failures = [];
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const S = `(window.__coralStatic || '/static/')`, T = '#group-table-view';
-    const rowNames = () => ev(`[...document.querySelectorAll('${T} tbody tr')].map(r => (r.textContent.match(/bulk-0\\d/) || [''])[0])`);
+    const rowNames = () => ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].map(r => (r.textContent.match(/bulk-0\\d/) || [''])[0])`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 800, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true }); // the Needs you table selects rows on a phone layout only
@@ -32,21 +32,21 @@ const { coralReady } = require('./helpers/wait');
         await ev(`fetch('/api/board/bulk/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Writer', job_title: 'W' }) }).then(r => r.status)`);
         await ev(`localStorage.removeItem('coral-inbox-needs-filters'); window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-        await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 3`, 'three review rows', 15000);
+        await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length >= 3`, 'three review rows', 15000);
 
         for (const n of ['bulk-01', 'bulk-02']) { // the first press starts selecting (the rows are drawn again), so each is found anew
-            await waitFor(`!![...document.querySelectorAll('${T} tbody [aria-label^="Select ${n}"], ${T} tbody tr')].find(x => /${n}/.test(x.getAttribute('aria-label') || x.textContent))`, n + ' is a row', 8000);
-            await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr')].find(r => /${n}/.test(r.textContent)), pick = row.querySelector('button[role="checkbox"], .dt-check input'); pick.click(); return true; })()`);
-            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(r => /${n}/.test(r.textContent) && (r.querySelector('[aria-checked="true"]') || r.querySelector('.dt-check input:checked')))`, n + ' is selected', 6000);
+            await waitFor(`!![...document.querySelectorAll('${T} tbody [aria-label^="Select ${n}"], ${T} tbody tr:not(.dt-group)')].find(x => /${n}/.test(x.getAttribute('aria-label') || x.textContent))`, n + ' is a row', 8000);
+            await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(r => /${n}/.test(r.textContent)), pick = row.querySelector('button[role="checkbox"], .dt-check input'); pick.click(); return true; })()`);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].some(r => /${n}/.test(r.textContent) && (r.querySelector('[aria-checked="true"]') || r.querySelector('.dt-check input:checked')))`, n + ' is selected', 6000);
         }
         await waitFor(`!!document.querySelector('.dt-bar') && /2 selected/.test(document.querySelector('.dt-bar').textContent)`, '2 selected in the bar', 8000);
         await ev(`[...document.querySelectorAll('.dt-bar button')].find(b => (b.getAttribute('aria-label') || b.textContent).trim().startsWith('Dismiss')).click(); true`);
-        await waitFor(`document.querySelectorAll('${T} tbody tr').length === 1`, 'the two dismissed files leave Needs you', 10000);
+        await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 1`, 'the two dismissed files leave Needs you', 10000);
         await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Dismissed 2/.test(t.textContent) && [...t.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo'))`, 'the toast says Dismissed 2, with Undo', 8000);
         await ev(`window.__ntDelay = 1500; import(${S} + 'inbox_reviews.js').then(m => { window.__inFlight = m.refreshReviews(true); return true; })`); // a read starts now: the protected computer page is captured before Undo and resolves late
         await new Promise(r => setTimeout(r, 400)); // sleep-ok: the read's team list comes back (before the Undo writes) while its no-team read is still held
         await ev(`[...document.querySelectorAll('.toast')].filter(t => /Dismissed 2/.test(t.textContent)).forEach(t => t.querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); })); true`);
-        await waitFor(`document.querySelectorAll('${T} tbody tr').length === 3`, 'Undo with a read in flight brings both back to Needs you', 9000);
+        await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 3`, 'Undo with a read in flight brings both back to Needs you', 9000);
         check(JSON.stringify((await rowNames()).sort()) === JSON.stringify(['bulk-01', 'bulk-02', 'bulk-03']), 'the three files are the rows: ' + JSON.stringify(await rowNames()));
         await ev(`window.__ntDelay = 0; window.__inFlight.then(() => true)`);
     } finally { await removeBoards(ev, ['bulk']).catch(() => {}); await client.close(); }

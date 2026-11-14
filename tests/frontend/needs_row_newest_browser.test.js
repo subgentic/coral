@@ -29,7 +29,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return true; })()`);
             await ev(STUB); // the series (v1, v2, v3) and the file's text, for the viewer
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 1`, at + 'the one review row', 15000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 1`, at + 'the one review row', 15000);
             const state = () => ev(`(() => { const d = document.querySelector('#artifact-viewer'); return { open: !!d && !d.hidden, comparing: !!d && d.classList.contains('av-comparing'), current: ((d && d.querySelector('.av-current')) || {}).textContent || '', heading: !!(d && d.querySelector('.av-heading') && d.querySelector('.av-heading').getClientRects().length), text: (d && d.textContent) || '' }; })()`);
             const opened = async how => {
                 await waitFor(`(() => { const d = document.querySelector('#artifact-viewer'); return !!d && !d.hidden && !!d.querySelector('.av-current'); })()`, at + how + ': the viewer opens with its versions bar', 8000);
@@ -43,7 +43,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             };
             await ev(`document.querySelector('${T} .inbox-review-name').click(); true`);
             await opened('the name');
-            await ev(`document.querySelector('${T} tbody tr td:nth-child(2)').click(); true`); // a click on the row (not a button) opens it too
+            await ev(`document.querySelector('${T} tbody tr:not(.dt-group) td:nth-child(2)').click(); true`); // a click on the row (not a button) opens it too
             await opened('a click on the row');
             await removeBoards(ev, [team]).catch(() => {});
         }

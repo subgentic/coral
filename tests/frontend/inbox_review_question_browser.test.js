@@ -29,8 +29,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
                     return json({ project: 'qn', artifacts: window.__items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false }); }; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 4`, at + 'four review rows', 15000);
-            const rowText = n => ev(`(() => { const r = [...document.querySelectorAll('${T} tbody tr')].find(x => x.textContent.includes(${JSON.stringify(n)})); const sub = r.querySelector('.dt-subtitle'), meta = r.querySelector('.inbox-review-metadata'); return { all: r.textContent.replace(/\\s+/g, ' '), sub: sub ? sub.textContent : '', meta: meta ? meta.textContent : '', ask: (r.querySelector('.inbox-review-question') || {}).textContent || '', shown: [r.querySelector('.inbox-review-from'), sub].filter(x => x && getComputedStyle(x).display !== 'none' && x.getBoundingClientRect().width > 1 && x.getBoundingClientRect().height > 1).map(x => x.textContent).join(' | ') }; })()`);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 4`, at + 'four review rows', 15000);
+            const rowText = n => ev(`(() => { const r = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(x => x.textContent.includes(${JSON.stringify(n)})); const sub = r.querySelector('.dt-subtitle'), meta = r.querySelector('.inbox-review-metadata'); return { all: r.textContent.replace(/\\s+/g, ' '), sub: sub ? sub.textContent : '', meta: meta ? meta.textContent : '', ask: (r.querySelector('.inbox-review-question') || {}).textContent || '', shown: [r.querySelector('.inbox-review-from'), sub].filter(x => x && getComputedStyle(x).display !== 'none' && x.getBoundingClientRect().width > 1 && x.getBoundingClientRect().height > 1).map(x => x.textContent).join(' | ') }; })()`);
             const a = await rowText('plan-a.md'), b = await rowText('plan-b.md'), c = await rowText('plan-c.md');
             if (mobile) {
                 check(/Writer/.test(a.shown) && /Which port should the test server use\?/.test(a.shown) && !/For review/.test(a.shown), at + 'a phone row has the uploader on its top line and the question under it, not "For review": ' + JSON.stringify(a.shown));
@@ -42,14 +42,14 @@ const { removeBoards } = require('./helpers/board_cleanup');
             check(/<U\+202E>/.test(b.all) && !b.all.includes('\u202e'), at + 'a hidden character in a question is written out, never drawn raw: ' + JSON.stringify(b.all.slice(0, 160)));
 
             if (!mobile) { // a coral://artifacts link in a question is a link that opens that file (#15338, walk 23)
-                const link = await ev(`(() => { const r = [...document.querySelectorAll('${T} tbody tr')].find(x => x.textContent.includes('plan-d.md')), l = r.querySelector('.dt-subtitle .inbox-question-link'); return l ? { text: l.textContent, tag: l.tagName, title: l.title, sub: r.querySelector('.dt-subtitle').textContent } : null; })()`);
+                const link = await ev(`(() => { const r = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(x => x.textContent.includes('plan-d.md')), l = r.querySelector('.dt-subtitle .inbox-question-link'); return l ? { text: l.textContent, tag: l.tagName, title: l.title, sub: r.querySelector('.dt-subtitle').textContent } : null; })()`);
                 check(!!link && link.tag === 'BUTTON' && link.title === 'coral://artifacts/' + '0'.repeat(63) + '9' && /^Read file 0{8} first$/.test(link.sub), at + 'the question\'s coral://artifacts reference is a link: ' + JSON.stringify(link));
-                await ev(`[...document.querySelectorAll('${T} tbody tr')].find(x => x.textContent.includes('plan-d.md')).querySelector('.inbox-question-link').click(); true`);
+                await ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(x => x.textContent.includes('plan-d.md')).querySelector('.inbox-question-link').click(); true`);
                 await waitFor(`!!document.querySelector('.artifact-viewer-close')`, at + 'the link opens the file in the viewer', 8000);
                 await ev(`document.querySelector('.artifact-viewer-close')?.click(); true`);
             }
             // the viewer says it too
-            await ev(`[...document.querySelectorAll('${T} tbody tr')].find(x => x.textContent.includes('plan-a.md')).querySelector('.inbox-review-name').click(); true`);
+            await ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(x => x.textContent.includes('plan-a.md')).querySelector('.inbox-review-name').click(); true`);
             await waitFor(`!!document.querySelector('.artifact-viewer-from') && !document.querySelector('.artifact-viewer-from').hidden`, at + 'the viewer opens with its from line', 8000);
             const from = await ev(`document.querySelector('.artifact-viewer-from').textContent`);
             check(/Which port should the test server use\?/.test(from) && /from Writer/.test(from), at + 'the viewer\'s line under the title has the question and the uploader: ' + JSON.stringify(from));

@@ -26,15 +26,15 @@ const { coralReady } = require('./helpers/wait');
             window.__m.entry = a => ({ ...entry(a), board_project: a.session_id === 'qa-id' ? ${JSON.stringify(B)} : null, board_job_title: { 'rev-id': 'Reviewer', 'qa-id': 'QA Engineer' }[a.session_id] || '', waiting_for_input: waiting.includes(a.session_id), waiting_kind: waiting.includes(a.session_id) ? 'permission' : null, waiting_summary: a.session_id === 'qa-id' ? 'Run npm test in the frontend folder' : '', working_directory: a.session_id === 'qa-id' ? '/work/coral/tests/frontend' : '/work/coral/coral-go' });
             window.__m.add('rev', 'R', 4, { sleeping: false, session_id: 'rev-id' }); window.__m.add('qa', 'Q', 4, { sleeping: false, session_id: 'qa-id' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); return true; })()`);
         await ev(`window.switchNavTab('hub-inbox'); true`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'two agents waiting', 10000);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2`, 'two agents waiting', 10000);
         // Needs you: the folder beside the agent, the team where there is one, the question under the name when there is one (#9486: no Waiting for column)
-        const needs = await ev(`(() => { const th = [...document.querySelectorAll('#group-table-view thead th')].map(h => h.textContent.replace(/[↑↓↕]/g, '').trim()); const c = (tr, h) => th.includes(h) ? tr.cells[th.indexOf(h)].textContent.trim() : ''; return [...document.querySelectorAll('#group-table-view tbody tr')].map(tr => ({ name: tr.querySelector('.dt-primary').textContent, folder: c(tr, 'Folder'), team: c(tr, 'Team').replace(/^\u2014none$/, ''), ask: (tr.querySelector('.dt-subtitle') || { textContent: '' }).textContent.trim() })); })()`);
+        const needs = await ev(`(() => { const th = [...document.querySelectorAll('#group-table-view thead th')].map(h => h.textContent.replace(/[↑↓↕]/g, '').trim()); const c = (tr, h) => th.includes(h) ? tr.cells[th.indexOf(h)].textContent.trim() : ''; return [...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].map(tr => ({ name: tr.querySelector('.dt-primary').textContent, folder: c(tr, 'Folder'), team: c(tr, 'Team').replace(/^\u2014none$/, ''), ask: (tr.querySelector('.dt-subtitle') || { textContent: '' }).textContent.trim() })); })()`);
         const qa = needs.find(n => n.name === 'qa'), rev = needs.find(n => n.name === 'rev');
         assert.ok(qa && qa.folder === 'frontend' && qa.team && qa.ask === 'Run npm test in the frontend folder', 'the qa row says its folder, team and question: ' + JSON.stringify(needs));
         assert.ok(rev && rev.folder === 'coral-go' && rev.team === '', 'the rev row says its folder (no team, no question): ' + JSON.stringify(needs));
         // Tasks: priority first, a High chip, the count of high ones on the tab
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('tasks')); true`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, 'three tasks', 10000);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 3`, 'three tasks', 10000);
         const tasks = await ev(`({ titles: [...document.querySelectorAll('#group-table-view .dt-primary')].map(t => t.textContent), prio: document.querySelectorAll('#group-table-view td[data-key="priority"], #group-table-view th[data-key="priority"]').length, count: document.querySelector('#group-table-view .session-group-count').textContent })`);
         assert.deepEqual(tasks.titles, ['Decide: ship 166 with the Windows trace pending?', 'Approve the design', 'Pick the name for the Goals tab'], 'the tasks are ordered by priority: ' + JSON.stringify(tasks));
         assert.equal(tasks.prio, 0, 'the order is by priority but there is no Priority column (#8784): ' + JSON.stringify(tasks));
@@ -47,9 +47,9 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(reply.openTag, null, 'already on the task page: no redundant Open task link');
         // Saved: a message whose transcript is gone says Gone in the table (one word, not a sentence on every row) and says why once, on its own page
         await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('saved')); true`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, 'three saved', 10000);
-        await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr')].every(tr => tr.cells[2].textContent.trim() === 'Gone')`, 'the rows are marked gone from the list\'s own answer', 10000);
-        const saved = await ev(`({ gone: [...document.querySelectorAll('#group-table-view tbody tr')].filter(tr => tr.cells[2].textContent.trim() === 'Gone').length, sentences: document.querySelectorAll('#group-table-view .inbox-saved-why, #group-table-view .why').length, buttons: document.querySelectorAll('#group-table-view .dt-quiet').length })`);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 3`, 'three saved', 10000);
+        await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].every(tr => tr.cells[2].textContent.trim() === 'Gone')`, 'the rows are marked gone from the list\'s own answer', 10000);
+        const saved = await ev(`({ gone: [...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].filter(tr => tr.cells[2].textContent.trim() === 'Gone').length, sentences: document.querySelectorAll('#group-table-view .inbox-saved-why, #group-table-view .why').length, buttons: document.querySelectorAll('#group-table-view .dt-quiet').length })`);
         assert.equal(saved.gone, 3, 'three gone rows: ' + JSON.stringify(saved));
         assert.equal(saved.sentences, 0, 'the sentence is not repeated on the rows: ' + JSON.stringify(saved));
         await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);

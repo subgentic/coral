@@ -26,13 +26,13 @@ const { coralReady, framesJs } = require('./helpers/wait');
                     if (m && o && o.method === 'POST') { const body = JSON.parse(o.body); window.__closes.push({ board: m[1], id: Number(m[2]), body }); if (window.__refuse) return json({ error: window.__refuse }, 409); if (body.undo) window.__asks.push({ board: 'team', board_label: 'Sprout', kind: 'ask', id: 42, asker: 'Dev', text: '@Operator may I delete the old table?', at: new Date().toISOString() }); else window.__asks = window.__asks.filter(a => !(a.kind === 'ask' && a.id === Number(m[2]))); return json({ ok: true }); }
                     return orig(u, o); }; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'the question and the wait', 10000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2`, at + 'the question and the wait', 10000);
             const open = who => ev(`document.querySelector('button[aria-label="Answer the question of ${who}"]').click(); true`);
 
             const m = await ev(`(() => { const r = e => { const b = e.getBoundingClientRect(); return { l: Math.round(b.left), r: Math.round(b.right) }; };
                 const T = document.querySelector('#group-table-view'), tbl = T.querySelector('table, .dt-table') || T;
                 return { vw: innerWidth, sw: document.documentElement.scrollWidth, table: r(tbl), out: [...document.querySelectorAll('.inbox-folder-toolbar .gt-toolbar *')].filter(e => e.getClientRects().length && (e.getBoundingClientRect().right > innerWidth - 8 || e.getBoundingClientRect().left < 8)).map(e => e.className + ' ' + Math.round(e.getBoundingClientRect().left) + '-' + Math.round(e.getBoundingClientRect().right)).slice(0, 6),
-                    pills: [...document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills')].filter(e => e.getClientRects().length).map(e => e.scrollWidth - e.clientWidth), btns: [...T.querySelectorAll('tbody tr button')].filter(b => /^(Answer|Dismiss)/.test(b.textContent.trim())).map(b => ({ t: b.textContent.trim(), ...r(b) })) }; })()`);
+                    pills: [...document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills')].filter(e => e.getClientRects().length).map(e => e.scrollWidth - e.clientWidth), btns: [...T.querySelectorAll('tbody tr:not(.dt-group) button')].filter(b => /^(Answer|Dismiss)/.test(b.textContent.trim())).map(b => ({ t: b.textContent.trim(), ...r(b) })) }; })()`);
             check(at + 'no sideways scroll', m.sw <= m.vw + 1, JSON.stringify(m));
             check(at + 'the table keeps a gutter of at least 16 px on both sides', m.table.l >= 16 && m.table.r <= m.vw - 16, JSON.stringify(m.table));
             check(at + 'every control of the title line is whole on the screen', m.out.length === 0, JSON.stringify(m.out));

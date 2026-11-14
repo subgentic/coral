@@ -11,7 +11,7 @@ const { coralReady } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const team = 'review-inbox-' + Date.now().toString(36), failures = [];
-    const row = name => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r=>r.textContent.includes(${JSON.stringify(name)}))`;
+    const row = name => `[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(r=>r.textContent.includes(${JSON.stringify(name)}))`;
     const rows = `document.querySelectorAll('#group-table-view [data-review-artifact]')`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD}); await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' }));` }); // the Inbox's list is read before a test can set its order: oldest first, set before the page loads (newest first is the default, #11552)
@@ -69,14 +69,14 @@ const { coralReady } = require('./helpers/wait');
                 assert.deepEqual(await ev(`window.__versionCalls`),[],'no row asks the server for its version: 13 files, 0 requests (#11890)');
                 // #11998 (Beta pass 2): a message that only links a file is not a second item: the file shows once, as the file; a question with words of its own stays
                 if(width===1280){
-                    const hex3=(3).toString(16).padStart(64,'0'), before=await ev(`document.querySelectorAll('#group-table-view tbody tr').length`);
+                    const hex3=(3).toString(16).padStart(64,'0'), before=await ev(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length`);
                     await ev(`window.__asks=[{board:'${team}',kind:'ask',id:81,asker:'Review Writer',text:'The design doc: coral://artifacts/${hex3}',at:new Date().toISOString()}];import((window.__coralStatic||'/static/')+'operator_asks.js').then(m=>m.refreshOperatorAsks(true)).then(()=>true)`);
                     await new Promise(r=>setTimeout(r,500)); // sleep-ok: the list redraws after the read
-                    assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr').length`),before,'a message that only links a file adds no second row: the file is the item');
-                    assert.equal(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].filter(r=>/design doc: coral:/.test(r.textContent)).length`),0,'and no row shows the raw coral:// link');
+                    assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length`),before,'a message that only links a file adds no second row: the file is the item');
+                    assert.equal(await ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].filter(r=>/design doc: coral:/.test(r.textContent)).length`),0,'and no row shows the raw coral:// link');
                     await ev(`window.__asks=[{board:'${team}',kind:'ask',id:82,asker:'Review Writer',text:'Should we ship this on Friday or wait for the next release? Please read coral://artifacts/${hex3} first.',at:new Date().toISOString()}];import((window.__coralStatic||'/static/')+'operator_asks.js').then(m=>m.refreshOperatorAsks(true)).then(()=>true)`);
                     await new Promise(r=>setTimeout(r,500)); // sleep-ok: the list redraws after the read
-                    assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr').length`),before+1,'a question with words of its own that links the file is still a question');
+                    assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length`),before+1,'a question with words of its own that links the file is still a question');
                     await ev(`window.__asks=[];import((window.__coralStatic||'/static/')+'operator_asks.js').then(m=>m.refreshOperatorAsks(true)).then(()=>true)`);
                 }
                 assert.equal(await ev(`${rows}.length`),13,'the pinned Writer A file does not consume the ten-unstarred cap; all thirteen fit');

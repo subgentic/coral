@@ -14,7 +14,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const T = '#group-table-view';
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const S = `(window.__coralStatic || '/static/')`;
-    const rowsOf = () => ev(`[...document.querySelectorAll('${T} tbody tr')].map(r => (r.textContent.match(/plan-\\d/) || [''])[0])`);
+    const rowsOf = () => ev(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].map(r => (r.textContent.match(/plan-\\d/) || [''])[0])`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' }));` });
         for (const [w, h, mobile] of [[1440, 800, false], [390, 800, true]]) {
@@ -41,7 +41,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 3`, at + 'three review rows', 15000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 3`, at + 'three review rows', 15000);
             await ev(framesJs(3));
             const dots = file => ev(`(() => { document.querySelector('${T} button[aria-label="More actions for ${file}"]').click(); return true; })()`);
             // the three dots: Save for later
@@ -53,7 +53,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 await waitFor(`!!document.querySelector('${T} .menu-item[aria-label="Save for later: plan-1.md"]')`, at + 'the dots have "Save for later"', 5000);
                 await ev(`document.querySelector('${T} .menu-item[aria-label="Save for later: plan-1.md"]').click(); true`);
             }
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 2`, at + 'the saved row leaves Needs you', 8000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 2`, at + 'the saved row leaves Needs you', 8000);
             check(JSON.stringify(await rowsOf()) === JSON.stringify(['plan-2', 'plan-3']), at + 'the others stay: ' + JSON.stringify(await rowsOf()));
             let calls = await ev(`window.__calls`);
             check(calls.length === 1 && calls[0].path.endsWith('/review') && calls[0].body.decision === 'save', at + 'one decision, "save", and nothing else was posted: ' + JSON.stringify(calls));
@@ -76,14 +76,14 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`document.querySelector('.saved-files .menu-item[aria-label="Move to Needs you: plan-1.md"]').click(); true`);
             await waitFor(`!document.querySelector('.saved-files') || !document.querySelector('.saved-files').textContent.includes('plan-1.md')`, at + 'it leaves Saved', 8000);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 3`, at + 'it is back in Needs you', 10000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 3`, at + 'it is back in Needs you', 10000);
             calls = await ev(`window.__calls`);
             check(calls.length === 2 && calls[1].body.decision === 'unsave', at + 'the second decision is "unsave", nothing else: ' + JSON.stringify(calls.map(c => c.body)));
             // drag onto Saved (a desktop's gesture)
             if (!mobile) {
-                await ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => /plan-2/.test(r.textContent)), dt = new DataTransfer(), saved = document.querySelector('.view-list-item[data-key="saved"]');
+                await ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(r => /plan-2/.test(r.textContent)), dt = new DataTransfer(), saved = document.querySelector('.view-list-item[data-key="saved"]');
                     tr.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt })); saved.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt })); saved.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt })); return true; })()`);
-                await waitFor(`[...document.querySelectorAll('${T} tbody tr')].every(r => !/plan-2/.test(r.textContent))`, at + 'a row dragged onto Saved is saved', 8000);
+                await waitFor(`[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].every(r => !/plan-2/.test(r.textContent))`, at + 'a row dragged onto Saved is saved', 8000);
                 calls = await ev(`window.__calls`);
                 check(calls.length === 3 && calls[2].body.decision === 'save', at + 'the drop is one "save" decision: ' + JSON.stringify(calls.map(c => c.body)));
             }

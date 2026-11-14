@@ -21,7 +21,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(INBOX_WORLD);
             await ev(`(async () => { const { state } = await import(${S} + 'state.js'); const m = await import(${S} + 'inbox_tab.js'); state.liveSessions = [${JSON.stringify(AGENT)}]; m.updateInboxTab(); window.switchNavTab('hub-inbox'); await m.selectInboxTab('needs'); return true; })()`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 1`, at + 'the permission row', 15000); await ev(framesJs(6));
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length >= 1`, at + 'the permission row', 15000); await ev(framesJs(6));
 
             // A: every kind has its own icon, labelled, in the icon font, with no text of its own
             const kinds = await ev(`(async () => { const NF = await import(${S} + 'needs_filters.js'); const host = document.querySelector('${T}').parentElement; const out = [];
@@ -35,7 +35,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
 
             // B: in the real table: the icon leads the agent's button, the click target stays, the row's height is the same without it
             // inCell: the row holds the icon in its leading gutter.
-            const measureRow = () => ev(`(() => { const tr = document.querySelector('${T} tbody tr'), td = tr.querySelector('td'), i = tr.querySelector('.inbox-kind-icon'), btn = tr.querySelector('.dt-primary'), h = () => Math.round(tr.getBoundingClientRect().height);
+            const measureRow = () => ev(`(() => { const tr = document.querySelector('${T} tbody tr:not(.dt-group)'), td = tr.querySelector('td'), i = tr.querySelector('.inbox-kind-icon'), btn = tr.querySelector('.dt-primary'), h = () => Math.round(tr.getBoundingClientRect().height);
                 if (!i) return null; const withIcon = h(), t = tr.textContent; i.style.display = 'none'; const without = h(); i.style.display = '';
                 return { label: i.getAttribute('aria-label'), kind: i.dataset.kind, mail: !!tr.querySelector('.dt-mail-lead')?.contains(i), before: i.getBoundingClientRect().right <= btn.getBoundingClientRect().left + 1, sameLine: (() => { const a = i.getBoundingClientRect(), r = tr.getBoundingClientRect(); return a.top - r.top >= 0 && a.top - r.top <= 24; })() /* a card: the icon leads its first line (#15162) */, name: btn.getAttribute('aria-label') || '', withIcon, without, hasName: /Backend Dev/.test(t), noLigatureText: !/lock|help_outline|rate_review/.test(t), inCell: tr.contains(i), iconRight: Math.round(i.getBoundingClientRect().right), btnLeft: Math.round(btn.getBoundingClientRect().left), color: getComputedStyle(i).color }; })()`);
             const row = await measureRow();
@@ -44,10 +44,10 @@ const { coralReady, framesJs } = require('./helpers/wait');
             check(!!row && row.withIcon === row.without, at + `the row keeps its height (${row && row.withIcon} with the icon, ${row && row.without} without)`);
             check(!!row && row.hasName && row.noLigatureText, at + 'the row text is its words, no icon names: ' + JSON.stringify(row));
             await shot(`needs_kind_icons_${w}`);
-            check(await ev(`!!document.querySelector('${T} tbody tr .dt-primary')`), at + 'the agent button is still there');
+            check(await ev(`!!document.querySelector('${T} tbody tr:not(.dt-group) .dt-primary')`), at + 'the agent button is still there');
             if (mobile) { // a phone's open button names itself (aria-label): the kind is in that name, and the focused control says it
                 check(/\bPermission\b/.test(row.name), at + "the open button's name says the kind: " + JSON.stringify(row.name));
-                const focused = await ev(`(() => { const b = document.querySelector('${T} tbody tr .dt-primary'); b.focus(); return document.activeElement === b ? (b.getAttribute('aria-label') || '') : 'not focused'; })()`);
+                const focused = await ev(`(() => { const b = document.querySelector('${T} tbody tr:not(.dt-group) .dt-primary'); b.focus(); return document.activeElement === b ? (b.getAttribute('aria-label') || '') : 'not focused'; })()`);
                 check(/Permission/.test(focused), at + 'the focused control is named with the kind: ' + focused);
             }
             // real 200% text (root 32 px): the icon stays on the title's own line and the row is as tall with it as without

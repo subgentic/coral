@@ -16,7 +16,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const N = 30;
     const name = i => 'plan-' + String(i).padStart(2, '0') + '.md';
     const SCROLLER = `(() => { for (let e = document.querySelector('${T} tbody'); e; e = e.parentElement) { const o = getComputedStyle(e).overflowY; if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight + 1) return e; } return document.scrollingElement; })()`;
-    const state = () => ev(`(() => { const s = ${SCROLLER}, rows = [...document.querySelectorAll('${T} tbody tr')], a = document.activeElement, tr = a && a.closest ? a.closest('tr') : null;
+    const state = () => ev(`(() => { const s = ${SCROLLER}, rows = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')], a = document.activeElement, tr = a && a.closest ? a.closest('tr') : null;
         return { top: Math.round(s.scrollTop), names: rows.map(r => (r.textContent.match(/plan-\\d+\\.md/) || [''])[0]), focusRow: tr ? (tr.textContent.match(/plan-\\d+\\.md/) || [''])[0] : '' }; })()`);
     const toRow = n => ev(`document.querySelector('${T} button[aria-label="Approve: ${name(n)}"]').closest('tr').scrollIntoView({ block: 'center' }); true`); // the row, not its button: a phone's buttons are out of sight (#11671), and scrolling to one scrolls to nowhere
     const calls = () => ev(`window.__calls`);
@@ -47,7 +47,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return true; })()`);
             await ev(`localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' })); window.switchNavTab('hub-inbox'); true`); // oldest first: plan-01 first
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === ${N}`, at + 'thirty review rows', 15000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === ${N}`, at + 'thirty review rows', 15000);
             await ev(framesJs(3));
             // the control of an action: a word on the 1440 row, an item of the row's three dots on the phone
             const press = async (n, word) => {

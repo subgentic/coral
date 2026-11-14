@@ -30,7 +30,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 4`, `${w}: four review rows`, 15000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 4`, `${w}: four review rows`, 15000);
             await ev(framesJs(3));
             for (const theme of ['auto', 'dark', 'light']) { // auto: the page as it loaded, following the OS
                 const at = `${w} px, ${theme}${theme === 'auto' ? ' (OS ' + os + ')' : ''}: `;
@@ -40,7 +40,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                     const plain = el => { for (let e = el; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; if (rgba(c)[3] > 0) return c; } return 'rgb(255, 255, 255)'; }; // the colour behind a cell: its own or the nearest one painted
                     const lum = c => { const [r, g, b] = rgba(c).slice(0, 3).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
                     const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
-                    const info = n => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes('plan-' + n + '.md')), name = tr.querySelector('.inbox-review-name'), td = name.closest('td'), cs = getComputedStyle(name), tcs = getComputedStyle(td);
+                    const info = n => { const tr = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(r => r.textContent.includes('plan-' + n + '.md')), name = tr.querySelector('.inbox-review-name'), td = name.closest('td'), cs = getComputedStyle(name), tcs = getComputedStyle(td);
                         return { weight: Number(cs.fontWeight), bg: plain(name), bgLum: lum(plain(name)), color: cs.color, contrast: contrast(cs.color, plain(name)), text: (tr.querySelector('.inbox-review-item .sr-only') || {}).textContent || '', pill: [...tr.querySelectorAll('.dt-tag')].some(t => t.textContent.trim() === 'read'), cls: tr.className }; };
                     return { unread: info(1), read: info(2) }; })()`);
                 await shot(`needs-read-state-${w}-${theme}${theme === 'auto' ? '-os-' + os : ''}`);

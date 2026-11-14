@@ -26,8 +26,8 @@ const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a te
                         window.__asks = window.__asks.filter(a => !(body.content.startsWith('@' + a.asker + ' ') && (a.kind === 'wait' || body.reply_to === a.id))); return json({ id: 99 }); }
                     return orig(u, o); }; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'two rows of Needs you', 10000);
-            const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => ({ name: (r.querySelector('.inbox-review-name') || {}).textContent || '', sub: (r.querySelector('.cell-subtitle, [class*="subtitle"]') || {}).textContent || '', all: r.textContent }))`);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 2`, at + 'two rows of Needs you', 10000);
+            const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].map(r => ({ name: (r.querySelector('.inbox-review-name') || {}).textContent || '', sub: (r.querySelector('.cell-subtitle, [class*="subtitle"]') || {}).textContent || '', all: r.textContent }))`);
             const lead = rows.find(r => /Orchestrator/.test(r.all));
             assert.ok(lead, at + 'the question is a row: ' + JSON.stringify(rows.map(r => r.name)));
             assert.ok(!/\*\*|\]\(|^\s*-\s|`/.test(lead.name + ' ' + lead.sub), at + 'no Markdown marks on the row (' + JSON.stringify(lead.name.slice(0, 60)) + ' / ' + JSON.stringify(lead.sub.slice(0, 120)) + ')');

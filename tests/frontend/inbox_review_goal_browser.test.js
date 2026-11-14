@@ -59,6 +59,9 @@ const { coralReady } = require('./helpers/wait');
                     const anat = await ev(`(() => { const r = ${row('Review file 01.txt')}, name = r.querySelector('.inbox-review-name'), meta = r.querySelector('.inbox-meta'); if (!name || !meta) return null; const n = name.getBoundingClientRect(), m = meta.getBoundingClientRect(); return { kind: meta.querySelector('.inbox-kind') && meta.querySelector('.inbox-kind').textContent, from: !!meta.querySelector('.inbox-review-from'), pills: meta.querySelectorAll('.inbox-pill').length, under: m.top >= n.bottom - 1, nameFirst: name.compareDocumentPosition(meta) & Node.DOCUMENT_POSITION_FOLLOWING ? true : false }; })()`);
                     assert.ok(anat && anat.kind === 'For review' && anat.from && anat.pills === 2 && anat.under && anat.nameFirst, 'the card has the title, then a meta line with the kind, the sender and the pills: ' + JSON.stringify(anat));
                 }
+                // the groups (#16679, Option B): with no goal grouping the list has one heading per kind of ask; these are all files, so one 'Review' heading, above the first row
+                const heads = await ev(`[...document.querySelectorAll('#group-table-view tr.dt-group')].map(h => h.textContent.replace(/\\s+/g, ' ').trim())`);
+                assert.ok(heads.length === 1 && /^Review\b/.test(heads[0]), 'the files sit under one Review heading: ' + JSON.stringify(heads));
                 // the Filters panel's Goal field
                 await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').click(); true`);
                 await waitFor(`!document.querySelector('.inbox-folder-toolbar .list-bar-menu').hidden`, 'the Filters panel', 6000);

@@ -17,7 +17,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const name = i => 'plan-' + String(i).padStart(2, '0') + '.md';
     // the element that scrolls the rows: the nearest ancestor of the table body that overflows, else the page
     const SCROLLER = `(() => { for (let e = document.querySelector('${T} tbody'); e; e = e.parentElement) { const o = getComputedStyle(e).overflowY; if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight + 1) return e; } return document.scrollingElement; })()`;
-    const state = () => ev(`(() => { const s = ${SCROLLER}, rows = [...document.querySelectorAll('${T} tbody tr')], a = document.activeElement, tr = a && a.closest ? a.closest('tr') : null;
+    const state = () => ev(`(() => { const s = ${SCROLLER}, rows = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')], a = document.activeElement, tr = a && a.closest ? a.closest('tr') : null;
         return { top: Math.round(s.scrollTop), names: rows.map(r => (r.textContent.match(/plan-\\d+\\.md/) || [''])[0]), focusRow: tr ? (tr.textContent.match(/plan-\\d+\\.md/) || [''])[0] : '', focusTag: a ? a.tagName : '', inView: (n) => 0 }; })()`);
     const YES = `(()=>{const m=document.getElementById('confirm-modal');if(m&&getComputedStyle(m).display!=='none')document.getElementById('confirm-modal-yes').click();return true})()`; // an unopened file asks 'Approve without opening?' (#11999); these rows were never opened
     const approve = n => ev(`(() => { const b = document.querySelector('${T} button[aria-label="Approve: ${name(n)}"]'); b.closest('tr').scrollIntoView({ block: 'center' }); return true; })()`); // the row, not its button: a phone's buttons are out of sight (#11671)
@@ -41,7 +41,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return true; })()`);
             await ev(`localStorage.removeItem('coral-inbox-needs-filters'); localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' })); window.switchNavTab('hub-inbox'); true`); // oldest first: plan-01 is the first row, plan-40 the last
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === ${N}`, at + 'forty review rows', 15000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === ${N}`, at + 'forty review rows', 15000);
             await ev(framesJs(3));
 
             // approve a row in the middle of the list

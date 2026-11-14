@@ -35,8 +35,8 @@ const NASTY = `version 3 of rel\u202eease-plan.md (file ${FILE})`, MARKED = `ver
                         return original(url, opts); };
                     return true; })()`);
                 await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-                await waitFor(`document.querySelectorAll('${T} tbody tr').length === 1`, at + 'the one review row', 15000);
-                const from = await ev(`(([...document.querySelectorAll('${T} tbody tr')].find(r => r.querySelector('.inbox-review-name')) || {}).textContent || '')`); // the data row, not the agent's group head
+                await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 1`, at + 'the one review row', 15000);
+                const from = await ev(`(([...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(r => r.querySelector('.inbox-review-name')) || {}).textContent || '')`); // the data row, not the agent's group head
                 if (expectLine === 'marked') {
                     check(from.includes(noId(MARKED)) && !from.includes('(file ') && !from.includes('\u202e'), at + `the hidden character is written out, never raw: ${JSON.stringify(from)}`);
                 } else {
