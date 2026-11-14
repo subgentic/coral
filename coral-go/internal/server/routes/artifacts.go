@@ -518,6 +518,9 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 	}
 	if taskID > 0 {
 		reply["task_id"] = taskID // the task the upload is linked to (#7739)
+		if title := h.linkedTaskTitle(r.Context(), taskID); title != "" {
+			reply["task_title"] = title // so the line the agent reads names where it went (#16139)
+		}
 	}
 	if len(tags) > 0 {
 		reply["tags"] = tags

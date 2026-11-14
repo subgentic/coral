@@ -29,7 +29,7 @@ Run coral-agent artifact upload --help, artifact download --help, artifact reply
 const artifactUploadUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <file id>[@version]] [--rename] [--task N | --no-task] [--tag WORD]... [--question TEXT] [--kind done|release|decided]
 
 An upload is linked to the task you have in progress (the reply says task_id, and this prints
-"Linked to task #N"); the task's page and the team's Artifacts tab then list it. --task N links it to
+"Attached to task #N <title>"); the task's page and the team's Artifacts tab then list it. --task N links it to
 another task of yours instead; --no-task links it to none. A task that is not yours is refused and
 nothing is stored.
 
@@ -230,6 +230,7 @@ func uploadArtifactFull(serverURL, file, name, mediaType, sid, newVersionOf, tas
 		URI      string `json:"uri"`
 		Line     string `json:"version_line"`
 		TaskID   int64  `json:"task_id"`
+		Title    string `json:"task_title"`
 		Error    string `json:"error"`
 		Code     string `json:"code"`
 		Stripped bool   `json:"stripped"`
@@ -268,7 +269,11 @@ func uploadArtifactFull(serverURL, file, name, mediaType, sid, newVersionOf, tas
 		fmt.Fprintln(stderr, reply.Line)
 	}
 	if reply.TaskID > 0 { // the reply (stdout) is the JSON a script reads; the line for a person is on stderr (#7739)
-		fmt.Fprintf(stderr, "Linked to task #%d\n", reply.TaskID)
+		if title := clitext.Clean(reply.Title); title != "" { // which task it went to, by name: a wrong target is seen at once (#16139)
+			fmt.Fprintf(stderr, "Attached to task #%d %s\n", reply.TaskID, title)
+		} else {
+			fmt.Fprintf(stderr, "Attached to task #%d\n", reply.TaskID)
+		}
 	}
 	return nil
 }

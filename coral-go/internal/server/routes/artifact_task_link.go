@@ -49,8 +49,15 @@ func (h *SessionsHandler) artifactTaskLink(ctx context.Context, r *http.Request)
 			return 0, "X-Artifact-Task must be a task number, or none", ""
 		}
 		task, terr := h.bs.GetTask(ctx, sub.Project, id)
-		if terr != nil || task == nil || task.AssignedTo == nil || *task.AssignedTo != sub.SubscriberID {
-			return 0, "that task is not one of yours on this board", ""
+		// Mine: assigned to me, or in review and mine to begin with (#16139). A task handed in for review is assigned to the orchestrator and keeps its author in the workflow: the author's
+		// screenshots, asked for during the review, are theirs to add (they used to be refused, and the upload fell onto whatever else the author had open).
+		mine := terr == nil && task != nil && task.AssignedTo != nil && *task.AssignedTo == sub.SubscriberID
+		if !mine && terr == nil && task != nil && task.Status == "review_pending" && task.Workflow.OriginalAuthor != "" && board.SameIdentity(task.Workflow.OriginalAuthor, sub.SubscriberID) {
+			mine = true
+		}
+		if !mine {
+			// One answer for another member's task, another board's and a missing one, so it does not say which exist; it names the fix, and nothing is stored or linked to any other task (#16139).
+			return 0, "that task is not one of yours on this board: name a task assigned to you, or one you submitted for review (--task N), or upload with --no-task. Nothing was uploaded and it was not linked to any other task", ""
 		}
 		switch task.Status { // a finished task takes no more files: said now, never an upload that links to a task that is closed and vanishes from its page (#12755)
 		case "completed", "skipped":
@@ -101,4 +108,21 @@ func (h *SessionsHandler) noteOffBooksUpload(ctx context.Context, taskID int64, 
 		short = short[:8]
 	}
 	_ = h.bs.AddOffBooks(ctx, sub.Project, board.OffBooksUpload, sub.SubscriberID, digest, "uploaded an artifact ("+short+") with no task in progress", time.Now())
+}
+
+// linkedTaskTitle is the title of task id on the board of the verified agent in ctx, "" when it cannot be read: the upload's reply names the task it landed on, so a wrong target is seen at once (#16139).
+func (h *SessionsHandler) linkedTaskTitle(ctx context.Context, id int64) string {
+	owner, ok := VerifiedSession(ctx)
+	if !ok || owner == nil || h.bs == nil || id <= 0 {
+		return ""
+	}
+	sub, err := h.bs.GetSubscriptionBySessionName(ctx, owner.SessionName)
+	if err != nil || sub == nil {
+		return ""
+	}
+	titles, err := h.bs.TaskTitles(ctx, sub.Project, []int64{id})
+	if err != nil {
+		return ""
+	}
+	return titles[id]
 }
