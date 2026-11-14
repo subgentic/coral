@@ -35,7 +35,7 @@ export function createOrchestratorGrant(team, members) {
     };
     return {
         fields: () => [
-            { key: 'og_enabled', type: 'toggle', label: 'Let the Orchestrator manage agents', help: 'Off by default. On: the seat below may wake and put to sleep this team\'s agents and start new ones here, within the limits. It cannot send them text, and everything it does is logged and said on the board.' },
+            { key: 'og_enabled', type: 'toggle', label: 'Let the Orchestrator manage agents', help: 'Off by default. On: the seat below may wake, put to sleep, stop and start this team\'s agents, within the limits. It cannot send them text, and everything it does is logged and said on the board.' },
             { key: 'og_seat', type: 'select', label: 'Orchestrator seat', help: 'The one agent that gets this. Only this session counts, whatever another agent calls itself.', disabledWhen: v => !v.og_enabled, options: seats, validate: (value, values) => (values.og_enabled && !value ? 'Pick the agent that gets this.' : '') },
             num('og_max_per_hour', 'Starts and wakes an hour', 'per hour', LIMITS.perHour, 'Across the whole team.'),
             num('og_max_live', 'Most agents running', 'agents', LIMITS.live, 'It cannot start or wake more once the team has this many running.'),
