@@ -386,9 +386,9 @@ func TestTaskAddSelfNeedsAGoalAndSendsSelf(t *testing.T) {
 }
 
 func TestTaskAddReportsReopenedGoal16046(t *testing.T) {
- gs:=newGoalServer(t)
- gs.setReply("POST /api/board/team/tasks", `{"id":91,"goal_id":7,"goal_reopened":true}`)
- res:=goalRun(t,gs,"task","add","More work","--goal","7")
- require.Equal(t,0,res.code,res.stderr)
- assert.Contains(t,res.stdout,"Reopened goal #7")
+	gs := newGoalServer(t)
+	gs.setReply("POST /api/board/team/tasks", `{"id":91,"goal_id":7,"goal_reopened":true}`)
+	res := goalRun(t, gs, "task", "add", "More work", "--goal", "7")
+	require.Equal(t, 0, res.code, res.stderr)
+	assert.Contains(t, res.stdout, "Reopened goal #7")
 }

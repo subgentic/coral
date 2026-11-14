@@ -207,6 +207,9 @@ func cmdTaskAdd(st *boardState, args []string) {
 	if note, _ := task["warning"].(string); note != "" { // the assignee will not read it now (#17657): said at once, as a post to it is
 		fmt.Printf("  Note: %s\n", clitext.Clean(note))
 	}
+	if reopened, _ := task["goal_reopened"].(bool); reopened {
+		fmt.Printf("  Reopened goal #%.0f: the new task adds work to it.\n", task["goal_id"])
+	}
 	if *followUp > 0 {
 		fmt.Printf("  A follow-up of task #%d (it is listed there).\n", *followUp)
 	}

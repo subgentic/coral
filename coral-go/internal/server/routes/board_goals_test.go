@@ -120,16 +120,16 @@ func TestGoalRoutesEndToEnd(t *testing.T) {
 	assert.Equal(t, "goal_already_closed", out["code"])
 	before, _ := h.bs.ListTasks(ctx, "team")
 	code, out = call("POST", "/api/board/team/tasks", map[string]any{"title": "Late", "subscriber_id": "Orchestrator", "goal_id": id})
-	assert.Equal(t, http.StatusConflict, code)
-	assert.Equal(t, "goal_closed", out["code"])
+	assert.Equal(t, http.StatusCreated, code)
+	assert.Equal(t, true, out["goal_reopened"])
 	after, _ := h.bs.ListTasks(ctx, "team")
-	assert.Len(t, after, len(before), "the refused task was not stored")
+	assert.Len(t, after, len(before)+1, "new work is stored and reopens the goal")
 	code, out = call("GET", "/api/board/team/goals", nil)
 	require.Equal(t, 200, code)
-	assert.Empty(t, goalsOf(t, out), "a closed goal is not in the default list")
+	assert.Len(t, goalsOf(t, out), 1, "the reopened goal is in the default list")
 	code, out = call("GET", "/api/board/team/goals?state=done,dropped", nil)
 	require.Equal(t, 200, code)
-	assert.Len(t, goalsOf(t, out), 1)
+	assert.Empty(t, goalsOf(t, out), "the reopened goal is no longer closed")
 }
 
 const canonicalGoalUUID = `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`

@@ -9,7 +9,7 @@ import { _renderDepPicker, _getSelectedDeps } from './task_dep_picker.js';
 import { showToast } from './utils.js';
 import { addPendingMessage } from './live_chat.js';
 import { loadBoardTasks, loadAgentTasks } from './task_list.js';
-import { readOpenGoals, fillGoalSelect, chooseGoalLabel } from './task_goals.js';
+import { readTaskGoalOptions, fillGoalSelect, chooseGoalLabel } from './task_goals.js';
 import { mountSettingsView } from './settings_view.js'; // the dialog's fields (a startup module)
 
 let _project = '', _dependencies, _created = null; // explicit page context, independent of the selected agent/team
@@ -102,10 +102,10 @@ export async function showCreateTaskModal(preset = {}) {
 
     // The Goal select lists the board's open goals; it stays hidden when the board has none (and does not require one), so a board without goals sees no new control (#7253).
     if (boardProject) {
-        const read = await readOpenGoals(boardProject);
+        const read = await readTaskGoalOptions(boardProject);
         _requireGoal = read.requireGoal;
         // exactly one open goal: the new task starts on it (#11258 item 5, the phone NUX pass); with a choice to make, or a preset's own goal (a duplicate, a goal's New task), nothing changes
-        fillGoalSelect(document.getElementById('create-task-goal'), { goals: read.goals, requireGoal: read.requireGoal, selectedId: preset.goal_id ?? (read.goals.length === 1 ? read.goals[0].id : undefined) });
+        fillGoalSelect(document.getElementById('create-task-goal'), { goals: read.goals, requireGoal: read.requireGoal, selectedId: preset.goal_id ?? (read.goals.filter(g => !['done', 'dropped'].includes(g.state)).length === 1 ? read.goals.find(g => !['done', 'dropped'].includes(g.state)).id : undefined) });
         _goalShown = read.goals.length > 0 || read.requireGoal;
     }
 
@@ -162,11 +162,12 @@ async function submitValues(values) {
             const data = await resp.json().catch(() => ({}));
             throw new Error(data.error || `HTTP ${resp.status}`);
         }
+        const created = await resp.json();
         hideCreateTaskModal();
         if (_created) await _created();
         else await loadBoardTasks(boardProject);
         document.dispatchEvent(new CustomEvent('coral:task-created', { detail: { project: boardProject } })); // the team's Tasks page reads its own list again (it is not the dock's)
-        showToast('Task created');
+        showToast(created.goal_reopened ? 'Task created; goal reopened' : 'Task created');
     } catch (e) {
         view.fold(true); // server validation can name a workflow or prerequisite field; keep all of them visible
         throw e;
