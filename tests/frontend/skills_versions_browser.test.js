@@ -18,6 +18,13 @@ const ROWS=[row(5,'rejected'),row(4,'pending'),row(3,'approved'),row(2,'approved
   await ev(`window.switchNavTab('skills');true`);
   await show();
   await waitFor(`document.querySelector('#skills-view tbody tr')`,'skills list');
+  // the approval rule stays under the header with skills listed (#16211, Security on #15838): at 1280 and at 390
+  const note=()=>ev(`(()=>{const n=document.querySelector('#skills-view .skills-note');return n&&n.getClientRects().length?n.textContent:''})()`);
+  const shotN=async n=>{if(process.env.CORAL_SCREENSHOT_DIR){fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/'+n+'.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}};
+  assert.match(await note(),/A skill an agent publishes waits here until you approve it; one you import is approved at once\./,'1280: the approval rule is shown with skills listed');
+  await Emulation.setDeviceMetricsOverride({width:390,height:844,deviceScaleFactor:1,mobile:true});
+  await waitFor(`document.querySelector('#skills-view .skills-note')?.getClientRects().length>0`,'390: the approval rule is shown');await shotN('skills-390');
+  await Emulation.setDeviceMetricsOverride({width:1280,height:900,deviceScaleFactor:1,mobile:false});
   if(process.env.CORAL_SCREENSHOT_DIR){fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/skills-1280.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
   assert.equal((await list()).length,2,'one row per skill and publisher');
   const texts=await list();assert.ok(texts.some(t=>t.includes('Designer description v3')&&t.includes('v3')&&t.includes('Approved')&&t.includes('v4 waiting')),JSON.stringify(texts));

@@ -116,7 +116,8 @@ function drawList() {
     head.append(folderHead, sel, importBtn, input);
     PH.pageHeader(head, { idp: 'skills' });
     page.append(head);
-    if (!rows.length && !loadError) page.append(el('p', 'skills-note', 'Agent Skills: a folder with SKILL.md that agents read when it fits their task. A skill an agent publishes waits here until you approve it; one you import is approved at once.')); // the description is for an empty list: with skills, the list is the page
+    const approval = 'A skill an agent publishes waits here until you approve it; one you import is approved at once.';
+    if (!loadError) page.append(el('p', 'skills-note', rows.length ? approval : `Agent Skills: a folder with SKILL.md that agents read when it fits their task. ${approval}`)); // the description is for an empty list; the approval rule stays under the header with skills listed (#16211)
     if (loadError) { const p = el('p', 'skills-error', loadError); p.setAttribute('role', 'alert'); page.append(p); }
     const columns = [
         { key: 'name', label: 'Name', primary: true, width: 'grow', sort: true, sortValue: r => r.name.toLowerCase(), line: 1, cell: r => r.name },
