@@ -485,6 +485,13 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 	}
 	staleF, _ := staleness.(float64)
 	notStarted := agentNeverStarted(agent.AgentType, latestEv, staleF, sessionAgeSeconds(lv.createdAt[sid]))
+	// An agent with no first event that sits at its own input box is ready, not starting and not unstarted: the screen says so (#15952). Read only while one of the two notices would be on.
+	startupReady := false
+	if sid != "" && !lv.sleeping[sid] && !lv.archived[sid] && (notStarted || agentStarting(agent.AgentType, startedEv(latestEv, d.started[sid]), sessionAgeSeconds(lv.createdAt[sid]), false, false, false)) {
+		if startupReady = h.startupReadyState(agent.TmuxSession, agent.AgentType, sid); startupReady {
+			notStarted = false
+		}
+	}
 	stateInput := SessionStateInput{StalenessSeconds: staleF, NotStarted: notStarted, Sleeping: lv.sleeping[sid], Archived: lv.archived[sid]}
 	for _, ev := range d.stateEvents[sid] {
 		stateInput.Events = append(stateInput.Events, ev.StateEvent())
@@ -557,7 +564,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"needs_login":           state.NeedsLogin,
 		"awaiting_user":         state.AwaitingUser,
 		"not_started":           state.NotStarted,
-		"starting":              agentStarting(agent.AgentType, startedEv(latestEv, d.started[sid]), sessionAgeSeconds(lv.createdAt[sid]), lv.sleeping[sid], lv.archived[sid], state.NotStarted),
+		"starting":              agentStarting(agent.AgentType, startedEv(latestEv, d.started[sid]), sessionAgeSeconds(lv.createdAt[sid]), lv.sleeping[sid], lv.archived[sid], state.NotStarted || startupReady),
 		"done":                  state.Done,
 		"waiting_reason":        nilIf(!state.NeedsInput, state.WaitingReason),
 		"waiting_summary":       waitingLineIf(state.NeedsInput, waitingSource(state.WaitingWants, state.WaitingSummary)),

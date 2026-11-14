@@ -60,10 +60,12 @@ const LIMITS = { max_per_family: 50, max_total: 200, efforts: { claude: ['low', 
             check(`"${v.slice(0, 12)}" is refused with a reason under the box, and the box says it is invalid`, m.shown && re.test(m.text) && m.invalid === 'true', m.text);
         }
         await ev(`(() => { document.getElementById('cm-id').value = 'gpt-6-astra'; document.getElementById('cm-name').value = 'Astra'; document.querySelector('#settings-custom-models .cm-form .sv-save').click(); return true; })()`);
+        await waitFor(`document.querySelector('#settings-custom-models .cm-status').textContent==='Saved'`, 'Codex model saved');
         t = await ev(`document.querySelector('#settings-custom-models .cm-row[data-provider="codex"]').innerText.replace(/\\s+/g, ' ')`);
         check(`a valid id is added as a Codex row (${t})`, /Codex gpt-6-astra Astra/.test(t));
         check('the keyboard lands on the new row\'s Edit button', (await focusId()) === 'codex:0');
-        check('the page says the change is not saved yet', /Unsaved changes\. Apply to save\./.test(await ev(`document.querySelector('#settings-custom-models .cm-status').textContent`)));
+        await waitFor(`document.querySelector('#settings-custom-models .cm-status').textContent === 'Saved'`, 'the model action saved');
+        check('Add model saves immediately', (await ev(`window.__cm.puts.length`)) === 1);
         // a duplicate in the same provider is refused; the same id in another provider is fine
         await addFor('codex');
         await ev(`(() => { document.getElementById('cm-id').value = 'gpt-6-astra'; document.querySelector('#settings-custom-models .cm-form .sv-save').click(); return true; })()`);
@@ -74,27 +76,30 @@ const LIMITS = { max_per_family: 50, max_total: 200, efforts: { claude: ['low', 
         await addFor('claude');
         check('Claude offers the five levels as boxes', (await ev(`[...document.querySelectorAll('#settings-custom-models .cm-form input[type=checkbox]')].filter(c => c.getClientRects().length).map(c => c.value).join()`)) === 'low,medium,high,xhigh,max');
         await ev(`(() => { document.getElementById('cm-id').value = 'claude-opus-5-5'; document.querySelectorAll('#settings-custom-models .cm-form input[type=checkbox]').forEach(c => { if (c.value === 'medium' || c.value === 'max') c.checked = true; }); document.querySelector('#settings-custom-models .cm-form .sv-save').click(); return true; })()`);
+        await waitFor(`document.querySelector('#settings-custom-models .cm-status').textContent==='Saved'`,'Claude model added');
         await click('[data-cm-edit="claude:0"]');
         await ev(`(() => { document.getElementById('cm-name').value = 'Global Opus'; document.querySelector('#settings-custom-models .cm-form .sv-save').click(); return true; })()`);
+        await waitFor(`document.querySelector('#settings-custom-models .cm-status').textContent==='Saved'`,'Claude model updated');
         await click('#settings-custom-models .cm-row[data-provider="pi"] button[aria-label^="Remove"]');
+        await waitFor(`document.querySelector('#settings-custom-models .cm-status').textContent==='Saved'`,'Pi model removed');
         check('removing a row puts the keyboard on the Add button', (await focusId()) === '1');
         const pay = await ev(`import(${S} + 'custom_models.js').then(m => m.customModelsPayload())`);
         const by = f => pay.models.filter(m => m.family === f);
         check(`the draft is claude 2, codex 1, agy 1, pi 0 (${JSON.stringify(pay).slice(0, 160)})`, by('claude').length === 2 && by('claude')[0].display_name === 'Global Opus' && by('claude')[1].efforts.join() === 'medium,max' && by('codex').length === 1 && by('agy').length === 1 && by('pi').length === 0);
-        check('nothing was sent before Apply', (await ev(`window.__cm.puts.length`)) === 0);
+        check('Add, Update and Remove each save their action', (await ev(`window.__cm.puts.length`)) === 4);
 
         await ev(`import(${S} + 'custom_models.js').then(m => m.initCustomModels()).then(() => true)`);
         check('a refill of the dialog (the same open) keeps what the person has edited', (await ev(`import(${S} + 'custom_models.js').then(m => m.customModelsPayload().models.length)`)) === 4);
-        console.log('2. Apply: one PUT with the whole list, and every picker forgets its list');
-        await ev(`window.__cm.fail = true; Promise.resolve(window.applySettings()).then(() => true)`);
-        await waitFor(`[...document.querySelectorAll('.toast-message')].some(e => /custom model 1 \\(codex/.test(e.textContent))`, 'the toast naming the refused row', 8000);
-        check('a refusal is shown with the server\'s words (the row and the field), the draft stays, nothing is marked saved', (await ev(`import(${S} + 'custom_models.js').then(m => m.customModelsDirty())`)) === true && /Unsaved changes/.test(await ev(`document.querySelector('#settings-custom-models .cm-status').textContent`)));
-        await ev(`window.__cm.fail = false; window.__cm.puts.length = 0; true`);
-        await ev(`localStorage.setItem('coral-models:v1:local:claude', JSON.stringify({ models: [{ value: 'old' }] })); true`);
-        await ev(`Promise.resolve(window.applySettings()).then(() => true)`);
-        await waitFor(`window.__cm.puts.length >= 1`, 'the PUT', 8000);
-        const puts = await ev(`window.__cm.puts`);
-        check(`Apply sends exactly one PUT with the whole list, each row with its family (${puts.length})`, puts.length === 1 && Array.isArray(puts[0].models) && puts[0].models.length === 4 && puts[0].models.map(m => m.family).join() === 'claude,claude,codex,agy' && puts[0].models[1].value === 'claude-opus-5-5');
+        console.log('2. An action refusal says why and restores the saved models; retry succeeds');
+        await ev(`window.__cm.fail=true;true`);
+        await click('#settings-custom-models .cm-row[data-provider="codex"] button[aria-label^="Remove"]');
+        await waitFor(`/custom model 1/.test(document.querySelector('#settings-custom-models .cm-status').textContent)`, 'the inline server refusal');
+        check('refusal restores the saved model list', await ev(`import(${S}+'custom_models.js').then(m=>!m.customModelsDirty() && m.customModelsPayload().models.length===4)`));
+        await ev(`window.__cm.fail=false;window.__cm.puts=[];localStorage.setItem('coral-models:v1:local:claude',JSON.stringify({models:[{value:'old'}]}));true`);
+        await click('#settings-custom-models .cm-row[data-provider="codex"] button[aria-label^="Remove"]');
+        await waitFor(`document.querySelector('#settings-custom-models .cm-status').textContent==='Saved'`,'retry saved');
+        const puts=await ev(`window.__cm.puts`);
+        check('retry sends one complete list',puts.length===1 && puts[0].models.length===3 && puts[0].models.every(m=>m.family!=='codex'));
         check('the browser forgot its cached model lists', (await ev(`Object.keys(localStorage).filter(k => k.startsWith('coral-models:v1:')).length`)) === 0);
 
         // a refill whose read is still in flight when the person edits: the edit must survive the answer (#5480: dirty was decided before the read)

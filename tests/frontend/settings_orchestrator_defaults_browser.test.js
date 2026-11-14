@@ -12,6 +12,7 @@ const SAVED = { default_model_claude: 'claude-sonnet-5-5', default_thinking_clau
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const failures = [], check = (ok, what) => { if (!ok) failures.push(what); };
+    const guard = await require('./helpers/settings_guard').guardSettings();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
@@ -38,15 +39,15 @@ const SAVED = { default_model_claude: 'claude-sonnet-5-5', default_thinking_clau
             const filled = await ev(`Object.fromEntries(['settings-default-thinking-claude', 'settings-orchestrator-model-claude', 'settings-orchestrator-thinking-claude', 'settings-default-thinking-pi', 'settings-orchestrator-thinking-pi', 'settings-orchestrator-model-codex'].map(id => [id, document.getElementById(id)?.value]))`);
             check(filled['settings-default-thinking-claude'] === 'medium' && filled['settings-orchestrator-model-claude'] === 'claude-opus-5-5' && filled['settings-orchestrator-thinking-claude'] === 'high' && filled['settings-default-thinking-pi'] === 'low' && filled['settings-orchestrator-thinking-pi'] === 'high' && filled['settings-orchestrator-model-codex'] === '', at + 'the rows are filled from the saved settings, an unset one empty: ' + JSON.stringify(filled));
             // a change is sent under its own key, and only that
-            const sent = await ev(`(async () => { const f = await import((window.__coralStatic || '/static/') + 'settings_form.js'); const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
-                set('settings-orchestrator-model-codex', ' gpt-5.5-codex '); set('settings-orchestrator-thinking-agy', 'max'); set('settings-default-thinking-codex', 'minimal');
-                return f.readSettingsForm().payload; })()`);
-            const keys = Object.keys(sent).filter(k => /orchestrator|default_thinking/.test(k)).sort();
-            check(JSON.stringify(keys) === JSON.stringify(['default_orchestrator_model_codex', 'default_orchestrator_thinking_agy', 'default_thinking_codex']), `${at}only what changed is sent, under its own key: ` + JSON.stringify(keys));
-            check(sent.default_orchestrator_model_codex === 'gpt-5.5-codex' && sent.default_orchestrator_thinking_agy === 'max' && sent.default_thinking_codex === 'minimal', at + 'with the values trimmed: ' + JSON.stringify(sent));
+            await ev(`window.__rowWrites=[]; {const f=window.fetch;window.fetch=(u,o={})=>{if(new URL(String(u),location.href).pathname==='/api/settings' && o.method==='PUT'){window.__rowWrites.push(JSON.parse(o.body));return Promise.resolve(new Response('{}',{headers:{'Content-Type':'application/json'}}));}return f(u,o);};} true`);
+            for(const [id,value] of [['settings-orchestrator-model-codex',' gpt-5.5-codex '],['settings-orchestrator-thinking-agy','max'],['settings-default-thinking-codex','minimal']]) {
+                await ev(`(() => {const e=document.getElementById('${id}');e.dispatchEvent(new FocusEvent('focusin',{bubbles:true}));e.value=${JSON.stringify(value)};e.dispatchEvent(new Event('change',{bubbles:true}));e.dispatchEvent(new FocusEvent('focusout',{bubbles:true}));return true;})()`);
+                await waitFor(`document.getElementById('${id}').dataset.saving !== '1'`, id+' saved');
+            }
+            check(JSON.stringify(await ev(`window.__rowWrites`))===JSON.stringify([{default_orchestrator_model_codex:'gpt-5.5-codex'},{default_orchestrator_thinking_agy:'max'},{default_thinking_codex:'minimal'}]), at+'each row sends only its own trimmed key: '+JSON.stringify(await ev(`window.__rowWrites`)));
             check(!(await ev(`document.documentElement.scrollWidth > innerWidth + 1`)), at + 'no sideways scroll');
         }
-    } finally { await client.close(); }
+    } finally { await client.close(); await guard.restore(); }
     if (failures.length) { console.error('FAIL\n  ' + failures.join('\n  ')); process.exit(1); }
     console.log('PASS Settings has the Orchestrator defaults and every thinking row that takes levels, at 1280 and 390');
 })().catch(e => { console.error(e); process.exit(1); });

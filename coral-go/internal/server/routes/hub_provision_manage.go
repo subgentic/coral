@@ -34,6 +34,8 @@ func manageSteps(kind string) []provisionStep {
 			s("install", "Download, verify and install this hub's release"), s("restart", "Restart Coral on the new release"), s("verify", "Check that it answers")}
 	case kindStop:
 		return []provisionStep{s("connect", "Connect over SSH and check the host key"), s("identity", "Check it is the computer that was set up"), s("stop", "Stop Coral")}
+	case kindStart:
+		return []provisionStep{s("connect", "Connect over SSH and check the host key"), s("identity", "Check it is the computer that was set up"), s("start", "Start Coral"), s("verify", "Check that it answers")}
 	case kindApprovals:
 		return []provisionStep{s("connect", "Connect over SSH and check the host key"), s("identity", "Check it is the computer that was set up"), s("approvals", "Set up Approve through this hub")}
 	}
@@ -47,8 +49,8 @@ func (pr *Provisioner) planManage(w http.ResponseWriter, r *http.Request, req pl
 		errBadRequest(w, "a server to manage is named by its id only")
 		return
 	}
-	if req.Action != kindUpgrade && req.Action != kindStop && req.Action != kindRemove && req.Action != kindApprovals {
-		errBadRequest(w, "the action is upgrade, stop, remove or approvals")
+	if req.Action != kindUpgrade && req.Action != kindStop && req.Action != kindRemove && req.Action != kindApprovals && req.Action != kindStart {
+		errBadRequest(w, "the action is upgrade, start, stop, remove or approvals")
 		return
 	}
 	if req.DeleteData && req.Action != kindRemove {
@@ -136,6 +138,8 @@ func (pr *Provisioner) runPlan(ctx context.Context, p *provisionPlan) {
 		pr.detectSteps(ctx, p)
 	case kindUpgrade:
 		pr.upgradeSteps(ctx, p)
+	case kindStart:
+		pr.startSteps(ctx, p)
 	case kindStop:
 		pr.stopSteps(ctx, p)
 	case kindApprovals:
@@ -272,6 +276,77 @@ func (pr *Provisioner) stopSteps(ctx context.Context, p *provisionPlan) {
 	pr.done(p)
 }
 
+// startSteps starts the Coral of a computer whose Coral is not running (#15998): the newest release installed under its install folder, with the data folder and backend recorded at its last start and the port it
+// was set up on, then it waits for it to answer. A Coral that already answers is left alone. Nothing outside the install folder is touched and no release is installed or downloaded here.
+func (pr *Provisioner) startSteps(ctx context.Context, p *provisionPlan) {
+	row, err := pr.store.Get(ctx, p.ServerID)
+	if err != nil {
+		pr.fail(p, "identity", "That server is no longer registered.")
+		return
+	}
+	key, err := pr.store.DecryptedKey(ctx, p.ServerID)
+	if err != nil {
+		pr.fail(p, "identity", "This hub cannot read that server's key.")
+		return
+	}
+	if !pr.identity(ctx, p, row) {
+		return
+	}
+	if h := pr.checkHealth(ctx, row, key); h.Status == store.RemoteStatusOnline {
+		p.setStep("start", stepSkipped, "Coral is already running there.")
+		p.setStep("verify", stepSkipped, "")
+		pr.done(p)
+		return
+	}
+	farPort := row.RemotePort
+	if !sshprov.ValidPort(farPort) {
+		farPort = sshprov.DefaultPort
+	}
+	p.setStep("start", stepRunning, "")
+	version, err := pr.runner.LatestInstalled(ctx, p.Target)
+	if err != nil {
+		if errors.Is(err, sshprov.ErrNothingInstalled) {
+			pr.fail(p, "start", "No release of Coral is installed on that computer, so there is nothing to start. Use Upgrade to install this hub's release.")
+		} else if isConnectFailure(err) {
+			pr.failConnect(p, "start", err)
+		} else {
+			pr.fail(p, "start", "Could not look for the installed release on that computer.")
+		}
+		return
+	}
+	if err := pr.runner.StartOn(ctx, p.Target, version, sshprov.BackendKeep, "", farPort); err != nil {
+		var se *sshprov.StartError
+		note := restartNote{port: farPort}
+		switch {
+		case errors.Is(err, sshprov.ErrPortInUse):
+			var pe *sshprov.PortInUseError
+			if errors.As(err, &pe) {
+				note.holderPid = pe.Pid
+			}
+			pr.failRestart(ctx, p, "start", portInUseSentenceFor(err), err, note)
+		case errors.Is(err, sshprov.ErrNoTmux):
+			note.noTmux = true
+			pr.failRestart(ctx, p, "start", "Coral on that computer was set up to run its agents in tmux, but tmux is not installed there now, so Coral was not started. The last lines below start it without tmux.", err, note)
+		case errors.As(err, &se):
+			pr.failRestart(ctx, p, "start", fmt.Sprintf("Coral could not be started on that computer: its start command ended with code %d.", se.ExitCode), err, note)
+		case isConnectFailure(err):
+			pr.failRestart(ctx, p, "start", connectSentence(err), err, note)
+		default:
+			pr.failRestart(ctx, p, "start", "Coral could not be started on that computer.", err, note)
+		}
+		return
+	}
+	p.setStep("start", stepOK, "Started Coral "+version+".")
+	p.setStep("verify", stepRunning, "")
+	if h := pr.checkHealth(ctx, row, key); h.Status != store.RemoteStatusOnline {
+		slog.Info("[provision] the started Coral did not answer", "plan", p.ID)
+		pr.failRestart(ctx, p, "verify", "Coral was started, but it did not answer as expected.", errors.New("the started Coral did not answer"), restartNote{port: farPort, stoppedAgain: true})
+		return
+	}
+	p.setStep("verify", stepOK, "Coral is running.")
+	pr.done(p)
+}
+
 func (pr *Provisioner) stopRemote(ctx context.Context, p *provisionPlan) bool {
 	p.setStep("stop", stepRunning, "")
 	if err := pr.runner.StopAndConfirm(ctx, p.Target); err != nil {
@@ -352,6 +427,10 @@ func (pr *Provisioner) upgradeSteps(ctx context.Context, p *provisionPlan) {
 		pr.fail(p, "install", "That computer runs a newer Coral than this hub ("+cleanVersionText(h.Version)+", this hub runs "+want+"). Nothing was changed. To install this hub's release over it anyway, choose to allow a downgrade.")
 		return
 	}
+	kept, ok := pr.keepRunningDataDir(ctx, p)
+	if !ok {
+		return
+	}
 	if err := pr.install(ctx, p, arch); err != nil {
 		var ie *sshprov.ErrInstall
 		msg := "Could not install Coral on that computer."
@@ -365,7 +444,7 @@ func (pr *Provisioner) upgradeSteps(ctx context.Context, p *provisionPlan) {
 	if !sshprov.ValidPort(farPort) {
 		farPort = sshprov.DefaultPort
 	}
-	p.setStep("restart", stepRunning, "Stopping Coral and starting the new release.")
+	p.setStep("restart", stepRunning, "Stopping Coral and starting the new release."+kept)
 	if err := pr.runner.StopAndConfirm(ctx, p.Target); err != nil {
 		pr.failRestart(ctx, p, "restart", stopFailureSentence(err), err, restartNote{port: farPort})
 		return
@@ -397,7 +476,7 @@ func (pr *Provisioner) upgradeSteps(ctx context.Context, p *provisionPlan) {
 		}
 		return
 	}
-	p.setStep("restart", stepOK, "Started.")
+	p.setStep("restart", stepOK, "Started."+kept)
 	p.setStep("verify", stepRunning, "")
 	if h := pr.checkHealth(ctx, row, key); h.Status != store.RemoteStatusOnline || h.Version != want {
 		slog.Info("[provision] upgrade did not come back", "plan", p.ID)
@@ -426,4 +505,60 @@ func (pr *Provisioner) ensureOwnerSecret(ctx context.Context, p *provisionPlan, 
 		return " Approve and Request changes through this hub are not set up for it."
 	}
 	return " Approve and Request changes now work through this hub."
+}
+
+// keepRunningDataDir makes the upgrade keep the data folder the running Coral actually uses (#16021): its --home, read from its command line before anything is stopped. A folder under the home folder there is
+// recorded as the relative path the start reads; one outside it is kept only when it is a Coral data folder (a sessions.db in it), and is named in the steps. A Coral that was started with no --home, or none that
+// runs (the recorded folder then stands), changes nothing. What it cannot place or keep stops the upgrade before anything is changed: never a silent fall back to the default folder. It returns the sentence the
+// steps show ("" when nothing is kept) and false when the run was failed.
+func (pr *Provisioner) keepRunningDataDir(ctx context.Context, p *provisionPlan) (string, bool) {
+	kind, path, err := pr.runner.RunningHome(ctx, p.Target)
+	if err != nil {
+		pr.fail(p, "install", "Could not read which data folder that Coral uses, so nothing was changed.")
+		return "", false
+	}
+	switch kind {
+	case "rel":
+		if sshprov.DataDirProblem(path) != "" {
+			pr.fail(p, "install", "That Coral keeps its data in ~/"+remoteFolderText(path)+", a folder this hub will not carry over. Nothing was changed.")
+			return "", false
+		}
+	case "abs":
+		if !pr.runner.IsCoralDataDir(ctx, p.Target, path) {
+			pr.fail(p, "install", "That Coral keeps its data in "+remoteFolderText(path)+", which is not a Coral data folder this hub can keep (no sessions.db there, or it is not yours). Nothing was changed.")
+			return "", false
+		}
+	case "relative":
+		pr.fail(p, "install", "That Coral was started with a data folder given as a relative path, so this hub cannot tell where it is. Nothing was changed.")
+		return "", false
+	default:
+		return "", true
+	}
+	if err := pr.runner.RecordDataDir(ctx, p.Target, path); err != nil {
+		pr.fail(p, "install", "Could not record that Coral's data folder, so nothing was changed.")
+		return "", false
+	}
+	if kind == "rel" {
+		return " Keeping its data folder ~/" + remoteFolderText(path) + ".", true
+	}
+	return " Keeping its data folder " + remoteFolderText(path) + ".", true
+}
+
+// remoteFolderText is a folder as the far computer's command line gave it, made fit for a sentence the person reads (#16047): printable ASCII only (no control characters, no escape sequences, nothing that
+// reads as markup in another script) and at most 80 characters, the rest cut with "...". The record kept for the start is never this text, only a path the checks passed.
+func remoteFolderText(s string) string {
+	var b strings.Builder
+	n := 0
+	for _, r := range s {
+		if r < 0x20 || r > 0x7e {
+			r = '?'
+		}
+		if n == 80 {
+			b.WriteString("...")
+			break
+		}
+		b.WriteRune(r)
+		n++
+	}
+	return b.String()
 }

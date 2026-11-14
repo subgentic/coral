@@ -45,6 +45,7 @@ GET /api/board/{project}/working-mode/presets redact
 GET /api/call-metrics/summary redact
 GET /api/chief redact
 GET /api/custom-models redact
+GET /api/custom-modes redact
 GET /api/folder-tags redact
 GET /api/folder-tags/{name} redact
 GET /api/goal-links redact

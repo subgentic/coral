@@ -34,6 +34,11 @@ const CLOUD_PRELOAD = `(() => {
         if (p === '/api/servers' && (opts.method || 'GET').toUpperCase() === 'GET') {
             return Promise.resolve(new Response(JSON.stringify(window.__arrayShape ? ${JSON.stringify(SERVERS.map(x => ({ ...x, url: 'https://' + x.id + '.example.com:8420', status: 'online' })))} : { servers: ${JSON.stringify(SERVERS)} }), { status: 200, headers: { 'content-type': 'application/json' } }));
         }
+        // The page reloads its live list on a timer and each answer REPLACES state.servers (api.js); a real answer on a plain dev server carries none, so a poll landing after the injected feed wiped it and the hints read as absent (#16293).
+        // While __liveServers is set the list answer carries the feed too, so every poll puts the same servers back.
+        if (p === '/api/sessions/live' && window.__liveServers) {
+            return inner(url, opts).then(async r => { const j = await r.json(); const out = Array.isArray(j) ? { sessions: j } : j; out.servers = window.__liveServers; return new Response(JSON.stringify(out), { status: 200, headers: { 'Content-Type': 'application/json' } }); });
+        }
         return inner(url, opts);
     };
 })();`;
@@ -63,7 +68,7 @@ const CLOUD_PRELOAD = `(() => {
         await Page.loadEventFired();
         await install();
         await coralReady(ev, 'startup', 'liveListLoaded'); // a late list answer would overwrite the injected servers (#12932)
-        await ev(`(() => { T.state.servers = ${JSON.stringify(LIVE)}; return true; })()`);
+        await ev(`(() => { window.__liveServers = ${JSON.stringify(LIVE)}; T.state.servers = ${JSON.stringify(LIVE)}; return true; })()`);
 
         console.log('1. The Servers list: the hint beside the machines that are below, nowhere else');
         await ev(`document.getElementById('nav-tab-servers').click(); true`);
@@ -123,14 +128,18 @@ const CLOUD_PRELOAD = `(() => {
         await Page.loadEventFired();
         await install();
         await coralReady(ev, 'startup', 'liveListLoaded'); // a late list answer would overwrite the injected servers (#12932)
-        await ev(`(() => { window.__arrayShape = true; T.state.hub = true; T.state.servers = ${JSON.stringify(LIVE)}; return true; })()`);
+        await ev(`(() => { window.__arrayShape = true; window.__liveServers = ${JSON.stringify(LIVE)}; T.state.hub = true; T.state.servers = ${JSON.stringify(LIVE)}; return true; })()`);
         await ev(`window.switchNavTab('servers'); true`);
         await waitFor(`document.querySelectorAll('#servers-view .dt-row').length >= ${SERVERS.length}`, 'the self-hosted hub server rows', 8000);
         // the hint is on a server's page (#7638): open each in turn
-        const own = await ev(`(async () => { const until = async f => { for (let i = 0; i < 100 && !f(); i++) await new Promise(r => setTimeout(r, 20)); }; const out = {};
-            for (const id of [...document.querySelectorAll('#servers-view .dt-row[data-key]:not([data-key="local"])')].map(r => r.dataset.key)) { document.querySelector('#server-row-' + id + ' [data-action=open]').click(); await until(() => document.querySelector('.servers-page'));
-                out[id] = [...document.querySelectorAll('.servers-page .server-below-minimum')].map(n => ({ text: n.textContent, kids: n.children.length })); document.getElementById('servers-back').click(); await until(() => document.querySelector('table.servers-table')); }
-            return out; })()`);
+        // each page is waited for by what it is (its own data-id), and a page that never opens fails here, not as an empty read. A click that lands before the row's handler is wired is repeated (opening twice is the same as once) (#16293: a silent 2 s poll let a lost first click read as "no hint")
+        const own = {};
+        for (const id of await ev(`[...document.querySelectorAll('#servers-view .dt-row[data-key]:not([data-key="local"])')].map(r => r.dataset.key)`)) {
+            await waitFor(`(() => { if (!document.querySelector('.servers-page[data-id="${id}"]')) { const b = document.querySelector('#server-row-${id} [data-action=open]'); if (b) b.click(); } return !!document.querySelector('.servers-page[data-id="${id}"]'); })()`, `${id}'s page`, 15000);
+            own[id] = await ev(`[...document.querySelectorAll('.servers-page[data-id="${id}"] .server-below-minimum')].map(n => ({ text: n.textContent, kids: n.children.length }))`);
+            await ev(`document.getElementById('servers-back').click(); true`);
+            await waitFor(`!document.querySelector('.servers-page') && document.querySelectorAll('#servers-view .dt-row[data-key]').length >= ${SERVERS.length}`, 'the list is back', 15000);
+        }
         assert.deepEqual(own.m1, [{ text: 'Update Coral to 1.4.61', kids: 0 }], 'm1 in the self-hosted list');
         assert.ok(own.m2.length === 1 && own.m2[0].text.startsWith('Update Coral to <img src=x') && own.m2[0].kids === 0, 'm2: hostile text stays text');
         assert.deepEqual(own.m3, []); assert.deepEqual(own.m4, []);

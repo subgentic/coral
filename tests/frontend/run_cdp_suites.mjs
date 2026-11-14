@@ -97,7 +97,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classifySuites, problems } from './suites.mjs';
-import { loadDurations, orderLongestFirst, partsByDuration } from './suite_order.mjs';
+import { durationsFile, loadDurations, orderLongestFirst, partsByDuration } from './suite_order.mjs';
 import { failingOutput } from './failing_output.mjs';
 import { suiteTimeoutS } from './suite_timeout.mjs';
 import { shardDirName } from './shard_dir.mjs';
@@ -107,6 +107,7 @@ import { sqliteAvailable, sqliteExec } from './helpers/sqlite.js';
 import { redactEvidence as redactEvidenceText } from './helpers/redact_evidence.mjs';
 import { snapshot as serverSnapshot, diff as serverDiff, rowLeaks, restoreSettings, leftovers, cleanup as cleanupLeftovers } from './helpers/server_state.mjs';
 import { profileEnv, profileLeaks, writeStub } from './sandbox_profile.mjs';
+import { wsCloseNote } from './helpers/ws_close_note.mjs';
 
 // Linux: the run goes in a private network namespace with only loopback (#3466). Chrome cancels
 // every request in flight, even to 127.0.0.1, when the host's addresses change (ERR_NETWORK_CHANGED;
@@ -176,7 +177,7 @@ const keep = flag('--keep');
 // accepted by a marker in the shard's throwaway home, telemetry off. It runs STRICT_SUITES plus PROD_TIER_EXTRA, only what needs neither a test hook nor seeded data.
 const prodTier = flag('--prod-tier');
 const strictOnly = flag('--strict') || prodTier;
-const PROD_TIER_EXTRA = ['settings_dialog_save_flow_browser.test.js'];
+const PROD_TIER_EXTRA = ['settings_autosave_browser.test.js'];
 // Left out of the prod-tier shard, each with its reason (printed at the start of the shard): they need what a default build does not have.
 const PROD_TIER_SKIPPED = { 'agent_state.test.js': 'drives the list through window._coralSetLiveSessions, a test hook the default build does not expose (trial 42922281825)' };
 const STRICT_SUITES = [
@@ -453,6 +454,7 @@ function ensureRunDir() {
     restoring = (async () => {
       console.log(`  [runner] the run's folder ${tmp} (or coral's binary in it) is gone: something outside this run removed it. Recreating it and building coral again ...`);
       fs.mkdirSync(tmp, { recursive: true });
+      ownerOnlyOnWindows(tmp, true); // owner only again, as when it was first made (#293)
       const built = await new Promise(resolve => {
         const p = spawn('go', goBuildArgs, { cwd: goDir, stdio: 'inherit' });
         p.on('error', e => resolve({ error: e.message }));
@@ -639,7 +641,7 @@ async function startShard(n, gen = 0, strict = false, backend = MAIN_BACKEND) {
   // CORAL_TEST_TMUX_SOCKET: this shard's own tmux socket (<data>/tmux.sock), for suites that compare
   // the pane with the dashboard (#3422). CORAL_TEST_LOG: this shard's Coral log, which a suite reads
   // only to explain its own failure (helpers/stand_in_agent.js, #3502).
-  return { n, gen, log, coral, chrome, throttler, strict, backend, data, tmuxSock, serverEnv, pprofPort, env: { ...testEnv, NODE_OPTIONS: [testEnv.NODE_OPTIONS, `--require=${path.join(import.meta.dirname, 'helpers', 'start_on_agents.js')}`].filter(Boolean).join(' '), CORAL_TEST_URL: `http://127.0.0.1:${port}`, CDP_PORT: String(cdp), CORAL_CDP_PORT: String(cdp), CDP_CPU_THROTTLE: String(throttle),
+  return { n, gen, log, coral, chrome, chromeStderr: () => chromeErr, throttler, strict, backend, data, tmuxSock, serverEnv, pprofPort, env: { ...testEnv, NODE_OPTIONS: [testEnv.NODE_OPTIONS, `--require=${path.join(import.meta.dirname, 'helpers', 'start_on_agents.js')}`].filter(Boolean).join(' '), CORAL_TEST_URL: `http://127.0.0.1:${port}`, CDP_PORT: String(cdp), CORAL_CDP_PORT: String(cdp), CDP_CPU_THROTTLE: String(throttle),
     CORAL_TEST_TMUX_SOCKET: path.join(data, 'tmux.sock'), CORAL_TEST_LOG: log, CORAL_TEST_DATA_DIR: data, CORAL_TEST_BIN: bin /* the built coral, for a suite that starts a server of its own (first_run_browser) */, /* helpers/settings_guard.js restores the shard's settings exactly through this */ ...(strict ? { CORAL_TEST_STRICT: '1' } : {}) } };
 }
 
@@ -666,7 +668,7 @@ for (const t of [...STRICT_SUITES, ...PROD_TIER_EXTRA]) if (!suites.cdp.includes
 for (const t of TMUX_SUITES) if (!suites.cdp.includes(t)) { console.error(`TMUX_SUITES names ${t}, which is not a CDP suite`); process.exit(2); }
 // Longest first, from the durations of a previous run (suite_durations.json; update_suite_durations.mjs writes it): shards take the next
 // suite from one queue, and a long suite left to the end of an alphabetical queue would leave the other shards idle (#3916).
-const suiteDurations = loadDurations(path.join(here, 'suite_durations.json'));
+const suiteDurations = loadDurations(durationsFile(here));
 let tests = sequencesOnly ? [] : (strictOnly ? (prodTier ? [...STRICT_SUITES, ...PROD_TIER_EXTRA].filter(f => !(f in PROD_TIER_SKIPPED)) : STRICT_SUITES) : tmuxOnly ? TMUX_SUITES : [...suites.cdp, ...suites.server].filter(f => MAIN_BACKEND !== 'default' || !TMUX_ONLY_SUITES.includes(f)))
   .filter(f => !only || only.split(',').some(o => f.includes(o))).sort();
 // Suites known to fail on Windows only (windows_known_reds.json, each with its reason) are left out there; every entry must still be a CDP suite.
@@ -875,6 +877,12 @@ async function runAttempt(t, shard) {
       for (const end = Date.now() + 2000; !closed && Date.now() < end; await sleep(50)) { /* drain */ }
       const tDrained = Date.now();
       const status = timedOut ? 'timeout' : code === 0 ? 'pass' : 'fail';
+      // A suite that lost its CDP socket (#15933): say what became of the shard's Chrome (still running or gone, which pages it has, what it printed), so the failure is not a mystery.
+      let outNote = '';
+      if (status === 'fail') outNote = await wsCloseNote(out, shard.n, async () => ({
+        exit: shard.chrome.exitCode != null || shard.chrome.signalCode ? `exit code ${shard.chrome.exitCode} signal ${shard.chrome.signalCode}` : null,
+        pages: await fetch(`http://127.0.0.1:${shard.env.CDP_PORT}/json/list`, { signal: AbortSignal.timeout(3000) }).then(r => r.json()).then(l => l.filter(t => t.type === 'page').map(t => t.url || '')).catch(() => null),
+        stderr: shard.chromeStderr ? shard.chromeStderr() : '' }));
       // What the suite left in the server's shared state (#4830): reported, and the settings put back so the next suite starts from what this one found.
       let leaks = [], restored = 0, cleaned = null, rows = [];
       if (before) {
@@ -898,7 +906,7 @@ async function runAttempt(t, shard) {
       stepLog({ suite: t, shard: shard.n, status, health: shard._healthMs ?? null, clear: tCleared - tStart, clearSteps: shard._clearSteps || null,
         snapshot: started - tCleared, toFirstOutput: firstOut ? firstOut - started : null, run: tExit - started, after: Date.now() - tExit,
         afterSteps: { kill: tKilled - tExit, drain: tDrained - tKilled, state: Date.now() - tDrained }, healthSteps: shard._healthSteps || null });
-      resolve({ status, code: timedOut ? 'timeout' : code, secs, shard: shard.n, log: shard.log, leaks, rows, restored, cleaned, out: timedOut ? `${out}\n[runner] TIMEOUT: killed after ${limitS}s` : out });
+      resolve({ status, code: timedOut ? 'timeout' : code, secs, shard: shard.n, log: shard.log, leaks, rows, restored, cleaned, out: timedOut ? `${out}\n[runner] TIMEOUT: killed after ${limitS}s` : out + outNote });
     });
   });
 }

@@ -53,7 +53,7 @@ function render(root, st, sessions) {
     const head = el('div', 'tb-head');
     const label = el('span', 'tb-label', 'Browser sign-in'); label.id = 'sec-label';
     // The one sentence that explains the row is its hint line, under the label (#7405: no (i)).
-    const whyText = el('p', 'settings-hint settings-hint-line', "Browsers ask for it. The app and CLI sign in alone."); whyText.id = 'sec-why-text';
+    const whyText = el('p', 'settings-hint settings-hint-line sv-help', "Browsers ask for it. The app and CLI sign in alone."); whyText.id = 'sec-why-text';
     head.append(label, el('span', 'tb-now', st.password_set ? 'Password set' : 'No password'));
     root.setAttribute('aria-labelledby', 'sec-label');
     root.append(head, whyText);
@@ -96,7 +96,9 @@ function changeForm() {
         document.dispatchEvent(new CustomEvent('coral:password-changed'));
         loadSecurityRow();
     });
-    d.append(form, el('p', 'tb-note', 'Forgot it? Run coral reset-password on this computer.'));
+    const help = el('a', 'tb-note tb-learn sv-help', 'Forgot password');
+    help.href = '/static/password-reset.html'; help.target = '_blank'; help.rel = 'noopener';
+    d.append(form, help);
     return d;
 }
 
@@ -105,7 +107,7 @@ function sessionsBlock(data) {
     if (data && data.needSignIn) return el('div', 'sec-sessions'); // nothing to manage and nothing to say (#7040)
     const all = (data && Array.isArray(data.sessions)) ? data.sessions : null;
     const list = all && all.filter(s => s.method !== 'hub');   // Coral Hub sign-ins are listed, with Sign out, in their own block
-    if (!list) { box.append(el('p', 'tb-note', 'The list of signed-in browsers could not be loaded.')); return box; }
+    if (!list) { box.append(el('p', 'tb-note sv-help', 'The list of signed-in browsers could not be loaded.')); return box; }
     const h = el('div', 'sec-sub-head', 'Signed-in browsers '); h.append(el('span', 'sec-count', `(${list.length})`));
     box.append(h);
     const ul = el('ul', 'sec-list'); ul.id = 'sec-sessions';
@@ -177,17 +179,17 @@ function hubBlock(st, origins, hubSessions) {
     const box = el('div', 'sec-sessions sec-hub'); box.id = 'sec-hub';
     box.append(el('div', 'sec-sub-head', 'Sign in with Coral Hub'));
     const row = el('label', 'sec-switch');
-    const cb = el('input'); cb.type = 'checkbox'; cb.id = 'sec-hub-enabled'; cb.checked = st.enabled === true;
+    const cb = el('input', 'switch'); cb.type = 'checkbox'; cb.id = 'sec-hub-enabled'; cb.checked = st.enabled === true;
     const txt = el('span');
-    txt.append(el('b', '', 'Let Coral Hub sign in here'), document.createElement('br'), el('span', 'sec-muted', st.owner_known === false
+    txt.append(el('b', '', 'Let Coral Hub sign in here'), document.createElement('br'), el('span', 'sec-muted sv-help', st.owner_known === false
         ? 'Off by default. Sign-in stays off until Coral Hub reports the account that linked this computer.'
         : 'Off by default. Only the Coral Hub account that linked this computer can use it.'));
-    row.append(cb, txt);
+    row.append(txt, cb);
     const warn = el('div', 'sec-warn'); warn.id = 'sec-hub-warn';
     const wi = el('span', '', '\u26A0'); const wt = el('span');
     wt.append(el('b', '', 'This lets your Coral Hub account run commands on this computer.'), ' A Coral Hub sign-in has full control, like your password. Turning it off signs out every Coral Hub session at once.');
     warn.append(wi, wt);
-    box.append(row, warn, el('p', 'tb-note', 'Turned off while "Don\'t let Coral Hub act as the Operator" is on.'));
+    box.append(row, warn, el('p', 'tb-note sv-help', 'Turned off while "Don\'t let Coral Hub act as the Operator" is on.'));
     cb.addEventListener('change', async () => {
         const want = cb.checked;
         cb.disabled = true;
@@ -228,7 +230,7 @@ function hubBlock(st, origins, hubSessions) {
 
     box.append(el('div', 'sec-sub-head sec-gap', `Coral Hub sign-ins now (${hubSessions.length})`));
     const sl = el('ul', 'sec-list'); sl.id = 'sec-hub-sessions';
-    if (!hubSessions.length) sl.append(el('li', 'sec-item sec-muted', 'None'));
+    if (!hubSessions.length) sl.append(el('li', 'sec-item sec-muted sv-help', 'None'));
     for (const s of hubSessions) {
         const li = el('li', 'sec-item');
         const out = el('button', 'btn btn-small', 'Sign out'); out.type = 'button';

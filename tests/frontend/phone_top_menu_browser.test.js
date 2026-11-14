@@ -31,7 +31,7 @@ const { coralReady } = require('./helpers/wait');
             const top = await ev(`${vis('.top-bar button, .top-bar a')}.map(b => ({ id: b.id, label: b.getAttribute('aria-label'), w: Math.round(b.getBoundingClientRect().width), h: Math.round(b.getBoundingClientRect().height) }))`);
             assert.deepEqual(top.map(b => b.id), ['top-phone-menu', ''], 'the top row is the shared bar (phone_bar.js, #11236): the ☰ and the account, with the view\'s name in the pill between them: ' + JSON.stringify(top));
             assert.ok(top[0].w >= 44 && top[0].h >= 44, 'a 44 px target: ' + JSON.stringify(top[0]));
-            await waitFor(`document.querySelector('#top-phone-bar .phone-bar-title').textContent === 'Inbox'`, 'the pill names the view it is on (the Inbox)', 6000); // it follows the switch: it said Agents only because the read came before the redraw
+            await waitFor(`document.querySelector('#top-phone-bar .phone-bar-title').textContent === (document.getElementById('group-table-title')?.textContent || 'Inbox')`, 'the header names the open Inbox folder', 6000); // it follows the switch: it said Agents only because the read came before the redraw
             assert.equal(await ev(`${vis('#nav-select')}.length`), 0, 'the view dropdown is inside it');
             await shot('top-menu-closed-390');
             // 2. its menu

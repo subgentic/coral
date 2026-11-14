@@ -9,17 +9,20 @@
 #settings-modal #settings-dropbox .settings-dropbox-types label { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; margin: 0; cursor: pointer; }
 #settings-modal #settings-dropbox .settings-dropbox-types input[type="checkbox"] { display: inline-block; width: auto; margin: 0; flex: 0 0 auto; }
 #settings-dropbox .dropbox-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
-#settings-modal #settings-dropbox .dropbox-inline label { display: inline; margin: 0; }
+#settings-modal #settings-dropbox .dropbox-inline label:not(.sec-switch) { display: inline; margin: 0; }
 #settings-dropbox .dropbox-inline input[type="number"] { width: 6em; flex: 0 0 auto; }
 #settings-dropbox .settings-dropbox-filters p.settings-hint { margin: 4px 0 8px; }
 
 /* Share via Dropbox (#14944): the dialog a file's More actions opens. */
-dialog.modal-content.dropbox-share-dialog { position: fixed; inset: 0; margin: auto; height: fit-content; max-height: calc(100dvh - 32px); overflow-y: auto; box-sizing: border-box; }
+dialog.modal-content.dropbox-share-dialog { position: fixed; inset: 0; margin: auto; height: fit-content; max-height: calc(100dvh - 32px); overflow: hidden; box-sizing: border-box; }
 dialog.dropbox-share-dialog .dropbox-share-choice input[type="radio"], dialog.dropbox-share-dialog .dropbox-share-tick input[type="checkbox"] { display: inline-block; width: auto; flex: 0 0 auto; margin: 3px 0 0; }
 dialog.dropbox-share-dialog label.dropbox-share-choice, dialog.dropbox-share-dialog label.dropbox-share-tick { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; margin: 0; }
 dialog.dropbox-share-dialog label.dropbox-share-tick[hidden] { display: none; }
 dialog.dropbox-share-dialog .dropbox-share-choice > span, dialog.dropbox-share-dialog .dropbox-share-tick > span { min-width: 0; }
-.dropbox-share-body { display: flex; flex-direction: column; gap: 8px; }
+/* An auto basis measures the form before the viewport cap; WebKit can collapse a zero-basis body inside a content-sized native dialog. */
+.dropbox-share-dialog .dropbox-share-body { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.dropbox-share-body > * { flex-shrink: 0; }
+.dropbox-share-dialog > .modal-header, .dropbox-share-dialog > .modal-footer, .dropbox-share-dialog > .dropbox-share-say { flex-shrink: 0; }
 .dropbox-share-body .settings-input { width: 100%; box-sizing: border-box; }
 .dropbox-share-choices { display: flex; flex-direction: column; gap: 6px; margin: 4px 0; }
 .dropbox-share-choice { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 8px 10px; cursor: pointer; min-height: 44px; box-sizing: border-box; }

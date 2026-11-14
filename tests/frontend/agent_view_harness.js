@@ -25,7 +25,11 @@ async function connect(opts = {}) {
     // Record each /static/ request that failed or answered >= 400, and add them to that error.
     const staticFailures = [];
     const staticUrls = new Map();
+    const pageErrors = []; // the page's console errors and uncaught exceptions, for a wait that times out (#16376: a swallowed failed module load left no trace)
     try {
+        await Runtime.enable();
+        Runtime.consoleAPICalled(e => { if (e.type === 'error' || e.type === 'assert') pageErrors.push((e.args || []).map(a => String(a.value !== undefined ? a.value : a.description || '')).join(' ').slice(0, 200)); });
+        Runtime.exceptionThrown(e => { const d = e.exceptionDetails || {}; pageErrors.push(String((d.exception && d.exception.description) || d.text || '').split('\n')[0].slice(0, 200)); });
         await Network.enable();
         Network.requestWillBeSent(e => { if (e.request.url.includes('/static/')) staticUrls.set(e.requestId, e.request.url); });
         Network.responseReceived(e => { if (e.response.status >= 400 && staticUrls.has(e.requestId)) staticFailures.push(`${e.response.status} ${staticUrls.get(e.requestId)}`); });
@@ -46,7 +50,7 @@ async function connect(opts = {}) {
             let ok = false;
             try { ok = await ev(expression); } catch (e) { if (!isNavigationError(e)) throw e; } // the page navigating under the poll: look again (#4879)
             if (ok) return;
-            if (Date.now() > until) throw new Error(`timed out waiting for ${what}` + (diag ? ' ' + JSON.stringify(await ev(diag)) : ''));
+            if (Date.now() > until) throw new Error(`timed out waiting for ${what}` + (diag ? ' ' + JSON.stringify(await ev(diag)) : '') + (staticFailures.length ? `\n  static files that failed to load: ${staticFailures.slice(-8).join(' | ')}` : '') + (pageErrors.length ? `\n  page console errors: ${pageErrors.slice(-8).join(' | ')}` : ''));
             await new Promise(r => setTimeout(r, 20));
         }
     };
@@ -205,6 +209,9 @@ async function connect(opts = {}) {
         // The real feed would replace the mocked agents with the test server's (empty) list:
         // detach it and drive sleeping/awake changes through handleCoralMessage instead.
         ws.feedHooks.schedule = () => {};
+        // A feed still connecting is let open first: closing it then never fires 'open', the page's feed part of
+        // window.__coralReady would stay false, and nothing reconnects now (#15978, a slow Windows runner).
+        for (let i = 0; i < 1000 && state.coralWs && state.coralWs.readyState === 0; i++) await new Promise(r => setTimeout(r, 10));
         if (state.coralWs) { state.coralWs.onmessage = null; state.coralWs.onclose = null; state.coralWs.close(); }
         // A feed update that landed before this detach (after the page's list load, before here) already replaced the mocked agents with that empty list, and nothing draws them again:
         // agent_instructions_browser waited 15 s for its rows once in the trial-250 gate. Read the mocked list again when an agent is missing (agent_view_harness_feed_race_browser).

@@ -19,6 +19,7 @@ const { settingsAtOpen } = await importOnce('./settings_snapshots.js'); // lazy 
 // The CLI path fields, as the server has them now. The dialog opens at once from the settings this page loaded, which a
 // CLI path saved from another tab or client has outdated: a moment later the fields the person has not touched show the
 // server's value, and it becomes what Save compares with (so a path the person never edited is never written back).
+export const whenPaneShown = (id, key, fn) => { const pane = document.getElementById(id); if (!pane || typeof ResizeObserver !== 'function') return fn(); const mark = key + 'Wait'; if (pane.dataset[mark]) return; pane.dataset[mark] = '1'; const ro = new ResizeObserver(es => { if (es.some(e => e.contentRect.width > 0)) { ro.disconnect(); delete pane.dataset[mark]; fn(); } }); ro.observe(pane); }; // Storage and cleanup's modules load when that pane is first shown: opening Settings on another section does not fetch them (the 24-file budget). One observer per pane and key waits at a time: a Settings opened and closed again on another section must not add one each time (agent_switch_stable's live observers)
 export const CLI_PATH_FIELDS = { cli_path_claude: 'settings-cli-path-claude', cli_path_codex: 'settings-cli-path-codex', cli_path_pi: 'settings-cli-path-pi', cli_path_agy: 'settings-cli-path-agy' };
 
 // The CLI path settings whose field the person typed in since the dialog opened.
@@ -132,7 +133,7 @@ export async function _fillMachineSettings(s) {
         // Loaded with the dialog, through importOnce so a failed load is retried (#3140).
         importOnce('./cloud_connect.js').then(m => { m.initCloudConnect(); m.loadCloudStatus(); }).catch(() => {});
         importOnce('./hub_mode_setting.js').then(m => m.loadHubModeSetting()).catch(() => {});
-        importOnce('./dropbox_settings.js').then(m => m.loadDropbox()).catch(() => {}); // the Dropbox backup block of Storage and cleanup (#14609)
+        whenPaneShown('settings-pane-cleanup', 'dropbox', () => importOnce('./dropbox_settings.js').then(m => m.loadDropbox()).catch(() => {})); // the Dropbox backup block of Storage and cleanup (#14609)
         importOnce('./setup_code_setting.js').then(m => m.initSetupCode()).catch(() => {}); // read only while Network and Hub is the pane in view (#6410)
     }
 }
@@ -190,10 +191,15 @@ export function _fillDefaults(s) {
     if (permModeSelect) {
         // Nothing saved: the first option, "Not set (Auto)", is chosen (Claude starts in Auto, #5836), and picking Auto is then a real change that is saved (#7620). Once a mode is saved that option is not offered: a saved mode is not cleared from here.
         const notSet = [...permModeSelect.options].find(o => o.value === '');
-        if (s.default_permission_mode) { notSet?.remove(); permModeSelect.value = s.default_permission_mode; }
+        if (s.default_permission_mode) { notSet?.remove(); permModeSelect.dataset.initial = s.default_permission_mode; permModeSelect.dataset.customSynced = ''; importOnce('./custom_modes.js').then(m => { m.syncCustomModeOptions(permModeSelect, ''); }).catch(() => {}); permModeSelect.value = s.default_permission_mode; } // a saved custom mode (#15950) is put back once the list is read
         else { if (!notSet) permModeSelect.prepend(new Option('Not set (Auto)', '')); permModeSelect.value = ''; }
         _updatePermModeDescription(permModeSelect, !s.default_permission_mode);
-        importOnce('./permission_mode_list.js').then(m => m.modeList(permModeSelect)).catch(() => {}); // the same rows as New agent (#15886)
+        if (!permModeSelect.dataset.listWired) { // the same rows as New agent (#15886), loaded when the field is first laid out: opening Settings on another section does not fetch the list, its sheet and the segmented control (the 24-file budget)
+            permModeSelect.dataset.listWired = '1';
+            const load = () => importOnce('./permission_mode_list.js').then(m => m.modeList(permModeSelect)).catch(() => {});
+            if (typeof ResizeObserver !== 'function') load(); // a hidden pane has no size: the observer reports once the field is laid out, scrolled to or not (an IntersectionObserver waited for it to be in the viewport, and the field sits low in a long pane)
+            else { const ro = new ResizeObserver(es => { if (es.some(e => e.contentRect.width > 0)) { ro.disconnect(); load(); } }); ro.observe(permModeSelect); }
+        }
         // A pick is a choice even when it is the mode the field showed (nothing saved shows Auto): it is saved, so a person who picks Auto and saves has Auto saved (#7620)
         permModeSelect.dataset.edited = '';
         if (!permModeSelect.dataset.watched) { permModeSelect.dataset.watched = '1'; permModeSelect.addEventListener('change', () => { permModeSelect.dataset.edited = '1'; }); }
@@ -271,7 +277,8 @@ export function _fillCliAndModels(s) {
     const picks = () => importOnce('./settings_model_pick.js').then(m => m.syncModelPicks()).catch(() => {}); // each box is a dropdown of the models with Other… behind it (#10000)
     picks();
     // On the hub the Default Models rows are hidden (machine settings), and the hub has no model catalog of its own to ask.
-    if (!isCloud()) importOnce('./custom_models.js').then(m => m.initCustomModels()).catch(() => {}); // the custom models list (#5480): hidden when this server has no such route
+    if (!isCloud()) whenPaneShown('settings-pane-agents', 'custommodels', () => importOnce('./custom_models.js').then(m => m.initCustomModels()).catch(() => {})); // the custom models list (#5480): hidden when this server has no such route
+    if (!isCloud()) importOnce('./custom_modes.js').then(m => m.initCustomModes()).catch(() => {}); // the custom permission modes (#15950): hidden when this server has no such route
     if (!isCloud()) _getAgentModels().then(models => {
         // _getAgentModels swallows errors and resolves with {} on failure; on
         // success it returns the canonical map with an array for each agent type.

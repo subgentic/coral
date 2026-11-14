@@ -6,8 +6,8 @@ const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
 
 // words a person can see in a group now, per the audit (artifact 141071b6); a group with no number has not been cut yet
-const TERMINAL_BUDGET = 66; // #7405: +1 for the visible hint lines (the (i) are gone), +3 for round 2's Fit pane width line, +2 for the Display and Backend sub-headings (#9490: a group of eight rows is headed); the backend's own sentence is kept on purpose (isolation versus surviving an upgrade is the one choice a person must be told about)
-const WITH_WARNING_BUDGET = 88; // 60 (+1 for the render engine's disclosure moved here from General, #7040), and the tools folder warning's label, line and button when that row shows // the same as settings_text_budget_browser's, now on a pty-only system // (Security: +3 for #6047's install ID row, "Install ID", "Copy" and its hint; "No prompts, transcripts, or secrets are sent." stays visible beside the Usage analytics switch: it is what a person reads where they decide) // (Storage: 47 on a fresh server; a server where an earlier suite turned automatic cleanup on shows its two status lines, up to 62)
+const TERMINAL_BUDGET = 66 + 16; // ST6: the two newly visible short help lines (fit_pane_width and tb_fixed). // #7405: +1 for the visible hint lines (the (i) are gone), +3 for round 2's Fit pane width line, +2 for the Display and Backend sub-headings (#9490: a group of eight rows is headed); the backend's own sentence is kept on purpose (isolation versus surviving an upgrade is the one choice a person must be told about)
+const WITH_WARNING_BUDGET = 88 + 16; // ST6: the same short help lines. // 60 (+1 for the render engine's disclosure moved here from General, #7040), and the tools folder warning's label, line and button when that row shows // the same as settings_text_budget_browser's, now on a pty-only system // (Security: +3 for #6047's install ID row, "Install ID", "Copy" and its hint; "No prompts, transcripts, or secrets are sent." stays visible beside the Usage analytics switch: it is what a person reads where they decide) // (Storage: 47 on a fresh server; a server where an earlier suite turned automatic cleanup on shows its two status lines, up to 62)
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -44,15 +44,10 @@ const WITH_WARNING_BUDGET = 88; // 60 (+1 for the render engine's disclosure mov
         assert.ok(withRow.some(t => /agent tools folder can be changed without administrator rights/.test(t)), 'the tools folder line shows: ' + JSON.stringify(withRow));
         assert.ok(wordsWithRow <= WITH_WARNING_BUDGET, `Terminal shows ${wordsWithRow} words with the tools folder warning too, budget ${WITH_WARNING_BUDGET}: ${JSON.stringify(withRow)}`);
         await ev(`document.getElementById('settings-tools-folder-row').hidden = true; true`);
-        const note = await ev(`(() => { const p = document.getElementById('tb-fixed'), b = p.closest('.sv-row').querySelector('.sv-learn'), d = document.getElementById(b.getAttribute('aria-controls')); const vis = e => e.getClientRects().length > 0;
-            return { noteShown: vis(p), note: p.textContent.trim(), learnShown: vis(b), expanded: b.getAttribute('aria-expanded'), controls: b.getAttribute('aria-controls'), detailHidden: d.hidden, detail: d.textContent.trim() }; })()`);
-        assert.ok(note.noteShown && note.learnShown, JSON.stringify(note));
-        assert.match(note.note, /pty/); assert.match(note.note, /wake next time/);
-        assert.equal(note.expanded, 'false'); assert.ok(note.controls); assert.equal(note.detailHidden, true);
-        assert.match(note.detail, /no tmux on this system/); assert.match(note.detail, /resume their conversation/);
-        await ev(`document.getElementById('tb-fixed').closest('.sv-row').querySelector('.sv-learn').click(); true`);
-        const open = await ev(`(() => { const b = document.getElementById('tb-fixed').closest('.sv-row').querySelector('.sv-learn'); return { expanded: b.getAttribute('aria-expanded'), hidden: document.getElementById(b.getAttribute('aria-controls')).hidden, label: b.textContent.trim() }; })()`);
-        assert.deepEqual(open, { expanded: 'true', hidden: false, label: 'Show less' });
-        console.log('PASS Settings > Terminal on a pty-only system: a short line, the rest behind Learn more, within the word budget');
+        const note = await ev(`(() => { const p=document.getElementById('tb-fixed'), a=p.closest('.sv-row').querySelector('a.sv-learn'); return {note:p.textContent, shown:!!a.getClientRects().length, href:a.getAttribute('href'), name:a.getAttribute('aria-label')}; })()`);
+        assert.match(note.note, /pty/); assert.match(note.note, /wake next time/); assert.ok(note.shown); assert.equal(note.href, '/docs/settings-system'); assert.match(note.name, /Terminal backend/);
+        const detail = await ev(`fetch('/api/agent-docs/settings-system').then(r=>r.text())`);
+        assert.match(detail, /no tmux on this system/); assert.match(detail, /resume their conversation/);
+        console.log('PASS Settings > Terminal on a pty-only system: a short line, the rest linked in Docs, within the word budget');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

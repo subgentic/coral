@@ -82,9 +82,8 @@ function buildOnce() {
     $('team-page-back-agent')?.addEventListener('click', backToAgent);
     $('team-page-bar-back')?.addEventListener('click', () => { if (backTo) backToAgent(); else go(cameFrom ? (u => parse(u.pathname, u.search))(new URL(cameFrom, location.origin)) : { view: 'agents' }); }); // a phone's bar arrow: back to the agent it came from, else to the agent list (#11239)
     $('team-page-add-agent').addEventListener('click', () => { window.showAddAgentToBoard?.(S.team, teamDir()); });
-    $('team-page-settings').addEventListener('click', () => { openSettings(); });
     buildMore();
-    buildStop();
+    syncStop();
     // A click or a tap that opens a page or the pane puts the focus on its heading by script: no ring for a pointer, the ring for a key (the dialogs' rule, quiet_focus.js).
     $('team-page-view').addEventListener('click', () => quietFocus($('team-page-view')), true);
 }
@@ -146,42 +145,33 @@ function stopItems() {
         { key: 'kill', label: 'Kill all', hint: 'Ends every agent now; their chats stay in History', danger: true, why, run: () => window.killBoard?.(S.team) },
     ];
 }
-/** The items in the Stop menu and in a phone's More (labels follow the team: asleep or not). */
+/** The team's stop items, last in More under a line (labels follow the team: asleep or not; #15856: Stop agents is no longer a button of its own). */
 function syncStop() {
-    const menu = $('team-page-stop-menu'); if (!menu) return;
-    const moreMenu = $('team-page-more-menu');
-    $('team-page-stop').textContent = teamAsleep() ? 'Wake agents' : 'Stop agents'; // a sleeping team is already stopped (walk 13 M9)
-    for (const [host, cls] of [[menu, 'menu-item'], [moreMenu, 'menu-item team-more-add team-more-stop']]) {
-        if (!host) continue;
-        for (const old of host.querySelectorAll('[data-stop], .team-more-stop-sep')) old.remove();
-        const items = stopItems();
-        if (host === moreMenu) { const r = el('hr', 'overflow-menu-divider team-more-add team-more-stop-sep'); r.dataset.stop = 'sep'; host.append(r); }
-        items.forEach((it, i) => {
-            if (host === menu && it.danger && !items[i - 1]?.danger) { const r = el('hr', 'overflow-menu-divider'); r.dataset.stop = 'sep'; host.append(r); }
-            const b = el('button', `${cls}${it.danger ? ' menu-item-danger' : ''}`); const label = el('span', 'menu-item-text', it.label); if (it.hint && !it.why) label.append(el('span', 'menu-item-hint', it.hint)); b.append(label); b.type = 'button'; b.dataset.stop = it.key; if (it.why) { b.disabled = true; b.setAttribute('aria-disabled', 'true'); b.append(' ', el('span', 'overflow-menu-note', it.why)); } b.addEventListener('click', () => { if (it.why) return; importOnce('./menu_button.js').then(x => x.closeMenus()); it.run(); });
-            host.append(b);
-        });
+    const host = $('team-page-more-menu'); if (!host) return;
+    for (const old of host.querySelectorAll('[data-stop], .team-more-stop-sep')) old.remove();
+    const r = el('hr', 'overflow-menu-divider team-more-stop-sep'); r.dataset.stop = 'sep'; host.append(r);
+    for (const it of stopItems()) {
+        const b = el('button', `menu-item team-more-stop${it.danger ? ' menu-item-danger' : ''}`); const label = el('span', 'menu-item-text', it.label); if (it.hint && !it.why) label.append(el('span', 'menu-item-hint', it.hint)); b.append(label); b.type = 'button'; b.dataset.stop = it.key;
+        if (it.why) { b.disabled = true; b.setAttribute('aria-disabled', 'true'); b.append(' ', el('span', 'overflow-menu-note', it.why)); } b.addEventListener('click', () => { if (it.why) return; importOnce('./menu_button.js').then(x => x.closeMenus()); it.run(); });
+        host.append(b);
     }
-}
-function buildStop() {
-    const b = $('team-page-stop'); if (!b) return;
-    b.addEventListener('click', async () => { syncStop(); (await importOnce('./menu_button.js')).toggleMenu(b); });
-    syncStop();
 }
 
 function buildMore() {
     const host = $('team-page-actions');
-    const b = el('button', 'btn team-page-more'); b.type = 'button'; b.id = 'team-page-more';
-    b.innerHTML = '<svg class="team-more-dots" viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg><span class="team-more-word">Actions</span>'; /* a phone draws the dots (#11239 slice B), a wide screen the word; the name is Actions on both */ b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-controls', 'team-page-more-menu');
+    const b = el('button', 'btn team-page-more'); b.type = 'button'; b.id = 'team-page-more'; b.setAttribute('aria-label', 'More team actions'); // the word is More (#15856); its name says more of what, so it is not the tab strip's More tab (#10942)
+    b.innerHTML = '<svg class="team-more-dots" viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg><span class="team-more-word">More</span>'; /* a phone draws the dots (#11239 slice B), a wide screen the word; the name is Actions on both */ b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-controls', 'team-page-more-menu');
     const menu = el('div', 'menu team-more-menu'); menu.id = 'team-page-more-menu'; menu.hidden = true; menu.setAttribute('aria-label', 'More team actions');
     const add = el('button', 'menu-item team-more-add', 'Add agent'); add.type = 'button'; add.id = 'team-page-more-add'; // a phone's header has one button: More, with Add agent first, then Settings
     add.addEventListener('click', () => { window.showAddAgentToBoard?.(S.team, teamDir()); });
-    const settings = el('button', 'menu-item team-more-add team-more-settings', 'Settings'); settings.type = 'button'; settings.id = 'team-page-more-settings';
+    const settings = el('button', 'menu-item team-more-settings', 'Settings'); settings.type = 'button'; settings.id = 'team-page-more-settings';
     settings.addEventListener('click', () => { openSettings(); });
     const tpl = Object.assign(el('button', 'menu-item', 'Save as template'), { type: 'button', id: 'team-page-more-template', onclick: () => window.saveTeamFromSidebar?.(S.team) });
-    menu.append(add, settings, tpl);
+    const copy = el('button', 'menu-item team-phone-copy', 'Copy for an agent'); copy.type = 'button';
+    copy.addEventListener('click', () => $('team-page-agent-copy')?.click());
+    menu.append(add, settings, tpl, copy);
     host.append(b, menu);
-    const set = (open, { focus = false } = {}) => { moreOpen = open; menu.hidden = !open; b.setAttribute('aria-expanded', String(open)); if (open) menu.querySelector('button:not([hidden])')?.focus(); else if (focus) b.focus(); };
+    const set = (open, { focus = false } = {}) => { moreOpen = open; menu.hidden = !open; b.setAttribute('aria-expanded', String(open)); if (open) menu.style.setProperty('--more-max', `${Math.max(160, Math.floor(innerHeight - menu.getBoundingClientRect().top - 12))}px`); /* the room under the button: at 200% text the header is tall and the menu must scroll inside the window, not run off it (#15856) */ if (open) menu.querySelector('button:not([hidden])')?.focus(); else if (focus) b.focus(); };
     b.addEventListener('click', () => { syncStop(); set(!moreOpen); }); // the Stop items in it follow the team (asleep or not) each time it opens
     menu.addEventListener('click', (e) => { if (e.target.closest('button')) set(false); });
     document.addEventListener('keydown', (e) => { if (moreOpen && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); set(false, { focus: true }); } }, true);
@@ -399,9 +389,13 @@ const teamHooks = () => ({
 });
 
 /** A goal or task the address names is not on this team: say so by name, with the way back to the list (#15295). */
-function itemNotFound(what, id, tab) {
+async function itemNotFound(what, id, tab) {
     const team = S.team;
-    importOnce('./np.js').then(m => m.showNotFound({ what, id: `#${id}`, back: { view: 'team', id: splitKey(team).name, server: splitKey(team).server, sub: tab }, backLabel: `Back to ${what === 'goal' ? 'Goals' : 'Tasks'}` })).catch(() => {});
+    // The address asked for this view, so a module that fails to load is not dropped quietly (#16376: one dropped request left the route on /tasks/77 with nothing on screen): it is tried once more, and a second failure says so in a toast.
+    let m;
+    try { m = await importOnce('./np.js'); } catch { m = await importOnce('./np.js', 'the page that says it was not found').catch(() => null); }
+    if (!m) return;
+    return m.showNotFound({ what, id: `#${id}`, back: { view: 'team', id: splitKey(team).name, server: splitKey(team).server, sub: tab }, backLabel: `Back to ${what === 'goal' ? 'Goals' : 'Tasks'}` }).catch(e => console.error('[coral]', e));
 }
 
 async function fillTab(tab, item = 0) {
@@ -465,7 +459,7 @@ async function openTaskById(id) {
     const host = $('team-panel-item');
     let missing = false;
     const full = await m.readTask(team, id, () => { missing = true; });
-    if (missing && seq === S.navSeq && team === S.team && S.tab === 'tasks') { itemNotFound('task', id, 'tasks'); return; }
+    if ((missing || !full) && seq === S.navSeq && team === S.team && S.tab === 'tasks') { itemNotFound('task', id, 'tasks'); return; } // a task that could not be read at all (both tries failed) is said too, never a blank route (#16403)
     if (!full || seq !== S.navSeq || team !== S.team || S.tab !== 'tasks') return;
     const origin = panel('tasks');
     S.item = { kind: 'task', id, origin };

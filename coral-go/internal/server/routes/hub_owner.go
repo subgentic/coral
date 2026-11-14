@@ -152,6 +152,8 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("GET", "/api/board/{project}/cross-team/settings"):                         textHubSwitchOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/custom-models"):                                               textCustomModelsOwnerOnly,
 	tunnel.OwnerRouteKey("PUT", "/api/custom-models"):                                               textCustomModelsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/custom-modes"):                                                textCustomModesOwnerOnly,
+	tunnel.OwnerRouteKey("PUT", "/api/custom-modes"):                                                textCustomModesOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/saved"):                                                       textSavedOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/saved/{id}/message"):                                          textSavedOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/saved"):                                                      textSavedOwnerOnly,
@@ -187,6 +189,7 @@ const textGuideRosterOwnerOnly = "through Coral Hub the guides' names on a board
 const textOrchGrantOwnerOnly = "through Coral Hub what a board's orchestrator may do, and the log of it, are for the account this computer is linked to only (#11432)"
 const textActivityOwnerOnly = "through Coral Hub the activity counts are for the account this computer is linked to only (#11225)"
 
+const textCustomModesOwnerOnly = "through Coral Hub only the account this computer is linked to can add or change custom permission modes (#15950)"
 const textCustomModelsOwnerOnly = "through Coral Hub only the account this computer is linked to can add or change custom models (#5996)"
 
 const textStarOwnerOnly = "through Coral Hub only the account this computer is linked to can star an artifact (#9819)"

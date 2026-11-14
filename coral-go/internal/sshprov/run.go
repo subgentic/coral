@@ -84,7 +84,24 @@ const (
 	CmdTailLog
 	// CmdPortHolder prints "<pid> <command name>" of what listens on port 8420 (lsof, else ss), or nothing; the hub only shows a pid and a name that match fixed patterns.
 	CmdPortHolder
+	// CmdKillStuck is the escalation after a stop that was not confirmed in time (#15997): SIGKILL for each process of THIS user that runs a Coral from the install folder (ourCoralPids), nothing else.
+	CmdKillStuck
+	// CmdListInstalled prints, one per line, the numbered folders under the install folder that hold a runnable release (<install>/<folder>/root/coral, an executable file, the folder itself no link). The hub picks the
+	// newest it can read (LatestInstalled): the release a Start Coral starts (#15998).
+	CmdListInstalled
+	// CmdReadRunningHome prints how THIS install's running Coral was given its data folder (#16021): "rel <path under the home folder>", "abs <path elsewhere>", "relative <word>" for a --home that is neither (the
+	// hub cannot tell where it points), or nothing when no Coral of this install runs or it has no --home. The match is ourCoralPids's.
+	CmdReadRunningHome
+	// CmdCheckDataDir is exit 0 when arg 0, an absolute path, is a Coral data folder this user owns: a folder (no link) with a sessions.db in it. Anything else exits 1.
+	CmdCheckDataDir
+	// CmdRecordDataDir writes arg 0 (a folder relative to the home folder, or an absolute one CmdCheckDataDir passed) into <install>/datadir, so the start after an upgrade keeps it (#16021).
+	CmdRecordDataDir
 )
+
+// ourCoralPids lists, one per line, the PIDs of this user's processes that run a Coral from the install folder: the program is the first word of the command line and is exactly <install>/<version>/root/coral.
+// It is what the stop and the check mean by "this install's Coral", whatever coral.pid says: a Coral that restarted itself runs under a PID the file never learned (#15997, the Operator's upgrade to v2.0.67).
+// The program is read as a word of its own, so the shell that runs this very command (its text is in its arguments) is never taken for one.
+const ourCoralPids = "ps -u \"$(id -u)\" -o pid= -o args= 2>/dev/null | awk -v d=\"$HOME/" + InstallDir + "/\" 'index($2, d) == 1 && substr($2, length(d) + 1) ~ /^[^\\/]+\\/root\\/coral$/ { print $1 }'"
 
 // aliveTest is true (exit 0) when <install>/coral.pid names a live process of this user whose command line is a Coral from the install folder: the daemon a start left. A recycled PID of another program fails the
 // command-line test, so it is never taken for Coral (and never signalled).
@@ -133,8 +150,11 @@ func DataDirProblem(d string) string {
 	return ""
 }
 
-// readDataDir sets d to the data folder recorded at the last start (<install>/datadir), or the default when there is none or it is not a plain relative path.
-const readDataDir = "d=$(cat \"$HOME/" + InstallDir + "/datadir\" 2>/dev/null); case \"$d\" in \"\"|/*|*..*|.ssh|.ssh/*|.gnupg|.gnupg/*|.config|.config/*) d=" + DefaultDataDir + ";; esac; "
+// readDataDir sets d to the data folder recorded at the last start (<install>/datadir), or the default when there is none or it is neither a plain relative path nor an absolute one that is a Coral data folder (a sessions.db in it, no link); h is its full path.
+const readDataDir = "d=$(cat \"$HOME/" + InstallDir + "/datadir\" 2>/dev/null); case \"$d\" in \"\"|*..*|*[!A-Za-z0-9_./-]*|.ssh|.ssh/*|.gnupg|.gnupg/*|.config|.config/*) d=" + DefaultDataDir + ";; /*) if [ -L \"$d\" ] || [ ! -f \"$d/sessions.db\" ]; then d=" + DefaultDataDir + "; fi;; esac; " + homeOfD
+
+// homeOfD sets h to the data folder's full path: d as it is when it is absolute (a Coral that was running from a folder outside the home folder, kept by an upgrade: #16021), else under the home folder.
+const homeOfD = "case \"$d\" in /*) h=\"$d\";; *) h=\"$HOME/$d\";; esac; "
 
 // DefaultPort is the port the far Coral listens on unless the person chose another (#13081).
 const DefaultPort = 8420
@@ -144,6 +164,12 @@ var portArgRe = regexp.MustCompile(`^(102[4-9]|10[3-9][0-9]|1[1-9][0-9]{2}|[2-9]
 
 // ValidPort reports whether p is a port a set up may name: 1024 to 65535 (not the ones that need root).
 func ValidPort(p int) bool { return p >= 1024 && p <= 65535 }
+
+// absDirRe is an absolute folder as an argument: up to ten names of dataDirSeg (so no "..", no odd character).
+var absDirRe = regexp.MustCompile(`^(/` + dataDirSeg + `){1,10}$`)
+
+// recordDirRe is what CmdRecordDataDir takes: a folder relative to the home folder (DataDirProblem passes it first) or an absolute one.
+var recordDirRe = regexp.MustCompile(`^(` + dataDirSeg + `(/` + dataDirSeg + `){0,4}|(/` + dataDirSeg + `){1,10})$`)
 
 var backendArgRe = regexp.MustCompile(`^(pty|tmux|keep)$`)
 
@@ -163,18 +189,24 @@ var specs = map[Command]spec{
 	CmdReceive:        {template: "umask 077 && cat > \"$HOME/" + InstallDir + "/%s/package.tar.gz\"", args: []*regexp.Regexp{versionRe}, timeout: 15 * time.Minute},
 	CmdTarList:        {template: "cd \"$HOME/" + InstallDir + "/%s\" && tar -tzf package.tar.gz", args: []*regexp.Regexp{versionRe}, timeout: 2 * time.Minute},
 	CmdStartDaemon: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "\" && { " + aliveTest + " || { bf=\"$HOME/" + InstallDir + "/backend\"; b=%[2]s; " +
-		"d=%[3]s; if [ \"$d\" = @keep ]; then " + readDataDir + "fi; mkdir -p \"$HOME/$d\" && printf %%s \"$d\" > \"$HOME/" + InstallDir + "/datadir\" || exit 1; " +
+		"d=%[3]s; if [ \"$d\" = @keep ]; then " + readDataDir + "else " + homeOfD + "fi; mkdir -p \"$h\" && printf %%s \"$d\" > \"$HOME/" + InstallDir + "/datadir\" || exit 1; " +
 		"if [ \"$b\" = keep ]; then b=$(cat \"$bf\" 2>/dev/null); case \"$b\" in pty|tmux) ;; *) if command -v tmux >/dev/null 2>&1; then b=tmux; else b=pty; fi;; esac; fi; " +
 		"if [ \"$b\" = tmux ] && ! command -v tmux >/dev/null 2>&1; then exit 7; fi; printf %%s \"$b\" > \"$bf\"; s=; command -v setsid >/dev/null 2>&1 && s=setsid; " +
 		"l=\"$HOME/" + InstallDir + "/coral.log\"; if [ \"$(wc -c < \"$l\" 2>/dev/null || echo 0)\" -gt 10485760 ]; then mv -f \"$l\" \"$l.1\"; fi; " +
-		"P=\"$HOME/" + InstallDir + "/coral.pid\" C=\"$HOME/" + InstallDir + "/%[1]s/root/coral\" B=$b H=\"$HOME/$d\" " +
+		"P=\"$HOME/" + InstallDir + "/coral.pid\" C=\"$HOME/" + InstallDir + "/%[1]s/root/coral\" B=$b H=\"$h\" " +
 		"nohup $s sh -c 'echo $$ > \"$P\"; exec \"$C\" --host 127.0.0.1 --port %[4]s --no-browser --cloud-url off --backend \"$B\" --home \"$H\"' </dev/null >>\"$l\" 2>&1 & }; }", args: []*regexp.Regexp{versionRe, backendArgRe, dataDirArgRe, portArgRe}},
 	CmdEnsureInstanceID: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "\" && f=\"$HOME/" + InstallDir + "/instance-id\" && { [ -s \"$f\" ] || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \\n' > \"$f\"; } && cat \"$f\""},
-	CmdReadAPIKey:       {template: readDataDir + "\"$HOME/" + InstallDir + "/%s/root/coral\" api-key --home \"$HOME/$d\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
+	CmdReadAPIKey:       {template: readDataDir + "\"$HOME/" + InstallDir + "/%s/root/coral\" api-key --home \"$h\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
 	CmdAcceptTerms:      {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" accept-terms", args: []*regexp.Regexp{versionRe}},
-	CmdStopDaemon:       {template: aliveTest + " && kill \"$(cat \"$HOME/" + InstallDir + "/coral.pid\")\" 2>/dev/null; true"},
-	CmdStopTmux:         {template: "tmux kill-session -t =coral-server 2>/dev/null; true"},
-	CmdRemoveInstalls:   {template: "cd \"$HOME/" + InstallDir + "\" 2>/dev/null && for d in [0-9]*; do [ -d \"$d\" ] && rm -rf -- \"$d\"; done; true"},
+	CmdStopDaemon:       {template: aliveTest + " && kill \"$(cat \"$HOME/" + InstallDir + "/coral.pid\")\" 2>/dev/null; for p in $(" + ourCoralPids + "); do kill \"$p\" 2>/dev/null; done; true"},
+	CmdListInstalled:    {template: "cd \"$HOME/" + InstallDir + "\" 2>/dev/null && for d in [0-9]*; do if [ -d \"$d\" ] && [ ! -L \"$d\" ] && [ -f \"$d/root/coral\" ] && [ -x \"$d/root/coral\" ]; then printf '%%s\\n' \"$d\"; fi; done; true"},
+	CmdKillStuck:        {template: "for p in $(" + ourCoralPids + "); do kill -9 \"$p\" 2>/dev/null; done; true"},
+	CmdReadRunningHome: {template: "h=$(ps -u \"$(id -u)\" -o pid= -o args= 2>/dev/null | awk -v d=\"$HOME/" + InstallDir + "/\" 'index($2, d) == 1 && substr($2, length(d) + 1) ~ /^[^\\/]+\\/root\\/coral$/ { for (i = 3; i <= NF; i++) { if ($i == \"--home\" && i < NF) { print $(i + 1); exit } if (index($i, \"--home=\") == 1) { print substr($i, 8); exit } } }'); " +
+		"while [ \"${h%%/}\" != \"$h\" ]; do h=${h%%/}; done; case \"$h\" in \"\") ;; \"$HOME\"/*) printf 'rel %%s' \"${h#\"$HOME\"/}\";; /*) printf 'abs %%s' \"$h\";; *) printf 'relative %%s' \"$h\";; esac; true"},
+	CmdCheckDataDir:   {template: "[ -d '%[1]s' ] && [ ! -L '%[1]s' ] && [ -O '%[1]s' ] && [ -f '%[1]s/sessions.db' ]", args: []*regexp.Regexp{absDirRe}},
+	CmdRecordDataDir:  {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "\" && printf %%s '%[1]s' > \"$HOME/" + InstallDir + "/datadir\"", args: []*regexp.Regexp{recordDirRe}},
+	CmdStopTmux:       {template: "tmux kill-session -t =coral-server 2>/dev/null; true"},
+	CmdRemoveInstalls: {template: "cd \"$HOME/" + InstallDir + "\" 2>/dev/null && for d in [0-9]*; do [ -d \"$d\" ] && rm -rf -- \"$d\"; done; true"},
 	// Never a link, never a folder that is not a Coral's (it has the instance id file this hub's setup made, and that file is no link): exit 7 for those, nothing deleted; exit 0 when there is nothing to delete (#12263).
 	CmdRemoveAll: {template: "[ -n \"$HOME\" ] || exit 1; d=\"$HOME/" + InstallDir + "\"; if [ ! -e \"$d\" ] && [ ! -L \"$d\" ]; then exit 0; fi; " +
 		"if [ -L \"$d\" ] || [ ! -d \"$d\" ] || [ -L \"$d/instance-id\" ] || [ ! -f \"$d/instance-id\" ]; then exit 7; fi; rm -rf -- \"$d\""},
@@ -184,7 +216,7 @@ var specs = map[Command]spec{
 		"if grep -Eqs \"^ *[0-9]+: [0-9A-Fa-f]+:$h [0-9A-Fa-f:]+ 0A \" /proc/net/tcp /proc/net/tcp6; then exit 2; fi; exit 0", args: []*regexp.Regexp{portArgRe}},
 	CmdPortHolder:         {template: `p=$(lsof -nP -iTCP:%[1]s -sTCP:LISTEN 2>/dev/null | awk 'NR==2{print $2" "$1}'); if [ -z "$p" ]; then p=$(ss -ltnpH 'sport = :%[1]s' 2>/dev/null | sed -n 's/.*users:(("\([^"]*\)",pid=\([0-9]*\).*/\3 \1/p' | head -1); fi; echo "$p"`, args: []*regexp.Regexp{portArgRe}},
 	CmdTailLog:            {template: "tail -n 20 \"$HOME/" + InstallDir + "/coral.log\" 2>/dev/null"},
-	CmdInstallOwnerSecret: {template: readDataDir + "\"$HOME/" + InstallDir + "/%s/root/coral\" hub-owner-secret --home \"$HOME/$d\"", args: []*regexp.Regexp{versionRe}},
+	CmdInstallOwnerSecret: {template: readDataDir + "\"$HOME/" + InstallDir + "/%s/root/coral\" hub-owner-secret --home \"$h\"", args: []*regexp.Regexp{versionRe}},
 	CmdFreeKB:             {template: "df -Pk \"$HOME\" | awk 'NR==2 {print $4}'"},
 	// The recorded sum goes FIRST: a re-unpack that is interrupted leaves no sum next to a half-written root, so the next run does not say "already installed". It is written last.
 	CmdUnpack: {template: "umask 077 && cd \"$HOME/" + InstallDir + "/%[1]s\" && rm -f package.sha256 && rm -rf root && mkdir root && tar -xzf package.tar.gz --no-same-owner -C root && " +

@@ -72,7 +72,7 @@ const AGENTS = (waiting) => waiting ? [
             if (!mobile) await step('a task page starts at its Back link (never a ring round the title, #7404) and Back puts the focus on the task row', async () => {
                 await ev(`window.switchNavTab('hub-inbox'); true`); await click('Tasks', `${pane} .view-list-item[data-key="tasks"]`); await settle(300);
                 await click('the task', '#group-table-view .dt-primary[data-task-id="12"]');
-                await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-input')`, 'the task page', 8000); await settle(300);
+                await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-input') && (document.activeElement && String(document.activeElement.className) || '').includes('goals-back')`, 'the task page, with the Back link focused', 10000);
                 assert.equal((await active()).cls.includes('goals-back'), true, 'the Back link has the focus'); assert.notEqual((await active()).id, 'team-task-title', 'not the title');
                 await click('Back', '#inbox-page .goals-back'); await settle(400);
                 const a = await active(); assert.equal(a.data.taskId, '12', 'Back: the row the task was opened from (' + JSON.stringify(a) + ')');
@@ -95,9 +95,11 @@ const AGENTS = (waiting) => waiting ? [
             });
             if (mobile) await step('the phone: a task opens at its Back link (not a ring round the title) and Back puts the focus on its row in the table', async () => {
                 await ev(`document.querySelector('${pane} .view-list-item[data-key="tasks"]').click(); true`); await settle(400);
-                await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`); await settle(600);
+                await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
+                await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-input') && (document.activeElement && String(document.activeElement.className) || '').includes('goals-back')`, 'the task page, with the Back link focused', 10000); // the focus moves after the page is drawn: wait for it, not a fixed 600 ms (#15947)
                 assert.equal((await active()).cls.includes('goals-back'), true, 'the Back link has the focus'); assert.notEqual((await active()).id, 'team-task-title', 'not the title');
-                await ev(`document.querySelector('#inbox-page .goals-back').click(); true`); await settle(500);
+                await ev(`document.querySelector('#inbox-page .goals-back').click(); true`);
+                await waitFor(`(document.activeElement && String(document.activeElement.className) || '').includes('dt-primary')`, 'the task row has the focus again', 10000);
                 const a = await active(); assert.ok(a.cls.includes('dt-primary') && a.data.taskId, 'the task row in the table has the focus (' + JSON.stringify(a) + ')');
             });
             if (mobile) await step('the Saved list on a phone is mail rows (#9583): the message and its time on the row, the whole row on screen, nothing behind a sideways scroll, and a tap opens the message (Done is on its page)', async () => {

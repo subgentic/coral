@@ -306,8 +306,9 @@
 1	registered_server_view.js	label
 1	registered_server_view.js	m.cls
 1	registered_server_view.js	online
-1	registered_server_view.js	s.transport === 'ssh' && !running ? `${upgradeControl(s, version, busy)} ${s.owner_stamp ? '' : `<button type=
+1	registered_server_view.js	s.transport === 'ssh' && !running ? `${startControl(s, status, busy)}${upgradeControl(s, version, busy)} ${s.o
 1	registered_server_view.js	setup
+1	registered_server_view.js	startControl(s, status, busy)
 1	registered_server_view.js	statusPill(status)
 1	registered_server_view.js	title
 1	registered_server_view.js	upgradeControl(s, version, busy)
@@ -533,6 +534,7 @@
 1	template_browser.js	btnLabel
 1	template_browser.js	meta.length ? `<div class="template-preview-meta">${meta.map(m => escapeHtml(m)).join(' &middot; ')}</div>` : 
 1	template_browser.js	meta.map(m => escapeHtml(m)).join(' &middot; ')
+1	terminal_gone.js	word
 1	theme_config.js	builtIn
 1	theme_config.js	groups
 1	theme_config.js	rows

@@ -3,7 +3,7 @@ import { showToast } from './utils.js';
 
 // "Trust Coral's hooks in Codex" (#153): written only by its own route on this computer (never PUT /api/settings, never
 // through Coral Hub), so it is saved as soon as it changes and is not part of the Save payload. The line under it says
-// whether Coral trusts its hooks now, and why not (a tools folder this user can change, a platform other than Windows).
+// whether Coral trusts its hooks now, and why not (a hook tool with no absolute path).
 export async function loadCodexTrustHooks() {
     const box = document.getElementById('settings-codex-trust-hooks');
     if (!box) return;

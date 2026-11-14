@@ -4,6 +4,10 @@ const { _acfServer, _settingsFor } = await importOnce('./launch_models.js');
 import { getEngineName } from './renderers.js';
 const { defaultPermissionMode, syncDefaultPermissionMode, trackPermissionPick } = await importOnce('./preset_enforcement.js');
 import { state } from './state.js';
+const { warmCustomModes, syncCustomModeOptions, customModeById, customModeFlagsLine, isCustomMode } = await importOnce('./custom_modes.js');
+
+warmCustomModes(); // the operator's own modes (#15950): read once, so every picker can list them
+export { isCustomMode, customModeById };
 
 /** Map agent type to its permission bypass flag. */
 const PERM_FLAGS = {
@@ -38,6 +42,7 @@ const SKIPS_ALL_PROMPTS = ['', 'auto', 'dontAsk', 'bypassPermissions'];
 /** What a permission mode allows for this CLI, in words; with no CLI (Settings' own select, which is for all of them) the generic description. */
 export function permissionDescription(type, value) {
     const t = String(type || '').toLowerCase(), v = value || '';
+    if (isCustomMode(v)) { const m = customModeById(v); return m ? `Runs with: ${customModeFlagsLine(m)}${m.risky ? ' (no prompts)' : ''}` : 'A custom mode that is no longer saved: this starts in Default.'; } // #15950
     if (t === 'pi') return PI_NO_PERMISSIONS;
     if (t === 'hermes') return v === 'bypassPermissions' ? HERMES_BYPASS_DESCRIPTION : HERMES_DEFAULT_DESCRIPTION;
     if ((t === 'agy' || t === 'antigravity' || t === 'gemini') && SKIPS_ALL_PROMPTS.includes(v)) return NO_CHECKS_DESCRIPTION;
@@ -86,6 +91,7 @@ export function _updatePermModeDescription(selectEl, unset = false) {
     }
     const type = selectEl.closest('[data-acf-uid]')?.querySelector('.acf-agent-type')?.value;
     offerModesFor(selectEl, type);
+    syncCustomModeOptions(selectEl, type); // the custom modes of this CLI, after the built-in ones (#15950)
     for (const o of selectEl.options) o.title = permissionDescription(type, o.value); // each option's tip is the CLI's own words, refreshed with the agent type (#10074)
     const hint = selectEl.parentElement?.querySelector('.perm-mode-desc') || selectEl.closest('.settings-row, .sv-row')?.querySelector('.perm-mode-desc'); // Settings' line is in the label, not beside the select
     if (!hint) return;
@@ -94,6 +100,7 @@ export function _updatePermModeDescription(selectEl, unset = false) {
 
 export function _getPermissionFlagsForAgentMode(agentType, mode) {
     const permMode = mode || defaultPermissionMode(state.settings, agentType);
+    if (isCustomMode(permMode)) return ''; // a custom mode (#15950) travels by name (permission_mode), never as flags typed here: the server adds its checked flags
     if (!permMode || permMode === 'default' || agentType === 'pi' || agentType === 'terminal') return '';
     if (agentType === 'claude') return `--permission-mode ${permMode}`;
     if (agentType === 'hermes') return permMode === 'bypassPermissions' ? '--yolo' : ''; // Hermes has one switch, and only Bypass is it: the server's PermissionFlagsForAgent says the same; without this a Bypass launch or restart sent no flag and ran in Default (#12464)
@@ -229,3 +236,8 @@ export function _syncACFAutoPermissions(container) {
     noteEl.textContent = _getPermFlagHelp(agentType);
     noteEl.style.opacity = toggleEl.checked ? '1' : '0.72';
 }
+
+// The custom modes arrive after a form is drawn, or change in Settings: every mode select takes the new list (#15950).
+document.addEventListener('coral:custom-modes', () => {
+    for (const sel of document.querySelectorAll('.acf-permission-mode, #settings-permission-mode')) _updatePermModeDescription(sel);
+});

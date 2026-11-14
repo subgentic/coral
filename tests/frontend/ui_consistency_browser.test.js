@@ -186,12 +186,14 @@ const fixtures = async () => {
                     assert.ok(await ev(`Array.from(document.querySelectorAll('.wf-detail-actions button:not(.wf-more-menu button)')).filter(b=>b.getClientRects().length).every(b=>{const r=b.getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth+1})`),'workflow actions fit instead of squeezing title');
                 }
                 if(!baseline && view==='settings') {
+                    const originalWorkingDir = await ev(`document.getElementById('settings-working-dir').value`);
                     await ev(`document.getElementById('settings-working-dir').focus();document.getElementById('settings-working-dir').value='/workspace/keyboard-fixture'`);
                     assert.equal(await ev(`document.activeElement.value`),'/workspace/keyboard-fixture');
                     assert.notEqual(await ev(`getComputedStyle(document.activeElement).boxShadow`),'none','focused field has a visible ring');
                     assert.ok(await ev(`document.querySelector('#settings-modal input[type=checkbox]').getBoundingClientRect().height<36`),'native checkbox has not inherited text field sizing');
                     if(device==='mobile')assert.ok(await ev(`Array.from(document.querySelectorAll('#settings-modal .modal-footer .btn')).every(b=>b.getBoundingClientRect().height>=44)`),'mobile dialog action targets');
-                    await ev(`document.activeElement.blur()`);
+                    // This is a focus/appearance probe: restore its value before blur invokes row autosave.
+                    await ev(`document.activeElement.value=${JSON.stringify(originalWorkingDir)};document.activeElement.blur()`);
                 }
                 if(shots){fs.mkdirSync(shots,{recursive:true});fs.writeFileSync(path.join(shots,`${theme}-${device}-${view}.png`),Buffer.from((await c.Page.captureScreenshot({format:'png'})).data,'base64'))}
             }

@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/subgentic/coral/internal/custommodes"
 	"net/http"
 	"strings"
 
@@ -40,6 +41,9 @@ func isAgyType(agentType string) bool {
 
 // modeRank is the rank of a permission mode as the type's CLI takes it. "" is no mode named.
 func modeRank(agentType, mode string) int {
+	if _, custom := custommodes.IDOf(mode); custom {
+		return rankOpen // a custom permission mode (#15950) is unknown risk: an agent caller never reaches one (Security, #15950)
+	}
 	if agentType == at.Pi || agentType == at.Opencode {
 		return rankOpen // no mode of theirs asks (agent.SkipsPermissionPrompts)
 	}

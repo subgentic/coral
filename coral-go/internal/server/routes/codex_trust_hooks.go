@@ -29,9 +29,12 @@ func CodexTrustFromSettings(ss *store.SessionStore) func() bool {
 
 // codexTrustStatus is what the settings page shows: the switch, and whether Coral trusts its hooks now and why not.
 func (h *CloudHandler) codexTrustStatus(r *http.Request) map[string]any {
-	on := true
+	on := false // a settings read that fails is off, as the launch reads it (#16128)
 	if s, err := h.ss.GetSettings(r.Context()); err == nil {
 		on = setreg.Bool(s, CodexTrustHooksSetting)
+	}
+	if !on { // the switch as this request read it: off is never trusted, whatever the process-wide switch the launch reads says (#16123)
+		return map[string]any{"trust": false, "trusted": false, "why": "turned off in Settings"}
 	}
 	trusted, why := agent.CodexHookTrust()
 	return map[string]any{"trust": on, "trusted": trusted, "why": why}

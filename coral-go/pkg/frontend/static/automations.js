@@ -12,6 +12,7 @@ import { setHidden } from './dom_write.js';
 import { announceNotice } from './notifications.js';
 import { importOnce } from './import_once.js';
 const { agentCopyButton } = await importOnce('./agent_copy_button.js'); // the robot at the toolbar's end (#15063)
+const PH = await importOnce('./page_header.js'); // the shared page header: title, More and the Primary, then the search row (#15814)
 import { jobList, onJobsChanged, refreshJobs, selectScheduledJob, openJobId, scheduleOf, nextOf, offWord } from './scheduler.js';
 import { lastWords, lastChip, atWords, whenWords, failureWords, isExample } from './job_words.js';
 import { liveRuns, onLiveRuns, selectLiveJobRun } from './live_jobs.js';
@@ -21,6 +22,7 @@ const IT = await importOnce('./inbox_toolbar.js');
 const AF = await importOnce('./automation_filters.js');
 const W = await importOnce('./workflows.js');
 const AR = await importOnce('./automation_runs.js');
+const SM = await importOnce('./status_mark.js'); // the one status mark: shape and word (#15813)
 const AQ = await importOnce('./automations_queue.js'); // the Queue folder: this computer's resource queue (#13651)
 
 const $ = id => document.getElementById(id);
@@ -156,7 +158,9 @@ function toolbarOf(key) {
             onPick: pick => { setFilters(key, { ...filtersOf(key), state: pick === 'all' ? '' : pick }); renderNav(true); } },
         action: createAction(key),
     });
-    if (!node.querySelector('.agent-copy')) node.append(agentCopyButton(f.resources ? 'resources' : 'jobs', () => (f.resources ? 'The resource queue: run coral-board resource list.' : `Coral\u2019s scheduled ${f.noun[1]} (the Automations tab).`))); // where in the docs to read (#15063)
+    const copySubject = () => (f.resources ? 'The resource queue: run coral-board resource list.' : `Coral\u2019s scheduled ${f.noun[1]} (the Automations tab).`); // where in the docs to read (#15063)
+    if (key === 'jobs') PH.pageHeader(node.querySelector('.list-bar-search-row'), { idp: 'automations-jobs', agentCopy: { key: 'jobs', subject: copySubject } }); // Jobs is on the page header (guidelines 4.2): Copy for an agent is in More, not a robot of its own (#15814)
+    else if (!node.querySelector('.agent-copy')) node.append(agentCopyButton(f.resources ? 'resources' : 'jobs', copySubject));
     return { node, signature: JSON.stringify([filt, counts, rows.length]) };
 }
 
@@ -166,13 +170,12 @@ const openItem = i => {
     openRow(i.kind === 'workflow' ? 'workflows' : 'jobs', i, itemKey(i));
 };
 const openRow = (key, i, rowKey = i.id) => { const t = $('group-table-view'); opener = { key: rowKey, scroll: t ? t.scrollTop : 0 }; go(routeOf(key, i.id)); };
+const RUN_STATE = { Passed: 'done', Failed: 'failed', Running: 'working' }; // a run's chip word to the status mark's state; Stopped, Waiting to start and Result not seen are none of the three: the hollow dot (design guidelines 4.5)
 const lastRunCell = i => {
     const c = lastChip(i.run);
     if (!c) return 'Never run';
-    const chip = DT.chip(c.word, resultClass(i.run));
-    if (c.detail) chip.title = c.detail;
-    return chip;
-}; // one chip word, as the Runs table and the Workflows list say it (#9456); the reason a run failed to start is the tooltip
+    return SM.statusMark(RUN_STATE[c.word] || 'idle', c.word, { title: c.detail });
+}; // the same words as the Runs table and the Workflows list (#9456), now with the status mark's shape; the reason a run failed to start is the tooltip
 const workflowResult = i => W.lastResult(i.run);
 /** A row's name button: the name is the one line; what the item is or runs is its tooltip (the page has it in full). */
 const nameButton = (i, what) => {

@@ -119,6 +119,8 @@ const AGENTS_FIELDS = host => [
     { key: 'default_models_notice', type: 'notice', render: slot => { slot.innerHTML = '<span id="settings-default-models-notice" class="settings-hint" role="status"></span>'; } },
     { key: 'custom_models', type: 'custom', id: 'settings-custom-models', wide: true, label: 'Custom models', help: moreOnly('Model ids are passed to the CLI as they are written here.', "They appear in every model picker, including the one that switches a running agent's model."), // the list and its form: custom_models.js draws them and shows the row once the server has the route
         render: slot => slot.classList.add('settings-custom-models') },
+    { key: 'custom_modes', type: 'custom', id: 'settings-custom-modes', wide: true, label: 'Custom permission modes', help: moreOnly('A mode is the flags the CLI is started with, one per line.', 'Custom modes appear after the built-in ones wherever a permission mode is chosen. Coral only accepts the permission flags of each CLI, and checks them again at every launch.'), // the list and its form: custom_modes.js draws them and shows the row once the server has the route (#15950)
+        render: slot => slot.classList.add('settings-custom-models') },
     { key: 'agents_defaults', type: 'heading', id: 'settings-agents-defaults', label: 'Defaults' },
     { key: 'permission_mode', type: 'select', id: 'settings-permission-mode', wide: true, labelId: 'settings-permission-mode-label', label: 'Default permission mode', options: PERMISSION_OPTIONS,
         help: { text: 'Everything; safety checks on Claude only.', about: 'Default permission mode', docs: { topic: 'how-do-i', answer: 'What the permission modes allow' } }, helpTextClass: 'perm-mode-desc',
@@ -148,7 +150,7 @@ const AGENTS_FIELDS = host => [
     { key: 'agents_experimental', type: 'heading', id: 'settings-agents-experimental', label: 'Experimental' },
     { key: 'launch_in_worktree', type: 'toggle', id: 'settings-launch-in-worktree', label: 'Enable launch into git worktree (experimental)', help: moreOnly('Experimental, and off until you turn it on: a team can then be launched into its own git worktree.') },
     { key: 'agents_tools', type: 'heading', id: 'settings-agents-tools', label: 'Tools' },
-    { key: 'codex_trust_hooks', type: 'toggle', id: 'settings-codex-trust-hooks', label: "Skip Codex's review of Coral's hooks", help: helpLine('Turns off a safety check: Codex will not ask you to review Coral\'s hooks.', "Codex asks you to review new hooks before it runs them, because a trusted hook runs outside its sandbox. When this is on and only an administrator can change Coral's tools folder (an installed Coral), Coral trusts its own hooks for each Codex agent it launches, so the agent starts without that question; your own hooks and a repository's still ask. Off, Codex asks every time. Applies to Codex agents launched after the change, and can only be changed on this computer.") },
+    { key: 'codex_trust_hooks', type: 'toggle', id: 'settings-codex-trust-hooks', label: "Skip Codex's review of Coral's hooks", help: helpLine('Turns off a safety check: Codex will not ask you to review Coral\'s hooks.', "Codex asks you to review new hooks before it runs them, because a trusted hook runs outside its sandbox. When this is on, Coral trusts its own hooks, and only those exact commands, for each Codex agent it launches, so the agent starts without that question; your own hooks, a repository's and a plugin's still ask. Off, Codex asks every time. Applies to Codex agents launched after the change, and can only be changed on this computer.") },
     live('settings-prompts-live'),
 ];
 
@@ -246,11 +248,33 @@ export const NETWORK_FIELDS = [
         help: { text: 'Adds a Computers tab; whoever signs in here controls every computer you add.', more: "It uses this Coral's own address, port and sign-in: the API key from other computers, and Remote access above for who can reach it. Nothing new listens. Turning it off keeps the computers you added." } },
 ];
 
+const HELP_LINES = {
+    check_updates: 'Shows a notice in this browser.',
+    git_poll_interval: 'How often Coral checks Git for changed files.',
+    fit_pane_width: 'Sizes the tmux terminal to this browser window.',
+    tb_fixed: 'Agents run in terminals held by this Coral.',
+    custom_models: 'Model ids are passed to the CLI as written.',
+    working_dir: 'The folder a new agent starts in.',
+    default_thinking_claude: 'How much Claude thinks before it answers.',
+    auto_resume: 'Wakes an agent again after a rate limit or API error.',
+    agent_low_priority: 'Keeps the dashboard quick while agents are busy.',
+    board_auto_attach: 'Stores recent local images and Markdown documents so teammates can open them.',
+    nudge_claude_artifacts: 'Reminds agents to publish shared files to Coral.',
+    launch_in_worktree: 'Uses an isolated checkout for each team. Experimental; off by default.',
+    prune_days: 'Removes old saved diffs and unlinked artifacts after a preview.',
+    retention_enabled: 'Deletes old saved diffs and unlinked artifacts automatically after a preview.',
+    accounts: 'Use CLI sign-in.',
+    debug_input_log: 'Records everything Coral types, including secrets. For troubleshooting only.',
+};
+
 /** Draws the groups that are fields into the Settings modal's panes (once, when the modal is built). mount is mountSettingsView. */
 export function drawSettingsGroups(modal, mount) {
     for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-inbox-rows', INBOX_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-terminal-rows', TERMINAL_FIELDS], ['settings-agents-rows', AGENTS_FIELDS], ['settings-cleanup-rows', CLEANUP_FIELDS], ['settings-security-rows', SECURITY_FIELDS], ['settings-network-rows', NETWORK_FIELDS]]) {
         const host = modal.querySelector(`#${hostId}`);
-        if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields: typeof fields === 'function' ? fields(host) : fields });
-        for (const id of hostId === 'settings-terminal-rows' ? TERMINAL_BACKEND_IDS : hostId === 'settings-agents-rows' ? ['settings-custom-models'] : []) host.querySelector(`#${id}`)?.closest('.sv-row')?.setAttribute('hidden', ''); // until the module that fills them has read its status
+        if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields: (typeof fields === 'function' ? fields(host) : fields).map(field => {
+            if (!field.help?.more) return field;
+            return { ...field, help: { ...field.help, text: field.help.text || HELP_LINES[field.key], more: undefined, docs: { topic: 'settings-system', answer: field.label } } };
+        }) });
+        for (const id of hostId === 'settings-terminal-rows' ? TERMINAL_BACKEND_IDS : hostId === 'settings-agents-rows' ? ['settings-custom-models', 'settings-custom-modes'] : []) host.querySelector(`#${id}`)?.closest('.sv-row')?.setAttribute('hidden', ''); // until the module that fills them has read its status
     }
 }

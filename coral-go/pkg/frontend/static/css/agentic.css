@@ -115,7 +115,8 @@ body.panel-dragging .agentic-state {
 
 /* ── Tabs ──────────────────────────────────────────────────── */
 
-.agentic-state-tabs { flex-shrink: 0; } /* the strip is the one tab strip's (.tabs .tabs-icons, components.css): the tabs share its width and wrap at large text (#4344) */
+.agentic-state-tabs { flex-shrink: 0; }
+.agentic-state-tabs > .agentic-tab { align-self: flex-start; } /* a tab is 36 px, not stretched to the strip's overlap (#15821) */ /* the strip is the one tab strip's (.tabs .tabs-icons, components.css): the tabs share its width and wrap at large text (#4344) */
 
 .agentic-tab .material-icons {
     font-size: var(--icon-size);
@@ -1396,6 +1397,7 @@ body.panel-dragging .agentic-state {
 
 .inline-preview-cm .cm-deletedChunk .cm-deletedText,
 .inline-preview-cm .cm-merge-b .cm-deletedText { background-color: var(--diff-word-del) !important; background-image: none !important; text-decoration: none !important; border-radius: 2px; }
+.inline-preview-cm .cm-merge-b .cm-line[data-plain] .cm-changedText, .inline-preview-cm .cm-deletedChunk[data-plain] .cm-deletedText { background: none !important; } /* lines only added or only removed: the plain band, no box behind the text (#16171) */
 .inline-preview-cm .cm-deletedLine,
 .inline-preview-cm .cm-deletedLine del{
     background-color: transparent !important;
@@ -1781,7 +1783,7 @@ body.panel-dragging .agentic-state {
 /* "+N" only where it shows whole beside five pills, the search box and the icon (#9144); on a narrower row the chip stands alone and the number badge on the Filters icon says how many are on */
 @container (max-width: 62rem) { .list-bar-chips-inrow > .list-bar-chips-more-item, .team-panel .team-tb-chips .team-tb-chip-more { display: none; } }
 @container (min-width: 62.01rem) { .list-bar-chips-inrow:has(.list-bar-chips-more-item), .team-panel .team-tb-chips:has(.team-tb-chip-more) { min-width: 12rem; } } /* the chip's 8 rem and the "+N" (#9144) */
-.list-bar-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 2px 8px; font-size: var(--fs-base); color: var(--text-primary); background: var(--bg-hover); border: 1px solid var(--control-border); border-radius: 999px; cursor: pointer; }
+.list-bar-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 2px 8px; font-size: var(--fs-base); color: var(--text-primary); background: var(--bg-hover); border: 1px solid var(--control-border); border-radius: var(--radius-md); cursor: pointer; }
 .list-bar-chip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .list-bar-chip-x { color: var(--text-primary); } /* 4.4:1 in the light theme with the secondary text colour on the chip's fill (#4851) */
 .list-bar-chip-all { background: none; }

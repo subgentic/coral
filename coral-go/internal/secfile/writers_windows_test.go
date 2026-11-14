@@ -134,9 +134,24 @@ func TestWritersNamesEachAccountOnce(t *testing.T) {
 	}
 	assert.Len(t, mine, 1, "this user is named once: %q", who)
 
-	everyone := []writer{{nil, []string{"the owner"}}, {nil, nil}, {nil, []string{"the owner", "through the parent folder"}}, {nil, []string{"through the parent folder"}}}
-	got := mergeWays([]string{"this user", "this user", "this user", `DOMAIN\bob`}, everyone)
+	sid := func(s string) *windows.SID {
+		t.Helper()
+		x, err := windows.StringToSid(s)
+		require.NoError(t, err)
+		return x
+	}
+	me, bob := sid("S-1-5-21-1-2-3-1001"), sid("S-1-5-21-1-2-3-1002")
+	found := []writer{{me, []string{"the owner"}}, {me, nil}, {me, []string{"the owner", "through the parent folder"}}, {bob, []string{"through the parent folder"}}}
+	got := mergeWays([]string{"this user", "this user", "this user", `DOMAIN\bob`}, found)
 	assert.Equal(t, []string{"this user (the owner, through the parent folder)", `DOMAIN\bob (through the parent folder)`}, got)
 	assert.Equal(t, []string{"Everyone"}, mergeWays([]string{"Everyone"}, []writer{{nil, nil}}), "an entry of its own has no parenthesis")
 	assert.Empty(t, mergeWays(nil, nil))
+
+	// The coral-go-team Security's INFO on #199: accounts are told apart by SID, not by name. The Everyone group (S-1-1-0) and a folder with no
+	// access list both read "Everyone", and two accounts whose lookups were late can't share a line by name either.
+	everyone := sid("S-1-1-0")
+	assert.Equal(t, []string{"Everyone", "Everyone (through the parent folder)"},
+		mergeWays([]string{"Everyone", "Everyone"}, []writer{{nil, nil}, {everyone, []string{"through the parent folder"}}}), "no access list and the Everyone group are two lines")
+	assert.Equal(t, []string{`DOMAIN\x`, `DOMAIN\x (the owner)`},
+		mergeWays([]string{`DOMAIN\x`, `DOMAIN\x`}, []writer{{me, nil}, {bob, []string{"the owner"}}}), "two SIDs with one name stay two accounts")
 }

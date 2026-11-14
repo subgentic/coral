@@ -140,6 +140,7 @@ b GET /api/chief
 b GET /api/cloud/owner-label
 c GET /api/cloud/status
 b GET /api/custom-models
+b GET /api/custom-modes
 c GET /api/filesystem/is-git
 b GET /api/filesystem/trust-probe
 c GET /api/filesystem/list
@@ -522,6 +523,7 @@ b PUT /api/system/update/settings
 b PUT /api/cloud/max-mode
 b PUT /api/cloud/redact-tokens
 b PUT /api/custom-models
+b PUT /api/custom-modes
 b PUT /api/system/identity-actor
 b PUT /api/remote/{server}/*
 b PUT /api/scheduled/jobs/{jobID}

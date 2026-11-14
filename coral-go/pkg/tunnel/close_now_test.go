@@ -2,6 +2,7 @@ package tunnel
 
 import (
 	"context"
+	"net"
 	"runtime"
 	"strings"
 	"sync"
@@ -135,4 +136,36 @@ func TestCloseNowEndsOpenStreams(t *testing.T) {
 	assert.Error(t, rerr, "so does a read")
 	_, oerr := s.ys.OpenStream()
 	assert.Error(t, oerr, "and a new stream cannot be opened")
+}
+
+// #16261 (v2.0.68 gate 3: TestCloseNowIsSafeAndIdempotent took 5.0 s on a loaded runner). The WebSocket library's Close waits up to 5 s for the peer's close frame, and its CloseNow, when a Close is
+// already running, does not end that wait: it waits behind it. So a CloseNow that came second left the first Close stuck for the full 5 s, as often as the Close won the start. The session's connection
+// now stops waiting when CloseNow says so. A connection whose Close never returns on its own (the peer is gone) stands for the library's.
+type stuckCloseConn struct {
+	net.Conn
+	release chan struct{}
+}
+
+func (c *stuckCloseConn) Close() error { <-c.release; return nil }
+
+func TestACloseStuckOnThePeerIsReleasedByCloseNowAtOnce(t *testing.T) {
+	inner := &stuckCloseConn{release: make(chan struct{})}
+	t.Cleanup(func() { close(inner.release) })
+	hard := make(chan struct{})
+	c := &releasableConn{Conn: inner, hard: hard}
+	returned := make(chan struct{})
+	go func() { _ = c.Close(); close(returned) }()
+	select {
+	case <-returned:
+		t.Fatal("Close returned while the peer's close was still awaited and nothing released it")
+	case <-time.After(100 * time.Millisecond):
+	}
+	start := time.Now()
+	close(hard)
+	select {
+	case <-returned:
+	case <-time.After(time.Second):
+		t.Fatal("a closed hard channel did not release the stuck Close")
+	}
+	assert.Less(t, time.Since(start), 500*time.Millisecond)
 }

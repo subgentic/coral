@@ -71,6 +71,8 @@ type restartPlan struct {
 	startMode                                                 string // the mode the stored agent's transcript says its chat started in, read when it had none recorded (#12718)
 	modeFromTranscript                                        bool   // the stored agent had no mode and no permission flag: its transcript's start mode is the one it restarts in and records (#12718)
 	pickedMode                                                bool   // the dialog named the mode: it replaces the stored one and the stored permission flags
+	liveMode                                                  string // the mode a Claude agent is in now when Shift+Tab changed it (liveClaudeMode, #16536); used when the dialog named none
+	liveSet                                                   bool   // liveMode is the mode it restarts in and records
 	modeNotRecorded                                           bool   // the stored agent had no mode: it restarts in Default and the answer says so
 	chiefMode                                                 string // set when the restarted agent is the recorded Chief: the mode its chief_actions setting names (#11798)
 }
@@ -174,6 +176,7 @@ func (h *SessionsHandler) restartResolve(ctx context.Context, name string, req r
 			}
 			p.stored = ls
 			p.startMode = h.transcriptStartMode(ctx, ls, store.UnmarshalFlags(ls.Flags))
+			p.liveMode = h.liveClaudeMode(*ls, ptr.Value(ls.PermissionMode), store.UnmarshalFlags(ls.Flags))
 			if ls.Capabilities != nil && *ls.Capabilities != "" {
 				p.caps = &agent.Capabilities{}
 				if err := json.Unmarshal([]byte(*ls.Capabilities), p.caps); err != nil {
@@ -405,8 +408,11 @@ func (p *restartPlan) restartSettings() {
 	if p.chiefMode != "" {
 		p.permMode = p.chiefMode
 	}
+	if p.liveMode != "" && p.chiefMode == "" && !p.pickedMode && p.caps.IsEmpty() && p.agentType == at.Claude { // Shift+Tab changed the mode inside Claude and the dialog named none: it restarts in the mode it was in (#16536)
+		p.permMode, p.liveSet, p.modeNotRecorded = p.liveMode, true, false
+	}
 	cleanFlags := restartFlags(storedFlags, p.model, p.req.ExtraFlags)
-	if carried, _ := agent.SplitPermissionFlags(storedFlags); p.chiefMode == "" && !p.pickedMode && p.caps.IsEmpty() && len(carried) > 0 {
+	if carried, _ := agent.SplitPermissionFlags(storedFlags); p.chiefMode == "" && !p.pickedMode && !p.liveSet && p.caps.IsEmpty() && len(carried) > 0 {
 		cleanFlags = append(cleanFlags, carried...) // what the agent was started with, as it was (#6423)
 	} else if p.caps.IsEmpty() && p.permMode != "" && p.permMode != "default" {
 		cleanFlags = append(cleanFlags, agent.PermissionFlagsForAgent(p.agentType, p.permMode)...)
@@ -686,8 +692,8 @@ func (h *SessionsHandler) restartRecord(ctx context.Context, p *restartPlan) {
 			if p.chiefMode != "" {
 				return &p.chiefMode // Chief's mode is its setting's, not the stored one (#11798)
 			}
-			if p.pickedMode {
-				return ptr.NonEmpty(p.permMode) // the person's pick is the mode it restarted in, and the next restart's (#12481)
+			if p.pickedMode || p.liveSet {
+				return ptr.NonEmpty(p.permMode) // the person's pick, or the mode Shift+Tab set (#16536), is the mode it restarted in, and the next restart's (#12481)
 			}
 			if p.stored != nil && p.stored.PermissionMode != nil && *p.stored.PermissionMode != "" {
 				return p.stored.PermissionMode

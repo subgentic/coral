@@ -7,7 +7,7 @@ import { retryOnce } from './overload.js';
 import { importOnce } from './import_once.js';
 import { isImagePath, isMediaPath } from './utils.js';
 import { loadCodeMirror } from './vendor_loader.js';
-import { getCm, getLangExtension, getLangFromPath, DIFF_CONFIG, cmHost, cmTheme } from './cm_util.js';
+import { getCm, getLangExtension, getLangFromPath, diffMergeView, plainWholeLineMarks, cmHost, cmTheme } from './cm_util.js';
 
 /** A file longer than this many lines is not diffed until the person asks: a stack of big diffs must not stall the panel. */
 export const BIG_LINES = 4000;
@@ -52,7 +52,7 @@ async function mount(slot, file, { original, content }, drawing) {
     body.className = 'file-diff-body';
     slot.replaceChildren(body);
     const host = cmHost(body);
-    const mergeExt = cm.unifiedMergeView({ original: cm.Text.of(original.split('\n')), diffConfig: DIFF_CONFIG, mergeControls: false, collapseUnchanged: { margin: 3, minSize: 4 } });
+    const mergeExt = diffMergeView(cm, original, content, { collapseUnchanged: { margin: 3, minSize: 4 } });
     const extensions = [
         cm.basicSetup, ...cmTheme(cm), cm.EditorView.lineWrapping,
         cm.EditorView.editable.of(false), cm.EditorState.readOnly.of(true),
@@ -64,6 +64,7 @@ async function mount(slot, file, { original, content }, drawing) {
     if (langExt) extensions.push(langExt);
     const view = new cm.EditorView({ state: cm.EditorState.create({ doc: content, extensions }), parent: host });
     views.set(slot, view);
+    plainWholeLineMarks(view);
     importOnce('./diff_comments.js').then(m => { if (current() && views.get(slot) === view) return m.attachDiffComments(slot, file, view, { original, content }, compareBase(file), m.mergeFields(mergeExt)); }).catch(() => {}); // comments on these lines (#12536); the diff reads fine without them
 }
 

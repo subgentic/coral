@@ -10,7 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/server/routes"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
@@ -90,4 +92,40 @@ func TestCodexTrustHooksGate(t *testing.T) {
 		r.srv.cloudHandler.SetPeerCheck(func(*http.Request) (bool, bool) { return false, true })
 		assert.False(t, admitted(do(rt.method, rt.body, dashboard)), "%s: another user, with dashboard headers", rt.method)
 	}
+}
+
+// #16123: the launch reads the same setting the switch writes: wired as startup wires it, a PUT of trust:false makes Coral refuse to trust its hooks for the next Codex it launches (and the page says so), so no hook is
+// trusted after the switch is turned off.
+func TestTurningTheCodexTrustSwitchOffStopsTheLaunchTrustingHooks(t *testing.T) {
+	r := newE2ERemote(t, "codex-trust-launch", nil)
+	h := r.srv.Router()
+	r.srv.cloudHandler.SetPeerCheck(func(*http.Request) (bool, bool) { return true, true })
+	agent.SetCodexHookTrust(routes.CodexTrustFromSettings(store.NewSessionStore(r.db))) // as internal/startup does
+	t.Cleanup(func() { agent.SetCodexHookTrust(nil) })
+	dashboard := map[string]string{"Content-Type": "application/json", "Sec-Fetch-Site": "same-origin", "Origin": "http://127.0.0.1:8420"}
+	rec := call(h, "PUT", "/api/system/codex-trust-hooks", `{"trust":false}`, dashboard)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	trusted, why := agent.CodexHookTrust()
+	assert.False(t, trusted, "the launch's own answer after the switch is off: %s", why)
+	assert.Contains(t, why, "turned off in Settings")
+	var out map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+	assert.Equal(t, false, out["trusted"], "the PUT's own reply says it too")
+}
+
+// #16128: a settings read that fails is off for the status page, as it is for the launch: it must not say Coral trusts.
+func TestCodexTrustStatusWithAFailedSettingsReadIsOff(t *testing.T) {
+	r := newE2ERemote(t, "codex-trust-readerr", nil)
+	h := r.srv.Router()
+	r.srv.cloudHandler.SetPeerCheck(func(*http.Request) (bool, bool) { return true, true })
+	t.Cleanup(func() { agent.SetCodexHookTrust(nil) })
+	agent.SetCodexHookTrust(func() bool { return true }) // the launch's switch is on; only the page's own read fails
+	require.NoError(t, r.db.Close())
+	dashboard := map[string]string{"Content-Type": "application/json", "Sec-Fetch-Site": "same-origin", "Origin": "http://127.0.0.1:8420"}
+	rec := call(h, "GET", "/api/system/codex-trust-hooks", "", dashboard)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var out map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+	assert.Equal(t, false, out["trust"], "a failed read is off")
+	assert.Equal(t, false, out["trusted"])
 }

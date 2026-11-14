@@ -73,10 +73,10 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
         await S.run('on a Hub the first step is Which computer? with several machines and only then (no machine select on step 1 either way)', async () => {
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); T.state.hub = true; T.state.cloud = true; T.state.serversKnown = true; T.state.servers = [{ id: 'm1', label: 'build-server', status: 'online', version: '1.4.6', last_seen: new Date().toISOString() }]; true`);
             await ev(`(async () => { await window.showLaunchModal(); const c = document.querySelector('#launch-step-chooser [data-arg="agent"]'); if (c && c.getClientRects().length) c.click(); return true; })()`);
-            await waitFor(`(() => { const s = document.getElementById('launch-step-computer'); return !!s && getComputedStyle(s).display !== 'none' && document.querySelectorAll('#launch-computer-list input[type=radio]').length >= 1; })()`, 'the Which computer? step', 6000);
+            await waitFor(`(() => { const s = document.getElementById('launch-step-computer'); return !!s && getComputedStyle(s).display !== 'none' && document.querySelectorAll('#launch-computer-list .launch-computer-pick').length >= 1; })()`, 'the Which computer? step', 6000);
             assert.ok(await ev(`/build-server/.test(document.getElementById('launch-computer-list').textContent) && document.getElementById('launch-computer-title').textContent === 'Which computer?'`), 'the step lists the computers and is named Which computer?');
-            await ev(`document.getElementById('launch-computer-go').click(); true`);
-            await waitFor(`!!window.__na.dialog()`, 'the New agent dialog after Continue', 6000);
+            await ev(`document.querySelector('#launch-computer-list .launch-computer-pick:not(:disabled)').click(); true`);
+            await waitFor(`!!window.__na.dialog()`, 'the New agent dialog after Select', 6000);
             assert.ok(!(await has('select', /computer|machine|server/i)), 'no machine select on step 1: the choice is a chip, On build-server, with Change');
             await ev(`window.hideLaunchModal(); T.state.servers = []; T.state.hub = false; T.state.cloud = false; true`);
             await openNewAgent(ev, waitFor);

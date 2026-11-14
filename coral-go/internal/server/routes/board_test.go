@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -1479,7 +1480,7 @@ func TestBoardTaskNudge_UsesTheTasksBoard(t *testing.T) {
 	postJSON(t, server.URL+"/api/board/myproject/subscribe", map[string]string{
 		"subscriber_id": "Frontend Dev", "job_title": "Frontend Dev", "session_name": "claude-00000004-3864-4864-8864-000000000004",
 	}).Body.Close()
-	time.Sleep(1100 * time.Millisecond) // subscribed_at has second resolution
+	// no wait: the lookup orders by subscribed_at then rowid DESC, so the later subscription wins inside one second too
 	postJSON(t, server.URL+"/api/board/other/subscribe", map[string]string{
 		"subscriber_id": "Frontend Dev", "job_title": "Frontend Dev", "session_name": "claude-00000005-3864-4864-8864-000000000005",
 	}).Body.Close()
@@ -1487,8 +1488,9 @@ func TestBoardTaskNudge_UsesTheTasksBoard(t *testing.T) {
 	resp := postJSON(t, server.URL+"/api/board/myproject/tasks", map[string]string{
 		"title": "Fix the header", "created_by": "Orchestrator", "assigned_to": "Frontend Dev",
 	})
+	refusal, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	require.Equal(t, http.StatusCreated, resp.StatusCode, "body %s, identity enforced %v", refusal, identityActorEnforced())
 
 	require.Eventually(t, func() bool { return len(terminal.sentTo("claude-00000004-3864-4864-8864-000000000004")) > 0 }, 2*time.Second, 20*time.Millisecond)
 	assert.Contains(t, terminal.sentTo("claude-00000004-3864-4864-8864-000000000004")[0], "coral-board task claim")

@@ -261,9 +261,10 @@ function acfStartValues(container, opts) {
     const nameVal = v.name || '';
     const promptVal = v.prompt || '';
     const flagsVal = v.flags || '';
-    const autoPermsVal = Object.prototype.hasOwnProperty.call(v, 'autoPermissions')
+    const customPick = String(v.permissionMode || v.permission_mode || '').startsWith('custom:') ? (v.permissionMode || v.permission_mode) : '';
+    const autoPermsVal = customPick || (Object.prototype.hasOwnProperty.call(v, 'autoPermissions')
         ? (typeof v.autoPermissions === 'string' ? v.autoPermissions : !!v.autoPermissions) // a mode's name opens the select on it (Restart: the agent's own mode, #12481)
-        : (Object.prototype.hasOwnProperty.call(v, 'flags') ? _hasPermFlag(flagsVal) : true);
+        : (Object.prototype.hasOwnProperty.call(v, 'flags') ? _hasPermFlag(flagsVal) : true));
 
     // Build permissions summary text
     const caps = v.capabilities || null;
@@ -742,7 +743,14 @@ export function setAgentConfig(containerId, values) {
         // Extract permission mode from flags if present, otherwise use default from settings
         const flagMode = _permissionModeFromFlags(v.flags || '');
         const defaultMode = defaultPermissionMode(_settingsFor(_acfServer(container)), typeEl?.value || 'claude');
-        if (flagMode) {
+        // A custom selection carries an ID, never expanded CLI flags. Preserve it
+        // across member-form transfers instead of inferring Default from empty flags.
+        _updatePermModeDescription(permModeEl);
+        const customPick = v.permissionMode || v.permission_mode;
+        if (String(customPick).startsWith('custom:') && [...permModeEl.options].some(o => o.value === customPick)) {
+            permModeEl.value = customPick;
+            permModeEl.dataset.pickedByPerson = '1';
+        } else if (flagMode) {
             permModeEl.value = flagMode;
             permModeEl.dataset.pickedByPerson = '1'; // a saved configuration's mode is a choice
         } else if (_hasPermFlag(v.flags || '')) {

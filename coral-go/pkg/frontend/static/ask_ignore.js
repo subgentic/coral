@@ -27,5 +27,5 @@ export async function ignoreAsk(a, who) {
 
 /** The bulk Dismiss of a phone's selection (#11671): the same close route and Undo, with one toast for the whole selection (said by the caller). */
 export const closeAsk = a => close(a, { note: NOTE });
-export const reopenAsk = a => close(a, { undo: true }).then(() => refreshOperatorAsks(true));
+export const reopenAsk = (a, { unanswer = false } = {}) => close(a, { undo: true, ...(unanswer ? { unanswer: true } : {}) }).then(() => refreshOperatorAsks(true));
 export { refreshOperatorAsks };

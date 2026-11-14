@@ -1,6 +1,10 @@
 package settings
 
-import "math"
+import (
+	"math"
+
+	"github.com/subgentic/coral/internal/custommodes"
+)
 
 // Key names that other packages refer to by constant. They are declared here so there is one spelling.
 const (
@@ -122,7 +126,7 @@ func init() {
 	text("custom_theme", ApplyClient, "The custom theme's colours.")
 	text("default_renderer", ApplyClient, "The renderer a new terminal uses.")
 	register(Spec{Key: DefaultAgentType, Kind: KindEnum, Values: AgentTypes, Apply: ApplyLive, Doc: "The agent type a launch without one uses."})
-	register(Spec{Key: "default_permission_mode", Kind: KindEnum, Values: permissionModes, Apply: ApplyClient, Doc: "The permission mode the launch form starts with."})
+	register(Spec{Key: "default_permission_mode", Kind: KindEnum, Values: permissionModes, AlsoValid: func(v string) bool { _, ok := custommodes.IDOf(v); return ok }, Apply: ApplyClient, Doc: "The permission mode the launch form starts with."})
 	text("default_working_dir", ApplyClient, "The folder the launch form starts in.")
 	boolOff("fit_pane_width", ApplyClient, "Fit the terminal to the pane's width.")
 	boolOff("notify_needs_input", ApplyClient, "Notify when an agent needs input.")
@@ -251,7 +255,7 @@ func init() {
 	register(Spec{Key: IdentityActor, Kind: KindEnum, Values: []string{"log", "enforce"}, Default: "log", Class: ClassOwnRoute, Apply: ApplyLive, Doc: "Whether the actor header is enforced."})
 	ownRoute(CloudMaxMode, KindText, "", "The most access Coral Hub may have.")
 	ownRoute(CloudAllowHubAutoAccept, KindBool, "true", "The Hub may auto-accept, or start an agent that skips permission prompts (on unless the owner turned it off; the Hub owner may change it, #5840).")
-	ownRoute(CodexTrustCoralHooks, KindBool, "true", "Coral trusts its own hooks for each Codex it launches, when only an administrator can change them (#153); off, Codex asks the person to review them.")
+	ownRoute(CodexTrustCoralHooks, KindBool, "true", "Coral trusts its own hooks for each Codex it launches, on every OS and only its exact hook commands (#153, #16008); off, Codex asks the person to review them.")
 	ownRoute(UpdateAuto, KindBool, "true", "Coral checks for updates in the background and keeps a verified one ready (#5280); installing one needs a person to relaunch it unless update_auto_install is on (#11170).")
 	ownRoute(HubRelaunchUpdates, KindBool, "false", "The Hub's owner may relaunch this Coral to install a staged update (#5280). Off until the person at this computer turns it on (#6290): an install the person here was not asked about is never the default.")
 	optIn(HubRelaunchUpdates)

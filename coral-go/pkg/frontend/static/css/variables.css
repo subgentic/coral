@@ -202,6 +202,9 @@
     --sv-label-size: var(--fs-md);                   /* 13px */
     --sv-label-weight: 500;
     --sv-label-color: var(--text-primary);
+    --sv-learn-display: inline;
+    --sv-learn-height: 0;
+    --sv-learn-target-display: block;
     --sv-help-size: var(--fs-base);                  /* 12px */
     --sv-help-weight: 400;
     --sv-help-color: var(--text-muted);              /* tertiary */

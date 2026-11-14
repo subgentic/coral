@@ -31,21 +31,14 @@ const { coralReady } = require('./helpers/wait');
                 const tb = await ev(`[...document.querySelectorAll('#tb-choice option')].map(o => o.textContent.trim())`);
                 assert.deepEqual(tb, ['Keep agents running when Coral restarts (tmux)', 'Put agents to sleep when Coral restarts (pty, default)'], 'the backend is a select with two short options (#9490: no radio buttons in the product)');
                 assert.equal(await ev(`document.querySelectorAll('input[type=radio]').length`), 0, 'no radio button in Settings');
-                const more = await ev(`(() => { const m = ${RADIO_ROW}.querySelector('.sv-more'); return { text: m.textContent, shown: m.checkVisibility({ checkVisibilityCSS: true }) }; })()`);
-                assert.match(more.text, /any other program running as you, can find that socket/, 'the access warning is in Learn more, whole');
-                assert.ok(!more.shown && more.text.length > 600, 'Learn more is closed at first and holds the whole explanation');
-                assert.equal((more.text.match(/macOS: with pty|Linux: with pty/g) || []).length, 1, "the operating system's note ends the explanation, said once");
-                assert.equal(await ev(`${RADIO_ROW}.querySelectorAll('.sv-learn').length`), 1, 'the backend card has one Learn more (#7636)');
+                const more = await ev(`fetch('/api/agent-docs/settings-system').then(r=>r.text())`);
+                assert.match(more, /any other program running as you, can find that socket/, 'the access warning stays whole in Docs');
+                assert.match(more, /macOS: with pty/); assert.match(more, /Linux: with pty/);
+                assert.equal(await ev(`${RADIO_ROW}.querySelector('a.sv-learn').getAttribute('href')`), '/docs/settings-system');
                 const wake = await ev(`(() => { const a = document.getElementById('tb-autowake-on').closest('.sv-row'); if (a.hidden) return null; const c = document.getElementById('tb-autowake-on').getBoundingClientRect(), r = a.getBoundingClientRect(); return { fromEdge: Math.round(r.right - c.right), first: a.firstElementChild.tagName === 'DIV' && /Wake agents/.test(a.firstElementChild.textContent) ? 'SPAN' : a.firstElementChild.tagName }; })()`);
                 if (wake) assert.ok(wake.fromEdge < 12 && wake.first === 'SPAN', 'Wake agents after a restart: the label first, its switch at the far end like every other row (#7636): ' + JSON.stringify(wake));
                 await shot('terminal-short', w);
-                await ev(`document.getElementById('tb-choice').value = 'tmux'; ${RADIO_ROW}.querySelector('.sv-learn').click(); true`);
-                const opened = await ev(`(() => { const b = ${RADIO_ROW}.querySelector('.sv-learn'), d = ${RADIO_ROW}.querySelector('.sv-more'); return { shown: d.checkVisibility({ checkVisibilityCSS: true }), text: d.textContent, label: b.textContent, expanded: b.getAttribute('aria-expanded'), selectChanged: document.getElementById('tb-choice').value !== 'tmux' }; })()`);
-                assert.ok(opened.shown && opened.label === 'Show less' && opened.expanded === 'true' && /puts them to sleep first when it stops cleanly/.test(opened.text), JSON.stringify(opened).slice(0, 200));
-                const learnName = await ev(`${RADIO_ROW}.querySelector('.sv-learn').getAttribute('aria-label')`);
-                assert.equal(learnName, 'Show less about the terminal backends', 'an open Learn more is named by its visible words and what it explains: ' + learnName);
-                assert.equal(opened.selectChanged, false, 'Learn more does not choose the backend');
-                await shot('terminal-learn', w);
+                assert.equal(await ev(`${RADIO_ROW}.querySelector('.sv-learn').getAttribute('aria-label')`), 'Learn more about the terminal backends, in Docs');
                 await ev(`window.hideSettingsModal(); true`);
             }
 
@@ -70,8 +63,8 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`window.__copied.length === 1`, 'the copy'); assert.deepEqual(await ev(`window.__copied`), ['coral --cloud-url https://app.coralhub.dev\ncoral cloud connect']);
                 await shot('network-off', w);
             }
-            console.log(`4. (${w}) Settings footer says Save settings`);
-            assert.equal(await ev(`document.querySelector('#settings-modal [data-on-click=m-apply-settings]').textContent.trim()`), 'Save settings');
+            console.log(`4. (${w}) Settings footer has only Close`);
+            assert.equal(await ev(`document.getElementById('settings-cancel-btn').textContent.trim()`), 'Close');
             await ev(`window.hideSettingsModal(); true`);
 
             console.log(`5. (${w}) The launch chooser: the start page's robot, in the page's font`);

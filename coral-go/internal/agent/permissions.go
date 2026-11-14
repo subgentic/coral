@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/custommodes"
 )
 
 // Capability represents a Coral-level permission capability.
@@ -363,6 +364,9 @@ func PermissionFlagsForAgent(agentType, mode string) []string {
 	if mode == "" || mode == "default" || agentType == at.Pi || agentType == at.Terminal {
 		return nil
 	}
+	if _, custom := custommodes.IDOf(mode); custom {
+		return nil // a custom mode (#15950) has no flags of its own here: the launch builder resolves it to the mode's flags (launchCommand), and the raw "custom:<id>" must never reach a CLI, which rejects it and exits (#16589)
+	}
 	switch agentType {
 	case at.Claude:
 		return []string{"--permission-mode", mode}
@@ -435,6 +439,9 @@ func DefaultLaunchPermissionMode(agentType string) string {
 
 // ValidPermissionMode reports whether mode is a recognized permission mode string.
 func ValidPermissionMode(mode string) bool {
+	if _, ok := custommodes.IDOf(mode); ok {
+		return true // "custom:<id>" (#15950): a custom mode's name; the launch resolves it, and a mode that is gone launches as Default
+	}
 	switch mode {
 	case "default", "plan", "acceptEdits", "auto", "bypassPermissions", "dontAsk":
 		return true

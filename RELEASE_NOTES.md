@@ -1,5 +1,67 @@
 # Release Notes
 
+## v2.0.68 — Custom permission modes, Settings that save as you go, Codex trusting Coral's hooks by default, a computer set up over SSH that starts again, and one look across the dialogs and phone
+
+Task numbers in brackets. Built on v2.0.67 and gated on ci/v2068-gate8 4df09ccee. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **Custom permission modes** (#15950, #15886, #16345, #16388, #16420): name a set of a CLI's own permission flags and pick it as a mode. The mode is a list of explained rows in New agent, the team member dialog and Settings > Defaults; a team member in a custom mode is judged by its own flags, on every Coral Hub path, and wins over the team's flags. Add mode, Update mode and Remove save at once and say Saved, or "Not saved" with the server's reason.
+- **Settings saves each row as it changes** (#15875, #15880): no Apply button; the Docs links, help text, switches and risk notices are shared across the panes, and a risk warning links to its safety summary (#16061, #16084: Settings still opens within its file budget).
+- **Codex trusts Coral's own hooks by default on every OS** (#16008, #16007, #16123, #16128): an unreadable Codex version means the newest behaviour; an unwired switch or a failed settings read is off, and a switch that is off reports not trusted.
+- **A computer set up over SSH** (#15997, #15998, #16021, #16010, #16047): an upgrade stops this install's Coral by its command line, keeps the data folder the running Coral uses, and a stopped Coral starts again from the newest installed release with its kept data folder, backend and port.
+- **Which computer?** (#16397): a Select button at the right of each computer card replaces the radio and Continue.
+- **One look across the dialogs and the phone** (#15815, #15816, #15821, #15827, #15856, #15859, #15889, #15891, #15819, #16233): one control height (32, 36 on a dock's tabs, 44 on touch), filters as one bordered strip, one dialog footer, one goals column order, a team's More menu that scrolls at 200% text, a folder step with one error under its field, and the shared phone header inset for Inbox search.
+
+#### Fixed
+
+- A model you set in New agent stays when a CLI check answers late (#16210, #16404): an older build of the provider cards no longer redraws the form's old Model row.
+- A task link whose task cannot be read says so instead of leaving a blank route, and a stylesheet that never answers no longer keeps a view from drawing (#16403, #16376).
+- A wholly added file in the diff viewer shows the quiet added-line band (#16171).
+- A post or ask with no words is refused, with the way to ask (#16186).
+- A Codex, Antigravity or Pi agent sitting at its input box is not "starting" or "Waiting in the terminal" (#15952).
+- Team page on a phone: the title of a team that is not there takes the header's full width (#16301); the split Send keeps its 44 px on touch (#15821).
+- A tunnel's Close stuck in the WebSocket close handshake is released (#16261).
+
+#### For the team
+
+- The beta and dropboxers tiers are gone from the release pipeline (#15075, #15110); tag a plain vX.Y.Z for a production release.
+- Test and gate work: many Windows and Linux flakes got their cause fixed (#16178, #16176, #16177, #16293, #16280, #16406, #15947).
+
+## v2.0.67 — Activity that reads like the Inbox, compact Needs you rows on a computer, Codex's own Auto mode, an updater that says what it is doing, and more of a remote computer's work done from the Hub
+
+Task numbers in brackets. Built on v2.0.66 and gated on ci/v2067-gate2c fbabdce6e.
+
+### Changes
+
+#### What you will notice first
+
+- **Activity is like the Inbox** (#15724, #15774, #15801): kind chips (Everything, Decisions, Answers, Permissions, Files and tasks, Words sent), an answered question opens as a thread (the question, the answer, later replies) with one Reply box that sends into the same thread, and a picture can go with a reply (to the agent that is running; an agent that is not running gets no toast and nothing is sent). On a phone Activity has no right column: the words and the time, the badge and who, and the answer and the goal take one line each.
+- **Needs you rows on a computer are compact** (#15722): the select box, the icon and the sender share the first line with the team and the wait on the right, a question's whole text sits under the sender, and Comment, Save, More and the star are labelled buttons on the bottom line. The phone is unchanged. The text beside a file's name shows only where the card is wide enough.
+- **Codex's Auto is Codex's own auto-review** (#15780, #15795): on Codex 0.163.0 and later an Auto pick launches with Codex's `--approve-for-me` (on a launch, restart, wake and resume); an older or unreadable version keeps the sandboxed setting it had. The Auto note says plainly that Codex's reviewer can approve actions outside the sandbox, such as writes outside the workspace, without asking you.
+- **Restart, Resume and New agent say what the flags are and why** (#15735, #15727, #15761): step 3 of New agent and the Restart and Resume dialogs name the flags a Codex agent will start with and the reason they differ from your pick (a role's Shell rule narrows Bypass, Default with Shell takes its flags from the capabilities, Full access is kept). Resume keeps Full access like Restart and Wake.
+- **Updates say what they are doing** (#15768, #15770, #15771, #15772): a newer release that has not been promoted yet reads "not promoted", not "up to date", in plain words for everyone; a check that is already running is said, not an error, and Check now is off while it runs; Settings > Updates follows a release being staged and the tray then says "Update and relaunch"; the install dialog says how long it takes and which step it is on, and the window comes forward after your own update.
+- **A remote computer, from the Hub** (#15697, #15708, #15713, #15715, #15717, #15720, #15729, #15749, #15730, #15691, #15787): a Hub owner can pause and resume an agent's notices, read person-only data, mark an artifact private, import a team from a folder, run a team's daily knowledge, delete an ended agent's terminal logs and unlisted received files, and acknowledge artifact retention, all on a remote computer. A remote computer's questions are proved through the Hub, and a refusal says why. Activity names the computers it could not read and filters by computer, and Analytics has a Computer picker. Run your own hub: choose where the release package comes from, and the steps are the switch, then Set up over SSH.
+- **The Agents list shows the active teams** (#15744): Show all teams brings back the idle ones.
+- **The agent side panel opens with Files, Browse, Artifacts, Activity and Tasks** (#15731, #15733): the other tabs stay in Customize tabs, unticked; a saved layout is read as saved; the More button stays while a tab is behind it, and the tab picked from it swaps into the row.
+
+#### Fixed
+
+- An ended agent's row shows one word, Ended; hover offers Restart, Wake and Sleep (#15777).
+- The Inbox icon rail shows a red badge only on Needs you (#15797).
+- Chief appears only in Settings > Chief: no sidebar card and no menu entry (#15793).
+- Find in conversation answers the platform's own key only (#15798).
+- A jump-host lookup that was killed or failed is said in the sentence, not shown as an empty answer (#15809, #15812).
+- The version list's "You" reads the same for an edit made in the dashboard in both lists (#15369).
+- Security: a Knowledge tab error that echoes `api_key=` or `password:` no longer shows the value (#15539); a Hub package upload that is cancelled or expires mid-way is refused cleanly (#15699); the permission-flags preview is a person-only route that starts and writes nothing (#15719); read routes that only a person may use refuse in the words of a read (#15740); an agent's screenshot guidance now says to check the shot for an account name, a local path or a secret before upload (#15420).
+
+#### For the team
+
+- Release checks: the release workflow's test and smoke steps are listed and a census fails when they and the list disagree, including steps named with Windows paths (#13015); the Linux digests of v2.0.64 and v2.0.65 are pinned for machine launch (#13779).
+- Tests: the routes tests run in parallel where they can and stay serial where they share state (#15686, #15704, #15748); the Windows jump-host test no longer depends on the clock (#15809); five tests found red in the v2.0.67 gate were fixed in the tests (#15926, #15927, #15930, #15954, #15933), and the Windows slowdown of the Needs you card styles was fixed in the product (#15953).
+
 ## v2.0.66 — Safer permission cards, restart and context reset that say what they do, Dropbox app key, and a calmer Needs you
 
 Task numbers in brackets. Built on v2.0.65 and gated on lead-v2066 f9d68cd63.

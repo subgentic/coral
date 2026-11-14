@@ -67,8 +67,9 @@ var notAStarter = map[string]string{
 	"tools/gen_route_queries.py":     "code generator",
 	"tools/gen_windows_resources.sh": "resource generator",
 	// The real-machine egress check for `coral machine` droplets: it matches startsCoral only through "install -d /etc/coral" (a folder), runs nftables and curl as a throwaway user, and starts no Coral at all.
-	"tools/machine-egress-check.sh": "checks a droplet's nftables egress block with curl as a non-root user; it creates /etc/coral as a folder and starts no Coral",
-	"tools/make_windows_icon.py":    "icon generator",
+	"tools/machine-egress-check.sh":           "checks a droplet's nftables egress block with curl as a non-root user; it creates /etc/coral as a folder and starts no Coral",
+	"tools/make_windows_icon.py":              "icon generator",
+	"tools/devops/windows-suite-durations.py": "reads windows-tests run logs (saved with gh) and prints the median time of each CDP suite; the name run_cdp_suites is in its text; it runs no process and starts no Coral",
 
 	// Reads run_cdp_suites.mjs as text to check that it takes each suite's limit from suite_timeout.mjs; runs no process at all.
 	"tests/frontend/suite_timeout.test.mjs": "reads the cdp runner's source for a string (the name run_cdp_suites matches startsCoral); starts no Coral",

@@ -2,7 +2,7 @@
 # Build coral-go Linux portable tarball
 #
 # Usage: ./installers/build-linux.sh [version] [amd64|arm64]
-#   Set CORAL_TIER=dev|beta to select build tier. Default: prod.
+#   Set CORAL_TIER=dev to select build tier. Default: prod.
 #   The architecture defaults to amd64; arm64 cross-compiles (CGO is off).
 # Output: installers/dist/coral-linux-<arch>-<version>.tar.gz
 
@@ -25,12 +25,9 @@ BUILD_TAGS="fts5"
 if [ "$CORAL_TIER" = "dev" ]; then
     BUILD_TAGS+=",dev"
     echo "==> Tier: dev (EULA skipped)"
-elif [ "$CORAL_TIER" = "dropboxers" ]; then
-    BUILD_TAGS+=",dropboxers"
-    echo "==> Tier: dropboxers (EULA skipped)"
-elif [ "$CORAL_TIER" = "beta" ]; then
-    BUILD_TAGS+=",beta"
-    echo "==> Tier: beta (EULA required, same as prod)"
+elif [ "$CORAL_TIER" = "dropboxers" ] || [ "$CORAL_TIER" = "beta" ]; then
+    echo "error: the $CORAL_TIER tier was removed (#15075); use CORAL_TIER=dev or leave it unset for prod" >&2
+    exit 2
 else
     echo "==> Tier: prod (EULA required)"
 fi

@@ -17,11 +17,13 @@ const { coralReady } = require('./helpers/wait');
     const text = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); return e ? e.textContent.replace(/\\s+/g, ' ').trim() : null; })()`);
     const vis = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); return !!e && e.checkVisibility(); })()`;
     const headings = () => ev(`[...document.querySelectorAll('#settings-pane-network :is(.sv-heading, .sv-row-toggle .sv-label)')].filter(h => h.checkVisibility()).map(h => h.textContent.replace(/\\s+/g, ' ').trim())`);
+    const guard=await require('./helpers/settings_guard').guardSettings();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            await fetch(BASE+'/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({remote_access_enabled:false})});
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev);
             await ev(`(async () => {
@@ -41,7 +43,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none' && document.getElementById('settings-cloud-connect').getClientRects().length > 0`, 'Settings on screen', 8000);
             await waitFor(`document.getElementById('settings-remote-access-enabled').dataset.saved !== undefined`, 'the access state read', 8000);
             await installAudit(ev);
-            const remote = () => ev(`(() => { const c = document.getElementById('settings-remote-access-enabled'); c.click(); return c.checked; })()`);
+            const remote = async () => {await ev(`(() => {document.getElementById('settings-remote-access-enabled').click();return true;})()`);const asked=await waitFor(`!!document.getElementById('settings-remote-access-enabled').checked || document.getElementById('confirm-modal-title')?.textContent === 'Turn on Remote access?'`,'the switch flips or asks first',8000).then(()=>true,()=>false);if(asked&&await ev(`document.getElementById('confirm-modal-title')?.textContent === 'Turn on Remote access?'`))await ev(`document.getElementById('confirm-modal-yes').click(); true`);const on=await ev(`document.getElementById('settings-remote-access-enabled').checked`);await waitFor(`document.getElementById('settings-remote-access-enabled').dataset.saving !== '1'`,'access row saved');return on;};
 
             // 1. the groups: headings, and the order (one order at every width)
             assert.deepEqual(await headings(), ['Use from other devices', 'Remote access', 'Status', 'Coral Hub', 'Manage other computers from this one'], at + 'the headings list, with nothing that could use a setup code yet');
@@ -65,7 +67,7 @@ const { coralReady } = require('./helpers/wait');
             if (!mobile) assert.ok(rows.level.select.left > rows.level.label.right - 4, at + 'the level select sits at the right of its question ' + JSON.stringify(rows.level));
             else assert.ok(rows.level.select.top >= rows.level.label.bottom - 2, at + 'on a phone the select is under its question');
             // 1c. Learn more comes after the short line in the Coral Hub and Manage groups (#7626, UI/UX)
-            const learn = await ev(`(() => { const t = (g, sel) => document.querySelector('#' + g + ' ' + sel).getBoundingClientRect().top; const m = document.getElementById('settings-hub-mode-enabled').closest('.sv-row'); const hl = document.querySelector('#net-group-hub .settings-learn').getBoundingClientRect(), hs = document.getElementById('settings-cloud-status').getBoundingClientRect(); return { hub: hl.top >= hs.top - 2 && hl.top < hs.bottom + 12 && hl.left >= hs.left, /* on the sentence's own line, or right under it where the pane is too narrow for both (#8276): no lone line and gap */ manage: m.querySelector('.sv-learn').getBoundingClientRect().top >= m.querySelector('.sv-help-text').getBoundingClientRect().top }; })()`);
+            const learn = await ev(`(() => { const a = document.querySelector('#net-group-hub a.sv-learn'), m=document.getElementById('settings-hub-mode-enabled').closest('.sv-row'); return {hub:!!a.closest('.sv-help')&&a.getAttribute('href')==='/docs/hub',manage:!!m.querySelector('.sv-help a.sv-learn')}; })()`);
             assert.deepEqual(learn, { hub: true, manage: true }, at + 'Learn more follows the short line: after the Coral Hub sentence on its line, under the Manage line');
             // 2. Manage other computers: its wording
             assert.equal(await ev(`document.getElementById('settings-hub-mode-enabled').closest('.sv-row').querySelector('.sv-help-text').textContent.trim()`), 'Adds a Computers tab; whoever signs in here controls every computer you add.', at + 'a hub has full control of what it manages, said where the switch is');
@@ -75,13 +77,16 @@ const { coralReady } = require('./helpers/wait');
             // 3. Remote access turning on: a note, it waits for Save
             assert.equal(await text('#net-remote-note'), '', at + 'no note while nothing is changed');
             assert.equal(await remote(), true);
-            assert.match(await text('#net-remote-note'), /^Applies when you press Save settings\. Other devices on your network can then reach Coral; they need your password or a setup code\.$/, at + 'turning it on says what it lets in and that it waits for Save');
+            await waitFor(`document.getElementById('settings-remote-access-enabled').dataset.saving !== '1'`, 'Remote access saved');
+            assert.equal(await text('#net-remote-note'), '', at+'the saved row has no unsaved note');
+            assert.match(await text('#settings-remote-access-status'), /Saved: on.*Restart to apply/, at+'the saved access choice needs a restart');
             assert.equal(await ev(`document.getElementById('net-remote-note').getAttribute('role')`), 'status');
             assert.equal(await ev(`document.getElementById('net-remote-note').hasAttribute('hidden')`), false, at + 'the live region is always in the page');
             await waitFor(`!document.getElementById('net-group-setup').hidden`, 'the Setup code group once Remote access is on', 8000);
             assert.deepEqual(await headings(), ['Use from other devices', 'Remote access', 'Setup code', 'Status', 'Coral Hub', 'Manage other computers from this one'], at + 'Setup code is a heading under Remote access');
             await ev(`document.getElementById('settings-remote-access-enabled').click(); true`);
-            assert.equal(await text('#net-remote-note'), '', at + 'back to what is saved: no note');
+            await waitFor(`document.getElementById('settings-remote-access-enabled').dataset.saving !== '1'`, 'Remote access off saved');
+            assert.equal(await text('#net-remote-note'), '', at + 'the off choice is saved too');
             assert.equal(await ev(vis('#net-group-setup')), false, at + 'and the group goes');
             await remote();
             await waitFor(`!document.getElementById('net-group-setup').hidden`, 'the group again', 8000);
@@ -149,5 +154,5 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await ev(`document.documentElement.scrollWidth <= innerWidth`), true, at + 'no sideways scroll');
         }
         console.log('PASS net pane: groups with headings, Remote access explicit, the setup code on request');
-    } finally { await client.close(); }
+    } finally { await client.close(); await guard.restore(); }
 })().catch(e => { console.error(e); process.exit(1); });

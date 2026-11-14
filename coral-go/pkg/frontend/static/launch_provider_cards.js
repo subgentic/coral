@@ -55,6 +55,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
         for (const r of group.querySelectorAll('input[type="radio"]')) r.setAttribute('aria-describedby', [`${group.id}-st-${r.value}`, on ? n.id : ''].filter(Boolean).join(' '));
     };
     const typeNow = () => ALIAS[select.value] || select.value;
+    const modelOwned = () => form?.dataset.acfModelDirty === 'true'; // a model the person typed or picked is theirs: a probe's answer must not move the provider under it and drop it (#16210)
     let chosen = false; // a person picked a provider here, or the select moved some other way: the answers of the checks leave the selection alone
     const start = select.value;
     const state = new Map(TYPES.map(([t]) => [t, { found: null, url: '' }])); // found: null until the check answers
@@ -136,6 +137,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     const paintStatus = () => { for (const [type, card] of cards) { const st = card.querySelector('.provider-status'), t = statusOf(type); if (st) st.textContent = t; const line = bodies.get(type)?.querySelector('.provider-body-status'); if (line) line.textContent = t ? `${t}` : ''; } };
 
     function draw() {
+        if (group._pickToken !== gen) return; // a newer build owns the group
         keepFocus(() => drawCards());
     }
     function drawCards() {
@@ -182,15 +184,15 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     if (group._pickToken !== gen || !group.isConnected) return; // another New Agent opened meanwhile
     TYPES.forEach(([t], i) => state.set(t, found[i]));
     // nothing was ever chosen and the built-in default is not here: start on the first provider that is
-    if (!chosen && implicitDefault && typeNow() === 'claude' && found[0].found === false) {
+    if (!chosen && !modelOwned() && implicitDefault && typeNow() === 'claude' && found[0].found === false) {
         const first = TYPES.findIndex((_, i) => found[i].found === true);
         if (first >= 0) { select.value = TYPES[first][0]; select.dispatchEvent(new Event('change', { bubbles: true })); chosen = false; }
     }
     // Claude is missing and nothing was chosen, but a provider has not answered yet (the check runs "<cli> --version", which Hermes, a Python program, takes seconds to do): wait for it a while longer before
     // giving up on finding one to start on (#12169). The cards are already drawn and usable; this only moves the start, and not once a person has chosen.
-    if (!chosen && implicitDefault && typeNow() === 'claude' && found[0].found === false && !found.some(f => f.found === true) && found.some(f => f.found === null)) {
+    if (!chosen && !modelOwned() && implicitDefault && typeNow() === 'claude' && found[0].found === false && !found.some(f => f.found === true) && found.some(f => f.found === null)) {
         const late = await Promise.race([Promise.all(probes), new Promise(r => setTimeout(() => r(null), LATE_PROBE_MS))]);
-        if (late && group._pickToken === gen && group.isConnected && !chosen) {
+        if (late && group._pickToken === gen && group.isConnected && !chosen && !modelOwned()) {
             TYPES.forEach(([t], i) => state.set(t, late[i]));
             const first = TYPES.findIndex((_, i) => late[i].found === true);
             if (first >= 0) { select.value = TYPES[first][0]; select.dispatchEvent(new Event('change', { bubbles: true })); chosen = false; }
@@ -203,7 +205,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     if (state.get(signin.type).found === true) askSignin();
     // a later check of a CLI (Check again, or after Set path and Save) draws its card again from the fresh answer (#10161)
     const onChecked = e => {
-        if (!group.isConnected) { document.removeEventListener('cli-checked', onChecked); return; }
+        if (!group.isConnected || group._pickToken !== gen) { document.removeEventListener('cli-checked', onChecked); return; } // an older build of this group (the dialog opened again since) draws nothing: its rows are the form's OLD ones, and drawing them put a second Model field into the dialog, which the form's own reads then missed (#16404)
         const type = ALIAS[e.detail.type] || e.detail.type; if (!state.has(type)) return;
         state.set(type, { found: !!e.detail.found, url: state.get(type).url, why: state.get(type).why, refused: e.detail.refused || '' });
         if (!group.contains(document.activeElement)) draw();
