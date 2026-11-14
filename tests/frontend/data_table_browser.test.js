@@ -187,10 +187,10 @@ const { coralReady, framesJs } = require('./helpers/wait');
         assert.deepEqual(Object.keys(JSON.parse(await ev(`localStorage.getItem(${JSON.stringify(KEY)})`))).includes('who'), true, 'the width is kept in this browser');
         await mount();
         assert.ok(Math.abs((await W('who')) - kept) <= 2, 'a redraw (a new table for the same list) has the kept width: ' + (await W('who')) + ' vs ' + kept);
-        await waitFor(`!!document.querySelector('#dt-host .cols-reset-btn:not([hidden])')`, 'a Reset column widths button is offered once widths are kept (#12409; it was "no reset", #9845)', 4000);
-        await ev(`document.querySelector('#dt-host .cols-reset-btn').click(); true`); await ev(framesJs(6));
-        assert.equal(await ev(`localStorage.getItem(${JSON.stringify(KEY)})`), null, 'Reset takes the kept widths out of this browser');
-        assert.ok(Math.abs((await W('who')) - w0.who) <= 2 && Math.abs((await W('name')) - w0.name) <= 2 && await ev(`document.querySelector('#dt-host .cols-reset-btn').hidden`), 'and every column is the width it had before any drag, and the button is gone');
+        assert.equal(await ev(`!!document.querySelector('#dt-host .cols-reset-btn')`), false, 'dragged widths add no reset control');
+        assert.equal(await ev(`document.querySelector('#dt-host .cols-hidden-bar').hidden`), true, 'no hidden columns means no extra bar row');
+        // Start the keyboard checks from the fixture's original widths.
+        await ev(`localStorage.removeItem(${JSON.stringify(KEY)}); true`); await mount();
         // the keyboard: an edge moves by 16 px a key, the columns on its right give or take the room (#12409): the Name edge left narrows Name and widens Who, right gives it back
         await ev(`document.querySelector('#dt-host th[data-key="name"] .dt-resize').focus(); true`);
         const before = await W('name'), whoBefore = await W('who');
