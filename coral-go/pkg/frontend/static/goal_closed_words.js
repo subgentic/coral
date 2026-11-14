@@ -13,4 +13,4 @@ export function closedByLine(g) {
     return `Closed as ${word}${who}.${why ? ` Reason: ${why}` : ''}`;
 }
 /** What Not yet does on a goal that looks done, in a line beside its buttons (a phone shows no tooltip). */
-export const looksDoneText = 'All its tasks are done. Close goal finishes it. Not yet keeps it open and hides this reminder until another task is added.';
+export const looksDoneText = 'Mark done finishes it. Not yet keeps it open and hides this reminder until another task is added.';
