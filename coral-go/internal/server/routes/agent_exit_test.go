@@ -143,7 +143,7 @@ func TestExitNoticeOncePerBurstWithFixedLabels(t *testing.T) {
 	assert.True(t, strings.HasPrefix(post, exitNoticeSender+"|3 agents stopped:"), post)
 	assert.Contains(t, post, "Backend Dev: rate limited. Wake resumes it.")
 	assert.Contains(t, post, "QA: overloaded. Wake resumes it.")
-	assert.Contains(t, post, "Frontend: exits right after it starts: its CLI ended and left its terminal at a shell, with no error shown. Wake resumes it.", "a turn that did not fail says what Coral saw (#15062); this agent was just started")
+	assert.Contains(t, post, "Frontend: exits right after it starts: its CLI refused to start. Check its terminal for the error, then Wake it once that is fixed.", "a turn that did not fail says what Coral saw (#15062); this agent was just started")
 	assert.NotContains(t, post, "@", "no mention: workers aren't nudged")
 	for _, raw := range []string{"SECRET", "/Users", "529", "429", "rate_limit_error"} {
 		assert.NotContains(t, post, raw, "the CLI's text never leaves the server")
