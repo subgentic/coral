@@ -172,7 +172,11 @@ async function loadQuery({ append = false, quiet = false } = {}) {
 const queryHasMore = () => !!model.q.cursor || (!!TF.phases(model.filters) && model.q.phase === 0 && model.q.doneTotal > 0);
 
 let bar = null, barKey = '';
+let filterBeforeSearch = null; // the pill the person had before a search started (#16743): restored when the search is cleared
 function setFilters(next) {
+    const hadQ = !!model.filters.q, hasQ = !!TF.clean(next).q;
+    if (!hadQ && hasQ) { filterBeforeSearch = model.filter; model.filter = 'all'; }
+    else if (hadQ && !hasQ && filterBeforeSearch != null) { model.filter = filterBeforeSearch; filterBeforeSearch = null; }
     model.filters = next;
     TF.saveFilters(model.project, next, browserLocal);
     hooks.onFilters?.(TF.toQuery(next)); // the address keeps them (#7782)
@@ -244,7 +248,7 @@ function draw() {
     if (PHONE.matches) bar.node.querySelector('.list-bar-search-row')?.classList.add('phone-list-bar');
     Toolbar.adopt(bar.node.querySelector('.list-bar-search-row'), {
         pills: { label: 'Show tasks that are', current: model.filter, items: FILTERS.map(([key, label]) => ({ key, label, count: c[key] })),
-            onPick: key => { model.filter = key; if (key === 'open' || key === 'all') browserLocal.set(HIDE_KEY, key === 'open' ? 'true' : 'false'); say(`${FILTERS.find(f => f[0] === key)[1]}: ${c[key]} tasks`); draw(); } },
+            onPick: key => { model.filter = key; filterBeforeSearch = null; if (key === 'open' || key === 'all') browserLocal.set(HIDE_KEY, key === 'open' ? 'true' : 'false'); say(`${FILTERS.find(f => f[0] === key)[1]}: ${c[key]} tasks`); draw(); } },
         chips: TF.chips(model.filters).filter(c => c.key !== 'q').map(c => ({ label: c.label, aria: `Remove the filter: ${c.label}`, onRemove: () => { say(`Removed the filter: ${c.label}`); setFilters(TF.without(model.filters, c.key)); } })),
         action: newTask,
     });
@@ -252,7 +256,7 @@ function draw() {
     if (query && L.total != null && L.total > all.length && all.length && !model.loading) body.append(el('p', 'goals-note team-count-line', `Showing ${all.length} of ${L.total}${L.truncated ? '+' : ''}`));
     if (failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, failed), btn('btn btn-small', 'Retry', loadTasks)); body.append(f); }
     if (model.loading) body.append(el('p', 'goals-note', 'Loading tasks…'));
-    else if (!all.length) { if (!failed) { const e = el('div', 'empty-state empty-state-tight'); e.append(el('p', 'empty-state-line', query && TF.isFiltered(model.filters) ? 'No tasks match this search.' : noTasksYet())); body.append(e); } }
+    else if (!all.length) { if (!failed) { const e = el('div', 'empty-state empty-state-tight'); const hasText = !!model.filters.q; e.append(el('p', 'empty-state-line', query && TF.isFiltered(model.filters) ? (hasText ? 'No tasks match this search.' : 'No tasks match these filters.') : noTasksYet())); if (query && TF.isFiltered(model.filters) && !hasText) e.append(btn('btn empty-state-action', 'Clear filters', () => setFilters(TF.EMPTY))); body.append(e); } }
     else {
         const shown = all.filter(t => (model.filter === 'all' || (model.filter === 'needs_review' ? needsReview(t) : model.filter === 'open' ? bucket(t) !== 'done' || doneToday(t) : bucket(t) === model.filter)));
         if (!shown.length) {
