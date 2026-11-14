@@ -28,34 +28,8 @@
     margin-bottom: 8px;
 }
 
-.sched-presets {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-bottom: 8px;
-}
-
-.sched-preset {
-    padding: 5px 12px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    background: var(--bg-tertiary);
-    color: var(--text-secondary);
-    font-size: var(--fs-md);
-    cursor: pointer;
-    transition: none; /* the global button fade (base.css) left the old choice looking chosen for a moment: two presets lit at once */
-}
-
-.sched-preset:hover {
-    border-color: var(--accent);
-    color: var(--text-primary);
-}
-
-.sched-preset.active {
-    background: var(--accent-dim); /* white on --accent is 2.5:1 in the dark theme (#6171) */
-    border-color: var(--accent-dim);
-    color: var(--text-on-accent);
-}
+.sched-presets { flex-wrap: wrap; gap: 1px; width: 100%; margin-bottom: 8px; background: var(--control-border); } /* the family's segmented strip (.btn-seg, components.css), wrapped: a 1px gap over the border colour draws the lines between the rows as well as the columns, so two rows at 390 keep their border (#15836) */
+.btn-seg.sched-presets > .btn.btn { flex: 1 1 auto; border-inline-start: 0; white-space: normal; }
 
 .sched-line { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .sched-line[hidden], .sched-days[hidden] { display: none; }

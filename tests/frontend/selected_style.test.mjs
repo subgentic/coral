@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const css = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../coral-go/pkg/frontend/static/css');
 const SELECTED = [
     ['components.css', '.btn-seg > .btn[aria-checked="true"]'],
-    ['scheduler.css', '.sched-preset.active'],
+    ['components.css', '.btn-seg > .btn[aria-pressed="true"], .btn-seg > .btn[aria-checked="true"]'], // the New job dialog's When and Type are the same strip (#15836)
     ['components.css', '.flag-shortcut-btn.active'],
     ['components.css', '.perm-chip.active'],
 ];
