@@ -109,13 +109,6 @@ export async function checkAgentCLI(type, element, {force = false, command = '',
     }
 }
 
-function ptyOfferNodes(container) {
-    container.replaceChildren();
-    const link = document.createElement('button'); link.type = 'button'; link.className = 'btn-link';
-    link.textContent = 'switch to PTY in Settings'; link.addEventListener('click', () => window.showSettingsModal?.('terminal'));
-    container.append('You can ', link, '. Agents will end when Coral restarts.');
-}
-
 export async function checkTmux(force = false) {
     const banner = document.getElementById('tmux-missing-banner');
     if (!banner) return;
@@ -135,6 +128,7 @@ export async function checkTmux(force = false) {
         if (data.tmux_available || data.tmux_required === false || data.effective_backend === 'pty') { banner.style.display='none'; return; }
         title.textContent = 'tmux is not installed.';
         message.textContent = 'Agents cannot start.';
+        const { ptyOfferNodes } = await importOnce('./tmux_missing_ui.js');
         ptyOfferNodes(ptyOffer); ptyOffer.hidden = false;
         const install = data.tmux_install_command;
         advanced.hidden = !install;
@@ -166,19 +160,8 @@ export async function checkTmuxForLaunch(element, {force = false, isLocal = () =
         if (!current(element,controller)) return;
         if (data.tmux_available || data.tmux_required === false || data.effective_backend === 'pty') { element.replaceChildren(); setHidden(element, true); blocksLaunch(element, false); return; }
         blocksLaunch(element, true); setHidden(element, false);
-        element.replaceChildren(); element.style.display = '';
-        element.setAttribute('role', 'status'); element.setAttribute('aria-live', 'polite');
-        const label = document.createElement('span'); label.textContent = 'tmux is not installed.'; element.append(label);
-        const pty = document.createElement('span'); ptyOfferNodes(pty); element.append(pty);
-        const install = data.tmux_install_command;
-        if (install) {
-            const fold = document.createElement('details'); fold.className = 'disclosure cli-advanced-fold';
-            const sum = document.createElement('summary'); sum.textContent = 'Install command'; fold.append(sum);
-            const code = document.createElement('code'); code.textContent = install; fold.append(code);
-            element.append(fold);
-        }
-        const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn btn-small';
-        btn.textContent = 'Check again'; btn.addEventListener('click', recheck); element.append(btn);
+        const { renderTmuxMissingLaunch } = await importOnce('./tmux_missing_ui.js');
+        renderTmuxMissingLaunch(element, data, recheck);
     } catch (error) {
         if (!current(element,controller) || error.name === 'AbortError') return;
         element.replaceChildren(); setHidden(element, true); blocksLaunch(element, false);
