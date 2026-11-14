@@ -37,7 +37,7 @@ export const saveFilters = f => kept.save('inbox-needs', { ...f, q: '' }, browse
 
 /** The leading icon of a Needs you row (#13144): one glyph per kind, drawn in a full-height gutter by css/data_table.css from data-kind (all from the icon subset, tests/frontend/fixtures/material-icons.names.txt), named by the kind's own word for a screen reader. The glyph is drawn by CSS (data-kind), so the row's text stays its words. */
 export function kindIcon(s) {
-    const k = s && s.waiting_kind === 'ask' ? 'ask' : kindOf(s), i = document.createElement('span'); // a question put to the Operator is a question, not "needs input" (#13819); it is still the 'other' pill's, so no filter changes
+    const k = s && s.waiting_kind === 'ask' ? 'ask' : kindOf(s), i = document.createElement('span'); // board questions share the Question chip (#16548)
     i.className = 'material-icons inbox-kind-icon'; i.dataset.kind = k; i.setAttribute('role', 'img'); i.setAttribute('aria-label', KIND_LABEL[k]); i.title = KIND_LABEL[k];
     if (s?.review) { i.classList.add('inbox-artifact-thumbnail'); i.append(artifactThumbnail(s.review, { size: 32, url: typeof s.server === 'string' && thumbnailPath(s.review) ? serverUrl(thumbnailPath(s.review), s.server) : '' })); }
     return i;
@@ -63,7 +63,7 @@ export function decorateKindRow(tr) {
     column.className = 'inbox-kind-column'; column.append(icon); cell.append(column);
 }
 /** The kind of a waiting agent for the pills: `waiting_kind` permission or question, else other. */
-export const kindOf = s => (s && (s.waiting_kind === 'permission' || s.waiting_kind === 'question' || s.waiting_kind === 'review' || s.waiting_kind === 'run' || s.waiting_kind === 'proposal' || s.waiting_kind === 'goal_done' || s.waiting_kind === 'skill_review' || s.waiting_kind === 'welcome') ? s.waiting_kind : 'other');
+export const kindOf = s => s?.waiting_kind === 'ask' ? 'question' : (s && (s.waiting_kind === 'permission' || s.waiting_kind === 'question' || s.waiting_kind === 'review' || s.waiting_kind === 'run' || s.waiting_kind === 'proposal' || s.waiting_kind === 'goal_done' || s.waiting_kind === 'skill_review' || s.waiting_kind === 'welcome') ? s.waiting_kind : 'other');
 
 /** Whether a waiting agent passes the filters. ctx: { text(s) the words the search covers, teamOf(s), nameOf(s) }; `now` (ms) is the clock. The pill's kind is a filter here too. */
 export function matches(s, f, ctx, now = Date.now()) {

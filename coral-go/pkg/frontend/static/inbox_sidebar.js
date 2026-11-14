@@ -374,25 +374,14 @@ function inboxNeedsToolbar() {
     const teams = [...new Set([...all.map(teamOf).filter(Boolean), ...facets.teams])].sort(), names = [...new Set([...all.map(needsName), ...facets.agents])].sort();
     const goalNames = [...new Set([...all.filter(s => s.review || s.goal).map(goalLabel).filter(title => !facets.goals.some(g => g.title === title)), ...facets.goals.map(g => g.value)])].sort((a, b) => (a === NO_GOAL) - (b === NO_GOAL) || a.localeCompare(b)); // review rows and rows with a goal: "No goal" last
     const rows = all.filter(s => matchesNeeds(s, { ...needsFilters, kind: '' }));
-    const countState = reviewAttentionCount();
-    const attention = reviewFilters() ? reviewQueryState()?.attentionTotal ?? rows.filter(s => s.review && needsUnread(s)).length : countState.value;
-    const completeCount = reviewFilters() ? Number.isSafeInteger(reviewQueryState()?.attentionTotal) : countState.complete;
-    const counts = NF.KINDS.filter(kindShown).map(k => k === 'review' && attention !== null && attention !== undefined ? attention : rows.filter(s => NF.kindOf(s) === k && (k === 'welcome' || needsUnread(s))).length); // a pill counts what the badge counts (the Welcome pill its own items)
-    const listed = NF.KINDS.filter(kindShown).map(k => rows.filter(s => NF.kindOf(s) === k).length), said = (n, m) => (n === m ? n : `${n} of ${m}`); // the rows read ones are listed too: 'For review 0 of 4', one number (the unread) and the list's size when they differ (#11886)
-    const pageSummary = reviewFilters() ? reviewQueryState() : reviewPageSummary();
-    const serverListed = reviewFilters() ? pageSummary?.total : pageSummary?.queryTotal;
-    const listedReviews = Number.isSafeInteger(serverListed) ? serverListed : rows.filter(s => s.review).length;
-    const listedComplete = Number.isSafeInteger(serverListed);
-    const cards = rows.filter(s => NF.kindOf(s) !== 'welcome'); // the welcome cards are listed, never unread, and have their own pill: the All pill does not count them (it said 'All 0 of 6', #15078)
-    const pillCount = (n, m) => {
-        const value = `${completeCount ? '' : 'at least '}${n}`;
-        return completeCount && listedComplete && n === m ? value : `${value} of ${listedComplete ? '' : 'at least '}${m}`;
-    };
+    // Kind chips describe the rows selected, including read items and Welcome.
+    // Unread attention remains in the folder and Inbox notification badges.
+    const counts = NF.KINDS.filter(kindShown).map(k => rows.filter(s => NF.kindOf(s) === k).length);
     const node = needsBar.draw({
         filters: needsFilters,
         options: { team: { values: teams, labels: {} }, agent: { values: names, labels: {} }, goal: { values: goalNames, labels: {} } },
         pills: { label: 'Show agents waiting on', current: needsFilters.kind || 'all',
-            items: [{ key: 'all', label: 'All', count: attention !== null && attention !== undefined ? pillCount(rows.filter(s => !s.review && needsUnread(s)).length + attention, cards.filter(s => !s.review).length + listedReviews) : said(rows.filter(needsUnread).length, cards.length) }, ...NF.KINDS.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: k === 'review' && attention !== null && attention !== undefined ? pillCount(attention, listedReviews) : said(counts[i], listed[i]) }))],
+            items: [{ key: 'all', label: 'All', count: rows.length }, ...NF.KINDS.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: counts[i] }))],
             onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; persistNeedsFilters(); renderInboxNav(true); } },
     });
     // Group by goal is an option of the Filters panel, with the other ways to show the list (#14378, the Operator): not a checkbox always on the page under the header. It is shut with the panel, so it takes no room until asked for.
@@ -407,7 +396,7 @@ function inboxNeedsToolbar() {
     const skip = DT.el('a', 'skip-link', 'Skip to the list'); skip.href = '#'; skip.addEventListener('click', e => { e.preventDefault(); document.querySelector('#group-table-view tbody tr:not(.dt-group) button, #group-table-view tbody tr:not(.dt-group) a')?.focus(); }); node.prepend(skip); // a keyboard user passes the search and filters (walk 7 M3)
     if (needsFilters.team && !activeNeedsTeam) { const n = DT.el('p', 'goals-note inbox-filter-note', `Filtered by team: ${needsFilters.team} `), c = DT.el('button', 'btn', 'Clear'); c.type = 'button'; c.setAttribute('aria-label', `Clear the team filter: ${needsFilters.team}`); c.addEventListener('click', () => { needsFilters = { ...needsFilters, team: '', server: '' }; persistNeedsFilters(); renderInboxNav(true); }); n.append(c); node.append(n); } /* a team filter kept from last time says so above the list (walk 15 M2, #15259) */
     if (!node.querySelector('.agent-copy')) node.append(agentCopyButton('needs_you', 'Coral\u2019s Needs you list: what agents and the board wait on the Operator for.'));
-    return { node, signature: JSON.stringify([groupMode, needsFilters, teams, names, goalNames, counts, completeCount, listedReviews, listedComplete, rows.length, rows.filter(needsUnread).length]) };
+    return { node, signature: JSON.stringify([groupMode, needsFilters, teams, names, goalNames, counts, rows.length, rows.filter(needsUnread).length]) };
 }
 
 // ── Tasks ────────────────────────────────────────────────────────────────

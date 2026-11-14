@@ -57,3 +57,7 @@ assert.deepEqual(NF.chips({ ...NF.EMPTY, goal: 'No goal' }).map(c => c.label), [
 assert.deepEqual(NF.without({ ...NF.EMPTY, goal: 'No goal', team: 'team-a' }, 'goal'), { ...NF.EMPTY, team: 'team-a' });
 assert.equal(NF.isFiltered({ ...NF.EMPTY, goal: 'No goal' }), true);
 console.log('needs_filters: ok');
+
+assert.equal(NF.kindOf({ waiting_kind: 'ask' }), 'question', 'board asks belong to the Question chip');
+assert.equal(NF.matches({ waiting_kind: 'ask' }, { kind: 'question' }, ctx, NOW), true);
+assert.equal(NF.matches({ waiting_kind: 'ask' }, { kind: 'other' }, ctx, NOW), false);
