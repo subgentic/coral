@@ -50,7 +50,7 @@ const { safePaused } = require('./helpers/paused');
         const after = await rowTop();
         assert.ok(Math.abs(after - before) <= 1, `the first row does not move when the strip arrives (${before} -> ${after})`);
         const strip = await ev(`(() => { const s = document.querySelector('#team-panel-artifacts .team-files-strip'); return { text: s.textContent, buttons: [...s.querySelectorAll('button')].map(b => b.textContent) }; })()`);
-        assert.ok(strip.text.includes(`/Users/me/Coral/${B}`) && /index\.html/.test(strip.text), 'the strip names the team folder and says what to open: ' + JSON.stringify(strip));
+        assert.ok(strip.text.includes(`/Users/me/Coral/${B}`) && !/index\.html/.test(strip.text), 'the strip names the team folder and does not mention index.html (#16738): ' + JSON.stringify(strip));
         assert.deepEqual(strip.buttons, ['Copy path', 'Download all (zip)']);
         await ev(`[...document.querySelectorAll('#team-panel-artifacts .team-files-strip button')].find(b => b.textContent === 'Copy path').click(); true`);
         await waitFor(`window.__copied.length === 1`, 'the path is copied', 5000);
