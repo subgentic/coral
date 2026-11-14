@@ -49,7 +49,7 @@ const fs = require('node:fs');
         check(await colour(VAR) === '#ff00aa', 'after a reload the loaded theme is still the theme: ' + await colour(VAR));
         await open();
         check(await ev(`document.getElementById('theme-load-select').value`) === A, 'the reopened editor shows the theme in use');
-        await pick(B); await waitFor(`getComputedStyle(document.documentElement).getPropertyValue(${JSON.stringify(VAR)}).trim().toLowerCase() === '#00aa44'`, 'B is applied', 6000).catch(() => {});
+        await pick(B); await waitFor(`getComputedStyle(document.documentElement).getPropertyValue(${JSON.stringify(VAR)}).trim().toLowerCase() === '#00aa44' && ((window.T.state.settings || {}).custom_theme === ${JSON.stringify(B)})`, 'B is applied and saved (Cancel before the save lands is its own suite, theme_load_cancel_race)', 6000).catch(() => {});
         // an edit that is only previewed is dropped by Cancel, back to the loaded theme
         await ev(`(() => { const t = document.querySelector('#theme-configurator-modal .theme-color-text[data-var="${VAR}"]'); t.value = '#123456'; t.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('[data-on-click="theme-preview"]').click(); return true; })()`);
         check(await colour(VAR) === '#123456', 'Preview shows the edit');

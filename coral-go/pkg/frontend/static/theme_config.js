@@ -267,7 +267,9 @@ async function useTheme(name, theme, base) {
         const resp = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         if (!resp.ok) throw new Error('settings');
         Object.assign(state.settings, body);
-        activeName = name; commitPage();
+        activeName = name;
+        if (!pageBefore) { clearCustomThemeVars(); if (name) applyThemeData(theme); else applyTheme(base); updateTerminalTheme(); } // the editor was closed (Cancel, Escape) while the save was on its way: Cancel put the page back to what it was, and the theme is saved now, so the page shows it (#16466)
+        else commitPage();
         return true;
     } catch {
         back();
