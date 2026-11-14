@@ -77,10 +77,13 @@ type DropboxBackup struct {
 	parallel   int
 
 	// #16170: the people in the account's shared folders, read from Dropbox for the share dialog's suggestions and kept here for five minutes (memory only, never stored).
-	contactsMu   sync.Mutex
-	contactsAt   time.Time
-	contactsFor  string
-	contactsList []string
+	contactsMu     sync.Mutex
+	contactsAt     time.Time
+	contactsFor    string
+	contactsList   []string
+	contactsFailed bool // the kept read failed (kept 30 s, not five minutes)
+	contactsBusy   bool // a read is under way
+	contactsGen    int  // bumped when the cache is forgotten, so a read begun before is dropped
 
 	// Stage 4b, retention (#14703).
 	retainEvery time.Duration                                           // at most one retention pass this often (an hour)

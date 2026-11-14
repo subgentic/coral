@@ -90,3 +90,50 @@ func TestRememberedAddressesGoWithTheAccountAndAreCapped(t *testing.T) {
 	all, _ = be.b.outbox.ShareContacts(ctx, "acct", "", 500)
 	assert.Empty(t, all)
 }
+
+// Security's SHOULD on #16170: a Dropbox that is down or rate-limited is asked once per 30 s, not on every keystroke, and the lock is not held across the call.
+func TestAFailedFolderReadIsKeptThirtySecondsAndNeverHoldsTheLock(t *testing.T) {
+	be, d := newDropboxShareEnv(t)
+	require.Equal(t, http.StatusOK, mustCode(be.share(d, `{"name":"x.md","audience":"people","emails":["ana@example.com"],"confirm":true}`)))
+	now := time.Now()
+	be.b.now = func() time.Time { return now }
+	be.dbx.foldersFail, be.dbx.folderCalls = true, 0
+	for _, q := range []string{"", "a", "an", "ana"} {
+		assert.Equal(t, []string{"ana@example.com"}, be.contacts(q), "the kept addresses still come back")
+	}
+	assert.Equal(t, 1, be.dbx.folderCalls, "four keystrokes, one Dropbox call")
+	now = now.Add(29 * time.Second)
+	be.contacts("")
+	assert.Equal(t, 1, be.dbx.folderCalls, "still kept at 29 s")
+	now = now.Add(2 * time.Second)
+	be.dbx.foldersFail, be.dbx.folders = false, map[string][]string{"f1": {"lee@work.org"}}
+	assert.ElementsMatch(t, []string{"ana@example.com", "lee@work.org"}, be.contacts(""), "asked again after 30 s, and the good read is kept")
+	assert.Equal(t, 2, be.dbx.folderCalls)
+
+	// The lock is free while a read is under way: a keystroke during it is answered at once from what is kept.
+	be.b.forgetContacts()
+	be.b.contactsMu.Lock()
+	be.b.contactsBusy = true
+	be.b.contactsMu.Unlock()
+	done := make(chan []string, 1)
+	go func() { done <- be.contacts("") }()
+	select {
+	case got := <-done:
+		assert.Equal(t, []string{"ana@example.com"}, got)
+	case <-time.After(5 * time.Second):
+		t.Fatal("a keystroke waited for a read that was under way")
+	}
+}
+
+// Security's INFO on #16170: Disconnect, Switch and Rekey empty the folder-member cache with the remembered addresses.
+func TestForgettingTheSharesEmptiesTheFolderMemberCache(t *testing.T) {
+	be, _ := newDropboxShareEnv(t)
+	be.dbx.folders = map[string][]string{"f1": {"lee@work.org"}}
+	assert.Equal(t, []string{"lee@work.org"}, be.contacts(""))
+	require.NotEmpty(t, be.b.contactsList)
+	(&dropboxRoutes{backup: be.b}).forgetShares(context.Background())
+	be.b.contactsMu.Lock()
+	assert.Empty(t, be.b.contactsList)
+	assert.Empty(t, be.b.contactsFor)
+	be.b.contactsMu.Unlock()
+}

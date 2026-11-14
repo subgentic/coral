@@ -124,6 +124,10 @@ func (f *fakeDropbox) sharing(w http.ResponseWriter, r *http.Request) {
 		refuse(http.StatusConflict, "shared_link_not_found/")
 	case "/2/sharing/list_folders":
 		f.folderCalls++
+		if f.foldersFail {
+			refuse(http.StatusTooManyRequests, "too_many_requests/")
+			return
+		}
 		var es []any
 		for id := range f.folders {
 			es = append(es, map[string]any{"shared_folder_id": id})

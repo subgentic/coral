@@ -759,6 +759,7 @@ func (d *dropboxRoutes) sharesGuard(ctx context.Context, w http.ResponseWriter, 
 // forgetShares drops the share rows after a Disconnect, Switch or Rekey that went ahead: their copies and links stay in the person's Dropbox.
 func (d *dropboxRoutes) forgetShares(ctx context.Context) {
 	if d != nil && d.backup != nil {
+		d.backup.forgetContacts()
 		if _, err := d.backup.outbox.ForgetShares(ctx); err != nil {
 			slog.Warn("[dropbox] the list of shared files was not cleared")
 		}
@@ -769,6 +770,7 @@ const (
 	shareSuggestMax      = 8
 	shareSuggestFolders  = 20
 	shareSuggestCacheTTL = 5 * time.Minute
+	shareSuggestFailTTL  = 30 * time.Second
 )
 
 // DropboxShareContacts answers GET /api/dropbox/share-contacts?q=: up to eight addresses for the share dialog to suggest as the person types (#16170). Dropbox has no call that lists
@@ -813,17 +815,49 @@ func (h *CloudHandler) DropboxShareContacts(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, map[string]any{"emails": out})
 }
 
-// folderContacts is the people in the account's shared folders (cached five minutes per account); a Dropbox that cannot be read gives none.
+// folderContacts is the people in the account's shared folders (cached five minutes per account); a Dropbox that cannot be read gives none, and that failure is kept 30 seconds
+// too, so a Dropbox that is down or rate-limited is asked once, not on every keystroke (Security's SHOULD on #16170). The lock covers the cache fields only, never the network calls:
+// a second caller while a read is under way gets what is kept (or none) instead of waiting for it or starting another.
 func (b *DropboxBackup) folderContacts(ctx context.Context, cl *dropbox.Client, access, account string) []string {
 	b.contactsMu.Lock()
-	defer b.contactsMu.Unlock()
-	if b.contactsFor == account && b.clock().Sub(b.contactsAt) < shareSuggestCacheTTL {
-		return b.contactsList
+	ttl := shareSuggestCacheTTL
+	if b.contactsFailed {
+		ttl = shareSuggestFailTTL
 	}
+	if b.contactsFor == account && b.clock().Sub(b.contactsAt) < ttl {
+		list := b.contactsList
+		b.contactsMu.Unlock()
+		return list
+	}
+	if b.contactsBusy {
+		b.contactsMu.Unlock()
+		return nil
+	}
+	b.contactsBusy = true
+	gen := b.contactsGen
+	b.contactsMu.Unlock()
+
 	list, err := cl.FolderMemberEmails(ctx, access, shareSuggestFolders)
-	if err != nil {
-		return nil // not kept: the next keystroke after a failure asks again
+
+	b.contactsMu.Lock()
+	defer b.contactsMu.Unlock()
+	b.contactsBusy = false
+	if gen != b.contactsGen {
+		return list // the account went while this read was under way: nothing of it is kept
 	}
-	b.contactsFor, b.contactsAt, b.contactsList = account, b.clock(), list
+	b.contactsFor, b.contactsAt, b.contactsFailed = account, b.clock(), err != nil
+	if err != nil {
+		b.contactsList = nil
+		return nil
+	}
+	b.contactsList = list
 	return list
+}
+
+// forgetContacts empties the folder-member cache: the people of the old account's folders go with a Disconnect, Switch or Rekey, as the remembered addresses do.
+func (b *DropboxBackup) forgetContacts() {
+	b.contactsMu.Lock()
+	b.contactsFor, b.contactsAt, b.contactsList, b.contactsFailed = "", time.Time{}, nil, false
+	b.contactsGen++
+	b.contactsMu.Unlock()
 }
