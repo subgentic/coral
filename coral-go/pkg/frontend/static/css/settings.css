@@ -24,7 +24,6 @@
 
 /* a row: its label and its hint (always visible) at the left, its control at the right in a fixed column; a row marked wide puts the control on its own line under them */
 #settings-modal .settings-hint-line { display: block; margin: 2px 0 0; color: var(--text-secondary); }
-#settings-modal .info-grid dt.toggle-dt .toggle-desc.sv-help { font-size: var(--sv-help-size); } /* a legacy row's hint turned into a help line (settings_nav.js) takes the help size, not the old description's 12px: the Agent tools folder row, shown on a machine whose tools folder others can change (#16178, settings_row_parts on Windows) */
 @container settingspane (min-width: 40.01rem) { #settings-modal .settings-row { grid-template-columns: minmax(0, 1fr) 340px; } } /* (the pane stacks a row under 40rem of its own width: components.css) */
 #settings-modal .info-grid.settings-grid .settings-row > dt, #settings-modal .info-grid.settings-grid .settings-row > dt.toggle-dt { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; gap: 0; }
 /* a phone: the dialog is the screen on every section (the tab list is the Section selector) */
