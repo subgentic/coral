@@ -64,7 +64,8 @@ const { coralReady } = require('./helpers/wait');
             // the old all-done box stays gone; the header now offers Not yet beside Close goal, as the goal's item in Needs you does (#12248)
             assert.deepEqual(strip, { box: false, words: false, notYet: ['Not yet'] }, `${width} px: a goal with all its tasks done has no all-done box, and Not yet is in the header: ${JSON.stringify(strip)}`);
             // #15166 (walk 6): an active goal with every task done SAYS so, in words, and the button reads Mark done
-            assert.match(await ev(`(document.querySelector('#inbox-page .goal-done-note') || {}).textContent || ''`), /^All tasks are done\./, `${width} px: the goal says all its tasks are done`);
+            assert.match(await ev(`(document.querySelector('#inbox-page .goal-done-note') || {}).textContent || ''`), /^All tasks done: close this goal\?/, `${width} px: the goal asks to close it`);
+            assert.ok(await ev(`!!document.querySelector('#inbox-page .goal-done-note .goal-done-mark')`), `${width} px: Mark done is in the line, a phone included`);
             await shot(`goal-head-alldone-${width}`);
         }
         // a closed goal: Reopen takes Close goal's place

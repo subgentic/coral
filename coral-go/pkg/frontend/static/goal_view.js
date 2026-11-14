@@ -22,7 +22,7 @@ import { pollEvery } from './overload.js';
 const doneNote = g => {
     if (!looksDone(g)) return '';
     const min = Math.ceil((quietEndsAt(g) - Date.now()) / 60000);
-    return min > 0 ? `All tasks are done. It reaches Needs you in about ${min} min.` : 'All tasks are done.';
+    return min > 0 ? `All tasks done: close this goal? It reaches Needs you in about ${min} min.` : 'All tasks done: close this goal?';
 };
 const { linkedText } = await importOnce('./artifact_refs.js');
 const { renderGoalText } = await importOnce('./goal_text.js'); // the description is Markdown-lite (#12724)
@@ -211,8 +211,8 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         main.append(line);
         const closedLine = C.closedByLine(g); // who closed it, so a goal an agent closed is not mistaken for one the person closed (#15244)
         if (closedLine) { const c = el('p', `goals-note goals-closed-by${g.closedBy && g.closedBy !== 'Operator' ? ' goals-closed-by-agent' : ''}`, closedLine); c.setAttribute('role', 'note'); main.append(c); }
-        if (looksDone(g) && !W.isClosedGoal(g)) main.append(el('p', 'goals-note goals-looks-done', C.looksDoneText));
-        const doneWords = doneNote(g); if (doneWords) main.append(el('p', 'goals-note goal-done-note', doneWords)); // an active goal with every task done says so, and when it reaches Needs you (#15166)
+        const doneWords = doneNote(g);
+        if (doneWords && !W.isClosedGoal(g)) { const note = el('p', 'goals-note goal-done-note', doneWords); if (W.isOpenGoal(g)) { const mark = btn('btn btn-small goal-done-mark', 'Mark done', () => openClose(g)); mark.setAttribute('aria-label', `Mark done: ${g.title}`); note.append(' ', mark); } main.append(note); } // an active goal with every task done says so, and when it reaches Needs you (#15166)
         if (g.movedOpen) main.append(el('p', 'goals-note', `${g.movedOpen} moved task${g.movedOpen === 1 ? ' is' : 's are'} unfinished or cannot be checked here. Check “Done when” before closing this goal.`));
         const waitNote = el('p', 'goals-note goal-reviews-waiting'); waitNote.hidden = true; main.append(waitNote); // files for review on this goal that were never answered (Beta #11837 G): said while any wait, whatever the goal's state
         paintWaiting(g, waitNote);
