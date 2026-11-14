@@ -309,7 +309,7 @@ function needsInputHtml(info, session) {
         + context
         + reviewHtml(info)
         + controls.body
-        + `<div class="cni-foot"><button type="button" class="cni-link" data-on-click="terminal-view-open">Open terminal</button>${hint}${!info.readOnly && canDismissWait(session, info.kind) ? `<button type="button" class="cni-link" data-on-click="dismiss-wait" data-session-id="${escapeAttr(session.session_id)}" title="Clear this if the agent is not waiting. Nothing is sent to the agent.">Dismiss</button>` : ""}<span class="cni-foot-spacer"></span>${info.signedOut ? `<button type="button" class="btn cni-recheck" data-on-click="startup-recheck" data-agent="${escapeAttr(info.agent || "claude")}">Check again</button>` : ""}${controls.foot}</div>`;
+        + `<div class="cni-foot"><button type="button" class="cni-link" data-on-click="terminal-view-open">Open terminal</button>${hint}${!info.readOnly && canDismissWait(session, info.kind) ? `<button type="button" class="cni-link" data-on-click="dismiss-wait" data-session-id="${escapeAttr(session.session_id)}" title="Clear this if the agent is not waiting. It comes back while the agent is still waiting. Nothing is sent to the agent.">Dismiss</button>` : ""}<span class="cni-foot-spacer"></span>${info.signedOut ? `<button type="button" class="btn cni-recheck" data-on-click="startup-recheck" data-agent="${escapeAttr(info.agent || "claude")}">Check again</button>` : ""}${controls.foot}</div>`;
 }
 
 // The sign-in card (#3830): the login happens in the agent's terminal (a browser link and a code

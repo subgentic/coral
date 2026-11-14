@@ -23,7 +23,7 @@ export function dismissButton(className, session) {
     b.type = 'button';
     b.className = className;
     b.textContent = 'Dismiss';
-    b.title = 'Dismiss this notice. An active terminal wait stays listed until the agent continues. Nothing is sent to the agent.';
+    b.title = 'Dismiss this notice. It comes back while the agent is still waiting. Nothing is sent to the agent.';
     b.dataset.dismissSession = session.session_id;
     return b;
 }
@@ -54,7 +54,7 @@ export async function dismissWait(session, button) {
         }
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const said = await resp.json().catch(() => ({}));
-        if (said.hidden || said.dismissed) saidDismiss(said.hidden ? 'Dismissed. An active wait stays in Needs you. Nothing was sent to the agent.' : 'Dismissed. Nothing was sent to the agent.', session); else showToast('It was not waiting any more.', false, 4000); // hidden: a request the machine cannot clear, kept as hidden on the machine (#11946)
+        if (said.hidden || said.dismissed) saidDismiss(said.hidden ? 'Dismissed. It comes back while the agent is still waiting. Nothing was sent to the agent.' : 'Dismissed. Nothing was sent to the agent.', session); else showToast('It was not waiting any more.', false, 4000); // hidden: a request the machine cannot clear, kept as hidden on the machine (#11946)
         await loadLiveSessions();
     } catch {
         if (button) button.disabled = false;

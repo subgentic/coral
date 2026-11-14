@@ -71,9 +71,10 @@ const browserMenu = po => {
     const o = po && po.options;
     if (!po || po.browser_menu !== true || !po.unnumbered || po.multi || !Array.isArray(o) || o.length !== 3) return null;
     if (!o.every((x, i) => String(x && x.label || '').trim().toLowerCase() === BROWSER_LABELS[i] && Number.isInteger(Number(x.n)))) return null;
-    return { notNow: o[1] };
+    return { notNow: o[1], more: [o[0], o[2]].map(x => String(x.label).trim()) }; // the two left to Open, by the agent's own words (#16970)
 };
-const BROWSER_NOTE = 'Not now: Claude goes on without browser tools; nothing is installed. To install the extension, or to stop being asked, open the agent.';
+/** What the one button does, then every other choice the agent offers, named, with Open agent beside it (#16970): a partial list must not read as the whole list. The lasting ones are still never buttons here (Security, #10462). */
+const browserNote = more => `Not now: Claude goes on without browser tools; nothing is installed. ${more.length} more in Open: ${more.join(', ')}.`;
 
 /** The card's one-time choices and the ask they belong to: { ask, picks, onlyReject } ({ ask: '', picks: [] } when the card cannot be answered by one choice). onlyReject: the request can only be rejected, and picks are then only the No form. */
 async function readAsk(s) {
@@ -94,7 +95,7 @@ async function readAsk(s) {
         return submit && !onlyReject ? { ask: String(po.ask_id || ''), picks: [submit], onlyReject, step: `Submit these answers? ${drawn}`, stepFull: `Submit these answers? ${full}`, lines } : none; // exactly what the screen shows now, every question with its answer: the click compares the UNCUT text, a field cut for drawing wears an ellipsis and the hover is the whole line (#11997, Security)
     }
     const browser = browserMenu(po);
-    if (browser) return { ask: String(po.ask_id || ''), picks: [browser.notNow], onlyReject, browser: true, question: '' }; // only Not now is a button; Install and Don't ask again are left to Open, and the row says so
+    if (browser) return { ask: String(po.ask_id || ''), picks: [browser.notNow], onlyReject, browser: browser.more, question: '' }; // only Not now is a button; Install and Don't ask again are left to Open, and the row says so
     const trust = trustMenu(po);
     if (trust) return trust.folder ? { ask: String(po.ask_id || ''), picks: [trust.no, trust.yes], onlyReject, trust: { folder: trust.folder, yes: trust.yes } } : { ask: String(po.ask_id || ''), picks: [trust.no], onlyReject, held: true, trustWhy: trust.why }; // No only, and the row says the rest is left to Open
     const rl = rateLimitMenu(po);
@@ -272,7 +273,7 @@ function fill(s, cell, withDismiss = true) {
             if (typeof ResizeObserver === 'function') { const ro = new ResizeObserver(() => { if (!block.isConnected) { ro.disconnect(); return; } apply(); }); ro.observe(block); cell._cmdObserver = ro; } // one observer per drawn block: it goes when the cell is drawn again (below) or the block leaves the page
             gate = { clipped: () => !allowed(), apply };
         }
-        if (browser) { const note = document.createElement('span'); note.className = 'inbox-trust-note inbox-browser-note'; note.textContent = BROWSER_NOTE; cell.append(note); } // what the one button does, and why the other two are not buttons (#14151)
+        if (browser) { const note = document.createElement('span'); note.className = 'inbox-trust-note inbox-browser-note'; note.textContent = browserNote(browser); cell.append(note); } // what the one button does, and why the other two are not buttons (#14151)
         if (trust) { // the folder, plain text, and what Yes does, before any choice (#14110)
             const note = document.createElement('span'); note.className = 'inbox-trust-note';
             const path = document.createElement('code'); path.className = 'inbox-trust-path'; path.textContent = trust.folder;
@@ -307,7 +308,7 @@ function fill(s, cell, withDismiss = true) {
             o.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
             cell.append(note, o);
         }
-        if (!picks.length && !held && !onlyReject) { // nothing here can be answered (Claude's 'Is this a project you trust?' is such a prompt): the way on is the agent's own chat, one click away; nothing is typed for the person (#12346)
+        if ((!picks.length && !held && !onlyReject) || browser) { // (a browser menu: Open agent sits by the line naming the choices left to Open, #16970) nothing here can be answered (Claude's 'Is this a project you trust?' is such a prompt): the way on is the agent's own chat, one click away; nothing is typed for the person (#12346)
             const o = document.createElement('button'); o.type = 'button'; o.className = 'btn btn-small inbox-open-agent'; o.textContent = 'Open agent';
             o.setAttribute('aria-label', `Open ${resolveSessionIdentity(s)} to answer`);
             o.addEventListener('click', e => { e.stopPropagation(); openAgent(s); });
@@ -336,7 +337,7 @@ const viewOnlyWhy = s => (askable(s) ? blockedReason(sessionServer(s), 'interact
 export function rowActions(s) {
     if (s.waiting_for_input && waitIgnored(s)) return canRemoveWait(s) ? [{ label: 'Remove from Needs you', title: REMOVE_WAIT_LINE, help: REMOVE_WAIT_LINE, run: b => removeWait(s, b) }] : [];
     if (!canDismissWait(s, s.waiting_kind)) return []; // every waiting agent's row has one, a sign-in's too (#11946)
-    return [{ label: 'Dismiss', title: 'Clear this if the agent is not waiting. Nothing is sent to the agent.', run: b => dismissWait(s, b) }];
+    return [{ label: 'Dismiss', title: 'Clear this if the agent is not waiting. It comes back while the agent is still waiting. Nothing is sent to the agent.', run: b => dismissWait(s, b) }];
 }
 
 /** The Answer cell of a Needs you row: empty for a review or a run, for a viewer through the Hub, otherwise the one-time choices once they are read. `dismiss: false` leaves the Dismiss to the row's ⋯ menu (a phone's). */

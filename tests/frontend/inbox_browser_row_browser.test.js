@@ -61,10 +61,13 @@ const MENU = (extra = {}) => ({ question: 'Claude wants to use your browser This
             };
 
             // 1) the menu on the real row: one button, the sentence, reachable
-            await show(MENU(), 1);
-            assert.deepEqual(await rowButtons(), ['Not now'], `${at}only Not now is a button`);
+            await show(MENU(), 2); // Not now and Open agent (#16970)
+            assert.deepEqual((await rowButtons()).filter(t => t !== 'Open agent'), ['Not now'], `${at}only Not now answers (#16970: the lasting choices are not buttons)`);
+            assert.ok((await rowButtons()).includes('Open agent'), `${at}Open agent is next to the line naming the other choices (#16970)`);
             const note = await ev(`(() => { const n = document.querySelector('#group-table-view .inbox-answers .inbox-browser-note'); return n && n.textContent; })()`);
-            check(note && /Not now: Claude goes on without browser tools; nothing is installed/.test(note) && /open the agent/.test(note), `${at}the sentence says what Not now does and where the rest is: ` + JSON.stringify(note));
+            check(note && /Not now: Claude goes on without browser tools; nothing is installed/.test(note) && /2 more in Open: Install extension, Don.t ask again/.test(note), `${at}the line names the choices left to Open, none left out (#16970): ` + JSON.stringify(note));
+            const dtitle = await ev(`(document.querySelector('#group-table-view .inbox-dismiss') || {}).title || ''`);
+            if (!mobile) check(/comes back while the agent is still waiting/.test(dtitle), `${at}Dismiss says plainly that the card comes back while the agent still waits (#16970): ` + JSON.stringify(dtitle));
             const geo = await ev(`(() => { const bs = [...document.querySelectorAll('#group-table-view .inbox-answers button:not(.inbox-dismiss)')].map(b => { b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { h: Math.round(r.height), w: Math.round(r.width), left: Math.round(r.left), right: Math.round(r.right) }; }); const n = document.querySelector('#group-table-view .inbox-browser-note'); n.scrollIntoView({ block: 'center' }); const nr = n.getBoundingClientRect(); return { bs, vw: innerWidth, noteLeft: Math.round(nr.left), noteRight: Math.round(nr.right), wide: document.documentElement.scrollWidth > innerWidth + 1 }; })()`);
             check(geo.bs.every(b => b.left >= 0 && b.right <= geo.vw && b.w > 0) && geo.noteLeft >= 0 && geo.noteRight <= geo.vw && !geo.wide, `${at}the button and the sentence are on the screen, nothing sideways: ` + JSON.stringify(geo));
             if (mobile) check(geo.bs.every(b => b.h >= 44 && b.w >= 44), `${at}Not now is a 44 px target: ` + JSON.stringify(geo));
