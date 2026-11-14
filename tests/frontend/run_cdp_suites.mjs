@@ -620,7 +620,9 @@ async function startShard(n, gen = 0, strict = false, backend = MAIN_BACKEND) {
   // Port 0: Chrome picks a free DevTools port itself and writes it to <profile>/DevToolsActivePort, so the
   // port read back is the one this Chrome bound (no race with other shards or processes).
   const profile = path.join(dir, 'profile');
-  const chromeArgs = ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+  // With CORAL_CDP_PORT_RANGE the DevTools port is picked inside the range too (a small race, opt-in); otherwise 0.
+  const chromePort = portRange ? await freePort() : 0;
+  const chromeArgs = ['--headless=new', `--remote-debugging-port=${chromePort}`, `--user-data-dir=${profile}`,
     '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1400,900', // the desktop a suite names has a mouse (hover, a fine pointer) on any machine: a headless Chrome on a build server has no pointing device and reports no hover and no pointer, so a control shown only on (hover: hover) and (pointer: fine) was drawn at rest there (#9673). CDP_NO_HOVER=1 is that machine, to see how a suite does on it; a suite that wants touch turns touch emulation on.
     ...(process.env.CDP_NO_HOVER ? ['--blink-settings=primaryHoverType=1,availableHoverTypes=1,primaryPointerType=1,availablePointerTypes=1'] : ['--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4']),
     ...(process.env.CI ? ['--no-sandbox', '--disable-dev-shm-usage'] : []),
