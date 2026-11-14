@@ -238,8 +238,9 @@ function openCliPathsWhenMissing(type) {
 }
 
 /** A CLI that was found and is not used (an agent works in its folder, #12053) is told here, under its path field, in the one short line with its Why? fold (#16003: New agent no longer says it, #15887). The server's note is read as text by cli_missing_list.js, loaded only when there is one to show. */
-function showRefusedClis() {
-    for (const type of Object.keys(CLI_PATH_FIELDS).map(k => k.replace('cli_path_', ''))) {
+function showRefusedClis(defaultType) {
+    // Only the default agent type is checked, as it was before (#16003, QA's reject): the check RUNS the CLI (--version), so one check for every type on every Settings open ran a real codex where no mock path is set and tripped the #4354 guard.
+    for (const type of Object.keys(CLI_PATH_FIELDS).map(k => k.replace('cli_path_', '')).filter(t => t === defaultType)) {
         const input = document.getElementById(`settings-cli-path-${type}`);
         if (!input) continue;
         fetch(`/api/system/cli-check?type=${encodeURIComponent(type)}`).then(r => r.ok ? r.json() : null).then(async d => {
@@ -270,7 +271,7 @@ export function _fillCliAndModels(s) {
     for (const id of Object.values(CLI_PATH_FIELDS)) { const el = document.getElementById(id); if (el) el.dataset.filled = '1'; }
     refreshCLIPathFields();
     openCliPathsWhenMissing(s.default_agent_type || 'claude');
-    showRefusedClis();
+    showRefusedClis(s.default_agent_type || 'claude');
 
     // Default Models — populate combo inputs + datalists from /api/agent-models
     const defClaude = document.getElementById("settings-default-model-claude");
