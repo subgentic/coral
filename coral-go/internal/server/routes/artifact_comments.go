@@ -122,9 +122,10 @@ func commentRefuse(w http.ResponseWriter, status int, code, msg string) {
 
 // commentView is one comment as the client sees it. Mine and the can* flags are for the UI only (the server decides again on every write).
 type commentView struct {
-	AtS    *float64 `json:"at_s,omitempty"`
-	EndS   *float64 `json:"end_s,omitempty"`
-	SentTo string   `json:"sent_to,omitempty"` // the agent the Operator's comment was sent to on its own (#11420): set only on the answer to the comment's creation
+	AtS       *float64 `json:"at_s,omitempty"`
+	EndS      *float64 `json:"end_s,omitempty"`
+	QueuedFor string   `json:"queued_for,omitempty"` // the agent whose copy is held because it is busy (#14860): the person is told "Queued for <agent>", not "Sent to"
+	SentTo    string   `json:"sent_to,omitempty"`    // the agent the Operator's comment was sent to on its own (#11420): set only on the answer to the comment's creation
 	// NotDelivered: why the Operator's comment reached no agent when it should have (#15034): the board is paused, the agent asleep, a rate limit, a failure. Set only on the answer to the comment's creation; the comment stands.
 	NotDelivered string         `json:"not_delivered,omitempty"`
 	ID           int64          `json:"id"`
@@ -162,6 +163,8 @@ type commentAskView struct {
 	// Seen: the agent has read the artifact's threads or replied (#11722): the thread says "seen by <agent>". Nudged: Coral reminded it to answer in the thread.
 	Seen   bool `json:"seen"`
 	Nudged bool `json:"nudged"`
+	// Queued: the comment is held for this agent because it is busy (a turn or a task) and is posted when it is free (#14860): the thread says "Queued for <agent>, delivers when it's free".
+	Queued bool `json:"queued,omitempty"`
 	// ReadAt is when the agent first read the comment, as an RFC 3339 UTC time: the earlier of the comments-GET stamp and the board-read stamp (coral-board read of the message that delivered it) (#14130);
 	// "" while neither is set. On the owner's list only, like the asks themselves.
 	ReadAt string `json:"read_at"`
@@ -753,8 +756,9 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		}
 		view := h.commentView(caller, c, locked, hubWrite)
 		if _, isGuide := guideOf(r); !isGuide && (in.NotifyAgent == nil || *in.NotifyAgent) {
-			if d := h.deliverOperatorComment(r, caller, c, id, in.Board); d.To != "" {
+			if d := h.deliverOperatorComment(r, caller, c, id, in.Board); d.To != "" || d.Queued != "" {
 				view.SentTo = d.To
+				view.QueuedFor = d.Queued
 			} else if words := notDeliveredWords(d.Reason); words != "" {
 				view.NotDelivered = words
 			}
@@ -981,7 +985,7 @@ func (h *SessionsHandler) attachAsks(ctx context.Context, views []commentView) {
 		}
 		byComment := map[int64][]commentAskView{}
 		for _, a := range asks {
-			byComment[a.CommentID] = append(byComment[a.CommentID], commentAskView{Agent: a.AgentName, Open: a.OpenAt(now), Replies: a.Replies, LimitReached: a.OpenAt(now) && a.Replies >= store.MaxAskReplies, Seen: a.SeenAt != nil, Nudged: a.NudgedAt != nil, ReadAt: a.ReadStamp()})
+			byComment[a.CommentID] = append(byComment[a.CommentID], commentAskView{Agent: a.AgentName, Open: a.OpenAt(now), Replies: a.Replies, LimitReached: a.OpenAt(now) && a.Replies >= store.MaxAskReplies, Seen: a.SeenAt != nil, Nudged: a.NudgedAt != nil, Queued: a.QueuedAt != nil && a.OpenAt(now), ReadAt: a.ReadStamp()})
 		}
 		for _, i := range idx {
 			views[i].Asks = byComment[views[i].ID]

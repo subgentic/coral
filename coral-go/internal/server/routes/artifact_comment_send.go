@@ -229,7 +229,7 @@ func sendBuilder(kind sendKind, title, author, version, replyCmd, snippet string
 
 type sendResult struct {
 	Agent  string `json:"agent"`
-	State  string `json:"state"` // sent, already_asked, asleep, unavailable, not_on_board, paused, failed
+	State  string `json:"state"` // sent, queued (the agent is busy: held until it is free, #14860), already_asked, asleep, unavailable, not_on_board, paused, failed
 	AskID  int64  `json:"ask_id,omitempty"`
 	Reason string `json:"reason,omitempty"`
 }
@@ -272,6 +272,7 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 	}
 	var in struct {
 		Agents []string `json:"agents"`
+		Now    bool     `json:"now"` // deliver at the agent's next idle prompt even while it has a task (#14860); never mid-turn
 	}
 	if !readJSONBody(w, r, sendBodyMax, &in) {
 		return
@@ -401,7 +402,13 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 					timedText = label + "\n" + text
 				}
 				msg := sendMessage(title, author, version, sendReplyCommand(id, t.ID), timedText, snippet, mentionNames, commentPictureLinks(t.ImagesJSON)...)
-				posted, err := h.bs.PostDefusedMessage(r.Context(), t.Board, board.OperatorName, msg)
+				posted, held, err := h.holdOrPost(r.Context(), &ls, sub, t.Board, t.ID, msg, in.Now, false)
+				if held { // the agent is busy: the message waits on its ask and is posted when it is free (#14860)
+					res.State, res.AskID = "queued", ask.ID
+					sent++
+					slog.Info("[artifact comments] comment held for a busy agent", "artifact", id, "comment", t.ID, "agent", title, "board", t.Board)
+					break
+				}
 				if err != nil {
 					slog.Warn("[artifact comments] message not posted", "board", t.Board, "error", err)
 					_ = h.ss.CloseArtifactAsk(r.Context(), t.ID, ls.SessionID, time.Now())

@@ -21,6 +21,7 @@ import (
 // autoDelivery is what became of the delivery of one comment: who it went to, or why it did not (never shown to the agent).
 type autoDelivery struct {
 	To     string // the agent's title, "" when nothing was sent
+	Queued string // the agents whose copy is held because they are busy, posted when they are free (#14860)
 	Reason string // not_owner, no_uploader, asleep_or_gone (the session is archived, ended or gone, or a terminal: a SLEEPING agent is told and reads it on waking), ambiguous_uploader (a no-team file two agents uploaded), board_paused, rate_limited, redaction_unavailable, failed; pinned by delivery_reasons_test.go
 }
 
@@ -84,7 +85,7 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 			names = append(names, tt)
 		}
 	}
-	var sent []string
+	var sent, queued []string
 	reason := ""
 	for _, t := range targets {
 		ls, err := h.ss.GetLiveSession(ctx, t.sessionID)
@@ -105,7 +106,12 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 		}
 		h.ss.ResetAskReplies(ctx, rootID, t.sessionID) // a new turn of the Operator's: the agent has its replies again (#15034)
 		msg := sendMessage(title, sendAuthorOperator, h.sendVersionLine(id, b), sendReplyCommand(id, rootID), text, snippet, names, commentPictureLinks(c.ImagesJSON)...)
-		posted, err := h.postCommentMessage(ctx, b, msg)
+		posted, held, err := h.holdOrPost(ctx, ls, &t.sub, b, rootID, msg, false, true)
+		if held { // the agent is busy: the comment waits on the ask and is posted when it is free (#14860)
+			queued = append(queued, title)
+			slog.Info("[artifact comments] the Operator's comment held for a busy agent", "artifact", id, "comment", c.ID, "agent", title, "board", b)
+			continue
+		}
 		if err != nil {
 			slog.Warn("[artifact comments] message not posted", "board", b, "error", err)
 			reason = firstReason(reason, "failed")
@@ -117,12 +123,15 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 		slog.Info("[artifact comments] the Operator's comment sent to an agent", "artifact", id, "comment", c.ID, "agent", title, "board", b)
 	}
 	if len(sent) == 0 {
+		if len(queued) > 0 {
+			return autoDelivery{Queued: strings.Join(queued, ", ")}
+		}
 		return autoDelivery{Reason: reason}
 	}
 	if h.boardHandler != nil && h.boardHandler.notifyFn != nil {
 		h.boardHandler.notifyFn(b)
 	}
-	return autoDelivery{To: strings.Join(sent, ", ")}
+	return autoDelivery{To: strings.Join(sent, ", "), Queued: strings.Join(queued, ", ")}
 }
 
 // linkCommentMessage records that the board message posted delivered the thread's comment to the agent session: that agent's coral-board read of it is when it read the comment (#14130). A failure is logged

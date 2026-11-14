@@ -10,9 +10,9 @@ export async function sendCommentQueue(comments, { send, isCurrent, record }) {
         record(c, part.results);
         for (const r of part.results) {
             const prior = combined.get(r.agent);
-            if (!prior || prior.state === 'already_asked' || (prior.state === 'sent' && !['sent', 'already_asked'].includes(r.state))) combined.set(r.agent, r);
+            if (!prior || prior.state === 'already_asked' || (['sent', 'queued'].includes(prior.state) && !['sent', 'queued', 'already_asked'].includes(r.state))) combined.set(r.agent, r);
         }
-        if (part.results.some(r => r.state === 'sent' || r.state === 'already_asked')) sentThreads++;
+        if (part.results.some(r => r.state === 'sent' || r.state === 'queued' || r.state === 'already_asked')) sentThreads++;
         response = { ...part, results: [...combined.values()] };
         if (!part.ok || !part.results.length) break;
     }

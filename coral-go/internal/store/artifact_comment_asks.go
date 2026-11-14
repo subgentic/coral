@@ -50,9 +50,15 @@ type ArtifactAsk struct {
 	NudgedAt *string `db:"nudged_at" json:"nudged_at"`
 	// ReadAt is when the agent first read, with coral-board read, the message that delivered this comment to it (#14130).
 	ReadAt *string `db:"read_at" json:"read_at"`
+	// QueuedAt is when the comment was held for this agent because it was busy (#14860); nil once delivered. QueuedMsg is the board message waiting (never sent to a browser), QueuedNow the Operator's "now".
+	QueuedAt  *string `db:"queued_at" json:"queued_at"`
+	QueuedMsg string  `db:"queued_msg" json:"-"`
+	QueuedNow int     `db:"queued_now" json:"queued_now"`
+	// QueuedSystem: the held message goes out as Coral's own notice (the delivery on writing a comment), not as the Operator's post (Send to agent).
+	QueuedSystem int `db:"queued_system" json:"-"`
 }
 
-const artifactAskCols = "id, comment_id, artifact_id, board, agent_session, agent_name, created_at, expires_at, closed_at, replies, seen_at, nudged_at, read_at"
+const artifactAskCols = "id, comment_id, artifact_id, board, agent_session, agent_name, created_at, expires_at, closed_at, replies, seen_at, nudged_at, read_at, queued_at, queued_msg, queued_now, queued_system"
 
 func (a ArtifactAsk) open(now time.Time) bool {
 	if a.ClosedAt != nil {
@@ -80,7 +86,7 @@ func (s *SessionStore) CreateArtifactAsk(ctx context.Context, commentID int64, a
 	case err == nil && cur.open(now):
 		return cur, false, tx.Commit()
 	case err == nil:
-		_, err = tx.ExecContext(ctx, `UPDATE artifact_comment_asks SET artifact_id = ?, board = ?, agent_name = ?, created_at = ?, expires_at = ?, closed_at = NULL, replies = 0, seen_at = NULL, nudged_at = NULL, read_at = NULL WHERE id = ?`,
+		_, err = tx.ExecContext(ctx, `UPDATE artifact_comment_asks SET artifact_id = ?, board = ?, agent_name = ?, created_at = ?, expires_at = ?, closed_at = NULL, replies = 0, seen_at = NULL, nudged_at = NULL, read_at = NULL, queued_at = NULL, queued_msg = '', queued_now = 0, queued_system = 0 WHERE id = ?`,
 			artifactID, board, agentName, now.UTC().Format(ISOFormat), now.Add(AskTTL).UTC().Format(ISOFormat), cur.ID)
 	case errors.Is(err, sql.ErrNoRows):
 		_, err = tx.ExecContext(ctx, `INSERT INTO artifact_comment_asks (comment_id, artifact_id, board, agent_session, agent_name, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -296,4 +302,47 @@ func (s *SessionStore) CreateUploaderReply(ctx context.Context, c ArtifactCommen
 		return ArtifactComment{}, ErrUploaderHourCap
 	}
 	return s.CreateArtifactComment(ctx, c)
+}
+
+// HoldAskMessage keeps the board message of a comment for an agent that is busy (#14860): the ask row holds it until the agent is free. A second comment of the same thread is added after the first (blank line
+// between), in the order they came; "now" sticks once any held comment said it. A closed or expired ask holds nothing (false).
+func (s *SessionStore) HoldAskMessage(ctx context.Context, commentID int64, agentSession, msg string, now, system bool, at time.Time) (bool, error) {
+	n, sys := 0, 0
+	if system {
+		sys = 1
+	}
+	if now {
+		n = 1
+	}
+	res, err := s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET queued_msg = CASE WHEN queued_at IS NULL THEN ? ELSE queued_msg || char(10) || char(10) || ? END,
+		queued_now = MAX(queued_now, ?), queued_system = ?, queued_at = COALESCE(queued_at, ?) WHERE comment_id = ? AND agent_session = ? AND closed_at IS NULL AND expires_at > ?`,
+		msg, msg, n, sys, at.UTC().Format(ISOFormat), commentID, agentSession, at.UTC().Format(ISOFormat))
+	if err != nil {
+		return false, err
+	}
+	k, _ := res.RowsAffected()
+	return k == 1, nil
+}
+
+// HeldAsks are the asks holding a message at now, oldest hold first, whose agent is live, awake and not archived (an agent that sleeps or is gone is looked at again when it wakes). Expired and closed asks are
+// not held any more (DropHeldAsks).
+func (s *SessionStore) HeldAsks(ctx context.Context, now time.Time, limit int) ([]ArtifactAsk, error) {
+	var out []ArtifactAsk
+	err := s.reader().SelectContext(ctx, &out, "SELECT "+artifactAskCols+` FROM artifact_comment_asks WHERE queued_at IS NOT NULL AND closed_at IS NULL AND expires_at > ?
+		AND agent_session IN (SELECT session_id FROM live_sessions WHERE COALESCE(is_archived, 0) = 0 AND COALESCE(is_sleeping, 0) = 0 AND agent_type != 'terminal') ORDER BY queued_at, id LIMIT ?`, now.UTC().Format(ISOFormat), limit)
+	return out, err
+}
+
+// ReleaseHeldAsks clears the hold of the given asks once their message is posted; it reports how many were released.
+func (s *SessionStore) ReleaseHeldAsks(ctx context.Context, ids []int64) (int, error) {
+	n := 0
+	for _, id := range ids {
+		res, err := s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET queued_at = NULL, queued_msg = '', queued_now = 0, queued_system = 0 WHERE id = ? AND queued_at IS NOT NULL`, id)
+		if err != nil {
+			return n, err
+		}
+		k, _ := res.RowsAffected()
+		n += int(k)
+	}
+	return n, nil
 }

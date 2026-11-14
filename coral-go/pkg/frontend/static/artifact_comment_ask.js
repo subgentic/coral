@@ -60,7 +60,8 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
             else if (state === 'read') {
                 p.append('Read by ', link);
                 if (s.k.readAt) { const t = document.createElement('span'); t.textContent = `, ${ago(s.k.readAt)}`; t.title = s.k.readAt; p.append(t); }
-            } else if (state === 'unread') p.append('Sent to ', link, `, not read yet${s.k.replies > 0 ? ` (it replied ${s.k.replies === 1 ? 'once' : `${s.k.replies} times`} before)` : ''}`);
+            } else if (state === 'queued') p.append('Queued for ', link, ", delivers when it's free"); // held while the agent is busy (#14860)
+            else if (state === 'unread') p.append('Sent to ', link, `, not read yet${s.k.replies > 0 ? ` (it replied ${s.k.replies === 1 ? 'once' : `${s.k.replies} times`} before)` : ''}`);
             else {
                 const who = names.get(role) || role, asleep = !!(liveAgentOf(who, { board: boardTeamKey(st.server, st.board) }) || {}).sleeping; // an agent asleep has it, unread, until it wakes (#15155)
                 p.append('Sent to ', link, asleep ? ' (asleep: delivered when it wakes)' : sentWords(s.words));
@@ -80,7 +81,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
     const redrawStatus = id => { const p = panel.querySelector(`.ac-card[data-id="${id}"] .ac-ask-status`); if (p) fillStatus(p, id); };
     function askBlock() {
         const k = st.ask;
-        return askUi.buildSendBlock({ id: k.id, board: st.board, agents: k.agents, empty: k.empty, picked: k.picked, asked: k.queue.length > 1 ? new Map() : askedNow(k.id), count: k.queue.length, long: k.queue.some(q => String(q.body || '').length > askUi.SEND_COMMENT_CAP), results: k.results, busy: k.busy, error: k.error,
+        return askUi.buildSendBlock({ id: k.id, board: st.board, agents: k.agents, empty: k.empty, picked: k.picked, asked: k.queue.length > 1 ? new Map() : askedNow(k.id), count: k.queue.length, long: k.queue.some(q => String(q.body || '').length > askUi.SEND_COMMENT_CAP), results: k.results, busy: k.busy, now: k.now, onNow: v => { k.now = v; }, error: k.error,
             onToggle: (role) => { if (k.picked.has(role)) k.picked.delete(role); else if (k.picked.size < askUi.MAX_AGENTS) k.picked.add(role); redrawAsk(role); },
             onCancel: () => { st.ask = null; render(); panel.querySelector(`.ac-card[data-id="${k.id}"] .ac-ask-open`)?.focus(); },
             onSend: () => sendAsk() });
@@ -104,7 +105,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
         } catch { /* no uploader known: nothing is ticked */ }
     }
     async function openAsk(c, queue = [c]) {
-        const k = st.ask = { queue: queue.map(c => ({ ...c, artifactId: ownHex(c) })), context: { hex: st.hex, server: st.server, board: st.board }, lifetime: st.lifetime, id: c.id, hex: ownHex(c), agents: null, picked: new Set(), results: null, busy: false, error: '' };
+        const k = st.ask = { queue: queue.map(c => ({ ...c, artifactId: ownHex(c) })), context: { hex: st.hex, server: st.server, board: st.board }, lifetime: st.lifetime, id: c.id, hex: ownHex(c), agents: null, picked: new Set(), now: false, results: null, busy: false, error: '' };
         render();
         panel.querySelector('.ac-ask')?.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() });
         try {
@@ -128,8 +129,8 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
             const { sendCommentQueue } = await importOnce('./artifact_comment_send_queue.js');
             const batch = await sendCommentQueue(k.queue, {
                 isCurrent: () => current(k),
-                send: c => api.sendComment(c.artifactId, k.context.server, c.id, agents),
-                record: (c, results) => { for (const r of results) if (r.state === 'sent' || r.state === 'already_asked') { names.set(r.agent.toLowerCase(), r.agent); askedOf(c.id).set(r.agent.toLowerCase(), r.state === 'sent' ? 'Asked just now' : 'Already asked'); } },
+                send: c => api.sendComment(c.artifactId, k.context.server, c.id, agents, k.now),
+                record: (c, results) => { for (const r of results) if (r.state === 'sent' || r.state === 'queued' || r.state === 'already_asked') { names.set(r.agent.toLowerCase(), r.agent); askedOf(c.id).set(r.agent.toLowerCase(), (r.state === 'sent' || r.state === 'queued') ? 'Asked just now' : 'Already asked'); } },
             });
             if (batch.cancelled) return;
             res = batch.response; sentThreads = batch.sentThreads;
@@ -140,9 +141,10 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
         if (res.results.length) {
             k.results = res.results;
             const asked = askedOf(k.id);
-            for (const r of res.results) if (k.queue.length === 1 && (r.state === 'sent' || r.state === 'already_asked')) names.set(r.agent.toLowerCase(), r.agent), asked.set(r.agent.toLowerCase(), r.state === 'sent' ? 'Asked just now' : 'Already asked');
-            const n = res.results.filter(r => r.state === 'sent').length;
+            for (const r of res.results) if (k.queue.length === 1 && (r.state === 'sent' || r.state === 'queued' || r.state === 'already_asked')) names.set(r.agent.toLowerCase(), r.agent), asked.set(r.agent.toLowerCase(), (r.state === 'sent' || r.state === 'queued') ? 'Asked just now' : 'Already asked');
+            const n = res.results.filter(r => r.state === 'sent' || r.state === 'queued').length;
             announce(k.queue.length > 1 ? `Sent ${sentThreads} of ${k.queue.length} comments. Replies come into each comment’s own thread.` : n ? `Asked ${n} agent${n === 1 ? '' : 's'}. Their replies come into this thread.` : 'Nobody was asked.');
+            if (res.results.some(r => r.state === 'queued') && !isSignedOut()) refresh(); // the thread says "Queued for <agent>" at once (#14860)
             if (n) for (const ms of [10000, 30000, 90000]) setTimeout(() => { if (current(k) && !isSignedOut()) refresh(); }, ms); // the agents' replies are replies in the thread: fetched a few times while they work
         } else { k.error = res.error || 'The comment was not sent.'; }
         redrawAsk(); for (const c of k.queue) redrawStatus(c.id);

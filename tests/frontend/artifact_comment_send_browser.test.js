@@ -39,7 +39,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             if (url.includes('/api/artifacts/${HEX}/comments')) {
                 const sub = url.split('/comments')[1].split('?')[0];
                 if (method === 'POST' && /^\\/\\d+\\/send$/.test(sub)) {
-                    const b = JSON.parse(o.body); window.__sends.push({ id: Number(sub.split('/')[1]), agents: b.agents });
+                    const b = JSON.parse(o.body); window.__sends.push({ id: Number(sub.split('/')[1]), agents: b.agents, now: b.now === true });
                     if (window.__send.body) return json(window.__send.body, window.__send.status);
                     return json({ ok: true, results: b.agents.map((a, i) => ({ agent: a, state: a === 'Backend Dev' ? 'already_asked' : 'sent', ask_id: i + 1 })) });
                 }
@@ -124,12 +124,14 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             await ev(`document.querySelector('.ac-ask input[value="Backend Dev"]').click(); true`);
             b = await block();
             check(`${tag}: two picked: "Send to 2 agents"; a ticked box keeps its focus`, b.go === 'Send to 2 agents' && !b.goDisabled && (await ev(`document.activeElement && document.activeElement.value`)) === 'Backend Dev', JSON.stringify([b.go, b.agents.map(a => a.checked)]));
+            check(`${tag}: a "Deliver now" box is offered, unticked (#14860): a comment waits for a busy agent unless it is ticked`, await ev(`(() => { const c = document.querySelector('.ac-ask .ac-ask-now input[type=checkbox]'); return !!c && !c.checked && /even if the agent has a task/.test(c.closest('label').textContent); })()`));
+            await ev(`document.querySelector('.ac-ask .ac-ask-now input').click(); true`);
             await shot(`send-${tag}-picked`);
             await ev(`document.querySelector('.ac-ask-go').click(); true`);
             await waitFor(`!!document.querySelector('.ac-ask .ac-ask-sent') || !!document.querySelector('.ac-ask-agent[data-state="sent"]')`, 'the answer', 6000);
             b = await block();
             const posted = await ev('window.__sends');
-            check(`${tag}: one request with exactly the roles picked, for that comment`, posted.length === 1 && posted[0].id === 1 && posted[0].agents.join() === 'QA Engineer,Backend Dev', JSON.stringify(posted));
+            check(`${tag}: one request with exactly the roles picked, for that comment`, posted.length === 1 && posted[0].id === 1 && posted[0].agents.join() === 'QA Engineer,Backend Dev' && posted[0].now === true, JSON.stringify(posted)); // and the ticked "Deliver now" is sent as now (#14860)
             check(`${tag}: the answer is said per agent: Asked, Already asked; the boxes are off and the button is Close`, /Asked/.test(b.agents[0].text) && b.agents[0].state === 'sent' && b.agents[1].state === 'already_asked' && /Already asked/.test(b.agents[1].text) && b.agents.every(a => a.disabled) && b.close === 'Close' && b.go === '', JSON.stringify(b.agents));
             check(`${tag}: it fits`, b.fits);
             check(`${tag}: the line under the comment says who has it as soon as the send answers, not "Not sent to an agent yet" (#12112): ` + await ev(`document.querySelector('.ac-card[data-id="1"] .ac-ask-status')?.textContent || ''`), /Sent to .*(asked|already asked)/i.test(await ev(`document.querySelector('.ac-card[data-id="1"] .ac-ask-status')?.textContent || ''`)));
