@@ -31,10 +31,10 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 1000; w
                     { session_id: 'sess-fd-remote', name: 'fd-remote', agent_type: 'claude', server: 'm1', board_subscriber_id: 'Frontend Dev', board_project: 'coral-go-team' },
                     { session_id: 'sess-ds', name: 'ds', agent_type: 'claude', board_subscriber_id: 'Data Science & Dashboarding', board_project: 'coral-go-team' }];
                 window.__opened = []; window.selectLiveSession = (...a) => { window.__opened.push(['agent', ...a.map(x => (x && x.session_id) || x)]); }; window.openTeamPage = (t, o) => { window.__opened.push(['team', t, JSON.stringify(o)]); return Promise.resolve(); }; window.switchNavTab = (...a) => { window.__opened.push(['nav', ...a.slice(0, 1)]); }; })(); true`);
-            await ev(`history.pushState(null, '', '/automations/queue'); window.dispatchEvent(new PopStateEvent('popstate')); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 3`, at + 'the three rows', 10000);
+            await ev(`history.pushState(null, '', '/queue'); window.dispatchEvent(new PopStateEvent('popstate')); true`);
+            await waitFor(`document.querySelectorAll('#queue-tab-body tbody tr[data-key]').length === 3`, at + 'the three rows', 10000);
             await shot(`queue-links-${process.env.SHOT_TAG || 'after'}-${w}`);
-            const row = who => `[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].find(r => r.textContent.includes(${JSON.stringify(who)}))`;
+            const row = who => `[...document.querySelectorAll('#queue-tab-body tbody tr[data-key]')].find(r => r.textContent.includes(${JSON.stringify(who)}))`;
             if (!mobile) {
                 // the agent
                 assert.equal(await ev(`${row('Data Science')}.querySelector('.queue-agent').tagName`), 'BUTTON', at + 'a running holder is the shared agent link');
@@ -44,7 +44,7 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 1000; w
                 const keys = await ev(`(() => { const out = []; for (const b of [${row('Data Science')}.querySelector('.queue-agent'), ${row('Data Science')}.querySelector('td:nth-child(4) button'), ${row('Data Science')}.querySelector('button.queue-goal')]) { b.focus(); out.push(document.activeElement === b && b.tabIndex >= 0 && b.tagName === 'BUTTON'); } return out; })()`);
                 assert.deepEqual(keys, [true, true, true], at + 'the agent, task and goal links are buttons the keyboard reaches: ' + JSON.stringify(keys));
                 // the task and the goal
-                const seen = await ev(`(() => { const vis = e => !!e && e.getClientRects().length > 0 && e.getBoundingClientRect().width > 0; const r = ${row('Data Science')}, a = r.querySelector('.queue-agent'); return { goal: vis(r.querySelector('button.queue-goal')), head: [...document.querySelectorAll('#group-table-view thead th')].some(h => h.textContent.trim() === 'Goal' && vis(h)), agentWhole: a.scrollWidth <= a.clientWidth + 1 }; })()`);
+                const seen = await ev(`(() => { const vis = e => !!e && e.getClientRects().length > 0 && e.getBoundingClientRect().width > 0; const r = ${row('Data Science')}, a = r.querySelector('.queue-agent'); return { goal: vis(r.querySelector('button.queue-goal')), head: [...document.querySelectorAll('#queue-tab-body thead th')].some(h => h.textContent.trim() === 'Goal' && vis(h)), agentWhole: a.scrollWidth <= a.clientWidth + 1 }; })()`);
                 assert.deepEqual(seen, { goal: true, head: true, agentWhole: true }, at + 'the Goal column is on screen at this width and the longest agent name is not cut: ' + JSON.stringify(seen));
                 assert.equal(await ev(`${row('Data Science')}.querySelector('td:nth-child(4) button').textContent`), '#13596', at + 'the task is a link named #id');
                 const goal = await ev(`(() => { const b = ${row('Data Science')}.querySelector('button.queue-goal'); return b && [b.textContent, b.getAttribute('aria-label'), b.title]; })()`);

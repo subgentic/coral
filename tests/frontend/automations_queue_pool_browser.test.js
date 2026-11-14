@@ -25,9 +25,9 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 3600000
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev, 'startup', 'liveList', 'settings');
-            await ev(`history.pushState(null, '', '/automations/queue'); window.dispatchEvent(new PopStateEvent('popstate')); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 3`, at + 'three rows: the pool has two holds and one waiting, and its members show no duplicate of the holds: ' + (await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`)).join(' | '), 10000);
-            const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
+            await ev(`history.pushState(null, '', '/queue'); window.dispatchEvent(new PopStateEvent('popstate')); true`);
+            await waitFor(`document.querySelectorAll('#queue-tab-body tbody tr[data-key]').length === 3`, at + 'three rows: the pool has two holds and one waiting, and its members show no duplicate of the holds: ' + (await ev(`[...document.querySelectorAll('#queue-tab-body tbody tr[data-key]')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`)).join(' | '), 10000);
+            const rows = await ev(`[...document.querySelectorAll('#queue-tab-body tbody tr[data-key]')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
             const text = rows.join(' | ');
             assert.equal((text.match(/Dev On Mac/g) || []).length, 1, at + "the pool's hold on the Mac member shows once, not under both: " + text);
             assert.equal((text.match(/Dev On Mini/g) || []).length, 1, at + 'and the mini one once: ' + text);
@@ -36,14 +36,14 @@ const STUB = `(() => { const real = window.fetch; window.__queueTickMs = 3600000
             assert.match(text, /Dev On Mini.*Stuck 12 min on Mini.*(1[0-9]|2[0-9]) min left/, at + 'a stuck pool hold says Stuck and the machine, with its lease: ' + text);
             assert.match(text, /Dev Waiting.*(Waiting, place|Place) 1/, at + 'the pool has its one line');
             if (!mobile) {
-                const fit = await ev(`(() => [...document.querySelectorAll('#group-table-view tbody tr[data-key]')].filter(r => /Dev On/.test(r.textContent)).map(r => { const c = r.querySelector('.dt-chip, [class*=chip]'); return c ? c.scrollWidth <= c.clientWidth + 1 : false; }))()`);
+                const fit = await ev(`(() => [...document.querySelectorAll('#queue-tab-body tbody tr[data-key]')].filter(r => /Dev On/.test(r.textContent)).map(r => { const c = r.querySelector('.dt-chip, [class*=chip]'); return c ? c.scrollWidth <= c.clientWidth + 1 : false; }))()`);
                 assert.deepEqual(fit, [true, true], at + 'the state chip is not clipped on a desktop row: ' + JSON.stringify(fit));
             }
-            const groups = await ev(`[...document.querySelectorAll('#group-table-view tr.dt-group th')].map(th => th.textContent.trim())`);
+            const groups = await ev(`[...document.querySelectorAll('#queue-tab-body tr.dt-group th')].map(th => th.textContent.trim())`);
             assert.ok(groups.some(g => /^heavy: 3 of 3 in use, 1 waiting/.test(g) || /^heavy: 2 of 3 in use, 1 waiting/.test(g)), at + 'the pool group counts its members slots in use: ' + JSON.stringify(groups));
             // only the machine of a hold changes: the table is drawn again (the machine is part of what it shows)
             await ev(`window.__queue[0].holders[0] = { ...window.__queue[0].holders[0], machine: 'Mac Studio' }; true`);
-            await waitFor(`/Holding on Mac Studio/.test(document.getElementById('group-table-view').textContent)`, at + 'a machine alone changing is drawn by the next read, with no clock tick to help: ' + (await ev(`document.getElementById('group-table-view').textContent.replace(/\\s+/g, ' ').slice(0, 300)`)), 14000);
+            await waitFor(`/Holding on Mac Studio/.test(document.getElementById('queue-tab-body').textContent)`, at + 'a machine alone changing is drawn by the next read, with no clock tick to help: ' + (await ev(`document.getElementById('queue-tab-body').textContent.replace(/\\s+/g, ' ').slice(0, 300)`)), 14000);
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll');
         }
         console.log('PASS the Queue folder with a pool: machine on desktop and phone, stuck, once under the pool, redraw on a machine change');

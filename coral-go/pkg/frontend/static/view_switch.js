@@ -26,6 +26,7 @@ const VIEW_IDS = [
     "inbox-view",
     "artifacts-view",
     "skills-view",
+    "queue-view",
 ];
 
 const VIEW_DISPLAY = {
@@ -47,6 +48,7 @@ const VIEW_DISPLAY = {
     "inbox-view": "flex",
     "artifacts-view": "flex",
     "skills-view": "block",
+    "queue-view": "block",
 };
 
 const FULL_WIDTH_VIEWS = new Set([
@@ -55,6 +57,7 @@ const FULL_WIDTH_VIEWS = new Set([
     "servers-view",
     "inbox-view",
     "artifacts-view",
+    "queue-view",
 ]); // not skills-view: the Skills Store has its sidebar (#12997)
 
 let _viewChanges = 0;

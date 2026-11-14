@@ -62,13 +62,13 @@ const runningItems = () => { const live = liveJobIds(); return [...allJobs().fil
 const failedItems = () => [...allJobs(), ...allWorkflows()].filter(i => i.result === 'failed');
 /** Every run of every job and workflow, newest first, one page at a time (automation_runs.js, GET /api/automations/runs): the computer applies the search and the Result filter before it cuts the page, so the rows are not filtered again here (#13183). */
 const recentItems = () => AR.pagedRuns().map(r => ({ ...r, id: r.key, enabled: true, runs: '', agent: '', does: '', stepTypes: [], last: r.atMs })); // at stays the run's start time (a string: the Started column)
-const ITEMS = { jobs: allJobs, workflows: allWorkflows, running: runningItems, failed: failedItems, recent: recentItems, queue: AQ.queueItems };
+const ITEMS = { jobs: allJobs, workflows: allWorkflows, running: runningItems, failed: failedItems, recent: recentItems, queue: () => [] };
 const folderFilters = key => { const f = filtersOf(key); return folderOf(key).attention && f.sort === 'next' ? { ...f, sort: 'last' } : f; }; // what needs attention is read newest first unless the person chose an order
-const rowsOf = key => key === 'queue' ? AQ.queueSearch(AQ.queueItems(), filtersOf('queue').q) : AF.ordered(ITEMS[key]().filter(i => key === 'recent' || AF.matches(i, filtersOf(key))), folderFilters(key)); // Recent runs: the computer already filtered (the page of the search and Result asked for)
+const rowsOf = key => key === 'queue' ? [] : AF.ordered(ITEMS[key]().filter(i => key === 'recent' || AF.matches(i, filtersOf(key))), folderFilters(key)); // Recent runs: the computer already filtered (the page of the search and Result asked for)
 const runsWords = i => i.runs === 'workflow' ? `Workflow ${nameOfWorkflow(i.job.workflow_id) || i.job.workflow_id}` : `Agent prompt (${AF.AGENT_LABEL[i.agent] || i.agent})`;
 const stepsWords = i => `${i.stepCount} step${i.stepCount === 1 ? '' : 's'}`;
 const usedByWords = i => (i.usedBy ? `${i.usedBy} job${i.usedBy === 1 ? '' : 's'}` : 'No jobs');
-const countOf = key => (key === 'recent' ? AR.unreadCount() : key === 'queue' ? AQ.queueCount() : ITEMS[key]().length); // Recent runs counts the runs not opened yet, the others their rows
+const countOf = key => (key === 'recent' ? AR.unreadCount() : key === 'queue' ? 0 : ITEMS[key]().length); // Recent runs counts the runs not opened yet, the others their rows
 
 // ── The folders ──────────────────────────────────────────────────────────
 const sections = () => [{ title: 'Needs attention', items: FOLDERS.filter(f => f.attention).map(f => ({ key: f.key, label: f.label, count: countOf(f.key), alert: f.key === 'failed' })) },
@@ -92,7 +92,7 @@ function pickFolder(key) { if (folderOf(key)) go(routeOf(key)); }
 function setFolder(key) {
     if (!folderOf(key)) key = 'jobs';
     folder = key;
-    AQ.watchQueue(key === 'queue'); // the queue is read every few seconds while its folder is on screen
+    AQ.watchQueue(false); // the queue is read by its own tab (queue_tab.js, #16030), not from here
     const input = $('automations-search'), f = folderOf(key);
     if (input) {
         if (input.getAttribute('aria-label') !== f.search) input.setAttribute('aria-label', f.search);
@@ -274,7 +274,7 @@ export function noteJobDeleted(name) {
 }
 function folderTable(key) {
     const f = folderOf(key), rows = rowsOf(key), filt = filtersOf(key), narrowed = AF.isFiltered(filt) || filt.q;
-    if (key === 'queue') return AQ.queueTable(rows, !!filt.q);
+    if (key === 'queue') return AQ.movedTable(); // the queue has its own tab (#16030): this folder is the way there
     if (key === 'recent') { AR.ensureRunsPage({ q: filt.q, result: filt.result }); return recentTable(rows, narrowed); } // the page of this search and Result filter (a no-op when it is the one loaded or on its way)
     if (f.attention) return attentionTable(key, rows, narrowed);
     const base = { title: f.label, noun: f.noun, rows, status: key === 'jobs' ? _gone : '',
@@ -335,8 +335,6 @@ function mount() {
     AR.onRunsChanged(() => renderNav());
     AR.startRuns();
     W.refreshWorkflows();
-    AQ.onQueueChanged(() => renderNav());
-    AQ.refreshQueue(); // the Queue folder's count in the list
 }
 
 /** Called by switchNavTab('automations'): the folders are drawn and the folder that was on screen opens, unless an item's page is the address (the route handler opens that). */

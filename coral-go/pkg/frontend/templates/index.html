@@ -82,6 +82,7 @@
             <button class="tab top-nav-tab" data-cloud-only data-native-inbox-hides id="nav-tab-history" data-coral-hook="nav-tab-history" data-on-click="m-switch-nav-tab" data-arg="history">Chats</button>
             <button class="tab top-nav-tab" data-local-only id="nav-tab-automations" data-coral-hook="nav-tab-automations" data-on-click="m-switch-nav-tab" data-arg="automations" aria-controls="scheduler-view" title="Jobs and workflows that run on a schedule or when you start them">Automations</button>
             <button class="tab top-nav-tab" data-local-only id="nav-tab-skills" data-on-click="m-switch-nav-tab" data-arg="skills" aria-controls="skills-view" title="Agent Skills: browse, approve and import">Skills<span class="chip chip-count nav-tab-badge" id="nav-tab-skills-badge" hidden></span></button>
+            <button class="tab top-nav-tab" data-local-only id="nav-tab-queue" data-on-click="m-switch-nav-tab" data-arg="queue" aria-controls="queue-view" title="The resource queue of this computer and of each linked one">Queue</button>
             <button class="tab top-nav-tab" data-local-only id="nav-tab-tokens" data-coral-hook="nav-tab-tokens" data-on-click="m-switch-nav-tab" data-arg="tokens" title="Analytics — token usage and cost">Analytics</button>
             <!-- Servers right after Analytics, before Docs (the operator's order, #8704: Agents, Inbox, Workflows, Jobs, Analytics, Servers, Docs; on the Hub's own pages, where the local tabs are not drawn, right after Chats). -->
             <button class="tab top-nav-tab" id="nav-tab-servers" data-coral-hook="nav-tab-servers" data-on-click="m-switch-nav-tab" data-arg="servers" aria-controls="servers-view" hidden>Computers</button>
@@ -363,6 +364,7 @@
 
             <!-- Scheduler Job Detail View -->
             <div id="skills-view" style="display:none" class="skills-view"></div>
+            <div id="queue-view" style="display:none" class="queue-view"></div>
             <div id="scheduler-view" style="display:none" class="scheduler-view">
                 <div class="sched-view-header" id="sched-view-header">
                     <h2>Automations</h2>
