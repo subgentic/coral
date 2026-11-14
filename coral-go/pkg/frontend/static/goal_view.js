@@ -148,24 +148,14 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         main.append(backButton(backLabel, () => closeGoal())); // says where it goes: the Inbox passes the screen it was opened from (#8861)
         const row = el('div', 'goal-back-row'); // the header: the way back, the team link, the actions at the right (#11823), and under them the title
         row.append(main.querySelector('.goals-back'));
-        if (teamLink) {
-            const link = el('a', 'goal-team-link', 'Open on team page'); link.href = teamLink;
-            link.setAttribute('aria-label', `Open ${keyLabel(team)} on team page`);
-            link.addEventListener('click', e => {
-                if (e.button || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
-                e.preventDefault();
-                importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(team, id));
-            });
-            row.append(link);
-        }
         // Add task and Close goal (Reopen for a closed one), at the top right of the page's header
         const acts = el('div', 'goal-head-actions');
-        // On a phone the header keeps ONE button and a More menu with the rest (#13119, the Operator: "very cluttered"; the same rule as the task page's bar, #9076). The primary is Close goal for a goal that looks done
+        // The header keeps two buttons and a More menu with the rest, at every width (#13119 on a phone, the Operator: "very cluttered"; #15832 on desktop too; the same rule as the task page's bar, #9076). Before: the primary was Close goal for a goal that looks done
         // and for a closed one Reopen, otherwise Add task; Copy for an agent is in the menu too, not wedged into the driver line.
         const phone = isPhoneLayout();
         const sp = splitKey(model.project);
         const act = [];  // { key, cls, label, aria, title, run, primary }
-        const backToAction = sel => (phone ? acts.querySelector('.task-more-btn') : acts.querySelector(sel) || main.querySelector('.goals-back'))?.focus(); // a dialog closes: focus goes back to what opened it; on a phone that is the visible More toggle, not the hidden menu item (#13119)
+        const backToAction = () => (acts.querySelector('.task-more-btn') || main.querySelector('.goals-back'))?.focus(); // a dialog closes: focus goes back to what opened it, the More toggle (its items are in the menu, #15832)
         act.push({ key: 'add', cls: 'btn goals-add-task', label: 'Add task', run: () => { (window.showCreateTaskModal || (() => {}))({ project: model.project, goal_id: g.id, onCreated: loadGoals }); } });
         // A goal that looks done has its item in Needs you with Close goal, Not yet and Dismiss; its page offers the first two too (#12248): Not yet hides the item until a task is added
         if (looksDone(g) && sp.server === LOCAL_SERVER && !hiddenList().some(e => e === `${sp.name}|${g.id}|${W.allTasksOf(g.rollup)}` || e === `${sp.name}|${g.id}|*`)) {
@@ -174,7 +164,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
                 try {
                     const undo = await hideGoalDone(sp.name, g, 'not-yet');
                     if (ny) ny.remove(); // the item is gone from Needs you, so the choice is too; Undo puts both back
-                    showToast('Hidden from Needs you until a task is added', false, 30000, { action: { label: 'Undo', onClick: async () => { try { await undo(); if (phone) loadGoals(); else if (ny) { ny.disabled = false; acts.append(ny); } } catch { /* it stays hidden */ } } } });
+                    showToast('Hidden from Needs you until a task is added', false, 30000, { action: { label: 'Undo', onClick: async () => { try { await undo(); loadGoals(); } catch { /* it stays hidden */ } } } });
                 } catch (e) { if (ny) ny.disabled = false; showToast(`Not saved: ${e && e.message ? e.message : 'try again'}`, true); }
             } });
         }
@@ -188,15 +178,13 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         if (W.isOpenGoal(g)) act.push({ key: 'close', cls: 'btn btn-primary goals-close', label: 'Mark done', aria: `Mark done: ${g.title}`, run: () => openClose(g) }); // named for its goal (#15166: the button says Mark done, as the task asks; its dialog is still the Close dialog)
         else if (W.isClosedGoal(g)) act.push({ key: 'reopen', cls: 'btn goals-reopen', label: 'Reopen', run: () => reopenGoal(g) });
         const makeBtn = a => { const b = btn(a.cls, a.label, a.run); if (a.aria) b.setAttribute('aria-label', a.aria); if (a.title) b.title = a.title; return b; };
-        if (!phone) { for (const k of ['add', 'notyet', 'edit', 'driver', 'move', 'close', 'reopen']) { const a = act.find(x => x.key === k); if (a) acts.append(makeBtn(a)); } }
-        else {
-            const primaryKey = act.some(a => a.key === 'reopen') ? 'reopen' : (act.some(a => a.key === 'notyet') ? 'close' : 'add'); // a goal that looks done: Close goal; otherwise the commonest, Add task
-            const primary = act.find(a => a.key === primaryKey); if (primary.key === 'add') primary.cls = 'btn btn-primary goals-add-task';
-            acts.append(makeBtn(primary));
-            const menuItems = [...act.filter(a => a !== primary && a.key !== 'close'), { key: 'copy', cls: 'goal-copy-agent', label: 'Copy for an agent', title: 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal', run: () => { copyText(agentCopyText('goal', W.agentBriefLine(g))).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok)); } }];
-            const closeItem = act.find(a => a.key === 'close' && a !== primary); if (closeItem) menuItems.push(closeItem);
-            acts.append(moreMenu(`goal-more-${g.id}`, menuItems.map(a => ({ label: a.label, title: a.title, ariaLabel: a.aria, className: a.cls.replace(/^btn( btn-primary)? ?/, ''), run: a.run })), { label: 'More goal actions' }));
-        }
+        // One header at every width (#15832, design G1): Add task and Mark done (Reopen for a closed goal) are the buttons, Mark done the one blue; the rest is in More (the way to the team page, Not yet, Edit goal, Change driver, Move to another team; on a phone Copy for an agent too).
+        for (const k of ['add', 'close', 'reopen']) { const a = act.find(x => x.key === k); if (a) acts.append(makeBtn(a)); }
+        const menuItems = [];
+        if (teamLink) menuItems.push({ key: 'team', cls: 'goal-team-link', label: 'Open on team page', aria: `Open ${keyLabel(team)} on team page`, run: () => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(team, id)) });
+        for (const k of ['notyet', 'edit', 'driver', 'move']) { const a = act.find(x => x.key === k); if (a) menuItems.push(a); }
+        if (phone) menuItems.push({ key: 'copy', cls: 'goal-copy-agent', label: 'Copy for an agent', title: 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal', run: () => { copyText(agentCopyText('goal', W.agentBriefLine(g))).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok)); } });
+        if (menuItems.length) acts.append(moreMenu(`goal-more-${g.id}`, menuItems.map(a => ({ label: a.label, title: a.title, ariaLabel: a.aria, className: a.cls.replace(/^btn( btn-primary)? ?/, ''), run: a.run })), { label: 'More goal actions' }));
         row.append(acts); main.append(row);
         if (W.isOpenGoal(g) && operatorChangesNeedNewer(sp.server)) { const note = el('p', 'goals-note goals-ops-note', operatorChangesNote()); note.setAttribute('role', 'note'); main.append(note); } // an older computer behind a Hub: the two buttons are hidden, and the page says why (#13517)
         const h = el('h2', 'goals-detail-title', shortTitle(g.title)); h.dataset.goalId = String(g.id); h.tabIndex = -1; if (phone) { row.classList.add('goal-head-phone'); } h.id = 'goals-detail-title';

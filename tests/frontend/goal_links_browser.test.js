@@ -45,7 +45,7 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`location.pathname === ${JSON.stringify(inboxGoal)} && document.querySelector('#inbox-page #goals-detail-title')?.textContent === ${JSON.stringify(TITLE)}`, 'Goals folder: the goal opens in the Inbox', 15000);
         assert.equal(await ev(`getComputedStyle(document.getElementById('inbox-page')).display !== 'none'`), true, 'the Inbox goal is on screen');
         assert.equal(await ev(`document.activeElement === document.querySelector('#inbox-page #goals-detail-title')`), false, 'Inbox goal: the heading does not take the focus (no ring round plain words, #7404; #8571)');
-        assert.equal(await ev(`document.querySelector('#inbox-page .goal-team-link')?.getAttribute('href')`), WANT, 'the explicit team link addresses the same goal');
+        assert.equal(await ev(`document.querySelector('#inbox-page .goal-head-actions .task-more-menu .goal-team-link')?.textContent.trim()`), 'Open on team page', 'the way to the team page is an item in the goal header\'s More menu (#15832)');
         await ev(`document.querySelector('#inbox-page .goal-team-link').click(); true`);
         await landed('Goals folder: Open on team page');
         console.log('   ✓');

@@ -252,13 +252,11 @@
 .inbox-goal-page > .goals-page { flex: 1 1 auto; width: 100%; min-height: 0; }
 .inbox-goal-page > .view-list { display: none; }
 .goal-back-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
-.goal-team-link { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--accent); margin-left: auto; }
 /* A task page's row in the Inbox holds the way back, the team link and the title: the back on the left and the link on the right over the title; on a phone the back is beside the title and the link is under them (the phone way-back rule) */
 .goal-back-row > .goals-back, .goal-back-row > .phone-title-row { order: 1; }
 .goal-back-row > .goals-back { white-space: nowrap; flex: none; } /* a way back is one line at any text size (it was "←" over "Tasks" at 200%) */
-.goal-back-row > .goal-team-link, .goal-back-row > .goal-head-actions { order: 2; }
+.goal-back-row > .goal-head-actions { order: 2; }
 .goal-head-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-left: auto; max-width: 100%; } /* Change driver and Move to another team (#12693) join Add task and Close goal: on a phone they wrap onto a second row that still ends at the right edge */
-.goal-team-link + .goal-head-actions { margin-left: 0; }
 @media (min-width: 761px) { .goal-back-row .phone-title-row > .goals-back { order: 1; } .goal-back-row .goals-detail-title { order: 3; flex: 0 0 100%; margin-top: 4px; } } /* a descendant: the folded phone-title-row is display: contents here, so the title is a flex item of the row; on a phone it stays beside the way back */
 @media (max-width: 760px) {
     .goal-back-row > .phone-title-row { flex: 1 1 100%; min-width: 0; padding-block: 8px; }
@@ -267,12 +265,11 @@
 @media (max-width: 760px) {
     .inbox-goal-page > .view-list { display: block; padding: 12px 16px 0; }
     .inbox-goal-page > .view-list .view-list-nav { display: none; }
-    .goal-team-link { display: inline-flex; align-items: center; min-height: 44px; }
 }
 
 /* The goal page's phone header (#13119): keyed on .goal-head-phone, which goal_view.js adds when isPhoneLayout() says phone (the shared query: <= 767 px, or a sideways phone), so it follows the same rule as the One-button-and-More actions and not a width of its own; at a sideways phone's width the desktop header's order and basis are undone. */
 .goal-back-row.goal-head-phone .phone-title-row > .goals-detail-title, .goal-back-row.goal-head-phone .goals-detail-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; white-space: normal; order: 0; flex: 1 1 0; min-width: 0; margin-top: 0; } /* a goal's title is two lines at most on a phone (the Operator: three lines was clutter); the whole title is its tooltip */
-.goal-head-phone > .goal-head-actions { flex: 1 1 100%; justify-content: flex-start; margin-left: 0; order: 2; } /* the one button and More under the title, from the left, not a wrapped row at the right */
+.goal-head-phone > .goal-head-actions { flex: 1 1 100%; justify-content: flex-start; margin-left: 0; order: 2; } /* Add task, Mark done and More under the title, from the left, not a wrapped row at the right */
 .goal-head-actions .task-more-btn { min-height: 44px; }
 
 /* Inbox task and Board mounts keep the shared page spacing and their own phone folder picker. */
