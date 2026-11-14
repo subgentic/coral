@@ -49,7 +49,7 @@ async function load(idx) {
     const at = serverForSession(cur.name, cur.session_id), mine = ++_asked;
     _loading = true;
     try {
-        const r = await serverFetch(at, '/api/skills/search?q=');
+        const r = await serverFetch(at, `/api/skills/search?q=&session_id=${encodeURIComponent(cur.session_id || '')}`); // the agent's folder is where the repo's own skills are read from (#16015)
         if (!r.ok) {
             if (at !== LOCAL_SERVER && mine === _asked && list.start === idx) { showRows([], _words, SKILLS_STAY); return; } // another computer's agent and its Hub refuses: one row that says why, not a menu that closes without a word (QA)
             throw new Error(String(r.status));
@@ -66,7 +66,7 @@ function draw() {
     const skills = filterSkills(_all.skills, _words);
     if (skills.length) { showRows(skills, _words, ''); return; }
     if (!_words) { showRows([], _words, ''); return; } // no approved skills at all: the row that says so
-    if (_all.skills.length >= MENU_FULL) { fallback(_words); return; } // more skills than the list shows: the route's own search may know one
+    if (_all.skills.filter(s => (s.source || 'coral') === 'coral').length >= MENU_FULL) { fallback(_words); return; } // more skills than the list shows: the route's own search may know one
     list.hide(); // "$PATH": nothing is called that, so there is no menu
 }
 
@@ -74,7 +74,7 @@ async function fallback(words) {
     const cur = state.currentSession, mine = ++_asked, idx = list.start;
     if (!cur || cur.type !== 'live' || !_all) return;
     try {
-        const r = await serverFetch(_all.at, `/api/skills/search?q=${encodeURIComponent(words)}`);
+        const r = await serverFetch(_all.at, `/api/skills/search?q=${encodeURIComponent(words)}&session_id=${encodeURIComponent(cur.session_id || '')}`);
         if (!r.ok) throw new Error(String(r.status));
         const j = await r.json();
         if (mine !== _asked || list.start !== idx || _words !== words) return; // the words moved on
@@ -88,9 +88,11 @@ function showRows(skills, words, note) {
     list.selected = 0;
     if (note) { list.results = [{ note }]; list.show([{ cells: [{ cls: 'skill-note', parts: [note] }] }]); return; }
     if (skills.length === 0) { list.results = [{ store: true }]; list.show([{ cells: [{ cls: 'skill-note', parts: ['No approved skills yet. Open the Skills Store'] }] }]); return; }
-    list.show(skills.map(s => ({ sep: ' ', cells: [{ cls: 'skill-name', parts: highlight(s.name, words) }, { cls: 'skill-desc', parts: [oneLine(s.description)] }] })));
+    list.show(skills.map(s => ({ sep: ' ', cells: [{ cls: 'skill-name', parts: highlight(s.name, words) }, { cls: 'skill-desc', parts: [oneLine(s.description)] }, ...(SOURCE_WORDS[s.source] ? [{ cls: `skill-source skill-source-${s.source}`, parts: [SOURCE_WORDS[s.source]] }] : [])] })));
 }
 
+/** Where a skill comes from (#16015): Coral's Skills Store, the person's own folders, or the folder the agent works in. A row with no source (an older server) shows none. */
+const SOURCE_WORDS = { coral: 'Coral', you: 'You', repo: 'This repo' };
 const oneLine = t => String(t || '').replace(/\s+/g, ' ').trim().slice(0, 140);
 function highlight(name, words) {
     const q = String(words || '').toLowerCase(), lower = String(name).toLowerCase(), at = q ? lower.indexOf(q) : -1;
@@ -108,6 +110,7 @@ async function pick(index) {
     if (item.store) { list.hide(); go({ view: 'skills' }); return; }
     const cur = state.currentSession;
     if (!cur || cur.type !== 'live') return;
+    if (item.source === 'you' || item.source === 'repo') { pickLocal(input, item); return; } // the person's own or the repo's skill: the agent's CLI finds it by name; nothing is attached or run
     // what this pick is for, fixed now (UI Reviewer): the agent, and the exact "$words" token with the text before and after it
     const agent = agentKey(cur), start = list.start, end = input.selectionStart, typed = input.value.slice(start, end);
     if (!typed.startsWith('$')) return;
@@ -128,6 +131,18 @@ async function pick(index) {
         list.hide();
     } catch (e) { showToast(`The skill was not attached: ${e && e.message ? e.message : 'try again'}`); }
     finally { _picking = false; }
+}
+
+/** A skill from the person's folders or the repo (#16015): there is nothing to attach (Coral's store holds none of it), so the message says to use it by its plain name and the agent's own CLI finds it. */
+function pickLocal(input, item) {
+    const start = list.start, end = input.selectionStart, typed = input.value.slice(start, end);
+    if (!typed.startsWith('$')) return;
+    const line = `Use the skill ${String(item.name).replace(/[^A-Za-z0-9._-]/g, '')}.`;
+    input.value = input.value.slice(0, start) + line + ' ' + input.value.slice(end);
+    input.selectionStart = input.selectionEnd = start + line.length + 1;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
+    list.hide();
 }
 
 // The first trigger was typed before this module loaded; read the current field, not the old event.

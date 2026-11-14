@@ -28,8 +28,9 @@ import (
 // SkillsHandler serves the Skills Store to an agent (#12021, goal #191): search, list and get of APPROVED skills only. What an agent publishes waits for the Operator, and what it reads is checked
 // against the approved digest on every request.
 type SkillsHandler struct {
-	ss  *store.SessionStore
-	cfg *config.Config
+	ss   *store.SessionStore
+	cfg  *config.Config
+	home func() (string, error) // the person's home folder, for the $ menu's own skills (#16015); a test gives its own
 
 	mu        sync.Mutex
 	recent    map[string][]time.Time                                                                          // per caller: the times of its requests in the last minute
@@ -56,7 +57,7 @@ func (h *SkillsHandler) record(r *http.Request, action string, row *store.SkillR
 
 // NewSkillsHandler returns the Skills Store's agent routes.
 func NewSkillsHandler(db *store.DB, cfg *config.Config) *SkillsHandler {
-	return &SkillsHandler{ss: store.NewSessionStore(db), cfg: cfg, recent: map[string][]time.Time{}, nowFunc: time.Now}
+	return &SkillsHandler{ss: store.NewSessionStore(db), cfg: cfg, home: os.UserHomeDir, recent: map[string][]time.Time{}, nowFunc: time.Now}
 }
 
 // skillsPerMinute is how many searches, lists and gets one caller may make in a minute.
@@ -119,10 +120,11 @@ type skillSummary struct {
 	Description   string `json:"description"`
 	HasScripts    bool   `json:"has_scripts"`
 	NotReviewable bool   `json:"not_reviewable"`
+	Source        string `json:"source"` // where it comes from: "coral" (the Skills Store), "you" (the person's own folders) or "repo" (the agent's working folder) (#16015)
 }
 
 func summaryOf(r store.SkillRow) skillSummary {
-	return skillSummary{ID: r.ID, Name: r.Name, Version: r.Version, Description: r.Description, HasScripts: r.HasScripts, NotReviewable: r.NotReviewable}
+	return skillSummary{ID: r.ID, Name: r.Name, Version: r.Version, Description: r.Description, HasScripts: r.HasScripts, NotReviewable: r.NotReviewable, Source: sourceCoral}
 }
 
 // SearchSkills: GET /api/agent/skills/search?q=<words>. Approved skills only; the words are never kept, only how many results there were.

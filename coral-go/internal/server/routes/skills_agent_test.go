@@ -56,6 +56,8 @@ func newSkillsEnv(t *testing.T) *skillsEnv {
 	r.Post("/api/skills/{id}/approve", h.ApproveSkill)
 	r.Post("/api/skills/{id}/reject", h.RejectSkill)
 	r.Delete("/api/skills/{id}", h.RemoveSkill)
+	home := t.TempDir()
+	h.home = func() (string, error) { return home, nil } // never the real home folder: a test sees only the skills it writes
 	return &skillsEnv{t: t, h: h, ss: store.NewSessionStore(db), router: r, dir: dir}
 }
 
