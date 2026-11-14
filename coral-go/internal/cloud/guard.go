@@ -69,6 +69,9 @@ func Guard(maxMode func() tunnel.Mode) func(http.Handler) http.Handler {
 	allowService := tunnel.AllowServiceRequest(maxMode)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !TunneledAuthentic(r) { // the device key's signature headers (#16654) are the connector's to carry: from anyone else (a browser, an agent, a local program, a forged stamp) they are removed, never read
+				tunnel.StripDeviceHeaders(r.Header)
+			}
 			if guideClaimed(r) && GuideNotFound(r) { // another board's path: the answer an unknown route gets, so a guide learns nothing of boards it has no grant on
 				http.NotFound(w, r)
 				return

@@ -43,6 +43,8 @@ var forwardRequestHeaders = map[string]bool{
 	"X-Coral-Hub-Links":       true,
 	// The client's request id for the six routes that start something (#5841): forwarded only on those routes (scrub).
 	"Idempotency-Key": true,
+	// The device key's signature headers (#16654): evidence for a later step, forwarded only on the owner routes' writes, all four or none (devicekey.go).
+	DeviceKeyHeader: true, DeviceSigHeader: true, DeviceTsHeader: true, DeviceNonceHeader: true,
 }
 
 // HubUserHeader names the Coral Hub user behind a tunnel board write: the sender of a
@@ -161,6 +163,11 @@ func scrub(h http.Header, method, decodedPath string) http.Header {
 	}
 	if !ForwardsIdempotencyKey(method, decodedPath) {
 		out.Del(IdempotencyKeyHeader)
+	}
+	if ForwardsDeviceHeaders(method, decodedPath) {
+		keepWholeDeviceSet(out)
+	} else {
+		StripDeviceHeaders(out)
 	}
 	if !ForwardsHubServer(method, decodedPath) && !ForwardsHubTarget(method, decodedPath) {
 		out.Del(HubServerHeader)

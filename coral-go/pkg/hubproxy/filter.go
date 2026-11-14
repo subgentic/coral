@@ -495,6 +495,8 @@ var forwardToConnector = map[string]bool{
 	tunnel.HubUserHeader: true,
 	// The client's request id, only on the six routes that take it (#5841), see below.
 	tunnel.IdempotencyKeyHeader: true,
+	// The device key's signature headers (#16654): only on the owner routes' writes, see below.
+	tunnel.DeviceKeyHeader: true, tunnel.DeviceSigHeader: true, tunnel.DeviceTsHeader: true, tunnel.DeviceNonceHeader: true,
 }
 
 // allowlistHeaders keeps the allowlisted headers of a request to method and the
@@ -510,7 +512,7 @@ func allowlistHeaders(h http.Header, method, decodedPath string) {
 	idem := tunnel.ForwardsIdempotencyKey(method, decodedPath)
 	for k := range h {
 		canon := http.CanonicalHeaderKey(k)
-		if !forwardToConnector[canon] || (canon == tunnel.HubUserHeader && !hubUser) || (canon == tunnel.IdempotencyKeyHeader && !idem) {
+		if !forwardToConnector[canon] || (canon == tunnel.HubUserHeader && !hubUser) || (canon == tunnel.IdempotencyKeyHeader && !idem) || !tunnel.DeviceHeaderMayStay(canon, method, decodedPath) {
 			delete(h, k)
 		}
 	}
