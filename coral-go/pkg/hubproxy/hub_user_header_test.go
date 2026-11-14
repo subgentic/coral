@@ -69,7 +69,7 @@ func TestAllowlistHeadersHubUser(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, added)
-	assert.Len(t, forwardToConnector, 14, "12 before, plus exactly X-Coral-Hub-User, and Idempotency-Key (#5841)")
+	assert.Len(t, forwardToConnector, 18, "12 before, plus exactly X-Coral-Hub-User, Idempotency-Key (#5841) and the four device-key signature headers (#16654)")
 }
 
 // #3489: a browser can never send X-Coral-Hub-Server (the source Coral of a relayed
