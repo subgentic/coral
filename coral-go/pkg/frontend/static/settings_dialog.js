@@ -58,8 +58,6 @@ export async function showSettingsModal(group) {
 
     // App version
     fetch('/api/system/status').then(r => r.json()).then(d => {
-        const el = document.getElementById('app-version-label');
-        if (el && d.version) el.textContent = 'Version ' + d.version;
         const peer = document.getElementById('peer-check-line'); // one line when this computer does not let Coral tell which account opens a sign-in link (#12546)
         if (peer && d.peer_check_unavailable) {
             peer.hidden = false;
@@ -72,6 +70,7 @@ export async function showSettingsModal(group) {
     openSettingsGroup(typeof group === 'string' ? group : undefined); // the group last used here, or the one asked for
     const modalEl = document.getElementById('settings-modal');
     buildSettingsGroupLabels(modalEl);
+    if (group === 'terminal') modalEl.querySelector('#settings-defaults-advanced').open = true;
     wireSettingsRisks(modalEl);
     wireSettingsAutosave(modalEl);
     setPayloadAtOpen(payloadNow());

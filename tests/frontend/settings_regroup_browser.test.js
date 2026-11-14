@@ -18,9 +18,9 @@ const BASE=require('./test_base').BASE;
    await ev(`document.documentElement.dataset.theme='${theme}';document.documentElement.style.fontSize='${size}px';true`);await ev(framesJs(2));
    if((width===1440&&theme==='dark'&&size===16)||(width===390&&theme==='light'&&size===32)||(width===390&&theme==='dark'&&size===16)||(width===1440&&theme==='light'&&size===32))await shot(`settings-groups-${width}-${size}-${theme}`);
    const nav=await ev(`({groups:[...document.querySelectorAll('#settings-tabs .settings-nav-label')].map(e=>e.textContent),tabs:[...document.querySelectorAll('#settings-tabs [role=tab]')].map(e=>({id:e.id,name:e.querySelector('.settings-tab-name').textContent,hint:e.querySelector('.settings-tab-name').dataset.sub}))})`);
-   if(JSON.stringify(nav.groups)!==JSON.stringify(['You','Agents','This computer','Access'])||nav.tabs.length!==10){failures.push({width,theme,size,nav});continue;}
+   if(JSON.stringify(nav.groups)!==JSON.stringify(['You','Agents','This computer','Access'])||nav.tabs.length!==9){failures.push({width,theme,size,nav});continue;}
    assert.equal(await ev(`document.getElementById('settings-tabs').getAttribute('aria-label')`),'Settings sections');
-   assert.deepEqual(nav.tabs.map(t=>t.name),['Appearance','Notifications','Terminal','Defaults','Teams and Chief','Updates','Storage and backup','Files and Git','Security and privacy','Coral Hub and remote access']);
+   assert.deepEqual(nav.tabs.map(t=>t.name),['Appearance','Notifications','Defaults','Teams and Chief','Updates','Storage and backup','Files and Git','Security and privacy','Coral Hub and remote access']);
    assert.ok(nav.tabs.every(t=>t.hint),'every phone section has a summary');
    if(width===390){
     const styles=await ev(`[...document.querySelectorAll('#settings-tabs .settings-tab-name')].map(e=>({display:getComputedStyle(e,'::after').display,content:getComputedStyle(e,'::after').content,color:getComputedStyle(e,'::after').color,hintSize:parseFloat(getComputedStyle(e,'::after').fontSize),labelSize:parseFloat(getComputedStyle(e).fontSize)}))`);
@@ -30,7 +30,7 @@ const BASE=require('./test_base').BASE;
    for(const key of ['general','agents','terminal','notifications','needs-you','files','cleanup','network','chief','security','updates']){
     await ev(`window.showSettingsModal('${key}')`);
     const current=await ev(`[...document.querySelectorAll('#settings-modal .settings-pane')].filter(p=>!p.hidden).map(p=>p.dataset.group)`);
-    assert.deepEqual(current,[key==='needs-you'?'notifications':key],`legacy section ${key} resolves`);
+    assert.deepEqual(current,[key==='needs-you'?'notifications':key==='terminal'?'agents':key],`legacy section ${key} resolves`);
    }
    await waitFor(`!!document.querySelector('#update-pane-body .settings-section-link')`,'Updates link to remote access');
    await ev(`document.querySelector('#update-pane-body .settings-section-link').scrollIntoView({block:'center'});${framesJs(2)}`);
@@ -46,6 +46,6 @@ const BASE=require('./test_base').BASE;
    await client.Input.dispatchKeyEvent({type:'keyDown',key:'ArrowDown',code:'ArrowDown'});await client.Input.dispatchKeyEvent({type:'keyUp',key:'ArrowDown',code:'ArrowDown'});
    assert.equal(await ev(`document.getElementById('settings-tab-notifications').getAttribute('aria-selected')`),'true','arrow navigation skips group labels');
   }
-  assert.deepEqual(failures,[],'four groups and ten sections');
+  assert.deepEqual(failures,[],'four groups and nine sections before Providers');
  }finally{await client.close();}
 })().catch(e=>{console.error(e);process.exit(1);});

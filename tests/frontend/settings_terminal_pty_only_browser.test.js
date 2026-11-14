@@ -23,10 +23,10 @@ const WITH_WARNING_BUDGET = 88 + 16; // ST6: the same short help lines. // 60 (+
         await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'the dialog open', 8000);
         await waitFor(`!!document.getElementById('settings-tab-network')`, 'the Settings dialog', 8000);
         await waitFor(`document.querySelectorAll('#settings-modal .settings-hint-line').length > 5`, 'the hint lines', 8000);
-        await ev(`document.getElementById('settings-tab-terminal').click(); true`);
-        await waitFor(`(() => { const p = document.querySelector('#settings-modal .settings-pane:not([hidden])'); return !!p && p.dataset.group === 'terminal' && !document.getElementById('tb-fixed').closest('.sv-row').hidden; })()`, 'the Terminal group, loaded', 8000);
+        await ev(`document.getElementById('settings-tab-agents').click(); document.getElementById('settings-defaults-advanced').open = true; true`);
+        await waitFor(`(() => { const p = document.querySelector('#settings-modal .settings-pane:not([hidden])'); return !!p && p.dataset.group === 'agents' && !document.getElementById('tb-fixed').closest('.sv-row').hidden; })()`, 'the Terminal group, loaded', 8000);
         await ev(`(() => { const r = document.getElementById('settings-tools-folder-row'); if (r) r.hidden = true; return true; })()`); // the normal state has no warning row: a Windows runner shows it for real (its tools folder is a temp folder), and the 64-word state with it is checked on its own
-        const seen = await ev(`(() => { const pane = document.querySelector('#settings-modal .settings-pane:not([hidden])'); const out = [];
+        const seen = await ev(`(() => { const pane = document.getElementById('settings-defaults-advanced'); const out = [];
             const shown = e => { for (let p = e; p; p = p.parentElement) { const s = getComputedStyle(p); if (s.display === 'none' || s.visibility === 'hidden' || p.hidden) return false; } return true; };
             const w = document.createTreeWalker(pane, NodeFilter.SHOW_TEXT);
             for (let t = w.nextNode(); t; t = w.nextNode()) { const e = t.parentElement; if (!e || e.closest('select, option, script, style, .material-icons') || !shown(e)) continue; const v = t.nodeValue.trim(); if (v) out.push(v); }
@@ -35,7 +35,7 @@ const WITH_WARNING_BUDGET = 88 + 16; // ST6: the same short help lines. // 60 (+
         assert.ok(words <= TERMINAL_BUDGET, `Terminal shows ${words} words on a pty-only system, budget ${TERMINAL_BUDGET}: ${JSON.stringify(seen)}`);
         // With the agent tools folder warning showing too (a portable install in the profile: the row's label, its one line and the "How to fix it" button, 16 words), the group stays within 64 words: the 60 of the budget plus that row, which is no longer left out of the count (its line carries its own subject because a status is announced alone)
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'settings_core.js'); m.renderToolsFolderStatus({ tools_folder: { path: 'C:\\\\Users\\\\someone\\\\Coral\\\\tools', writable_by: ['Users', 'Everyone'] } }); return true; })()`);
-        const withRow = await ev(`(() => { const pane = document.querySelector('#settings-modal .settings-pane:not([hidden])'); const out = [];
+        const withRow = await ev(`(() => { const pane = document.getElementById('settings-defaults-advanced'); const out = [];
             const shown = e => { for (let p = e; p; p = p.parentElement) { const s = getComputedStyle(p); if (s.display === 'none' || s.visibility === 'hidden' || p.hidden) return false; } return true; };
             const w = document.createTreeWalker(pane, NodeFilter.SHOW_TEXT);
             for (let t = w.nextNode(); t; t = w.nextNode()) { const e = t.parentElement; if (!e || e.closest('select, option, script, style, .material-icons') || !shown(e)) continue; const v = t.nodeValue.trim(); if (v) out.push(v); }

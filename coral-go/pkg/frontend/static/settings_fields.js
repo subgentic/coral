@@ -267,14 +267,29 @@ const HELP_LINES = {
     debug_input_log: 'Records everything Coral types, including secrets. For troubleshooting only.',
 };
 
+// One definition per setting; layout chooses its home without copying a control.
+const TEAM_KEYS = new Set(['agents_team', 'board_auto_attach', 'nudge_claude_artifacts', 'board_health_monitor']);
+const ADVANCED_KEYS = new Set(['agents_experimental', 'launch_in_worktree', 'agents_tools', 'live_settings-prompts-live']);
+const pick = (fields, keys) => fields.filter(f => keys.has(f.key));
+const advanced = id => ({ key: id, id, type: 'heading', label: 'Advanced', fold: true });
+
 /** Draws the groups that are fields into the Settings modal's panes (once, when the modal is built). mount is mountSettingsView. */
 export function drawSettingsGroups(modal, mount) {
-    for (const [hostId, fields] of [['settings-general-rows', GENERAL_FIELDS], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-inbox-rows', INBOX_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-terminal-rows', TERMINAL_FIELDS], ['settings-agents-rows', AGENTS_FIELDS], ['settings-cleanup-rows', CLEANUP_FIELDS], ['settings-security-rows', SECURITY_FIELDS], ['settings-network-rows', NETWORK_FIELDS]]) {
+    const agentHost = modal.querySelector('#settings-agents-rows');
+    const agents = AGENTS_FIELDS(agentHost);
+    const general = GENERAL_FIELDS.filter(f => !['default_agent_type', 'check_updates'].includes(f.key));
+    const display = TERMINAL_FIELDS.filter(f => ['terminal_display_title', 'terminal_font_size', 'terminal_scrollback', 'fit_pane_width'].includes(f.key));
+    const defaultType = GENERAL_FIELDS.find(f => f.key === 'default_agent_type');
+    const checkUpdates = GENERAL_FIELDS.find(f => f.key === 'check_updates');
+    const defaultFields = agents.filter(f => !TEAM_KEYS.has(f.key) && !ADVANCED_KEYS.has(f.key));
+    const agentAdvanced = agents.filter(f => ADVANCED_KEYS.has(f.key) && f.type !== 'heading');
+    for (const [hostId, fields] of [['settings-general-rows', [...general, ...display, live('settings-engine-more')]],
+        ['settings-updates-rows', [checkUpdates]], ['settings-team-rows', pick(agents, TEAM_KEYS)], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-inbox-rows', INBOX_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-agents-rows', [defaultType, ...defaultFields, advanced('settings-defaults-advanced'), ...agentAdvanced, ...TERMINAL_BACKEND_FIELDS, live('settings-tools-folder-dl')]], ['settings-cleanup-rows', CLEANUP_FIELDS], ['settings-security-rows', SECURITY_FIELDS], ['settings-network-rows', NETWORK_FIELDS]]) {
         const host = modal.querySelector(`#${hostId}`);
         if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields: (typeof fields === 'function' ? fields(host) : fields).map(field => {
             if (!field.help?.more) return field;
             return { ...field, help: { ...field.help, text: field.help.text || HELP_LINES[field.key], more: undefined, docs: { topic: 'settings-system', answer: field.label } } };
         }) });
-        for (const id of hostId === 'settings-terminal-rows' ? TERMINAL_BACKEND_IDS : hostId === 'settings-agents-rows' ? ['settings-custom-models', 'settings-custom-modes'] : []) host.querySelector(`#${id}`)?.closest('.sv-row')?.setAttribute('hidden', ''); // until the module that fills them has read its status
+        for (const id of hostId === 'settings-agents-rows' ? [...TERMINAL_BACKEND_IDS, 'settings-custom-models', 'settings-custom-modes'] : []) host.querySelector(`#${id}`)?.closest('.sv-row')?.setAttribute('hidden', ''); // until the module that fills them has read its status
     }
 }

@@ -2763,14 +2763,6 @@ div.overflow-menu-note { margin: 0; padding: 6px 12px 2px; } /* a row menu's fir
     margin: 16px 0;
 }
 
-/* ── Settings / Status (the version) ─────────────────────── */
-
-.settings-version-label {
-    font-size: var(--fs-base);
-    color: var(--text-secondary);
-    margin-top: 8px;
-}
-
 /* ── Misc Extracted Inline Styles ──────────────────────────── */
 
 .capture-wrapper {

@@ -578,20 +578,6 @@
                     <section class="settings-pane" id="settings-pane-general" data-group="general" data-icon="tune" data-title="Appearance" data-nav-group="You" data-hint="Theme and display" role="tabpanel" aria-labelledby="settings-tab-general" tabindex="-1">
                         <h4 class="settings-pane-title">Appearance</h4>
                         <div id="settings-general-rows"></div>
-
-                    </section>
-                    <section class="settings-pane" id="settings-pane-notifications" data-group="notifications" data-icon="notifications" data-title="Notifications" data-nav-group="You" data-hint="Alerts and Needs you" role="tabpanel" aria-labelledby="settings-tab-notifications" tabindex="-1" hidden>
-                        <h4 class="settings-pane-title">Notifications</h4>
-                        <div id="settings-notifications-rows"></div>
-                    <section class="settings-inbox-block" id="settings-pane-needs-you" aria-labelledby="settings-inbox-block-title">
-                        <h5 id="settings-inbox-block-title">What reaches Needs you</h5>
-                        <div id="settings-inbox-rows"></div>
-                    </section>
-                    </section>
-                    <section class="settings-pane" id="settings-pane-terminal" data-group="terminal" data-icon="terminal" data-title="Terminal" data-nav-group="You" data-hint="Text and terminal backend" role="tabpanel" aria-labelledby="settings-tab-terminal" tabindex="-1" hidden>
-                        <h4 class="settings-pane-title">Terminal</h4>
-                        <div id="settings-terminal-rows"></div>
-                        <!-- the live parts of this group (filled by terminal_backend.js and settings_dialog.js) sit here until the group's rows are drawn, then settings_fields.js moves each into its place -->
                         <div id="settings-terminal-live" hidden>
                         <dl class="info-grid settings-grid" id="settings-tools-folder-dl">
                 <div class="settings-row" id="settings-tools-folder-row" hidden>
@@ -605,7 +591,7 @@
                 </div>
                         </dl>
                         <details class="disclosure settings-engine-more" id="settings-engine-more">
-                            <summary>Terminal drawing</summary>
+                            <summary>Advanced</summary>
                             <dl class="info-grid settings-grid">
                                 <div class="settings-row">
                                 <dt id="settings-renderer-select-label">Drawing engine</dt>
@@ -616,6 +602,16 @@
                             </dl>
                         </details>
                         </div>
+
+
+                    </section>
+                    <section class="settings-pane" id="settings-pane-notifications" data-group="notifications" data-icon="notifications" data-title="Notifications" data-nav-group="You" data-hint="Alerts and Needs you" role="tabpanel" aria-labelledby="settings-tab-notifications" tabindex="-1" hidden>
+                        <h4 class="settings-pane-title">Notifications</h4>
+                        <div id="settings-notifications-rows"></div>
+                    <section class="settings-inbox-block" id="settings-pane-needs-you" aria-labelledby="settings-inbox-block-title">
+                        <h5 id="settings-inbox-block-title">What reaches Needs you</h5>
+                        <div id="settings-inbox-rows"></div>
+                    </section>
                     </section>
                     <section class="settings-pane" id="settings-pane-agents" data-group="agents" data-icon="smart_toy" data-title="Defaults" data-nav-group="Agents" data-hint="Models and agent behaviour" role="tabpanel" aria-labelledby="settings-tab-agents" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Defaults</h4>
@@ -636,11 +632,13 @@
                     <section class="settings-pane" id="settings-pane-chief" data-group="chief" data-icon="chat" data-title="Teams and Chief" data-nav-group="Agents" data-hint="Chief and team controls" role="tabpanel" aria-labelledby="settings-tab-chief" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Teams and Chief</h4>
                         <!-- Filled by chief_setup.js (#11796); not on the hub: Chief is this computer's. -->
+                        <div id="settings-team-rows"></div>
                         <div id="settings-chief-host"></div>
                     </section>
-                    <section class="settings-pane" id="settings-pane-updates" data-group="updates" data-flag="updates" data-icon="system_update" data-title="Updates" data-nav-group="This computer" data-hint="Versions and relaunch" role="tabpanel" aria-labelledby="settings-tab-updates" tabindex="-1" hidden>
+                    <section class="settings-pane" id="settings-pane-updates" data-group="updates" data-icon="system_update" data-title="Updates" data-nav-group="This computer" data-hint="Versions and relaunch" role="tabpanel" aria-labelledby="settings-tab-updates" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Updates</h4>
-                        <div id="update-pane-body"></div>
+                        <div id="settings-updates-rows"></div>
+                        <div id="update-pane-body" data-flag="updates"></div>
                     </section>
                     <section class="settings-pane" id="settings-pane-cleanup" data-group="cleanup" data-icon="inventory_2" data-title="Storage and backup" data-nav-group="This computer" data-hint="Limits, clean-up and backup" role="tabpanel" aria-labelledby="settings-tab-cleanup" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Storage and backup</h4>
@@ -775,7 +773,6 @@
                 <section class="net-group" id="about-section" aria-labelledby="net-status-title">
                 <!-- Status: the version (Coral has no paid licence, #3221) and this machine's health from the feed (#3446); a hub-served page has no machine of its own, so it hides the group (UI audit #5589, finding 19) -->
                 <div class="net-body">
-                    <div id="app-version-label" class="settings-version-label"></div>
                     <div id="peer-check-line" class="settings-hint sv-help" role="status" hidden></div>
                     <div class="settings-machine-health" data-local-only>
                         <div id="machine-health-local"></div>
