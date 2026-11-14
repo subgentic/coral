@@ -1517,8 +1517,6 @@
     .team-page #team-page-head .team-bar-back { grid-row: 1; }
     .team-page #team-page-head .team-page-actions { grid-row: 1; grid-column: 3; }
     .team-page-head .team-page-title { line-height: var(--lh-body); }
-    .team-page #team-page-head > .team-page-agent-copy { display: none; }
-    .team-page #team-page-head .team-phone-copy { display: flex; }
     .team-page #team-page-head .team-page-status { align-self: start; }
     .team-page #team-page-head > .team-bar-needs { grid-row: 2; grid-column: 1; justify-self: center; }
     body.live-session-active:not(.popout-mode) .terminal-header:not([data-more]) :is(.live-view-switch, .notice-pause-btn, .terminal-session-context) { display: none !important; }

@@ -14,10 +14,20 @@ export function agentCopyButton(key, subject = '', opts = {}) {
     b.type = 'button'; b.className = `agent-copy${opts.className ? ' ' + opts.className : ''}`;
     b.title = AGENT_COPY_LABEL; b.setAttribute('aria-label', opts.label || AGENT_COPY_LABEL);
     const i = document.createElement('span'); i.className = 'material-icons'; i.setAttribute('aria-hidden', 'true'); i.textContent = 'smart_toy'; b.append(i);
-    b.addEventListener('click', e => {
-        e.stopPropagation();
-        copyText(agentCopyText(key, typeof subject === 'function' ? subject() : subject)).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok));
-    });
+    b.addEventListener('click', e => { e.stopPropagation(); copyForAgent(key, subject); });
+    return b;
+}
+
+/** The copy itself, for a menu item or a labelled button that is not the robot (#15993): the object's line and where in the docs to read, then the toast. */
+export function copyForAgent(key, subject = '') {
+    return copyText(agentCopyText(key, typeof subject === 'function' ? subject() : subject)).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok));
+}
+
+/** A labelled Quiet button (words, no lone robot) for a screen with no More menu (Settings > General, #15993). */
+export function agentCopyLabelled(key, subject = '', opts = {}) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = `btn btn-quiet agent-copy-labelled${opts.className ? ' ' + opts.className : ''}`; b.textContent = AGENT_COPY_LABEL;
+    b.addEventListener('click', e => { e.stopPropagation(); copyForAgent(key, subject); });
     return b;
 }
 

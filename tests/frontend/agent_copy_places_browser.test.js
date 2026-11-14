@@ -61,8 +61,8 @@ const { coralReady } = require('./helpers/wait');
             await has('#settings-modal .settings-pane[data-group="network"] > .agent-copy-hrow > .agent-copy', at, 'the robot on Network and Hub');
             await robot('#settings-modal .settings-pane[data-group="network"] > .agent-copy-hrow > .agent-copy', 'Network and Hub');
             assert.match(await press('#settings-modal .settings-pane[data-group="network"] > .agent-copy-hrow > .agent-copy', at, 'the Network and Hub line'), /Network and Hub[\s\S]*\nDocs: coral-agent docs hub, section “Registry \(hub only\)”$/);
-            const panes = await ev(`[...document.querySelectorAll('#settings-modal .settings-pane[data-group]')].filter(p => !p.querySelector(':scope > .agent-copy-hrow > .agent-copy')).map(p => p.dataset.group)`);
-            assert.deepEqual(panes, [], at + 'every section has one: ' + panes);
+            const panes = await ev(`[...document.querySelectorAll('#settings-modal .settings-pane[data-group]')].filter(p => p.dataset.group !== 'general' && !p.querySelector(':scope > .agent-copy-hrow > .agent-copy')).map(p => p.dataset.group)`);
+            assert.deepEqual(panes, [], at + 'every section but General has one (General has a labelled button, #15993): ' + panes);
             await ev(`(async () => { await window.showSettingsModal('notifications'); return true; })()`);
             assert.match(await press('#settings-modal .settings-pane[data-group="notifications"] > .agent-copy-hrow > .agent-copy', at, 'the Notifications line'), /\nDocs: coral-agent docs notifications, section “Create Notification”$/);
         }
