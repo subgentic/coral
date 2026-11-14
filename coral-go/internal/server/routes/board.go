@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/operatortouch"
 	"log/slog"
@@ -289,6 +290,10 @@ func (h *BoardHandler) persistTaskArtifact(ctx context.Context, task *board.Task
 		return
 	}
 	if err := h.writeTaskArtifact(ctx, task, h.taskArtifactPath(task.BoardID, task.ID)); err != nil {
+		if errors.Is(err, errNotGitRepo) {
+			slog.Debug("task changes not persisted: the agent's folder is not a git repository", "task_id", task.ID, "board", task.BoardID)
+			return
+		}
 		slog.Warn("persist task changes artifact failed", "task_id", task.ID, "board", task.BoardID, "error", err)
 	} else if h.bs != nil {
 		h.bs.NoteArtifactsChanged(task.BoardID)
