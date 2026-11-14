@@ -9,11 +9,12 @@ const { coralReady } = require('./helpers/wait');
 // LA2 adds 96 words for the six readable permission modes and warning lines.
 // ST6 adds a visible short help line where there used to be only a closed More.
 // #15950: Agents 262 to 269 (+7: the Custom permission modes block, its title (3), Learn more (2) and Add a custom mode (4)).
+// #16109 adds 18 visible words: Share through Coral Hub (4), its short rule (12), Sharing details (2).
 // Keep the old section budgets plus the words in those authored lines (HELP_LINES /
 // HINTS); long explanations remain in Docs and never inflate the dialog.
 // Notifications includes the existing Inbox block; retain an allowance of 180 words for its labels/help and team notice.
 const BEFORE = { 'Coral Hub and remote access':186, Defaults:269, 'Storage and backup':151, Updates:20, 'Teams and Chief':80, Appearance:80, Notifications:72+180, 'Files and Git':40, 'Security and privacy':59 };
-const HELP_WORDS = { 'Coral Hub and remote access':80, Defaults:73, 'Storage and backup':21, Updates:6, 'Teams and Chief':12, Appearance:22, 'Files and Git':8, 'Security and privacy':17 };
+const HELP_WORDS = { 'Coral Hub and remote access':80, Defaults:73, 'Storage and backup':21+18, Updates:6, 'Teams and Chief':12, Appearance:22, 'Files and Git':8, 'Security and privacy':17 };
 const BUDGET = Object.fromEntries(Object.entries(BEFORE).map(([k,v])=>[k,v+(HELP_WORDS[k]||0)]));
 
 (async () => {
@@ -57,7 +58,7 @@ const BUDGET = Object.fromEntries(Object.entries(BEFORE).map(([k,v])=>[k,v+(HELP
                 const w = document.createTreeWalker(pane, NodeFilter.SHOW_TEXT);
                 for (let t = w.nextNode(); t; t = w.nextNode()) { const e = t.parentElement; if (!e || e.closest('select, option, script, style, .material-icons, .sv-fold-note') || !shown(e)) continue; n += t.nodeValue.trim().split(/\\s+/).filter(Boolean).length; }
                 return n; })()`);
-            (global.__tb = global.__tb || []).push(`${g.name}: ${words}`);
+            console.log(`${g.name}: ${words} words (budget ${BUDGET[g.name] ?? "none"})`);
             const seenText = words > (BUDGET[g.name] ?? Infinity) ? await ev(`(() => { const pane = document.querySelector('#settings-modal .settings-pane:not([hidden])'); const out = []; const shown = e => { for (let p = e; p; p = p.parentElement) { const s = getComputedStyle(p); if (s.display === 'none' || s.visibility === 'hidden' || p.hidden) return false; const d = p.parentElement; if (d && d.tagName === 'DETAILS' && !d.open && p.tagName !== 'SUMMARY') return false; } return true; }; const w = document.createTreeWalker(pane, NodeFilter.SHOW_TEXT); for (let t = w.nextNode(); t; t = w.nextNode()) { const e = t.parentElement; if (!e || e.closest('select, option, script, style, .material-icons, .sv-fold-note') || !shown(e)) continue; const v = t.nodeValue.trim(); if (v) out.push(v.slice(0, 80)); } return out; })()`) : null;
             if (!process.env.TB_DUMP && BUDGET[g.name] !== undefined) assert.ok(words <= BUDGET[g.name], `${g.name} shows ${words} words, budget ${BUDGET[g.name]}: ${JSON.stringify(seenText)}`);
         }

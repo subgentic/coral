@@ -24,6 +24,15 @@ const BASE = require('./test_base').BASE;
     if (group==='network') await ev(`document.querySelectorAll('#settings-cloud details.settings-cloud-more').forEach(d=>{d.hidden=false;d.open=true}); true`);
     await ev(framesJs(2));
     const helpIssues = await ev(`(() => { const root=document.getElementById('settings-modal'), expected=${size}*0.6875; return [...root.querySelectorAll('.sv-help,.settings-hint,.toggle-desc,.tb-note,.sec-muted')].filter(e=>e.getClientRects().length && !e.closest('[hidden]') && !['status','alert'].includes(e.getAttribute('role'))).filter(e=>!e.classList.contains('sv-help') || Math.abs(parseFloat(getComputedStyle(e).fontSize)-expected)>0.2).map(e=>e.outerHTML.slice(0,200)); })()`);
+    if (group==='cleanup') {
+     const share = await ev(`(() => { const row=document.getElementById('settings-dropbox-hubshare'), hint=row.querySelector('#settings-dropbox-hubshare-desc'), details=row.querySelector('details'); return {shown:!row.hidden, rule:hint.textContent.trim(), visible:hint.getClientRects().length>0, closed:!details.open, safety:details.textContent}; })()`);
+     assert.equal(share.shown,true);
+     assert.equal(share.visible,true,'Share-only consent stays visible without opening details');
+     assert.equal(share.rule,'Sends only when you press Share. Off by default; this computer only.');
+     assert.equal(share.closed,true);
+     assert.match(share.safety,/private or tagged internal is never sent/);
+     assert.match(share.safety,/secret waits here for you to press Upload anyway/);
+    }
     if (helpIssues.length) failures.push(`${width}/${size}/${theme}/${group}: help pattern ${JSON.stringify(helpIssues)}`);
     if (['general','cleanup','network','security'].includes(group) && ((width===1440 && size===16 && theme==='dark') || (width===390 && size===32 && theme==='light'))) await shot(`settings-rows-${width}-${size}-${theme}-${group}`);
     if (group==='cleanup' || group==='security') {
