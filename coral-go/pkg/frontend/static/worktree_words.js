@@ -9,7 +9,7 @@ export function worktreeConfirmWords(branch) {
 /** The kill answer's `worktree` ({ state: removed | kept | failed | none, path, branch, reason }) as words: { text, error } (error: said as an alert, the rest as a status), or null when there is nothing to say. */
 export function worktreeAnswerWords(w, subject = 'team') {
     if (!w || typeof w !== 'object' || !w.state || w.state === 'none') return null;
-    const stopped = subject === 'agent' ? 'The agent was killed' : subject === 'worktree' ? '' : 'The team stopped';
+    const stopped = subject === 'agent' ? 'The agent was stopped' : subject === 'worktree' ? '' : 'The team stopped';
     const reason = typeof w.reason === 'string' ? w.reason.trim().replace(/[.\s]+$/, '') : '';
     const where = w.path ? ` It is at ${w.path}${w.branch ? `, on branch ${w.branch}` : ''}.` : (w.branch ? ` Its branch is ${w.branch}.` : '');
     // removed: the worktree went; a reason says what stays ("its branch is kept: it has commits that are not merged"). kept: why it was kept. failed: why it could not be removed.

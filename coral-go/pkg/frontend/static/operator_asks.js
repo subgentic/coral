@@ -187,7 +187,7 @@ export async function wakeMember(a, name) {
         // The page's list can lack an agent that is running (not loaded yet, or stale): only the server's own list says whether it is gone. A session that is running is never resumed (#14420, after #14172).
         const real = await serverLiveRow(server, sub.session_name);
         if (real.failed) throw new Error(`Could not check whether ${who} is running (${real.failed}), so nothing was started.`);
-        if (!real.row) return resumeEndedMember(server, a, name, who, sub.session_name); // an agent Kill all (or its own exit) ended has no live row: its chat is resumed, as History's Resume does (#14172)
+        if (!real.row) return resumeEndedMember(server, a, name, who, sub.session_name); // an agent Stop agents (or its own exit) ended has no live row: its chat is resumed, as History's Resume does (#14172)
         live = real.row;
         if (!live.sleeping) { try { await (await importOnce('./api.js')).loadLiveSessions(); } catch { /* the list refreshes on its own tick */ } throw new Error(`${who} is running.`); } // the page's list is brought up to date, nothing is launched
     }

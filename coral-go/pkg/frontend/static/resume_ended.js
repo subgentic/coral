@@ -1,4 +1,4 @@
-/* Resume an agent that was ended (Kill all, or its own exit) from its earlier chat (#14172, #14208). The agent has no live row any more, so the way back is History's Resume: the chat's resume-info
+/* Resume an agent that was ended (Stop agents, or its own exit) from its earlier chat (#14172, #14208). The agent has no live row any more, so the way back is History's Resume: the chat's resume-info
  * (its folder, name, mode and resume id), then the launch route with resume_session_id on the same board. Used by the inbox's Restart on a question and by Wake team's offer to resume the
  * members it found ended. Rejects in words, starting nothing, when the folder is gone, unknown, or the chat cannot be read. Plain text only: names and paths go through markHidden. */
 import { importOnce } from './import_once.js';

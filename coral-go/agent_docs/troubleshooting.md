@@ -266,7 +266,7 @@ you chose it. An install that ran on the older tmux default and still has agents
 keeps tmux for that one start, so nothing is hidden; the first start without them runs the built-in
 terminal.
 
-On the built-in terminal, ending an agent (quitting Coral, Kill, Restart) ends everything that agent
+On the built-in terminal, ending an agent (quitting Coral, Stop agent, Restart) ends everything that agent
 started, however it started it: a helper in a session of its own, and a background process the agent
 began on purpose (`nohup`, a dev server) end with it. Run something that must outlive the agent from
 your own terminal, or choose tmux. On macOS, a helper that had already detached from the agent before
@@ -276,7 +276,7 @@ every 3 seconds while agents run, and remembers what it saw: an Apple helper tha
 to the agent at one of those looks, and detached later (its parent exited), is ended with the agent.
 One that detached before the first look that saw it (within about 3 seconds of starting) is not found;
 whatever is still attached is ended, and on Linux both are found.
-Under tmux Kill, sleep and Restart end an agent's whole tree the same way: an agent started by this version of Coral carries the same mark (a random tag kept with its session, so a restart or wake keeps it),
+Under tmux Stop, sleep and Restart end an agent's whole tree the same way: an agent started by this version of Coral carries the same mark (a random tag kept with its session, so a restart or wake keeps it),
 and a helper that detached is found by it, or by the same 3-second look at the pane's tree that the built-in terminal has; an agent started before this version has no mark, so only what is attached
 to it, or was seen attached, is ended. A helper that clears its environment and detached before the first look that saw it, or an Apple binary that detached within moments, may keep running. A Coral that is killed or crashes ends nothing itself: the
 terminals are hung up by the system, which ends an agent that exits on hangup and may leave its helpers.

@@ -74,7 +74,7 @@ function findChrome() {
         // The folder group's menu item is a registered action since #3645 (no inline onclick): data-on-click="group-kill",
         // with the group in data-group. The window is set to the layout under test: on a phone the same list is #mobile-session-list (#4497), on a desktop #live-sessions-list.
         const button = `[...document.querySelectorAll('${LIST} [data-on-click="group-kill"]')].find(b => b.dataset.group === ${JSON.stringify(folder)})`;
-        await waitFor(`!!${button}`, `the "${folder}" group's Kill all`).catch(async e => { // say what the list does show: a changed group key or a list that did not render reads differently
+        await waitFor(`!!${button}`, `the "${folder}" group's Stop all`).catch(async e => { // say what the list does show: a changed group key or a list that did not render reads differently
             const seen = await ev(`JSON.stringify({ groups: [...document.querySelectorAll('[data-on-click="group-kill"]')].map(b => b.dataset.group), list: !!document.getElementById('live-sessions-list'), rows: document.querySelectorAll('#live-sessions-list > *').length })`);
             throw Error(`${e.message}; the page has ${seen}`);
         });

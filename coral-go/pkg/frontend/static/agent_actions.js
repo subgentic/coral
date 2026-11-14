@@ -1,4 +1,4 @@
-/* What the sidebar's menus do to one agent: kill, info, attach, restart, sleep and archive (moved out of render.js, #4996; no behaviour change). */
+/* What the sidebar's menus do to one agent: stop, info, attach, restart, sleep and archive (moved out of render.js, #4996; no behaviour change). */
 import { relaunchNarrowing, wakeQuestion, permissionNarrowing, useFullAccessQuestion } from './codex_mode.js';
 import { state } from './state.js';
 import { serverFetch, serverForSession, sessionServer, normServer } from './server_base.js';
@@ -11,11 +11,11 @@ import { agentWords, WHAT_STAYS_ARCHIVE, WHAT_STAYS_SLEEP } from './agent_words.
 import { applySleepingView } from './sleeping_view.js';
 import { isHomeFolderAsk, askHomeFolder } from './home_folder_ask.js';
 
-// What Kill does with the agent's terminal log, said in every Kill confirmation (#4399): it is kept, on both terminal backends
+// What Stop does with the agent's terminal log, said in every Stop confirmation (#4399): it is kept, on both terminal backends
 // (#4437: tmux's KillSession no longer removes it), in <data dir>/logs.
 export const KILL_LOG_NOTE = "Its terminal log is kept, in the logs folder of Coral's data folder.";
 
-// The same for a confirmation about several agents (Kill all Agents, Kill Team, Reset team: Reset kills each agent and
+// The same for a confirmation about several agents (Stop all, Stop agents, Reset team: Reset stops each agent and
 // starts it again under a new session id, so the old logs stay as they are).
 export const KILL_LOG_NOTE_MANY = "Their terminal logs are kept, in the logs folder of Coral's data folder.";
 

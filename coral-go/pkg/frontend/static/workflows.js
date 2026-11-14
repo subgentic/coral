@@ -315,7 +315,7 @@ function renderRunDetail(run) {
 
     const killBtn = isActive
         ? `<button class="btn" style="color:var(--error-text)" data-on-click="wf-kill-run" data-run-id="${Number(run.id)}">
-            <span class="material-icons" style="font-size:var(--fs-lg)" aria-hidden="true">stop</span> Kill
+            <span class="material-icons" style="font-size:var(--fs-lg)" aria-hidden="true">stop</span> Stop
           </button>`
         : '';
 
@@ -395,19 +395,19 @@ function sayStarted(text) { const s = document.getElementById('wf-status'); if (
     const name = shownRun && Number(shownRun.id) === runId && shownRun.workflow_name ? ` of workflow "${shownRun.workflow_name}"` : '';
     // Kill Run stops the step that is running; an agent step goes through the same kill as Kill session, which keeps its terminal log (#4399, #4437).
     const agentRunning = !!shownRun && Number(shownRun.id) === runId && (shownRun.steps || []).some(s => s.type === 'agent' && s.status === 'running');
-    window.showConfirmModal('Kill run', `Stop run #${runId}${name}? Its steps stop where they are and the run cannot be resumed.${agentRunning ? ' ' + KILL_LOG_NOTE : ''}`, () => killWorkflowRun(runId), undefined, { label: 'Kill run', danger: true });
+    window.showConfirmModal('Stop run', `Stop run #${runId}${name}? Its steps stop where they are and the run cannot be resumed.${agentRunning ? ' ' + KILL_LOG_NOTE : ''}`, () => killWorkflowRun(runId), undefined, { label: 'Stop run', danger: true });
 }
 
 export async function killWorkflowRun(runId) {
     try {
         await apiFetch(`/api/workflows/runs/${runId}/kill`, { method: 'POST' });
-        showToast(`Run #${runId} killed`);
+        showToast(`Run #${runId} stopped`);
         // Refresh
         const updated = await fetchRunDetail(runId);
         if (updated) renderRunDetail(updated);
         stopRunPolling();
     } catch (e) {
-        showToast('Failed to kill run: ' + e.message, true);
+        showToast('Failed to stop run: ' + e.message, true);
     }
 }
 

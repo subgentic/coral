@@ -1,6 +1,6 @@
 // Through the Coral Hub, killing a whole team and deleting a board need Launch on that machine (#3433).
 // The hub-served dashboard (#3443):
-//   1. at Interact, the team menu's "Kill all" is shown disabled with "needs Launch" and the reason,
+//   1. at Interact, the team menu's "Stop agents" is shown disabled with "needs Launch" and the reason,
 //      and calling it says why (a toast, no dialog) instead of sending a kill per agent;
 //   2. the board's Delete button is disabled ("Delete (needs Launch)", the reason as its title), and
 //      deleting says why;
@@ -79,7 +79,7 @@ const HUB_PRELOAD = `(() => {
         await ev(`(() => { for (const n of ['x-one', 'x-two']) window.__m.add(n, 'X', 2, { sleeping: false, server: 'm1', board_project: ${JSON.stringify(BOARD)} });
             T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
 
-        console.log('1. Interact: Kill all disabled, with the reason');
+        console.log('1. Interact: Stop agents disabled, with the reason');
         await waitFor(`(() => { const b = [...document.querySelectorAll('.overflow-menu-item')].find(x => /Stop agents/.test(x.textContent)); return !!b && b.disabled; })()`, 'Stop agents disabled at Interact', 8000);
         let k = await killAll();
         assert.match(k.text, /Stop agents needs Launch/);
@@ -110,7 +110,7 @@ const HUB_PRELOAD = `(() => {
         assert.equal(k.text, 'Stop agents'); assert.equal(k.onclick, true);
         await ev(`(async () => { (await import((window.__coralStatic || '/static/') + 'message_board.js')).selectBoardProject(${JSON.stringify(team)}); return true; })()`);
         await waitFor(`document.getElementById('mb-delete-btn').disabled === false && document.getElementById('mb-delete-btn').textContent === 'Remove team'`, 'Remove team enabled', 5000);
-        console.log('   ✓ Kill all and Delete enabled');
+        console.log('   ✓ Stop agents and Delete enabled');
 
         console.log('4. A local dashboard is unchanged');
         await cloudMode(false);
@@ -122,7 +122,7 @@ const HUB_PRELOAD = `(() => {
         await waitFor(`[...document.querySelectorAll('.overflow-menu-item')].some(x => /Stop agents/.test(x.textContent))`, 'the local team menu', 5000);
         k = await killAll();
         assert.equal(k.disabled, false, 'never gated locally'); assert.equal(k.text, 'Stop agents');
-        console.log('   ✓ local Kill all as before');
+        console.log('   ✓ local Stop agents as before');
 
         console.log('\nAll hub Launch-action checks passed');
     } finally {

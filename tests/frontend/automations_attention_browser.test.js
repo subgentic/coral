@@ -42,7 +42,7 @@ const STUB = `(() => {
     const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(tr => tr.querySelector('.dt-primary').textContent.trim() + '|' + (tr.querySelector('.dt-tag') || {}).textContent)`);
     const pathname = () => ev(`location.pathname`);
-    const folderWords = mobile => ev(mobile ? `[...document.querySelectorAll('#group-table-view .view-list-select option')].map(o => o.textContent.trim())` : `[...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`);
+    const folderWords = mobile => ev(mobile ? `[...document.querySelectorAll('#group-table-view .view-list-select option')].map(o => o.textContent.trim())` : `[...document.querySelectorAll('.view-list-item')].map(b => ((() => { const c = b.cloneNode(true); c.querySelectorAll('.view-list-icon').forEach(i => i.remove()); return c.textContent; })()).trim().replace(/\\s+/g, ' '))`);
     const live = runs => ev(`import((window.__coralStatic || '/static/') + 'live_jobs.js').then(m => m.renderLiveJobs(${JSON.stringify(runs)})).then(() => true)`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB });

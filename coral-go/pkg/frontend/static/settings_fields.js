@@ -173,7 +173,7 @@ export const CLEANUP_FIELDS = [
     live('settings-storage-actions'),
     { key: 'retention_enabled', type: 'toggle', id: 'settings-retention-enabled', label: 'Prune every hour', live: ['settings-retention-status', 'settings-retention-review'],
         help: { text: '', more: 'Does the same as Prune by itself, once an hour. After you turn it on, nothing is removed until you review what it would do, or 24 hours later; each run frees at most 2 GiB.' } },
-    { key: 'terminal_logs', type: 'heading', id: 'settings-terminal-logs-title', label: 'Terminal logs', help: { text: 'Kept after an agent is killed.', more: "Each agent's terminal output stays in the logs folder of Coral's data folder. Deleting removes the logs of agents that have ended; the log of a live, sleeping or archived agent is never touched." } },
+    { key: 'terminal_logs', type: 'heading', id: 'settings-terminal-logs-title', label: 'Terminal logs', help: { text: 'Kept after an agent is stopped.', more: "Each agent's terminal output stays in the logs folder of Coral's data folder. Deleting removes the logs of agents that have ended; the log of a live, sleeping or archived agent is never touched." } },
     live('settings-terminal-logs-status'),
     live('settings-terminal-logs-delete'),
     { key: 'examples', type: 'heading', id: 'settings-examples-title', label: 'Examples', help: { text: 'The example job and workflow Coral added to Automations.', more: 'They are there to show what Automations does. Removing them deletes only those; your own jobs and workflows stay.' } },

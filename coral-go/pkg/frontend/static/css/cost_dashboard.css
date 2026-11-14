@@ -470,3 +470,10 @@
     #cost-dashboard-view #cost-view-title { grid-column: 2; grid-row: 1; margin: 0; font-size: var(--fs-xl); font-weight: var(--fw-strong); line-height: var(--lh-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #cost-dashboard-view .cost-view-question, #cost-dashboard-view .cost-range-line { grid-column: 1 / -1; margin-inline: 12px; }
 }
+
+/* The sidebar's views read as the other sidebars' rows (#15820): a glyph, the name, and the section names above (Spend, Team, Work). The glyph is drawn from data-icon, so a row's text is still only its name. */
+#cost-nav-list .row-btn[data-icon] { padding-left: 10px; gap: 10px; }
+#cost-nav-list .row-btn[data-icon]::before { content: attr(data-icon) / ''; flex: none; width: 1.25rem; height: 1.25rem; font-family: 'Material Icons'; font-style: normal; font-size: var(--icon-size); line-height: 1.25rem; text-align: center; font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased; overflow: hidden; white-space: nowrap; }
+#cost-nav-list .session-list-heading { padding: 0; }
+#cost-nav-list .session-list-heading .view-list-title { margin: 14px 16px 4px; }
+#cost-nav-list .session-list-heading:first-child .view-list-title { margin-top: 2px; }
