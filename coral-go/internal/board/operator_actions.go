@@ -107,6 +107,7 @@ const (
 	ActGoalRequestNo  = "goal_request_decline"
 	ActFileComment    = "file_comment"   // the person commented on a file (the note is the comment, redacted and cut) (#17360)
 	ActFileReply      = "file_reply"     // an agent answered in a file's comment thread; asker is the agent (#17360)
+	ActFileReview     = "file_review"    // an agent put a file in Needs you for review; asker is the agent, the note is its question (#17174)
 	ActFileVersion    = "file_version"   // an agent uploaded a new version of a file; asker is the agent, the note says which version (#17360)
 	ActInboxHide      = "inbox_hide"     // Dismiss or Not yet on a goal-looks-done row, a welcome item's Dismiss: kept in settings
 	ActAgentSleep     = "agent_sleep"    // the Operator put one agent to sleep (#16972); the item is the agent
