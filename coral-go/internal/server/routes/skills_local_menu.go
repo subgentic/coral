@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/subgentic/coral/internal/secfile"
 )
 
 // #16015: the $ menu also lists the skills the person has in their own folders and the ones in the agent's working folder, each marked with where it comes from. It reads names and descriptions only:
@@ -113,7 +115,7 @@ func readFrontMatter(path string) (name, desc string, ok bool) {
 	if err != nil || !fi.Mode().IsRegular() {
 		return "", "", false
 	}
-	f, err := os.Open(path)
+	f, err := secfile.OpenNoFollow(path, os.O_RDONLY, 0) // no link at the last step even if one is swapped in after the Lstat
 	if err != nil {
 		return "", "", false
 	}
