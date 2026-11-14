@@ -15,6 +15,7 @@ await loadStyles('analytics_tabs.css');
 const V = await importOnce('./analytics_viz.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 const D = await importOnce('./analytics_tabs_data.js');
 const { machineChoices, machineLabel, machineNow, machineOnline, pickMachine, MACHINE_EVENT } = await importOnce('./analytics_machine.js'); // which computer these tabs read (#15730)
+const T = await importOnce('./analytics_tasks.js'); // the Tasks view (#17206)
 const Q = await importOnce('./analytics_queue.js'); // the Resource queue view (#13671) // not in the start's stylesheet: it arrives before the page is drawn (#10706)
 const { el } = V;
 const TEAM_KEY = 'coral-activity-team';
@@ -24,6 +25,7 @@ const RQ = 'resource-queue';
 const IVC = 'inbox-' + 'chat'; // the Inbox-versus-chat tab's key, spelled in two parts: the icon-name lint reads a quoted inbox as an icon name
 const tabs = {
     usage: { range: '14d', metric: 'cost', group: 'agent', day: -1, data: null, status: 'loading', seq: 0, turns: null },
+    tasks: { range: '14d', group: 'agent', reviews: false, data: null, status: 'loading', seq: 0 }, // tasks completed (#17206): this computer's boards
     operator: { range: '14d', team: '', data: null, status: 'loading', seq: 0 },
     [IVC]: { range: '30d', team: '', day: -1, data: null, status: 'loading', seq: 0 }, // Inbox versus chat (#12158): all teams at first
     comm: { range: '14d', team: '', data: null, status: 'loading', seq: 0 },
@@ -74,6 +76,12 @@ async function load(key) {
             if (seq !== m.seq) return;
             if (!r.ok) throw new Error(String(r.status));
             m.data = (await r.json()).buckets || []; m.status = 'ok'; m.day = -1; m.turns = null;
+        } else if (key === 'tasks') {
+            const r = await serverFetch('local', `/api/analytics/tasks?range=${encodeURIComponent(m.range)}&group_by=${encodeURIComponent(m.group)}${m.reviews ? '&reviews=1' : ''}`);
+            if (seq !== m.seq) return;
+            if (r.status === 401 || r.status === 403 || r.status === 404) { m.status = 'guest'; m.data = null; draw(key); return; }
+            if (!r.ok) throw new Error(String(r.status));
+            m.data = await r.json(); m.status = 'ok';
         } else if (key === RQ) {
             if (!machineOnline(server)) { m.status = 'offline'; m.data = null; draw(key); return; }
             const r = await serverFetch(server, `/api/analytics/resource-queue?days=${D.daysOf(m.range)}`);
@@ -109,7 +117,13 @@ function filterBar(key) {
     const m = tabs[key], bar = el('div', 'atab-filters');
     if (MACHINE_TABS.has(key) && machineChoices().length > 1) bar.append(V.selectField('Computer', machineChoices().map(id => [id, machineLabel(id) + (machineOnline(id) ? '' : ' (offline)')]), machineNow(), v => pickMachine(v)));
     bar.append(V.selectField('Period', D.RANGES, m.range, v => { m.range = v; reload(key); }));
-    if (key === RQ) {
+    if (key === 'tasks') {
+        bar.append(V.selectField('Group by', T.GROUPS, m.group, v => { m.group = v; reload(key); }));
+        const lab = el('label', 'atab-check'), box = el('input'); box.type = 'checkbox'; box.checked = m.reviews;
+        box.addEventListener('change', () => { m.reviews = box.checked; reload(key); });
+        lab.append(box, document.createTextNode(' Include review tasks'));
+        bar.append(lab);
+    } else if (key === RQ) {
         // the period alone: the queue is this computer's, not a team's
     } else if (key === 'usage') {
         bar.append(V.selectField('Group by', [['agent', 'Agent'], ['team', 'Team'], ['provider', 'Agent type'], ['model', 'Model']], m.group, v => { m.group = v; reload(key); }));
@@ -130,11 +144,11 @@ function draw(key) {
     root.append(filterBar(key));
     if (m.status === 'offline') root.append(say(`${machineLabel(machineNow())} is offline, so its numbers cannot be read.`));
     else if (m.status === 'refused') root.append(say(`${machineLabel(machineNow())} would not give these numbers. It may be an older Coral that needs an update, or you may only be a guest there.`));
-    else if (m.status === 'guest') root.append(say(key === IVC ? INBOX_GUEST_LINE : key === RQ ? Q.QUEUE_GUEST_LINE : GUEST_LINE));
+    else if (m.status === 'guest') root.append(say(key === IVC ? INBOX_GUEST_LINE : key === RQ ? Q.QUEUE_GUEST_LINE : key === 'tasks' ? 'Tasks completed are visible to the owner of this Coral only.' : GUEST_LINE));
     else if (m.status === 'noteam') root.append(say('No team has a board yet. Start a team and its numbers appear here.'));
     else if (m.status === 'error') { const p = say(machineNow() === 'local' ? 'This could not be read.' : `${machineLabel(machineNow())} could not be read.`); const b = el('button', 'btn btn-small', 'Retry'); b.type = 'button'; b.addEventListener('click', () => reload(key)); p.append(' ', b); root.append(p); }
     else if (!m.data) root.append(say('Loading…'));
-    else root.append(...({ usage: drawUsage, operator: drawOperator, [IVC]: drawInbox, comm: drawComm, [RQ]: mm => Q.drawQueue(mm.data, phone()) }[key])(m));
+    else root.append(...({ usage: drawUsage, tasks: mm => T.drawTasks(mm.data, { phone: phone(), group: mm.group }), operator: drawOperator, [IVC]: drawInbox, comm: drawComm, [RQ]: mm => Q.drawQueue(mm.data, phone()) }[key])(m));
     const focus = host.contains(document.activeElement) ? document.activeElement.getAttribute('aria-label') : null;
     host.replaceChildren(root);
     if (focus) {

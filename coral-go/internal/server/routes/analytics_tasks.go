@@ -12,7 +12,7 @@ import (
 	"github.com/subgentic/coral/internal/store"
 )
 
-// GET /api/analytics/tasks?range=24h|7d|14d|30d&group_by=agent|team|model|provider[&reviews=1] (#17206, the Operator's "how many tasks is each agent completing"): the tasks completed in a window,
+// GET /api/analytics/tasks?range=24h|7d|14d|30d|90d&group_by=agent|team|model|provider[&reviews=1] (#17206, the Operator's "how many tasks is each agent completing"): the tasks completed in a window,
 // from every board on this computer, counted like the usage breakdowns: one series per group over daily buckets (hourly for 24h), and a table row per group (completed, failed, median time claimed to done,
 // tokens and cost per task). A task is "completed" when its status is completed (a cancelled one is not), so with reviews=1 the total is the count `coral-board task list` shows for the same window; the
 // default leaves out the reviewers' own tasks ("Review #N"), which are not work on the product. "Failed" is the part of Completed whose outcome is failed. Who did the work, and the time, are the
@@ -39,7 +39,7 @@ func (h *TasksAnalyticsHandler) clock() time.Time {
 	return time.Now().UTC()
 }
 
-var tasksRanges = map[string]time.Duration{"24h": 24 * time.Hour, "7d": 7 * 24 * time.Hour, "14d": 14 * 24 * time.Hour, "30d": 30 * 24 * time.Hour}
+var tasksRanges = map[string]time.Duration{"24h": 24 * time.Hour, "7d": 7 * 24 * time.Hour, "14d": 14 * 24 * time.Hour, "30d": 30 * 24 * time.Hour, "90d": 90 * 24 * time.Hour}
 
 const tasksNotRecorded = "Not recorded"
 
@@ -80,7 +80,7 @@ func (h *TasksAnalyticsHandler) Tasks(w http.ResponseWriter, r *http.Request) {
 	}
 	dur, ok := tasksRanges[rng]
 	if !ok {
-		errBadRequest(w, "range must be 24h, 7d, 14d or 30d")
+		errBadRequest(w, "range must be 24h, 7d, 14d, 30d or 90d")
 		return
 	}
 	if dim != "agent" && dim != "team" && dim != "model" && dim != "provider" {

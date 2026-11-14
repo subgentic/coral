@@ -19,6 +19,7 @@ export const VIEWS = [
     { key: 'comm', label: 'Team communication', icon: 'forum', section: 'Team', question: 'Who talks to whom, and how much?' },
     { key: 'per-commit', label: 'Tokens per commit', icon: 'commit', section: 'Work', question: 'What did each commit cost?' },
     { key: 'task-time', label: 'Task time', icon: 'hourglass_top', section: 'Work', question: 'How long do tasks take?' },
+    { key: 'tasks', label: 'Tasks', icon: 'task_alt', section: 'Work', question: 'How many tasks is each agent completing?' }, // #17206: tasks completed, by agent, team, agent type or model
     { key: 'calls', label: 'Tool and API calls', icon: 'api', question: 'Which calls does the work make?', advanced: true }, // Coral's own routes and tools, not what a person asks of spend: under Advanced (#10521)
     { key: 'provider', label: 'By provider', under: 'overview', hidden: true },
     { key: 'model', label: 'By model', under: 'overview', hidden: true },

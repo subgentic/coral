@@ -158,6 +158,25 @@ export function lineChart(points, { fmt = String, phone = false, dots = false, t
     return svg;
 }
 
+/** Several lines over the same days (#17206): `labels` names each day, `series` is [{name, values: [n per day]}] in the colours and stripes of the legend; the chart is aria-hidden like the others, the table beside it is its text. */
+export function multiLine(labels, series, { fmt = String, phone = false } = {}) {
+    const W = phone ? 360 : 760, H = phone ? 200 : 232, pl = 40, pb = 26, pt = 10, iw = W - pl - 10, ih = H - pb - pt;
+    const { max, lines } = axisFor(series.flatMap(s => s.values), 4), L = Math.max(lines, 1), n = labels.length;
+    const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, class: 'atab-svg', 'aria-hidden': 'true', focusable: 'false' });
+    for (let g = 0; g <= lines; g++) { const y = pt + ih - ih * g / L; svg.append(sv('line', { x1: pl, x2: W - 10, y1: y, y2: y, class: 'atab-grid' }), sv('text', { x: pl - 6, y: y + 4, 'text-anchor': 'end', class: 'atab-axis' }, fmt(max * g / L))); }
+    if (lines === 0) svg.append(sv('text', { x: pl + iw / 2, y: pt + ih / 2, 'text-anchor': 'middle', class: 'atab-axis atab-empty' }, 'Nothing in this period'));
+    const x = i => pl + (n > 1 ? iw * i / (n - 1) : iw / 2), step = Math.max(1, Math.ceil(n / (phone ? 4 : 8)));
+    labels.forEach((t, i) => { if (i % step === 0) svg.append(sv('text', { x: x(i).toFixed(1), y: H - 6, 'text-anchor': 'middle', class: 'atab-axis' }, t)); });
+    series.forEach((s, j) => {
+        const d = s.values.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + (pt + ih - (max > 0 ? ih * v / max : 0)).toFixed(1)).join('');
+        const path = sv('path', { d, class: 'atab-line', fill: 'none' });
+        path.style.stroke = seriesColor(j);
+        if (striped(j)) path.style.strokeDasharray = '5 3';
+        svg.append(path);
+    });
+    return svg;
+}
+
 /** The who-talks-to-whom grid: names (rows send, columns receive), cells[i][j] counts. Cell text is always the page's text colour on a tint of at most 45% of the accent, so it holds 4.5:1 in both themes. On a phone the grid is
  *  a ranked list of pairs instead (`pairs`: [{name, value, text}]). */
 export function matrix(names, cells, { phone = false } = {}) {

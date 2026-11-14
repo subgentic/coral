@@ -546,7 +546,7 @@ async function _refreshOverview() {
     series.drawOverviewPanel(host, { phone: isPhoneLayout() });
 }
 
-const TAB_VIEWS = new Set(['usage', 'operator', 'inbox-' + 'chat', 'comm', 'resource-queue']);
+const TAB_VIEWS = new Set(['usage', 'tasks', 'operator', 'inbox-' + 'chat', 'comm', 'resource-queue']);
 async function openTab(key, force = false) {
     const host = document.getElementById(`cost-${key}`);
     if (!host) return;
