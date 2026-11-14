@@ -1,5 +1,6 @@
 /* The alerts offer (#10248): a strip in the page's flow; its sentence wraps and the buttons go under it when the line is short. Lazy: loaded by alerts_offer.js. */
-.alerts-offer-banner { flex: none; flex-wrap: wrap; gap: 8px 12px; }
+.alerts-offer-banner { flex: none; flex-wrap: wrap; gap: 8px 12px; padding-block: 5px; min-height: 40px; } /* one line of about 40 px on a desktop (#15851); wraps only when the text is large */
+.alerts-offer-banner > * { margin-block: 0; } /* a .btn-small carries a margin for a button on its own line: inside a one-line strip it would make it 59 px */
 .alerts-offer-banner[hidden] { display: none; }
 .alerts-offer-text { flex: 1 1 14rem; min-width: 0; overflow-wrap: anywhere; }
 .alerts-offer-banner .btn-icon { margin-left: auto; } /* the x stays at the right edge, on the buttons' row */

@@ -22,6 +22,15 @@ const { JSDOM } = require('jsdom');
     const offers = () => [...document.querySelectorAll('#alerts-offer-banner .alerts-offer-text')].map(t => t.textContent); // the offer is a strip in the page's flow (#10248), the answers are toasts
     const turnOn = () => document.querySelector('#alerts-offer-banner .btn:not(.btn-icon)').click();
 
+    // a first-run dialog is open (the set-password prompt): no offer behind it, the once-per-browser flag is not spent, and the offer comes when it closes (#15851)
+    const pw = document.createElement('div'); pw.id = 'set-password-modal'; document.body.append(pw);
+    assert.strictEqual(m.offerAlertsAfterLaunch(), false, 'no offer while the password prompt is open');
+    assert.strictEqual(offers().length, 0);
+    assert.strictEqual(dom.window.localStorage.getItem(m.ALERTS_OFFERED_KEY), null, 'the one offer is not spent');
+    pw.remove(); document.dispatchEvent(new dom.window.Event('coral:password-prompt-closed'));
+    assert.strictEqual(offers().length, 1, 'the offer comes once the prompt has closed');
+    document.querySelectorAll('#alerts-offer-banner').forEach(t => t.remove()); dom.window.localStorage.clear();
+
     // first agent, nothing asked yet: one toast, with one button, and no permission box (a browser ignores one that is not from a click)
     assert.strictEqual(m.offerAlertsAfterLaunch(), true);
     assert.strictEqual(offers().length, 1);

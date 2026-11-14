@@ -13,6 +13,7 @@ export const REOFFER_AFTER_MS = 5 * 60 * 1000;
 
 /** Offer desktop alerts after an agent started. Does nothing when this browser has no alerts, already has them, blocks them, or was already asked. */
 export function offerAlertsAfterLaunch() {
+    if (firstRunDialogOpen()) { document.addEventListener('coral:password-prompt-closed', () => offerAlertsAfterLaunch(), { once: true }); return false; } // not behind a first-run dialog, and the once-per-browser offer is not spent on it (#15851)
     if (!desktopNotifySupported() || desktopNotifyEnabled() || desktopNotifyBlocked()) return false;
     if (typeof Notification !== 'undefined' && Notification.permission !== 'default') return false;
     try { if (browserLocal.get(ALERTS_OFFERED_KEY) === '1') return false; } catch { return false; }
@@ -24,7 +25,7 @@ export function offerAlertsAfterLaunch() {
 /** The offer once more, after the person dismissed it and the first thing that needs them has waited 5 minutes (#11893, Beta #11837: two questions waited 14 and 29 minutes with alerts off). `oldestMs` is when the oldest waiting item
  * began to wait. Only for a browser that was offered, dismissed, and could still turn alerts on; only while the tab is on screen (a banner in a hidden tab is not seen and would spend the one offer); never more than once. */
 export function offerAlertsAgain(oldestMs, now = Date.now()) {
-    if (!Number.isFinite(oldestMs) || now - oldestMs < REOFFER_AFTER_MS || document.hidden) return false;
+    if (firstRunDialogOpen() || !Number.isFinite(oldestMs) || now - oldestMs < REOFFER_AFTER_MS || document.hidden) return false;
     if (!desktopNotifySupported() || desktopNotifyEnabled() || desktopNotifyBlocked()) return false;
     if (typeof Notification !== 'undefined' && Notification.permission !== 'default') return false;
     try {
@@ -34,6 +35,9 @@ export function offerAlertsAgain(oldestMs, now = Date.now()) {
     showOfferBanner();
     return true;
 }
+
+/** The set-a-password prompt is the first-run question: one banner or question at a time, and it comes first. */
+const firstRunDialogOpen = () => !!document.getElementById('set-password-modal');
 
 const OFFER = 'Get an alert when an agent needs you or finishes a reply while you are in another tab?';
 const OFFER_SHORT = 'Get an alert when an agent needs you?'; // a phone's one line (#15164, walk 6 M9)
@@ -45,7 +49,7 @@ function showOfferBanner() {
     const banner = document.createElement('div');
     banner.id = 'alerts-offer-banner'; banner.className = 'notice notice-info notice-bar alerts-offer-banner'; banner.setAttribute('role', 'status');
     const text = document.createElement('div'); text.className = 'alerts-offer-text'; text.textContent = window.matchMedia?.('(max-width: 600px)').matches ? OFFER_SHORT : OFFER;
-    const on = document.createElement('button'); on.type = 'button'; on.className = 'btn btn-small'; on.textContent = 'Turn on alerts';
+    const on = document.createElement('button'); on.type = 'button'; on.className = 'btn btn-quiet btn-small'; on.textContent = 'Turn on alerts';
     const off = document.createElement('button'); off.type = 'button'; off.className = 'btn btn-quiet btn-icon btn-small'; off.setAttribute('aria-label', 'Not now'); off.title = 'Not now'; off.textContent = '\u00d7';
     // not 'Close': Settings and other dialogs have a Close of their own, and a page with two controls of one name is read as one (#15547)
     off.addEventListener('click', () => banner.remove());

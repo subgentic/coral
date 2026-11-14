@@ -34,6 +34,7 @@ const BASE = require('./test_base').BASE;
             assert.equal(r.cut, false, `${w}: its sentence is not cut: ${JSON.stringify(r)}`);
             await waitFor(`/Get an alert when an agent/.test((document.getElementById('notice-live') || {}).textContent || '')`, 'the offer said once through the notices live region', { timeout: 4000 }); // a strip drawn with its words is not reliably read out: the notices' own region says it (Security Reviewer, #10248)
             assert.equal(r.off, false, `${w}: it fits the width`);
+            if (!mobile) assert.ok(r.h <= 44, `${w}: on a desktop the offer is one line of about 40 px, not 70 (#15851): ${JSON.stringify(r)}`);
             if (mobile) assert.ok(r.h <= 72 && r.xw >= 44 && r.xh >= 44, `${w}: at 390 px the offer is one short row (not a quarter of the screen) with a 44 px x (#15164): ${JSON.stringify(r)}`);
             if (process.env.CORAL_SCREENSHOT_DIR) { require('node:fs').mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); require('node:fs').writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/alerts-offer-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
             console.log(`ok ${w}`);
