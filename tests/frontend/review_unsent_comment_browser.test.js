@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const shotAll = async (Page, ev, name) => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); for (const theme of ['light', 'dark']) { await ev(`import((window.__coralStatic || '/static/') + 'settings_core.js').then(m => { m.applyTheme('${theme}'); return true; })`); await new Promise(r => setTimeout(r, 250)); fs.writeFileSync(`${d}/${name}-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }; // sleep-ok: the theme repaints before a shot
 const { H3, STUB } = require('./helpers/artifact_versions_stub');
 const { coralReady } = require('./helpers/wait');
 
@@ -33,6 +34,7 @@ const { coralReady } = require('./helpers/wait');
             await box(); await type('Is the date right?');
             await ev(`document.querySelector('.artifact-review-approve').click(); true`);
             await new Promise(r => setTimeout(r, 400)); // sleep-ok: an approval that wrongly went through would have posted by now
+            await shotAll(Page, ev, `approve-warning-${w}`);
             check(`${w}: Approve with an unsent comment does not approve at once`, (await posts()) === 0, 'posts ' + await posts());
             check(`${w}: and the comment box has the focus`, await ev(`document.activeElement === document.querySelector('.ac-composer .ac-input')`), 'focus elsewhere');
             await ev(`document.querySelector('.artifact-review-approve').click(); true`);

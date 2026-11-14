@@ -2,6 +2,7 @@
 // does not move up under the pointer; (2) the way to send is said once: one line under the box ("Enter starts a new line. Press Ctrl+Enter to send."; ⌘ Return on a Mac), and the count beside the buttons is only the count.
 // The box is made by the composer module itself, with the panel's styles loaded. 1280 and 390 px, light and dark.
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
@@ -25,6 +26,7 @@ const { coralReady } = require('./helpers/wait');
             const shown = await m();
             await ev(`document.querySelector('#box-host .ac-hint').hidden = true; true`);
             const hidden = await m();
+            if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/comment-box-${w}-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
             check(shown.hintHidden === false && hidden.hintHidden === true, 'the hint was shown, then hidden');
             check(shown.send === hidden.send, `the Comment button stays where it was when the hint goes (${shown.send} px, then ${hidden.send} px)`);
             check(/^\d+ \/ \d+$/.test(shown.count), `the count is only the count: ${JSON.stringify(shown.count)}`);

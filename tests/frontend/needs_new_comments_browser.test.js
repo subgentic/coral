@@ -5,6 +5,8 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const fs = require('node:fs');
+const shotAll = async (Page, ev, name) => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); for (const theme of ['light', 'dark']) { await ev(`import((window.__coralStatic || '/static/') + 'settings_core.js').then(m => { m.applyTheme('${theme}'); return true; })`); await new Promise(r => setTimeout(r, 250)); fs.writeFileSync(`${d}/${name}-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }; // sleep-ok: the theme repaints before a shot
 const { coralReady } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -62,6 +64,7 @@ const { coralReady } = require('./helpers/wait');
                 assert.ok(await marker('Replied file.txt'), 'its row says New comments');
                 // #16399 (Beta Tester): an approved file's new comment is to be read, not reviewed again: the row says Approved (not For review) and offers no Approve or Request changes; a file still waiting says For review and does
                 const rowInfo = name => ev(`(() => { const r = ${row(name)}, m = r.querySelector('.inbox-review-metadata'); return { metaSaysReview: m ? /For review/.test(m.textContent) : false, metaSaysApproved: m ? /Approved/.test(m.textContent) : null, review: /For review/.test(r.textContent), approve: !!r.querySelector('[data-slot=approve]'), changes: !!r.querySelector('[data-slot=changes]') }; })()`); // a phone's card may not draw the metadata line: then only the buttons are checked
+                await shotAll(Page, ev, `needs-approved-news-${width}`);
                 const decided = await rowInfo('Decided file.txt'), waiting = await rowInfo('Replied file.txt');
                 assert.ok(!decided.metaSaysReview && decided.metaSaysApproved !== false && !decided.approve && !decided.changes, 'an approved file with a new comment says Approved (not For review) in its line, and asks for no new decision: ' + JSON.stringify(decided));
                 assert.ok(waiting.review && waiting.approve && waiting.changes && !waiting.metaSaysApproved, 'a file still waiting for review keeps For review, Approve and Request changes: ' + JSON.stringify(waiting));
