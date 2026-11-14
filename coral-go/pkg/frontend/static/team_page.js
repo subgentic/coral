@@ -133,11 +133,11 @@ let moreOpen = false;
 /** The team's settings, in a popout over the page (#8853): the header's Settings button and its phone More item. */
 function openSettings() { importOnce('./team_settings_modal.js').then(m => m.openTeamSettings(S.team)).catch(e => console.error('team settings', e)); }
 
-/** Stopping a team: one menu, the same words and the same actions as the team's row in the sidebar (Sleep team or Wake team, Reset team, Kill all; the last two apart, each asks first). A wide header has the Stop button; a phone's has the same items in More (#10008, Beta Tester and Mobile tester). */
+/** Stopping a team: one menu, the same words and the same actions as the team's row in the sidebar (Sleep team or Wake team, Reset team, Stop team; the last two apart, each asks first). A wide header has the Stop button; a phone's has the same items in More (#10008, Beta Tester and Mobile tester). */
 const teamAsleep = () => { const m = (state.liveSessions || []).filter(s => inTeam(s, S.team)); return m.length > 0 && m.every(s => s.sleeping); };
 function stopItems() {
     const asleep = teamAsleep();
-    const none = !(state.liveSessions || []).some(s => inTeam(s, S.team)); // a team with no live agent has nothing to put to sleep, reset or kill: say so, do not offer a button that does nothing (#10187)
+    const none = !(state.liveSessions || []).some(s => inTeam(s, S.team)); // a team with no live agent has nothing to put to sleep, reset or stop: say so, do not offer a button that does nothing (#10187)
     const why = none ? 'No agent of this team is running' : '';
     return [
         { key: 'sleep', label: asleep ? 'Wake team' : 'Sleep team', hint: asleep ? 'Starts the sleeping agents again' : 'Stops every agent for now; Wake team starts them again', why, run: () => window.toggleTeamSleep?.(S.team, asleep ? 'wake' : 'sleep') },
