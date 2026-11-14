@@ -1376,6 +1376,8 @@ body.panel-dragging .agentic-state {
     overflow: auto;
 }
 
+/* The line-number gutter of a diff is the editor's own colour, in both themes (#16366): CodeMirror's light look gave it a fixed #f5f5f5, a lighter column beside the tinted rows (and a theme change with a diff open left it so). */
+.file-diff .cm-gutters, .inline-preview-cm .cm-gutters { background-color: transparent !important; border-right: 1px solid var(--border); }
 /* Make merge changes readable without CodeMirror's default underline effect.
    Used by the preview pane's Diff mode. */
 .inline-preview-cm .cm-merge-b .cm-changedLine,

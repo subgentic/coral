@@ -382,6 +382,8 @@ window.toggleSendMenu = function(btn, event) {
     const menu = btn.parentElement.querySelector('.send-btn-menu');
     if (!menu) return;
     const show = menu.style.display === 'none';
+    const onTeam = !!(state.currentSession && state.currentSession.board_project); // the team reminder and the board protocol are for an agent on a team; for one with no team they are hidden (#16366)
+    for (const i of menu.querySelectorAll('[data-on-click="send-menu-team"], [data-on-click="send-menu-protocol"]')) i.hidden = !onTeam;
     menu.style.display = show ? '' : 'none';
     btn.setAttribute('aria-expanded', String(show));
     if (show && event && event.detail === 0) menu.querySelector('.send-menu-item')?.focus(); // opened by the keyboard (Enter or Space): the focus goes in (#9116)
