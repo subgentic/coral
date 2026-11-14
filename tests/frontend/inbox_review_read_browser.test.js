@@ -65,7 +65,7 @@ const { coralReady } = require('./helpers/wait');
                 assert.ok(await ev(`![...document.querySelectorAll('#group-table-view .dt-tag')].some(t => t.textContent.trim() === 'read')`),'there is no "read" pill any more (#11668)');
                 assert.equal(await ev(`[...(${row('Read me 1.txt')}).querySelectorAll('button')].some(b=>b.getAttribute('aria-label')==='Mark unread: Read me 1.txt')`),true,'a read item offers Mark unread');
                 const nc = await navCount(); assert.ok(nc !== null && /(^|\D)2( of \d+)?$/.test(nc), 'the Needs you folder counts the two unread (and says how many are listed when that is more, #12789): ' + nc);
-                // one number (#11639, the operator): the heading and the All pill say the unread count too, the badge's, with the read row still listed
+                // one number (#11639, the operator): the heading says the unread count, the All pill says the total listed (#16734)
                 assert.equal(await ev(`(document.querySelector('#group-table-view .session-group-count') || {}).textContent`), '2', 'the heading counts the two unread, not the three rows');
                 assert.ok(await ev(`[...document.querySelectorAll('button.goals-chip')].some(e => e.textContent.trim() === 'All 3')`), 'the All chip counts all three listed rows (#16548): ' + JSON.stringify(await ev(`[...document.querySelectorAll('button.goals-chip')].map(e => e.textContent.trim())`)));
                 const heights = await ev(`[${row('Read me 1.txt')}.getBoundingClientRect().height, ${row('Read me 2.txt')}.getBoundingClientRect().height]`);
