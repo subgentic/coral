@@ -1,60 +1,95 @@
-// Skill-to-approve row in Needs you (#16881): the row has Approve and Reject buttons (other review rows have them),
-// Approve asks 'without opening?' for a skill without scripts, a skill with scripts says 'open to approve',
-// and the Skills tab's pending view has a sticky decision bar at the top. Stubbed skills API. 1280 and 390 px.
+// #16881: the skill-to-approve row in Needs you has Approve and Reject buttons (the parent has only Review),
+// Approve asks 'without opening?' for a skill without scripts, 'Open to approve' for one with scripts,
+// Reject asks 'Reject this skill?', the POSTs carry the digest and scripts_acked, and the Skills tab's
+// pending view has a .skills-decision-bar above the Files section. Each assertion fails on the parent.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
-const { coralReady, waitStable } = require('./helpers/wait');
+const { coralReady } = require('./helpers/wait');
 
-const SKILL = { id: 'skill:test-linter', name: 'test-linter', version: 1, digest: 'abc123', description: 'Lint tests', status: 'pending', has_scripts: false, not_reviewable: false, publisher_agent: 'Backend Dev', publisher_team: 'alpha', publisher_kind: 'agent', created_at: new Date(Date.now() - 600000).toISOString() };
-const SKILL_SCRIPTS = { ...SKILL, id: 'skill:test-runner', name: 'test-runner', has_scripts: true, description: 'Run tests with scripts' };
+const D1 = 'b'.repeat(64), D2 = 'c'.repeat(64);
+const SKILL = { id: '2'.repeat(32), name: 'test-linter', version: 1, digest: D1, description: 'Lint tests', status: 'pending', has_scripts: false, not_reviewable: false, publisher_agent: 'Backend Dev', publisher_team: 'alpha', publisher_kind: 'agent', created_at: '2026-11-02T09:00:00Z' };
+const SKILL_SCRIPTS = { id: '3'.repeat(32), name: 'test-runner', version: 2, digest: D2, description: 'Run tests', status: 'pending', has_scripts: true, not_reviewable: false, publisher_agent: 'Dev', publisher_team: 'beta', publisher_kind: 'agent', created_at: '2026-11-02T08:00:00Z' };
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const S = `(window.__coralStatic || '/static/')`;
-    const failures = [];
-    const check = (ok, what) => { if (!ok) failures.push(what); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
-            const at = `${w}: `;
-            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+        await coralReady(ev, 'startup', 'liveList', 'settings');
 
-            // stub the skills API to return two pending skills
-            await ev(`(() => {
-                const real = window.fetch;
-                window.__skillApproved = []; window.__skillRejected = [];
-                window.fetch = (u, o = {}) => {
-                    const url = String(u), m = (o.method || 'GET').toUpperCase();
-                    if (url.includes('/api/skills?status=pending') && m === 'GET') return Promise.resolve(new Response(JSON.stringify({ skills: ${JSON.stringify([SKILL, SKILL_SCRIPTS])} }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-                    if (url.includes('/api/skills') && m === 'GET' && !url.includes('/approve') && !url.includes('/reject')) return Promise.resolve(new Response(JSON.stringify({ skills: ${JSON.stringify([SKILL, SKILL_SCRIPTS])} }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-                    if (url.includes('/approve') && m === 'POST') { const id = url.split('/api/skills/')[1]?.split('/')[0]; window.__skillApproved.push(decodeURIComponent(id)); return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })); }
-                    if (url.includes('/reject') && m === 'POST') { const id = url.split('/api/skills/')[1]?.split('/')[0]; window.__skillRejected.push(decodeURIComponent(id)); return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })); }
-                    return real(u, o);
-                }; return true;
-            })()`);
+        await ev(`(() => {
+            const real = window.fetch; window.__calls = [];
+            const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));
+            const skills = ${JSON.stringify([SKILL, SKILL_SCRIPTS])};
+            const detail = { skill: skills[0], files: [{ path: 'SKILL.md', size: 90, kind: 'instructions', sha256: 'f'.repeat(64) }], contents: { 'SKILL.md': '# Lint tests' }, warnings: [], hosts: [] };
+            const detail2 = { skill: skills[1], files: [{ path: 'SKILL.md', size: 90, kind: 'instructions', sha256: 'f'.repeat(64) }, { path: 'scripts/run.sh', size: 40, kind: 'script', sha256: 'e'.repeat(64) }], contents: { 'SKILL.md': '# Run tests', 'scripts/run.sh': '#!/bin/sh\\necho run' }, warnings: [], hosts: [] };
+            window.fetch = (u, o = {}) => {
+                const url = new URL(String(u && u.url || u), location.origin), m = (o.method || 'GET').toUpperCase(), p = url.pathname;
+                if (p === '/api/skills' && url.searchParams.get('status') === 'pending') return json({ skills });
+                if (p === '/api/skills' && m === 'GET') return json({ skills });
+                if (p === '/api/skills/${SKILL.id}' && m === 'GET') return json(detail);
+                if (p === '/api/skills/${SKILL_SCRIPTS.id}' && m === 'GET') return json(detail2);
+                if (p.endsWith('/approve') && m === 'POST') { window.__calls.push(m + ' ' + p + ' ' + (o.body || '')); return json({ ok: true }); }
+                if (p.endsWith('/reject') && m === 'POST') { window.__calls.push(m + ' ' + p + ' ' + (o.body || '')); return json({ ok: true }); }
+                return real(u, o);
+            }; return true;
+        })()`);
 
-            // load the inbox and navigate to Needs you
-            await ev(`(async () => { const m = await import(${S} + 'inbox_sidebar.js'); return true; })()`);
-            // trigger loading of pending skills via the needs_skills module
-            await ev(`(async () => { const m = await import(${S} + 'needs_skills.js'); await m.loadPendingSkills(); return true; })()`);
+        await ev(`window.switchNavTab('hub-inbox', { folder: 'needs' }); true`);
+        await waitFor(`/test-linter/.test(document.getElementById('group-table-view')?.innerText || '')`, 'skill rows in Needs you', 10000);
 
-            // check that skillCount includes both skills
-            const count = await ev(`(async () => { const m = await import(${S} + 'needs_skills.js'); return m.skillCount(); })()`);
-            check(count === 2, `${at}skillCount should be 2, got ${count}`);
+        // 1. Approve and Reject buttons on the row (the parent has only Review)
+        const btns = await ev(`(() => {
+            const row = [...document.querySelectorAll('#group-table-view tr.dt-row')].find(r => /test-linter/.test(r.textContent));
+            return row ? [...row.querySelectorAll('button')].map(b => ({ text: b.textContent.trim(), label: b.getAttribute('aria-label') || '' })) : null;
+        })()`);
+        assert.ok(btns, 'the test-linter row is in Needs you');
+        assert.ok(btns.some(b => b.text === 'Approve'), 'Approve button on the row: ' + JSON.stringify(btns.map(b => b.text)));
+        assert.ok(btns.some(b => b.text === 'Reject'), 'Reject button on the row');
+        assert.ok(btns.some(b => b.label === 'Approve: test-linter'), 'Approve has the right aria-label');
 
-            // check that skillRows produces rows with the right shape
-            const rows = await ev(`(async () => { const m = await import(${S} + 'needs_skills.js'); return m.skillRows().map(r => ({ id: r.skillReview.id, kind: r.waiting_kind, hasDigest: !!r.skillReview.digest, hasScripts: r.skillReview.has_scripts })); })()`);
-            check(rows.length === 2, `${at}skillRows should return 2 rows, got ${rows.length}`);
-            check(rows[0].kind === 'skill_review', `${at}row kind should be skill_review: ${rows[0].kind}`);
-            check(rows[0].hasDigest, `${at}row should carry the skill digest`);
-            check(!rows[0].hasScripts, `${at}first skill has no scripts`);
-            check(rows[1].hasScripts, `${at}second skill has scripts`);
+        // 2. Approve on a skill without scripts → 'Approve without opening?'
+        await ev(`document.querySelector('#group-table-view button[aria-label="Approve: test-linter"]').click(); true`);
+        await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display === 'flex'`, 'the confirm modal for Approve', 4000);
+        assert.equal(await ev(`document.getElementById('confirm-modal-title').textContent`), 'Approve without opening?');
+        await ev(`document.getElementById('confirm-modal-yes').click(); true`);
+        await waitFor(`window.__calls.some(c => c.includes('/approve'))`, 'the approve POST', 6000);
+        const ac = await ev(`window.__calls.find(c => c.includes('/approve'))`);
+        assert.ok(ac.includes(SKILL.id), 'approve targets the right skill');
+        const ab = JSON.parse(ac.slice(ac.indexOf('{')));
+        assert.deepEqual(ab, { digest: D1, scripts_acked: false }, 'approve payload: digest + scripts_acked false');
 
-            console.log(`${at}1. Skill rows carry the data the buttons need`);
-        }
+        // 3. Approve on a skill with scripts → 'Open to approve'
+        await ev(`window.__calls = []; true`);
+        await waitFor(`document.querySelector('#group-table-view button[aria-label="Approve: test-runner"]')`, 'test-runner Approve button', 6000);
+        await ev(`document.querySelector('#group-table-view button[aria-label="Approve: test-runner"]').click(); true`);
+        await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display === 'flex'`, 'the scripts confirm modal', 4000);
+        assert.equal(await ev(`document.getElementById('confirm-modal-title').textContent`), 'Open to approve');
+        await ev(`document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)').click(); true`);
+
+        // 4. Reject → 'Reject this skill?'
+        await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'flex'`, 'modal dismissed', 2000);
+        await ev(`document.querySelector('#group-table-view button[aria-label="Reject: test-runner"]').click(); true`);
+        await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display === 'flex'`, 'the reject confirm modal', 4000);
+        assert.equal(await ev(`document.getElementById('confirm-modal-title').textContent`), 'Reject this skill?');
+        await ev(`document.getElementById('confirm-modal-yes').click(); true`);
+        await waitFor(`window.__calls.some(c => c.includes('/reject'))`, 'the reject POST', 6000);
+        assert.ok((await ev(`window.__calls.find(c => c.includes('/reject'))`)).includes(SKILL_SCRIPTS.id), 'reject targets the right skill');
+
+        // 5. Skills tab: .skills-decision-bar above the Files section (the parent has none)
+        await ev(`window.switchNavTab('skills', { skillId: '${SKILL.id}' }); true`);
+        await waitFor(`document.querySelector('#skills-view .skills-banner')`, 'the pending skill view', 8000);
+        assert.ok(await ev(`!!document.querySelector('#skills-view .skills-decision-bar')`), '.skills-decision-bar exists');
+        const pos = await ev(`(() => {
+            const bar = document.querySelector('#skills-view .skills-decision-bar');
+            const files = [...document.querySelectorAll('#skills-view .skills-section h3')].find(h => /Files/.test(h.textContent));
+            return bar && files ? { b: bar.getBoundingClientRect().top, f: files.getBoundingClientRect().top } : null;
+        })()`);
+        assert.ok(pos, 'both the decision bar and the Files heading exist');
+        assert.ok(pos.b < pos.f, '.skills-decision-bar is above the Files section');
+
+        console.log('PASS skill review row: Approve/Reject buttons, confirm modals, POSTs, decision bar');
     } finally { await client.close(); }
-    if (failures.length) { console.error('FAIL\n  ' + failures.join('\n  ')); process.exit(1); }
-    console.log('PASS skill review row: rows carry digest, has_scripts; count is correct');
 })().catch(e => { console.error(e); process.exitCode = 1; });

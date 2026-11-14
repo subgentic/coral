@@ -53,9 +53,11 @@ const PENDING = [
         await ev(`window.switchNavTab('hub-inbox', { folder: 'needs' }); true`);
         await waitFor(`/Skill to approve: db-review version 1/.test(document.getElementById('group-table-view').innerText)`, 'the desktop rows again', 10000);
         assert.match(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), /^[2-9]\d*$/, 'the Inbox tab counts them');
-        assert.match(await ev(`Array.from(document.querySelectorAll('#group-table-view button')).map(b => b.textContent.trim()).join('|')`), /Review/, 'a Review button on the row');
-        // Review opens the Skills tab at that skill
-        await ev(`Array.from(document.querySelectorAll('#group-table-view tr.dt-row')).find(r => /db-review/.test(r.textContent)).querySelector('button.btn').click(); true`);
+        assert.match(await ev(`Array.from(document.querySelectorAll('#group-table-view button')).map(b => b.textContent.trim()).join('|')`), /Approve/, 'an Approve button on the row (#16881)');
+        // Review (in the ⋯ menu since #16881) opens the Skills tab at that skill
+        await ev(`Array.from(document.querySelectorAll('#group-table-view tr.dt-row')).find(r => /db-review/.test(r.textContent)).querySelector('.inbox-row-more-toggle').click(); true`);
+        await waitFor(`(() => { const r = Array.from(document.querySelectorAll('#group-table-view tr.dt-row')).find(x => /db-review/.test(x.textContent)); const m = r && r.querySelector('.dt-mail-menu'); return m && !m.hidden; })()`, 'the more menu opens', 4000);
+        await ev(`Array.from(document.querySelectorAll('.menu-item')).find(b => /^Review$/.test(b.textContent.trim())).click(); true`);
         await waitFor(`location.pathname === '/skills/${PENDING[0].id}'`, 'the Skills tab at that skill', 8000);
         console.log('PASS a skill waiting for approval is an item of Needs you');
     } finally { await client.close(); }
