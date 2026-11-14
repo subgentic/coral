@@ -28,24 +28,20 @@ const { coralReady } = require('./helpers/wait');
             // a button of the list, pressed once it is there: the list is redrawn when the proposals and the settings are read, so a button found a moment ago may be gone
             const press = async (label, sel = '#group-table-view button', nth = 0) => { await waitFor(`[...document.querySelectorAll(${JSON.stringify(sel)})].filter(b => b.textContent === ${JSON.stringify(label)}).length > ${nth}`, `${tag}: the ${label} button`, 8000); await ev(`[...document.querySelectorAll(${JSON.stringify(sel)})].filter(b => b.textContent === ${JSON.stringify(label)})[${nth}].click(); true`); };
             const open = () => ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
-            const titles = () => ev(`[...document.querySelectorAll('#group-table-view .inbox-review-name')].map(e => e.firstChild ? e.firstChild.textContent : '')`);
+            const titles = () => ev(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].map(e => e.firstChild ? e.firstChild.textContent : '')`);
             await open();
-            await waitFor(`document.querySelectorAll('#group-table-view .inbox-review-name').length === 6`, `${tag}: six welcome items`, 8000);
+            await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 6`, `${tag}: six welcome items`, 8000);
             const folderCount = () => ev(`[...document.querySelectorAll('.view-list-item')].filter(r => r.querySelector('.view-list-name, .view-list-label') && /Needs you$/.test(r.querySelector('.view-list-label').textContent.trim())).map(r => (r.querySelector('.view-list-count') || {}).textContent)`);
             const pills = () => ev(`[...document.querySelectorAll('button.goals-chip')].map(e => e.textContent.trim())`);
             const counts = await folderCount();
             check(counts.length > 0 && counts.every(c => c === '0' || c === '' || c == null), `${tag}: the Needs you folder does not count the five welcome items, as the badge does not (#11622): ` + JSON.stringify(counts));
             check(await ev(`[...document.querySelectorAll('.view-list-item')].filter(r => /Needs you$/.test((r.querySelector('.view-list-label') || {}).textContent || '')).every(r => !(r.querySelector('.view-list-count') || document.body).classList.contains('view-list-alert'))`), `${tag}: the count of welcome items alone is not drawn as an alert`);
             const chips = await pills();
-            check(chips.includes('All 6') && chips.includes('Welcome 6') && chips.includes('Needs input 0'), `${tag}: the pills file them under Welcome, not Needs input: ` + JSON.stringify(chips));
+            check(chips.includes('All 0') && !chips.some(c=>/^Welcome/.test(c)) && chips.includes('Needs input 0'), `${tag}: the pills file them under Welcome, not Needs input: ` + JSON.stringify(chips));
             check(await ev(`document.getElementById('nav-tab-hub-inbox-badge').hidden || document.getElementById('nav-tab-hub-inbox-badge').textContent === ''`), `${tag}: the items are still not in the Inbox badge`);
             const names = await ev(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].map(e => ({ t: e.firstChild ? e.firstChild.textContent : '', ws: getComputedStyle(e).whiteSpace, cut: e.scrollWidth > e.clientWidth + 1, lines: Math.round(e.getBoundingClientRect().height / parseFloat(getComputedStyle(e).lineHeight || 20)) }))`);
             check(names.length === 6 && names.every(n => n.ws === 'normal' && !n.cut), `${tag}: no welcome title is cut: ` + JSON.stringify(names));
-            // #11671: a phone row has no button, so a title has the whole row and no longer wraps beside one; it is whole (above) and its row's buttons are out of sight (below)
-            if (mobile) { // #11671: a phone's welcome row carries no button on screen (a tap runs the item, a swipe ignores it, Dismiss is in the row's menu); the five actions and four menus stay in the page for a screen reader
-                const geo = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view tbody tr')]; return { actions: rows.map(r => r.querySelector('.inbox-welcome-actions .inbox-main-action')).filter(Boolean).length, menus: rows.filter(r => r.querySelector('.inbox-welcome-actions .inbox-row-more-toggle')).length, onScreen: rows.filter(r => { const c = (r.querySelector('.inbox-welcome-actions') || r).closest('.dt-td'), b = c && c.getBoundingClientRect(); return b && b.width > 2; }).length }; })()`);
-                check(geo.actions === 6 && geo.menus === 5 && geo.onScreen === 0, `${tag}: six actions and five menus in the page, none on screen: ` + JSON.stringify(geo));
-            }
+            check(await ev(`document.querySelectorAll('#group-table-view .inbox-getting-started li').length === 6 && document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 0`), `${tag}: onboarding is outside the Needs you table`);
             // two agents waiting beside the five welcome items: the folder, the Inbox badge and the phone drawer's count are one number (#11622)
             await ev(`T.state.liveSessions = [0, 1].map(i => ({ name: 'w' + i, session_id: '0000000' + i + '-0000-4000-8000-0000000000aa', agent_type: 'claude', server: 'local', status: 'idle', display_name: 'Waiting ' + i, working_directory: '/repo/a', waiting_for_input: true, waiting_kind: 'permission', waiting_since: new Date(Date.now() - 300000).toISOString(), sleeping: false })); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return true; })`);
             await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '2'`, `${tag}: the badge says 2`, 8000);
@@ -53,11 +49,10 @@ const { coralReady } = require('./helpers/wait');
             check(mixedCounts.length > 0 && mixedCounts.every(c => c === '2'), `${tag}: with two waiting and five welcome items the folder says 2, like the badge: ` + JSON.stringify(mixedCounts));
             check(await ev(`import(${S} + 'inbox_tab.js').then(m => m.inboxCountsNow().needs === 2)`), `${tag}: the drawer's count is 2 too`);
             await ev(`T.state.liveSessions = []; T.state.settings = { ...T.state.settings, inbox_welcome: 'on', inbox_welcome_done: '' }; import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return true; })`); // the agents go: the five items are back for the rest of the walk
-            await waitFor(`document.querySelectorAll('#group-table-view .inbox-review-name').length === 6`, `${tag}: six welcome items again`, 8000);
+            await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 6`, `${tag}: six welcome items again`, 8000);
             await shot(`inbox-welcome-counts-${w}`);
-            for (let i = 0; i < 5; i++) { await press('Dismiss'); await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === ${5 - i}`, `${tag}: Dismiss took away only that row (${5 - i} left)`, 8000); } // one at a time, like any other item
-            await press('Got it');
-            await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 0`, `${tag}: the items put away`, 8000);
+            await ev(`document.querySelector('button[aria-label="Dismiss Getting started"]').click(); true`);
+            await waitFor(`!document.querySelector('.inbox-getting-started')`, `${tag}: Getting started dismissed`, 8000);
             const after = await folderCount(), chipsAfter = await pills();
             check(after.every(c => c === '0' || c === '' || c == null) && !chipsAfter.some(c => /^Welcome/.test(c)), `${tag}: the count and the Welcome pill go with them: ` + JSON.stringify([after, chipsAfter]));
         }

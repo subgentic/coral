@@ -75,6 +75,12 @@ function mark(id) {
 }
 
 export const dismissWelcome = id => mark(id);
+export function dismissGettingStarted() {
+    const action = {}; document.dispatchEvent(new CustomEvent('coral:action-start', { detail: action }));
+    save({ inbox_welcome: 'off' });
+    document.dispatchEvent(new CustomEvent('coral:welcome-changed'));
+    document.dispatchEvent(new CustomEvent('coral:action-result', { detail: action }));
+}
 
 /** An item's own action. */
 export function runWelcome(id) {

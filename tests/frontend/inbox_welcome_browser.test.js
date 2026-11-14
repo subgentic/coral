@@ -38,7 +38,7 @@ const { coralReady } = require('./helpers/wait');
             const want = mobile ? [['Got it'], ['New agent'], ['New team'], ['Connect'], ['Read it'], ['Open guide']] : [['Got it'], ['New agent', 'Dismiss'], ['New team', 'Dismiss'], ['Connect', 'Dismiss'], ['Read it', 'Dismiss'], ['Open guide', 'Dismiss']]; // a phone row has no Dismiss button: it is in the three-dot menu, or a swipe (#11642)
             check(JSON.stringify(acts) === JSON.stringify(want), `${tag}: each item's action, and Dismiss on all but the welcome (in the menu on a phone): ` + JSON.stringify(acts));
             check(await ev(`/optional/.test([...document.querySelectorAll('#group-table-view .inbox-welcome-name')][3].textContent)`), `${tag}: Connect is marked optional`);
-            check(await ev(`![...document.querySelectorAll('#group-table-view button, #group-table-view .menu-item')].some(b => /hide all/i.test(b.textContent + ' ' + (b.getAttribute('aria-label') || ''))) && !document.querySelector('.inbox-welcome-hide')`), `${tag}: no Hide all welcome items control (#14742): each is dismissed on its own`);
+            check(await ev(`!!document.querySelector('button[aria-label="Dismiss Getting started"]')`), `${tag}: the separate block is dismissible`);
             check(await ev(`document.getElementById('nav-tab-hub-inbox-badge').hidden || document.getElementById('nav-tab-hub-inbox-badge').textContent === ''`), `${tag}: the items are not counted in the Inbox badge`);
             if (mobile) check(await ev(`[...document.querySelectorAll('#group-table-view .inbox-review-actions button:not(.menu-item)')].every(b => b.getBoundingClientRect().height >= 44)`), `${tag}: every action is a 44 px target`);
 
