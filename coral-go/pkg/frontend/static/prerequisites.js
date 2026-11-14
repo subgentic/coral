@@ -49,14 +49,16 @@ function renderCLI(element, text, recheck, {pending = false, command = '', url =
     const label = document.createElement('span'); label.textContent = text; element.append(label);
     // The vendor's own install page first (it does not assume Node and npm); the one-line command is the shortcut for a person who has them.
     if (httpsURL(url)) {
-        const p = document.createElement('p'); p.className = 'cli-install-link'; p.append('Install it from the official page: ');
-        const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = url.replace(/^https:\/\//, ''); p.append(a); element.append(p);
+        const p = document.createElement('p'); p.className = 'cli-install-link'; p.append('Install it from ');
+        const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = url.replace(/^https:\/\//, ''); p.append(a, ', then check again.'); element.append(p);
     }
-    if (command) {
-        const help = document.createElement('p'); help.textContent = 'Or in your terminal, then check again: ';
-        const code = document.createElement('code'); code.textContent = command; help.append(code); element.append(help);
+    if (command || (note && typeof note === 'string')) {
+        const fold = document.createElement('details'); fold.className = 'disclosure cli-advanced-fold';
+        const sum = document.createElement('summary'); sum.textContent = 'Advanced'; fold.append(sum);
+        if (command) { const help = document.createElement('p'); help.textContent = 'In your terminal: '; const code = document.createElement('code'); code.textContent = command; help.append(code); fold.append(help); }
+        if (note && typeof note === 'string') { const p = document.createElement('p'); p.className = 'cli-install-note'; p.textContent = String(note); fold.append(p); }
+        element.append(fold);
     }
-    if (note && typeof note === 'string') { const p = document.createElement('p'); p.className = 'cli-install-note'; p.textContent = String(note); element.append(p); }
     const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-small';
     button.textContent = pending ? 'Checking…' : 'Check again'; button.disabled = pending;
     button.addEventListener('click', recheck);

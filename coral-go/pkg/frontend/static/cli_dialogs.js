@@ -78,18 +78,22 @@ function _showCLINotFoundModal(agentType, server = LOCAL_SERVER, { retry = null 
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.style.display = 'flex';
+    const hasURL = /^https:\/\/[^\s"'<>]+$/.test(info.url || '');
     modal.innerHTML = `
         <div class="modal-content dlg-confirm cli-dialog">
             <h3>${label} is not installed</h3>
             <p class="cli-dialog-text">
-                Coral starts ${label} for you, but it is not installed ${where}. Run this in a terminal, then press Check again.
+                Coral starts ${label} for you, but it is not installed ${where}.${hasURL ? '' : ' Install it, then press Check again.'}
             </p>
-            <div class="cli-dialog-command">
-                <code>${escapeHtml(info.cmd)}</code>
-                <button class="btn btn-small" data-on-click="info-copy" data-cmd="${escapeAttr(info.cmd)}">Copy</button>
-            </div>
-            ${/^https:\/\/[^\s"'<>]+$/.test(info.url || '') ? `<p class="cli-dialog-alt">Or use the official install page:<br><a href="${escapeAttr(info.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(info.url.replace(/^https:\/\//, ''))}</a></p>` : ''}
-            ${info.note ? `<p class="cli-dialog-note">${escapeHtml(info.note)}</p>` : ''}
+            ${hasURL ? `<p class="cli-dialog-link">Install it from <a href="${escapeAttr(info.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(info.url.replace(/^https:\/\//, ''))}</a>, then press Check again.</p>` : ''}
+            <details class="disclosure cli-dialog-advanced">
+                <summary>Advanced</summary>
+                <div class="cli-dialog-command">
+                    <code>${escapeHtml(info.cmd)}</code>
+                    <button class="btn btn-small" data-on-click="info-copy" data-cmd="${escapeAttr(info.cmd)}">Copy</button>
+                </div>
+                ${info.note ? `<p class="cli-dialog-note">${escapeHtml(info.note)}</p>` : ''}
+            </details>
             <p class="cli-recheck-status" role="status" aria-live="polite"></p>
             <div class="modal-actions cli-dialog-actions">
                 ${remote ? '' : '<button class="btn" data-action="settings">It is installed somewhere else</button>'}
