@@ -7,6 +7,26 @@ import (
 	"github.com/subgentic/coral/internal/agent"
 )
 
+// coralGoalNudgeTitles are the two sentences Coral types into an agent about a goal (typedGoalDriverNudge, typedNewGoalNudge): as the first message of a chat they were its title, 'You now drive goal #2. Run
+// coral-board goal show 2 to read it.' Their short words stand for them, with the goal's number only (#16632). Only the exact typed sentence matches, so a person's own message that starts the same stays theirs.
+var coralGoalNudgeTitles = []struct {
+	re    *regexp.Regexp
+	title string
+}{
+	{regexp.MustCompile(`^You now drive goal #(\d+)\. Run 'coral-board goal show (\d+)' to read it\.$`), "Drive goal #"},
+	{regexp.MustCompile(`^You have a new goal to read: #(\d+)\. Run 'coral-board goal show (\d+)' to read it\.$`), "New goal #"},
+}
+
+func coralNudgeTitle(first string) string {
+	first = strings.TrimSpace(first)
+	for _, n := range coralGoalNudgeTitles {
+		if m := n.re.FindStringSubmatch(first); m != nil && m[1] == m[2] {
+			return n.title + m[1]
+		}
+	}
+	return ""
+}
+
 // chatTitleLimit is how much of a chat's first message its title keeps.
 const chatTitleLimit = 120
 
@@ -50,6 +70,9 @@ func markdownLine(text string) string {
 // with its markdown taken off and cut to one line, else the agent's name alone. The launch prompt Coral gave the agent is never a title: a row indexed before it was kept out of the first message is read here too.
 func chatTitle(summaryTitle, firstUserMessage, displayName, agentName string) string {
 	if t := strings.TrimSpace(summaryTitle); t != "" {
+		return t
+	}
+	if t := coralNudgeTitle(firstUserMessage); t != "" {
 		return t
 	}
 	if !agent.IsLaunchPromptText(firstUserMessage) {
