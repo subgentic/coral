@@ -15,6 +15,8 @@
 .skills-ack ul { margin: 6px 0 10px; padding-left: 20px; }
 .skills-ack code { font-family: var(--font-mono, ui-monospace, monospace); }
 .skills-ack li { overflow-wrap: anywhere; } /* a file's 64-character SHA-256 has no break of its own: it wraps inside the notice (#12943) */
+.skills-decision-bar { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0 12px; margin: 0 0 4px; background: var(--bg-primary); border-bottom: 1px solid var(--border-color); }
+.skills-decision-bar .btn { margin: 0; }
 .skills-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
 .skills-actions .btn { margin: 0; }
 .skills-error { margin: 0 0 12px; color: var(--error-text); }

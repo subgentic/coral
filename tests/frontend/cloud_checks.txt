@@ -335,6 +335,7 @@ node proposals_actions_hub.test.mjs
 node inbox_artifacts_loading.test.mjs
 node files_refresh_403_other_agent.test.mjs
 node skill_filter.test.mjs
+node skill_review_row_browser.test.js
 node goal_guide.test.mjs
 node guide_theme_caption.test.mjs
 node inbox_teams_checked.test.mjs

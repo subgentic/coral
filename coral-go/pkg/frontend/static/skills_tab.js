@@ -178,15 +178,15 @@ function drawDetail() {
         history.append(summary, list); page.append(history);
     }
     if (s.status === 'removed') { page.append(el('p', 'skills-note', 'This skill was removed.')); return page; }
+    const risky = files.filter(f => f.kind === 'script' || f.kind === 'not_reviewable');
     let unopenedEl = null;
     if (s.status === 'pending') {
         const b = el('div', 'notice notice-warn skills-banner'); b.append(el('strong', '', 'Read it before you approve it.'));
         b.append(el('span', '', `This skill was published by ${publisher(s)}. Its text is instructions an agent will follow, and approving it puts its description into the instructions of every agent that has it attached. Nothing here is searchable or attachable until you approve.`));
         unopenedEl = el('p', 'skills-unopened'); b.append(unopenedEl);
         page.append(b);
+        page.append(drawTopDecisionBar(s, risky));
     }
-    // the files: every one, with its size, kind and SHA-256
-    const risky = files.filter(f => f.kind === 'script' || f.kind === 'not_reviewable');
     const fileSec = el('div', 'skills-section'); fileSec.append(el('h3', '', 'Files'));
     fileSec.append(DT.dataTable({ label: `Files, ${files.length}`, rows: files, rowKey: f => f.path, rowName: f => f.path, columns: [
         { key: 'path', label: 'File', primary: true, width: 'grow', sort: true, cell: f => f.path },
@@ -217,6 +217,35 @@ function drawDetail() {
 /** The files whose text this view can show and the Operator has not had on screen yet (SKILL.md is on screen at first). The ones that cannot be shown are the second step's. */
 const unopenedFiles = d => (d.files || []).filter(f => (d.contents || {})[f.path] != null && !open.opened.has(f.path));
 const confirmOrSay = (title, text, fn, opts) => { if (typeof window.showConfirmModal === 'function') window.showConfirmModal(title, text, fn, undefined, { label: opts.label, danger: opts.danger === true }); else showToast('The confirm box is not available, so nothing was done. Reload the page and try again.', true); };
+
+/** A sticky decision bar at the top of the skill view (#16881): the Operator sees Approve / Reject without scrolling past the whole SKILL.md. It delegates to the full drawApproval section for scripts that need acknowledgment. */
+function drawTopDecisionBar(s, risky) {
+    const bar = el('div', 'skills-decision-bar');
+    const digest = s.digest;
+    const needsScripts = risky.length > 0;
+    const doApprove = async () => {
+        try {
+            await requestJson('POST', `/api/skills/${encodeURIComponent(s.id)}/approve`, { digest, scripts_acked: false });
+            showToast(`Approved ${s.name}.`); open = null; await loadList(); draw(); loadSkillsBadge();
+        } catch (e) {
+            if (e.data && e.data.code === 'skill_changed') { showToast('This is not the skill you reviewed: here is the new view.', true); await loadOne(s.id); return; }
+            if (e.data && e.data.code === 'scripts_not_acknowledged') { showToast('Open the files below and confirm them before approving.', true); return; }
+            showToast(`Couldn't approve it: ${e.message}`, true);
+        }
+    };
+    const approve = button('btn', 'Approve', () => {
+        if (needsScripts) { showToast('Review and confirm the script files below before approving.', true); return; }
+        const n = unopenedFiles(open.data).length;
+        if (!n) { doApprove(); return; }
+        confirmOrSay('Approve with files not opened', `${n} file${n === 1 ? ' has' : 's have'} not been opened yet. Approve ${s.name} anyway?`, doApprove, { label: 'Approve' });
+    });
+    const reject = button('btn btn-danger', 'Reject', () => confirmOrSay('Reject this skill', `Reject ${s.name}? Nobody can attach it, and an agent cannot publish these exact bytes again.`, async () => {
+        try { await requestJson('POST', `/api/skills/${encodeURIComponent(s.id)}/reject`); showToast(`Rejected ${s.name}.`); open = null; await loadList(); draw(); loadSkillsBadge(); }
+        catch (e) { showToast(`Couldn't reject it: ${e.message}`, true); }
+    }, { label: 'Reject', danger: true }));
+    bar.append(approve, reject);
+    return bar;
+}
 
 function drawApproval(s, risky) {
     const wrap = el('div', 'skills-section');
