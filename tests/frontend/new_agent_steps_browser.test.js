@@ -21,12 +21,13 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
         await setFolder(folder);
         for (let s = 1; s < n; s++) { await click('button', N.next); await waitFor(`/Step ${s + 1} of 3/.test(window.__na.dialog() ? window.__na.dialog().textContent : '')`, `step ${s + 1} of 3`, 4000); }
     };
-    // Cancel is the first and leftmost footer control, the primary one the rightmost, both at the footer's one row.
+    // Cancel sits at the right with the primary, like every dialog (#15816, #16361): Back (when there is one) first, then Cancel, the primary one the rightmost, all on the footer's one row.
     const footerOrder = async (primary, label) => {
         const b = await ev(`window.__na.buttons()`);
         const cancel = b.find(x => N.cancel.test(x.name)), prim = b.find(x => primary.test(x.name));
         assert.ok(cancel, `${label}: Cancel is in the footer`); assert.ok(prim, `${label}: ${primary} is in the footer`);
-        for (const x of b.filter(y => /^(Back|Next|Launch|Restart)$/i.test(y.name))) assert.ok(cancel.x < x.x, `${label}: Cancel (x ${cancel.x}) is left of ${x.name} (x ${x.x})`);
+        for (const x of b.filter(y => /^Back$/i.test(y.name))) assert.ok(x.x < cancel.x, `${label}: Back (x ${x.x}) is left of Cancel (x ${cancel.x})`);
+        assert.ok(cancel.x < prim.x, `${label}: Cancel (x ${cancel.x}) is left of ${prim.name} (x ${prim.x}), together at the right`);
         for (const x of b.filter(y => /^(Cancel|Back)$/i.test(y.name))) assert.ok(prim.x >= x.x, `${label}: ${prim.name} is the rightmost, right of ${x.name}`);
         assert.ok(Math.abs(cancel.y - prim.y) < 4, `${label}: Cancel and ${prim.name} are on one row`);
     };
@@ -83,7 +84,7 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             assert.ok(!(await has('select', /computer|machine|server/i)), 'no machine select with this computer alone');
             assert.ok(await ev(`getComputedStyle(document.getElementById('launch-step-computer')).display === 'none'`), 'and no Which computer? step with this computer alone');
         });
-        await S.run('step 1 footer: Cancel leftmost, Next rightmost, one row', async () => { await reopen(); await setFolder('/work/payments-app'); await footerOrder(N.next, 'step 1'); });
+        await S.run('step 1 footer: Cancel then Next at the right, one row', async () => { await reopen(); await setFolder('/work/payments-app'); await footerOrder(N.next, 'step 1'); });
 
         await S.run('step 2 is "Step 2 of 3: Persona, all optional": persona first, then Name, then the Instructions for this agent, with Back, Cancel and Next and no tabs', async () => {
             await reopen(); await toStep(2);
@@ -151,10 +152,10 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             await waitFor(`!window.__na.dialog()`, 'Cancel closes the dialog', 4000);
         });
 
-        // phone: every footer button is 44 px tall, Cancel at the left, the primary filling the right (v4 section 1)
+        // phone: every footer button is 44 px tall, Cancel beside the primary at the right (#16361)
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installNA(ev);
-        await S.run('on a phone: every footer button of every step is at least 44 px tall, Cancel at the left edge of the footer, and no sideways scroll', async () => {
+        await S.run('on a phone: every footer button of every step is at least 44 px tall, Cancel beside the primary, and no sideways scroll', async () => {
             await openNewAgent(ev, waitFor);
             for (const n of [1, 2, 3]) {
                 if (n === 1) await setFolder('/work/payments-app'); else await click('button', N.next);
@@ -162,7 +163,7 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
                 const b = await ev(`window.__na.buttons().filter(x => /^(Cancel|Back|Next|Launch)$/i.test(x.name))`);
                 assert.ok(b.length >= 2, `phone step ${n}: footer buttons`);
                 for (const x of b) assert.ok(x.h >= 44, `phone step ${n}: ${x.name} is ${x.h}px tall`);
-                const cancel = b.find(x => /^Cancel$/i.test(x.name)); const pl = await ev(`window.__na.box(window.__na.panel()).x`); assert.ok(cancel.x - pl <= 24, `phone step ${n}: Cancel is within 24 px of the dialog's left edge (it is ${Math.round(cancel.x - pl)} px in)`);
+                const cancel = b.find(x => /^Cancel$/i.test(x.name)), prim = b.find(x => /^(Next|Launch)$/i.test(x.name)); const pl = await ev(`window.__na.box(window.__na.panel())`); assert.ok(cancel && prim && cancel.x < prim.x && Math.abs(cancel.y - prim.y) < 4 && cancel.x >= pl.x, `phone step ${n}: Cancel sits left of ${prim && prim.name} with it, on one row, inside the dialog (#16361): ${JSON.stringify({ cancel: [cancel.x, cancel.y], prim: prim && [prim.x, prim.y], dialogLeft: pl.x })}`);
                 assert.ok(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), `phone step ${n}: no sideways scroll`);
                 if (n === 3) { assert.ok(await ev(`(() => { const d = window.__na.dialog(), n = d.querySelector('.launch-recap-note'), r = n && n.closest('.launch-recap'); if (!n || !r) return false; const a = n.getBoundingClientRect(), b = r.getBoundingClientRect(); return a.height > 0 && a.bottom <= b.bottom + 1 && r.scrollHeight <= r.clientHeight + 1; })()`), 'phone step 3: the mode note is whole inside the recap, not cut off by its line clamp'); await shotIf('new-agent-mode-note-390'); }
             }
