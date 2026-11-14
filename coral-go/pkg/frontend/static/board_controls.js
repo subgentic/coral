@@ -37,6 +37,9 @@ function updatePauseButton(say = true) {
     btn.textContent = isSleeping ? 'Wake team' : bs.isPaused ? 'Resume team' : 'Pause team';
     const note = document.getElementById('mb-pause-note'); if (note) note.textContent = isSleeping ? 'Starts every agent again; the board takes messages again.' : bs.isPaused ? 'Agents get messages again when you resume.' : 'Agents stop receiving new messages until you resume.'; // what it does (#10008)
     btn.classList.toggle('mb-action-danger', bs.isPaused);
+    // On the team page the Sleep item of the same menu is already the way out (Wake team, with its own line): the Pause item says it a second time while the team sleeps (#16394), so it waits.
+    const inTeamMenu = !!btn.closest('#team-page-more-menu');
+    btn.hidden = isSleeping && inTeamMenu; if (note) note.hidden = btn.hidden;
 }
 
 // One pause for the page and the Board column (#15331): team_pause.js reads the team's state first, wakes a team the sleep paused, and says what it did.
@@ -96,7 +99,7 @@ function updateSleepUI() {
     if (banner) {
         banner.style.display = isSleeping ? '' : 'none';
         const text = banner.querySelector('.mb-sleep-text');
-        if (text) text.textContent = 'This team is sleeping. Messages are paused until you use Wake team (Actions menu or the Sleep button).';
+        if (text) text.textContent = 'This team is sleeping. Messages are paused until you use Wake team (in More).';
     }
     updatePauseButton(false); // Repainting sleep controls is not a pause change.
     const input = document.getElementById('mb-post-input');
