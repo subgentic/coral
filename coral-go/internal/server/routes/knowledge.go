@@ -339,8 +339,18 @@ func (h *SessionsHandler) SaveAgentKnowledge(w http.ResponseWriter, r *http.Requ
 
 	// Load existing bundle to get the directory
 	bundle, err := background.ReadKnowledgeBundle(coralDir, teamName)
+	if err == nil && bundle == nil && background.IsNoteName(agentName) {
+		// A note written by hand does not need a distilled bundle: the first one gives the team its small index (#16685).
+		if err = background.EnsureKnowledgeIndex(coralDir, teamName); err == nil {
+			bundle, err = background.ReadKnowledgeBundle(coralDir, teamName)
+		}
+	}
 	if err != nil || bundle == nil {
 		errBadRequest(w, "no knowledge bundle exists for this team")
+		return
+	}
+	if background.IsNoteName(agentName) && len(body.Content) > 16*1024 {
+		errBadRequest(w, "a note is at most 16 KB")
 		return
 	}
 
@@ -370,6 +380,13 @@ func (h *SessionsHandler) SaveAgentKnowledge(w http.ResponseWriter, r *http.Requ
 // InjectKnowledgeIntoPrompt appends relevant knowledge to an agent's prompt.
 func InjectKnowledgeIntoPrompt(coralDir, teamName, agentName, prompt string) string {
 	knowledge := background.LoadAgentKnowledge(coralDir, teamName, agentName)
+	// The notes a person wrote by hand are for the whole team (#16685); an agent's own file stays first.
+	if notes := background.TeamNotes(coralDir, teamName); notes != "" && !background.IsNoteName(agentName) {
+		if knowledge != "" {
+			knowledge += "\n\n"
+		}
+		knowledge += notes
+	}
 	if knowledge == "" {
 		return prompt
 	}

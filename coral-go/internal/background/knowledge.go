@@ -537,6 +537,63 @@ func LoadAgentKnowledge(coralDir, teamName, agentName string) string {
 	return md
 }
 
+// NoteFilePrefix starts the file name of a note a person wrote by hand (#16685): note-<title>.md. Every agent of the team reads the notes, not one agent's file.
+const NoteFilePrefix = "note-"
+
+// maxTeamNotesBytes caps the hand-written notes put into one start prompt, so a long list cannot crowd out the agent's own instructions.
+const maxTeamNotesBytes = 32 * 1024
+
+// IsNoteName says whether an entry name is a hand-written note's (note-<title>).
+func IsNoteName(name string) bool {
+	return strings.HasPrefix(slugify(name), NoteFilePrefix) && len(slugify(name)) > len(NoteFilePrefix)
+}
+
+// EnsureKnowledgeIndex gives a team that was never distilled the small index.md the Knowledge tab needs to show anything; an existing one is left alone.
+func EnsureKnowledgeIndex(coralDir, teamName string) error {
+	dir, err := knowledgeTeamDir(coralDir, teamName)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(filepath.Join(dir, "index.md")); err == nil {
+		return nil
+	}
+	return WriteKnowledgeIndex(coralDir, teamName, "# Team knowledge\n\nNotes added by hand are here. Distill knowledge adds what each agent learned.\n")
+}
+
+// TeamNotes is the text of every hand-written note of the team, oldest name first, redacted as every knowledge read is ("" when there are none).
+func TeamNotes(coralDir, teamName string) string {
+	dir, err := knowledgeTeamDir(coralDir, teamName)
+	if err != nil {
+		return ""
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	var out strings.Builder
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") || !strings.HasPrefix(e.Name(), NoteFilePrefix) {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			continue
+		}
+		md, err := redactKnowledge(string(data))
+		if err != nil {
+			continue // unchecked knowledge is none
+		}
+		if out.Len()+len(md) > maxTeamNotesBytes {
+			break
+		}
+		if out.Len() > 0 {
+			out.WriteString("\n\n")
+		}
+		out.WriteString(strings.TrimSpace(md))
+	}
+	return out.String()
+}
+
 // WriteKnowledgeFile writes a single agent's knowledge file to disk, redacted; redacted says
 // whether a secret was replaced.
 func WriteKnowledgeFile(coralDir, teamName, agentName, content string) (redacted bool, err error) {

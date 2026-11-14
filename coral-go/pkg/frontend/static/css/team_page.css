@@ -510,3 +510,10 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
 
 /* The Artifacts tab's files strip: its space is held, unseen, until the real strip replaces it, so the table does not jump down (#15618). */
 .team-files-strip-reserve { visibility: hidden; }
+.team-panel .team-toolbar-row { flex-wrap: wrap; } /* the Knowledge row: the search field and the two buttons wrap instead of overflowing at 200% text (#16685) */
+.team-panel .team-knowledge-actions.team-tb-action { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; width: max-content; max-width: 100%; box-sizing: border-box; padding: 0; min-height: 0; } /* Add a note and Distill knowledge: one slot, two buttons */
+.team-panel .team-knowledge-actions > .btn { margin: 0; min-height: var(--toolbar-control-h); padding: 0 12px; font-size: var(--fs-md); }
+@media (pointer: coarse), (max-width: 767px) { .team-panel .team-knowledge-actions > .btn { min-height: var(--control-touch-height, 44px); } }
+.knowledge-note-label { display: block; margin: 12px 0 4px; font-size: var(--fs-sm); color: var(--text-secondary); }
+.knowledge-note-label:first-child { margin-top: 0; }
+.knowledge-note-title { width: 100%; box-sizing: border-box; }

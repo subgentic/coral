@@ -8,7 +8,7 @@ import { teamFetch } from './server_base.js';
 import { refusedTooLarge } from './utils.js';
 import { whenText } from './when_text.js';
 import { refreshDistill, startDistill, distillJob } from './knowledge_distill.js';
-const { splitFrontMatter, entryForLink } = await importOnce('./knowledge_text.js'); // the entry's front matter and its links (pure)
+const { splitFrontMatter, entryForLink, slugOf } = await importOnce('./knowledge_text.js'); // the entry's front matter and its links (pure)
 const { renderSafe } = await importOnce('./safe_markdown.js'); // the Inbox's renderer: DOM-built, no markup from text
 const { loadSafeMarkdown } = await importOnce('./vendor_loader.js');
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
@@ -23,12 +23,19 @@ let root = null, hooks = {};
 const say = (t) => { const s = root && root.querySelector('.team-knowledge-status'); if (s) { s.textContent = ''; s.textContent = t; } };
 const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
+const NOTE = 'note-'; // a hand-written note is the file note-<title>.md; every agent of the team reads the notes when it starts (#16685)
+const isNote = (name) => String(name).startsWith(NOTE) && String(name).length > NOTE.length;
+const shownName = (e) => e.label || e.name;
+
 /** The table's entries: the team's index first, then each agent's notes by name. */
 function entriesOf(data) {
     if (!data || !data.exists) return [];
     const out = [];
     if (data.index) out.push({ key: 'index', name: 'Index', text: data.index, from: 'The whole team' });
-    for (const a of [...(data.agents || [])].sort((x, y) => String(x.name).localeCompare(String(y.name)))) out.push({ key: `agent:${a.name}`, name: a.name, text: a.content || '', from: `${a.name}'s sessions` });
+    for (const a of [...(data.agents || [])].sort((x, y) => String(x.name).localeCompare(String(y.name)))) {
+        if (isNote(a.name)) { const t = splitFrontMatter(a.content || '').facts; out.push({ key: `agent:${a.name}`, name: a.name, label: (t && t.title) || a.name.slice(NOTE.length).replace(/-/g, ' '), text: a.content || '', from: 'Added by hand', note: true }); } // a note a person wrote (#16685)
+        else out.push({ key: `agent:${a.name}`, name: a.name, text: a.content || '', from: `${a.name}'s sessions` });
+    }
     return out;
 }
 
@@ -104,7 +111,7 @@ function openEntry(entry, opener, { focus = true } = {}) {
     const toView = (focus = true) => { showFacts(); showText(); foot()?.replaceChildren(status, editButton); if (focus) editButton.focus({ preventScroll: true }); };
     // Edit: the text becomes a box and the pane's bar reads Cancel at the left and Save at the right with a status line; Escape and Cancel ask once, in the bar, when the text was changed.
     function startEdit() {
-        const box = el('textarea', 'knowledge-editor'); box.value = entry.text || ''; box.setAttribute('aria-label', `Notes of ${entry.name}`); box.rows = 16;
+        const box = el('textarea', 'knowledge-editor'); box.value = entry.text || ''; box.setAttribute('aria-label', `Notes of ${shownName(entry)}`); box.rows = 16;
         const save = btn('btn btn-primary', 'Save', null), cancel = btn('btn', 'Cancel', null);
         const dirty = () => box.value !== (entry.text || '');
         const toEdit = () => { foot()?.replaceChildren(status, cancel, save); };
@@ -133,7 +140,7 @@ function openEntry(entry, opener, { focus = true } = {}) {
         box.focus();
     }
     openDetailPane({
-        key: entry.key, opener, title: entry.name, sub: [whenText(when), entry.from].filter(Boolean).join(' · '), subTitle: exactTime(when), resizable: true, backLabel: 'Knowledge', focus, details: (h) => { more = h; showFacts(); },
+        key: entry.key, opener, title: shownName(entry), sub: [entry.note ? '' : whenText(when), entry.from].filter(Boolean).join(' · '), subTitle: exactTime(when), resizable: true, backLabel: 'Knowledge', focus, details: (h) => { more = h; showFacts(); },
         body: (host) => { bodyHost = host; showText(); },
         actions: editable ? [{ label: 'Edit', run: (b) => { editButton = b; startEdit(); } }] : [],
         onClose: () => { root?.querySelectorAll('tr[aria-current="true"]').forEach(r => r.removeAttribute('aria-current')); },
@@ -145,6 +152,46 @@ function openEntry(entry, opener, { focus = true } = {}) {
         foot()?.addEventListener('keydown', (e) => { if (e.key !== 'Escape' || !bodyHost?.querySelector('textarea')) return; e.preventDefault(); e.stopPropagation(); const k = [...foot().querySelectorAll('button')].find(b => b.textContent === 'Keep editing'); if (k) k.click(); else [...foot().querySelectorAll('button')].find(b => b.textContent === 'Cancel')?.click(); });
     }
     root?.querySelectorAll('tr[data-key]').forEach(r => { if (r.dataset.key === entry.key) r.setAttribute('aria-current', 'true'); else r.removeAttribute('aria-current'); });
+}
+
+/** Add a note (#16685): a title and the text, in the same pane an entry opens in. Saved as the note-<title> entry through the route an edit uses; every agent of the team reads it when it starts. */
+function openNewNote(opener) {
+    const title = el('input', 'field knowledge-note-title'); title.type = 'text'; title.maxLength = 80; title.autocomplete = 'off'; title.id = 'knowledge-note-title';
+    const text = el('textarea', 'knowledge-editor'); text.rows = 12; text.maxLength = 12000; text.id = 'knowledge-note-text';
+    const status = el('span', 'detail-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+    let save = null;
+    const say2 = (t) => { status.textContent = ''; status.textContent = t; };
+    openDetailPane({
+        key: 'new-note', opener, title: 'Add a note', sub: 'Every agent of this team reads it when it starts.', resizable: true, backLabel: 'Knowledge', focus: false,
+        body: (host) => {
+            const l1 = el('label', 'knowledge-note-label', 'Title'); l1.htmlFor = title.id;
+            const l2 = el('label', 'knowledge-note-label', 'What the team should know'); l2.htmlFor = text.id;
+            host.replaceChildren(l1, title, l2, text);
+        },
+        actions: [{ label: 'Save note', primary: true, run: (b) => { save = b; doSave(); } }],
+        onClose: () => { root?.querySelectorAll('tr[aria-current="true"]').forEach(r => r.removeAttribute('aria-current')); },
+    });
+    const foot = document.querySelector('#detail-pane .detail-foot');
+    save = foot?.querySelector('button') || save;
+    foot?.prepend(status);
+    title.focus({ preventScroll: true });
+    async function doSave() {
+        const name = title.value.replace(/\s+/g, ' ').trim(), body = text.value.trim(), slug = slugOf(name);
+        if (!name || !slug) { say2(name ? 'Use letters or numbers in the title.' : 'Give the note a title.'); title.focus(); return; }
+        if (!body) { say2('Write what the team should know.'); text.focus(); return; }
+        if (entriesOf(model.data).some(e => e.key === `agent:${NOTE}${slug}`)) { say2('A note with that title exists. Open it to change it, or give this one another title.'); title.focus(); return; }
+        const file = NOTE + slug;
+        save.disabled = true; say2('Saving…');
+        try {
+            const r = await teamFetch(model.team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge/${encodeURIComponent(file)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `---\ntype: note\ntitle: ${JSON.stringify(name)}\n---\n\n${body}\n` }) });
+            const b = await r.json().catch(() => ({}));
+            if (!r.ok || !b.ok) { say2(`Could not save: ${(b && b.error) || `HTTP ${r.status}`}`); save.disabled = false; return; }
+            say(b.redacted ? 'Note saved. A secret in the text was replaced before it was saved.' : 'Note saved.');
+            await load();
+            const e = entriesOf(model.data).find(x => x.key === `agent:${file}`);
+            if (e) openEntry(e, null); else closeDetailPane();
+        } catch (e) { say2(`Could not save: ${e && e.message ? e.message : 'no answer'}`); save.disabled = false; }
+    }
 }
 
 async function distill() {
@@ -159,15 +206,17 @@ function emptyLine(text, hint) { const e = el('div', 'empty-state'); e.append(el
 function draw() {
     const body = root && root.querySelector('.team-knowledge-body'); if (!body) return;
     const a = document.activeElement;
-    const held = a && body.contains(a) ? (a.closest('tr[data-key]')?.dataset.key || (a.classList.contains('team-distill') ? '#distill' : '')) : '';
+    const held = a && body.contains(a) ? (a.closest('tr[data-key]')?.dataset.key || (a.classList.contains('team-distill') ? '#distill' : a.classList.contains('team-add-note') ? '#add' : '')) : '';
     body.replaceChildren();
     const running = distillJob(model.team).status === 'running';
     const everything = entriesOf(model.data), q = model.search.trim().toLowerCase();
-    const entries = q ? everything.filter(e => String(e.name || '').toLowerCase().includes(q)) : everything;
+    const entries = q ? everything.filter(e => shownName(e).toLowerCase().includes(q)) : everything;
     const d = btn('btn btn-small team-distill', running ? 'Distilling…' : 'Distill knowledge', distill); d.disabled = running;
     if (running) d.setAttribute('aria-label', 'Distill knowledge, running');
     // The one toolbar line (#7717): the search field and Distill knowledge at the right (no count line: the table is the count).
-    body.append(Toolbar.build({ id: 'team-knowledge-search', label: 'Search knowledge', placeholder: 'Search knowledge', value: model.search, onSearch: text => { model.search = text; draw(); }, action: d }));
+    const add = btn('btn btn-small team-add-note', 'Add a note', () => openNewNote(add));
+    const actions = el('span', 'team-knowledge-actions'); actions.append(add, d); // the toolbar's one action slot holds both: Add a note, then Distill knowledge, which wrap together when the line is short
+    body.append(Toolbar.build({ id: 'team-knowledge-search', label: 'Search knowledge', placeholder: 'Search knowledge', value: model.search, onSearch: text => { model.search = text; draw(); }, action: actions }));
     // A run in progress says how long it has gone and what it is doing; a failed one keeps its error here (#15272).
     const job = distillJob(model.team), pr = job.progress || {};
     if (running) {
@@ -178,19 +227,19 @@ function draw() {
     if (model.failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, model.failed), btn('btn btn-small', 'Retry', () => load())); body.append(f); }
     if (model.loading) body.append(el('p', 'goals-note', 'Loading knowledge…'));
     else if (model.refused) body.append(emptyLine('This team’s knowledge is too large to show through Coral Hub; open it on the computer.'));
-    else if (!entries.length) { if (!model.failed) body.append(everything.length ? emptyLine('No entries match this search.') : emptyLine('No knowledge yet.', 'Distill knowledge reads the team’s work and writes what each agent learned.')); }
+    else if (!entries.length) { if (!model.failed) body.append(everything.length ? emptyLine('No entries match this search.') : emptyLine('No knowledge yet.', 'Add a note to give the team a fact it should know, or Distill knowledge to write what each agent learned from its work.')); }
     else {
         body.append(DT.dataTable({
             label: `Knowledge, ${entries.length}`, rows: entries, rowKey: e => e.key, current: detailKey(), state: knowledgeTableState,
             open: (e, tr) => openEntry(e, tr.querySelector('.dt-primary')),
             columns: [
-                { key: 'entry', label: 'Entry', primary: true, width: 'grow', field: 'name', sort: true, line: 1, cell: e => DT.primaryButton(e.name) },
+                { key: 'entry', label: 'Entry', primary: true, width: 'grow', field: 'name', sort: true, line: 1, cell: e => DT.primaryButton(shownName(e)) },
                 { key: 'updated', label: 'Updated', sort: 'date', sortValue: () => model.data.created_at, tone: 'tertiary', align: 'end', line: 1, cell: () => DT.timeCell(model.data.created_at) },
                 { key: 'from', label: 'From', field: 'from', sort: true, line: 0 }, // a folded row is one line: the entry and when it was updated (#8981)
             ],
         }).el);
     }
-    if (held) (held === '#distill' ? body.querySelector('.team-distill') : rowFocusTarget(body, held))?.focus({ preventScroll: true });
+    if (held) (held === '#distill' ? body.querySelector('.team-distill') : held === '#add' ? body.querySelector('.team-add-note') : rowFocusTarget(body, held))?.focus({ preventScroll: true });
 }
 
 /** The result of a distillation, in the pane (#7761): the entry it wrote or changed (the team's index first) opens in the sidebar when the tab is on screen. Nothing opens when nothing changed or the person is elsewhere

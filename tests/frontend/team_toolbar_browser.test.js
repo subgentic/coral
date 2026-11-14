@@ -11,7 +11,7 @@ const VIEWS = [['1280x800', 1280, 800, false], ['390x844', 390, 844, true]];
 const TEAM = `qa-toolbar-${Date.now() % 100000}`;
 // what each tab's row must hold: the pills, the Filters icon, More, and the action's words
 const TABS = [['Goals', { pills: true, filters: false, action: 'New goal' }], ['Board', { pills: false, filters: true, more: true }], ['Tasks', { pills: true, many: true, filters: true, action: 'New task' }],
-    ['Agents', { pills: true, filters: false }], ['Artifacts', { pills: false, filters: true, more: true }], ['Knowledge', { pills: false, filters: false, action: 'Distill knowledge' }]];
+    ['Agents', { pills: true, filters: false }], ['Artifacts', { pills: false, filters: true, more: true }], ['Knowledge', { pills: false, filters: false, action: 'Add a noteDistill knowledge' }]];
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -20,7 +20,7 @@ const TABS = [['Goals', { pills: true, filters: false, action: 'New goal' }], ['
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const probe = () => ev(`(() => { const p = document.querySelector('[role=tabpanel]:not([hidden])'); const vis = e => !!(e && window.__na.vis(e) && e.getBoundingClientRect().height > 0);
         const row = [...p.querySelectorAll('.list-bar-search-row')].find(vis); if (!row) return null; const pr = p.getBoundingClientRect(); const r = e => e.getBoundingClientRect(); const mid = e => (r(e).top + r(e).bottom) / 2;
-        const search = row.querySelector('input.list-bar-search'), pills = row.querySelector('.team-tb-pills'), select = row.querySelector('.team-tb-select'), tog = row.querySelector('.list-bar-toggle'), more = row.querySelector('.list-bar-more-btn'), act = row.querySelector('.team-tb-action');
+        const search = row.querySelector('input.list-bar-search'), pills = row.querySelector('.team-tb-pills'), select = row.querySelector('.team-tb-select'), tog = row.querySelector('.list-bar-toggle'), more = row.querySelector('.list-bar-more-btn'), act = row.querySelector('.team-tb-action'); /* Knowledge's slot holds Add a note and Distill knowledge (#16685) */
         const shown = [search, vis(pills) ? pills : null, vis(select) ? select : null, vis(tog) ? tog : null, vis(more) ? more : null, vis(act) ? act : null].filter(Boolean);
         const lines = [...new Set(shown.map(e => Math.round(mid(e) / 10)))].length;
         return { left: Math.round(r(row.querySelector('.list-bar-search-wrap')).left - pr.left), lines, search: vis(search), pills: vis(pills), select: vis(select), filters: vis(tog), more: vis(more), action: act ? act.textContent.trim() : '', actionShown: vis(act),
@@ -45,10 +45,11 @@ const TABS = [['Goals', { pills: true, filters: false, action: 'New goal' }], ['
                     assert.equal(t.search, true, `${tab}: the search field is there`);
                     assert.equal(t.filters, want.filters, `${tab}: the Filters icon ${want.filters ? 'is' : 'is not'} there`);
                     assert.equal(t.more, !!want.more, `${tab}: More ${want.more ? 'is' : 'is not'} there`);
-                    assert.equal(t.action, mobile && ['Goals', 'Tasks'].includes(tab) ? 'add' : (want.action || ''), `${tab}: the action`); // Goals and Tasks have a compact + on a phone (#12230): its text is the icon's ligature, its name the words
+                    assert.equal(t.action, mobile && ['Goals', 'Tasks'].includes(tab) ? 'add' : (want.action || ''), `${tab}: the action`); // Knowledge's is both buttons' words // Goals and Tasks have a compact + on a phone (#12230): its text is the icon's ligature, its name the words
                     if (want.pills) assert.ok(mobile || want.many ? t.select && !t.pills : t.pills && !t.select, `${tab}: ${mobile ? 'a phone has the compact select' : want.many ? 'seven pills with counts need 62 rem: the compact select stands in at 1280 (#9861)' : 'the pills are on the line'} (${JSON.stringify({ pills: t.pills, select: t.select })})`);
                     else assert.ok(!t.pills && !t.select, `${tab}: no pills`);
                     assert.ok(t.last, `${tab}: the action is the last control at the right`);
+                    if (tab === 'Knowledge') assert.equal(await ev(`[...document.querySelectorAll('[role=tabpanel]:not([hidden]) .team-knowledge-actions > button')].map(b => b.textContent.trim()).join('|')`), 'Add a note|Distill knowledge', 'Knowledge: Add a note, then Distill knowledge, in the one slot');
                     if (tab === 'Goals') { // the tasks that serve no goal are the table's last row, not a line under the toolbar
                         const last = await ev(`(() => { const p = document.querySelector('[role=tabpanel]:not([hidden])'); const rows = [...p.querySelectorAll('tbody tr')]; return { note: !!p.querySelector('p.goals-no-goal'), last: rows.length ? rows[rows.length - 1].textContent.replace(/\\s+/g, ' ').trim() : '' }; })()`);
                         assert.equal(last.note, false, 'no no-goal line under the toolbar'); assert.match(last.last, /1 task has no goal/, /* a phone's mail row begins with its icon's ligature text (#12230) */  `the last row of the table says it: ${last.last}`);
