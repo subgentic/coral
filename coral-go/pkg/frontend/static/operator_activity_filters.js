@@ -33,7 +33,8 @@ const KIND_TEST = {
     files: r => ['file', 'task', 'goal'].includes(r.item_kind) && r.action !== 'chat_send',
     words: r => ['message', 'chat_send', 'task_reply'].includes(r.action),
 };
-export const inKind = (r, k) => !k || !!(KIND_TEST[k] && KIND_TEST[k](r));
+const primaryKind = r => { for (const k of ['words', 'answers', 'permissions', 'files', 'decisions']) if (KIND_TEST[k]?.(r)) return k; return ''; };
+export const inKind = (r, k) => !k || primaryKind(r) === k;
 
 export const NO_GOAL = 'No goal';
 /** The agent a row is about, when the record says (#14445): who asked, for an ask (an older answer kept the asker as its title), or the agent named by a prompt, wait or chat row; '' for a row about no agent. */

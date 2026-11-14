@@ -304,9 +304,9 @@ function askBlockers() { // loaded once, when a row carries the field; the table
     if (BL || !allNeeds().some(s => (s.review || s).waits_on_this)) return;
     importOnce('./inbox_blockers.js').then(m => { BL = m; refreshGroupTable('hub-inbox'); }).catch(() => {});
 }
-let answered = ''; // what an answer given here went through as, for five minutes: the row is gone and the list says so (#10720)
+let answered = '', answeredTimer; // what an answer given here went through as, for five minutes: the row is gone and the list says so (#10720)
 const answeredRows = new Map(); // `${server}:${session_id}` -> { began, at }: a row answered here, waiting for the agent to stop waiting (#14408)
-document.addEventListener('coral:inbox-answered', e => { answered = e.detail.said; setTimeout(() => { answered = ''; }, 3e5); if (e.detail.began && e.detail.session_id) answeredRows.set(`${e.detail.server || ''}:${e.detail.session_id}`, { began: e.detail.began, at: Date.now() }); });
+document.addEventListener('coral:inbox-answered', e => { clearTimeout(answeredTimer); answered = e.detail.said; answeredTimer = setTimeout(() => { answered = ''; renderInboxNav(true); }, 3e5); if (e.detail.began && e.detail.session_id) answeredRows.set(`${e.detail.server || ''}:${e.detail.session_id}`, { began: e.detail.began, at: Date.now() }); });
 const everyNeed = () => [...waitingSessions(), ...reviewRows(), ...runRows(), ...proposalRows(), ...goalDoneRows(), ...skillRows(), ...askRows(), ...recordRows(), ...closedByAgentRows(), ...welcomeRows()]; // the welcome items of a new install come last: real work first (#11443)
 let activeNeedsTeam = '';
 let teamNeedsMount = null;
