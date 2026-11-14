@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -272,7 +273,7 @@ func TestHubDropbox_ClosedBodies(t *testing.T) {
 
 func TestHubDropboxShared_RecordsAYesNoOnlyAndOnlyWhenOn(t *testing.T) {
 	e := newHDEnv(t)
-	d := strings.Repeat("c", 64)
+	d := e.put(t, "a shared file") // the hint is kept only for a digest of a real artifact (#16206)
 	_, got := e.call(e.d.SharedHint, `{"digest":"`+d+`","shared":true}`)
 	assert.JSONEq(t, `{"word":"ok"}`, got)
 	assert.True(t, e.d.Shared(d))
@@ -471,4 +472,58 @@ func TestHubSharePage_ANonLoopbackEnrolmentNeverBuildsAnHTTPAddress(t *testing.T
 	}
 	assert.Equal(t, "https://app.coralhub.dev/dropbox/share/srv_1/"+digest, hubSharePage("https://app.coralhub.dev", "srv_1", digest))
 	assert.Equal(t, "http://127.0.0.1:8421/dropbox/share/srv_1/"+digest, hubSharePage("http://127.0.0.1:8421", "srv_1", digest), "a literal loopback development Hub")
+}
+
+// #16206 (Security on #16109, SHOULD 1): the yes/no hint holds only digests of real artifacts, and at most hubDropboxSharedMax of them.
+func TestHubDropboxShared_KeepsOnlyRealArtifactsAndIsCapped(t *testing.T) {
+	e := newHDEnv(t)
+	// a digest with no file here, and one whose name is a link or a folder, are not artifacts
+	ghost := strings.Repeat("c", 64)
+	_, got := e.call(e.d.SharedHint, `{"digest":"`+ghost+`","shared":true}`)
+	assert.JSONEq(t, `{"word":"not_available"}`, got, "no such artifact")
+	assert.False(t, e.d.Shared(ghost))
+	folder := strings.Repeat("d", 64)
+	require.NoError(t, os.Mkdir(filepath.Join(e.dir, "artifacts", "objects", folder), 0o700))
+	_, got = e.call(e.d.SharedHint, `{"digest":"`+folder+`","shared":true}`)
+	assert.JSONEq(t, `{"word":"not_available"}`, got, "a folder is not an artifact")
+	linked := strings.Repeat("e", 64)
+	require.NoError(t, os.Symlink(filepath.Join(e.dir, "artifacts", "objects", folder), filepath.Join(e.dir, "artifacts", "objects", linked)))
+	_, got = e.call(e.d.SharedHint, `{"digest":"`+linked+`","shared":true}`)
+	assert.JSONEq(t, `{"word":"not_available"}`, got, "a link is not an artifact")
+	assert.False(t, e.d.Shared(linked))
+
+	// the cap: real artifacts up to the limit are kept, the next is not, a no frees a place, and a yes already held stays a yes
+	digests := make([]string, 0, hubDropboxSharedMax+1)
+	for i := 0; i <= hubDropboxSharedMax; i++ {
+		d := fmt.Sprintf("%064x", i+1)
+		require.NoError(t, os.WriteFile(filepath.Join(e.dir, "artifacts", "objects", d), []byte("x"), 0o600))
+		digests = append(digests, d)
+	}
+	for _, d := range digests[:hubDropboxSharedMax] {
+		_, got = e.call(e.d.SharedHint, `{"digest":"`+d+`","shared":true}`)
+		require.JSONEq(t, `{"word":"ok"}`, got, d)
+	}
+	over := digests[hubDropboxSharedMax]
+	_, got = e.call(e.d.SharedHint, `{"digest":"`+over+`","shared":true}`)
+	assert.JSONEq(t, `{"word":"not_available"}`, got, "the hint is full")
+	assert.False(t, e.d.Shared(over))
+	_, got = e.call(e.d.SharedHint, `{"digest":"`+digests[0]+`","shared":true}`)
+	assert.JSONEq(t, `{"word":"ok"}`, got, "a digest already held is still a yes at the cap")
+	_, _ = e.call(e.d.SharedHint, `{"digest":"`+digests[1]+`","shared":false}`)
+	assert.False(t, e.d.Shared(digests[1]))
+	_, got = e.call(e.d.SharedHint, `{"digest":"`+over+`","shared":true}`)
+	assert.JSONEq(t, `{"word":"ok"}`, got, "a no made room")
+	assert.True(t, e.d.Shared(over))
+}
+
+// #16206 (Security on #16109, INFO 2): the link's path is checked decoded, so an encoded dot segment is refused like a plain one.
+func TestHubDropboxValidPushLink_RefusesEncodedAndOtherDotSegments(t *testing.T) {
+	ok := "https://content.dropboxapi.com/2/files/upload/TOKEN"
+	assert.True(t, validPushLink(ok))
+	for _, tail := range []string{
+		"/2/files/%2e%2e/%2e%2e/oauth2/token", "/2/files/%2E%2E/x", "/2/files/a/%2e%2e/b", "/2/files/%2e/x", "/2/files/a/../b", "/2/files/./x",
+		"/2/files//x", "/2/files/upload/", "/2/files/a%2f..%2fb", "/2/files/a/%2e%2e",
+	} {
+		assert.False(t, validPushLink("https://content.dropboxapi.com"+tail), tail)
+	}
 }

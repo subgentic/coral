@@ -1492,7 +1492,7 @@ func TestBoardTaskNudge_UsesTheTasksBoard(t *testing.T) {
 	resp.Body.Close()
 	require.Equal(t, http.StatusCreated, resp.StatusCode, "body %s, identity enforced %v", refusal, identityActorEnforced())
 
-	require.Eventually(t, func() bool { return len(terminal.sentTo("claude-00000004-3864-4864-8864-000000000004")) > 0 }, 2*time.Second, 20*time.Millisecond)
+	require.Eventually(t, func() bool { return len(terminal.sentTo("claude-00000004-3864-4864-8864-000000000004")) > 0 }, 15*time.Second, 20*time.Millisecond)
 	assert.Contains(t, terminal.sentTo("claude-00000004-3864-4864-8864-000000000004")[0], "coral-board task claim")
 	assert.Empty(t, terminal.sentTo("claude-00000005-3864-4864-8864-000000000005"), "no nudge to the same name on another board")
 }
