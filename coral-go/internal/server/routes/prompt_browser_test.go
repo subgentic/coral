@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -68,4 +69,35 @@ func TestBrowserAndTrustMenus_OnlyForClaude(t *testing.T) {
 	require.True(t, ok)
 	assert.True(t, isFolderTrustMenu(s))
 	assert.NotEmpty(t, s.TrustFolder)
+}
+
+// #16609: the screen below is a REAL capture, tmux capture-pane -p of Claude Code 2.1.325 (Haiku, Auto) asked to open a page with the claude-in-chrome skill: the "Skill(claude-in-chrome)" tool line, a rule, the title,
+// the description over two lines, then the three rows, the cursor on Not now, and about 20 blank lines of the pane below. The rows' descriptions are worded differently from the 2.1.319 capture above.
+func TestBrowserMenu_ReadFromARealClaude2_1_325Capture(t *testing.T) {
+	raw, err := os.ReadFile("testdata/browser_menu_2_1_325.txt")
+	require.NoError(t, err)
+	s, ok := parseAgentScreen(at.Claude, string(raw))
+	require.True(t, ok, "the real 2.1.325 screen is read")
+	assert.True(t, isBrowserPromptMenu(s), "and is the browser menu")
+	require.Len(t, s.Options, 3)
+	assert.Equal(t, "Not now", s.Options[1].Label)
+	assert.True(t, s.Options[1].Selected)
+}
+
+// #16609 (walk 26 F9): Not now on the Inbox row did nothing. The row sends the ask's id with the answer and refuses to send without one ("That question changed"), and the browser menu came out of its parser with NO ask_id
+// (every other menu gets one in parsePromptScreenFor), so the row's click was refused before any key went, on a real session (found by asking a real Claude 2.1.325 for the browser skill through an isolated server: the chat reply's
+// prompt_options carried the menu and no ask_id). The two REAL captures are the same menu a second apart: Claude blinks the pending tool's bullet ("⏺ Skill(...)" then "  Skill(...)"), which must not make another ask.
+func TestBrowserMenu_HasAnAskIDThatSurvivesTheToolBulletBlinking(t *testing.T) {
+	read := func(file string) promptScreen {
+		raw, err := os.ReadFile(file)
+		require.NoError(t, err)
+		s, ok := parseAgentScreen(at.Claude, string(raw))
+		require.True(t, ok, file)
+		require.True(t, isBrowserPromptMenu(s), file)
+		return s
+	}
+	on, off := read("testdata/browser_menu_2_1_325.txt"), read("testdata/browser_menu_2_1_325_bullet_off.txt")
+	assert.NotEmpty(t, on.AskID, "the menu carries an ask id, as every other menu does: the row refuses to answer without one")
+	assert.Equal(t, on.AskID, off.AskID, "the same ask whether the bullet is drawn or not")
+	assert.True(t, samePrompt(on, off))
 }
