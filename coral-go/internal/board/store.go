@@ -55,6 +55,7 @@ type Store struct {
 	msgIndexCheckStop       atomic.Pointer[context.CancelFunc] // the check of a complete index after open (message_fts.go)
 	bg                      sync.WaitGroup                     // the index's background goroutines (build, check, drop): Close waits for them, so none still holds the file when it returns (#15022)
 	msgIndexAnswers         atomic.Int64                       // searches the index answered (tests check it is used)
+	reviewLog               forReviewLog                       // the tag and untag events of "for review" for the Hub's feed (#15996)
 }
 
 func isInMemoryPath(dbPath string) bool {

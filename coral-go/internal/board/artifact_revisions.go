@@ -72,6 +72,7 @@ func (s *Store) ArtifactsRevision(board string) uint64 {
 // NoteArtifactsChanged follows a successful mutation affecting the board's
 // artifact list. It cannot fail after the business write has committed.
 func (s *Store) NoteArtifactsChanged(board string) {
+	s.noteForReviewChanged(board) // the Hub's feed is told when "for review" went on or off an artifact (#15996)
 	r := &s.artifactsRevision
 	defer r.moved()
 	r.mu.Lock()

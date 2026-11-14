@@ -71,8 +71,9 @@ type wsTick struct {
 // goalEventsWindow is how many goal events of a board a tick carries: one more than a frame may send (goalEventsPerFrame), so a window that is full says there were more than a frame can hold.
 // goalEventsPerFrame is the most goal events one frame carries; past that, or when events are missing, the frame says goal_events_gap and the page refetches.
 const (
-	goalEventsWindow   = 51
-	goalEventsPerFrame = 50
+	goalEventsWindow        = 51
+	goalEventsPerFrame      = 50
+	forReviewEventsPerFrame = 50 // the for-review events one frame carries (#15996); more is a gap
 )
 
 // wsLocalPart is this server's sessions and job runs, serialized.

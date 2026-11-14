@@ -235,6 +235,7 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	runTagStore := store.NewSessionStore(s.db)
 	ptymanager.SetRunTagLookup(func(sessionID string) string { return runTagStore.RunTagOf(context.Background(), sessionID) })
 	s.sessHandler = sessHandler
+	sessHandler.WireForReviewFeed(s.boardStore)                                                             // a tag on or off "for review" reaches the Hub's feed at once (#15996)
 	s.opencode = opencode.NewManager(opencode.Config{DataDir: filepath.Join(s.cfg.CoralDir(), "opencode")}) // the binary comes from the person's settings at each launch
 	s.opencode.Redact = func(text string) (string, bool) {                                                  // the newest message is kept on disk redacted, for the list of an agent with no server
 		out, err := secrets.Redactor().Text([]byte(text))
