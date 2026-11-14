@@ -28,8 +28,6 @@
 
 .goal-rollup { display: flex; height: 6px; border-radius: var(--radius-xs); overflow: hidden; background: var(--bg-tertiary); border: 1px solid var(--text-muted); }
 .goal-rollup-done { background: var(--success); }
-.goal-rollup-active { background: var(--accent); }
-.goal-rollup-blocked { background: var(--warning); }
 
 .goals-sub { margin: 8px 0 0; font-size: var(--fs-md); color: var(--text-secondary); }
 .goals-detail-title { margin: 0; font-size: var(--fs-2xl); overflow-wrap: anywhere; font-weight: var(--fw-title); }

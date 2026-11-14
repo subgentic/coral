@@ -102,6 +102,9 @@ export function rollupShares(rollup) {
     return { done: n(r.done) / total, active: n(r.active) / total, blocked: n(r.blocked) / total };
 }
 
+/** The goal page's bar draws what its sentence counts, "2 of 4 tasks done": the done share, in the done colour, and nothing else. Active and blocked tasks are not progress; they used to be drawn in blue and amber, so "0 of 4 done" beside a half-full bar, and a finished goal's bar looked blue, never green (walk 27, #16629). */
+export const doneShare = (rollup) => rollupShares(rollup).done;
+
 /** Which goals a filter keeps, and how many each chip counts. */
 export const keepsGoal = (which, goal) => which === 'all' || String(goal && goal.state || '').toLowerCase() === which;
 export function filterCounts(goals) {

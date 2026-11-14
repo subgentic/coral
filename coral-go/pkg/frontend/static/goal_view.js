@@ -119,8 +119,8 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
 
     function rollupBar(rollup) {
         const bar = el('span', 'goal-rollup'); bar.setAttribute('aria-hidden', 'true'); // the sentence beside the bar says the same: a reader hears it once (#7250)
-        const sh = W.rollupShares(rollup);
-        for (const k of ['done', 'active', 'blocked']) { if (!sh[k]) continue; const seg = el('span', `goal-rollup-${k}`); seg.style.width = `${(sh[k] * 100).toFixed(1)}%`; bar.append(seg); }
+        const done = W.doneShare(rollup); // only the done share: the bar says what "N of M tasks done" says (#16629)
+        if (done) { const seg = el('span', 'goal-rollup-done'); seg.style.width = `${(done * 100).toFixed(1)}%`; bar.append(seg); }
         return bar;
     }
 
