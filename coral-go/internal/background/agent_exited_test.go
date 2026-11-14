@@ -358,3 +358,23 @@ func TestReconciler_AnEndedAgentWhoseTerminalIsGoneIsNotWoken(t *testing.T) {
 	r.reconcileOnce(ctx)
 	assert.True(t, isSleeping(t, ss, testUUID), "no terminal to read: stays Ended")
 }
+
+// A woken agent's launch grace starts when Coral typed its launch line again (launched_at, which a wake stamps on its reused row), not at the row's creation (#17298): Wake Team on a team
+// that slept for hours typed the resume line into every member's shell, and the first reconcile pass that still saw the shell (the CLI had not started yet) marked each Ended: walks 55 and 60
+// saw Lead Developer and QA 'Ended' after Wake, idle, under a toast that said the team was awake.
+func TestReconciler_AWokenAgentGetsTheLaunchGraceFromItsWake(t *testing.T) {
+	ss, rt, r := newExitedFixture(t)
+	r.now = time.Now // now: the wake just typed the launch line
+	ctx := context.Background()
+	registerAwake(t, ss, "claude", testUUID)
+	old := time.Now().Add(-6 * time.Hour).UTC().Format(store.ISOFormat)
+	_, err := ss.DB().ExecContext(ctx, "UPDATE live_sessions SET created_at = ? WHERE session_id = ?", old, testUUID) // it slept for hours
+	require.NoError(t, err)
+	require.NoError(t, ss.StampLaunch(ctx, testUUID)) // the wake typed the line just now
+	rt.listed = []AgentInfo{{AgentType: "claude", SessionID: testUUID}}
+	rt.set(FormatSessionName("claude", testUUID), "zsh") // the CLI has not started yet: the pane still shows the shell
+	for i := 0; i < 3; i++ {
+		r.reconcileOnce(ctx)
+	}
+	assert.False(t, isSleeping(t, ss, testUUID), "a woken agent whose CLI is still starting is not Ended")
+}

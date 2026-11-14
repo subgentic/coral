@@ -284,7 +284,13 @@ func (r *SessionReconciler) checkExited(ctx context.Context, ls store.LiveSessio
 	if r.cliMissing(ctx, ls, name) || r.hermesGatewayRefused(ctx, ls, name) {
 		return
 	}
-	if created, err := time.Parse(store.ISOFormat, ls.CreatedAt); err == nil && r.now().Sub(created) < exitedLaunchGrace {
+	// The grace runs from when Coral last typed the launch line: launched_at, which a wake stamps on its reused row; a launch, restart or resume makes a row whose created_at is that moment (#17298: a team
+	// woken after hours had no grace, so every member whose CLI had not started yet was marked Ended while the toast said the team was awake).
+	started := ptr.Value(ls.LaunchedAt)
+	if _, err := time.Parse(store.ISOFormat, started); err != nil {
+		started = ls.CreatedAt
+	}
+	if t0, err := time.Parse(store.ISOFormat, started); err == nil && r.now().Sub(t0) < exitedLaunchGrace {
 		return
 	}
 	if err := r.sessionStore.SetSessionSleepingFor(ctx, ls.SessionID, store.SleepReasonAgentExited); err != nil {
