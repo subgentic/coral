@@ -24,4 +24,15 @@ assert.equal(AF.isFiltered({ ...AF.EMPTY, sort: 'oldest' }), false, 'the order a
 AF.setTeamNames(new Map([['beta', 'Beta team']]));
 assert.ok(AF.chips({ ...AF.EMPTY, team: 'beta' }).some(c => /Team: Beta team/.test(c.label || c.text || String(c))), 'the team chip says the name');
 assert.ok(AF.ACTIONS.includes('undone') && AF.ACTIONS.includes('goal_close'));
+// #17360: a row is in ONE chip, so the chips add up to the heading (they summed to 22 against 15 when an answered prompt was a Permission and a Decision, a closed goal a Decision and a File).
+{
+    const mix = ['prompt_allow', 'prompt_reject', 'prompt_answer', 'goal_close', 'task_complete', 'answer', 'proposal', 'message', 'chat_send', 'file_star', 'file_comment', 'file_reply', 'file_version', 'inbox_hide', 'setting_change']
+        .map((action, i) => row(i + 1, { action, item_kind: /^prompt_/.test(action) ? 'agent' : /^goal_/.test(action) ? 'goal' : /^file_/.test(action) ? 'file' : 'x' }));
+    const sum = AF.KINDS.reduce((n, k) => n + mix.filter(r => AF.inKind(r, k)).length, 0);
+    assert.equal(sum, mix.length, 'every row is in exactly one chip: ' + AF.KINDS.map(k => k + '=' + mix.filter(r => AF.inKind(r, k)).length).join(' '));
+    assert.equal(AF.kindOfRow({ action: 'prompt_allow', item_kind: 'agent' }), 'permissions');
+    assert.equal(AF.kindOfRow({ action: 'goal_close', item_kind: 'goal' }), 'decisions');
+    assert.equal(AF.kindOfRow({ action: 'goal_edit', item_kind: 'goal' }), 'files', 'a row about a goal that is no decision is a File-and-tasks row');
+    assert.equal(AF.kindOfRow({ action: 'agents_record', item_kind: 'x' }), 'other', 'what fits no chip is Other, not lost');
+}
 console.log('PASS operator_activity_filters: search, team, action, since, order');

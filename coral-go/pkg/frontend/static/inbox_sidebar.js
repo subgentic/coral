@@ -812,7 +812,7 @@ function inboxActivityToolbar() {
     const teams = AC.teams();
     AF.setTeamNames(new Map(teams.map(t => [t, teamLabel(t)])));
     AF.setServerNames(new Map(serverChoices().map(id => [id, pagingServerLabel(id)])));
-    const pills = { label: 'Show', panelLabel: 'Show', current: activityFilters.kind || 'all', items: [{ key: 'all', label: 'Everything', count: AC.total() }, ...AF.KINDS.map(k => ({ key: k, label: AF.KIND_LABEL[k], count: AC.countKind(k) }))], onPick: key => { activityFilters = { ...activityFilters, kind: key === 'all' ? '' : key }; AF.saveFilters(activityFilters); renderInboxNav(true); } };
+    const pills = { label: 'Show', panelLabel: 'Show', current: activityFilters.kind || 'all', items: [{ key: 'all', label: 'Everything', count: AC.total() }, ...AF.KINDS.filter(k => k !== 'other' || AC.countKind(k)).map(k => ({ key: k, label: AF.KIND_LABEL[k], count: AC.countKind(k) }))], onPick: key => { activityFilters = { ...activityFilters, kind: key === 'all' ? '' : key }; AF.saveFilters(activityFilters); renderInboxNav(true); } };
     const node = activityBar.draw({ filters: activityFilters, pills, options: { team: { values: teams, labels: Object.fromEntries(teams.map(t => [t, teamLabel(t)])) }, agent: { values: AC.agents(), labels: {} }, goal: { values: AC.goals(), labels: {} } } });
     activityBar.bar.showField('server', multipleServers());
     const menu = node.querySelector('.list-bar-menu');

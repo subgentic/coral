@@ -50,3 +50,7 @@ assert.equal(activityParts({action:'answer',item_kind:'question',title:'@Operato
 assert.equal(activityParts({action:'answer',item_kind:'question',title:'Ask @Operator about release',asker:'Lead'},words).on,'Ask @Operator about release');
 assert.deepEqual(activityParts({action:'file_tags',item_kind:'file',title:'plan.md'},words),{did:'Changed the tags',on:'plan.md',detail:''});
 assert.deepEqual(activityParts({action:'file_share',item_kind:'file',title:'plan.md'},words),{did:'Shared',on:'plan.md',detail:''});
+// #17360: the person's comment, an agent's reply and an agent's new version are rows that name the file and carry the words.
+assert.deepEqual(activityParts({action:'file_comment',item_kind:'file',title:'plan.md',note:'Please add a Print button'},words),{did:'Commented on',on:'plan.md',detail:'Please add a Print button'});
+assert.deepEqual(activityParts({action:'file_reply',item_kind:'file',title:'plan.md',asker:'Orchestrator',note:'Added it.'},words),{did:'Orchestrator replied on',on:'plan.md',detail:'Added it.'});
+assert.deepEqual(activityParts({action:'file_version',item_kind:'file',title:'plan.md',asker:'Orchestrator',note:'version 2'},words),{did:'Orchestrator saved a new version of',on:'plan.md',detail:'version 2'});

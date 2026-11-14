@@ -13,7 +13,7 @@ export const ACTION_LABEL = {
     send_review: 'Sent for review', unsend_review: 'Taken out of review',
     message: 'Sent a message', task_create: 'Created a task', task_complete: 'Completed a task', task_cancel: 'Cancelled a task', task_publish: 'Published a task', task_edit: 'Changed a task', task_remind: 'Reminded about a task',
     task_park: 'Parked or released a task', task_reply: 'Replied on a task', prompt_answer: "Answered an agent's prompt", prompt_allow: 'Allowed what an agent asked', prompt_reject: 'Refused what an agent asked', wait_dismiss: 'Dismissed a waiting agent', wait_send: 'Sent held words to an agent',
-    mark_unread: 'Marked unread', file_tags: 'Changed the tags of a file', file_star: 'Starred a file', file_unstar: 'Unstarred a file', file_keep: 'Kept a file', file_release: 'Released a file', file_delete: 'Deleted a file', file_share: 'Shared a file with an agent', file_edit: 'Saved a new version of a file', file_edit_send: 'Sent an edit of a file to agents',
+    mark_unread: 'Marked unread', file_tags: 'Changed the tags of a file', file_comment: 'Commented on a file', file_reply: 'An agent replied on a file', file_version: 'An agent saved a new version of a file', file_star: 'Starred a file', file_unstar: 'Unstarred a file', file_keep: 'Kept a file', file_release: 'Released a file', file_delete: 'Deleted a file', file_share: 'Shared a file with an agent', file_edit: 'Saved a new version of a file', file_edit_send: 'Sent an edit of a file to agents',
     saved_add: 'Saved a message', saved_update: 'Changed a saved message', saved_remove: 'Removed a saved message', chat_flag: 'Starred or archived a chat', chat_send: 'Sent words to an agent', run_seen: 'Opened or dismissed a failed run',
     agents_record: 'Recorded for all agents', keep_full_access: 'Changed Full access on restart', goal_create: 'Created a goal', goal_edit: 'Changed a goal', goal_driver: 'Changed the driver of a goal', goal_move: 'Moved a goal to another team', goal_request_accept: 'Accepted a goal request',
     goal_request_decline: 'Declined a goal request', inbox_hide: 'Dismissed a row in Needs you', preview_trust: 'Trusted a file to run scripts in its preview', preview_untrust: 'Turned scripts off in a file preview',
@@ -24,8 +24,8 @@ export const DECISIONS = Object.keys(DECISION_LABEL);
 export const decisionOf = row => ({ ignore: 'dismiss', wait_dismiss: 'dismiss', inbox_hide: 'dismiss', prompt_answer: 'answer', prompt_allow: 'approve', prompt_reject: 'deny', skill_approve: 'approve', skill_reject: 'deny' }[row.action] || (DECISIONS.includes(row.action) ? row.action : ''));
 
 /** The kinds of action the folder's chips show (#15724, the Operator's pick of design B): the page opens on Everything, and a chip narrows the record to one kind. The full record stays one chip away. */
-export const KINDS = ['decisions', 'answers', 'permissions', 'files', 'words'];
-export const KIND_LABEL = { decisions: 'Decisions', answers: 'Answers', permissions: 'Permissions', files: 'Files and tasks', words: 'Words sent' };
+export const KINDS = ['decisions', 'answers', 'permissions', 'files', 'words', 'other'];
+export const KIND_LABEL = { decisions: 'Decisions', answers: 'Answers', permissions: 'Permissions', files: 'Files and tasks', words: 'Words sent', other: 'Other' };
 const KIND_TEST = {
     decisions: r => !!DECISION_LABEL[decisionOf(r)] || ['goal_close', 'task_complete', 'task_cancel', 'goal_review'].includes(r.action), // Answered, Allowed, Denied, Approved, Closed, Completed and the like
     answers: r => r.action === 'answer' || r.action === 'proposal',
@@ -33,7 +33,10 @@ const KIND_TEST = {
     files: r => ['file', 'task', 'goal'].includes(r.item_kind) && r.action !== 'chat_send',
     words: r => ['message', 'chat_send', 'task_reply'].includes(r.action),
 };
-export const inKind = (r, k) => !k || !!(KIND_TEST[k] && KIND_TEST[k](r));
+/** A row is in ONE chip, the first that fits (#17360: the chips summed to 22 against 15 rows, because an answered prompt was both a Permission and a Decision and a closed goal both a Decision and a File): the numbers on the chips add up to the heading's. What fits none is Other. */
+const KIND_ORDER = ['permissions', 'answers', 'words', 'decisions', 'files'];
+export const kindOfRow = r => KIND_ORDER.find(k => KIND_TEST[k](r)) || 'other';
+export const inKind = (r, k) => !k || kindOfRow(r) === k;
 
 export const NO_GOAL = 'No goal';
 /** The agent a row is about, when the record says (#14445): who asked, for an ask (an older answer kept the asker as its title), or the agent named by a prompt, wait or chat row; '' for a row about no agent. */

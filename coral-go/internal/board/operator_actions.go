@@ -105,7 +105,10 @@ const (
 	ActGoalMove       = "goal_move"
 	ActGoalRequestAdd = "goal_request_accept"
 	ActGoalRequestNo  = "goal_request_decline"
-	ActInboxHide      = "inbox_hide" // Dismiss or Not yet on a goal-looks-done row, a welcome item's Dismiss: kept in settings
+	ActFileComment    = "file_comment" // the person commented on a file (the note is the comment, redacted and cut) (#17360)
+	ActFileReply      = "file_reply"   // an agent answered in a file's comment thread; asker is the agent (#17360)
+	ActFileVersion    = "file_version" // an agent uploaded a new version of a file; asker is the agent, the note says which version (#17360)
+	ActInboxHide      = "inbox_hide"   // Dismiss or Not yet on a goal-looks-done row, a welcome item's Dismiss: kept in settings
 )
 
 // ActivityMeta is what a handler knows about the action, set on the context so the store's own transaction can write the row: the actor and source come from the verified request, never the body.

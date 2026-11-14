@@ -139,6 +139,7 @@ func (h *SessionsHandler) agentReplyArtifactComment(w http.ResponseWriter, r *ht
 		if h.bs != nil {
 			h.bs.NoteAllArtifactsChanged()
 		}
+		h.recordCommentActivity(r, caller.withName(name), id, t.Board, body) // the agent's reply is a row of Activity (#17360)
 		slog.Info("[artifact comments] agent replied into a thread", "via", map[bool]string{true: "its own upload (never asked)", false: "an ask"}[viaUpload], "artifact", id, "comment", t.ID, "agent", name, "board", t.Board)
 		writeJSON(w, http.StatusCreated, h.commentView(caller, c, false, false))
 	}
