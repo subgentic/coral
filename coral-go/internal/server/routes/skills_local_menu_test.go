@@ -148,3 +148,33 @@ func TestTheLocalListIsCappedAndCoralsOwnStayAtMostTwenty(t *testing.T) {
 	assert.LessOrEqual(t, n, maxLocalMenuSkills)
 	assert.Greater(t, n, 0)
 }
+
+// #16083: a skills folder with a great many sub-folders costs a bounded read: at most dirEntryCap entries of it are listed, whatever its size.
+func TestAHugeSkillsFolderIsReadOnlyUpToTheEntryCap(t *testing.T) {
+	old := dirEntryCap
+	dirEntryCap = 5
+	t.Cleanup(func() { dirEntryCap = old })
+	e := newSkillsEnv(t)
+	for i := 0; i < 30; i++ {
+		name := "skill-" + string(rune('a'+i/10)) + string(rune('a'+i%10))
+		e.skillFolder(e.homeDir(), ".claude/skills", name, "---\nname: "+name+"\ndescription: One of many.\n---\n")
+	}
+	var n int
+	for _, r := range e.menu("/api/skills/search") {
+		if r.Source == "you" {
+			n++
+		}
+	}
+	assert.Equal(t, 5, n, "only the first dirEntryCap entries of the folder are read")
+	small, err := readFolderEntriesForTest(filepath.Join(e.homeDir(), ".claude/skills"))
+	require.NoError(t, err)
+	assert.Len(t, small, 5)
+}
+
+func readFolderEntriesForTest(dir string) ([]os.DirEntry, error) {
+	got, ok := readSomeEntries(dir, dirEntryCap)
+	if !ok {
+		return nil, os.ErrNotExist
+	}
+	return got, nil
+}
