@@ -4,14 +4,20 @@
  * team without a Hub or a reader without the owner's right sees no empty box. Everything is drawn as text (textContent), never HTML. The Settings > Messaging list is the same data and is left as it is. */
 import { splitKey, boardFetch, isCloud } from './server_base.js';
 
-const HUB_LINKS_URL = 'https://app.coralhub.dev/team-links'; // Coral Hub's Team links page: a constant, the hub refuses a query on it (the constant of team_cross_team_fields.js)
+const LINKS_PATH = '/team-links'; // Coral Hub's Team links page, on the Hub this computer is linked to (#16484): its origin only, no path, query or team data
 const MAX_LINKS = 50;
 const label = v => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, '').trim().slice(0, 80); // display text: no control or bidi characters, bounded
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 let seq = 0; // the latest draw wins: a slow answer for the team left behind draws nothing
 
+// null when no Hub is linked; else { url }: the Team links page of the linked Hub, or '' when its address is not a usable http(s) one (the rows still show, the link out does not)
 async function hubLinked() {
-    try { const r = await fetch('/api/cloud/status'); if (!r.ok) return false; const st = await r.json(); return ['connecting', 'connected', 'retrying'].includes(st && st.state); } catch { return false; }
+    try {
+        const r = await fetch('/api/cloud/status'); if (!r.ok) return null; const st = await r.json();
+        if (!['connecting', 'connected', 'retrying'].includes(st && st.state)) return null;
+        let url = ''; try { const u = new URL(String(st.hub_url || '')); if (u.protocol === 'https:' || u.protocol === 'http:') url = u.origin + LINKS_PATH; } catch { /* no usable address */ }
+        return { url };
+    } catch { return null; }
 }
 function rowsOf(state) {
     const one = (list, how) => (Array.isArray(list) ? list : []).filter(l => l && typeof l === 'object').map(l => ({
@@ -27,9 +33,9 @@ export async function drawLinkedTeams(host, team) {
     const hide = () => { if (mine === seq) { host.hidden = true; host.replaceChildren(); } };
     const server = splitKey(team).server;
     if (isCloud() || (server && server !== 'local')) return hide();
-    let state = null;
+    let state = null, hub = null;
     try {
-        if (!(await hubLinked())) return hide();
+        hub = await hubLinked(); if (!hub) return hide();
         const r = await boardFetch(team, '/cross-team-state');
         if (!r.ok) return hide();
         state = await r.json();
@@ -38,10 +44,12 @@ export async function drawLinkedTeams(host, team) {
     const rows = rowsOf(state);
     const head = mk('div', 'team-links-head');
     head.append(mk('h2', 'team-links-h', 'Linked teams'));
-    const a = mk('a', 'update-link', rows.length ? 'Manage in Coral Hub' : 'Link a team in Coral Hub');
-    a.href = HUB_LINKS_URL; a.target = '_blank'; a.rel = 'noopener noreferrer';
-    a.append(mk('span', 'sr-only', ' (opens Coral Hub in a new tab)'));
-    head.append(a);
+    if (hub.url) {
+        const a = mk('a', 'update-link', rows.length ? 'Manage in Coral Hub' : 'Link a team in Coral Hub');
+        a.href = hub.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+        a.append(mk('span', 'sr-only', ' (opens Coral Hub in a new tab)'));
+        head.append(a);
+    }
     host.replaceChildren(head);
     if (!rows.length) host.append(mk('p', 'team-links-none', 'No linked teams yet.'));
     else {
