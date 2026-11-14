@@ -5,6 +5,7 @@ import { isPhoneLayout } from './phone_layout.js';
 import { scrollBehavior } from './motion.js';
 import { showToast, escapeHtml, escapeAttr, boardNameProblem, OPERATOR_ID } from './utils.js';
 import { loadLiveSessions } from './api.js';
+import { state } from './state.js';
 import { recordRecentDir, getRecentDirs, pruneMissingRecents } from './browser.js';
 import { teamForm, showTeamWorktree, showTeamWorkers, syncSuggestionExists, trustTicked, resetFolderTrust, scheduleFolderTrust } from './team_form.js';
 import { agentNameForm } from './agent_form.js';
@@ -328,6 +329,23 @@ function _applyACFPresetFor(containerId, name) {
 // Default team: first 3 presets
 
 /** Step 1 checks the chosen folder before Next advances. A missing local folder can be made at Launch only when its parent is accessible and does not list it. Suggested folders use their existing create_dir path; remote folders are checked without requesting creation. */
+/** One quiet line when another live agent or team already works in the chosen folder (#17196 item 5, walk 51): both can change the same files; a warning, never a block. */
+const _sameDir = d => String(d || '').trim().replace(/[\\/]+$/, '').replace(/\\/g, '/').toLowerCase();
+export function sharedFolderWords(dir, sessions) {
+    const want = _sameDir(dir); if (!want) return '';
+    const here = (Array.isArray(sessions) ? sessions : []).filter(s => s && s.working_directory && _sameDir(s.working_directory) === want);
+    if (!here.length) return '';
+    const byTeam = here.every(s => s.board_project);
+    const names = [...new Set(here.map(s => byTeam ? s.board_project : (s.display_name || s.name || 'An agent')))];
+    const who = names.length > 2 ? `${names[0]} and ${names.length - 1} others` : names.join(' and ');
+    return `${who} also ${names.length === 1 ? 'works' : 'work'} in this folder; both can change the same files.`;
+}
+function _syncSharedFolderLine() {
+    const input = document.getElementById('launch-team-dir'), line = document.getElementById('launch-team-dir-shared'); if (!input || !line) return;
+    const words = _effectiveServer(launch.server) === LOCAL_SERVER ? sharedFolderWords(input.value, state.liveSessions) : '';
+    if (line.textContent !== words) line.textContent = words;
+    line.hidden = !words;
+}
 const NEW_FOLDER_NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$/;
 async function _checkNewTeamFolder({ validate = false } = {}) {
     const input = document.getElementById('launch-team-dir'), line = document.getElementById('launch-team-dir-new');
@@ -464,6 +482,7 @@ async function _initTeamForm() {
         let _gitCheckTimer;
         dirInput.addEventListener('input', () => { delete dirInput.dataset.createNew; const nl = document.getElementById('launch-team-dir-new'); if (nl) nl.hidden = true; clearTimeout(_gitCheckTimer); _gitCheckTimer = setTimeout(() => { _checkTeamGitDir(); _checkNewTeamFolder(); }, 500); }); // the line goes the moment the field changes and comes back when the folder is checked
         dirInput.addEventListener('change', () => { _checkTeamGitDir(); _checkNewTeamFolder(); });
+        dirInput.addEventListener('input', _syncSharedFolderLine); dirInput.addEventListener('change', _syncSharedFolderLine);
     }
     for (const id of ['team-board-name', 'launch-team-dir']) { // Enter in either is Next (#7407)
         const el = document.getElementById(id);
