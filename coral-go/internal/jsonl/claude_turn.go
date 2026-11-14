@@ -22,6 +22,14 @@ func (r *SessionReader) ReadClaudeTurnEvent(sessionID, workingDir string) (strin
 	return st.event, st.at
 }
 
+// ReadClaudePermissionMode returns the permission mode a Claude session's newest transcript entry that records one carries, and when that entry was written, or "" and the zero
+// time (#16523). Claude writes permissionMode on its user entries, so a Shift+Tab inside the terminal shows here at the next message and nowhere else: Coral's stored launch mode
+// does not change. The caller decides whether the value may be used (a mode older than the launch is not the live one).
+func (r *SessionReader) ReadClaudePermissionMode(sessionID, workingDir string) (string, time.Time) {
+	st := r.scanClaudeTranscript(sessionID, workingDir)
+	return st.permMode, st.permAt
+}
+
 // ReadClaudeVersion returns the Claude Code version the session's newest transcript line
 // carries, or "" (#3573). It is the running process's own version: Claude Code updates itself
 // while an agent keeps running, so the binary's --version can already be newer.
@@ -58,6 +66,7 @@ func (r *SessionReader) scanClaudeTranscript(sessionID, workingDir string) claud
 		c.claudeState.turnAt = time.Time{}
 		c.claudeState.assistantAt = time.Time{}
 		c.claudeState.apiErr = ClaudeAPIError{}
+		c.claudeState.permMode, c.claudeState.permAt = "", time.Time{}
 	}
 	consume := func(line []byte) {
 		if v := claudeLineVersion(line); v != "" {
@@ -70,6 +79,9 @@ func (r *SessionReader) scanClaudeTranscript(sessionID, workingDir string) claud
 		}
 		if t := claudeLineMainAssistantTime(line); !t.IsZero() {
 			c.claudeState.assistantAt = t
+		}
+		if m := claudeLinePermissionMode(line); m != "" {
+			c.claudeState.permMode, c.claudeState.permAt = m, claudeLineTime(line)
 		}
 		updateClaudeTurnState(&c.claudeState, line)
 		updateClaudeAPIError(&c.claudeState.apiErr, line)
@@ -94,6 +106,27 @@ func (r *SessionReader) scanClaudeTranscript(sessionID, workingDir string) claud
 		reset()
 	}
 	return c.claudeState
+}
+
+var claudePermModeKey = []byte(`"permissionMode"`)
+
+// claudeLinePermissionMode is a transcript line's top-level "permissionMode" value, or "": only lines that contain the key are decoded. A value that is not one of Claude's
+// modes is "" (the caller never launches with a word nobody here can read).
+func claudeLinePermissionMode(line []byte) string {
+	if !bytes.Contains(line, claudePermModeKey) {
+		return ""
+	}
+	var rec struct {
+		PermissionMode string `json:"permissionMode"`
+	}
+	if json.Unmarshal(line, &rec) != nil {
+		return ""
+	}
+	switch rec.PermissionMode {
+	case "default", "plan", "acceptEdits", "auto", "bypassPermissions", "dontAsk":
+		return rec.PermissionMode
+	}
+	return ""
 }
 
 var claudeVersionKey = []byte(`"version"`)
