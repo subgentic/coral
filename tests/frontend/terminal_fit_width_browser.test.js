@@ -252,9 +252,23 @@ function assertFits(v, what) {
         assert.equal(v.font, fitted, 'the same size as before');
         console.log(`   ✓ ${v.font} px after a reload`);
 
-        console.log('3. A 200-column pane stops at the minimum and scrolls');
+        console.log('3. A 200-column pane: with no choice made the phone keeps a readable font and scrolls (#16365); pressing Fit goes down to the minimum');
         const wide = { cols: 200, rows: 50 };
         setPane(A.name, wide.cols, wide.rows);
+        {
+            const ctx = await newContext(); contexts.push(ctx);
+            const fresh = await openTab({ contextId: ctx, width: 390, height: 844, mobile: true, fitDefault: true });
+            tabs.push(fresh);
+            v = await show(fresh, A, wide);
+            v = await settled(fresh, 'the toggle shown', 'v.btn && v.btn.shown');
+            assert.equal(v.font, PHONE_BASE, `a pane that needs under 8 px is not shrunk by default: the phone's own ${PHONE_BASE} px (${JSON.stringify(v)})`);
+            assert.ok(v.scrolls, 'and scrolls sideways');
+            assert.equal(v.btn.pressed, 'false'); assert.equal(v.btn.label, 'Fit the terminal to the screen width');
+            assert.equal(await fresh.ev(`localStorage.getItem('coral-terminal-fit-width')`), null, 'declining stores nothing');
+            await click(fresh);
+            v = await settled(fresh, 'the minimum font on request', `v.font === ${MIN_FONT} && v.btn.pressed === 'true'`);
+            await fresh.close(); tabs.pop();
+        }
         await phone.load();
         await show(phone, A, wide);
         v = await settled(phone, 'the minimum font', `v.font === ${MIN_FONT}`);
