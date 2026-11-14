@@ -48,4 +48,20 @@ assert.ok(AF.inKind(kindRows[3], 'files'), 'an approve of a file is in Files');
 assert.ok(!AF.inKind(kindRows[3], 'decisions'), 'an approve of a file is NOT in Decisions');
 assert.ok(AF.inKind(kindRows[4], 'words'), 'a message is in Words');
 assert.ok(AF.inKind(kindRows[7], 'decisions'), 'a skill_approve is in Decisions (no more specific kind)');
-console.log('PASS operator_activity_filters: search, team, action, since, order, exclusive kinds');
+// A row whose action matches no specific kind still lands in a chip, so the sum never falls short (#16983)
+const noKindRows = [
+    ...kindRows,
+    row(19, { action: 'hub_update_check', item_kind: 'setting', title: 'Checked for update' }),
+    row(20, { action: 'save', item_kind: 'agent', title: 'Saved for later' }),
+    row(21, { action: 'mark_read', item_kind: 'file', title: 'spec.md' }), // mark_read of a file: item_kind is file, but the action is not a decision and files test includes file → files
+    row(22, { action: 'run_seen', item_kind: 'run', title: 'Run 42' }), // run_seen: item_kind is run, not file/task/goal → no specific kind before this fix
+];
+const noKindCount = k => noKindRows.filter(r => AF.inKind(r, k)).length;
+const noKindTotal = noKindRows.length;
+const noKindChipSum = AF.KINDS.reduce((sum, k) => sum + noKindCount(k), 0);
+assert.equal(noKindChipSum, noKindTotal, `every row has a primary kind (${noKindChipSum} vs ${noKindTotal}): no row outside all chips`);
+assert.ok(AF.inKind(noKindRows[9], 'decisions'), 'hub_update_check is in Decisions (the fallback kind)');
+assert.ok(AF.inKind(noKindRows[10], 'decisions'), 'save is in Decisions (the fallback kind)');
+assert.ok(AF.inKind(noKindRows[11], 'files'), 'mark_read of a file is in Files (item_kind is file)');
+assert.ok(AF.inKind(noKindRows[12], 'decisions'), 'run_seen is in Decisions (the fallback kind)');
+console.log('PASS operator_activity_filters: search, team, action, since, order, exclusive kinds, no-kind fallback');
