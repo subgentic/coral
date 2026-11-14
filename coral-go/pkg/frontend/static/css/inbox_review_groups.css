@@ -54,7 +54,7 @@
 #group-table-view .gt-toolbar.tb-low { flex-wrap: wrap; }
 #group-table-view .gt-toolbar.tb-low > .team-tb-selection { order: 10; flex: 1 1 100%; min-height: 40px; flex-wrap: nowrap; overflow-x: auto; }
 #group-table-view .gt-toolbar.tb-low > .list-bar-count { display: none; }
-@media (min-width: 768px) { #group-table-view .inbox-folder-toolbar:not(:has(.team-toolbar-selecting)) { padding-bottom: 52px; } } /* the actions' line (40 px and the row's 8 px gap) is kept while nothing is selected, so ticking a row moves no row (#15339) */
+@media (min-width: 768px) { #group-table-view .inbox-folder-toolbar:not(:has(.team-toolbar-selecting)) { padding-bottom: 50px; } } /* the actions' line (40 px and the row's 8 px gap, plus 2 px from the toggle's box) is kept while nothing is selected, so ticking a row moves no row (#15339, #16792) */
 /* #15540: icon and star share a line at the row's top on a computer; a phone card keeps its star at the end of the button row (#15658) */
 @media (min-width: 768px) {
     #group-table-view .inbox-needs-results  .inbox-review-star-anchor { position: static; }
