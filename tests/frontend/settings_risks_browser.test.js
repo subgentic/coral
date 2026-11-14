@@ -29,7 +29,7 @@ const BASE = require('./test_base').BASE;
     window.__riskChanges=[];modal.addEventListener('change',e=>window.__riskChanges.push(e.target.id));return true;
    })()`);
    const choose=(id,value)=>ev(`(()=>{const e=document.getElementById('${id}');e.focus();${typeof value==='boolean'?`e.checked=${value}`:`e.value=${JSON.stringify(value)}`};e.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
-   for(const [id,value,count] of [ ['settings-permission-mode','bypassPermissions',1],['settings-permission-mode','dontAsk',1],['settings-remote-access-enabled',true,2],['settings-cloud-hub-operator',true,3],['sec-hub-enabled',true,4],['settings-debug-input-log',true,5] ]) {
+   for(const [id,value,count] of [ ['settings-permission-mode','bypassPermissions',1],['settings-permission-mode','dontAsk',0],['settings-remote-access-enabled',true,1],['settings-cloud-hub-operator',true,2],['sec-hub-enabled',true,3],['settings-debug-input-log',true,4] ]) {
     const before=await ev('window.__riskChanges.length');await choose(id,value);
     await waitFor(`document.getElementById('confirm-modal').style.display==='flex'`,'enabling asks');
     assert.equal(await ev('window.__riskChanges.length'),before,'no save before confirmation');
@@ -37,19 +37,23 @@ const BASE = require('./test_base').BASE;
     assert.equal(await ev('window.__riskChanges.length'),before,'Cancel writes nothing');
     await choose(id,value);await ev(`document.getElementById('confirm-modal-yes').click();true`);
     assert.equal(await ev('window.__riskChanges.length'),before+1,'confirmation dispatches one save');
-    assert.match(await ev(`document.getElementById('settings-safety-summary').textContent`),new RegExp('Safety checks turned off: '+count));
+    assert.match(await ev(`document.getElementById('settings-safety-summary').textContent`),count?new RegExp('Risky choices on: '+count):/None of the risky choices below are on/);
     assert.match(await ev(`document.getElementById('${id}-risk').textContent`),/⚠ /);
    }
    await choose('settings-codex-trust-hooks',true);
    assert.notEqual(await ev(`document.getElementById('confirm-modal').style.display`),'flex','trusting Coral’s Codex hooks is an ordinary default, without confirmation');
    assert.equal(await ev(`!!document.getElementById('settings-codex-trust-hooks-risk')`),false,'Codex trust has no risk warning');
-   assert.match(await ev(`document.getElementById('settings-safety-summary').textContent`),/Safety checks turned off: 5/,'Codex trust does not increase the count');
+   assert.match(await ev(`document.getElementById('settings-safety-summary').textContent`),/Risky choices on: 4/,'Codex trust does not increase the count');
    await choose('tb-autowake-on',true);
    assert.match(await ev(`document.querySelector('.settings-wake-warning').textContent`),/saved permissions.*bypass/);
    for(const id of ['settings-codex-trust-hooks','settings-remote-access-enabled','settings-cloud-hub-operator','sec-hub-enabled','settings-debug-input-log'])await choose(id,false);
    await choose('settings-permission-mode','default');
-   assert.equal(await ev(`document.getElementById('settings-safety-summary').textContent`),'All safety checks are on');
+   assert.equal(await ev(`document.getElementById('settings-safety-summary').textContent`),'None of the risky choices below are on');
    assert.equal(await ev(`document.querySelectorAll('.settings-risk-warning:not([hidden]):not(.settings-wake-warning)').length`),0);
+   // Safari does not focus a switch on a click: the value it had was last taken on focus, so a value loaded since could make the next change look like no change and skip the confirm
+   await ev(`(()=>{const e=document.getElementById('settings-debug-input-log');e.checked=true;e.dispatchEvent(new Event('focusin',{bubbles:true}));e.checked=false;e.dispatchEvent(new Event('pointerdown',{bubbles:true}));e.checked=true;e.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
+   await waitFor(`document.getElementById('confirm-modal').style.display==='flex'`,'a click that did not focus the switch still asks');
+   await ev(`window.hideConfirmModal();true`);
   }
   assert.deepEqual(missing,[],'Security shows its safety summary at every width, theme and text size');
   // Drive the real Settings rows through autosave, without changing the machine's saved security settings.
@@ -72,8 +76,9 @@ const BASE = require('./test_base').BASE;
    if(id==='settings-permission-mode') await waitFor(`!!document.getElementById('${id}')._segmented?.querySelector('[aria-checked="true"]')`, 'visible permission mode control rendered');
    await ev(`document.getElementById('settings-tab-security').click();true`);
    const label=id==='settings-permission-mode'?(value==='dontAsk'?"Don't ask":'Bypass permissions'):id==='settings-remote-access-enabled'?'Remote access':'Record what Coral types';
+   if(!(id==='settings-permission-mode'&&value==='dontAsk')){ // "Don't ask" has a warning on its row but no button in the summary
    await ev(`document.querySelector('#settings-safety-summary details').open=true;[...document.querySelectorAll('#settings-safety-summary button')].find(b=>b.textContent===${JSON.stringify(label)}).click();true`);
-   await waitFor(`(()=>{const e=document.getElementById('${id}');const target=e._segmented?.querySelector('[aria-checked="true"]')||e;return !e.closest('.settings-pane').hidden && target.getClientRects().length>0 && document.activeElement===target;})()`, 'summary opens the pane and focuses the rendered risk control');
+   await waitFor(`(()=>{const e=document.getElementById('${id}');const target=e._segmented?.querySelector('[aria-checked="true"]')||e;return !e.closest('.settings-pane').hidden && target.getClientRects().length>0 && document.activeElement===target;})()`, 'summary opens the pane and focuses the rendered risk control');}
    const warning=await ev(`document.getElementById('${id}-risk').textContent`);assert.match(warning,/⚠ /);
    await shot(`settings-risks-active-${id}-${typeof value==='boolean'?'on':value}`);
    if(id==='settings-permission-mode'&&value==='dontAsk') {

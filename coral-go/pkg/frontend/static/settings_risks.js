@@ -4,7 +4,7 @@ const { showConfirmModal } = await importOnce('./confirm_dialog.js');
 const { openSettingsGroup } = await importOnce('./settings_nav.js');
 const choices = [
     { id: 'settings-permission-mode', value: 'bypassPermissions', label: 'Bypass permissions', text: 'Claude’s permission checks are off. Claude can run tools without asking.' },
-    { id: 'settings-permission-mode', value: 'dontAsk', label: "Don't ask", text: 'Claude’s permission questions are off. Tools that need permission are denied instead of asking.' },
+    { id: 'settings-permission-mode', value: 'dontAsk', label: "Don't ask", quiet: true, text: 'Claude’s permission questions are off. Tools that need permission are denied instead of asking.' },
     { id: 'settings-remote-access-enabled', label: 'Remote access', text: 'Access is no longer limited to this computer. Other devices can control agents and read files after signing in.' },
     { id: 'settings-cloud-hub-operator', label: 'Let Coral Hub act as the Operator', text: 'Operator decisions are no longer limited to this computer. Coral Hub users with permission can make them here.' },
     { id: 'sec-hub-enabled', label: 'Let Coral Hub sign in here', text: 'Local sign-in is no longer required. Your linked Coral Hub account can sign in with full control.' },
@@ -33,13 +33,13 @@ export function wireSettingsRisks(modal) {
             let note = row.querySelector('.settings-risk-warning');
             if (!note) { note = document.createElement('p'); note.className='settings-risk-warning'; note.id=`${id}-risk`; (row.querySelector('.sv-text') || row).append(note); const desc=e.getAttribute('aria-describedby'); e.setAttribute('aria-describedby',[desc,note.id].filter(Boolean).join(' ')); }
             note.hidden = !c; text(note,c ? `⚠ ${c.text}` : '');
-            if(c) enabled.push(c);
+            if(c && !c.quiet) enabled.push(c); // "Don't ask" denies tools: it warns on its row but is not a lowered check
         }
         const signature = enabled.map(c=>c.label).join('|');
         if(summary.dataset.signature!==signature) {
             summary.dataset.signature=signature; summary.replaceChildren();
             const list=document.createElement(enabled.length ? 'details' : 'div');summary.append(list);
-            const title=document.createElement(enabled.length ? 'summary' : 'p'); title.textContent=enabled.length ? `Safety checks turned off: ${enabled.length}` : 'All safety checks are on'; list.append(title);
+            const title=document.createElement(enabled.length ? 'summary' : 'p'); title.textContent=enabled.length ? `Risky choices on: ${enabled.length}` : 'None of the risky choices below are on'; list.append(title);
             for(const c of enabled) {
                 const link=document.createElement('button'); link.type='button'; link.className='btn btn-small'; link.textContent=c.label;
                 link.addEventListener('click',()=>{const e=document.getElementById(c.id),pane=e?.closest('.settings-pane');if(!e||!pane)return;openSettingsGroup(pane.dataset.group || pane.dataset.section);for(const fold of [e.closest('details')])if(fold)fold.open=true;const target=e._segmented?.querySelector('[aria-checked="true"]') || e;target.focus();target.scrollIntoView({block:'nearest'});}); list.append(link);
@@ -59,7 +59,8 @@ export function wireSettingsRisks(modal) {
             e.focus();put(e,want);pending.delete(e);accepted.add(e);e.dispatchEvent(new Event('change',{bubbles:true}));refresh();
         },()=>{pending.delete(e);put(e,before);refresh();e.focus();},{label:'Turn on',danger:false});
     },true);
-    modal.addEventListener('focusin',event=>{if(choices.some(c=>c.id===event.target.id)&&!pending.has(event.target))previous.set(event.target,get(event.target));});
+    // Safari does not focus a switch it is clicked, so the value before the change is also taken when the pointer or a key goes down on it
+    for(const type of ['focusin','pointerdown','keydown'])modal.addEventListener(type,event=>{if(choices.some(c=>c.id===event.target.id)&&!pending.has(event.target))previous.set(event.target,get(event.target));},true);
     modal.addEventListener('coral-refresh-risks',refresh);
     new MutationObserver(refresh).observe(modal,{subtree:true,childList:true,attributes:true,attributeFilter:['checked','disabled','data-shown','data-saved']});
     modal.addEventListener('change',refresh); refresh();
