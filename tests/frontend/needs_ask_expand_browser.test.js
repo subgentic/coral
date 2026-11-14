@@ -63,7 +63,12 @@ const PLAN = 'Plan for the Reading List app (task #1) — OK to proceed? 1) Scop
             await waitFor(`(() => { const tr = ${askRow('Designer')}; const b = tr && tr.querySelector('.inbox-ask-expand'); return !!b && b.getAttribute('aria-expanded') === 'true'; })()`, `${w}: one tap opens the question in place`, 6000);
             await new Promise(r => setTimeout(r, 300)); // sleep-ok: the row is drawn again
             const open = await state('Designer');
-            assert.ok(open.len === PLAN.repeat(2).replace(/\s+/g, ' ').trim().length + '@Operator '.length && open.text.endsWith('after a reload.') && !open.text.endsWith('…'), `${w}: opened, every word is there and nothing is cut: ${shut.len} -> ${open.len}, ends ${JSON.stringify(open.text.slice(-24))}`);
+            const flat = open.text.replace(/\s+/g, ' ').trim();
+            assert.ok(flat === PLAN.repeat(2).replace(/\s+/g, ' ').trim() && open.text.endsWith('after a reload.') && !open.text.endsWith('…'), `${w}: opened, every word is there (the address aside) and nothing is cut: ${shut.len} -> ${open.len}, ends ${JSON.stringify(open.text.slice(-24))}`);
+            // #16680: the points are on lines of their own, the address is not said again, and the words are no wider than about 90 characters
+            assert.ok(!/@Operator/.test(open.text) && /\n1\) Scope/.test(open.text) && /\n2\) Stack/.test(open.text) && /\n3\) Screens/.test(open.text), `${w}: opened, each numbered point starts a line and "@Operator" is gone: ${JSON.stringify(open.text.slice(0, 160))}`);
+            const cap = await ev(`(() => { const q = ${askRow('Designer')}.querySelector('.inbox-ask-name'), p = document.createElement('span'); p.style.cssText = 'position:absolute;visibility:hidden;width:90ch;font:' + getComputedStyle(q).font; q.append(p); const ninety = p.getBoundingClientRect().width; p.remove(); return { w: q.getBoundingClientRect().width, ninety }; })()`);
+            assert.ok(cap.w <= cap.ninety + 1, `${w}: the opened words are no wider than 90 characters: ${JSON.stringify(cap)}`);
             assert.ok(open.button.label === 'Show less' && open.button.expanded === 'true' && open.button.h >= (mobile ? 44 : 28) && open.button.inside, `${w}: the button says Show less and stays a control (44 px on a phone) in the row: ` + JSON.stringify(open.button));
             assert.ok(!open.overlapsNext && open.scroll <= 0, `${w}: the opened row does not run over the next one and the page does not scroll sideways: ` + JSON.stringify({ o: open.overlapsNext, s: open.scroll }));
             await ev(`${askRow('Designer')}.scrollIntoView({ block: 'center', behavior: 'instant' }); true`);

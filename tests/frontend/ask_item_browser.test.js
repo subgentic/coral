@@ -46,7 +46,7 @@ const OPERATOR_TEXT = '@Operator TEST ITEM, safe to answer any way: this is a te
             await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn:not(.btn-primary)').click(); true`);
             await waitFor(`!document.querySelector('dialog.inbox-ask-dialog')`, at + 'Close closes it', 4000);
             // bidi and zero-width characters in the question remain written out in its body (Security's SHOULD on #12143; hidden characters reshape what the Operator reads before deciding)
-            const titles = await ev(`import(${S} + 'operator_asks.js').then(m => ({
+            const titles = await ev(`import(${S} + 'operator_ask_dialog.js').then(m => ({
                 short: m.askParts({ text: '@Operator approve \\u202edeploy\\u200b now?\\nmore' }).body,
                 long: m.askParts({ text: '@Operator \\u202e' + 'Which of the two designs do we ship, given what each costs and what the other would cost us? ' + 'x'.repeat(20) }).body,
                 heading: m.askParts({ text: '## \\u200bship it?' }).body }))`);

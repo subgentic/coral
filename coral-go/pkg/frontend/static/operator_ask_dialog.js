@@ -7,7 +7,13 @@ import { whenText } from './when_text.js';
 import { loadStyles } from './lazy_styles.js';
 import { showToast } from './notifications.js';
 import { importOnce } from './import_once.js';
-import { askParts, askSubjects, fromAnotherComputer, buttonsOffered, noteButtonsOwnerOnly, yesNoButtons, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, operatorAsks, askKey, replyToAsk, forgetAsk, questionContextNote } from './operator_asks.js';
+import { askSubjects, askWhole, listsOf, withoutOperator, fromAnotherComputer, buttonsOffered, noteButtonsOwnerOnly, yesNoButtons, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, operatorAsks, askKey, replyToAsk, forgetAsk, questionContextNote } from './operator_asks.js';
+
+/** The dialog names the asker and team; the complete question is shown once in its body (#12722). */
+export function askParts(a) {
+    return { title: `${markHidden(a.asker || 'Agent', { strict: true })} · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`,
+        body: listsOf(withoutOperator(askWhole(a))) };
+}
 await loadStyles('operator_ask_dialog.css');
 
 const isReply = action => /^reply$/.test(action);

@@ -48,7 +48,7 @@ export const askWhole = a => markHidden(a && a.text, { strict: true });
 export const askIsLong = a => String((a && a.text) == null ? '' : a.text).length > PREVIEW_IN;
 /** The question as an opened row says it (#14617): ALL the words the Operator's list carries (up to 4096 characters), white space collapsed as the preview's is; a question the server itself cut says so after it. */
 export function askOpened(a) {
-    const one = plainMarkdown(askWhole(a)).replace(/\s+/g, ' ').trim();
+    const one = listsOf(withoutOperator(plainMarkdown(askWhole(a))).replace(/\s+/g, ' ').trim()); // points and choices on lines of their own (#16680)
     return a && a.cut ? `${one} \u2026 (cut: the board has the rest)` : one;
 }
 /** A stable id of one question among the rows. */
@@ -218,27 +218,18 @@ async function resumeEndedMember(server, a, name, who, sessionName) {
     return resumeEndedAgent(server, { agentType: m[1], sid: m[2], name }, a.board);
 }
 
-/** The dialog names the asker and team; the complete question is shown once in its body (#12722). */
-export function askParts(a) {
-    return { title: `${markHidden(a.asker || 'Agent', { strict: true })} · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`,
-        body: listsOf(askWhole(a).replace(/^\s*@Operator\b[:,]?\s*/i, '').trim()) };
-}
-
-/** A question written on one line with its steps inline ("... console: 1. Open it. 2. Generate a token. 3. Save it.") is set out as a list: a blank line before the first step and each step on its own line. Only when the
- * numbers run 1, 2, ... in order (so "version 2.5" or a date is left alone) and the text has no line breaks of its own to go by. */
+/** A question written on one line with its steps inline ("... console: 1. Open it. 2. Generate a token. 3. Save it.") or its choices inline ("A) Keep it. B) Drop it.") is set out as a list: a blank line before the first
+ * point and each point on its own line (#16680). Only when the marks run 1, 2, ... (or A, B, ...) in order (so "version 2.5" or a date is left alone) and the text has no line breaks of its own to go by. */
 export function listsOf(text) {
     if (/\n/.test(text)) return text;
-    const marks = [];
-    for (let n = 1, from = 0; n < 50; n++) {
-        const m = new RegExp(`(?:^|[\\s])${n}[.)]\\s+(?=\\S)`).exec(text.slice(from));
-        if (!m) break;
-        marks.push(from + m.index + (m[0].length - m[0].trimStart().length)); // where the number starts
-        from = from + m.index + m[0].length;
-    }
-    if (marks.length < 2) return text;
-    const parts = [text.slice(0, marks[0]).trimEnd(), ...marks.map((at, i) => text.slice(at, marks[i + 1] ?? text.length).trim())];
+    const find = label => { const marks = []; for (let n = 0, from = 0; n < 50; n++) { const m = new RegExp(`(?:^|[\\s(])\\(?${label(n)}[.)]\\s+(?=\\S)`).exec(text.slice(from)); if (!m) break; marks.push(from + m.index + m[0].length - m[0].trimStart().length); from += m.index + m[0].length; } return marks; };
+    const marks = [find(n => n + 1), find(n => String.fromCharCode(65 + n))].find(m => m.length > 1);
+    if (!marks) return text;
+    const parts = [text.slice(0, marks[0]).trimEnd(), ...marks.map((at, i) => text.slice(at, marks[i + 1]).trim())];
     return parts[0] ? `${parts[0]}\n\n${parts.slice(1).join('\n')}` : parts.slice(1).join('\n');
 }
+/** The question's words without the address: "@Operator" at the start, or said again where a point begins, is the dialog's own audience (#16680). */
+export const withoutOperator = text => text.replace(/(^|[\s(])@Operator\b[:,]?(?=\s|$)\s*/gi, '$1').trim();
 
 /** The goal and the task a question was asked about (#12194, #12164): [{ kind, id, title }], the goal first; empty when the asker named neither. */
 export function askSubjects(a) {
