@@ -101,6 +101,8 @@ const BASE = require('./test_base').BASE;
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); true`); await settle(200);
             const opened = await ev(`(() => { const b = [...document.querySelectorAll('button, a')].filter(e => e.getClientRects().length > 0).find(e => /^\\+?\\s*New (agent|team)/i.test((e.getAttribute('aria-label') || e.textContent || '').replace(/\\s+/g, ' ').trim())); if (!b) return false; window.__qaOpener = b; b.focus(); b.click(); return true; })()`);
             assert.ok(opened, 'a visible New agent button to open the launch dialog with');
+            await waitFor(`!!document.querySelector('.launch-back-btn') && document.querySelector('.launch-back-btn').getClientRects().length > 0`, 'the form\'s back arrow (New agent opens the one-page form now, #15888)', 6000);
+            await ev(`document.querySelector('.launch-back-btn').click(); true`); // the chooser is behind the form's arrow
             await waitFor(`!!document.querySelector('#launch-step-chooser [data-arg="team"]') && document.querySelector('#launch-step-chooser [data-arg="team"]').getClientRects().length > 0`, 'the chooser', 6000);
             await ev(`document.querySelector('#launch-step-chooser [data-arg="team"]').click(); true`); await waitFor(`!!window.__nt.dlg(${N.team})`, 'New team', 5000);
             await key('Escape'); await waitFor(`!window.__nt.dlg(${N.team})`, 'Escape closes New team', 4000);
