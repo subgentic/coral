@@ -942,6 +942,7 @@
         color: var(--text-on-accent); /* was var(--accent) on var(--accent-dim): 1.8:1 in the dark theme, 1.5:1 in the light one, so the open tab's icon was all but invisible on a phone (#4851) */
         background: var(--accent-dim);
     }
+    .agentic-state.mobile-panel-overlay .agentic-tab.active .agentic-tab-word { color: inherit; } /* the dock's open-tab word is the page's text colour on the light panel (agentic.css), but here the tab is filled: its word takes the on-accent colour, 2.08:1 otherwise (#15855) */
 
     /* The close button leads the strip and stays put while the tabs scroll under it. At the end of the strip it
        covered the tabs it was stuck over (a half-hidden Tasks tab at 390px); on the left nothing is hidden at rest
