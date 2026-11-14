@@ -181,7 +181,7 @@ function buildMore() {
     document.addEventListener('keydown', (e) => { if (moreOpen && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); set(false, { focus: true }); } }, true);
     document.addEventListener('click', (e) => { if (moreOpen && !menu.contains(e.target) && !b.contains(e.target)) set(false); });
 }
-const BOARD_ACTIONS = ['mb-export-btn', 'mb-pause-btn', 'mb-select-btn', 'mb-delete-btn'];
+const BOARD_ACTIONS = ['mb-export-btn', 'mb-pause-btn', 'mb-delete-btn', 'mb-select-btn'];
 function adoptBoardActions() {
     const menu = $('team-page-more-menu'); if (!menu) return;
     for (const id of BOARD_ACTIONS) { const b = $(id); if (b && b.parentElement !== menu) { b.dataset.home = b.parentElement ? b.parentElement.id : ''; menu.append(b); } }
