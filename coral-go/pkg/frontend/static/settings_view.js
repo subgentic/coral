@@ -464,7 +464,7 @@ export function mountSettingsView(host, spec) {
         async submit() { // a form: check it (the first invalid field takes the focus, the line says what is missing), then hand the values to the caller
             if (busy || !formSpec) return null;
             const v = view.validate({ focus: true });
-            if (!v.ok) { status = errors.get(v.first) || 'Check the form.'; statusError = true; paintBar(); return null; }
+            if (!v.ok) { status = formSpec.countOnly ? `${errors.size === 1 ? '1 field needs' : `${errors.size} fields need`} attention.` : (errors.get(v.first) || 'Check the form.'); statusError = true; paintBar(); return null; } // countOnly (#16389): the sentence is under the field already, a long one is not said twice
             busy = true; status = null; statusError = false; paintBar();
             let result = {};
             try { result = (await formSpec.onSubmit(valuesNow(), view)) || {}; }

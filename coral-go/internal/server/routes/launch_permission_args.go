@@ -41,6 +41,13 @@ func (h *SessionsHandler) PostLaunchPermissionArgs(w http.ResponseWriter, r *htt
 			}
 		}
 	}
+	// A custom mode (custom:<id>, #16389) is resolved as the launch resolves it: its own flags added, the built-in mode default. Without this the line showed the internal id.
+	if strings.HasPrefix(body.PermissionMode, "custom:") {
+		if extra, _ := h.customModeFlags(r.Context(), body.AgentType, body.PermissionMode); extra != nil {
+			body.Flags = append(append([]string{}, body.Flags...), extra...)
+		}
+		body.PermissionMode = "default"
+	}
 	args, err := agent.LaunchPermissionArgs(body.AgentType, agent.LaunchParams{PermissionMode: body.PermissionMode, Flags: body.Flags, CLIPath: cliPath, KeepFullAccess: body.KeepFullAccess, Capabilities: body.Capabilities})
 	if err != nil {
 		errBadRequest(w, "that choice cannot be launched: "+err.Error())

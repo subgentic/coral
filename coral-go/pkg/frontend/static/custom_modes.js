@@ -145,7 +145,7 @@ function form(index) {
         { key: 'allowed', type: 'notice', render: slot => { slot.append(mk('p', 'sv-help cpm-allowed', '')); } },
     ];
     const view = mountSettingsView(box, { mode: 'form', fields, form: {
-        submit: index >= 0 ? 'Update mode' : 'Add mode', cancel: 'Cancel',
+        submit: index >= 0 ? 'Update mode' : 'Add mode', cancel: 'Cancel', countOnly: true,
         onSubmit: async values => {
             const entry = { id: index >= 0 ? draft[index].id : '', agent_type: values.agent_type, name: String(values.name).trim(), flags: parseFlagLines(values.flags) };
             if (index >= 0) draft[index] = { ...draft[index], ...entry }; else draft.push(entry);
