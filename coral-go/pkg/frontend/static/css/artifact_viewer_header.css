@@ -43,6 +43,7 @@
     .artifact-viewer-foot .artifact-review-approve, .artifact-viewer-foot .artifact-review-changes { flex: 1 1 0; min-height: 44px; }
     .artifact-review { flex: 0 1 auto; min-height: 0; max-height: max(120px, calc(var(--visual-viewport-height, 100dvh) - 260px)); overflow-y: auto; } /* the change-request form scrolls inside what the keyboard leaves, so Send is reachable (#12226 review) */
     .artifact-viewer-foot .artifact-review-approve[hidden], .artifact-viewer-foot .artifact-review-changes[hidden] { display: none; }
+    .artifact-viewer-foot:has(.artifact-review-changes[aria-expanded="true"]) .artifact-review-approve { display: none; } /* the open change-request form has its own Approve with comment: one Approve, not two (walk 47, #17032) */
 }
 /* A phone's header (#15033, the Operator: it was squished): the name, Comments and ⋯ on one row; Details is an item of ⋯ (the button comes back only while Details is open, to close it); the version is one button, 'v1 of 4', with no Previous and Next; Sandboxed, Waiting for review and Scripts on read as one muted line beside it. */
 .artifact-viewer-details-item { display: none; }

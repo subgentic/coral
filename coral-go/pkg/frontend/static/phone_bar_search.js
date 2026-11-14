@@ -10,8 +10,9 @@ export function paintPhoneSearch(words) {
         if (bar.closest('#mobile-agent-list')) continue;
         const target = searchTarget();
         let input = bar.querySelector(':scope > .phone-bar-search');
-        for (const w of document.querySelectorAll('.list-bar-search-wrap.phone-searched')) if (!target || target.closest('.list-bar-search-wrap') !== w) w.classList.remove('phone-searched'); // the page box the pill stands in for is not drawn
+        for (const w of document.querySelectorAll('.list-bar-search-wrap.phone-searched, .sidebar-search.phone-searched')) if (!target || (target.closest('.list-bar-search-wrap') !== w && target.closest('.sidebar-search') !== w)) w.classList.remove('phone-searched'); // the page box the pill stands in for is not drawn
         if (target?.classList.contains('list-bar-search') && isPhoneBar()) target.closest('.list-bar-search-wrap').classList.add('phone-searched');
+        if (target?.id === 'analytics-search' && isPhoneBar()) target.closest('.sidebar-search')?.classList.add('phone-searched'); // Analytics' own box above the views is the same search as the pill: one box, not two (walk 47, #17032)
         if (!target) { input?.remove(); continue; }
         if (!input) {
             input = document.createElement('input'); input.type = 'search'; input.className = 'field phone-bar-search'; input.autocomplete = 'off'; input.enterKeyHint = 'search';

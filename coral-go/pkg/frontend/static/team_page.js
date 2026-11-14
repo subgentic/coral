@@ -263,7 +263,7 @@ function syncBarNeeds() {
     if (!head || (!shown && !b)) return;
     if (!shown) { b.remove(); head.classList.remove('has-needs'); return; }
     if (!b) { loadStyles('team_bar_needs.css'); b = el('button', 'team-bar-needs'); b.id = 'team-page-bar-needs'; b.type = 'button'; b.addEventListener('click', () => goTab('needs', { user: true, focus: true })); head.append(b); head.classList.add('has-needs'); }
-    b.textContent = n; b.setAttribute('aria-label', `Needs you: ${n} waiting. Open the Needs you tab`); b.title = `Needs you: ${n}`;
+    b.textContent = `${n} waiting`; /* a number alone under the back arrow meant nothing (walk 47, #17032) */ b.setAttribute('aria-label', `Needs you: ${n} waiting. Open the Needs you tab`); b.title = `Needs you: ${n}`;
 }
 
 function drawCounts() {

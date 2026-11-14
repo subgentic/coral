@@ -124,7 +124,12 @@ export function openAskDialog(a, onDone, runners = {}) {
         if (offered && !binary) reading.append(offered);
         if (offered && binary) { offered.classList.add('inbox-ask-yes-no'); offered.replaceChildren(offered.querySelector('.inbox-ask-offers-list')); sendRow.insertBefore(offered, send); }
     };
-    const foot = document.createElement('div'); foot.className = 'inbox-ask-foot'; foot.append(row); // Reply attachments belong with the reply box; the footer holds its final actions
+    const foot = document.createElement('div'); foot.className = 'inbox-ask-foot'; foot.append(row);
+    if (!dismiss.hidden) { // the two exits say how they differ (walk 47, #17032)
+        const how = document.createElement('p'); how.className = 'inbox-ask-sub inbox-ask-exits'; how.textContent = 'Close keeps this question in Needs you. Dismiss takes it out and tells nobody.';
+        close.title = 'Close this; the question stays in Needs you'; foot.append(how);
+    }
+    // Reply attachments belong with the reply box; the footer holds its final actions
     const reading = document.createElement('div'); reading.className = 'inbox-ask-reading'; reading.tabIndex = -1;
     if (!whole.hidden) reading.append(whole);
     const compose = document.createElement('div'); compose.className = 'inbox-ask-compose';

@@ -72,3 +72,4 @@
     html.kb-open dialog.inbox-ask-dialog .inbox-ask-sendrow { position: sticky; bottom: calc(-1 * var(--space-2xl)); z-index: 2; padding: 8px 0; background: var(--bg-secondary); }
     html.kb-open dialog.inbox-ask-dialog .inbox-ask-foot { position: static; }
 }
+.inbox-ask-dialog .inbox-ask-foot > .inbox-ask-exits { flex: 1 1 100%; margin: 8px 0 0; font-size: var(--fs-sm); } /* how Close and Dismiss differ, under the buttons (#17032) */

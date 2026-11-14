@@ -20,15 +20,19 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`!!document.getElementById('set-password-confirm') && document.getElementById('set-password-confirm').getClientRects().length > 0`, `${tag}: the dialog`, 8000);
             const top = () => ev(`(() => { const c = document.getElementById('set-password-confirm'); const b = c.closest('.modal-body'); return Math.round(c.getBoundingClientRect().top + (b ? b.scrollTop : 0)); })()`);
             const type = v => ev(`(() => { const i = document.getElementById('set-password-new'); i.value = ${JSON.stringify(v)}; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            const base = await top();
+            const btn = () => ev(`Math.round(document.getElementById('set-password-save').getBoundingClientRect().top)`); // the Set password button: a tap aimed at it must not miss (walk 47, #17032)
+            const base = await top(), btnBase = await btn();
             for (const [label, v] of [['one character', 'a'], ['a weak password', 'password1'], ['a strong password', 'correct horse battery staple 77!']]) {
                 await type(v); await new Promise(r => setTimeout(r, 200)); // sleep-ok: the line is drawn after the input
                 const t = await top();
                 if (t !== base) problems.push(`${tag}: ${label} moves the Confirm field from ${base} to ${t}`);
+                const bt = await btn();
+                if (bt !== btnBase) problems.push(`${tag}: ${label} moves the Set password button from ${btnBase} to ${bt}`);
             }
             await type(''); await new Promise(r => setTimeout(r, 200)); // sleep-ok: the line is cleared
             const back = await top();
             if (back !== base) problems.push(`${tag}: cleared, the Confirm field is at ${back}, it was at ${base}`);
+            if (await btn() !== btnBase) problems.push(`${tag}: cleared, the Set password button is not where it was`);
             await ev(`document.getElementById('set-password-modal').remove(); true`); // no Not now (#11892)
         }
     } finally { await client.close(); }

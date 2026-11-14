@@ -16,7 +16,7 @@ export const WELCOME = {
     team: { title: 'Make a team so agents can work together', text: 'A team gives agents a shared board to talk and hand off work.', go: 'New team', dismiss: true },
     connect: { title: 'Connect a second computer or the Hub', text: 'Run agents on another computer, or reach this one from your phone.', go: 'Connect', dismiss: true, optional: true },
     asks: { title: 'How agents ask you for things', text: 'Approvals, dialogs and review artifacts all land here. A short read, then it clears.', go: 'Read it', dismiss: true },
-    guide: { title: 'Read the Coral guide', text: 'How to set Coral up, and a tour of what it can do.', go: 'Open guide', dismiss: true },
+    guide: { title: 'Read the Coral guide', text: 'How to set Coral up, and a tour of what it can do.', go: 'Guide', dismiss: true },
 };
 
 export const welcomeOn = () => (state.settings || {}).inbox_welcome === 'on';

@@ -5,7 +5,7 @@ const { connect } = require('./agent_view_harness');
 const { setTheme } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
-const ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2', chats: 'chat_bubble_outline', 'chats-group': 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' };
+const ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2', activity: 'schedule', chats: 'chat_bubble_outline', 'chats-group': 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' };
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const shot = require('./helpers/scene_shots')(Page, 'inbox-folder-icons');
@@ -33,6 +33,8 @@ const ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved
                             cut: name.scrollWidth > name.clientWidth + 1 };
                     }) };
             })()`);
+            const used = probe.rows.map(r => r.icon).filter(Boolean), twice = used.filter((n, i) => used.indexOf(n) !== i);
+            assert.deepEqual([...new Set(twice)], [], `${label}: no two folders share an icon (Tasks and Activity both had the checklist, walk 47 #17032)`);
             for (const [key, expected] of Object.entries(ICONS)) {
                 const row = probe.rows.find(r => r.key === key);
                 assert.ok(row, `${label}: ${key} exists`);

@@ -20,13 +20,13 @@ const { coralReady, framesJs } = require('./helpers/wait');
             const g = await ev(`(() => { const a = document.getElementById('set-password-new').closest('.pw-field'), c = document.getElementById('set-password-confirm').closest('.pw-field'), m = document.getElementById('set-password-strength').closest('.pw-strength'), ar = a.getBoundingClientRect(), cr = c.getBoundingClientRect(), mr = m.getBoundingClientRect(), fs = parseFloat(getComputedStyle(document.documentElement).fontSize); return { gap: Math.round(cr.top - ar.bottom), em: fs, meterAfterConfirm: !!(c.compareDocumentPosition(m.closest('.pw-strength')) & Node.DOCUMENT_POSITION_FOLLOWING), order: [...document.querySelectorAll('#set-password-form > *')].map(e => e.className || e.tagName).join('|') }; })()`);
             if (!(g.gap >= 0 && g.gap <= Math.round(g.em * 1.5))) problems.push(`${tag}: ${g.gap} px between the Password field and Confirm (normal spacing is under ${Math.round(g.em * 1.5)}): ${g.order}`);
             if (!g.meterAfterConfirm) problems.push(`${tag}: the strength advice is under the Confirm field, not between the two`);
-            // nothing typed: the advice holds no room; typing brings it
+            // nothing typed: the first dialog keeps the advice's room blank (the footer button must not move, #17032); typing fills it
             const idle = await ev(`Math.round(document.getElementById('set-password-strength').closest('.pw-strength').getBoundingClientRect().height)`);
-            if (idle !== 0) problems.push(`${tag}: the empty advice holds ${idle} px under Confirm (it holds none until there is something to say)`);
+            if (!(idle > 0)) problems.push(`${tag}: the empty advice holds ${idle} px under Confirm (the dialog keeps its room so the Set password button stays put)`);
             await ev(`(() => { const i = document.getElementById('set-password-new'); i.focus(); i.value = 'abc'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await new Promise(r => setTimeout(r, 200)); // sleep-ok: the advice is drawn on the input event
             const shown = await ev(`Math.round(document.getElementById('set-password-strength').closest('.pw-strength').getBoundingClientRect().height)`);
-            if (!(shown > 0)) problems.push(`${tag}: the advice appears once a password is typed (it is ${shown} px)`);
+            if (shown !== idle) problems.push(`${tag}: typing changes the advice's room from ${idle} to ${shown} px`);
             await ev(`document.getElementById('set-password-modal').remove(); true`); // no Not now (#11892): this check goes on without the dialog
             // the same spacing in Settings' Change password form
             const cp = await ev(`(async () => { const R = window.fetch; window.fetch = (u, o = {}) => { const p = String(u); if (p.startsWith('/api/system/auth-status')) return Promise.resolve(new Response(JSON.stringify({ authenticated: true, method: 'session', password_set: true, local: true }), { status: 200, headers: { 'content-type': 'application/json' } })); if (p.startsWith('/api/auth/sessions') && !o.method) return Promise.resolve(new Response(JSON.stringify({ sessions: [], recent: [] }), { status: 200, headers: { 'content-type': 'application/json' } })); return R(u, o); };
