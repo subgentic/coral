@@ -16,7 +16,10 @@ assert.deepEqual(word({ status: 'in_progress', review_requested: true }), ['bloc
 assert.deepEqual(word({ status: 'in_progress', claimed_at: '2026-10-20T10:00:00Z' }), ['in-progress', 'Claimed · Working', 'Claimed']);
 assert.deepEqual(word({ status: 'in_progress' }), ['in-progress', 'Open · Working', 'Open']);
 assert.deepEqual(word({ status: 'skipped' }), ['cancelled', 'Cancelled', 'Cancelled']);
-assert.deepEqual(word({ status: 'blocked' }), ['blocked', 'Blocked: waiting for prerequisites', 'Blocked']);
+assert.deepEqual(word({ status: 'blocked' }), ['blocked', 'Blocked: waiting for prerequisites', 'Blocked'], 'blocked with no deps: generic');
+assert.deepEqual(word({ status: 'blocked', blocked_by: [{ task_id: 42, satisfied: false }, { task_id: 43, satisfied: false }] }), ['blocked', 'Blocked: waiting on #42, #43', 'Blocked'], '#17069: blocked row names the blockers');
+assert.deepEqual(word({ status: 'blocked', blocked_by: [{ task_id: 42, satisfied: true }, { task_id: 43, satisfied: false }] }), ['blocked', 'Blocked: waiting on #43', 'Blocked'], '#17069: only unsatisfied blockers');
+assert.deepEqual(word({ status: 'blocked', blocked_by: [{ task_id: 42, satisfied: true }] }), ['blocked', 'Blocked: waiting for prerequisites', 'Blocked'], '#17069: all satisfied falls back to generic');
 assert.deepEqual(word({ status: 'draft' }), ['pending', 'Open · Draft', 'Open · Draft']);
 assert.deepEqual(word({ status: 'pending' }), ['pending', 'Open', 'Open']);
 
