@@ -280,7 +280,7 @@ const upToDate = { ...idle, not_ready_reason: 'up_to_date' }; // what the server
             const hubPut = await ev(`window.__upd.calls.filter(c => c.method !== 'GET')`);
             check(`${tag}: the hub switch in Network and Hub saves to PUT /api/cloud/hub-relaunch {allow} at once and nothing goes to a path the server lacks (${JSON.stringify(hubPut)})`, hubPut.length === 1 && hubPut[0].url === '/hub-relaunch' && JSON.stringify(hubPut[0].body) === '{"allow":false}');
             await ev(`window.showSettingsModal('updates'); true`); await settle(300);
-            const pointer = await ev(`(() => { const b = document.getElementById('update-pane-body'); const go = [...b.querySelectorAll('button')].find(x => /Network and Hub/.test(x.textContent)); return { text: b.textContent.includes('Relaunch from Coral Hub'), go: !!go }; })()`);
+            const pointer = await ev(`(() => { const b = document.getElementById('update-pane-body'); const go = [...b.querySelectorAll('button')].find(x => /Coral Hub and remote access/.test(x.textContent)); return { text: b.textContent.includes('Relaunch from Coral Hub'), go: !!go }; })()`);
             check(`${tag}: Updates says where the hub switch is (${JSON.stringify(pointer)})`, pointer.text && pointer.go);
         }
         const failed = results.filter(r => !r).length;

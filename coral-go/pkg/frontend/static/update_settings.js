@@ -204,7 +204,7 @@ export async function showUpdatesPane() {
             help: windowsInstall(s) ? HUB_RELAUNCH_WINDOWS : hubOn ? (hubRelaunchSetAtLaunch() ? HUB_RELAUNCH_AT_LAUNCH : HUB_RELAUNCH_ON) : (hubRelaunchSetAtLaunch() ? HUB_RELAUNCH_OFF_AT_LAUNCH : HUB_RELAUNCH_OFF),
             render: slot => {
                 if (windowsInstall(s)) return;
-                const go = mk('button', 'btn btn-small', 'Change in Network and Hub'); go.type = 'button';
+                const go = mk('button', 'btn btn-small settings-section-link', 'Change in Coral Hub and remote access'); go.type = 'button';
                 go.addEventListener('click', () => window.showSettingsModal && window.showSettingsModal('network'));
                 slot.append(go);
             },

@@ -39,12 +39,12 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`!!document.getElementById('settings-inbox-release')`, 'the Inbox controls', 8000);
             await sleep(500); // sleep-ok: the team boxes are drawn from the boards the page just read; no event marks them done
             const view = () => ev(`(() => { const on = id => { const e = document.getElementById(id); return e ? e.checked : null; };
-                const tab = document.getElementById('settings-tab-needs-you'), pane = document.getElementById('settings-pane-needs-you');
+                const tab = document.getElementById('settings-tab-notifications'), pane = document.getElementById('settings-pane-needs-you');
                 return { tab: tab ? tab.textContent.replace(/\\s+/g, ' ').trim() : null, always: (document.getElementById('settings-inbox-always') || {}).textContent || '',
                     kinds: ['file', 'done', 'release', 'decided', 'digest'].map(k => on('settings-inbox-' + k)), time: (document.getElementById('settings-inbox-digest-time') || {}).value,
                     teams: [...document.querySelectorAll('#settings-inbox-teams input[data-team]')].map(b => [b.dataset.team, b.checked]), muted: (document.getElementById('settings-inbox-muted') || {}).textContent || '', paneIn: !!pane }; })()`);
             let v = await view();
-            check(`${tag}: Settings has an Inbox group`, v.paneIn && /Inbox/.test(v.tab || ''), JSON.stringify(v.tab));
+            check(`${tag}: Notifications contains the Inbox block`, v.paneIn && /Notifications/.test(v.tab || ''), JSON.stringify(v.tab));
             check(`${tag}: questions and decisions are said to always reach you, with no switch of their own`, /always reach you/i.test(v.always) && !(await ev(`!!document.querySelector('#settings-pane-needs-you input[id*="question"], #settings-pane-needs-you input[id*="decision-always"]')`)), v.always);
             check(`${tag}: every kind is on by default`, JSON.stringify(v.kinds) === '[true,true,true,true,true]', JSON.stringify(v.kinds));
             check(`${tag}: all three teams are ticked, and the daily time is 09:00`, JSON.stringify(v.teams) === '[["alpha",true],["beta",true],["gamma",true]]' && v.time === '09:00', JSON.stringify([v.teams, v.time]));

@@ -569,38 +569,26 @@
             </div>
             <div class="modal-body settings-modal-body">
                 <div class="settings-shell">
-                    <nav class="settings-nav" aria-label="Settings groups">
-                        <div class="settings-group-pick"><select id="settings-group-select" class="settings-select" aria-label="Settings group"></select></div>
-                        <p class="sr-only" id="settings-tabs-hint">Use the arrow keys to move between the groups; Tab goes on to the group's settings.</p>
-                        <div class="settings-tabs" id="settings-tabs" role="tablist" aria-orientation="vertical" aria-label="Settings groups" aria-describedby="settings-tabs-hint"></div>
+                    <nav class="settings-nav" aria-label="Settings sections">
+                        <div class="settings-group-pick"><select id="settings-group-select" class="settings-select" aria-label="Settings section"></select></div>
+                        <p class="sr-only" id="settings-tabs-hint">Use the arrow keys to move between sections; Tab goes on to the section's settings.</p>
+                        <div class="settings-tabs" id="settings-tabs" role="tablist" aria-orientation="vertical" aria-label="Settings sections" aria-describedby="settings-tabs-hint"></div>
                     </nav>
                     <div class="settings-panes">
-                    <section class="settings-pane" id="settings-pane-general" data-group="general" data-icon="tune" data-title="General" data-hint="Theme (Light, Dark), default agent, groups" role="tabpanel" aria-labelledby="settings-tab-general" tabindex="-1">
-                        <h4 class="settings-pane-title">General</h4>
+                    <section class="settings-pane" id="settings-pane-general" data-group="general" data-icon="tune" data-title="Appearance" data-nav-group="You" data-hint="Theme and display" role="tabpanel" aria-labelledby="settings-tab-general" tabindex="-1">
+                        <h4 class="settings-pane-title">Appearance</h4>
                         <div id="settings-general-rows"></div>
 
                     </section>
-                    <section class="settings-pane" id="settings-pane-updates" data-group="updates" data-flag="updates" data-icon="system_update" data-title="Updates" role="tabpanel" aria-labelledby="settings-tab-updates" tabindex="-1" hidden>
-                        <h4 class="settings-pane-title">Updates</h4>
-                        <div id="update-pane-body"></div>
+                    <section class="settings-pane" id="settings-pane-notifications" data-group="notifications" data-icon="notifications" data-title="Notifications" data-nav-group="You" data-hint="Alerts and Needs you" role="tabpanel" aria-labelledby="settings-tab-notifications" tabindex="-1" hidden>
+                        <h4 class="settings-pane-title">Notifications</h4>
+                        <div id="settings-notifications-rows"></div>
+                    <section class="settings-inbox-block" id="settings-pane-needs-you" aria-labelledby="settings-inbox-block-title">
+                        <h5 id="settings-inbox-block-title">What reaches Needs you</h5>
+                        <div id="settings-inbox-rows"></div>
                     </section>
-                    <section class="settings-pane" id="settings-pane-agents" data-group="agents" data-icon="smart_toy" data-title="Agents" role="tabpanel" aria-labelledby="settings-tab-agents" tabindex="-1" hidden>
-                        <h4 class="settings-pane-title">Agents</h4>
-                        <div id="settings-agents-rows" data-coral-root="{{ .CoralRoot }}"></div>
-                        <!-- the live parts of this group (filled by settings_dialog.js, shown or hidden by it) sit here until the rows are drawn, then settings_fields.js moves each into place -->
-                        <div id="settings-agents-live" hidden>
-                        <!-- the CLI paths' live parts (#8460): each field's verify result and the Verify All button, filled by cli_dialogs.js; settings_fields.js moves them under their fields -->
-                        <span id="cli-result-claude" class="cli-verify-result" role="status" aria-live="polite"></span><span id="cli-result-codex" class="cli-verify-result" role="status" aria-live="polite"></span><span id="cli-result-agy" class="cli-verify-result" role="status" aria-live="polite"></span><span id="cli-result-pi" class="cli-verify-result" role="status" aria-live="polite"></span>
-                        <button class="btn btn-small" data-on-click="m-verify-all-c-l-is" id="verify-all-btn">Verify All</button>
-                        <div id="settings-prompts-live">
-                        <button class="btn settings-prompts-btn" data-on-click="m-hide-settings-modal-then-show-default-prompts-modal">
-                            <span class="material-icons icon-inline" aria-hidden="true">edit</span>
-                            Edit default prompts
-                        </button>
-                        </div>
-                        </div>
                     </section>
-                    <section class="settings-pane" id="settings-pane-terminal" data-group="terminal" data-icon="terminal" data-title="Terminal" role="tabpanel" aria-labelledby="settings-tab-terminal" tabindex="-1" hidden>
+                    <section class="settings-pane" id="settings-pane-terminal" data-group="terminal" data-icon="terminal" data-title="Terminal" data-nav-group="You" data-hint="Text and terminal backend" role="tabpanel" aria-labelledby="settings-tab-terminal" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Terminal</h4>
                         <div id="settings-terminal-rows"></div>
                         <!-- the live parts of this group (filled by terminal_backend.js and settings_dialog.js) sit here until the group's rows are drawn, then settings_fields.js moves each into its place -->
@@ -629,20 +617,33 @@
                         </details>
                         </div>
                     </section>
-                    <section class="settings-pane" id="settings-pane-notifications" data-group="notifications" data-icon="notifications" data-title="Notifications" role="tabpanel" aria-labelledby="settings-tab-notifications" tabindex="-1" hidden>
-                        <h4 class="settings-pane-title">Notifications</h4>
-                        <div id="settings-notifications-rows"></div>
+                    <section class="settings-pane" id="settings-pane-agents" data-group="agents" data-icon="smart_toy" data-title="Defaults" data-nav-group="Agents" data-hint="Models and agent behaviour" role="tabpanel" aria-labelledby="settings-tab-agents" tabindex="-1" hidden>
+                        <h4 class="settings-pane-title">Defaults</h4>
+                        <div id="settings-agents-rows" data-coral-root="{{ .CoralRoot }}"></div>
+                        <!-- the live parts of this group (filled by settings_dialog.js, shown or hidden by it) sit here until the rows are drawn, then settings_fields.js moves each into place -->
+                        <div id="settings-agents-live" hidden>
+                        <!-- the CLI paths' live parts (#8460): each field's verify result and the Verify All button, filled by cli_dialogs.js; settings_fields.js moves them under their fields -->
+                        <span id="cli-result-claude" class="cli-verify-result" role="status" aria-live="polite"></span><span id="cli-result-codex" class="cli-verify-result" role="status" aria-live="polite"></span><span id="cli-result-agy" class="cli-verify-result" role="status" aria-live="polite"></span><span id="cli-result-pi" class="cli-verify-result" role="status" aria-live="polite"></span>
+                        <button class="btn btn-small" data-on-click="m-verify-all-c-l-is" id="verify-all-btn">Verify All</button>
+                        <div id="settings-prompts-live">
+                        <button class="btn settings-prompts-btn" data-on-click="m-hide-settings-modal-then-show-default-prompts-modal">
+                            <span class="material-icons icon-inline" aria-hidden="true">edit</span>
+                            Edit default prompts
+                        </button>
+                        </div>
+                        </div>
                     </section>
-                    <section class="settings-pane" id="settings-pane-needs-you" data-group="needs-you" data-icon="checklist" data-title="Inbox" data-hint="What reaches Needs you" role="tabpanel" aria-labelledby="settings-tab-needs-you" tabindex="-1" hidden>
-                        <h4 class="settings-pane-title">Inbox</h4>
-                        <div id="settings-inbox-rows"></div>
+                    <section class="settings-pane" id="settings-pane-chief" data-group="chief" data-icon="chat" data-title="Teams and Chief" data-nav-group="Agents" data-hint="Chief and team controls" role="tabpanel" aria-labelledby="settings-tab-chief" tabindex="-1" hidden>
+                        <h4 class="settings-pane-title">Teams and Chief</h4>
+                        <!-- Filled by chief_setup.js (#11796); not on the hub: Chief is this computer's. -->
+                        <div id="settings-chief-host"></div>
                     </section>
-                    <section class="settings-pane" id="settings-pane-files" data-group="files" data-icon="account_tree" data-title="Files and Git" role="tabpanel" aria-labelledby="settings-tab-files" tabindex="-1" hidden>
-                        <h4 class="settings-pane-title">Files and Git</h4>
-                        <div id="settings-files-rows"></div>
+                    <section class="settings-pane" id="settings-pane-updates" data-group="updates" data-flag="updates" data-icon="system_update" data-title="Updates" data-nav-group="This computer" data-hint="Versions and relaunch" role="tabpanel" aria-labelledby="settings-tab-updates" tabindex="-1" hidden>
+                        <h4 class="settings-pane-title">Updates</h4>
+                        <div id="update-pane-body"></div>
                     </section>
-                    <section class="settings-pane" id="settings-pane-cleanup" data-group="cleanup" data-icon="inventory_2" data-title="Storage and cleanup" role="tabpanel" aria-labelledby="settings-tab-cleanup" tabindex="-1" hidden>
-                        <h4 class="settings-pane-title">Storage and cleanup</h4>
+                    <section class="settings-pane" id="settings-pane-cleanup" data-group="cleanup" data-icon="inventory_2" data-title="Storage and backup" data-nav-group="This computer" data-hint="Limits, clean-up and backup" role="tabpanel" aria-labelledby="settings-tab-cleanup" tabindex="-1" hidden>
+                        <h4 class="settings-pane-title">Storage and backup</h4>
                         <div id="settings-cleanup-rows"></div>
                         <div id="settings-cleanup-live" hidden>
                             <div id="settings-artifact-store-size" class="settings-hint sv-help" role="status">Loading&hellip;</div>
@@ -734,8 +735,29 @@
                             </div>
                         </div>
                     </section>
-                    <section class="settings-pane" id="settings-pane-network" data-group="network" data-icon="hub" data-title="Network and Hub" role="tabpanel" aria-labelledby="settings-tab-network" tabindex="-1" hidden>
-                        <h4 class="settings-pane-title">Network and Hub</h4>
+                    <section class="settings-pane" id="settings-pane-files" data-group="files" data-icon="account_tree" data-title="Files and Git" data-nav-group="This computer" data-hint="File search and Git" role="tabpanel" aria-labelledby="settings-tab-files" tabindex="-1" hidden>
+                        <h4 class="settings-pane-title">Files and Git</h4>
+                        <div id="settings-files-rows"></div>
+                    </section>
+                    <section class="settings-pane" id="settings-pane-security" data-group="security" data-icon="lock" data-title="Security and privacy" data-nav-group="Access" data-hint="Sign-in and privacy" role="tabpanel" aria-labelledby="settings-tab-security" tabindex="-1" hidden>
+                        <h4 class="settings-pane-title">Security and privacy</h4>
+                        <div id="settings-security-rows"></div>
+                        <div id="settings-security-live" hidden>
+                            <!-- Settings > Browser sign-in (#3948): filled by security_settings.js; never shown through Coral Hub. -->
+                            <div class="sec-row" id="settings-security" role="group" hidden></div>
+                            <div id="settings-database-encryption-status" class="settings-hint sv-help" role="status">Loading encryption status&hellip;</div>
+                            <div class="telemetry-install-id" id="settings-telemetry-install-box">
+                                <code id="settings-telemetry-install-id" aria-describedby="settings-telemetry-install-hint">Loading&hellip;</code>
+                                <button type="button" class="btn" id="settings-telemetry-install-copy" aria-label="Copy install ID" disabled>Copy</button>
+                            </div>
+                            <span id="settings-telemetry-install-hint" class="settings-hint sv-help">Send it with a deletion request.</span>
+                            <span id="settings-telemetry-install-status" class="settings-hint sv-help" role="status"></span>
+                            <div id="settings-debug-input-log-status" class="settings-hint sv-help" role="status"></div>
+                            <button class="btn btn-small" type="button" id="settings-debug-input-log-delete" hidden>Delete the log</button>
+                        </div>
+                    </section>
+                    <section class="settings-pane" id="settings-pane-network" data-group="network" data-icon="hub" data-title="Coral Hub and remote access" data-nav-group="Access" data-hint="Hub and other devices" role="tabpanel" aria-labelledby="settings-tab-network" tabindex="-1" hidden>
+                        <h4 class="settings-pane-title">Coral Hub and remote access</h4>
                         <div id="settings-network-rows"></div>
                         <div id="settings-network-live" hidden>
                             <div id="settings-remote-access-status" class="settings-hint sv-help" role="status">Loading effective access status&hellip;</div>
@@ -840,28 +862,7 @@
                             <button type="button" class="btn btn-small" id="settings-hub-mode-restart" hidden>Restart Coral</button>
                         </div>
                     </section>
-                    <section class="settings-pane" id="settings-pane-chief" data-group="chief" data-icon="chat" data-title="Chief" role="tabpanel" aria-labelledby="settings-tab-chief" tabindex="-1" hidden>
-                        <h4 class="settings-pane-title">Chief</h4>
-                        <!-- Filled by chief_setup.js (#11796); not on the hub: Chief is this computer's. -->
-                        <div id="settings-chief-host"></div>
-                    </section>
-                    <section class="settings-pane" id="settings-pane-security" data-group="security" data-icon="lock" data-title="Security and privacy" role="tabpanel" aria-labelledby="settings-tab-security" tabindex="-1" hidden>
-                        <h4 class="settings-pane-title">Security and privacy</h4>
-                        <div id="settings-security-rows"></div>
-                        <div id="settings-security-live" hidden>
-                            <!-- Settings > Browser sign-in (#3948): filled by security_settings.js; never shown through Coral Hub. -->
-                            <div class="sec-row" id="settings-security" role="group" hidden></div>
-                            <div id="settings-database-encryption-status" class="settings-hint sv-help" role="status">Loading encryption status&hellip;</div>
-                            <div class="telemetry-install-id" id="settings-telemetry-install-box">
-                                <code id="settings-telemetry-install-id" aria-describedby="settings-telemetry-install-hint">Loading&hellip;</code>
-                                <button type="button" class="btn" id="settings-telemetry-install-copy" aria-label="Copy install ID" disabled>Copy</button>
-                            </div>
-                            <span id="settings-telemetry-install-hint" class="settings-hint sv-help">Send it with a deletion request.</span>
-                            <span id="settings-telemetry-install-status" class="settings-hint sv-help" role="status"></span>
-                            <div id="settings-debug-input-log-status" class="settings-hint sv-help" role="status"></div>
-                            <button class="btn btn-small" type="button" id="settings-debug-input-log-delete" hidden>Delete the log</button>
-                        </div>
-                    </section>
+
                     </div>
                 </div>
             </div>
