@@ -402,7 +402,8 @@ func (s *Session) Close() error {
 
 // CloseNow ends the session at once: the WebSocket is closed without the close handshake (Close waits up to five seconds for a peer that is gone or never answers), then the session is shut down as
 // Close does, so every stream ends and Done fires. It is safe to call concurrently with Close, from several goroutines and after Close: a Close stuck on an unanswering peer is released by it, and a second
-// call is a no-op that returns nil. No goroutine is left waiting on the peer.
+// call is a no-op that returns nil. When a Close was already in its handshake, that Close's own library call (and the goroutine that made it) can linger in the background for up to the library's 5 s limit
+// after CloseNow has returned: nothing waits on it (CloseNow waits on the library's call for 50 ms at most), and it ends by itself.
 func (s *Session) CloseNow() error {
 	s.hardOnce.Do(func() {
 		if s.hard != nil {
