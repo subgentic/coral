@@ -1,4 +1,4 @@
-/* Kept worktrees, in Settings > Storage and cleanup (#6743, the dashboard side of #6736). A stop removes a team's (or a job run's) git worktree only when it holds nothing of yours, and keeps it otherwise
+/* Kept worktrees, in Settings > Storage and backup (#6743, the dashboard side of #6736). A stop removes a team's (or a job run's) git worktree only when it holds nothing of yours, and keeps it otherwise
  * (#6701), so kept ones pile up: this lists them (GET /api/worktrees: id, kind, name, path, repo_path, branch, dirty, unmerged, in_use) with what keeps each, and Remove asks Coral to remove one the same
  * safe way (POST /api/worktrees/remove {id}: never forced, an id from the list only). The answer {state, path, branch, reason} is said in the status that is always in the page, and the list is read again.
  * Remove is this computer's dashboard only: through Coral Hub the list shows and Remove does not (a Hub viewer must not delete folders on the owner's computer). */

@@ -37,7 +37,7 @@ const idle = (over = {}) => ({ enabled: true, relaunch_available: true, installe
         console.log('1. every relaunch reason has its own words, one wording for "not available"');
         const words = await ev(`import(${S} + 'update_api.js').then(m => ({ r: ${JSON.stringify(REASONS)}.map(x => m.reasonText(x)), unknown: m.reasonText('who_knows'), proto: m.reasonText('constructor'), na: m.notAvailable('busy') }))`);
         check(`the ten reasons are not "Unavailable" (${JSON.stringify(words.r.map(w => w.slice(0, 28)))})`, words.r.every(w => w && w !== 'Unavailable'));
-        check('switch_off says where the switch is', /Settings > Network and Hub/.test(words.r[2]));
+        check('switch_off says where the switch is', /Settings > Coral Hub and remote access/.test(words.r[2]));
         check(`no_run_record says it cannot relaunch itself here (${words.r[9]})`, words.r[9] === 'Coral could not be restarted automatically on this computer, so it cannot relaunch itself here.');
         check(`an unknown reason, and "constructor", say that Coral did not say why, not "Unavailable" (${words.unknown}, ${words.proto})`, words.unknown === 'Coral did not say why. Nothing was changed.' && words.proto === words.unknown);
         check(`one wording: "${words.na}"`, words.na === 'Not available right now: Another relaunch is already running.');

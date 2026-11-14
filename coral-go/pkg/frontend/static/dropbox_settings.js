@@ -1,10 +1,10 @@
-/* The Dropbox backup block of Settings > Storage and cleanup (#14609, Dropbox stage 3b; design v33 §4, §4b and §11). It reads GET /api/dropbox/status
+/* The Dropbox backup block of Settings > Storage and backup (#14609, Dropbox stage 3b; design v33 §4, §4b and §11). It reads GET /api/dropbox/status
    (never a token) and offers one next step for each state: Connect, Reconnect, Disconnect, Switch to the new account, Take over. Connect opens Dropbox's
    own page in a new tab; Coral then waits for the person's Allow by reading the status again. Every server text is put in with textContent. */
 
 import { loadStyles } from './lazy_styles.js';
 
-// The block's own sheet loads when its section (Storage and cleanup) is shown, not when Settings opens (modals_lazy's cap) nor at start
+// The block's own sheet loads when its section (Storage and backup) is shown, not when Settings opens (modals_lazy's cap) nor at start
 // (page_weight). The block is drawn either way; only its spacing waits for the sheet.
 const dropboxStyles = () => loadStyles('dropbox.css');
 const cleanupShown = () => { const p = document.getElementById('settings-pane-cleanup'); return !!p && !p.hidden; };
@@ -482,7 +482,7 @@ function render(st) {
 // loadDropbox reads the status and shows it; it returns the status (or null when it could not be read).
 export async function loadDropbox() {
     wire();
-    if (cleanupShown()) await dropboxStyles(); // opened straight on Storage and cleanup: styled before it draws
+    if (cleanupShown()) await dropboxStyles(); // opened straight on Storage and backup: styled before it draws
     let st = null;
     try {
         const r = await fetch(STATUS, { cache: 'no-store' });

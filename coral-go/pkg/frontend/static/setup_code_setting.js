@@ -1,4 +1,4 @@
-/* Settings > Network and Hub > Setup code (#6410, Security's #6408 rank 1 option A; #6579 part 2): the one-time code another device asks for (the sign-in page, "Link this computer to Coral Hub") shown where the person is,
+/* Settings > Coral Hub and remote access > Setup code (#6410, Security's #6408 rank 1 option A; #6579 part 2): the one-time code another device asks for (the sign-in page, "Link this computer to Coral Hub") shown where the person is,
  * not only in a terminal ('coral setup-code'). It is the same code and expiry; the route answers only a dashboard signed in on this computer, so the group is not there anywhere else, through Coral Hub, and
  * once a password is set (there is no code then). The group is there only while another device could use the code: Remote access is on, or a Coral Hub link is being made. The code is not on the screen until the
  * person asks ("Show setup code", a button that says whether it is open), is read aloud letter by letter, and hides itself after a minute (Settings is the screen people share in a call). It is read when the Network and

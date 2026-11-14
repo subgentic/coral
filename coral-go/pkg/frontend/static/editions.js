@@ -6,7 +6,7 @@
      → Done. "Skip for now" keeps Coral local. "Run your own hub" is the
      secondary option, with a short explainer. The server marks a new install
      welcome_pending; the answer is saved as welcome_choice, so another browser does not ask
-     again. Settings > Network and Hub reopens it. It opens only when this build has a hub configured
+     again. Settings > Coral Hub and remote access reopens it. It opens only when this build has a hub configured
      and the server was started to offer it (a hub URL passed explicitly, or --cloud-connect
      prompt or auto: offer_at_launch, #3459); otherwise Coral Hub waits on the home screen and
      in Settings.
@@ -165,7 +165,7 @@ function _connectHtml() {
                 <div data-cloud="auto-accept-row" hidden>
                     ${switchRow({ label: 'Coral Hub can turn on auto-accept', labelClass: 'editions-auto-accept', attrs: ' data-cloud="allow-auto-accept"', desc: 'Agents it launches act without asking for permission each time.', descId: 'editions-ask-auto', descClass: 'editions-ask-desc', descTag: 'div' })}
                 </div>
-                <div class="editions-ask-note">You can change this any time in Settings › Network and Hub.</div>
+                <div class="editions-ask-note">You can change this any time in Settings › Coral Hub and remote access.</div>
             </fieldset>
             <div class="editions-cloud-actions">
                 <button type="button" class="btn btn-primary editions-connect" data-cloud="connect" data-editions-focus hidden>Connect</button>

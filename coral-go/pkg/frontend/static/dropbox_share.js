@@ -86,7 +86,7 @@ export async function openShareDialog(opts) {
     f.body.replaceChildren();
     if (res.status === 403 && res.body.code === 'private') { f.body.append(mk('p', null, 'A private file is not shared.')); return; }
     if (res.status !== 200) { f.body.append(mk('p', null, String(res.body.error || "Couldn't read this file's sharing. Try again."))); return; }
-    if (!res.body.connected) { f.body.append(mk('p', null, 'Connect Dropbox in Settings, Storage and cleanup, to share through it.')); return; }
+    if (!res.body.connected) { f.body.append(mk('p', null, 'Connect Dropbox in Settings, Storage and backup, to share through it.')); return; }
     const info = res.body;
     f.h.textContent = `Share ${info.name || 'this file'} via Dropbox`;
     const live = Array.isArray(info.shares) ? info.shares.filter(s => s.state === 'live') : [];
@@ -111,7 +111,7 @@ export async function openChatShareDialog(opts) {
     if (!dialog.open) return;
     f.body.replaceChildren();
     if (res.status !== 200) { f.body.append(mk('p', null, String(res.body.error || "Couldn't make the page. Try again."))); return; }
-    if (!res.body.connected) { f.body.append(mk('p', null, 'Connect Dropbox in Settings, Storage and cleanup, to share through it.')); return; }
+    if (!res.body.connected) { f.body.append(mk('p', null, 'Connect Dropbox in Settings, Storage and backup, to share through it.')); return; }
     const p = res.body;
     const n = Number(p.included || 0), left = Number(p.left_out || 0);
     f.body.append(mk('p', 'settings-hint', `One Markdown file of ${n} ${n === 1 ? 'message' : 'messages'}${left ? ` (${left} left out: Coral's own posts and messages to a group)` : ''}, which Dropbox shows; what the messages say is shown as written, never as links or formatting. ` +

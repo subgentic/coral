@@ -1,5 +1,5 @@
 // #5572 owner path, the UI half: Coral Hub's owner may turn a team's cross-team switches on or off unless this computer forbids it.
-//   - Settings > Network and Hub: the row "Let Coral Hub change cross-team settings" (Security's sentence), saved at once with
+//   - Settings > Coral Hub and remote access: the row "Let Coral Hub change cross-team settings" (Security's sentence), saved at once with
 //     PUT /api/cloud/hub-cross-team {allow}, on unless the server says off;
 //   - Team settings > Messaging: a persistent line "Coral Hub can change these settings." while the lock allows it (cross-team-state
 //     hub_may_change), and under each switch a line saying who changed it last ("Turned on by <hub user> via Coral Hub at <time>"
@@ -30,7 +30,7 @@ const { coralReady } = require('./helpers/wait');
                 return real(u, o); };
             return true; })()`);
 
-        console.log('1. Settings > Network and Hub: the lock row');
+        console.log('1. Settings > Coral Hub and remote access: the lock row');
         await ev(`(async () => { await window.showSettingsModal('network'); return true; })()`);
         await waitFor(`!!document.getElementById('settings-cloud-hub-cross-team') && document.getElementById('settings-cloud-hub-cross-team').closest('#settings-cloud-mode-row').hidden === false`, 'the lock row', 10000);
         const row = await ev(`(() => { const c = document.getElementById('settings-cloud-hub-cross-team'); const d = document.getElementById('settings-cloud-hub-cross-team-desc');

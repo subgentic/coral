@@ -162,7 +162,7 @@
          views in it are counted and sized, and its height is settled before the terminal is sized. The red sign-in-off banner has no close button (a risk, not a nudge); the amber no-password one can be dismissed, and that is remembered (#11258). -->
     <div id="local-auth-banner" class="notice notice-error notice-bar notice-compact local-auth-banner" role="note" hidden>
         <span class="material-icons" aria-hidden="true">warning</span>
-        <div class="local-auth-banner-text"><span data-auth-state="off"><b>Sign-in is off:</b> any program on this computer can use Coral without a password.</span><span data-auth-state="nopw" hidden><b>No password is set.</b><span class="local-auth-more"> The Coral app opens without one; a browser needs a password to sign in.<span id="local-auth-remote" hidden> Other devices sign in with the setup code (Settings, Network and Hub).</span></span></span></div>
+        <div class="local-auth-banner-text"><span data-auth-state="off"><b>Sign-in is off:</b> any program on this computer can use Coral without a password.</span><span data-auth-state="nopw" hidden><b>No password is set.</b><span class="local-auth-more"> The Coral app opens without one; a browser needs a password to sign in.<span id="local-auth-remote" hidden> Other devices sign in with the setup code (Settings > Coral Hub and remote access).</span></span></span></div>
         <button type="button" class="btn btn-small" id="local-auth-set-password" data-on-click="local-auth-set-password" hidden>Set a password</button>
         <button type="button" class="btn btn-small local-auth-dismiss" id="local-auth-dismiss" hidden>Dismiss</button>
     </div>
@@ -282,7 +282,7 @@
                         <span class="welcome-connect-icon material-icons" aria-hidden="true">device_hub</span>
                         <div class="welcome-connect-copy">
                             <h2 id="welcome-connect-title">Connect your first computer</h2>
-                            <p>Install Coral on each computer. In Coral, go to Settings &gt; Network and Hub &gt; Connect to Coral Hub, and the computer appears here.</p>
+                            <p>Install Coral on each computer. In Coral, go to Settings &gt; Coral Hub and remote access &gt; Connect to Coral Hub, and the computer appears here.</p>
                         </div>
                         <a class="btn btn-primary welcome-connect-btn" href="/machines/add">Add a computer</a>
                         <a class="btn welcome-get-coral" href="https://coralhub.dev/coral.html#download" target="_blank" rel="noopener noreferrer">Get Coral</a>

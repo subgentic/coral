@@ -1,6 +1,6 @@
 /* The one-time "Let Coral Hub sign you in here?" notice (#3966) for a computer that was linked to Coral Hub before Hub sign-in
  * existed. The server says when to offer it (GET /api/auth/hub-signin: offer). Hub sign-in stays off unless the person ticks
- * it here or in Settings; "Not now" is final (POST /api/auth/hub-signin/dismiss) and Settings, Browser sign-in can still turn
+ * it here or in Settings; "Not now" is final (POST /api/auth/hub-signin/dismiss) and Settings, Security and privacy can still turn
  * it on. The switch is written only through PUT /api/auth/hub-signin, as in Settings. Never shown through Coral Hub. */
 
 import { showToast } from './utils.js';
@@ -45,7 +45,7 @@ function showHubNotice() {
     const warn = el('div', 'sec-warn'); const wt = el('span');
     wt.append(el('b', '', 'It gives full control of this computer.'), ' Anyone who gets into your Coral Hub account could run commands here.');
     warn.append(el('span', '', '⚠'), wt);
-    body.append(warn, el('p', 'pw-note', 'Not now is final. You can turn it on later in Settings, Browser sign-in.'));
+    body.append(warn, el('p', 'pw-note', 'Not now is final. You can turn it on later in Settings, Security and privacy.'));
     const foot = el('div', 'modal-actions modal-footer');
     const no = el('button', 'btn', 'Not now'); no.type = 'button'; no.id = 'hub-notice-no';
     const yes = el('button', 'btn btn-primary', 'Let Coral Hub sign me in'); yes.type = 'button'; yes.id = 'hub-notice-yes';
@@ -72,7 +72,7 @@ function showHubNotice() {
         try { res = await sendJson('PUT', '/api/auth/hub-signin', { enabled: true }); } catch { res = { ok: false, data: {} }; }
         if (!res.ok) { showToast((res.data && res.data.error) || 'Could not turn on Sign in with Coral Hub.', true); yes.disabled = false; no.disabled = false; return; }
         close(); await dismiss();
-        showToast('Sign in with Coral Hub is on. You can turn it off in Settings, Browser sign-in.');
+        showToast('Sign in with Coral Hub is on. You can turn it off in Settings, Security and privacy.');
         document.dispatchEvent(new CustomEvent('coral:hub-signin-changed'));
     });
     yes.focus();

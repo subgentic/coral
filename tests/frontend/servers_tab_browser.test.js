@@ -185,7 +185,7 @@ const contrast = (a, b) => {
         v = await rowView('m2');
         assert.deepEqual(v.options, ['View', 'Interact (disabled)', 'Launch']);
         assert.equal(v.value, 'launch');
-        assert.equal(v.help, 'This computer allows up to View; change it in Coral on that computer (Settings > Network and Hub).');
+        assert.equal(v.help, 'This computer allows up to View; change it in Coral on that computer (Settings > Coral Hub and remote access).');
         assert.deepEqual(v.effective, ['Effective: View, limited by this computer']);
         // m3: Launch on a computer that allows Launch: nothing limits, the help says what Launch means.
         v = await rowView('m3');

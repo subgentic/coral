@@ -5,7 +5,7 @@
 import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
 
-const CONFIRM = 'This Coral becomes a hub: a Computers tab where you add other computers and manage their agents. Whoever signs in to this Coral controls every computer you add. It uses this Coral\u2019s own address, port and sign-in, so who can reach it stays what Remote access in Settings > Network and Hub says; nothing new listens. It applies when Coral restarts. You can turn it off here or in Settings > Network and Hub.';
+const CONFIRM = 'This Coral becomes a hub: a Computers tab where you add other computers and manage their agents. Whoever signs in to this Coral controls every computer you add. It uses this Coral\u2019s own address, port and sign-in, so who can reach it stays what Remote access in Settings > Coral Hub and remote access says; nothing new listens. It applies when Coral restarts. You can turn it off here or in Settings > Coral Hub and remote access.';
 
 let _st = null;
 const on = st => !!(st && (st.saved || st.forced));

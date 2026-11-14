@@ -146,7 +146,7 @@ export function showSetPasswordModal({ required = false } = {}) {
         const st = await authStatus();
         if (!modal.isConnected || !st || st.password_set !== true) return;
         close();
-        showToast('A password is already set. Change it in Settings, Security.');
+        showToast('A password is already set. Change it in Settings, Security and privacy.');
         document.dispatchEvent(new CustomEvent('coral:password-changed'));
     };
     const onVisible = () => { if (document.visibilityState === 'visible') recheck(); };

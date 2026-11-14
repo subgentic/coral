@@ -98,6 +98,7 @@ node artifact_anchor.test.mjs
 node display_hygiene.test.mjs
 node css_vars_defined.test.mjs
 node settings_view_census.test.mjs
+node settings_path_names.test.mjs
 node js_unused.test.mjs
 node font_size_units.test.mjs
 node icon_aria_hidden.test.mjs

@@ -210,7 +210,7 @@ function _addHtml(s) {
     return `<form class="model-chip-add-form" role="group" aria-label="Add a model" aria-busy="${escapeAttr(String(a.busy))}" novalidate>`
         + `<label class="model-chip-add-field"><span>Model id</span><input type="text" class="model-chip-add-id" name="id" value="${escapeAttr(a.id)}" autocomplete="off" spellcheck="false" maxlength="128" aria-describedby="model-chip-add-help${a.error ? ' model-chip-add-err' : ''}"${a.error ? ' aria-invalid="true"' : ''}${escapeAttr(dis)}></label>`
         + `<label class="model-chip-add-field"><span>Display name (optional)</span><input type="text" class="model-chip-add-name" name="name" value="${escapeAttr(a.name)}" autocomplete="off" maxlength="80"${escapeAttr(dis)}></label>`
-        + `<p class="model-chip-add-help" id="model-chip-add-help">The id the CLI takes after --model. Thinking levels can be added in Settings &gt; Agents.</p>`
+        + `<p class="model-chip-add-help" id="model-chip-add-help">The id the CLI takes after --model. Thinking levels can be added in Settings &gt; Providers.</p>`
         + (a.error ? `<p class="model-chip-add-err" id="model-chip-add-err" role="alert">${escapeHtml(a.error)}</p>` : '')
         + `<div class="model-chip-add-actions"><button type="submit" class="btn btn-small btn-primary"${escapeAttr(dis)}>${a.busy ? 'Adding…' : 'Add'}</button><button type="button" class="btn btn-small" data-add-cancel${escapeAttr(dis)}>Cancel</button></div></form>`;
 }

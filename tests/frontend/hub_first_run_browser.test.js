@@ -1,4 +1,4 @@
-// Coral Hub's first run (#4586, coral-hub's copy): an account whose machine list loaded and is empty gets "Connect your first computer" (install Coral on each, then Settings > Network and Hub > Connect to Coral Hub) with an Add a computer link (the hub's /machines/add, same tab, #6351)
+// Coral Hub's first run (#4586, coral-hub's copy): an account whose machine list loaded and is empty gets "Connect your first computer" (install Coral on each, then Settings > Coral Hub and remote access > Connect to Coral Hub) with an Add a computer link (the hub's /machines/add, same tab, #6351)
 // instead of launch cards that go nowhere, and the empty agent list says so too (it is the phone's Agents page); computers that are all offline get "Your computers are offline"; a usable
 // machine with no agents gets "No agents yet"; a list that failed to load is never shown as a first run. A folder Browse says "Connect a computer first" instead of "Failed to load".
 // A local Coral never shows any of it. Served as the hub would serve it (the boot flag says mode
@@ -59,7 +59,7 @@ const { settle } = require('./helpers/wait');
         assert.equal(await ev(shown('.welcome-connect-another')), false, 'no Connect another computer link with none connected');
         assert.equal(await ev(`document.querySelector('.welcome-first-run h2').textContent`), 'Connect your first computer');
         assert.deepEqual(await ev(`(() => { const a = document.querySelector('.welcome-get-coral'); return a && [a.textContent.trim(), a.href, a.target, a.rel]; })()`), ['Get Coral', 'https://coralhub.dev/coral.html#download', '_blank', 'noopener noreferrer'], 'a Get Coral link to the download, in a new tab (#11463 F6)');
-        assert.deepEqual(await ev(`[...document.querySelectorAll('.welcome-first-run p')].map(p => p.textContent)`), ['Install Coral on each computer. In Coral, go to Settings > Network and Hub > Connect to Coral Hub, and the computer appears here.']);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('.welcome-first-run p')].map(p => p.textContent)`), ['Install Coral on each computer. In Coral, go to Settings > Coral Hub and remote access > Connect to Coral Hub, and the computer appears here.']);
         assert.equal(await ev(shown('.welcome-offline')), false);
         const side = await ev(`({ text: document.getElementById('live-sessions-list').innerText.replace(/\\s+/g, ' ').trim(), open: !document.querySelector('[data-section="live-sessions"]').classList.contains('collapsed') })`);
         assert.deepEqual(side, { text: 'No computers connected yet', open: true }, 'on a wide screen the empty list says one line (the home carries the panel) and stays open');

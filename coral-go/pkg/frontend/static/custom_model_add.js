@@ -37,7 +37,7 @@ export async function addCustomModel({ server, agentType, id, name, known = [] }
         if (!data || !Array.isArray(data.models)) return { ok: false, error: 'Could not read the custom models, so nothing was changed. Try again.' };
         if (data.models.some(m => m.family === family && m.value === id)) return { ok: false, error: `${id} is already in the list.` };
         const max = (data.limits && data.limits.max_per_family) || 50;
-        if (data.models.filter(m => m.family === family).length >= max) return { ok: false, error: `At most ${max} custom models per provider. Remove one in Settings > Agents first.` };
+        if (data.models.filter(m => m.family === family).length >= max) return { ok: false, error: `At most ${max} custom models per provider. Remove one in Settings > Providers first.` };
         const put = await serverFetch(server, ROUTE, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ models: [...data.models, { family, value: id, display_name: name, efforts: [] }] }) });
         if (refused(put)) return operatorOnly;
         if (!put.ok) { const d = await put.json().catch(() => ({})); return { ok: false, error: (d && (d.message || d.error)) || 'The model was not added.' }; }
@@ -52,7 +52,7 @@ export function addModelForm({ prefix, submit, cancel }) {
     const form = mk('form', 'model-chip-add-form'); form.noValidate = true; form.setAttribute('role', 'group'); form.setAttribute('aria-label', 'Add a model');
     const field = (label, cls, name, max) => { const l = mk('label', 'model-chip-add-field'); l.append(mk('span', null, label)); const i = mk('input', cls); i.type = 'text'; i.name = name; i.autocomplete = 'off'; i.maxLength = max; if (name === 'id') i.spellcheck = false; l.append(i); return { l, i }; };
     const idF = field('Model id', 'model-chip-add-id', 'id', 128), nameF = field('Display name (optional)', 'model-chip-add-name', 'name', 80);
-    const help = mk('p', 'model-chip-add-help', 'The id the CLI takes after --model. Thinking levels can be added in Settings > Agents.'); help.id = `${prefix}-help`;
+    const help = mk('p', 'model-chip-add-help', 'The id the CLI takes after --model. Thinking levels can be added in Settings > Providers.'); help.id = `${prefix}-help`;
     idF.i.setAttribute('aria-describedby', help.id);
     const err = mk('p', 'model-chip-add-err'); err.id = `${prefix}-err`; err.hidden = true;
     const add = mk('button', 'btn btn-small btn-primary', 'Add'); add.type = 'submit';

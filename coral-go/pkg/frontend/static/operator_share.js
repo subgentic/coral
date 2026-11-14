@@ -21,7 +21,7 @@ const asHeader = s => String.fromCharCode(...new TextEncoder().encode(s));
 /** What a refused upload says, in words: the status and the server's code. */
 export function refusalWords(status, code, team = false) {
     if (code === 'artifact_too_large' || status === 413 && code !== 'artifact_quota') return `it is over ${mib(MAX_BYTES)}`;
-    if (code === 'artifact_quota') return 'the artifact store is full: delete old artifacts in Settings, Storage and cleanup';
+    if (code === 'artifact_quota') return 'the artifact store is full: delete old artifacts in Settings, Storage and backup';
     if (code === 'board_paused') return 'the team is paused, so nothing reaches its agents: resume it first';
     if (code === 'rate_limited' || status === 429) return 'too many files in a minute: wait a moment and try again';
     if (code === 'owner_only' || status === 403) return 'only the person at this computer can share a file with an agent';

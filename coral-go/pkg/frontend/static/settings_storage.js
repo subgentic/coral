@@ -1,4 +1,4 @@
-/* The Settings dialog's Storage and cleanup group: the artifact store, the terminal logs, free space and automatic cleanup, the received files limit (moved out of settings_dialog.js, #8374; no behaviour change). */
+/* The Settings dialog's Storage and backup group: the artifact store, the terminal logs, free space and automatic cleanup, the received files limit (moved out of settings_dialog.js, #8374; no behaviour change). */
 import { plural } from './format.js';
 import { importOnce } from './import_once.js';
 import { showToast } from './utils.js';

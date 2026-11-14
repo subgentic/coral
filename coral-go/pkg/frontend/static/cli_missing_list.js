@@ -7,8 +7,8 @@ const { refusedWords } = await importOnce('./cli_refused_words.js'); // what the
 const { agentLink } = await importOnce('./agent_link.js'); // the agent's name opens its chat, as everywhere (#12168)
 
 const STEPS = {
-    agent: agent => [`Archive ${agent ? agent : 'that agent'} (an asleep one counts too), or restart it in a project folder, then check again.`, 'Or install the CLI somewhere else.', 'Or set its path in Settings > CLI paths.'],
-    other: () => ['Install the CLI somewhere else.', 'Or set its path in Settings > CLI paths.'],
+    agent: agent => [`Archive ${agent ? agent : 'that agent'} (an asleep one counts too), or restart it in a project folder, then check again.`, 'Or install the CLI somewhere else.', 'Or set its path in Settings > Providers.'],
+    other: () => ['Install the CLI somewhere else.', 'Or set its path in Settings > Providers.'],
 };
 
 /** The one message wherever a person meets a CLI that was found and not used (the list, and the launch dialog's single-CLI banner, #12364): [the short line, the Why? fold]. Every piece is text; the agent's name is the shared link. */

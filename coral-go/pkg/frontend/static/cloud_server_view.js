@@ -297,7 +297,7 @@ function launchDisclosureLine(s) {
         if (!d || !line.isConnected) return;
         line.replaceChildren(
             h('p', { text: d.text }),
-            h('p', { text: 'Shown here for information. Acknowledge this notice in Coral on this computer. To lower its default, open Settings › Agents › Default permission mode on this computer.' }));
+            h('p', { text: 'Shown here for information. Acknowledge this notice in Coral on this computer. To lower its default, open Settings › Defaults › Default permission mode on this computer.' }));
     });
     return line;
 }
@@ -387,7 +387,7 @@ function enrollBlock() {
                 h('p', { className: 'cs-meta', text: 'Each computer connects out to this hub; no inbound port is needed.' }),
                 h('ol', {},
                     h('li', {}, h('strong', { text: 'Install Coral' }), ' on the computer you want to add: ', h('a', { href: DOWNLOAD_URL, target: '_blank', rel: 'noopener noreferrer', text: 'coralhub.dev/coral.html#download' })),
-                    h('li', {}, 'Open Coral on that computer and press ', h('strong', { text: 'Connect to Coral Hub' }), ' (Settings › Network and Hub, or the Coral Hub card on the home screen).'),
+                    h('li', {}, 'Open Coral on that computer and press ', h('strong', { text: 'Connect to Coral Hub' }), ' (Settings › Coral Hub and remote access, or the Coral Hub card on the home screen).'),
                     h('li', {}, 'Choose what Coral Hub may do on that computer, then press ', h('strong', { text: 'Connect' }), '. Coral shows a short code.'),
                     h('li', {}, 'Enter the code here, check the computer\'s details on the next page and approve.')),
                 h('form', { className: 'cs-enroll-form', onsubmit: e => { e.preventDefault(); go(); } }, input,

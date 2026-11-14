@@ -88,7 +88,7 @@ function managed(s) {
         const copy = mk('button', 'btn', 'Copy'); copy.type = 'button';
         copy.addEventListener('click', async () => { showToast((await copyText(code.textContent)) ? 'Copied' : 'Could not copy', false); });
         cmd.append(code, copy); t.append(cmd);
-        t.append(mk('p', 'update-calm', 'Homebrew updates Coral; Coral does not update itself. Coral still shows a notice in this browser when a new version is out (Settings > General).'));
+        t.append(mk('p', 'update-calm', 'Homebrew updates Coral; Coral does not update itself. Coral still shows a notice in this browser when a new version is out (Settings > Appearance).'));
     } else {
         t.append(mk('b', null, 'This install cannot update itself'), mk('p', null, 'Coral can only update installs it can replace safely (the app, the installer or the archive from the releases page). Install the new release by hand.'));
         const a = mk('a', 'update-link', 'Open the releases page'); a.href = 'https://github.com/subgentic/coral/releases'; a.target = '_blank'; a.rel = 'noopener noreferrer'; t.append(a);
@@ -196,7 +196,7 @@ export async function showUpdatesPane() {
             help: { text: 'Installs a downloaded, checked update by itself once Coral has been idle for a few minutes.', more: 'Idle means no agent is working, Coral is typing nothing into an agent and nobody has typed in the dashboard lately. Coral restarts itself the way Update and relaunch does; agents running in tmux keep running. If an automatic install fails, Coral starts the old version again, says why, and tries once a day at most. Off: only Update and relaunch installs.' },
         });
     }
-    // The Coral Hub relaunch switch lives in Settings > Network and Hub (with the rest of what the hub may do here); this pane only says where it is
+    // The Coral Hub relaunch switch lives in Settings > Coral Hub and remote access (with the rest of what the hub may do here); this pane only says where it is
     if (!isCloud() && hubOn !== null && !unmanaged && s.hubRelaunch) { // Coral Hub's relaunch exists in this build (#7343)
         fields.push({
             key: 'hub_relaunch', type: 'custom', label: 'Relaunch from Coral Hub',

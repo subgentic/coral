@@ -14,7 +14,7 @@ export function worktreeAnswerWords(w, subject = 'team') {
     const where = w.path ? ` It is at ${w.path}${w.branch ? `, on branch ${w.branch}` : ''}.` : (w.branch ? ` Its branch is ${w.branch}.` : '');
     // removed: the worktree went; a reason says what stays ("its branch is kept: it has commits that are not merged"). kept: why it was kept. failed: why it could not be removed.
     const tail = reason ? ` ${reason.charAt(0).toUpperCase()}${reason.slice(1)}.` : '';
-    if (subject === 'worktree') { // asked of the worktree itself (Settings > Storage and cleanup), not as the end of a stop
+    if (subject === 'worktree') { // asked of the worktree itself (Settings > Storage and backup), not as the end of a stop
         if (w.state === 'removed') return { text: `The worktree was removed.${tail}`, error: false };
         if (w.state === 'kept') return { text: `The worktree was kept${reason ? `: ${reason}` : ''}.${where}`, error: false };
         if (w.state === 'failed') return { text: `The worktree could not be removed${reason ? `: ${reason}` : ''}.${where}`, error: true };

@@ -10,7 +10,7 @@ import { importOnce } from './import_once.js';
 export function showWorktreeNotice(w, subject = 'team') {
     const words = worktreeAnswerWords(w, subject);
     if (!words) return null;
-    // Settings' Storage and cleanup may be open while this stop finishes: its list read the worktree as in use before the stop ended, so read it again now (#7055)
+    // Settings' Storage and backup may be open while this stop finishes: its list read the worktree as in use before the stop ended, so read it again now (#7055)
     if (w.state === 'kept' && document.getElementById('wt-list')) importOnce('./worktrees_panel.js').then(m => m.loadWorktrees({ keepSaid: true })).catch(() => {});
     if (w.path && (w.state === 'kept' || w.state === 'failed') && showWorktreeDock({ text: words.text, path: w.path, error: words.error })) return null;
     return showToast(words.text, words.error);
