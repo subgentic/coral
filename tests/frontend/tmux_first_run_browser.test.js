@@ -33,9 +33,10 @@ const { coralReady } = require('./helpers/wait');
         await ev(`document.getElementById('tmux-missing-banner').style.display = ''; true`); // the app-wide banner is showing
         await ev(open);
         await waitFor(`(() => { const s = ${slot}; return !!s && s.offsetParent !== null && /tmux is not installed/.test(s.textContent); })()`, 'the tmux line', 8000);
-        assert.match(await ev(`${slot}.textContent`), /Coral needs tmux to run agents\./, 'the line is not under a tmux heading, so it names tmux');
+        assert.match(await ev(`${slot}.textContent`), /switch to PTY in Settings/, 'the line offers the pty alternative');
+        assert.match(await ev(`${slot}.textContent`), /Agents will end when Coral restarts/, 'the restart effect is stated');
         const line = await ev(`(() => { const s = ${slot}, go = document.getElementById('launch-agent-go');
-            return { command: s.querySelector('code').textContent, buttons: [...s.querySelectorAll('button')].map(b => b.textContent), role: s.getAttribute('role'),
+            return { command: s.querySelector('code').textContent, buttons: [...s.querySelectorAll('button:not(.btn-link)')].map(b => b.textContent), role: s.getAttribute('role'),
                 disabled: go.disabled, describedBy: go.getAttribute('aria-describedby') === s.id, blocks: s.dataset.blocksLaunch, stage: document.getElementById('launch-step-agent').dataset.stage }; })()`);
         assert.deepEqual(line, { command: 'brew install tmux', buttons: ['Check again'], role: 'status', disabled: true, describedBy: true, blocks: '1', stage: 'agent' });
         assert.equal(await ev(`getComputedStyle(document.getElementById('tmux-missing-banner')).display`), 'none', 'said once: the app-wide banner steps aside while the dialog has the line');

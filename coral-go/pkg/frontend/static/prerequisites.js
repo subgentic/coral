@@ -109,13 +109,21 @@ export async function checkAgentCLI(type, element, {force = false, command = '',
     }
 }
 
+function ptyOfferNodes(container) {
+    container.replaceChildren();
+    const link = document.createElement('button'); link.type = 'button'; link.className = 'btn-link';
+    link.textContent = 'switch to PTY in Settings'; link.addEventListener('click', () => window.showSettingsModal?.('terminal'));
+    container.append('You can ', link, '. Agents will end when Coral restarts.');
+}
+
 export async function checkTmux(force = false) {
     const banner = document.getElementById('tmux-missing-banner');
     if (!banner) return;
     const controller = start(banner);
     const title = banner.querySelector('strong');
     const message = document.getElementById('tmux-check-message');
-    const command = banner.querySelector('.tmux-missing-banner-cmd');
+    const ptyOffer = document.getElementById('tmux-banner-pty');
+    const advanced = document.getElementById('tmux-banner-advanced');
     const button = document.getElementById('tmux-check-again');
     button.disabled = true; button.textContent = 'Checking…';
     try {
@@ -126,27 +134,29 @@ export async function checkTmux(force = false) {
         if (!current(banner,controller)) return;
         if (data.tmux_available || data.tmux_required === false || data.effective_backend === 'pty') { banner.style.display='none'; return; }
         title.textContent = 'tmux is not installed.';
-        message.textContent = 'Coral needs it to run agents.';
+        message.textContent = 'Agents cannot start.';
+        ptyOfferNodes(ptyOffer); ptyOffer.hidden = false;
         const install = data.tmux_install_command;
-        command.hidden = !install;
+        advanced.hidden = !install;
         document.getElementById('tmux-missing-banner-cmd-text').textContent = install || '';
         banner.style.display = '';
     } catch (error) {
         if (!current(banner,controller) || error.name === 'AbortError') return;
         title.textContent = 'tmux check failed.'; message.textContent = error instanceof SyntaxError ? 'The server returned an invalid response.' : error.message;
-        command.hidden = true; banner.style.display = '';
+        if (ptyOffer) ptyOffer.hidden = true;
+        if (advanced) advanced.hidden = true;
+        banner.style.display = '';
     } finally {
         if (current(banner,controller)) { button.disabled=false;button.textContent='Check again'; }
     }
 }
 
-/** First run: tmux missing is said once in the launch form, with the one command for this OS and a Check again; Launch stays off with it as the reason (#6046).
- *  Only where the backend needs tmux and the launch is on this computer; nothing is installed. */
+/** First run: tmux missing is said once in the launch form, with a Settings link to switch to PTY and an Advanced fold for the install command; Launch stays off with it as the reason (#6046).
+ *  Only where the backend needs tmux and the launch is on this computer; nothing is installed or changed by itself. */
 export async function checkTmuxForLaunch(element, {force = false, isLocal = () => true} = {}) {
     if (!element) return;
     const controller = start(element);
     const recheck = () => checkTmuxForLaunch(element, {force:true, isLocal});
-    // A launch on another server is that server's to report: this dashboard's tmux is not the one the agent will run in.
     if (!isLocal()) { element.replaceChildren(); setHidden(element, true); blocksLaunch(element, false); return; }
     try {
         const response = await fetchSystemStatus({fresh:force});
@@ -156,10 +166,21 @@ export async function checkTmuxForLaunch(element, {force = false, isLocal = () =
         if (!current(element,controller)) return;
         if (data.tmux_available || data.tmux_required === false || data.effective_backend === 'pty') { element.replaceChildren(); setHidden(element, true); blocksLaunch(element, false); return; }
         blocksLaunch(element, true); setHidden(element, false);
-        renderCLI(element, 'tmux is not installed. Coral needs tmux to run agents.', recheck, {command:data.tmux_install_command || ''});
+        element.replaceChildren(); element.style.display = '';
+        element.setAttribute('role', 'status'); element.setAttribute('aria-live', 'polite');
+        const label = document.createElement('span'); label.textContent = 'tmux is not installed.'; element.append(label);
+        const pty = document.createElement('span'); ptyOfferNodes(pty); element.append(pty);
+        const install = data.tmux_install_command;
+        if (install) {
+            const fold = document.createElement('details'); fold.className = 'disclosure cli-advanced-fold';
+            const sum = document.createElement('summary'); sum.textContent = 'Install command'; fold.append(sum);
+            const code = document.createElement('code'); code.textContent = install; fold.append(code);
+            element.append(fold);
+        }
+        const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn btn-small';
+        btn.textContent = 'Check again'; btn.addEventListener('click', recheck); element.append(btn);
     } catch (error) {
         if (!current(element,controller) || error.name === 'AbortError') return;
-        // A check that failed says nothing about tmux: it does not hold the launch.
         element.replaceChildren(); setHidden(element, true); blocksLaunch(element, false);
     }
 }

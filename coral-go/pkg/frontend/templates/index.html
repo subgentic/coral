@@ -172,7 +172,11 @@
         <div class="tmux-missing-banner-body">
             <strong>tmux is not installed.</strong>
             <span id="tmux-check-message"></span>
-            <span class="tmux-missing-banner-cmd">Install with: <code id="tmux-missing-banner-cmd-text"></code></span>
+            <span id="tmux-banner-pty" hidden></span>
+            <details class="disclosure tmux-missing-banner-advanced" id="tmux-banner-advanced" hidden>
+                <summary>Install command</summary>
+                <span class="tmux-missing-banner-cmd"><code id="tmux-missing-banner-cmd-text"></code></span>
+            </details>
         </div>
         <button id="tmux-check-again" class="btn btn-small" type="button">Check again</button>
         <button class="tmux-missing-banner-close ic-close" data-on-click="m-tmux-banner-close" aria-label="Dismiss"></button>
