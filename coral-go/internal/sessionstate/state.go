@@ -161,7 +161,7 @@ type State struct {
 	LastStop   time.Time
 
 	// WaitingSince is when the agent's own request to the user began (zero: it waits for nothing, or only on Coral's held notice, a sign-in or a launch prompt, which are not its request). It does not move when a second
-	// request opens while the first is open, nor when Coral's held notice came first; Since is the phase's start and is left to the paste gate (#6981).
+	// request opens while the first is open (when the first is answered and the second stays, it becomes the second's own start, #16962), nor when Coral's held notice came first; Since is the phase's start and is left to the paste gate (#6981).
 	WaitingSince time.Time
 }
 
@@ -454,12 +454,33 @@ func (d *deriver) toolUsed(event Event) {
 			d.open--
 		}
 		if d.open > 0 {
+			d.waitingSinceOldestOpen()
 			return
 		}
 	}
 	d.latestType = event.Type
 	d.clearRequest()
 	d.state.AwaitingUser = false
+}
+
+// waitingSinceOldestOpen: when one of several open requests was answered, the clock is the oldest one still open's own start, not the answered one's (#16962: a card for the second question read "waiting 45 min" on a 25-minute-old ask).
+// Only when every open request has its calls and a time; otherwise the start stays as it was.
+func (d *deriver) waitingSinceOldestOpen() {
+	if !d.ownOpen || len(d.waits) != d.open {
+		return
+	}
+	var oldest time.Time
+	for _, w := range d.waits {
+		if w.at.IsZero() {
+			return
+		}
+		if oldest.IsZero() || w.at.Before(oldest) {
+			oldest = w.at
+		}
+	}
+	if !oldest.IsZero() {
+		d.state.WaitingSince = oldest
+	}
 }
 
 // notified takes a notification: Coral's held notice ending, Coral's held notice (never over the agent's own
