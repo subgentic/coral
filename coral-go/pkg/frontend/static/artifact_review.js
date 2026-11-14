@@ -236,6 +236,7 @@ export function attachReview(d, { reload }) {
     // Both are bound to THE FILE they were made for (#14263, QA Reviewer 2's surviving mutants on #14187): another file opened in this form never reuses this one's recorded decision or its comment, whatever else is or is not cleared on open.
     const fileKey = x => JSON.stringify([x.team, x.server || '', x.hex]);
     let legacyDecision = null, legacyComment = null;
+    let draftWarned = false; // Approve found an unsent comment and said so (#16399)
     let armed = false, armedAt = 0; // Approve on a series of several files, some never opened, asks once more (#15254)
     let cur = null, gen = 0, sending = false, done = false, inProgress = false, progressTimer = null;
     const progress = $('.artifact-review-pending');
@@ -257,7 +258,7 @@ export function attachReview(d, { reload }) {
     const syncHold = () => { approve.disabled = approveNote.disabled = deciding || !!d.dataset.contentPending; }; // the new version's content has not rendered: the old text must not sit under 'Approve v2' (#15636)
     d.addEventListener('av-content', () => { syncHold(); syncSend(); }); // the form's own Approve (approveWith, #15545) waits for the new content too
     const show = (s) => {
-        cur = s; armed = false;
+        cur = s; armed = false; draftWarned = false;
         form.querySelector('label').textContent = s && s.row.produced_by ? `What should change? ${shown(s.row.produced_by)}, who uploaded this file, will get it.` : 'What should change?'; // the box says who gets the request (walk 17 M13)
         const waiting = !!s && (s.state === 'pending' || s.state === 'changes');
         const pending = waiting && !decisionNeedsPerson(s.server); // a remote of a self-hosted hub: the decision is made on that machine's own dashboard (#11372)
@@ -294,7 +295,9 @@ export function attachReview(d, { reload }) {
         if (!cur) return;
         if (!armed && d.dataset.coversFiles && Number(d.dataset.unopenedFiles) > 0) { armed = true; armedAt = Date.now(); paintApprove(); return; } // covers several files and some were never opened: say so, and ask again
         if (armed && Date.now() - armedAt < 600) return; // a double click is one press: it cannot answer the question it has not shown yet (Security's INFO on #15254)
-        armed = false;
+        const unsent = [...d.querySelectorAll('.ac-composer .ac-input')].find(t => t.value.trim()); // a comment typed and not sent: Approve says so once, and a second press approves without it (#16399)
+        if (unsent && !draftWarned) { draftWarned = true; showToast('Your comment is not sent yet. Send it first, or press Approve again to approve without it.', true); unsent.focus(); return; }
+        draftWarned = false; armed = false;
         deciding = true; syncHold();
         try { const out = await approveRow(cur.team, cur.row); sayApproved(cur.row.name || 'the artifact', out); show({ ...cur, state: 'approved', at: out.review?.at || new Date().toISOString() }); }
         catch (e) { showToast(e.message, true); } finally { deciding = false; syncHold(); }

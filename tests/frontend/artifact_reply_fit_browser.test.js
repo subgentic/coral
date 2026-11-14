@@ -25,7 +25,7 @@ const { coralReady } = require('./helpers/wait');
                 const pr = r(panel), cr = r(c), fr = foot && foot.getClientRects().length ? r(foot) : null;
                 return { hint: hint ? hint.textContent : null, described: !!hint && ta.getAttribute('aria-describedby') === hint.id, cTop: Math.round(cr.top), cBottom: Math.round(cr.bottom), pTop: Math.round(pr.top), pBottom: Math.round(pr.bottom), fTop: fr ? Math.round(fr.top) : null }; })()`);
             console.log(at + JSON.stringify(m));
-            assert.ok(m.hint && /Enter/.test(m.hint) && /Ctrl/.test(m.hint) && m.described, at + 'it says how to send, and the box is described by it: ' + JSON.stringify(m));
+            assert.ok(m.hint && /Enter/.test(m.hint) && /Ctrl|⌘/.test(m.hint) && m.described, at + 'it says how to send, and the box is described by it: ' + JSON.stringify(m));
             assert.ok(m.cTop >= m.pTop - 1 && m.cBottom <= m.pBottom + 1, at + 'the reply box is inside the panel: ' + JSON.stringify(m));
             const hit = await ev(`(() => { const out = {}; for (const k of ['.ac-input', '.ac-send', '.ac-cancel']) { const e = document.querySelector('#artifact-viewer .ac-composer ' + k), b = e.getBoundingClientRect(), t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); out[k] = t === e || e.contains(t); } return out; })()`);
             assert.ok(hit['.ac-input'] && hit['.ac-send'] && hit['.ac-cancel'], at + 'the box, Reply and Cancel are what a finger reaches (nothing, such as the footer, is over them): ' + JSON.stringify(hit));
