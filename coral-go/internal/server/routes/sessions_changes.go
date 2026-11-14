@@ -258,6 +258,10 @@ func writeSessionChanges(w http.ResponseWriter, r *http.Request, diff []byte, wo
 	_, _ = w.Write(diff)
 }
 
+// errNotGitRepo is PersistTaskChanges saying the agent's folder is not a git working tree: there is nothing to diff (#16554, walk 24: 'git diff ... Not a git repository' warned on every task of a
+// team whose folder is no repo).
+var errNotGitRepo = errors.New("the agent's folder is not a git repository")
+
 // PersistTaskChanges stores a board task's final patch before its working
 // directory can be cleaned up.
 func (h *SessionsHandler) PersistTaskChanges(ctx context.Context, task *board.Task, artifactPath string) error {
@@ -267,6 +271,9 @@ func (h *SessionsHandler) PersistTaskChanges(ctx context.Context, task *board.Ta
 	workdir := h.resolveGitRoot(ctx, "", "", *task.SessionID)
 	if workdir == "" {
 		return fmt.Errorf("could not determine working directory")
+	}
+	if !gitutil.IsWorkTree(ctx, workdir) {
+		return errNotGitRepo // a team folder that is not a git repo has no changes to diff: not a failure (#16554)
 	}
 	diff, err := h.generatePersistedDiff(ctx, workdir) // filtered and capped (#3555)
 	if err != nil {
