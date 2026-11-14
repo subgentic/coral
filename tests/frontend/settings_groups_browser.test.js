@@ -71,7 +71,7 @@ const GROUPS = {
         console.log('3. A short help line ends with its named Docs link');
         await ev(`document.getElementById('settings-tab-cleanup').click(); true`);
         const info = await ev(`(() => { const a = document.querySelector('#settings-pane-cleanup a.sv-learn'); return {name:a.getAttribute('aria-label'), href:a.getAttribute('href'), help:!!a.closest('.sv-help'), more:!!document.querySelector('#settings-pane-cleanup .sv-more')}; })()`);
-        assert.match(info.name, /^Learn more about /); assert.equal(info.href, '/docs/settings-system'); assert.equal(info.help, true); assert.equal(info.more, false);
+        assert.match(info.name, /^Learn more about /); assert.equal(info.href, '/docs/settings'); assert.equal(info.help, true); assert.equal(info.more, false);
         const loose = await ev(`[...document.querySelectorAll('#settings-modal dt .toggle-desc:not(.settings-hint-line), #settings-modal [data-info]')].filter(e => !/^Now:/.test(e.textContent.trim())).map(e => (e.closest('.settings-row') || {}).id + ' ' + e.className + ' ' + e.textContent.slice(0, 30))`); // (a status line, "Now: Codex will ask", is not an explanation)
         assert.deepEqual(loose, [], 'every explanation is a hint line under its label, none half-built');
         const unnamed = await ev(`[...document.querySelectorAll('#settings-modal .settings-learn, #settings-modal .sv-learn')].filter(b => !b.getAttribute('aria-label')).length`);
