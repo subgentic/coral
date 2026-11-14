@@ -12,17 +12,20 @@ const { coralReady } = require('./helpers/wait');
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
     const { Network } = client;
     const sleep = ms => new Promise(r => setTimeout(r, ms));
+    // A step that takes over 10 s says so on stderr, so a slow run in a loaded batch names what it waited on (#17205: it took 2 s alone and 67 to 180 s in a batch).
+    const timed = async (name, work) => { const t = Date.now(); try { return await work; } finally { const d = Date.now() - t; if (d > 10000) console.error(`[slow] ${view} ${name} took ${d} ms`); } };
+    let view = '';
     try {
         await Promise.all([Page.enable(), Network.enable()]);
+        await Network.setCacheDisabled({ cacheDisabled: true }); // a cold page for every load: nothing comes from the cache, and no disk is cleared (Network.clearBrowserCache blocked for minutes under load, #17205)
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         const seen = [];
         Network.requestWillBeSent(p => { const m = /\/vendor\/([^?#]+)/.exec(p.request.url); if (m) seen.push(m[1]); });
-        for (const view of ['home', 'chat']) {
-            seen.length = 0;
-            await Network.clearBrowserCache();
-            await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await coralReady(ev);
+        for (const which of ['home', 'chat']) {
+            view = which; seen.length = 0;
+            await timed('navigate', Page.navigate({ url: process.env.CORAL_TEST_URL + '/' })); await timed('load', Page.loadEventFired()); await install();
+            await timed('coralReady', coralReady(ev));
             if (view === 'chat') {
                 await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('vendor-bot', 'A', 6, { sleeping: false }); true`);
                 await ev(`window.selectLiveSession('vendor-bot', 'claude', 'vendor-bot-id', 'local'); true`);
