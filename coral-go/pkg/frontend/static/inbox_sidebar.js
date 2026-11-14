@@ -1487,6 +1487,7 @@ registerGroupSource('hub-inbox', {
 function setGroup(key, { auto = false } = {}) {
     if (!groupMeta(key)) key = 'needs';
     const was = group;
+    if (was && was !== key && (queries[was] || '') && !hubFrame(was)) filterInbox(''); // the sidebar's search is for the list on screen: it does not follow the person to another folder or wait for their next visit, hiding a real item with no word of why (#17020, walk 46)
     group = key;
     if (key === 'tasks' && nativeTasks()) refreshTasks();
     if (key === 'saved' && !hubFrame(key)) { saved.loadSaved(); activateSavedReviews(); }
