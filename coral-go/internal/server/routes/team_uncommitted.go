@@ -223,10 +223,10 @@ func (h *SessionsHandler) TeamCommit(w http.ResponseWriter, r *http.Request) {
 	}
 	undo := func() {
 		if len(mine) > 0 {
-			gitutil.Command(context.Background(), folder, append([]string{"reset", "-q", "--"}, mine...)...).Run() //nolint:errcheck // best effort: the commit already failed
+			gitutil.Command(context.Background(), folder, append([]string{"--literal-pathspecs", "reset", "-q", "--"}, mine...)...).Run() //nolint:errcheck // best effort: the commit already failed
 		}
 	}
-	if out, err := gitutil.Command(ctx, folder, append([]string{"add", "--"}, paths...)...).CombinedOutput(); err != nil {
+	if out, err := gitutil.Command(ctx, folder, append([]string{"--literal-pathspecs", "add", "--"}, paths...)...).CombinedOutput(); err != nil {
 		undo()
 		commitFailed(w, "git could not stage the files", out)
 		return
@@ -237,7 +237,9 @@ func (h *SessionsHandler) TeamCommit(w http.ResponseWriter, r *http.Request) {
 			args = append(args, "-c", key+"="+fallback)
 		}
 	}
-	args = append(args, "-c", "commit.gpgsign=false", "commit", "-m", msg)
+	// Only the listed paths are committed (commit -- paths, taken literally): a file already staged that is not listed (a secret-looking one left out) stays staged and is not in the commit.
+	args = append(args, "--literal-pathspecs", "-c", "commit.gpgsign=false", "commit", "-m", msg, "--")
+	args = append(args, paths...)
 	if out, err := gitutil.Command(ctx, folder, args...).CombinedOutput(); err != nil {
 		undo()
 		commitFailed(w, "git could not make the commit", out)
