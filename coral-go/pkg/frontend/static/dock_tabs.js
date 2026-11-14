@@ -1,6 +1,6 @@
-/* The agent's side panel tabs say their words (UI/UX's 170 list, item 1, #7621): at 1280 px and up each tab shows its word beside its icon when ALL the words fit the row on one line (a panel dragged narrow,
- * or text at 200%, falls back to icons alone, whose name is the title and the aria-label: no word is clipped and the row does not wrap), and the three rarely used tabs (Notes, Agent UI, Branches), once turned on, sit behind one
- * More menu. They stay the real tab buttons (their panels, counts and handlers are the old ones): in More they are only drawn out of the way (.tab-more) and out of the tab order, and the menu's items
+/* The agent's side panel tabs say their words (UI/UX's 170 list, item 1, #7621; #15855, Design C5): four tabs, Board, Files, Artifacts and Tasks (the Operator's choice, 2026-11-12), show their word beside
+ * their icon when ALL the words fit the row on one line, at any width (a panel dragged narrow, or text at 200%, falls back to icons alone, whose name is the title and the aria-label: no word is clipped and
+ * the row does not wrap), and every other tab the page has (Browse, Activity, Notes, Info, Agent UI, Branches, Saved) sits behind one More menu, in the order the person gave in Customize tabs. They stay the real tab buttons (their panels, counts and handlers are the old ones): in More they are only drawn out of the way (.tab-more) and out of the tab order, and the menu's items
  * open them through switchAgenticTab. The open one swaps into the row and More stays (#15733). */
 import { registerActions } from './actions.js';
 import { escapeHtml, escapeAttr } from './utils.js';
@@ -8,11 +8,10 @@ import { setHidden, setAttr, setHtml } from './dom_write.js';
 import { menuMove } from './menu_keys.js';
 import { watchScrollCue } from './scroll_cue.js';
 
-const RARE = ['notes', 'agent-ui', 'branches'];
-const WIDE = window.matchMedia('(min-width: 1280px)');
+const PRIMARY = ['board', 'files', 'artifacts', 'tasks']; // the four that stay in the row with their words (#15855)
 const $ = id => document.getElementById(id);
 const strip = () => document.querySelector('#agentic-block-top .agentic-state-tabs');
-const rareTabs = () => RARE.map(t => $(`agentic-tab-${t}`)).filter(Boolean);
+const rareTabs = () => [...(strip()?.querySelectorAll('.agentic-tab[data-tab]') || [])].filter(b => !PRIMARY.includes(b.dataset.tab)); // in the row's own (Customize tabs) order
 const wordOf = b => b.getAttribute('aria-label') || b.dataset.tab;
 const iconOf = b => b.querySelector('.material-icons')?.textContent || '';
 const shown = b => getComputedStyle(b).display !== 'none'; // the page's own rules (data-page, data-scope) and the customizer's .tab-hidden say which tabs this page has
@@ -24,7 +23,6 @@ export function fitWords() {
     const row = strip();
     if (!row) return;
     const on = row.hasAttribute('data-words');
-    if (!WIDE.matches) { if (on) row.removeAttribute('data-words'); if (row.hasAttribute('data-active-word')) row.removeAttribute('data-active-word'); return; }
     const tabs = [...row.querySelectorAll('.agentic-tab')].filter(shown).filter(b => !b.classList.contains('tab-more'));
     if (tabs.length === 0) return;
     if (!on) row.setAttribute('data-words', '');
@@ -99,7 +97,7 @@ const items = () => [...($('agentic-more-menu')?.querySelectorAll('[role=menuite
 
 registerActions({
     'dock-more-toggle': () => { if (menuOpen) closeMore(true); else openMore(); },
-    'dock-more-pick': el => { const t = el.dataset.tab; closeMore(false); if (RARE.includes(t)) { window.switchAgenticTab?.(t, 'top'); focusPanel(t); } },
+    'dock-more-pick': el => { const t = el.dataset.tab; closeMore(false); if (!PRIMARY.includes(t) && $(`agentic-tab-${t}`)) { window.switchAgenticTab?.(t, 'top'); focusPanel(t); } },
     'dock-more-key': (el, event) => {
         const list = items(), i = list.indexOf(el);
         if (event.key === 'Escape') { event.preventDefault(); closeMore(true); }
@@ -121,7 +119,6 @@ export function initDockTabs() {
         for (const b of row.children) ro.observe(b); // with the words on the row does not wrap (agentic.css), so a larger text size or a tab's new count widens the tabs and leaves the row's size alone: the tabs are watched, and the words come off when they do not fit (#9435)
         watchScrollCue(row);
     } // the phone's overlay strip scrolls: a fade says which edge hides tabs
-    WIDE.addEventListener('change', fitWords);
     document.addEventListener('click', e => { if (menuOpen && !e.target.closest?.('#agentic-more, #agentic-more-menu')) closeMore(false); }); // the menu is beside the More wrapper (#10214): both are the control
     document.addEventListener('focusout', e => { if (menuOpen && e.relatedTarget && !e.relatedTarget.closest?.('#agentic-more, #agentic-more-menu')) closeMore(false); });
 }
