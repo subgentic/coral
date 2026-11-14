@@ -1,0 +1,12 @@
+/* The card layout for the Goals tab (#16709): each row is a left-aligned card with a grey
+   flag icon, the goal title, outcome subtitle, Goal #N and State pills, and a progress bar. */
+
+.goal-row-card { display: flex; align-items: flex-start; gap: 10px; padding: 2px 0; }
+.goal-card-icon { font-size: 20px; color: var(--text-tertiary); line-height: 1.4; flex-shrink: 0; }
+.goal-card-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; max-width: 60ch; }
+.goal-card-body .dt-primary { text-align: left; }
+.goal-card-outcome { font-size: var(--fs-sm); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60ch; }
+.goal-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.goal-card-id { font-size: var(--fs-xs, 0.6875rem); color: var(--text-tertiary); background: var(--bg-tertiary, var(--chip-bg)); }
+.goal-card-progress { font-size: var(--fs-sm); }
+.goal-card-progress .dt-progress-meter { width: 80px; }

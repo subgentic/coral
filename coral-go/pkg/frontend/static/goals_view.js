@@ -14,21 +14,23 @@ import { importOnce } from './import_once.js';
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the goal's column is its folded form
 const { el } = DT;
-const GC = await importOnce('./goal_columns.js');
 
 import * as W from './goal_words.js';
 import { looksDone } from './goal_done.js';
+import { isPhoneLayout } from './phone_layout.js';
 const { shortTitle } = await importOnce('./goal_short.js');
 const { mountGoal } = await importOnce('./goal_view.js');
+const { statusMark } = await importOnce('./status_mark.js');
 await loadStyles('phone_lists.css'); // the phone form of a team list: edge-to-edge rows, a one-line toolbar (#12230); not at start (page_weight)
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 loadStyles('short_screen.css'); // what a short window needs (200% zoom, #15303)
+loadStyles('goals_cards.css'); // the card layout for the Goals tab (#16709)
 let detail = null, detailHost = null, detailId = 0;
 function clearDetail() { detail?.dispose(); detail = null; detailHost = null; detailId = 0; }
 
 const DEFAULT_FILTER = 'active'; // the Goals tab opens on the goals in progress, not on every goal ever (#8517, the operator); a pill the person picks is kept while they are on the team
 const model = { project: '', sig: '', goals: [], requireGoal: false, noGoalOpen: null, filter: DEFAULT_FILTER, openId: 0, loading: false, failed: '', asOf: '', creating: false, goalSearch: '' };
-const PHONE = matchMedia('(max-width: 760px)'); // the team page's phone layout (team_page.css): a goal, its task list and a task are three screens
+const MARK = { active: 'working', blocked: 'waiting', proposed: 'idle', done: 'done', dropped: 'sleeping', failed: 'failed' };
 let root = null;
 let layout = 'cards'; // 'cards': the board's Goals face (cards and the goal beside them); 'page': the team page's Goals tab (a table, and a goal's own page, #7453)
 let hooks = {}; // the page's: openTask(task, goal), onCount(n)
@@ -132,21 +134,41 @@ function goalBulkActions() {
 /** A compact icon button with its name (a phone's New goal). */
 function iconBtn(cls, icon, name, run) { const b = btn(`btn btn-primary btn-icon ${cls}`, '', run); const i = el('span', 'material-icons', icon); i.setAttribute('aria-hidden', 'true'); b.append(i); b.setAttribute('aria-label', name); b.title = name; return b; }
 
+/** A goal card's cell content: grey icon, title, outcome, pills (Goal #N, State) and progress bar (#16709). */
+function goalCardCell(g) {
+    if (g.noGoal) { const b = DT.primaryButton(g.title); b.classList.add('goals-no-goal'); return b; }
+    const wrap = el('span', 'goal-row-card');
+    const icon = el('span', 'material-icons goal-card-icon', 'flag'); icon.setAttribute('aria-hidden', 'true');
+    const body = el('span', 'goal-card-body');
+    const title = DT.primaryButton(g.title ? shortTitle(g.title) : `Goal ${g.id}`); if (g.title) title.title = g.title; title.dataset.goalId = String(g.id);
+    body.append(title);
+    if (g.outcome) { const sub = el('span', 'goal-card-outcome'); sub.textContent = g.outcome; body.append(sub); }
+    const meta = el('span', 'goal-card-meta');
+    meta.append(el('span', 'chip chip-tag goal-card-id', `Goal #${g.id}`));
+    meta.append(statusMark(MARK[String(g.state || '').toLowerCase()] || 'idle', W.stateWord(g)));
+    body.append(meta);
+    const n = totalOf(g.rollup);
+    if (n) { const prog = DT.progressCell(doneOf(g.rollup), n); prog.classList.add('goal-card-progress'); body.append(prog); }
+    wrap.append(icon, body);
+    return wrap;
+}
+
 function drawTableRaw(col) {
     col.replaceChildren();
+    const phone = isPhoneLayout();
     const counts = W.filterCounts(model.goals);
     // The one toolbar line (#7717): the search field, the state pills (one compact select when they do not fit) and New goal at the right.
     const toolbar = Toolbar.build({
         id: 'goals-search', label: 'Search goals', placeholder: 'Search goals', value: model.goalSearch,
         onSearch: text => { model.goalSearch = text; drawList(); },
         pills: { label: 'Show goals that are', current: model.filter, items: W.FILTERS.map(f => ({ key: f, label: W.filterLabel(f), count: counts[f] })), onPick: f => { model.filter = f; say(W.filterAnnouncement(f, counts[f])); drawList(); } },
-        action: PHONE.matches ? iconBtn('goals-new', 'add', 'New goal', () => openCreate()) : btn('btn btn-primary goals-new', 'New goal', () => openCreate()), // a phone: a compact + beside the search (#12230)
+        action: phone ? iconBtn('goals-new', 'add', 'New goal', () => openCreate()) : btn('btn btn-primary goals-new', 'New goal', () => openCreate()),
     });
-    if (PHONE.matches) toolbar.classList.add('phone-list-bar');
+    if (phone) toolbar.classList.add('phone-list-bar');
     col.append(toolbar);
-    if (model.requireGoal) { // a phone: one quiet line, the whole sentence on its tap-and-hold (#12230); elsewhere the sentence
+    if (model.requireGoal) {
         const note = el('p', 'goals-note goals-require');
-        if (PHONE.matches) { const i = el('span', 'material-icons goals-note-icon', 'info'); i.setAttribute('aria-hidden', 'true'); note.append(i, ' Goal required here'); note.setAttribute('title', W.requireGoalNote); /* the whole sentence on the quiet line's tooltip; the line shows only "Goal required here" */ } else note.textContent = W.requireGoalNote;
+        if (phone) { const i = el('span', 'material-icons goals-note-icon', 'info'); i.setAttribute('aria-hidden', 'true'); note.append(i, ' Goal required here'); note.setAttribute('title', W.requireGoalNote); } else note.textContent = W.requireGoalNote;
         col.append(note);
     }
     if (state.hubConnected || window.__goalsHub) col.append(el('p', 'goals-note', W.otherBoardsNote));
@@ -171,14 +193,20 @@ function drawTableRaw(col) {
     const rows = shown.concat(model.noGoalOpen > 0 && (model.filter === 'all' || model.filter === DEFAULT_FILTER) ? [{ id: 'no-goal', title: W.noGoalRowText(model.noGoalOpen), noGoal: true }] : [], finished); // the finished goals stay under the active ones, in their own group (#15305, walk 18 M7)
     const table = DT.dataTable({
         label: `Goals, ${shown.length}`, rows, rowKey: g => g.id, state: goalsTableState, rowName: g => g.title,
-        selectable: { contextKey: model.project, canSelect: g => !g.noGoal && W.isOpenGoal(g), actions: goalBulkActions(), onChange: keys => Toolbar.mountSelection(toolbar, keys.size ? table.bar : null), ...(PHONE.matches ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) }, // a phone: a long press selects, as in Needs you; no checkboxes and no Select button (#12230)
+        selectable: { contextKey: model.project, canSelect: g => !g.noGoal && W.isOpenGoal(g), actions: goalBulkActions(), onChange: keys => Toolbar.mountSelection(toolbar, keys.size ? table.bar : null), ...(phone ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) },
         onSort: () => drawList(), // keep the no-goal navigation row last in either direction
         ...(finished.length ? { groupBy: g => ({ key: g.state === 'done' ? 'done' : 'open', label: g.state === 'done' ? `Done (${finished.length})` : 'Active' }), groupSorted: true } : {}),
         open: g => g.noGoal ? window.openTeamPage?.(model.project, { tab: 'tasks', noGoal: true }) : openGoal(g.id, true),
-        columns: GC.goalColumns({ progressLabel: 'Tasks' }, ['goal', 'state', 'progress', 'updated']), oneLine: true, resize: true, sortBar: false, bare: PHONE.matches, // a phone: no card around the rows (#12230)
-        ...(PHONE.matches ? { mail: g => (g.noGoal ? { lead: { icon: 'checklist', square: true, name: 'Tasks with no goal' }, title: g.title, snippet: '', state: '', time: '' } : { lead: { icon: 'flag', square: true, name: W.stateWord(g) }, title: shortTitle(g.title), data: { goalId: String(g.id) }, ask: g.outcome || '', state: W.stateWord(g), time: `${W.stateWord(g)}${looksDone(g) ? ', all tasks done' : ''}${totalOf(g.rollup) ? ` \u00b7 ${doneOf(g.rollup)}/${totalOf(g.rollup)}` : ''}` }) } : {}), // a phone's row, like the Inbox's Goals: a flag, the goal, its outcome, when it moved
+        fold: 'always', sortBar: false, bare: phone,
+        columns: [
+            { key: 'goal', label: 'Goal', primary: true, width: 'grow', line: 1, sort: true, sortValue: g => g.title, cell: g => goalCardCell(g) },
+            { key: 'state', label: 'State', sort: true, sortValue: W.stateWord, line: 0, width: '1px', cell: () => '' },
+            { key: 'progress', label: 'Tasks', sort: 'number', sortValue: g => totalOf(g.rollup) ? doneOf(g.rollup) / totalOf(g.rollup) : 0, line: 0, width: '1px', cell: () => '' },
+            { key: 'updated', label: 'Updated', sort: 'date', sortValue: g => g.updatedAt || g.updated_at || '', firstDir: 'desc', line: 0, width: '1px', cell: () => '' },
+        ],
+        ...(phone ? { mail: g => (g.noGoal ? { lead: { icon: 'checklist', name: 'Tasks with no goal' }, title: g.title, snippet: '', state: '', time: '' } : { lead: { icon: 'flag', name: W.stateWord(g) }, title: shortTitle(g.title), data: { goalId: String(g.id) }, ask: g.outcome || '', state: W.stateWord(g), time: `${W.stateWord(g)}${looksDone(g) ? ', all tasks done' : ''}${totalOf(g.rollup) ? ` \u00b7 ${doneOf(g.rollup)}/${totalOf(g.rollup)}` : ''}` }) } : {}),
     });
-    if (PHONE.matches) { const bleed = el('div', 'goals-bleed'); bleed.append(table.el); col.append(bleed); } else col.append(table.el); // a phone: the rows run to the screen's edges (goals_phone.css)
+    if (phone) { const bleed = el('div', 'goals-bleed'); bleed.append(table.el); col.append(bleed); } else col.append(table.el);
     Toolbar.mountSelection(toolbar, goalsTableState.selected.size ? table.bar : null);
 }
 
@@ -216,7 +244,7 @@ export function closeGoal() {
     model.openId = 0;
     if (layout === 'page') hooks.onItem?.(0);
     draw();
-    (root.querySelector(`.goal-card[data-goal-id="${id}"]`) || root.querySelector(`.dt-primary[data-goal-id="${id}"]`))?.focus();
+    (root.querySelector(`.goal-row-card[data-goal-id="${id}"]`) || root.querySelector(`.dt-primary[data-goal-id="${id}"]`))?.focus();
 }
 
 /** The goal page's own id (0 on the list): the team page asks it to put the address and the Back button right. */
