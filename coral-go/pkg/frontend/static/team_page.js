@@ -173,7 +173,7 @@ function buildMore() {
     menu.append(add, settings, tpl, copy);
     host.append(b, menu);
     const set = (open, { focus = false } = {}) => { moreOpen = open; menu.hidden = !open; b.setAttribute('aria-expanded', String(open)); if (open) menu.style.setProperty('--more-max', `${Math.max(160, Math.floor(innerHeight - menu.getBoundingClientRect().top - 12))}px`); /* the room under the button: at 200% text the header is tall and the menu must scroll inside the window, not run off it (#15856) */ if (open) menu.querySelector('button:not([hidden])')?.focus(); else if (focus) b.focus(); };
-    b.addEventListener('click', () => { syncStop(); set(!moreOpen); }); // the Stop items in it follow the team (asleep or not) each time it opens
+    b.addEventListener('click', () => { if (!moreOpen) syncStop(); set(!moreOpen); }); // the Stop items in it follow the team (asleep or not) each time it opens, not when it closes: nothing under the pointer moves on the click that shuts it (#16394)
     menu.addEventListener('click', (e) => { if (e.target.closest('button')) set(false); });
     document.addEventListener('keydown', (e) => { if (moreOpen && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); set(false, { focus: true }); } }, true);
     document.addEventListener('click', (e) => { if (moreOpen && !menu.contains(e.target) && !b.contains(e.target)) set(false); });
@@ -182,7 +182,8 @@ const BOARD_ACTIONS = ['mb-select-btn', 'mb-export-btn', 'mb-pause-btn', 'mb-del
 function adoptBoardActions() {
     const menu = $('team-page-more-menu'); if (!menu) return;
     for (const id of BOARD_ACTIONS) { const b = $(id); if (b && b.parentElement !== menu) { b.dataset.home = b.parentElement ? b.parentElement.id : ''; menu.append(b); } }
-    const pause = $('mb-pause-btn'); // what Pause board does, in words under it (Mobile tester, #10008): a title is no help on a phone
+    const pause = $('mb-pause-btn'); if (pause) { const asleepWord = /^Wake/.test(pause.textContent); pause.hidden = asleepWord; const pn = $('mb-pause-note'); if (pn) pn.hidden = asleepWord; } // while the team sleeps its Sleep item is the Wake team (#16394)
+    // what Pause board does, in words under it (Mobile tester, #10008): a title is no help on a phone
     if (pause && !$('mb-pause-note')) { const n = el('span', 'menu-note', /^Resume/.test(pause.textContent) ? 'Agents get messages again when you resume.' : 'Agents stop receiving new messages until you resume.'); n.id = 'mb-pause-note'; pause.after(n); pause.setAttribute('aria-describedby', 'mb-pause-note'); }
     for (const id of BOARD_ACTIONS) { const b = $(id); if (b) b.style.display = ''; } // display-ok: the holder's markup hides these with an inline display:none, which message_board.js clears the same way
     const sel = $('mb-select-btn'); if (sel) sel.hidden = S.tab !== 'messages'; // selecting messages is the Messages tab's
