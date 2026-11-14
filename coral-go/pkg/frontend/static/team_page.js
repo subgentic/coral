@@ -308,7 +308,7 @@ async function readCounts() {
     if (g) S.counts.goals = (Array.isArray(g) ? g : g.goals || []).filter(x => !['done', 'dropped'].includes(String(x.state).toLowerCase())).length; // open goals, as the sidebar's Goals counts them (#15340)
     const t = tasks.value;
     if (t && Number.isFinite(t.total_completed)) S.tasksDone = t.total_completed; // for the header's Finished state (#15304)
-    if (t && Number.isFinite(t.total_open)) S.counts.tasks = (state.teamTasksOpen && state.teamTasksOpen.team === String(team) && Number.isFinite(state.teamTasksOpen.n) ? state.teamTasksOpen.n : t.total_open + (t.completed_since || 0)); // the list's own Open count when it has been read, so the tab and the list agree (#12248)
+    if (t && Number.isFinite(t.total_open)) S.counts.tasks = (state.teamTasksOpen && state.teamTasksOpen.team === String(team) && Number.isFinite(state.teamTasksOpen.n) ? state.teamTasksOpen.n : t.total_open); // the list's own Open count when it has been read, so the tab and the list agree (#12248, #16686: no completed_since — Open is pending + in progress + in review)
     if (avail.value && Array.isArray(avail.value.agents)) S.counts.agents = avail.value.agents.filter(a => a.availability !== 'archived').length; // as the sidebar group counts them (#10164)
     const k = kn.value;
     if (k && k.exists) S.counts.knowledge = ((k.index ? 1 : 0) + (Array.isArray(k.agents) ? k.agents.length : 0)) || null;

@@ -24,11 +24,12 @@ export function stateWord(goal) {
 /** A task's state, one word each (a task is blocked, never "blocked on" in a row). */
 export const taskStateWord = (state) => {
     const s = String(state || '').toLowerCase();
-    const done = ['completed', 'skipped'], active = ['in_progress', 'review_pending'], blocked = ['blocked', 'parked'], queued = ['pending', 'draft'];
+    const done = ['completed', 'skipped'], active = ['in_progress', 'review_pending'], blocked = ['blocked', 'parked'];
     if (done.includes(s)) return 'Done';
     if (active.includes(s)) return 'Active';
     if (blocked.includes(s)) return 'Blocked';
-    if (queued.includes(s)) return 'Queued';
+    if (s === 'draft') return 'Draft';
+    if (s === 'pending') return 'Queued';
     return word(s.replace(/_/g, ' '));
 };
 
@@ -42,7 +43,8 @@ export function taskStatusWord(status, review, parked) {
     if (parked) return 'Waiting'; // set aside on purpose (parked): it holds no slot, so it is not the agent's one In progress task (#11659)
     if (s === 'in_progress') return 'In progress';
     if (['blocked', 'parked'].includes(s)) return 'Blocked';
-    if (['pending', 'draft'].includes(s)) return 'Queued';
+    if (s === 'draft') return 'Draft';
+    if (s === 'pending') return 'Queued';
     return word(s.replace(/_/g, ' '));
 }
 /** The class that colours a state's dot (the goal chips' classes, shared). */
