@@ -1,0 +1,14 @@
+/* The Sub-agents tab (#16016): loaded with it (subagents_tab.js), not at start. */
+#agentic-panel-subagents { padding: 8px 12px; overflow-y: auto; }
+.subagents-head { color: var(--text-secondary); font-size: var(--fs-base); padding: 4px 0 8px; }
+.subagents-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.subagents-open { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: var(--control-touch-height, 36px); text-align: left; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-ml, 8px); background: var(--bg-secondary); color: var(--text-primary); font: inherit; cursor: pointer; }
+.subagents-open:hover { background: var(--bg-hover, var(--bg-tertiary)); }
+.subagents-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; max-width: 100%; }
+.subagents-title { overflow-wrap: anywhere; font-weight: var(--fw-medium); }
+.subagents-state { flex: none; font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--text-secondary); }
+.subagents-state-running { color: var(--link-text); }
+.subagents-state-stopped { color: var(--text-secondary); }
+.subagents-state-done { color: var(--success-text); }
+.subagents-meta { color: var(--text-secondary); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+@media (max-width: 767px), (pointer: coarse) { .subagents-open { min-height: var(--control-touch-height, 44px); } }

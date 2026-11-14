@@ -604,9 +604,9 @@ export function renderBoardTaskList() {
     const subagentTasks = (state.currentSubagents || []).map(sa => subagentToTaskRow(sa, agentDisplayName));
 
     const includeAgentTasks = !querying || (scope && !isQuery(_taskFilters));
-    const allTasks = includeAgentTasks ? [...boardTasks, ...agentTasks, ...(scope ? [] : subagentTasks)] : boardTasks; // a search is about the board's tasks
+    const allTasks = includeAgentTasks ? [...boardTasks, ...agentTasks, ...subagentTasks] : boardTasks; // a search is about the board's tasks
     const isDone = t => t.status === 'completed' || t.status === 'skipped';
-    const otherTasks = includeAgentTasks ? [...agentTasks, ...(scope ? [] : subagentTasks)] : [];
+    const otherTasks = includeAgentTasks ? [...agentTasks, ...subagentTasks] : [];
     // The board's done tasks are counted by the server: only a page of them is loaded (#3269).
     const boardDoneLoaded = boardTasks.filter(isDone).length;
     const boardDoneTotal = scopedBaseReady ? (_boardList.totalCompleted ?? boardDoneLoaded) : 0;

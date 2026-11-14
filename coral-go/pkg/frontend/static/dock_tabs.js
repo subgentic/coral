@@ -20,7 +20,7 @@ let menuOpen = false;
 
 /** The words fit when every tab of the row is on one line with them showing and none is clipped: measured, so a narrow panel, a large text size and an unusual word all fall back the same way.
  *  The words are put on to look (only when they are off) and taken off again when they do not fit; with them already on it only looks. */
-function fitWords() {
+export function fitWords() {
     const row = strip();
     if (!row) return;
     const on = row.hasAttribute('data-words');
