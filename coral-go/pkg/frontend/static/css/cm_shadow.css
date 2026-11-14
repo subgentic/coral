@@ -4,6 +4,7 @@
 .cm-shadow-mount { height: 100%; }
 .cm-editor { height: 100%; }
 .cm-scroller { overflow: auto; }
+.cm-gutters { background-color: transparent !important; border-right: 1px solid var(--border); } /* the gutter is the editor's own colour in both themes (#16366) */
 
 .cm-merge-b .cm-changedLine,
 .cm-inlineChangedLine {

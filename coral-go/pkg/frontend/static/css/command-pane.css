@@ -142,6 +142,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 } /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
 
 .send-menu-item { white-space: nowrap; }
+.send-menu-item[hidden] { display: none; } /* team-only entries for an agent with no team (#16366) */
 
 .send-menu-hint {
     margin-left: auto;
