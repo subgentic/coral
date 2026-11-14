@@ -76,6 +76,12 @@ type DropboxBackup struct {
 	now        func() time.Time
 	parallel   int
 
+	// #16170: the people in the account's shared folders, read from Dropbox for the share dialog's suggestions and kept here for five minutes (memory only, never stored).
+	contactsMu   sync.Mutex
+	contactsAt   time.Time
+	contactsFor  string
+	contactsList []string
+
 	// Stage 4b, retention (#14703).
 	retainEvery time.Duration                                           // at most one retention pass this often (an hour)
 	retainPoll  time.Duration                                           // how often a running delete job is read (a second)

@@ -282,3 +282,52 @@ func ValidLink(s string) bool {
 	}
 	return strings.HasPrefix(u.Path, "/scl/") || strings.HasPrefix(u.Path, "/s/")
 }
+
+// FolderMemberEmails reads the addresses of the people in the shared folders this account has (sharing/list_folders, then sharing/list_folder_members for the first maxFolders
+// of them; sharing.read, which Coral already holds), for the share dialog's suggestions (#16170). Dropbox has no call that lists a person's contacts (the contacts namespace
+// only deletes them), so this is the nearest thing under the scopes Coral has. One page of each, no more; a folder that cannot be read is skipped. Nothing is stored here.
+func (c *Client) FolderMemberEmails(ctx context.Context, access string, maxFolders int) ([]string, error) {
+	var folders struct {
+		Entries []struct {
+			ID string `json:"shared_folder_id"`
+		} `json:"entries"`
+	}
+	if err := c.rpc(ctx, access, "sharing/list_folders", map[string]any{"limit": maxFolders}, &folders); err != nil {
+		return nil, sharingError(err)
+	}
+	var out []string
+	seen := map[string]bool{}
+	for i, f := range folders.Entries {
+		if i >= maxFolders {
+			break
+		}
+		var members struct {
+			Users []struct {
+				User struct {
+					Email string `json:"email"`
+				} `json:"user"`
+			} `json:"users"`
+			Invitees []struct {
+				Invitee struct {
+					Email string `json:"email"`
+				} `json:"invitee"`
+			} `json:"invitees"`
+		}
+		if err := c.rpc(ctx, access, "sharing/list_folder_members", map[string]any{"shared_folder_id": f.ID, "limit": 50}, &members); err != nil {
+			continue
+		}
+		add := func(e string) {
+			if e = strings.ToLower(strings.TrimSpace(e)); e != "" && !seen[e] {
+				seen[e] = true
+				out = append(out, e)
+			}
+		}
+		for _, u := range members.Users {
+			add(u.User.Email)
+		}
+		for _, v := range members.Invitees {
+			add(v.Invitee.Email)
+		}
+	}
+	return out, nil
+}

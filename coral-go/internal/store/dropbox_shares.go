@@ -8,6 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -174,10 +175,36 @@ func (o *DropboxOutbox) StaleShares(ctx context.Context, before time.Time) ([]Dr
 // ForgetShares deletes every share row: the Operator confirmed a Disconnect, Rekey or Switch with files still shared, which leaves those copies
 // and links in their Dropbox, theirs to manage there. It returns how many were forgotten.
 func (o *DropboxOutbox) ForgetShares(ctx context.Context) (int, error) {
+	_, _ = o.db.ExecContext(ctx, "DELETE FROM dropbox_share_contacts") // the addresses were the old account's (#16170)
 	res, err := o.db.ExecContext(ctx, "DELETE FROM dropbox_shares")
 	if err != nil {
 		return 0, err
 	}
 	n, _ := res.RowsAffected()
 	return int(n), nil
+}
+
+// MaxShareContacts is how many addresses are kept per account (#16170): the newest.
+const MaxShareContacts = 100
+
+// RememberShareContacts records the addresses a share to people was made to (already checked, lower-cased), newest first kept, at most MaxShareContacts per account.
+func (o *DropboxOutbox) RememberShareContacts(ctx context.Context, account string, emails []string, now time.Time) error {
+	at := now.UTC().Format(time.RFC3339)
+	for _, e := range emails {
+		if _, err := o.db.ExecContext(ctx, `INSERT INTO dropbox_share_contacts (account_id, email, used_at) VALUES (?, ?, ?)
+			ON CONFLICT(account_id, email) DO UPDATE SET used_at = excluded.used_at`, account, e, at); err != nil {
+			return err
+		}
+	}
+	_, err := o.db.ExecContext(ctx, `DELETE FROM dropbox_share_contacts WHERE account_id = ? AND email NOT IN
+		(SELECT email FROM dropbox_share_contacts WHERE account_id = ? ORDER BY used_at DESC, rowid DESC LIMIT ?)`, account, account, MaxShareContacts)
+	return err
+}
+
+// ShareContacts returns the remembered addresses of the account that contain q (case-insensitive; every one when q is empty), the most recently used first, at most limit.
+func (o *DropboxOutbox) ShareContacts(ctx context.Context, account, q string, limit int) ([]string, error) {
+	q = strings.ToLower(q)
+	var out []string
+	err := o.db.SelectContext(ctx, &out, `SELECT email FROM dropbox_share_contacts WHERE account_id = ? AND instr(email, ?) > 0 ORDER BY used_at DESC, rowid DESC LIMIT ?`, account, q, limit)
+	return out, err
 }

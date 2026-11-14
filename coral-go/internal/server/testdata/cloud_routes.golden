@@ -143,6 +143,7 @@ GET /api/custom-models view
 GET /api/custom-modes view
 GET /api/dropbox/artifact/{digest} never
 GET /api/dropbox/removals never
+GET /api/dropbox/share-contacts never
 GET /api/dropbox/share/{digest} never
 GET /api/dropbox/shares never
 GET /api/dropbox/status never

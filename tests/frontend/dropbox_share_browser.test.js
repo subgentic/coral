@@ -16,7 +16,7 @@ const LINK = 'https://www.dropbox.com/scl/fi/abc/release-plan.md?rlkey=k&dl=0';
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
-    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; await sleep(300); /* sleep-ok: a screenshot waits out transitions */ fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, `${name}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; name = process.env.CORAL_SHOT_THEME === 'light' ? name + '-light' : name; await sleep(300); /* sleep-ok: a screenshot waits out transitions */ fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, `${name}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true]]) {
@@ -24,11 +24,13 @@ const LINK = 'https://www.dropbox.com/scl/fi/abc/release-plan.md?rlkey=k&dl=0';
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev);
+            if (process.env.CORAL_SHOT_THEME === 'light') await ev(`document.documentElement.setAttribute('data-theme', 'light'); true`); // light-theme screenshots (#16170); the default run is the dark theme
             await ev(STUB);
             await ev(`(() => { const inner = window.fetch; window.__shareCalls = [];
                 const json = (o, s) => Promise.resolve(new Response(JSON.stringify(o), { status: s || 200, headers: { 'Content-Type': 'application/json' } }));
                 window.fetch = (u, o) => { const p = new URL(String(u), location.origin).pathname, m = (o && o.method) || 'GET';
                     if (p === '/api/dropbox/status') return json({ connected: true, state: 'connected' });
+                    if (p === '/api/dropbox/share-contacts') { const q = (new URL(String(u), location.origin).searchParams.get('q') || '').toLowerCase(); return json({ emails: ['ana@example.com', 'sam@example.com', 'lee@work.org'].filter(e => e.includes(q)) }); } // #16170
                     if (p === '/api/dropbox/share/${H3}' && m === 'GET') return json({ connected: true, name: 'release-plan.md', size: 14336, version: 3, can_expire: true, team: 'Acme', secret: false, folder: '/Shared from Coral/team-a', shares: [] });
                     if (p === '/api/dropbox/share/${H3}' && m === 'POST') { window.__shareCalls.push(JSON.parse(o.body)); return json({ id: 5, name: 'release-plan.md', folder: '/Shared from Coral/team-a', audience: 'public', link: '${LINK}', expires_at: '2026-12-09T10:00:00Z', version: 3 }); }
                     if (p === '/api/dropbox/share/stop/5' && m === 'POST') { window.__shareCalls.push('stop'); return json({ stopped: 1 }); }
@@ -53,6 +55,18 @@ const LINK = 'https://www.dropbox.com/scl/fi/abc/release-plan.md?rlkey=k&dl=0';
             check(`${tag}: the button says what happens`, (await ev(`${go}.textContent`)) === 'Share with 2 people');
             check(`${tag}: no sideways scroll`, await ev(`document.documentElement.scrollWidth <= innerWidth + 1`));
             await shot(`dropbox-share-people-${w}`);
+
+            // #16170: as an address is typed the dialog suggests addresses; a click fills only the address being typed.
+            await ev(`(() => { const t = document.getElementById('dropbox-share-emails'); t.focus(); t.value = 'ana@example.com\\nlee'; t.setSelectionRange(t.value.length, t.value.length); t.dispatchEvent(new Event('input')); return true; })()`);
+            await waitFor(`!!document.querySelector('#dropbox-share-dialog .dropbox-share-suggestion')`, 'a suggestion', 4000);
+            const sug = await ev(`JSON.stringify([...document.querySelectorAll('#dropbox-share-dialog .dropbox-share-suggestion')].map(b => b.textContent))`);
+            check(`${tag}: typing 'lee' suggests the matching address`, sug === JSON.stringify(['lee@work.org']), sug);
+            check(`${tag}: a suggestion is a 44px button`, await ev(`document.querySelector('#dropbox-share-dialog .dropbox-share-suggestion').getBoundingClientRect().height >= 44`));
+            await shot(`dropbox-share-suggest-${w}`);
+            await ev(`document.querySelector('#dropbox-share-dialog .dropbox-share-suggestion').click(); true`);
+            check(`${tag}: the click fills only the address being typed`, (await ev(`document.getElementById('dropbox-share-emails').value`)) === 'ana@example.com\nlee@work.org\n');
+            check(`${tag}: the button counts both people`, (await ev(`${go}.textContent`)) === 'Share with 2 people');
+            await ev(`(() => { const t = document.getElementById('dropbox-share-emails'); t.value = 'ana@example.com, sam@example.com'; t.dispatchEvent(new Event('input')); return true; })()`);
 
             await ev(`(() => { const r = document.querySelector('#dropbox-share-dialog input[value="public"]'); r.click(); return true; })()`);
             check(`${tag}: a public link waits for its box`, await ev(`${go}.disabled && ${go}.textContent === 'Create public link'`));

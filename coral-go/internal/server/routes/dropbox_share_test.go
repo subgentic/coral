@@ -122,6 +122,19 @@ func (f *fakeDropbox) sharing(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		refuse(http.StatusConflict, "shared_link_not_found/")
+	case "/2/sharing/list_folders":
+		f.folderCalls++
+		var es []any
+		for id := range f.folders {
+			es = append(es, map[string]any{"shared_folder_id": id})
+		}
+		json.NewEncoder(w).Encode(map[string]any{"entries": es})
+	case "/2/sharing/list_folder_members":
+		var us []any
+		for _, e := range f.folders[str("shared_folder_id")] {
+			us = append(us, map[string]any{"user": map[string]any{"email": e}})
+		}
+		json.NewEncoder(w).Encode(map[string]any{"users": us, "invitees": []any{}})
 	case "/2/sharing/unshare_file":
 		delete(f.members, str("file"))
 		w.Write([]byte("null"))
@@ -143,6 +156,7 @@ func (be *backupEnv) shareCall(method, url, body, kind string) (int, map[string]
 	r.Get("/api/dropbox/share/{digest}", be.h.DropboxShareInfo)
 	r.Post("/api/dropbox/share/{digest}", be.h.DropboxShare)
 	r.Post("/api/dropbox/share/stop/{id}", be.h.DropboxStopShare)
+	r.Get("/api/dropbox/share-contacts", be.h.DropboxShareContacts)
 	r.Get("/api/dropbox/shares", be.h.DropboxShares)
 	r.Post("/api/dropbox/shares/stop-all", be.h.DropboxStopAllShares)
 	req := httptest.NewRequest(method, url, strings.NewReader(body))

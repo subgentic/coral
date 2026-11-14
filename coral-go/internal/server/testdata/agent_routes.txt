@@ -608,6 +608,7 @@ b PUT /api/dropbox/offload
 b POST /api/dropbox/undo/{digest}
 b POST /api/dropbox/resend/{digest}
 b GET /api/dropbox/artifact/{digest}
+b GET /api/dropbox/share-contacts
 b GET /api/dropbox/share/{digest}
 b POST /api/dropbox/share/{digest}
 b POST /api/dropbox/share/stop/{id}

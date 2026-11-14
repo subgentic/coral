@@ -719,6 +719,14 @@ CREATE TABLE IF NOT EXISTS dropbox_shares (
 CREATE INDEX IF NOT EXISTS idx_dropbox_shares_digest ON dropbox_shares(digest);
 -- When each share was made, for the 20-an-hour bound (a stopped share still counts); rows older than two hours are dropped.
 CREATE TABLE IF NOT EXISTS dropbox_share_log (at TEXT NOT NULL);
+-- The addresses a share to people was made to, so the dialog can suggest them as the person types (#16170): only what the person typed, per Dropbox account, the newest 100,
+-- never sent anywhere, cleared with the shares when the account goes.
+CREATE TABLE IF NOT EXISTS dropbox_share_contacts (
+    account_id TEXT NOT NULL,
+    email      TEXT NOT NULL,
+    used_at    TEXT NOT NULL,
+    PRIMARY KEY (account_id, email)
+);
 
 -- Coral Hub enrollment in progress, and its rate limit (one row). The device code is
 -- sealed like the server token. Kept across restarts so a restart loop reuses one code

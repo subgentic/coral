@@ -10,7 +10,7 @@
 import { el as mk } from './dom_el.js';
 import { loadStyles } from './lazy_styles.js';
 
-const INFO = '/api/dropbox/share/', STOP = '/api/dropbox/share/stop/', CHAT = '/api/dropbox/share-chat/';
+const CONTACTS = '/api/dropbox/share-contacts?q=', INFO = '/api/dropbox/share/', STOP = '/api/dropbox/share/stop/', CHAT = '/api/dropbox/share-chat/';
 const LINK_RE = /^https:\/\/www\.dropbox\.com\/(scl|s)\//;
 const EMAIL_RE = /^[^\s@,;<>"']+@[^\s@,;<>"']+\.[^\s@,;<>"']+$/;
 
@@ -25,6 +25,69 @@ async function call(method, url, body) {
     } catch { return { status: 0, body: { error: "Couldn't reach Coral. Try again." } }; }
     try { j = await r.json(); } catch { /* no body */ }
     return { status: r.status, body: j || {} };
+}
+
+/* Address suggestions (#16170): as the person types an address, up to eight come from Coral (the addresses it already shared to and the people in the Dropbox account's shared folders;
+ * Dropbox has no call that lists contacts). Plain buttons under the box; a suggestion replaces only the address being typed; every address is set as text; a failed or empty answer shows nothing. */
+const SEPARATORS = /[\n,;]/;
+const EMAIL_SHAPE = /^[^\s@,;<>"']+@[^\s@,;<>"']+\.[^\s@,;<>"']+$/;
+
+/** The address being typed: the text around the caret between separators (newline, comma, semicolon). */
+export function tokenAt(value, pos) {
+    let start = pos, end = pos;
+    while (start > 0 && !SEPARATORS.test(value[start - 1])) start--;
+    while (end < value.length && !SEPARATORS.test(value[end])) end++;
+    return { start, end, text: value.slice(start, end).trim() };
+}
+
+/** The text with the address being typed replaced by email (and a new line after it), and where the caret goes. */
+export function applySuggestion(value, pos, email) {
+    const { start, end } = tokenAt(value, pos);
+    const after = value.slice(end).replace(/^[\n,;]\s*/, '');
+    const head = value.slice(0, start);
+    const next = `${head}${email}\n${after}`;
+    return { value: next, pos: head.length + email.length + 1 };
+}
+
+/** The addresses already in the box, lower-cased (a suggestion for one of them is not offered again). */
+export function typedAddresses(value) {
+    return value.split(SEPARATORS).map(s => s.trim().toLowerCase()).filter(Boolean);
+}
+
+/** Attach suggestions to a textarea: host is where the list goes; load(q) answers the addresses for q ({status, body:{emails}}). Returns a function that hides the list. */
+export function attachSuggestions(textarea, host, load) {
+    const list = mk('div', 'dropbox-share-suggest'); list.hidden = true;
+    list.setAttribute('role', 'group'); list.setAttribute('aria-label', 'Suggested addresses');
+    host.append(list);
+    let seq = 0, timer = 0;
+    const hide = () => { list.hidden = true; list.replaceChildren(); };
+    const show = (emails) => {
+        const typed = new Set(typedAddresses(textarea.value));
+        const fresh = emails.filter(e => typeof e === 'string' && EMAIL_SHAPE.test(e) && !typed.has(e.toLowerCase())).slice(0, 8);
+        if (!fresh.length) { hide(); return; }
+        list.replaceChildren(...fresh.map(e => {
+            const b = mk('button', 'dropbox-share-suggestion', e); b.type = 'button';
+            b.addEventListener('mousedown', ev => ev.preventDefault()); // keep the caret in the box
+            b.addEventListener('click', () => {
+                const r = applySuggestion(textarea.value, textarea.selectionStart ?? textarea.value.length, e);
+                textarea.value = r.value; textarea.focus(); textarea.setSelectionRange(r.pos, r.pos);
+                textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+            return b;
+        }));
+        list.hidden = false;
+    };
+    const ask = () => {
+        const q = tokenAt(textarea.value, textarea.selectionStart ?? textarea.value.length).text;
+        const mine = ++seq;
+        load(q).then(res => { if (mine === seq && res && res.status === 200 && Array.isArray(res.body.emails)) show(res.body.emails); else if (mine === seq) hide(); }, () => { if (mine === seq) hide(); });
+    };
+    const later = () => { clearTimeout(timer); timer = setTimeout(ask, 150); };
+    textarea.addEventListener('input', later);
+    textarea.addEventListener('focus', later);
+    textarea.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !list.hidden) { ev.stopPropagation(); hide(); } }); // Escape closes the list first, the dialog next
+    textarea.addEventListener('blur', () => setTimeout(() => { if (!list.contains(document.activeElement)) hide(); }, 150));
+    return hide;
 }
 
 function ensureDialog(opener) {
@@ -148,6 +211,7 @@ function form(f, info, send, whatText) {
     const emailsL = mk('label', 'form-label', 'Email addresses (one per line, or separated by commas)'); emailsL.htmlFor = `${idb}-emails`;
     const emails = mk('textarea', 'settings-input'); emails.id = `${idb}-emails`; emails.rows = 2;
     const peopleBox = mk('div', 'dropbox-share-people'); peopleBox.append(emailsL, emails);
+    attachSuggestions(emails, peopleBox, (q) => call('GET', CONTACTS + encodeURIComponent(q.slice(0, 100)))); // #16170
     const linkOK = mk('label', 'dropbox-share-tick'); const linkTick = mk('input'); linkTick.type = 'checkbox'; linkTick.id = `${idb}-link-ok`;
     const linkWords = mk('span'); linkOK.append(linkTick, linkWords);
     const secretOK = mk('label', 'dropbox-share-tick'); const secretTick = mk('input'); secretTick.type = 'checkbox'; secretTick.id = `${idb}-secret-ok`;

@@ -132,6 +132,7 @@ node artifact_download.test.js
 node cloud_settings.test.js
 node artifact_dropbox.test.js
 node dropbox_settings.test.js
+node dropbox_share_suggest.test.mjs
 node board_mentions.test.js
 node settings_diff.test.mjs
 node settings_lists.test.mjs
