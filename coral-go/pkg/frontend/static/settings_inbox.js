@@ -22,6 +22,15 @@ export function includedTeams(raw) {
     try { const list = JSON.parse(s); return Array.isArray(list) ? list.map(String) : 'all'; } catch { return 'all'; }
 }
 
+
+/** The closed line over the team boxes: "All teams" when every drawn team is ticked, else "All teams except A, B" (three names, then a count); Except… says what opens it. */
+function teamsSummary(list) {
+    const boxes = [...list.querySelectorAll('input[data-team]')], off = boxes.filter(b => !b.checked).map(b => keyLabel(b.dataset.team));
+    const head = !off.length ? 'All teams' : off.length <= 3 ? `All teams except ${off.join(', ')}` : `All teams except ${off.length}`;
+    return `${head} · Except…`;
+}
+function refreshTeamsSummary(host) { const list = host.querySelector('.settings-inbox-list'), sum = host.querySelector('.settings-inbox-except > summary'); if (list && sum) sum.textContent = teamsSummary(list); }
+
 /** Draws the team boxes: every team of this computer, ticked when it is included. */
 export async function drawInboxTeams(raw) {
     const host = teamsHost();
@@ -42,24 +51,29 @@ export async function drawInboxTeams(raw) {
     const chosen = includedTeams(raw);
     const frag = document.createDocumentFragment();
     if (!projects.length) { const p = document.createElement('p'); p.className = 'sv-help'; p.textContent = 'No teams yet. The switches apply to every team.'; frag.append(p); }
+    const list = document.createElement('div'); list.className = 'settings-inbox-list'; // the boxes: shut behind "All teams", opened by Except… (guideline 4.12 rule 9, #15881)
     for (const team of projects) {
         const label = document.createElement('label'), box = document.createElement('input');
         label.className = 'settings-inbox-team';
         box.type = 'checkbox'; box.checked = chosen === 'all' || chosen.includes(team); box.dataset.team = team;
         label.append(box, ` ${keyLabel(team)}`);
-        frag.append(label);
+        list.append(label);
+    }
+    if (projects.length) {
+        const d = document.createElement('details'), sum = document.createElement('summary'); d.className = 'disclosure sv-fold settings-inbox-except'; d.append(sum, list); frag.append(d);
+        sum.textContent = teamsSummary(list);
     }
     host.replaceChildren(frag);
     delete host.dataset.everyTeam;
     if (!host.dataset.bound) { // bound once, however often the teams are drawn again
         host.dataset.bound = '1';
-        host.addEventListener('change', e => { if (e.target && e.target.matches && e.target.matches('input[data-team]')) delete host.dataset.everyTeam; }); // a box changed by hand is a choice of its own: it is no longer "every team"
+        host.addEventListener('change', e => { if (e.target && e.target.matches && e.target.matches('input[data-team]')) { delete host.dataset.everyTeam; refreshTeamsSummary(host); } }); // a box changed by hand is a choice of its own: it is no longer "every team"
     }
     if (chosen !== 'all' && projects.length) { // an explicit choice has a way back to "every team", for the teams that are not shown as well
         const b = document.createElement('button');
         b.type = 'button'; b.className = 'btn btn-quiet btn-small settings-inbox-every'; b.textContent = 'Include every team';
-        b.addEventListener('click', () => { host.querySelectorAll('input[data-team]').forEach(x => { x.checked = true; }); host.dataset.everyTeam = '1'; }); // it stays: after a box is changed by hand it is the way back to every team
-        host.prepend(b);
+        b.addEventListener('click', () => { host.querySelectorAll('input[data-team]').forEach(x => { x.checked = true; }); host.dataset.everyTeam = '1'; refreshTeamsSummary(host); }); // it stays: after a box is changed by hand it is the way back to every team
+        (host.querySelector('.settings-inbox-list') || host).prepend(b);
     }
 }
 
