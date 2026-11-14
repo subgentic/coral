@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/subgentic/coral/internal/psquote"
 )
 
 // #3362: PowerShell expands $var, $(…) and backticks inside double quotes, so anything
@@ -54,4 +56,14 @@ func TestShellQuotePowerShell(t *testing.T) {
 	raw := `"$((Get-Content -Raw 'C:\t\p.txt') -replace '"', '\"')"`
 	assert.Equal(t, `& 'C:\Program Files\claude.exe' '$(calc)' `+raw,
 		ShellJoin([]string{`C:\Program Files\claude.exe`, "$(calc)", raw}, raw))
+}
+
+// #16207: a .cmd that is not npm's shim is started as it is, and cmd.exe reads each argument: the -c value of Coral's hook trust has < > in its key, so it goes in double quotes (plain text to cmd), written as it is and not with NativeArg's \".
+func TestShellJoinQuotesCmdMetacharactersForABatchProgram(t *testing.T) {
+	t.Setenv("CORAL_SHELL", "powershell.exe")
+	value := codexHookTrustArgs("windows", "& 'C:/Coral/coral-hook-agentic-state.exe'")[1]
+	line := ShellJoin([]string{`C:\tools\codex.cmd`, "-c", value})
+	assert.Equal(t, `& 'C:\tools\codex.cmd' -c `+psquote.Literal(`"`+value+`"`), line)
+	// a program that is not a batch file keeps the old rule
+	assert.Equal(t, `& 'C:\tools\codex.exe' -c `+psquote.Literal(value), ShellJoin([]string{`C:\tools\codex.exe`, "-c", value}))
 }

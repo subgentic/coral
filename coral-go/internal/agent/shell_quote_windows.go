@@ -63,7 +63,20 @@ func ShellJoin(parts []string, raw ...string) string {
 		slog.Warn("agent CLI is a .cmd that is not npm's: it is started without the first message", "cli", filepath.Base(p[programIndex(p, r)]))
 	}
 	legacy := legacyNativeArgs()
-	line := joinQuoted(parts, raw, func(s string) string { return psQuote(s, legacy) }, true)
+	cmdArgs := map[string]string{} // a .cmd or .bat that is started as it is gets each argument with a < > & | or ^ in double quotes, which cmd.exe reads as plain text (#16207)
+	if prog := programIndex(parts, raw); prog >= 0 && isBatchFile(parts[prog]) {
+		for _, p := range parts[prog+1:] {
+			if q, ok := psquote.CmdArg(p); ok {
+				cmdArgs[p] = psquote.Literal(q)
+			}
+		}
+	}
+	line := joinQuoted(parts, raw, func(s string) string {
+		if q, ok := cmdArgs[s]; ok {
+			return q
+		}
+		return psQuote(s, legacy)
+	}, true)
 	if notice != "" {
 		line = "Write-Host " + psquote.Literal(notice) + " -ForegroundColor Yellow; " + line
 	}

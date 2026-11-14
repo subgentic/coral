@@ -83,7 +83,11 @@ func codexHookTrustArgs(goos, command string) []string {
 func codexHookTrustArgsFor(goos, command string, events []string) []string {
 	entries := make([]string, 0, len(events))
 	for _, event := range events {
-		entries = append(entries, fmt.Sprintf("'%s'={trusted_hash=%s}", codexHookStateKey(goos, event), tomlString(codexHookTrustHash(event, command))))
+		hash := tomlString(codexHookTrustHash(event, command))
+		if goos == "windows" { // no double quote in the value: a .cmd that starts Codex reads the < > in the key as redirects unless the whole argument is quoted, and cmd.exe counts every " (#16207)
+			hash = "'" + codexHookTrustHash(event, command) + "'" // a TOML literal string: the hash is "sha256:" and hex, nothing to escape
+		}
+		entries = append(entries, fmt.Sprintf("'%s'={trusted_hash=%s}", codexHookStateKey(goos, event), hash))
 	}
 	return []string{"-c", "hooks.state={" + strings.Join(entries, ",") + "}"}
 }
