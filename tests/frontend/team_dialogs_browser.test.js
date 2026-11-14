@@ -139,6 +139,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(post.path, '/api/board/crew-1/messages'); delete post.path;
         assert.deepEqual(post, { subscriber_id: 'Operator', as: 'Operator', content: '@' + leadName + ' Build the login page.' }, 'to the Orchestrator, else the first member');
         await waitFor(`T.state.selectedTeam === 'crew-1'`, 'the launched team is opened');
+        assert.equal(await ev(`document.activeElement?.id`), 'team-page-title', 'a sent launch focuses the heading, not the hidden Board input (#16732)');
         assert.equal(await ev(`document.getElementById('team-goal').value`), 'Build the login page.', 'the field keeps what was typed until the dialog is opened again');
         // The first task that could not be sent (the board answers 500) is not lost: it waits in the board's message box, with a toast, to send again.
         await openTeam();
@@ -148,6 +149,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await ev(`window.__posts[0].path`), '/api/board/crew-1-2/messages', 'the first task goes to the id the server made ("Create another" on a name in use), not the label typed');
         await waitFor(`[...document.querySelectorAll('.toast')].some(t => /first task was not sent/.test(t.textContent))`, 'the toast that says so');
         await waitFor(`document.getElementById('mb-post-input')?.value === '@Orchestrator Try again.' && !!document.getElementById('mb-post-input').closest('#team-panel-messages')`, 'the draft in the message box of the team page');
+        assert.equal(await ev(`document.activeElement?.id`), 'mb-post-input', 'a failed send focuses the input so the person can re-send');
         assert.equal(await ev(`T.state.selectedTeam`), 'crew-1-2', 'and the team that opens is that board');
         await ev(`window.__postStatus = 200; window.__launchAnswer = { status: 200, body: { agents: [{ name: 'A', session_id: 's' }] } }; true`);
         await openTeam();
