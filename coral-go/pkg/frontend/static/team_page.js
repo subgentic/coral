@@ -128,7 +128,7 @@ function syncTabsMore() {
 /** The folder the team works in: where an agent added to it starts. */
 function teamDir() { return teamWorkDir(state.liveSessions, S.team); } // by the team's key: a team on another computer is "@server/name" and its sessions say the bare name (#9970)
 
-// More: the board's own actions (Select, Export, Pause, Delete), moved here from the board view's hidden holder (message_board.html) while this page is on screen (they keep their ids and their handlers).
+// More: the board's own actions (Export, Pause, Select, Delete), moved here from the board view's hidden holder (message_board.html) while this page is on screen (they keep their ids and their handlers).
 let moreOpen = false;
 /** The team's settings, in a popout over the page (#8853): the header's Settings button and its phone More item. */
 function openSettings() { importOnce('./team_settings_modal.js').then(m => m.openTeamSettings(S.team)).catch(e => console.error('team settings', e)); }
@@ -178,7 +178,7 @@ function buildMore() {
     document.addEventListener('keydown', (e) => { if (moreOpen && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); set(false, { focus: true }); } }, true);
     document.addEventListener('click', (e) => { if (moreOpen && !menu.contains(e.target) && !b.contains(e.target)) set(false); });
 }
-const BOARD_ACTIONS = ['mb-select-btn', 'mb-export-btn', 'mb-pause-btn', 'mb-delete-btn'];
+const BOARD_ACTIONS = ['mb-export-btn', 'mb-pause-btn', 'mb-select-btn', 'mb-delete-btn'];
 function adoptBoardActions() {
     const menu = $('team-page-more-menu'); if (!menu) return;
     for (const id of BOARD_ACTIONS) { const b = $(id); if (b && b.parentElement !== menu) { b.dataset.home = b.parentElement ? b.parentElement.id : ''; menu.append(b); } }
@@ -186,7 +186,7 @@ function adoptBoardActions() {
     // what Pause board does, in words under it (Mobile tester, #10008): a title is no help on a phone
     if (pause && !$('mb-pause-note')) { const n = el('span', 'menu-note', /^Resume/.test(pause.textContent) ? 'Agents get messages again when you resume.' : 'Agents stop receiving new messages until you resume.'); n.id = 'mb-pause-note'; pause.after(n); pause.setAttribute('aria-describedby', 'mb-pause-note'); }
     for (const id of BOARD_ACTIONS) { const b = $(id); if (b) b.style.display = ''; } // display-ok: the holder's markup hides these with an inline display:none, which message_board.js clears the same way
-    const sel = $('mb-select-btn'); if (sel) sel.hidden = S.tab !== 'messages'; // selecting messages is the Messages tab's
+    const sel = $('mb-select-btn'); if (sel) { sel.hidden = false; sel.disabled = S.tab !== 'messages'; if (sel.disabled) sel.setAttribute('aria-disabled', 'true'); else sel.removeAttribute('aria-disabled'); }
 }
 function releaseBoardActions() {
     const home = $('mb-more-menu'); if (!home) return;
