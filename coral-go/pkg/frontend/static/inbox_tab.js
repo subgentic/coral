@@ -14,7 +14,7 @@ import { reportInboxOpened } from './dashboard_analytics.js';
 import { unreadReviewItems, refreshReviews, reviewAttentionCount, setReviewCounter } from './ask_filter.js';
 import { failedUnread, refreshRuns, onRunsChanged } from './automation_runs.js';
 import { pendingProposals, refreshProposals, onProposalsChanged } from './proposals_state.js';
-import { goalDoneCount } from './goal_done.js';
+import { goalDoneCount, closedByAgentCount } from './goal_done.js';
 import { skillCount } from './needs_skills.js';
 import { operatorAsks, refreshOperatorAsks, onOperatorAsksChanged } from './operator_asks.js';
 import { isCloud, nativeInbox, nativeNeeds, sessionServer } from './server_base.js';
@@ -38,7 +38,7 @@ export function waitingCount() {
 
 /** The ONE number of things that need the person: the tab's badge, the sidebar's Needs you count and the page header all read it, so they cannot disagree (#15380 D). Only what is live is counted: rows kept from a computer that is offline are shown, not counted (#15380 C). */
 export function needsCount(reviews = reviewAttentionCount().value) {
-    return waitingCount() + reviews + failedUnread().length + pendingProposals().length + operatorAsks().length + goalDoneCount() + skillCount();
+    return waitingCount() + reviews + failedUnread().length + pendingProposals().length + operatorAsks().length + goalDoneCount() + closedByAgentCount() + skillCount();
 }
 
 /** Something has waited for the person 5 minutes with alerts still off: the offer comes back once (alerts_offer.js decides whether this browser may be offered again). */

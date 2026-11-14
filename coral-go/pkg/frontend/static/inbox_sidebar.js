@@ -8,7 +8,7 @@ import { unrecordedItem, recordAllAgents } from './waiting.js';
 import { welcomeRows, runWelcome, dismissWelcome } from './welcome_items.js';
 import { incompleteNote, readGaps } from './needs_incomplete.js';
 import { loadPendingSkills, skillRows, skillLine, skillName, openSkill } from './needs_skills.js';
-import { doneGoals, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, isGoalDoneRead, markGoalDoneRead, markGoalDoneUnread, SETTING as GOAL_DONE_SETTING } from './goal_done.js';
+import { doneGoals, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, setClosedByAgentCount, isGoalDoneRead, markGoalDoneRead, markGoalDoneUnread, SETTING as GOAL_DONE_SETTING } from './goal_done.js';
 /* The dashboard's own Inbox on the shared sidebar (#7472), loaded the first time the Inbox tab is shown (inbox_tab.js keeps the badge and the counts, which are always there).
  *
  * Three groups, the hub's /inbox order: Needs you (the agents waiting for input, from the live list the dashboard already holds), Tasks (the open tasks assigned to the Operator) and Saved (the
@@ -48,7 +48,7 @@ import { claudeSignedIn, onSigninChange } from './signin_line.js';
 import { markHidden } from './visible_marks.js';
 import { onInboxHooks, setInboxCount, askOf, updateInboxTab, needsCount } from './inbox_tab.js';
 const { coralInboxAdapter, savedExpandFor, listInboxGoals, goalsReadFailed, doneGoalsCapped, taskReadState } = await importOnce('./inbox_coral.js');
-const { closedGoalRows } = await importOnce('./goal_closed_items.js'); // 'Goal closed as done by <agent>' with Reopen: listed, not counted (#15257)
+const { closedGoalRows, madeByPerson } = await importOnce('./goal_closed_items.js'); // 'Goal closed as done by <agent>' with Reopen: listed, not counted (#15257)
 const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is one shared helper everywhere (#12168)
 const { openedFrom, backLabelFor } = await importOnce('./inbox_back_label.js'); // the Back words of the Inbox's task and goal screens (#8861)
 const saved = await importOnce('./saved.js');
@@ -203,7 +203,7 @@ const subOf = (s, withTeam) => [s.review ? questionOf(s) : '', fromOf(s, withTea
 /** Whether a Needs you row is unread (#11668): everything that counts in the badge is; a read review and the welcome items (listed, not alarms) are not. */
 /** The marker a file's row carries while agents have replied in the Operator's comment thread and they have not opened it (#12026). */
 const newCommentsTag = () => { const t = DT.tag('New comments'); t.classList.add('inbox-new-comments'); return t; };
-const needsUnread = s => !(s.welcome || (s.review && !needsReviewAttention(s.review)) || (s.goalDone && isGoalDoneRead(goalTeamHere(s.goalDone), s.goalDone) && !(s.goalDone.new_comments > 0))); // a read file and an opened goal item are listed, not counted (#11983); either is counted again while agents have replied in the Operator's thread on it (#12026, #12073)
+const needsUnread = s => !((s.welcome && !(s.goalClosed && madeByPerson(s.goalClosed))) || (s.review && !needsReviewAttention(s.review)) || (s.goalDone && isGoalDoneRead(goalTeamHere(s.goalDone), s.goalDone) && !(s.goalDone.new_comments > 0))); // a read file and an opened goal item are listed, not counted (#11983); either is counted again while agents have replied in the Operator's thread on it (#12026, #12073)
 /** A wide screen with a real pointer shows a row's actions on its hover or focus, and the waiting time where they are the rest of the time (#11669, the operator's Gmail shot); a touch screen and a phone keep the buttons drawn. */
 const hoverRows = () => false; // the buttons are always on the row's bottom line, not shown on hover (#15120, the Operator's bottom-row layout)
 const hoverWrap = (s, box) => { if (!box || !hoverRows()) return box; const wrap = DT.el('div', 'inbox-actions-hover'), when = waitingText(s.waiting_since); wrap.append(box); if (when) wrap.append(DT.el('span', 'inbox-row-when', when)); return wrap; };
@@ -283,7 +283,7 @@ const proposalRows = () => proposalItems().map(p => ({ proposal: p, session_id: 
 const goalTeamHere = g => { const k = splitKey(g.board_id); return k.name ? identityKey(k.server, k.name) : ''; };
 const goalDoneRows = () => doneGoals(goals, goalTeamHere).map(g => ({ goalDone: g, session_id: `goal_done:${goalTeamHere(g)}:${g.id}`, display_name: `Goal #${g.id}`, board_project: splitKey(goalTeamHere(g)).name, server: splitKey(goalTeamHere(g)).server, waiting_kind: 'goal_done', waiting_summary: (g.done_when || g.doneWhen) ? `Done when: ${markedText(g.done_when || g.doneWhen)}` : 'Every task is done.', waiting_since: quietEndsAt(g) ? new Date(quietEndsAt(g)).toISOString() : (g.looks_done_at || g.updated_at) })); // since the row appeared: its last task's completion (#12081) plus the quiet period (#12161), not since the goal was made or edited
 let closedGoals = [], closedReadAt = 0; // goals closed as done lately, read at most once a minute apart from the open goals (#15257)
-const closedByAgentRows = () => closedGoalRows(closedGoals, goalTeamHere, { reopen: async g => { try { const r = await (await importOnce('./goal_write.js')).goalWrite(g.board_id, 'goal_update', g.id, `/goals/${g.id}`, 'PATCH', { subscriber_id: OPERATOR_ID, state: 'active' }); if (!r.ok) throw new Error(`HTTP ${r.status}`); closedGoals = closedGoals.filter(x => !(x.id === g.id && x.board_id === g.board_id)); sayLive(`Reopened goal #${g.id}. The team read it on the board.`); showToast(`Goal #${g.id} reopened. The team read it on the board.`); refreshGoals(true); renderInboxNav(true); } catch (e) { showToast(`Not reopened: ${e && e.message || 'try again'}`, true); } }, dismissed: () => renderInboxNav(true) });
+const closedByAgentRows = () => closedGoalRows(closedGoals, goalTeamHere, { reopen: async g => { try { const r = await (await importOnce('./goal_write.js')).goalWrite(g.board_id, 'goal_update', g.id, `/goals/${g.id}`, 'PATCH', { subscriber_id: OPERATOR_ID, state: 'active' }); if (!r.ok) throw new Error(`HTTP ${r.status}`); closedGoals = closedGoals.filter(x => !(x.id === g.id && x.board_id === g.board_id)); syncGoalDoneCount(); sayLive(`Reopened goal #${g.id}. The team read it on the board.`); showToast(`Goal #${g.id} reopened. The team read it on the board.`); refreshGoals(true); renderInboxNav(true); } catch (e) { showToast(`Not reopened: ${e && e.message || 'try again'}`, true); } }, dismissed: () => { syncGoalDoneCount(); renderInboxNav(true); } });
 const goalDoneLine = g => `Goal #${g.id} looks done: ${markedText(g.title)}`;
 /** A question an agent asked the Operator (post --ask, wait --operator, #11417): a row of Needs you, opened whole in a dialog with a Reply box. */
 const askRows = () => operatorAsks().map(a => ({ operatorAsk: a, session_id: askKey(a), display_name: a.asker, board_project: a.board, board_label: a.board_label || '', server: a.server || '', waiting_kind: 'ask', waiting_summary: askLine(a), waiting_since: a.at }));
@@ -586,7 +586,7 @@ function runActions(run) {
 /** The tab's badge counts the goal items too: told after every read of the goals and of what was hidden (#11825). */
 let quietTimer = 0;
 function syncGoalDoneCount() {
-    setGoalDoneCount(goalDoneRows().filter(needsUnread).length); updateInboxTab();
+    setGoalDoneCount(goalDoneRows().filter(needsUnread).length); setClosedByAgentCount(closedByAgentRows().filter(needsUnread).length); updateInboxTab(); // a goal the person made that an agent closed counts until they dismiss or reopen it (#16753)
     clearTimeout(quietTimer); // a goal still in its quiet period (#12161) is drawn when the period ends, with no refresh needed
     const due = nextQuietEnd(goals, goalTeamHere);
     if (due !== null) quietTimer = setTimeout(() => { syncGoalDoneCount(); renderInboxNav(true); }, Math.min(due, 2 ** 31 - 1) + 250);
