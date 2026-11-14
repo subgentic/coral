@@ -1437,8 +1437,6 @@ func isRejectLabel(label string) bool { return rejectLabel.MatchString(strings.T
 // allowLabel matches an answer that allows: the Yes rows of an approval.
 var allowLabel = regexp.MustCompile(`(?i)^(yes|allow|approve|proceed|run)\b`)
 
-// optionIsReject says whether answering this option refuses the request. Where the option has a kind (it is the approval table's approve-once option, or one of an opencode card's own answers) the KIND decides:
-// an option that allows is not a reject whatever its words begin with. Only an option with no kind is judged by its label (^(no|reject|deny|cancel)\b: "None" and "Nothing" are not rejects). Security's #11399 INFO 5.
 // answerKind is the option's kind for the log line: one of a fixed set, never its words (an option can name a folder or a command, "Yes, allow reading from <dir>", #16440).
 func answerKind(screen promptScreen, opt promptOption, trustAsked bool) string {
 	switch {
@@ -1454,6 +1452,8 @@ func answerKind(screen promptScreen, opt promptOption, trustAsked bool) string {
 	return "other"
 }
 
+// optionIsReject says whether answering this option refuses the request. Where the option has a kind (it is the approval table's approve-once option, or one of an opencode card's own answers) the KIND decides:
+// an option that allows is not a reject whatever its words begin with. Only an option with no kind is judged by its label (^(no|reject|deny|cancel)\b: "None" and "Nothing" are not rejects). Security's #11399 INFO 5.
 func optionIsReject(o promptOption) bool {
 	switch o.Kind {
 	case "reject":
