@@ -395,6 +395,22 @@ func TestDefaultPromptGuidanceKeepsCorrectionsAndHandoffsActionable(t *testing.T
 	}
 }
 
+func TestDefaultPromptsNameSearch(t *testing.T) {
+	for name, prompt := range map[string]string{
+		"orchestrator system": DefaultOrchestratorSystemPrompt,
+		"worker system":       DefaultWorkerSystemPrompt,
+		"orchestrator action": DefaultOrchestratorActionPrompt,
+		"worker action":       DefaultWorkerActionPrompt,
+	} {
+		if !strings.Contains(prompt, "coral-board search") {
+			t.Errorf("%s prompt missing coral-board search", name)
+		}
+		if !strings.Contains(prompt, "history search") {
+			t.Errorf("%s prompt missing history search", name)
+		}
+	}
+}
+
 func TestBuildBoardSystemPrompt_WithOverrides(t *testing.T) {
 	overrides := map[string]string{"default_prompt_worker": "Custom worker instructions"}
 	prompt := BuildBoardSystemPrompt("board1", "dev", "", overrides, "")
