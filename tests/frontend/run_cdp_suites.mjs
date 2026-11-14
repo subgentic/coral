@@ -638,7 +638,7 @@ async function startShard(n, gen = 0, strict = false, backend = MAIN_BACKEND) {
   let chromeExit = null;
   chrome.on('exit', (code, sig) => { chromeExit = `exit code ${code} signal ${sig}`; });
   chrome.on('error', e => { chromeExit = `could not start ${chromePath}: ${e.message}`; });
-  let cdp = 0;
+  let cdp = chromePort; // 0 until read back from DevToolsActivePort; a port we chose (CORAL_CDP_PORT_RANGE) is known already, Chrome writes no file for it
   try {
     const portFile = path.join(profile, 'DevToolsActivePort');
     for (const end = Date.now() + 60000; !cdp; await sleep(100)) {
