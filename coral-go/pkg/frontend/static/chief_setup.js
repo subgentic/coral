@@ -155,7 +155,12 @@ export async function mountChiefSetup(host) {
         if (reason) { view.error(key, reason); return; }
         view.error(key, '');
         if (value === saved[key] && !pending.get(key)) return;
-        if (key === 'chief_agent' || key === 'chief_fronts') {
+        if (key === 'chief_actions' && value === 'act') {
+            view.set(key, saved[key]); redraw();
+            showConfirmModal('Chief actions', 'Chief edits without asking. A shell command still asks. Applies when Chief restarts. Switch Chief’s actions to Act?', () => {
+                view.set(key, value); redraw(); commit(key, value);
+            }, () => {}, { label: 'Switch to Act', danger: false });
+        } else if (key === 'chief_agent' || key === 'chief_fronts') {
             view.set(key, saved[key]); redraw();
             const name = key === 'chief_agent' ? (choices.find(c => c.value === value)?.label || 'No agent picked') : (value || 'No team chosen');
             showConfirmModal('Chief routing', `Save ${key === 'chief_agent' ? 'Which agent' : 'Team it fronts'}: ${name}?`, () => {

@@ -39,8 +39,8 @@ const { coralReady } = require('./helpers/wait');
         let p = await ev(`window.__puts.map(b => JSON.parse(b))`);
         assert.equal(p.length, 1, JSON.stringify(p)); assert.ok(!('chief_actions' in p[0]), 'an untouched Chief choice writes no change: ' + JSON.stringify(p[0]));
 
-        // Choosing Act sends it.
-        await open(); await ev('window.__puts.length=0'); await pick('act'); await save();
+        // Choosing Act sends it after confirmation.
+        await open(); await ev('window.__puts.length=0'); await pick('act'); await ev(`document.getElementById('confirm-modal-yes').click(); true`); await save();
         p = await ev(`window.__puts.map(b => JSON.parse(b))`);
         assert.equal(p.length, 1, JSON.stringify(p)); assert.deepEqual(p[0], { chief_actions: 'act' }, JSON.stringify(p[0]));
 
