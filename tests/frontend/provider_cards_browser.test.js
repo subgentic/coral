@@ -69,7 +69,7 @@ const { install: installNA, N, stubModels } = require('./helpers/new_agent');
             check(lows.length === 0, `${tag}: text in the open card is under 4.5:1: ${JSON.stringify(lows)}`);
 
             // the mouse: a card chosen by a click shows the open state, not a focus ring; the keyboard shows the ring
-            const headBox = type => ev(`(() => { const r = document.querySelector('#launch-agent-pick .provider-card-head[data-type="${type}"]').getBoundingClientRect(); return { x: Math.round(r.left + 60), y: Math.round(r.top + r.height / 2) }; })()`);
+            const headBox = type => ev(`(() => { const h = document.querySelector('#launch-agent-pick .provider-card-head[data-type="${type}"]'); h.scrollIntoView({ block: 'center' }); const r = h.getBoundingClientRect(); return { x: Math.round(r.left + 60), y: Math.round(r.top + r.height / 2) }; })()`);
             const b = await headBox('codex');
             await Input.dispatchMouseEvent({ type: 'mousePressed', x: b.x, y: b.y, button: 'left', clickCount: 1 }); await Input.dispatchMouseEvent({ type: 'mouseReleased', x: b.x, y: b.y, button: 'left', clickCount: 1 }); await settle(400);
             const ring = type => ev(`(() => { const h = document.querySelector('#launch-agent-pick .provider-card-head[data-type="${type}"]'); const cs = getComputedStyle(h); return { outline: cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0, focusVisible: !!h.querySelector('input:focus-visible') }; })()`);
