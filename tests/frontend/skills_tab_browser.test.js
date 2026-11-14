@@ -45,11 +45,12 @@ const DETAIL = { skill: ROWS[1], files: [
         const heads = await ev(`Array.from(document.querySelectorAll('#skills-view th.dt-th')).map(t => t.textContent.trim())`);
         for (const h of ['Name', 'Published by', 'Version', 'Status', 'Updated']) assert.ok(heads.some(x => x.includes(h)), `column ${h}: ${heads}`);
         assert.equal(await ev(`document.getElementById('skills-view').scrollWidth <= document.getElementById('skills-view').clientWidth + 1`), true, 'no sideways scroll');
-        // #12678: the button says "Import a skill" with a hint, the picker takes .zip and .md, a lone SKILL.md is sent as one, anything else is refused in words and sends nothing
-        const btnText = await ev(`Array.from(document.querySelectorAll('#skills-view .skills-head button')).map(b => b.textContent.trim())`);
-        assert.ok(btnText.includes('Import a skill'), 'the button reads Import a skill, not (.zip): ' + btnText);
-        assert.ok(!btnText.some(t => /\.zip\)/.test(t)), 'no (.zip) in the button');
-        assert.match(await ev(`document.querySelector('#skills-view .skills-hint').textContent`), /\.zip or a SKILL\.md/, 'the hint');
+        // #15838: the shared page header: the title with its count, Import as the one Primary at the far right (its hint is the label and the tooltip, not a loose line), no description while there are skills
+        const head = await ev(`(() => { const h = document.querySelector('#skills-view .page-header'); if (!h) return null; const b = h.querySelector('.page-header-actions .btn-primary'); return { title: h.querySelector('h2').textContent, count: h.querySelector('.session-group-count').textContent, btn: b && b.textContent.trim(), label: b && b.getAttribute('aria-label'), tip: b && b.title, hint: !!document.querySelector('#skills-view .skills-hint'), note: !!document.querySelector('#skills-view .skills-note'), btns: [...h.querySelectorAll('button.btn-primary')].length }; })()`);
+        assert.ok(head, 'the Skills header is the shared page header');
+        assert.deepEqual([head.title, head.count, head.btn, head.btns], ['Skills', '3', 'Import', 1], 'title, count and one Primary: ' + JSON.stringify(head));
+        assert.match(head.label, /Import a skill/, 'the button still says what it imports'); assert.match(head.tip, /\.zip or a SKILL\.md/, 'the hint is in the tooltip');
+        assert.equal(head.hint, false, 'no loose hint line'); assert.equal(head.note, false, 'no description while the list has skills');
         const accept = await ev(`document.querySelector('#skills-view input[type=file]').accept`);
         assert.ok(/\.zip/.test(accept) && /\.md/.test(accept), 'the picker takes .zip and .md: ' + accept);
         const give = (name, text) => ev(`(() => { const i = document.querySelector('#skills-view input[type=file]'); const dt = new DataTransfer(); dt.items.add(new File([${JSON.stringify(text)}], ${JSON.stringify(name)})); i.files = dt.files; i.dispatchEvent(new Event('change')); return true; })()`);

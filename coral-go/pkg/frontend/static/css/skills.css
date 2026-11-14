@@ -3,7 +3,6 @@
 .skills-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
 .skills-head h2 { margin: 0 auto 0 0; font-size: var(--fs-xl); }
 .skills-head .btn, .skills-head select { margin: 0; }
-.skills-hint { font-size: var(--fs-sm, 12px); color: var(--text-secondary); }
 .skills-note { margin: 0 0 12px; max-width: 70ch; font-size: var(--fs-base); color: var(--text-secondary); }
 .skills-banner, .skills-ack { margin: 0 0 16px; max-width: 80ch; flex-direction: column; align-items: stretch; gap: 0; } /* the notice is a row for an icon and a line; these hold a heading, paragraphs and a list: a column, or each ran off the panel as a third of a row (#12943) */ /* the look is the shared .notice; only where it sits is here */
 .skills-banner strong { display: block; margin-bottom: 4px; }
