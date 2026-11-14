@@ -55,7 +55,7 @@ func TestDumpRouteTableForRelease(t *testing.T) {
 	}
 }
 GO
-  ( cd "$T/$2/coral-go" && CORAL_DUMP_ROUTES="$T/$2.tsv" go test -count=1 -run '^TestDumpRouteTableForRelease$' ./pkg/tunnel/ >"$T/$2.log" 2>&1 ) || { echo "new-routes: the route dump of $1 failed:" >&2; tail -5 "$T/$2.log" >&2; return 1; }
+  ( cd "$T/$2/coral-go" && CORAL_TELEMETRY_DISABLED=1 CORAL_DUMP_ROUTES="$T/$2.tsv" go test -count=1 -run '^TestDumpRouteTableForRelease$' ./pkg/tunnel/ >"$T/$2.log" 2>&1 ) || { echo "new-routes: the route dump of $1 failed:" >&2; tail -5 "$T/$2.log" >&2; return 1; }
   [ -s "$T/$2.tsv" ] || { echo "new-routes: the route dump of $1 is empty" >&2; return 1; }
 }
 dump "$PREV" prev || exit 1; dump "$NEW" new || exit 1

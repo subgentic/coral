@@ -84,8 +84,6 @@ the first failed check.
      **pre-release that is not "latest"** (the AGENTIC channel, #5551): installed Corals, Homebrew and the stable download links keep
      serving the last APPROVED release until the operator runs the **Approve release** workflow (below).
 
-5a. **Tell coral-hub what is new (#16727)**: with every tag, `bash tools/devops/new-routes.sh vPREV vX.Y.Z` prints the routes (method, path, view/interact/launch, owner-refused or not), tier changes and embedded html files that are new since the previous tag (v2.0.68 -> the custom-modes routes and `static/password-reset.html`, which cost the Hub two red runs). Post its output to coral-hub with the tag: `coral-board send --board coral-hub "<tag> new routes and html: ..."`. It needs Go and git and leaves nothing behind (throwaway worktrees).
-
 5. **Finish**: `tools/devops/after-release.sh X.Y.Z` waits for the release run and runs `finish-release.sh` (the check is
    `verify-release.sh --stage agentic`: a plain tag is expected to be a pre-release, the tap is not expected to have moved).
    `finish-release.sh X.Y.Z` itself:
@@ -102,6 +100,8 @@ the first failed check.
      the script). A cosign that is not that exact binary (a distro build) is refused: it is the tool that vouches for every release.
 
    Edit the body only after verify-release has passed, since its notes row compares the body with the tag's notes.
+
+5a. **Tell coral-hub what is new (#16727)**: with every tag, `bash tools/devops/new-routes.sh vPREV vX.Y.Z` prints the routes (method, path, view/interact/launch, owner-refused or not), tier changes and embedded html files that are new since the previous tag (v2.0.68 -> the custom-modes routes and `static/password-reset.html`, which cost the Hub two red runs). Post its output to coral-hub with the tag: `coral-board send --board coral-hub "<tag> new routes and html: ..."`. It needs Go and git and leaves nothing behind (throwaway worktrees).
 
 5b. **Pin the PREVIOUS release in the next batch (#12626, #13779)**: when a batch is prepared (step 1), run `git fetch --tags` and then `tools/devops/pin-check.sh X.Y.Z` for the release being prepared (it reads LOCAL tags: a checkout that has not fetched them may name an older release and pass). It is read-only: it finds the newest plain `vX.Y.Z` tag below X.Y.Z and exits 1, printing the exact command, when `releaseDigests` in the batch has no row for it, so the newest CLI always pins its predecessor (a digest never comes from where the tarball does). The row itself is made as below, from the previous tag, and goes in that batch; never auto-pinned. The digest step: `tools/pin-release-digests.sh X.Y.Z` on the new tag. It needs `gh` (logged in) and the PINNED cosign on PATH, as step 5 does. It checks the release's `SHA256SUMS.txt` Sigstore bundle with the rules `promote.yml` uses
    (published, immutable, the tag's own commit, the exact `release.yml@refs/tags/vX.Y.Z` identity by a tag push) and prints the two Linux rows `coral machine launch` pins, or it fails and **prints nothing**. Run it, paste its two lines (a comment and a row) into
