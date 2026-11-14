@@ -516,6 +516,12 @@ func TestProvisionListShapes(t *testing.T) {
 	add("earlier", "ssh-two", kindUpgrade, phaseRunning, now.Add(-3*time.Minute))
 	add("stale", "ssh-box", kindRemove, phaseDone, now.Add(-provisionTTL-time.Minute))
 	add("shown", "ssh-box", kindStop, phasePlanned, now)
+	// These plans are made up: nothing runs them, so a "running" one would never finish and the cleanup's quiesce (up to 30 s) would wait for it: this test took 30 s of the package's 800 (#16223).
+	t.Cleanup(func() {
+		me.p.mu.Lock()
+		clear(me.p.plans)
+		me.p.mu.Unlock()
+	})
 	code, v := me.do("GET", "/api/servers/provision", nil)
 	require.Equal(t, 200, code, "%v", v)
 	var got []string

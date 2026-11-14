@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -72,6 +73,8 @@ func setupAgyTestRig(t *testing.T) *agyTestRig {
 
 	term := newMockTerminal()
 	h := NewSessionsHandler(db, cfg, nil, term, nil)
+	noSettle := time.Duration(0) // a respawned pane is not waited for: the product gives it 500 ms and every restart, wake and resume here paid that against a mock terminal (as setupSessionsTestServer does, #16223)
+	h.paneSettle = &noSettle
 	ss := store.NewSessionStore(db)
 	require.NoError(t, ss.SetSetting(context.Background(), agent.CLIPathSettingKey(at.Agy), fakeAgy))
 

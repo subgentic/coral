@@ -176,6 +176,8 @@ func TestUsageTurnsRouteMatchesPlainSQL(t *testing.T) {
 	}
 	edge = append(edge, pinned.Format(time.RFC3339Nano), pinned.Add(time.Second).Format(time.RFC3339Nano))
 	times := []string{"", edge[0], edge[1], edge[2], edge[3], now.Add(-20 * 24 * time.Hour).Format(time.RFC3339), now.Add(-10 * 24 * time.Hour).Format(time.RFC3339Nano), now.Add(-time.Hour).Format(time.RFC3339), now.Add(24 * time.Hour).Format(time.RFC3339), "2001-01-01T00:00:00Z"}
+	fullLimits := map[string]bool{"|": true, edge[0] + "|" + edge[1]: true, edge[2] + "|" + edge[3]: true, times[5] + "|" + times[9]: true, times[7] + "|" + times[8]: true}
+	boundaryLimit := map[string]bool{"": true, "1": true, "201": true, "200": true}
 	cases := 0
 	for _, order := range []string{"", "cost", "time"} {
 		for _, limit := range []string{"", "1", "7", "20", "199", "200", "201", "300", "400", "401", "5000"} {
@@ -183,6 +185,11 @@ func TestUsageTurnsRouteMatchesPlainSQL(t *testing.T) {
 				for _, session := range []string{"", "s3"} {
 					for _, since := range times {
 						for _, until := range times {
+							// The limit does not depend on the window (#16253): every limit is tried on the windows that matter most (none, the two edges, one around the pinned turns, one
+							// before everything), the boundary limits (the default, one, one over the cap) on all of them. Under half the queries (26400 became 10440); every combination of the rest is kept.
+							if !fullLimits[since+"|"+until] && !boundaryLimit[limit] {
+								continue
+							}
 							q := url.Values{}
 							for k, v := range map[string]string{"order": order, "limit": limit, "agent": agent, "session_id": session, "since": since, "until": until} {
 								if v != "" {
