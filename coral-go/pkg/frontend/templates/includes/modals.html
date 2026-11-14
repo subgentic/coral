@@ -695,6 +695,8 @@
                                     </div>
                                     <p id="settings-dropbox-autosync-note" class="settings-hint sv-help" role="status"></p>
                                     <ul id="settings-dropbox-edits" class="settings-dropbox-edits" aria-label="Files edited in Dropbox" hidden></ul>
+                                    <!-- the set-up of the backup (what, how long, how old), folded: the status, the counts and the edits switch are the block (ST8, #15882) -->
+                                    <details id="settings-dropbox-setup" class="disclosure sv-fold settings-dropbox-setup"><summary>Backup set-up</summary>
                                     <fieldset class="settings-dropbox-filters">
                                         <legend>What to back up</legend>
                                         <div id="settings-dropbox-types" class="settings-dropbox-types"></div>
@@ -729,6 +731,7 @@
                                         <div id="settings-dropbox-offload-confirm" role="group" aria-label="Turn on Free up space" hidden></div>
                                         <p id="settings-dropbox-offload-kept" class="settings-hint sv-help" role="status"></p>
                                     </fieldset>
+                                    </details>
                                 </div>
                             </section>
                             <div id="settings-worktrees-live">

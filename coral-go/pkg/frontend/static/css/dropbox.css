@@ -50,3 +50,7 @@ dialog.dropbox-share-dialog .dropbox-share-choice > span, dialog.dropbox-share-d
 #settings-dropbox-key ol { margin: 6px 0 0; padding-left: 20px; }
 #settings-dropbox-key li { margin: 2px 0; overflow-wrap: anywhere; }
 #settings-dropbox-key summary { cursor: pointer; }
+/* ST8 (#15882): the backup is a block of its own: a rule above it and room, so the limits and clean-up rows above it do not run into it; its set-up (what to back up, how long to keep) is one closed fold. */
+#settings-modal #settings-dropbox { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+#settings-dropbox .settings-dropbox-setup { margin-top: 12px; }
+#settings-dropbox .settings-dropbox-setup > .settings-dropbox-filters:first-of-type { margin-top: 4px; }
