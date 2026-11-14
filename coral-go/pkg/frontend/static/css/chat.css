@@ -971,6 +971,12 @@ body:has(.model-chip-menu:not([hidden])) .chat-jump-latest-btn { visibility: hid
     font-weight: var(--fw-strong);
     font-variant-numeric: tabular-nums;
 }
+/* #17069: the launch prompt Coral sent to the agent, folded to one line. */
+.chat-launch-prompt { border-color: color-mix(in srgb, var(--text-muted) 25%, transparent); background: color-mix(in srgb, var(--text-muted) 6%, transparent); }
+.chat-launch-prompt .chat-system-label { color: var(--text-secondary); }
+.chat-launch-prompt .material-icons { color: var(--text-muted); }
+.chat-launch-prompt .chat-system-text { display: none; }
+.chat-launch-prompt.open .chat-system-text { display: block; overflow: visible; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* Agent is waiting on the user: what it is asking, and a way to answer */
 .chat-needs-input {

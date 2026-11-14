@@ -62,6 +62,11 @@ export function filterAndSortTasks(allTasks, sort, { querying = false, hideCompl
     return tasks;
 }
 
+function blockedDetail(t) {
+    const ids = (Array.isArray(t.blocked_by) ? t.blocked_by : []).filter(d => d && d.satisfied === false).map(d => `#${Number(d.task_id)}`);
+    return ids.length ? `Blocked: waiting on ${ids.join(', ')}` : 'Blocked: waiting for prerequisites';
+}
+
 /** A row's status icon and label. */
 export function taskStatus(t) {
     const statusWrap = (className, detail, label) => ({ className, detail, label });
@@ -82,7 +87,7 @@ export function taskStatus(t) {
         : t.status === 'skipped'
         ? statusWrap('cancelled', 'Cancelled', 'Cancelled')
         : t.status === 'blocked'
-        ? statusWrap('blocked', 'Blocked: waiting for prerequisites', 'Blocked')
+        ? statusWrap('blocked', blockedDetail(t), 'Blocked')
         : t.status === 'draft'
         ? statusWrap('pending', 'Open · Draft', 'Open · Draft')
         : statusWrap('pending', 'Open', 'Open');

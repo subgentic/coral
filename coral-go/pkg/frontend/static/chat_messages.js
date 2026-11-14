@@ -21,6 +21,11 @@ import { visibleName } from './artifact_names.js';
 const messageMenuButton = text => { const words = markHidden(text || '').trim().split(/\s+/).filter(Boolean).slice(0, 6).join(' '); const label = words ? `Message actions: ${words}` : 'Message actions'; return `<button type="button" class="btn btn-quiet btn-icon btn-xs chat-msg-menu-btn" title="Message actions" aria-label="${escapeAttr(label)}" aria-haspopup="menu" aria-expanded="false" aria-controls="chat-msg-menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="13" cy="8" r="1.4"/></svg></button>`; };
 const COPY_BUTTON = `<button type="button" class="btn btn-quiet btn-icon btn-xs chat-copy-btn" title="Copy" aria-label="Copy message"><span class="material-icons" aria-hidden="true">content_copy</span></button>`;
 
+// #17069: the launch prompt Coral gave the agent (its role, knowledge section and board action text) fills the first screen — fold it to one line.
+const LAUNCH_BOARD_MARKER = "You were automatically joined to message board";
+const LAUNCH_KNOWLEDGE_MARKER = "## Your Institutional Knowledge\n\nThe following is distilled knowledge from your previous sessions.";
+function isLaunchPrompt(text) { return !!text && (text.includes(LAUNCH_BOARD_MARKER) || text.includes(LAUNCH_KNOWLEDGE_MARKER)); }
+
 export const bubbleSource = new WeakMap();
 
 // One message that can't be drawn must not cost the rest of the history (#3694): it gets a note
@@ -60,6 +65,26 @@ function renderOneMessage(msg, container, agentType) {
     } else if (msg.type === "user" && msg.local_command === true) {
         // A slash command the CLI ran by itself ("/model sonnet"): a small note of what was typed, not a bubble (#5488). Seeing it here is how the message the person sent is known to be taken.
         appendContent(container, makeBubble("chat-note chat-local-command", escapeHtml(markHidden(msg.content || ""))));
+    } else if (msg.type === "user" && isLaunchPrompt(unwrapPastedContent(msg.content))) {
+        const pill = makeBubble("chat-system chat-launch-prompt",
+            `<span class="material-icons" aria-hidden="true">play_arrow</span><span class="chat-system-label">Coral's start instructions</span><span class="chat-system-text"></span>`);
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "chat-system-toggle";
+        toggle.innerHTML = '<span class="material-icons" aria-hidden="true">expand_more</span>';
+        toggle.setAttribute("aria-expanded", "false");
+        toggle.setAttribute("aria-label", "Show start instructions");
+        toggle.addEventListener("click", () => {
+            const open = pill.classList.toggle("open");
+            toggle.setAttribute("aria-expanded", String(open));
+            toggle.setAttribute("aria-label", open ? "Hide start instructions" : "Show start instructions");
+            if (open && !pill.dataset.filled) {
+                pill.dataset.filled = "1";
+                pill.querySelector(".chat-system-text").innerHTML = renderMarkdown(markHidden(unwrapPastedContent(msg.content)), CHAT_MARKDOWN, 'chat');
+            }
+        });
+        pill.appendChild(toggle);
+        appendContent(container, pill);
 	} else if (msg.type === "user" && isCoralDelivery(msg)) {
 		const text = unwrapPastedContent(msg.content);
 		appendCoralNotice(container, normalizeNudgeText(text), isCoralHealthNudge(text));
