@@ -16,6 +16,10 @@ let counted = 0;
 /** How many goal items Needs you holds, as the Inbox sidebar last worked it out: the tab's badge adds it to its count (the sidebar is loaded after the Inbox is first opened). */
 export const goalDoneCount = () => counted;
 export const setGoalDoneCount = n => { counted = n; };
+let closedCounted = 0;
+/** How many goals the person made that an agent closed and they have not dismissed or reopened (#16753, the Operator: "put it into the needs you"): the badge adds it, as the sidebar last worked it out. */
+export const closedByAgentCount = () => closedCounted;
+export const setClosedByAgentCount = n => { closedCounted = n; };
 
 export const SETTING = 'goal_done_hidden';
 const MAX = 100;
