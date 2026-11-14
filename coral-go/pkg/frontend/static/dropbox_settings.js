@@ -57,6 +57,26 @@ async function post(url, method = 'POST', payload = '{}') {
 // icon-subset scan counts every whole string that equals one (icon_names.mjs).
 const TYPES = ['.md', '.txt', '.json', '.csv', '.png', '.jpg', '.gif', '.webp', '.pdf', '.mp4'].map(t => t.slice(1));
 
+// Feedback lives with the fieldset and is announced without a success toast.
+const saveTimers = new WeakMap();
+function rowStatus(id, text, error = false) {
+    const field = $(id), row = field?.closest('fieldset') || field?.parentElement;
+    if (!row) return;
+    let status = row.querySelector('.settings-save-status');
+    if (!status) {
+        status = document.createElement('span'); status.className = 'settings-save-status';
+        status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); status.setAttribute('aria-atomic', 'true'); row.append(status);
+    }
+    clearTimeout(saveTimers.get(status)); status.textContent = text; status.dataset.error = error ? '1' : '0';
+    if (text === 'Saved') saveTimers.set(status, setTimeout(() => { status.textContent = ''; }, 2000));
+}
+function dayFailure(id, saved, message) {
+    const field = $(id);
+    if (field) field.value = String(saved || 0);
+    rowStatus(id, `Not saved. ${message || 'Try again.'}`, true);
+}
+const savedDays = (key) => Number(lastStatus?.[key]?.days || 0);
+
 // renderBackup shows the backup's counts and its filters (stage 4c, #14693) once connected.
 function renderBackup(st, keepControls = false) {
     const on = !!(st && st.connected && !st.looks_like_copy);
@@ -124,6 +144,7 @@ function renderBackup(st, keepControls = false) {
 
 // Free up space (stage 6b, #14845): keep files older than N days only in Dropbox. Turning it on shows the dry run's count and asks for both
 // sentences (the risk and the warning) before Turn on; 0 turns it off, and the files kept only in Dropbox come back over the next passes.
+let offloadSeq = 0;
 let offloadSeen = null; // the dry run Turn on confirms: {days, count, bytes}
 function renderOffload(o, keepControls) {
     const kept = $('settings-dropbox-offload-kept'), field = $('settings-dropbox-offload-for');
@@ -144,13 +165,15 @@ function offloadConfirm(show) {
 export async function saveOffload() {
     const field = $('settings-dropbox-offload-for');
     const days = Number(field && field.value);
-    if (!Number.isInteger(days) || days < 0 || days > 3650 || (days > 0 && days < 30)) { note('Free up space is 0 (off) or 30 to 3650 days.'); return; }
+    if (!String(field?.value || '').trim() || !Number.isInteger(days) || days < 0 || days > 3650 || (days > 0 && days < 30)) { dayFailure('settings-dropbox-offload-for', savedDays('offload'), 'Use 0 (off) or 30 to 3650 days.'); return; }
     offloadConfirm(false);
     offloadSeen = null;
+    const seq = ++offloadSeq;
     let res;
     try { res = await post('/api/dropbox/offload', 'PUT', JSON.stringify({ days })); } catch { res = { ok: false, body: {} }; }
-    if (!res.ok) { note(String(res.body.error || "Couldn't save Free up space.")); return; }
-    if (!days) { note('Free up space is off. Files kept only in Dropbox come back to this computer over the next passes.'); return; }
+    if (seq !== offloadSeq || Number(field?.value) !== days) return;
+    if (!res.ok) { dayFailure('settings-dropbox-offload-for', savedDays('offload'), String(res.body.error || 'Try again.')); return; }
+    if (!days) { if (lastStatus) lastStatus.offload = { ...lastStatus.offload, days: 0 }; rowStatus('settings-dropbox-offload-for', 'Saved'); note('Free up space is off. Files kept only in Dropbox come back to this computer over the next passes.'); return; }
     offloadSeen = { days, count: Number(res.body.count || 0), bytes: Number(res.body.bytes || 0) };
     const box = $('settings-dropbox-offload-confirm');
     if (!box) return;
@@ -172,11 +195,13 @@ export async function saveOffload() {
         try { r2 = await post('/api/dropbox/offload', 'PUT', JSON.stringify({ days: seen.days, confirm: true, risk_ok: risk.c.checked, warning_ok: warn.c.checked, seen_count: seen.count, seen_bytes: seen.bytes })); } catch { r2 = { ok: false, body: {} }; }
         offloadConfirm(false);
         offloadSeen = null;
-        if (r2.status === 409 && r2.body.code === 'changed') { note(`More files would be freed now (${Number(r2.body.count || 0)}). Press Save to see the new count, then confirm again.`); focusEl('settings-dropbox-offload-for'); return; }
+        if (r2.status === 409 && r2.body.code === 'changed') { note(`More files would be freed now (${Number(r2.body.count || 0)}). Enter the days again to see the new count, then confirm again.`); focusEl('settings-dropbox-offload-for'); return; }
+        if (r2.ok) { if (lastStatus) lastStatus.offload = { ...lastStatus.offload, days: seen.days }; rowStatus('settings-dropbox-offload-for', 'Saved'); }
+        else dayFailure('settings-dropbox-offload-for', savedDays('offload'), String(r2.body.error || 'Try again.'));
         note(r2.ok ? `Free up space is on: files older than ${seen.days} days are kept only in Dropbox after the next pass.` : String(r2.body.error || "Couldn't turn Free up space on."));
         focusEl('settings-dropbox-offload-for');
     });
-    cancel.addEventListener('click', () => { offloadConfirm(false); offloadSeen = null; note('Nothing changed.'); focusEl('settings-dropbox-offload-for'); });
+    cancel.addEventListener('click', () => { offloadConfirm(false); offloadSeen = null; if (field) field.value = String(savedDays('offload')); note('Nothing changed.'); focusEl('settings-dropbox-offload-for'); });
     box.append(p, risk.l, warn.l, on, cancel);
     cancel.focus?.();
 }
@@ -264,23 +289,35 @@ function filterKey() {
     return JSON.stringify([types, ($('settings-dropbox-age') || {}).value || '0']);
 }
 
-// saveDropboxFilters sends the ticked types and the age limit.
-export async function saveDropboxFilters() {
-    note('');
+// Filter edits are serialized so a later response cannot overwrite a newer save.
+let filterQueue = Promise.resolve();
+let filterPending = null;
+export function saveDropboxFilters() {
+    const sentKey = filterKey();
+    if (filterPending === sentKey) return filterQueue;
+    filterPending = sentKey;
     const box = $('settings-dropbox-types');
     const types = box ? [...box.querySelectorAll('input[type=checkbox]')].filter(i => i.checked).map(i => i.value) : [];
-    const days = parseInt(($('settings-dropbox-age') || {}).value || '0', 10);
-    const sentKey = filterKey();
-    let res;
-    try { res = await post('/api/dropbox/filters', 'PUT', JSON.stringify({ types, max_age_days: Number.isFinite(days) ? days : 0 })); } catch { note("Couldn't reach Coral. Try again."); return; }
-    if (!res.ok) { note(String(res.body.error || "Couldn't save. Try again.")); return; }
-    // The summary follows what was saved (UI Reviewer's MUST 1 on #14693), from the answer itself. The boxes and the age follow it too, unless
-    // the person changed them while the save was on its way: newer edits are kept for the next Save.
-    if (lastStatus) {
-        lastStatus = { ...lastStatus, filters: { types: res.body.types || [], max_age_days: Number(res.body.max_age_days || 0) } };
-        renderBackup(lastStatus, filterKey() !== sentKey);
-    }
-    note('Saved. Narrowing what is backed up never deletes what is already in Dropbox.');
+    const raw = String($('settings-dropbox-age')?.value || '').trim();
+    const run = async () => {
+        rowStatus('settings-dropbox-age', '');
+        try {
+            if (!/^[0-9]{1,4}$/.test(raw) || Number(raw) > 3650) throw new Error('Use a whole number from 0 to 3650.');
+            const res = await post('/api/dropbox/filters', 'PUT', JSON.stringify({ types, max_age_days: Number(raw) }));
+            if (!res.ok) throw new Error(String(res.body.error || 'Try again.'));
+            if (lastStatus) {
+                lastStatus = { ...lastStatus, filters: { types: res.body.types || [], max_age_days: Number(res.body.max_age_days || 0) } };
+                renderBackup(lastStatus, filterKey() !== sentKey);
+            }
+            rowStatus('settings-dropbox-age', 'Saved');
+            note('Narrowing what is backed up never deletes what is already in Dropbox.');
+        } catch (error) {
+            if (filterKey() === sentKey && lastStatus) renderBackup(lastStatus);
+            rowStatus('settings-dropbox-age', `Not saved. ${error.message || 'Try again.'}`, true);
+        } finally { if (filterPending === sentKey) filterPending = null; }
+    };
+    filterQueue = filterQueue.then(run, run);
+    return filterQueue;
 }
 
 // The app key (#15638): Coral ships no Dropbox app key, so each person makes their own Dropbox app and pastes its key here. The form is built on first use (this
@@ -305,7 +342,7 @@ function keyForm() {
     input.autocomplete = 'off'; input.spellcheck = false;
     input.setAttribute('aria-describedby', 'settings-dropbox-key-note');
     const save = document.createElement('button');
-    save.type = 'button'; save.className = 'btn btn-small'; save.id = 'settings-dropbox-key-save'; save.textContent = 'Save key';
+    save.type = 'button'; save.className = 'btn btn-small'; save.id = 'settings-dropbox-key-save'; save.textContent = 'Connect';
     const steps = document.createElement('details');
     steps.id = 'settings-dropbox-key-steps';
     const sum = document.createElement('summary');
@@ -332,10 +369,10 @@ function keyForm() {
     confirm.append(ctext, ' ', yes, ' ', no);
     f.append(label, ' ', input, ' ', save, steps, knote, confirm);
     anchor.after(f);
-    save.addEventListener('click', () => { saveAppKey(); });
-    yes.addEventListener('click', () => { saveAppKey(true); });
+    save.addEventListener('click', () => { saveAppKey(false, true); });
+    yes.addEventListener('click', () => { saveAppKey(true, true); });
     no.addEventListener('click', () => { keyPending = null; confirm.hidden = true; knote.textContent = ''; input.value = lastStatus && lastStatus.app_key || ''; input.focus(); });
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveAppKey(); } });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveAppKey(false, true); } });
     return f;
 }
 
@@ -361,7 +398,9 @@ function showKey(st) {
     for (const el of f.children) if (el.id !== 'settings-dropbox-key-confirm') el.hidden = false;
     if (c) c.hidden = true;
     if (input && document.activeElement !== input) input.value = (st && st.app_key) || '';
-    f.hidden = !st;
+    const connectKey = $('settings-dropbox-key-save');
+    if (connectKey) connectKey.hidden = !!st?.app_key_set;
+    f.hidden = !st || (!!st.connected && !st.paused_no_key);
 }
 
 const keyErrors = {
@@ -369,7 +408,7 @@ const keyErrors = {
 };
 
 // saveAppKey saves the field's key. A key changed while connected disconnects the old account: the server answers 409 first and the person confirms.
-export async function saveAppKey(confirm = false) {
+export async function saveAppKey(confirm = false, connect = false) {
     const input = $('settings-dropbox-key-input');
     if (!input) return;
     const key = input.value.trim();
@@ -393,6 +432,7 @@ export async function saveAppKey(confirm = false) {
     }
     if (!res.ok) { keyNote(keyErrors[String(res.body.code || '')] || String(res.body.error || "Couldn't save the key. Try again.")); return; }
     await loadDropbox();
+    if (connect && key && !res.body.env_wins) { await connectDropbox(); return; }
     keyNote(res.body.disconnected ? 'Key saved. The old account is disconnected: connect again.' : res.body.env_wins ? 'Key saved. The key from CORAL_DROPBOX_APP_KEY is still the one in use.' : (key ? 'Key saved.' : 'Key removed.'));
 }
 
@@ -824,19 +864,20 @@ export async function saveRetention() {
     note('');
     dropRetentionPreview();
     const days = retentionDays();
-    if (days === null) { note('Keep in Dropbox takes a whole number of days, 0 (off) to 3650.'); return; }
+    if (days === null) { dayFailure('settings-dropbox-keep-for', savedDays('retention'), 'Use a whole number from 0 to 3650.'); return; }
     const seq = retentionSeq;
     let res;
     if (days === 0) {
         try { res = await post(RETENTION, 'PUT', JSON.stringify({ days: 0 })); } catch { res = { ok: false, body: {} }; }
-        if (!res.ok) { note(String(res.body.error || "Couldn't save. Try again.")); return; }
+        if (!res.ok) { dayFailure('settings-dropbox-keep-for', savedDays('retention'), String(res.body.error || 'Try again.')); return; }
+        rowStatus('settings-dropbox-keep-for', 'Saved');
         note('Retention is off. Nothing more is deleted from Dropbox.');
         await loadDropbox();
         return;
     }
     try { res = await post(RETENTION, 'PUT', JSON.stringify({ days })); } catch { res = { ok: false, body: {} }; }
     if (seq !== retentionSeq || retentionDays() !== days) return; // superseded: the field changed or another count was asked for
-    if (!res.ok || !res.body.dry_run || Number(res.body.days) !== days) { note(String(res.body.error || "Couldn't count what would be deleted. Try again.")); return; }
+    if (!res.ok || !res.body.dry_run || Number(res.body.days) !== days) { dayFailure('settings-dropbox-keep-for', savedDays('retention'), String(res.body.error || 'Try again.')); return; }
     const due = Number(res.body.due || 0);
     pendingRetention = { days, due, bytes: Number(res.body.bytes || 0), seq };
     const what = due ? `${due} ${due === 1 ? 'file' : 'files'} (${sizeText(res.body.bytes)}) would be deleted from Dropbox now` : 'nothing would be deleted from Dropbox now';
@@ -855,7 +896,8 @@ export async function confirmRetention() {
     focusEl('settings-dropbox-keep-for');
     let res;
     try { res = await post(RETENTION, 'PUT', JSON.stringify({ days: p.days, confirm: true, seen_count: p.due, seen_bytes: p.bytes })); } catch { res = { ok: false, body: {} }; }
-    if (!res.ok) { note(String(res.body.error || "Couldn't save. Try again.")); return; }
+    if (!res.ok) { dayFailure('settings-dropbox-keep-for', savedDays('retention'), String(res.body.error || 'Try again.')); return; }
+    rowStatus('settings-dropbox-keep-for', 'Saved');
     note(`Retention is on: files older than ${dayWord(p.days)} are deleted from Dropbox, at most 100 an hour.`);
     await loadDropbox();
 }
@@ -941,20 +983,37 @@ function focusEl(id) {
 function wire() {
     if (wired) return;
     const on = (id, fn) => { const el = $(id); if (el) el.addEventListener('click', () => { fn(); }); };
-    on('settings-dropbox-connect', connectDropbox);
+    on('settings-dropbox-connect', () => { const key = $('settings-dropbox-key-input')?.value.trim(); if (!lastStatus?.app_key_from_env && key && key !== lastStatus?.app_key) saveAppKey(false, true); else connectDropbox(); });
     on('settings-dropbox-disconnect', disconnectDropbox);
     on('settings-dropbox-delete', deleteBackupStart);
     on('settings-dropbox-switch', confirmSwitch);
     on('settings-dropbox-takeover', takeOver);
-    on('settings-dropbox-filters-save', saveDropboxFilters);
+    $('settings-dropbox-types')?.addEventListener('change', () => saveDropboxFilters());
     on('settings-dropbox-recheck', checkAgain);
-    on('settings-dropbox-retention-save', saveRetention);
+
     on('settings-dropbox-retention-on', confirmRetention);
     on('settings-dropbox-retention-cancel', cancelRetention);
     const sync = $('settings-dropbox-autosync');
     if (sync) sync.addEventListener('change', () => setAutoSync(sync.checked));
     on('settings-dropbox-autosync-resume', async () => { await setAutoSync(true); focusEl('settings-dropbox-autosync'); }); // Resume hides itself: the keyboard goes to the switch (UI Accessibility's 5)
-    on('settings-dropbox-offload-save', saveOffload);
+    const autosaveDays = (id, save, current) => {
+        const input = $(id); if (!input) return;
+        let attempted = null;
+        input.addEventListener('input', () => { attempted = null; if (id === 'settings-dropbox-offload-for') { offloadSeq++; offloadSeen = null; offloadConfirm(false); } });
+        const commit = () => {
+            if (id === 'settings-dropbox-keep-for' && pendingRetention?.days === Number(input.value)) return;
+            if (id === 'settings-dropbox-offload-for' && offloadSeen?.days === Number(input.value)) return;
+            if (input.value === attempted || input.value === String(current())) return;
+            attempted = input.value;
+            Promise.resolve(save()).finally(() => { if (input.value !== attempted) attempted = null; });
+        };
+        input.addEventListener('focusout', commit);
+        if (id === 'settings-dropbox-age') input.addEventListener('change', commit);
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
+    };
+    autosaveDays('settings-dropbox-age', saveDropboxFilters, () => Number(lastStatus?.filters?.max_age_days || 0));
+    autosaveDays('settings-dropbox-keep-for', saveRetention, () => savedDays('retention'));
+    autosaveDays('settings-dropbox-offload-for', saveOffload, () => savedDays('offload'));
     const field = $('settings-dropbox-keep-for');
     if (field) field.addEventListener('input', dropRetentionPreview); // a changed field takes the shown count and Turn on away
     wired = true;

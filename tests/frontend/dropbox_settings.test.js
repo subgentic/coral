@@ -28,12 +28,12 @@ const KEY_A = fake('abcd', '1234', 'efgh', '567'), KEY_B = fake('zyxw', '9876', 
           <div id="settings-dropbox-counts"></div>
           <input type="checkbox" id="settings-dropbox-autosync"><button id="settings-dropbox-autosync-resume" hidden></button><p id="settings-dropbox-autosync-note"></p>
           <ul id="settings-dropbox-edits" hidden></ul>
-          <input id="settings-dropbox-offload-for" type="number"><button id="settings-dropbox-offload-save"></button><div id="settings-dropbox-offload-confirm" hidden></div><p id="settings-dropbox-offload-kept"></p>
+          <input id="settings-dropbox-offload-for" type="number"><div id="settings-dropbox-offload-confirm" hidden></div><p id="settings-dropbox-offload-kept"></p>
           <div id="settings-dropbox-types"></div>
           <input id="settings-dropbox-age" type="number">
-          <button id="settings-dropbox-filters-save"></button>
+
           <input id="settings-dropbox-keep-for" type="number">
-          <button id="settings-dropbox-retention-save"></button>
+
           <button id="settings-dropbox-retention-on" hidden></button>
           <button id="settings-dropbox-retention-cancel" hidden></button>
         </div>
@@ -53,6 +53,7 @@ const KEY_A = fake('abcd', '1234', 'efgh', '567'), KEY_B = fake('zyxw', '9876', 
     const m = await import(pathToFileURL(path.join(dir, 'dropbox_settings.js')).href);
     const $ = (id) => document.getElementById(id);
     const shown = (id) => !$(id).hidden;
+    const savedText = id => ($(id).closest('fieldset') || $(id).parentElement).querySelector('.settings-save-status')?.textContent || '';
     const status = (body) => { answers['/api/dropbox/status'] = { status: 200, body }; return m.loadDropbox(); };
 
     // Not in this build (no app key): a plain sentence, no buttons.
@@ -244,7 +245,7 @@ const KEY_A = fake('abcd', '1234', 'efgh', '567'), KEY_B = fake('zyxw', '9876', 
     assert.strictEqual(put.method, 'PUT');
     const sent = JSON.parse(put.body);
     assert.deepStrictEqual({ ...sent, types: [...sent.types].sort() }, { types: ['md', 'pdf', 'png'], max_age_days: 7 }, 'the ticked types (any order) and the age');
-    assert.match($('settings-dropbox-note').textContent, /Saved/);
+    assert.match(savedText('settings-dropbox-age'), /Saved/);
     assert.match($('settings-dropbox-note').textContent, /never deletes/i, 'narrowing is said to keep what is already in Dropbox');
     // UI Reviewer's MUST 1 on #14693: the summary and the controls follow the saved answer, with no reload.
     assert.match($('settings-dropbox-counts').textContent, /Backing up \.md, \.pdf, \.png from the last 7 days\./);
@@ -260,6 +261,7 @@ const KEY_A = fake('abcd', '1234', 'efgh', '567'), KEY_B = fake('zyxw', '9876', 
         ? new Promise(res => { release = () => res({ ok: true, status: 200, json: async () => ({ types: ['md'], max_age_days: 0 }) }); })
         : realFetch0(url, opts);
     const saving = m.saveDropboxFilters();
+    await Promise.resolve(); // queued filter writes begin on the next microtask
     $('settings-dropbox-types').querySelector('input[value=png]').checked = true; // ticked after Save was pressed
     $('settings-dropbox-age').value = '3';
     release();
@@ -271,9 +273,10 @@ const KEY_A = fake('abcd', '1234', 'efgh', '567'), KEY_B = fake('zyxw', '9876', 
 
     // A refused save shows the server's sentence.
     answers['/api/dropbox/filters'] = { status: 400, body: { error: 'max_age_days is 0 (no limit) to 3650' } };
-    $('settings-dropbox-age').value = '99999';
+    $('settings-dropbox-age').value = '8';
     await m.saveDropboxFilters();
-    assert.match($('settings-dropbox-note').textContent, /0 \(no limit\) to 3650/);
+    assert.match(savedText('settings-dropbox-age'), /Not saved.*0 \(no limit\) to 3650/);
+    assert.strictEqual($('settings-dropbox-age').value, '0', 'refused age rolls back to the persisted value');
 
     // No filter: every type and every age.
     await status({ ...connected, filters: { types: [], max_age_days: 0 } });
@@ -300,7 +303,7 @@ const KEY_A = fake('abcd', '1234', 'efgh', '567'), KEY_B = fake('zyxw', '9876', 
     // UI Reviewer's MUST 2 on #14693: connected, then a refused or failed read hides the backup controls, the stale counts and every button.
     const stale = () => {
         assert.ok(!shown('settings-dropbox-backup'), 'the backup part, with the types, the age and Save, is hidden');
-        assert.ok($('settings-dropbox-filters-save').closest('#settings-dropbox-backup'), 'Save lives in the backup part');
+        assert.ok($('settings-dropbox-age').closest('#settings-dropbox-backup'), 'age control lives in the backup part');
         assert.strictEqual($('settings-dropbox-counts').textContent, '', 'no stale counts');
         for (const id of ['settings-dropbox-disconnect', 'settings-dropbox-recheck', 'settings-dropbox-connect']) assert.ok(!shown(id), id);
     };
@@ -436,7 +439,7 @@ const KEY_A = fake('abcd', '1234', 'efgh', '567'), KEY_B = fake('zyxw', '9876', 
         await m.saveRetention();
         assert.strictEqual(retentionCalls().length, n0, `nothing sent for ${JSON.stringify(bad)}`);
         assert.ok(!shown('settings-dropbox-retention-on'));
-        assert.match($('settings-dropbox-note').textContent, /whole number of days, 0 \(off\) to 3650/);
+        assert.match(savedText('settings-dropbox-keep-for'), /Not saved.*whole number from 0 to 3650/);
     }
 
     // (1) The confirm is bound to the days the field shows. Edited after the count (with or without an input event): Turn on goes, and a
@@ -615,7 +618,7 @@ const KEY_A = fake('abcd', '1234', 'efgh', '567'), KEY_B = fake('zyxw', '9876', 
     assert.match($('settings-dropbox-note').textContent, /Free up space is on/);
     $('settings-dropbox-offload-for').value = '10';
     await m.saveOffload();
-    assert.match($('settings-dropbox-note').textContent, /0 \(off\) or 30 to 3650/, 'a value out of range sends nothing');
+    assert.match(savedText('settings-dropbox-offload-for'), /Not saved.*0 \(off\) or 30 to 3650/, 'a value out of range sends nothing');
     // UI Accessibility's 3 to 5 on cee349ca6 (#14886): the rows' buttons say which file; a list action gives the keyboard back to the list; Resume
     // gives it to the switch.
     answers['/api/dropbox/removals'] = { status: 200, body: { removals: [{ digest: 'c'.repeat(64), name: 'notes.md', state: 'edited', edited: [{ path: '/v1/x', rev: 'r2' }] }, { digest: 'f'.repeat(64), name: 'plan.md', state: 'kept', reason: 'markers_unreadable' }] } };
