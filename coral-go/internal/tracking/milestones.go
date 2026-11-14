@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -305,6 +306,38 @@ func TrackOnce(eventName string, extraProps map[string]string) {
 		}
 		releaseMilestone(eventName)
 	})
+}
+
+// replayPendingMilestones sends the one-time events that were reached and kept, frozen, but could not be delivered then (#16569): a send that found no install ID (the first run says the Terms were
+// accepted inside startup.Start, before TrackInstallAsync writes the ID) or no network. Nothing called their trigger a second time, so they waited for ever (eula_accepted never arrived in PostHog).
+// Called at each start once the install ID exists. Only with analytics on (an opt-out has already dropped what was pending, clearPendingMilestones); each goes out under its own frozen time and
+// event id, once (confirmMilestoneSent). The per-day active keys (their names carry a "|") are not replayed: a day that passed is not sent late.
+func replayPendingMilestones(gen uint64) {
+	if !stateDirReady() || !(posthogKeyPresent() && telemetryValid(gen)) {
+		return
+	}
+	milestoneMu.Lock()
+	s := loadMilestones()
+	var names []string
+	for name := range s.Pending {
+		if _, fired := s.Fired[name]; fired || strings.Contains(name, "|") {
+			continue
+		}
+		names = append(names, name)
+	}
+	milestoneMu.Unlock()
+	sort.Strings(names)
+	for _, name := range names {
+		send, snap := reserveMilestoneAt(name, true, nil, "") // the stored snapshot: its time and its properties
+		if !send {
+			continue
+		}
+		if emitEvent(name, snap.Props, milestoneEventUUID(name, snap.Timestamp), snap.Timestamp, gen) {
+			confirmMilestoneSent(name)
+			continue
+		}
+		releaseMilestone(name)
+	}
 }
 
 // recordFirstOpen stores the first-open timestamp if it is not already set and

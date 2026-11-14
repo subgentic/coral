@@ -146,6 +146,7 @@ func TrackInstallAsync() {
 	gen := telemetryGen.Load()
 	asyncGo(func() {
 		trackInstall(gen)
+		replayPendingMilestones(gen) // the install ID exists now: a one-time event that waited for it (eula_accepted, said before it) or for the network goes out (#16569)
 		// Always send app_opened for DAU tracking
 		emitEvent(EventAppOpened, nil, uuid.NewString(), nowUTC(), gen)
 		// Retention: fire returned_24h once, on the first open >24h after the first.
