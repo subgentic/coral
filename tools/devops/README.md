@@ -84,6 +84,8 @@ the first failed check.
      **pre-release that is not "latest"** (the AGENTIC channel, #5551): installed Corals, Homebrew and the stable download links keep
      serving the last APPROVED release until the operator runs the **Approve release** workflow (below).
 
+5a. **Tell coral-hub what is new (#16727)**: with every tag, `bash tools/devops/new-routes.sh vPREV vX.Y.Z` prints the routes (method, path, view/interact/launch, owner-refused or not), tier changes and embedded html files that are new since the previous tag (v2.0.68 -> the custom-modes routes and `static/password-reset.html`, which cost the Hub two red runs). Post its output to coral-hub with the tag: `coral-board send --board coral-hub "<tag> new routes and html: ..."`. It needs Go and git and leaves nothing behind (throwaway worktrees).
+
 5. **Finish**: `tools/devops/after-release.sh X.Y.Z` waits for the release run and runs `finish-release.sh` (the check is
    `verify-release.sh --stage agentic`: a plain tag is expected to be a pre-release, the tap is not expected to have moved).
    `finish-release.sh X.Y.Z` itself:
