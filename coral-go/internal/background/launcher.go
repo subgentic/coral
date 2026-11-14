@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/logsafe"
 	"log/slog"
@@ -306,23 +307,54 @@ func (l *AgentLauncher) SendPrompt(ctx context.Context, sessionID, sessionName, 
 	// its normal input box: a freshly started CLI may be on its trust-this-folder
 	// screen or a login or model picker, and the prompt plus Enter would answer
 	// it. Held until the user deals with that screen.
-	if _, err := deliverAutomated(ctx, l.runtime, l.logger, sessionName, agentType, sessionID, prompt, "initial prompt", ptymanager.InputBoxKnown(agentType), false); err != nil {
-		l.logger.Warn("prompt send failed", "session", sessionID[:8], "error", err)
+	// A prompt the gate skipped is gone (nothing is kept for later): it is asked again for a while, since a person's send in flight is over in moments, and then reported (#16796). It was
+	// ignored: the run sat 'Running' with an agent that never got its work and no chat to open.
+	for deadline := time.Now().Add(promptRetryFor); ; {
+		skipped, err := deliverAutomated(ctx, l.runtime, l.logger, sessionName, agentType, sessionID, prompt, "initial prompt", ptymanager.InputBoxKnown(agentType), false)
+		if err != nil {
+			l.logger.Warn("prompt send failed", "session", sessionID[:8], "error", err)
+			return nil
+		}
+		if !skipped {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			l.logger.Warn("prompt could not be typed into the agent", "session", sessionID[:8])
+			return ErrPromptNotTyped
+		}
+		select {
+		case <-time.After(promptRetryEvery):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
-
-	return nil
 }
+
+// ErrPromptNotTyped: Coral could not type a job's prompt into its agent (the terminal was refused or busy every time it tried), so the run could never begin its work.
+var ErrPromptNotTyped = errors.New("Coral could not type the job's prompt into the agent, so the run never began")
+
+var (
+	promptRetryFor   = 90 * time.Second // how long a skipped prompt is asked again
+	promptRetryEvery = 3 * time.Second
+)
 
 // startPromptDelivery sends prompt in the background and returns a channel that closes when the
 // delivery is over. It runs on ctx, so cancelling ctx (the run ended) ends it too.
 func (l *AgentLauncher) startPromptDelivery(ctx context.Context, sessionID, sessionName, agentType, prompt string) <-chan struct{} {
+	done, _ := l.startPromptDeliveryResult(ctx, sessionID, sessionName, agentType, prompt)
+	return done
+}
+
+// startPromptDeliveryResult is startPromptDelivery and the error the delivery ended with (ErrPromptNotTyped: the prompt never went in), read after done closes.
+func (l *AgentLauncher) startPromptDeliveryResult(ctx context.Context, sessionID, sessionName, agentType, prompt string) (<-chan struct{}, func() error) {
 	done := make(chan struct{})
+	var out error
 	go func() {
 		defer safego.Recover("background/launcher:startPromptDelivery")
 		defer close(done)
-		_ = l.SendPrompt(ctx, sessionID, sessionName, agentType, prompt)
+		out = l.SendPrompt(ctx, sessionID, sessionName, agentType, prompt)
 	}()
-	return done
+	return done, func() error { <-done; return out }
 }
 
 // BuildSchedulerLaunchFn returns a function suitable for scheduler.SetLaunchFn.
@@ -348,12 +380,24 @@ func (l *AgentLauncher) BuildSchedulerLaunchFn(schedStore *store.ScheduleStore) 
 
 		// Send prompt to the agent after delay, on the run's own context: when the run ends the
 		// delivery (and an initial prompt held for a screen nobody answers) ends with it (#3999).
-		if !oneShot { // a one-shot run has its prompt on the command line
-			l.startPromptDelivery(ctx, result.SessionID, result.SessionName, job.AgentType, job.Prompt)
+		if oneShot {
+			// Monitor the tmux session — return when agent finishes or context expires
+			return l.watchSession(ctx, result.SessionName)
 		}
-
-		// Monitor the tmux session — return when agent finishes or context expires
-		return l.watchSession(ctx, result.SessionName)
+		done, outcome := l.startPromptDeliveryResult(ctx, result.SessionID, result.SessionName, job.AgentType, job.Prompt)
+		watched := make(chan error, 1)
+		go func() { watched <- l.watchSession(ctx, result.SessionName) }() // return when the agent finishes or the context expires
+		for {
+			select {
+			case err := <-watched:
+				return err
+			case <-done:
+				if err := outcome(); errors.Is(err, ErrPromptNotTyped) {
+					return err // the run fails with its reason (#16796) instead of sitting 'Running' with an agent that has nothing to do
+				}
+				done = nil // delivered (or given up for another reason): the run goes on as before
+			}
+		}
 	}
 }
 

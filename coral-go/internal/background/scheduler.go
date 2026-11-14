@@ -600,6 +600,10 @@ func (s *JobScheduler) launchAndWatch(runID int64, job store.ScheduledJob, rc ru
 		exitReason = agentNeverStartedCode // the code in exit_reason, the sentence in error_msg, on every path (the startup settle's shape, #7016)
 		s.store.UpdateScheduledRun(ctx, runID, map[string]interface{}{"error_msg": agentNeverStartedMsg, "error_code": agentNeverStartedCode})
 	}
+	if status == "failed" && errors.Is(launchErr, ErrPromptNotTyped) { // its own sentence and code: the person sees why the run never began (#16796)
+		exitReason = promptNotTypedCode
+		s.store.UpdateScheduledRun(ctx, runID, map[string]interface{}{"error_msg": ErrPromptNotTyped.Error(), "error_code": promptNotTypedCode})
+	}
 	if status == "failed" && errors.Is(launchErr, ptymanager.ErrStartCommand) { // one plain sentence and a fixed code, not "spawn agent failed: ..." (#6978)
 		exitReason = startCommandFailedCode
 		s.store.UpdateScheduledRun(ctx, runID, map[string]interface{}{"error_msg": ptymanager.ErrStartCommand.Error(), "error_code": startCommandFailedCode})
@@ -642,6 +646,9 @@ func (s *JobScheduler) SetLastEventType(fn func(ctx context.Context, sessionID s
 func reportsEvents(agentType string) bool {
 	return agentType == "claude" || agentType == "codex" || agentType == ""
 }
+
+// promptNotTypedCode is the run's fixed error_code when the job's prompt could not be typed into its agent (#16796).
+const promptNotTypedCode = "prompt_not_delivered"
 
 // startCommandFailedCode is the run's fixed error_code when Coral could not hand the agent its start command (#6978).
 const startCommandFailedCode = "start_command_failed"

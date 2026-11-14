@@ -287,7 +287,7 @@ function renderRunsTable(page) {
             ...(!workflowHistory ? [{ key: 'conversation', label: 'Conversation', hideLabel: true, width: '6.5rem', when: r => !!r.session_id, cell: r => {
                 if (!r.session_id) return '';
                 // short, so the Result keeps its room at 390 (Started 9.5 rem, See result 6.5 rem); it is where a newcomer looks for what the run said (#10378)
-                const b = DT.link('See result'); b.setAttribute('aria-label', 'See what this run did: open its conversation'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = r.session_id; return b;
+                const b = DT.link('See result'); b.setAttribute('aria-label', 'See what this run did: open its conversation'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = r.session_id; b.dataset.runStatus = String(r.status || ''); b.dataset.runError = String(r.error_msg || '').slice(0, 200); return b;
             } }] : []),
         ],
     });
@@ -393,6 +393,13 @@ export function initScheduler() {
 
 // The scheduled jobs' markup (#3645): data-on-* names, never code.
 // Ids are checked (idOf, uuidOf) before use: a bad one does nothing. Deleting still asks first.
+/** Why a run has no chat to open, by its status. */
+function noChatWords(status, error) {
+    if (status === 'running' || status === 'pending') return 'this run is still going and has no chat yet. Its result appears here when it ends.';
+    if (status === 'failed' || status === 'killed') return `this run ${status === 'killed' ? 'was stopped' : 'failed'} before it had a chat to show${error ? `: ${error.replace(/[.\s]+$/, '')}` : ''}.`;
+    return 'this run finished, but its chat was not kept, so there is nothing to open.';
+}
+
 registerActions({
     'job-new': () => importOnce('./job_form.js', 'the job form').then(m => m.showJobModal()).catch(() => {}), // the form loads when it is first opened (#10218)
     'job-edit': el => withId(el.dataset.jobId, id => importOnce('./job_form.js', 'the job form').then(m => m.editScheduledJob(id)).catch(() => {})),
@@ -409,7 +416,7 @@ registerActions({
         const opened = await window.selectHistorySession(sid);
         if (opened === false) { // the run has no saved chat to open (a run still going, or one whose chat was not kept): the chat page is already up and would say 'Loading chat…' for good (#16770, walk 32 F1), so go back to the job and say why
             window.switchNavTab?.('automations'); if (jobId) selectScheduledJob(jobId);
-            showToast(`${job ? `${job.name}: ` : ''}this run has no chat to show${job ? '' : ' yet'}. If it is still running, its result appears here when it ends.`, true);
+            showToast(`${job ? `${job.name}: ` : ''}${noChatWords(el.dataset.runStatus, el.dataset.runError)}`, true); // worded by the run's own status: 'if it is still running' read wrong for a run that had ended (#16796)
             return;
         }
         const back = document.getElementById('history-back'); // the way back is the job it came from, not All chats (#10378)
