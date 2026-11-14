@@ -511,3 +511,15 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
 
 /* The Artifacts tab's files strip: its space is held, unseen, until the real strip replaces it, so the table does not jump down (#15618). */
 .team-files-strip-reserve { visibility: hidden; }
+
+/* The Linked teams section (#16011): a slim card under the header, the same on every tab; its rows are text. */
+.team-page-links { flex: none; margin: 8px 24px 0; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-primary); min-width: 0; box-sizing: border-box; }
+.team-page-links[hidden] { display: none; }
+.team-links-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px; }
+.team-links-h { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-strong); color: var(--text-secondary); }
+.team-links-none { margin: 4px 0 0; color: var(--text-secondary); font-size: var(--fs-base); }
+.team-links-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.team-links-list li { display: grid; gap: 1px; min-width: 0; }
+.team-links-list b { overflow-wrap: anywhere; }
+.team-links-sub { color: var(--text-secondary); font-size: var(--fs-base); overflow-wrap: anywhere; }
+@media (max-width: 760px) { .team-page-links { margin-left: 16px; margin-right: 16px; } }
