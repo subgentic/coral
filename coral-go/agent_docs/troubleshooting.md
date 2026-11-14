@@ -318,9 +318,9 @@ Coral does not automatically kill an older tmux server during discovery.
 
 Earlier builds never populated the full-text index. The indexer now writes it whenever an
 agent parser supplies searchable text,
-so search should return results for indexed sessions. *Unverified on a live database in
-this review.* If a term you can see in a session returns nothing, the session may not
-be indexed yet; browse and filter the history list meanwhile.
+so search should return results for sessions that have been indexed. If a term you can see
+in a session returns nothing, the session may not be indexed yet; browse and filter the
+history list meanwhile.
 
 ### Cost shows for some agents but not others
 
@@ -337,6 +337,19 @@ the file).
 Do not read a team total as complete spend across vendors. A missing agent shows as
 nothing rather than as an error.
 
+### A scheduled job says "not a git repository"
+
+The folder you chose for the job is not a git repository (or git cannot find it). Coral
+needs a git repository for scheduled jobs so it can create a worktree for each run and
+track file changes. To fix it:
+
+- Make sure the path in the job's **Repository** field is the full path to a folder that
+  contains a `.git` directory (or is inside one). Open a terminal and run `git -C <path>
+  rev-parse --git-dir` — if it prints an error, the folder is not a git repository.
+- If the folder is a project you have not put under git yet, run `git init` in it first.
+- If the folder moved or was deleted, update the job's **Repository** field to the new
+  path, or recreate the folder.
+
 ### Scheduled job runs and `git worktree add`
 
 Earlier builds ran `git worktree add <dir> <base_branch>`, which Git refuses when that
@@ -344,8 +357,7 @@ branch is already checked out in your main checkout, so a default `main` base fa
 run. The current scheduler creates a per-run branch off the base
 (`git worktree add -b coral/job-run-<runID> <repo>_task_run_<runID> <base_branch>`), so a
 checked-out base branch is fine. If a run still records `git worktree add failed`, the
-message from Git is shown with the run; check that `base_branch` exists. *Not re-run
-end-to-end in this review.*
+message from Git is shown with the run; check that `base_branch` exists.
 
 ### A repository's git hooks or filters don't run in Coral's worktrees
 

@@ -256,9 +256,15 @@ function renderDocNav() {
     list.innerHTML = groups.map(g => groupHeaderHtml('docs', g.key, g.label, g.docs.length) + (isGroupFolded('docs', g.key) ? '' : g.docs.map(row).join(''))).join('')
         || (docsList.length || docsLoaded ? `<li class="empty-state empty-state-tight">${docsList.length ? (docsQuery && !docTextReady ? 'Searching the topics\u2026' : 'No topic matches. Try other words, or clear the search.') : 'No documentation found.'}</li>` : ''); // a build with none says so in the list too: a phone shows the list, not the content pane (#10266)
     syncPaneGroupToggle('docs');
-    refreshGroupTable('docs');
-    const pane = document.getElementById('docs-content'); // the page with no topic open says what to do, where it was an empty space under a line about agents (#10736)
-    if (pane && !selectedDoc && !pane.firstChild) pane.innerHTML = emptyHtml(docsQuery ? 'Pick a result' : 'Pick a topic');
+    if (docsQuery && !selectedDoc && !isPhoneLayout()) {
+        showView('docs-view'); // a search's results are in the sidebar; the right pane says "Pick a result", not a group table (#17151)
+        const pane = document.getElementById('docs-content');
+        if (pane) pane.innerHTML = emptyHtml('Pick a result');
+    } else {
+        refreshGroupTable('docs');
+        const pane = document.getElementById('docs-content'); // the page with no topic open says what to do, where it was an empty space under a line about agents (#10736)
+        if (pane && !selectedDoc && !pane.firstChild) pane.innerHTML = emptyHtml(docsQuery ? 'Pick a result' : 'Pick a topic');
+    }
 }
 
 /** Say which topic is showing, politely (the text changes under a reader without a word otherwise, #6586). */
