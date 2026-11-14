@@ -127,6 +127,7 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"PUT /api/board/{project}/orchestrator-grant": "owner-only",
 		"GET /api/board/{project}/lifecycle-log":      "owner-only",
 		"GET /api/chief":                              "owner-only", // the recorded Chief, for the Hub's own Chief page (#11470)
+		"GET /api/resources":                          "owner-only", // #16140
 		"GET /api/artifacts/{hex64}/private":          "owner-only", // the manager's private mark (#11457)
 		"PUT /api/artifacts/{hex64}/private":          "owner-only",
 		"GET /api/board/{project}/guide-roster":       "owner-only", // which name goes with which guide (#11457)

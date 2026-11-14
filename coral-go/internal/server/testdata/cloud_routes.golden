@@ -162,7 +162,7 @@ GET /api/needs-you view
 GET /api/operator-asks view
 GET /api/pinned-folders view
 GET /api/proposals view
-GET /api/resources never
+GET /api/resources view
 GET /api/resources/{name} never
 GET /api/saved view
 GET /api/saved/{id}/message view

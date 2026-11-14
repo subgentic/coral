@@ -148,7 +148,8 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		"/api/chief":         true, // which agent the Operator recorded as Chief is the owner's alone through the hub (#11470)
 		"/api/board/{project}/orchestrator-grant": true, "/api/board/{project}/lifecycle-log": true, "/api/board/{project}/guide-roster": true, "/api/artifacts/{id}/private": true, // the grant to a board's orchestrator and its log are the owner's alone (#11432)
 		"/api/board/{project}/artifacts/{digest}/edit": true, "/api/board/{project}/artifacts/{digest}/edit/send": true, // what the Markdown editor may do with a file is the owner's alone (#13757)
-		"/api/custom-modes": true, "/api/custom-models": true} // the custom models are the owner's alone through the hub (#5996)
+		"/api/custom-modes": true, "/api/custom-models": true, // the custom models are the owner's alone through the hub (#5996)
+		"/api/resources": true} // the resource queue's list is the owner's alone through the hub, notes redacted (#16140)
 
 	golden, err := os.ReadFile("testdata/cloud_routes.golden")
 	require.NoError(t, err)
