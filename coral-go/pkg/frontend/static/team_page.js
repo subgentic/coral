@@ -220,6 +220,7 @@ function drawHeader() {
 
 function drawStatus(data) {
     const s = $('team-page-status'); if (!s) return;
+    clearTimeout(S.attentionTimer); S.attentionTimer = null;
     syncStop();
     S.statusData = data;
     const live = (state.liveSessions || []).filter(row => inTeam(row, S.team));
@@ -230,8 +231,15 @@ function drawStatus(data) {
     if (!data.agents.length) { s.textContent = ''; s.className = 'team-page-status'; const hb = $('team-page-health'); if (hb) hb.hidden = true; return; }
     const owed = Math.max(0, data.agents.filter(agent => ['needs_input', 'waiting'].includes(agent.availability) && !live.some(row => row.session_id === agent.session_id && row.wait_removed)).length - n); // agents the board says wait, that no live row here agrees with
     if (!owed) S.disagreeSince = 0; else if (!S.disagreeSince) S.disagreeSince = Date.now();
-    const settled = owed > 0 && Date.now() - S.disagreeSince > (Number(globalThis.__coralAttentionGraceMs) >= 0 ? Number(globalThis.__coralAttentionGraceMs) : 30000); // #15151: 'Checking attention status' is for a moment (the rows catch up); when the two still disagree after 30 s the board's word counts, it never stays
+    const graceMs = Number(globalThis.__coralAttentionGraceMs) >= 0 ? Number(globalThis.__coralAttentionGraceMs) : 30000;
+    const elapsed = Date.now() - S.disagreeSince;
+    const settled = owed > 0 && elapsed > graceMs; // #15151: 'Checking attention status' is for a moment (the rows catch up); when the two still disagree after 30 s the board's word counts, it never stays
     const uncertainAttention = owed > 0 && !settled;
+    if (uncertainAttention) {
+        // Wake/Reset can leave the next status read pending. Reconcile at the deadline without requiring another response or live-row event.
+        const team = S.team;
+        S.attentionTimer = setTimeout(() => { if (S.team === team && currentTeamPage()) drawStatus(S.statusData); }, Math.max(1, graceMs - elapsed + 1));
+    }
     const shown = n + (settled ? owed : 0);
     const waking = wakingSince(S.team) > 0;
     // no signal yet, or (right after Wake, while the read still says so) still asleep: nothing says they are well (#10006), and a just-woken team is counted as it reports (#10052, #10359)
