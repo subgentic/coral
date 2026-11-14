@@ -26,10 +26,12 @@ export const decisionOf = row => ({ ignore: 'dismiss', wait_dismiss: 'dismiss', 
 /** The kinds of action the folder's chips show (#15724, the Operator's pick of design B): the page opens on Everything, and a chip narrows the record to one kind. The full record stays one chip away. */
 export const KINDS = ['decisions', 'answers', 'permissions', 'files', 'words'];
 export const KIND_LABEL = { decisions: 'Decisions', answers: 'Answers', permissions: 'Permissions', files: 'Files and tasks', words: 'Words sent' };
+/** An answer to a dialog about trusting something (Codex's "Trust all and continue", a folder trust): the row keeps only the option's words, so the words decide. */
+export const isTrustAnswer = r => r.action === 'prompt_answer' && (r.title === 'Trust dialog' || /\btrust/i.test(String(r.note || ''))); // a newer row says it answered a trust dialog (title, whichever option: 'No, quit' too, #16129); an older one is told by its note's words
 const KIND_TEST = {
     decisions: r => !!DECISION_LABEL[decisionOf(r)] || ['goal_close', 'task_complete', 'task_cancel', 'goal_review'].includes(r.action), // Answered, Allowed, Denied, Approved, Closed, Completed and the like
     answers: r => r.action === 'answer' || r.action === 'proposal' || r.action === 'prompt_answer', // an agent's question answered (#16088)
-    permissions: r => r.action === 'prompt_allow' || r.action === 'prompt_reject', // a request to use a tool, allowed or refused: not a question's answer (#16088)
+    permissions: r => r.action === 'prompt_allow' || r.action === 'prompt_reject' || isTrustAnswer(r), // a request to use a tool, allowed or refused (#16088); a trust dialog's answer is a permission decision too, so it is in both lists (#16116)
     files: r => ['file', 'task', 'goal'].includes(r.item_kind) && r.action !== 'chat_send',
     words: r => ['message', 'chat_send', 'task_reply'].includes(r.action),
 };
@@ -37,7 +39,7 @@ export const inKind = (r, k) => !k || !!(KIND_TEST[k] && KIND_TEST[k](r));
 
 export const NO_GOAL = 'No goal';
 /** The agent a row is about, when the record says (#14445): who asked, for an ask (an older answer kept the asker as its title), or the agent named by a prompt, wait or chat row; '' for a row about no agent. */
-export const agentOf = row => String(row.asker || ((row.item_kind === 'agent' || /^(prompt_|wait_)/.test(row.action || '') || (row.action === 'answer' && row.item_kind === 'question')) ? (row.title || (row.item_kind === 'agent' ? row.item_id : '')) : '') || '').trim();
+export const agentOf = row => String(row.asker || ((row.item_kind === 'agent' || /^(prompt_|wait_)/.test(row.action || '') || (row.action === 'answer' && row.item_kind === 'question')) ? ((row.action === 'prompt_answer' ? row.item_id : row.title) || (row.item_kind === 'agent' ? row.item_id : '')) : '') || '').trim();
 /** The goal a row served: its title (the server looks it up now), else its number, else the words for none; a row from before the record kept goals has none. */
 export const goalOf = row => (row.goal_title ? String(row.goal_title).trim() : Number(row.goal_id) > 0 ? `Goal #${Number(row.goal_id)}` : NO_GOAL);
 export const ACTIONS = Object.keys(ACTION_LABEL);

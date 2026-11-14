@@ -1118,7 +1118,8 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	if body.TrustFolder != "" && isTrustYes(screen, opt) {
 		note = opt.Label + ": " + screen.TrustFolder // the grant can be found later: who, which agent, which folder (#14110)
 	}
-	noteActivity(r, row, "agent", name, "", "", note)
+	// The row says it answered a trust dialog, whichever option was taken (#16129).
+	noteActivity(r, row, "agent", name, "", trustDialogTitle(screen), note)
 	h.kickWS()                     // every screen showing the card takes the answer now
 	h.forgetDialog(body.SessionID) // the prompt was answered: it is not a dialog the agent is stuck at (#11437); the next pass reads the screen again
 	// One line on success too (#16398: a report that an answer "changed nothing" had no log to show whether it reached the terminal): who, which option, how it was sent, never the question or any typed text.
@@ -1480,4 +1481,31 @@ func markApprovalKinds(agentType, screenText string, s *promptScreen) {
 			s.Options[i].Kind = "allow_always" // the other Yes rows (don't ask again, always allow, switch mode): they last past this one answer
 		}
 	}
+}
+
+// activityTrustDialog is the title of an Activity row for an answer to a trust dialog (#16129): the dashboard files every such row under Permissions, whichever option was taken ("No, quit" and "Continue without
+// trusting" too, whose labels do not say "trust"). The page reads this word; it is a kind, not text from the screen.
+const activityTrustDialog = "Trust dialog"
+
+// trustDialogOf says whether the screen is a dialog that asks whether to trust something, by its structure and not by an option's words: Codex's hooks review ("Hooks need review"), Codex's "Do you trust the
+// files in this folder?" and Claude's folder-trust menu (it names its folder). An agent's own question that says "trust" is none of these.
+func trustDialogOf(s promptScreen) bool {
+	if s.TrustFolder != "" {
+		return true
+	}
+	for _, text := range []string{s.Title, s.Question} {
+		t := strings.ToLower(strings.TrimSpace(text))
+		if strings.HasPrefix(t, "hooks need review") || strings.HasPrefix(t, "do you trust the files") {
+			return true
+		}
+	}
+	return false
+}
+
+// trustDialogTitle is the Activity row's title for an answer to screen: the trust-dialog kind, or "".
+func trustDialogTitle(s promptScreen) string {
+	if trustDialogOf(s) {
+		return activityTrustDialog
+	}
+	return ""
 }

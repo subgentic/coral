@@ -60,7 +60,32 @@ assert.deepEqual(activityParts({action:'file_share',item_kind:'file',title:'plan
         assert.equal(activityParts(row, r => r.item_id).did, 'Answered');
         assert.equal(activityParts(row, r => r.item_id).on, `${row.item_id}’s question`);
         assert.ok(F.inKind(row, 'answers'), 'filed under Answers');
-        assert.ok(!(F.inKind(row, 'permissions')), 'not under Permissions');
+        assert.equal(F.inKind(row, 'permissions'), row === codex, 'under Permissions only when it is a trust decision (#16116)');
     }
     for (const action of ['prompt_allow', 'prompt_reject']) assert.ok(F.inKind({ action }, 'permissions'), action + ' stays under Permissions');
+}
+
+// #16116: a trust dialog's answer is a permission decision: under Permissions as well as Answers; a plain question answer stays out of Permissions.
+{
+    const F = await import('../../coral-go/pkg/frontend/static/operator_activity_filters.js');
+    const trust = { action: 'prompt_answer', item_kind: 'agent', item_id: 'coral-go', note: 'Trust all and continue' };
+    const folder = { action: 'prompt_answer', item_kind: 'agent', item_id: 'a', note: 'Yes, I trust this folder: /tmp/x' };
+    const choice = { action: 'prompt_answer', item_kind: 'agent', item_id: 'coral-hub', note: "On that group's own Coral" };
+    for (const r of [trust, folder]) { assert.ok(F.inKind(r, 'permissions'), r.note); assert.ok(F.inKind(r, 'answers'), r.note); }
+    assert.ok(!F.inKind(choice, 'permissions') && F.inKind(choice, 'answers'));
+}
+
+// #16129: a row that says it answered a trust dialog lists under Permissions whatever option was taken (no word 'trust' in "No, quit"); a row of an older make is told by its note, and a plain question stays out.
+{
+    const F = await import('../../coral-go/pkg/frontend/static/operator_activity_filters.js');
+    const quit = { action: 'prompt_answer', item_kind: 'agent', item_id: 'coral-go', title: 'Trust dialog', note: 'No, quit' };
+    const without = { action: 'prompt_answer', item_kind: 'agent', item_id: 'coral-go', title: 'Trust dialog', note: 'Continue without' };
+    const plain = { action: 'prompt_answer', item_kind: 'agent', item_id: 'coral-hub', title: '', note: 'Green' };
+    for (const r of [quit, without]) { assert.ok(F.inKind(r, 'permissions'), r.note); assert.ok(F.inKind(r, 'answers'), r.note); }
+    assert.ok(!F.inKind(plain, 'permissions') && F.inKind(plain, 'answers'));
+    // QA's reject of the first make: the row's title is the dialog's kind, so the words and the agent filter must still name the agent that was answered (its item)
+    assert.deepEqual(activityParts(quit, words), { did: 'Answered', on: 'coral-go’s question', detail: 'No, quit' }, 'the row says which agent was answered, not "Trust dialog’s question"');
+    assert.equal(F.agentOf(quit), 'coral-go', 'the agent filter and grouping see the agent, not the dialog kind');
+    assert.equal(F.agentOf(plain), 'coral-hub');
+    assert.deepEqual(activityParts(plain, words), { did: 'Answered', on: 'coral-hub’s question', detail: 'Green' });
 }

@@ -23,7 +23,7 @@ export const cleanAnswer = (note, asker) => {
 };
 /** @returns {{ did: string, on: string, detail: string }} the verb for YOU DID, the object for ON (what the record kept, else the kind), and the detail for its own line. `itemWords(row)` is the row's own object words (inbox_activity.js). */
 export function activityParts(row, itemWords) {
-    const obj = itemWords(row), who = row.title || row.item_id || 'an agent', note = String(row.note || '').trim();
+    const obj = itemWords(row), who = (row.action === 'prompt_answer' ? row.item_id : row.title || row.item_id) || 'an agent', note = String(row.note || '').trim(); // a prompt_answer row's title is the dialog's kind ('Trust dialog', #16129): the agent answered is its item
     const mk = (did, on, detail = '') => ({ did, on, detail: detail === FIXED_DISMISS_NOTE ? '' : detail });
     if (row.action === 'answer' && row.item_kind === 'question') { // a NEW row: the title is the ask's line and `asker` is who asked; an older row keeps the asker in the title
         const answer = note ? `Your answer: ${cleanAnswer(note, row.asker || row.title)}` : '';
