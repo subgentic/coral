@@ -15,7 +15,9 @@ tests/release/ldflags_build_test.sh | dryrun | every build script's -X flags tak
 tests/release/notes_commit_test.sh | dryrun | the notes commit's trailers are what the release reads
 tests/release/promote_copy_check_test.sh | dryrun | the pinned copy of promote.yml and main's are byte-identical when it changes
 tests/release/promote_workflow_test.py | dryrun | promote.yml's order of steps, permissions and pinned actions
+tests/release/release_body_test.sh | dryrun | the release page body is the tag's RELEASE_NOTES.md section, a missing section fails, no @mentions (#16503)
 tests/release/release_cadence_test.sh | dryrun | the release cadence table
+tools/release-body.py | release-only | builds the release page body from the tag's notes section at release time (its test runs in the dry run)
 tests/release/release_code_test.py | dryrun | the release code's TOTP check
 tests/release/release_homes_test.sh | dryrun | a tag is checked against the repository that built it (tools/release-homes.sh)
 tests/release/release_notes_edits_test.sh | dryrun | lines removed from a published body on purpose

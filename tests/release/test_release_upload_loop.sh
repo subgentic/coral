@@ -64,7 +64,10 @@ run_case() {
   mkdir -p "$dir"
   ( cd "$dir"
     for f in "$@"; do mkdir -p "$(dirname "$f")"; : > "$f"; done
-    [ -n "${NO_INSTALL_SH:-}" ] || echo '#!/usr/bin/env bash' > install.sh )  # the checkout's install.sh (#14097)
+    [ -n "${NO_INSTALL_SH:-}" ] || echo '#!/usr/bin/env bash' > install.sh   # the checkout's install.sh (#14097)
+    # the release body is the tag's RELEASE_NOTES.md section (#16503): the checkout's tool and notes, unless NO_NOTES_SECTION says the notes commit is missing
+    mkdir -p tools && cp "$ROOT/tools/release-body.py" tools/release-body.py
+    if [ -n "${NO_NOTES_SECTION:-}" ]; then printf '## v9.9.9 — other\n\nx\n' > RELEASE_NOTES.md; else printf '## v0.0.0-test — the test release\n\nnotes for the test @Someone\n' > RELEASE_NOTES.md; fi )
   export GH_LOG="$dir/gh.log"; : > "$GH_LOG"
   export COSIGN_LOG="$dir/cosign.log"; : > "$COSIGN_LOG"
   local rc=0
@@ -123,6 +126,10 @@ NO_RELEASE=1 FAIL_CREATE=1 run_case create-fails nonzero 0 0 "${ALL[@]}"
 grep -q '  install.sh$' "$WORK/case-all-present/SHA256SUMS.txt" || { echo "FAIL all-present: SHA256SUMS.txt does not list install.sh" >&2; failures=$((failures + 1)); }
 grep -q '^gh release upload .*stable/install.sh' "$WORK/case-all-present/gh.log" || { echo "FAIL all-present: install.sh was not uploaded" >&2; failures=$((failures + 1)); }
 NO_INSTALL_SH=1 run_case install-sh-missing nonzero 0 0 "${ALL[@]}"
+# the release body comes from RELEASE_NOTES.md, never --generate-notes (#16503): a tag with no section stops the step before the release is created or anything is uploaded
+NO_NOTES_SECTION=1 run_case notes-section-missing nonzero 0 0 "${ALL[@]}"
+grep -q '^gh release create .*--notes-file' "$WORK/case-new-release/gh.log" || { echo "FAIL new-release: the release was not created with --notes-file" >&2; failures=$((failures + 1)); }
+! grep -q -e '--generate-notes' "$WORK/case-new-release/gh.log" || { echo "FAIL new-release: the release was created with --generate-notes" >&2; failures=$((failures + 1)); }
 
 # The Coral For Dropbox tier is gone (#15075): a stale dropboxers build tag no longer drops the MSI, so a release with no MSI in the artifacts stops the step like any missing package (windows-missing).
 BUILD_TAGS=fts5,dropboxers NO_RELEASE=1 PRERELEASE=true run_case old-tier-needs-msi nonzero 3 0 "$LINUX" "$LINUX_ARM" "$DMG" "$ZIP"
