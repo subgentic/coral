@@ -247,7 +247,7 @@ document.addEventListener('click', async (e) => {
         } else {
             await save(c, key, body);
             paint(btn, true);
-            showToast('Saved.', false, 5000, { action: { label: 'View saved', onClick: () => importOnce('./saved.js').then(m => m.openSaved()).catch(() => {}) } });
+            showToast('Saved.', false, 5000, { action: { label: 'View Saved messages', onClick: () => importOnce('./saved.js').then(m => m.openSaved()).catch(() => {}) } });
         }
         document.dispatchEvent(new CustomEvent('coral:saved-changed'));
     } catch (err) {

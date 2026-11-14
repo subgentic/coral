@@ -168,7 +168,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         await ev(`document.querySelector('#inbox-page .wf-more > .btn').focus(); true`);
         await ev(`document.querySelector('#inbox-page .wf-more > .btn').click(); true`); // (a button's Enter is a click)
         mm = await more();
-        check('More opens its menu with Remove from saved focused (aria-expanded true)', mm.expanded === 'true' && mm.shown && mm.onItem && mm.item === 'Remove from saved', JSON.stringify(mm));
+        check('More opens its menu with Remove from saved focused (aria-expanded true)', mm.expanded === 'true' && mm.shown && mm.onItem && mm.item === 'Remove from Saved messages', JSON.stringify(mm));
         await key('Escape', 27);
         mm = await more();
         check('Escape closes the menu and returns to the More button', mm.expanded === 'false' && !mm.shown && mm.onToggle, JSON.stringify(mm));
