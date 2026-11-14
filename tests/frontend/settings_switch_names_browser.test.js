@@ -29,7 +29,7 @@ const REPEAT_OK = new Set([]);
         await coralReady(ev, 'startup', 'liveList', 'settings');
         const statusReads = () => ev(`performance.getEntriesByType('resource').filter(e => e.name.includes('/api/cloud/status')).length`);
         const readsBefore = await statusReads();
-        await ev(`(async () => { await window.showSettingsModal(); return true; })()`);
+        await ev(`(async () => { await window.showSettingsModal('cleanup'); return true; })()`); // Storage and cleanup in view: its Dropbox module loads when the pane is shown
         await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'Settings opens', 10000);
         // The Hub block re-hides its rows while it reads the status after Settings opens: wait for that first render, then show every pane and every row that is hidden until a state holds, so each switch is in the accessibility tree.
         await waitFor(`!!document.querySelector('#settings-cloud[data-cloud-bound]')`, 'the Hub block is bound', 10000);

@@ -107,6 +107,21 @@ CREATE TABLE IF NOT EXISTS custom_models (
 	PRIMARY KEY (family, value)
 );
 
+-- Custom permission modes (#15950): a name, an agent type and the launch flags (a JSON array of argv tokens) the mode adds. The set is replaced as a whole; custommodes.ValidateSet checks it
+-- when it is saved and every read and every launch checks it again. custom_modes_log has one row per save (when, how many, how many turn the prompts off), never the flags.
+CREATE TABLE IF NOT EXISTS custom_modes (
+	id         TEXT PRIMARY KEY,
+	agent_type TEXT NOT NULL,
+	name       TEXT NOT NULL,
+	flags      TEXT NOT NULL DEFAULT '[]',
+	position   INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS custom_modes_log (
+	at     TEXT NOT NULL,
+	modes  INTEGER NOT NULL,
+	bypass INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS saved_messages (
 	id         INTEGER PRIMARY KEY AUTOINCREMENT,
 	kind       TEXT NOT NULL,

@@ -117,6 +117,9 @@ func runStub() {
 		}
 	}
 	if out := os.Getenv(envFileVar); out != "" {
+		if ms, _ := strconv.Atoi(os.Getenv(pidDelayVar)); ms > 0 {
+			time.Sleep(time.Duration(ms) * time.Millisecond) // a slow start (a loaded -race run, a Windows process): the pid record comes late, or never when the start ends the child first
+		}
 		if f, err := os.OpenFile(out+".pids", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600); err == nil { // every stand-in started, so a test can see that none is left
 			fmt.Fprintln(f, os.Getpid())
 			f.Close()
@@ -219,6 +222,8 @@ func runStub() {
 
 // envFileVar names where the stand-in writes the environment it saw. Not a CORAL_, OPENCODE_ or XDG_ name: the server's environment filter keeps nothing of those, and this must reach the stand-in.
 const messagesFileVar = "STANDIN_MESSAGES_FOR_TESTS" // a file the stand-in answers the messages route with, newest first
+
+const pidDelayVar = "STANDIN_PID_DELAY_MS_FOR_TESTS" // the stand-in waits this long before it writes its pid record
 
 const listenDelayVar = "STANDIN_LISTEN_DELAY_MS_FOR_TESTS"
 

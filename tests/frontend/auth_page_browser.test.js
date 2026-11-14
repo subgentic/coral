@@ -148,11 +148,9 @@ const GOLD = n => fs.readFileSync(path.join(__dirname, '../../coral-go/internal/
         assert.deepEqual(posts[posts.length - 1], { url: '/auth/password', body: { password: 'right', keep: true } });
         // forgot password
         await open('signin');
-        await ev(`document.getElementById('show-forgot').click(); true`);
-        assert.ok(await visible('panel-forgot')); assert.ok(!(await visible('panel-signin')));
-        assert.equal(await text('reset-cmd'), 'coral reset-password');
-        await ev(`document.querySelector('#panel-forgot [data-back]').click(); true`);
-        assert.ok(await visible('panel-signin'));
+        assert.equal(await $('show-forgot', 'href'), BASE + '/static/password-reset.html');
+        assert.equal(await $('show-forgot', 'target'), '_blank');
+        assert.ok(!(await text('panel-signin')).includes('coral reset-password'));
         // API key fallback
         await ev(`document.getElementById('show-key').click(); true`);
         assert.ok(await visible('panel-key'));

@@ -48,9 +48,9 @@ const SENTENCE = 'Applies to every team; each team still turns its own check on 
         await ev(`(() => { document.querySelector('#settings-board-health-monitor').closest('.sv-row').scrollIntoView({ block: 'center' }); return true; })()`);
         for (const th of ['dark', 'light']) { await theme(th); await new Promise(r => setTimeout(r, 350)); await shot(`health-monitor-settings-${th}`); } // sleep-ok: the theme's colour transitions
         await theme('dark');
-        await ev(`document.getElementById('settings-board-health-monitor').click(); document.querySelector('[data-on-click="m-apply-settings"]').click(); true`);
-        await waitFor(`!document.getElementById('settings-modal') || getComputedStyle(document.getElementById('settings-modal')).display === 'none'`, 'Settings applied');
-        check('turning it off and Apply saves board_health_monitor false', (await saved()) === 'false', String(await saved()));
+        await ev(`document.getElementById('settings-board-health-monitor').click(); true`);
+        await waitFor(`document.getElementById('settings-board-health-monitor').closest('.sv-row').querySelector('.settings-save-status')?.textContent==='Saved'`, 'setting saved');
+        check('turning it off saves board_health_monitor false', (await saved()) === 'false', String(await saved()));
         await load(); await openSettings();
         check('reopened, it shows off', (await ev(`document.getElementById('settings-board-health-monitor').checked`)) === false);
 

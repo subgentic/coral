@@ -14,7 +14,7 @@ const names = new Set();
 for (const m of actions.matchAll(/Object\.assign\(window, \{([\s\S]*?)\n\}\);/g)) {
   for (const id of m[1].replace(/\/\/.*$/gm, '').matchAll(/\b([a-z][A-Za-z0-9]{5,})\b(?=\s*[,:}\n])/g)) names.add(id[1]);
 }
-assert.ok(names.has('selectLiveSession') && names.has('applySettings') && names.size > 60, 'the window entry points were read: ' + names.size);
+assert.ok(names.has('selectLiveSession') && names.has('showSettingsModal') && names.size > 60, 'the window entry points were read: ' + names.size);
 
 const found = {};
 for (const f of fs.readdirSync(here).filter(x => /\.(test\.js|test\.mjs)$|^text200_scenes\.js$/.test(x))) {

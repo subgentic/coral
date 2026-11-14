@@ -1,0 +1,11 @@
+/* The page header (design guidelines 4.2, #15814; page_header.js): row 1 is the title and its count, then More and the Primary at the far right; row 2 is the search, the filter strip and the filter icon. Loaded with the
+   module, not at start. The toolbar row's children keep their own look; this orders them (`order`) so the layout does not depend on the order they were drawn in. */
+.list-bar-search-row.gt-toolbar.page-header { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-md); }
+.list-bar-search-row.gt-toolbar.page-header > .inbox-folder-head { order: 1; flex: 1 1 auto; min-width: 0; }
+.list-bar-search-row.gt-toolbar.page-header > .page-header-actions { order: 2; display: inline-flex; align-items: center; gap: var(--space-md); margin-left: auto; flex: none; }
+.list-bar-search-row.gt-toolbar.page-header::before { content: ""; order: 3; flex: 0 0 100%; height: 0; } /* the line break between the rows */
+.list-bar-search-row.gt-toolbar.page-header > .list-bar-search-wrap { order: 4; flex: 1 1 14rem; min-width: 0; max-width: 26rem; }
+.list-bar-search-row.gt-toolbar.page-header > .team-tb-pills, .list-bar-search-row.gt-toolbar.page-header > .team-tb-select { order: 5; }
+.list-bar-search-row.gt-toolbar.page-header > .list-bar-toggle, .list-bar-search-row.gt-toolbar.page-header > .list-bar-more { order: 6; }
+.page-header-more { position: relative; display: inline-flex; }
+.page-header .page-header-actions .btn { margin: 0; }

@@ -29,9 +29,10 @@ const BASE = require('./test_base').BASE;
         check('and it is not on screen', (await ev(`document.querySelector('.skip-link').getClientRects().length`)) === 0);
         const tabs = await stops(16);
         check('and it is not a Tab stop', !tabs.some(x => /Skip to message box/.test(x)), JSON.stringify(tabs));
-        // Enter in the chat's Find works at this size: Ctrl+F opens it, the typed words are counted, Enter steps to the next match
+        // Enter in the chat's Find works at this size: the platform's Find key opens it, the typed words are counted, Enter steps to the next match
         await ev(`document.getElementById('command-input').blur(); true`);
-        await Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'f', code: 'KeyF', windowsVirtualKeyCode: 70, modifiers: 2 }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'f', code: 'KeyF', windowsVirtualKeyCode: 70, modifiers: 2 });
+        const FIND_MOD = (await ev(`navigator.platform.includes('Mac')`)) ? 4 : 2; // the platform's own key: Cmd on a Mac, Ctrl elsewhere (#15798; the Mac run of this suite sent Ctrl and timed out, #16237)
+        await Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'f', code: 'KeyF', windowsVirtualKeyCode: 70, modifiers: FIND_MOD }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'f', code: 'KeyF', windowsVirtualKeyCode: 70, modifiers: FIND_MOD });
         await waitFor(`!!document.querySelector('.chat-find-bar') && !document.querySelector('.chat-find-bar').hidden`, 'Ctrl+F opens Find', 5000);
         await ev(`document.querySelector('.chat-find-input').focus(); true`);
         await key('Enter');

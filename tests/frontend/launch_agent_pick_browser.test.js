@@ -88,6 +88,15 @@ const { coralReady } = require('./helpers/wait');
             s = await state();
             check(`${tag}: nobody chose: the late answers order the installed first and start on Codex`, JSON.stringify(s.cards) === JSON.stringify(['Codex', 'Pi']) && s.setup && s.checked === 'codex', JSON.stringify([s.cards, s.setup, s.checked]));
             await ev(`window.hideLaunchModal(); true`);
+            // the person typed a model for the default agent before the late answers came (#16210, the Windows dialog_requests_golden flake): the answers must not move the provider under it and wipe the model
+            await stub(['codex', 'pi'], 600);
+            await open(false);
+            await ev(`(() => { const c = document.getElementById('launch-agent-acf'), m = c.querySelector('.acf-model'); c.dataset.acfModelDirty = 'true'; m.value = 'claude-opus-4'; m.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+            await waitFor(`document.getElementById('launch-agent-pick').dataset.probed === '1'`, 'the late answers', 8000);
+            s = await state();
+            const kept = await ev(`document.querySelector('#launch-agent-acf .acf-model').value`);
+            check(`${tag}: a model the person set stays: the late answers do not move the agent under it`, s.select === 'claude' && kept === 'claude-opus-4', JSON.stringify([s.select, kept]));
+            await ev(`window.hideLaunchModal(); true`);
         }
     } finally { /* the harness closes the page */ }
     const failed = results.filter(r => !r).length;

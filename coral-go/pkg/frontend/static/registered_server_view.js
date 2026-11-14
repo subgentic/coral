@@ -38,7 +38,7 @@ let _host = null;         // the Servers tab body (#3070); there is no separate 
 let _ssh = null;          // the set-up-over-SSH flow (#11370) while it is open: { mode: 'setup' } or { mode: 'manage', server, action, deleteData }; its own module draws into #servers-ssh-host
 let _sshView = null;      // what that module returned ({ unmount })
 
-const PLAN_WORDS = { stop: ['Stopping Coral', 'Stop finished', 'Stop did not finish'], upgrade: ['Upgrading Coral', 'Upgrade finished', 'Upgrade did not finish'], remove: ['Uninstalling Coral', 'Uninstall finished', 'Uninstall did not finish'] };
+const PLAN_WORDS = { start: ['Starting Coral', 'Start finished', 'Start did not finish'], stop: ['Stopping Coral', 'Stop finished', 'Stop did not finish'], upgrade: ['Upgrading Coral', 'Upgrade finished', 'Upgrade did not finish'], remove: ['Uninstalling Coral', 'Uninstall finished', 'Uninstall did not finish'] };
 /** What the hub is doing to this computer, in words: "Stopping Coral", or how the last one ended; '' when it has no setup running or finished. */
 const planWord = s => { const p = _plans.get(s.id); const w = p && PLAN_WORDS[p.kind]; return w ? w[p.phase === 'done' ? 1 : p.phase === 'failed' ? 2 : 0] : ''; };
 /** Read the hub's running and just-finished setups for its computers: one request, and a redraw only when something changed. A hub with no such route (a Coral that is not a hub, an older one) has none. */
@@ -184,6 +184,12 @@ function upgradeControl(s, remoteVersion, busy) {
     const label = order === null ? 'Upgrade' : `${order > 0 ? 'Downgrade' : 'Upgrade'} to v${escHtml(hub)}`;
     return `<button type="button" class="btn${order < 0 ? ' btn-primary' : ''}" data-action="ssh-upgrade" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>${label}</button>`;
 }
+/** Start Coral (#15998) for a computer set up over SSH that does not answer: the hub starts the release installed there, with its kept data folder, backend and port. Not shown while it answers or for a status that
+ *  says it does (a key it cannot read, a refused host). */
+function startControl(s, status, busy) {
+    if (status !== 'unreachable' && status !== 'offline') return '';
+    return `<button type="button" class="btn btn-primary" data-action="ssh-start" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Start Coral</button>`;
+}
 const RECONNECT_HINT = "Checks the computer now and restarts the hub's connection to it.";
 
 /** A server's page: its facts, what to do about a problem, and Test, Edit and Remove in a bar pinned at its foot (Remove the danger button, the primary last). */
@@ -215,7 +221,7 @@ function pageHtml(s) {
            <button type="button" class="btn" data-action="reconnect" data-id="${escHtml(s.id)}" aria-describedby="reconnect-hint-${escHtml(s.id)}" title="${escHtml(RECONNECT_HINT)}"${busy ? ' disabled' : ''}${busy && _busyVerb === 'reconnect' ? ' aria-busy="true"' : ''}>${busy && _busyVerb === 'reconnect' ? 'Reconnecting...' : 'Reconnect'}</button>
            <span class="sr-only" id="reconnect-hint-${escHtml(s.id)}">${escHtml(RECONNECT_HINT)}</span>
            <button type="button" class="btn" data-action="edit" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Edit</button>
-           ${s.transport === 'ssh' && !running ? `${upgradeControl(s, version, busy)}
+           ${s.transport === 'ssh' && !running ? `${startControl(s, status, busy)}${upgradeControl(s, version, busy)}
            ${s.owner_stamp ? '' : `<button type="button" class="btn" data-action="ssh-approvals" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Set up approvals</button>`}
            <button type="button" class="btn" data-action="ssh-stop" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Stop Coral</button>
            <button type="button" class="btn btn-danger" data-action="ssh-remove" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Uninstall</button>` : ''}
@@ -380,7 +386,7 @@ async function onClick(e) {
         return render();
     }
     if (action === 'ssh-back') { closeSsh(); _focusNext = 'row'; return render(); }
-    if (action === 'ssh-upgrade' || action === 'ssh-stop' || action === 'ssh-remove' || action === 'ssh-approvals') {
+    if (action === 'ssh-upgrade' || action === 'ssh-start' || action === 'ssh-stop' || action === 'ssh-remove' || action === 'ssh-approvals') {
         const s = _servers.find(x => x.id === id);
         if (!s) return;
         _ssh = { mode: 'manage', server: { id: s.id, label: s.label }, action: action.slice(4) };

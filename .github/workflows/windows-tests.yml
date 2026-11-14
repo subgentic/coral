@@ -358,8 +358,8 @@ jobs:
       - name: cloud-mode frontend tests
         run: npm run test:cloud
 
-  # The dashboard CDP suites on Windows (#106: 39 of them failed there and no CI ran them), in six parts by recorded duration
-  # (--part K/6: each default-mode suite in exactly one part; the sequences and the strict phase stay on cdp-gate.yml's Linux
+  # The dashboard CDP suites on Windows (#106: 39 of them failed there and no CI ran them), in eight parts by recorded duration
+  # (--part K/8: each default-mode suite in exactly one part; the sequences and the strict phase stay on cdp-gate.yml's Linux
   # runs). Same rules as cdp-gate.yml: one retry per suite, a suite that passes only on its retry fails the part, a suite that
   # leaves settings changed fails it (--fail-on-leak), stub agent CLIs first on PATH so no real CLI can start (#4354), nothing
   # cached. Chrome is the runner image's. The runner's run folder is put under runner.temp (TEMP/TMP), so the logs of a failed
@@ -367,24 +367,26 @@ jobs:
   cdp:
     name: cdp (windows-latest, ${{ matrix.name }})
     runs-on: windows-latest
-    # Six parts (was three: the slowest took 57 to 59 minutes, run 42511236486 57.9, and one slow runner was cancelled at 60, run 42389966511): about 24 to 29 minutes each, so 45 leaves headroom (#14722, #14308).
+    # Eight parts (was six, run about 35 min; three before that: the slowest took 57 to 59 minutes, run 42511236486 57.9, and one slow runner was cancelled at 60, run 42389966511): about 21 suite-minutes each on the measured Windows times (a run about 26 min, #14722), so 45 leaves headroom (#14722, #14308).
     timeout-minutes: 45
     env:
       CORAL_TELEMETRY_DISABLED: "1"
     strategy:
       fail-fast: false
       matrix:
-        # The six parts of the default run, then the strict phase (suites against a Coral with strict local auth, signed in through 'coral open --print'), as cdp-gate.yml runs
+        # The eight parts of the default run, then the strict phase (suites against a Coral with strict local auth, signed in through 'coral open --print'), as cdp-gate.yml runs
         # it on Linux (#6265). The tmux phase and the sequences have no Windows form: the sequence's Coral starts with --backend tmux ("tmux is required to launch agents"), so
         # terminal_pane_size (which drives tmux itself) stays on Linux and macOS; its partner terminal_scroll already runs in a default part. --no-tmux: a --strict run would
         # otherwise add the tmux shard too (9 suites that cannot start here).
         include:
-          - { name: "part 1/6", args: "--part 1/6", id: "1" }
-          - { name: "part 2/6", args: "--part 2/6", id: "2" }
-          - { name: "part 3/6", args: "--part 3/6", id: "3" }
-          - { name: "part 4/6", args: "--part 4/6", id: "4" }
-          - { name: "part 5/6", args: "--part 5/6", id: "5" }
-          - { name: "part 6/6", args: "--part 6/6", id: "6" }
+          - { name: "part 1/8", args: "--part 1/8", id: "1" }
+          - { name: "part 2/8", args: "--part 2/8", id: "2" }
+          - { name: "part 3/8", args: "--part 3/8", id: "3" }
+          - { name: "part 4/8", args: "--part 4/8", id: "4" }
+          - { name: "part 5/8", args: "--part 5/8", id: "5" }
+          - { name: "part 6/8", args: "--part 6/8", id: "6" }
+          - { name: "part 7/8", args: "--part 7/8", id: "7" }
+          - { name: "part 8/8", args: "--part 8/8", id: "8" }
           - { name: "strict", args: "--strict --no-tmux", id: "strict" }
     defaults:
       run:

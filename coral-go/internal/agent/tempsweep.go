@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"github.com/subgentic/coral/internal/logsafe"
 	"log/slog"
 	"os"
@@ -32,6 +33,9 @@ type TempSweep struct {
 	Running func() (string, error)
 	// Now is the clock (tests).
 	Now func() time.Time
+	// Ctx, when set, bounds the sweep: once it ends, no more files are looked at or removed (the rest are kept). A folder of hundreds of thousands of files must not keep a sweep
+	// running past its minute (#357, Security).
+	Ctx context.Context
 }
 
 // SweepStaleTempFiles removes, from dir, the launch temp files left by agents that are gone
@@ -57,13 +61,16 @@ func SweepStaleTempFiles(dir string, opt TempSweep) []string {
 	type candidate struct{ path, sessionID string }
 	var cands []candidate
 	for _, e := range entries {
+		if opt.Ctx != nil && opt.Ctx.Err() != nil {
+			return nil // out of time: keep everything not yet looked at
+		}
 		m := staleTempFileName.FindStringSubmatch(e.Name())
 		if m == nil || !isCanonicalUUID(m[2]) {
 			continue
 		}
 		path := filepath.Join(dir, e.Name())
 		info, err := os.Lstat(path)
-		if err != nil || !info.Mode().IsRegular() || !ownedByCurrentUser(info) || now().Sub(info.ModTime()) <= opt.MinAge {
+		if err != nil || !info.Mode().IsRegular() || !ownedByCurrentUser(path, info) || now().Sub(info.ModTime()) <= opt.MinAge {
 			continue
 		}
 		cands = append(cands, candidate{path, m[2]})
@@ -78,16 +85,19 @@ func SweepStaleTempFiles(dir string, opt TempSweep) []string {
 	}
 	var removed []string
 	for _, c := range cands {
+		if opt.Ctx != nil && opt.Ctx.Err() != nil {
+			break // out of time: the rest stay for the next start
+		}
 		// A file's name carries its session id, so a process naming the file names the id too.
 		if opt.Live(c.sessionID) || strings.Contains(procs, c.sessionID) || (opt.Ended != nil && !opt.Ended(c.sessionID)) {
 			continue
 		}
 		// Checked again just before removing it: the same file, still a regular one of ours.
 		info, err := os.Lstat(c.path)
-		if err != nil || !info.Mode().IsRegular() || !ownedByCurrentUser(info) {
+		if err != nil || !info.Mode().IsRegular() || !ownedByCurrentUser(c.path, info) {
 			continue
 		}
-		if err := os.Remove(c.path); err != nil {
+		if err := removeOwnedFile(c.path); err != nil {
 			slog.Debug("launch temp file sweep: could not remove", "path", logsafe.Dir(c.path), "error", err)
 			continue
 		}

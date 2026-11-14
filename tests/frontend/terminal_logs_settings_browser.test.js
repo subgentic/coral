@@ -97,8 +97,7 @@ const MIB = 1024 ** 2;
         await ev(`document.documentElement.style.fontSize = '32px'; true`);
         // Reproduce late form population after a prior open: its snapshot is now dirty.
         // This fixture resets the dialog, rather than testing its Discard confirmation.
-        await ev(`(() => { const size = document.getElementById('settings-terminal-font-size'); size.value = size.value === '18' ? '10' : '18'; const show = window.showSettingsModal; window.__settingsReopened = false; window.showSettingsModal = async (...args) => { await show(...args); await ${framesJs(2)}; window.__settingsReopened = true; }; return true; })()`);
-        assert.equal(await ev(`import((window.__coralStatic || '/static/') + 'settings_form.js').then(m => m.unsavedFields())`), true, 'late form population differs from the previous open snapshot');
+        await ev(`(() => { const show = window.showSettingsModal; window.__settingsReopened = false; window.showSettingsModal = async (...args) => { await show(...args); await ${framesJs(2)}; window.__settingsReopened = true; }; return true; })()`);
         await openSettings();
         assert.equal(await ev(`window.__settingsReopened`), true, 'openSettings awaits the asynchronous open, not the retained status line');
         await sleep(400); // sleep-ok: the font-size layout settles

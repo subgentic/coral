@@ -2,7 +2,7 @@
 # Build coral-go Windows portable ZIP (cross-compiled from Linux/macOS)
 #
 # Usage: ./installers/build-windows.sh [version]
-#   Set CORAL_TIER=dev|beta to select build tier. Default: prod (license required).
+#   Set CORAL_TIER=dev to select build tier. Default: prod (license required).
 # Output: installers/dist/coral-windows-amd64.zip
 
 set -euo pipefail
@@ -22,12 +22,9 @@ BUILD_TAGS=""
 if [ "$CORAL_TIER" = "dev" ]; then
     BUILD_TAGS="-tags dev"
     echo "==> Tier: dev (EULA skipped)"
-elif [ "$CORAL_TIER" = "dropboxers" ]; then
-    BUILD_TAGS="-tags dropboxers"
-    echo "==> Tier: dropboxers (EULA skipped)"
-elif [ "$CORAL_TIER" = "beta" ]; then
-    BUILD_TAGS="-tags beta"
-    echo "==> Tier: beta (EULA required, same as prod)"
+elif [ "$CORAL_TIER" = "dropboxers" ] || [ "$CORAL_TIER" = "beta" ]; then
+    echo "error: the $CORAL_TIER tier was removed (#15075); use CORAL_TIER=dev or leave it unset for prod" >&2
+    exit 2
 else
     echo "==> Tier: prod (EULA required)"
 fi
@@ -50,7 +47,6 @@ if [ "$VERSION" != "dev" ]; then
     }
     trap restore_syso EXIT
     PRODUCT="Coral"
-    [ "$CORAL_TIER" = "dropboxers" ] && PRODUCT="Coral For Dropbox"
     "$PROJECT_DIR/tools/gen_windows_resources.sh" "$VERSION" "$PRODUCT"
 fi
 

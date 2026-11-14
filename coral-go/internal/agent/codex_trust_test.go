@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"runtime"
 	"strings"
 	"testing"
 
@@ -50,50 +49,26 @@ func TestCodexHookTrustArgsShape(t *testing.T) {
 	assert.NotContains(t, strings.Join(args, " "), "bypass", "never Codex's --dangerously-bypass-hook-trust")
 }
 
-// The trust is given only with the switch on, on Windows, and only for a hooks folder nobody but an administrator can
-// change; otherwise there is none and Codex shows its dialog as before.
-func TestCodexHookTrustNeedsTheSwitchAndAProtectedFolder(t *testing.T) {
-	oldSafe := codexHooksFolderSafe
-	t.Cleanup(func() { codexHooksFolderSafe = oldSafe; codexTrustSwitch.Store(nil) })
+// The trust is given on every OS while the switch is on (#16008), whatever folder the hook tool is in; off, there is none and
+// Codex shows its dialog as before. The hooks themselves are always passed.
+func TestCodexHookTrustFollowsTheSwitchOnEveryOS(t *testing.T) {
+	t.Cleanup(func() { codexTrustSwitch.Store(nil) })
 	withHookTool(t)
 
-	for _, tc := range []struct {
-		name   string
-		on     bool
-		safe   bool
-		trusts bool
-	}{
-		{"switch on, protected folder", true, true, true},
-		{"switch on, folder others can change", true, false, false},
-		{"switch off, protected folder", false, true, false},
-		{"switch off, folder others can change", false, false, false},
-	} {
-		on, safe := tc.on, tc.safe
+	for _, on := range []bool{true, false} {
 		SetCodexHookTrust(func() bool { return on })
-		codexHooksFolderSafe = func(string) (bool, string) {
-			if safe {
-				return true, ""
-			}
-			return false, "this user can change it"
-		}
 		trusted, why := CodexHookTrust()
-		args := strings.Join(codexHookArgs("sid-"+tc.name), " ")
-		if runtime.GOOS != "windows" {
-			assert.False(t, trusted, tc.name)
-			if tc.on {
-				assert.Contains(t, why, "only on Windows", tc.name)
-			} else {
-				assert.Contains(t, why, "turned off in Settings", tc.name)
-			}
-			assert.NotContains(t, args, "hooks.state", tc.name)
-			continue
+		args := strings.Join(codexHookArgs("sid"), " ")
+		assert.Equal(t, on, trusted, "switch %v: %s", on, why)
+		assert.Equal(t, on, strings.Contains(args, "hooks.state={"), "switch %v", on)
+		assert.NotContains(t, args, "bypass", "never Codex's --dangerously-bypass-hook-trust")
+		assert.Contains(t, args, "hooks.SessionStart=", "the hooks themselves are always passed")
+		if !on {
+			assert.Contains(t, why, "turned off in Settings")
 		}
-		assert.Equal(t, tc.trusts, trusted, "%s: %s", tc.name, why)
-		assert.Equal(t, tc.trusts, strings.Contains(args, "hooks.state={"), tc.name)
-		assert.Contains(t, args, "hooks.SessionStart=", "%s: the hooks themselves are always passed", tc.name)
 	}
 	codexTrustSwitch.Store(nil)
-	codexHooksFolderSafe = func(string) (bool, string) { return true, "" }
 	trusted, _ := CodexHookTrust()
-	assert.Equal(t, runtime.GOOS == "windows", trusted, "unset is on")
+	assert.False(t, trusted, "unwired is off: a launch nobody told the person's choice never trusts (#16128)")
+	assert.NotContains(t, strings.Join(codexHookArgs("sid"), " "), "hooks.state={", "and passes no trust")
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/secrets"
+	"github.com/subgentic/coral/internal/semverorder"
 )
 
 // Starting the installed Coral on the far computer and reading what the hub needs to register it (#11370). The remote listens on its own loopback only (--host 127.0.0.1); the hub reaches it
@@ -53,13 +54,15 @@ func (r Runner) AcceptTerms(ctx context.Context, t Target, version string, paylo
 var (
 	stopWait = 15 * time.Second
 	stopPoll = time.Second
+	// stopKillWait is how long a Coral that outlived stopWait is given after the escalation (SIGKILL) before the stop is refused.
+	stopKillWait = 5 * time.Second
 )
 
 // SetStopTimingForTest shortens how long StopAndConfirm waits (other packages' tests run it against a Coral that will not stop); it returns the function that puts the old values back.
 func SetStopTimingForTest(wait, poll time.Duration) (restore func()) {
-	oldW, oldP := stopWait, stopPoll
-	stopWait, stopPoll = wait, poll
-	return func() { stopWait, stopPoll = oldW, oldP }
+	oldW, oldP, oldK := stopWait, stopPoll, stopKillWait
+	stopWait, stopPoll, stopKillWait = wait, poll, wait
+	return func() { stopWait, stopPoll, stopKillWait = oldW, oldP, oldK }
 }
 
 // ErrNotStopped is a Coral that is still there after a stop (a session, or a process of this user running it), or one that could not be checked.
@@ -88,7 +91,7 @@ func (r Runner) StopAndConfirm(ctx context.Context, t Target) error {
 	if _, err := r.Run(ctx, t, CmdStopTmux); err != nil { // a Coral set up before the daemon start lives in this session
 		return err
 	}
-	deadline := time.Now().Add(stopWait)
+	deadline, escalated := time.Now().Add(stopWait), false
 	for {
 		res, err := r.Run(ctx, t, CmdCheckStopped)
 		if err != nil {
@@ -97,8 +100,18 @@ func (r Runner) StopAndConfirm(ctx context.Context, t Target) error {
 		if res.ExitCode == 0 {
 			return nil
 		}
-		if res.ExitCode == CannotTell || time.Now().After(deadline) {
+		if res.ExitCode == CannotTell {
 			return &NotStoppedError{Found: res.ExitCode}
+		}
+		if time.Now().After(deadline) {
+			// a Coral that ignored the SIGTERM for the whole grace period (#15997): SIGKILL it, this install's processes only, and give it one short wait more
+			if escalated || res.ExitCode != StillProcess {
+				return &NotStoppedError{Found: res.ExitCode}
+			}
+			if _, err := r.Run(ctx, t, CmdKillStuck); err != nil {
+				return err
+			}
+			escalated, deadline = true, time.Now().Add(stopKillWait)
 		}
 		select {
 		case <-ctx.Done():
@@ -213,6 +226,34 @@ func (e *StartError) Error() string {
 	return "sshprov: could not start Coral (exit code " + strconv.Itoa(e.ExitCode) + ")"
 }
 func (e *StartError) Is(target error) bool { return target == ErrStartFailed }
+
+// ErrNothingInstalled is a computer with no runnable release under the install folder: there is nothing to start (an upgrade installs one).
+var ErrNothingInstalled = errors.New("sshprov: no release is installed on that computer")
+
+// LatestInstalled is the newest release installed under the install folder (CmdListInstalled): the one a Start Coral starts. A folder name that is not a release version the hub can read is ignored.
+func (r Runner) LatestInstalled(ctx context.Context, t Target) (string, error) {
+	res, err := r.Run(ctx, t, CmdListInstalled)
+	if err != nil {
+		return "", err
+	}
+	best, bestV := "", semverorder.Version{}
+	for _, f := range strings.Fields(res.Stdout) {
+		if !versionRe.MatchString(f) {
+			continue
+		}
+		v, ok := semverorder.Parse(f)
+		if !ok {
+			continue
+		}
+		if best == "" || semverorder.Compare(v, bestV) > 0 {
+			best, bestV = f, v
+		}
+	}
+	if best == "" {
+		return "", ErrNothingInstalled
+	}
+	return best, nil
+}
 
 // StopWait is how long StopAndConfirm gives a stopped Coral to be gone.
 func StopWait() time.Duration { return stopWait }
@@ -336,4 +377,46 @@ func (r Runner) PortHolder(ctx context.Context, t Target, port int) (int, string
 	}
 	pid, _ := strconv.Atoi(m[1])
 	return pid, m[2]
+}
+
+// RunningHome is the data folder the running Coral of this install was started with (#16021): its --home, read from its command line. kind is "rel" (path is relative to the home folder there), "abs" (an
+// absolute path outside it), "relative" (a --home the hub cannot place) or "" when no Coral of this install runs or it has no --home.
+func (r Runner) RunningHome(ctx context.Context, t Target) (kind, path string, err error) {
+	res, err := r.Run(ctx, t, CmdReadRunningHome)
+	if err != nil {
+		return "", "", err
+	}
+	if res.ExitCode != 0 {
+		return "", "", &StartError{ExitCode: res.ExitCode}
+	}
+	k, p, _ := strings.Cut(strings.TrimSpace(res.Stdout), " ")
+	switch k {
+	case "rel", "abs", "relative":
+		return k, p, nil
+	}
+	return "", "", nil
+}
+
+// IsCoralDataDir reports whether the absolute folder is a Coral data folder this user owns (a sessions.db in it, no link).
+func (r Runner) IsCoralDataDir(ctx context.Context, t Target, dir string) bool {
+	if !absDirRe.MatchString(dir) {
+		return false
+	}
+	res, err := r.Run(ctx, t, CmdCheckDataDir, dir)
+	return err == nil && res.ExitCode == 0
+}
+
+// RecordDataDir makes the start after an upgrade keep the folder: a relative one DataDirProblem passes, or an absolute one IsCoralDataDir passed.
+func (r Runner) RecordDataDir(ctx context.Context, t Target, dir string) error {
+	if !recordDirRe.MatchString(dir) || (!strings.HasPrefix(dir, "/") && DataDirProblem(dir) != "") {
+		return errors.New("sshprov: not a data folder that can be kept")
+	}
+	res, err := r.Run(ctx, t, CmdRecordDataDir, dir)
+	if err != nil {
+		return err
+	}
+	if res.ExitCode != 0 {
+		return &StartError{ExitCode: res.ExitCode}
+	}
+	return nil
 }

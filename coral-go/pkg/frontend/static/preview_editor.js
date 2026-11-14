@@ -1,6 +1,6 @@
 /* The active preview editor and read-only diff, including capture and disposal. */
 import { escapeHtml } from './utils.js';
-import { getCm, getLangExtension, getLangFromPath, DIFF_CONFIG, cmHost, cmTheme } from './cm_util.js';
+import { getCm, getLangExtension, getLangFromPath, diffMergeView, plainWholeLineMarks, cmHost, cmTheme } from './cm_util.js';
 import { retryOnce } from './overload.js';
 import { _renderContentView } from './preview_content.js';
 
@@ -86,11 +86,12 @@ export function createPreviewEditor({ _activeTab, _isDirty, _renderTabs, _fileUr
                     cm.EditorView.theme({ '&': { height: '100%' }, '.cm-scroller': { overflow: 'auto' } }),
                     // diffConfig: the merge view's own scanLimit would otherwise return one chunk.
                     // mergeControls off: the view is read-only, so its Accept and Reject buttons would do nothing when clicked.
-                    cm.unifiedMergeView({ original: cm.Text.of(tab.originalContent.split('\n')), diffConfig: DIFF_CONFIG, mergeControls: false }),
+                    diffMergeView(cm, tab.originalContent, tab.content),
                 ];
                 const langExt = getLangExtension(cm, getLangFromPath(tab.filepath));
                 if (langExt) extensions.push(langExt);
                 _cmView = new cm.EditorView({ state: cm.EditorState.create({ doc: tab.content, extensions }), parent: host });
+                plainWholeLineMarks(_cmView);
                 return;
             } catch (e) {
                 console.error('[coral] CodeMirror merge view creation failed:', e);

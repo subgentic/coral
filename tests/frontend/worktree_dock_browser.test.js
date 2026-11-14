@@ -15,7 +15,7 @@ const S = `(window.__coralStatic || '/static/')`;
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; await sleep(300); /* sleep-ok: a screenshot waits out transitions */ fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const WT = n => ({ state: 'kept', path: `/tmp/wt/team-${n}`, branch: `coral-team/team-${n}`, reason: 'it has uncommitted changes' });
     const MEASURE = `(() => { const r = s => { const e = document.querySelector(s); if (!e || !e.getClientRects().length) return null; const b = e.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, left: b.left, right: b.right }; };
-        const dock = r('#worktree-dock'); const others = { toggle: r('.live-view-toggle') || r('#live-view-switch'), box: r('#command-input'), toolbar: r('#command-toolbar'), header: r('#live-agent-header, .agent-header') };
+        const dock = r('#worktree-dock'); const others = { more: r('#agent-bar-more') || r('.live-view-toggle'), /* the Chat/Terminal switch is in the header's More on a phone since #15859: the More button is what the bar must not cover */ box: r('#command-input'), toolbar: r('#command-toolbar'), header: r('#live-agent-header, .agent-header') };
         const hit = (a, b) => a && b && a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top < b.bottom - 0.5 && a.bottom > b.top + 0.5;
         const line = document.querySelector('#worktree-dock .worktree-dock-line'); const lb = line && line.getBoundingClientRect();
         return { dock, overlaps: Object.entries(others).filter(([k, o]) => hit(dock, o)).map(([k]) => k), seen: Object.entries(others).filter(([, o]) => o).map(([k]) => k), inside: !!dock && dock.bottom <= innerHeight + 0.5 && dock.left >= -0.5 && dock.right <= innerWidth + 0.5,
@@ -40,7 +40,7 @@ const S = `(window.__coralStatic || '/static/')`;
                     await Emulation.setDeviceMetricsOverride({ width: w, height: vh, deviceScaleFactor: 1, mobile: true });
                     await sleep(400); // sleep-ok: the layout settles after a resize
                     const m = await ev(MEASURE);
-                    check(`${tag}, ${kb}: the bar overlaps nothing (${m.seen.join(', ')}) and is inside the screen`, m.dock && m.overlaps.length === 0 && m.inside && m.seen.includes('toggle'), JSON.stringify(m));
+                    check(`${tag}, ${kb}: the bar overlaps nothing (${m.seen.join(', ')}) and is inside the screen`, m.dock && m.overlaps.length === 0 && m.inside && m.seen.includes('more'), JSON.stringify(m));
                     check(`${tag}, ${kb}: closed it is a line of 44 px or more and does not take the screen (at most half of it)`, m.lineH >= 44 && m.docH <= m.vh / 2, `${m.lineH} px line, ${m.docH} of ${m.vh} px`);
                     if (pct === 200) check(`${tag}, ${kb}: at large text the closed bar is one row: the title (it opens the details) and the x, with Copy path inside the disclosure`, m.buttons.length === 2 && m.buttons[1] === '×' && m.buttons[0] === 'Worktree kept' && m.lineH <= 80, JSON.stringify([m.buttons, m.lineH]));
                     if (pct === 100) check(`${tag}, ${kb}: it is one row (title, Copy path, Details and × side by side)`, m.lineH <= 48, `${m.lineH} px`);

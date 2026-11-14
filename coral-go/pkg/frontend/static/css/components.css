@@ -735,6 +735,9 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     margin-top: 16px;
 }
 
+/* One dialog footer (#15816, guideline 4.8): Cancel then the one Primary at the right; a destructive action is a Quiet button alone at the far left, whatever its place in the markup. */
+.modal-actions > .btn-quiet.btn-danger { order: -1; margin-inline-end: auto; border-color: transparent; background: transparent; } /* Quiet: no box (the later .btn-danger edge in theme-configurator.css would draw one) */
+
 .launch-modal-step {
     flex: 1;
     flex-direction: column;
@@ -1966,6 +1969,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     font-size: var(--fs-sm);
     color: var(--text-muted);
 }
+div.overflow-menu-note { margin: 0; padding: 6px 12px 2px; } /* a row menu's first line: why the agent is asleep (#15819) */
 
 .overflow-menu-divider {
     border: none;
@@ -3030,26 +3034,14 @@ button.auto-accept-header-off { display: inline-flex; align-items: center; margi
 button.auto-accept-header-off:hover { color: var(--text-primary); border-color: rgba(var(--warning-rgb), 0.6); }
 button.auto-accept-header-off:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-/* An agent whose terminal is gone (#3218): on its row and in the header; a click restarts it. */
-.terminal-gone-chip {
-    display: inline-flex;
-    align-items: center;
-    flex-shrink: 0;
-    margin-left: 4px;
-    padding: 0 5px;
-    border-radius: var(--radius-sm);
-    font: inherit;
-    font-size: var(--fs-sm);
-    font-weight: var(--fw-strong);
-    line-height: 16px;
-    color: var(--error);
-    background: rgba(var(--error-rgb), 0.12);
-    border: 1px solid rgba(var(--error-rgb), 0.45);
-    cursor: pointer;
-}
-.terminal-gone-chip:hover { background: rgba(var(--error-rgb), 0.22); }
+/* An agent whose terminal is gone or whose program ended (#3218, #15819): its row's status mark, a shape and a word (the moon for sleeping, the cross for a real error), no red chip; a click restarts it. The header badge keeps its red. */
+.terminal-gone-chip { display: inline-flex; align-items: center; flex-shrink: 1; min-width: 1.25rem; overflow: hidden; white-space: nowrap; gap: 4px; margin-left: 4px; padding: 0 2px; border: 0; border-radius: var(--radius-sm); background: none; font: inherit; font-size: var(--fs-sm); line-height: var(--lh-label); color: var(--text-primary); cursor: pointer; }
+.terminal-gone-chip:hover { background: var(--bg-hover); }
 .terminal-gone-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-height: 20px; padding: 0 8px; }
+.status-glyph { flex: none; width: 10px; height: 10px; border-radius: 50%; box-shadow: inset -3px -1px 0 0 currentColor; color: var(--text-muted); }
+.terminal-gone-chip[data-state="failed"] .status-glyph { border-radius: 0; box-shadow: none; color: var(--error); background: linear-gradient(45deg, transparent 43%, currentColor 43% 57%, transparent 57%), linear-gradient(-45deg, transparent 43%, currentColor 43% 57%, transparent 57%); }
+@media (forced-colors: active) { .status-glyph { forced-color-adjust: none; } }
+button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-height: 20px; padding: 0 8px; color: var(--error); background: rgba(var(--error-rgb), 0.12); border: 1px solid rgba(var(--error-rgb), 0.45); }
 
 /* Machine health (#3446): a status dot and a compact card. The dot is the only coloured part;
    every value is text in the normal text colours (contrast as in the accessibility pass). */
@@ -3270,8 +3262,6 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 .sec-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 767px), (pointer: coarse) { .sec-actions .btn { min-height: var(--control-touch-height, 44px); } }
 .sec-muted { color: var(--text-secondary); font-weight: var(--fw-regular); }
-#settings-modal .sec-switch { display: flex; flex-direction: row; gap: 10px; align-items: flex-start; font-size: var(--fs-md); margin: 6px 0; cursor: pointer; }
-#settings-modal .sec-switch input[type="checkbox"] { width: 16px; height: 16px; flex: none; margin: 2px 0 0; padding: 0; }
 .sec-warn { display: flex; gap: 8px; align-items: flex-start; background: rgba(212, 167, 44, .13); border: 1px solid rgba(212, 167, 44, .55); border-radius: var(--radius-lg); padding: 10px 12px; font-size: var(--fs-base); line-height: var(--lh-body); margin: 8px 0; }
 .sec-add { display: flex; gap: 8px; align-items: center; }
 .sec-add .btn { margin: 0; }
@@ -3671,8 +3661,6 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .launch-type-glyph { font-size: var(--fs-display); } /* the agent card draws the same robot as the start page */
 
 /* Settings' footer: the note that something is not saved yet, on the left (UI audit #5589, finding 27); and the CLI paths behind one line. */
-.settings-unsaved { margin-right: auto; align-self: center; font-size: var(--fs-base); color: var(--text-secondary); }
-.settings-unsaved[hidden] { display: none; }
 
 /* The missing-CLI line of the New Agent dialog sits under the folder, outside More options (#5835): nothing shows while it has nothing to say. */
 .launch-cli-slot:empty { display: none; }

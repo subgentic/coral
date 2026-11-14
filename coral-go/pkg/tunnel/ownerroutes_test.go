@@ -107,7 +107,7 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 				continue
 			}
 			// The custom models (#5996) are the owner's alone through the hub: the old list never had them.
-			if p == "/api/custom-models" && (m == http.MethodGet || m == http.MethodPut) {
+			if (p == "/api/custom-models" || p == "/api/custom-modes") && (m == http.MethodGet || m == http.MethodPut) {
 				continue
 			}
 			// Resolving a shortened artifact link (#9841) is the owner's alone through the hub: the old list never had it.

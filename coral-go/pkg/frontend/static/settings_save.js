@@ -1,4 +1,4 @@
-/* The Settings dialog's Save flow and closing: send the payload, put the saved settings on the page, close (moved out of settings_dialog.js, #8383). */
+/* Main Settings row persistence and closing, plus the legacy combined-save test surface. */
 import { terminalFontFor } from './terminal_font.js';
 import { importOnce } from './import_once.js';
 import { updatesUiOn } from './update_flag.js';
@@ -13,29 +13,25 @@ import { savedWords, renderRemoteAccessStatus, renderDebugInputLogStatus, applyT
 import { browserLocal } from './safe_storage.js';
 const { _invalidateAgentModels, _invalidateDefaultModels } = await importOnce('./launch_models.js');
 const { databaseEncryptionChanged, saveDatabaseEncryptionSettings } = await importOnce('./settings_machine.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
-const { readSettingsForm, formKey, payloadNow, changedSince, refreshUnsavedNote, unsavedFields } = await importOnce('./settings_form.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
-const { showConfirmModal } = await importOnce('./confirm_dialog.js'); // lazy like this file (import_hygiene)
-const { settingsAtOpen, setSettingsAtOpen, setFormAtOpen, setPayloadAtOpen } = await importOnce('./settings_snapshots.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
+const { readSettingsForm, payloadNow, changedSince } = await importOnce('./settings_form.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
+const { settingsAtOpen, setSettingsAtOpen, setPayloadAtOpen } = await importOnce('./settings_snapshots.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 
-/** Close Settings. With a change not saved yet it asks first (Close, Cancel, Escape and the backdrop all come here, #10526); force === true closes without asking (after a Save, or on the way to another dialog).
- *  onClosed runs once Settings has closed: at once, or after Discard changes (never after Keep editing): what the person was on their way to when they closed it, a link into Docs (#10906). */
+/** Close Settings; its rows persist independently. Docs links continue after it closes. */
 export function hideSettingsModal(force, onClosed) {
-    if (force !== true && unsavedFields()) { // decided at once: a Close with nothing changed still closes in the same turn
-        showConfirmModal('Discard unsaved changes?', 'Settings you changed have not been saved.', () => hideSettingsModal(true, onClosed), undefined, { label: 'Discard changes', cancelLabel: 'Keep editing', danger: true });
-        return;
-    }
+    document.activeElement?.closest('#settings-modal') && document.activeElement.blur();
     document.getElementById("settings-modal").style.display = "none";
     restoreSavedTheme().catch(() => {}); // a theme previewed in the dialog and not saved goes back to the saved one (#10481)
     if (!isCloud()) importOnce('./custom_models.js').then(m => m.discardCustomModels()).catch(() => {}); // unsaved custom models are dropped with the dialog (#5480)
+    if (!isCloud()) importOnce('./custom_modes.js').then(m => m.discardCustomModes()).catch(() => {}); // and unsaved custom permission modes (#15950)
     if (typeof onClosed === 'function') onClosed();
 }
 
 /** Sends the payload (nothing, when nothing changed) and takes it into state.settings and the privacy status. Returns true when there was nothing to save; throws when the server refuses. */
-async function saveSettings({ payload, remoteAccessEnabled, debugInputLog }) {
+async function saveSettings({ payload, remoteAccessEnabled, debugInputLog }, rowOnly = false) {
     // Nothing to save when no setting changed and neither the database encryption choice nor the backend and wake choices did (they are saved apart).
-    const sideChange = databaseEncryptionChanged() || await importOnce('./terminal_backend.js').then(tb => tb.hasUnsavedBackendChange(), () => true);
+    const sideChange = !rowOnly && (databaseEncryptionChanged() || await importOnce('./terminal_backend.js').then(tb => tb.hasUnsavedBackendChange(), () => true));
     const nothingToSave = Object.keys(payload).length === 0 && !sideChange;
-    if (!isCloud()) await saveDatabaseEncryptionSettings();
+    if (!isCloud() && !rowOnly) await saveDatabaseEncryptionSettings();
     // Nothing changed: nothing to write.
     const response = Object.keys(payload).length === 0 ? { ok: true } : await fetch("/api/settings", {
         method: "PUT",
@@ -51,11 +47,11 @@ async function saveSettings({ payload, remoteAccessEnabled, debugInputLog }) {
     }
     state.settings = { ...state.settings, ...payload };
     if (settingsAtOpen()) setSettingsAtOpen({ ...settingsAtOpen(), ...payload }); // the dialog stays open on a cancelled backend change
-    if (!isCloud() && state.privacyStatus) {
+    if (!isCloud() && state.privacyStatus && (!rowOnly || 'remote_access_enabled' in payload)) {
         state.privacyStatus.remote_access_enabled = remoteAccessEnabled;
         state.privacyStatus.remote_access_restart_required = state.privacyStatus.remote_access_effective !== remoteAccessEnabled;
     }
-    if (!isCloud() && state.privacyStatus) {
+    if (!isCloud() && state.privacyStatus && (!rowOnly || 'debug_input_log' in payload)) {
         const log = state.privacyStatus.debug_input_log || {};
         state.privacyStatus.debug_input_log = { ...log, enabled: log.forced === true || debugInputLog };
         // The server knows whether a log file is now kept on disk; refresh from it.
@@ -148,10 +144,11 @@ export async function applySettings() {
         const updatesSaved = updatesUiOn() ? await importOnce('./update_settings.js').then(m => m.applyUpdatePrefs()) : false; // the update switch and channel (#5275, #5558)
         const modelsSaved = isCloud() ? false : await importOnce('./custom_models.js').then(m => m.applyCustomModels()); // the custom models (#5480)
         if (modelsSaved) { _invalidateAgentModels(); (await importOnce('./model_labels.js')).clearModelsCache(); }
+        const modesSaved = isCloud() ? false : await importOnce('./custom_modes.js').then(m => m.applyCustomModes()); // the custom permission modes (#15950)
         // the rows by name (#7041), not "Settings saved" for every change; what was saved apart (custom models, the update choices) is named too
-        const extra = [modelsSaved && 'Custom models', updatesSaved && 'Updates'].filter(Boolean);
+        const extra = [modelsSaved && 'Custom models', modesSaved && 'Custom permission modes', updatesSaved && 'Updates'].filter(Boolean);
         showToast(nothingToSave && !extra.length ? NOTHING_TO_SAVE : savedWords(changedSince(form.payload), { extra, restart: !!state.privacyStatus?.remote_access_restart_required }));
-        setFormAtOpen(formKey()); setPayloadAtOpen(payloadNow()); refreshUnsavedNote();
+        setPayloadAtOpen(payloadNow());
     } catch (e) {
         showToast(e && e.userMessage ? `Failed to save settings: ${e.userMessage}` : "Failed to save settings", true);
         return;
@@ -163,4 +160,18 @@ export async function applySettings() {
         if (!(await tb.applyTerminalBackendChange())) return; // cancelled: the dialog stays open
     } catch { /* the rest is saved */ }
     hideSettingsModal(true);
+}
+
+/** Save just the edited row. Other text fields may still be in progress. */
+export async function saveSettingsRow(payload) {
+    const form = readSettingsForm(true), oldGit = state.settings?.git_diff_mode || 'previous_commit';
+    await saveSettings({ ...form, payload }, true);
+    const saved = state.settings || {};
+    await applySettingsEffects({ ...form, themeSaved: 'theme' in payload,
+        fitPaneWidth: !!payload.fit_pane_width,
+        terminalFontSize: saved.terminal_font_size,
+        terminalScrollback: saved.terminal_scrollback,
+        showScrollbars: String(saved.show_scrollbars ?? 'true').toLowerCase() !== 'false',
+        gitDiffMode: saved.git_diff_mode || oldGit,
+    }, oldGit).catch(() => {}); // persistence succeeded even if a live view could not refresh
 }

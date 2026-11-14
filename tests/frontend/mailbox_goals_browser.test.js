@@ -32,9 +32,12 @@ const { coralReady } = require('./helpers/wait');
         console.log('1. Desktop: the Goals folder');
         await open(1280, 800, false);
         const d = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr')]; return { title: document.getElementById('group-table-title').textContent, heads: [...document.querySelectorAll('#group-table-view th')].map(h => h.textContent.replace(/[↑↓↕]/g, '').trim()),
-            rows: rows.map(r => ({ goal: r.querySelector('.dt-primary').textContent, team: r.querySelector('td[data-key="team"]').textContent.trim(), chip: r.querySelector('.goal-chip').textContent, progress: r.querySelector('td[data-key="progress"]').textContent.replace(/\\s+/g, ' ').trim() })),
+            rows: rows.map(r => ({ goal: r.querySelector('.dt-primary').textContent, team: r.querySelector('td[data-key="team"]').textContent.trim(), chip: r.querySelector('.status-mark').textContent, shape: !!r.querySelector('.status-mark svg.status-shape'), progress: r.querySelector('td[data-key="progress"]').textContent.replace(/\\s+/g, ' ').trim() })),
             sidebar: [...document.querySelectorAll('.view-list-item')].map(${ROW_WORDS}).filter(t => /^(Needs you|Tasks|Goals|Saved)/.test(t)), goalsSoon: !!document.querySelector('.view-list-item[data-key="goals"].view-list-soon, .view-list-item[data-key="goals"][aria-disabled="true"]') }; })()`);
-        assert.equal(d.title, 'Goals'); assert.deepEqual(d.heads, ['State', 'Goal', 'Team', 'Progress', 'Updated'], 'the team page\'s goal row plus a Team column');
+        assert.equal(d.title, 'Goals'); assert.deepEqual(d.heads, ['Goal', 'State', 'Team', 'Progress', 'Updated'], 'the team page\'s goal row plus a Team column, in the same order');
+        assert.ok(d.rows.every(r => r.shape), 'each State is the status mark: a shape and its word ' + JSON.stringify(d.rows));
+        await ev(`document.querySelector('#group-table-view .dt-sort[data-key="state"]').click(); true`); // sort still works on State (#15827)
+        await waitFor(`(() => { const w = [...document.querySelectorAll('#group-table-view .dt-table tbody tr .status-word')].map(e => e.textContent); return w.length >= 3 && w.every((x, i) => !i || w[i - 1].localeCompare(x) <= 0); })()`, 'the rows are in State order after the sort');
         for (const bw of [1280, 1024]) { // the table's default sizes (#9856): the goal's title is at least 24 characters and nothing scrolls sideways, at 1280 and at 1024
             await Emulation.setDeviceMetricsOverride({ width: bw, height: 800, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the table follows its box
             const z = await ev(SIZING('#group-table-view .dt-box', 'goal'));

@@ -102,16 +102,7 @@
 
 
 
-    <div class="linkrow"><button type="button" class="link" id="show-forgot">Forgot password?</button><button type="button" class="link" id="show-key">Use an API key instead</button></div>
-  </section>
-  <section id="panel-forgot" class="panel" hidden>
-    <h1>Forgot your password?</h1>
-    <p class="sub">Coral has no email to send a link to. Resetting happens on the computer that runs Coral, which keeps it safe from anyone else on the network.</p>
-    <ol class="steps"><li>Open a terminal on <b>this computer</b> (the one running Coral).</li><li>Run:</li></ol>
-    <div class="code"><span id="reset-cmd">coral reset-password</span><button type="button" class="btn btn-small" id="copy-reset">Copy</button></div>
-    <ol class="steps" start="3"><li>Choose a new password when it asks. Browsers that were signed in are signed out.</li><li>Come back here and sign in.</li></ol>
-    <div class="btnrow"><button type="button" class="btn btn-primary wide" data-back="signin">Back to sign in</button></div>
-    <p class="note">A password keeps other people and other devices out of Coral when it is opened in a web browser.</p>
+    <div class="linkrow"><a class="link" id="show-forgot" href="/static/password-reset.html" target="_blank" rel="noopener">Forgot password?</a><button type="button" class="link" id="show-key">Use an API key instead</button></div>
   </section>
 
 
@@ -121,7 +112,7 @@
     <div id="hub-link-err" class="err" role="alert" hidden></div>
     <form id="hub-link-form" autocomplete="off">
       <label class="pw-field" for="hub-setup-code" id="hub-setup-field"><span class="pw-label">Setup code</span><span class="pw-input-row"><input class="pw-input setup-input" id="hub-setup-code" name="setup-code" type="text" autocomplete="off" spellcheck="false" autocapitalize="characters" maxlength="16"></span>
-      <span class="note" style="display:block;margin:6px 0 14px">In Coral on that computer, open <b>Settings &rsaquo; Network and Hub</b> (or the tray menu), or run <b>coral setup-code</b> there.</span></label>
+      <span class="note" style="display:block;margin:6px 0 14px">In Coral on that computer, open <b>Settings &rsaquo; Network and Hub</b> (or the tray menu).</span></label>
       <div class="warn"><span style="font-size:1rem">&#9888;</span><span><b>Coral Hub can then sign you in here with full control of this computer.</b> A Coral Hub account that is signed in can run commands on this computer, like your password can.</span></div>
       <label class="check" style="margin-top:0"><input type="checkbox" id="hub-enable"><span>Let Coral Hub sign me in here<small>Off unless you tick it. You can change it later in Settings, Browser sign-in.</small></span></label>
       <div class="btnrow"><button type="submit" disabled data-needs-script id="hub-link-go" class="btn btn-primary wide">Link this computer to Coral Hub and sign in</button></div>

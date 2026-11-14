@@ -58,28 +58,35 @@ func Writers(path string) ([]string, error) {
 
 // mergeWays gives each account once, in the order the accounts first appear, with every way it can change the folder
 // once each in one parenthesis: an account found as the owner, by an entry of its own and through the parent folder
-// is "this user (the owner, through the parent folder)", not three names (#307's copy note).
+// is "this user (the owner, through the parent folder)", not three names (#307's copy note). An account is told apart by its SID, not its
+// name: two accounts can carry the same name (the Everyone group and a folder with no access list both read "Everyone"; a lookup that is late
+// leaves a SID string), and two accounts are never merged into one line.
 func mergeWays(names []string, found []writer) []string {
 	var order []string
+	name := map[string]string{}
 	ways := map[string][]string{}
 	for i, w := range found {
-		name := names[i]
-		if _, seen := ways[name]; !seen {
-			order = append(order, name)
-			ways[name] = []string{}
+		key := "" // no access list: Everyone, a key no SID string can be
+		if w.sid != nil {
+			key = w.sid.String()
+		}
+		if _, seen := ways[key]; !seen {
+			order = append(order, key)
+			ways[key] = []string{}
+			name[key] = names[i]
 		}
 		for _, way := range w.ways {
-			if !slices.Contains(ways[name], way) {
-				ways[name] = append(ways[name], way)
+			if !slices.Contains(ways[key], way) {
+				ways[key] = append(ways[key], way)
 			}
 		}
 	}
 	who := make([]string, 0, len(order))
-	for _, name := range order {
-		if len(ways[name]) == 0 {
-			who = append(who, name)
+	for _, key := range order {
+		if len(ways[key]) == 0 {
+			who = append(who, name[key])
 		} else {
-			who = append(who, name+" ("+strings.Join(ways[name], ", ")+")")
+			who = append(who, name[key]+" ("+strings.Join(ways[key], ", ")+")")
 		}
 	}
 	return who

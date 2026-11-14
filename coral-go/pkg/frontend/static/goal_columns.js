@@ -1,5 +1,5 @@
 /* The Goals columns shared by the team page and mailbox (#7797/#7776).
- * goalColumns(ctx, keys) accepts state, goal, team, progress, updated (in the requested order).
+ * goalColumns(ctx, keys) accepts goal, state, team, progress, updated (in the requested order; the order on both pages is Goal, State, Team, Progress, Updated, and the team page has no Team, #15827).
  * Rows: {id, title, outcome?, state, rollup:{done,active,blocked,queued}, updatedAt|updated_at, board?|project?}.
  * ctx: teamOf(goal) optionally supplies the displayed team; openTeam(goal) optionally makes it a link;
  * progressLabel optionally renames Progress (the team page calls it Tasks). noGoal rows are navigation only.
@@ -9,15 +9,18 @@ import { importOnce } from './import_once.js';
 import * as W from './goal_words.js';
 const { shortTitle } = await importOnce('./goal_short.js');
 const DT = await importOnce('./data_table.js');
+const { statusMark } = await importOnce('./status_mark.js');
+/** A goal's state as the one status mark (design guidelines 4.5, #15827): Active works, Blocked waits, Proposed is idle, Done is done, Dropped is switched off; a server that refused its key failed. */
+const MARK = { active: 'working', blocked: 'waiting', proposed: 'idle', done: 'done', dropped: 'sleeping', failed: 'failed' };
 
-export function goalColumns(ctx = {}, keys = ['state', 'goal', 'team', 'progress', 'updated']) {
+export function goalColumns(ctx = {}, keys = ['goal', 'state', 'team', 'progress', 'updated']) {
     const total = g => W.allTasksOf(g.rollup || {});
     const done = g => Number(g.rollup?.done) || 0;
     const team = g => ctx.teamOf ? ctx.teamOf(g) : g.board || g.project || '';
     const stamp = g => g.updatedAt || g.updated_at || '';
     const all = {
         state: { key: 'state', label: 'State', sort: true, sortValue: W.stateWord, line: 2, width: '6.5rem', dropAt: 16,
-            cell: g => g.noGoal ? '' : DT.chip(W.stateWord(g), `goal-state-${g.state || 'unknown'}`) },
+            cell: g => g.noGoal ? '' : statusMark(MARK[String(g.state || '').toLowerCase()] || 'idle', W.stateWord(g)) },
         goal: { key: 'goal', label: 'Goal', primary: true, width: 'grow', sort: true, sortValue: g => g.title, line: 1,
             cell: g => { const b = DT.primaryButton(g.noGoal ? g.title : g.title ? shortTitle(g.title) : `Goal ${g.id}`); if (!g.noGoal && g.title) b.title = g.title; b.dataset.goalId = String(g.id); if (g.noGoal) b.classList.add('goals-no-goal');
                 const n = total(g), left = W.openTasksOf(g.rollup || {}), news = Number(g.newComments || g.new_comments) > 0; if (g.noGoal || (!n && !news)) return b;

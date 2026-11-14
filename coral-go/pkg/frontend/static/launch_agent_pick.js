@@ -37,6 +37,7 @@ export async function buildAgentPick({ group, form, server, implicitDefault }) {
         const on = !note.hidden;
         for (const el of [group, ...group.querySelectorAll('input')]) { if (on) el.setAttribute('aria-describedby', note.id); else el.removeAttribute('aria-describedby'); }
     };
+    const modelOwned = () => form?.dataset.acfModelDirty === 'true'; // a model the person typed or picked is theirs: a probe's answer must not move the provider under it and drop it (#16210)
     let chosen = false; // a person picked an agent here, or the select moved some other way: the probes' answers leave the selection alone
     const start = select.value;
     const labels = new Map();
@@ -75,15 +76,15 @@ export async function buildAgentPick({ group, form, server, implicitDefault }) {
     const order = TYPES.map((_, i) => i).filter(i => labels.has(TYPES[i][0])).sort((a, b) => (found[b] === true) - (found[a] === true) || a - b); // installed first, then the rest as they were
     if (!chosen && !group.contains(document.activeElement)) for (const i of order) group.append(labels.get(TYPES[i][0])); // moving a label would drop the keyboard from it: only when nobody is on the group
     // nothing was ever chosen and the built-in default is not here: start on the first agent that is
-    if (!chosen && implicitDefault && (ALIAS[select.value] || select.value) === 'claude' && found[0] === false) {
+    if (!chosen && !modelOwned() && implicitDefault && (ALIAS[select.value] || select.value) === 'claude' && found[0] === false) {
         const first = order.find(i => found[i] === true);
         if (first !== undefined) { select.value = TYPES[first][0]; select.dispatchEvent(new Event('change', { bubbles: true })); chosen = false; }
     }
     // Claude is missing and nothing was chosen, but an agent has not answered yet (the check runs "<cli> --version", which Hermes, a Python program, takes seconds to do): wait for it a while longer before giving up
     // on finding one to start on (#12169). The radios are already drawn and usable; this only moves the start, and not once a person has chosen or is on the group.
-    if (!chosen && implicitDefault && (ALIAS[select.value] || select.value) === 'claude' && found[0] === false && !order.some(i => found[i] === true) && res.some(r => r.found === null)) {
+    if (!chosen && !modelOwned() && implicitDefault && (ALIAS[select.value] || select.value) === 'claude' && found[0] === false && !order.some(i => found[i] === true) && res.some(r => r.found === null)) {
         const late = await Promise.race([Promise.all(probes), new Promise(r => setTimeout(() => r(null), LATE_PROBE_MS))]);
-        if (late && group._pickToken === token && group.isConnected && !chosen) {
+        if (late && group._pickToken === token && group.isConnected && !chosen && !modelOwned()) {
             const first = order.find(i => late[i].found === true);
             if (first !== undefined) { select.value = TYPES[first][0]; select.dispatchEvent(new Event('change', { bubbles: true })); chosen = false; }
         }

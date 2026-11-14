@@ -166,8 +166,11 @@ type Session struct {
 	peerCaps  []string     // the connector's Hello.Capabilities when the whole list is well formed, else nil
 	active    atomic.Int32
 	closeOnce sync.Once
-	hooks     map[Kind]inboundHook // the connector-opened kinds advertised to this tunnel
-	inflight  atomic.Int32         // relay hook calls in progress
+	// hard is closed by CloseNow: a Close stuck in the WebSocket close handshake (the library's Close waits up to 5 s for the peer, and its CloseNow does not end a Close already running: it waits behind it) stops waiting for it (#16261).
+	hard     chan struct{}
+	hardOnce sync.Once
+	hooks    map[Kind]inboundHook // the connector-opened kinds advertised to this tunnel
+	inflight atomic.Int32         // relay hook calls in progress
 	// signinInflight: sign-in hook calls in progress (their own budget, #3966).
 	signinInflight atomic.Int32
 	// control requests (#5918): their own in-flight budget, and when the last local mode message was taken (at most one a second).
@@ -281,14 +284,15 @@ func Accept(ctx context.Context, c *websocket.Conn, auth AuthFunc, cfg SessionCo
 
 	c.SetReadLimit(cfg.wsReadLimit())
 	sctx, cancel := context.WithCancel(context.Background())
-	nc := websocket.NetConn(sctx, c, websocket.MessageBinary)
+	hard := make(chan struct{})
+	nc := &releasableConn{Conn: websocket.NetConn(sctx, c, websocket.MessageBinary), hard: hard}
 	ys, err := yamux.Server(nc, cfg.yamux())
 	if err != nil {
 		cancel()
 		_ = nc.Close()
 		return nil, err
 	}
-	s := &Session{ys: ys, ws: c, cfg: cfg, cancel: cancel, identity: identity, version: v, coralVer: hello.CoralVersion, peerCaps: wellFormedCapabilities(hello.Capabilities), peerKind: wellFormedOwnerKind(hello.OwnerKind),
+	s := &Session{ys: ys, ws: c, hard: hard, cfg: cfg, cancel: cancel, identity: identity, version: v, coralVer: hello.CoralVersion, peerCaps: wellFormedCapabilities(hello.Capabilities), peerKind: wellFormedOwnerKind(hello.OwnerKind),
 		hooks: hooks, artifactHook: artifactHook, relaySlot: make(chan struct{}, cfg.MaxRelayStreams)}
 	s.localMode.Store(int32(parseLocalMode(hello.LocalMode)))
 	s.bootID, s.startedAt = parsePeerBoot(hello.BootID, hello.StartedAt) // informational (#5855)
@@ -400,11 +404,41 @@ func (s *Session) Close() error {
 // Close does, so every stream ends and Done fires. It is safe to call concurrently with Close, from several goroutines and after Close: a Close stuck on an unanswering peer is released by it, and a second
 // call is a no-op that returns nil. No goroutine is left waiting on the peer.
 func (s *Session) CloseNow() error {
+	s.hardOnce.Do(func() {
+		if s.hard != nil {
+			close(s.hard) // a Close in the handshake stops waiting for the peer now
+		}
+	})
 	if s.ws != nil {
-		_ = s.ws.CloseNow() // already closed is not an error here
+		// The library's CloseNow, when a Close is already running, waits for that Close to end (its 5 s peer wait): so it is not waited for here beyond a moment; it ends on its own.
+		done := make(chan struct{})
+		go func() { defer safego.Recover("tunnel/server:CloseNow"); _ = s.ws.CloseNow(); close(done) }() // already closed is not an error here
+		select {
+		case <-done:
+		case <-time.After(50 * time.Millisecond):
+		}
 	}
 	s.cancel()
 	return s.Close()
+}
+
+// releasableConn is the session's connection with a Close that a CloseNow can cut short: the WebSocket's Close sends its close frame and waits up to five seconds for the peer's, and a CloseNow
+// that comes after it started does not end that wait (the library's CloseNow waits behind the Close). Close here returns when the library's does or when hard is closed, whichever is first; the
+// library's Close then ends by itself, at its own limit.
+type releasableConn struct {
+	net.Conn
+	hard <-chan struct{}
+}
+
+func (c *releasableConn) Close() error {
+	done := make(chan error, 1)
+	go func() { defer safego.Recover("tunnel/server:releasableConn"); done <- c.Conn.Close() }()
+	select {
+	case err := <-done:
+		return err
+	case <-c.hard:
+		return nil
+	}
 }
 
 // HubStream is a stream opened by the hub. Read and Write move raw stream

@@ -32,6 +32,7 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 		Note         string `json:"note"`
 		Withdraw     bool   `json:"withdraw"` // the asker (or the board's orchestrator) takes the question back (#13147): the note is "withdrawn by <who>", the reason after it is optional
 		Undo         bool   `json:"undo"`     // open the question again (the Operator's Undo of an Ignore, #11552): no note, the same callers, nothing posted
+		Unanswer     bool   `json:"unanswer"` // with undo: an ANSWERED question is open again too (#15792, the Activity thread's Reopen question): the replies stay, only a later one answers it
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -88,6 +89,13 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 			}
 			errInternalServer(w, "could not open the question again")
 			return
+		}
+		if body.Unanswer {
+			if err := h.bs.ReopenAskAnswer(r.Context(), project, id); err != nil {
+				errInternalServer(w, "could not open the question again")
+				return
+			}
+			reopened = true
 		}
 		h.recordAskActivity(r, board.ActUnignore, project, id, "")
 		if hubOwner != nil {

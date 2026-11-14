@@ -50,7 +50,7 @@ const BASE = require('./test_base').BASE;
         // The note, its words and the dimming all follow the access answer, which arrives after the dialog opens, and the page treats an access it
         // does not hold (yet, or again: the cached answer is dropped and asked for anew) as "not blocked", so each can flicker off for a moment on a slow host.
         // So they are waited for together, in one evaluation, and nothing is read again afterwards (#4992: read a moment later, the button was undimmed).
-        await ev(`window._selectLaunchType('agent'); { const g = document.getElementById('launch-computer-go'); if (g && getComputedStyle(document.getElementById('launch-step-computer')).display !== 'none') g.click(); } /* on a Hub New agent opens on Which computer? (#15014): Continue */ true`);
+        await ev(`window._selectLaunchType('agent'); { const g = document.querySelector('#launch-computer-list .launch-computer-pick:not(:disabled)'); if (g && getComputedStyle(document.getElementById('launch-step-computer')).display !== 'none') g.click(); } /* on a Hub New agent opens on Which computer? (#15014): Select */ true`);
         await waitFor(`(() => { const n = document.getElementById('launch-access-note'); return n.textContent !== '' && /Box B needs Launch/.test(n.textContent) && document.querySelector('#launch-step-agent [data-on-click="m-launch-session"]').classList.contains('hub-blocked'); })()`, 'the note says Box B needs Launch and the launch button is dimmed', { timeout: 30000 });
         assert.equal(await ev(`document.querySelectorAll('.toast').length`), 0, 'nothing was toasted yet');
 
@@ -85,8 +85,8 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.querySelectorAll('#launch-modal .hub-blocked').length`), 0);
 
         console.log('3b. The hub refuses a launch the dialog did not know to be blocked: one toast, not two');
-        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); window._selectLaunchType('agent'); { const g = document.getElementById('launch-computer-go'); if (g && getComputedStyle(document.getElementById('launch-step-computer')).display !== 'none') g.click(); } /* on a Hub New agent opens on Which computer? (#15014): Continue */ true`);
-        await waitFor(`getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none'`, 'the agent form after Continue', { timeout: 6000 });
+        await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); window._selectLaunchType('agent'); { const g = document.querySelector('#launch-computer-list .launch-computer-pick:not(:disabled)'); if (g && getComputedStyle(document.getElementById('launch-step-computer')).display !== 'none') g.click(); } /* on a Hub New agent opens on Which computer? (#15014): Select */ true`);
+        await waitFor(`getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none'`, 'the agent form after Select', { timeout: 6000 });
         await ev(`document.getElementById('launch-dir').value = '/work/project'; document.querySelector('#launch-step-agent [data-on-click="m-launch-session"]').click(); true`);
         await waitFor(`document.querySelectorAll('.toast').length >= 1`, 'the refusal', { timeout: 6000 });
         await new Promise(r => setTimeout(r, 1500)); // sleep-ok: a second toast, if there were one, arrives after the refusal; there is nothing to wait on for its absence

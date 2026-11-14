@@ -56,6 +56,9 @@ the first failed check.
    (cd tests/frontend && node update_suite_durations.mjs /tmp/gate-v1491/cdp-{0,1,2,3,4,5}-a*/results.json)
    ```
 
+   The Windows run splits by its own file, `tests/frontend/suite_durations.windows.json` (#14722: with the Linux file the six parts' suites ran 26.6 to 30.3 min on Windows, with this one 28.0 each).
+   Refresh it from 3 or 4 recent windows-tests runs when a part's suites drift more than 2 min apart: `gh run view <run> --repo subgentic/coral --log > run1.log` for each, then `tools/devops/windows-suite-durations.py run1.log run2.log run3.log > tests/frontend/suite_durations.windows.json`.
+
    Do this after every release gate: it had not been run since v1.4.94, and by v1.4.101 the six parts took 233 to 369 s
    instead of about equal times (#4956). The parts are only as even as these numbers are fresh.
 

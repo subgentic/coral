@@ -168,6 +168,21 @@ if [ -n "$meta" ]; then
   [ -z "$zeros" ] || fail release "empty assets" "$zeros"
 fi
 
+# notes_commit_on_main TAG: the sha of the main commit whose "Gated-commit: <the tag's commit>" trailer names the tag's commit (the notes commit that landed after the tag), only when
+# it is on main (compare main...sha says identical or behind) and touches only RELEASE_NOTES.md; prints nothing otherwise.
+notes_commit_on_main() {
+  local tag="$1" tsha cand st files
+  tsha="$(gh api "repos/$REPO/commits/$tag" --jq .sha 2>/dev/null)"
+  [[ "$tsha" =~ ^[0-9a-f]{40}$ ]] || return 0
+  cand="$(gh api "repos/$REPO/commits?sha=main&per_page=100" --jq ".[] | select(.commit.message | split(\"\n\") | any(. == \"Gated-commit: $tsha\")) | .sha" 2>/dev/null | head -n 1)"
+  [[ "$cand" =~ ^[0-9a-f]{40}$ ]] || return 0
+  st="$(gh api "repos/$REPO/compare/main...$cand" --jq .status 2>/dev/null)"
+  case "$st" in identical|behind) ;; *) return 0 ;; esac
+  files="$(gh api "repos/$REPO/commits/$cand" --jq '[.files[].filename] | join(",")' 2>/dev/null)"
+  [ "$files" = "RELEASE_NOTES.md" ] || return 0
+  printf '%s\n' "$cand"
+}
+
 # ---- 2. the notes ----
 if [ -n "$meta" ]; then
   body="$(jq -r .body <<<"$meta")"
@@ -186,9 +201,22 @@ if [ -n "$meta" ]; then
     # this version's section: the lines after its "## vX.Y.Z" heading, up to the next "## "
     section="$(awk -v v="## v$want_ver" 'index($0, v) == 1 && substr($0, length(v)+1, 1) !~ /[0-9.]/ {on=1; next} on && /^## / {exit} on {print}' <<<"$notes" | sed '/./,$!d')"
     section="$(notes_drop_edited "$TAG" <<<"$section")"   # lines removed from the published body on purpose (tools/release-notes-edits.txt)
+    notes_from=""
+    if [ -z "$section" ]; then
+      # The tag has no section for itself (its notes commit landed after the tag, v2.0.68): read it from the main commit whose "Gated-commit:" trailer
+      # names the tag's commit. That commit must be on main and touch only RELEASE_NOTES.md; anything else fails as before.
+      gm="$(notes_commit_on_main "$TAG")"
+      if [ -n "$gm" ]; then
+        gnotes="$(gh api -H "Accept: application/vnd.github.raw" "repos/$REPO/contents/RELEASE_NOTES.md?ref=$gm" 2>/dev/null)"
+        section="$(awk -v v="## v$want_ver" 'index($0, v) == 1 && substr($0, length(v)+1, 1) !~ /[0-9.]/ {on=1; next} on && /^## / {exit} on {print}' <<<"$gnotes" | sed '/./,$!d')"
+        section="$(notes_drop_edited "$TAG" <<<"$section")"
+        [ -z "$section" ] || notes_from="main commit ${gm:0:9} (its Gated-commit trailer names the tag's commit)"
+      fi
+    fi
     if [ -z "$section" ]; then
       fail notes "section for v$want_ver" "RELEASE_NOTES.md at the tag has none"
     else
+      [ -z "$notes_from" ] || pass notes "section for v$want_ver" "RELEASE_NOTES.md at the tag has none; the notes come from $notes_from"
       # the whole section, not its first lines: an edit further down is the one that gets missed
       nlines="$(wc -l <<<"$section" | tr -d ' ')"
       if [ "$(head -n "$nlines" <<<"$body")" = "$section" ]; then

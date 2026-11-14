@@ -304,6 +304,7 @@ var activityNotAnInboxAction = map[string]string{
 	"PUT /api/cloud/max-mode":                                              "Coral Hub connection and Hub-to-computer calls",
 	"PUT /api/cloud/redact-tokens":                                         "Coral Hub connection and Hub-to-computer calls",
 	"PUT /api/custom-models":                                               "settings",
+	"PUT /api/custom-modes":                                                "settings (its own audit row, custom_modes_log, is the record)",
 	"PUT /api/resources/{name}":                                            "the shared-resource queue (an agent's claim, or the Resources screen's rename, move and release of a slot): not an Inbox action",
 	"PUT /api/scheduled/jobs/{jobID}":                                      "the Automations tab",
 	"PUT /api/sessions/history/{sessionID}/notes":                          "a chat's own page",

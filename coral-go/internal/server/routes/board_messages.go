@@ -352,6 +352,10 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 		errBadRequest(w, "content required")
 		return nil, false
 	}
+	if why := clitext.WordlessMessage(body.Content); why != "" { // a bare "-" or only mentions is not a message, on every path in: CLI, HTTP, Hub (#16186)
+		errBadRequest(w, why)
+		return nil, false
+	}
 	if h.refuseShortArtifactRefs(w, r, &body.Content) { // a shortened coral://artifacts link is made whole, or the post is refused (#9841)
 		return nil, false
 	}

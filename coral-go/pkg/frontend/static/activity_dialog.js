@@ -8,6 +8,7 @@ import { markHidden } from './visible_marks.js';
 import { whenText } from './when_text.js';
 import { loadStyles } from './lazy_styles.js';
 import { state } from './state.js';
+import { importOnce } from './import_once.js';
 import { prepareImage } from './image_attach.js';
 import { postImage } from './image_composer.js';
 import { attachmentsLead } from './shared_images.js';
@@ -59,7 +60,9 @@ export async function openThread(row, { onDone, openBoard, openTask } = {}) {
     const board = el('button', 'btn btn-small activity-thread-board', 'Open on the Board'); board.type = 'button'; board.hidden = typeof openBoard !== 'function';
     const task = el('button', 'btn btn-small activity-thread-task', `Open task #${row.task_id || ''}`); task.type = 'button'; task.hidden = !(row.task_id && typeof openTask === 'function');
     const close = el('button', 'btn btn-small', 'Close'); close.type = 'button';
-    const actions = el('div', 'activity-thread-actions'); actions.append(task, board, close, send);
+    // Reopen question (#15792): the question goes back to Needs you, unanswered; the thread stays on the board
+    const reopen = el('button', 'btn btn-small activity-thread-reopen', 'Reopen question'); reopen.type = 'button';
+    const actions = el('div', 'activity-thread-actions'); actions.append(task, board, close, reopen, send);
     const canSend = () => (box.value.trim() || pics.length) && !uploading;
     const drawPics = () => { strip.hidden = !pics.length && !uploading; strip.replaceChildren(...pics.map((a, i) => { const w = el('div', 'image-attachment'); const im = el('img'); im.src = a.previewUrl; im.alt = `Image ${i + 1}`; const x = el('button', 'image-attachment-remove', '\u00d7'); x.type = 'button'; x.setAttribute('aria-label', `Remove image ${i + 1}`); x.addEventListener('click', () => { URL.revokeObjectURL(a.previewUrl); pics.splice(i, 1); drawPics(); }); w.append(im, x); return w; }), ...(uploading ? [Object.assign(el('div', 'image-uploading', `Uploading ${uploading === 1 ? 'image' : uploading + ' images'}\u2026`), {})] : [])); send.disabled = !canSend(); };
     // An image goes up to the asking agent's own computer the way the message box's does (one uploader, postImage): it needs that agent to be running.
@@ -85,6 +88,14 @@ export async function openThread(row, { onDone, openBoard, openTask } = {}) {
     const finish = () => { dlg.close(); dlg.remove(); if (onDone) onDone(); if (opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true }); };
     close.addEventListener('click', finish); dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     board.addEventListener('click', () => { finish(); openBoard(row); });
+    reopen.addEventListener('click', async () => {
+        reopen.disabled = true; err.textContent = '';
+        try {
+            const { reopenAsk } = await importOnce('./ask_ignore.js');
+            await reopenAsk({ server: splitKey(team).server, board: splitKey(team).name, id: askId }, { unanswer: true });
+            showToast('The question is back in Needs you, unanswered.'); finish();
+        } catch (e) { err.textContent = e.message || 'Could not reopen the question.'; reopen.disabled = false; }
+    });
     task.addEventListener('click', () => { finish(); openTask(row); });
     let thread = [], kept = false; // kept: the record's own words stand in for a thread the board no longer has
     const paint = () => { list.replaceChildren(...thread.map(block)); status.hidden = true; send.disabled = !canSend(); };

@@ -8,7 +8,7 @@ const BASE = require('./test_base').BASE;
 const { coralReady, framesJs } = require('./helpers/wait');
 
 (async () => {
-    const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const S = `(window.__coralStatic || '/static/')`, team = 'reload-' + Date.now().toString(36);
     const TITLES = { needs: /^Needs (you|attention)/, tasks: /^Tasks/, goals: /^Goals/, saved: /^Saved/, artifacts: /^Artifacts/ };
     try {
@@ -24,7 +24,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 const where = () => ev(`({ path: location.pathname, title: ((document.querySelector('#group-table-view h2, #inbox-page h2') || {}).textContent || '').trim(), side: [...document.querySelectorAll('.sidebar-list-item.active, [aria-current=true]')].map(e => e.textContent.trim()).join(' | ') })`);
                 const before = await where();
                 assert.equal(before.path, `/inbox/${tab}`, `${w}: ${tab} is open: ` + JSON.stringify(before));
-                await Page.reload(); await Page.loadEventFired(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); await ev(framesJs(30));
+                await Page.reload(); await Page.loadEventFired(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+                await waitFor(`location.pathname === ${JSON.stringify('/inbox/' + tab)} && (${mobile} || ${TITLES[tab].toString()}.test(((document.querySelector('#group-table-view h2, #inbox-page h2') || {}).textContent || '').trim()))`, `${w}: the ${tab} page is drawn after the reload`, 15000).catch(() => {}); // wait for the title, not 30 frames (#15947); the assertion below says what was there if it never came
                 const after = await where();
                 assert.ok(after.path === `/inbox/${tab}` && (mobile || TITLES[tab].test(after.title)), `${w}: after a reload the ${tab} page is still open (it showed ${after.path}, "${after.title}"): ` + JSON.stringify(after));
             }

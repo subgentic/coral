@@ -13,7 +13,7 @@ const { coralReady } = require('./helpers/wait');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev);
-        const field = () => ev(`(() => { const i = [...document.querySelectorAll('.phone-bar-search')].find(e => e.getClientRects().length); return i ? { placeholder: i.placeholder, value: i.value, label: i.getAttribute('aria-label'), h: Math.round(i.getBoundingClientRect().height), title: i.closest('.phone-bar-title').textContent } : null; })()`);
+        const field = () => ev(`(() => { const i = [...document.querySelectorAll('.phone-bar-search')].find(e => e.getClientRects().length); return i ? { placeholder: i.placeholder, value: i.value, label: i.getAttribute('aria-label'), h: Math.round(i.getBoundingClientRect().height), title: i.closest('.phone-bar').querySelector('.phone-bar-title').textContent } : null; })()`);
         // Inbox: the pill is the open tab's own search (#13591): its words, the page's box not drawn
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await waitFor(`!!document.querySelector('#inbox-needs-search')`, 'the Inbox page has its search', 8000);

@@ -332,8 +332,10 @@ export function focusTaskRow(id) { const b = root && rowFocusTarget(root, `t${id
 /** A task by id: the list's item when it is read, else the route's. */
 export async function readTask(project, id, onMissing) {
     const have = model.project === project ? model.rows.find(t => t.id === Number(id)) : null;
-    try {
+    // A read that throws or is answered 5xx is tried once more (#16403: a Windows runner's one dropped request left /tasks/77 with nothing on screen); only a 404 says the task is not there.
+    for (let attempt = 0; attempt < 2; attempt++) try {
         const r = await boardFetch(project, `/tasks/${pathId(id)}`);
+        if (r.status >= 500 && attempt === 0) { await new Promise(res => setTimeout(res, 300)); continue; } // sleep-ok: one pause before the second read
         if (r.ok) {
             const task = await r.json();
             // A direct task mount has not loaded the team's list or its title cache.
@@ -344,7 +346,8 @@ export async function readTask(project, id, onMissing) {
             return task;
         }
         if (r.status === 404) onMissing?.(); // the task is not on this team (the address named one that is not there, #15295)
-    } catch { /* the list's item below */ }
+        break;
+    } catch { if (attempt === 0) await new Promise(res => setTimeout(res, 300)); /* the list's item below */ } // sleep-ok: one pause before the second read
     return have || null;
 }
 

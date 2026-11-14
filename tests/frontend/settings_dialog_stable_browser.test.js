@@ -6,10 +6,11 @@ const BASE = require('./test_base').BASE;
 const { framesJs, coralReady } = require('./helpers/wait');
 
 // family, size px, weight: the dialog title, pane title, section heading, nav tab and its selected one, row label, control and button, hint, badge
-const SCALE = new Set(['16/700', '17/700', '14/600', '14/400', '13/500', '13/400', '12/400', '11/600']);
+const SCALE = new Set(['16/700', '17/700', '14/600', '14/400', '13/500', '13/400', '12/400', '11/400', '11/600']);
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const guard = await require('./helpers/settings_guard').guardSettings();
     const report = process.env.CDP_FULL === '1';
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -117,5 +118,6 @@ const SCALE = new Set(['16/700', '17/700', '14/600', '14/400', '13/500', '13/400
         await pickAll('phone 390 px at 200% text', 390, 844, true, '200%');
         await pickAll('desktop 1280 px at 200% text', 1280, 900, false, '200%');
         console.log('PASS settings dialog stable');
-    } finally { await client.close(); }
+    } finally { try { await waitFor(`!document.querySelector('#settings-modal [data-saving="1"]')`, 'pending row saves finish before restoring settings'); }
+        finally { await client.close(); await guard.restore(); } }
 })().catch(e => { console.error(e); process.exit(1); });

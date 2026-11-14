@@ -70,6 +70,7 @@ var signInGuardedRoutes = []string{
 	"POST /api/themes/generate",
 	"PUT /api/settings",
 	"PUT /api/custom-models",
+	"PUT /api/custom-modes",
 	"POST /api/teams/import",
 	"POST /api/teams/generate",
 	"PUT /api/teams/detail/{name}/knowledge/{agentName}",
@@ -346,7 +347,7 @@ func TestEveryWriteRouteIsGuardedOrSaysWhyNot(t *testing.T) {
 // guardCensusCovers is which routes TestEveryWriteRouteIsGuardedOrSaysWhyNot looks at.
 func guardCensusCovers(route string) bool {
 	for _, p := range []string{"/api/board/", "/api/saved", "/api/tasks/", "/api/artifacts", "/api/agent/", "/api/sessions/", "/api/scheduled/",
-		"/api/teams/", "/api/workflows", "/api/settings", "/api/tags", "/api/folder-tags", "/api/views", "/api/custom-models", "/api/upload",
+		"/api/teams/", "/api/workflows", "/api/settings", "/api/tags", "/api/folder-tags", "/api/views", "/api/custom-models", "/api/custom-modes", "/api/upload",
 		"/api/themes", "/api/pinned-folders", "/api/system/hub-operator"} {
 		if strings.HasPrefix(route, p) {
 			return true

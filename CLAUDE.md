@@ -108,14 +108,12 @@ Pushing a tag triggers the GitHub Actions release workflow. Tag suffixes control
 
 #### Build Tiers
 
-Tiers are selected via **compile-time build tags** (not ldflags). Coral has no licence and no usage limits in any tier. Tiers differ only in the EULA and the default Coral Hub (`TierDefaultCloudURL`: https://app.coralhub.dev for prod, beta and staging; none for dev and dropboxers):
+Tiers are selected via **compile-time build tags** (not ldflags). Coral has no licence and no usage limits in any tier. Tiers differ only in the EULA and the default Coral Hub (`TierDefaultCloudURL`: https://app.coralhub.dev for prod and staging; none for dev). The beta and dropboxers tiers were removed (#15075): a stale `-tags beta` or `-tags dropboxers` builds prod, and an old `-beta` or `-forDropbox` tag still parses (a prerelease that builds prod):
 
 | Tier | Build Tag | EULA |
 |------|-----------|------|
 | Prod | (default) | Required |
 | Dev | `-tags dev` | Skipped |
-| Beta | `-tags beta` | Required (same as prod; kept so `-beta` tags still build) |
-| Dropboxers | `-tags dropboxers` | Skipped ("Coral For Dropbox" partner build) |
 
 #### Tag Naming Conventions
 
@@ -127,8 +125,6 @@ update):
 |---|---|---|
 | `v0.x.x` | prod | **Latest** (use this for production) |
 | `v0.x.x-dev` | dev (EULA skipped) | prerelease |
-| `v0.x.x-beta` | beta (same as prod) | prerelease |
-| `v0.x.x-forDropbox` | dropboxers (EULA skipped, "Coral For Dropbox" branding) | prerelease |
 | `v0.x.x-rc…` | prod | prerelease |
 
 The version is the tag name without the leading `v`, suffix included, so tag production
@@ -140,9 +136,6 @@ and would end up in the version string.
 # Dev build (no EULA)
 CORAL_TIER=dev ./installers/build-macos.sh 0.10.15
 
-# Beta build (same as prod)
-CORAL_TIER=beta ./installers/build-macos.sh 0.10.15
-
 # Prod build (default — EULA required)
 ./installers/build-macos.sh 0.10.15
 ```
@@ -151,10 +144,6 @@ CORAL_TIER=beta ./installers/build-macos.sh 0.10.15
 ```bash
 # Dev build (no EULA; prerelease)
 git tag v0.10.15-dev
-git push origin main --tags
-
-# Beta build for partners (same as prod; prerelease)
-git tag v0.10.15-beta
 git push origin main --tags
 
 # Production release (all platforms; the workflow creates the GitHub Release,

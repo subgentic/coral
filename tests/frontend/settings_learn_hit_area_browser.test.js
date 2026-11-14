@@ -56,7 +56,7 @@ const { connect } = require('./agent_view_harness');
             for (const [label, w, h, mobile, zoom] of [['team 1280', 1280, 1000, false, ''], ['team 1280-200', 1280, 1000, false, '200%'], ['team 390-200', 390, 844, true, '200%']]) {
                 await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
                 await Page.navigate({ url: `${process.env.CORAL_TEST_URL}/team/${B}/goals` }); await Page.loadEventFired(); await install(); await coralReady();
-                await waitFor(`typeof window.showTeamWorkingModeWorkspace === 'function' && !!document.getElementById('team-page-settings')`, 'the team page', { timeout: 15000 });
+                await waitFor(`typeof window.showTeamWorkingModeWorkspace === 'function' && !!document.getElementById('team-page-more-settings')`, 'the team page', { timeout: 15000 });
                 await ev(`window.showTeamWorkingModeWorkspace(${JSON.stringify(B)}); true`);
                 await waitFor(`document.querySelectorAll('#team-panel-settings .sv-learn').length > 0`, 'the team settings Learn more buttons', { timeout: 15000 });
                 if (zoom) await ev(`document.documentElement.style.fontSize = ${JSON.stringify(zoom)}; true`); await settle(500);

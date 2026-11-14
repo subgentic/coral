@@ -9,10 +9,10 @@ import { browserLocal } from './safe_storage.js';
 import { storeKey } from './local_store.js';
 import { onBuilt } from './lazy_dom.js';
 import { updatesUiOn } from './update_flag.js';
+import { settingsDocsLink } from './docs_answer.js';
 
 const GROUP_KEY = 'coral-settings-group';
 const FIRST = 'general';
-let infoSeq = 0;
 
 const modalEl = () => document.getElementById('settings-modal');
 const panes = () => [...(modalEl()?.querySelectorAll('.settings-pane') || [])];
@@ -65,86 +65,45 @@ export function refreshSettingsGroups() {
     if (!cur || cur.dataset.empty) showSettingsGroup(FIRST, { remember: false });
 }
 
-/** The explanation of a row is its hint line, under the label, always visible (#7405: the (i) tooltips are gone): one short line, about ten words. A longer one is not shown; the row has a "Learn more" link that opens it in place (UI/UX's rule). */
-const LONG_HINT = 60; // characters: about ten words
-// A row whose label alone does not say what it does keeps one short line beside its Learn more (UI/UX's #7405 round 1: Default thinking, Default models, Fit pane width, Free space, Automatic cleanup); a row whose label says it needs no line. By the row's label.
-const SHORT_HINTS = {
-    'Default thinking': 'How much Claude thinks before it answers.',
-    'Default models': 'Used when an agent starts with no model of its own.',
-    'Fit pane width': 'Sizes the terminal to this window (tmux).',
-    'Artifact store limit': "Above it, agents' new uploads are refused.",
-    'Received files limit': 'Above it, new received files are refused.',
-    'Desktop alerts': 'Alert while this tab is in the background.',
-    'Remote access': 'Let other devices on your network use Coral.',
-    'Free space': 'Shrink or prune old saved diffs and artifacts.',
-    'Automatic cleanup': 'Prunes what is older than this, every hour. 0 is off.',
+/** Legacy Network rows share the same help line and Docs anchor as schema rows. */
+const HINTS = {
+    'Coral Hub': 'Limit what Coral Hub can do on this computer.',
+    'What may Coral Hub do on this computer?': 'Choose whether remote users can look, interact or launch agents.',
+    'Let Coral Hub relaunch this Coral to install updates': 'Allow Coral Hub to install a version already downloaded and checked here.',
+    'Coral Hub can turn on auto-accept': 'Allow Coral Hub to enable automatic permission approval.',
+    'Let Coral Hub change cross-team settings': 'Allow Coral Hub to change how teams communicate.',
+    'Hide tokens from view-only hub users': 'Redacts recognised credentials before sharing output with read-only viewers.',
+    'Let Coral Hub act as the Operator': 'Allow Coral Hub users to make Operator decisions here.',
 };
+function docsHint(holder, name, original = null) {
+    const p = original || document.createElement('p'); p.hidden = false; p.classList.add('sv-help', 'settings-hint-line');
+    const sentence = document.createElement('span'); sentence.textContent = HINTS[name] || 'Permissions and limits for this computer.';
+    if (p.id) { sentence.id = p.id; p.removeAttribute('id'); }
+    p.replaceChildren(sentence, ' ');
+    const answer = ['Coral Hub', 'What may Coral Hub do on this computer?'].includes(name) ? 'Coral Hub access limits' : HINTS[name] ? name : 'Settings help for Coral Hub access';
+    const a = settingsDocsLink({ docs: { topic: 'hub', answer } }, { label: name });
+    p.append(a); if (!original) holder.append(p);
+}
 function buildInfoButtons(root) {
     for (const row of root.querySelectorAll('.settings-row, .net-group')) {
-        const group = row.classList.contains('net-group'); // a Network group: its title is the heading its aria-labelledby names (#8491)
-        const dt = group ? document.getElementById(row.getAttribute('aria-labelledby')) : row.querySelector(':scope > dt');
+        const dt = row.classList.contains('net-group') ? document.getElementById(row.getAttribute('aria-labelledby')) : row.querySelector(':scope > dt');
         const texts = [...row.querySelectorAll('dt .toggle-desc, [data-info]')];
         if (!dt || !texts.length || row.dataset.hinted) continue;
         row.dataset.hinted = '1';
-        const label = dt.querySelector('label, [id$="-label"]') || dt; // a label span that names its control counts too (Default permission mode)
-        const name = (label.textContent || '').trim();
-        let holder = dt; // a Network group: its hints go in a line of their own at the top of its body
-        if (group) {
-            holder = document.createElement('div'); holder.className = 'settings-hint-wrap';
-            const lead = row.dataset.learnAfter && row.querySelector(row.dataset.learnAfter); // a group whose short line is in its body (Coral Hub's status, Manage's line): Learn more comes after that line, not before it (#7626, UI/UX)
-            const anchor = lead && lead.closest('.net-body > *');
-            if (anchor) anchor.after(holder); else row.prepend(holder);
-        }
-        const all = [];
-        for (const t of texts) {
-            t.removeAttribute('data-info');
-            if (!t.classList.contains('settings-hint') && !t.classList.contains('toggle-desc')) t.classList.add('settings-hint');
-            t.classList.add('settings-hint-line');
-            if (holder !== dt || (t.parentElement !== dt && !dt.contains(t))) holder.append(t); // under the label, where the eye is, not under the control
-            all.push(t);
-        }
-        const long = all.filter(t => (t.textContent || '').trim().length > LONG_HINT);
-        if (!long.length) continue;
-        for (const t of long) t.classList.add('settings-hint-clamp');
-        if (!long[0].id) long[0].id = `settings-hint-${++infoSeq}`;
-        if (SHORT_HINTS[name] && !all.some(t => !long.includes(t))) { const line = document.createElement('span'); line.className = 'settings-hint settings-hint-line settings-hint-short'; line.textContent = SHORT_HINTS[name]; holder.append(line); }
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'settings-learn';
-        btn.textContent = 'Learn more';
-        btn.setAttribute('aria-expanded', 'false');
-        btn.setAttribute('aria-controls', long.map((t, i) => t.id || (t.id = `${long[0].id}-${i}`)).join(' '));
-        btn.setAttribute('aria-label', `Learn more about ${name}`);
-        btn.addEventListener('click', () => { const open = btn.getAttribute('aria-expanded') !== 'true'; for (const t of long) t.classList.toggle('settings-hint-clamp', !open); btn.setAttribute('aria-expanded', String(open)); btn.textContent = open ? 'Show less' : 'Learn more'; });
+        for (const t of texts) { t.removeAttribute('data-info'); t.hidden = true; }
+        const name = (dt.querySelector('label, [id$="-label"]') || dt).textContent.trim();
+        docsHint(row.querySelector('.net-body') || dt, name, texts[0]);
         const lead = row.dataset.learnAfter && row.querySelector(row.dataset.learnAfter);
-        if (lead && holder !== dt && lead.parentElement && lead.parentElement.matches('.net-body > *')) lead.after(' ', btn); // the sentence's own line: Learn more follows it on that line (#8276), the long text stays under it
-        else holder.append(btn);
+        lead?.closest('.net-body > *')?.after(texts[0]);
     }
 }
-
-/** The Hub rows nested in the Coral Hub row (Hub access, the switches under it): their explanation is a visible hint line under the label too, with "Learn more" when it is long (#7405). */
 function buildCloudInfoButtons(root) {
-    const rows = [
-        ...[...root.querySelectorAll('.settings-cloud-switch-row')].map(r => ({ row: r, label: r.querySelector('.settings-cloud-switch-label'), texts: [r.querySelector('.settings-cloud-switch-text > .settings-hint')] })),
-        ...[...root.querySelectorAll('.settings-cloud-mode')].map(r => ({ row: r, label: r.querySelector(':scope > label'), texts: [r.querySelector('[data-cloud="mode-full"]')] })),
-    ];
-    for (const { row, label, texts } of rows) {
-        const list = texts.filter(Boolean);
-        if (!label || !list.length || row.dataset.hinted) continue;
-        row.dataset.hinted = '1';
-        for (const t of list) { t.classList.add('settings-hint-line'); t.hidden = false; }
-        const long = list.filter(t => (t.textContent || '').trim().length > LONG_HINT);
-        if (!long.length) continue;
-        for (const t of long) { t.classList.add('settings-hint-clamp'); if (!t.id) t.id = `settings-hint-${++infoSeq}`; }
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'settings-learn';
-        btn.textContent = 'Learn more';
-        btn.setAttribute('aria-expanded', 'false');
-        btn.setAttribute('aria-controls', long.map(t => t.id).join(' '));
-        btn.setAttribute('aria-label', `Learn more about ${(label.textContent || '').trim()}`);
-        btn.addEventListener('click', () => { const open = btn.getAttribute('aria-expanded') !== 'true'; for (const t of long) t.classList.toggle('settings-hint-clamp', !open); btn.setAttribute('aria-expanded', String(open)); btn.textContent = open ? 'Show less' : 'Learn more'; });
-        long[long.length - 1].after(btn);
+    for (const row of root.querySelectorAll('.settings-cloud-switch-row, .settings-cloud-mode')) {
+        const label = row.matches('.settings-cloud-mode') ? row.querySelector(':scope > .net-level-row label, :scope > label') : row.querySelector('.settings-cloud-switch-label, :scope > label');
+        const text = row.querySelector('.settings-cloud-switch-text > .settings-hint, [data-cloud="mode-full"]');
+        if (!label || !text || row.dataset.hinted) continue;
+        row.dataset.hinted = '1'; text.hidden = true;
+        docsHint(text.parentElement, label.textContent.trim(), text.matches('[data-cloud="mode-full"]') ? null : text);
     }
 }
 

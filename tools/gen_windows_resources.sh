@@ -9,7 +9,7 @@
 #   No arguments: the committed files, with version 0.0.0.0 (a source build has no release
 #   version). Commit the results.
 #   A release build passes the release version (the tag without its "v", suffix included, e.g.
-#   1.4.148 or 1.4.148-beta) and, for the Dropbox tier, "Coral For Dropbox". The numeric file and
+#   1.4.148 or 1.4.148-rc1), and optionally a product name (default "Coral"). The numeric file and
 #   product version are the leading X.Y.Z of it; the text version is all of it. Release builds
 #   regenerate the files before compiling and do not commit them.
 set -euo pipefail

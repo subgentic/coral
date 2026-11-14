@@ -76,8 +76,7 @@ const hex = n => n.toString(16).padStart(64, '0');
             await open(`/inbox/needs/review/${team}/zzz`);
             check(await ev(`!document.querySelector('.artifact-viewer') && !document.querySelector('dialog[open]')`), at + 'a malformed link opens nothing');
         }
-        await removeBoards(ev, [team]).catch(() => {});
-    } finally { await client.close(); }
+    } finally { await removeBoards(ev, [team]); await client.close(); } // in finally: a step that fails or times out left the team's board behind (the Lead's v2.0.67 run: LEAK link-mwd7u4su, #15915)
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
     console.log('needs_item_link_browser: ok');
 })().catch(e => { console.error(e); process.exit(1); });

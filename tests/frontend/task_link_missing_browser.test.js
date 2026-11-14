@@ -19,7 +19,8 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`!!document.querySelector('#mb-messages .mb-queue-run .mb-queue-task')`, 'the task link', 15000);
         await ev(`document.querySelector('#mb-messages .mb-queue-run .mb-queue-task').dataset.taskId = '77'; document.querySelector('#mb-messages .mb-queue-run .mb-queue-task').click(); true`); // the line's task is one that cannot be read (deleted, or not this team's)
         await waitFor(`location.pathname === ${JSON.stringify(`/team/${board}/tasks/77`)}`, 'the task route', 10000);
-        await new Promise(r => setTimeout(r, 1500)); // sleep-ok: a read that fails has nothing to wait for; a short pause shows what the page settles on
+        const diag = `({ tab: location.pathname, nf: (() => { const v = document.getElementById('not-found-view'); return v ? { hidden: v.hidden, text: v.textContent.trim().slice(0, 80) } : null; })() })`;
+        await waitFor(`(() => { const v = document.getElementById('not-found-view'); return !!v && !v.hidden && /77/.test(v.textContent); })()`, 'the not-found view naming task 77', 15000, diag); // the read that fails settles when the view shows, however slow the machine: wait for it, not a fixed pause (#16280)
         const seen = await ev(`({ modal: [...document.querySelectorAll('dialog[open], .modal')].filter(m => getComputedStyle(m).display !== 'none' && m.offsetHeight).map(m => m.id + ':' + m.textContent.trim().slice(0, 80)), item: (() => { const v = document.getElementById('not-found-view'); return v && !v.hidden ? v.querySelector('.not-found-title').textContent.trim() : null; })(), tab: location.pathname })`);
         console.log(JSON.stringify(seen));
         assert.ok(seen.item && /Task #?77|no longer|could not|not found/i.test(seen.item) && /77/.test(seen.item), 'the place says which task it could not show: ' + JSON.stringify(seen));

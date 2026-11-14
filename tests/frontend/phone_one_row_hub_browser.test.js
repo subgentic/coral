@@ -34,7 +34,8 @@ const overlap = (a, b) => Math.min(a.r, b.r) - Math.max(a.l, b.l) > 1 && Math.mi
             assert.equal(m.mode, 'cloud', `${fs}: the page is the Hub's`);
             assert.equal(m.topBar, 'none', `${fs}: the top bar is hidden while an agent is open`);
             const names = m.parts.map(p => p[0]);
-            for (const n of ['back', 'identity', 'switch', 'more']) assert.ok(names.includes(n), `${fs}: ${n} is in the row: ` + JSON.stringify(m.parts));
+            for (const n of ['back', 'identity', 'more']) assert.ok(names.includes(n), `${fs}: ${n} is in the row: ` + JSON.stringify(m.parts));
+            assert.ok(!names.includes('switch'), 'the Hub also keeps the view switch in More');
             const mids = m.parts.filter(p => /menu|back|chat|more/.test(p[0])).map(p => (p[1].t + p[1].b) / 2);
             assert.ok(Math.max(...mids) - Math.min(...mids) <= 2, `${fs}: one row (the menu, back, switch and ⋯ on one centre line): ` + JSON.stringify(m.parts));
             for (const [n, b] of m.parts) if (/menu|back|chat|terminal|more/.test(n)) assert.ok(b.r - b.l >= 43 && b.b - b.t >= 43, `${fs}: ${n} is a 44 px target: ` + JSON.stringify(b));

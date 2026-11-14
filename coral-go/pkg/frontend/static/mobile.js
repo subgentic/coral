@@ -145,7 +145,8 @@ function _listHeader(agentList) {
         `;
     const searchRow = document.createElement('div'); searchRow.className = 'mobile-search-row'; searchRow.id = 'mobile-search-row';
     searchRow.innerHTML = `<input type="search" class="field field-search sidebar-search-input mobile-search-input" placeholder="Search agents and messages" autocomplete="off" aria-label="Search agents and messages" data-on-input="agent-search-filter" data-on-keydown="agent-search-key">`;
-    header.prepend(buildPhoneBar({ pill: searchRow })); // the same bar every top-level view has (phone_bar.js): ☰, the search in the pill, the account
+    searchRow.append(...header.querySelectorAll('[data-display-button], [data-group-toggle]'));
+    header.prepend(buildPhoneBar({ pill: searchRow })); // the shared navigation/title/action row with search and filters below it
     agentList.prepend(header);
     const hubWords = document.body.getAttribute('data-hub-label'); if (hubWords) header.querySelector('.phone-hub-state').textContent = `, ${hubWords}`; // the hub's state, if it was read before this header was built (hub_indicator.js)
     return header;

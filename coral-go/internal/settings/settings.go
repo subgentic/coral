@@ -90,6 +90,8 @@ type Spec struct {
 	ReadBounded      bool
 	// KindEnum: the values. An enum is read without regard to case; an unrecognised value reads as the default.
 	Values []string
+	// AlsoValid, for an enum, is a rule for values that are not in Values (a custom permission mode's "custom:<id>", #15950: the ids are made at run time); such a value is kept as written.
+	AlsoValid func(string) bool
 	// OptIn is for a bool that widens exposure (remote access, hub mode): only the word true turns it on, in any case; yes, 1 and on do not, so a
 	// stray value fails closed. It is off by default and off for anything else.
 	OptIn bool
@@ -244,6 +246,9 @@ func Enum(m map[string]string, key string) string {
 		if strings.EqualFold(v, want) {
 			return want
 		}
+	}
+	if s.AlsoValid != nil && s.AlsoValid(v) {
+		return v
 	}
 	return s.Default
 }

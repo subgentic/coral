@@ -219,7 +219,7 @@ function renderEdits(items) {
         name.textContent = String(it.name || 'A file');
         head.append(name, document.createTextNode(` was edited in Dropbox (${sizeText(it.size)}, ${String(it.media_type || 'unknown type')}).`));
         const why = document.createElement('div');
-        why.className = 'settings-hint';
+        why.className = 'settings-hint sv-help';
         why.append(document.createTextNode('Coral has not shown you what changed. '));
         const url = String(it.dropbox_url || '');
         if (url.startsWith('https://www.dropbox.com/')) {
@@ -320,7 +320,7 @@ function keyForm() {
     ]) { const li = document.createElement('li'); li.textContent = t; ol.append(li); }
     steps.append(sum, ol);
     const knote = document.createElement('div');
-    knote.id = 'settings-dropbox-key-note'; knote.className = 'settings-hint'; knote.setAttribute('role', 'status');
+    knote.id = 'settings-dropbox-key-note'; knote.className = 'settings-hint sv-help'; knote.setAttribute('role', 'status');
     const confirm = document.createElement('div');
     confirm.id = 'settings-dropbox-key-confirm'; confirm.hidden = true;
     const ctext = document.createElement('span');
@@ -619,7 +619,7 @@ export async function loadRemovals(refocus = false) {
 }
 
 const rmButton = (text, onClick) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-small'; b.textContent = text; b.addEventListener('click', onClick); return b; };
-const rmLine = (text, cls = 'settings-hint') => { const p = document.createElement('p'); p.className = cls; p.textContent = text; return p; };
+const rmLine = (text, cls = 'settings-hint sv-help') => { const p = document.createElement('p'); p.className = cls; p.textContent = text; return p; };
 const rmName = r => String(r.name || 'A file');
 
 function renderRemovals(rows) {
@@ -654,7 +654,7 @@ function askedRemoval(r) {
     const li = document.createElement('li'); li.className = 'settings-dropbox-edit';
     const idBase = `settings-dropbox-rm-${String(r.digest || '').slice(0, 12)}`;
     const name = document.createElement('strong'); name.textContent = rmName(r);
-    const why = document.createElement('p'); why.className = 'settings-hint'; why.id = `${idBase}-why`;
+    const why = document.createElement('p'); why.className = 'settings-hint sv-help'; why.id = `${idBase}-why`;
     const acts = document.createElement('div'); acts.className = 'dropbox-inline';
     const body = { confirm: true };
     let typed = null;

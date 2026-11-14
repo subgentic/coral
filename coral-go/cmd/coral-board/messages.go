@@ -187,6 +187,10 @@ func cmdPost() {
 			clierr.Exit1()
 		}
 	}
+	if why := clitext.WordlessMessage(message); why != "" { // nothing was sent: a bare "-" is what `@Operator - <<EOF` posts (#16186)
+		fmt.Fprintln(os.Stderr, "Error: "+why)
+		os.Exit(2)
+	}
 	if err := refuseSignInLink("post", message); err != nil { // from the arguments, --file or stdin alike
 		fmt.Fprintln(os.Stderr, err)
 		clierr.Exit1()

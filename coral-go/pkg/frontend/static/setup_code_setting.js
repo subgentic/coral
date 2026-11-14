@@ -58,15 +58,15 @@ function syncGroup() {
     group.hidden = !want;
 }
 
-/** The note under the Remote access switch: a change waits for Save, and turning it on says what it then lets in. */
+/** The note under the Remote access switch: a changed preference takes effect after restart, and turning it on says what it then lets in. */
 function syncRemoteNote() {
     const box = $('settings-remote-access-enabled'), note = $('net-remote-note');
     if (!box || !note) return;
     const saved = box.dataset.saved === '1';
     const pending = box.dataset.saved !== undefined && box.checked !== saved;
     note.textContent = !pending ? '' : box.checked
-        ? 'Applies when you press Save settings. Other devices on your network can then reach Coral; they need your password or a setup code.'
-        : 'Applies when you press Save settings.';
+        ? 'Applies when Coral restarts. Other devices on your network can then reach Coral; they need your password or a setup code.'
+        : 'Applies when Coral restarts.';
 }
 
 /** Read the code (it is not shown until asked for), or take the group away when the server has none for this page. */

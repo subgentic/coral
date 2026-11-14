@@ -34,12 +34,12 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
                 assert.equal(await activeTab(), 'Goals', 'the page opens on Goals');
                 assert.ok(await ev(`window.__tp.tablist() !== null`), 'a tablist named Team');
             });
-            await S.run(`${label}: the header has ONE status (a button or text) and the buttons Add agent and Actions, and the h1 starts with the team's name`, async () => {
+            await S.run(`${label}: the header has ONE status (a button or text) and the buttons Add agent and More, and the h1 starts with the team's name`, async () => {
                 if (mobile) { await ev(`document.getElementById('team-page-more').click(); true`); await settle(250); } // a phone's header has ONE button, More, with Add agent as its first item (UI/UX, #7453 round 1)
-                const r = await ev(`(() => { const t = window.__tp; const h = t.h1(); const status = h ? [...h.querySelectorAll('*')].map(e => window.__na.text(e)).filter(x => /need attention|all well|running|working|idle/i.test(x)) : []; return { h1: h ? window.__na.text(h) : '', add: !!t.find('button', /^Add agent$/i), more: !!t.find('button', /^Actions$/i), statuses: [...new Set(status)] }; })()`);
+                const r = await ev(`(() => { const t = window.__tp; const h = t.h1(); const status = h ? [...h.querySelectorAll('*')].map(e => window.__na.text(e)).filter(x => /need attention|all well|running|working|idle/i.test(x)) : []; return { h1: h ? window.__na.text(h) : '', add: !!t.find('button', /^Add agent$/i), more: !!t.find('button', /^More team actions$/i), statuses: [...new Set(status)] }; })()`);
                 if (mobile) { await ev(`document.getElementById('team-page-more').click(); true`); await settle(150); } // close it again
                 assert.ok(r.h1.startsWith(TEAM), `the h1 starts with the team name (got ${JSON.stringify(r.h1)})`);
-                assert.ok(r.add, 'a button named Add agent'); assert.ok(r.more, 'a button named Actions (the header\'s was More: the tab strip has one too, #10942)');
+                assert.ok(r.add, 'a button named Add agent'); assert.ok(r.more, 'a button named More team actions (it says More; the name tells it from the tab strip\'s, #10942, #15856)');
                 assert.ok(r.statuses.length <= 1, `one status in the header, not ${r.statuses.length}: ${JSON.stringify(r.statuses)}`);
             });
             await S.run(`${label}: the tablist named Team has the eight tabs in order (Needs you second, Board seventh, Branches last), each name carrying its count where it has one`, async () => {

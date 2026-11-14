@@ -1,4 +1,4 @@
-// What Save does in the Settings dialog, setting by setting (#4896, from #4893 proposal A): applySettings (settings_dialog.js) reads about forty controls, builds the payload, sends only what changed,
+// Legacy combined-save module compatibility oracle, setting by setting (#4896, from #4893 proposal A): applySettings (settings_dialog.js) reads about forty controls, builds the payload, sends only what changed,
 // saves it and then applies each setting to the page. Splitting it into reading, saving and applying must change nothing. This opens the real dialog (showSettingsModal) with the settings empty,
 // changes ONE control (or a few), calls applySettings, and records for each case: the request body (or that none was sent), the toast, whether the dialog closed, the theme (data-theme, the saved
 // preference, the inline variables of a custom theme), the scrollbar class, the terminal's font size and scrollback, the browser's update-check flag, state.settings, the privacy status, and what was
@@ -132,7 +132,12 @@ const CASES = [
                     else if (kind === 'pick') { if (![...e.options].some(o => o.value === v)) missing.push(id + '=' + v); e.value = v; }
                     else if (kind === 'next') { const cur = e.value; const o = [...e.options].find(o => o.value !== cur && !o.disabled); if (o) e.value = o.value; else missing.push(id + ' (no other option)'); }
                     else e.value = v;
-                    e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true }));
+                    // Keep preview/dependent controls in sync without saving before this legacy combined-save oracle runs. Real row saves are covered in settings_autosave_browser.
+                    e.dataset.saving = '1';
+                    e.dispatchEvent(new Event('input', { bubbles: true }));
+                    e.dispatchEvent(new Event('change', { bubbles: true }));
+                    delete e.dataset.saving;
+
                 }
                 window.__dm0 = window.LM._getDefaultModels();
                 const before = window.__fetched.length;

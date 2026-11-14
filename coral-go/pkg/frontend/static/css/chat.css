@@ -628,11 +628,16 @@ body:has(.model-chip-menu:not([hidden])) .chat-jump-latest-btn { visibility: hid
     display: none;
 }
 .live-view-toggle-btn {
-    padding: 3px 7px;
+    padding-inline: 7px; /* the height is the toolbar's, not padding's */
+    min-height: var(--control-compact-height); /* one toolbar height (#15821) */
 }
 .live-view-toggle-btn .material-icons {
     font-size: var(--fs-xl);
 }
+
+/* A message's icon buttons are drawn at 24 px inside a 32 px hit area (44 on touch), #15821 */
+.chat-bubble .btn-icon.btn-xs::after { content: ""; position: absolute; inset: -4px; }
+@media (pointer: coarse) { .chat-bubble .btn-icon.btn-xs::after { inset: -10px; } }
 
 /* ── Chat prose: reading typography (live Chat view + history Chat tab) ── */
 /* Prose uses the shared body role, with user-overridable family/size.

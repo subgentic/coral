@@ -29,6 +29,10 @@ const walkAllocBoundMB = 2000
 const (
 	goalNeedsYouWalkMs   = 4000
 	goalNeedsYouWalkCIMs = 8000
+	// The CPU the walk may use on a developer's machine (#16035). The wall clock is the machine's as much as the code's: a box with four pinned cores or other agents' go tests took 5.6 and 6.1 s for a walk that
+	// takes 1.6 s alone (epoch), and the best of three was no help. The walk's CPU time moves little with load (3.05 s alone, 3.55 s beside eight busy loops on the Mac). 7 s is twice what the walk uses
+	// and the cache-less code (every page builds the list: 14 s on the fastest machine) is far over it.
+	goalNeedsYouWalkCPUMs = 7000
 )
 
 // needsYouWalkCeilingMs is the ceiling for this machine: the CI one when CI is set.
@@ -121,14 +125,25 @@ func TestNeedsYouWalkOfABigBoardIsUnderTheGoal(t *testing.T) {
 	// The fastest of up to three cold walks (each on a fresh rig, so none is warmed by the one before): one wall-clock sample that a loaded machine stalls is not a slow walk, three over the goal are (#15480).
 	var files, pages int
 	var allocMB float64
+	// On a developer's machine the goal is read from the walk's CPU time (a loaded box stretches the wall clock, not the CPU); where the platform does not say (Windows) or on CI (its own wall ceiling, above), the wall clock.
+	_, haveCPU := processCPU()
+	byCPU := haveCPU && os.Getenv("CI") == ""
+	if byCPU {
+		ceiling = time.Duration(float64(goalNeedsYouWalkCPUMs)*scale) * time.Millisecond
+	}
 	elapsed := fastestWithin(3, ceiling, func(attempt int) time.Duration {
 		_, srv, _ := bigBoardWalkRig(t, true)
 		var m0, m1 runtime.MemStats
 		runtime.GC()
 		runtime.ReadMemStats(&m0)
+		cpu0, _ := processCPU()
 		t0 := time.Now()
 		files, pages = walkForReview(t, srv)
 		d := time.Since(t0)
+		if cpu1, ok := processCPU(); ok && byCPU {
+			t.Logf("PERF walk %d: %s wall, %s CPU", attempt+1, d.Round(time.Millisecond), (cpu1 - cpu0).Round(time.Millisecond))
+			d = cpu1 - cpu0
+		}
 		runtime.ReadMemStats(&m1)
 		if a := float64(m1.TotalAlloc-m0.TotalAlloc) / (1 << 20); attempt == 0 || a > allocMB {
 			allocMB = a // the allocation bound reads the worst run: it is not a clock
@@ -136,10 +151,14 @@ func TestNeedsYouWalkOfABigBoardIsUnderTheGoal(t *testing.T) {
 		return d
 	})
 	t.Logf("PERF the walk allocated %.0f MB (bound %d MB)", allocMB, walkAllocBoundMB)
-	t.Logf("PERF the cold walk of the for-review list: %d files in %d pages, %s (goal %s)", files, pages, elapsed.Round(time.Millisecond), ceiling)
+	unit := "wall"
+	if byCPU {
+		unit = "CPU"
+	}
+	t.Logf("PERF the cold walk of the for-review list: %d files in %d pages, %s %s (goal %s)", files, pages, elapsed.Round(time.Millisecond), unit, ceiling)
 	require.Equal(t, 20000, files, "every file for review is in the walk")
 	if elapsed > ceiling {
-		t.Errorf("the cold walk of 20,000 for-review files took %s, over the goal's %d ms (#13522)", elapsed.Round(time.Millisecond), int(float64(needsYouWalkCeilingMs())*scale))
+		t.Errorf("the cold walk of 20,000 for-review files took %s of %s, over the goal's %s (#13522)", elapsed.Round(time.Millisecond), unit, ceiling)
 	}
 	// An allocation bound, not a clock: the walk of a loaded or slow machine takes longer, but a page that copies the whole list (every matching row, for every page: #13614) allocates gigabytes wherever it runs.
 	if allocMB > walkAllocBoundMB {

@@ -156,7 +156,11 @@ export function defaultPermissionMode(settings, agentType) {
 export function syncDefaultPermissionMode(selectEl, settings, agentType) {
     if (!selectEl) return;
     trackPermissionPick(selectEl);
-    if (!selectEl.dataset.pickedByPerson) selectEl.value = defaultPermissionMode(settings, agentType);
+    if (!selectEl.dataset.pickedByPerson) {
+        let want = defaultPermissionMode(settings, agentType);
+        if (String(want).startsWith('custom:') && ![...selectEl.options].some(o => o.value === want)) want = defaultPermissionMode({}, agentType); // a saved custom mode of another CLI (or one that is gone): the type's own default (#15950)
+        selectEl.value = want;
+    }
 }
 
 /** Marks a permission mode select as picked when its value changes (a change event): wired once, as soon as the select exists, so a pick made before the first sync still counts. */
