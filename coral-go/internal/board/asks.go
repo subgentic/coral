@@ -650,3 +650,32 @@ func (s *Store) ReopenAskAnswer(ctx context.Context, project string, messageID i
 	_, err := s.db.ExecContext(ctx, `INSERT OR REPLACE INTO board_ask_reopened (message_id, project, after_id, reopened_at) VALUES (?, ?, ?, ?)`, messageID, project, newest, nowUTC())
 	return err
 }
+
+// OpenDuplicateAsk is the id of an earlier question of asker's on the board with exactly this text that nobody has answered or closed yet, 0 for none (#16135). An agent that ran
+// post --ask again (its output was cut, so it thought the post failed) put the Operator's Needs you twice with one question; the route answers with the first one instead. Only a
+// question young enough to still count as open (askMaxAge) is looked at, and the text must match whole.
+func (s *Store) OpenDuplicateAsk(ctx context.Context, project, asker, content string, now time.Time) (int64, error) {
+	var asks []askRow
+	if err := s.reader().SelectContext(ctx, &asks, `SELECT a.message_id, a.asker, a.asked, a.created_at FROM board_asks a JOIN board_messages m ON m.project = a.project AND m.id = a.message_id
+        WHERE a.project = ? AND a.created_at > ? AND lower(a.asker) = lower(?) AND m.content = ? ORDER BY a.message_id DESC`,
+		project, now.Add(-askMaxAge).UTC().Format(time.RFC3339), asker, content); err != nil {
+		return 0, err
+	}
+	if len(asks) == 0 {
+		return 0, nil
+	}
+	subs, err := s.subscriberIndex(ctx, project)
+	if err != nil {
+		return 0, err
+	}
+	for _, a := range asks {
+		info, err := s.askInfo(ctx, project, a, subs)
+		if err != nil {
+			return 0, err
+		}
+		if !info.Answered && !info.Closed {
+			return a.MessageID, nil
+		}
+	}
+	return 0, nil
+}

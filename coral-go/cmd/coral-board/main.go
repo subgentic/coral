@@ -201,6 +201,10 @@ Commands:
                                them with it. With one claimed task you need
                                not: it is attached
   post --ask --yes-no "@Operator <yes/no question>"
+  post --withdraw N            Take back your own open question N (the same as
+                               ask withdraw N). Asking the same question again
+                               while it is open posts nothing: it answers
+                               "Already asked as #N" (--again posts it anyway)
   post --ask --button 'Label=action' "@Operator <question>"
                                Up to 3 buttons on a question to the Operator,
                                each one action: reply (the label is sent as
