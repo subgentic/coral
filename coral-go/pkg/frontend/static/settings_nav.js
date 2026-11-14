@@ -26,6 +26,7 @@ const setScreen = screen => modalEl()?.setAttribute('data-screen', screen);
 
 /** Opens the pane for a group; an unknown or empty group opens the first one. Returns the group shown. */
 function showSettingsGroup(id, { focus = false, remember = true } = {}) {
+    if (id === 'needs-you') id = 'notifications';
     const list = shown();
     const pane = list.find(p => p.dataset.group === id) || list[0];
     if (!pane) return null;
@@ -59,6 +60,7 @@ export function refreshSettingsGroups() {
         const tab = tabFor(p.dataset.group);
         if (tab) tab.hidden = empty;
     }
+    modalEl()?._refreshGroupLabels?.();
     const pick = document.getElementById('settings-group-select');
     if (pick) for (const o of pick.options) o.hidden = !!panes().find(p => p.dataset.group === o.value)?.dataset.empty;
     const cur = panes().find(p => !p.hidden);
@@ -117,8 +119,9 @@ function buildTabs(modal) {
         b.type = 'button'; b.id = `settings-tab-${id}`; b.className = 'settings-tab'; b.setAttribute('role', 'tab');
         b.setAttribute('aria-controls', p.id); b.setAttribute('aria-selected', String(!p.hidden)); b.tabIndex = p.hidden ? -1 : 0;
         b.innerHTML = `<span class="material-icons" aria-hidden="true">${p.dataset.icon}</span><span class="settings-tab-name"></span>`;
-        b.querySelector('.settings-tab-name').textContent = p.dataset.title;
-        if (p.dataset.hint) b.querySelector('.settings-tab-name').setAttribute('data-sub', p.dataset.hint); // a phone's list says what is inside (mobile.css): General: Theme... (#11128)
+        const name = b.querySelector('.settings-tab-name');
+        name.textContent = p.dataset.title;
+        if (p.dataset.hint) name.setAttribute('data-sub', p.dataset.hint); // a phone's list says what is inside (mobile.css): General: Theme... (#11128)
         b.addEventListener('click', () => { showSettingsGroup(id); setScreen('pane'); if (!b.getClientRects().length) p.focus({ preventScroll: true }); }); // on a phone the list goes away: the keyboard is on the section, which the tab names (it was on nothing, #10644)
         tabs.append(b);
         const o = document.createElement('option'); o.value = id; o.textContent = p.dataset.title; pick?.append(o);
