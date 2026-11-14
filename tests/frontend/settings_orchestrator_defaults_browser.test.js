@@ -23,11 +23,11 @@ const SAVED = { default_model_claude: 'claude-sonnet-5-5', default_thinking_clau
                 if (url.pathname === '/api/settings' && (o.method || 'GET').toUpperCase() === 'GET') return original(u, o).then(async r => { const d = await r.json(); return new Response(JSON.stringify({ ...d, settings: { ...(d.settings || {}), ...${JSON.stringify(SAVED)} } }), { status: 200, headers: { 'Content-Type': 'application/json' } }); });
                 return original(u, o); }; return true; })()`);
             await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.settings = { ...(m.state.settings || {}), ...${JSON.stringify(SAVED)} }; return true; })`); // the dialog fills from the settings the page already holds
-            await ev(`(async () => { await window.showSettingsModal('agents'); return true; })()`);
+            await ev(`(async () => { await window.showSettingsModal('providers'); return true; })()`);
             await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none' && !!document.getElementById('settings-orchestrator-model-claude')`, at + 'Settings with the Orchestrator rows', 10000);
             // the section is there, closed by default, and opens
-            const sec = await ev(`(() => { const h = document.getElementById('settings-orchestrator-defaults'); return { there: !!h, text: h && h.textContent.trim(), open: h && (h.closest('details') ? h.closest('details').open : h.getAttribute('aria-expanded')) }; })()`);
-            check(sec.there && /Orchestrator defaults/.test(sec.text), at + 'the Orchestrator defaults heading is there: ' + JSON.stringify(sec));
+            const sec = await ev(`(() => { const h = document.getElementById('settings-provider-advanced-claude'); return { there: !!h, text: h && h.textContent.trim(), open: h && (h.closest('details') ? h.closest('details').open : h.getAttribute('aria-expanded')) }; })()`);
+            check(sec.there && /Advanced/.test(sec.text), at + 'the closed Advanced fold with the Orchestrator rows is there: ' + JSON.stringify(sec));
             // the thinking lists: the levels each CLI takes, empty first (the CLI's own default for the workers, the same as the workers for the Orchestrator)
             for (const [t, levels] of Object.entries(LEVELS)) {
                 const lists = await ev(`(() => { const opts = id => [...(document.getElementById(id)?.options || [])].map(o => o.value); return { workers: opts('settings-default-thinking-${t}'), orch: opts('settings-orchestrator-thinking-${t}'), orchEmpty: (document.getElementById('settings-orchestrator-thinking-${t}')?.options[0] || {}).textContent, modelHint: (document.getElementById('settings-orchestrator-model-${t}') || {}).placeholder }; })()`);

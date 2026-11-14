@@ -1,0 +1,10 @@
+/* Settings > Providers (ST4): one card per provider. A card that is installed shows its rows; one that is not folds to its title and one line, "Set up Codex". Loaded when the Providers
+   section is first shown (settings_providers.js), so the start's stylesheet does not carry it. */
+#settings-providers-rows .prov-card { border: var(--card-border); border-radius: var(--card-radius); background: var(--bg-primary); margin: 0 0 12px; padding: var(--card-pad); min-width: 0; }
+#settings-providers-rows .prov-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-height: var(--control-touch-height, 36px); }
+#settings-providers-rows .prov-card-title { margin: 0; font: var(--dlg-section); color: var(--text-primary); }
+#settings-providers-rows .prov-card-status { margin-left: auto; font-size: var(--fs-sm); color: var(--text-secondary); min-width: 0; }
+#settings-providers-rows .prov-card-setup { margin: 0 0 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: var(--fs-md); color: var(--text-secondary); }
+#settings-providers-rows .prov-card[data-state="missing"] > :not(.prov-card-head):not(.prov-card-setup) { display: none; }
+#settings-providers-rows .prov-card:not([data-state="missing"]) > .prov-card-setup { display: none; }
+#settings-providers-rows .prov-card > details { margin-top: 6px; }
