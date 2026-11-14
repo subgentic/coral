@@ -5,6 +5,7 @@ package agent
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -66,4 +67,22 @@ func TestShellJoinQuotesCmdMetacharactersForABatchProgram(t *testing.T) {
 	assert.Equal(t, `& 'C:\tools\codex.cmd' -c `+psquote.Literal(`"`+value+`"`), line)
 	// a program that is not a batch file keeps the old rule
 	assert.Equal(t, `& 'C:\tools\codex.exe' -c `+psquote.Literal(value), ShellJoin([]string{`C:\tools\codex.exe`, "-c", value}))
+}
+
+// #16224: on pwsh 7.3+ the line asks for 'Windows' native argument passing (the .cmd gets its arguments as 5.1 writes them) before it runs a .cmd with a wrapped argument; 5.1 needs no such line; a .cmd argument cmd.exe cannot be made safe for is not started.
+func TestShellJoinBatchOnPwshAndRefusal(t *testing.T) {
+	value := codexHookTrustArgs("windows", "& 'C:/Coral/coral-hook-agentic-state.exe'")[1]
+	pwsh := filepath.Join(t.TempDir(), "pwsh.exe")
+	if err := os.WriteFile(pwsh, []byte("MZ"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CORAL_SHELL", pwsh)
+	line := ShellJoin([]string{`C:\tools\codex.cmd`, "-c", value})
+	assert.True(t, strings.HasPrefix(line, "$PSNativeCommandArgumentPassing = 'Windows'; & 'C:\\tools\\codex.cmd' -c "), line)
+	assert.NotContains(t, ShellJoin([]string{`C:\tools\codex.exe`, "-c", value}), "PSNativeCommandArgumentPassing", "only a .cmd needs it")
+	t.Setenv("CORAL_SHELL", "powershell.exe")
+	assert.NotContains(t, ShellJoin([]string{`C:\tools\codex.cmd`, "-c", value}), "PSNativeCommandArgumentPassing", "5.1 passes arguments as they are")
+	refused := ShellJoin([]string{`C:\tools\codex.cmd`, "-C", `C:\Users\A&B%x`})
+	assert.True(t, strings.HasPrefix(refused, "Write-Host "), refused)
+	assert.NotContains(t, refused, "codex.cmd' -C", "the program is not started")
 }

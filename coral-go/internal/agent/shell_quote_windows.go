@@ -64,8 +64,14 @@ func ShellJoin(parts []string, raw ...string) string {
 	}
 	legacy := legacyNativeArgs()
 	cmdArgs := map[string]string{} // a .cmd or .bat that is started as it is gets each argument with a < > & | or ^ in double quotes, which cmd.exe reads as plain text (#16207)
+	batch := false
 	if prog := programIndex(parts, raw); prog >= 0 && isBatchFile(parts[prog]) {
+		batch = true
 		for _, p := range parts[prog+1:] {
+			if psquote.CmdUnsafe(p) { // cmd.exe would read part of it as a redirect or a second command: the line does not start the program (#16224)
+				slog.Warn("agent CLI is a .cmd and an argument has characters cmd.exe would act on: not started", "cli", filepath.Base(parts[prog]))
+				return "Write-Host " + psquote.Literal("Coral: "+filepath.Base(parts[prog])+" is a .cmd, and one of its arguments has characters cmd.exe would read as a redirect or a second command (a & | < > or ^ with a quote or a %), so it was not started. Point the CLI path at the .exe, or move the folder to a path without them.") + " -ForegroundColor Red"
+			}
 			if q, ok := psquote.CmdArg(p); ok {
 				cmdArgs[p] = psquote.Literal(q)
 			}
@@ -77,6 +83,9 @@ func ShellJoin(parts []string, raw ...string) string {
 		}
 		return psQuote(s, legacy)
 	}, true)
+	if batch && !legacy && len(cmdArgs) > 0 { // PowerShell 7.3+ hands a .cmd its arguments as 5.1 does only in its 'Windows' mode; in 'Standard' it writes an embedded " as \" and cmd.exe would read the wrapped argument wrong (#16224)
+		line = "$PSNativeCommandArgumentPassing = 'Windows'; " + line
+	}
 	if notice != "" {
 		line = "Write-Host " + psquote.Literal(notice) + " -ForegroundColor Yellow; " + line
 	}
