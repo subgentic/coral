@@ -86,7 +86,9 @@ const { answerCell, rowActions, readWholeQuestion } = await importOnce('./inbox_
 /** The agent's own chat card, on the Agents tab (a row that needs an answer shows the chat card, not the terminal saved last, #10141). */
 const openInAgents = s => { window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => window.showChatView?.()); };
 /** A computer cut its list short (#14827): said once under the list. With no filter applied the way out is Filters; with one on and the list still cut, a narrower filter. A list that is complete says nothing. */
-const cutShort = () => reviewPages().some(p => p.truncated) ? (NF.isFiltered(needsFilters) ? 'filtered' : 'open') : '';
+// A source can mark its wider scan truncated even when this review page is
+// complete. Warn only when it also reports omitted rows or fills the 50-row page.
+const cutShort = () => reviewPages().some(p => p.truncated && (p.has_more || p.total > p.loadedCount || p.loadedCount >= 50)) ? (NF.isFiltered(needsFilters) ? 'filtered' : 'open') : '';
 function cutShortLine() { const c = cutShort(); return c ? DT.el('p', 'goals-note inbox-cut-short', c === 'filtered' ? 'This list is cut short. Narrow the filters further.' : 'This list is cut short. Use Filters to narrow it.') : null; }
 /** The one quiet line under Needs you when the Operator's own switches keep files out of it (#12144): what and how many, and the way to them (their folder, Artifacts). Never counted, never pushed: a line, not an item. */
 // A muted file that is more than a day old and still unread surfaces ONCE, in this quiet line only (never in the badge or a push): the ones already shown in an earlier visit are remembered in this browser, the ones shown
