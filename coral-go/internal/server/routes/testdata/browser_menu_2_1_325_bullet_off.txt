@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.325
+▝▜██████▀  Haiku 5.5 · Claude Team
+ ▝▝   ▝▝   /…/-Users-cknorowski-Software-coral-coral-go/ba1e7db2-1c63-db8c-1540-862373255348/scratchpad/cap16609
+
+
+❯ Use the claude-in-chrome skill to open https://example.com in my browser and tell me its title
+
+  Skill(claude-in-chrome)
+  ⎿  Initializing…
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Claude wants to use your browser
+
+  This task could use your Chrome browser. The Claude in Chrome extension lets Claude navigate sites, click buttons,
+  and fill forms in your existing session.
+
+    Install extension  Opens the install page in Chrome
+  ❯ Not now            Continue without browser tools
+    Don't ask again    Revisit anytime with /chrome
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

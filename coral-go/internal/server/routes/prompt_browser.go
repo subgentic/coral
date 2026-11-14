@@ -103,7 +103,9 @@ func parseBrowserPromptMenu(lines []string) (promptScreen, bool) {
 	if len(body) > 0 {
 		question += " " + strings.Join(body, " ")
 	}
-	return promptScreen{Title: browserPromptTitle, Question: question, Options: opts, Unnumbered: true, BrowserMenu: true, context: strings.Join(body, "\n")}, true
+	s := cleanPromptScreen(promptScreen{Title: browserPromptTitle, Question: question, Options: opts, Unnumbered: true, BrowserMenu: true, context: strings.Join(body, "\n")})
+	s.AskID = askID(s) // every other menu gets one in parsePromptScreenFor; without it the row refuses to answer ("That question changed") and Not now did nothing (#16609)
+	return s, true
 }
 
 // isBrowserPromptMenu says whether s is Claude's browser menu as parseBrowserPromptMenu reads it, and the one choice a row may take is its "Not now".
