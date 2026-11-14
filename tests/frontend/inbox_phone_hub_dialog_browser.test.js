@@ -10,6 +10,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setupHubWorld } = require('./helpers/hub_world');
 const BASE = require('./test_base').BASE;
+const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_notice');
 const { coralReady } = require('./helpers/wait');
 
 (async () => {
@@ -23,7 +24,7 @@ const { coralReady } = require('./helpers/wait');
             const at = `${w}: `;
             const snap = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; await ev(`new Promise(r => setTimeout(r, 700))`); /* sleep-ok: a synthesized touch leaves its tap highlight on screen for a moment; the picture waits for it to fade */ fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/hub-dialog-${name}-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
             await setupHubWorld({ client, Page, Emulation, width: w, height: h, mobile, inbox: 'native', needs: true, hubPages: true });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, BASE + '/'); /* the unseen first-run notice sits in the phone Inbox pane now (#16460) and shifts what these measure: acked on the test server */ await install(); await coralReady(ev, 'startup', 'settings');
             await ev(`localStorage.setItem('coral-alerts-offered', '1'); localStorage.setItem('coral-alerts-reoffered', '1'); true`); // the first question offers alerts (#15297): this suite is not about that banner
             await ev(`(() => { const original = window.fetch.bind(window), json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
                 window.__closes = [];
@@ -55,7 +56,7 @@ const { coralReady } = require('./helpers/wait');
                 await tapAt(target.x, target.y);
                 await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`, `${at}the dialog opens from a real ${mobile ? 'tap' : 'click'}`, 8000);
             };
-            const foot = () => ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); const vis = e => !!e && !e.hidden && e.getClientRects().length > 0; const dm = [...d.querySelectorAll('.inbox-ask-buttons button')].find(b => b.textContent.trim() === 'Dismiss'); const yn = [...d.querySelectorAll('.inbox-ask-yes-no .inbox-ask-offer button')].map(b => { const r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, top = document.elementFromPoint(cx, cy); let inside = true, scrolled = false; for (let a = b.parentElement; a && a !== d.parentElement; a = a.parentElement) { const ar = a.getBoundingClientRect(); if (ar.width > 0 && (r.left < ar.left - 0.5 || r.right > ar.right + 0.5)) inside = false; if (a.scrollWidth - a.clientWidth > 1 && getComputedStyle(a).overflowX !== 'visible') scrolled = true; if (a === d) break; } return { text: b.textContent.replace(/\\s+/g, ' ').trim(), w: Math.round(r.width), h: Math.round(r.height), right: Math.round(r.right), inside, scrolled, hit: top === b || b.contains(top) }; });
+            const foot = () => ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); const vis = e => !!e && !e.hidden && e.getClientRects().length > 0; const dm = [...d.querySelectorAll('.inbox-ask-buttons button')].find(b => /^Dismiss\\b/.test(b.textContent.trim())); const yn = [...d.querySelectorAll('.inbox-ask-yes-no .inbox-ask-offer button')].map(b => { const r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, top = document.elementFromPoint(cx, cy); let inside = true, scrolled = false; for (let a = b.parentElement; a && a !== d.parentElement; a = a.parentElement) { const ar = a.getBoundingClientRect(); if (ar.width > 0 && (r.left < ar.left - 0.5 || r.right > ar.right + 0.5)) inside = false; if (a.scrollWidth - a.clientWidth > 1 && getComputedStyle(a).overflowX !== 'visible') scrolled = true; if (a === d) break; } return { text: b.textContent.replace(/\\s+/g, ' ').trim(), w: Math.round(r.width), h: Math.round(r.height), right: Math.round(r.right), inside, scrolled, hit: top === b || b.contains(top) }; });
             return { dismiss: vis(dm), dismissBox: dm ? Math.round(dm.getBoundingClientRect().height) : 0, yn, error: d.querySelector('.inbox-ask-error').textContent, overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth, dlgRight: Math.round(d.getBoundingClientRect().right), vw: innerWidth }; })()`);
 
             // the Yes/No question (m1, id 7): words on the buttons, and Dismiss through the Hub
@@ -68,7 +69,7 @@ const { coralReady } = require('./helpers/wait');
             check(f.yn.every(b => !b.scrolled), `${at}and none of those boxes scrolls sideways: ` + JSON.stringify(f.yn));
             check(f.dismiss && f.dismissBox >= 36, `${at}through the Hub the owner's dialog has Dismiss: ` + JSON.stringify(f));
             await snap('yes-no');
-            await ev(`window.__closes.length = 0; [...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-buttons button')].find(b => b.textContent.trim() === 'Dismiss').click(); true`);
+            await ev(`window.__closes.length = 0; [...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-buttons button')].find(b => /^Dismiss\\b/.test(b.textContent.trim())).click(); true`);
             await waitFor(`window.__closes.length === 1`, `${at}Dismiss sends the close call`, 8000).catch(() => {});
             const c = await ev(`window.__closes`);
             check(c.length === 1 && c[0].path === '/api/remote/m1/api/board/team-x/asks/7/close' && c[0].method === 'POST' && c[0].search === '' && c[0].body === JSON.stringify({ note: 'Dismissed by the operator' }), `${at}the close call is the Hub's: ` + JSON.stringify(c));
@@ -78,14 +79,14 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.__closes.length = 0; true`);
             await openRow('Is the sandbox ready');
             check((await foot()).dismiss, `${at}m2's dialog offers Dismiss until it says no`);
-            await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-buttons button')].find(b => b.textContent.trim() === 'Dismiss').click(); true`);
+            await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-buttons button')].find(b => /^Dismiss\\b/.test(b.textContent.trim())).click(); true`);
             await waitFor(`/owner/i.test(document.querySelector('dialog.inbox-ask-dialog .inbox-ask-error').textContent)`, `${at}the refusal is told`, 8000).catch(() => {});
             const g = await foot();
             check(!g.dismiss && /owner/i.test(g.error), `${at}after the refusal Dismiss is gone and the owner is named: ` + JSON.stringify(g));
             await snap('refused');
             await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); if (d) { d.close(); d.remove(); } return true; })()`);
         }
-    } finally { await client.close(); }
+    } finally { try { await restoreLaunchNotice(ev); } catch (e) {} await client.close(); }
     if (failures.length) { console.error('FAIL\n  ' + failures.join('\n  ')); process.exit(1); }
     console.log('PASS through Coral Hub: Dismiss in the dialog for the owner, Yes and No in words, a phone card with room between name and question, at 390 and 1280');
 })().catch(e => { console.error(e); process.exit(1); });

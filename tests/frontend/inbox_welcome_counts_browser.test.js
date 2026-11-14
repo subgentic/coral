@@ -3,6 +3,7 @@
 // without the setting never sees them. At 1280 and 390 px, through agent_view_harness.js against the isolated dev server (the settings the page keeps are put in its state; the PUTs are answered here).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_notice');
 const { coralReady } = require('./helpers/wait');
 
 (async () => {
@@ -16,7 +17,7 @@ const { coralReady } = require('./helpers/wait');
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             const tag = `${w}px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
+            await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, process.env.CORAL_TEST_URL + '/'); /* the unseen first-run notice sits in the phone Inbox pane now (#16460) and shifts what these measure: acked on the test server */ await install();
             await coralReady(ev);
             // the page's own state: a new install (the setting on, nothing done), no agents, no computers; the team list and the settings save are answered here
             await ev(`window.__puts = []; window.__teams = []; window.__realFetch = window.__realFetch || window.fetch; window.fetch = (u, o) => { const s = String(u), json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
@@ -60,7 +61,7 @@ const { coralReady } = require('./helpers/wait');
             const after = await folderCount(), chipsAfter = await pills();
             check(after.every(c => c === '0' || c === '' || c == null) && !chipsAfter.some(c => /^Welcome/.test(c)), `${tag}: the count and the Welcome pill go with them: ` + JSON.stringify([after, chipsAfter]));
         }
-    } finally { await client.close(); }
+    } finally { try { await restoreLaunchNotice(ev); } catch (e) {} await client.close(); }
     if (found.length) { console.error(found.join('\n')); process.exit(1); }
     console.log('inbox_welcome_counts_browser: ok');
 })().catch(e => { console.error(e); process.exit(1); });

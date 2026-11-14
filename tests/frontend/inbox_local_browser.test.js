@@ -9,6 +9,7 @@ const assert = require('node:assert/strict');
 const { OPEN_INBOX_SAVED } = require('./helpers/open_inbox_saved');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
+const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_notice');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 const { coralReady } = require('./helpers/wait');
@@ -42,7 +43,7 @@ const hex = i => i.toString(16).padStart(20, '0');
 
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, BASE + '/'); /* the unseen first-run notice sits in the phone Inbox pane now (#16460) and shifts what these measure: acked on the test server */ await install();
         await coralReady(ev);
         for (const it of (await api('GET', '/api/saved')).body.items) await api('DELETE', `/api/saved/${it.id}`);
         // A board bookmark's author is what the board says wrote the message (#4816): real board messages, written by those names.
@@ -60,7 +61,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         const open = async (w, mobile, waiting = ['qa-b-id']) => {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await ev(`try { localStorage.removeItem('coral-last-place'); } catch {} true`).catch(() => {}); // a fresh browser has no place to reopen (#10057): the scene starts at Home, not where the scene before left off
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, BASE + '/'); /* the unseen first-run notice sits in the phone Inbox pane now (#16460) and shifts what these measure: acked on the test server */ await install();
             await coralReady(ev);
             await ev(`localStorage.removeItem('coral.inbox.tab'); true`); // a fresh browser: the Inbox opens on Needs you
             await ev(`(() => { const jobs = { 'qa-a-id': 'QA Engineer', 'fe-a-id': 'Frontend Dev', 'qa-b-id': 'QA Engineer' }; const waiting = ${JSON.stringify(waiting)};
@@ -245,6 +246,7 @@ const hex = i => i.toString(16).padStart(20, '0');
     } finally {
         await require('./helpers/saved_cleanup').clearSaved(api).catch(() => {}); // the bookmarks this suite saved are taken off again (#4916)
         await removeBoards(ev, [BOARD, 'team-a', 'team-b']);
+        try { await restoreLaunchNotice(ev); } catch (_) {}
         try { await client.close(); } catch (_) {}
     }
     const failed = results.filter(r => !r).length;

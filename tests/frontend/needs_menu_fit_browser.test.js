@@ -7,6 +7,7 @@
 // with Undo. A button is at the same x on every row; on a phone every target is 44 px. 1280 and 390 px; review files and a question stubbed in the page.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_notice');
 const BASE = require('./test_base').BASE;
 const { coralReady, framesJs } = require('./helpers/wait');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -21,7 +22,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         for (const [w, h, mobile, font] of [[1280, 800, false, 16], [1280, 800, false, 32], [390, 844, true, 16]]) {
             const at = `${w} px, ${font}px text: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await ev(`localStorage.clear(); sessionStorage.clear(); true`); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await ev(`localStorage.clear(); sessionStorage.clear(); true`); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, BASE + '/'); /* the unseen first-run notice sits in the phone Inbox pane now (#16460): acked on the test server */ await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`document.documentElement.style.fontSize='${font}px';true`);
             await ev(`fetch('/api/board/${team}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Writer', job_title: 'Writer' }) }).then(r => r.status)`);
             await ev(`(() => { const hex = n => n.toString(16).padStart(64, '0'), ago = m => new Date(Date.now() - m * 60000).toISOString(); const original = window.fetch, json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
@@ -61,7 +62,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await waitFor(`!document.querySelector('.inbox-row-more-toggle[aria-expanded="true"]')`,at+'Escape closes the menu');
             await removeBoards(ev, [team]).catch(() => {});
         }
-    } finally { await client.close(); }
+    } finally { try { await restoreLaunchNotice(ev); } catch (e) {} await client.close(); }
     assert.deepEqual(failures, [], 'Menus and prompt choices escape clipping: '+failures.join('; '));
     console.log('needs_menu_fit_browser: ok');
 })().catch(e => { console.error(e && e.message || e); process.exit(1); });

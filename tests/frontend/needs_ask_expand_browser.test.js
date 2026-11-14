@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const { touchTap } = require('./helpers/touch_tap');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
+const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_notice');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 
@@ -18,7 +19,7 @@ const PLAN = 'Plan for the Reading List app (task #1) — OK to proceed? 1) Scop
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Emulation.setFocusEmulationEnabled({ enabled: true });
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, BASE + '/'); /* the unseen first-run notice sits in the phone Inbox pane now (#16460) and shifts what these measure: acked on the test server */ await install();
             await coralReady(ev);
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.__answers = []; window.__multi = false;
                 const real = window.fetch; window.fetch = (u, o = {}) => { const url = String(u), m = (o.method || 'GET').toUpperCase();
@@ -100,5 +101,5 @@ const PLAN = 'Plan for the Reading List app (task #1) — OK to proceed? 1) Scop
             assert.ok(back.text.endsWith('…') && back.len === shut.len, `${w}: shut again, the preview is back: ${back.len}`);
         }
         console.log('needs_ask_expand: ok');
-    } finally { await client.close(); }
+    } finally { try { await restoreLaunchNotice(ev); } catch (e) {} await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
