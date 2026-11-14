@@ -115,6 +115,8 @@ func TestAuthPageHubStates(t *testing.T) {
 	unpaired := AuthPage(PageState{PasswordSet: true, Local: true, HubSignin: "unpaired"})
 	assert.Contains(t, unpaired, `id="hub-link-open"`)
 	assert.Contains(t, unpaired, "Link this computer to Coral Hub and sign in")
+	assert.Contains(t, unpaired, `class="link" id="hub-link-open"`, "the link step is a quiet link, not a second full-width button beside Sign in (#15094)")
+	assert.NotContains(t, unpaired, `class="btn hub" id="hub-link-open"`)
 	assert.NotContains(t, unpaired, "/auth/hub/start", "no sign-in action until the link finishes")
 	assert.Contains(t, unpaired, "Coral Hub can then sign you in here with full control of this computer.", "the full-control sentence is in the link step")
 	assert.Contains(t, unpaired, `<input type="checkbox" id="hub-enable">`, "the checkbox is unchecked, and nothing in the markup ticks it")

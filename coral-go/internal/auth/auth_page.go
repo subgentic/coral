@@ -79,7 +79,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
     <p class="note" style="text-align:center">Uses your Coral Hub account, as the owner of this computer. Gives full control of it.</p>
 {{else if eq .HubSignin "unpaired"}}
     <div class="or">or</div>
-    <button type="button" class="btn hub" id="hub-link-open"><span class="hubmark"></span>Link this computer to Coral Hub and sign in</button>
+    <p class="hubquiet" style="text-align:center"><button type="button" class="link" id="hub-link-open">Link this computer to Coral Hub and sign in</button></p>
 {{end}}
 {{template "hubwarn" .}}
 {{end}}
