@@ -100,7 +100,7 @@ type Collector struct {
 	counts   map[string]counts // by base tip + branch tip
 	paused   map[string]time.Time
 	asked    map[string]time.Time // canonical agent folders whose tab was read, and when
-	notRepo  map[string]bool      // canonical roots where repoKey returned "" (#17058: ReadState tells pending from not-git)
+	notRepo  map[string]bool      // canonical roots that are not git repositories (rev-parse failed); pruned each Observe pass
 	prs      map[string]*prState  // PR state by repository key (gh.go)
 	gh       func(ctx context.Context, path string, args ...string) ([]byte, string, error)
 	ghLooked time.Time
@@ -200,7 +200,7 @@ func scrubGitEnv(env []string) []string {
 	return out
 }
 
-// Observe reads the repositories of roots (the agents' working folders' git roots), each at most every refreshEvery, within passBudget for all of them.
+// Observe reads the repositories of roots (the agents' working folders, which may include non-git directories), each at most every refreshEvery, within passBudget for all of them.
 func (c *Collector) Observe(ctx context.Context, roots []string) {
 	ctx, cancel := context.WithTimeout(ctx, passBudget)
 	defer cancel()
@@ -255,6 +255,18 @@ func (c *Collector) Observe(ctx context.Context, roots []string) {
 		if !seen[key] {
 			delete(c.repos, key)
 			delete(c.prs, key)
+		}
+	}
+	for cr := range c.notRepo { // a non-git folder no agent works in any more is forgotten too
+		still := false
+		for _, root := range roots {
+			if rc := canonical(root); rc == cr {
+				still = true
+				break
+			}
+		}
+		if !still {
+			delete(c.notRepo, cr)
 		}
 	}
 	type ask struct {
