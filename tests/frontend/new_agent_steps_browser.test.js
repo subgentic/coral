@@ -105,9 +105,9 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             await waitFor(`window.__na.find('input', ${N.name}).value.length > 0 && window.__na.find('textarea', ${N.prompt}).value.length > 0`, 'the persona fills the name and the prompt', 4000);
             assert.doesNotMatch(await ev(`window.__na.dialog().textContent.replace(/\\s+/g, ' ')`), /Filled from the persona|It fills in the name and prompt/);
         });
-        await S.run('step 2: the recap above the buttons names the agent once there is a name', async () => {
-            const r = await ev(`(() => { const d = window.__na.dialog(); const t = d.textContent.replace(/\\s+/g, ' '); return t; })()`);
-            assert.match(r, /: Claude, \/work\/payments-app, default model, \w+ mode/, 'the recap reads "<name>: Claude, <folder>, default model, <Mode> mode"');
+        await S.run('step 2: the Runs as line above the buttons shows the four values the launch will use', async () => {
+            const r = await ev(`(() => { const l = window.__na.dialog().querySelector('#launch-recap .runs-as'); return l ? [...l.querySelectorAll('.runs-as-ctl')].filter(c => !c.hidden).map(c => c.querySelector('.runs-as-name').textContent) : null; })()`);
+            assert.deepEqual(r, ['Provider', 'Model', 'Thinking', 'Permission mode'], 'Runs as: Provider, Model, Thinking, Permission mode: ' + JSON.stringify(r));
         });
         await S.run('Back keeps what was typed and returns to step 1 with the folder', async () => {
             await ev(`(() => { const i = window.__na.find('input', ${N.name}); i.value = 'QA Engineer'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
@@ -131,7 +131,7 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             for (const rx of [N.back, N.cancel, N.launch]) assert.ok(await has('button', rx), `${rx} on step 3`);
             assert.ok(!(await has('button', N.next)), 'no Next on step 3');
             await footerOrder(N.launch, 'step 3');
-            assert.match(await ev(`window.__na.dialog().textContent.replace(/\\s+/g, ' ')`), /QA Engineer: Claude, \/work\/payments-app, default model, \w+ mode/, 'the recap');
+            assert.ok(await ev(`!!window.__na.dialog().querySelector('#launch-recap .runs-as')`), 'the Runs as line');
             // the footer says what the chosen mode allows (Desktop tester, #10000), and follows the choice
             const noteOf = () => ev(`(() => { const n = window.__na.dialog().querySelector('.launch-recap-note'); return n ? n.textContent : ''; })()`);
             assert.match(await noteOf(), /^\w+ mode allows: [a-z].{10,}\.$/, 'a line under the recap says what the mode allows');

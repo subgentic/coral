@@ -52,6 +52,16 @@ export function permissionDescription(type, value) {
     return PERMISSION_MODE_DESCRIPTIONS[v] || '';
 }
 
+/** Whether a mode is risky for this CLI: a fact of the mode's own record, not read back from its words (Security INFO, #16057). Bypass everywhere (Hermes' --yolo too), and the modes of the CLIs that skip every prompt and check (Antigravity, Gemini). */
+export function permissionRisky(type, value) {
+    const t = String(type || '').toLowerCase(), v = value || '';
+    if (t === 'pi') return false;
+    if (t === 'hermes') return v === 'bypassPermissions';
+    if ((t === 'agy' || t === 'antigravity' || t === 'gemini') && SKIPS_ALL_PROMPTS.includes(v)) return true;
+    if (t === 'codex' && (CODEX_NETWORK_MODES.includes(v) || v === 'default')) return false;
+    return v === 'bypassPermissions';
+}
+
 // Codex's Auto is a workspace sandbox with the network on (Security's #7483): a board member needs it to reach Coral
 // Codex launches these as workspace-write that never asks, which has the network on (Security's #7503); so does Codex with nothing chosen (the saved default or Auto). Default is not one of them since #10362: it sends no flags
 export const CODEX_NETWORK_MODES = ['auto', 'dontAsk']; // not Default: an explicit Default sends no flags (#10362), so Codex runs its own default, which asks
