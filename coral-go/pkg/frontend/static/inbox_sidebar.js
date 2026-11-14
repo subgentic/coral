@@ -529,14 +529,14 @@ export function reviewActions(row, inSaved = false) { // inSaved (#11641, #11799
     const unread = b => { b.disabled = true; errorText.textContent = ''; return setReviewRead(row, false, { click: true }).then(() => sayLive(`Marked ${file} unread.`)).catch(error => failed(b, error)); };
     const bookmark = !inSaved && !isPhoneLayout() && !decisionNeedsPerson(splitKey(row.team).server); // the star's slot is Save for later (#11672, the operator): a bookmark button; a phone has it in the three dots
     let saveButton = null; // Save for later: an icon beside Request changes (the third button of the row), in the dots on a phone
-    if (bookmark) { const mark = DT.el('button', 'btn btn-quiet btn-icon inbox-bookmark'); mark.type = 'button'; mark.setAttribute('data-slot', 'save'); mark.setAttribute('aria-label', `Save for later: ${file}`); mark.title = 'Save for later'; if (isPhoneLayout()) mark.append(bookmarkIcon()); else { mark.className = 'btn btn-quiet btn-small inbox-bookmark'; mark.textContent = 'Save'; } /* a computer's row says it in a word (#15722) */ mark.addEventListener('click', () => save(mark)); saveButton = mark; }
+    if (bookmark) { const mark = DT.el('button', 'btn btn-quiet btn-icon inbox-bookmark'); mark.type = 'button'; mark.setAttribute('data-slot', 'save'); mark.setAttribute('aria-label', `Save for later: ${file}`); mark.title = 'Save for later: keep it in Saved messages, out of Needs you'; if (isPhoneLayout()) mark.append(bookmarkIcon()); else { mark.className = 'btn btn-quiet btn-small inbox-bookmark'; mark.textContent = 'Save'; } /* a computer's row says it in a word (#15722) */ mark.addEventListener('click', () => save(mark)); saveButton = mark; }
     const menu = [];
     if (!decisionNeedsPerson(splitKey(row.team).server)) { // through Coral Hub a guest cannot decide
         box.append(word('Approve', 'Approve', 'btn-primary', b => (isRead(row) ? approve(b) : approveUnopened(b))));
         const changes = DT.el('button', 'btn btn-quiet btn-icon inbox-changes'); changes.type = 'button'; changes.setAttribute('data-slot', 'changes'); changes.setAttribute('aria-label', `Request changes: ${file}`); changes.title = 'Request changes'; changes.append(changesIcon()); if (isPhoneLayout()) { changes.className = 'btn inbox-changes'; changes.replaceChildren('Request changes'); } else { changes.className = 'btn btn-quiet btn-small inbox-changes'; changes.replaceChildren('Comment'); changes.setAttribute('aria-label', `Comment: ${file}`); } /* a computer's row says it in a word, the one the Operator picked (#15722); the title still says what it opens */ /* a phone's card says it in words beside Approve, as the approved mock does (#14627) */ changes.addEventListener('click', () => openReview(row, { requestChanges: true })); box.append(changes); if (saveButton) box.append(saveButton); // option B (the operator's pick, #12231): one Approve, a quiet icon for Request changes, Save beside it, the rest in the dots
         menu.push({ label: 'Approve with a note', title: 'Approve it with one short comment for the agent; it is not shown again', run: approveNote }, { label: 'Dismiss', title: 'Take it out of Needs you; nobody is told', run: ignore }, { label: 'Deny', title: 'A final no: the agent is told', danger: true, run: deny });
         if (inSaved) menu.push({ label: 'Move to Needs you', title: 'Put it back in Needs you as it was', run: unsave });
-        else if (!bookmark) menu.push({ label: 'Save for later', title: 'Keep it in Saved, out of Needs you; nobody is told', run: save });
+        else if (!bookmark) menu.push({ label: 'Save for later', title: 'Keep it in Saved messages, out of Needs you; nobody is told', run: save });
     }
     menu.push({ label: 'Copy version ID', title: 'The id of this version only', run: b => { const hex = row.id; return importOnce('./artifact_clipboard.js').then(m => m.copyArtifactId(hex)).catch(error => failed(b, error)); } });
     if (isRead(row) && !inSaved) { box.classList.add('inbox-review-actions-read'); menu.push({ label: 'Mark unread', title: 'Count it in Needs you again', run: unread }); }
@@ -1101,7 +1101,7 @@ function savedListSpec(where = '') {
     const files = dock ? [] : savedFiles().filter(a => !v.query || [a.name, a.produced_by].join(' ').toLowerCase().includes(v.query.toLowerCase())); // the saved review files, listed above the messages (#11641)
     const spec = { title: 'Saved messages', count: dock ? rows.length : `${countSavedReviews().complete && savedKnown() ? '' : 'at least '}${rows.length + countSavedReviews().value}`, noun: ['item', 'items'], headless: dock, chipsLabel: 'Show',
         chips: !dock ? [] : [{ action: 'inbox-saved-chip', data: { tab: 'open' }, label: 'Open', count: v.totals.open, pressed: v.tab === 'open' }, { action: 'inbox-saved-chip', data: { tab: 'done' }, label: 'Done', count: v.totals.done, pressed: v.tab === 'done' }],
-        empty: { line: empty, hint: v.loading || v.error || v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark. A starred file or chat is in Starred.' },
+        empty: { line: empty, hint: v.loading || v.error || v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its Save message button. A starred file or chat is in Starred.' },
         note: [v.notice, v.browserOnly ? 'Read-only. Search filters the first 200 saved messages loaded from each owned computer.' : v.query ? 'The search covers every saved message, not only these.' : '', v.capped ? 'More saved messages may be available on the source computer.' : '', ...v.down.map(d => d.ownerOnly ? `Only this computer's owner sees Saved on ${d.label || d.id}.` : `${d.label || d.id} did not answer, so its saved messages are not shown.`)].filter(Boolean).join(' '), rows,
         signature: JSON.stringify([v.notice, v.capped, v.down, multi, rows.map(f => [f.id, f.which, f.saved, f.state, f.gone, f.done, f.serverName])]),
         node: () => DT.dataTable({ label: `Saved messages, ${rows.length}`, compact: true, rows, rowKey: f => f.id, state: dock ? dockSavedState : savedState, sortBar: !dock, rowName: f => f.which,
@@ -1144,7 +1144,7 @@ async function openDockSavedSheet(id, opener) {
     const actions = [];
     if (!isCloud() && !cannotOpen) actions.push({ label: f.open.text, primary: true, ariaLabel: f.open.name, run: () => saved.savedOpen(it) });
     if (!f.gone && !isCloud()) actions.push({ label: f.done ? 'Reopen' : 'Done', ariaLabel: `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}`, run: async () => { const now = saved.findSavedItem(id); if (!now) return; const done = !now.done_at; if (await saved.savedSetDone(now, done)) { sayLive(done ? 'Marked done' : 'Moved back to Open'); back(); } } }); // a phone's rows have no Done button: it is in the item (#9786)
-    if (!isCloud()) actions.push({ label: 'Remove from saved', ariaLabel: `Remove from saved: ${f.which}`, run: async () => { if (await saved.savedRemove(it)) { sayLive('Removed from saved'); back(); } } });
+    if (!isCloud()) actions.push({ label: 'Remove from Saved messages', ariaLabel: `Remove from Saved messages: ${f.which}`, run: async () => { if (await saved.savedRemove(it)) { sayLive('Removed from Saved messages'); back(); } } });
     dockSheetId = id;
     openDetailPane({
         key: `saved:${id}`, title: f.title, sub: [f.said ? `Said ${f.said}` : '', `Saved ${f.saved}`, f.state, f.serverName].filter(Boolean).join(' · '),
@@ -1602,7 +1602,7 @@ function openSavedPage(id) {
         else if (isOpen && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key) && e.target === rm) e.preventDefault(); // one item: the arrows stay on it
     });
     wrap.addEventListener('focusout', e => { if (openMore && openMore.wrap === wrap && !wrap.contains(e.relatedTarget)) closeMore(false); }); // Tab out of the menu closes it
-    rm.addEventListener('click', async () => { closeMore(false); if (await saved.savedRemove(it)) { sayLive('Removed from saved'); closePage(true); } });
+    rm.addEventListener('click', async () => { closeMore(false); if (await saved.savedRemove(it)) { sayLive('Removed from Saved messages'); closePage(true); } });
     menu.append(rm); wrap.append(toggle, menu); if (!isCloud()) bar.append(wrap);
     const open = el('button', 'btn btn-small btn-primary', f.open.text);
     open.type = 'button'; open.setAttribute('aria-label', f.open.name);

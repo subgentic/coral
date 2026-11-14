@@ -83,7 +83,7 @@ export function aboutRow(btn) {
 
 /** The button's name for its state, with the message it is on (a list of these must not read as the same button). */
 export function nameSaveButton(btn) {
-    const label = btn.getAttribute('aria-pressed') === 'true' ? 'Remove from saved' : 'Save for later';
+    const label = btn.getAttribute('aria-pressed') === 'true' ? 'Remove from Saved messages' : 'Save message';
     const about = aboutRow(btn);
     btn.setAttribute('aria-label', about ? `${label}: message from ${about}` : label);
     return label;
@@ -241,7 +241,7 @@ document.addEventListener('click', async (e) => {
             if (!r.ok && r.status !== 404) throw new Error(`HTTP ${r.status}`);
             entry.items.delete(key);
             paint(btn, false);
-            showToast('Removed from saved.', false, 6000, { action: { label: 'Undo', onClick: async () => {
+            showToast('Removed from Saved messages.', false, 6000, { action: { label: 'Undo', onClick: async () => {
                 try { await save(c, key, body); syncSavedButtons(btn.closest('#live-history-messages, #history-messages, #mb-messages')); document.dispatchEvent(new CustomEvent('coral:saved-changed')); } catch (err) { showToast(`Could not save the message again: ${err.message}`, true); }
             } } });
         } else {
