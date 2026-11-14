@@ -18,7 +18,7 @@ export function offerAlertsAfterLaunch() {
     if (typeof Notification !== 'undefined' && Notification.permission !== 'default') return false;
     try { if (browserLocal.get(ALERTS_OFFERED_KEY) === '1') return false; } catch { return false; }
     try { browserLocal.set(ALERTS_OFFERED_KEY, '1'); } catch { /* storage blocked: offered again next time, harmless */ }
-    showOfferBanner();
+    showWhenStill();
     return true;
 }
 
@@ -32,12 +32,26 @@ export function offerAlertsAgain(oldestMs, now = Date.now()) {
         if (browserLocal.get(ALERTS_OFFERED_KEY) !== '1' || browserLocal.get(ALERTS_REOFFERED_KEY) === '1') return false;
         browserLocal.set(ALERTS_REOFFERED_KEY, '1');
     } catch { return false; }
-    showOfferBanner();
+    showWhenStill();
     return true;
 }
 
 /** The set-a-password prompt is the first-run question: one banner or question at a time, and it comes first. */
 const firstRunDialogOpen = () => !!document.getElementById('set-password-modal');
+
+/** The strip pushes the page down by its height, so it never arrives while a person is aiming: it waits until the pointer and keys have been still for 1 s (at most 8 s), so a click on a menu item does not land on what moved (#16841, walk 34 F12, walk 26 M3). */
+export const STILL_MS = 1000, STILL_MAX_MS = 8000;
+function showWhenStill() {
+    let last = Date.now(); const t0 = last, mark = () => { last = Date.now(); };
+    const ev = ['pointermove', 'pointerdown', 'keydown', 'wheel'];
+    ev.forEach(e => document.addEventListener(e, mark, { passive: true, capture: true }));
+    const timer = setInterval(() => {
+        const now = Date.now();
+        if (now - last < STILL_MS && now - t0 < STILL_MAX_MS) return;
+        clearInterval(timer); ev.forEach(e => document.removeEventListener(e, mark, { capture: true }));
+        if (!document.hidden || now - t0 >= STILL_MAX_MS) showOfferBanner(); else document.addEventListener('visibilitychange', () => showOfferBanner(), { once: true });
+    }, 100);
+}
 
 const OFFER = 'Get an alert when an agent needs you or finishes a reply while you are in another tab?';
 const OFFER_SHORT = 'Get an alert when an agent needs you?'; // a phone's one line (#15164, walk 6 M9)
