@@ -82,3 +82,18 @@ func TestAPendingAcceptanceIsNotReplayedAfterAnOptOut(t *testing.T) {
 	waitForAsync()
 	assert.Zero(t, rec.count(EventEULAAccepted), "what waited while analytics were switched off is gone: %v", rec.names())
 }
+
+// #16582: a caller's "can send" can be older than an opt-out. The reservation checks telemetry itself, under the lock, so a stale true leaves no pending entry for a later opt-in to replay.
+func TestAReservationMadeWithAStaleCanSendLeavesNothingPending(t *testing.T) {
+	newTestTracking(t)
+	SetTelemetryEnabled(false)
+	t.Cleanup(func() { SetTelemetryEnabled(true) })
+	send, _ := reserveMilestoneAt("stale_check_event", true, nil, "")
+	assert.False(t, send, "telemetry is off: nothing is to be sent")
+	SetTelemetryEnabled(true)
+	milestoneMu.Lock()
+	s := loadMilestones()
+	milestoneMu.Unlock()
+	assert.Empty(t, s.Pending, "a stale canSend must not leave a pending entry")
+	assert.Contains(t, s.Reached, "stale_check_event", "the product state is still recorded")
+}

@@ -143,7 +143,7 @@ var milestoneInflight = map[string]bool{}
 // accepts it (confirmMilestoneSent), so a failed delivery, an opt-out or a
 // keyless build never consumes the install's one-time event.
 //
-// canSend must already include "telemetry enabled". If the state cannot be
+// canSend says whether the caller can send (key present, generation valid); telemetry being on is checked here too, under the lock, so an opt-out between the caller's check and this call cannot leave a fresh pending entry for a later opt-in to replay. If the state cannot be
 // persisted it returns false, so a broken disk yields no events rather than
 // one per launch.
 func reserveMilestone(name string, canSend bool, props map[string]string) (send bool, snap pendingMilestone) {
@@ -172,11 +172,12 @@ func reserveMilestoneAt(name string, canSend bool, props map[string]string, at s
 	}
 	// With telemetry off (by any means) nothing pending may survive: an old
 	// event must not be replayed after a later opt-in.
-	if !telemetryEnabled() && len(s.Pending) > 0 {
+	on := telemetryEnabled() // read once, under the lock: the caller's own check may be older than an opt-out that came since (#16582)
+	if !on && len(s.Pending) > 0 {
 		s.Pending = nil
 		changed = true
 	}
-	send = canSend && !milestoneInflight[name]
+	send = canSend && on && !milestoneInflight[name]
 	if _, fired := s.Fired[name]; fired {
 		send = false
 	}
