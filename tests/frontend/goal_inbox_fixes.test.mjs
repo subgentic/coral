@@ -25,7 +25,7 @@ const agentClosed = closedGoal(1, 'orch', now - 60000);
 const rows = GCI.closedGoalRows([agentClosed], teamOf, { reopen: noop, now });
 assert.equal(rows.length, 1, 'the agent-closed goal produces a row');
 assert.equal(rows[0].waiting_since, '', 'waiting_since is empty: no "waiting 1 min" on an informational notice');
-assert.ok(rows[0].waiting_kind === 'welcome', 'it is a welcome item (listed, not counted)');
+assert.ok(rows[0].waiting_kind === 'goal_done', 'it is a goal_done item (the Goal looks done pill)');
 assert.ok(rows[0].display_name.includes('Goal #1 closed as done by orch'), 'the title names the goal and agent');
 
 // a goal the Operator closed: no row

@@ -1967,6 +1967,10 @@ body.panel-dragging .agentic-state {
 /* The collapsible list bar (#5293): the agents tab's pattern: the search, the count, one icon for Filters and Sort (a dot on it while anything is on) and, for the artifact lists, one for expand or collapse all */
 .list-bar-toggle, .list-bar-expand-all { position: relative; flex: none; }
 .list-bar-toggle .material-icons { font-size: var(--icon-size); }
+.list-bar-toggle-labeled { display: inline-flex; align-items: center; gap: 4px; padding: 0 6px; margin: 0; }
+.list-bar-toggle-labeled .material-icons { font-size: var(--icon-size); }
+.list-bar-toggle-text { font-size: var(--fs-sm); white-space: nowrap; }
+@media (max-width: 999px) { .list-bar-toggle-text { display: none; } .list-bar-toggle-labeled { gap: 0; padding: 0; } }
 .list-bar-collapsible .list-bar-search-wrap { flex: 1 1 8em; min-width: 0; }
 .list-bar-panel { padding: 6px 0; }
 .list-bar-panel .list-bar-field > .list-bar-by { flex: 1 1 9rem; width: auto; min-width: 0; max-width: none; } /* the text field (Agent, Uploaded by) spans the panel like the selects beside it (UI/UX #5293): its datalist is the field's last child, so the inline rule above never reached the input */

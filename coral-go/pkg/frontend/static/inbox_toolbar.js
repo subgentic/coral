@@ -25,7 +25,7 @@ export function adoptPills(node, pills, action = null) {
 
 /** A folder's toolbar: `spec` is a list bar spec without the shared parts (idp, noun, label, searchLabel, placeholder, fields, sorts, model); `onChange(filters)` is told the new, clean filters. */
 export function folderToolbar(spec, onChange) {
-    const bar = buildListBar({ hideCount: true, collapsible: true, compactPanel: true, doneButton: true, sheet: true, label: `Search and filter ${spec.noun}s`, placeholder: spec.searchLabel, ...spec, fields: [serverField(spec.idp), ...(spec.fields || [])] }, onChange, {});
+    const bar = buildListBar({ hideCount: true, collapsible: true, compactPanel: true, doneButton: true, sheet: true, toggleLabel: true, label: `Search and filter ${spec.noun}s`, placeholder: spec.searchLabel, ...spec, fields: [serverField(spec.idp), ...(spec.fields || [])] }, onChange, {});
     bar.node.classList.add('inbox-folder-toolbar');
     const row = bar.node.querySelector('.list-bar-search-row');
     row.classList.add('gt-toolbar');
