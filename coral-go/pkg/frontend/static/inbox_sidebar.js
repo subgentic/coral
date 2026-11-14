@@ -382,7 +382,7 @@ function inboxNeedsToolbar() {
     const serverListed = reviewFilters() ? pageSummary?.total : pageSummary?.queryTotal;
     const listedReviews = Number.isSafeInteger(serverListed) ? serverListed : rows.filter(s => s.review).length;
     const listedComplete = Number.isSafeInteger(serverListed);
-    const cards = rows.filter(s => NF.kindOf(s) !== 'welcome' && !s.goalClosed); // the welcome cards and goal-closed notices are listed, never unread, and have their own pill: the All pill does not count them (it said 'All 0 of 6', #15078)
+    const cards = rows.filter(s => NF.kindOf(s) !== 'welcome' && !(s.goalClosed && !madeByPerson(s.goalClosed))); // welcome cards and agent-proposed goal-closed notices are listed, not counted; a person-made goal-closed item is counted (#16753)
     const pillCount = (n, m) => {
         const value = `${completeCount ? '' : 'at least '}${n}`;
         return completeCount && listedComplete && n === m ? value : `${value} of ${listedComplete ? '' : 'at least '}${m}`;
