@@ -122,10 +122,10 @@ func commentRefuse(w http.ResponseWriter, status int, code, msg string) {
 
 // commentView is one comment as the client sees it. Mine and the can* flags are for the UI only (the server decides again on every write).
 type commentView struct {
-	AtS    *float64 `json:"at_s,omitempty"`
-	EndS   *float64 `json:"end_s,omitempty"`
-	QueuedFor string `json:"queued_for,omitempty"` // the agent whose copy is held because it is busy (#14860): the person is told "Queued for <agent>", not "Sent to"
-	SentTo string   `json:"sent_to,omitempty"` // the agent the Operator's comment was sent to on its own (#11420): set only on the answer to the comment's creation
+	AtS       *float64 `json:"at_s,omitempty"`
+	EndS      *float64 `json:"end_s,omitempty"`
+	QueuedFor string   `json:"queued_for,omitempty"` // the agent whose copy is held because it is busy (#14860): the person is told "Queued for <agent>", not "Sent to"
+	SentTo    string   `json:"sent_to,omitempty"`    // the agent the Operator's comment was sent to on its own (#11420): set only on the answer to the comment's creation
 	// NotDelivered: why the Operator's comment reached no agent when it should have (#15034): the board is paused, the agent asleep, a rate limit, a failure. Set only on the answer to the comment's creation; the comment stands.
 	NotDelivered string         `json:"not_delivered,omitempty"`
 	ID           int64          `json:"id"`
