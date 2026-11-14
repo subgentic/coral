@@ -1,4 +1,4 @@
-/* Pieces the agent list's team and folder cards share: the pin item, the icons, a row's name with its server, the team's accent, Stop team and the health icon (moved out of render.js, #4996; no behaviour change). */
+/* Pieces the agent list's team and folder cards share: the pin item, the icons, a row's name with its server, the team's accent, Stop agents and the health icon (moved out of render.js, #4996; no behaviour change). */
 import { launchBlockedReason } from './hub_access.js';
 import { splitKey, LOCAL_SERVER, keyLabel, isCloud } from './server_base.js';
 import { escapeAttr, escapeHtml } from './utils.js';

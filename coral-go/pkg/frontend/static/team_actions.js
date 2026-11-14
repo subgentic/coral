@@ -56,7 +56,7 @@ export async function killGroup(groupName) {
     );
 }
 
-/** Stop team's confirmation says what happens to the team's worktree, when it has one (an agent of the team is on a worktree). */
+/** Stop agents's confirmation says what happens to the team's worktree, when it has one (an agent of the team is on a worktree). */
 function _teamWorktreeSentence(sessions) {
     const wt = sessions.find(s => s.git_state && s.git_state.is_worktree);
     return wt ? `${worktreeConfirmWords(wt.branch)} ` : '';
@@ -169,7 +169,7 @@ export function saveTeamFromSidebar(boardName) {
     });
 }
 
-/** Wake team found members that were ended (Stop team, or their own exit) and says so: ask once to resume them all, each in its own folder with its earlier chat, on the team's own computer. */
+/** Wake team found members that were ended (Stop agents, or their own exit) and says so: ask once to resume them all, each in its own folder with its earlier chat, on the team's own computer. */
 async function offerResumeEnded(boardName, ended) {
     if (!Array.isArray(ended) || !ended.length) return;
     const { endedSessionOf, resumeEndedAgents, resumeEndedWords, resumeEndedQuestion } = await importOnce('./resume_ended.js');
@@ -198,7 +198,7 @@ export function toggleTeamSleep(boardName, action) {
             // The route answers 200 with ok: false when it did nothing (no sessions on that board): that is a refusal to say, not a team that is awake (#12417: Sleep team "did nothing" and said nothing).
             if (!resp.ok || data.ok === false) {
                 showToast(data.error || data.message || `Could not ${action} the team (HTTP ${resp.status})`, true);
-                if (action === 'wake') offerResumeEnded(boardName, data.ended); // members Stop team ended: one click brings them back (#14208)
+                if (action === 'wake') offerResumeEnded(boardName, data.ended); // members Stop agents ended: one click brings them back (#14208)
                 return;
             }
             const sleeping = !!data.sleeping;
