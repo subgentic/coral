@@ -6,7 +6,11 @@ must land before the tag. An @name outside a code span or fence would link (and 
 import re
 import sys
 
-MENTION = re.compile(r"(?<![A-Za-z0-9_`@/.])@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:/[A-Za-z0-9_](?:[A-Za-z0-9_.-]*[A-Za-z0-9_])?)?")
+SKIP = re.compile(r"(`[^`]*`|https?://[^\s)>\"']+)")  # a code span or a URL (a Mastodon address holds an @name that is no mention) is left alone
+MENTION = re.compile(r"(?<![A-Za-z0-9_@])@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:/[A-Za-z0-9_](?:[A-Za-z0-9_.-]*[A-Za-z0-9_])?)?")
+
+
+AT_NAME = re.compile(r"(?<![A-Za-z0-9_])@[A-Za-z0-9]")
 
 
 def section(text, ver):
@@ -35,8 +39,7 @@ def neutralize(lines):
         if fence:
             res.append(line)
             continue
-        parts = re.split(r"(`[^`]*`)", line)
-        res.append("".join(p if p.startswith("`") and p.endswith("`") and len(p) > 1 else MENTION.sub(lambda m: "`" + m.group(0) + "`", p) for p in parts))
+        res.append("".join(p if SKIP.fullmatch(p) else MENTION.sub(lambda m: "`" + m.group(0) + "`", p) for p in SKIP.split(line)))
     return res
 
 
@@ -48,8 +51,8 @@ def bare_mentions(lines):
             continue
         if fence:
             continue
-        for p in re.split(r"(`[^`]*`)", line):
-            if not (p.startswith("`") and p.endswith("`") and len(p) > 1) and MENTION.search(p):
+        for p in SKIP.split(line):
+            if not SKIP.fullmatch(p) and AT_NAME.search(p):  # its own, wider pattern: any @ followed by a name character that is not the middle of a word (an address)
                 bad.append(line)
     return bad
 
