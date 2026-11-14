@@ -333,7 +333,7 @@ async function _checkNewTeamFolder({ validate = false } = {}) {
     const input = document.getElementById('launch-team-dir'), line = document.getElementById('launch-team-dir-new');
     if (!input || !line) return false;
     const dir = input.value.trim(), server = _effectiveServer(launch.server);
-    const clear = () => { delete input.dataset.createNew; if (!line.hidden) line.hidden = true; };
+    const clear = () => { delete input.dataset.createNew; if (!line.hidden) line.hidden = true; teamForm()?.refresh(); };
     if (!dir) { clear(); return false; }
     if (usesSuggestion(input)) { clear(); return true; } // the server makes only its own safe suggestion
     const m = /^(.*[\\/])([^\\/]+)[\\/]*$/.exec(dir);
@@ -358,6 +358,7 @@ async function _checkNewTeamFolder({ validate = false } = {}) {
     input.dataset.createNew = dir;
     line.textContent = `${m[2]} does not exist yet. Coral creates it inside ${parent} when you launch the team.`;
     line.hidden = false;
+    teamForm()?.refresh();
     return true;
 }
 
