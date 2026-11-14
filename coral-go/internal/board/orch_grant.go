@@ -34,6 +34,7 @@ const (
 	LifecycleWake    = "wake"
 	LifecycleSleep   = "sleep"
 	LifecycleRestart = "restart" // counts toward the hour's cap like a wake (#15112)
+	LifecycleStop    = "stop"    // the orchestrator stopped an agent's current turn
 )
 
 // OrchGrant is a board's grant: off unless Enabled, and then only for SeatSession.

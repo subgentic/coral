@@ -21,6 +21,7 @@ import (
 	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/terminalinput"
 )
 
 // The Operator's grant to a board's Orchestrator (#11432): a switch, off by default, that lets ONE session, the seat the Operator names, wake and sleep the agents seated on its own board and launch onto it,
@@ -180,7 +181,7 @@ func (h *SessionsHandler) orchSeat(w http.ResponseWriter, r *http.Request, proje
 		return g, nil, false
 	}
 	if !g.Enabled {
-		orchRefusal(w, http.StatusForbidden, "orchestrator_switch_off", "the Operator has not allowed this board's orchestrator to wake, sleep or start agents")
+		orchRefusal(w, http.StatusForbidden, "orchestrator_switch_off", "the Operator has not allowed this board's orchestrator to wake, sleep, stop or start agents")
 		return g, nil, false
 	}
 	if g.SeatSession == "" || owner.SessionID != g.SeatSession {
@@ -221,7 +222,7 @@ func (h *SessionsHandler) orchTarget(w http.ResponseWriter, r *http.Request, pro
 	case err != nil || target == nil || ptr.Value(target.BoardName) != project:
 		orchRefusal(w, http.StatusNotFound, "no_such_agent", "that agent is not seated on this board")
 	case target.SessionID == seat.SessionID:
-		orchRefusal(w, http.StatusForbidden, "not_itself", "the orchestrator seat cannot wake or sleep itself")
+		orchRefusal(w, http.StatusForbidden, "not_itself", "the orchestrator seat cannot wake, sleep or stop itself")
 	case target.AgentType == at.Terminal:
 		orchRefusal(w, http.StatusForbidden, "not_an_agent", "a terminal is not an agent")
 	case target.IsArchived == 1:
@@ -325,6 +326,47 @@ func (h *SessionsHandler) OrchestratorSleep(w http.ResponseWriter, r *http.Reque
 	h.sayLifecycle(r.Context(), project, actor+" put "+who+" to sleep")
 	h.kickWS()
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "slept": who})
+}
+
+// OrchestratorStop: POST /api/board/{project}/agents/{subscriber}/stop. Stop the agent's current turn (the same as the composer's Stop button: Escape for Claude/Codex, Ctrl-C for Hermes). An agent that is
+// idle or asleep gets a plain sentence, not an error. No body is read.
+func (h *SessionsHandler) OrchestratorStop(w http.ResponseWriter, r *http.Request) {
+	project := chi.URLParam(r, "project")
+	_, seat, ok := h.orchSeat(w, r, project)
+	if !ok {
+		return
+	}
+	target, member, ok := h.orchTarget(w, r, project, seat)
+	if !ok {
+		return
+	}
+	actor, who := h.orchActor(seat), orchName(member)
+	if target.IsSleeping == 1 {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "stopped": false, "name": who, "note": who + " is asleep; nothing to stop"})
+		return
+	}
+	st := h.deriveSingleSessionState(r.Context(), target.SessionID, 0)
+	if !st.InTurn && !st.Working {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "stopped": false, "name": who, "note": who + " is not working; nothing to stop"})
+		return
+	}
+	pane := naming.SessionName(target.AgentType, target.SessionID)
+	keys := []string{"Escape"}
+	if target.AgentType == at.Hermes {
+		keys = []string{"C-c"}
+	}
+	if err := h.terminal.SendRawInput(r.Context(), terminalinput.Internal, pane, keys, target.AgentType, target.SessionID); err != nil {
+		slog.Warn("orchestrator stop failed", "board", project, "error", err)
+		orchRefusal(w, http.StatusBadGateway, "stop_failed", "Coral could not send the stop to that agent's terminal")
+		return
+	}
+	id, err := h.bs.ReserveLifecycle(r.Context(), project, board.LifecycleStop, actor, who, nil)
+	if err == nil {
+		_ = h.bs.FinishLifecycle(r.Context(), id, "ok", "")
+	}
+	h.sayLifecycle(r.Context(), project, actor+" stopped "+who+"'s turn")
+	h.kickWS()
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "stopped": true, "name": who})
 }
 
 // refuseSleepNow says why an agent must not be put to sleep now: it waits on the person (a permission prompt, a question, an ask to the Operator: that is theirs to answer), or it is working and has not been
@@ -559,7 +601,7 @@ func (h *SessionsHandler) seedTeamGrant(ctx context.Context, project, seatSessio
 	if id, err := h.bs.ReserveLifecycle(ctx, project, "grant", "Operator", h.orchGrantWords(ctx, g), nil); err == nil {
 		_ = h.bs.FinishLifecycle(ctx, id, "ok", "")
 	}
-	h.sayLifecycle(ctx, project, fmt.Sprintf("this team's Orchestrator may start, wake and put to sleep agents here, up to %d at a time besides itself. The Operator can change or turn it off in the team's settings (Orchestrator access).", g.MaxLive))
+	h.sayLifecycle(ctx, project, fmt.Sprintf("this team's Orchestrator may start, wake, stop and put to sleep agents here, up to %d at a time besides itself. The Operator can change or turn it off in the team's settings (Orchestrator access).", g.MaxLive))
 }
 
 // accountingBoard is the board an agent's launch is logged and held to the caps of (#13903): the team the calling session is seated on when that team's grant is on, wherever the agent is placed (another

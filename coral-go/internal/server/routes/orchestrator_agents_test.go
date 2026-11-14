@@ -60,6 +60,7 @@ func newOrchRig(t *testing.T) *orchRig {
 	rt.Post("/api/board/{project}/agents/{subscriber}/wake", h.OrchestratorWake)
 	rt.Post("/api/board/{project}/agents/{subscriber}/sleep", h.OrchestratorSleep)
 	rt.Post("/api/board/{project}/agents/{subscriber}/restart", h.OrchestratorRestart)
+	rt.Post("/api/board/{project}/agents/{subscriber}/stop", h.OrchestratorStop)
 	rt.Post("/api/sessions/launch", h.Launch)
 	rt.Post("/api/sessions/launch-team", h.LaunchTeam)
 	own := httptest.NewServer(rt)
@@ -788,4 +789,110 @@ func TestWakeAndSleepReachAnAgentWhoseNameHasASlashAndASpace(t *testing.T) {
 
 	code, out = r.agentPost("Orchestrator", "wake", "UX/Nobody", "")
 	assert.Equal(t, "no_such_agent", out["code"], "%d: another name with a slash is still unknown", code)
+}
+
+// #16698: the orchestrator's stop sends Escape (or C-c for Hermes) to a working agent's terminal, and plain-sentences an idle or sleeping one.
+func TestStopRefusesNonAgentsAndSendsEscapeToAWorkingClaude(t *testing.T) {
+	r := newOrchRig(t)
+	ctx := context.Background()
+	r.usualBoard()
+	r.seat("Elsewhere", "Developer", "other-board", "claude", true, 4)
+	r.seat("Shell", "Terminal", orchBoard, "terminal", false, 6)
+	code, _ := r.operatorGrant("Orchestrator", nil)
+	require.Equal(t, http.StatusOK, code)
+
+	// refusals: the same as wake/sleep
+	for name, c := range map[string]struct{ who, target, want string }{
+		"itself":          {"Orchestrator", "Orchestrator", "not_itself"},
+		"a terminal":      {"Orchestrator", "Shell", "not_an_agent"},
+		"another board's": {"Orchestrator", "Elsewhere", "no_such_agent"},
+		"an unknown name": {"Orchestrator", "Nobody", "no_such_agent"},
+		"the Operator":    {"Orchestrator", "Operator", "bad_target"},
+	} {
+		code, out := r.agentPost(c.who, "stop", c.target, "")
+		assert.GreaterOrEqual(t, code, 400, name)
+		assert.Equal(t, c.want, out["code"], name)
+	}
+
+	// a sleeping agent: OK with stopped=false
+	code, out := r.agentPost("Orchestrator", "stop", "Dev", "")
+	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, false, out["stopped"])
+	assert.Contains(t, out["note"], "asleep")
+
+	// an idle (awake, no events) agent: OK with stopped=false
+	code, out = r.agentPost("Orchestrator", "stop", "Dev2", "")
+	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, false, out["stopped"])
+	assert.Contains(t, out["note"], "not working")
+
+	// make Dev2 working: insert a tool_use event so deriveSingleSessionState reports InTurn/Working
+	d2 := r.sid["Dev2"]
+	bash := "Bash"
+	_, err := r.h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "Dev2", SessionID: &d2, EventType: "tool_use", ToolName: &bash, Summary: "Bash", RefID: &bash, CreatedAt: time.Now().UTC().Add(-5 * time.Second).Format(store.ISOFormat)})
+	require.NoError(t, err)
+	code, out = r.agentPost("Orchestrator", "stop", "Dev2", "")
+	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, true, out["stopped"])
+	assert.Equal(t, "Dev2", out["name"])
+
+	// Escape was sent to the right pane
+	r.term.mu.Lock()
+	pane := naming.SessionName("claude", d2)
+	assert.Equal(t, []string{"Escape"}, r.term.raw[pane], "Escape sent to the claude agent")
+	r.term.mu.Unlock()
+
+	// logged and said on the board
+	log, err := r.h.bs.LifecycleLog(ctx, orchBoard, 10)
+	require.NoError(t, err)
+	found := false
+	for _, e := range log {
+		if e.Kind == board.LifecycleStop && e.Target == "Dev2" {
+			found = true
+			assert.Equal(t, "ok", e.Status)
+		}
+	}
+	assert.True(t, found, "the stop is in the lifecycle log")
+	msgs, err := r.h.bs.ListMessages(ctx, orchBoard, 50, 0, 0)
+	require.NoError(t, err)
+	said := false
+	for _, m := range msgs {
+		if strings.Contains(m.Content, "stopped Dev2") {
+			said = true
+		}
+	}
+	assert.True(t, said, "the stop is said on the board")
+}
+
+func TestStopSendsCtrlCToAWorkingHermesAgent(t *testing.T) {
+	r := newOrchRig(t)
+	ctx := context.Background()
+	r.seat("Orchestrator", "Orchestrator", orchBoard, "claude", false, 1)
+	r.seat("HermesBot", "Developer", orchBoard, "hermes", false, 2)
+	code, _ := r.operatorGrant("Orchestrator", nil)
+	require.Equal(t, http.StatusOK, code)
+
+	// make HermesBot working
+	hSid := r.sid["HermesBot"]
+	bash := "Bash"
+	_, err := r.h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "HermesBot", SessionID: &hSid, EventType: "tool_use", ToolName: &bash, Summary: "Bash", RefID: &bash, CreatedAt: time.Now().UTC().Add(-5 * time.Second).Format(store.ISOFormat)})
+	require.NoError(t, err)
+
+	code, out := r.agentPost("Orchestrator", "stop", "HermesBot", "")
+	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, true, out["stopped"])
+
+	r.term.mu.Lock()
+	pane := naming.SessionName("hermes", hSid)
+	assert.Equal(t, []string{"C-c"}, r.term.raw[pane], "C-c sent to the hermes agent, not Escape")
+	r.term.mu.Unlock()
+}
+
+func TestStopIsRefusedWithTheSwitchOff(t *testing.T) {
+	r := newOrchRig(t)
+	r.usualBoard()
+	// no grant: the switch is off
+	code, out := r.agentPost("Orchestrator", "stop", "Dev2", "")
+	assert.Equal(t, http.StatusForbidden, code)
+	assert.Equal(t, "orchestrator_switch_off", out["code"])
 }

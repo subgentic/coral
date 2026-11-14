@@ -154,6 +154,8 @@ func main() {
 		cmdWakeSleep(true)
 	case "restart":
 		cmdRestart()
+	case "stop":
+		cmdStop()
 	case "settings":
 		cmdSettings()
 	default:
@@ -278,6 +280,9 @@ Commands:
   sleep <member> [--board <project>]
                                The Orchestrator only, with the Operator's grant: put an
                                awake agent of this board to sleep
+  stop <member> [--board <project>]
+                               The Orchestrator only, with the Operator's grant: stop an
+                               agent's current turn (it reads "Interrupted" and waits)
   restart <member> [--board <project>] [--when-idle]
                                The Orchestrator only, with the Operator's grant: restart an
                                agent of this board as a fresh session with its launch settings

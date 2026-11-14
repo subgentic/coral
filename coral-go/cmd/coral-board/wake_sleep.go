@@ -23,7 +23,7 @@ const wakeUsageText = `Usage: coral-board wake <member> [--board <project>]
   wake    Wake an agent of this board that is asleep (it resumes its conversation and is told to read the board first).
   sleep   Put an awake agent of this board to sleep (it is woken again by wake, a task or a message for it that wakes it).
 
-  Only the board's Orchestrator, and only while the Operator has switched on "the orchestrator may wake, sleep and start agents" for the board: any other caller, or the switch off, is refused with
+  Only the board's Orchestrator, and only while the Operator has switched on "the orchestrator may wake, sleep, stop and start agents" for the board: any other caller, or the switch off, is refused with
   the server's reason. The grant's hourly and live-agent caps apply to wake; a refused wake says which cap.`
 
 func cmdWakeSleep(sleep bool) {

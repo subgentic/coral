@@ -20,7 +20,7 @@ const restartUsageText = `Usage: coral-board restart <member> [--board <project>
 
   Restart an agent of this board as a fresh session (no context) with the settings it was launched with: the same CLI, model, mode, folder, board seat and job title. The board says who restarted whom.
 
-  Only the board's Orchestrator, and only while the Operator has switched on "the orchestrator may wake, sleep and start agents" for the board: any other caller, or the switch off, is refused with
+  Only the board's Orchestrator, and only while the Operator has switched on "the orchestrator may wake, sleep, stop and start agents" for the board: any other caller, or the switch off, is refused with
   the server's reason. It counts toward the hourly cap shared with wake. An agent in the middle of a turn is refused; with --when-idle the restart is queued for its next idle (dropped after two hours).`
 
 func cmdRestart() {
