@@ -85,6 +85,19 @@ func TestTheOrchestratorMakesATaskForWhatAGoalNamesForTheirReview(t *testing.T) 
 	}
 }
 
+// #16703 (walk 31 F2): an Orchestrator closed a goal the person made before the person reviewed the code. The guide says a person's goal is closed by the person: ask in Needs you, leave it open.
+func TestTheOrchestratorAsksBeforeClosingAGoalThePersonMade(t *testing.T) {
+	const rule = "A goal the person made is closed by the person: when its work is finished, post `coral-board post --ask \"@Operator Goal #N looks done: close it?\"` and leave it open until they say so"
+	if !strings.Contains(agent.DefaultOrchestratorSystemPrompt, rule) {
+		t.Errorf("the orchestrator's default prompt lacks %q", rule)
+	}
+	srv := realDocsServer(t)
+	code, out, errOut := runAgentWithToken(t, srv.URL, "docs", "board")
+	if code != 0 || !strings.Contains(strings.Join(strings.Fields(out), " "), rule) {
+		t.Errorf("docs board lacks the rule (exit %d): %s", code, errOut)
+	}
+}
+
 // #14314 (beta report run 2, item 6): files with the 'for review' tag do reach Needs you, but the team's agents never tagged them. The upload REFUSES --tag "for review" without --question (one line, the decision), and the
 // default prompts and the board docs told agents to use the tag alone, so an agent that followed them was refused. They now name the question beside the tag, say it is required, and say what is and is not for review.
 func TestTheDefaultPromptsTellAnAgentToTagWithAOneLineQuestion(t *testing.T) {
