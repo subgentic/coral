@@ -140,7 +140,7 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             await waitFor(`/^Plan mode allows: reads only/.test((window.__na.dialog().querySelector('.launch-recap-note') || {}).textContent || '')`, 'the line follows the mode', 4000);
             // Auto is not the same on every CLI (Security's review): safety checks are Claude's; Codex has its sandbox; Antigravity and Gemini skip every prompt and check; Pi has no permissions
             const as = async (type, mode) => { await ev(`(() => { const d = window.__na.dialog(), t = d.querySelector('.acf-agent-type'); t.value = ${JSON.stringify(type)}; t.dispatchEvent(new Event('change', { bubbles: true })); const sel = d.querySelector('.acf-permission-mode'); sel.value = ${JSON.stringify(mode)}; sel.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await new Promise(r => setTimeout(r, 250)); return noteOf(); }; // sleep-ok: the recap follows
-            assert.match(await as('claude', 'auto'), /^Auto mode allows: everything, with safety checks\.$/, 'Claude Auto has safety checks');
+            assert.match(await as('claude', 'auto'), /^Auto mode allows: everything; safety checks on Claude only\.$/, 'Claude Auto says the one wording, as Settings does (#16357)');
             assert.match(await as('codex', 'auto'), /workspace sandbox/, 'Codex Auto is its workspace sandbox');
             assert.equal(await as('agy', 'auto'), 'Auto mode allows: everything, with no prompts and no safety checks.', 'Antigravity Auto has no prompts and no safety checks');
             assert.equal(await as('pi', 'auto'), 'Pi has no permission prompts: it always acts on its own.', 'Pi has no permission system');

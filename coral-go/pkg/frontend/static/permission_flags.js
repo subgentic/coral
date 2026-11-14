@@ -26,7 +26,7 @@ export const PERMISSION_MODE_DESCRIPTIONS = {
     default: "Asks before acting (each CLI's normal mode)",
     acceptEdits: 'Reads, file edits, and common filesystem commands (mkdir, touch, mv, cp, etc.) — best for iterating on code you\'re reviewing',
     plan: 'Reads only — best for exploring a codebase before changing it',
-    auto: 'Everything, with safety checks.',
+    auto: 'Everything; safety checks on Claude only.', // one wording in the New agent dialog and in Settings (#16357): it is true of every CLI, where 'with safety checks' is true of Claude only
     dontAsk: 'Only pre-approved tools — best for locked-down CI and scripts',
     bypassPermissions: 'Everything except protected paths — isolated containers and VMs only',
 };

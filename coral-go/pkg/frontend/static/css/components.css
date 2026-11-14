@@ -3284,8 +3284,7 @@ body[data-nav-tab]:not([data-nav-tab="agents"], [data-nav-tab="automations"]) .s
 .acf-model-refresh .material-icons { font-size: var(--fs-xl); }
 .acf-model-refresh:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
 .acf-model-refresh:disabled { opacity: .5; cursor: progress; }
-.acf-model-id { display: block; margin-top: 2px; font-family: var(--font-mono); font-size: var(--fs-sm, 11px); font-weight: var(--fw-regular); color: var(--text-muted); overflow-wrap: anywhere; }
-.acf-model-id:empty { display: none; }
+.acf-model-id { display: block; margin-top: 2px; font-family: var(--font-mono); font-size: var(--fs-sm, 11px); line-height: var(--lh-ui); min-height: calc(1em * var(--lh-ui)); font-weight: var(--fw-regular); color: var(--text-muted); overflow-wrap: anywhere; } /* its line is kept blank while a model has no id to show, so picking one does not push the Thinking row down 18 px (#16357) */
 .acf-model-note { display: block; margin-top: 2px; font-size: var(--fs-sm, 11px); font-weight: var(--fw-regular); color: var(--text-secondary); }
 .acf-model-note:empty { display: none; }
 .acf-thinking-note, .acf-thinking-ran { display: block; margin-top: 2px; font-size: var(--fs-sm, 11px); font-weight: var(--fw-regular); color: var(--text-secondary); }
