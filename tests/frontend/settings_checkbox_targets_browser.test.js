@@ -25,7 +25,7 @@ const CHECKBOXES = `(() => [...document.querySelectorAll('#settings-modal input[
         await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
         await require('./helpers/wait').bind(ev).coralReady('startup', 'settings');
-        await ev(`(async () => { await window.showSettingsModal(); return true; })()`);
+        await ev(`(async () => { await window.showSettingsModal(); document.querySelectorAll('details.sv-advanced').forEach(d => d.open = true); return true; })()`);
         const boxes = await acrossGroups(ev, CHECKBOXES);
         assert.ok(boxes.length >= 12, `the Settings checkboxes are found (${boxes.length})`);
         const small = boxes.filter(b => b.w < 44 || b.h < 44);
@@ -50,7 +50,7 @@ const CHECKBOXES = `(() => [...document.querySelectorAll('#settings-modal input[
         await Emulation.setTouchEmulationEnabled({ enabled: false });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
         await require('./helpers/wait').bind(ev).coralReady('startup', 'settings');
-        await ev(`(async () => { await window.showSettingsModal(); return true; })()`);
+        await ev(`(async () => { await window.showSettingsModal(); document.querySelectorAll('details.sv-advanced').forEach(d => d.open = true); return true; })()`);
         const desk = (await acrossGroups(ev, CHECKBOXES)).filter(b => b.label);
         const wide = desk.filter(b => b.w > 30 || b.h > 30).map(b => `${b.id} ${b.w}x${b.h}`);
         // Labels with text of their own (a switch row, the cloud switches) are wider by design: only the bare wrappers are checked.

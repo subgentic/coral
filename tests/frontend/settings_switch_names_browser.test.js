@@ -37,7 +37,7 @@ const REPEAT_OK = new Set([]);
         await waitFor(`performance.getEntriesByType('resource').filter(e => e.name.includes('/api/cloud/status')).length > ${readsBefore}`, 'the Hub block read its status', 10000);
         await nextFrame(ev); // the render that follows the answer has run (two bounded frames)
         const reveal = () => ev(`(() => { const m = document.getElementById('settings-modal'); for (const e of m.querySelectorAll('[hidden]')) { if (e.querySelector('input[type=checkbox]') || e.matches('input[type=checkbox]') || e.closest('[data-cloud], .settings-cloud-switch-row, #tb-autowake-on')) e.hidden = false; }
-            for (const e of m.querySelectorAll('.settings-pane')) { e.hidden = false; e.style.display = 'block'; } for (const id of ['tb-autowake-on', 'tb-choice']) { const e = document.getElementById(id)?.closest('.sv-row'); if (e) { e.hidden = false; e.style.display = 'block'; } }
+            m.querySelectorAll('details.sv-advanced').forEach(d => { d.open = true; }); for (const e of m.querySelectorAll('.settings-pane')) { e.hidden = false; e.style.display = 'block'; } for (const id of ['tb-autowake-on', 'tb-choice']) { const e = document.getElementById(id)?.closest('.sv-row'); if (e) { e.hidden = false; e.style.display = 'block'; } }
             for (const e of m.querySelectorAll('[hidden]')) if (e.contains(m.querySelector('input[type=checkbox]:not([data-x])')) === false && e.querySelector('input[type=checkbox]')) e.hidden = false; return true; })()`);
         await reveal();
         await ev(`document.querySelectorAll('#settings-modal details.settings-cloud-more').forEach(d => { d.hidden = false; d.open = true; }); true`); // the closed "More Coral Hub permissions": its switches are in the tree once it is open (#6579)

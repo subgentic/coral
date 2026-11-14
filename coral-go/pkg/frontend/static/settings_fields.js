@@ -37,6 +37,7 @@ const INBOX_FIELDS = [
     { key: 'inbox_always', type: 'notice', render: slot => { const p = document.createElement('p'); p.id = 'settings-inbox-always'; p.className = 'sv-help'; p.textContent = 'Questions and decisions always reach you: an agent waiting on a question, a permission or a plan, a goal or task proposal, a goal that looks done.'; slot.append(p); } },
     { key: 'inbox_kind_file', type: 'toggle', id: 'settings-inbox-file', label: 'Files for review', help: 'A file an agent wants you to read, approve or send back.', default: true },
     { key: 'inbox_kind_done', type: 'toggle', id: 'settings-inbox-done', label: 'Finished requests', help: '"Done. Does it work for you?" when a request of yours is finished, with what changed.', default: true },
+    { key: 'inbox_advanced', type: 'heading', advanced: true, label: 'Advanced' },
     { key: 'inbox_kind_release', type: 'toggle', id: 'settings-inbox-release', label: 'Release summaries', help: 'One page per release: what is new for you and the known issues.', default: true },
     { key: 'inbox_kind_decided', type: 'toggle', id: 'settings-inbox-decided', label: 'Decisions made for you', help: 'What the Orchestrator decided on your behalf, once a day.', default: true },
     { key: 'inbox_kind_digest', type: 'toggle', id: 'settings-inbox-digest', label: 'Daily digest', help: 'What landed, what is blocked and what waits for you. Coral writes it from the board.', default: true },
@@ -87,6 +88,7 @@ const TERMINAL_FIELDS = [
     { key: 'terminal_scrollback', type: 'select', id: 'settings-terminal-scrollback', labelId: 'settings-terminal-scrollback-label', label: 'Terminal scrollback', default: '20000',
         options: [{ value: '1000', label: '1,000 lines' }, { value: '5000', label: '5,000 lines' }, { value: '10000', label: '10,000 lines' }, { value: '20000', label: '20,000 lines' }, { value: '50000', label: '50,000 lines' }, { value: '100000', label: 'Unlimited (100k)' }] },
     { key: 'fit_pane_width', type: 'toggle', id: 'settings-fit-pane-width', label: 'Fit pane width', help: { text: '', more: 'With the tmux backend, the terminal takes the size of this browser window.' } },
+    { key: 'terminal_advanced', type: 'heading', advanced: true, label: 'Advanced' },
     { key: 'terminal_backend_title', type: 'heading', id: 'settings-terminal-backend-title', label: 'Backend' },
     ...TERMINAL_BACKEND_FIELDS,
     live('settings-tools-folder-dl'), live('settings-engine-more'),
@@ -148,6 +150,7 @@ const AGENTS_FIELDS = host => [
     { key: 'auto_resume', type: 'toggle', id: 'settings-auto-resume', label: 'Resume after API errors', help: moreOnly('Wakes an agent again after a rate limit or API error.', "When an agent's CLI stops on a rate limit, an overload or another API error, Coral wakes it again after about 2, then 5, then 15 minutes, and stops trying after the third. Waking the agent yourself starts the count again.") },
     { key: 'auto_sleep', type: 'toggle', id: 'settings-auto-sleep', label: 'Auto-sleep' }, // no help line: the Agents tab is at its word budget; what it does is in the release notes and the line Coral posts the first time it sleeps one (#12111)
     { key: 'auto_sleep_idle_minutes', type: 'number', id: 'settings-auto-sleep-minutes', label: 'After', unit: 'min', min: 15, max: 1440, step: 5, default: 60, attrs: { inputmode: 'numeric', 'aria-label': 'Minutes idle before an agent is put to sleep' } },
+    { key: 'agents_advanced', type: 'heading', advanced: true, label: 'Advanced' },
     { key: 'auto_goals', type: 'toggle', id: 'settings-auto-goals', label: "Name each agent's goal", help: helpLine('Haiku writes a short goal line from your requests.', "Coral asks Claude Code's smallest model (Haiku) for a short goal line for each agent, from your requests only: once when the agent first answers, then for a new request at most every 30 minutes. Each one is a short call made with your Claude Code account (about 1,300 input tokens). When off, the goal shows your first prompt.") },
     { key: 'agent_low_priority', type: 'toggle', id: 'settings-agent-low-priority', label: 'Run agents at lower priority', help: moreOnly('Keeps the dashboard quick while agents are busy.', 'Agents and everything they start (builds, test runs) run below Coral itself (nice +10 on Mac and Linux, below normal on Windows), so the dashboard, Coral Hub and your own apps stay quick while agents use every CPU. It changes scheduling only, never what an agent may do. Applies to agents started after the change.') },
     { key: 'agents_team', type: 'heading', id: 'settings-agents-team', label: 'Team and board' },
@@ -239,6 +242,7 @@ export const SECURITY_FIELDS = [
         help: { text: 'Applies after restart.', more: 'Coral never stores a database password in browser storage, URLs, logs, or ordinary settings.' },
         options: [{ value: 'disabled', label: 'Off (plaintext database)' }, { value: 'key_file', label: 'Local key file (~/.coral/.db_key)' }, { value: 'password', label: 'Password at startup' }] },
     { key: 'telemetry_enabled', type: 'toggle', id: 'settings-telemetry-enabled', label: 'Usage analytics', help: { text: 'Anonymous product events only, no prompts.', more: 'No prompts, transcripts or secrets are sent.' } }, // the promise stays in the line ("no prompts"); the full exclusion is behind Learn more, so the pane stays under its word budget (#10698, #10705)
+    { key: 'security_advanced', type: 'heading', advanced: true, label: 'Advanced' },
     { key: 'install_id', type: 'custom', id: 'settings-install-id-group', label: 'Install ID', live: ['settings-telemetry-install-hint', 'settings-telemetry-install-status'], render: slot => { const el = document.getElementById('settings-telemetry-install-box'); if (el) slot.append(el); } },
     { key: 'debug_input_log', type: 'toggle', id: 'settings-debug-input-log', label: 'Record what Coral types (debug)', disabledWhen: () => { const e = document.getElementById('settings-debug-input-log'); return !!e && e.dataset.locked === '1'; }, live: ['settings-debug-input-log-status', { id: 'settings-debug-input-log-delete', describes: false }], help: { text: '', more: 'Saves everything Coral sends to agent terminals, including anything typed or pasted, such as passwords. For troubleshooting only: turn it off afterwards. Applies immediately.' } },
 ];

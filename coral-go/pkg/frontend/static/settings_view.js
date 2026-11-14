@@ -256,6 +256,7 @@ export function mountSettingsView(host, spec) {
         const body = node('div', 'sv-body');
         let set = null; // see pane(): a field with fieldset: 'Name' starts a group
         let card = null; // a heading with card: true starts a card (see below)
+        let advanced = null; // the section's Advanced fold, once its marker is met: it holds every row after it
         let fold = null; // a heading with fold: true starts a disclosure (closed) that holds the rows after it, up to the next heading: a form's optional part
         for (const g of groups) for (const field of g.fields || []) {
             if (!field.key) continue;
@@ -264,11 +265,15 @@ export function mountSettingsView(host, spec) {
                 const head = node('div', 'prov-card-head'); head.append(node('h5', 'prov-card-title', field.label)); card.append(head);
                 fold = null; set = null; body.append(card); continue;
             }
+            if (field.type === 'heading' && field.advanced) { // "Advanced (n)" (guideline 4.12 rule 7, #15879): a section opens with at most seven rows; everything after this marker, headings included, sits in one closed fold. n is the rows in it, counted below
+                fold = node('details', 'disclosure sv-fold sv-advanced'); fold.dataset.label = field.label || 'Advanced'; if (field.id) fold.id = field.id; fold.append(node('summary', '', fold.dataset.label)); folds.push(fold); body.append(fold); advanced = fold; continue;
+            }
             if (field.type === 'heading' && field.fold) { fold = node('details', 'disclosure sv-fold'); if (field.id) fold.id = field.id; fold.append(node('summary', '', field.label)); folds.push(fold); (card || body).append(fold); continue; }
-            if (field.type === 'heading') { fold = null; set = null; card = null; }
+            if (field.type === 'heading' && !advanced) { fold = null; set = null; card = null; }
             if (field.fieldset) { set = node('fieldset', 'sv-fieldset'); set.append(node('legend', 'sv-legend', field.fieldset)); (fold || card || body).append(set); }
-            const rec = buildRow(field, g); fields.set(field.key, rec); (set || fold || card || body).append(rec.row);
+            const rec = buildRow(field, g); fields.set(field.key, rec); (set || fold || card || advanced || body).append(rec.row);
         }
+        if (advanced) { const n = [...advanced.querySelectorAll('.sv-row')].filter(r => !r.classList.contains('sv-row-heading') && !r.classList.contains('sv-row-notice')).length; advanced.querySelector('summary').textContent = `${advanced.dataset.label} (${n})`; }
         inner.append(body);
     } else {
         shell = node('div', 'settings-shell sv-shell');

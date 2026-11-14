@@ -12,7 +12,7 @@ const { coralReady } = require('./helpers/wait');
 // Keep the old section budgets plus the words in those authored lines (HELP_LINES /
 // HINTS); long explanations remain in Docs and never inflate the dialog.
 // Notifications includes the existing Inbox block; retain an allowance of 180 words for its labels/help and team notice.
-const BEFORE = { 'Coral Hub and remote access':186, Defaults:269, 'Storage and backup':151, Terminal:70, Appearance:39, Notifications:72+180, 'Files and Git':40, 'Security and privacy':59 };
+const BEFORE = { 'Coral Hub and remote access':186, Defaults:269, 'Storage and backup':151, Terminal:70, Appearance:39, Notifications:72+180, 'Files and Git':40, 'Security and privacy':61 }; // ST5: +2 for the "Advanced (2)" label
 const HELP_WORDS = { 'Coral Hub and remote access':80, Defaults:73, 'Storage and backup':21, Terminal:16, Appearance:6, 'Files and Git':8, 'Security and privacy':17 };
 const BUDGET = Object.fromEntries(Object.entries(BEFORE).map(([k,v])=>[k,v+(HELP_WORDS[k]||0)]));
 
@@ -28,7 +28,7 @@ const BUDGET = Object.fromEntries(Object.entries(BEFORE).map(([k,v])=>[k,v+(HELP
         await ev(`(async () => { await window.__coral.buildAllLazy(); const real = window.fetch; const json = b => new Response(JSON.stringify(b), { headers: { 'Content-Type': 'application/json' } });
             window.fetch = async (u, o = {}) => { const p = String(u); if (p.endsWith('/api/cloud/status')) return json({ configured: true, state: 'connected', hub_url: 'https://app.coralhub.dev', label: 'my-mac', server_id: 'srv_x', max_mode: 'launch', max_mode_saved: true, allow_hub_auto_accept: true, redact_tokens: true, hub_relaunch_updates: true, hub_cross_team_settings: true, allow_hub_auto_accept_changed: { by: 'hub', user: 'hub-user-3f2a', at: '2026-10-21T20:15:00Z' } }); if (/hub-operator/.test(p)) return json({ linked: true, disabled: false, recent_actions: [] }); if (p.split('?')[0].endsWith('/api/system/terminal-logs')) return json({ files: 0, bytes: 0, ended: { count: 0, bytes: 0 } }); if (p.split('?')[0].endsWith('/api/worktrees')) return json({ worktrees: [] }); return real(u, o); };
             const cc = await import((window.__coralStatic || '/static/') + 'cloud_connect.js'); cc.initCloudConnect(); await cc.loadCloudStatus(); return true; })()`);
-        await ev(`window.showSettingsModal(); true`);
+        await ev(`window.showSettingsModal(); document.querySelectorAll('details.sv-advanced').forEach(d => d.open = true); true`);
         await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'the dialog open', 8000);
         await waitFor(`!!document.getElementById('settings-tab-network')`, 'the Settings dialog', 8000);
         await waitFor(`document.querySelectorAll('#settings-modal .settings-hint-line').length > 5`, 'the hint lines', 8000);
