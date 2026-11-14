@@ -196,6 +196,7 @@ node goal_filters.test.mjs
 node inbox_goals_done_read.test.mjs
 node chat_filters.test.mjs
 node coral_notice_fixture.test.mjs
+node turn_end_quiet.test.mjs
 node needs_filters.test.mjs
 node inbox_read.test.mjs
 node inbox_hub_lists.test.mjs

@@ -125,7 +125,7 @@ export function renderActivityChart(container, events, groups) {
 
 /** One row of the Activity list: the icon, the summary, how long it took and when (the live feed and a search draw the same). */
 export function eventRowHtml(ev) {
-    const icon = getToolIcon(ev.tool_name, ev.event_type);
+    const icon = getToolIcon(ev.tool_name, ev.event_type, ev.summary);
     const typeCls = (ev.event_type ? `event-type-${ev.event_type}` : '') + (eventFailed(ev) ? ' event-failed' : '');
     const extra = eventDetailText(ev);
     return `<div class="event-item ${typeCls}" data-tooltip="${escapeAttr(icon.title === ev.summary ? '' : escapeAttr(icon.title) + ': ')}${escapeAttr(ev.summary)}${escapeAttr(extra ? escapeAttr(' (' + extra + ')') : '')}">

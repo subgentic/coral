@@ -392,6 +392,7 @@ body.panel-dragging .agentic-state {
 .event-icon.tool-status { color: var(--color-tool-status); background: rgba(var(--accent-rgb), 0.15); }
 .event-icon.tool-goal   { color: var(--color-tool-goal); background: rgba(var(--fx-green-rgb), 0.15); }
 .event-icon.tool-stop   { color: var(--color-tool-stop); background: rgba(var(--fx-red-rgb), 0.1); }
+.event-icon.tool-turn-end { color: var(--text-muted); background: rgba(var(--accent-rgb), 0.08); } /* a normal end of turn: quiet, not red (#16395) */
 .event-icon.tool-notification { color: var(--color-tool-edit); background: rgba(var(--fx-amber-rgb), 0.1); }
 .event-icon.tool-confidence   { color: var(--color-tool-confidence); background: rgba(var(--fx-gold-rgb), 0.15); }
 .event-icon.tool-pulse  { color: var(--color-tool-pulse); background: rgba(188, 140, 255, 0.15); }

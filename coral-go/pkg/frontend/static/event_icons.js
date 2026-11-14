@@ -58,10 +58,16 @@ const EVENT_ICONS = {
     auto_recommend_notice_not_typed: { char: '&#xe034;', cls: 'tool-auto-accept-skipped', title: 'The agent was not told Coral answered' },
 };
 
-export function getToolIcon(toolName, eventType) {
+/** A stop event that is only the end of a turn (#16395): the hook writes "Agent stopped: <reason>" with "unknown" when the CLI gave no reason, and a turn that simply finished is not a failure. Red (tool-stop) is for a real stop: an error, a limit, an interrupt. */
+const NORMAL_END_RE = /^(?:Agent stopped: (?:unknown|end_turn|stop|stop_sequence|completed?|done)|Turn ended)$/i;
+export function isNormalTurnEnd(ev) {
+    return !!ev && ev.event_type === 'stop' && NORMAL_END_RE.test(String(ev.summary || '').trim());
+}
+
+export function getToolIcon(toolName, eventType, summary) {
     // Check agent event types first
     const eventIcon = EVENT_ICONS[eventType];
-    if (eventIcon) return { ...eventIcon };
+    if (eventIcon) return eventType === 'stop' && isNormalTurnEnd({ event_type: eventType, summary }) ? { ...eventIcon, cls: 'tool-turn-end', title: 'Turn ended' } : { ...eventIcon };
     // Tool-based events
     const icon = TOOL_ICONS[toolName];
     if (icon) return { ...icon, title: toolName };

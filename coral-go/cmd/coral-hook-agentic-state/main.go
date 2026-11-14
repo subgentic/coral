@@ -540,12 +540,13 @@ func toolUseEvent(d map[string]any, hookType, sessionID, tool string) map[string
 // stopEvent is the event of the agent's turn ending.
 func stopEvent(d map[string]any, hookType, sessionID string) map[string]any {
 	reason, _ := d["reason"].(string)
-	if reason == "" {
-		reason = "unknown"
+	summary := "Agent stopped: " + reason
+	if reason == "" || reason == "unknown" {
+		summary = "Turn ended" // no reason given is a turn that finished, not "Agent stopped: unknown" (#16395)
 	}
 	event := map[string]any{
 		"event_type": "stop",
-		"summary":    "Agent stopped: " + reason,
+		"summary":    summary,
 		"session_id": sessionID,
 	}
 	// A claude.ai artifact link in the reply this turn ended with (#6583): only the ids, read from the end of the agent's own transcript.

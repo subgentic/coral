@@ -105,7 +105,7 @@ func TestToolDurationIsKeptFromZeroUp(t *testing.T) {
 func TestAnUnnamedPayloadIsKnownByItsFields(t *testing.T) {
 	stop := parseAgenticEvent(map[string]any{"stop_hook_active": false}, "", "sid")
 	assert.Equal(t, "stop", stop["event_type"], "(g) a payload with stop_hook_active is a stop")
-	assert.Equal(t, "Agent stopped: unknown", stop["summary"])
+	assert.Equal(t, "Turn ended", stop["summary"]) // no reason: a turn that finished (#16395)
 
 	note := parseAgenticEvent(map[string]any{"message": "needs you"}, "", "sid")
 	assert.Equal(t, "notification", note["event_type"], "(h) a payload with only a message is a notification")
