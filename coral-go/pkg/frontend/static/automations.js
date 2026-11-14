@@ -159,7 +159,7 @@ function toolbarOf(key) {
         action: createAction(key),
     });
     const copySubject = () => (f.resources ? 'The resource queue: run coral-board resource list.' : `Coral\u2019s scheduled ${f.noun[1]} (the Automations tab).`); // where in the docs to read (#15063)
-    if (key === 'jobs') PH.pageHeader(node.querySelector('.list-bar-search-row'), { idp: 'automations-jobs', agentCopy: { key: 'jobs', subject: copySubject } }); // Jobs is on the page header (guidelines 4.2): Copy for an agent is in More, not a robot of its own (#15814)
+    if (node.querySelector('.list-bar-search-row')) PH.pageHeader(node.querySelector('.list-bar-search-row'), { idp: `automations-${key}`, agentCopy: { key: f.resources ? 'resources' : 'jobs', subject: copySubject } }); // every folder is on the page header (guidelines 4.2): Copy for an agent is in More, not a robot of its own (#15814); Workflows, Failed and Recent runs had search and filters on the title row, Jobs on a second one (#16422)
     else if (!node.querySelector('.agent-copy')) node.append(agentCopyButton(f.resources ? 'resources' : 'jobs', copySubject));
     return { node, signature: JSON.stringify([filt, counts, rows.length]) };
 }
@@ -245,7 +245,7 @@ function recentTable(rows, narrowed) {
                 { key: 'started', label: 'Started', width: '7rem', dropAt: 28, tone: 'tertiary', cell: i => DT.el('span', 'dt-time', whenWords(i.at)) },
                 { key: 'took', label: 'Took', width: '6rem', dropAt: 28, tone: 'tertiary', cell: i => AR.tookWords(i.at, i.finishedAt) },
             ],
-            footer: { auto: !info.failedMore && !info.stale, text: info.stale ? 'Searching…' : info.failedMore ? `Showing ${rows.length} of ${info.total}. The next runs could not be read.` : `Showing ${rows.length} of ${info.total}`, more: info.failedMore ? { label: 'Try again', busy: info.loading, run: () => AR.retryRunsPage() } : info.hasMore && !info.stale ? { label: 'Load more', busy: info.loading, run: () => AR.loadMoreRuns() } : null }, // 50 a page, newest first (the cursor follows that order, so these columns do not sort); the rest when the footer scrolls into view, or by the button; a failed next page says so and offers to ask again
+            footer: { auto: !info.failedMore && !info.stale && !AR.unreadCount(), text: info.stale ? 'Searching…' : info.failedMore ? `Showing ${rows.length} of ${info.total}. The next runs could not be read.` : `Showing ${rows.length} of ${info.total}${AR.unreadCount() ? ` · ${AR.unreadCount()} not opened` : ''}`, more: info.failedMore ? { label: 'Try again', busy: info.loading, run: () => AR.retryRunsPage() } : info.hasMore && !info.stale ? { label: 'Load more', busy: info.loading, run: () => AR.loadMoreRuns() } : null }, // 50 a page, newest first (the cursor follows that order, so these columns do not sort); the rest when the footer scrolls into view, or by the button; a failed next page says so and offers to ask again
         }).el };
 }
 /** Running now and Failed: the jobs and workflows together, one table, the same five columns in both. */

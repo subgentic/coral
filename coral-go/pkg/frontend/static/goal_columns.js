@@ -13,6 +13,9 @@ const { statusMark } = await importOnce('./status_mark.js');
 /** A goal's state as the one status mark (design guidelines 4.5, #15827): Active works, Blocked waits, Proposed is idle, Done is done, Dropped is switched off; a server that refused its key failed. */
 const MARK = { active: 'working', blocked: 'waiting', proposed: 'idle', done: 'done', dropped: 'sleeping', failed: 'failed' };
 
+/** A goal's state mark for a place that is not a column (a phone's row, #16422). */
+export const goalStateMark = g => statusMark(MARK[String(g.state || '').toLowerCase()] || 'idle', W.stateWord(g));
+
 export function goalColumns(ctx = {}, keys = ['goal', 'state', 'team', 'progress', 'updated']) {
     const total = g => W.allTasksOf(g.rollup || {});
     const done = g => Number(g.rollup?.done) || 0;

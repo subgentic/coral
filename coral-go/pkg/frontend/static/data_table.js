@@ -212,7 +212,7 @@ const mailCell = (m, label, open, pick, showTeam = false, gap = false) => { // o
     if (m.live) { const dot = el('span', 'dt-mail-live'); dot.setAttribute('role', 'img'); dot.setAttribute('aria-label', m.live); dot.title = m.live; line.append(dot); } // a live chat's state: a dot after the title (names stay in one column), its word the label (Active now) (#9740)
     text.append(line);
     if (m.ask) { text.classList.add('dt-mail-two'); const ask = el('span', 'dt-mail-ask'); if (m.askTag) ask.append(tag(m.ask)); else ask.textContent = m.ask; tipIf(ask, m.ask, () => ask.scrollHeight > ask.clientHeight || ask.scrollWidth > ask.clientWidth); text.append(ask); } // the whole ask is the line's title, so a cut one can be read (#9495)
-    const side = el('span', 'dt-mail-side'); side.append(el('span', 'dt-mail-time', m.time || ''));
+    const side = el('span', 'dt-mail-side'); { const t = el('span', 'dt-mail-time'); if (m.timeNode) t.append(m.timeNode); t.append(m.time || ''); side.append(t); } // timeNode: a status mark before the words (a phone's Goals row, #16422)
     if (m.mark) { const dot = el('span', `dt-mail-dot dt-mail-${m.mark}`); dot.setAttribute('aria-hidden', 'true'); side.append(dot); }
     else if (m.unread) { const dot = el('span', 'dt-mail-dot dt-mail-new'); dot.append(el('span', 'sr-only', 'Unread')); side.append(dot); } // the dot is the signal, the 600 only reinforces it, and neither is colour alone
     body.append(text, ' ', side);

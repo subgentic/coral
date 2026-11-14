@@ -39,6 +39,7 @@ const GOAL = 'Explore goals with two teams';
                 assert.ok(rows.some(r => r.includes(GOAL)) && rows.some(r => r.includes('Plan the release notes')), 'the two goals are the rows');
                 assert.equal(await ev(`!!window.__tp.page().querySelector('.dt-table')`), true, 'Goals uses the shared table');
                 if (mobile) { const sides = await ev(`[...window.__tp.page().querySelectorAll('tbody .dt-mail-time')].map(e => e.textContent)`); assert.ok(sides.some(t => /\d+\/\d+/.test(t)), 'a phone row says the state and the task count (1/2): ' + JSON.stringify(sides)); }
+                if (mobile) assert.ok(await ev(`(() => { const t = [...window.__tp.page().querySelectorAll('tbody .dt-mail-time')].filter(e => /\\d+\\/\\d+/.test(e.textContent)); return t.length > 0 && t.every(e => { const m = e.querySelector('.status-mark .status-shape'); return !!m && m.getClientRects().length > 0; }); })()`), 'a phone row says its state with the mark before the words, not only the words (#16422)');
                 else { const progress = await ev(`(() => { const p = window.__tp.page().querySelector('progress'); return p && { max: p.max, value: p.value, label: p.getAttribute('aria-label') }; })()`);
                 assert.ok(progress && progress.max > 0 && progress.label === `${progress.value} of ${progress.max} done`, 'progress exposes the task counts'); }
                 if (mobile) assert.equal(await ev(`!!window.__tp.page().querySelector('.dt-box.dt-mail-on')`), true, 'a phone has the shared phone form: mail rows, no column heads (#12230)');
