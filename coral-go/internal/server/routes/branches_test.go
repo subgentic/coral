@@ -53,19 +53,21 @@ func newBranchesRig(t *testing.T) *branchesRig {
 	_, h, mock, ss := setupSessionsTestServer(t)
 	ctx := context.Background()
 	team, other := "team-a", "team-b"
+	alice := "Alice"
 	for _, s := range []struct {
 		sid, name, dir string
 		board          *string
+		displayName    *string
 	}{
-		{"aaaaaaaa-0423-4000-8000-000000000001", "dev-a", "/work/repo", &team},
-		{"aaaaaaaa-0423-4000-8000-000000000002", "dev-a2", "/work/feature", &team},
-		{"bbbbbbbb-0423-4000-8000-000000000003", "dev-b", "/work/other", &other},
+		{"aaaaaaaa-0423-4000-8000-000000000001", "dev-a", "/work/repo", &team, nil},
+		{"aaaaaaaa-0423-4000-8000-000000000002", "dev-a2", "/work/feature", &team, &alice},
+		{"bbbbbbbb-0423-4000-8000-000000000003", "dev-b", "/work/other", &other, nil},
 	} {
-		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: s.sid, AgentType: "claude", AgentName: s.name, WorkingDir: s.dir, BoardName: s.board}))
+		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: s.sid, AgentType: "claude", AgentName: s.name, WorkingDir: s.dir, BoardName: s.board, DisplayName: s.displayName}))
 		mock.addSession("claude-"+s.sid, s.dir)
 	}
 	src := &fakeBranches{own: 0, repo: branches.Repo{Base: "main", At: time.Date(2026, 11, 1, 6, 0, 0, 0, time.UTC), Worktrees: []branches.Worktree{
-		{Branch: "main", Head: "0123456789ab", Main: true},
+		{Branch: "main", Head: "0123456789ab", Main: true, IsBase: true},
 		{Branch: "feature", Head: "abcdef012345", Ahead: 2, Behind: 1, Changed: 3},
 	}}}
 	h.SetBranches(src)
@@ -111,6 +113,7 @@ func TestTheBranchesTabShowsTheAgentsRepositoryFromTheSnapshot(t *testing.T) {
 	require.Len(t, rows, 2)
 	first := rows[0].(map[string]any)
 	assert.Equal(t, true, first["current"], "the agent's own worktree")
+	assert.Equal(t, true, first["is_base"], "the main worktree is the base branch")
 	feature := rows[1].(map[string]any)
 	assert.EqualValues(t, 2, feature["ahead"])
 	assert.EqualValues(t, 3, feature["changed"])
@@ -125,6 +128,7 @@ func TestABoundedCallerSeesNoAgentsOfOtherWorktrees(t *testing.T) {
 	_, body := r.get("dev-a", "aaaaaaaa-0423-4000-8000-000000000001", asBranchesDashboard)
 	raw, _ := json.Marshal(body)
 	assert.Contains(t, string(raw), `"name":"dev-a2"`, "the local dashboard sees who works where")
+	assert.Contains(t, string(raw), `"display_name":"Alice"`, "the agent's display name is served")
 	_, body = r.get("dev-a", "aaaaaaaa-0423-4000-8000-000000000001", nil) // not the local dashboard: bounded (the Hub, another page)
 	raw, _ = json.Marshal(body)
 	assert.NotContains(t, string(raw), "dev-a2")
@@ -178,6 +182,7 @@ func TestTheTeamViewShowsItsAgentsRepositoriesAndOnlyItsOwnTeam(t *testing.T) {
 	raw, _ := json.Marshal(body)
 	assert.Contains(t, string(raw), `"name":"dev-a"`)
 	assert.Contains(t, string(raw), `"name":"dev-a2"`)
+	assert.Contains(t, string(raw), `"display_name":"Alice"`, "the team view serves the agent's display name")
 	assert.NotContains(t, string(raw), "dev-b", "another team's agent")
 	assert.NotContains(t, string(raw), "/work/", "no folder path")
 

@@ -1,0 +1,12 @@
+/* Shared by the agent and team Branches panels; loaded with branches_tab.js. */
+.branches-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+.branches-row { padding:8px 0; border-bottom:1px solid var(--border); min-width:0; }
+.branches-row[aria-current="true"] .branches-name { color:var(--accent); }
+.branches-name { font-weight:var(--fw-strong); color:var(--text-primary); overflow-wrap:anywhere; }
+.branches-meta, .branches-note { color:var(--text-secondary); font-size:var(--fs-sm); overflow-wrap:anywhere; }
+.branches-note { margin:0 0 8px; }
+.branches-repo + .branches-repo { margin-top:16px; }
+.branches-remote { margin:0 0 4px; font-size:var(--fs-md); font-weight:var(--fw-strong); color:var(--text-primary); overflow-wrap:anywhere; }
+.branches-mark { color:var(--text-muted); font-size:var(--fs-sm); font-weight:var(--fw-regular); }
+#team-panel-branches { padding: 16px 24px; }
+@media (max-width: 760px) { #team-panel-branches { padding: 12px 16px; } }
