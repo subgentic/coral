@@ -67,7 +67,7 @@ function buildOnce() {
     }
     buildTabsMore(tabs);
     drawTabEdges = watchScrollCue(tabs);
-    window.addEventListener('resize', () => { syncTabStop(); drawTabEdges(); });
+    window.addEventListener('resize', () => { syncTabStop(); revealInStrip(tabs, $(`team-tab-${S.tab}`)); drawTabEdges(); });
     tabs.addEventListener('keydown', (e) => {
         const list = [...tabs.querySelectorAll('[role=tab]')].filter(b => b.getClientRects().length), i = list.indexOf(document.activeElement); // a phone's tabs behind More are not in the row
         if (i < 0) return;
@@ -102,6 +102,10 @@ function buildTabsMore(tabs) {
         menu.append(m);
     }
     row.append(b, menu);
+    for (const [side, glyph] of [['start', '‹'], ['end', '›']]) {
+        const cue = el('span', `team-strip-edge team-strip-edge-${side}`, glyph);
+        cue.setAttribute('aria-hidden', 'true'); row.append(cue);
+    }
     b.addEventListener('click', async () => { syncTabsMore(); (await importOnce('./menu_button.js')).toggleMenu(b); }); // its keys (arrows, Escape, Tab) and outside click are the shared menu's
     menu.addEventListener('click', (e) => {
         const m = e.target.closest('[data-tab]'); if (!m) return;
@@ -377,6 +381,8 @@ export async function goTab(tab, { focus = false, user = false, item = 0, replac
     if (user || item) note(keyRoute('team', S.team, tab, item || null), { replace });
     S.itemPending = !!item; // a task is being opened: the Tasks list must not rewrite its address meanwhile (#8898)
     try { await fillTab(tab, item); } finally { S.itemPending = false; }
+    // Lazy panel styles can change the strip's geometry after markTab measured it.
+    if (S.tab === tab) { revealInStrip($('team-tabs'), $(`team-tab-${tab}`)); drawTabEdges(); }
     if (focus) { const b = $(`team-tab-${tab}`); (b.getClientRects().length ? b : $('team-tab-more')).focus(); } // a tab behind More is not in the row
 }
 

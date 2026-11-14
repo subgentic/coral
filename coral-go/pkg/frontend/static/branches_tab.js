@@ -4,6 +4,8 @@
 import { state } from './state.js';
 import { serverFetch, serverForSession, boardFetch } from './server_base.js';
 import { emptyState } from './dom_write.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('branches.css');
 
 const REFRESH_MS = 60000; // the snapshot is read again at most once a minute on the server
 const FIRST_READ_STEPS = [2000, 4000, 8000, 15000]; // a repository is first read when the tab asks (the server starts a pass then): look again soon, then less often
@@ -56,16 +58,19 @@ export async function showTeamBranches(host, team) {
     if (mine !== teamSeq || !host.isConnected) return; // another team or tab was opened meanwhile
     if (!data || data.available === false) emptyState(host, 'Branches are not available from this computer.');
     const none = !!data && data.available !== false && !(data.repos || []).length;
+    const notGit = none && data.read_state === 'done' && data.not_git === true;
     if (!none) teamWaiting = { team: '', since: 0 };
     else if (teamWaiting.team !== team) teamWaiting = { team, since: Date.now() };
     const overdue = none && Date.now() - teamWaiting.since > FIRST_READ_LIMIT_MS;
     if (!data || data.available === false) emptyState(host, 'Branches are not available from this computer.');
-    else if (none) emptyState(host, overdue
-        ? "Coral has not read a repository for this team's agents. Their folders may not be in git repositories, or a slow read is paused for a few minutes."
-        : "Reading the repositories this team's agents work in: the first read takes a few seconds.");
+    else if (notGit) emptyState(host, 'This folder is not under git, so there are no branches or changes. To use Branches, run git init in the team folder, or add an agent that works in an existing Git repository.');
+    else if (none) emptyState(host, data.read_state === 'done'
+        ? "No branches are available for this team's agents. Check that their folders are Git repositories."
+        : overdue ? "Reading the repositories is taking longer than expected. You can use the other tabs while Coral keeps checking."
+        : "Reading the repositories… You can use the other tabs while Coral checks.");
     else host.replaceChildren(...data.repos.map(r => drawRepo(r, '')));
     // past the limit, ask once a minute like the agent's tab, so a page left open on folders that are not repositories does not start a pass every 15 s (Security's INFO on #531)
-    teamTimer = setTimeout(() => { if (host.isConnected && host.offsetParent !== null) showTeamBranches(host, team); }, none && !overdue ? FIRST_READ_MS : REFRESH_MS);
+    teamTimer = setTimeout(() => { if (host.isConnected && host.offsetParent !== null) showTeamBranches(host, team); }, none && !notGit && !overdue ? FIRST_READ_MS : REFRESH_MS);
 }
 
 function text(tag, className, value) {

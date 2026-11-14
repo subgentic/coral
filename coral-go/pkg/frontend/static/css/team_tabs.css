@@ -2,3 +2,13 @@
 .team-tabs .team-tab-count:empty::before { content: '0'; }
 .team-tabs .team-tab-count { font-variant-numeric: tabular-nums; box-sizing: border-box; min-width: 2.1em; text-align: center; } /* one glyph, whichever: the room kept for 0 is also the room of 1 to 9 and of the '…' a count shows while it loads (it was 1.6 px wider, so the tabs after Needs moved 2 px when the number came: walk21_part2 M4, 6 of 10 runs) */ /* every digit one width: the room kept for 0 is the room of 1 to 9 */
 .team-tabs .tab { transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease; } /* not 'all': a tab's weight, and so its width, does not animate, so the strip is scrolled to the pressed tab's final place, not to where it started (#15494) */
+
+/* The phone strip visibly points toward hidden tabs, including when Branches is selected at the end. */
+.team-strip-edge { display: none; }
+@media (max-width: 760px) {
+    .team-strip-edge { position: absolute; bottom: 1px; height: var(--control-touch-height, 44px); width: 16px; align-items: center; justify-content: center; color: var(--text-primary); background: var(--bg-primary); pointer-events: none; }
+    .team-strip-edge-start { left: 0; }
+    .team-strip-edge-end { right: 0; }
+    .team-tabs-row:has(.team-tabs[data-more="start"], .team-tabs[data-more="both"]) .team-strip-edge-start,
+    .team-tabs-row:has(.team-tabs[data-more="end"], .team-tabs[data-more="both"]) .team-strip-edge-end { display: flex; }
+}
