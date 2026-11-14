@@ -133,12 +133,12 @@ const $ = id => document.getElementById(id);
  *  the chat folders are native, and so are Goals (GET /api/goals, a View route of every online computer) and Artifacts (GET /api/team-artifacts: a View route the Hub answers owner_only for a grantee, who then has no Artifacts folder, #11071). */
 const HUB_FRAMES = { needs: '/inbox/hub/needs', tasks: '/inbox/hub/tasks', saved: '/inbox/hub/saved' };
 const hubFrame = key => (nativeInbox() && HUB_FRAMES[key] && !((key === 'needs' && nativeNeeds()) || (key === 'tasks' && nativeTasks()) || (key === 'saved' && nativeSaved())) ? HUB_FRAMES[key] : ''); // a Hub page's address, or '' when the folder is Coral's own (Needs you with the Hub's `needs: 'native'`, #13446)
-const GROUPS = nativeInbox() ? [{ key: 'needs', label: 'Needs you', ...(nativeNeeds() ? {} : { frame: HUB_FRAMES.needs }) }, { key: 'tasks', label: 'Tasks', ...(nativeTasks() ? {} : { frame: HUB_FRAMES.tasks }) }, { key: 'goals', label: 'Goals' }, { key: 'artifacts', label: 'Artifacts' }, { key: 'saved', label: 'Saved', ...(nativeSaved() ? {} : { frame: HUB_FRAMES.saved }) }].map(g => ({ ...g, search: g.frame ? 'Search the Inbox' : g.key === 'needs' ? 'Search needs you' : g.key === 'goals' ? 'Search goals' : g.key === 'tasks' ? 'Search tasks' : g.key === 'saved' ? 'Search saved messages' : 'Search artifacts', short: 'Search' })) : [
+const GROUPS = nativeInbox() ? [{ key: 'needs', label: 'Needs you', ...(nativeNeeds() ? {} : { frame: HUB_FRAMES.needs }) }, { key: 'tasks', label: 'Tasks', ...(nativeTasks() ? {} : { frame: HUB_FRAMES.tasks }) }, { key: 'goals', label: 'Goals' }, { key: 'artifacts', label: 'Artifacts' }, { key: 'saved', label: 'Saved messages', ...(nativeSaved() ? {} : { frame: HUB_FRAMES.saved }) }].map(g => ({ ...g, search: g.frame ? 'Search the Inbox' : g.key === 'needs' ? 'Search needs you' : g.key === 'goals' ? 'Search goals' : g.key === 'tasks' ? 'Search tasks' : g.key === 'saved' ? 'Search saved messages' : 'Search artifacts', short: 'Search' })) : [
     { key: 'needs', label: 'Needs you', search: 'Search needs you', short: 'Search' },
     { key: 'tasks', label: 'Tasks', search: 'Search tasks', short: 'Search' },
     { key: 'goals', label: 'Goals', search: 'Search goals', short: 'Search' }, // the open goals of every team the person runs (GET /api/goals): the team page's goal row plus a Team column (#7776)
     { key: 'artifacts', label: 'Artifacts', search: 'Search artifacts', short: 'Search' }, // every team's artifacts (GET /api/team-artifacts): the team page's list plus a Team filter (Goal #62)
-    { key: 'saved', label: 'Saved', search: 'Search saved messages', short: 'Search' }, // the box beside Display options and Expand is narrow: its placeholder is the short words, its name the whole ones
+    { key: 'saved', label: 'Saved messages', search: 'Search saved messages', short: 'Search' }, // the box beside Display options and Expand is narrow: its placeholder is the short words, its name the whole ones
     { key: 'activity', label: 'Activity', search: 'Search activity', short: 'Search' }, // what you did in Needs you (GET /api/activity, the owner's alone, read only; #12070)
 ];
 const GROUP_KEY = 'coral.inbox.tab'; // the group last on screen, kept in this browser
@@ -932,7 +932,7 @@ const folderSections = () => {
     const hub = nativeInbox(), shown = key => !hub || (GROUPS.some(g => g.key === key) && (key !== 'artifacts' || !IA.artifactsOwnerOnly())), framed = key => hub && !!GROUPS.find(g => g.key === key)?.frame;
     const item = (key, label, count, extra) => shown(key) ? [{ key, label, count: framed(key) ? undefined : count, ...extra }] : [];
     const sections = [
-        { title: 'Needs attention', items: [...item('needs', 'Needs you', countOf('needs'), { alert: !hub && countOf('needs') > 0, words: needsCountWords() }), ...item('tasks', 'Tasks', countOf('tasks')), ...item('goals', 'Goals', countOf('goals')), ...item('saved', 'Saved', countOf('saved'))] },
+        { title: 'Needs attention', items: [...item('needs', 'Needs you', countOf('needs'), { alert: !hub && countOf('needs') > 0, words: needsCountWords() }), ...item('tasks', 'Tasks', countOf('tasks')), ...item('goals', 'Goals', countOf('goals')), ...item('saved', 'Saved messages', countOf('saved'))] },
         { title: 'Files', items: item('artifacts', 'Artifacts', countOf('artifacts')) },
         { title: 'History', items: item('activity', 'Activity') },
     ].filter(section => section.items.length);
@@ -1099,12 +1099,12 @@ function savedListSpec(where = '') {
     const multi = rows.some(f => f.serverName);
     const empty = v.loading ? 'Loading saved items' : v.error ? v.error : v.filtered ? 'No saved messages match this search.' : v.notice || v.scoped || (v.tab === 'done' ? 'Nothing is marked done.' : 'Nothing is saved for later.');
     const files = dock ? [] : savedFiles().filter(a => !v.query || [a.name, a.produced_by].join(' ').toLowerCase().includes(v.query.toLowerCase())); // the saved review files, listed above the messages (#11641)
-    const spec = { title: 'Saved', count: dock ? rows.length : `${countSavedReviews().complete && savedKnown() ? '' : 'at least '}${rows.length + countSavedReviews().value}`, noun: ['item', 'items'], headless: dock, chipsLabel: 'Show',
+    const spec = { title: 'Saved messages', count: dock ? rows.length : `${countSavedReviews().complete && savedKnown() ? '' : 'at least '}${rows.length + countSavedReviews().value}`, noun: ['item', 'items'], headless: dock, chipsLabel: 'Show',
         chips: !dock ? [] : [{ action: 'inbox-saved-chip', data: { tab: 'open' }, label: 'Open', count: v.totals.open, pressed: v.tab === 'open' }, { action: 'inbox-saved-chip', data: { tab: 'done' }, label: 'Done', count: v.totals.done, pressed: v.tab === 'done' }],
         empty: { line: empty, hint: v.loading || v.error || v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark. A starred file or chat is in Starred.' },
         note: [v.notice, v.browserOnly ? 'Read-only. Search filters the first 200 saved messages loaded from each owned computer.' : v.query ? 'The search covers every saved message, not only these.' : '', v.capped ? 'More saved messages may be available on the source computer.' : '', ...v.down.map(d => d.ownerOnly ? `Only this computer's owner sees Saved on ${d.label || d.id}.` : `${d.label || d.id} did not answer, so its saved messages are not shown.`)].filter(Boolean).join(' '), rows,
         signature: JSON.stringify([v.notice, v.capped, v.down, multi, rows.map(f => [f.id, f.which, f.saved, f.state, f.gone, f.done, f.serverName])]),
-        node: () => DT.dataTable({ label: `Saved, ${rows.length}`, compact: true, rows, rowKey: f => f.id, state: dock ? dockSavedState : savedState, sortBar: !dock, rowName: f => f.which,
+        node: () => DT.dataTable({ label: `Saved messages, ${rows.length}`, compact: true, rows, rowKey: f => f.id, state: dock ? dockSavedState : savedState, sortBar: !dock, rowName: f => f.which,
             open: (f, row) => dock ? openDockSavedSheet(f.id, row.querySelector('.dt-primary')) : openSavedPage(f.id),
             mail: f => ({ lead: { text: f.title || f.which, name: f.title || f.which }, title: f.title || f.which, medium: true, snippet: f.snip, time: f.saved, data: { id: String(f.id) }, tip: multi && f.serverName ? `${f.which} \u00b7 ${f.serverName}` : '' }), // the snippet as the name cuts it, so the words on the row are the words in its name // a phone's row (#9583): who it is from, the message, when it was saved, one line, in the Inbox and in the agent dock alike (Done is inside the item, not on every row, #9786)
             columns: [
@@ -1580,7 +1580,7 @@ function openSavedPage(id) {
     if (!it) return;
     const f = saved.savedItemFacts(it);
     page = { kind: 'saved', id };
-    const host = openPageShell('Saved', 'saved');
+    const host = openPageShell('Saved messages', 'saved');
     host.dataset.saved = id;
     host.append(el('h2', 'wf-item-title', f.title));
     host.append(el('p', 'item-meta', [f.said ? `Said ${f.said}` : '', `Saved ${f.saved}`, f.state, f.serverName].filter(Boolean).join(' · ')));
