@@ -470,7 +470,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         return anchorOf(sel.getRangeAt(0));
     }
     function anchorOf(r) { // the anchor of a range of the document: a selection's, or a passage chosen by keyboard (#15173)
-        if (!body.contains(r.commonAncestorContainer)) return null;
+        if (dialog.classList.contains('av-comparing') || !body.contains(r.commonAncestorContainer)) return null; // Diff text spans two versions; keep passage anchors on the original document.
         const before = document.createRange(); before.setStart(body, 0); before.setEnd(r.startContainer, r.startOffset);
         const after = document.createRange(); after.setStart(r.endContainer, r.endOffset); after.setEnd(body, body.childNodes.length);
         const a = buildAnchor(before.toString(), r.toString(), after.toString(), st.source);

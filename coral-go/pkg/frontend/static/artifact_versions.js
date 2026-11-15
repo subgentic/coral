@@ -7,6 +7,7 @@ import { serverUrl, artifactPath } from './server_base.js';
 const { readVersions } = await importOnce('./versions_read.js');
 import { el } from './dom_el.js';
 import { pollEvery } from './overload.js';
+import { isPhoneLayout } from './phone_layout.js';
 
 const btn = (cls, text, label) => { const b = el('button', 'btn btn-small ' + cls, text); b.type = 'button'; if (label) b.setAttribute('aria-label', label); return b; };
 const sr = (text) => el('span', 'sr-only', text);
@@ -213,7 +214,7 @@ export function attachVersions(dialog, hooks) {
         const i = cur(), row = st.rows[i], before = st.rows[i - 1];
         if (!TEXTY.test(row.media_type || '') && !/\.(md|markdown|txt|json|ya?ml|toml|csv|log)$/i.test(row.name || '')) { say('Compare is for text files.'); return; }
         dialog.classList.toggle('av-keep-wide', dialog.classList.contains('ac-on')); // the dialog keeps the width the version had with its comments: no jump on Compare
-        st.comparing = true; st.sheetWas = hooks.sheetOpen(); if (st.sheetWas) hooks.setSheet(false); draw(); // a phone's open comments sheet would keep the document out of the keyboard's reach
+        st.comparing = true; st.sheetWas = hooks.sheetOpen(); if (st.sheetWas && isPhoneLayout()) hooks.setSheet(false); draw(); // a phone's open comments sheet would keep the document out of the keyboard's reach
         st.abort?.abort(); st.abort = new AbortController();
         const gen = ++st.gen, signal = st.abort.signal;
         try {
