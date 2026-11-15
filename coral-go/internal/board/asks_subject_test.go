@@ -132,3 +132,69 @@ func TestAskSubjectSaysWhenItsTaskIsInReview(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, read().TaskInReview, "a task waiting in review")
 }
+
+// #17338: completing a task closes every open ask linked to it.
+func TestCloseOvertakenAsks_TaskCompleted(t *testing.T) {
+	s, ctx := askBoard(t)
+	task, err := s.CreateTask(ctx, "alpha", "Ship the feature", "", "medium", "Lead", "Dev A")
+	require.NoError(t, err)
+
+	q1 := askPost(t, s, ctx, "Lead", "@Dev B deploy now?", true, 0)
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q1.ID, 0, task.ID))
+	q2 := askPost(t, s, ctx, "Lead", "@Dev A ready?", true, 0)
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q2.ID, 0, task.ID))
+	unrelated := askPost(t, s, ctx, "Lead", "@Dev B unrelated?", true, 0)
+
+	n, err := s.CloseOvertakenAsks(ctx, "alpha", task.ID, 0, "Overtaken: task completed")
+	require.NoError(t, err)
+	assert.Equal(t, 2, n)
+
+	c1, err := s.AskIsClosed(ctx, "alpha", q1.ID)
+	require.NoError(t, err)
+	assert.True(t, c1, "linked ask is closed")
+	c2, err := s.AskIsClosed(ctx, "alpha", q2.ID)
+	require.NoError(t, err)
+	assert.True(t, c2, "second linked ask is closed")
+	cu, err := s.AskIsClosed(ctx, "alpha", unrelated.ID)
+	require.NoError(t, err)
+	assert.False(t, cu, "unlinked ask stays open")
+}
+
+// #17338: creating a goal closes every open ask linked to it.
+func TestCloseOvertakenAsks_GoalCreated(t *testing.T) {
+	s, ctx := askBoard(t)
+
+	q := askPost(t, s, ctx, "Lead", "@Dev A should we create a goal?", true, 0)
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 7, 0))
+
+	n, err := s.CloseOvertakenAsks(ctx, "alpha", 0, 7, "Overtaken: goal #7 created")
+	require.NoError(t, err)
+	assert.Equal(t, 1, n)
+
+	closed, err := s.AskIsClosed(ctx, "alpha", q.ID)
+	require.NoError(t, err)
+	assert.True(t, closed)
+}
+
+// #17338: an already-closed ask is not closed again and the count reflects only newly closed.
+func TestCloseOvertakenAsks_AlreadyClosed(t *testing.T) {
+	s, ctx := askBoard(t)
+	task, err := s.CreateTask(ctx, "alpha", "Done task", "", "medium", "Lead", "Dev A")
+	require.NoError(t, err)
+
+	q := askPost(t, s, ctx, "Lead", "@Dev B check?", true, 0)
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 0, task.ID))
+	require.NoError(t, s.CloseAsk(ctx, "alpha", q.ID, "Operator", "answered in chat"))
+
+	n, err := s.CloseOvertakenAsks(ctx, "alpha", task.ID, 0, "Overtaken: task completed")
+	require.NoError(t, err)
+	assert.Equal(t, 0, n, "already-closed ask not counted")
+}
+
+// #17338: no task or goal id is a no-op.
+func TestCloseOvertakenAsks_NoIDs(t *testing.T) {
+	s, ctx := askBoard(t)
+	n, err := s.CloseOvertakenAsks(ctx, "alpha", 0, 0, "nothing")
+	require.NoError(t, err)
+	assert.Equal(t, 0, n)
+}
