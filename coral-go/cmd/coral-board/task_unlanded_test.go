@@ -27,6 +27,12 @@ func TestHeadSHAIsTheOneAfterHeadElseTheFirstRealHexWord(t *testing.T) {
 	assert.Equal(t, "2010aa1b98", headSHAFromText("Download; 2010aa1b98, stacked on 5d2ffdd95f"), "no 'head': the first commit-looking word")
 	assert.Equal(t, "", headSHAFromText("it effaced a deadbeef-less word, 1234567 digits only", "review pending"), "a word with no letter, or no digit, is not a commit")
 	assert.Equal(t, "abc1234", headSHAFromText("", "Head: ABC1234."), "case and punctuation")
+	// a base is never taken for the head (#18255): it would show the task as landed
+	assert.Equal(t, "", headSHAFromText("ready on main 7ca240b821, fix at abc1234def"), "the first word is main's")
+	assert.Equal(t, "", headSHAFromText("fixed (base 7ca240b821)"))
+	assert.Equal(t, "", headSHAFromText("", "based on 7ca240b821"))
+	assert.Equal(t, "", headSHAFromText("stacked on 5d2ffdd95f"))
+	assert.Equal(t, "", headSHAFromText("parent: 5d2ffdd95f"))
 }
 
 // Approved work whose head is not on the ref is listed, with the ones that name no commit; landed work, failed work, work outside the window and open work are not. Real git, in a temp repository.
@@ -52,8 +58,9 @@ func TestUnlandedListsApprovedTasksWhoseHeadIsNotOnTheRef(t *testing.T) {
 		{"id": 7.0, "status": "completed", "outcome": "success", "completed_at": day(2), "title": "a commit this clone lacks"},
 		{"id": 8.0, "status": "completed", "outcome": "success", "completed_at": day(1), "title": "Review #2: approved, not on main"},
 		{"id": 9.0, "status": "completed", "outcome": "success", "completed_at": day(1), "title": "a review task by another name"},
+		{"id": 10.0, "status": "completed", "outcome": "success", "completed_at": day(1), "title": "names only its base, which is on main"},
 	}
-	text := map[int64]string{1: "Head " + onMain, 2: "Head " + offMain, 3: "all done", 7: "Head 0123abc4567"}
+	text := map[int64]string{1: "Head " + onMain, 2: "Head " + offMain, 3: "all done", 7: "Head 0123abc4567", 10: "ready, base " + onMain}
 	detail := func(id int64) (map[string]any, error) {
 		if id == 9 {
 			return map[string]any{"workflow": map[string]any{"review_of": 2.0}}, nil
@@ -66,7 +73,7 @@ func TestUnlandedListsApprovedTasksWhoseHeadIsNotOnTheRef(t *testing.T) {
 	for _, r := range got {
 		ids = append(ids, fmt.Sprintf("%d:%s", r.ID, r.Why))
 	}
-	assert.Equal(t, []string{"2:not on main", "3:no head SHA recorded", "7:commit not in this repository (git fetch it)"}, ids)
+	assert.Equal(t, []string{"2:not on main", "3:no head SHA recorded", "7:commit not in this repository (git fetch it)", "10:no head SHA recorded"}, ids)
 	assert.Equal(t, offMain, got[0].SHA)
 	assert.Equal(t, before, gitIn(t, repo, "rev-parse", "HEAD"), "read-only: the repository did not move")
 	assert.Empty(t, gitIn(t, repo, "status", "--porcelain"))

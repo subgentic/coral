@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -15,6 +17,7 @@ import (
 
 	"github.com/subgentic/coral/internal/clierr"
 	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/gitutil"
 )
 
 // task unlanded (#18240): the tasks approved in a window whose head commit is not on main (or a named trial), so approved work cannot silently miss a release. Read-only: it reads the board and asks git
@@ -25,8 +28,9 @@ var (
 	unlandedHexRe  = regexp.MustCompile(`\b[0-9a-f]{7,40}\b`)
 )
 
-// headSHAFromText is the commit a task was submitted at: the hex word after "head" in the submit message or reason, else the first hex word of 7 to 40 digits that holds both a letter and a digit (a plain word like "effaced"
-// is not a commit). "" when there is none.
+// headSHAFromText is the commit a task was submitted at: the hex word after "head" in the submit message or reason. Without a "head <sha>" it takes the first commit-looking word (7 to 40 hex digits holding a
+// letter and a digit; a plain word like "effaced" is not one) of the text, but only when that word is not named as someone else's commit ("base", "on", "parent", "stacked on", "main"...): a base taken for the
+// head would show the task as landed. "" when there is no safe one.
 func headSHAFromText(texts ...string) string {
 	for _, t := range texts {
 		if m := unlandedHeadRe.FindStringSubmatch(t); m != nil && hasLetterAndDigit(m[1]) {
@@ -34,14 +38,24 @@ func headSHAFromText(texts ...string) string {
 		}
 	}
 	for _, t := range texts {
-		for _, w := range unlandedHexRe.FindAllString(strings.ToLower(t), -1) {
-			if hasLetterAndDigit(w) {
-				return w
+		low := strings.ToLower(t)
+		for _, loc := range unlandedHexRe.FindAllStringIndex(low, 1) {
+			w := low[loc[0]:loc[1]]
+			if !hasLetterAndDigit(w) {
+				continue
 			}
+			prev := strings.Fields(strings.Trim(low[:loc[0]], " \t(["))
+			if len(prev) > 0 && notTheHead[strings.Trim(prev[len(prev)-1], ":,;.([")] {
+				return ""
+			}
+			return w
 		}
 	}
 	return ""
 }
+
+// notTheHead are the words that put a commit's name in front of someone else's work: its base, its parent, what it is stacked on.
+var notTheHead = map[string]bool{"base": true, "on": true, "onto": true, "parent": true, "from": true, "main": true, "trial": true, "of": true, "after": true, "over": true}
 
 func hasLetterAndDigit(s string) bool {
 	return strings.Trim(s, "0123456789") != "" && strings.Trim(s, "abcdef") != ""
@@ -116,14 +130,15 @@ func findUnlanded(tasks []map[string]any, since time.Time, ref string, detail fu
 // gitLanded asks git, in dir, whether sha is an ancestor of ref (read-only: merge-base --is-ancestor writes nothing).
 func gitLanded(dir, ref string) func(sha string) landedState {
 	return func(sha string) landedState {
-		if exec.Command("git", "-C", dir, "cat-file", "-e", sha+"^{commit}").Run() != nil {
+		if gitutil.Command(context.Background(), dir, "cat-file", "-e", sha+"^{commit}").Run() != nil {
 			return stateUnknown
 		}
-		err := exec.Command("git", "-C", dir, "merge-base", "--is-ancestor", sha, ref).Run()
+		err := gitutil.Command(context.Background(), dir, "merge-base", "--is-ancestor", sha, ref).Run()
 		if err == nil {
 			return stateLanded
 		}
-		if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() == 1 {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) && ee.ExitCode() == 1 {
 			return stateNotLanded
 		}
 		return stateUnknown
@@ -186,7 +201,7 @@ func cmdTaskUnlanded(st *boardState, args []string) {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(clierr.ExitUsage)
 	}
-	if exec.Command("git", "-C", repo, "rev-parse", "--verify", "--quiet", ref+"^{commit}").Run() != nil {
+	if gitutil.Command(context.Background(), repo, "rev-parse", "--verify", "--quiet", ref+"^{commit}").Run() != nil {
 		fmt.Fprintf(os.Stderr, "%s is not a commit in %s: run this where the repository is, or name it with --repo and --ref\n", ref, repo)
 		clierr.Exit1()
 	}
