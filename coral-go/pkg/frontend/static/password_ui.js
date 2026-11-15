@@ -121,6 +121,8 @@ export function showSetPasswordModal({ required = false } = {}) {
     // One wording for everyone (a new install and an upgrade alike): what the password is for. The server has no first-run marker, and nobody needs "nothing changed here" (#6010).
     body.append(el('p', 'pw-lead', 'A password keeps other people and other devices out of Coral when it is opened in a web browser.'));
     if (required) body.append(el('p', 'pw-lead pw-required', 'Coral needs a password before it opens.')); // no Cancel here, so the dialog says why (#16594)
+    const why = el('p', 'pw-note', 'Every Coral asks for one, so a web browser cannot open it by accident. You can change it any time in Settings, Security.'); why.id = 'set-password-why'; // why it is asked, and where to change it (#17695): the prompt is required by design (#11892)
+    body.append(why);
     const form = el('form', 'pw-form'); form.autocomplete = 'on'; form.id = 'set-password-form';
     const pw = passwordField({ id: 'set-password-new', label: 'Password', autocomplete: 'new-password', name: 'new-password' });
     pw.input.setAttribute('aria-describedby', 'set-password-strength');

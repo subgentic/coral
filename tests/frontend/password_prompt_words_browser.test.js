@@ -20,6 +20,7 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(d.title, 'Protect Coral with a password', `${w}: the title says what it is`);
             assert.equal(d.lead, 'A password keeps other people and other devices out of Coral when it is opened in a web browser.', `${w}: it says what the password protects`);
             assert.match(d.text, /Coral needs a password before it opens\./, `${w}: a prompt with no way past it says so in one line (#16594): ${d.text}`);
+            assert.equal(await ev(`(document.getElementById('set-password-why') || {}).textContent || ''`), 'Every Coral asks for one, so a web browser cannot open it by accident. You can change it any time in Settings, Security.', `${w}: one line says why it is asked and where to change it later (#17695)`);
             assert.equal(d.note, '', `${w}: no line about skipping (#11892: a password is always created)`);
             assert.doesNotMatch(d.text, /skip|without a password|Only you use this computer|Not now/i, `${w}: nothing reads as a way around it: ${d.text}`);
             assert.doesNotMatch(d.text, /\btray\b|open command|strict|local sign-in|\bcli\b/i, `${w}: no jargon: ${d.text}`);
