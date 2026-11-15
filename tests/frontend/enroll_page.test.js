@@ -26,7 +26,7 @@ function fakeEl() {
     return el;
 }
 
-async function runEnroll(search, hookSrc, replyOf) {
+async function runEnroll(search, hookSrc, replyOf, lateHookSrc) {
     let src = fs.readFileSync(path.join(dir, 'static/cloud/enroll.js'), 'utf8');
     src = src.replace(/^import \{[^}]*\} from '\.\/common\.js';/m, '');
     const els = {};
@@ -35,7 +35,7 @@ async function runEnroll(search, hookSrc, replyOf) {
         document: { getElementById: id => (els[id] = els[id] || fakeEl()), createElement: () => fakeEl() },
         location: { pathname: '/enroll', search, replace() {} },
         URLSearchParams, Date, Math, Number, String,
-        getSession: async () => ({ authenticated: true, csrf: 'csrf' }),
+        getSession: async () => { if (lateHookSrc) vm.runInContext('window.CoralPairing = ' + lateHookSrc, ctx); return { authenticated: true, csrf: 'csrf' }; }, // lateHookSrc: a script that sets the hook while the session is being read (#16728)
         postJSON: async (p, body, csrf) => { calls.push([p, body, csrf]); if (p === '/api/enroll/confirm') return replyOf || { status: 200, ok: true, data: { ok: true, secret: 'x' } }; return { status: 200, ok: true, data: { nonce: 'n', requester: { ip: '1.2.3.4', hostname: 'box', coral_version: '1.4.15', requested_at: new Date().toISOString() } } }; },
         setStatus: () => {}, setTimeout, clearTimeout, // Object, JSON and Promise are the context's own: a hook built in the page's realm is a plain object there
         safeNext: (raw, fb) => fb,
@@ -59,8 +59,8 @@ async function runEnroll(search, hookSrc, replyOf) {
     assert.strictEqual(without.calls.length, 0, 'no lookup without a code');
     assert.strictEqual(without.els.code.focused, 1, 'the field is focused');
     // ── 3. the pairing hook (device keys step 1) ──
-    const confirmBody = async (hook, reply) => {
-        const r = await runEnroll('?code=abcd2345', hook, reply);
+    const confirmBody = async (hook, reply, late) => {
+        const r = await runEnroll('?code=abcd2345', hook, reply, late);
         r.els.label.value = 'laptop';
         await r.els.approve.listeners.click();
         for (let i = 0; i < 20; i++) await new Promise(x => setImmediate(x));
@@ -81,6 +81,12 @@ async function runEnroll(search, hookSrc, replyOf) {
     assert.strictEqual(seen.body, JSON.stringify({ user_code: 'ABCD-2345', label: 'laptop', nonce: 'n' }), 'a hook cannot change what it was handed');
     assert.strictEqual(vm.runInContext('Object.keys(window.__a).join()', seen.r.ctx), 'user_code,label', 'the hook is handed user_code and label only');
     assert.strictEqual(vm.runInContext('window.__a.label', seen.r.ctx), 'laptop', 'frozen: it cannot rewrite them');
+
+    // "read once, at load" (#16728, QA2 on #16655): a hook that a script defines AFTER enroll.js has started, while the session is being read, is not honoured
+    const late = await confirmBody(null, undefined, `Object.freeze({ beforeConfirm() { return { device_public_key: 'LATE', device_key_proof: 'LATE' }; } })`);
+    assert.strictEqual(late.body, plain.body, 'a hook set after load (during the session read) is ignored');
+    const early = await confirmBody(`Object.freeze({ beforeConfirm() { return { device_public_key: 'EARLY' }; } })`, undefined, `Object.freeze({ beforeConfirm() { return { device_public_key: 'LATE' }; } })`);
+    assert.strictEqual(early.body, JSON.stringify({ device_public_key: 'EARLY', user_code: 'ABCD-2345', label: 'laptop', nonce: 'n' }), 'a hook set before load stays the one used, even if another is set later');
 
     // a hook that is not frozen is ignored
     const thawed = await confirmBody(`{ beforeConfirm() { return { device_public_key: 'PUB' }; } }`);
