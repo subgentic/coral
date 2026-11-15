@@ -99,7 +99,9 @@ func checkKnownFlags(args []string) error {
 			spec = jsonOnly
 		case "goal":
 			spec = clihelp.FlagSpec{Positional: 2}
-		case "detail", "show":
+		case "detail":
+			spec = clihelp.FlagSpec{Bools: []string{"--json"}, Values: []string{"--version"}, Positional: 1} // task detail N --version K reads an earlier version of the task (the census, #17860: the table refused it)
+		case "show":
 			spec = clihelp.FlagSpec{Bools: []string{"--json"}, Positional: 1}
 		default:
 			return nil
