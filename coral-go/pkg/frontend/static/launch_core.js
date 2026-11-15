@@ -46,7 +46,7 @@ export function setLaunchStage(stage) {
     if (subEl) subEl.textContent = sub;
     const back = document.getElementById("launch-agent-back"), next = document.getElementById("launch-agent-next"), go = document.getElementById("launch-agent-go"), save = document.getElementById("launch-agent-save");
     if (back) back.hidden = stage === stages[0];
-    if (next) { next.hidden = stage === 'agent'; next.textContent = stages[n] === 'agent' ? 'Choose model' : 'Next'; } // the button that opens the agent step names it (Operator, v2.0.69 trial); n is this stage's place counted from 1, so stages[n] is the next one
+    if (next) { next.hidden = stage === 'agent'; next.textContent = stages[n] === 'agent' && !launch.member ? 'Choose model' : 'Next'; } // the button that opens the agent step names it (Operator, v2.0.69 trial); n is this stage's place counted from 1, so stages[n] is the next one
     if (go) go.hidden = !!launch.member || !(stage === 'agent' || launchFlags.launchFromAnyStep); // a member is saved into the team form, not launched (#7861)
     if (save) save.hidden = !launch.member || stage !== 'agent';
     const rm = document.getElementById("launch-agent-remove");
