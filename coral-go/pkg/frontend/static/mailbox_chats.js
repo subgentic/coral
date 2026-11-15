@@ -113,7 +113,7 @@ const bump = (keys, by) => { if (unread) for (const k of keys) unread[k] = Math.
 export async function openHistory(c) {
     if (!setHistorySource(c.server || 'local')) return;
     if (await window.selectHistorySession?.(c.session_id, null, c) !== false || !c.run_state) return;
-    (await importOnce('./history_note.js')).noChat(c.run_state, () => openHistory(c));
+    (await importOnce('./history_note.js')).noChat(() => openHistory(c));
 }
 
 /** A chat was opened from the Inbox: marked read, and the numbers of the folders it is in go down by one, in memory, with no request (#9703). */
