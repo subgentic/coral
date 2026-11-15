@@ -40,6 +40,17 @@ const { coralReady } = require('./helpers/wait');
         assert.ok(order.pause >= 0 && order.note === order.pause + 1 && order.prev === 'mb-pause-btn', "Pause team's words are right under Pause team: " + JSON.stringify(order));
         assert.ok(Math.abs(order.note - order.template) > 1, "and not under Save as template: " + JSON.stringify(order));
 
+        // paused too: the words change (Resume), and they are still under the one they describe
+        await ev(`document.getElementById('mb-pause-btn').click(); true`);
+        await waitFor(`/^Resume/.test(document.getElementById('mb-pause-btn').textContent)`, 'the board is paused (the button says Resume)', 8000);
+        await ev(`document.getElementById('team-page-more').click(); true`);
+        await waitFor(`!!document.getElementById('mb-pause-note')?.getClientRects().length`, 'the menu again', 8000);
+        const paused = await ev(`(() => { const note = document.getElementById('mb-pause-note'); return { prev: note.previousElementSibling && note.previousElementSibling.id, text: note.textContent }; })()`);
+        assert.ok(paused.prev === 'mb-pause-btn' && /resume/i.test(paused.text), 'paused: the Resume words are right under the Resume button: ' + JSON.stringify(paused));
+        await ev(`document.getElementById('mb-pause-btn').click(); true`); // resumed again; the menu closes on the click
+        await waitFor(`/^Pause/.test(document.getElementById('mb-pause-btn').textContent)`, 'the board is resumed', 8000);
+        await ev(`document.getElementById('team-page-more').click(); true`);
+        await waitFor(`!!document.getElementById('mb-delete-btn')?.getClientRects().length`, 'the menu with Remove team', 8000);
         // (2) the dialog, then (1) the row goes with the team
         await ev(`document.getElementById('mb-delete-btn').click(); true`);
         await waitFor(`document.getElementById('confirm-modal').getClientRects().length > 0`, 'the Remove dialog', 8000, `JSON.stringify({ btn: !!document.getElementById('mb-delete-btn'), hidden: document.getElementById('mb-delete-btn')?.hidden, disp: document.getElementById('mb-delete-btn') && getComputedStyle(document.getElementById('mb-delete-btn')).display, modal: getComputedStyle(document.getElementById('confirm-modal')).display, toasts: [...document.querySelectorAll('.toast')].map(t => t.textContent.slice(0, 80)) })`);

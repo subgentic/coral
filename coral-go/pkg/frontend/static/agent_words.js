@@ -47,7 +47,8 @@ export function deleteTeamWords(team, running = []) {
     const name = oneLine(team);
     const shown = running.length > 5 ? `${running.slice(0, 5).join(', ')} and ${running.length - 5} more` : running.join(', ');
     const live = running.length ? ` ${running.length} agent${running.length === 1 ? ' is' : 's are'} running on it: ${shown}. Stop agents and remove stops them first.` : '';
-    return `Remove team "${name}"?${live} This removes the team's messages, tasks, goals, members, reminders, waits, presets, settings, artifact tags and health data for good. The agents' chats stay in History, and the files in the team's folder and the logs are not touched. This cannot be undone.`;
+    return [`Remove team "${name}"?`, live.trim(), "This removes the team's messages, tasks, goals, members, reminders, waits, presets, settings, artifact tags and health data for good.",
+        "The files its agents uploaded are not deleted, but their tags, review questions and decisions go with the team.", "The agents' chats stay in History; the files in the team's folder and the logs are not touched.", 'This cannot be undone.'].filter(Boolean).join('\n');
 }
 
 /** The toast after a folder is taken off the list: what it did and did not do. */

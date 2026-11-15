@@ -260,7 +260,8 @@ export function deleteTeam(project) {
     if (!project) return;
     const running = runningAgentsOn(project);
     const label = keyLabel(project);
-    window.showConfirmModal('Remove team', deleteTeamWords(label, running), async () => {
+    const words = deleteTeamWords(label, running);
+    window.showConfirmModal('Remove team', words, async () => {
         try {
             if (running.length) { // a board with agents running is not deleted (#5043): they are stopped first, here, so the team is not left half there
                 const { ok, answer } = await killLiveTeam(project);
@@ -273,6 +274,7 @@ export function deleteTeam(project) {
                 showToast(out.error || 'The team was not removed.', true);
                 return;
             }
+            document.dispatchEvent(new CustomEvent('coral:team-removed', { detail: { team: project } })); // the Inbox drops the team's "Goal closed" rows now, not at its next read (#16895)
             showToast(`Removed team "${label}". Its agents' chats stay in History and its folder is untouched.`);
             if (document.getElementById('team-page-view')?.getClientRects().length) { window.exitTeamPage?.({ force: true }); window.switchNavTab?.('agents'); } // removed from its team page: back to Agents, not the board list
             else if (document.getElementById('messageboard-view')?.getClientRects().length) showMessageBoardProjects();
@@ -282,6 +284,7 @@ export function deleteTeam(project) {
             showToast('Could not reach Coral to remove the team.', true);
         }
     }, undefined, { label: running.length ? 'Stop agents and remove' : 'Remove team', danger: true });
+    { const m = document.getElementById('confirm-modal-message'); if (m) m.replaceChildren(...words.split('\n').flatMap((l, i) => (i ? [document.createElement('br'), l] : [l]))); } // the words are short lines, one under another, not one paragraph (#16895)
 }
 
 // ── Polling ──────────────────────────────────────────────────────────────
