@@ -26,8 +26,7 @@ function _renderTeamCard(boardName, boardSessions) {
         const boardCollapsed = _isGroupCollapsed(boardName);
         const boardWorkDir = pickTeamFolder('', boardSessions);
         const boardIsSleeping = boardSessions.every(s => s.sleeping);
-        const sleepLabel = boardIsSleeping ? 'Wake team' : 'Sleep team';
-        const sleepAction = boardIsSleeping ? 'wake' : 'sleep';
+        const [sleepLabel, sleepAction] = boardIsSleeping ? ['Wake team', 'wake'] : ['Sleep team', 'sleep'];
         const bKebab = `<div class="sidebar-kebab-wrapper group-kebab">
             <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn group-kebab-btn" data-coral-hook="sidebar-kebab-button" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(keyLabel(boardName))}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}">${MORE_DOTS_SVG}</button>
             <div class="menu sidebar-kebab-menu" data-coral-hook="sidebar-kebab-menu" id="${escapeAttr(kebabId('team', boardName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(keyLabel(boardName))}">
@@ -255,8 +254,7 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                 const boardCollapsed = _isGroupCollapsed(boardName);
                         const boardWorkDir = pickTeamFolder('', boardSessions);
                 const boardIsSleeping = boardSessions.some(s => s.sleeping);
-                const sleepLabel = boardIsSleeping ? 'Wake team' : 'Sleep team';
-                const sleepAction = boardIsSleeping ? 'wake' : 'sleep';
+                const [sleepLabel, sleepAction] = boardIsSleeping ? ['Wake team', 'wake'] : ['Sleep team', 'sleep'];
                 const bKebab = `<div class="sidebar-kebab-wrapper group-kebab">
                     <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn group-kebab-btn" data-coral-hook="sidebar-kebab-button" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(keyLabel(boardName))}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}">${MORE_DOTS_SVG}</button>
                     <div class="menu sidebar-kebab-menu" data-coral-hook="sidebar-kebab-menu" id="${escapeAttr(kebabId('team', boardName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(keyLabel(boardName))}">
