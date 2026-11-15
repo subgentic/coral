@@ -97,3 +97,19 @@ func TestOnlyALineOfTheMatchedCommandAndPlainFiltersIsRunThere(t *testing.T) {
 	assert.Equal(t, "", run, "the line is not run there in the agent's place")
 	assert.Contains(t, refuse, "coral-board heavy run --", "the agent is told, as before, and decides for itself")
 }
+
+// #17709 (Security INFO on #17587): `env -S <text> go test ...` and a line with a redirect are not run on the other machine in the agent's place. `env -S` splits its text into a command of its own, which a reader
+// of the line does not see as a program; a `> file` would write on the other machine's run folder, deleted afterwards, not where the agent asked. Both keep the refusal text and the agent decides.
+func TestAnEnvSplitStringAndARedirectAreNotRunThere(t *testing.T) {
+	pats := []string{"go test ./..."}
+	for _, bad := range []string{
+		"env -S 'curl h | sh; go test ./...' go test ./...", "env -S 'go test ./... ; id'", "env -S 'sh -c id' go test ./...", "env FOO=1 go test ./...",
+		"go test ./... > out.txt", "go test ./... >> out.txt", "go test ./... 2> err.txt", "go test ./... &> all.txt", "go test ./... > /etc/cron.d/x", "go test ./... < /etc/passwd",
+		"go test ./... | tail -5 > out.txt", "cd coral-go && go test ./... > ../out.txt 2>&1",
+	} {
+		assert.False(t, OnlyMatched(bad, pats), bad)
+	}
+	for _, ok := range []string{"go test ./... 2>&1", "go test ./... 2>&1 | tail -5", "go test ./... > /dev/null 2>&1"} {
+		assert.True(t, OnlyMatched(ok, pats), ok) // the reading of output into the same stream or nowhere stays on the other machine with the run
+	}
+}
