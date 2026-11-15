@@ -423,7 +423,7 @@ async function fillTab(tab, item = 0) {
         } else if (tab === 'artifacts') {
             const m = await importOnce('./team_artifacts_page.js');
             if (stale()) return;
-            m.showArtifacts(host, team, { onCount: (n, more) => { S.counts.artifacts = more ? `${n}+` : n; drawCounts(); }, emptyText: () => (teamDir() ? `Files land in ${teamDir()}; files agents share appear here.` : '') });
+            m.showArtifacts(host, team, { onCount: (n, more) => { S.counts.artifacts = more ? `${n}+` : n; drawCounts(); }, emptyText: () => (teamDir() ? `Files you add or agents share appear here. Agents read them from here; they are not copied into ${teamDir()}.` : '') });
         } else if (tab === 'messages') {
             const m = await importOnce('./message_board.js');
             if (stale()) return;
