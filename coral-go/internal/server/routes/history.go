@@ -68,11 +68,9 @@ func (h *HistoryHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 	agentTotal := 0
 	if chatType == "all" || chatType == "agent" {
 		agentParams := params
-		if chatType == "all" {
-			// The merged list is cut into pages after the group chats are put among the agent chats by time, so the agent chats must be read from the first to the end of the page asked for: a
-			// page of agent chats merged and then cut again lost every agent chat after the first page (All chats said 196 and gave 53). Capped, a page deeper than that is not served.
-			agentParams.Page, agentParams.PageSize = 1, min(page*pageSize, maxMergedWindow)
-		}
+		// The merged list is cut into pages after board chats or untracked job runs are put among the agent chats by time, so the agent chats
+		// must be read from the first to the end of the page asked for (#17557). Capped, a page deeper than that is not served.
+		agentParams.Page, agentParams.PageSize = 1, min(page*pageSize, maxMergedWindow)
 		result, err := h.ss.ListSessionsPaged(r.Context(), agentParams)
 		if err != nil {
 			if agentParams.Search != "" { // a search that failed is said so, in words the page shows (#10137): the page used to wait for ever on the 500
@@ -104,10 +102,10 @@ func (h *HistoryHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 
 		agentTotal = result.Total
 		agentSessions = append(agentSessions, agentHistoryRows(result.Sessions)...)
-		runs := h.untrackedRunRows(r.Context(), params) // a job run whose agent never wrote a line is listed too (#17447): on the first page of Chats only, so a later page does not repeat it
+		runs := h.untrackedRunRows(r.Context(), params) // a job run whose agent never wrote a line is listed too (#17447)
 		agentTotal += len(runs)
-		if len(runs) > 0 && (chatType == "all" || page == 1) {
-			agentSessions = append(runs, agentSessions...)
+		if len(runs) > 0 {
+			agentSessions = mergeByLastTimestamp(agentSessions, runs)
 		}
 	}
 
@@ -129,7 +127,7 @@ func (h *HistoryHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 	switch chatType {
 	case "agent":
 		writeJSON(w, http.StatusOK, map[string]any{
-			"sessions":  agentSessions,
+			"sessions":  pageRows(agentSessions, page, pageSize),
 			"total":     agentTotal,
 			"page":      page,
 			"page_size": pageSize,
