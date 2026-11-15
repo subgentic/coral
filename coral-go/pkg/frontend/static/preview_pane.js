@@ -3,7 +3,7 @@
 import './phone_layout.js';
 import { state } from './state.js';
 import { registerUnsavedWork } from './update_banner.js';
-import { escapeHtml, escapeAttr, showToast, isImagePath, isMediaPath, renderImagePanes, renderMediaPanes, renderMarkdownStrict, highlightCodeIn, keepFragmentsInside } from './utils.js';
+import { escapeHtml, escapeAttr, showToast, canDownload, isImagePath, isMediaPath, renderImagePanes, renderMediaPanes, renderMarkdownStrict, highlightCodeIn, keepFragmentsInside } from './utils.js';
 import { getLangFromPath } from './cm_util.js';
 import { loadCodeMirror, showVendorLoading, showVendorLoadError } from './vendor_loader.js';
 import './draggable.js';
@@ -187,7 +187,7 @@ function _renderToolbar(tab) {
         _modeBtn('preview', 'visibility', 'Preview', tab),
         binary ? '' : _modeBtn('edit', 'edit', 'Edit', tab),
         !binary && tab.mode === 'edit' ? `<button class="inline-preview-save" data-action="save">Save</button>` : '',
-        _fileBtn('download-file', 'download', 'Download', `Download ${_fileName(tab.filepath)}`), // #17632
+        canDownload(tab.filepath) ? _fileBtn('download-file', 'download', 'Download', `Download ${_fileName(tab.filepath)}`) : '', // #17632
         _fileBtn('share-file', 'link', 'Share as artifact', `Share ${_fileName(tab.filepath)} as an artifact`), // #10269
     ].join('');
     bar.innerHTML = `<span class="preview-toolbar-path" title="${escapeAttr(tab.filepath)}">${escapeHtml(tab.filepath)}</span>

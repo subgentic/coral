@@ -5,6 +5,9 @@ const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|avif|bmp|ico|svg)$/i;
 
 const MEDIA_EXT_RE = /\.(mp3|wav|ogg|oga|m4a|aac|flac|mp4|webm|ogv|mov|m4v)$/i;
 
+const BINARY_EXT_RE = /\.(zip|gz|tar|7z|pdf|docx?|xlsx?|pptx?|exe|dmg|bin|woff2?|ttf|db)$/i; // files the server hands out as text or as media only: a file of these would save damaged (#17632)
+export const canDownload = filepath => !BINARY_EXT_RE.test(filepath || '');
+
 export function isImagePath(filepath) {
     return IMAGE_EXT_RE.test(filepath || '');
 }

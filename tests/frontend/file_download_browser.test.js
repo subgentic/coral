@@ -14,7 +14,7 @@ const NAME = 'claude-' + SID;
     const stub = () => ev(`(() => { const R = window.fetch; window.__saved = []; window.__refuse = false; window.__blobs = {}; const mk = URL.createObjectURL; URL.createObjectURL = b => { const u = mk.call(URL, b); window.__blobs[u] = b; return u; };
         const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
         window.fetch = (u, o) => { const url = String(u && u.url || u);
-            if (/\\/api\\/sessions\\/live\\/[^/]+\\/files(\\?|$)/.test(url)) return json({ files: [{ filepath: 'out/report.html', status: '??', additions: 0, deletions: 0, recorded_at: '2026-10-28T09:00:00Z' }], diff_mode: 'branch_point', is_git: false });
+            if (/\\/api\\/sessions\\/live\\/[^/]+\\/files(\\?|$)/.test(url)) return json({ files: [{ filepath: 'out/report.html', status: '??', additions: 0, deletions: 0, recorded_at: '2026-10-28T09:00:00Z' }, { filepath: 'out/bundle.zip', status: '??', additions: 0, deletions: 0, recorded_at: '2026-10-28T08:00:00Z' }], diff_mode: 'branch_point', is_git: false });
             if (/\\/file-content\\?/.test(url)) return window.__refuse ? json({ error: 'File not found' }, 404) : json({ filepath: 'out/report.html', content: '<h1>Report</h1>', working_directory: '/w' });
             return R(u, o); };
         const click = HTMLAnchorElement.prototype.click;
@@ -37,6 +37,10 @@ const NAME = 'claude-' + SID;
             assert.equal(saved.name, 'report.html', `${w}: saved under the file's name`);
             assert.equal(saved.text, '<h1>Report</h1>', `${w}: with the file's content`);
 
+            // a file the server only hands out as text or as media (a zip) has no Download button, on its row or in its preview (it would save damaged)
+            assert.equal(await ev(`document.querySelectorAll('#changed-files-list .file-item').length`), 2, `${w}: the zip is listed too`);
+            assert.equal(await ev(`(() => { const r = [...document.querySelectorAll('#changed-files-list .file-item')].find(x => (x.dataset.filepath || '').endsWith('bundle.zip')); return !!r && !r.querySelector('[data-on-click="file-download"]'); })()`), true, `${w}: the zip row has no Download button`);
+
             // the open preview has the same button
             await ev(`window.openFilePreview('out/report.html'); true`);
             await waitFor(`!!document.querySelector('#preview-toolbar [data-action="download-file"]')`, 5000);
@@ -48,6 +52,9 @@ const NAME = 'claude-' + SID;
             await ev(`window.__refuse = true; document.querySelector('#preview-toolbar [data-action="download-file"]').click(); true`);
             await waitFor(`[...document.querySelectorAll('.toast .toast-message')].some(e => /report\\.html could not be read \\(404\\)\\. Nothing was saved/.test(e.textContent))`, 5000);
             assert.equal(await ev(`window.__saved.length`), 2, `${w}: nothing was saved`);
+            await ev(`window.openFilePreview('out/bundle.zip'); true`);
+            await waitFor(`(document.querySelector('#preview-toolbar .preview-toolbar-path') || {}).textContent === 'out/bundle.zip'`, 5000);
+            assert.equal(await ev(`!!document.querySelector('#preview-toolbar [data-action="download-file"]')`), false, `${w}: a zip's preview has no Download button`);
         }
         console.log('PASS Download a file: a Files row and the open preview save the file under its name with its content, a failure says why and saves nothing, at 1280 and 390');
     } finally { await client.close(); }
