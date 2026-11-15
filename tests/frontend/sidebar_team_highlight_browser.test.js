@@ -27,13 +27,14 @@ const B = `team-b-${Date.now() % 100000}`;
 
         // switch to team B's Artifacts tab
         await openTeam(ev, waitFor, B);
-        await goTab(ev, settle, 'Artifacts'); await settle(400);
+        await goTab(ev, settle, 'Artifacts');
+        await waitFor(`(() => { const h = document.querySelectorAll('.board-card-header.team-selected'); return h.length === 1 && h[0].dataset.groupName === ${JSON.stringify(B)}; })()`, 'B is highlighted', 5000);
         const afterB = await selected();
         assert.deepEqual(afterB, [B], 'after opening team B Artifacts, only B is highlighted: ' + JSON.stringify(afterB));
 
         console.log('PASS sidebar highlight follows the team (#16669, #17611)');
     } finally {
-        await removeBoards([A, B]);
+        await removeBoards(ev, [A, B]);
         await client.close();
     }
 })().catch(e => { console.error(e); process.exit(1); });
