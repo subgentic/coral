@@ -139,3 +139,6 @@
     .artifact-viewer-header > .artifact-viewer-title { flex: 1 0 100%; }
 }
 @media (max-width: 768px) { .artifact-review-form > .artifact-review-cancel { order: 3; } .artifact-review-form > .btn { padding-inline: 10px; } .artifact-review > .artifact-review-form { padding-inline: 0; } .artifact-review-form textarea { min-height: 3.25em; } } /* #15545: on a phone the request and the approval are side by side, Cancel is under them */
+.artifact-viewer-trail { padding: 0 var(--space-3, 12px) 4px; } /* 'Back to <the document>' after a link inside it opened another file (#18208) */
+.artifact-viewer-trail[hidden] { display: none; }
+.artifact-viewer-back { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
