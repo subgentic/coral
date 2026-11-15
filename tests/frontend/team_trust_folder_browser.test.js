@@ -1,4 +1,4 @@
-// New team trusts the folder (#11889, the Operator's decision, Security's conditions): a folder Coral makes says "Coral will start these agents in this folder and trust it for them. A Claude agent may still ask once."; an existing folder shows
+// New team trusts the folder (#11889, the Operator's decision, Security's conditions): a folder Coral makes says "Coral trusts this folder for the team. A Claude agent may still ask once."; an existing folder shows
 // a "Trust this folder" switch, off, that names the path, and only a ticked one sends trust_folder. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -54,7 +54,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         console.log('A folder Coral makes says it will trust it, and has no switch');
         await open(); await setDir('/home/p/Coral/proj', true);
         assert.equal(await visible('launch-team-trust-line'), true, 'the line shows');
-        assert.equal(await ev(`document.getElementById('launch-team-trust-line').textContent`), 'Coral will start these agents in this folder and trust it for them. A Claude agent may still ask once.');
+        assert.equal(await ev(`document.getElementById('launch-team-trust-line').textContent`), 'Coral trusts this folder for the team. A Claude agent may still ask once.');
         assert.equal(await visible('launch-team-trust'), false, 'no switch for a folder Coral makes');
         let sent = await go();
         assert.equal(sent.create_dir, true); assert.equal(sent.trust_folder, undefined, 'the made folder is trusted by the server, not asked for');
@@ -67,21 +67,21 @@ const { removeBoards } = require('./helpers/board_cleanup');
         assert.equal(await ev(`document.getElementById('launch-team-trust').checked`), false, 'off by default');
         assert.match(await ev(`document.getElementById('launch-team-trust').closest('.sv-row').textContent`), /Trust this folder: its settings and tools can run/);
         assert.match(await ev(`document.getElementById('launch-team-trust').closest('.sv-row').textContent`), /\/home\/p\/Code\/app/, 'it names the path');
-        assert.match(await ev(`document.getElementById('launch-team-trust').closest('.sv-row').textContent`), /Coral will not trust \/home\/p\/Code\/app unless this is on/, 'a typed folder says plainly that it is not trusted while the switch is off (#12413)');
+        assert.match(await ev(`document.getElementById('launch-team-trust').closest('.sv-row').textContent`), /Off: each agent asks about \/home\/p\/Code\/app when it starts/, 'a typed folder says plainly that it is not trusted while the switch is off (#12413)');
         sent = await go();
         assert.equal(sent.trust_folder, undefined, 'unticked: nothing'); assert.equal(sent.create_dir, undefined);
         await ev(`window.hideLaunchModal(); true`);
         await open(); await setDir('/home/p/Code/app', false);
         await ev(`document.getElementById('launch-team-trust').click(); true`);
         { const t = await ev(`document.getElementById('launch-team-trust').closest('.sv-row').textContent`);
-          assert.doesNotMatch(t, /will not trust/, 'ticked: the "will not trust" sentence is gone'); assert.match(t, /is trusted for the team's agents/, 'ticked: it says it is trusted'); }
+          assert.doesNotMatch(t, /Off:/, 'ticked: the "Off:" sentence is gone'); assert.match(t, /is trusted\. Settings, tools and hooks run without asking/, 'ticked: it says it is trusted'); }
         sent = await go();
         assert.equal(sent.trust_folder, true, 'ticked: the request says so');
         await ev(`window.hideLaunchModal(); true`);
 
         console.log('A suggested folder that is already there is not made by Coral: no line, the switch shows, and only a tick trusts it');
         await open(); await setDir('/home/p/Coral/exists', true);
-        assert.equal(await visible('launch-team-trust-line'), false, 'the line "Coral will ... trust it for them" is gone');
+        assert.equal(await visible('launch-team-trust-line'), false, 'the line "Coral trusts this folder for the team" is gone');
         assert.equal(await visible('launch-team-trust'), true, 'the switch shows for it');
         sent = await go();
         assert.equal(sent.trust_folder, undefined, 'unticked: nothing is trusted');
@@ -170,12 +170,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
         };
         await choose('/home/p/Code/clean','clean');
         await waitFor(`document.getElementById('launch-team-trust').checked`,'clean chosen folder defaults on');
-        assert.match(await ev(`document.getElementById('launch-team-trust').closest('.sv-row').textContent`), /Untick/);
+        assert.match(await ev(`document.getElementById('launch-team-trust').closest('.sv-row').textContent`), /is trusted\. Settings, tools and hooks run without asking/);
         sent = await go(); assert.equal(sent.trust_folder,true,'default tick reaches the existing server contract');
         await ev(`window.hideLaunchModal();true`);
         await choose('/home/p/Code/clean','clean');
         await waitFor(`document.getElementById('launch-team-trust').checked`,'default ready before opt-out');
         await ev(`document.getElementById('launch-team-trust').click();true`);
+        assert.match(await ev(`document.getElementById('launch-team-trust').closest('.sv-row').textContent`), /Off: each agent asks about \/home\/p\/Code\/clean when it starts/, 'unticked: the "Off:" help names the folder');
         sent = await go(); assert.equal(sent.trust_folder,undefined,'unticking omits the opt-in wire field');
         await ev(`window.hideLaunchModal();true`);
         await choose('/home/p/Code/config','config');

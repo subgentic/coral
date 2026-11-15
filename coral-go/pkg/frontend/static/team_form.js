@@ -135,12 +135,12 @@ function mount(modal) {
             live: [{ id: 'btn-browse-team', wide: true, describes: false }, { id: 'launch-team-dir-recents', wide: true, describes: false }, { id: 'launch-team-dir-suggest', describes: false }, { id: 'launch-team-dir-new', describes: true }, { id: 'dir-browser-team', wide: true, describes: false }] },
         // Trusting the folder (#11889): a folder Coral makes is trusted for the agents that ask, and says so; an existing folder is trusted only when the person ticks it, naming the path. Neither shows through Coral Hub
         // (the server ignores the tick there). The server decides what it may trust: this is what is said and what is sent.
-        { key: 'trustLine', type: 'custom', wide: true, label: ' ', render: slot => { const p = document.createElement('p'); p.id = 'launch-team-trust-line'; p.className = 'sv-help'; p.textContent = 'Coral will start these agents in this folder and trust it for them. A Claude agent may still ask once.'; slot.append(p); },
+        { key: 'trustLine', type: 'custom', wide: true, label: ' ', render: slot => { const p = document.createElement('p'); p.id = 'launch-team-trust-line'; p.className = 'sv-help'; p.textContent = 'Coral trusts this folder for the team. A Claude agent may still ask once.'; slot.append(p); },
             visibleWhen: () => { const d = document.getElementById('launch-team-dir'); return !isHub() && usesSuggestion(d) && !suggestionExists(d); } },
         { key: 'trust', type: 'toggle', id: 'launch-team-trust', label: 'Trust this folder: its settings and tools can run', default: true, help: 'Its settings, hooks and tools can run without each CLI asking.',
             helpOf: () => { const f = document.getElementById('launch-team-dir')?.value.trim() || 'this folder'; // off: say plainly what that means, so a typed folder is not taken for one Coral trusts (#12413)
-                return (_trustNote ? _trustNote + ' ' : '') + (document.getElementById('launch-team-trust')?.checked ? 'On, ' + f + " is trusted for the team's agents, so settings, tools and hooks in it run with no question. Untick to let each agent’s CLI ask about the folder."
-                    : 'Coral will not trust ' + f + " unless this is on, so each agent's CLI asks about the folder when it starts."); },
+                return (_trustNote ? _trustNote + ' ' : '') + (document.getElementById('launch-team-trust')?.checked ? 'On: ' + f + " is trusted. Settings, tools and hooks run without asking."
+                    : 'Off: each agent asks about ' + f + ' when it starts.'); },
             visibleWhen: () => { const d = document.getElementById('launch-team-dir'); return !isHub() && !!(d && d.value.trim() && (!usesSuggestion(d) || suggestionExists(d))); } },
         { key: 'server', type: 'text', id: 'team-board-server', label: "Another computer's address", placeholder: 'e.g. http://remote-computer:8420' },
         { key: 'worktree', type: 'toggle', id: 'launch-team-worktree', label: 'Launch in a git worktree', default: false, help: 'The team works on its own branch in an isolated copy of the repository.' },
