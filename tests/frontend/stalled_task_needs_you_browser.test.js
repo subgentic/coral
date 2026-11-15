@@ -19,7 +19,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`fetch('/api/board/'+${JSON.stringify(team)}+'/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'QA Engineer',job_title:'QA Engineer'})}).then(r=>r.ok)`);
             await ev(`(() => { localStorage.removeItem('coral-inbox-needs-filters'); window.__m.add('stalled-agent', 'QA Engineer', 3, { sleeping: false });
                 const row = window.T.state.liveSessions.find(s => s.session_id === 'stalled-agent-id'); window.__stalled = row;
-                Object.assign(row, { board_project: ${JSON.stringify(team)}, stalled_task: { team: ${JSON.stringify(team)}, task_id: 3, title: 'Check the calculator', since: new Date(Date.now() - 180000).toISOString(), agent: 'QA Engineer' } });
+                Object.assign(row, { board_project: ${JSON.stringify(team)}, stalled_task: { team: ${JSON.stringify(team)}, task_id: 3, words: 'Stopped with task #3 in progress', title: 'Check the calculator', since: new Date(Date.now() - 180000).toISOString(), agent: 'QA Engineer' } });
                 window.T.render.renderLiveSessions(window.T.state.liveSessions); return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`!!document.querySelector('#group-table-view .inbox-stalled-restart')`, `${width}: the stalled row's Restart`, 8000);

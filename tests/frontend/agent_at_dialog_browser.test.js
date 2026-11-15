@@ -28,7 +28,7 @@ const { connect } = require('./agent_view_harness');
         check(/At a dialog/.test(seen) && !/\bIdle\b/.test(seen), 'the row itself says At a dialog: ' + seen.slice(0, 200));
         const needs = await ev(`import(${S} + 'asked_before_restart.js').then(m => T.state.liveSessions.filter(m.needsYou).map(r => r.display_name).sort())`);
         check(JSON.stringify(needs) === JSON.stringify(['Own Ask', 'Security Reviewer', 'Server Dialog']), 'a dialog is a Needs you item after its own minutes (5 from the held message, the server\'s after_min otherwise), not when the team turned it off, and not before: ' + JSON.stringify(needs));
-        const item = await ev(`import(${S} + 'asked_before_restart.js').then(m => { const r = m.askedRow(T.state.liveSessions.find(x => x.display_name === 'Security Reviewer')); return { summary: r.waiting_summary, kind: r.waiting_kind }; })`);
+        const item = await ev(`import(${S} + 'asked_row.js').then(m => { const r = m.askedRow(T.state.liveSessions.find(x => x.display_name === 'Security Reviewer')); return { summary: r.waiting_summary, kind: r.waiting_kind }; })`);
         check(item.summary === 'Needs one click: it is at a dialog' && item.kind === 'dialog', 'the Needs you row says it needs one click: ' + JSON.stringify(item));
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.updateInboxTab()); true`);
         await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '3'`, 'the Inbox badge counts the two dialogs and the ask', 6000);

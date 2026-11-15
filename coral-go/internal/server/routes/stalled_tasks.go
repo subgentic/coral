@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -98,7 +99,7 @@ func (w *stalledWatch) field(sid string) any {
 	if e == nil {
 		return nil
 	}
-	return map[string]any{"team": e.Team, "task_id": e.TaskID, "title": e.Title, "since": e.Since.UTC().Format(time.RFC3339), "agent": e.Agent}
+	return map[string]any{"team": e.Team, "task_id": e.TaskID, "title": e.Title, "since": e.Since.UTC().Format(time.RFC3339), "agent": e.Agent, "words": "Stopped with task #" + strconv.FormatInt(e.TaskID, 10) + " in progress"}
 }
 
 // all lists the stalled agents (a copy).

@@ -3,7 +3,7 @@ import { onAccountForgotten } from './local_store.js';
 import { keepMenuOnScreen } from './menu_fit.js';
 import { rememberFocus } from './dom_morph.js';
 import { onArtifactsRev } from './artifacts_feed.js';
-import { needsYou, askedRow } from './asked_before_restart.js';
+import { needsYou } from './asked_before_restart.js';
 import { unrecordedItem, recordAllAgents } from './waiting.js';
 import { welcomeRows, runWelcome, dismissWelcome } from './welcome_items.js';
 import { incompleteNote, readGaps } from './needs_incomplete.js';
@@ -51,6 +51,7 @@ const { coralInboxAdapter, savedExpandFor, listInboxGoals, goalsReadFailed, done
 const { closedGoalRows } = await importOnce('./goal_closed_items.js'); // 'Goal closed as done by <agent>' with Reopen: listed, not counted (#15257)
 const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is one shared helper everywhere (#12168)
 const { openedFrom, backLabelFor } = await importOnce('./inbox_back_label.js'); // the Back words of the Inbox's task and goal screens (#8861)
+const { askedRow } = await importOnce('./asked_row.js'); // the row of an agent that asked before a restart, stopped with a task, or is at a dialog (#18010: not in the start path)
 const saved = await importOnce('./saved.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the Tasks group's page is its Tasks columns
 await loadStyles('needs_actions.css'); // the actions cell's fixed slots (moved out of the start CSS, #12231)

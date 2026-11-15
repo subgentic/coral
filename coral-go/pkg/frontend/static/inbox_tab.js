@@ -1,6 +1,6 @@
 import './board_fetch.js'; // shared retry-safe route helpers used statically by the lazy board views
 import './inbox_servers.js'; // source helpers shared by lazy Inbox filters and lists
-import { needsYou, askedRow } from './asked_before_restart.js';
+import { needsYou } from './asked_before_restart.js';
 import { unrecordedItem } from './waiting.js';
 import { syncWelcome } from './welcome_items.js';
 /* Inbox tab (#4718, #4811, #7472): on every Coral. Where the hub serves the dashboard it is the Coral Hub's /inbox page (what needs the Operator, what was saved) inside the dashboard, in a
@@ -126,7 +126,7 @@ const waitingKey = s => `${sessionServer(s)}|${s.session_id}`;
  *  the list, a refresh of the same agents, or the page loading with agents already waiting says nothing. It speaks only while the Inbox is on screen: elsewhere the toast ("needs input") and the tab's badge
  *  carry it, and a second voice for the same agent would only repeat it. The look is kept up while the Inbox is not shown, so what waited meanwhile is in the list but not announced when it is opened. */
 function announceNewlyWaiting(tab) {
-    const rows = (state.liveSessions || []).filter(needsYou).map(askedRow);
+    const rows = (state.liveSessions || []).filter(needsYou);
     const now = new Set(rows.map(waitingKey));
     const before = _announced;
     _announced = now;
@@ -135,9 +135,11 @@ function announceNewlyWaiting(tab) {
     const shown = !!live && tab.classList.contains('active') && !document.getElementById('inbox-local')?.hidden;
     const fresh = rows.filter(s => !before.has(waitingKey(s)));
     if (!shown || !fresh.length) return;
-    const span = document.createElement('span'); // a new node each time: the same words for the same agent waiting again are said again
-    span.textContent = fresh.map(s => `${resolveSessionIdentity(s)} needs you: ${needsWords(s)}`).join('. ');
-    live.replaceChildren(span);
+    importOnce('./asked_row.js').then(({ askedRow }) => { // the row's words come from the lazy module (#18010)
+        const span = document.createElement('span'); // a new node each time: the same words for the same agent waiting again are said again
+        span.textContent = fresh.map(askedRow).map(s => `${resolveSessionIdentity(s)} needs you: ${needsWords(s)}`).join('. ');
+        live.replaceChildren(span);
+    });
 }
 
 /** What a Needs you row says an agent waits for, in one string: the state's words, then the agent's own ask when it has one (the same words as the row's two lines, so the announcement never differs from the row). */
