@@ -29,7 +29,7 @@ let docsQuery = '';   // the sidebar search's text, lower case
 
 // ── Groups (#7443, #10093): Getting started and For developers ────────────────
 // The list the server sends has no groups; these topics are the ones a new reader starts with, in this order ("How do I...?" first, then Quickstart); every other topic, the API reference included, is for developers.
-const GETTING_STARTED_ORDER = ['how-do-i', 'quickstart', 'using-the-dashboard', 'worked-demos', 'workflow-quickstart', 'troubleshooting'];
+const GETTING_STARTED_ORDER = ['how-do-i', 'quickstart', 'key-concepts', 'using-the-dashboard', 'worked-demos', 'workflow-quickstart', 'troubleshooting'];
 const GETTING_STARTED = new Set(GETTING_STARTED_ORDER);
 const DOC_GROUPS = [
     { key: 'getting-started', label: 'Getting started', has: d => GETTING_STARTED.has(d.name), order: d => GETTING_STARTED_ORDER.indexOf(d.name) },
@@ -77,7 +77,9 @@ function hitOf(d) {
     const titleAll = words.every(w => title.includes(w));
     // where the best of the words found sits: 1 the title, 2 a heading, 3 a step or paragraph, 4 code (#10303); a word the topic does not have counts for nothing here and a little against it below
     const place = Math.min(...found.map(w => (title.includes(w) ? 1 : (placeOf(d, w)?.kind ?? 4))));
-    const base = d.name === 'how-do-i' ? -1 : titleAll ? 0 : place;
+    const allQ = docsQuery.split(/\s+/).filter(Boolean);
+    const kcBoost = d.name === 'key-concepts' && place <= 2 && (/^what\s+(is|are|does)\s/i.test(docsQuery) || (allQ.length >= 2 && linesOf(d).some(l => l.kind === 2 && allQ.every(w => l.low.includes(w)))));
+    const base = kcBoost ? -2 : d.name === 'how-do-i' ? -1 : titleAll ? 0 : place;
     return { rank: base + (words.length - found.length) / 100, titleAll };
 }
 /** The sentence of a topic's text to show for a hit: in the best place a word is (a heading, else a step or paragraph, else code, #10303; the line with more of the words first), the sentence of that line that has the most of the query's words (the first, when two have as many), without the Markdown marks, cut to about 180 characters around the first word found; '' when no word is in the text. */
@@ -94,7 +96,7 @@ function hitSentence(name) {
     if (!line) return '';
     let best = '', bestN = 0;
     for (const part of line.text.split(/(?<=[.!?])\s+/)) {
-        const text = part.replace(/^[#>*\-\d.\s]+/, '').replace(/[`*_|\[\]]+/g, '').replace(/\s+/g, ' ').trim(), low = text.toLowerCase();
+        const text = part.replace(/^[#>*\-\d.\s]+/, '').replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[`*_|]+/g, '').replace(/#\d{3,}/g, '').replace(/\s+/g, ' ').trim(), low = text.toLowerCase();
         const n = words.filter(w => low.includes(w)).length;
         if (n > bestN) { bestN = n; best = text; }
     }
