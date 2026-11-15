@@ -1,12 +1,14 @@
 /* "While you were away" (#17537): one quiet line at the top of Needs you when the person comes back after five minutes or more without touching the page: how many tasks and goals were finished
- * meanwhile and how many agents are idle. Counts only. The start code keeps two numbers for it (fetch_share.js: window.__coralAway, the person's last input before the gap, in ms); this lazy module asks the server once for what happened since then (GET /api/away, this computer's, the person's alone), says it, and keeps it until Dismiss or the next gap.
+ * meanwhile and how many agents are idle. Counts only. Nothing of it is in the start code: this lazy module watches the person's input from the first time Needs you is drawn; after a gap of five
+ * minutes the input before the gap is when they went away. It asks the server once for what happened since then (GET /api/away, this computer's, the person's alone), says it, and keeps it until Dismiss or the next gap.
  * Switched off in Settings > Inbox (inbox_away). It is no item of Needs you and changes no count. Built with textContent only. */
 import { state } from './state.js';
 import { el } from './dom_el.js';
 import { loadStyles } from './lazy_styles.js';
 import { settingBool } from './settings_core.js';
+import { importOnce } from './import_once.js';
 
-let result = null, asking = 0, dismissed = 0, listening = 0, newest = null; // result: { from, text }; newest: the last slot to ask for the line
+let result = null, asking = 0, dismissed = 0, lastInput = 0, away = 0, newest = null; // result: { from, text }; newest: the last slot to ask for the line
 
 const idleAgents = () => (state.liveSessions || []).filter(s => s && s.session_id && s.agent_type !== 'terminal' && !s.sleeping && !s.archived && !s.not_started && !s.working && !s.waiting_for_input).length;
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
@@ -30,12 +32,15 @@ function draw(slot) {
     slot.replaceChildren(box);
 }
 
-/** Fills `slot` (the Needs you list's banner) with the line, or leaves it empty. Safe to call at every redraw: the answer is asked for once per gap. */
-export function mountAway(slot) {
+/** Fills `slot` with the line, or leaves it empty. Safe to call at every redraw: the answer is asked for once per gap. */
+function fill(slot) {
     if (!slot) return;
     newest = slot;
-    if (!listening) { listening = 1; for (const t of ['pointerdown', 'keydown', 'touchstart']) document.addEventListener(t, () => { if (newest && newest.isConnected) mountAway(newest); }); } // the person's return is an input: the gap is known only then
-    const from = Number(window.__coralAway);
+    if (!lastInput) {
+        lastInput = Date.now();
+        for (const t of ['pointerdown', 'click', 'keydown', 'touchstart']) document.addEventListener(t, () => { const n = Date.now(), gap = n - lastInput > 3e5; if (gap) away = lastInput; lastInput = n; if (gap && newest && newest.isConnected) fill(newest); }, true); // the person's return is an input: the gap is known only then
+    }
+    const from = away;
     if (!(from > 0) || from === dismissed || !settingBool(state.settings?.inbox_away, true)) { slot.replaceChildren(); return; }
     if (result && result.from === from) { if (!slot.firstChild) draw(slot); return; }
     if (asking === from) return;
@@ -46,4 +51,11 @@ export function mountAway(slot) {
         result = { from, text: awayText(a, idleAgents(), Date.now() - from) };
         if (newest && newest.isConnected) draw(newest);
     }).catch(() => { asking = 0; });
+}
+
+/** The Needs you list's banner: the line, then the signed-out notice when Claude is signed out (that notice's module is loaded from here so the start code holds one import for both). */
+export function mountAway(slot, signedOut) {
+    const aw = el('div'), sg = el('div'); slot.append(aw, sg);
+    if (signedOut) importOnce('./inbox_signin_notice.js').then(m => m.mountInboxSigninNotice(sg)).catch(() => {});
+    fill(aw);
 }
