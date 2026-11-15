@@ -26,7 +26,6 @@ function _renderTeamCard(boardName, boardSessions) {
         const boardCollapsed = _isGroupCollapsed(boardName);
         const boardWorkDir = pickTeamFolder('', boardSessions);
         const boardIsSleeping = boardSessions.every(s => s.sleeping);
-        const boardSleepIcon = sleepIcon(boardIsSleeping);
         const sleepLabel = boardIsSleeping ? 'Wake team' : 'Sleep team';
         const sleepAction = boardIsSleeping ? 'wake' : 'sleep';
         const bKebab = `<div class="sidebar-kebab-wrapper group-kebab">
@@ -90,7 +89,7 @@ function _renderTeamCard(boardName, boardSessions) {
         const sleepingClass = boardIsSleeping ? ' team-sleeping' : '';
         html += `<li class="session-board-card session-team-group session-board-card-toplevel${sleepingClass}"${accentStyle}>
             <div class="session-group-header board-card-header${escapeAttr(state.selectedTeam === boardName ? ' team-selected' : '')}"${state.selectedTeam === boardName ? ' aria-current="true"' : ''} data-group-name="${escapeAttr(boardName)}" data-on-click="team-name-open" data-board="${escapeAttr(boardName)}" data-group="${escapeAttr(boardName)}"${_teamHeaderAttrs(boardName)}>${_chevron(boardName, boardCollapsed)}
-                <div class="group-header-text"><div class="group-name-line"><svg class="team-group-icon" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg><span class="group-name-text" title="${escapeAttr(keyLabel(boardName))}">${_rowNameWithServer(boardName)}</span>${boardSleepIcon}${distillChip(boardName)} ${groupCount(boardSessions)}</div>${_rowServerLine(boardName)}</div><span class="session-name-spacer"></span>${teamHealthBtn(boardName, boardSessions)}${bKebab}
+                <div class="group-header-text"><div class="group-name-line"><svg class="team-group-icon" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg><span class="group-name-text" title="${escapeAttr(keyLabel(boardName))}">${_rowNameWithServer(boardName)}</span>${sleepIcon(boardIsSleeping)}${distillChip(boardName)} ${groupCount(boardSessions)}</div>${_rowServerLine(boardName)}</div><span class="session-name-spacer"></span>${teamHealthBtn(boardName, boardSessions)}${bKebab}
             </div>
             <ul class="board-card-agents${boardCollapsed ? ' board-card-collapsed' : ''}">`;
 
@@ -143,7 +142,7 @@ function _renderWorkflowCard(wfName, wfSessions) {
 
 const sleepIcon = on => on ? ' <span class="agent-icon" title="Team is sleeping">🌙</span>' : '';
 /** A header's count is the agents awake; of says how many there are in all, and review_counts.js (loaded at idle) turns that into the count's title (#16740). */
-const groupCount = ss => `<span class="session-group-count" data-of="${ss.length}">${ss.filter(s => !s.sleeping).length}</span>`;
+const groupCount = ss => `<span class="session-group-count" data-of="${Number(ss.length)}">${ss.filter(s => !s.sleeping).length}</span>`;
 
 // Team-first mode: one folder group of the agents that are on no team or workflow.
 function _renderFolderGroup(groupName, groupSessions) {
@@ -256,7 +255,6 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                 const boardCollapsed = _isGroupCollapsed(boardName);
                         const boardWorkDir = pickTeamFolder('', boardSessions);
                 const boardIsSleeping = boardSessions.some(s => s.sleeping);
-                const boardSleepIcon = sleepIcon(boardIsSleeping);
                 const sleepLabel = boardIsSleeping ? 'Wake team' : 'Sleep team';
                 const sleepAction = boardIsSleeping ? 'wake' : 'sleep';
                 const bKebab = `<div class="sidebar-kebab-wrapper group-kebab">
@@ -307,7 +305,7 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                 </div>`;
                 html += `<li class="session-board-card session-team-group"${accentStyle}>
                     <div class="session-group-header board-card-header${escapeAttr(state.selectedTeam === boardName ? ' team-selected' : '')}"${state.selectedTeam === boardName ? ' aria-current="true"' : ''} data-group-name="${escapeAttr(boardName)}" data-on-click="team-name-open" data-board="${escapeAttr(boardName)}" data-group="${escapeAttr(boardName)}"${_teamHeaderAttrs(boardName)}>${_chevron(boardName, boardCollapsed)}
-                        <div class="group-header-text"><div class="group-name-line"><svg class="team-group-icon" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg><span class="group-name-text" title="${escapeAttr(keyLabel(boardName))}">${_rowNameWithServer(boardName)}</span>${boardSleepIcon}${distillChip(boardName)} <span class="session-group-count">${boardSessions.length}</span></div>${_rowServerLine(boardName)}</div><span class="session-name-spacer"></span>${teamHealthBtn(boardName, boardSessions)}${bKebab}
+                        <div class="group-header-text"><div class="group-name-line"><svg class="team-group-icon" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg><span class="group-name-text" title="${escapeAttr(keyLabel(boardName))}">${_rowNameWithServer(boardName)}</span>${sleepIcon(boardIsSleeping)}${distillChip(boardName)} <span class="session-group-count">${boardSessions.length}</span></div>${_rowServerLine(boardName)}</div><span class="session-name-spacer"></span>${teamHealthBtn(boardName, boardSessions)}${bKebab}
                     </div>
                     <ul class="board-card-agents${boardCollapsed ? ' board-card-collapsed' : ''}">`;
                 const orderedBoardNested = _sortByOrder(boardSessions);
