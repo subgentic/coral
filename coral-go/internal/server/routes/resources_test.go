@@ -449,3 +449,15 @@ func TestAskingMayIDefineAnswersForTheCallerAndDefinesNothing(t *testing.T) {
 	code, _ = g.do("operator", "GET", "/api/resources/newbox", nil)
 	assert.Equal(t, 404, code, "asking defined nothing")
 }
+
+// #18222: ?check=1 runs the name check a definition gets: a name that would be refused is a 400 before any box is read, and a good one is still a 200.
+func TestAskingMayIDefineRefusesABadNameLikeADefinitionWould(t *testing.T) {
+	g := newResRig(t)
+	body := map[string]any{"slots": -1}
+	code, _ := g.do("operator", "PUT", "/api/resources/bad%20name?check=1", body)
+	assert.Equal(t, 400, code, "a name with a space is refused")
+	code, _ = g.do("operator", "PUT", "/api/resources/-leading?check=1", body)
+	assert.Equal(t, 400, code, "a name that starts with a dash is refused")
+	code, _ = g.do("operator", "PUT", "/api/resources/good-box.1?check=1", body)
+	assert.Equal(t, 200, code, "a good name is told yes")
+}
