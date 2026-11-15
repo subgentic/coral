@@ -16,7 +16,7 @@ import (
 )
 
 // One decision is one item in Needs you (#17634, walk 78): an agent that sends a plan as a file for review and asks the same question about that file in words made two items; deciding the file now closes
-// the open question to the Operator that names it, so the pair settles together. A question about another file stays.
+// the open question to the Operator that carries its id, so the pair settles together. A question about another file stays.
 func TestDecidingAFileClosesTheQuestionAboutIt(t *testing.T) {
 	for _, decision := range []string{"approve", "changes", "deny"} {
 		resetOwnerState(t)
@@ -47,7 +47,7 @@ func TestDecidingAFileClosesTheQuestionAboutIt(t *testing.T) {
 			require.NoError(t, h.bs.RecordAsk(ctx, "alpha", q, []string{"Operator"}))
 			return q.ID
 		}
-		about, other := ask("@Operator Plan file: plan.md. Go ahead with it?"), ask("@Operator Should the logo be blue?")
+		about, other := ask("@Operator Plan coral://artifacts/"+id+" is up. Go ahead with it?"), ask("@Operator Should the logo be blue, as in plan.md?")
 		open := func() map[int64]bool {
 			asks, err := h.bs.OpenAsksOf(ctx, "alpha", board.OperatorName, time.Now())
 			require.NoError(t, err)
@@ -70,6 +70,6 @@ func TestDecidingAFileClosesTheQuestionAboutIt(t *testing.T) {
 		require.NoError(t, err)
 		resp.Body.Close()
 		require.Equal(t, http.StatusOK, resp.StatusCode, decision)
-		assert.Equal(t, map[int64]bool{other: true}, open(), decision+": the question naming the file is settled with it, the other stays")
+		assert.Equal(t, map[int64]bool{other: true}, open(), decision+": the question carrying the file id is settled with it; one that only names plan.md stays")
 	}
 }
