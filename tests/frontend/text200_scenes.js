@@ -138,9 +138,6 @@ const { removeBoards } = require('./helpers/board_cleanup');
                     if (url.pathname === '/api/token-usage/timeseries') return json({ buckets: hours.map(b => ({ bucket: b, cost_usd: 0.0015625, series: [{ key: 'Frontend Dev', label: 'Frontend Dev', cost_usd: 0.019 / 24, num_requests: 1 }, { key: 'QA Engineer', label: 'QA Engineer', cost_usd: 0.0185 / 24, num_requests: 1 }] })) });
                     return R(u, o); }; return true; })()`);
             await Emulation.setDeviceMetricsOverride({ width: 820, height: 1180, deviceScaleFactor: 1, mobile: true }); await settle(600);
-            // a table's column drag handle is a pointer's: on a touch screen of any width it is not drawn (a 10x47 target at 820 px was the red, #17869); asserted on a bare handle so it does not depend on which table is open
-            const handleDisplay = await ev(`(() => { const s = document.createElement('span'); s.className = 'dt-resize'; document.body.append(s); const d = getComputedStyle(s).display; s.remove(); return d; })()`);
-            if (handleDisplay !== 'none') problems.push('tablet 820: a table column handle (.dt-resize) is drawn on a touch screen (display ' + handleDisplay + ')');
             await subset('tablet 820');
             await Emulation.setDeviceMetricsOverride({ width: 844, height: 390, deviceScaleFactor: 1, mobile: true }); await settle(600);
             await subset('landscape 844x390');

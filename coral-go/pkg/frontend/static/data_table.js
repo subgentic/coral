@@ -513,7 +513,7 @@ export function dataTable(cfg) {
                 const icon = el('span', 'material-icons', 'filter_list'); icon.setAttribute('aria-hidden', 'true'); f.append(icon);
                 th.append(f);
             }
-            if (cfg.resize !== false && c.resize !== false && !c.fixed) { const rh = resizeHandle(c, th); rh.hidden = !columns.slice(columns.indexOf(c) + 1).some(x => !x.fixed && !fixedW(x)); th.append(rh); } // the last column has no handle on show: its right edge is the table's (#12409; applyWidths hides and shows it with the layout)
+            if (cfg.resize !== false && c.resize !== false && !c.fixed && !matchMedia('(pointer: coarse)').matches) { const rh = resizeHandle(c, th); rh.hidden = !columns.slice(columns.indexOf(c) + 1).some(x => !x.fixed && !fixedW(x)); th.append(rh); } // a touch screen has no handle, of any width: a drag handle is a pointer's, not a 10 px target (#17869, #8837). The last column has no handle on show: its right edge is the table's (#12409; applyWidths hides and shows it with the layout)
             if (cfg.decorateHead) cfg.decorateHead(th, c);
             if (emptyKeys.has(c.key)) th.classList.add('dt-col-unused');
             tr.append(th);
