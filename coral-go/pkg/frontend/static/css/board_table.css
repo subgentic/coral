@@ -8,6 +8,7 @@
 .mb-table-tools { display: flex; align-items: center; gap: 0.5rem 0.75rem; flex-wrap: wrap; padding: 0.25rem 0 0.5rem; }
 .mb-table-tools .mb-pills { flex: 1 1 auto; min-width: 0; }
 .mb-view-switch { margin-inline-start: auto; }
+@media (max-width: 767px) { .mb-table-tools { flex-wrap: nowrap; } .mb-view-switch { flex: none; } } /* a phone: one line, the pills scroll inside their strip (320 and 360 px wrapped to two lines, #17733) */
 
 /* In the agent dock's head line the switch sits between the title and the buttons. */
 .board-chat-header .mb-table-tools { padding: 0; margin-inline-start: auto; flex: none; }
