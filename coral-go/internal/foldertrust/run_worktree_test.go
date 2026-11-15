@@ -113,3 +113,47 @@ func TestUntrustRemovesOnlyThatRunsEntry(t *testing.T) {
 	assert.Contains(t, string(tb), "untrusted", "the person's own answer stays")
 	assert.Contains(t, string(tb), `model = "x"`)
 }
+
+// #17396: git keeps a worktree with unsaved work and a folder can be removed by hand, so a run's entry can outlive its folder; a sweep takes only those, for Claude and Codex, and nothing else.
+func TestSweepRemovesTheEntriesOfGoneRunFoldersOnly(t *testing.T) {
+	_, root, live := runTree(t)
+	gone := filepath.Join(root, "job-run-9-gone")
+	require.NoError(t, os.MkdirAll(gone, 0o755))
+	cfg := filepath.Join(t.TempDir(), ".claude.json")
+	require.NoError(t, os.WriteFile(cfg, []byte(`{"numStartups": 3, "projects": {"/keep/me": {"hasTrustDialogAccepted": true}}}`), 0o600))
+	toml := filepath.Join(t.TempDir(), "config.toml")
+	require.NoError(t, os.WriteFile(toml, []byte("model = \"x\"\n\n[projects.\"/keep/me\"]\ntrust_level = \"untrusted\"\n"), 0o600))
+	for _, p := range []string{live, gone} {
+		ok, err := TrustClaude(cfg, p)
+		require.NoError(t, err)
+		require.True(t, ok)
+		ok, err = TrustCodex(toml, p)
+		require.NoError(t, err)
+		require.True(t, ok)
+	}
+	elsewhere := filepath.Join(t.TempDir(), "job-run-5-elsewhere") // a folder that is gone but is not in the worktrees folder: not Coral's to take
+	ok, err := TrustClaude(cfg, elsewhere)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.NoError(t, os.RemoveAll(gone))
+
+	n, err := SweepGoneRunFolders(cfg, toml, root)
+	require.NoError(t, err)
+	assert.Equal(t, 2, n, "the gone run's entry in each file")
+	c, _ := os.ReadFile(cfg)
+	assert.NotContains(t, string(c), "job-run-9-gone")
+	assert.Contains(t, string(c), "job-run-7-demo", "a folder that is still there keeps its entry")
+	assert.Contains(t, string(c), "job-run-5-elsewhere", "an entry outside the worktrees folder is left")
+	assert.Contains(t, string(c), "/keep/me")
+	tb, _ := os.ReadFile(toml)
+	assert.NotContains(t, string(tb), "job-run-9-gone")
+	assert.Contains(t, string(tb), "job-run-7-demo")
+	assert.Contains(t, string(tb), "/keep/me")
+
+	n, err = SweepGoneRunFolders(cfg, toml, root)
+	require.NoError(t, err)
+	assert.Zero(t, n, "a second sweep finds nothing")
+	n, err = SweepGoneRunFolders(filepath.Join(t.TempDir(), "none.json"), filepath.Join(t.TempDir(), "none.toml"), root)
+	require.NoError(t, err)
+	assert.Zero(t, n, "no settings files is not an error")
+}

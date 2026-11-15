@@ -82,7 +82,8 @@ func applyTrustTick(w http.ResponseWriter, r *http.Request, fields map[string]in
 		return true
 	}
 	if existing != nil && existing.TrustWorktree == 1 {
-		stale := repoChanged || noWT == 1 || (agentType != "claude" && agentType != "codex") || (jobType != "" && jobType != "prompt")
+		// an empty agent_type is Claude, the default (#17396)
+		stale := repoChanged || noWT == 1 || (agentType != "" && agentType != "claude" && agentType != "codex") || (jobType != "" && jobType != "prompt")
 		if stale {
 			fields["trust_worktree"] = 0
 		}

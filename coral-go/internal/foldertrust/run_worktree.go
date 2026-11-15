@@ -132,3 +132,75 @@ func UntrustCodex(cfg, path string) (bool, error) {
 	}
 	return true, nil
 }
+
+// SweepGoneRunFolders removes the trust entries of run worktrees whose folder no longer exists (#17396): git keeps a worktree that has unsaved work and Coral's cleanup then leaves its entry, and a folder removed by
+// hand never had its entry removed. Only keys directly inside worktreesRoot (as given or resolved) named job-run-<something> whose folder is absent (not "cannot be read": any other error keeps the entry) are
+// taken, from Claude's settings at claudeCfg and Codex's at codexCfg, each through the same removal as a finished run's. It returns how many it removed; the first error stops that file, not the other.
+func SweepGoneRunFolders(claudeCfg, codexCfg, worktreesRoot string) (int, error) {
+	if worktreesRoot == "" || !filepath.IsAbs(worktreesRoot) {
+		return 0, nil
+	}
+	roots := []string{filepath.Clean(worktreesRoot)}
+	if r, err := filepath.EvalSymlinks(worktreesRoot); err == nil && filepath.Clean(r) != roots[0] {
+		roots = append(roots, filepath.Clean(r))
+	}
+	gone := func(key string) bool {
+		if !filepath.IsAbs(key) || !strings.HasPrefix(filepath.Base(key), "job-run-") {
+			return false
+		}
+		inside := false
+		for _, r := range roots {
+			inside = inside || filepath.Dir(filepath.Clean(key)) == r
+		}
+		if !inside {
+			return false
+		}
+		_, err := os.Lstat(key)
+		return errors.Is(err, os.ErrNotExist)
+	}
+	removed := 0
+	var firstErr error
+	if raw, _, err := readConfig(claudeCfg); err == nil {
+		var top struct {
+			Projects map[string]json.RawMessage `json:"projects"`
+		}
+		if json.Unmarshal(raw, &top) == nil {
+			for key := range top.Projects {
+				if !gone(key) {
+					continue
+				}
+				if ok, err := UntrustClaude(claudeCfg, key); err != nil {
+					firstErr = err
+					break
+				} else if ok {
+					removed++
+				}
+			}
+		}
+	} else if !errors.Is(err, ErrNoConfig) {
+		firstErr = err
+	}
+	if raw, _, err := readConfig(codexCfg); err == nil {
+		var top struct {
+			Projects map[string]any `toml:"projects"`
+		}
+		if toml.Unmarshal(raw, &top) == nil {
+			for key := range top.Projects {
+				if !gone(key) {
+					continue
+				}
+				if ok, err := UntrustCodex(codexCfg, key); err != nil {
+					if firstErr == nil {
+						firstErr = err
+					}
+					break
+				} else if ok {
+					removed++
+				}
+			}
+		}
+	} else if !errors.Is(err, ErrNoConfig) && firstErr == nil {
+		firstErr = err
+	}
+	return removed, firstErr
+}
