@@ -8,7 +8,7 @@ import { whenText } from './when_text.js';
 import { loadStyles } from './lazy_styles.js';
 import { showToast } from './notifications.js';
 import { importOnce } from './import_once.js';
-import { askParts, askSubjects, fromAnotherComputer, buttonsOffered, noteButtonsOwnerOnly, yesNoButtons, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, operatorAsks, askKey, replyToAsk as replyOnBoard, forgetAsk, questionContextNote } from './operator_asks.js';
+import { askParts, askSubjects, fromAnotherComputer, buttonsOffered, noteButtonsOwnerOnly, yesNoButtons, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, operatorAsks, askKey, replyToAsk as replyOnBoard, closeAnsweredDuplicates, forgetAsk, questionContextNote } from './operator_asks.js';
 const replyToAsk = (a, text) => a.kind === 'agent' ? importOnce('./agent_ask_answer.js').then(m => m.answerAgentAsk(a, text)) : replyOnBoard(a, text); // a single agent's question (#18106) is answered in its conversation, not on a board
 await loadStyles('operator_ask_dialog.css');
 
@@ -85,7 +85,7 @@ export function openAskDialog(a, onDone, runners = {}) {
                         const draft = replyText();
                         if (binary && draft) { await replyToAsk(a, `${b.label}\n\n${draft}`); finish(); left(); showToast(`Sent: ${b.label} with your reply`); return; }
                         const got = await claimButton(a, b); // the stored action, whatever the label says
-                        if (isReply(got.action)) { forgetAsk(a); refreshOperatorAsks(true); finish(); left(); showToast(`Sent: ${markHidden(got.label, { strict: true })}`); return; }
+                        if (isReply(got.action)) { await closeAnsweredDuplicates(a); forgetAsk(a); refreshOperatorAsks(true); finish(); left(); showToast(`Sent: ${markHidden(got.label, { strict: true })}`); return; }
                         const navigates = ['open:new-agent', 'open:task', 'open:artifact'].includes(got.action);
                         finish(); // the dialog is modal: it goes before the page it opens
                         try {
