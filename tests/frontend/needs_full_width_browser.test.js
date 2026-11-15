@@ -35,8 +35,8 @@ const BASE = require('./test_base').BASE;
             await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr.dt-row').length >= 10`, `${at}the ten items`, 20000);
             const m = await ev(`(() => { const r = document.querySelector('#group-table-view .inbox-needs-results'), host = r.parentElement, box = r.querySelector('.dt-box') || r, bar = document.querySelector('#group-table-view .list-bar, #group-table-view .gt-toolbar'); return { list: Math.round(r.getBoundingClientRect().width), host: Math.round(host.getBoundingClientRect().width), box: Math.round(box.getBoundingClientRect().width), bar: bar ? Math.round(bar.getBoundingClientRect().width) : -1, over: document.documentElement.scrollWidth > innerWidth + 1 }; })()`);
-            check(m.list >= m.host - 2, `${at}the Needs you list fills its area (no max width): ${JSON.stringify(m)}`);
-            check(m.box >= m.host - 2, `${at}and so does its table: ${JSON.stringify(m)}`);
+            check(m.bar > 0 && m.list >= m.bar - 2, `${at}the Needs you list is as wide as the toolbar above it (no max width): ${JSON.stringify(m)}`);
+            check(m.bar > 0 && m.box >= m.bar - 2, `${at}and so does its table: ${JSON.stringify(m)}`);
             check(!m.over, `${at}no sideways scroll: ${JSON.stringify(m)}`);
             await snap('needs');
         }
