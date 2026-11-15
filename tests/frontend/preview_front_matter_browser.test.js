@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, framesJs } = require('./helpers/wait');
 
 const SKILL = '---\nname: pdf-tools\ndescription: Fill and merge PDF forms when an agent is asked to\nmetadata:\n  author: <img src=x onerror=window.__pwn=1>\n---\n\n# PDF tools\n\nBody text here.\n';
 const NOT_FRONT = '---\n\nA document that starts with a rule and never closes it.\n';
@@ -50,9 +50,9 @@ const NOT_FRONT = '---\n\nA document that starts with a rule and never closes it
         const kept = await ev(`(async () => { const host = document.createElement('div'); host.style.cssText = 'height:300px;overflow:auto;position:fixed;top:0;left:0;width:600px;background:#fff'; document.body.append(host);
             host.innerHTML = '<div class="prose preview-pane-markdown">' + marked.parse(${JSON.stringify(LONG)}) + '</div>'; // the first render: the front matter run together
             const prose = host.firstElementChild, top = el => el.getBoundingClientRect().top - host.getBoundingClientRect().top;
-            host.scrollTop = 900; await new Promise(r => requestAnimationFrame(r));
+            host.scrollTop = 900; await ${framesJs(2)};
             const pick = Array.from(prose.querySelectorAll('p')).find(p => /^Paragraph \\d+/.test(p.textContent) && top(p) >= 0), label = pick.textContent.slice(0, 14), before = top(pick);
-            const fm = await import((window.__coralStatic || '/static/') + 'md_front.js?t=1'); await fm.show(host, ${JSON.stringify(LONG)}); await new Promise(r => requestAnimationFrame(r));
+            const fm = await import((window.__coralStatic || '/static/') + 'md_front.js?t=1'); await fm.show(host, ${JSON.stringify(LONG)}); await ${framesJs(2)};
             const again = Array.from(host.querySelectorAll('p')).find(p => p.textContent.startsWith(label)); const r = { label, before: Math.round(before), after: again ? Math.round(top(again)) : null, dl: !!host.querySelector('dl') }; host.remove(); return r; })()`);
         if (!kept.dl) problems.push('the header was not drawn in the scroll check');
         else if (kept.after === null || Math.abs(kept.after - kept.before) > 2) problems.push(`the block in view moved when the header was drawn: ${kept.label} was ${kept.before} px from the top, now ${kept.after}`);
