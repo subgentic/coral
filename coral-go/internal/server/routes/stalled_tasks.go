@@ -101,6 +101,17 @@ func (w *stalledWatch) isQuiet(project string, now time.Time) bool {
 	return now.Before(w.quietUntil[project])
 }
 
+// pruneQuiet forgets the quiet time of a board that is no longer listed (a deleted team), so the table does not grow with the teams that came and went (#18013).
+func (w *stalledWatch) pruneQuiet(listed map[string]bool) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for project := range w.quietUntil {
+		if !listed[project] {
+			delete(w.quietUntil, project)
+		}
+	}
+}
+
 func (w *stalledWatch) setQuiet(project string, quiet bool, now time.Time) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -147,6 +158,11 @@ func (h *SessionsHandler) stalledPass(ctx context.Context, now time.Time, after 
 	}
 	found := map[string]*stalledTask{}
 	read := map[string]bool{}
+	listed := make(map[string]bool, len(projects))
+	for _, p := range projects {
+		listed[p.Project] = true
+	}
+	h.stalls.pruneQuiet(listed)
 	for _, p := range projects {
 		if ctx.Err() != nil {
 			return
@@ -224,7 +240,7 @@ func (h *SessionsHandler) alreadyToldStalled(ctx context.Context, st *stalledTas
 	name := h.boardHandler.noticeText(ctx, st.Team, st.Agent)
 	want := fmt.Sprintf("task #%d in progress", st.TaskID)
 	for _, m := range msgs {
-		if !m.IsSystem || !strings.Contains(m.Content, want) || !strings.Contains(m.Content, name+" is ") {
+		if !m.IsSystem || !strings.Contains(m.Content, want) || !strings.Contains(m.Content, "[Coral] "+name+" is ") { // the name starts the notice's own words: "Engineer 3" is not "QA Engineer 3" (#18013)
 			continue
 		}
 		if at, ok := boardMessageTime(m.CreatedAt); ok && !at.Before(st.Since) {

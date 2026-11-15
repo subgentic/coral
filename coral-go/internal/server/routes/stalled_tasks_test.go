@@ -122,3 +122,45 @@ func TestAStalledNoticeSurvivesARestartAndAQuietBoardIsReadLess(t *testing.T) {
 	require.True(t, h.stalls.isQuiet(team, start.Add(5*time.Minute+20*time.Second)), "a board with nobody idle on a task is not read again for 45 s")
 	require.False(t, h.stalls.isQuiet(team, start.Add(5*time.Minute+50*time.Second)), "and is read again after that")
 }
+
+// #18013: a notice about "QA Engineer 3" is not the notice about "Engineer 3" on the same task: the name is matched where the notice's own words start it.
+func TestAStalledNoticeIsMatchedByTheWholeAgentName(t *testing.T) {
+	_, h, _, ss := setupSessionsTestServer(t)
+	h.SetBoardHandler(NewBoardHandler(h.bs))
+	ctx := context.Background()
+	team := "stall-names"
+	sid := uuid.NewString()
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentName: "lead", AgentType: "claude", BoardName: &team, WorkingDir: "/tmp"}))
+	_, err := h.bs.Subscribe(ctx, team, "lead", "Orchestrator", "claude-"+sid, nil, "all")
+	require.NoError(t, err)
+	since := time.Now().Add(-time.Hour)
+	told := func() int {
+		msgs, err := h.bs.ListMessages(ctx, team, 100, 0, 0)
+		require.NoError(t, err)
+		n := 0
+		for _, m := range msgs {
+			if m.IsSystem && strings.Contains(m.Content, "task #7 in progress") {
+				n++
+			}
+		}
+		return n
+	}
+	h.tellOrchestratorStalled(ctx, &stalledTask{Team: team, Agent: "QA Engineer 3", TaskID: 7, Title: "t", Since: since, SessionID: "s1"})
+	require.Equal(t, 1, told())
+	h.tellOrchestratorStalled(ctx, &stalledTask{Team: team, Agent: "Engineer 3", TaskID: 7, Title: "t", Since: since, SessionID: "s2"})
+	require.Equal(t, 2, told(), "Engineer 3 is not QA Engineer 3: it is told too")
+	h.tellOrchestratorStalled(ctx, &stalledTask{Team: team, Agent: "Engineer 3", TaskID: 7, Title: "t", Since: since, SessionID: "s2"})
+	require.Equal(t, 2, told(), "and the same agent is not told twice")
+}
+
+// #18013: the quiet times of boards that are no longer listed are forgotten.
+func TestQuietTimesOfDeletedBoardsArePruned(t *testing.T) {
+	var w stalledWatch
+	now := time.Now()
+	w.setQuiet("kept", true, now)
+	w.setQuiet("gone", true, now)
+	w.pruneQuiet(map[string]bool{"kept": true})
+	require.True(t, w.isQuiet("kept", now))
+	require.False(t, w.isQuiet("gone", now))
+	require.Len(t, w.quietUntil, 1)
+}
