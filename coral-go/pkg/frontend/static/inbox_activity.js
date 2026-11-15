@@ -40,14 +40,15 @@ const expanded = new Set();
 let onChange = () => {};
 
 /** The row as the one rule says it (#14423): verb, object, detail. */
-export const partsOf = r => ({ ...activityParts(r, itemWords), about: aboutWords(r) });
+const M = v => markHidden(v, { strict: true }); // what an agent wrote is written out where it is drawn, once, here: every branch of the rows below reads these (#18275)
+export const partsOf = r => { const p = activityParts(r, itemWords); return { ...p, on: M(p.on), detail: M(p.detail), about: M(aboutWords(r)) }; };
 const KIND_WORD = { file: 'a file', question: 'a question', goal: 'a goal', proposal: 'a proposal', message: 'a message', task: 'a task', agent: 'an agent', chat: 'a chat', run: 'a run', workflow_run: 'a workflow run', job_run: 'an automation run', setting: 'a row in Needs you', goal_request: 'a goal request' };
 /** What it was done to: the item's title when the record kept one (words an agent wrote), else the kind. */
 export const itemWords = r => r.item_kind === 'job_run' ? (r.title && r.title !== '__oneshot__' ? r.title : jobRunParts(r.item_id) ? `Job ${jobRunParts(r.item_id).jobId}` : 'an automation run') : r.title || (r.item_kind === 'agent' && r.item_id ? r.item_id : r.item_kind === 'task' && r.item_id ? `Task #${r.item_id}` : KIND_WORD[r.item_kind]) || 'an item';
 /** Where it was done from: the server decides this computer or Coral Hub; the phone hint is only what the page said about itself. */
 export const fromWords = r => [r.source === 'hub' ? 'Coral Hub' : 'this computer', r.hint === PHONE_HINT ? `${PHONE_HINT} (reported by the page)` : ''].filter(Boolean).join(', ');
 /** The From column when a Hub-served dashboard reads several computers (#15730): the computer the action was done on, then how it was reached (Coral Hub, the phone); a dashboard of one computer says what it always did. */
-export const fromCell = r => multipleServers() ? [serverLabel(r.server || LOCAL_SERVER), r.source === 'hub' ? 'via Coral Hub' : '', r.hint === PHONE_HINT ? `${PHONE_HINT} (reported by the page)` : ''].filter(Boolean).join(', ') : fromWords(r);
+export const fromCell = r => M(multipleServers() ? [serverLabel(r.server || LOCAL_SERVER), r.source === 'hub' ? 'via Coral Hub' : '', r.hint === PHONE_HINT ? `${PHONE_HINT} (reported by the page)` : ''].filter(Boolean).join(', ') : fromWords(r));
 /** The computers whose record is not in the folder, each with why (#15730): the ones that are offline (never asked), the ones that refused (an older Coral that does not give its record to a Hub's owner yet, or a computer this person is only a guest of) and the ones that failed. Named, never left out silently. */
 export const missingComputers = () => {
     if (!appState.hub) return [];
@@ -156,7 +157,7 @@ export const teams = () => [...new Set(shown().map(r => r.team))].sort((a, b) =>
 /** The agents and the goals the record names, for the Filters panel's lists (#14445): the agents by name, the goals by title with No goal last when any row has none. */
 export const agents = () => [...new Set(shown().map(AF.agentOf).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 export const goals = () => { const all = [...new Set(shown().map(AF.goalOf))]; return [...all.filter(g => g !== AF.NO_GOAL).sort((a, b) => a.localeCompare(b)), ...all.filter(g => g === AF.NO_GOAL)]; };
-export const teamOf = r => teamLabel(r.team);
+export const teamOf = r => M(teamLabel(r.team));
 export const filtered = f => AF.ordered(shown().filter(r => AF.matches(r, f, teamOf)), f);
 export const total = () => shown().length;
 /** How many of the rows read are of a kind (the chips' counts); '' is all of them. */
@@ -172,7 +173,7 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
         skill_scripts_ack: 'Scripts acknowledged', skill_secret_ack: 'Secret acknowledged', supersede: 'Superseded', save: 'Saved', unsave: 'Returned', undone: 'Undone', send_review: 'Review requested', unsend_review: 'Review withdrawn',
         task_remind: 'Reminder sent', task_park: 'Parked/released', task_reply: 'Replied', wait_send: 'Message sent', file_tags: 'Tags changed', file_share: 'Shared', file_edit: 'Version saved', file_edit_send: 'Edit sent',
         chat_flag: 'Chat changed', run_seen: 'Run action', agents_record: 'Recorded', keep_full_access: 'Access changed', goal_driver: 'Driver changed', goal_move: 'Moved', preview_trust: 'Scripts allowed', preview_untrust: 'Scripts disabled', hub_update_check: 'Update checked', hub_update_relaunch: 'Relaunched' })[r.action] || parts(r).did; const label = DT.el('span', 'activity-decision', word); if (['Approved', 'Allowed'].includes(word)) label.prepend(DT.el('span', 'activity-checkmark', '✓'), ' '); return label; };
-    const summary = r => { const p = parts(r); return [p.did, p.detail, p.about ? markHidden(p.about, { strict: true }) : ''].filter(Boolean).join(' · '); };
+    const summary = r => { const p = parts(r); return [p.did, p.detail, p.about].filter(Boolean).join(' · '); };
     const groupFor = grouped ? Threads.activityGroupLookup(list, teamLabel, parts, tasks, byTask) : null;
     const opens = r => (r.item_kind === 'job_run' && !!jobRunParts(r.item_id)) || (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) || (r.item_kind === 'agent' && r.item_id && r.action !== 'agents_record') || (['goal', 'question', 'task', 'message', 'workflow_run'].includes(r.item_kind) && /^\d+$/.test(r.item_id)) || (r.item_kind === 'chat' && !!r.item_id);
     const openItem = r => { if (!opens(r)) return; if (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) open.file(r); else if (r.item_kind === 'goal') open.goal(r); else if (r.item_kind === 'question' && opens(r)) open.question(r); else if (r.item_kind === 'task' && opens(r)) open.task(r); else if (r.item_kind === 'agent' && opens(r)) open.agent(r); else if (r.item_kind === 'message' && opens(r)) open.message(r); else if (r.item_kind === 'chat' && opens(r)) open.chat(r); else if (r.item_kind === 'workflow_run' && opens(r)) open.workflow(r); else if (r.item_kind === 'job_run' && opens(r)) open.job(r, jobRunParts(r.item_id)); };
@@ -193,8 +194,8 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
                 open: toggle,
                 detail: { id: r => `activity-detail-${encodeURIComponent(keyOf(r))}`, open: r => expanded.has(keyOf(r)), render: r => {
                     const p = partsOf(r), node = DT.el('div', 'activity-expanded');
-                    node.append(DT.el('strong', '', markHidden(p.on, { strict: true })), DT.el('p', '', [p.did, p.detail].filter(Boolean).join(' · ')));
-                    if (p.about) node.append(DT.el('p', 'activity-about', markHidden(p.about, { strict: true })));
+                    node.append(DT.el('strong', '', p.on), DT.el('p', '', [p.did, p.detail].filter(Boolean).join(' · ')));
+                    if (p.about) node.append(DT.el('p', 'activity-about', p.about));
                     for (const kind of ['goal', 'task']) if (Number(r[`${kind}_id`]) > 0 && !(r.item_kind === kind && String(r.item_id) === String(r[`${kind}_id`]))) { const link = DT.el('button', 'btn btn-small', `${kind === 'goal' ? 'Goal' : 'Task'} #${r[`${kind}_id`]}`); link.type = 'button'; link.onclick = () => open[kind]({ ...r, item_id: String(r[`${kind}_id`]) }); node.append(link); }
                     node.append(DT.el('p', '', `${markHidden(AF.agentOf(r) || 'You', { strict: true })} · ${teamOf(r)} · ${fromCell(r)}`));
                     if (opens(r)) { const b = DT.el('button', 'btn btn-small activity-open-item', 'Open item'); b.type = 'button'; b.onclick = () => openItem(r); node.append(b); }
