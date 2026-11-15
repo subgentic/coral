@@ -1,4 +1,4 @@
-// #13958: bounded protected reads, independent cursors, off-page facets and server attention totals.
+// #13958/#17594: bounded pages and server attention badges; kind pills count listed rows (#16548).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady, framesJs } = require('./helpers/wait');
@@ -81,7 +81,7 @@ function installReviews() {
         await ev(`(async () => { window.__C = await import(${S} + 'review_counts.js'); await window.__C.refreshCounts(true); (await import(${S} + 'inbox_tab.js')).updateInboxTab(); return true; })()`);
         await waitFor(`/33 need your attention/.test(document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label') || '')`, 'badge uses 33 server attention items, not loaded unread rows');
         assert.equal(await ev(`window.__R.unreadReviewItems().length`), 4, 'loaded page attention includes the new unopened version and news, excludes quiet changes requests');
-        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => /^For review\\s*33 of 130$/.test(b.textContent.trim()))`, 'For review pill uses the same server total');
+        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => /^For review\\s*100$/.test(b.textContent.trim()))`, 'For review pill counts the 100 loaded rows, including read documents');
         await ev(`window.__hiddenReviewTab = true; Object.defineProperty(document, 'hidden', { configurable: true, get: () => window.__hiddenReviewTab }); document.dispatchEvent(new Event('visibilitychange')); true`);
         await waitFor(`/^\\(33\\) /.test(document.title)`, 'background title uses the server total');
         await ev(`window.__hiddenReviewTab = false; document.dispatchEvent(new Event('visibilitychange')); true`);
@@ -90,20 +90,21 @@ function installReviews() {
         assert.equal(new Set(goals).size, 2, 'same goal title and number on two computers stays two choices');
         await ev(`window.__failReviewCount = true; window.__C.refreshCounts(true).then(() => import(${S} + 'inbox_tab.js')).then(m => m.updateInboxTab())`);
         await waitFor(`/at least 18 need your attention/.test(document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label') || '')`, 'partial count adds only failed-source loaded rows');
-        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.includes('For review') && b.textContent.includes('at least 18'))`, 'partial pill uses the same lower bound');
+        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 100')`, 'count-source failure leaves the listed-row pill at 100');
         await ev(`window.__failReviewCount = false; window.__C.refreshCounts(true).then(() => import(${S} + 'inbox_tab.js')).then(m => m.updateInboxTab())`);
         await ev(`window.__failReviewMore = true; document.querySelector('[data-review-more="box-b"][data-review-stream="review"]').click(); true`);
         await waitFor(`/Retry/.test(document.querySelector('[data-review-more="box-b"][data-review-stream="review"]')?.textContent || '')`, 'failed cursor offers Retry');
         assert.equal(await ev(`window.__R.reviewItems().length`), 100, 'append failure preserves loaded rows');
         await ev(`window.__failReviewMore = false; document.querySelector('[data-review-more="box-b"][data-review-stream="review"]').focus(); document.querySelector('[data-review-more="box-b"][data-review-stream="review"]').click(); true`);
         await waitFor(`window.__R.reviewItems().length === 115`, 'only the selected computer appends its next page');
+        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 115')`, 'Show more updates the pill to the 115 listed rows');
         assert.equal(await ev(`window.__R.reviewPages().find(p => p.server === 'local').next_cursor`), 'local:50');
         assert.ok(await ev(`window.__reviewRequests.filter(r => r.cursor).every(r => r.server === 'box-b' && r.cursor === 'box-b:50')`), 'failure and retry reuse only the selected source cursor');
         await ev(framesJs(2));
         assert.equal(await ev(`document.activeElement.id`), 'group-table-title', 'exhausting a keyboard paging button preserves a useful focus target');
         await ev(`(() => { const q = document.getElementById('inbox-search'); q.value = 'Entry 064'; q.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
         await waitFor(`window.__R.reviewQueryState()?.shown === 2`, 'off-page search is answered by the computers, not a loaded-page filter');
-        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 1 of 2')`, 'filtered pill uses filtered server attention');
+        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 2')`, 'filtered pill counts both listed matches, including the read document');
         await ev(`(() => { const q = document.getElementById('inbox-search'); q.value = ''; q.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
         await waitFor(`document.querySelector('[data-review-more="local"][data-review-stream="review"]') && window.__R.reviewQueryState() === null`, 'clearing a query restores its retained unfiltered window and cursor');
         for (const [width, font, theme] of [[1280, 16, 'dark'], [390, 32, 'light']]) {
@@ -113,6 +114,6 @@ function installReviews() {
             const target = await ev(`(() => { const b = document.querySelector('[data-review-more="local"][data-review-stream="review"]'), r = b.getBoundingClientRect(); return { left: r.left, right: r.right, width: r.width, viewport: innerWidth }; })()`);
             assert.ok(target.width > 0 && target.left >= 0 && target.right <= target.viewport + 1, `Show more remains on screen at ${width}/${font}/${theme}: ${JSON.stringify(target)}`);
         }
-        console.log('PASS bounded review pages, protected cursor retry, off-page facets, and badge/title/pill totals with partial-source handling');
+        console.log('PASS bounded review pages, protected cursor retry, off-page facets, and server badge/title totals, listed-row pill counts and partial-source handling');
     } finally { await client.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
