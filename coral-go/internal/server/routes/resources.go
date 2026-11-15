@@ -391,6 +391,10 @@ func (h *ResourcesHandler) Define(w http.ResponseWriter, r *http.Request) {
 	if !h.manager(w, r) {
 		return
 	}
+	if r.URL.Query().Get("check") == "1" { // may this caller define? Answers yes and defines nothing (resource setup asks before it reads a box, #17894)
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "may_define": true})
+		return
+	}
 	var body struct {
 		Slots     int      `json:"slots"`
 		Machine   string   `json:"machine"`

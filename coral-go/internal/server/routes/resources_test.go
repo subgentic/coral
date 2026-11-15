@@ -431,3 +431,21 @@ func TestAResourceCarriesFactsWeightAndNeedsAndRefusesBadOnes(t *testing.T) {
 	code, _ = g.do("operator", "PUT", "/api/resources/bad2", map[string]any{"members": []string{"epoch-go"}, "needs": []string{"nonsense"}})
 	assert.Equal(t, 400, code)
 }
+
+// PUT ?check=1 answers whether the caller may define and defines nothing (resource setup asks before it reads a box, #17894).
+func TestAskingMayIDefineAnswersForTheCallerAndDefinesNothing(t *testing.T) {
+	g := newResRig(t)
+	g.subscribe("alpha", "Plain Dev", "Developer", false)
+	g.subscribe("alpha", "The Orchestrator", "Orchestrator", true)
+	body := map[string]any{"slots": -1}
+	code, out := g.do("token:Plain Dev", "PUT", "/api/resources/newbox?check=1", body)
+	assert.Equal(t, 403, code, "an ordinary agent is told no")
+	assert.Equal(t, "manager_only", out["code"])
+	code, out = g.do("token:The Orchestrator", "PUT", "/api/resources/newbox?check=1", body)
+	assert.Equal(t, 200, code, "an Orchestrator is told yes")
+	assert.Equal(t, true, out["may_define"])
+	code, _ = g.do("operator", "PUT", "/api/resources/newbox?check=1", body)
+	assert.Equal(t, 200, code)
+	code, _ = g.do("operator", "GET", "/api/resources/newbox", nil)
+	assert.Equal(t, 404, code, "asking defined nothing")
+}

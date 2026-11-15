@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/subgentic/coral/internal/clihelp"
 	"github.com/subgentic/coral/internal/machineprobe"
@@ -57,6 +58,38 @@ var boxRun = func(alias string, here bool, script string, timeout time.Duration)
 func lastLine(s string) string {
 	lines := strings.Split(strings.TrimSpace(s), "\n")
 	return lines[len(lines)-1]
+}
+
+// plainLine is what a box said, made safe to print: control characters (escape sequences, bell, NUL), format and line-separator characters are dropped, so a hostile box cannot write into the terminal (Security, #17894).
+func plainLine(s string) string {
+	s = strings.Map(func(r rune) rune {
+		switch {
+		case r == '\n' || r == '\r' || r == '\t':
+			return ' '
+		case r < 0x20 || r == 0x7f || (r >= 0x80 && r < 0xa0) || unicode.In(r, unicode.Cf, unicode.Zl, unicode.Zp):
+			return -1
+		}
+		return r
+	}, s)
+	return strings.Join(strings.Fields(s), " ")
+}
+
+// checkPassed: the check test printed its own "ok" line and reached the end, with no FAIL: a missing toolchain or a build error prints neither and is not a pass (Security, #17894).
+func checkPassed(out string) bool {
+	if !strings.Contains(out, "check-end") {
+		return false
+	}
+	ok := false
+	for _, l := range strings.Split(out, "\n") {
+		l = strings.TrimSpace(l)
+		switch {
+		case strings.Contains(l, "FAIL"):
+			return false
+		case strings.HasPrefix(l, "ok ") || strings.HasPrefix(l, "ok\t"):
+			ok = true
+		}
+	}
+	return ok
 }
 
 type setupBox struct {
@@ -168,6 +201,12 @@ func resourceSetup(rest []string) {
 		exitFn(1)
 		return
 	}
+	// who may not define reaches no ssh: ask the server before any box is read (Security, #17894)
+	if err := mayDefine(boxes[0].name); err != nil {
+		fmt.Fprintln(os.Stderr, "resource setup: "+err.Error())
+		exitFn(1)
+		return
+	}
 	failed := 0
 	var added []string
 	for _, b := range boxes {
@@ -191,31 +230,53 @@ func resourceSetup(rest []string) {
 	}
 }
 
+// mayDefine asks the server whether the caller may define resources, defining nothing (PUT ?check=1 with a body an older server refuses as not a definition).
+func mayDefine(name string) error {
+	data, status, err := resourceCall("PUT", "/"+name+"?check=1", map[string]any{"slots": -1})
+	if err != nil {
+		return fmt.Errorf("could not ask the server whether you may define resources: %v", err)
+	}
+	if status != http.StatusOK {
+		why := plainLine(string(data))
+		var e struct {
+			Error string `json:"error"`
+		}
+		if json.Unmarshal(data, &e) == nil && e.Error != "" {
+			why = plainLine(e.Error)
+		}
+		return fmt.Errorf("not set up, no box was read: %s (%d)", why, status)
+	}
+	return nil
+}
+
 func setupOne(b setupBox, slotsFlag int, desc string, dry bool) bool {
 	fail := func(why string) bool {
 		fmt.Fprintf(os.Stderr, "%s: not set up (left as it was): %s\n", b.name, why)
 		return false
 	}
+	old, err := getSetupView(b.name)
+	if err != nil && !dry {
+		return fail(err.Error())
+	}
+	if old != nil && len(old.Members) > 0 {
+		return fail(b.name + " is a pool with members; setup defines a single box and would replace the pool (use --pool " + b.name + " to add boxes to it)")
+	}
 	out, err := boxRun(b.alias, b.here, machineprobe.Script, 30*time.Second)
 	if err != nil {
-		return fail("could not read the machine over ssh: " + err.Error())
+		return fail("could not read the machine over ssh: " + plainLine(err.Error()))
 	}
 	p, err := machineprobe.Parse(out)
 	if err != nil {
-		return fail(err.Error())
+		return fail(plainLine(err.Error()))
 	}
 	check := "no Go on it, so no test was run"
 	if p.Go != "" {
 		start := time.Now()
 		cout, err := boxRun(b.alias, b.here, machineprobe.CheckScript, 3*time.Minute)
-		if err != nil || !strings.Contains(cout, "check-end") || strings.Contains(cout, "FAIL") {
-			return fail("the check test did not pass: " + strings.TrimSpace(lastLine(cout+" "+errString(err))))
+		if err != nil || !checkPassed(cout) {
+			return fail("the check test did not pass: " + plainLine(lastLine(strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(cout), "check-end"))+" "+errString(err))))
 		}
 		check = fmt.Sprintf("check test passed (%.1fs)", time.Since(start).Seconds())
-	}
-	old, err := getSetupView(b.name)
-	if err != nil && !dry {
-		return fail(err.Error())
 	}
 	n, kept := p.Slots(), ""
 	switch {
