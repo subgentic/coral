@@ -824,7 +824,7 @@ Git worktrees Coral made for teams and jobs and kept when they stopped. Remove o
 
 ### Accounts
 
-Agents sign in through each CLI's own login, not a key stored in Coral. Check asks Claude and Pi now; Pi signs in per provider and says which one.
+Agents sign in through each CLI's own login, not a key stored in Coral. Check asks Claude and Pi now; Pi signs in per provider and says which one. Where the CLI has a non-interactive login (Claude: `claude auth login`), a Sign in button starts it on this computer; through the Hub the button is hidden and the text says to sign in on the computer. Pi's login is interactive (start pi and run /login), so it shows the instruction text instead of a button.
 
 ### Database encryption
 
