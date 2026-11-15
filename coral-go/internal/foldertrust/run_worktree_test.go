@@ -167,6 +167,7 @@ func TestSweepWritesEachSettingsFileOnceAndSkipsAMissingRoot(t *testing.T) {
 	var cj strings.Builder
 	cj.WriteString(`{"projects": {"/keep/me": {"x": 1}`)
 	var tb strings.Builder
+	tb.WriteString("[projects.\"/keep/me\"]\ntrust_level = \"trusted\"\n\n")
 	for i := 0; i < 5; i++ {
 		p := filepath.Join(root, fmt.Sprintf("job-run-%d-gone", 100+i))
 		cj.WriteString(fmt.Sprintf(`, %q: {"hasTrustDialogAccepted": true}`, p))
@@ -201,4 +202,7 @@ func TestSweepWritesEachSettingsFileOnceAndSkipsAMissingRoot(t *testing.T) {
 	c, _ = os.ReadFile(cfg)
 	assert.NotContains(t, string(c), "job-run-10")
 	assert.Contains(t, string(c), "/keep/me")
+	tb1, _ := os.ReadFile(toml) // #18091: the Codex file keeps its own entry and loses only the gone run folders'
+	assert.NotContains(t, string(tb1), "job-run-10")
+	assert.Contains(t, string(tb1), "/keep/me")
 }

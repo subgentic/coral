@@ -3,7 +3,9 @@
 package background
 
 import (
+	"bytes"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -39,7 +41,7 @@ func TestARunFolderIsClosedToGroupWriteAllTheWayDown(t *testing.T) {
 	require.NoError(t, os.Chmod(file, 0o775))
 	require.NoError(t, os.Symlink(outside, filepath.Join(dir, "link")))
 
-	closeRunFolder(dir)
+	closeRunFolder(dir, slog.Default())
 
 	require.NoError(t, filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.Type()&fs.ModeSymlink != 0 {
@@ -56,4 +58,25 @@ func TestARunFolderIsClosedToGroupWriteAllTheWayDown(t *testing.T) {
 	ofi, err := os.Stat(outside)
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o666), ofi.Mode().Perm(), "a link's target outside the folder is not changed")
+}
+
+// #18091 (Security, QA3): a path in the run's folder that cannot be read or closed is logged with its path, not swallowed; the rest of the folder is still closed.
+func TestCloseRunFolderLogsWhatItCannotDo(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root reads every folder")
+	}
+	dir := filepath.Join(t.TempDir(), "job-run-2-x")
+	locked := filepath.Join(dir, "locked")
+	require.NoError(t, os.MkdirAll(locked, 0o775))
+	other := filepath.Join(dir, "other.txt")
+	require.NoError(t, os.WriteFile(other, []byte("x"), 0o666))
+	require.NoError(t, os.Chmod(other, 0o666))
+	require.NoError(t, os.Chmod(locked, 0o000))
+	t.Cleanup(func() { os.Chmod(locked, 0o700) })
+	var buf bytes.Buffer
+	closeRunFolder(dir, slog.New(slog.NewTextHandler(&buf, nil)))
+	assert.Contains(t, buf.String(), "locked", "the path that could not be read is named")
+	fi, err := os.Stat(other)
+	require.NoError(t, err)
+	assert.Zero(t, fi.Mode().Perm()&0o022, "the rest of the folder is still closed")
 }

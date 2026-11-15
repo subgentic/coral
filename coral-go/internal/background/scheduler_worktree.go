@@ -7,6 +7,7 @@ import (
 	"github.com/subgentic/coral/internal/coralnames"
 	"github.com/subgentic/coral/internal/logsafe"
 	"io/fs"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -70,7 +71,7 @@ func (s *JobScheduler) trustRunFolder(runID int64, job store.ScheduledJob, dir s
 	}
 	// A umask of 002 (the default for a user on most Linux distributions) makes git create the worktree group-writable, which CheckRunWorktree refuses; and every file and folder inside it is group-writable
 	// too, which a trusted run would then execute. The folder is ours, made for this run a moment ago: take group and other write away from everything in it (never following a link) before the check.
-	closeRunFolder(dir)
+	closeRunFolder(dir, s.logger)
 	resolved, err := foldertrust.CheckRunWorktree(dir, s.worktreeRoot)
 	if err != nil {
 		s.logger.Warn("scheduled run: its folder was not trusted", "run_id", runID, "job", job.Name, "why", err.Error())
@@ -93,24 +94,45 @@ func (s *JobScheduler) trustRunFolder(runID int64, job store.ScheduledJob, dir s
 	s.logger.Info("scheduled run trusted its own folder because the job's Trust box is ticked", "run_id", runID, "job", job.Name, "agent_type", typ, "folder", filepath.Base(resolved))
 }
 
-// closeRunFolder clears the group and other write bits of dir and of every file and folder inside it. A link is neither followed nor changed (WalkDir does not descend into one, and a chmod is made only on a
-// regular file or a folder found by Lstat), so nothing outside dir is touched. Windows has no such bits.
-func closeRunFolder(dir string) {
+// closeRunFolder clears the group and other write bits of dir and of every file and folder inside it. A link is neither followed nor changed: WalkDir does not descend into one, and every Lstat and chmod goes through
+// an os.Root on dir, which refuses a path that leaves it (so a link swapped in between the walk and the chmod is never followed either). An error is logged with its path, never swallowed. Windows has no such bits.
+func closeRunFolder(dir string, logger *slog.Logger) {
 	if runtime.GOOS == "windows" {
 		return
 	}
-	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		logger.Warn("scheduled run: its folder could not be opened to close it to group and other write", "folder", dir, "error", err.Error())
+		return
+	}
+	defer root.Close()
+	werr := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
+			logger.Warn("scheduled run: a path in its folder could not be read to close it to group and other write", "path", path, "error", err.Error())
 			return nil
 		}
 		if d.Type()&fs.ModeSymlink != 0 {
 			return nil
 		}
-		if fi, lerr := os.Lstat(path); lerr == nil && fi.Mode()&fs.ModeSymlink == 0 && fi.Mode().Perm()&0o022 != 0 {
-			_ = os.Chmod(path, fi.Mode().Perm()&^0o022)
+		rel, rerr := filepath.Rel(dir, path)
+		if rerr != nil {
+			return nil
+		}
+		fi, lerr := root.Lstat(rel)
+		if lerr != nil {
+			logger.Warn("scheduled run: a path in its folder could not be examined", "path", path, "error", lerr.Error())
+			return nil
+		}
+		if fi.Mode()&fs.ModeSymlink == 0 && fi.Mode().Perm()&0o022 != 0 {
+			if cerr := root.Chmod(rel, fi.Mode().Perm()&^0o022); cerr != nil {
+				logger.Warn("scheduled run: a path in its folder could not be closed to group and other write", "path", path, "error", cerr.Error())
+			}
 		}
 		return nil
 	})
+	if werr != nil {
+		logger.Warn("scheduled run: its folder could not be walked to close it to group and other write", "folder", dir, "error", werr.Error())
+	}
 }
 
 // untrustRunFolder removes the trust entries a run's worktree got, once the worktree is gone: only for a folder directly inside the worktrees root named for a run, so the settings files do not collect an
