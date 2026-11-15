@@ -223,11 +223,12 @@ function drawStatus(data) {
     syncStop();
     S.statusData = data;
     const live = (state.liveSessions || []).filter(row => inTeam(row, S.team));
-    const agentsN = live.filter(needsYou).length + (data?.agents || []).filter(a => a.availability === 'offline' && a.open_tasks).length; // an ended agent that holds a task is not "All well" (#15293)
-    // One definition of "needs you" for the header, the Needs you tab and the sidebar (#17067, #16548): the number the tab shows, once it is complete. Counting agents here said "2 need attention" with 1 on the tab and 0 in the sidebar,
-    // and kept saying it after the questions were answered. Until the tab's count is known (a read in flight, a gap) the agents are counted as before.
-    const tabCount = S.counts.needs, byTab = typeof tabCount === 'number';
-    const n = byTab ? tabCount : agentsN;
+    const ended = (data?.agents || []).filter(a => a.availability === 'offline' && a.open_tasks).length; // an ended agent that holds a task is not "All well" (#15293)
+    const agentsN = live.filter(needsYou).length + ended;
+    // One definition of "needs you" for the header, the Needs you tab and the sidebar (#17067, #16548): when the tab has something to show, its number is the header's (plus an ended agent that holds a task, which the tab does not list). Counting agents here said
+    // "2 need attention" with 1 on the tab and 0 in the sidebar. A tab at 0 or not yet known leaves the agents counted as before, so a wait only the board knows about (#14152, #15151) still reads as one.
+    const tabCount = S.counts.needs, byTab = typeof tabCount === 'number' && tabCount > 0;
+    const n = byTab ? tabCount + ended : agentsN;
     if (live.length && (!data || !data.agents?.length)) data = { agents: live.map(row => ({ availability: row.sleeping ? 'sleeping' : 'unknown' })) };
     if (!data || !Array.isArray(data.agents)) { s.textContent = 'Status unavailable'; s.className = 'team-page-status unknown'; const health = $('team-page-health'); if (health) health.hidden = true; return; } // kept in the page and empty: a live region that is shown and filled in one turn is not announced
     // a team with no agent has nothing to be well: a name no board has (a mistyped /team/<name>) said All well in green (#8839 c); say nothing
