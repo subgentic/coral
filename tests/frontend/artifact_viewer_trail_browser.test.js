@@ -43,7 +43,7 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64);
             await link();
             await waitFor(`/linked file/.test(document.querySelector('#artifact-viewer .artifact-viewer-body')?.textContent || '')`, at + 'the linked file is in the same viewer', 8000);
             assert.ok(await shown(), at + 'the viewer stays open');
-            assert.equal(await back(), '← Back to plan.md', at + 'the way back names the document: ' + await back());
+            assert.equal(await back(), 'Back to plan.md', at + 'the way back names the document: ' + await back());
             const bb = await ev(`(() => { const r = document.querySelector('#artifact-viewer .artifact-viewer-back').getBoundingClientRect(); return { h: Math.round(r.height), on: r.top >= 0 && r.bottom <= innerHeight }; })()`);
             assert.ok(bb.on && (!mobile || bb.h >= 40), at + 'the Back button is on screen' + (mobile ? ' and a phone target' : '') + ': ' + JSON.stringify(bb));
             let at1 = await backToDoc(() => ev(`document.querySelector('#artifact-viewer .artifact-viewer-back').click(); true`));
