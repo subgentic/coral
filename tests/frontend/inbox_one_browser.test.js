@@ -72,7 +72,7 @@ const AGENTS = (waiting) => waiting ? [
             await waitFor(`!document.querySelector('${pane}').hidden && document.querySelectorAll('${attn}').length === 4`, at + 'the Inbox pane', 10000);
             await waitFor(`document.querySelector('${pane} .view-list-item[data-key="tasks"] .view-list-count').textContent === '3' && document.querySelector('${pane} .view-list-item[data-key="saved"] .view-list-count').textContent === '2'`, at + 'the counts', 10000);
 
-            assert.deepEqual(await ev(`[...document.querySelectorAll('${attn} .view-list-name')].map(e => e.textContent)`), ['Needs you', 'Tasks', 'Goals', 'Saved messages'], at + 'the folders (#7785)');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${attn} .view-list-name')].map(e => e.textContent)`), ['Needs you', 'Tasks', 'Goals', 'Saved'], at + 'the folders (#7785)');
             assert.deepEqual(await ev(`[...document.querySelectorAll('${attn} .view-list-count')].map(e => e.textContent)`), ['2', '3', '0', '2'], at + 'with their counts (Goals has its own now: none open in this world)');
             assert.equal(await ev(`document.querySelectorAll('${pane} li.sb-row, ${pane} .sgroup-header').length`), 0, at + 'the pane lists folders only: the rows are the table\'s');
             if (!mobile) assert.equal(await ev(`Math.round(document.querySelector('${pane} .view-list-item').getBoundingClientRect().height) >= 36`), true, at + 'a folder is at least 36 px high');
@@ -148,7 +148,7 @@ const AGENTS = (waiting) => waiting ? [
 
             // Saved
             await ev(`document.querySelector('${pane} .view-list-item[data-key="saved"]').click(); true`);
-            await waitFor(`document.querySelector('#group-table-title').textContent === 'Saved messages' && document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'Saved opens its table', 10000);
+            await waitFor(`document.querySelector('#group-table-title').textContent === 'Saved' && document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'Saved opens its table', 10000);
             assert.equal(await ev(`document.querySelector('${pane} .sidebar-search-input').getAttribute('aria-label')`), 'Search saved messages', at + 'the search says it is for saved messages');
             assert.equal(await ev(`document.querySelector('${pane} [data-display-button]').hidden`), false, at + 'Display options is there for Saved');
             const savedBar = await ev(`(() => { const b = document.querySelector('#group-table-view .gt-toolbar'), s = b.querySelector('.gt-search, input[type=search]'); return { w: Math.round(s.getBoundingClientRect().width), left: Math.round(s.getBoundingClientRect().left), chipsOnLine: b.querySelectorAll('.group-chip, .team-tb-pills .goals-chip').length, chipsInHead: document.querySelectorAll('#group-table-view .group-table-head ~ .group-table-chips, #group-table-view .group-table-head .group-chip').length, label: s.getAttribute('aria-label') }; })()`);
@@ -211,7 +211,7 @@ const AGENTS = (waiting) => waiting ? [
             // a saved message's page: its link back, the message, and a bar with the primary last
             await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
             await waitFor(`!!document.querySelector('#inbox-page .item-bar') && document.getElementById('inbox-page').checkVisibility()`, at + "the saved message's page", 8000);
-            assert.equal(await ev(`document.querySelector('#inbox-page > .back-link').textContent`), '← Saved messages', at + 'back names Saved messages');
+            assert.equal(await ev(`document.querySelector('#inbox-page > .back-link').textContent`), '← Saved', at + 'back names Saved');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#inbox-page .wf-item-title')); return [t.fontSize, t.fontWeight]; })()`), ['20px', '700'], at + 'the title is 20/700 (the item page title, Goal #84)');
             assert.match(await ev(`document.querySelector('#inbox-page .inbox-saved-snippet').textContent`), /rollback step|Tuesday/, at + 'the message is on the page');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#inbox-page .item-bar > .btn, #inbox-page .item-bar > .wf-more > .btn')].filter(b => b.getClientRects().length).map(b => b.textContent.trim() + (b.classList.contains('btn-primary') ? '*' : ''))`), ['More', 'Open in Chats*'], at + 'the bar: More, Open, the primary last (no Read the whole message: the text is on the page)');

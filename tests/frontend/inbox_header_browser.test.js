@@ -8,7 +8,7 @@ const BASE = require('./test_base').BASE;
 const fs = require('node:fs');
 const path = require('node:path');
 
-const FOLDERS = [['needs', '/inbox/needs', 'Needs you'], ['tasks', '/inbox/tasks', 'Tasks'], ['goals', '/inbox/goals', 'Goals'], ['saved', '/inbox/saved', 'Saved messages'], ['chats', '/inbox/chats/all', 'All chats']];
+const FOLDERS = [['needs', '/inbox/needs', 'Needs you'], ['tasks', '/inbox/tasks', 'Tasks'], ['goals', '/inbox/goals', 'Goals'], ['saved', '/inbox/saved', 'Saved'], ['chats', '/inbox/chats/all', 'All chats']];
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();

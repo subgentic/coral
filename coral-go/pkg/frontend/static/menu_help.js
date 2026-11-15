@@ -15,7 +15,7 @@ export const HELP = {
     'Stop agents': "Ends every agent's process in the team now. Chats stay in History; the board, tasks and goals are kept. A Hermes agent's conversation is deleted with it.",
     'Remove team': "Deletes the team for good: its messages, tasks, goals, members, reminders, settings and more; the dialog lists everything. Chats stay in History and files are not touched. Only when no agent is running.",
     'Restart, same settings': 'Starts a fresh conversation with the same settings; the instructions are sent again.',
-    'Restart with changes': 'Starts a fresh conversation with the settings you choose; the instructions are sent again. A Claude agent\'s model or thinking level changes live, without a restart: use Model and thinking.',
+    'Restart with changes': 'Starts a fresh conversation with the settings you choose; the instructions are sent again.',
     'Wake': 'Continues the conversation.',
     'Sleep': 'Stops the terminal. The chat and files stay; Wake continues the conversation.',
     'Stop agent': 'Ends its process now. Its chat stays in History.',

@@ -98,8 +98,7 @@ function fill(container, agentType, data) {
     container._modelList = models;
     if (!models.length) { wrap.hidden = true; input.hidden = false; return; }   // no list: the text box, as before
     container._defaultNamed = !!named;
-    const now = named && String(named.description || '').split(' · ')[0]; // the CLI's description of its default starts with the model it is ("Opus 5.5 · Best for everyday tasks"): said when that is one of the listed models
-    select.innerHTML = `<option value="">${named ? escapeHtml(named.display_name + (now && models.some(m => m.display_name === now) ? ': ' + now : '')) : 'Default'}</option>`
+    select.innerHTML = `<option value="">${named ? escapeHtml(named.display_name) : 'Default'}</option>`
         + modelOptions(named ? models.filter(m => m !== named) : models, data && data.groups)
         + `<option value="${escapeAttr(OTHER)}">Other…</option>`
         + (familyOf(agentType) && peekCanAdd(_acfServer(container)) !== false ? `<option value="${escapeAttr(ADD)}">Add a model…</option>` : '');

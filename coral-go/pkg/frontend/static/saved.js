@@ -491,7 +491,7 @@ function showJumpBar(container) {
     bar.className = 'jumpbar';
     bar.setAttribute('role', 'status');
     const t = document.createElement('span'); t.textContent = 'Jumped to a saved message.';
-    const back = document.createElement('button'); back.type = 'button'; back.className = 'btn btn-small'; back.textContent = 'Back to Saved messages';
+    const back = document.createElement('button'); back.type = 'button'; back.className = 'btn btn-small'; back.textContent = 'Back to Saved';
     back.addEventListener('click', () => { dropJumpBar(); if (_jumpFrom === 'view') openSavedView(); else openSaved(); }); // back to the list the jump started from
     const x = document.createElement('button'); x.type = 'button'; x.className = 'btn btn-small'; x.setAttribute('aria-label', 'Dismiss'); x.textContent = '×';
     x.addEventListener('click', dropJumpBar);

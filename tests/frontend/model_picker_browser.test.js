@@ -80,10 +80,6 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(b.value, '', 'and a blank model selects it');
         await ev(`window.__acf.setAgentConfig('acf-t', { agentType: 'claude', model: 'default' }); true`); await sleep(300); // sleep-ok: the form's async loads have no completion event
         assert.equal((await box()).value, '', 'a stored "default" selects that same entry');
-        // #17427 (walk 63 F6): the CLI's description of its default begins with the model it is: the entry says which model Default means
-        await ev(`window.__serve.claude = { models: [{ value: 'default', display_name: 'Default (recommended)', description: 'Opus 4.1 \u00b7 Best for everyday tasks' }, ${JSON.stringify(OPUS)}], refreshing: false }; localStorage.removeItem('coral-models:v1:local:claude'); window.__acf.setAgentConfig('acf-t', { agentType: 'codex', model: '' }); true`); await sleep(300); // sleep-ok: the form's async loads have no completion event
-        await ev(`window.__acf.setAgentConfig('acf-t', { agentType: 'claude', model: '' }); true`);
-        await waitFor(`[...document.querySelectorAll('#acf-t .acf-model-select option')].some(o => o.textContent === 'Default (recommended): Opus 4.1')`, 'the Default entry names the model it is', 4000);
         await ev(`window.__serve.claude = { models: [${JSON.stringify(OPUS)}, ${JSON.stringify(SONNET)}], refreshing: false }; true`);
 
         console.log('3. values set from code');

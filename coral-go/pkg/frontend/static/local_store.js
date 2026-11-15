@@ -156,17 +156,6 @@ export function readStars(key) {
     return { files: [], at: Date.now() };
 }
 
-/** Every agent's starred files on this browser (the Files panel's stars are kept per session): [{ sid, files }], for the Inbox's Starred folder (#17215, walk 59). */
-export function allStarredFiles() {
-    const prefix = 'coral-starred-files-', tail = _tag ? `@${_tag}` : '', out = [];
-    for (const k of browserLocal.keys()) {
-        if (!k.startsWith(prefix) || (tail ? !k.endsWith(tail) : k.includes('@'))) continue;
-        const sid = k.slice(prefix.length, tail ? k.length - tail.length : undefined), files = readStars(k).files;
-        if (sid && files.length) out.push({ sid, files });
-    }
-    return out;
-}
-
 export function writeStars(key, files) {
     if (files.length) browserLocal.set(key, JSON.stringify({ files, at: Date.now() }));
     else browserLocal.remove(key);

@@ -40,19 +40,19 @@ const { coralReady } = require('./helpers/wait');
         if (process.env.CORAL_SCREENSHOT_DIR) { const fs = require('node:fs'); fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); await new Promise(r => setTimeout(r, 300)); /* sleep-ok: a screenshot waits out transitions */ fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/board-390-folded.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
         await ev(`document.querySelector('.mb-message-header .mb-msg-more').focus(); document.querySelector('.mb-message-header .mb-msg-more').click(); true`);
         await waitFor(`!!document.querySelector('dialog.mb-actions-sheet[open]')`, 'the sheet', 3000);
-        assert.deepEqual(await ev(`[...document.querySelectorAll('.mb-actions-sheet .mb-actions-item')].map(b => b.textContent)`), ['Save message', 'Delete message', 'Close']);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('.mb-actions-sheet .mb-actions-item')].map(b => b.textContent)`), ['Save for later', 'Delete message', 'Close']);
         if (process.env.CORAL_SCREENSHOT_DIR) { const fs = require('node:fs'); fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); await new Promise(r => setTimeout(r, 300)); /* sleep-ok: a screenshot waits out transitions */ fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/board-390-sheet.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
         const gap = await ev(`(() => { const items = [...document.querySelectorAll('.mb-actions-sheet .mb-actions-item')]; return Math.round(items[1].getBoundingClientRect().top - items[0].getBoundingClientRect().bottom); })()`);
         assert.ok(gap >= 24, `Delete is set apart from Save (${gap} px between them)`);
         assert.ok(await ev(`[...document.querySelectorAll('.mb-actions-sheet .mb-actions-item')].every(b => b.getBoundingClientRect().height >= 43.5)`), 'every item is 44 px');
-        assert.equal(await ev(`document.activeElement.textContent`), 'Save message', 'focus is in the sheet, on its first item');
+        assert.equal(await ev(`document.activeElement.textContent`), 'Save for later', 'focus is in the sheet, on its first item');
         await ev(`document.querySelectorAll('.mb-actions-sheet .mb-actions-item')[0].click(); true`);
         await waitFor(`!document.querySelector('dialog.mb-actions-sheet') && document.querySelector('.mb-message-header .mb-save-btn').getAttribute('aria-pressed') === 'true'`, 'the message saved', 6000);
         assert.equal(await ev(`!!document.activeElement.closest('.mb-message-header')`), true, 'focus stays on that message\'s header: the bookmark that Save just filled (the page focuses it) or the "..."');
         assert.equal(await shown('.mb-message-header .mb-save-btn[aria-pressed="true"]'), true, 'a saved message keeps its filled bookmark as its mark');
         await ev(`document.querySelector('.mb-message-header .mb-msg-more').click(); true`);
         await waitFor(`!!document.querySelector('dialog.mb-actions-sheet[open]')`, 'the sheet again', 3000);
-        assert.equal(await ev(`document.querySelectorAll('.mb-actions-sheet .mb-actions-item')[0].textContent`), 'Remove from Saved messages', 'the first item says what it will do now');
+        assert.equal(await ev(`document.querySelectorAll('.mb-actions-sheet .mb-actions-item')[0].textContent`), 'Remove from saved', 'the first item says what it will do now');
         await ev(`document.querySelectorAll('.mb-actions-sheet .mb-actions-item')[2].click(); true`);
         await waitFor(`!document.querySelector('dialog.mb-actions-sheet')`, 'Close', 3000);
         assert.equal(await ev(`document.activeElement.classList.contains('mb-msg-more')`), true, 'Close with nothing chosen: focus goes back to the "..." that opened the sheet');

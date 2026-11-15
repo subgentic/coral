@@ -220,7 +220,7 @@ const BASE = require('./test_base').BASE;
         // the menu's first item is Model and thinking (#9021): the team reminder is found by its words
         const team = await ev(`(() => { const b = document.querySelector('.mobile-send-options-btn'); const i = [...document.querySelectorAll('.mobile-send-menu .send-menu-item')].find(e => /team reminder/.test(e.textContent)); return b && { label: b.getAttribute('aria-label'), title: b.title, icon: !!b.querySelector('.material-icons'), text: b.textContent.replace('expand_more', '').trim(), item: i && i.textContent.trim(), action: i && i.getAttribute('data-on-click') }; })()`);
         assert.ok(team, 'the Send options button exists');
-        assert.equal(team.label, 'Model, thinking and send options');
+        assert.equal(team.label, 'Send options');
         assert.ok(team.icon, 'an icon, not "+T"');
         assert.equal(team.text, '', 'no cryptic text on it');
         assert.equal(team.item, 'Send with team reminder');

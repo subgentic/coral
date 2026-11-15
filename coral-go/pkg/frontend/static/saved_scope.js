@@ -47,6 +47,6 @@ export function scopeHeading(scope) { return !scope || scope.kind === 'all' ? 'A
 /** What an empty list says in this scope. */
 export function scopeEmpty(scope, tab) {
     if (tab === 'done') return 'Nothing marked done.';
-    if (!scope || scope.kind === 'all') return 'Save a message to keep it here.';
+    if (!scope || scope.kind === 'all') return 'Bookmark a message to save it here.';
     return `Nothing saved from ${scope.label} yet.`;
 }

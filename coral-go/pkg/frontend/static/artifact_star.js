@@ -16,7 +16,7 @@ export function starControl(item, { hex, name, onChange, reviewPin = false, labe
         b.className = `dt-star${on ? ' dt-star-on' : ''}${labelled ? ` btn btn-quiet btn-small dt-star-labelled inbox-star${on ? ' inbox-star-on' : ''}` : ''}`;
         b.setAttribute('aria-pressed', String(on));
         b.setAttribute('aria-label', `${on ? 'Remove the star from' : 'Star'} ${name}`);
-        b.title = on ? 'Starred (click to remove the star)' : reviewPin ? 'Star: keep this document at the top of Needs you, and find it in Starred' : 'Star: find this again in Starred';
+        b.title = on ? 'Starred (click to remove the star)' : reviewPin ? 'Star: keep this document at the top of Needs you' : 'Star: find this again in Starred';
         if (labelled) { b.replaceChildren('Star'); return; } // the word is the same on and off (the name 'Remove the star from X' holds it): aria-pressed and the filled look say which
         b.replaceChildren(Object.assign(document.createElement('span'), { className: 'material-icons', textContent: 'star' })); // one glyph for both (the icon font has no outline star): a starred row's is brighter, and aria-pressed says it
         b.firstChild.setAttribute('aria-hidden', 'true');

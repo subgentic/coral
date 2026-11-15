@@ -36,11 +36,11 @@ const { coralReady } = require('./helpers/wait');
         const btnNames = await ev(`(() => { const rows = [...document.querySelectorAll('#mb-messages .mb-message')]; const pick = sel => rows.map(r => r.querySelector(sel).getAttribute('aria-label')); const marked = rows.find(r => r.textContent.includes('markup')); return { save: pick('.mb-save-btn'), del: pick('.mb-delete-msg-btn'), pwn: window.__pwn || 0, imgInBtn: document.querySelectorAll('#mb-messages .mb-save-btn img, #mb-messages .mb-delete-msg-btn img').length, markedDel: marked.querySelector('.mb-delete-msg-btn').getAttribute('aria-label'), markedSave: marked.querySelector('.mb-save-btn').getAttribute('aria-label') }; })()`);
         assert.equal(new Set(btnNames.save).size, btnNames.save.length, 'every Save has its own name: ' + JSON.stringify(btnNames.save));
         assert.equal(new Set(btnNames.del).size, btnNames.del.length, 'every Delete has its own name: ' + JSON.stringify(btnNames.del));
-        assert.ok(btnNames.save.every(n => /^Save message: message from /.test(n)), 'Save btnNames the message: ' + JSON.stringify(btnNames.save));
+        assert.ok(btnNames.save.every(n => /^Save for later: message from /.test(n)), 'Save btnNames the message: ' + JSON.stringify(btnNames.save));
         assert.equal(btnNames.pwn, 0); assert.equal(btnNames.imgInBtn, 0);
         // the board shows the message's markup as text or a chip: the name is what is on screen, cut at a word, and never longer than the cut
         assert.ok(/^Delete the message from Developer: .*"quoted".*[a-z]…$/.test(btnNames.markedDel) && btnNames.markedDel.length <= 'Delete the message from Developer: '.length + 42, btnNames.markedDel);
-        assert.ok(btnNames.markedSave.startsWith('Save message: message from Developer: ') && btnNames.markedSave.endsWith('…'), btnNames.markedSave);
+        assert.ok(btnNames.markedSave.startsWith('Save for later: message from Developer: ') && btnNames.markedSave.endsWith('…'), btnNames.markedSave);
 
         console.log('1b. the messages are a list: every direct child is an item (#5813)');
         const list = await ev(`(() => { const c = document.getElementById('mb-messages'); const kids = [...c.children]; return { role: c.getAttribute('role'), name: c.getAttribute('aria-label'), kids: kids.length, notItems: kids.filter(k => k.getAttribute('role') !== 'listitem').map(k => k.className), messages: c.querySelectorAll(':scope > .mb-message[role=listitem]').length }; })()`);
