@@ -25,7 +25,7 @@ export function _renderContentView(body, content, filepath, line, interpretHtml)
         const safe = sanitizeHtml(html, DOMPURIFY_CONFIG, { links: 'file', headings: 2 });
         body.innerHTML = `<div class="prose preview-pane-markdown">${safe}</div>`;
         keepFragmentsInside(body);
-        importOnce('./preview_front_matter.js').then(m => m.show(body, content)).catch(() => {}); // the front matter as a key/value header (#16651)
+        importOnce('./md_front.js').then(m => m.show(body, content)); // the front matter as a key/value header (#16651); a failed load leaves the preview as drawn
     } else {
         body.innerHTML = `<pre class="preview-pane-code"><code class="language-${lang}">${escapeHtml(content)}</code></pre>`;
         // Plain first; coloured once highlight.js has loaded (plain if it cannot).
