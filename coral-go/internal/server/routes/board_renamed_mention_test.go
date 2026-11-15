@@ -5,10 +5,14 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/store/storetest"
 )
 
 // An agent renamed in the dashboard keeps its board id ("QA Engineer"): the board knows nobody called "Bug Hunter", so a CLI post
@@ -92,4 +96,33 @@ func TestTheDashboardsRowsSayARenamedAgentsCurrentName(t *testing.T) {
 		return map[string]string{"QA Engineer": "Bug Hunter"}
 	})
 	assert.ElementsMatch(t, []string{"QA Engineer=Bug Hunter", "Orchestrator=Orchestrator"}, titles("format=dashboard&limit=10"), "the dashboard's page says the new name; the id stays")
+}
+
+// A rename cannot take the Operator's name or a broadcast word: the dashboard's rows and the mention path would put an agent under it (Security, #17421). Real stores: the display name set
+// through the session store, read through the lookup the server uses, and through a post.
+func TestARenameToTheOperatorOrAllIsNotACurrentName(t *testing.T) {
+	server, h := setupBoardTestServer(t)
+	ctx := context.Background()
+	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "s.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	ss := store.NewSessionStore(db)
+	_, err = h.bs.Subscribe(ctx, "team", "QA Engineer", "QA Engineer", "claude-11111111-0000-0000-0000-000000000000", nil, "all")
+	require.NoError(t, err)
+	_, err = h.bs.Subscribe(ctx, "team", "Orchestrator", "Orchestrator", "claude-22222222-0000-0000-0000-000000000000", nil, "all")
+	require.NoError(t, err)
+	h.SetMemberNameLookup(MemberDisplayNames(h.bs, ss))
+	for _, name := range []string{"Operator", "operator", "all", "ALL", "notify-all", "notify_all", "NotifyAll"} {
+		require.NoError(t, ss.SetDisplayName(ctx, "11111111-0000-0000-0000-000000000000", name))
+		assert.Empty(t, h.memberNames(ctx, "team"), "%q is not a name a rename may take", name)
+		resp := postJSON(t, server.URL+"/api/board/team/messages", map[string]string{"subscriber_id": "Orchestrator", "content": "@" + name + " need a decision"})
+		resp.Body.Close()
+	}
+	msgs, err := h.bs.ListMessages(ctx, "team", 20, 0, 0)
+	require.NoError(t, err)
+	for _, m := range msgs {
+		assert.NotContains(t, m.Content, "@QA Engineer", "a reserved word stays as written, it does not reach the renamed agent")
+	}
+	require.NoError(t, ss.SetDisplayName(ctx, "11111111-0000-0000-0000-000000000000", "Bug Hunter"))
+	assert.Equal(t, map[string]string{"QA Engineer": "Bug Hunter"}, h.memberNames(ctx, "team"), "an ordinary new name still counts")
 }

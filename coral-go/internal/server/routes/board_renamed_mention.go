@@ -18,14 +18,14 @@ func (h *BoardHandler) SetMemberNameLookup(fn func(ctx context.Context, project 
 }
 
 // MemberDisplayNames maps a member's board id to the display name the dashboard gave their agent, for the members renamed: one whose name is another member's id or job title is left
-// out (it would name the wrong one), and so is one that is no change.
+// out (it would name the wrong one), and so is one that is no change, the Operator's or a broadcast word (@all).
 func MemberDisplayNames(bs *board.Store, ss *store.SessionStore) func(ctx context.Context, project string) map[string]string {
 	return func(ctx context.Context, project string) map[string]string {
 		subs, err := bs.ListSubscribers(ctx, project)
 		if err != nil {
 			return nil
 		}
-		known := map[string]bool{}
+		known := map[string]bool{"operator": true, "all": true, "notify-all": true, "notify_all": true, "notifyall": true} // names that are no agent's: the Operator and the broadcast words (a rename must not take them)
 		for _, s := range subs {
 			known[strings.ToLower(strings.TrimSpace(s.SubscriberID))] = true
 			known[strings.ToLower(strings.TrimSpace(s.JobTitle))] = true
