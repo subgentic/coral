@@ -56,7 +56,8 @@ let _editor = null;
 let _editAbort = null;
 let _editCapability = null, _editOpening = false;
 let _sendCapability = null, _editSend = null, _sendOpening = false;
-let _trail = [];         // the documents this one was reached from, newest last: { hex, opts, name, scroll, overlay } (#18208)
+let _trail = [];         // the documents this one was reached from, newest last: { hex, opts, name, scroll } (#18208)
+let _trailOverlay = 0;   // the trail's entry in overlay_history.js
 let _restore = null;     // the scroll the document we came Back to had, put back once it is drawn
 let _overlay = 0;        // its entry in overlay_history.js while it is open on a phone (#5219)
 
@@ -92,12 +93,19 @@ function backInViewer() {
     if (!last) return;
     openArtifactViewer(last.hex, { ...last.opts, trailBack: true, restoreScroll: last.scroll });
 }
-function leaveTrail() { // closing the viewer gives the history entries of its steps back, newest first
-    while (_trail.length) { const e = _trail.pop(); if (e.overlay) popOverlay(e.overlay); }
+function leaveTrail() { _trail.length = 0; if (_trailOverlay) { const id = _trailOverlay; _trailOverlay = 0; popOverlay(id); } }
+/* The history (overlay_history): the viewer has one entry (a phone's from the start, a computer's from its first step) and the trail one more above it, however many steps it holds. The browser's Back takes the trail's entry: it steps back and,
+ * while the trail is not empty, takes a new one; the router never sees a Back that lands on its own page until the viewer itself closes. */
+function trailPopped() {
+    _trailOverlay = 0;
+    if (!_trail.length) return;
+    backInViewer();
+    if (_trail.length && !_trailOverlay) _trailOverlay = pushOverlay(trailPopped);
 }
+function viewerPopped() { _overlay = 0; closeArtifactViewer({ popped: true }); }
 function followLink(d, hex, opts) {
     const name = d.querySelector('.artifact-viewer-title-name')?.textContent || '';
-    const entry = { hex: _hex, opts: _lastOpts, name, scroll: bodyScroller(d).scrollTop, overlay: 0 };
+    const entry = { hex: _hex, opts: _lastOpts, name, scroll: bodyScroller(d).scrollTop };
     openArtifactViewer(hex, { ...opts, keepTrail: true, trailFrom: entry });
 }
 function escapeViewer(d) {
@@ -428,9 +436,9 @@ export function openArtifactViewer(hex, opts = {}) {
     const gen = ++_gen;
     if (opts.trailFrom) { // a step into a linked file: the document stays on the trail, and the browser's Back is the way back on a computer too
         const e = opts.trailFrom; _trail.push(e);
-        if (!_overlay) _overlay = pushOverlay(() => closeArtifactViewer({ popped: true })); // a computer's viewer has no history entry of its own: the step's Back must land on one of ours, not on the router's page
-        e.overlay = pushOverlay(() => { e.overlay = 0; if (_trail[_trail.length - 1] === e) backInViewer(); });
-    } else if (opts.trailBack) { const e = _trail.pop(); if (e && e.overlay) popOverlay(e.overlay); }
+        if (!_overlay) _overlay = pushOverlay(viewerPopped); // a computer's viewer has no history entry of its own: the browser's Back must land on one of ours, not on the router's page
+        if (!_trailOverlay) _trailOverlay = pushOverlay(trailPopped);
+    } else if (opts.trailBack) { _trail.pop(); if (!_trail.length && _trailOverlay) { const id = _trailOverlay; _trailOverlay = 0; popOverlay(id); } }
     else if (!opts.keepTrail) leaveTrail();
     _restore = opts.trailBack ? opts.restoreScroll : null;
     opts = { ...opts, trailFrom: undefined, trailBack: undefined, restoreScroll: undefined, keepTrail: _trail.length > 0 || undefined };
@@ -477,7 +485,7 @@ export function openArtifactViewer(hex, opts = {}) {
     d.hidden = false;
     syncTitleExpand(d);
     if (!wasOpen && isPhoneLayout()) document.querySelectorAll('#toast-host > .toast:not(.error):not(.has-action)').forEach(t => t.remove()); // a plain toast was announced and sat over the viewer's header and versions at the top of a phone (#11621)
-    if (!wasOpen && isPhoneLayout() && !_overlay) _overlay = pushOverlay(() => closeArtifactViewer({ popped: true })); // Back closes it, above the preview's full screen, under its comments sheet
+    if (!wasOpen && isPhoneLayout() && !_overlay) _overlay = pushOverlay(viewerPopped); // Back closes it, above the preview's full screen, under its comments sheet
     _comments.open(hex, opts.server, opts.board, true); // true: the comments of earlier versions of a series too (the server answers the plain list for an artifact in none)
     _versions.open(hex, opts.server, { switched: !!opts.switched, board: opts.board || '' });
     _review.open(hex, opts);

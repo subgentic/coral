@@ -55,6 +55,7 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64);
             assert.ok(await shown(), at + 'the first Escape did not close the viewer');
             await ev(`document.querySelector('#artifact-viewer').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
             await waitFor(`!document.querySelector('#artifact-viewer:not([hidden])')`, at + 'the second Escape closes it', 5000);
+            await waitFor(`!history.state || !history.state.coralOverlay`, at + 'its history entry is given back', 5000);
             // 3 the browser's Back
             await ev(`import((window.__coralStatic||'/static/')+'artifact_viewer.js').then(m => { m.openArtifactViewer('${A}', { server: 'local', filename: 'plan.md', mediaType: 'text/markdown' }); return true; })`);
             await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown a.mb-artifact-ref')`, at + 'the document is drawn again', 10000);
@@ -63,6 +64,7 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64);
             assert.ok(await shown(), at + "the browser's Back returned to the document, not past the viewer");
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
             await waitFor(`!document.querySelector('#artifact-viewer:not([hidden])')`, at + 'Close closes', 5000);
+            await waitFor(`!history.state || !history.state.coralOverlay`, at + 'its history entry is given back', 5000);
             assert.equal(await back(), '', at + 'a closed viewer holds no trail');
         }
     } catch (e) { failures.push(e); }
