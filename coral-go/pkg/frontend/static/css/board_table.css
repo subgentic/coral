@@ -15,7 +15,7 @@
 /* ── The table ── */
 .mb-table { padding: 0 0 0.75rem; }
 #mb-messages.mb-table { max-width: none; } /* the table fills the pane like the other team tabs (#8504); the 840px cap of #mb-messages is the Chat view's line length */
-.mb-table .mb-message { display: block; position: relative; margin: 0; padding: 0; border-radius: 0; border-bottom: 1px solid var(--border); } /* a phone's chat-bubble margin and padding (mobile.css) skip table rows, so a row is the 44 px line without !important (#9741) */
+.mb-table .mb-message { display: block; margin: 0; padding: 0; border-radius: 0; border-bottom: 1px solid var(--border); } /* a phone's chat-bubble margin and padding (mobile.css) skip table rows, so a row is the 44 px line without !important (#9741) */
 .mb-table .mb-queue-run { margin: 0; padding: 0.5rem 0.875rem; border-bottom: 1px solid var(--border); }
 
 /* The row's own header is the chat's: the table shows only the Select checkbox from it (the head says who and when, the actions are under the open message). */
@@ -48,11 +48,7 @@
 .mb-row-task { font-variant-numeric: tabular-nums; }
 
 /* The open message: the whole text in an 80-character column; the head's snippet gives way to it. */
-.mb-table .mb-message:not(.mb-open) > :not(.mb-row-toggle):not(.mb-message-header):not(.mb-row-quick-reply) { display: none; }
-.mb-row-quick-reply { position: absolute; right: 0.875rem; top: 50%; transform: translateY(-50%); z-index: 1; margin: 0; opacity: 0; pointer-events: none; transition: opacity .1s; }
-.mb-message:not(.mb-open):hover > .mb-row-quick-reply, .mb-message:not(.mb-open):focus-within > .mb-row-quick-reply { opacity: 1; pointer-events: auto; }
-@media (pointer: coarse) { .mb-row-quick-reply { opacity: 1; pointer-events: auto; } }
-.mb-open > .mb-row-quick-reply { display: none; }
+.mb-table .mb-message:not(.mb-open) > :not(.mb-row-toggle):not(.mb-message-header) { display: none; }
 .mb-table .mb-message.mb-open { background: color-mix(in srgb, var(--accent) 8%, var(--bg-secondary)); }
 .mb-table .mb-message.mb-open > :not(.mb-row-toggle):not(.mb-message-header) { margin-inline: 3.0625rem 0.875rem; max-width: 80ch; }
 .mb-table .mb-message.mb-open > .mb-message-body { padding-top: 0.25rem; }
