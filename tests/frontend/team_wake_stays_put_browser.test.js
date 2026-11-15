@@ -18,9 +18,9 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.__m.add('orch', 'A', 4, { sleeping: false, board_project: 'tm', session_id: 'o-id' }); true`);
             await waitFor(`(window.__qaState && window.__qaState.liveSessions || []).length === 1`, `${label}: the agent`, 8000);
             const n = await ev(`(() => { const row = { ...window.__qaState.liveSessions[0], sleeping: false };
-                window.__qaState.currentSession = { ...row, type: 'live' }; window.__selects = 0; window.selectLiveSession = () => { window.__selects++; return Promise.resolve(true); };
+                window.__qaState.currentSession = { ...row, type: 'live' }; window.__selects = 0; window.__sel = Promise.resolve(); document.addEventListener('coral:agent-selected', () => window.__selects++);
                 document.body.classList.toggle('live-session-active', ${chatShown});
-                window.T.ws.handleCoralMessage({ type: 'coral_diff', changed: [{ ...row, sleeping: true }] }); return window.__selects; })()`);
+                window.T.ws.handleCoralMessage({ type: 'coral_diff', changed: [{ ...row, sleeping: true }] }); return window.__sel.then(() => new Promise(r => setTimeout(r, 600) /* sleep-ok: nothing happens is the assertion; the select is synchronous */)).then(() => window.__selects); })()`);
             if (n !== want) problems.push(`${label}: the open agent was selected ${n} time(s) after its sleeping flag changed, want ${want}`);
         }
     } finally { await client.close(); }

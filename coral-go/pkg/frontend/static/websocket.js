@@ -460,9 +460,7 @@ function _syncViewedSession(data) {
             // history takes over. The popout follows its own lifecycle.
             if (!isPopout()) {
                 if (!!s.sleeping !== !!state.currentSession.sleeping) {
-                    const cur = state.currentSession;
-                    if (isPhoneLayout() && !document.body.classList.contains('live-session-active')) return; // a phone's list or another page: a team Wake does not open its chat (#17243)
-                    window.selectLiveSession(cur.name, cur.agent_type, cur.session_id, sessionServer(cur));
+                    if (!isPhoneLayout() || document.body.classList.contains('live-session-active')) openLive(state.currentSession); // a phone re-selects only while the chat is the screen shown: a team Wake from its list does not open it (#17243)
                 } else if (s.sleeping) {
                     // The placeholder above was the awake one; archived may have changed.
                     applySleepingView(true, { archived: !!s.archived });
