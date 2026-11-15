@@ -68,11 +68,9 @@ func (h *HistoryHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 	agentTotal := 0
 	if chatType == "all" || chatType == "agent" {
 		agentParams := params
-		if chatType == "all" {
-			// The merged list is cut into pages after the group chats are put among the agent chats by time, so the agent chats must be read from the first to the end of the page asked for: a
-			// page of agent chats merged and then cut again lost every agent chat after the first page (All chats said 196 and gave 53). Capped, a page deeper than that is not served.
-			agentParams.Page, agentParams.PageSize = 1, min(page*pageSize, maxMergedWindow)
-		}
+		// The merged list is cut into pages after the group chats are put among the agent chats by time, so the agent chats must be read from the first to the end of the page asked for: a
+		// page of agent chats merged and then cut again lost every agent chat after the first page (All chats said 196 and gave 53). Capped, a page deeper than that is not served.
+		agentParams.Page, agentParams.PageSize = 1, min(page*pageSize, maxMergedWindow)
 		result, err := h.ss.ListSessionsPaged(r.Context(), agentParams)
 		if err != nil {
 			if agentParams.Search != "" { // a search that failed is said so, in words the page shows (#10137): the page used to wait for ever on the 500
@@ -123,12 +121,20 @@ func (h *HistoryHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 	total := 0
 	switch chatType {
 	case "agent":
-		writeJSON(w, http.StatusOK, map[string]any{
-			"sessions":  agentSessions,
+		out := map[string]any{
+			"sessions":  pageRows(agentSessions, page, pageSize),
 			"total":     agentTotal,
 			"page":      page,
 			"page_size": pageSize,
-		})
+		}
+		if page*pageSize > maxMergedWindow {
+			out["window_capped"] = true
+			out["max_page"] = maxMergedWindow / pageSize
+		}
+		if h.indexing() {
+			out["indexing"] = true
+		}
+		writeJSON(w, http.StatusOK, out)
 		return
 	case "group":
 		rows, total = boardSessions, len(boardSessions)
@@ -142,8 +148,7 @@ func (h *HistoryHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 		"page":      page,
 		"page_size": pageSize,
 	}
-	if chatType == "all" && page*pageSize > maxMergedWindow {
-		// The merged list reads at most maxMergedWindow agent chats to put the group chats among them by time: a page past that is not served (it is empty or short). Say so, and the last page that is (#13289).
+	if page*pageSize > maxMergedWindow {
 		out["window_capped"] = true
 		out["max_page"] = maxMergedWindow / pageSize
 	}
