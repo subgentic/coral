@@ -553,10 +553,6 @@ export function createArtifactsList({ inbox = false } = {}) {
     }
     function openArtifact(item, opener) {
         const key = itemKey(item), link = linkOf(item), name = readableName(item);
-        if (model.scope && link?.hex) {
-            importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(link.hex, { ...viewerOptions(item), server: link.server, ...viewerContext(item, opener) }));
-            return;
-        }
         if (model.scope && link) {
             importOnce('./preview_pane.js').then(m => m.openArtifactTab(link.hex ? `coral://artifacts/${link.hex}` : item.uri || '', {
                 server: link.server, filename: name, mediaType: item.media_type,
