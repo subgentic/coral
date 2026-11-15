@@ -7,8 +7,9 @@ const keyOf = (team, g) => `${team}|${g.id}|${g.closed_at || ''}`;
 const read = () => { try { const v = JSON.parse(browserLocal.get(KEY) || '[]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; } catch { return []; } };
 let _saving = Promise.resolve();
 const write = list => { const trimmed = list.slice(-MAX); browserLocal.set(KEY, JSON.stringify(trimmed)); _saving = _saving.then(async () => {
-    let server = [];
-    try { const r = await fetch('/api/settings'); if (r.ok) { const v = (await r.json()).settings[SETTING]; const a = JSON.parse(v || '[]'); if (Array.isArray(a)) server = a.filter(x => typeof x === 'string'); } } catch { /* use local only */ }
+    let server, loaded = false;
+    try { const r = await fetch('/api/settings'); if (r.ok) { const v = (await r.json()).settings[SETTING]; const a = JSON.parse(v || '[]'); server = Array.isArray(a) ? a.filter(x => typeof x === 'string') : []; loaded = true; } } catch { /* skip PUT — next write() retries */ }
+    if (!loaded) return;
     const merged = [...new Set([...server, ...trimmed])].slice(-MAX);
     await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [SETTING]: JSON.stringify(merged) }) });
 }).catch(() => {}); };

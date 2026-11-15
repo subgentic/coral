@@ -1,12 +1,14 @@
 // #17740: write() merges with the server's goal_closed_dismissed list before PUTting, so a second browser's dismissals survive.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { safePaused } = require('./helpers/paused');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { Fetch } = client;
     const B = 'gcm-' + Date.now().toString(36);
     const S = `(window.__coralStatic || '/static/')`;
     const api = (method, p, body) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body === undefined ? 'undefined' : JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
@@ -50,7 +52,41 @@ const { coralReady } = require('./helpers/wait');
         assert.ok(after.includes(browserBKey), 'browser B dismissal survives the merge: ' + JSON.stringify(after));
         assert.ok(after.includes(browserAKey), 'browser A dismissal is in the merged list: ' + JSON.stringify(after));
 
-        console.log('PASS goal_closed_dismissed write() merges with the server list (#17740)');
+        console.log('PASS 1/2 goal_closed_dismissed write() merges with the server list (#17740)');
+
+        // --- case 2: when GET /api/settings fails, write() must NOT PUT (the server list is untouched) ---
+        // create a third goal and close it
+        const gC = await mk('Goal from browser C');
+        assert.equal((await api('POST', `/api/board/${B}/goals/${gC.id}/close`, { subscriber_id: 'orch', state: 'done', reason: 'Done C' })).status, 200);
+        // seed the server with both A and B keys (the known-good state)
+        const seedJSON = JSON.stringify(JSON.stringify([browserAKey, browserBKey]));
+        await ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal_closed_dismissed: ${seedJSON} }) }).then(r => { if (!r.ok) throw new Error('PUT ' + r.status); })`);
+        assert.deepEqual(await readSetting(), [browserAKey, browserBKey], 'precondition: server has A+B');
+        // clear localStorage so goal C is not already dismissed locally
+        await ev(`localStorage.removeItem('coral_goal_closed_dismissed')`);
+
+        // intercept GET /api/settings → 500
+        let failGET = true;
+        await Fetch.enable({ patterns: [{ urlPattern: '*/api/settings', requestStage: 'Request' }] });
+        safePaused(client, e => (failGET && e.request.method === 'GET'
+            ? Fetch.fulfillRequest({ requestId: e.requestId, responseCode: 500, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from('{"error":"boom"}').toString('base64') })
+            : Fetch.continueRequest({ requestId: e.requestId })));
+
+        // reload and dismiss goal C
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+        await openNeeds();
+        await waitFor(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.textContent.includes('Goal #${gC.id} closed as done'))`, 'goal C row is visible', 15000);
+        assert.ok(await press(gC.id, 'Dismiss'), 'Dismiss is on goal C');
+        await waitFor(`![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.textContent.includes('Goal #${gC.id} closed as done'))`, 'goal C row dismissed', 10000);
+        await new Promise(r => setTimeout(r, 1000)); // sleep-ok: wait for the async write() chain
+
+        // stop interception and verify the server list is unchanged
+        failGET = false;
+        await Fetch.disable();
+        const afterFail = await readSetting();
+        assert.deepEqual(afterFail, [browserAKey, browserBKey], 'GET failure: server list unchanged, no PUT overwrote it: ' + JSON.stringify(afterFail));
+
+        console.log('PASS 2/2 goal_closed_dismissed write() skips PUT when GET fails (#17740)');
     } finally {
         await ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal_closed_dismissed: '[]' }) })`).catch(() => {});
         await removeBoards(ev, [B]).catch(() => {});
