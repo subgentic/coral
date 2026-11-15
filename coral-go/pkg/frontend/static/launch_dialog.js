@@ -86,7 +86,7 @@ function _selectLaunchType(type) {
     if (type === "back" && launch.member) { window.cancelTeamMember?.(); return; } // the arrow on a member goes back to the team form (#7861)
     if (type === "back" && document.getElementById('launch-step-agent')?.dataset.stage === 'details' && document.getElementById('launch-step-agent').style.display !== 'none') { _launchStage('folder'); return; } // the arrow goes back one step first
     if (type === "back") {
-        launch.mode = null;
+        launch.mode = null; launch.pendingType = null; // a Which computer? step still loading is no longer wanted (#16445)
         _showLaunchStep("chooser");
         return;
     }
@@ -257,6 +257,7 @@ function _needsComputerStep(type) {
 
 async function _showComputerStep(type) {
     await loadStyles('provider_cards.css').catch(() => {}); // the cards are styled before they are drawn: unstyled, a radio took the card's width (#16397)
+    if (launch.pendingType !== type) return; // Back (or another step) was pressed while the styles loaded: the step is no longer wanted, and drawing it would show it over the chooser (#16445)
     const list = document.getElementById('launch-computer-list');
     if (!list) return;
     document.getElementById('launch-computer-sub').textContent = type === 'team' ? 'The team will launch on it and use its folders.' : 'The agent will run on it and use its folders.';
