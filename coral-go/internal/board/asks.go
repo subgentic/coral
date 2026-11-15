@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/jmoiron/sqlx"
 )
 
 // broadcastTagRE finds the tags that name everyone (@all and its spellings).
@@ -431,11 +433,20 @@ func (s *Store) askInfo(ctx context.Context, project string, a askRow, subs map[
 	if err != nil || len(group) == 0 {
 		return info, err
 	}
-	for _, g := range group {
-		var row askRow
-		if err := s.reader().GetContext(ctx, &row, `SELECT message_id, asker, asked, created_at FROM board_asks WHERE project = ? AND message_id = ?`, project, g.ID); err != nil {
-			continue
-		}
+	ids := make([]int64, len(group))
+	for i, g := range group {
+		ids[i] = g.ID
+	}
+	q, args, err := sqlx.In(`SELECT message_id, asker, asked, created_at FROM board_asks WHERE project = ? AND message_id IN (?) ORDER BY message_id`, project, ids) // one read for the group, not one per member
+	if err != nil {
+		return info, err
+	}
+	var rows []askRow
+	if err := s.reader().SelectContext(ctx, &rows, s.reader().Rebind(q), args...); err != nil {
+		return info, err
+	}
+	for _, row := range rows {
+		g := LinkedAsk{ID: row.MessageID}
 		other, err := s.ownAskInfo(ctx, project, row, subs)
 		if err != nil {
 			return nil, err

@@ -201,6 +201,7 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	notLinked := false // the post asked to be the same question as an earlier one and was not linked: the reply says so (#17789)
 	if owner, verified := VerifiedSession(r.Context()); verified && owner != nil {
 		if err := h.bs.RecordMessageSession(r.Context(), project, msg.ID, owner.SessionID); err != nil {
 			slog.Warn("verified message author not recorded", "board", project, "message", msg.ID)
@@ -223,9 +224,11 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 				h.recordAskSubject(r.Context(), project, msg, body.AskGoal, body.AskTask)
 				if body.SameAs > 0 && h.checkSameAs(r.Context(), project, body.SameAs, to) != nil {
 					slog.Warn("board ask not linked: not put to the same people", "board", project, "message", msg.ID, "same_as", body.SameAs)
+					notLinked = true
 				} else if body.SameAs > 0 {
 					if err := h.bs.LinkAsk(r.Context(), project, msg.ID, body.SameAs); err != nil {
 						slog.Warn("board ask not linked", "board", project, "message", msg.ID, "same_as", body.SameAs, "error", err)
+						notLinked = true
 					}
 				}
 			}
@@ -273,6 +276,9 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 			out["notified"] = notified
 			if rest := h.postRestNotes(r.Context(), project, msg.SubscriberID, notified); len(rest) > 0 {
 				out["asleep"] = rest // who will not read it now, and why (#13189)
+			}
+			if notLinked {
+				out["not_linked"] = fmt.Sprintf("The question was posted, but it is not linked to #%d: it stays a question of its own, so answer it (or ask the Operator to) separately.", body.SameAs)
 			}
 			if notInNeedsYou(msg, humanInputCaller(r)) {
 				out["not_in_needs_you"] = notInNeedsYouNote // said at once: a post that waits on the Operator without --ask is not in their Needs you (#15304)
@@ -994,11 +1000,12 @@ func (h *BoardHandler) checkSameAs(ctx context.Context, project string, id int64
 	if m.Ask.Answered || m.Ask.Closed {
 		return board.ErrAskUnknown
 	}
-	if len(asked) != len(m.Ask.To) {
+	want, have := lowerSet(asked), lowerSet(m.Ask.To) // each person once: ["Dev A", "dev a"] is one addressee, not two
+	if len(want) != len(have) {
 		return board.ErrAskUnknown
 	}
-	for _, a := range asked {
-		if !askedHas(m.Ask.To, a) {
+	for a := range want {
+		if !have[a] {
 			return board.ErrAskUnknown
 		}
 	}
@@ -1043,6 +1050,15 @@ func (h *BoardHandler) tellAsker(r *http.Request, project, from, asker string, a
 	if h.notifyFn != nil {
 		h.notifyFn(project)
 	}
+}
+
+// lowerSet is the distinct names of list, lower-cased.
+func lowerSet(list []string) map[string]bool {
+	out := make(map[string]bool, len(list))
+	for _, n := range list {
+		out[strings.ToLower(n)] = true
+	}
+	return out
 }
 
 func askedHas(to []string, who string) bool {

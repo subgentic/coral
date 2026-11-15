@@ -157,3 +157,29 @@ func TestClosingAGoalRetiresItsAsksAndTellsTheAskers(t *testing.T) {
 	}
 	assert.True(t, told, "the asker is told")
 }
+
+// #17789: the addressees are compared as people, each once: a list that names one person twice is not a list of two.
+func TestSameAsComparesAddresseesAsDistinctPeople(t *testing.T) {
+	h, _, post := sameAsRig(t)
+	_, first := post(map[string]any{"subscriber_id": "Dev A", "content": "@Operator @Dev C which parser?", "ask": true})
+	ctx := context.Background()
+	assert.Error(t, h.checkSameAs(ctx, "team", sameAsID(first), []string{"Operator", "operator"}), "one person twice is not two people")
+	assert.Error(t, h.checkSameAs(ctx, "team", sameAsID(first), []string{"Operator"}), "one of two is not both")
+	assert.NoError(t, h.checkSameAs(ctx, "team", sameAsID(first), []string{"dev c", "Operator"}), "the same two people, in any order and case")
+	assert.NoError(t, h.checkSameAs(ctx, "team", sameAsID(first), []string{"Operator", "Dev C", "Operator"}), "a repeated name adds no one")
+}
+
+// #17789: three linked questions are one group; the answer to the last closes the first two as well (the group is read in one query).
+func TestSameAsAGroupOfThreeIsAnsweredByOne(t *testing.T) {
+	h, _, post := sameAsRig(t)
+	_, a := post(map[string]any{"subscriber_id": "Dev A", "content": "@Operator which parser?", "ask": true})
+	_, b := post(map[string]any{"subscriber_id": "Dev B", "content": "@Operator parser?", "ask": true, "same_as": sameAsID(a)})
+	_, c := post(map[string]any{"subscriber_id": "Dev C", "content": "@Operator parser please?", "ask": true, "same_as": sameAsID(b)})
+	code, ans := post(map[string]any{"subscriber_id": "Operator", "content": "@Dev C the new one", "reply_to": sameAsID(c)})
+	require.Equal(t, 200, code, "%v", ans)
+	_, rows, _ := readOperatorAsks(t, h, asPerson)
+	for _, r := range rows {
+		id := int64(r["id"].(float64))
+		assert.False(t, id == sameAsID(a) || id == sameAsID(b) || id == sameAsID(c), "question %d is still open", id)
+	}
+}
