@@ -26,7 +26,7 @@ function _renderTeamCard(boardName, boardSessions) {
         const boardCollapsed = _isGroupCollapsed(boardName);
         const boardWorkDir = pickTeamFolder('', boardSessions);
         const boardIsSleeping = boardSessions.every(s => s.sleeping);
-        const boardSleepIcon = boardIsSleeping ? ' <span class="agent-icon" title="Team is sleeping">🌙</span>' : '';
+        const boardSleepIcon = sleepIcon(boardIsSleeping);
         const sleepLabel = boardIsSleeping ? 'Wake team' : 'Sleep team';
         const sleepAction = boardIsSleeping ? 'wake' : 'sleep';
         const bKebab = `<div class="sidebar-kebab-wrapper group-kebab">
@@ -141,8 +141,9 @@ function _renderWorkflowCard(wfName, wfSessions) {
     return html;
 }
 
-/** A header's count is the agents awake; the title says how many sleep when the number is lower than the rows (#16740: 3 dropped to 2 with no word why). */
-const groupCount = ss => { const n = ss.filter(s => !s.sleeping).length; return `<span class="session-group-count"${n < ss.length ? ` title="${n} awake, ${ss.length - n} asleep"` : ''}>${n}</span>`; };
+const sleepIcon = on => on ? ' <span class="agent-icon" title="Team is sleeping">🌙</span>' : '';
+/** A header's count is the agents awake; its title says of how many (#16740: 3 dropped to 2 with no word why). */
+const groupCount = ss => { const n = ss.filter(s => !s.sleeping).length; return `<span class="session-group-count" title="${n} awake of ${ss.length}">${n}</span>`; };
 
 // Team-first mode: one folder group of the agents that are on no team or workflow.
 function _renderFolderGroup(groupName, groupSessions) {
@@ -255,7 +256,7 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                 const boardCollapsed = _isGroupCollapsed(boardName);
                         const boardWorkDir = pickTeamFolder('', boardSessions);
                 const boardIsSleeping = boardSessions.some(s => s.sleeping);
-                const boardSleepIcon = boardIsSleeping ? ' <span class="agent-icon" title="Team is sleeping">🌙</span>' : '';
+                const boardSleepIcon = sleepIcon(boardIsSleeping);
                 const sleepLabel = boardIsSleeping ? 'Wake team' : 'Sleep team';
                 const sleepAction = boardIsSleeping ? 'wake' : 'sleep';
                 const bKebab = `<div class="sidebar-kebab-wrapper group-kebab">
