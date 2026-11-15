@@ -3767,6 +3767,7 @@ li:has(> .row-btn:focus-visible) { outline: 2px solid var(--accent); outline-off
 .launch-recap b { color: var(--text-primary); font-weight: var(--fw-strong); }
 .launch-recap-note { display: block; font-size: var(--fs-base); } /* what the chosen mode allows, a line under the recap (#10000) */
 .launch-recap[hidden] { display: none; }
+.launch-recap-wrap{flex:none;position:relative}.launch-recap-toggle{display:none}
 .sd-modal-content .launch-wizard > .modal-actions, .sd-modal-content.launch-wizard > .modal-actions { display: flex; align-items: center; gap: 8px; padding: 10px 24px 16px; border-top: 0; }
 .launch-wizard[data-stage="folder"] > .modal-actions { border-top: 1px solid var(--border); padding-top: 16px; }
 .launch-wizard > .modal-actions { justify-content: flex-end; } /* Cancel then the Primary at the right, like every dialog footer (#16361, #15816); a destructive Quiet one stays alone at the far left */
@@ -3821,6 +3822,8 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
     .launch-page-folder, .launch-wizard .settings-panes { padding: 16px; }
     .launch-recap { padding: 10px 16px 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; } /* two lines at most, so large text leaves the body room */
     .launch-recap:has(.launch-recap-note) { -webkit-line-clamp: 4; } /* the recap and the line saying what the mode allows (#10000): the second line would cut it off */
+    #launch-recap:not([hidden]){padding-right:56px;-webkit-line-clamp:1;display:-webkit-box;overflow:hidden;max-height:none}#launch-recap:not([data-open]) .launch-recap-note{display:none}#launch-recap[data-open]{display:block;max-height:45dvh;overflow-y:auto}
+    .launch-recap-toggle{display:inline-flex;position:absolute;top:0;right:4px;min-width:44px;min-height:44px;align-items:center;justify-content:center}.launch-recap-toggle::before{content:'\25B4'}#launch-recap[hidden]+.launch-recap-toggle{display:none}#launch-recap[data-open]+.launch-recap-toggle::before{transform:rotate(180deg)}
     .sd-modal-content .launch-wizard > .modal-actions, .sd-modal-content.launch-wizard > .modal-actions { padding: 10px 16px 14px; }
     .launch-agent-pick, .seg-group:not(.seg-cards) { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
     #launch-agent-pick .launch-agent-opt:nth-child(2n) { border-right: 0; }
