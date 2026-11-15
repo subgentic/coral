@@ -183,6 +183,9 @@ func recordFrom(out status.Out, st relaunchState, now time.Time) UpdaterRecord {
 	}
 	if r := out.LastRolled; r != nil {
 		reason := r.Reason
+		if w, ok := updaterRollbackWords[reason]; ok {
+			reason = w
+		}
 		if !rollbackReasons[reason] {
 			reason = rollbackOtherTag
 		}
