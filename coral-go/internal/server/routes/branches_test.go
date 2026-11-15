@@ -24,6 +24,7 @@ type fakeBranches struct {
 	own   int
 	dirs  map[string]int // a folder -> the worktree that holds it
 	asked []string
+	none  map[string]bool // folders the snapshot has no repository for
 }
 
 func (f *fakeBranches) Holds(_ branches.Repo, i int, dir string) bool {
@@ -35,17 +36,18 @@ func (f *fakeBranches) Same(a, b branches.Repo) bool { return a.Base == b.Base }
 
 func (f *fakeBranches) For(dir string) (branches.Repo, int, bool) {
 	f.asked = append(f.asked, dir)
-	if dir == "" {
+	if dir == "" || f.none[dir] {
 		return branches.Repo{}, -1, false
 	}
 	return f.repo, f.own, true
 }
 
 type branchesRig struct {
-	t   *testing.T
-	h   *SessionsHandler
-	rt  chi.Router
-	src *fakeBranches
+	t     *testing.T
+	h     *SessionsHandler
+	rt    chi.Router
+	src   *fakeBranches
+	plain string // a real folder with no .git anywhere above it
 }
 
 func newBranchesRig(t *testing.T) *branchesRig {
@@ -53,6 +55,7 @@ func newBranchesRig(t *testing.T) *branchesRig {
 	_, h, mock, ss := setupSessionsTestServer(t)
 	ctx := context.Background()
 	team, other := "team-a", "team-b"
+	plain := t.TempDir()
 	for _, s := range []struct {
 		sid, name, dir string
 		board          *string
@@ -60,18 +63,19 @@ func newBranchesRig(t *testing.T) *branchesRig {
 		{"aaaaaaaa-0423-4000-8000-000000000001", "dev-a", "/work/repo", &team},
 		{"aaaaaaaa-0423-4000-8000-000000000002", "dev-a2", "/work/feature", &team},
 		{"bbbbbbbb-0423-4000-8000-000000000003", "dev-b", "/work/other", &other},
+		{"aaaaaaaa-0423-4000-8000-000000000004", "dev-plain", plain, &team},
 	} {
 		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: s.sid, AgentType: "claude", AgentName: s.name, WorkingDir: s.dir, BoardName: s.board}))
 		mock.addSession("claude-"+s.sid, s.dir)
 	}
-	src := &fakeBranches{own: 0, repo: branches.Repo{Base: "main", At: time.Date(2026, 11, 1, 6, 0, 0, 0, time.UTC), Worktrees: []branches.Worktree{
+	src := &fakeBranches{none: map[string]bool{plain: true}, own: 0, repo: branches.Repo{Base: "main", At: time.Date(2026, 11, 1, 6, 0, 0, 0, time.UTC), Worktrees: []branches.Worktree{
 		{Branch: "main", Head: "0123456789ab", Main: true},
 		{Branch: "feature", Head: "abcdef012345", Ahead: 2, Behind: 1, Changed: 3},
 	}}}
 	h.SetBranches(src)
 	rt := chi.NewRouter()
 	rt.Get("/api/sessions/live/{name}/branches", h.Branches)
-	return &branchesRig{t: t, h: h, rt: rt, src: src}
+	return &branchesRig{t: t, h: h, rt: rt, src: src, plain: plain}
 }
 
 // get asks for name's branches; mod makes the request the caller's (the dashboard, an agent token).
@@ -185,4 +189,20 @@ func TestTheTeamViewShowsItsAgentsRepositoriesAndOnlyItsOwnTeam(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, code, "an agent of team B")
 	code, _ = get("team-a", asBranchesAgent("aaaaaaaa-0423-4000-8000-000000000002"))
 	assert.Equal(t, http.StatusOK, code, "an agent of team A")
+}
+
+// #17483: a folder with no .git in it or above it is said so at once; a folder that may still be read is only "not found yet".
+func TestAFolderThatIsNotARepositoryIsSaidAtOnce(t *testing.T) {
+	r := newBranchesRig(t)
+	code, body := r.get("dev-plain", "aaaaaaaa-0423-4000-8000-000000000004", asBranchesDashboard)
+	require.Equal(t, http.StatusOK, code, "%v", body)
+	assert.Equal(t, false, body["found"])
+	assert.Equal(t, true, body["not_git"], "no .git here or above: not a repository, no waiting")
+	// a folder that does not exist on this computer is not claimed to be non-git
+	r.src.none["/work/repo"] = true
+	_, body = r.get("dev-a", "aaaaaaaa-0423-4000-8000-000000000001", asBranchesDashboard)
+	assert.Equal(t, false, body["found"])
+	assert.Equal(t, false, body["not_git"])
+	raw, _ := json.Marshal(body)
+	assert.NotContains(t, string(raw), r.plain, "no folder path is served")
 }

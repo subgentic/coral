@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/branches"
+	"github.com/subgentic/coral/internal/gitutil"
 )
 
 // The Branches tab (goal #11): the worktrees of the repository an agent works in, from the git poller's snapshot (internal/branches). Read-only: no git runs for a request, and there is
@@ -71,7 +72,8 @@ func (h *SessionsHandler) Branches(w http.ResponseWriter, r *http.Request) {
 	dir := h.resolveWorkdir(agentCtx(r), name, agentType, sessionID)
 	repo, own, ok := h.branches.For(dir)
 	if dir == "" || !ok {
-		writeJSON(w, http.StatusOK, map[string]any{"available": true, "found": false})
+		// A folder with no .git in it or above it is said so at once (#17483), not after a minute of "reading".
+		writeJSON(w, http.StatusOK, map[string]any{"available": true, "found": false, "not_git": dir != "" && gitutil.NoRepoMarkerFor(dir)})
 		return
 	}
 	rows := make([]branchWorktree, len(repo.Worktrees))
@@ -124,12 +126,17 @@ func (h *SessionsHandler) TeamBranches(w http.ResponseWriter, r *http.Request) {
 		rows []branchWorktree
 	}
 	var sections []*section
+	agentFolders, nonGit := 0, 0 // the team's agents with a folder, and those whose folder is not in a git repository (#17483)
 	for _, ls := range lives {
 		if ls.IsArchived == 1 || ls.WorkingDir == "" || ls.BoardName == nil || *ls.BoardName != project {
 			continue
 		}
+		agentFolders++
 		repo, own, ok := h.branches.For(ls.WorkingDir)
 		if !ok || own < 0 {
+			if gitutil.NoRepoMarkerFor(ls.WorkingDir) {
+				nonGit++
+			}
 			continue
 		}
 		var sec *section
@@ -155,5 +162,5 @@ func (h *SessionsHandler) TeamBranches(w http.ResponseWriter, r *http.Request) {
 		out = append(out, map[string]any{"base": s.repo.Base, "more": s.repo.More, "unreadable": s.repo.Unreadable, "remote": s.repo.Remote, "remote_unknown": s.repo.RemoteUnknown,
 			"pr_note": s.repo.PRNote, "at": s.repo.At.UTC().Format(time.RFC3339), "worktrees": s.rows})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"available": true, "repos": out})
+	writeJSON(w, http.StatusOK, map[string]any{"available": true, "repos": out, "not_git": len(out) == 0 && agentFolders > 0 && nonGit == agentFolders})
 }

@@ -12,6 +12,8 @@ const FIRST_READ_LIMIT_MS = 60000; // past this with nothing read, the tab says 
 let waiting = { session: '', since: 0, tries: 0 }; // how long the open agent's repository has been asked for without an answer
 let generation = 0;
 let timer = null;
+const NOT_GIT_AGENT = "This agent's folder is not a git repository, so there are no branches to show. To see them, run git init in that folder, or start the agent in a folder that is a repository.";
+const NOT_GIT_TEAM = "None of this team's agents works in a git repository, so there are no branches to show. To see them, run git init in an agent's folder, or start an agent in a folder that is a repository.";
 const panel = () => document.getElementById('agentic-panel-branches');
 
 /** Reads and draws the agent's open tab; does nothing while it is not the open one. */
@@ -29,11 +31,13 @@ export async function loadBranches() {
         if (resp.ok) data = await resp.json();
     } catch { /* drawn as unavailable below */ }
     if (mine !== generation || state.currentSession?.session_id !== s.session_id) return; // another agent was chosen meanwhile
-    const notYet = !!data && data.available !== false && !data.found;
+    const notGit = !!data && data.available !== false && !data.found && data.not_git === true; // no .git in the folder or above it: said at once, with the next step (#17483)
+    const notYet = !!data && data.available !== false && !data.found && !notGit;
     if (!notYet) waiting = { session: '', since: 0, tries: 0 };
     else if (waiting.session !== s.session_id) waiting = { session: s.session_id, since: Date.now(), tries: 0 };
     const overdue = notYet && Date.now() - waiting.since > FIRST_READ_LIMIT_MS;
     if (!data || data.available === false) emptyState(el, 'Branches are not available from this computer.');
+    else if (notGit) emptyState(el, NOT_GIT_AGENT);
     else if (!data.found) emptyState(el, waitingText(overdue));
     else el.replaceChildren(drawRepo(data, s.session_id));
     // past the limit the folder is likely not a repository: ask once a minute, so an open tab on it does not start a pass every 15 s (Security's INFO on #531)
@@ -55,14 +59,16 @@ export async function showTeamBranches(host, team) {
     } catch { /* drawn as unavailable below */ }
     if (mine !== teamSeq || !host.isConnected) return; // another team or tab was opened meanwhile
     if (!data || data.available === false) emptyState(host, 'Branches are not available from this computer.');
-    const none = !!data && data.available !== false && !(data.repos || []).length;
+    const notGit = !!data && data.available !== false && !(data.repos || []).length && data.not_git === true;
+    const none = !!data && data.available !== false && !(data.repos || []).length && !notGit;
     if (!none) teamWaiting = { team: '', since: 0 };
     else if (teamWaiting.team !== team) teamWaiting = { team, since: Date.now() };
     const overdue = none && Date.now() - teamWaiting.since > FIRST_READ_LIMIT_MS;
     if (!data || data.available === false) emptyState(host, 'Branches are not available from this computer.');
+    else if (notGit) emptyState(host, NOT_GIT_TEAM);
     else if (none) emptyState(host, overdue
         ? "Coral has not read a repository for this team's agents. Their folders may not be in git repositories, or a slow read is paused for a few minutes."
-        : "Reading the repositories this team's agents work in: the first read takes a few seconds.");
+        : "Reading the repositories this team's agents work in. The first read can take up to a minute on a large repository.");
     else host.replaceChildren(...data.repos.map(r => drawRepo(r, '')));
     // past the limit, ask once a minute like the agent's tab, so a page left open on folders that are not repositories does not start a pass every 15 s (Security's INFO on #531)
     teamTimer = setTimeout(() => { if (host.isConnected && host.offsetParent !== null) showTeamBranches(host, team); }, none && !overdue ? FIRST_READ_MS : REFRESH_MS);
@@ -94,7 +100,7 @@ function numbers(w, base) {
 function waitingText(overdue) {
     return overdue
         ? "Coral has not read a repository for this agent's folder. Its folder may not be in a git repository, or git took too long and the read is paused for a few minutes."
-        : "Reading this agent's repository: the first read takes a few seconds.";
+        : "Reading this agent's repository. The first read can take up to a minute on a large repository.";
 }
 
 const PR_STATE = { open: 'open', merged: 'merged', closed: 'closed' };
