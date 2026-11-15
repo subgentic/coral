@@ -103,6 +103,11 @@ func (h *HistoryHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 
 		agentTotal = result.Total
 		agentSessions = append(agentSessions, agentHistoryRows(result.Sessions)...)
+		runs := h.untrackedRunRows(r.Context(), params) // a job run whose agent never wrote a line is listed too (#17447): on the first page of Chats only, so a later page does not repeat it
+		agentTotal += len(runs)
+		if len(runs) > 0 && (chatType == "all" || page == 1) {
+			agentSessions = append(runs, agentSessions...)
+		}
 	}
 
 	// ── Group chats (board projects) ──

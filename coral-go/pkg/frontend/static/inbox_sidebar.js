@@ -1238,7 +1238,7 @@ async function openChat(c) {
     if (!setHistorySource(c.server || 'local')) return;
     const q = chatFiltersOf(group).q; // a search that found this chat opens at its matching message, not the newest (#17801)
     if (q) return importOnce('./chat_search.js').then(m => m.openAtMatch(q, c)).catch(() => window.selectHistorySession?.(c.session_id, null, c));
-    window.selectHistorySession?.(c.session_id, null, c);
+    return CH.openHistory(c); // a job run with no conversation says why (#17447); the rest opens as it did
 }
 
 /** A Hub page in the centre (Needs you, Tasks, Saved for later): one iframe, its address a constant from HUB_FRAMES, never built from a URL, a hash or a message; nothing is posted to it or read from it, so the
