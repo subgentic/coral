@@ -54,7 +54,7 @@ const { coralReady } = require('./helpers/wait');
             // On: accent, full strength, named on.
             await render(true);
             const on = await icon();
-            assert.equal(on.label, `Health monitor settings for ${TEAM}`); assert.equal(on.title, `Health monitor settings for ${TEAM}`); assert.equal(on.on, true);
+            assert.equal(on.label, `Health monitor settings for ${TEAM}`); assert.equal(on.title, `Health monitor is on for ${TEAM}: opens Team settings, Health check`, 'the tooltip says the monitor is on and where the icon goes (#17339 F11)'); assert.equal(on.on, true);
             assert.ok(on.w >= 24 && on.h >= 24, 'health settings has a 24px target');
             assert.ok(on.beside, `${dev}: it sits beside the team's info button ${JSON.stringify(on)}`);
             const accent = await ev(`getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()`);
