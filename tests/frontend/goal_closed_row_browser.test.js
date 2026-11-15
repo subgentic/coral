@@ -1,5 +1,5 @@
-// #15257 (Beta walk 12 H1): a goal an agent closed as done is a row of Needs you, "Goal #N closed as done by <agent>", with Reopen and Dismiss. It is listed, not counted: the Inbox badge does not move. Reopen puts the goal
-// back to active (and the row goes); Dismiss hides it in this browser; a goal the Operator closed has no such row. Real server, a real goal closed through the close route as an agent and as the Operator.
+// #15257 (Beta walk 12 H1): a goal an agent closed as done is a row of Needs you, "Goal #N closed as done by <agent>", with Reopen and Dismiss. #16781: the server counts it too (kind goal_closed), and
+// Dismiss saves to the goal_closed_dismissed setting so the server count, Hub badge and phone push drop it. Real server, a real goal closed through the close route as an agent and as the Operator.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -33,15 +33,20 @@ const { coralReady } = require('./helpers/wait');
         const titles = await rowTitles();
         assert.ok(titles.some(t => t.includes(`Goal #${c} closed as done by orch`)), 'the second agent-closed goal too: ' + JSON.stringify(titles));
         assert.ok(!titles.some(t => t.includes(`Goal #${b} `)), 'a goal the Operator closed has no row: ' + JSON.stringify(titles));
-        assert.equal(await needsCount(), baseline, 'listed, not counted: the Needs you count is the same with two rows as without them');
-        assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), baselineBadge, 'the Inbox badge is the same too');
+        // #16781: the server counts goal_closed items in GET /api/needs-you.
+        const serverCount = async () => (await api('GET', '/api/needs-you')).body.counts.goal_closed;
+        assert.equal(await serverCount(), 2, 'the server counts two agent-closed goals');
         const press = (goal, label) => ev(`(() => { const tr = [...document.querySelectorAll('#group-table-view tr')].find(r => r.textContent.includes('Goal #${goal} closed as done')); const btn = tr && [...tr.querySelectorAll('button')].find(x => x.textContent === ${JSON.stringify(label)}); if (btn) btn.click(); return !!btn; })()`);
         assert.ok(await press(a, 'Reopen'), 'Reopen is on the row');
         await waitFor(`![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.textContent.includes('Goal #${a} closed as done'))`, 'Reopen takes the row away', 10000);
         assert.equal((await api('GET', `/api/board/${B}/goals/${a}`)).body.state, 'active', 'the goal is active again');
+        assert.equal(await serverCount(), 1, 'reopened goal gone from the server count');
         assert.ok(await press(c, 'Dismiss'), 'Dismiss is on the row');
         await waitFor(`![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.textContent.includes('Goal #${c} closed as done'))`, 'Dismiss takes the row away', 10000);
         assert.equal((await api('GET', `/api/board/${B}/goals/${c}`)).body.state, 'done', 'dismissed, not reopened');
-        console.log('PASS a goal an agent closed has a listed, uncounted row with Reopen and Dismiss');
-    } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
+        // #16781: Dismiss saves to the setting, so the server count drops too.
+        await new Promise(r => setTimeout(r, 500)); // sleep-ok: the PUT /api/settings from Dismiss is fire-and-forget; give it time to land
+        assert.equal(await serverCount(), 0, 'dismissed goal gone from the server count (#16781: Dismiss saves the setting)');
+        console.log('PASS a goal an agent closed has a counted row with Reopen and Dismiss (#16781)');
+    } finally { await ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal_closed_dismissed: '[]' }) })`).catch(() => {}); await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

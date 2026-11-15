@@ -1,11 +1,12 @@
-/* "Goal #N closed as done by <agent>" (#15257, Beta walk 12 H1): a goal an agent closed is a row of Needs you with Reopen, so the person sees it and can undo it in one tap. It is listed, not counted (the welcome notes' rule,
- * #11622): it is no alarm, and the server's needs-you count, the phone push and the Hub projection know nothing of it. Dismiss is kept in this browser, keyed by the goal and the time it was closed, so a goal
- * that is reopened and closed again shows again. Lives in its own module: the Inbox sidebar imports it when it is built, never at start. */
+/* "Goal #N closed as done by <agent>" (#15257, Beta walk 12 H1): a goal an agent closed is a row of Needs you with Reopen, so the person sees it and can undo it in one tap. Dismiss is saved to the
+ * server setting (goal_closed_dismissed) so the server count, Hub badge and phone push exclude it too (#16781), with localStorage as the instant echo. Keyed by team|goalId|closed_at, so a goal that is
+ * reopened and closed again shows again. Lives in its own module: the Inbox sidebar imports it when it is built, never at start. */
 import { browserLocal } from './safe_storage.js';
-const KEY = 'coral_goal_closed_dismissed', WINDOW_MS = 14 * 864e5, MAX = 100;
+const KEY = 'coral_goal_closed_dismissed', SETTING = 'goal_closed_dismissed', WINDOW_MS = 14 * 864e5, MAX = 100;
 const keyOf = (team, g) => `${team}|${g.id}|${g.closed_at || ''}`;
 const read = () => { try { const v = JSON.parse(browserLocal.get(KEY) || '[]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; } catch { return []; } };
-const write = list => browserLocal.set(KEY, JSON.stringify(list.slice(-MAX)));
+let _saving = Promise.resolve();
+const write = list => { const trimmed = list.slice(-MAX); browserLocal.set(KEY, JSON.stringify(trimmed)); _saving = _saving.then(() => fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [SETTING]: JSON.stringify(trimmed) }) })).catch(() => {}); };
 
 /** Whether the goal was closed as done by an agent (not by the Operator, not unknown) within the last 14 days. */
 export const closedByAgent = (g, now = Date.now()) => {
