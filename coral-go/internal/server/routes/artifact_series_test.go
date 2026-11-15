@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // #6357 stage 1: artifact series, local routes only. The ownerRig has a1 and a2 on team-a, b1 on team-b, o1 on team-o and n1 on no team.
@@ -457,4 +459,27 @@ func TestAnAgentOnNoBoardAddsVersionsToItsOwnFileOnly(t *testing.T) {
 		assert.Contains(t, []int{http.StatusNotFound, http.StatusForbidden}, code, name+": %v", out)
 	}
 	assert.Len(t, seriesMembers(rig.coralDir, sid), 3, "nothing was added by the other agent")
+}
+
+// A restart gives an agent a new session id, so an agent on no team keeps its file by name and working folder (#18131): the restarted agent adds a version, an agent with another name or another folder cannot.
+func TestARestartedAgentOnNoBoardStillOwnsItsFile(t *testing.T) {
+	rig, w := ownerRig(t)
+	w.sessions["n3"], w.sessions["n4"], w.sessions["n5"] = "", "", ""
+	for _, s := range []string{"n3", "n4", "n5"} {
+		require.NoError(t, rig.ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: s, AgentName: s, AgentType: "codex", WorkingDir: t.TempDir()}))
+	}
+	names := map[string]string{"n1": "first-agent", "n3": "first-agent", "n4": "first-agent", "n5": "other-agent"}
+	folders := map[string]string{"n1": "/work/a", "n3": "/work/a", "n4": "/work/b", "n5": "/work/a"}
+	oldLookup, oldFolder := uploaderLookup, uploaderFolderLookup
+	SetUploaderLookup(func(_ context.Context, sid string) (string, string, string) { return "", names[sid], "" })
+	SetUploaderFolderLookup(func(_ context.Context, sid string) string { return folders[sid] })
+	t.Cleanup(func() { uploaderLookup, uploaderFolderLookup = oldLookup, oldFolder })
+	v1 := rig.uploadText("n1", "plan.txt", "plan before the restart")
+	code, out := rig.uploadVersion("n3", "plan.txt", "plan after the restart", "coral://artifacts/"+v1)
+	require.Equal(t, http.StatusCreated, code, "the same name in the same folder: %v", out)
+	assert.EqualValues(t, 2, out["version"])
+	for who, session := range map[string]string{"the same name in another folder": "n4", "another name in the same folder": "n5"} {
+		code, out = rig.uploadVersion(session, "plan.txt", "taken by "+who, "coral://artifacts/"+v1)
+		assert.Contains(t, []int{http.StatusNotFound, http.StatusForbidden}, code, who+": %v", out)
+	}
 }

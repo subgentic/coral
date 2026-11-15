@@ -47,6 +47,8 @@ type agentUploadRecord struct {
 	Board    string `json:"board,omitempty"`
 	Uploader string `json:"uploader,omitempty"`
 	Role     string `json:"role,omitempty"`
+	// Folder is the working folder of an agent on no team, at the upload (#18131): with Uploader it is the owner that survives a restart, which gives the agent a new session id. Absent on a team agent.
+	Folder string `json:"folder,omitempty"`
 	// OwnerKind and OwnerID say who owns this record (#5577): "operator" (the machine owner) or "hub_user" and its id. Recorded at the upload from authentication (an agent's team's owner;
 	// the operator for a dashboard paste). Absent on a record made before they were kept: the machine owner's.
 	OwnerKind string `json:"owner_kind,omitempty"`
