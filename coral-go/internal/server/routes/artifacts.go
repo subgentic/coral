@@ -47,6 +47,8 @@ type agentUploadRecord struct {
 	Board    string `json:"board,omitempty"`
 	Uploader string `json:"uploader,omitempty"`
 	Role     string `json:"role,omitempty"`
+	// Folder is the working folder of an agent on no team, at the upload (#18131): with Uploader it is the owner that survives a restart, which gives the agent a new session id. Absent on a team agent.
+	Folder string `json:"folder,omitempty"`
 	// OwnerKind and OwnerID say who owns this record (#5577): "operator" (the machine owner) or "hub_user" and its id. Recorded at the upload from authentication (an agent's team's owner;
 	// the operator for a dashboard paste). Absent on a record made before they were kept: the machine owner's.
 	OwnerKind string `json:"owner_kind,omitempty"`
@@ -313,7 +315,7 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 	if ref != "" {
 		callerBoard, _, _ := uploaderOf(sid)
 		var perr error
-		plan, perr = planNewVersion(coralDir, ref, callerBoard, hexID)
+		plan, perr = planNewVersion(coralDir, ref, callerBoard, hexID, sid)
 		if plan != nil {
 			plan.caller = chainUploader
 			// A new version keeps its file's name (#14145): a different name is a different file unless the agent says it is a rename. Only an upload that NAMED its file is checked: the server's own join of a task chain

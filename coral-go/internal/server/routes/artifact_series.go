@@ -222,6 +222,19 @@ func digestSeriesOnBoard(coralDir, digest, board string) (seriesID string, n int
 	return "", 0, false
 }
 
+// digestSeriesOfCaller is digestSeriesOnBoard for the caller of a new version: an agent on no board (board "") finds only the series its own session made (#18131), never another no-board agent's.
+func digestSeriesOfCaller(coralDir, digest, board string, owns func(session string, rec agentUploadRecord) bool) (seriesID string, n int, ok bool) {
+	if board != "" {
+		return digestSeriesOnBoard(coralDir, digest, board)
+	}
+	for _, r := range recordsOfDigest(coralDir, digest) {
+		if seriesIDRe.MatchString(r.rec.SeriesID) && r.rec.Board == "" && owns(r.session, r.rec) {
+			return r.rec.SeriesID, r.rec.Version, true
+		}
+	}
+	return "", 0, false
+}
+
 // seriesMember is a version as the records say it is.
 type seriesMember struct {
 	Digest   string
@@ -231,6 +244,7 @@ type seriesMember struct {
 	Uploader string
 	Role     string
 	Board    string
+	Folder   string // the working folder of an agent on no team (#18131)
 	Source   string // the server's own record of how the version came: "edit" (the Operator's editor), "share" (the Operator's file), empty for an agent's upload (#13792)
 	Name     string // the name this version was uploaded under: a file's name is its newest version's (#14145)
 	Virtual  bool   // a file that was never versioned, found by its derived id: version 1 of a series that does not exist yet
@@ -290,7 +304,7 @@ func membersOfSeries(coralDir, id string, full bool) []seriesMember {
 }
 
 func memberOf(digest, session string, rec agentUploadRecord) seriesMember {
-	return seriesMember{Digest: digest, N: rec.Version, Session: session, At: rec.CreatedAt, Uploader: rec.Uploader, Role: rec.Role, Board: rec.Board, Source: rec.Source, Name: rec.Name}
+	return seriesMember{Digest: digest, N: rec.Version, Session: session, At: rec.CreatedAt, Uploader: rec.Uploader, Role: rec.Role, Board: rec.Board, Folder: rec.Folder, Source: rec.Source, Name: rec.Name}
 }
 
 // seriesMemberSet is every artifact that belongs to a series: they count as kept for pruning (pick 4, keep all: only an explicit delete removes a version).
@@ -376,13 +390,32 @@ func errSeriesFull() *seriesRefusal {
 }
 
 // planNewVersion works out where an upload of the bytes newDigest goes as a new version of ref (a digest or a series id), for an agent on callerBoard. On success the series lock is held (plan.unlock).
-func planNewVersion(coralDir, ref, callerBoard, newDigest string) (*seriesPlan, error) {
+func planNewVersion(coralDir, ref, callerBoard, newDigest string, callerSession ...string) (*seriesPlan, error) {
+	own := ""
+	if len(callerSession) > 0 {
+		own = callerSession[0] // an agent on no board may version only the files its own session uploaded (#18131)
+	}
 	digest, series, base, ok := newVersionRef(ref)
 	if !ok {
 		return nil, &seriesRefusal{http.StatusBadRequest, "bad_request", "new version of: give the file's id (32 hex, with @<version> for the version you edited) or a 64-hex artifact link"}
 	}
-	if callerBoard == "" {
+	if callerBoard == "" && own == "" {
 		return nil, errSeriesNoBoard
+	}
+	// No board: the same session, or the same agent name in the same working folder (a restart gives a new session id), never another no-board agent (#18131).
+	_, ownName, _ := uploaderOf(own)
+	ownFolder := ""
+	if ownName != "" {
+		ownFolder = uploaderFolderOf(own)
+	}
+	owns := func(session string, rec agentUploadRecord) bool {
+		return session == own || (ownName != "" && ownFolder != "" && rec.Uploader == ownName && rec.Folder == ownFolder)
+	}
+	ours := func(board, session, uploader, folder string) bool {
+		if board != callerBoard {
+			return false
+		}
+		return callerBoard != "" || owns(session, agentUploadRecord{Uploader: uploader, Folder: folder})
 	}
 	p := &seriesPlan{board: callerBoard}
 	if series == "" {
@@ -401,14 +434,14 @@ func planNewVersion(coralDir, ref, callerBoard, newDigest string) (*seriesPlan, 
 		// The artifact the caller names must be one its board uploaded (a record of it names the caller's board): records decide, never the index.
 		recs := recordsOfDigest(coralDir, digest)
 		for _, r := range recs {
-			if r.rec.Board == callerBoard && p.base.session == "" {
+			if ours(r.rec.Board, r.session, r.rec.Uploader, r.rec.Folder) && p.base.session == "" {
 				p.base = r
 			}
 		}
 		if p.base.session == "" {
 			return nil, errSeriesNotYours
 		}
-		if sid, _, in := digestSeriesOnBoard(coralDir, digest, callerBoard); in { // the caller's own team's series of the bytes, never another team's (#13942)
+		if sid, _, in := digestSeriesOfCaller(coralDir, digest, callerBoard, owns); in { // the caller's own team's series of the bytes, never another team's (#13942)
 			p.id = sid
 			unlockCreate() // it is in a series already: the series lock serialises from here, as for a series link
 			unlockCreate = nil
@@ -427,7 +460,7 @@ func planNewVersion(coralDir, ref, callerBoard, newDigest string) (*seriesPlan, 
 	fail := func(e error) (*seriesPlan, error) { p.unlock(); return nil, e }
 	if !p.create {
 		p.rows = membersOfSeries(coralDir, p.id, true)
-		if len(p.rows) == 0 || p.rows[0].Board != callerBoard {
+		if len(p.rows) == 0 || !ours(p.rows[0].Board, p.rows[0].Session, p.rows[0].Uploader, p.rows[0].Folder) {
 			return fail(errSeriesNotYours) // not found and not yours look the same
 		}
 		if len(p.rows) == 1 && p.rows[0].Virtual { // the id of a file never versioned: this upload makes its series, with that id, and the file becomes version 1
@@ -470,7 +503,7 @@ func planNewVersion(coralDir, ref, callerBoard, newDigest string) (*seriesPlan, 
 		}
 	}
 	// Bytes already in ANOTHER series are refused, in words that name nothing of it.
-	if other, _, in := digestSeriesOnBoard(coralDir, newDigest, callerBoard); in && other != p.id { // bytes already in ANOTHER series of the caller's team; the same bytes in another team's series are that team's (#13942)
+	if other, _, in := digestSeriesOfCaller(coralDir, newDigest, callerBoard, owns); in && other != p.id { // bytes already in ANOTHER series of the caller's team; the same bytes in another team's series are that team's (#13942)
 		return fail(errSeriesOtherOwner)
 	}
 	var next int

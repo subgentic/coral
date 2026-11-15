@@ -343,3 +343,25 @@ func TestAllTeamArtifactsShowsAFileANoTeamAgentSentForReviewWithItsQuestion(t *t
 	all := getAllTeamArtifacts(t, srv, "", http.StatusOK)
 	assert.ElementsMatch(t, []string{"report.md", "run.log"}, names(all.Artifacts), "the plain file is still listed, with no review")
 }
+
+// A single agent's file for review names its agent in Needs you (#18131: "sender unknown" beside "Uploaded by first-agent" in Artifacts).
+func TestTheFileOfAnAgentWithoutATeamNamesItsAgent(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	coralDir := t.TempDir()
+	h.SetTaskArtifactWriter(coralDir, nil)
+	r := chi.NewRouter()
+	r.Get("/api/team-artifacts", h.ListAllTeamArtifacts)
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	id := storeManagedArtifact(t, coralDir, "# plan\n", true, true)
+	dir := uploadsDir(coralDir, "solo-1")
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	rec, _ := json.Marshal(agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: "plan.md", MediaType: "text/markdown", Size: 7, Digest: "sha256:" + id}, CreatedAt: "2026-10-09T10:00:00Z", Uploader: "first-agent"})
+	require.NoError(t, os.WriteFile(filepath.Join(dir, id+".json"), rec, 0o644))
+
+	got := getAllTeamArtifacts(t, srv, "", http.StatusOK)
+	require.Len(t, got.Artifacts, 1)
+	require.NotNil(t, got.Artifacts[0].ProducedBy, "the row names its agent")
+	assert.Equal(t, "first-agent", *got.Artifacts[0].ProducedBy)
+}

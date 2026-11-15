@@ -110,6 +110,42 @@ func uploaderTeamChecked(sessionID string) (string, error) {
 // uploaderLabelMax bounds each recorded label; one that is longer or holds a control or formatting character is dropped, never stored.
 const uploaderLabelMax = 160
 
+// uploaderFolderLookup says the working folder of a session; nil records none.
+var uploaderFolderLookup func(ctx context.Context, sessionID string) string
+
+// SetUploaderFolderLookup gives the upload paths the lookup of a session's working folder.
+func SetUploaderFolderLookup(fn func(ctx context.Context, sessionID string) string) {
+	uploaderFolderLookup = fn
+}
+
+// NewUploaderFolderLookup is the server's lookup: the live session's working folder.
+func NewUploaderFolderLookup(ss *store.SessionStore) func(ctx context.Context, sessionID string) string {
+	return func(ctx context.Context, sessionID string) string {
+		if ss == nil {
+			return ""
+		}
+		ls, err := ss.GetLiveSession(ctx, sessionID)
+		if err != nil || ls == nil {
+			return ""
+		}
+		return ls.WorkingDir
+	}
+}
+
+// uploaderFolderOf is the working folder of sessionID, or "" when it cannot be told or is not a clean label.
+func uploaderFolderOf(sessionID string) string {
+	if uploaderFolderLookup == nil || sessionID == "" {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	f := uploaderFolderLookup(ctx, sessionID)
+	if !board.ValidLabel(f, 1024) {
+		return ""
+	}
+	return f
+}
+
 // uploaderOf is what the record of an upload by sessionID says about who made it. It never waits long and never fails the upload: no answer is no fields.
 func uploaderOf(sessionID string) (boardID, name, role string) {
 	if uploaderLookup == nil || sessionID == "" {
@@ -131,6 +167,9 @@ func uploaderOf(sessionID string) (boardID, name, role string) {
 func newUploadRecord(meta agentArtifactMeta, sessionID, uploadedBy, source string) agentUploadRecord {
 	b, n, r := uploaderOf(sessionID)
 	rec := agentUploadRecord{agentArtifactMeta: meta, CreatedAt: time.Now().UTC().Format(time.RFC3339), UploadedBy: uploadedBy, Source: source, Board: b, Uploader: n, Role: r}
+	if b == "" && n != "" {
+		rec.Folder = uploaderFolderOf(sessionID)
+	}
 	owner := recordOwnerOf(sessionID, uploadedBy)
 	rec.OwnerKind, rec.OwnerID = owner.Kind, owner.ID
 	return rec

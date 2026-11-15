@@ -142,6 +142,7 @@ func NewWithKey(cfg *config.Config, db *store.DB, backend ptymanager.TerminalBac
 	}
 	if db != nil {
 		routes.SetUploaderLookup(routes.NewUploaderLookup(store.NewSessionStore(db), boardStore))       // each upload records its board, agent and role
+		routes.SetUploaderFolderLookup(routes.NewUploaderFolderLookup(store.NewSessionStore(db)))       // an agent on no team keeps its files across a restart by name and folder (#18131)
 		routes.SetUploaderTeamCheck(routes.NewUploaderTeamCheck(store.NewSessionStore(db), boardStore)) // the one decision that must not guess: a file for review needs to know the team (#13527) (#5575)
 		routes.SetArtifactCircle(routes.NewArtifactCircle(store.NewSessionStore(db), boardStore))       // the one artifact read check: an agent reads what its team's owner owns (#5577)
 	}
