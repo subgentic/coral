@@ -246,7 +246,7 @@ function drawStatus(data) {
     // every task done, none open, nobody working and nothing needs the person: not the same as "All well" while the team is still at it (walk 21 H2, #15304)
     const total = data.agents.length;
     const finished = !shown && !unknown && S.counts.tasks === 0 && S.tasksDone > 0 && data.agents.every(a => !['busy','needs_input','waiting'].includes(a.availability));
-    const text = paused ? 'Paused' : uncertainAttention ? 'Checking' : asleep ? 'Asleep' : wakingNow ? `Waking · ${total - unknown} of ${total} ready` : shown ? `${shown} ${shown === 1 ? 'needs' : 'need'} attention` : unknown ? (unknown === total ? 'No first message yet' : `${total - unknown} of ${total} ready`) : finished ? 'Finished: your turn' : 'All well';
+    const text = paused ? 'Paused' : uncertainAttention ? 'Checking' : asleep ? 'Asleep' : wakingNow ? `Waking · ${total - unknown} of ${total} ready` : shown ? `${shown} ${shown === 1 ? 'needs' : 'need'} attention` : unknown ? (unknown === total ? 'No agent has sent a first message yet' : `${total - unknown} of ${total} ready`) : finished ? 'Finished: your turn' : 'All well';
     // When agents need attention the visible status is a button to the Agents tab (beside the live region, which keeps saying it and is then only for a screen reader: the button's name is not announced twice); "All well" is plain text.
     const b = $('team-page-health');
     if (b) {
