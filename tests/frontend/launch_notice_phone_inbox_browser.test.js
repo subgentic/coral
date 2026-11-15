@@ -39,7 +39,7 @@ const TRACK = `(() => { const t = window.__jump = { tops: [], noticeAt: -1 };
             await Page.navigate({ url: BASE + '/inbox/needs' }); await Page.loadEventFired(); await install();
             if (pass === 2) check((w <= 600 ? /^p\|\d+$/ : /^d\|\d+$/).test(await ev(`localStorage.getItem('coral-launch-notice') || ''`)), `${at}the notice's height is kept as the hint after the first load`);
             check(await ev(`document.documentElement.hasAttribute('data-launch-notice')`), `${at}the room is reserved before first paint on a cold load of /inbox/needs`);
-            await waitFor(`!!document.getElementById('launch-disclosure-banner') && (window.__jump && w <= 600 ? window.__jump.noticeAt >= 0 && window.__jump.tops.length >= window.__jump.noticeAt + 3 : true)`, `${at}the notice on a cold load of /inbox/needs`, 15000);
+            await waitFor(`!!document.getElementById('launch-disclosure-banner') && (window.__jump && ${w <= 600} ? window.__jump.noticeAt >= 0 && window.__jump.tops.length >= window.__jump.noticeAt + 3 : true)`, `${at}the notice on a cold load of /inbox/needs`, 15000);
             await waitFor(`document.body.getAttribute('data-nav-tab') === 'hub-inbox' && !!document.querySelector('#group-table-view > .inbox-folder-toolbar')`, `${at}the Inbox's heading`, 10000);
             if (mobile && process.env.CORAL_SCREENSHOT_DIR) for (const theme of ['dark', 'light']) { // the shots: the phone's Inbox with the notice, both themes
                 await ev(`import((window.__coralStatic || '/static/') + 'settings_core.js').then(m => m.applyTheme('${theme}')).then(() => true)`);
