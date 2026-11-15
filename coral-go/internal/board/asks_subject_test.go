@@ -216,3 +216,22 @@ func TestCloseOvertakenAsks_AutoLinkedStaysOpen(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, closed, "auto-linked ask stays open")
 }
+
+// #17338: an ask with --goal only has its task auto-filled from the claimed task; the row is explicit=false
+// because only the goal was named. Completing the auto-filled task must not close the ask.
+func TestCloseOvertakenAsks_GoalOnlyWithAutoFilledTask(t *testing.T) {
+	s, ctx := askBoard(t)
+	task, err := s.CreateTask(ctx, "alpha", "Claimed work", "", "medium", "Lead", "Dev A")
+	require.NoError(t, err)
+
+	q := askPost(t, s, ctx, "Lead", "@Dev B should we create a goal?", true, 0)
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 7, task.ID, false))
+
+	n, err := s.CloseOvertakenAsks(ctx, "alpha", task.ID, 0, "Overtaken: task completed")
+	require.NoError(t, err)
+	assert.Equal(t, 0, n, "goal-only ask with auto-filled task must not be closed")
+
+	closed, err := s.AskIsClosed(ctx, "alpha", q.ID)
+	require.NoError(t, err)
+	assert.False(t, closed, "ask stays open because the task link was not explicit")
+}
