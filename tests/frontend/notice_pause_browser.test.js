@@ -1,6 +1,6 @@
 // Pause Coral's messages to one agent (#11388, the UI of Lead's per-agent notice pause): the chat header has ONE toggle ("Pause Coral messages", aria-pressed, 44 px on a touch screen); pressing it asks the server to pause
 // (POST .../notices/pause) and the bar above the composer says "Coral's messages are paused while you talk. N waiting." with the time left and a Resume button; Resume (the bar's or the toggle) asks to resume. A row with
-// notices_holding says "Coral's messages wait until you stop typing" quietly. A sleeping agent has no control. The routes are a stub (notice_pause.js `api`) until Lead's real shape is posted. 1280 and 390 px, light and dark.
+// notices_holding says "Coral's messages wait a minute after you type" quietly (the server holds them 60 s after any input of the person's: a keystroke, a sent message or a Stop, #17788). A sleeping agent has no control. The routes are a stub (notice_pause.js `api`) until Lead's real shape is posted. 1280 and 390 px, light and dark.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
@@ -56,7 +56,7 @@ const S = `(window.__coralStatic || '/static/')`;
             assert.ok(!v.bar && v.text === '', `${tag}: the person typing with nothing waiting says nothing (#12713, not a standing line): ` + JSON.stringify(v));
             await feed({ notices_holding: true, board_unread: 2 });
             v = await view();
-            assert.ok(v.bar && v.text === "Coral's messages wait until you stop typing" && !v.resume && v.pressed === 'false', `${tag}: the auto-hold with a message waiting is a quiet hint, with no Resume: ` + JSON.stringify(v));
+            assert.ok(v.bar && v.text === "Coral's messages wait a minute after you type" && !v.resume && v.pressed === 'false', `${tag}: the auto-hold with a message waiting is a quiet hint, with no Resume: ` + JSON.stringify(v));
             await feed({ notices_holding: true, board_unread: 0 });
             v = await view();
             assert.ok(!v.bar, `${tag}: delivered, the hint goes: ` + JSON.stringify(v));
