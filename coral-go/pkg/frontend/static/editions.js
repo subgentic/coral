@@ -276,7 +276,7 @@ document.addEventListener('coral:cloud-status', e => {
     const title = document.createElement('strong');
     title.textContent = 'Coral Hub moved';
     const text = document.createElement('span');
-    text.textContent = `Connect this computer again${host ? ` at ${host}` : ''}: run coral cloud connect --force on this computer.`;
+    text.textContent = `Connect this computer again${host ? ` at ${host}` : ''}.`;
     copy.replaceChildren(title, ' ', text); // the space keeps the two apart for a screen reader
     copy.dataset.moved = '1';
 });

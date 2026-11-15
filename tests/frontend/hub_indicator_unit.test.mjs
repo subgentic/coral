@@ -17,8 +17,8 @@ assert.equal(indicatorState({ state: 'idle', last_error_code: 'code_expired' }),
 // A failed attempt to enroll again has its own code, and hub_moved keeps the signal (#3546).
 const failed = { state: 'idle', hub_moved: true, last_error_code: 'rate_limited', hub_url: 'https://app.coralhub.dev', last_error: 'Coral Hub is busy: try again in 1m30s' };
 assert.equal(indicatorState(failed), 'disconnected');
-assert.equal(indicatorLabel(failed, 'disconnected', new Date()), 'Coral Hub moved to app.coralhub.dev: run coral cloud connect --force');
-assert.equal(indicatorLabel(moved, 'disconnected', new Date()), 'Coral Hub moved to app.coralhub.dev: run coral cloud connect --force', 'the fixed message, the new host only');
+assert.equal(indicatorLabel(failed, 'disconnected', new Date()), 'Coral Hub moved to app.coralhub.dev: click to connect again');
+assert.equal(indicatorLabel(moved, 'disconnected', new Date()), 'Coral Hub moved to app.coralhub.dev: click to connect again', 'the fixed message, the new host only');
 assert.equal(indicatorState(null), null);
 
 assert.equal(hubHost('https://app.coralhub.dev'), 'app.coralhub.dev');
