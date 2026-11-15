@@ -175,7 +175,7 @@ func TestReviewFlowRejection(t *testing.T) {
 	assert.Equal(t, "rejected", got.Workflow.ReviewRounds[0].Result)
 	assert.Equal(t, "unsafe default", got.Workflow.ReviewRounds[0].Reviewers[0].Note)
 	qa, _ := h.bs.GetTask(ctx, "rej", qaReview)
-	assert.Equal(t, "pending", qa.Status, "the other reviewer's review task stays open")
+	assert.Equal(t, "skipped", qa.Status, "the other reviewer's review task is closed with the round (#17948), and reopens with the next")
 	assert.Equal(t, 1, qa.Workflow.ReviewRound, "a review task records its round (#3805)")
 	code, out = postCode(t, base(task.ID, "approve"), map[string]any{"subscriber_id": "QA Engineer"})
 	assert.Equal(t, http.StatusBadRequest, code)

@@ -425,6 +425,11 @@ func (s *Store) reviewVerdictAt(ctx context.Context, project string, id int64, a
 	if err := concludeRound(ctx, tx, project, id, &w, round, approve, v); err != nil {
 		return nil, err
 	}
+	if !approve {
+		if err := skipOtherReviewTasks(ctx, tx, project, id, round, me.ReviewTaskID, actor); err != nil {
+			return nil, err
+		}
+	}
 	if err := saveWorkflow(ctx, tx, id, w); err != nil {
 		return nil, err
 	}
@@ -522,6 +527,22 @@ func concludeRound(ctx context.Context, tx *sqlx.Tx, project string, id int64, w
 	v.Complete = true
 	for _, r := range round.Reviewers {
 		v.Approvers = append(v.Approvers, r.Reviewer)
+	}
+	return nil
+}
+
+// skipOtherReviewTasks (#17948): a rejection ends the round, so the other reviewers' review tasks for it, still open, are skipped with the reason instead of being offered: a second reviewer claimed a review of a
+// piece the first had already rejected (#17937). A resubmission reopens every reviewer's task for the next round (reopenReviews), so nothing is lost. A task already done (a verdict given) is left as it is.
+func skipOtherReviewTasks(ctx context.Context, tx *sqlx.Tx, project string, id int64, round *ReviewRound, mine int64, actor string) error {
+	note := fmt.Sprintf("#%d round %d was rejected by %s: this review is no longer needed (it is offered again if #%d is resubmitted)", id, round.Round, actor, id)
+	for _, r := range round.Reviewers {
+		if r.ReviewTaskID == 0 || r.ReviewTaskID == mine || r.State != "pending" {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE board_tasks SET status='skipped', completed_by=?, completion_message=?, completed_at=?
+			WHERE id=? AND board_id=? AND status IN ('pending','in_progress')`, actor, note, nowUTC(), r.ReviewTaskID, project); err != nil {
+			return err
+		}
 	}
 	return nil
 }
