@@ -138,9 +138,8 @@ func (a *ClaudeAgent) LaunchCommand(params LaunchParams) (string, error) {
 	parts = appendPermissionMode(parts, params, true)
 
 	if sys := claudeSystemText(params); sys != "" {
-		arg := files.promptArg("claude_sys", effectiveID, "md", "", sys)
-		raw = append(raw, arg)
-		parts = append(parts, "--append-system-prompt", arg)
+		// A file, not the text on the command line: Windows limits a command line to 32 KB and a team's text plus a long brief passes it (#18098).
+		parts = append(parts, "--append-system-prompt-file", files.write("claude_sys", effectiveID, "md", []byte(sys)))
 	}
 
 	// Pass the prompt as a CLI positional argument so the agent starts immediately
@@ -298,9 +297,6 @@ func (a *ClaudeAgent) PrintArgs(params LaunchParams) (args []string, settingsFil
 	}
 	args = []string{"--print", "--no-session-persistence", "--settings", settingsFile}
 	args = append(args, params.Flags...)
-	if sys := claudeSystemText(params); sys != "" {
-		args = append(args, "--append-system-prompt", sys)
-	}
 	return appendPermissionMode(args, params, false), settingsFile, nil
 }
 

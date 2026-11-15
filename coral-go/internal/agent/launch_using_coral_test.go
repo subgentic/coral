@@ -97,3 +97,19 @@ func TestATeamAgentCarriesTheCompiledInProtocolWithNoProtocolFile(t *testing.T) 
 	has(t, got, "dev copy of the protocol", "a file that reads wins")
 	lacks(t, got, "# Coral Agent Protocol", "the file replaces the compiled-in text, it is not added to it")
 }
+
+// #18098: Claude Code does not read systemPrompt from a settings file: the launch carries Coral's text in a file named by --append-system-prompt-file (a file, not argv: Windows limits the line to 32 KB).
+func TestClaudeLaunchCarriesTheSystemPromptInAFileFlag(t *testing.T) {
+	p := LaunchParams{SessionID: "11111111-2222-3333-4444-555555555556", CoralDir: t.TempDir(), WorkingDir: t.TempDir(), SessionName: "claude-11111111-2222-3333-4444-555555555556", EmbeddedProtocol: true, BoardName: "team-x", Role: "Developer", Prompt: strings.Repeat("a long brief ", 4000)}
+	cmd, err := GetAgent("claude").LaunchCommand(p)
+	require.NoError(t, err)
+	require.Contains(t, cmd, "--append-system-prompt-file ")
+	assert.NotContains(t, cmd, "--append-system-prompt ", "the text is not on the command line")
+	assert.Less(t, len(cmd), 8000, "the line does not grow with the text")
+	m := regexp.MustCompile(`--append-system-prompt-file '?([^' ]+)`).FindStringSubmatch(cmd)
+	require.Len(t, m, 2, cmd)
+	b, err := os.ReadFile(m[1])
+	require.NoError(t, err)
+	assert.Contains(t, string(b), "CORAL_SESSION_ID: 11111111-2222-3333-4444-555555555556")
+	assert.Contains(t, string(b), "coral-board")
+}
