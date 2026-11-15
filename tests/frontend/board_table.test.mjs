@@ -22,6 +22,11 @@ assert.equal(snippetOf('## Report 7\n\nA table:\n\n| name | value |\n|------|---
 
 assert.deepEqual(taskRefs('See #7740, #7757 and #7740 again; not C#, not a#b, not http://x/#12, not #123456789'), ['7740', '7757']);
 assert.deepEqual(taskRefs('```\n#99\n```'), []);
+// #17339: a message number is not a task: "Open task #25" opened the message. A number after "task" comes first; one after message / msg / post / reply / comment is skipped.
+assert.deepEqual(taskRefs('Replying to message #25: task #2 is done'), ['2'], 'the task, not the message');
+assert.deepEqual(taskRefs('see msg #25 and #7'), ['7'], 'a bare number still counts, a msg number does not');
+assert.deepEqual(taskRefs('Reply to #25 about #4, then task #2'), ['2', '4'], 'a task-named number leads');
+assert.deepEqual(taskRefs('post #3'), [], 'only a message number: no task');
 
 const t = tagsOf({ content: 'Question for @Backend Dev and @QA Engineer and @Orchestrator: @Operator #7757', ask: { open: ['Backend Dev'] } });
 assert.deepEqual(t.mentions.map(m => m.name), ['Backend Dev', 'QA Engineer', 'Orchestrator', 'Operator']); assert.equal(t.task, '7757'); assert.equal(t.ask, true); assert.equal(t.mine, true);
