@@ -71,7 +71,10 @@ func (h *SessionsHandler) launchCommand(ctx context.Context, ag agent.Agent, p a
 	// Every launch, restart, wake and resume builds its command here: a custom permission mode (#15950) is resolved to its flags at this one place, checked again (a row edited in the database never
 	// reaches the command), and a mode that is gone or no longer passes starts the agent in Default.
 	if _, custom := custommodes.IDOf(p.PermissionMode); custom {
-		extra, _ := h.customModeFlags(ctx, ag.AgentType(), p.PermissionMode)
+		extra, note := h.customModeFlags(ctx, ag.AgentType(), p.PermissionMode)
+		if note != "" && p.SessionID != "" {
+			h.noteWake(p.SessionID, note) // the restart, wake or resume tells the person why the agent is in Default (#16624); a launch has already told them itself
+		}
 		p.PermissionMode = "default"
 		if extra != nil {
 			p.Flags = append(append([]string{}, p.Flags...), extra...)

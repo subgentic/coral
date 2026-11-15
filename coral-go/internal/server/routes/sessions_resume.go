@@ -65,9 +65,11 @@ func (h *SessionsHandler) Resume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.resumeRecord(ctx, p, body.SessionID)
-	writeJSON(w, http.StatusOK, map[string]any{
-		"ok": true, "session_id": p.newSessionID, "session_name": p.newSessionName,
-	})
+	out := map[string]any{"ok": true, "session_id": p.newSessionID, "session_name": p.newSessionName}
+	if note := takeWakeNote(p.newSessionID); note != "" {
+		out["custom_mode_note"] = note // its custom permission mode is gone or no longer passes: it started in Default (#16624)
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // resumeRequest is a Resume request: the conversation to resume, and the live session it replaces.

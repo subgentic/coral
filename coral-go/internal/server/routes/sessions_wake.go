@@ -378,7 +378,14 @@ func (h *SessionsHandler) finishWake(ctx context.Context, ls *store.LiveSession,
 var wakeNotes sync.Map
 
 // noteWake keeps what the wake of session sid has to tell the person, for the reply (takeWakeNote).
-func (h *SessionsHandler) noteWake(sid, note string) { wakeNotes.Store(sid, note) }
+func (h *SessionsHandler) noteWake(sid, note string) {
+	if old, ok := wakeNotes.Load(sid); ok { // two things to tell: both are said
+		if o, _ := old.(string); o != "" && o != note {
+			note = o + "; " + note
+		}
+	}
+	wakeNotes.Store(sid, note)
+}
 
 // takeWakeNote is what the wake of sid had to tell, once; "" when nothing.
 func takeWakeNote(sid string) string {

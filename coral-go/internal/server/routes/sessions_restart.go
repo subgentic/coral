@@ -154,6 +154,9 @@ func (h *SessionsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 	if plan.modeNotRecorded {
 		out["mode_note"] = "Its mode was not recorded: restarted in Default"
 	}
+	if note := takeWakeNote(plan.newSessionID); note != "" {
+		out["custom_mode_note"] = note // its custom permission mode is gone or no longer passes: it started in Default (#16624)
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 
