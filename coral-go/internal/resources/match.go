@@ -110,7 +110,7 @@ var plainFilters = map[string]bool{"cd": true, "tail": true, "head": true, "grep
 // and a matched command anywhere in it is enough to match). False when the line cannot be read.
 func OnlyMatched(command string, patterns []string) bool {
 	cmds, ok := shellkill.Programs(command)
-	if !ok || len(cmds) == 0 {
+	if !ok || len(cmds) == 0 || hasFileRedirect(command) {
 		return false
 	}
 	hit := false
@@ -120,7 +120,7 @@ func OnlyMatched(command string, patterns []string) bool {
 		}
 		matched := false
 		for _, p := range patterns {
-			if want := strings.Fields(p); len(want) > 0 && inOrder(words, want) {
+			if want := strings.Fields(p); len(want) > 0 && words[0] == want[0] && inOrder(words, want) { // the matched program starts the command: `env -S '...' go test` and `sudo go test` do not count (#17709)
 				matched = true
 				break
 			}
@@ -135,4 +135,49 @@ func OnlyMatched(command string, patterns []string) bool {
 		}
 	}
 	return hit
+}
+
+// hasFileRedirect reports whether the line redirects to or from a file: `> out`, `>> out`, `2> err`, `< in`, or a here-document. A redirect would be made on the other machine, in a run folder that is deleted afterwards, not
+// where the agent asked, and `> /etc/...` is written there as the run's user. Only `2>&1` (and `N>&M`) and a redirect to /dev/null stay (#17709). A quoted < or > is text, not a redirect.
+func hasFileRedirect(command string) bool {
+	rs := []rune(command)
+	var quote rune
+	for i := 0; i < len(rs); i++ {
+		c := rs[i]
+		switch {
+		case quote != 0:
+			if c == quote {
+				quote = 0
+			} else if c == '\\' && quote == '"' {
+				i++
+			}
+		case c == '\'' || c == '"':
+			quote = c
+		case c == '\\':
+			i++
+		case c == '<' || c == '>':
+			j := i + 1
+			for j < len(rs) && (rs[j] == '>' || rs[j] == '|') { // >>, >|, <<
+				j++
+			}
+			if c == '<' && j < len(rs) && rs[j] == '(' || c == '>' && j < len(rs) && rs[j] == '(' {
+				return true // process substitution
+			}
+			if c == '>' && j < len(rs) && rs[j] == '&' { // 2>&1, >&2: one stream into another
+				k := j + 1
+				if k < len(rs) && rs[k] >= '0' && rs[k] <= '9' {
+					i = k
+					continue
+				}
+				return true // >&file
+			}
+			rest := strings.TrimLeft(string(rs[j:]), " \t")
+			if c == '>' && (rest == "/dev/null" || strings.HasPrefix(rest, "/dev/null ") || strings.HasPrefix(rest, "/dev/null\t")) {
+				i = j
+				continue
+			}
+			return true
+		}
+	}
+	return false
 }

