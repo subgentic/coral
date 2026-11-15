@@ -5,7 +5,6 @@ import './hooks_review.js';
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
 import { escapeHtml, showToast, copyText } from './utils.js';
-import { loadStyles } from './lazy_styles.js';
 import './actions.js';
 import './platform/detect.js';
 import './xterm_renderer.js';
@@ -118,14 +117,8 @@ document.addEventListener("click", async (e) => {
 });
 
 // #16701: tap a reply bubble to reveal its copy button; tap elsewhere to hide it.
-loadStyles('copy_reveal.css');
-document.addEventListener("click", (e) => {
-    const bubble = e.target.closest && e.target.closest(".chat-bubble.assistant");
-    for (const old of document.querySelectorAll(".chat-bubble.copy-revealed")) {
-        if (old !== bubble) old.classList.remove("copy-revealed");
-    }
-    if (bubble && !bubble.classList.contains("copy-revealed")) bubble.classList.add("copy-revealed");
-});
+const _cr = import('./copy_reveal.js');
+document.addEventListener("click", (e) => { _cr.then(m => m.reveal(e.target)); });
 
 // The intent: pointer over, touch or keyboard focus on the Terminal button (it exists in the page from the start).
 for (const type of ["pointerover", "touchstart", "focusin"]) {
