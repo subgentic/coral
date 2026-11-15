@@ -1,7 +1,6 @@
-/* The New agent recap's phone toggle (#18082): lazy, loaded by launch_recap.js, not at start. The button is [hidden] until this sheet shows it on a phone. */
-.launch-recap-wrap{flex:none;position:relative}
+/* The New agent recap's phone toggle (#18082): lazy, loaded by launch_recap.js, not at start. The dialog opens only after this sheet has loaded, so the button is hidden here and shown on a phone. */
+.launch-recap-wrap{flex:none;position:relative}.launch-recap-toggle{display:none}
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     #launch-recap:not([hidden]){padding-right:56px;-webkit-line-clamp:1;display:-webkit-box;overflow:hidden;max-height:none}#launch-recap:not([data-open]) .launch-recap-note{display:none}#launch-recap[data-open]{display:block;max-height:45dvh;overflow-y:auto}
     .launch-recap-toggle{font-size:var(--fs-2xl);display:inline-flex;position:absolute;top:0;right:4px;min-width:44px;min-height:44px;align-items:center;justify-content:center}.launch-recap-toggle::before{content:'\25B4'}#launch-recap[hidden]+.launch-recap-toggle{display:none}#launch-recap[data-open]+.launch-recap-toggle::before{transform:rotate(180deg)}
-    .launch-recap-toggle[hidden]{display:inline-flex}
 }
