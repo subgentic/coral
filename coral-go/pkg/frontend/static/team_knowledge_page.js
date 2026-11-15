@@ -178,7 +178,7 @@ function draw() {
     if (model.failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, model.failed), btn('btn btn-small', 'Retry', () => load())); body.append(f); }
     if (model.loading) body.append(el('p', 'goals-note', 'Loading knowledge…'));
     else if (model.refused) body.append(emptyLine('This team’s knowledge is too large to show through Coral Hub; open it on the computer.'));
-    else if (!entries.length) { if (!model.failed) body.append(everything.length ? emptyLine('No entries match this search.') : emptyLine('No knowledge yet.', 'Distill knowledge reads the team’s work and writes what each agent learned.')); }
+    else if (!entries.length) { if (!model.failed) body.append(everything.length ? emptyLine('No entries match this search.') : emptyLine('No knowledge yet.', 'Distill knowledge reads the team’s work and writes what each agent learned. Run it when a goal is done.')); }
     else {
         body.append(DT.dataTable({
             label: `Knowledge, ${entries.length}`, rows: entries, rowKey: e => e.key, current: detailKey(), state: knowledgeTableState,

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -24,7 +25,9 @@ import (
 
 // KnowledgeBundle holds the OKF output for a team.
 type KnowledgeBundle struct {
-	TeamName  string                   `json:"team_name"`
+	TeamName string `json:"team_name"`
+	// TeamTitle is what the documents call the team: TeamName is a board id for a team made from a folder (b-kcvwz7n4h7), which a person should not read (#17544).
+	TeamTitle string                   `json:"-"`
 	CreatedAt string                   `json:"created_at"`
 	Agents    map[string]*AgentConcept `json:"agents"`
 	Links     []KnowledgeLink          `json:"links"`
@@ -151,11 +154,55 @@ Here are the team collaboration patterns:
 %s`
 
 func inferRole(prompt string) string {
-	lower := strings.ToLower(prompt)
-	if strings.Contains(lower, "orchestrat") || strings.Contains(lower, "coordinator") {
+	if selfIsOrchestrator.MatchString(prompt) {
 		return "orchestrator"
 	}
 	return "worker"
+}
+
+// selfIsOrchestrator: the prompt says the agent itself is one. A worker's prompt names the Orchestrator it reports to, which made it one in the index (#17544).
+var selfIsOrchestrator = regexp.MustCompile(`(?i)\b(you are|you're|you will be|your role is)\s+(the|an?)\s+(team\s+)?(lead\s+)?(orchestrator|coordinator)`)
+
+// knowledgeTeamTitle is teamTitle with the team's folder looked up (ts may be nil).
+func knowledgeTeamTitle(ctx context.Context, ts *store.TeamStore, teamName string) string {
+	if ts != nil {
+		if team, _ := ts.GetTeam(ctx, teamName); team != nil {
+			return teamTitle(teamName, team.WorkingDir)
+		}
+	}
+	return teamTitle(teamName, "")
+}
+
+var boardIDName = regexp.MustCompile(`^b-[a-z0-9]{6,}$`)
+
+// teamTitle is the team's name as a person reads it: a board id (a team made from a folder has no name of its own) becomes the folder's name, or "This team" with none (#17544).
+func teamTitle(name, workingDir string) string {
+	if !boardIDName.MatchString(name) {
+		return name
+	}
+	if base := filepath.Base(strings.TrimRight(workingDir, "/\\")); workingDir != "" && base != "." && base != "/" && base != "" {
+		return base
+	}
+	return "This team"
+}
+
+var frontMatterStart = regexp.MustCompile(`(?m)^---[ \t]*\n(?:[^\n]*\n){0,6}?type:`)
+
+// cleanKnowledgeDoc is the document a model wrote and nothing it said about writing it (#17544): what comes before the front matter (an apology, "here it is") goes, and so does the code
+// fence round the document. Words with no front matter in them are no document: "" (the caller assembles one from the extracted knowledge instead).
+func cleanKnowledgeDoc(s string) string {
+	loc := frontMatterStart.FindStringIndex(s)
+	if loc == nil {
+		return ""
+	}
+	fenced := strings.Contains(s[:loc[0]], "```")
+	out := s[loc[0]:]
+	if fenced {
+		if i := strings.LastIndex(out, "```"); i >= 0 && strings.TrimSpace(out[i+3:]) == "" {
+			out = strings.TrimRight(out[:i], " \t\n") + "\n"
+		}
+	}
+	return out
 }
 
 // DistillTeamKnowledge runs the three-pass knowledge distillation pipeline for a team.
@@ -178,6 +225,7 @@ func DistillTeamKnowledge(ctx context.Context, ss *store.SessionStore, ts *store
 
 	bundle := &KnowledgeBundle{
 		TeamName:  teamName,
+		TeamTitle: knowledgeTeamTitle(ctx, ts, teamName),
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 		Agents:    make(map[string]*AgentConcept),
 	}
@@ -309,6 +357,10 @@ func distillAgents(bundle *KnowledgeBundle, agents []agentMeta, call func(prompt
 // distillAgentsWith is distillAgents with the place the finished bundle goes: the team's live knowledge for a person's run, a candidate beside it for an automatic one (#13928).
 func distillAgentsWith(bundle *KnowledgeBundle, agents []agentMeta, call func(prompt, content string) (string, error), coralDir string, write func(coralDir string, bundle *KnowledgeBundle) error, progressFn func(DistillProgress)) (*KnowledgeBundle, error) {
 	teamName := bundle.TeamName
+	shown := bundle.TeamTitle
+	if shown == "" {
+		shown = teamName
+	}
 	total := len(agents)
 
 	// ── Pass 1: Individual agent knowledge extraction ──
@@ -403,17 +455,17 @@ func distillAgentsWith(bundle *KnowledgeBundle, agents []agentMeta, call func(pr
 		tags := fmt.Sprintf("%s, %s, %s", a.role, teamName, slug)
 
 		prompt := fmt.Sprintf(pass3Prompt,
-			a.name, a.role, teamName,
-			a.name, a.name, teamName,
+			a.name, a.role, shown,
+			a.name, a.name, shown,
 			tags, now,
 			concept.Pass1Raw, collabResult)
 
 		result, err := call(prompt, "")
-		if err != nil {
+		if doc := cleanKnowledgeDoc(result); err != nil || doc == "" {
 			// Fallback: assemble OKF manually from pass1+pass2
-			concept.FinalMD = assembleOKFFallback(a.name, a.role, teamName, now, concept.Pass1Raw, collabResult)
+			concept.FinalMD = assembleOKFFallback(a.name, a.role, shown, now, concept.Pass1Raw, collabResult)
 		} else {
-			concept.FinalMD = result
+			concept.FinalMD = doc
 		}
 	}
 
@@ -695,8 +747,12 @@ func writeKnowledgeBundle(coralDir string, bundle *KnowledgeBundle) error {
 // buildIndexMD generates the OKF index document for the team.
 func buildIndexMD(teamName, timestamp string, agents []agentMeta, bundle *KnowledgeBundle) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "---\ntype: Team Knowledge Bundle\ntitle: %s\n", teamName)
-	fmt.Fprintf(&b, "description: Distilled institutional knowledge for team %s\n", teamName)
+	shown := bundle.TeamTitle
+	if shown == "" {
+		shown = teamName
+	}
+	fmt.Fprintf(&b, "---\ntype: Team Knowledge Bundle\ntitle: %s\n", shown)
+	fmt.Fprintf(&b, "description: Distilled institutional knowledge for %s\n", shown)
 
 	var tagParts []string
 	for _, a := range agents {
@@ -705,7 +761,7 @@ func buildIndexMD(teamName, timestamp string, agents []agentMeta, bundle *Knowle
 	fmt.Fprintf(&b, "tags: [%s]\n", strings.Join(tagParts, ", "))
 	fmt.Fprintf(&b, "timestamp: %s\n---\n\n", timestamp)
 
-	fmt.Fprintf(&b, "# %s — Team Knowledge\n\n", teamName)
+	fmt.Fprintf(&b, "# %s — Team Knowledge\n\n", shown)
 	fmt.Fprintf(&b, "Auto-distilled from agent session histories.\n\n")
 
 	fmt.Fprintf(&b, "## Agents\n\n")
