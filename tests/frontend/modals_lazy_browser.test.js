@@ -129,6 +129,7 @@ const BASE = require('./test_base').BASE;
         const nStatic = reqs.slice(before).filter(u => /\/static\//.test(u)).length;
         assert.ok(!reqs.slice(before).some(u => /\/review_counts\.js/.test(u)), 'startup\'s deferred review counts are not counted as Settings\' files (#14928): ' + JSON.stringify(reqs.slice(before).filter(u => /\/static\//.test(u)).map(u => new URL(u).pathname)));
         assert.ok(nStatic <= 24, 'opening Settings loads at most 24 static files (46 before): ' + nStatic + ' ' + JSON.stringify(reqs.slice(before).filter(u => /\/static\//.test(u)).map(u => new URL(u).pathname)));
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#settings-tabs .settings-nav-label')].map(e => e.textContent)`), ['You', 'Agents', 'This computer', 'Access'], 'Settings grouping remains available without a separate lazy request');
         await escape();
         console.log('   ✓ Settings opens on its own module, ' + nStatic + ' static files, none of the launch, team or wizard dialogs');
 
