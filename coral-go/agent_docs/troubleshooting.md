@@ -339,16 +339,19 @@ nothing rather than as an error.
 
 ### A scheduled job says "not a git repository"
 
-The folder you chose for the job is not a git repository (or git cannot find it). Coral
-needs a git repository for scheduled jobs so it can create a worktree for each run and
-track file changes. To fix it:
+The folder you chose for the job is not a git repository (or git cannot find it). By
+default Coral creates a worktree for each run, which requires a git repository. To fix it:
 
-- Make sure the path in the job's **Repository** field is the full path to a folder that
+- Make sure the path in the job's **Folder** field is the full path to a folder that
   contains a `.git` directory (or is inside one). Open a terminal and run `git -C <path>
   rev-parse --git-dir` — if it prints an error, the folder is not a git repository.
-- If the folder is a project you have not put under git yet, run `git init` in it first.
-- If the folder moved or was deleted, update the job's **Repository** field to the new
-  path, or recreate the folder.
+- If the folder is a project you have not put under git yet, run `git init` in it — or
+  click the **Make it a repository** button the form offers when it detects this.
+- If the folder moved or was deleted, update the job's **Folder** field to the new path,
+  or recreate the folder.
+- If the job does not need git history or isolated worktrees, turn on
+  **Run in the folder itself, without a worktree** in the job form. The folder can then be
+  any directory, not a git repository. Runs that overlap will share it.
 
 ### Scheduled job runs and `git worktree add`
 

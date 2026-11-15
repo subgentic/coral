@@ -257,7 +257,7 @@ function renderDocNav() {
         || (docsList.length || docsLoaded ? `<li class="empty-state empty-state-tight">${docsList.length ? (docsQuery && !docTextReady ? 'Searching the topics\u2026' : 'No topic matches. Try other words, or clear the search.') : 'No documentation found.'}</li>` : ''); // a build with none says so in the list too: a phone shows the list, not the content pane (#10266)
     syncPaneGroupToggle('docs');
     if (docsQuery && !selectedDoc && !isPhoneLayout()) {
-        showView('docs-view'); // a search's results are in the sidebar; the right pane says "Pick a result", not a group table (#17151)
+        if (document.body.getAttribute('data-nav-tab') === 'docs') showView('docs-view'); // a search's results are in the sidebar; the right pane says "Pick a result", not a group table (#17151)
         const pane = document.getElementById('docs-content');
         if (pane) pane.innerHTML = emptyHtml('Pick a result');
     } else {
