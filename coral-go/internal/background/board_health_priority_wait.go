@@ -32,8 +32,8 @@ func priorityWord(p string) string {
 	return "High"
 }
 
-// priorityWaitItems names each agent that has a High (or Critical) task waiting while it works on a lower-priority task, both for over priorityWaitAfter. A task counts from its last change (a
-// reassignment included), the work in hand from its claim. Numbers and names only; it changes nothing.
+// priorityWaitItems names each agent that has a High (or Critical) task waiting while it works on a lower-priority task, both for over priorityWaitAfter. A waiting task counts from when it was filed (the board keeps no time
+// for a priority change), the work in hand from its claim. Numbers and names only; it changes nothing.
 func priorityWaitItems(tasks []board.Task, now time.Time) []teamhealth.Item {
 	type inHand struct {
 		id   int64
@@ -65,10 +65,7 @@ func priorityWaitItems(tasks []board.Task, now time.Time) []teamhealth.Item {
 		if !busy || cur.rank >= priorityRank(t.Priority) {
 			continue
 		}
-		at, ok := parseTime(t.UpdatedAt)
-		if !ok {
-			at, ok = parseTime(t.CreatedAt)
-		}
+		at, ok := parseTime(t.CreatedAt) // from when it was filed: an edit to the waiting task (its text, a reassignment) does not restart the 30 minutes and hide the stall (#18095)
 		if !ok || now.Sub(at) <= priorityWaitAfter {
 			continue
 		}
