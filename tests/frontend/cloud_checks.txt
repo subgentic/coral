@@ -434,3 +434,4 @@ node inbox_last_seen.test.mjs
 node open_link.test.mjs
 
 node pending_kept_receipts.test.mjs
+node launch_disclosure_modes.test.mjs
