@@ -83,9 +83,9 @@ export function dismissGettingStarted() {
 }
 
 /** An item's own action. */
-export function runWelcome(id) {
+export async function runWelcome(id) {
     if (id === 'welcome') { mark('welcome'); return; }
-    if (id === 'agent' || id === 'team') { window.showLaunchModal?.(); window._selectLaunchType?.(id); return; }
+    if (id === 'agent' || id === 'team') { await window.showLaunchModal?.(); await window._selectLaunchType?.(id); return; }
     if (id === 'connect') { window.switchNavTab?.('servers'); return; }
     if (id === 'guide') { importOnce('./artifact_viewer.js').then(m => m.openBundledDocument({ title: 'Getting started with Coral', name: 'getting-started.md', url: GUIDE_URL, onOpened: () => mark('guide') })); return; } // the guide (about 400 KB with its pictures) is fetched when the row is opened, never at start (page_weight)
     if (id === 'asks') importOnce('./welcome_asks.js').then(m => m.readAsks(WELCOME.asks.title, () => mark('asks'))); // the long read arrives when it is opened, not at start (page_weight)
