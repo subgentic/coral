@@ -135,6 +135,10 @@ func (h *SystemHandler) PutSettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
+// pageKeptSettings are the settings the dashboard writes for itself, not as a person's change (#17574): the first-launch answer marked when the person had already connected, and a notice remembered as shown. A save of
+// only these is no row; the header the Welcome cards send (AutoSaveHeader) cannot be added to these callers without growing the page's start code.
+var pageKeptSettings = map[string]bool{"welcome_choice": true, "welcome_pending": true, "received_cap_notice_ack": true}
+
 // noteSettingChange asks for a "Changed settings" row naming the settings saved (their names, never their values: a value may be a path or a secret), unless the request already asked for an inbox_hide row (#16972).
 func noteSettingChange(r *http.Request, values map[string]string) {
 	if p, _ := r.Context().Value(activityPendingKey{}).(*activityPending); p != nil && p.set {
@@ -142,7 +146,9 @@ func noteSettingChange(r *http.Request, values map[string]string) {
 	}
 	names := make([]string, 0, len(values))
 	for k := range values {
-		names = append(names, k)
+		if !pageKeptSettings[k] {
+			names = append(names, k)
+		}
 	}
 	sort.Strings(names)
 	if len(names) == 0 {

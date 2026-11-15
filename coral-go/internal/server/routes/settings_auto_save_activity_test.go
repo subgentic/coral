@@ -77,6 +77,28 @@ func TestASettingsSaveByAPersonIsARowThatNamesTheSettingsOnly(t *testing.T) {
 	assert.False(t, put(true).set, "the page's own save is not a row")
 }
 
+// #17574: the settings the page keeps for itself (the first-launch answer, a notice remembered as shown) are no "Changed settings" row, alone or beside a person's change, which is named without them.
+func TestSettingsThePageKeepsForItselfAreNotARow(t *testing.T) {
+	put := func(body string) *activityPending {
+		db, err := storetest.Open(t, filepath.Join(t.TempDir(), "c.db"))
+		require.NoError(t, err)
+		defer db.Close()
+		pend := &activityPending{}
+		r := httptest.NewRequest(http.MethodPut, "/api/settings", strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
+		r = r.WithContext(context.WithValue(r.Context(), activityPendingKey{}, pend))
+		rec := httptest.NewRecorder()
+		NewSystemHandler(db, nil).PutSettings(rec, r)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		return pend
+	}
+	assert.False(t, put(`{"welcome_choice":"connected","welcome_pending":"False"}`).set, "the first-launch answer marked by the page")
+	assert.False(t, put(`{"received_cap_notice_ack":"1048576"}`).set, "a notice remembered as shown")
+	mixed := put(`{"theme":"dark","received_cap_notice_ack":"1048576"}`)
+	require.True(t, mixed.set)
+	assert.Equal(t, "theme", mixed.note, "a person's change beside them is named alone")
+}
+
 // #16972: Sleep and Wake of one agent are rows, after they happened.
 func TestSleepingAndWakingOneAgentAreRows(t *testing.T) {
 	cfg := config.Load(t.TempDir())
