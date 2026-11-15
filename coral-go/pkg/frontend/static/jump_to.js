@@ -20,7 +20,7 @@ const team = tab => () => window.openTeamPage(here(), { tab });
 const COMMANDS = () => [
     ['Settings', () => window.showSettingsModal()], ['New agent', () => window.showLaunchModal() || window._selectLaunchType?.('agent')], ['New team', () => window.showLaunchModal() || window._selectLaunchType?.('team')],
     ['Go to Inbox', go('hub-inbox')], ['Go to Agents', go('agents')], ['Go to Automations', go('automations')], ['Go to Docs', go('docs')], ['Show or hide the sidebar', () => window.toggleSidebarRail()],
-    ['Search all chats', searchAllChats], ['Keyboard shortcuts', showShortcuts],
+    ['Search all chats', searchAllChats], ['Keyboard shortcuts (?)', showShortcuts],
     ...(here() ? [['Goals', 'goals'], ['Tasks', 'tasks'], ['Messages', 'messages'], ['Agents', 'agents'], ['Artifacts', 'artifacts']].map(([n, t]) => [`${keyLabel(here())}: ${n}`, team(t)]) : []),
 ].map(([text, open]) => ({ label: text, open }));
 
