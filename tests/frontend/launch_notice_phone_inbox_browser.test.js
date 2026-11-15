@@ -24,7 +24,7 @@ const TRACK = `(() => { const t = window.__jump = { tops: [], noticeAt: -1 };
     const where = () => ev(`(() => { const n = document.getElementById('launch-disclosure-banner'); if (!n) return { none: true }; const p = n.parentElement, prev = n.previousElementSibling; return { inPane: p && p.id === 'group-table-view', underHeading: !!prev && prev.classList.contains('inbox-folder-toolbar'), underBar: !!prev && (prev.id === 'local-auth-banner' || prev.matches('header.top-bar')), count: document.querySelectorAll('#launch-disclosure-banner').length }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [w, h, touch] of [[390, 844, true], [700, 900, false], [1280, 800, false]]) {
+        for (const [w, h, touch] of [[390, 844, true], [700, 900, true], [1280, 800, false]]) {
             const mobile = w <= 767; // the layout's own phone breakpoint (phone_layout.js), which placeNotice and the reserved room both follow
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: touch }); await Emulation.setTouchEmulationEnabled({ enabled: touch });
