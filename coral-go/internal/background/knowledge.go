@@ -540,7 +540,9 @@ func knowledgeTeamDir(coralDir, teamName string) (string, error) {
 	if !ValidKnowledgeTeam(teamName) {
 		return "", ErrBadKnowledgeTeam
 	}
-	return filepath.Join(coralDir, "agent_knowledge", teamName), nil
+	dir := filepath.Join(coralDir, "agent_knowledge", teamName)
+	keepLegacyAgentFilesAgentFiles(dir)
+	return dir, nil
 }
 
 // ReadKnowledgeBundle reads an existing knowledge bundle from disk.
