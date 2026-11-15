@@ -62,9 +62,10 @@ func enforceFlagSetters(funcs map[string]map[string]string) map[string]bool {
 	return setters
 }
 
+// callsAny: the body names a setter, called or passed as a function value (#17550: run(t, enableEnforce) sets the flag too). A same-named non-setter over-flags, the safe direction.
 func callsAny(body string, names map[string]bool) bool {
 	for n := range names {
-		if regexp.MustCompile(`\b` + regexp.QuoteMeta(n) + `\(`).MatchString(body) {
+		if regexp.MustCompile(`\b` + regexp.QuoteMeta(n) + `\b`).MatchString(body) {
 			return true
 		}
 	}
@@ -118,12 +119,14 @@ func TestEnforceFlagGuardFollowsHelpers(t *testing.T) {
 		"func TestOneLevelIsCaught(t *testing.T) {\n\tt.Parallel()\n\tenableEnforce(t)\n}\n\n" +
 		"func TestTwoLevelsAreCaught(t *testing.T) {\n\tt.Parallel()\n\tdeeperHelper(t)\n}\n\n" +
 		"func TestAMethodHelperIsCaught(t *testing.T) {\n\tt.Parallel()\n\te := &env{}\n\te.viaMethod(t)\n}\n\n" +
+		"func TestAFunctionValueIsCaught(t *testing.T) {\n\tt.Parallel()\n\trunWith(t, enableEnforce)\n}\n\n" +
 		"func TestSerialMayUseTheHelper(t *testing.T) {\n\tenableEnforce(t)\n}\n\n" +
 		"func TestSerialParentWithParallelSubtests(t *testing.T) {\n\tenableEnforce(t)\n\tt.Run(\"a\", func(t *testing.T) {\n\t\tt.Parallel()\n\t})\n}\n\n" +
 		"func TestParallelThatSetsNothing(t *testing.T) {\n\tt.Parallel()\n\tunrelated(t)\n}\n\n" +
 		"func unrelated(t *testing.T) {}\n"
 	got := parallelEnforceFlagOffenders(map[string]string{"mutant_test.go": src})
 	assert.Equal(t, []string{
+		"mutant_test.go: TestAFunctionValueIsCaught",
 		"mutant_test.go: TestAMethodHelperIsCaught",
 		"mutant_test.go: TestDirectIsCaught",
 		"mutant_test.go: TestOneLevelIsCaught",
