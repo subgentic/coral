@@ -3911,7 +3911,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 @container (max-width: 40em) { .launch-note-slot { min-height: 3.8em; } }
 @container (max-width: 17em) { .launch-note-slot { min-height: 5.6em; } }
 /* ── New team, three steps (#7407): the New Agent shell with the team's own pages ─────────────────────────────────────────────────────────────── */
-.team-wizard[data-stage="team"] .team-page:not(.team-page-team), .team-wizard[data-stage="members"] .team-page:not(.team-page-members), .team-wizard[data-stage="start"] .team-page:not(.team-page-start) { display: none; }
+.team-wizard[data-stage=team] .team-page:not(.team-page-team), .team-wizard[data-stage=members] .team-page:not(.team-page-members), .team-wizard[data-stage=start] .team-page:not(.team-page-start) { display: none; }
 .team-wizard .team-page { padding: 20px 24px; }
 .team-wizard .team-page-start.team-page { flex: 1; min-height: 0; display: flex; padding: 0; }
 .team-page-start .launch-shell, #team-start-host { flex: 1; min-width: 0; min-height: 0; display: flex; }

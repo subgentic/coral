@@ -50,6 +50,6 @@ export function showTeamStep(step, { focus = false } = {}) {
     document.dispatchEvent(new CustomEvent('team-step-shown', { detail: { step } }));
     if (focus) {
         const first = { team: '#team-board-name', members: '#team-template-select' }[step];
-        (step === 'start' ? document.getElementById('team-goal') || document.querySelector('#launch-step-team .settings-tab[aria-selected="true"]') : document.querySelector(first))?.focus();
+        (step === 'start' ? document.getElementById('team-goal') : document.querySelector(first))?.focus();
     }
 }
