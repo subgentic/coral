@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -88,8 +89,40 @@ const (
 	stateUnknown
 )
 
-// findUnlanded keeps the successful, completed tasks of the window whose head commit is not on the ref. detail reads one task in full; landed asks git. Oldest first.
-func findUnlanded(tasks []map[string]any, since time.Time, ref string, detail func(id int64) (map[string]any, error), landed func(sha string) landedState) ([]unlandedTask, error) {
+// landedCheck is what findUnlanded asks of git (nil funcs say no). A head on the ref by ancestry is landed; so is one whose commits all came onto the ref as picks (a cherry-pick or a rebase changes the SHA
+// and not the patch: Picked) and one the ref's log names (a trial's "Merge <sha> into the trial (#N)": Named). Picked and Named are asked only when the ancestry says no (#18373).
+type landedCheck struct {
+	Landed func(sha string) landedState
+	Picked func(sha string) bool
+	Named  func(id int64) bool
+}
+
+var approvedSHARe = regexp.MustCompile(`(?i)\bapproved\s+([0-9a-f]{7,40})\b`)
+
+// approvedSHA is the commit the last approval named ("Approved <sha>" in a reviewer's note of the latest round that ended approved): what was approved, which is what must reach the release, not the first
+// head a submit named (#18373). "" when no verdict names one.
+func approvedSHA(d map[string]any) string {
+	wf, _ := d["workflow"].(map[string]any)
+	rounds, _ := wf["review_rounds"].([]any)
+	for i := len(rounds) - 1; i >= 0; i-- {
+		r, _ := rounds[i].(map[string]any)
+		if res, _ := r["result"].(string); res != "approved" {
+			continue
+		}
+		revs, _ := r["reviewers"].([]any)
+		for j := len(revs) - 1; j >= 0; j-- {
+			rv, _ := revs[j].(map[string]any)
+			note, _ := rv["note"].(string)
+			if m := approvedSHARe.FindStringSubmatch(note); m != nil && hasLetterAndDigit(m[1]) {
+				return strings.ToLower(m[1])
+			}
+		}
+	}
+	return ""
+}
+
+// findUnlanded keeps the successful, completed tasks of the window whose head commit is not on the ref. detail reads one task in full; check asks git. The head is the SHA of the last approval, else of the latest submit (#18373). Oldest first.
+func findUnlanded(tasks []map[string]any, since time.Time, ref string, detail func(id int64) (map[string]any, error), check landedCheck) ([]unlandedTask, error) {
 	var out []unlandedTask
 	for _, t := range tasks {
 		if s, _ := t["status"].(string); s != "completed" {
@@ -118,19 +151,28 @@ func findUnlanded(tasks []map[string]any, since time.Time, ref string, detail fu
 			continue
 		}
 		cr, _ := wf["completion_review"].(map[string]any)
-		msg, _ := cr["message"].(string)
-		reason, _ := cr["reason"].(string)
-		sha := headSHAFromText(msg, reason)
-		switch {
-		case sha == "":
+		sha := approvedSHA(d)
+		if sha == "" {
+			msg, _ := cr["message"].(string)
+			reason, _ := cr["reason"].(string)
+			sha = headSHAFromText(msg, reason)
+		}
+		if sha == "" {
 			out = append(out, unlandedTask{ID: id, Title: title, Why: "no head SHA recorded"})
-		default:
-			switch landed(sha) {
-			case stateNotLanded:
-				out = append(out, unlandedTask{ID: id, SHA: sha, Title: title, Why: "not on " + ref})
-			case stateUnknown:
-				out = append(out, unlandedTask{ID: id, SHA: sha, Title: title, Why: "commit not in this repository (git fetch it)"})
-			}
+			continue
+		}
+		state := check.Landed(sha)
+		if state != stateLanded && check.Named != nil && check.Named(id) {
+			continue // the ref's log names the task: it came in as a merge or a pick
+		}
+		if state == stateNotLanded && check.Picked != nil && check.Picked(sha) {
+			continue // every commit of its range is on the ref under another SHA
+		}
+		switch state {
+		case stateNotLanded:
+			out = append(out, unlandedTask{ID: id, SHA: sha, Title: title, Why: "not on " + ref})
+		case stateUnknown:
+			out = append(out, unlandedTask{ID: id, SHA: sha, Title: title, Why: "commit not in this repository (git fetch it)"})
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
@@ -152,6 +194,82 @@ func gitLanded(dir, ref string) func(sha string) landedState {
 			return stateNotLanded
 		}
 		return stateUnknown
+	}
+}
+
+var subjectTaskRe = regexp.MustCompile(`#(\d+)\b`)
+
+// gitChecks is gitLanded plus the two ways a pick shows on the ref (#18373), both read-only.
+//   - Named: the task numbers in the subject lines of the ref's commits (a trial's merge subject carries "(#18082)"); only subjects, so a body that says "follows #17452" does not land #17452.
+//   - Picked: every commit of ref..sha (merges left out) has the patch-id (git patch-id --stable) of some commit between the merge-base and the ref. A range with no patch at all is not a pick.
+func gitChecks(dir, ref string) landedCheck {
+	run := func(stdin []byte, args ...string) (string, bool) {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		cmd := gitutil.Command(ctx, dir, args...)
+		if stdin != nil {
+			cmd.Stdin = bytes.NewReader(stdin)
+		}
+		out, err := cmd.Output()
+		return string(out), err == nil
+	}
+	patchIDs := func(logArgs ...string) (map[string]bool, bool) {
+		log, ok := run(nil, append([]string{"log", "--no-merges", "-p", "--format=%H", "--max-count=5000"}, logArgs...)...)
+		if !ok {
+			return nil, false
+		}
+		out, ok := run([]byte(log), "patch-id", "--stable")
+		ids := map[string]bool{}
+		for _, line := range strings.Split(out, "\n") {
+			if f := strings.Fields(line); len(f) >= 1 {
+				ids[f[0]] = true
+			}
+		}
+		return ids, ok
+	}
+	var named map[int64]bool
+	onRef := map[string]map[string]bool{} // by merge-base
+	return landedCheck{
+		Landed: gitLanded(dir, ref),
+		Named: func(id int64) bool {
+			if named == nil {
+				named = map[int64]bool{}
+				if out, ok := run(nil, "log", "--format=%s", "--max-count=20000", ref); ok {
+					for _, line := range strings.Split(out, "\n") {
+						for _, m := range subjectTaskRe.FindAllStringSubmatch(line, -1) {
+							if n, err := strconv.ParseInt(m[1], 10, 64); err == nil {
+								named[n] = true
+							}
+						}
+					}
+				}
+			}
+			return named[id]
+		},
+		Picked: func(sha string) bool {
+			mb, ok := run(nil, "merge-base", sha, ref)
+			if !ok {
+				return false
+			}
+			mb = strings.TrimSpace(mb)
+			mine, ok := patchIDs(ref + ".." + sha)
+			if !ok || len(mine) == 0 {
+				return false
+			}
+			if onRef[mb] == nil {
+				ids, ok := patchIDs(mb + ".." + ref)
+				if !ok {
+					return false
+				}
+				onRef[mb] = ids
+			}
+			for id := range mine {
+				if !onRef[mb][id] {
+					return false
+				}
+			}
+			return true
+		},
 	}
 }
 
@@ -223,7 +341,7 @@ func cmdTaskUnlanded(st *boardState, args []string) {
 		var m map[string]any
 		return m, json.Unmarshal(data, &m)
 	}
-	rows, err := findUnlanded(fetchTasks(st, 0), time.Now().Add(-window), ref, detail, gitLanded(repo, ref))
+	rows, err := findUnlanded(fetchTasks(st, 0), time.Now().Add(-window), ref, detail, gitChecks(repo, ref))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Unable to read tasks: "+err.Error())
 		clierr.Exit1()
