@@ -20,7 +20,8 @@ function add(msg) {
 }
 
 export function mount(root) {
-    for (const m of root.querySelectorAll('.mb-table .mb-message')) add(m);
+    const sel = root.classList?.contains('mb-table') ? '.mb-message' : '.mb-table .mb-message';
+    for (const m of root.querySelectorAll(sel)) add(m);
 }
 
 new MutationObserver(muts => {

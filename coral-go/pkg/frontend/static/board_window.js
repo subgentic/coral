@@ -356,6 +356,7 @@ export function renderMessages(messages, { keepAnchor = false, prepended = 0 } =
     }
     syncDays(container);
     refreshReplies(container);
+    loadedModule('./board_quick_reply.js')?.mount(container);
     if (earlierFocused) {
         // The button again, or with every message loaded the count line, so focus doesn't drop to the page.
         const next = container.querySelector(':scope > .mb-load-earlier button');
@@ -426,6 +427,7 @@ export function appendNewMessages(count) {
     if (wasAtBottom) trimBoardWindow(container);
     syncDays(container);
     refreshReplies(container);
+    loadedModule('./board_quick_reply.js')?.mount(container);
     updateBoardHeader(container);
     highlightBoard(container);
     if (wasAtBottom) container.scrollTop = container.scrollHeight;
