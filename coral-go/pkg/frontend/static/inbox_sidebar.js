@@ -1198,9 +1198,7 @@ async function openChat(c) {
     if (isGroup) { const { historyServer } = await importOnce('./history_source.js'); openItemRoute('boards', identityKey(c.server || historyServer(), c.title || String(c.session_id).replace(/^board:/, '')), null, c.session_id); return; }
     const live = (state.liveSessions || []).find(s => s.session_id === c.session_id && normServer(sessionServer(s)) === normServer(c.server || LOCAL_SERVER)); // an agent this computer has running now: its chat is the live one, with the message box (#12654); the history view is a transcript only
     if (live) { openInAgents(live); return; }
-    const { setHistorySource } = await importOnce('./history_source.js');
-    if (!setHistorySource(c.server || 'local')) return;
-    window.selectHistorySession?.(c.session_id, null, c);
+    return CH.openHistory(c);
 }
 
 /** A Hub page in the centre (Needs you, Tasks, Saved for later): one iframe, its address a constant from HUB_FRAMES, never built from a URL, a hash or a message; nothing is posted to it or read from it, so the

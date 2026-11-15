@@ -99,6 +99,8 @@ func (s *SessionStore) CountChatFolders(ctx context.Context, boards []string) (*
  UNION ALL
  SELECT ls.session_id,ls.agent_type,0,0,1,0,0 FROM live_sessions ls WHERE ls.status='active' AND ls.is_archived=1 AND NOT EXISTS (SELECT 1 FROM session_index si WHERE si.session_id=ls.session_id) -- an archived agent with no chat yet is in Archived too (#10654)
  UNION ALL
+ SELECT sr.session_id,COALESCE(j.agent_type,'claude'),0,0,0,CASE WHEN sr.status='failed' THEN 0 ELSE 1 END,0 FROM scheduled_runs sr LEFT JOIN scheduled_jobs j ON j.id=sr.job_id WHERE ` + untrackedRunWhere + ` -- a run whose agent never wrote a line is a chat too (#17447)
+ UNION ALL
  SELECT 'board:'||b.value,'board',1,COALESCE(cf.starred,0),COALESCE(cf.archived,0),
  EXISTS(SELECT 1 FROM live_sessions ls WHERE ls.board_name=b.value AND ls.status='active' AND ls.is_sleeping=0 AND ls.is_archived=0 AND ls.pid>0),0
  FROM json_each(?) b LEFT JOIN chat_flags cf ON cf.session_id='board:'||b.value
