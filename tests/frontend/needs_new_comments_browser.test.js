@@ -65,6 +65,7 @@ const { coralReady } = require('./helpers/wait');
                 const decided = await rowInfo('Decided file.txt'), waiting = await rowInfo('Replied file.txt');
                 assert.ok(!decided.metaSaysReview && decided.metaSaysApproved !== false && !decided.approve && !decided.changes, 'an approved file with a new comment says Approved (not For review) in its line, and asks for no new decision: ' + JSON.stringify(decided));
                 assert.ok(waiting.review && waiting.approve && waiting.changes && !waiting.metaSaysApproved, 'a file still waiting for review keeps For review, Approve and Request changes: ' + JSON.stringify(waiting));
+                assert.ok(await ev(`(() => { const t = [...(${row('Replied file.txt')}).querySelectorAll('.inbox-new-comments')].find(x => /new comments?/.test(x.textContent)); return !!t && t.scrollWidth <= t.clientWidth + 1; })()`), 'the badge is whole, not cut to New comme... (#17454)');
                 assert.ok(!(await marker('Quiet file.txt')), 'a file with no news carries no marker');
                 assert.ok(await ev(`(() => { const r = ${row('Replied file.txt')}; return r.classList.contains('dt-unread') && !r.classList.contains('dt-read') && /unread/.test(r.querySelector('.inbox-review-item .sr-only').textContent); })()`), 'the row is unread again');
                 assert.equal(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].filter(r => /Replied file/.test(r.textContent)).length`), 1, 'one row, not a second item');
