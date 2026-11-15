@@ -25,7 +25,8 @@ const idle = (over = {}) => ({ enabled: true, installed: '2.0.70', state: 'none'
                 if (p === '/api/cloud/status') return Promise.resolve(new Response(JSON.stringify({ connected: false }), { status: 200, headers: { 'content-type': 'application/json' } }));
                 return R(u, o); }; return true; })()`);
 
-        // open the Updates pane
+        // refresh the cached status from the stub, then open the Updates pane
+        await ev(`import(${S} + 'update_ui.js').then(m => m.refreshUpdateStatus()).then(() => true)`);
         await ev(`window.showSettingsModal('updates'); import(${S} + 'update_settings.js').then(m => m.showUpdatesPane()).then(() => true)`);
         await settle(300);
 

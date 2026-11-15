@@ -12,7 +12,8 @@ const { coralReady } = require('./helpers/wait');
 // Keep the old section budgets plus the words in those authored lines (HELP_LINES /
 // HINTS); long explanations remain in Docs and never inflate the dialog.
 const BEFORE = { 'Network and Hub':186, Agents:269, 'Storage and cleanup':151, Terminal:70, General:39, Notifications:72, 'Files and Git':40, 'Security and privacy':59 };
-const HELP_WORDS = { 'Network and Hub':80, Agents:73, 'Storage and cleanup':21, Terminal:16, General:6, 'Files and Git':8, 'Security and privacy':17 };
+// #17538: Storage and cleanup +22 (Local backup heading, the data-folder path, Copy path button, and the one-line backup note)
+const HELP_WORDS = { 'Network and Hub':80, Agents:73, 'Storage and cleanup':43, Terminal:16, General:6, 'Files and Git':8, 'Security and privacy':17 };
 const BUDGET = Object.fromEntries(Object.entries(BEFORE).map(([k,v])=>[k,v+(HELP_WORDS[k]||0)]));
 
 (async () => {
