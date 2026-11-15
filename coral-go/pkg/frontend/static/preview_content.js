@@ -10,6 +10,7 @@ export function _fileName(filepath) {
     return i === -1 ? filepath : filepath.substring(i + 1);
 }
 
+/** Rendered HTML (sandboxed), formatted Markdown, or highlighted source. */
 export function _renderContentView(body, content, filepath, line, interpretHtml) {
     if (interpretHtml && /\.html?$/i.test(filepath)) {
         _renderSandboxedPreview(body, content, filepath);
@@ -20,24 +21,24 @@ export function _renderContentView(body, content, filepath, line, interpretHtml)
 
     if (lang === 'markdown' && typeof marked !== 'undefined') {
         const html = marked.parse(content);
+        // A workspace file can be agent-written: its links follow the file policy (#3542).
         const safe = sanitizeHtml(html, DOMPURIFY_CONFIG, { links: 'file', headings: 2 });
         body.innerHTML = `<div class="prose preview-pane-markdown">${safe}</div>`;
-        importOnce('./preview_front_matter.js').then(m => m.show(body, content)).catch(() => {});
         keepFragmentsInside(body);
-        if (line > 0) _scrollToLine(body, content, line);
-        return;
+        importOnce('./preview_front_matter.js').then(m => m.show(body, content)).catch(() => {}); // the front matter as a key/value header (#16651)
+    } else {
+        body.innerHTML = `<pre class="preview-pane-code"><code class="language-${lang}">${escapeHtml(content)}</code></pre>`;
+        // Plain first; coloured once highlight.js has loaded (plain if it cannot).
+        const block = body.querySelector('pre code');
+        if (block) loadHighlight().then(h => { if (block.isConnected) h.highlightElement(block); }, () => {});
     }
-
-    body.innerHTML = `<pre class="preview-pane-code"><code class="language-${lang}">${escapeHtml(content)}</code></pre>`;
-    const block = body.querySelector('pre code');
-    if (block) loadHighlight().then(h => { if (block.isConnected) h.highlightElement(block); }, () => {});
     if (line > 0) _scrollToLine(body, content, line);
 }
 
 function _renderSandboxedPreview(body, content, filepath) {
     const frame = document.createElement('iframe');
     frame.className = 'preview-pane-iframe';
-    frame.setAttribute('aria-label', `Preview of ${_fileName(filepath)}`); // a title would be a ghost tooltip
+    frame.setAttribute('aria-label', `Preview of ${_fileName(filepath)}`); // the frame's name for a screen reader; a title would show as a tooltip over the content (a ghost tooltip)
     frame.setAttribute('sandbox', '');
     frame.referrerPolicy = 'no-referrer';
     frame.srcdoc = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'">${content}`;
