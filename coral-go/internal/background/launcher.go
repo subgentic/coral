@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/logsafe"
 	"log/slog"
@@ -265,6 +266,12 @@ func (l *AgentLauncher) launchAgent(ctx context.Context, workingDir, agentType, 
 	}, nil
 }
 
+// promptNotTypedCode is the run's fixed error_code when its first prompt was never typed, and promptNotTypedMsg the one sentence (#17520).
+const (
+	promptNotTypedCode = "prompt_not_typed"
+	promptNotTypedMsg  = "The job's prompt was never typed: the agent stayed on a question (such as trusting the folder) or was not ready for it. Run the job again and answer the question when it shows in Needs you."
+)
+
 // promptStartWait bounds how long SendPrompt waits for the agent CLI to take the
 // foreground of its terminal after the initial delay.
 var promptStartWait = 30 * time.Second
@@ -306,21 +313,54 @@ func (l *AgentLauncher) SendPrompt(ctx context.Context, sessionID, sessionName, 
 	// its normal input box: a freshly started CLI may be on its trust-this-folder
 	// screen or a login or model picker, and the prompt plus Enter would answer
 	// it. Held until the user deals with that screen.
-	if _, err := deliverAutomated(ctx, l.runtime, l.logger, sessionName, agentType, sessionID, prompt, "initial prompt", ptymanager.InputBoxKnown(agentType), false); err != nil {
-		l.logger.Warn("prompt send failed", "session", sessionID[:8], "error", err)
+	// A first prompt is not repeated by anything: when the gate does not type it (its look was blocked: a question still open, the agent's process not yet recorded, a person's send in flight), it is
+	// asked again until it is typed or promptGiveUp passes, never dropped after one try (#17520: a job whose agent was answered at its trust screen stayed 'Running...' with its prompt never typed).
+	giveUp := time.Now().Add(promptGiveUp)
+	for {
+		skipped, err := deliverAutomated(ctx, l.runtime, l.logger, sessionName, agentType, sessionID, prompt, "initial prompt", ptymanager.InputBoxKnown(agentType), false)
+		if err != nil {
+			l.logger.Warn("prompt send failed", "session", sessionID[:8], "error", err)
+			return nil
+		}
+		if !skipped {
+			return nil
+		}
+		if time.Now().After(giveUp) {
+			l.logger.Warn("the first prompt was never typed: the agent was not ready for it", "session", sessionID[:8])
+			return errPromptNotTyped
+		}
+		select {
+		case <-time.After(promptRetryEvery):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
-
-	return nil
 }
+
+// errPromptNotTyped: the first prompt could not be typed within promptGiveUp.
+var errPromptNotTyped = errors.New("the first prompt could not be typed")
+
+// promptRetryEvery is how often a first prompt the gate did not type is offered again, and promptGiveUp how long in all (variables for the tests).
+var (
+	promptRetryEvery = 5 * time.Second
+	promptGiveUp     = 15 * time.Minute
+)
 
 // startPromptDelivery sends prompt in the background and returns a channel that closes when the
 // delivery is over. It runs on ctx, so cancelling ctx (the run ended) ends it too.
 func (l *AgentLauncher) startPromptDelivery(ctx context.Context, sessionID, sessionName, agentType, prompt string) <-chan struct{} {
+	return l.startPromptDeliveryReporting(ctx, sessionID, sessionName, agentType, prompt, nil)
+}
+
+// startPromptDeliveryReporting is startPromptDelivery that calls gaveUp when the prompt could not be typed in the time given.
+func (l *AgentLauncher) startPromptDeliveryReporting(ctx context.Context, sessionID, sessionName, agentType, prompt string, gaveUp func(error)) <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
 		defer safego.Recover("background/launcher:startPromptDelivery")
 		defer close(done)
-		_ = l.SendPrompt(ctx, sessionID, sessionName, agentType, prompt)
+		if err := l.SendPrompt(ctx, sessionID, sessionName, agentType, prompt); errors.Is(err, errPromptNotTyped) && gaveUp != nil {
+			gaveUp(err)
+		}
 	}()
 	return done
 }
@@ -348,12 +388,25 @@ func (l *AgentLauncher) BuildSchedulerLaunchFn(schedStore *store.ScheduleStore) 
 
 		// Send prompt to the agent after delay, on the run's own context: when the run ends the
 		// delivery (and an initial prompt held for a screen nobody answers) ends with it (#3999).
+		gaveUp := make(chan error, 1)
 		if !oneShot { // a one-shot run has its prompt on the command line
-			l.startPromptDelivery(ctx, result.SessionID, result.SessionName, job.AgentType, job.Prompt)
+			l.startPromptDeliveryReporting(ctx, result.SessionID, result.SessionName, job.AgentType, job.Prompt, func(err error) { gaveUp <- err })
 		}
 
-		// Monitor the tmux session — return when agent finishes or context expires
-		return l.watchSession(ctx, result.SessionName)
+		// Monitor the tmux session — return when agent finishes or context expires; or when the prompt could not be typed: the run is failed with the reason, not left 'Running...' (#17520)
+		wctx, stop := context.WithCancel(ctx)
+		defer stop()
+		watched := make(chan error, 1)
+		go func() { watched <- l.watchSession(wctx, result.SessionName) }()
+		select {
+		case err := <-watched:
+			return err
+		case err := <-gaveUp:
+			schedStore.UpdateScheduledRun(context.Background(), runID, map[string]interface{}{"error_msg": promptNotTypedMsg, "error_code": promptNotTypedCode})
+			_ = l.runtime.KillAgent(context.Background(), result.SessionName)
+			stop()
+			return err
+		}
 	}
 }
 

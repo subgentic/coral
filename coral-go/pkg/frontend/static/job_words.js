@@ -154,7 +154,7 @@ export function exitNote(run) { const r = run && run.exit_reason; return (r && E
 const unseen = run => !!run && run.status === 'completed' && run.exit_reason === 'ended_while_coral_was_down';
 const restarted = run => !!run && run.status === 'failed' && run.exit_reason === 'interrupted_by_restart';
 // A run that failed before its agent did anything (#7025, from #7016): the exit_reason is the code, the server's own sentence is in error_msg. The status says which in a few words; error_msg is the line under it.
-const START_FAILS = { agent_never_started: 'never started', start_command_failed: "couldn't start the agent", agent_exited_before_start: 'agent exited at once' };
+const START_FAILS = { agent_never_started: 'never started', start_command_failed: "couldn't start the agent", agent_exited_before_start: 'agent exited at once', prompt_not_typed: "couldn't type the prompt" };
 const startFail = run => (run && run.status === 'failed' && START_FAILS[run.exit_reason]) || '';
 /** The line under a run's status where the status words do not already carry it: the server's error for a run that failed to start, else the exit_reason's sentence when the run has no error of its own. */
 export function resultLine(run) { return startFail(run) ? reasonWords(run) : (!reasonWords(run) ? exitNote(run) : ''); }

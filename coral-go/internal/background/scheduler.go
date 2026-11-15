@@ -604,6 +604,9 @@ func (s *JobScheduler) launchAndWatch(runID int64, job store.ScheduledJob, rc ru
 		exitReason = startCommandFailedCode
 		s.store.UpdateScheduledRun(ctx, runID, map[string]interface{}{"error_msg": ptymanager.ErrStartCommand.Error(), "error_code": startCommandFailedCode})
 	}
+	if status == "failed" && errors.Is(launchErr, errPromptNotTyped) { // the sentence and code are on the run (the launcher recorded them); the code is its reason too (#17520)
+		exitReason = promptNotTypedCode
+	}
 	if status == "completed" && s.exitedBeforeStarting(ctx, runID, job, time.Now().UTC().Format(store.ISOFormat), startedAt) {
 		status, exitReason = "failed", agentExitedEarlyCode // the sentence is in error_msg (exitedBeforeStarting)
 	}
