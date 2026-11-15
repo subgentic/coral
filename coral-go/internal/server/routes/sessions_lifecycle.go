@@ -228,14 +228,31 @@ func (h *SessionsHandler) Attach(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A test or isolated server (its data folder is not ~/.coral) never opens a Terminal on the desktop: an agent that starts one to try the dashboard would put a window in front of the person (#17810).
+	if isolatedDataDir(h.cfg.CoralDir()) && os.Getenv("CORAL_ALLOW_DESKTOP_TERMINAL") != "1" {
+		writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "code": "isolated_server", "error": "This Coral runs on its own data folder (a test or isolated server), so it does not open a Terminal window on the desktop. The agent's terminal is in the dashboard. Set CORAL_ALLOW_DESKTOP_TERMINAL=1 to allow it."})
+		return
+	}
+
 	// Open Terminal.app attached to the tmux session (macOS)
 	attachCmd := h.terminal.AttachCommand(pane.SessionName)
 	go func() {
 		defer safego.Recover("server/routes/sessions_lifecycle:840")
-		_ = executil.Run(osascriptTimeout, "osascript", terminalAttachArgs(attachCmd)...)
+		openDesktopTerminal(attachCmd)
 	}()
 
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// openDesktopTerminal opens Terminal.app running command; a variable so a test can see whether it was asked to.
+var openDesktopTerminal = func(command string) {
+	_ = executil.Run(osascriptTimeout, "osascript", terminalAttachArgs(command)...)
+}
+
+// isolatedDataDir is true for a data folder that is not the person's own ~/.coral: a test server, a CDP run or any Coral started with CORAL_DATA_DIR or --home elsewhere.
+func isolatedDataDir(dir string) bool {
+	home, err := os.UserHomeDir()
+	return err != nil || filepath.Clean(dir) != filepath.Join(home, ".coral")
 }
 
 // osascriptTimeout bounds the Terminal attach: a macOS automation-permission dialog that nobody
