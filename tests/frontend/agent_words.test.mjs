@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
-const { agentWords, WHAT_STAYS_KILL, WHAT_STAYS_KILL_MANY, WHAT_STAYS_RESET, WHAT_STAYS_ARCHIVE, whatStaysKill, whatStaysReset, deleteTeamWords, unpinWords } = await import(pathToFileURL(path.resolve(here, '../../coral-go/pkg/frontend/static/agent_words.js')).href);
+const { agentWords, WHAT_STAYS_KILL, WHAT_STAYS_KILL_MANY, WHAT_STAYS_RESET, WHAT_STAYS_ARCHIVE, whatStaysKill, whatStaysReset, unpinWords } = await import(pathToFileURL(path.resolve(here, '../../coral-go/pkg/frontend/static/agent_words.js')).href);
+const { deleteTeamWords } = await import(pathToFileURL(path.resolve(here, '../../coral-go/pkg/frontend/static/delete_team_words.js')).href); // lazy: read when the Remove team dialog opens (#16895)
 
 // role and team
 let w = agentWords({ board_job_title: 'QA Engineer', board_project: 'alpha', name: 'work-claude-1', working_directory: '/x/work' }, 'work');
