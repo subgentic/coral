@@ -175,15 +175,30 @@ func claudeSettingsFile(files *launchFiles, params LaunchParams, effectiveID str
 	}
 
 	// Inject permissions from capabilities
-	if perms := TranslateToClaudePermissionsForMode(params.Capabilities, claudeLaunchMode(params, interactive)); perms != nil && !params.KeepFullAccess {
-		permMap := map[string]any{}
-		if len(perms.Allow) > 0 {
-			permMap["allow"] = perms.Allow
+	if !params.KeepFullAccess {
+		if perms := TranslateToClaudePermissionsForMode(params.Capabilities, claudeLaunchMode(params, interactive)); perms != nil {
+			permMap := map[string]any{}
+			if allow := withCoralTools(perms.Allow, perms.Deny); len(allow) > 0 {
+				permMap["allow"] = allow
+			}
+			if len(perms.Deny) > 0 {
+				permMap["deny"] = perms.Deny
+			}
+			merged["permissions"] = permMap
+		} else {
+			// no capabilities: the person's own global rules stay as they are, with Coral's tools added to their allow list (#17547)
+			permMap, _ := merged["permissions"].(map[string]any)
+			if permMap == nil {
+				permMap = map[string]any{}
+			}
+			var allow, deny []string
+			for _, v := range anyStrings(permMap["allow"]) {
+				allow = append(allow, v)
+			}
+			deny = anyStrings(permMap["deny"])
+			permMap["allow"] = withCoralTools(allow, deny)
+			merged["permissions"] = permMap
 		}
-		if len(perms.Deny) > 0 {
-			permMap["deny"] = perms.Deny
-		}
-		merged["permissions"] = permMap
 	}
 
 	// Inject allowed tools
@@ -576,4 +591,44 @@ func writeNoFollow(path string, data []byte) error {
 		return err
 	}
 	return f.Close()
+}
+
+// withCoralTools adds Coral's own board and agent commands to an allow list (#17547): with no capabilities no rules were written and a team in Auto got a permission card for every
+// `coral-board post` and `coral-board read`. Left out when the capabilities deny the shell outright, and not doubled when a capability already allows them.
+func withCoralTools(allow, deny []string) []string {
+	for _, d := range deny {
+		if d == "Bash" {
+			return allow
+		}
+	}
+	for _, want := range []string{"Bash(coral-board *)", "Bash(coral-agent *)"} {
+		found := false
+		for _, a := range allow {
+			if a == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			allow = append(allow, want)
+		}
+	}
+	return allow
+}
+
+// anyStrings reads a settings list ([]any or []string) as strings; anything else is empty.
+func anyStrings(v any) []string {
+	switch l := v.(type) {
+	case []string:
+		return l
+	case []any:
+		var out []string
+		for _, e := range l {
+			if str, ok := e.(string); ok {
+				out = append(out, str)
+			}
+		}
+		return out
+	}
+	return nil
 }
