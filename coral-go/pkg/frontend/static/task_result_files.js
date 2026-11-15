@@ -5,26 +5,29 @@ import { serverFetch, sessionServer } from './server_base.js';
 import { attachDialogFocus } from './dialog_focus.js';
 import { importOnce } from './import_once.js';
 
-/** Turn the paths in the text of `host` (a node holding one text node) into buttons that open the file. `session` is the live agent that did the work. */
+/** Turn the paths in the text of `host` (its text nodes outside a link) into buttons that open the file. `session` is the live agent that did the work. */
 export async function linkPaths(host, session) {
-    const node = host && host.firstChild;
-    if (!session || !session.name || !session.working_directory || !node || node.nodeType !== 3) return;
+    if (!host || !session || !session.name || !session.working_directory) return;
     const { split } = await importOnce('./task_result_paths.js');
-    const parts = split(node.textContent, session.working_directory);
-    if (!node.isConnected || !parts.some(p => p.rel)) return;
-    node.replaceWith(...parts.map(p => {
-        if (!p.rel) return document.createTextNode(p.text);
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'team-link'; b.textContent = p.text; b.title = 'Open this file';
-        b.onclick = () => openResultFile(session, p.rel);
-        return b;
-    }));
+    const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT), nodes = [];
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) if (!n.parentElement.closest('a, button')) nodes.push(n);
+    for (const node of nodes) {
+        const parts = split(node.textContent, session.working_directory);
+        if (!node.isConnected || !parts.some(p => p.rel)) continue;
+        node.replaceWith(...parts.map(p => {
+            if (!p.rel) return document.createTextNode(p.text);
+            const b = document.createElement('button'); b.type = 'button'; b.className = 'team-link'; b.textContent = p.text; b.title = 'Open this file';
+            b.onclick = () => openResultFile(session, p.rel);
+            return b;
+        }));
+    }
 }
 
 /** The file in a dialog, read-only; the server's own words when it cannot be read. */
 export async function openResultFile(session, rel) {
     const dlg = document.createElement('dialog'); dlg.className = 'task-result-file';
     const head = document.createElement('h3'); head.textContent = rel;
-    const body = document.createElement('pre'); body.className = 'task-result-file-text'; body.textContent = 'Loading…';
+    const body = document.createElement('pre'); body.className = 'task-result-file-text'; body.textContent = 'Loading…'; body.style.cssText = 'max-height:60vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere'; // a long file scrolls inside the dialog
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close'; close.onclick = () => dlg.close();
     dlg.append(head, body, close); dlg.addEventListener('close', () => dlg.remove());
     document.body.append(dlg); attachDialogFocus(dlg); dlg.showModal();
