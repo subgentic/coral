@@ -1,8 +1,7 @@
 /* The active preview editor and read-only diff, including capture and disposal. */
 import { escapeHtml } from './utils.js';
-import { getCm, getLangExtension, getLangFromPath, diffMergeView, plainWholeLineMarks, cmHost, cmTheme } from './cm_util.js';
-import { retryOnce } from './overload.js';
-import { _renderContentView } from './preview_content.js';
+import { getCm, getLangExtension, getLangFromPath, cmHost, cmTheme } from './cm_util.js';
+import { importOnce } from './import_once.js';
 
 export function createPreviewEditor({ _activeTab, _isDirty, _renderTabs, _fileUrl, _setBody }) {
 
@@ -63,42 +62,10 @@ export function createPreviewEditor({ _activeTab, _isDirty, _renderTabs, _fileUr
     }
 
     async function _mountDiff(tab, body, current) {
-        if (tab.originalContent === null) {
-            _setBody('<div class="preview-pane-loading">Loading…</div>');
-            try {
-                const resp = await retryOnce(() => fetch(_fileUrl('file-original', tab.filepath)));
-                const data = await resp.json();
-                if (!current()) return;
-                tab.originalContent = data.error ? '' : (data.content || '');
-            } catch {
-                if (current()) _setBody('<div class="preview-pane-error">Failed to load diff</div>');
-                return;
-            }
-        }
-        tab.hasDiff = tab.originalContent !== tab.content;
-        const cm = tab.hasDiff ? getCm() : null;
-        if (cm) {
-            try {
-                const host = cmHost(body);
-                const extensions = [
-                    cm.basicSetup, ...cmTheme(cm), cm.EditorView.lineWrapping,
-                    cm.EditorView.editable.of(false), cm.EditorState.readOnly.of(true),
-                    cm.EditorView.theme({ '&': { height: '100%' }, '.cm-scroller': { overflow: 'auto' } }),
-                    // diffConfig: the merge view's own scanLimit would otherwise return one chunk.
-                    // mergeControls off: the view is read-only, so its Accept and Reject buttons would do nothing when clicked.
-                    diffMergeView(cm, tab.originalContent, tab.content),
-                ];
-                const langExt = getLangExtension(cm, getLangFromPath(tab.filepath));
-                if (langExt) extensions.push(langExt);
-                _cmView = new cm.EditorView({ state: cm.EditorState.create({ doc: tab.content, extensions }), parent: host });
-                plainWholeLineMarks(_cmView);
-                return;
-            } catch (e) {
-                console.error('[coral] CodeMirror merge view creation failed:', e);
-                _destroyEditor();
-            }
-        }
-        _renderContentView(body, tab.content, tab.filepath, tab.line, false);
+        const { mountPreviewDiff } = await importOnce('./preview_diff.js');
+        if (!current()) return;
+        const view = await mountPreviewDiff(tab, body, current, { _fileUrl, _setBody });
+        if (current()) _cmView = view; else view?.destroy();
     }
     return { _destroyEditor, _captureEditor, _mountEditor, _mountDiff };
 }
