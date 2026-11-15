@@ -13,6 +13,7 @@ import (
 
 	"github.com/subgentic/coral/internal/clierr"
 	"github.com/subgentic/coral/internal/clihelp"
+	"github.com/subgentic/coral/internal/clitext"
 )
 
 func cmdTaskAdd(st *boardState, args []string) {
@@ -193,6 +194,9 @@ func cmdTaskAdd(st *boardState, args []string) {
 		return
 	}
 	fmt.Printf("Created Task #%.0f: %s\n", id, title)
+	if note, _ := task["warning"].(string); note != "" { // the assignee will not read it now (#17657): said at once, as a post to it is
+		fmt.Printf("  Note: %s\n", clitext.Clean(note))
+	}
 	if *followUp > 0 {
 		fmt.Printf("  A follow-up of task #%d (it is listed there).\n", *followUp)
 	}

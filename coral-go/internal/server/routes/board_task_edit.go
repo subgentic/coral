@@ -82,7 +82,11 @@ func (h *BoardHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 			h.announceTaskTextEdit(context.Background(), project, edit.SubscriberID, before, task)
 		}
 	})
-	writeJSON(w, http.StatusOK, task)
+	warning := ""
+	if edit.AssignedTo != nil {
+		warning = h.assigneeRestWarning(r.Context(), project, *edit.AssignedTo) // a task given to a member that will not read it now says so (#17657)
+	}
+	writeJSON(w, http.StatusOK, withWarning(task, warning))
 }
 
 // taskEdit is an UpdateTask request: edits to a task's title, priority, assignee or blockers.
@@ -375,7 +379,7 @@ func (h *BoardHandler) ReassignTask(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	writeJSON(w, http.StatusOK, task)
+	writeJSON(w, http.StatusOK, withWarning(task, h.assigneeRestWarning(r.Context(), project, body.Assignee))) // a task given to a member that will not read it now says so (#17657)
 }
 
 // PublishTask transitions a draft task to pending or blocked.
