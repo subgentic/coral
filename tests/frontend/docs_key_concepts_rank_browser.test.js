@@ -18,7 +18,7 @@ const { coralReady } = require('./helpers/wait');
         const first = () => ev(`(document.querySelector('#docs-nav-list [data-doc]') || {}).dataset?.doc || ''`);
         for (const q of ['what is a goal', 'what is a task', 'done when']) {
             await search(q);
-            await waitFor(`document.querySelectorAll('#docs-nav-list [data-doc]').length > 0`, `results for "${q}"`, 15000);
+            await waitFor(`document.querySelector('#docs-nav-list [data-doc="key-concepts"]')`, `key-concepts in results for "${q}" (waits for doc text)`, 15000);
             const top = await first();
             assert.equal(top, 'key-concepts', `"${q}" → first result must be key-concepts, got ${top}`);
         }
