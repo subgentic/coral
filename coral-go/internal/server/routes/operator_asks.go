@@ -38,9 +38,11 @@ type operatorAskRow struct {
 	Kind       string `json:"kind"`
 	ID         int64  `json:"id"` // the question's message id (kind ask) or the wait's id (kind wait)
 	Asker      string `json:"asker"`
-	Text       string `json:"text"`
-	Cut        bool   `json:"cut,omitempty"`
-	At         string `json:"at"`
+	// Options: on a single agent's question (kind "agent", #18106), the answers it offered (up to 3); the Operator may still write their own.
+	Options []string `json:"options,omitempty"`
+	Text    string   `json:"text"`
+	Cut     bool     `json:"cut,omitempty"`
+	At      string   `json:"at"`
 	// Buttons the asker declared on a question (#11643), in order, with their state (pending, used); the Operator's click claims one through the claim route.
 	Buttons []board.AskButton `json:"buttons,omitempty"`
 	// GoalID and TaskID are the goal and the task the question is about (#12164), checked to be of its team when it was posted, with their titles cleaned and cut; absent for none.
@@ -134,6 +136,9 @@ func (h *BoardHandler) OperatorAsks(w http.ResponseWriter, r *http.Request) {
 			text, cut := operatorAskText(q.Reason)
 			rows = append(rows, operatorAskRow{Board: p.Project, BoardLabel: clitext.CleanName(p.BoardLabel), Kind: "wait", ID: q.ID, Asker: clitext.CleanName(q.SubscriberID), Text: text, Cut: cut, At: q.CreatedAt})
 		}
+	}
+	if h.agentAsks != nil { // a single agent's questions (#18106): no team, so no board
+		rows = append(rows, h.agentAsks(r)...)
 	}
 	if paged { // ?paged=1 (#13188): newest first, every open question reachable by next_cursor, the true total
 		writeJSON(w, http.StatusOK, pageOperatorAsks(rows, pagedLimit, pagedAfter))

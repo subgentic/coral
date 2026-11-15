@@ -73,6 +73,9 @@ func (h *BoardHandler) SetNeedsYouSkills(fn func(ctx context.Context) ([]NeedsYo
 	h.needsYouSkills = fn
 }
 
+// SetAgentAsks tells the board how to list the open questions of single agents (#18106).
+func (h *BoardHandler) SetAgentAsks(fn func(r *http.Request) []operatorAskRow) { h.agentAsks = fn }
+
 // SetNeedsYouAgents tells the board how to list the agents waiting on the Operator (the live list's rows; the sessions handler owns them).
 func (h *BoardHandler) SetNeedsYouAgents(fn func(r *http.Request) ([]NeedsYouItem, error)) {
 	h.needsYouAgents = fn
@@ -370,6 +373,11 @@ func onlyFileLinks(text string) []string {
 func (h *BoardHandler) needsYouItems(r *http.Request) (items []NeedsYouItem, unread []string, muted map[string]int, err error) {
 	ctx := r.Context()
 	muted = map[string]int{} // the files the Operator's settings mute, by kind: counted here and nowhere else (#12144)
+	if h.agentAsks != nil {  // a single agent's question (#18106): kind question, no team
+		for _, a := range h.agentAsks(r) {
+			items = append(items, NeedsYouItem{Kind: "question", From: needsYouLine(a.Asker), Line: needsYouLine(a.Text), ID: "agent-ask:" + strconv.FormatInt(a.ID, 10), At: needsYouTime(a.At)})
+		}
+	}
 	if h.needsYouAgents != nil {
 		if rows, err := h.needsYouAgents(r); err != nil {
 			unread = append(unread, "agents")

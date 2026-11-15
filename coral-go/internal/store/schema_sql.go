@@ -220,6 +220,18 @@ CREATE TABLE IF NOT EXISTS claude_artifact_nudges (
 );
 CREATE INDEX IF NOT EXISTS idx_claude_artifact_nudges_seen ON claude_artifact_nudges(seen_at);
 
+-- A question a single agent (no team) asked the Operator (#18106): open until the Operator answers, and the answer is typed into that agent's conversation. options is a JSON list of up to 3 answer labels.
+CREATE TABLE IF NOT EXISTS agent_asks (
+	id           INTEGER PRIMARY KEY AUTOINCREMENT,
+	session_id   TEXT NOT NULL,
+	session_name TEXT NOT NULL,
+	text         TEXT NOT NULL,
+	options      TEXT NOT NULL DEFAULT '[]',
+	created_at   TEXT NOT NULL,
+	answered_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_agent_asks_open ON agent_asks(answered_at);
+
 -- Operator mailbox flags survive transcript reindexing; board chats use their history id (board:<id>).
 CREATE TABLE IF NOT EXISTS chat_flags (
     session_id TEXT PRIMARY KEY,
