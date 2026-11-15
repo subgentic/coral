@@ -133,7 +133,10 @@ func TestNeedsYouWalkOfABigBoardIsUnderTheGoal(t *testing.T) {
 		ceiling = time.Duration(float64(goalNeedsYouWalkCPUMs)*scale) * time.Millisecond
 	}
 	elapsed := fastestWithin(3, ceiling, func(attempt int) time.Duration {
+		s0, _ := processCPU()
 		_, srv, _ := bigBoardWalkRig(t, true)
+		s1, _ := processCPU()
+		t.Logf("PERF seed %d: %s CPU", attempt+1, (s1 - s0).Round(time.Millisecond))
 		var m0, m1 runtime.MemStats
 		runtime.GC()
 		runtime.ReadMemStats(&m0)
