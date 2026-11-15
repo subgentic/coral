@@ -91,7 +91,13 @@ function changes(w) {
 
 /** The numbers of one worktree, as words. */
 function numbers(w, base) {
-    if (!base) return changes(w);
+    if (!base) {
+        const count = w.commit_count;
+        const history = Number.isInteger(count) && count >= 0
+            ? `${count > 1000 ? '1000+' : count} ${count === 1 ? 'commit' : 'commits'} saved in this branch`
+            : 'Commit history could not be counted';
+        return `${history} · ${changes(w)}`;
+    }
     if (w.is_base) return `the base branch · ${changes(w)}`;
     const where = (w.ahead || w.behind) ? `${w.ahead} ahead, ${w.behind} behind` : 'even with the base';
     return `${where} · ${changes(w)}`;
@@ -164,7 +170,7 @@ function drawRepo(data, currentSid, ask) {
     if (data.remote) box.append(text('h3', 'branches-remote', `${data.remote.host}/${data.remote.owner}/${data.remote.name}`));
     else if (data.remote_unknown) box.append(text('h3', 'branches-remote', 'unknown remote'));
     if (data.unreadable) { box.append(text('p', 'branches-note', 'Coral could not read this repository.')); return box; }
-    box.append(text('p', 'branches-note', data.base ? `Counted against ${data.base}.` : 'No base branch found: counts are not shown.'));
+    box.append(text('p', 'branches-note', data.base ? `Counted against ${data.base}.` : 'No comparison branch found. Saved commits and uncommitted files are shown below.'));
     if (data.pr_note) box.append(text('p', 'branches-note', data.pr_note));
     const list = document.createElement('ul');
     list.className = 'branches-list';
@@ -175,7 +181,7 @@ function drawRepo(data, currentSid, ask) {
         const name = w.name_hidden ? 'a branch whose name has hidden characters' : (w.detached || !w.branch ? `detached at ${w.head}` : w.branch);
         const title = text('div', 'branches-name', name);
         if (w.current) title.append(' ', text('span', 'branches-mark', 'this agent'));
-        if (w.main) title.append(' ', text('span', 'branches-mark', 'main worktree'));
+        if (w.main) title.append(' ', text('span', 'branches-mark', 'original folder'));
         row.append(title, text('div', 'branches-meta', numbers(w, data.base)));
         const marks = [];
         if (w.nothing_to_merge) marks.push('no commits left to merge');
