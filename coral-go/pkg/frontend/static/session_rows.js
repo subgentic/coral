@@ -240,7 +240,7 @@ ${['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access
                 ${SVGO.o1}<line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
                 Stop agent
             </button>`;
-    // Archived: no Restart, Rename or reordering (#3030).
+    // Archived: no Restart, Rename, Wake or reordering (#3030); Unarchive is the one way back (#17420).
     const _archivedMenu = `
             <a class="menu-item overflow-menu-item overflow-menu-open-window" href="/agent/${escapeAttr(sid)}" target="_blank" rel="noopener noreferrer" aria-label="Open agent tab" data-on-click="kebab-close">
                 ${SVGO.o0}<path d="M9 2h5v5"/><path d="M14 2L7 9"/><path d="M12 9v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4"/></svg>
@@ -249,10 +249,6 @@ ${['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access
             <button class="menu-item overflow-menu-item" data-on-click="agent-archive" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="unarchive">
                 ${SVGO.o0}<rect x="2" y="3" width="12" height="3" rx="0.5"/><path d="M3 6v7h10V6"/><path d="M8 12V8M6 10l2-2 2 2"/></svg>
                 Unarchive
-            </button>
-            <button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="wake" title="Continues the conversation">
-                ${SVGO.o0}<path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
-                Wake
             </button>
             <button class="menu-item overflow-menu-item" data-on-click="agent-info" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o1}<circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r="0.5" fill="currentColor" stroke="none"/></svg>
@@ -292,7 +288,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     const sleepChip = s.sleeping && !isGoneAsleep(s) && !isExitedAsleep(s) && !waitingBadge && !heldChip ? ` <span class="chip chip-caps session-state-pill neutral"${s.sleep_reason === 'coral_stopped' ? ' title="Asleep since Coral restarted"' : ''}>Sleeping</span>` : '';
     // An ended agent (its CLI exited, #15777) has one word, Ended (no moon, no Sleeping pill); at a hover it offers Restart, Wake and Sleep in the chip's place
     const restartBtn = isExitedAsleep(s) && !isStaleSession(s) ? ` <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-restart-same" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(s.session_id || '')}" data-mode="restart" title="Its program exited; Restart starts it again" aria-label="Restart ${escapeAttr(resolveSessionIdentity(s))}">Restart</button>` : '';
-    const wakeBtn = s.sleeping && !isStaleSession(s) ? ` <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(s.session_id || '')}" data-mode="wake" aria-label="Wake ${escapeAttr(resolveSessionIdentity(s))}">Wake</button>` : '';
+    const wakeBtn = s.sleeping && !s.archived && !isStaleSession(s) ? ` <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(s.session_id || '')}" data-mode="wake" aria-label="Wake ${escapeAttr(resolveSessionIdentity(s))}">Wake</button>` : '';
     // A terminal-gone or ended (#15068) agent is asleep already: Sleep files it under sleeping (no "Terminal gone" chip; a later Wake resumes it like any sleeper, #13171)
     const sleepBtn = (isGoneAsleep(s) || isExitedAsleep(s)) && !isStaleSession(s) ? ` <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(s.session_id || '')}" data-mode="sleep" aria-label="Put ${escapeAttr(resolveSessionIdentity(s))} to sleep">Sleep</button>` : '';
     const ctxHigh = s.context_pct !== null && s.context_pct !== undefined && s.context_pct >= 80;
