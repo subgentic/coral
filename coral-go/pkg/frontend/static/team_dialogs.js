@@ -69,7 +69,7 @@ function _updateTeamAgentSummary(row) {
     const selectedMode = acf?.querySelector('.acf-permission-mode')?.selectedOptions[0];
     const modeLabel = selectedMode?.value === mode ? selectedMode.textContent : _modeLabel(mode);
     const lm = launchedMode(type, mode, config.capabilities);
-    parts.push([lm.narrowed ? lm.text : `${modeLabel} mode`.replace(/^Default mode$/, 'default mode'), mode !== 'default' || !!lm.narrowed, !!lm.warn]);
+    parts.push([lm.narrowed ? lm.text : `${modeLabel} mode`, mode !== 'default' || !!lm.narrowed, !!lm.warn]);
     const line = row.querySelector('.team-agent-summary');
     if (line) {
         line.replaceChildren();
