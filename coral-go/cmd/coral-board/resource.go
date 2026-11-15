@@ -32,6 +32,8 @@ The queue is cooperation, not isolation: it tells the team who is using a machin
   resource renew <name>                           A full lease from now
   resource define <name> (--slots N | --pool a,b) [--machine M] [--here | --remote] [--lease 30m] [--allow a,b] [--match "go test ./..."]... [--facts os=linux]... [--weight N] [--needs go>=1.26]... --description "what it runs, how to reach it, its rules"
                                                   The Operator or an Orchestrator: make or change a resource
+  resource setup <box>... [--pool NAME] [--dry-run]
+                                                  The Operator or an Orchestrator: read each computer over ssh (or "here"), run a tiny check test on it, and define its resource with slots, facts and a description (run it again to update)
   resource remove <name>                          The Operator or an Orchestrator
   resource move <entry-id> first|up|down          The Operator or an Orchestrator: reorder the line
   resource kick <entry-id>                        The Operator or an Orchestrator: drop a holder or a waiting entry`
@@ -69,6 +71,8 @@ func cmdResource() {
 		resourceSimple(sub, rest)
 	case "define":
 		resourceDefine(rest)
+	case "setup":
+		resourceSetup(rest)
 	case "remove":
 		resourceRemove(rest)
 	case "move":
