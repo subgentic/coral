@@ -46,6 +46,7 @@ const HEX = 'd'.repeat(64);
         await waitFor(`window.__sends.length === 1`, 'the send went out', 8000);
         assert.deepEqual(await ev('window.__sends[0]'), ['the agent that uploaded this file']);
         await waitFor(`/Asked/.test(document.querySelector('.ac-ask')?.textContent || '')`, 'the sheet says Asked', 8000);
+        assert.equal(await ev(`document.querySelector('.ac-card[data-id="1"] .ac-ask-status').textContent`), 'Sent to the agent that uploaded this file', 'the thread agrees with the sheet and the toast: it is not "Not sent to an agent yet"');
         console.log('artifact_comment_send_no_team: ok');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
