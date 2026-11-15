@@ -20,6 +20,9 @@ const BASE = require('./test_base').BASE;
             await ev(`(() => { const real = window.fetch; window.__goals = Array.from({length:24}, (_,i) => ({id:i+1, board_id:'team-a', title:'Completed goal '+(i+1), state:'active', rollup:{done:2}, updated_at:'2026-11-01T00:00:00Z'})); window.fetch = (u,o={}) => new URL(String(u),location.origin).pathname === '/api/goals' ? Promise.resolve(new Response(JSON.stringify({goals:window.__goals}),{headers:{'content-type':'application/json'}})) : real(u,o); T.state.settings.goal_done_read = JSON.stringify(window.__goals.map(g=>'team-a|'+g.id+'|2|'+g.updated_at)); T.state.liveSessions=[]; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
             await waitFor(`document.querySelectorAll('.inbox-goaldone-actions .inbox-row-more-toggle').length === 24`, 'read goal menus');
+            await waitFor(`!!document.querySelector('#group-table-view [data-group-more]')`, 'the kind limit has arrived (it redraws the list once)'); // #16814: the groups show five rows and a Show N more, drawn once the lazy limit has loaded
+            await ev(`[...document.querySelectorAll('#group-table-view [data-group-more]')].forEach(b => { if (/^Show \\d+ more/.test(b.textContent)) b.click(); }); true`);
+            await waitFor(`document.querySelectorAll('.inbox-goaldone-actions .inbox-row-more-toggle').length === 24`, 'all 24 goal menus again');
             await ev(`window.__toggle=[...document.querySelectorAll('.inbox-goaldone-actions .inbox-row-more-toggle')].at(-1); __toggle.focus({preventScroll:true}); __toggle.scrollIntoView({block:'end'}); true`);
             await ev(framesJs(2));
             // Scrolling may redraw virtual rows; acquire the connected last-row control.

@@ -61,7 +61,7 @@ const N = 900;
 
         // 3: no filter: the list the page reads, as before
         await type('');
-        await waitFor(`/report-000/.test(document.getElementById('group-table-view').innerText)`, 'the unfiltered list is back', 10000);
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length >= 5`, 'the unfiltered list is back', 10000);
         assert.ok(await ev(`!!document.querySelector('#group-table-view .inbox-review-more [data-review-more]')`), 'unfiltered reviews retain the bounded page and offer explicit Show more');
         // 4: the agent filter 'Unknown agent' (a file with no producer) is the page's: it is not sent as by=, and the file with no producer is shown
         await ev(`localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ agent: 'Unknown agent' })); true`);
@@ -78,6 +78,7 @@ const N = 900;
             await waitFor(`window.__asked.slice(${before}).some(s=>window.__offeredCursors.some(c=>c.cursor===new URLSearchParams(s).get('cursor')))`, 'explicit page '+cursor);
             await waitFor(`import(${S}+'inbox_reviews.js').then(m=>m.reviewQueryState()?.loading===false)`, 'the requested page settles');
         }
+        await ev(`document.querySelectorAll('#group-table-view [data-group-more]').forEach(b => { if (/^Show \\d+ more/.test(b.textContent)) b.click(); }); true`); // the kind groups show five rows and a Show N more (#16814): the file is loaded, and shown once its group is open
         await waitFor(`/report-150/.test(document.getElementById('group-table-view').innerText)`, 'the file with no producer is shown under Agent: Unknown agent', 10000);
         assert.ok(!(await ev(`window.__asked.some(s => /by=/.test(s))`)), 'and by= was not sent for it');
         console.log('PASS');

@@ -54,7 +54,7 @@
 #group-table-view .gt-toolbar.tb-low { flex-wrap: wrap; }
 #group-table-view .gt-toolbar.tb-low > .team-tb-selection { order: 10; flex: 1 1 100%; min-height: 40px; flex-wrap: nowrap; overflow-x: auto; }
 #group-table-view .gt-toolbar.tb-low > .list-bar-count { display: none; }
-@media (min-width: 768px) { #group-table-view .inbox-folder-toolbar:not(:has(.team-toolbar-selecting)) { padding-bottom: 52px; } } /* the actions' line (40 px and the row's 8 px gap) is kept while nothing is selected, so ticking a row moves no row (#15339) */
+@media (min-width: 768px) { #group-table-view .inbox-folder-toolbar:not(:has(.team-toolbar-selecting)) { padding-bottom: 56px; } } /* the actions' line (40 px and the row's 8 px gap) is kept while nothing is selected, so ticking a row moves no row (#15339) */
 /* #15540: icon and star share a line at the row's top on a computer; a phone card keeps its star at the end of the button row (#15658) */
 @media (min-width: 768px) {
     #group-table-view .inbox-needs-results  .inbox-review-star-anchor { position: static; }
@@ -83,3 +83,4 @@
 .inbox-group-extra { display: inline-flex; align-items: baseline; gap: 10px; margin-inline-start: 8px; font-weight: var(--fw-regular); }
 .inbox-group-count { color: var(--text-muted); }
 .inbox-group-more { margin: 4px 0 4px 3.5rem; }
+#group-table-view .gt-toolbar.team-toolbar-selecting .list-bar-toggle-text { display: none; } /* while rows are selected the Filters button is the icon alone, so it keeps its place on the first row and ticking a row moves nothing (#15339, #18028) */

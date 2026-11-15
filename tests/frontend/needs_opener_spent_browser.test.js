@@ -39,6 +39,8 @@ const B = 'needs-opener-spent-' + Date.now().toString(36);
             await Emulation.setDeviceMetricsOverride({ width: w, height: 420, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await openNeeds();
+            await waitFor(`!!document.querySelector('${T} [data-group-more]')`, at + 'the kind limit has arrived', 4000).catch(() => {}); // #16814: the lazy limit redraws the list once, five rows to a group and a Show N more; open them so the scrolled rows stay
+            await ev(`[...document.querySelectorAll('${T} [data-group-more]')].forEach(b => { if (/^Show \\d+ more/.test(b.textContent)) b.click(); }); true`);
             const SCROLLER = `(() => { const tr = document.querySelector('${T} tbody tr:not(.dt-group)'); for (let e = tr; e; e = e.parentElement) { const o = getComputedStyle(e).overflowY; if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight + 2) return e; } return document.scrollingElement; })()`;
             const rowsOf = `[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].filter(tr => /looks done/.test(tr.textContent))`;
             await holdScroll(ev, SCROLLER, `${rowsOf}.slice(-2)[0]`); // the list is scrolled down and holds it (not a fixed sleep, which a redraw in the window beat)
