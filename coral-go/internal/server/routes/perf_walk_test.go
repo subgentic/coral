@@ -41,7 +41,7 @@ const (
 // ratio of the two boxes' calibration). It is the fastest of five runs, so a box that is loaded does not read slow, and it never lowers the goal (below 1) or raises it past 3: the cache-less code is 4 or more times the goal
 // whatever the machine, and the allocation bound below catches losing the fast path with no clock at all.
 const (
-	calibrationRefMs = 290 // the Mac: 287 to 307 ms (wall time; re-measure as CPU time, see machineSlowdown) (epoch-go: 716 to 792 ms, so a goal of about 2.5 times)
+	calibrationRefMs = 315 // the Mac mini, CPU time of the fastest of five: 315 to 327 ms in three runs (#17998; it was 290 ms of wall time). epoch-go: about 2.5 times, so a goal of 2.5 times
 	maxSlowdown      = 3.0
 )
 
