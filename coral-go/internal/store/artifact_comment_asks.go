@@ -149,6 +149,16 @@ func (s *SessionStore) CloseArtifactAsks(ctx context.Context, commentID int64, n
 	return err
 }
 
+// CloseOpenAsksOfVersions ends the open asks of agentSession on the comments of the given artifact versions: the agent answered by uploading a new version of the file (#17361).
+func (s *SessionStore) CloseOpenAsksOfVersions(ctx context.Context, artifactIDs []string, agentSession string, now time.Time) error {
+	for _, id := range artifactIDs {
+		if _, err := s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET closed_at = ? WHERE artifact_id = ? AND agent_session = ? AND closed_at IS NULL`, now.UTC().Format(ISOFormat), id, agentSession); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // DeleteAsksOfArtifact drops every ask of an artifact (the artifact was deleted).
 func (s *SessionStore) DeleteAsksOfArtifact(ctx context.Context, artifactID string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM artifact_comment_asks WHERE artifact_id = ?`, artifactID)

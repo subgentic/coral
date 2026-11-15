@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -436,4 +438,22 @@ func TestAnAgentRefusedOnSendIsToldTheDashboardOnly(t *testing.T) {
 	for route := range dashboardOnlyRoutes {
 		assert.Contains(t, operatorOnlyRoutes, route, "a dashboard-only route is an operator-only route")
 	}
+}
+
+// #17361 (walk 67): the agent that was asked into a comment on v1 answers by uploading v2 of the same file: its ask on v1 ends, another agent's stays.
+func TestUploadingTheNextVersionEndsTheUploadersAskOnTheOlderOne(t *testing.T) {
+	rig, _ := ownerRig(t)
+	ctx := context.Background()
+	v1 := rig.uploadText("a1", "plan.txt", "plan, first draft")
+	now := time.Now()
+	_, _, err := rig.ss.CreateArtifactAsk(ctx, 1, v1, "team-a", "a1", "A1", now)
+	require.NoError(t, err)
+	_, _, err = rig.ss.CreateArtifactAsk(ctx, 2, v1, "team-a", "a2", "A2", now)
+	require.NoError(t, err)
+	code, out := rig.uploadVersion("a1", "plan.txt", "plan, second draft", "coral://artifacts/"+v1)
+	require.Equal(t, http.StatusCreated, code, out)
+	mine, _, _ := rig.ss.GetArtifactAsk(ctx, 1, "a1")
+	other, _, _ := rig.ss.GetArtifactAsk(ctx, 2, "a2")
+	assert.False(t, mine.OpenAt(time.Now()), "the agent that uploaded the next version has answered")
+	assert.True(t, other.OpenAt(time.Now()), "another agent's ask stays open")
 }
