@@ -6,7 +6,7 @@ const dom = installDom({ mode: 'local' });
 dom.window.eval(fs.readFileSync(STATIC + 'vendor/marked.min.js', 'utf8')); globalThis.marked = dom.window.marked;
 dom.window.eval(fs.readFileSync(STATIC + 'vendor/purify.min.js', 'utf8')); globalThis.DOMPurify = dom.window.DOMPurify;
 import { analyze, mapRenderedBlock, editRun } from '../../coral-go/pkg/frontend/static/artifact_markdown_model.js';
-import { renderMarkdownStrict } from '../../coral-go/pkg/frontend/static/markdown.js';
+import { renderMarkdownStrict, noTilde } from '../../coral-go/pkg/frontend/static/markdown.js';
 function bytePatch(before, after) {
     const a = new TextEncoder().encode(before), b = new TextEncoder().encode(after); let prefix = 0, suffix = 0;
     while (prefix < a.length && prefix < b.length && a[prefix] === b[prefix]) prefix++;
@@ -157,6 +157,7 @@ test('rendered policy exposes additional invisible controls but retains variatio
 
 // #18467 (QA4 on #18435): the model lexes with the same single-tilde rule as the renderer, so a block with a lone ~ maps exactly and keeps its line-comment anchors.
 test('a single ~ is text in the model too: such blocks map exactly', () => {
+    marked.use(noTilde); // markdown.js does this when the page loads (marked is a script there; here it is set after the static imports ran)
     for (const source of ['export P=~/bin:~/go/bin\n', 'A ~one~ and ~/x\n', 'mount -o ro ~/a:~/b\n']) {
         const model = analyze(source, marked);
         assert.equal(model.blocks[0].reason, undefined, source + ': ' + model.blocks[0].reason);
