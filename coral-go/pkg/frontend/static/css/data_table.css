@@ -750,3 +750,4 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 
 :is(.dt-primary, .dt-link, .dt-mail-open)[data-goal-id]::before { content: '#' attr(data-goal-id) ' '; color: var(--text-secondary); } /* the number agents write in 'goal #3' (#15245): drawn from the element's data-goal-id, so the name's own text is unchanged */
 .dt-row:hover .dt-reveal, .dt-row:focus-within .dt-reveal { opacity: 1; } /* a control that shows on its row's hover or focus (the Agents table's Details link, #15857) */
+.dt-table .inbox-dismiss:focus-visible { outline-offset: -3px; } /* the cell clips what is drawn outside it: the whole ring sits inside the button (#17226) */
