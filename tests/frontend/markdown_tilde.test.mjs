@@ -16,11 +16,13 @@ globalThis.DOMPurify = { sanitize(html) { const t = document.createElement('temp
 const { renderMarkdown, renderMarkdownStrict } = await importUi('utils');
 const { renderDocsMarkdown } = await importUi('docs_markdown');
 const html = h => String(h);
-const CMD = 'cd ~/coral-test-data3 && ls ~/Coral-rc2-mnt';
+const CMDS = ['cd ~/coral-test-data3 && ls ~/Coral-rc2-mnt', 'export P=~/bin:~/go/bin', 'ln -s ~/a ~/b; ls ~/a;~/b', 'mount -o ro ~/Coral-rc2:~/mnt']; // marked strikes ~a~ when the closing ~ follows a non-space and precedes a non-~
 for (const [what, render] of [['chat', md => renderMarkdown(md, undefined, 'chat')], ['board', md => renderMarkdown(md, { breaks: true }, 'board')], ['a viewed file', renderMarkdownStrict], ['a Docs page', renderDocsMarkdown], ['the shared marked (notes, file preview)', md => globalThis.marked.parse(md)]]) {
-    const out = html(render(CMD));
-    assert.ok(!/<del/.test(out), `${what}: two ~/ paths are not struck through: ${out}`);
-    assert.equal((out.match(/~/g) || []).length, 2, `${what}: both tildes stay: ${out}`);
+    for (const cmd of CMDS) {
+        const out = html(render(cmd));
+        assert.ok(!/<del/.test(out), `${what}: ${cmd}: two ~/ paths are not struck through: ${out}`);
+        assert.equal((out.match(/~/g) || []).length, (cmd.match(/~/g) || []).length, `${what}: ${cmd}: every tilde stays: ${out}`);
+    }
     assert.ok(/<del>gone<\/del>/.test(html(render('a ~~gone~~ b'))), `${what}: a double tilde still strikes`);
     assert.ok(!/<del/.test(html(render('~one~ and ~/x'))), `${what}: ~one~ is text`);
 }
