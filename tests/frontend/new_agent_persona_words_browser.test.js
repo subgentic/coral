@@ -35,7 +35,8 @@ const WORD_BUDGET = Number(process.env.PERSONA_WORD_BUDGET || 53); // 52 before 
             assert.equal(r.fills, false, `${label}: no "It fills in the name and prompt."`); assert.equal(r.nameHelp, false, `${label}: no help line under Name`);
             assert.ok(r.note && /^⚠ Isolated containers and VMs only\.$/.test(r.note) && /mode allows: everything except protected paths/.test(r.noteTitle), `${label}: the Bypass warning is the short form, the sentence is its hover: ${JSON.stringify([r.note, r.noteTitle])}`);
             assert.equal(r.nameShown, true, `${label}: Name is on screen without scrolling`); assert.equal(r.wide, true, `${label}: nothing is wider than the screen`);
-            assert.ok(r.words <= WORD_BUDGET, `${label}: ${r.words} visible words, budget ${WORD_BUDGET}`);
+            const budget = WORD_BUDGET + (/^390/.test(label) ? 3 : 0); // a phone also shows 'Show full command' (three words, #15951)
+            assert.ok(r.words <= budget, `${label}: ${r.words} visible words, budget ${budget}`);
             console.log(`${label}: ${r.words} visible words`);
             if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/persona-step-${label}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
         }
