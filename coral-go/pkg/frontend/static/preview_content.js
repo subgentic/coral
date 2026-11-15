@@ -6,8 +6,7 @@ import { importOnce } from './import_once.js';
 
 
 export function _fileName(filepath) {
-    const i = filepath.lastIndexOf('/');
-    return i === -1 ? filepath : filepath.substring(i + 1);
+    return filepath.slice(filepath.lastIndexOf('/') + 1);
 }
 
 /** Rendered HTML (sandboxed), formatted Markdown, or highlighted source. */
