@@ -74,7 +74,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await open(); await setDir('/home/p/Code/app', false);
         await ev(`document.getElementById('launch-team-trust').click(); true`);
         { const t = await ev(`document.getElementById('launch-team-trust').closest('.sv-row').textContent`);
-          assert.doesNotMatch(t, /will not trust/, 'ticked: the "will not trust" sentence is gone'); assert.match(t, /is trusted for the team's agents/, 'ticked: it says it is trusted'); }
+          assert.doesNotMatch(t, /will not trust/, 'ticked: the "will not trust" sentence is gone'); assert.match(t, /will be trusted where the CLI already has settings/, 'ticked: it says it is trusted'); }
         sent = await go();
         assert.equal(sent.trust_folder, true, 'ticked: the request says so');
         await ev(`window.hideLaunchModal(); true`);
