@@ -1,0 +1,3 @@
+/* The Artifacts table's news and superseded badges (#17454): loaded with the page, not at start (#17746). */
+.dt-one-line .team-artifact-badge.team-artifact-badge-news { flex: none; max-width: none; overflow: visible; text-overflow: clip; } /* 'New comments' and 'Superseded by vN' are short fixed words: whole, the name gives way first (#17454) */
+.team-artifact-badge-news[role="link"] { cursor: pointer; text-decoration: underline; }

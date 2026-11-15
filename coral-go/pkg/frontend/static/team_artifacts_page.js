@@ -12,6 +12,7 @@ import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
 import { nameSpan } from './agent_live.js';
 import { loadStyles } from './lazy_styles.js';
+await loadStyles('team_artifact_badge.css'); // the badges' rules load with the page, not at start (#17746)
 await loadStyles('phone_lists.css'); // the phone form of a team list (#12230); not at start (page_weight)
 import { browserLocal } from './safe_storage.js';
 import { renderArtifact } from './artifact_preview.js';
