@@ -1,0 +1,5 @@
+/* Settings > Updates: version + check now row (#17538) */
+.update-version-value { font-weight: var(--fw-strong); font-size: var(--fs-lg, 1rem); }
+.update-check-inline { margin-left: var(--space-md, 8px); }
+.update-check-result { color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); margin-left: var(--space-sm, 4px); }
+.update-check-result[data-error="1"] { color: var(--error); }

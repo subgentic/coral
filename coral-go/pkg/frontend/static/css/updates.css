@@ -80,12 +80,6 @@
 [data-theme="light"] .update-source-link { color: var(--accent-dim); }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .update-link { display: inline-flex; align-items: center; min-height: 44px; } }
 
-/* Settings > Updates: version + check now row (#17538) */
-.update-version-value { font-weight: var(--fw-strong); font-size: var(--fs-lg, 1rem); }
-.update-check-inline { margin-left: var(--space-md, 8px); }
-.update-check-result { color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); margin-left: var(--space-sm, 4px); }
-.update-check-result[data-error="1"] { color: var(--error); }
-
 /* The update channel and the releases waiting for approval (#5558) */
 .update-waiting { margin: 0 0 var(--space-lg, 12px); }
 .update-waiting > summary { cursor: pointer; font-weight: var(--fw-strong); min-height: var(--control-height, 32px); display: flex; align-items: center; color: var(--text-primary); }

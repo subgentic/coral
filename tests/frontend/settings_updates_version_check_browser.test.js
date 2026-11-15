@@ -27,7 +27,7 @@ const idle = (over = {}) => ({ enabled: true, installed: '2.0.70', state: 'none'
 
         // refresh the cached status from the stub, then open the Updates pane
         await ev(`import(${S} + 'update_ui.js').then(m => m.refreshUpdateStatus()).then(() => true)`);
-        await ev(`window.showSettingsModal('updates'); import(${S} + 'update_settings.js').then(m => m.showUpdatesPane()).then(() => true)`);
+        await ev(`(async () => { await window.showSettingsModal('updates'); const m = await import(${S} + 'update_settings.js'); await m.showUpdatesPane(); return true; })()`);
         await settle(300);
 
         // 1. version is shown at the top
@@ -59,7 +59,7 @@ const idle = (over = {}) => ({ enabled: true, installed: '2.0.70', state: 'none'
         await ev(`(() => { const R = window.fetch; window.fetch = (u, o = {}) => { const p = new URL(String(u), location.origin).pathname;
             if (p === '/api/system/update/check') return Promise.resolve(new Response('{}', { status: 429, headers: { 'content-type': 'application/json' } }));
             return window.fetch.__orig(u, o); }; window.fetch.__orig = R; return true; })()`);
-        await ev(`window.showSettingsModal('updates'); import(${S} + 'update_settings.js').then(m => m.showUpdatesPane()).then(() => true)`);
+        await ev(`(async () => { await window.showSettingsModal('updates'); const m = await import(${S} + 'update_settings.js'); await m.showUpdatesPane(); return true; })()`);
         await settle(300);
         await ev(`document.querySelector('#update-pane-body .update-check-inline').click(); true`);
         await settle(500);
