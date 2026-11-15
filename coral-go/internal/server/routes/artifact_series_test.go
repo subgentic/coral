@@ -132,7 +132,8 @@ func TestOnlyTheBoardThatUploadedAnArtifactCanAddAVersionOfIt(t *testing.T) {
 	_, _, in := digestSeries(rig.coralDir, solo)
 	assert.False(t, in, "and no series was started from it")
 	code, out = rig.uploadVersion("n1", "x.txt", "an agent on no board", "coral://artifacts/"+d[0])
-	assert.Equal(t, http.StatusForbidden, code, out)
+	assert.Equal(t, http.StatusNotFound, code, out) // an agent on no board may version its own files (#18131); a team's file is not found for it, as for another team
+	assert.Equal(t, "series_not_found", out["code"])
 	assert.Len(t, seriesMembers(rig.coralDir, sid), 3, "nothing was added by either")
 	// a made-up series id and a digest nobody uploaded look the same
 	code, out = rig.uploadVersion("a1", "x.txt", "whatever", "coral://artifacts/series/"+strings.Repeat("ab", 16))
@@ -436,4 +437,24 @@ func TestAnAgentRefusedOnSendIsToldTheDashboardOnly(t *testing.T) {
 	for route := range dashboardOnlyRoutes {
 		assert.Contains(t, operatorOnlyRoutes, route, "a dashboard-only route is an operator-only route")
 	}
+}
+
+// An agent on no board adds versions to its own file (#18131): the review loop of a single agent could not finish ("only an agent on a board can add a version"). Another agent on no board still cannot touch it.
+func TestAnAgentOnNoBoardAddsVersionsToItsOwnFileOnly(t *testing.T) {
+	rig, _ := ownerRig(t)
+	v1 := rig.uploadText("n1", "plan.txt", "no-board plan, first draft")
+	code, out := rig.uploadVersion("n1", "plan.txt", "no-board plan, second draft", "coral://artifacts/"+v1)
+	require.Equal(t, http.StatusCreated, code, out)
+	sid, _ := out["series_id"].(string)
+	require.Regexp(t, `^[0-9a-f]{32}$`, sid)
+	assert.EqualValues(t, 2, out["version"])
+	v2 := strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")
+	code, out = rig.uploadVersion("n1", "plan.txt", "no-board plan, third draft", "coral://artifacts/series/"+sid)
+	require.Equal(t, http.StatusCreated, code, out)
+	assert.EqualValues(t, 3, out["version"])
+	for name, ref := range map[string]string{"its digest": "coral://artifacts/" + v2, "its series": "coral://artifacts/series/" + sid} {
+		code, out = rig.uploadVersion("n2", "plan.txt", "another no-board agent: "+name, ref)
+		assert.Contains(t, []int{http.StatusNotFound, http.StatusForbidden}, code, name+": %v", out)
+	}
+	assert.Len(t, seriesMembers(rig.coralDir, sid), 3, "nothing was added by the other agent")
 }

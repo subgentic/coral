@@ -247,6 +247,10 @@ func (h *BoardHandler) standaloneUploads(ctx context.Context, have []teamArtifac
 	var out []teamArtifact
 	for _, it := range h.uploads.merge(nil, h.coralDir, sessions) {
 		if !listed[it.ID] {
+			if it.ProducedBy == nil && it.Uploader != "" { // the agent's own name as its Artifacts tab says it (#18131): Needs you read "sender unknown" for a single agent's file
+				name := it.Uploader
+				it.ProducedBy = &name
+			}
 			out = append(out, it)
 		}
 	}

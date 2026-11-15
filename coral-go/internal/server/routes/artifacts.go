@@ -313,7 +313,7 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 	if ref != "" {
 		callerBoard, _, _ := uploaderOf(sid)
 		var perr error
-		plan, perr = planNewVersion(coralDir, ref, callerBoard, hexID)
+		plan, perr = planNewVersion(coralDir, ref, callerBoard, hexID, sid)
 		if plan != nil {
 			plan.caller = chainUploader
 			// A new version keeps its file's name (#14145): a different name is a different file unless the agent says it is a rename. Only an upload that NAMED its file is checked: the server's own join of a task chain
