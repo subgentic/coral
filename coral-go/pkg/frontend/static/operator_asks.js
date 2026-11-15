@@ -7,16 +7,29 @@ import { readOutcome } from './needs_incomplete.js';
 import { isHiddenAsk, prepareAskReviews } from './ask_filter.js';
 import { importOnce } from './import_once.js';
 import { OPERATOR_ID } from './utils.js';
-import { state } from './state.js';
 import { showToast } from './notifications.js';
-import { isCloud, isLocalServer, serverFetch, LOCAL_SERVER, normServer, sessionServer, decisionNeedsPerson } from './server_base.js';
+import { isCloud, isLocalServer, serverFetch, LOCAL_SERVER, normServer, decisionNeedsPerson } from './server_base.js';
 import { inboxSources, ownerOnlyAt } from './inbox_servers.js';
 
 const FRESH_MS = 15000, LINE_MAX = 140;
 let asks = [], pending = null, lastRead = 0;
 const listeners = new Set();
 /** The open questions, oldest first (without one that only links a file for review). */
-export const operatorAsks = () => asks.filter(a => !isHiddenAsk(a));
+export const operatorAsks = () => {
+    const groups = new Map();
+    for (const a of asks.filter(a => !isHiddenAsk(a))) {
+        const key = duplicateKey(a), existing = groups.get(key);
+        if (existing) existing.duplicates.push(a);
+        else groups.set(key, { ...a, duplicates: [] });
+    }
+    return [...groups.values()];
+};
+// Exact whitespace-normalized words only; never infer identity from prose or a shared goal alone.
+const duplicateKey = a => a.kind !== 'ask' || a.cut || !String(a.text || '').trim() ? askKey(a) : JSON.stringify([
+    normServer(a.server), a.board, a.goal_id || 0, a.task_id || 0,
+    String(a.text).replace(/\s+/g, ' ').trim(),
+    (a.buttons || []).map(b => [b.label, b.action, b.arg || '', b.state]),
+]);
 /** Called after a read that changed the list. Returns the way to stop. */
 export const onOperatorAsksChanged = fn => { listeners.add(fn); return () => listeners.delete(fn); };
 const fire = () => { for (const f of listeners) f(); };
@@ -42,7 +55,7 @@ export function askLine(a) {
 /** A question as a row says it (#14574, Beta run 3): all of the preview (the first PREVIEW_IN characters, Markdown marks dropped, white space collapsed) so the row wraps it and an inbox-only person reads it where it stands; a question longer than the preview ends in an ellipsis, and Answer opens it whole. */
 export function askFull(a) {
     const one = byLines(plainMarkdown(previewText(a)));
-    return String((a && a.text) == null ? '' : a.text).length > PREVIEW_IN ? `${one.trimEnd()}\u2026` : one;
+    return (String((a && a.text) == null ? '' : a.text).length > PREVIEW_IN ? `${one.trimEnd()}\u2026` : one) + duplicateSources(a);
 }
 /** The whole question, hidden characters written out, line breaks kept. */
 export const askWhole = a => markHidden(a && a.text, { strict: true });
@@ -51,7 +64,7 @@ export const askIsLong = a => String((a && a.text) == null ? '' : a.text).length
 /** The question as an opened row says it (#14617): ALL the words the Operator's list carries (up to 4096 characters), white space collapsed as the preview's is; a question the server itself cut says so after it. */
 export function askOpened(a) {
     const one = byLines(plainMarkdown(askWhole(a)));
-    return a && a.cut ? `${one} \u2026 (cut: the board has the rest)` : one;
+    return (a && a.cut ? `${one} \u2026 (cut: the board has the rest)` : one) + duplicateSources(a);
 }
 /** A stable id of one question among the rows. */
 export const askKey = a => `operator-ask:${a.server && !isLocalServer(a.server) ? `${a.server}/` : ''}${a.board}:${a.kind}:${a.id}`; // two computers can each have a team of one name and a question of one number
@@ -115,9 +128,21 @@ export async function replyToAsk(a, text) {
         try { const b = await resp.json(); if (b && typeof b.error === 'string') why = b.error; } catch { /* not JSON */ }
         throw new Error(why ? `Not sent: ${why}` : `Not sent (HTTP ${resp.status}).`);
     }
+    await closeAnsweredDuplicates(a);
     asks = asks.filter(x => askKey(x) !== askKey(a)); // gone at once; the next read confirms it
     fire();
     refreshOperatorAsks(true);
+}
+
+/** Only after an answer succeeded: retire matching source asks with an explicit note, never another approval. Failed closes remain visible on refresh. */
+export async function closeAnsweredDuplicates(a) {
+    for (const other of a.duplicates || []) {
+        try {
+            const m = await importOnce('./ask_ignore.js');
+            await m.closeAnsweredAsk(other, a.id);
+            forgetAsk(other);
+        } catch { showToast('Reply sent. A duplicate question could not be closed; it remains in Needs you.', true); }
+    }
 }
 
 // ── Buttons an agent put on a question (#11445, #11643) ─────────────────────────────────────────────────
@@ -176,49 +201,7 @@ export const settleButton = (a, b, outcome) => buttonCall(a, b, 'settle', { outc
 
 /** Wake the member the button names: a sleeping agent of this Coral, through the route the dashboard's own Wake uses. The member is found on the question's own board (its subscriber, whose session name is
  * "<cli>-<session id>"), never by name alone across teams. Rejects in words when there is nothing to wake. */
-export async function wakeMember(a, name) {
-    const who = markHidden(name, { strict: true });
-    const server = normServer(a.server);
-    const r = await serverFetch(server, `/api/board/${encodeURIComponent(a.board)}/subscribers`);
-    if (!r.ok) throw new Error(`Could not read this team's members (HTTP ${r.status}).`);
-    const subs = await r.json().catch(() => []);
-    const sub = (Array.isArray(subs) ? subs : []).find(x => x && x.subscriber_id === name);
-    if (!sub || !sub.session_name) throw new Error(`${who} is not a member of this team that Coral can wake.`);
-    let live = (state.liveSessions || []).find(s => sessionServer(s) === server && `${s.agent_type}-${s.session_id}` === sub.session_name);
-    if (!live) {
-        // The page's list can lack an agent that is running (not loaded yet, or stale): only the server's own list says whether it is gone. A session that is running is never resumed (#14420, after #14172).
-        const real = await serverLiveRow(server, sub.session_name);
-        if (real.failed) throw new Error(`Could not check whether ${who} is running (${real.failed}), so nothing was started.`);
-        if (!real.row) return resumeEndedMember(server, a, name, who, sub.session_name); // an agent Stop agents (or its own exit) ended has no live row: its chat is resumed, as History's Resume does (#14172)
-        live = real.row;
-        if (!live.sleeping) { try { await (await importOnce('./api.js')).loadLiveSessions(); } catch { /* the list refreshes on its own tick */ } throw new Error(`${who} is running.`); } // the page's list is brought up to date, nothing is launched
-    }
-    if (!live.sleeping) throw new Error(`${who} is not asleep.`);
-    const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(live.session_id)}/wake`, { method: 'POST' });
-    if (!resp.ok) { // the server says why in a sentence (a CLI not installed, a path it cannot run: cli_not_found, cli_path_unusable, cli_untrusted_mount) and what to set: show it, not the status code (#12049)
-        const why = await resp.json().then(b => (b && typeof b.error === 'string' ? b.error.trim() : ''), () => '');
-        throw new Error(why ? `Could not wake ${who}: ${markHidden(why, { strict: true })}` : `Could not wake ${who} (HTTP ${resp.status}).`);
-    }
-}
-
-/** The row the SERVER lists for a session name ("<cli>-<session id>") on `server`: {row} (null when it lists none) or {failed} in words when it cannot be asked or answers something that is not a list. */
-async function serverLiveRow(server, sessionName) {
-    let r; try { r = await serverFetch(server, '/api/sessions/live'); } catch { return { failed: 'the computer did not answer' }; }
-    if (!r.ok) return { failed: `HTTP ${r.status}` };
-    const raw = await r.json().catch(() => null);
-    const rows = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.sessions) ? raw.sessions : null);
-    if (!rows) return { failed: 'its list was not readable' };
-    // The list was asked of ONE computer, so its rows are that computer's: a remote answers machine-local rows with no server tag (the tag is what the page adds when it merges lists), and an untagged row must not be taken for the local computer's (#14420, UI Reviewer). Only a row tagged for ANOTHER computer (a hub's merged list) is not this one's.
-    return { row: rows.find(s => s && (!s.server || sessionServer(s) === server) && `${s.agent_type}-${s.session_id}` === sessionName) || null };
-}
-
-/** An ended agent's Restart from a question (#14172): no live row any more, so its earlier chat is resumed (resume_ended.js), under its own name and team. */
-async function resumeEndedMember(server, a, name, who, sessionName) {
-    const m = /^([a-z][a-z0-9]*)-([A-Za-z0-9][A-Za-z0-9._-]*)$/.exec(String(sessionName || ''));
-    if (!m) throw new Error(`${who} is not running on this computer.`);
-    const { resumeEndedAgent } = await importOnce('./resume_ended.js');
-    return resumeEndedAgent(server, { agentType: m[1], sid: m[2], name }, a.board);
-}
+export async function wakeMember(a, name) { return (await importOnce('./operator_ask_wake.js')).wakeMember(a, name); }
 
 /** The dialog names the asker and team; the complete question is shown once in its body (#12722). */
 export function askParts(a) {
@@ -263,3 +246,5 @@ export function questionContextNote(a) {
     const reason = { task_completed: 'The linked task is finished.', task_reassigned: 'The linked task has a different assignee.' }[a?.may_no_longer_apply];
     return reason ? `May no longer apply. ${reason} The asker can close this question.` : '';
 }
+
+const duplicateSources = a => a?.duplicates?.length ? `\nAlso asked by ${a.duplicates.map(x => markHidden(x.asker || 'Agent', { strict: true })).join(', ')}.` : '';

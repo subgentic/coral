@@ -29,3 +29,6 @@ export async function ignoreAsk(a, who) {
 export const closeAsk = a => close(a, { note: NOTE });
 export const reopenAsk = (a, { unanswer = false } = {}) => close(a, { undo: true, ...(unanswer ? { unanswer: true } : {}) }).then(() => refreshOperatorAsks(true));
 export { refreshOperatorAsks };
+
+/** Retire an exact duplicate after its source question was answered successfully. */
+export const closeAnsweredAsk = (a, id) => close(a, { note: `Same question answered on message #${id}` });
