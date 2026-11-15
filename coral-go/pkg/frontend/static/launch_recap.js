@@ -2,6 +2,8 @@
  * fields (the fields stay the one place that sets anything), so it can never say one thing and the launch another. */
 import { modelName } from './model_labels.js';
 import { importOnce } from './import_once.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('launch_recap_phone.css'); // the phone's one-line recap and its toggle: not at start (#18082)
 const { TYPE, fetchFlags, flagsNodes } = await importOnce('./permission_flags_line.js'); // the flags line is shared with Restart and Resume (#15761)
 const { permissionDescription, PI_NO_PERMISSIONS } = await importOnce('./permission_flags.js'); // lazy like launch_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 
