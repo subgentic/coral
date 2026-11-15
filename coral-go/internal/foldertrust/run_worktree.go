@@ -61,84 +61,125 @@ func CheckRunWorktree(runDir, worktreesRoot string) (string, error) {
 	return realDir, nil
 }
 
+// writeSettings is replaceFile; the tests count its calls.
+var writeSettings = replaceFile
+
 // UntrustClaude removes the projects["<path>"] entry of Claude's settings file at cfg, for a run's worktree that is going away, and reports whether it removed one. Only that key goes; the file must be a
 // regular file and not a link, and is replaced through a temp file as TrustClaude does. An absent file or entry is not an error.
 func UntrustClaude(cfg, path string) (bool, error) {
+	n, err := untrustClaudeKeys(cfg, []string{path})
+	return n > 0, err
+}
+
+// untrustClaudeKeys removes each of keys from projects in one read and one write of the file (none present: no write), and returns how many were there.
+func untrustClaudeKeys(cfg string, keys []string) (int, error) {
 	raw, mode, err := readConfig(cfg)
 	if err != nil {
 		if errors.Is(err, ErrNoConfig) {
-			return false, nil
+			return 0, nil
 		}
-		return false, err
+		return 0, err
 	}
 	var top map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &top); err != nil || top == nil {
-		return false, errors.New("the settings file is not a JSON object")
+		return 0, errors.New("the settings file is not a JSON object")
 	}
 	var projects map[string]json.RawMessage
 	if p, ok := top["projects"]; !ok || json.Unmarshal(p, &projects) != nil || projects == nil {
-		return false, nil
+		return 0, nil
 	}
-	if _, ok := projects[path]; !ok {
-		return false, nil
+	n := 0
+	for _, k := range keys {
+		if _, ok := projects[k]; ok {
+			delete(projects, k)
+			n++
+		}
 	}
-	delete(projects, path)
+	if n == 0 {
+		return 0, nil
+	}
 	pb, err := marshalRaw(projects)
 	if err != nil {
-		return false, err
+		return 0, err
 	}
 	top["projects"] = pb
 	out, err := marshalRaw(top)
 	if err != nil {
-		return false, err
+		return 0, err
 	}
-	if err := replaceFile(cfg, append(out, '\n'), mode); err != nil {
-		return false, err
+	if err := writeSettings(cfg, append(out, '\n'), mode); err != nil {
+		return 0, err
 	}
-	return true, nil
+	return n, nil
 }
 
 // UntrustCodex removes the [projects."<path>"] table TrustCodex added to Codex's config.toml at cfg: exactly its two lines (trust_level = "trusted"), and only if the file still parses afterwards. A table with
 // anything else in it, or a file that does not match, is left as it is. It reports whether it removed one.
 func UntrustCodex(cfg, path string) (bool, error) {
-	key, err := codexTableKey(path, runtime.GOOS == "windows")
-	if err != nil {
-		return false, err
-	}
+	n, err := untrustCodexKeys(cfg, []string{path})
+	return n > 0, err
+}
+
+// untrustCodexKeys removes the table of each of paths in one read and one write of the file, each removal checked in memory as UntrustCodex's is (a table that cannot be taken out cleanly stays; the first such
+// error is returned after the others are done), and returns how many it removed. Nothing removed: no write.
+func untrustCodexKeys(cfg string, paths []string) (int, error) {
 	existing, mode, err := readConfig(cfg)
 	if err != nil {
 		if errors.Is(err, ErrNoConfig) {
-			return false, nil
+			return 0, nil
 		}
-		return false, err
+		return 0, err
 	}
-	block := []byte(fmt.Sprintf("[projects.%s]\ntrust_level = \"trusted\"\n", key))
-	i := bytes.Index(existing, block)
-	if i < 0 || (i > 0 && existing[i-1] != '\n') {
-		return false, nil
+	text := existing
+	n := 0
+	var firstErr error
+	for _, path := range paths {
+		key, err := codexTableKey(path, runtime.GOOS == "windows")
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		block := []byte(fmt.Sprintf("[projects.%s]\ntrust_level = \"trusted\"\n", key))
+		i := bytes.Index(text, block)
+		if i < 0 || (i > 0 && text[i-1] != '\n') {
+			continue
+		}
+		next := append([]byte(nil), text[:i]...)
+		next = append(next, text[i+len(block):]...)
+		next = bytes.TrimRight(next, "\n")
+		if len(next) > 0 {
+			next = append(next, '\n')
+		}
+		var check map[string]any
+		if err := toml.Unmarshal(next, &check); err != nil && len(next) > 0 {
+			if firstErr == nil {
+				firstErr = errors.New("the table could not be removed without breaking Codex's settings file")
+			}
+			continue
+		}
+		text = next
+		n++
 	}
-	text := append([]byte(nil), existing[:i]...)
-	text = append(text, existing[i+len(block):]...)
-	text = bytes.TrimRight(text, "\n")
-	if len(text) > 0 {
-		text = append(text, '\n')
+	if n == 0 {
+		return 0, firstErr
 	}
-	var check map[string]any
-	if err := toml.Unmarshal(text, &check); err != nil && len(text) > 0 {
-		return false, errors.New("the table could not be removed without breaking Codex's settings file")
+	if err := writeSettings(cfg, text, mode); err != nil {
+		return 0, err
 	}
-	if err := replaceFile(cfg, text, mode); err != nil {
-		return false, err
-	}
-	return true, nil
+	return n, firstErr
 }
 
 // SweepGoneRunFolders removes the trust entries of run worktrees whose folder no longer exists (#17396): git keeps a worktree that has unsaved work and Coral's cleanup then leaves its entry, and a folder removed by
 // hand never had its entry removed. Only keys directly inside worktreesRoot (as given or resolved) named job-run-<something> whose folder is absent (not "cannot be read": any other error keeps the entry) are
-// taken, from Claude's settings at claudeCfg and Codex's at codexCfg, each through the same removal as a finished run's. It returns how many it removed; the first error stops that file, not the other.
+// taken, from Claude's settings at claudeCfg and Codex's at codexCfg, each file read once and written once for all of them (and not at all when none is gone). With a worktrees root that does not exist nothing is taken. It returns how many it removed; an error in one file does not stop the other.
 func SweepGoneRunFolders(claudeCfg, codexCfg, worktreesRoot string) (int, error) {
 	if worktreesRoot == "" || !filepath.IsAbs(worktreesRoot) {
 		return 0, nil
+	}
+	if fi, err := os.Stat(worktreesRoot); err != nil || !fi.IsDir() {
+		return 0, nil // an unmounted volume or a removed folder makes every key look gone: nothing is taken unless the root itself is there
 	}
 	roots := []string{filepath.Clean(worktreesRoot)}
 	if r, err := filepath.EvalSymlinks(worktreesRoot); err == nil && filepath.Clean(r) != roots[0] {
@@ -165,17 +206,15 @@ func SweepGoneRunFolders(claudeCfg, codexCfg, worktreesRoot string) (int, error)
 			Projects map[string]json.RawMessage `json:"projects"`
 		}
 		if json.Unmarshal(raw, &top) == nil {
+			var keys []string
 			for key := range top.Projects {
-				if !gone(key) {
-					continue
-				}
-				if ok, err := UntrustClaude(claudeCfg, key); err != nil {
-					firstErr = err
-					break
-				} else if ok {
-					removed++
+				if gone(key) {
+					keys = append(keys, key)
 				}
 			}
+			n, err := untrustClaudeKeys(claudeCfg, keys)
+			removed += n
+			firstErr = err
 		}
 	} else if !errors.Is(err, ErrNoConfig) {
 		firstErr = err
@@ -185,18 +224,16 @@ func SweepGoneRunFolders(claudeCfg, codexCfg, worktreesRoot string) (int, error)
 			Projects map[string]any `toml:"projects"`
 		}
 		if toml.Unmarshal(raw, &top) == nil {
+			var keys []string
 			for key := range top.Projects {
-				if !gone(key) {
-					continue
+				if gone(key) {
+					keys = append(keys, key)
 				}
-				if ok, err := UntrustCodex(codexCfg, key); err != nil {
-					if firstErr == nil {
-						firstErr = err
-					}
-					break
-				} else if ok {
-					removed++
-				}
+			}
+			n, err := untrustCodexKeys(codexCfg, keys)
+			removed += n
+			if firstErr == nil {
+				firstErr = err
 			}
 		}
 	} else if !errors.Is(err, ErrNoConfig) && firstErr == nil {
