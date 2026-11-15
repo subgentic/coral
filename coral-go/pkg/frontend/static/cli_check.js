@@ -1,7 +1,7 @@
 /* Moved out of modals.js as it was (#3844): no behaviour change. */
 import { importOnce } from './import_once.js';
 const { _acfServer } = await importOnce('./launch_models.js');
-import { checkAgentCLI } from './prerequisites.js';
+const { checkAgentCLI } = await importOnce('./prerequisites.js');
 
 // ── CLI Availability Check ────────────────────────────────────────────────
 // Mirrors agentCLIs in internal/agent/agent.go (a Go test keeps them equal): the install command, the vendor's own install page and,

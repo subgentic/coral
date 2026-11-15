@@ -14,7 +14,7 @@ const { launch } = await importOnce('./launch_state.js');
 const { _effectiveServer, _loadServerSettings, _serverSettings, _settingsFor } = await importOnce('./launch_models.js');
 const { defaultPermissionMode, syncDefaultPermissionMode, _normalizePermFlagsForAgent, _updatePermModeDescription, _hasPermFlag } = await importOnce('./permission_flags.js');
 const { _checkAgentCLI } = await importOnce('./cli_check.js');
-import { checkTmuxForLaunch } from './prerequisites.js';
+const { checkTmuxForLaunch } = await importOnce('./prerequisites.js');
 import { reportLaunchDialogOpened } from './dashboard_analytics.js';
 import { sectionFocus } from './section_dialog.js';
 import { loadStyles } from './lazy_styles.js';

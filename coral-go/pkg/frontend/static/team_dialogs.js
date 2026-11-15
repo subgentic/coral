@@ -8,7 +8,7 @@ import { loadLiveSessions } from './api.js';
 import { recordRecentDir, getRecentDirs, pruneMissingRecents } from './browser.js';
 import { teamForm, showTeamWorktree, showTeamWorkers, syncSuggestionExists, trustTicked, resetFolderTrust, scheduleFolderTrust } from './team_form.js';
 import { agentNameForm } from './agent_form.js';
-import { cliPathButton } from './prerequisites.js';
+const { cliPathButton } = await importOnce('./prerequisites.js');
 import { serverFetch, boardFetch, identityKey, LOCAL_SERVER, isHub } from './server_base.js';
 const { launch } = await importOnce('./launch_state.js');
 const { goalWrite } = await importOnce('./goal_write.js');

@@ -14,7 +14,7 @@ import './team_form.js';
 import './agent_form.js';
 import './branch_expand.js';
 import './nav_tabs.js';
-import { initPrerequisiteChecks } from './prerequisites.js';
+import { initPrerequisiteChecks } from './tmux_banner.js';
 import './system_status.js';
 import { beginDashboardAnalytics, dashboardInitialized, dashboardFailed } from './dashboard_analytics.js';
 import './agent_ui.js';
