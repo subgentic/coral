@@ -41,7 +41,7 @@ const (
 // ratio of the two boxes' calibration). It is the fastest of five runs, so a box that is loaded does not read slow, and it never lowers the goal (below 1) or raises it past 3: the cache-less code is 4 or more times the goal
 // whatever the machine, and the allocation bound below catches losing the fast path with no clock at all.
 const (
-	calibrationRefMs = 0 // set from the Mac's measurement below
+	calibrationRefMs = 290 // the Mac: 287 to 307 ms (epoch-go: 716 to 792 ms, so a goal of about 2.5 times)
 	maxSlowdown      = 3.0
 )
 
@@ -234,6 +234,14 @@ func TestNeedsYouWalkOfABigBoardIsUnderTheGoal(t *testing.T) {
 		t.Errorf("the walk allocated %.0f MB, over the bound's %d MB: a page must not copy the list it is cut from (#13614)", allocMB, walkAllocBoundMB)
 	}
 	_ = fmt.Sprint
+}
+
+// #17951: the calibration never lowers the goal and never raises it past maxSlowdown times.
+func TestMachineSlowdownIsBetweenOneAndTheCap(t *testing.T) {
+	f := machineSlowdown(t)
+	if f < 1 || f > maxSlowdown {
+		t.Fatalf("slowdown %.2f is outside [1, %.0f]", f, maxSlowdown)
+	}
 }
 
 // #15480: a stall in one timed walk (a loaded machine) is not a slow walk; three walks over the goal are.
