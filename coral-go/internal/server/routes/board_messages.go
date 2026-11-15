@@ -149,6 +149,16 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	if derr == nil && body.SameAs != 0 {
+		if !body.Ask {
+			errBadRequest(w, "--same-as links a question to an earlier one: use it with --ask")
+			return
+		}
+		if body.SameAs < 0 || h.checkSameAs(r.Context(), project, body.SameAs) != nil {
+			errBadRequest(w, fmt.Sprintf("message %d is not an open question of this team, so this one cannot be the same as it", body.SameAs))
+			return
+		}
+	}
 	if derr == nil && (body.AskGoal != 0 || body.AskTask != 0) {
 		if !body.Ask {
 			errBadRequest(w, "--goal and --task on a post name what a question is about: use them with --ask")
@@ -211,6 +221,11 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 				slog.Warn("board ask not recorded", "board", project, "message", msg.ID, "error", err)
 			} else {
 				h.recordAskSubject(r.Context(), project, msg, body.AskGoal, body.AskTask)
+				if body.SameAs > 0 {
+					if err := h.bs.LinkAsk(r.Context(), project, msg.ID, body.SameAs); err != nil {
+						slog.Warn("board ask not linked", "board", project, "message", msg.ID, "same_as", body.SameAs, "error", err)
+					}
+				}
 			}
 			if len(buttons) > 0 {
 				if err := h.bs.RecordAskButtons(r.Context(), project, msg.ID, buttons, time.Now()); err != nil {
@@ -223,6 +238,11 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 	if body.ReplyTo > 0 {
 		if err := h.bs.RecordReply(r.Context(), project, msg.ID, body.ReplyTo); err != nil {
 			slog.Warn("board reply not recorded", "board", project, "message", msg.ID, "error", err)
+		}
+		if !body.DryRun {
+			if asked, err := h.bs.GetMessageByID(r.Context(), project, body.ReplyTo); err == nil && asked != nil && asked.Ask != nil && !asked.Ask.Closed && askedHas(asked.Ask.To, msg.SubscriberID) {
+				h.tellLinkedAskers(r, project, body.ReplyTo, msg) // an answer of one of several linked questions answers them all (#17738)
+			}
 		}
 		if strings.EqualFold(msg.SubscriberID, board.OperatorName) && humanInputCaller(r) { // the Inbox's numbers (#7512): the Operator answered a question put to them
 			if asked, err := h.bs.GetMessageByID(r.Context(), project, body.ReplyTo); err == nil && asked != nil && asked.Ask != nil {
@@ -274,6 +294,8 @@ type postMessageBody struct {
 	Ask bool `json:"ask,omitempty"`
 	// Again posts a question to the Operator even when the same sender's identical one is still open (#16135): without it that second post is answered with the first one's id and duplicate=true, nothing stored.
 	Again bool `json:"again,omitempty"`
+	// SameAs links a question to an earlier open one that is the same question (#17738): they share a key, and one answer closes both. Only a question (Ask) takes it.
+	SameAs int64 `json:"same_as,omitempty"`
 	// AskGoal and AskTask say which goal and which task a question is about (#12164): both must be of this board, and only a question (Ask) takes them. An agent with exactly one claimed task attaches it, and its goal, when it says neither.
 	AskGoal int64 `json:"ask_goal,omitempty"`
 	AskTask int64 `json:"ask_task,omitempty"`
@@ -958,4 +980,65 @@ func (h *BoardHandler) answerDuplicateOperatorAsk(w http.ResponseWriter, r *http
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "duplicate": true, "message": fmt.Sprintf("Already asked as #%d; it is still open in Needs you.", id)})
 	return true
+}
+
+// checkSameAs: id is an ask of this team that nobody has answered or closed yet (#17738).
+func (h *BoardHandler) checkSameAs(ctx context.Context, project string, id int64) error {
+	m, err := h.bs.GetMessageByID(ctx, project, id)
+	if err != nil || m == nil || m.Ask == nil {
+		return board.ErrAskUnknown
+	}
+	if m.Ask.Answered || m.Ask.Closed {
+		return board.ErrAskUnknown
+	}
+	return nil
+}
+
+// tellLinkedAskers: an answer to a question that other askers put the same way (post --same-as) answers theirs too, so each of them is told with a post that names them (#17738). The answer's own words are
+// quoted cut and defused, and nobody is told twice or told what they asked themselves.
+func (h *BoardHandler) tellLinkedAskers(r *http.Request, project string, askID int64, answer *board.Message) {
+	group, err := h.bs.AskGroupOf(r.Context(), project, askID)
+	if err != nil || len(group) == 0 {
+		return
+	}
+	own, _ := h.bs.AskAsker(r.Context(), project, askID)
+	told := map[string]bool{strings.ToLower(own): true}
+	for _, g := range group {
+		k := strings.ToLower(g.Asker)
+		if told[k] {
+			continue
+		}
+		told[k] = true
+		h.tellAsker(r, project, answer.SubscriberID, g.Asker, g.ID, fmt.Sprintf("your question #%d was answered: the same question as #%d got this answer in #%d: ", g.ID, askID, answer.ID), answer.Content)
+	}
+}
+
+// tellAsker posts one line from `from` that starts with a mention of asker, as a reply to that asker's question askID (a reply to one message answers only that one, so it closes none of their other
+// questions); quoted is cleaned, cut and defused so it calls no one.
+func (h *BoardHandler) tellAsker(r *http.Request, project, from, asker string, askID int64, line, quoted string) {
+	text, _ := operatorAskText(quoted)
+	if rs := []rune(text); len(rs) > 300 {
+		text = string(rs[:300]) + "…"
+	}
+	content := strings.TrimSpace("@" + asker + " " + line + board.DefuseMentions(clitext.Clean(text), h.bs.BoardMentionNames(r.Context(), project)))
+	msg, err := h.bs.PostMessage(r.Context(), project, from, content, nil)
+	if err != nil {
+		slog.Warn("linked asker not told", "board", project, "asker", asker, "error", err)
+		return
+	}
+	if err := h.bs.RecordReply(r.Context(), project, msg.ID, askID); err != nil {
+		slog.Warn("note to an asker not linked to their question", "board", project, "message", msg.ID, "error", err)
+	}
+	if h.notifyFn != nil {
+		h.notifyFn(project)
+	}
+}
+
+func askedHas(to []string, who string) bool {
+	for _, t := range to {
+		if strings.EqualFold(t, who) {
+			return true
+		}
+	}
+	return false
 }

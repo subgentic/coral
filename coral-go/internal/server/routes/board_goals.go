@@ -559,6 +559,7 @@ func (h *BoardHandler) CloseGoal(w http.ResponseWriter, r *http.Request) {
 		noun = "open task"
 	}
 	h.postGoalLine(r, project, actor, "Goal #"+strconv.FormatInt(g.ID, 10)+" \""+g.Title+"\" is closed as "+g.State+": "+g.ClosedReason+" ("+strconv.Itoa(open)+" "+noun+" left)")
+	h.retireGoalAsks(r, project, actor, g)
 	if actor == board.OperatorName && humanInputCaller(r) {
 		h.recordActivity(r, board.ActGoalDone, "goal", strconv.FormatInt(g.ID, 10), project, g.Title, g.State+": "+g.ClosedReason)
 		if surfaceOf(r) == "inbox" { // the Inbox's "goal looks done" row closed it (#7512); a goal closed elsewhere is not an Inbox action
@@ -697,4 +698,17 @@ func goalEditedLine(actor string, g *board.Goal, wasTitle, wasOutcome, wasDoneWh
 		return ""
 	}
 	return "Goal #" + strconv.FormatInt(g.ID, 10) + " was edited by " + actor + ". New " + strings.Join(parts, "; ") + ". Read it again with: coral-board goal show " + strconv.FormatInt(g.ID, 10)
+}
+
+// retireGoalAsks: the questions still open about a goal that has just closed are resolved, not approved (#17738), and each asker is told, so no one waits on an answer to a question that no longer applies.
+func (h *BoardHandler) retireGoalAsks(r *http.Request, project, actor string, g *board.Goal) {
+	note := "goal #" + strconv.FormatInt(g.ID, 10) + " closed as " + g.State
+	retired, err := h.bs.RetireGoalAsks(r.Context(), project, g.ID, note, time.Now())
+	if err != nil {
+		slog.Warn("goal questions not retired", "project", project, "goal", g.ID, "error", err)
+		return
+	}
+	for _, a := range retired {
+		h.tellAsker(r, project, actor, a.Asker, a.ID, fmt.Sprintf("your question #%d is closed, not answered: goal #%d closed as %s. Ask again if it still matters.", a.ID, g.ID, g.State), "")
+	}
 }

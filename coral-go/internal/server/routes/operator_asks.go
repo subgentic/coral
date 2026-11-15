@@ -53,6 +53,8 @@ type operatorAskRow struct {
 	TaskInReview bool `json:"task_in_review,omitempty"`
 	// Superseded: the same agent has asked again on this team since (#15078). The row says so and offers Dismiss first; nothing is closed on its own.
 	Superseded bool `json:"superseded,omitempty"`
+	// Key is the id of the first of the questions that are the same question (post --ask --same-as, #17738): rows with one key are one question to answer once. Absent for a question that is alone.
+	Key int64 `json:"key,omitempty"`
 }
 
 // markSuperseded flags, among rows[from:] (one team's open questions), every question of an agent that has asked again since: the newest of each asker is not flagged (#15078). Waits are not questions and
@@ -107,6 +109,7 @@ func (h *BoardHandler) OperatorAsks(w http.ResponseWriter, r *http.Request) {
 		}
 		withButtons, _ := h.bs.AskButtonsOf(ctx, p.Project, ids)
 		subjects, links := h.askSubjects(ctx, p.Project, ids) // the goal and task each question is about (#12164)
+		keys, _ := h.bs.AskKeysOf(ctx, p.Project, ids)        // the questions that are the same one (#17738)
 		boardStart := len(rows)
 		var reviewed map[string]bool // read once per team, and only when a message of it is only links to files (#12096)
 		for _, a := range asks {
@@ -123,7 +126,7 @@ func (h *BoardHandler) OperatorAsks(w http.ResponseWriter, r *http.Request) {
 			}
 			text, cut := operatorAskText(a.Content)
 			rows = append(rows, operatorAskRow{Board: p.Project, BoardLabel: clitext.CleanName(p.BoardLabel), Kind: "ask", ID: a.MessageID, Asker: clitext.CleanName(a.Asker), Text: text, Cut: cut, At: a.At.UTC().Format(time.RFC3339), Buttons: withButtons[a.MessageID],
-				GoalID: subjects[a.MessageID].GoalID, TaskID: subjects[a.MessageID].TaskID, GoalTitle: links.goalTitle(ctx, subjects[a.MessageID].GoalID), TaskTitle: links.taskTitle(ctx, subjects[a.MessageID].TaskID), MayNoLongerApply: subjects[a.MessageID].MayNoLongerApply, TaskInReview: subjects[a.MessageID].TaskInReview})
+				GoalID: subjects[a.MessageID].GoalID, TaskID: subjects[a.MessageID].TaskID, GoalTitle: links.goalTitle(ctx, subjects[a.MessageID].GoalID), TaskTitle: links.taskTitle(ctx, subjects[a.MessageID].TaskID), MayNoLongerApply: subjects[a.MessageID].MayNoLongerApply, TaskInReview: subjects[a.MessageID].TaskInReview, Key: keys[a.MessageID]})
 		}
 		markSuperseded(rows, boardStart)
 		waits, err := h.bs.ListOperatorQuestions(ctx, p.Project)

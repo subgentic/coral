@@ -141,7 +141,7 @@ any board message ends the wait.`
 
 // postFlags and sendFlags are the options of post and of send. They are read in any case (--TO is --to) and anywhere before or among the words of the message.
 var (
-	postFlags = []string{"--to", "--file", "--task", "--assign", "--goal", "--title", "--priority", "--ask", "--reply-to", "--guide", "--button", "--yes-no", "--again", "--withdraw"}
+	postFlags = []string{"--to", "--file", "--task", "--assign", "--goal", "--title", "--priority", "--ask", "--reply-to", "--guide", "--button", "--yes-no", "--again", "--withdraw", "--same-as"}
 	sendFlags = []string{"--board", "--to", "--address", "--reply-to", "--message-id", "--attach", "--file"}
 )
 

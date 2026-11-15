@@ -86,3 +86,20 @@ func TestPostWithdrawTakesBackMyQuestion(t *testing.T) {
 	}
 	assert.Len(t, reqs(), 1, "a bad withdraw sends nothing")
 }
+
+// #17738: --same-as N links a question to an earlier open one and is sent as same_as; it needs --ask and a whole message number.
+func TestPostAskSameAsIsSentAndChecked(t *testing.T) {
+	srv, reqs := answerServer(t, `{"id": 90, "notified": ["Operator"], "ask": {"to": ["Operator"]}}`)
+	dir := subscribedDataDir(t, srv.URL)
+	res := runBoard(t, srv.URL, dir, "post", "--ask", "--same-as", "#41", "@Operator Ship it?")
+	require.Equal(t, 0, res.code, res.stderr)
+	assert.Contains(t, reqs()[0], `"same_as":41`)
+
+	before := len(reqs())
+	for _, args := range [][]string{{"post", "--same-as", "41", "@Operator Ship it?"}, {"post", "--ask", "--same-as", "x", "@Operator Ship it?"}, {"post", "--ask", "--same-as", "0", "@Operator Ship it?"}} {
+		res = runBoard(t, srv.URL, dir, args...)
+		assert.Equal(t, 2, res.code, "%v: %s", args, res.stderr)
+		assert.Contains(t, res.stderr, "--same-as")
+	}
+	assert.Len(t, reqs(), before, "nothing is posted for a refused --same-as")
+}
