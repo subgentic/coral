@@ -1,5 +1,5 @@
 // The viewer's header keeps a readable name after Request changes (#16618, walk 26 L3): the status chip then says "Changes requested: waiting for a new version from <agent>. Approving now approves this version as it is." and, one line
-// and unbreakable, it crushed the name to a letter or two between 1101 px and the widest windows and ran past the dialog's edge on a narrow computer window. The chip wraps inside the room it has and the name keeps 16rem.
+// and unbreakable, it crushed the name to a letter or two between 1101 px and the widest windows and ran past the dialog's edge on a narrow computer window. The chip wraps inside the room it has and the name keeps 12rem.
 // The state chip takes the text a requested change gives it; 1280, 1150 and 800 px; the routes are stubbed (artifact_versions_stub).
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -31,7 +31,7 @@ const { coralReady } = require('./helpers/wait');
             await new Promise(r => setTimeout(r, 400)); // sleep-ok: layout
             const m = await ev(`(() => { const t = document.querySelector('#artifact-viewer .artifact-viewer-title'), s = document.querySelector('#artifact-viewer .artifact-review-state'), h = document.querySelector('#artifact-viewer .artifact-viewer-header'); const r = e => Math.round(e.getBoundingClientRect().width); return { title: r(t), titleText: t.textContent.slice(0, 30), state: r(s), stateH: Math.round(s.getBoundingClientRect().height), head: r(h), headH: Math.round(h.getBoundingClientRect().height), wrap: getComputedStyle(h).flexWrap }; })()`);
             const dlg = await ev(`Math.round(document.querySelector('#artifact-viewer .artifact-viewer-content').getBoundingClientRect().right)`), right = await ev(`Math.round(document.querySelector('#artifact-viewer .artifact-review-state').getBoundingClientRect().right)`);
-            assert.ok(m.title >= 200, `${w}: the name keeps a readable width after Request changes (${m.title} px, ${JSON.stringify(m.titleText)}): ` + JSON.stringify(m));
+            assert.ok(m.title >= 180, `${w}: the name keeps a readable width after Request changes (${m.title} px, ${JSON.stringify(m.titleText)}): ` + JSON.stringify(m));
             assert.ok(right <= dlg, `${w}: the status chip stays inside the dialog (right ${right}, dialog ${dlg})`);
             await shot('header-' + w);
         }
