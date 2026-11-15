@@ -10,7 +10,7 @@ const { connect } = require('./agent_view_harness');
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const base = o => Object.assign({ name: 'coral-go', display_name: '', agent_type: 'claude', summary: 'Ship the release plan', model: 'claude-opus-5-5', branch: 'feat/long-branch-name', repo_name: 'coral', working_directory: '/work/coral-project', context_pct: 10, working: false, waiting_for_input: false, not_started: false, stuck: false, sleeping: false, awaiting_user: false, done: false, board_project: '', board_unread: 0 }, o);
     const ROWS = [
-        base({ session_id: 'o1', display_name: 'Worker', working: true, thinking_actual: 'high' }), // the newest turn ran at High: the header's model line and Details say it (#9826)
+        base({ session_id: 'o1', display_name: 'Worker', working: true, thinking: 'high', thinking_actual: 'high' }), // the newest turn ran at High: the header's model line and Details say it (#9826)
         base({ session_id: 'o2', display_name: 'Asker', waiting_for_input: true, waiting_kind: 'permission' }),
         base({ session_id: 'o3', display_name: 'Held', board_project: 'team-a', board_unread: 2, skipped_send: { why: 'a prompt is open', what: 'nudge' } }),
         base({ session_id: 'o4', display_name: 'Asker and held', waiting_for_input: true, waiting_kind: 'question', board_project: 'team-a', board_unread: 1, skipped_send: { why: 'a prompt is open', what: 'nudge' } }),

@@ -8,7 +8,7 @@ import { serverFetch, normServer } from './server_base.js';
 import { escapeHtml, escapeAttr, showToast } from './utils.js';
 import { importOnce } from './import_once.js';
 import { familyOf, addCustomModel, probeCanAdd, peekCanAdd } from './custom_model_add.js';
-import { modelLabel, readModelsCache, writeModelsCache, clearModelsCache, levelName } from './model_labels.js';
+import { modelLabel, readModelsCache, writeModelsCache, clearModelsCache, levelName, sessionLevel } from './model_labels.js';
 import { setText, setHidden, setTitle, setData, setAttr } from './dom_write.js';
 import { modeChip, keepChip, keepEventMatches } from './codex_mode.js';
 import { menuMove } from './menu_keys.js';
@@ -41,8 +41,8 @@ function parts() {
 function chipView(s, server) {
     const base = modelLabel(s.agent_type, s.model, server) || 'CLI default'; // no model set: the chip reads "Model: CLI default", never "Model: Model" (#7063)
     const sw = s.model_switch;
-    const lvl = levelName(s.thinking_actual || s.thinking || '');
-    const view = { model: { text: base, state: '' }, thinking: { text: lvl ? lvl + (s.thinking ? '' : ' (default)') : 'Default', state: !s.thinking_actual && s.thinking ? 'requested' : '' }, note: '' };
+    const L = sessionLevel(s);
+    const view = { model: { text: base, state: '' }, thinking: { text: L ? L.name : 'Default', state: L?.requested ? 'requested' : '' }, note: '' };
     if (view.thinking.state === 'requested') view.note = `Thinking ${view.thinking.text} was set when it started; the agent has not confirmed it yet.`; // names the setting: on a phone the chip it describes is not drawn (#12465)
     if (sw && sw.state === 'pending') {
         // The chip(s) the switch concerns say "Switching to …"; the other keeps saying what runs.
