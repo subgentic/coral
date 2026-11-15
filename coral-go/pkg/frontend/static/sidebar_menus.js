@@ -6,6 +6,11 @@ import { browserLocal } from './safe_storage.js';
 import { ensureBuilt, onBuilt } from './lazy_dom.js';
 import { importOnce } from './import_once.js';
 
+// What each item does (menu_help.js, lazy): fetched once the page is up, so a menu's help lines are drawn with the menu, before it is measured and before a pointer can be aimed at it; a phone shows them under the
+// labels and drawing them a tick later moved the items under the pointer (#17492).
+let describeMenu = null;
+setTimeout(() => importOnce('./menu_help.js').then(m => { describeMenu = m.describe; }).catch(() => {}), 0);
+
 // ── Sidebar kebab menu helpers ───────────────────────────────────────────
 // With restoreFocus (Escape) the focus goes back to the button of the menu that was open, when it was inside it (#4621).
 export function closeSidebarKebabs({ restoreFocus = false } = {}) {
@@ -34,6 +39,7 @@ export function toggleSidebarKebab(btn, event) {
         // Measured hidden; the tablet drawer (#15258) transforms and clips, so its box is the window
         menu.style.visibility = 'hidden';
         menu.style.display = 'block';
+        if (describeMenu) describeMenu(menu);
         const r = btn.getBoundingClientRect(), sb = menu.closest('.tablet-open');
         const x = sb ? sb.getBoundingClientRect() : new DOMRect(0, 0, innerWidth, innerHeight);
         // A menu longer than the screen scrolls inside it and never runs past its edge: a phone's row menu is 16 items (#17333), and Stop at the foot must be reachable.

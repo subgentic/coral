@@ -43,8 +43,8 @@ export function describe(menu) {
         const foot = document.createElement('div');
         foot.className = 'menu-help-foot'; foot.setAttribute('aria-hidden', 'true'); foot.textContent = HINT;
         menu.append(foot);
-        const r = menu.getBoundingClientRect(); // the menu grew under its button: keep it on the screen
-        if (r.height && r.bottom > innerHeight - 4) menu.style.top = Math.max(4, (parseFloat(menu.style.top) || 0) - (r.bottom - (innerHeight - 4))) + 'px';
+        const r = menu.getBoundingClientRect(); // the menu grew under its button: keep it on the screen. Its top stays where it was drawn (moving it put another item under a pointer that was already aimed, #17492): the menu ends at the screen's edge and scrolls instead.
+        if (r.height && r.bottom > innerHeight - 4) { menu.style.maxHeight = Math.max(120, innerHeight - 4 - r.top) + 'px'; menu.style.overflowY = 'auto'; }
     }
 }
 
