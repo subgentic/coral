@@ -18,7 +18,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/tmp'])); true`);
         await openNewAgent(ev, waitFor);
         for (let i = 0; i < 4 && !/Step 3 of 3/.test(await stepLine(ev)); i++) {
-            await ev(`(() => { const b = [...document.querySelectorAll('[role=dialog] button')].find(x => /^Next$/.test(x.textContent.trim()) && x.getClientRects().length); const f = document.getElementById('launch-dir'); if (f && !f.value) { f.value = '/tmp'; f.dispatchEvent(new Event('input', { bubbles: true })); } if (b) b.click(); return true; })()`);
+            await ev(`(() => { const b = [...document.querySelectorAll('[role=dialog] button')].find(x => /^(Next|Choose model)$/.test(x.textContent.trim()) && x.getClientRects().length); const f = document.getElementById('launch-dir'); if (f && !f.value) { f.value = '/tmp'; f.dispatchEvent(new Event('input', { bubbles: true })); } if (b) b.click(); return true; })()`);
             await waitFor(`/Step ${i + 2} of 3|Step 3 of 3/.test(document.querySelector('[role=dialog]')?.textContent || '')`, 'the next step', 4000).catch(() => {});
         }
         await waitFor(`!!document.querySelector('#launch-step-agent .provider-card-body:not([hidden]) .acf-model-select') && document.querySelector('#launch-step-agent .provider-card-body:not([hidden]) .acf-model-select').getClientRects().length > 0`, 'the Model field in the open card', 8000);

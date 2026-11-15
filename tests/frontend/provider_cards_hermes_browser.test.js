@@ -13,7 +13,7 @@ const WHY = "Hermes isn't offered on Windows yet: it has not been tried with Cor
     const S = `(window.__coralStatic || '/static/')`;
     const toAgentStep = async () => {
         for (let i = 0; i < 4 && !/Step 3 of 3/.test(await stepLine(ev)); i++) {
-            await ev(`(() => { const b = [...document.querySelectorAll('[role=dialog] button')].find(x => /^Next$/.test(x.textContent.trim()) && x.getClientRects().length); const f = document.getElementById('launch-dir'); if (f && !f.value) { f.value = '/tmp'; f.dispatchEvent(new Event('input', { bubbles: true })); } if (b) b.click(); return true; })()`);
+            await ev(`(() => { const b = [...document.querySelectorAll('[role=dialog] button')].find(x => /^(Next|Choose model)$/.test(x.textContent.trim()) && x.getClientRects().length); const f = document.getElementById('launch-dir'); if (f && !f.value) { f.value = '/tmp'; f.dispatchEvent(new Event('input', { bubbles: true })); } if (b) b.click(); return true; })()`);
             await waitFor(`/Step ${i + 2} of 3|Step 3 of 3/.test(document.querySelector('[role=dialog]')?.textContent || '')`, 'the next step', 4000).catch(() => {});
         }
         await waitFor(`document.getElementById('launch-agent-pick').dataset.probed === '1'`, 'the cards heard from the CLI checks', 8000);

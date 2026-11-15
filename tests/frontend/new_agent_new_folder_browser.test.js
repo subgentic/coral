@@ -25,7 +25,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); for (const k of Object.keys(localStorage)) if (/recent/i.test(k)) localStorage.removeItem(k); window.__posts.length = 0; true`);
             await openNewAgent(ev, waitFor); await fill(dir);
         };
-        const next = () => ev(`(() => { const b = window.__na.find('button', /^Next$/i); if (b) b.click(); return !!b; })()`);
+        const next = () => ev(`(() => { const b = window.__na.find('button', /^(Next|Choose model)$/i); if (b) b.click(); return !!b; })()`);
         const stage = () => ev(`document.getElementById('launch-step-agent').dataset.stage`);
         const state = () => ev(`(() => { const l = document.getElementById('launch-dir-new'), e = document.getElementById('launch-dir-error'), i = document.getElementById('launch-dir');
             return { line: !!l && !l.hidden && l.getClientRects().length > 0, lineText: l ? l.textContent : '', error: e ? e.textContent : '', invalid: i.getAttribute('aria-invalid') === 'true', toast: (document.getElementById('notices')?.textContent || ''), create: i.dataset.createNew || '' }; })()`);

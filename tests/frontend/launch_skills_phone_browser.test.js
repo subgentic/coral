@@ -59,7 +59,7 @@ const SKILLS = [
         await waitFor(`getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none' && !document.getElementById('launch-skills-row').hidden`, 'the agent step with its skills row', 8000);
         await ev(`(() => { const e = document.getElementById('launch-dir'); e.value = '/tmp/work'; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
         for (const stage of ['persona', 'agent']) {
-            await ev(`(() => { const b = [...document.querySelectorAll('#launch-step-agent button')].find(x => x.textContent.trim() === 'Next' && x.getClientRects().length); if (b) b.click(); return !!b; })()`);
+            await ev(`(() => { const b = [...document.querySelectorAll('#launch-step-agent button')].find(x => /^(Next|Choose model)$/.test(x.textContent.trim()) && x.getClientRects().length); if (b) b.click(); return !!b; })()`);
             await waitFor(`document.getElementById('launch-step-agent').dataset.stage === '${stage}'`, `step ${stage}`, 5000);
         }
         // step 3 opens on its Agent section: the skills are in it, with no other section to find first (a phone's section list is a dropdown)
