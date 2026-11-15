@@ -22,7 +22,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await client.Fetch.enable({ patterns: [{ urlPattern: '*data_table_goals.css*', requestStage: 'Request' }] });
         client.on('Fetch.requestPaused', p => held.push(p.requestId));
         await Page.navigate({ url: BASE + '/inbox/goals' });
-        await new Promise(r => setTimeout(r, 2500));
+        await new Promise(r => setTimeout(r, 2500)); // sleep-ok: nothing may be drawn while the stylesheet is held; the wait is the thing under test
         const early = await ev(`document.querySelectorAll('#inbox-page tbody tr, #group-table-view tbody tr').length`);
         if (!held.length) problems.push('the stylesheet was never requested while the Inbox Goals list was opening');
         if (early) problems.push(`${early} goal row(s) were drawn while data_table_goals.css was still loading (the old card shows for a frame)`);
