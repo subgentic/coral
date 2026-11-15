@@ -6,7 +6,7 @@ import { rememberFocus } from './dom_morph.js';
 import { onArtifactsRev } from './artifacts_feed.js';
 import { needsYou, askedRow } from './asked_before_restart.js';
 import { unrecordedItem, recordAllAgents } from './waiting.js';
-const { welcomeRows, runWelcome, dismissWelcome } = await importOnce('./welcome_items.js');
+const { welcomeRows, runWelcome } = await importOnce('./welcome_items.js');
 import { incompleteNote, readGaps } from './needs_incomplete.js';
 import { loadPendingSkills, skillRows, skillLine, skillName, openSkill } from './needs_skills.js';
 import { doneGoals, looksDone, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, setClosedByAgentCount, isGoalDoneRead, markGoalDoneRead, markGoalDoneUnread, SETTING as GOAL_DONE_SETTING } from './goal_done.js';
@@ -502,7 +502,7 @@ export function needsBulkActions() {
             const r = await each(rows, async s => {
                 if (s.review) { await ignoreRow(s.review.team, s.review); undo.push(() => unignoreRow(s.review.team, s.review)); }
                 else if (s.operatorAsk && (s.operatorAsk.kind === 'ask' || s.operatorAsk.kind === 'agent')) { await asks.closeAsk(s.operatorAsk); undo.push(() => asks.reopenAsk(s.operatorAsk)); }
-                else if (s.welcome && s.welcome.dismiss) (s.welcome.onDismiss ? s.welcome.onDismiss() : dismissWelcome(s.welcome.id));
+                else if (s.welcome && s.welcome.dismiss) { const m = await importOnce('./welcome_swipe.js'), w = s.welcome; if (w.onDismiss) { w.onDismiss(); if (w.onUndo) undo.push(w.onUndo); } else { m.dismissQuietly(w.id); undo.push(() => m.restoreWelcome(w.id)); } }
                 else if (s.autorun) markSeen(s.autorun);
                 else if (s.goalDone) undo.push(await hideGoalDone(goalTeamHere(s.goalDone), s.goalDone, 'ignore'));
                 else throw new Error(s.welcome ? `${needsName(s)}: use ${s.welcome.go || 'its button'}` : `${needsName(s)} cannot be dismissed`); /* it names the row it skipped and what to press instead (#15339, walk 23 H4) */
@@ -670,7 +670,7 @@ function welcomeActions(w) {
     go.addEventListener('click', () => (w.run ? w.run() : runWelcome(w.id)));
     box.append(go);
     if (w.dismiss) {
-        const ignore = () => { (w.onDismiss ? w.onDismiss() : dismissWelcome(w.id)); sayLive(`Dismissed: ${w.title}.`); };
+        const ignore = () => importOnce('./welcome_swipe.js').then(m => m.dismissWithUndo(w)).catch(() => sayLive('Not dismissed: try again.')); // says it, with Undo in the toast (#17410)
         if (isPhoneLayout()) box.append(moreMenu([{ label: 'Dismiss', title: 'Take it out of Needs you; nobody is told', run: ignore }], w.title)); // no Dismiss button on a phone row: the menu, or a swipe (#11642)
         else {
             const no = DT.el('button', 'btn btn-small btn-quiet', 'Dismiss'); no.type = 'button';

@@ -25,6 +25,8 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
         await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length===4`,'one row dismissed',8000);
         assert.equal(await ev(`window.__puts.some(x=>/asks/.test(x.inbox_welcome_done||''))`),true,'the dismissal is remembered in the settings');
         assert.deepEqual(await reached(ev),[],'dismissal sends nothing to an agent');
+        assert.equal(await ev(`window.__puts.some(x=>/asks/.test(x.inbox_welcome_dismissed||''))`),true,'the dismissal is also on the dismissed list (#17410): Settings > Inbox lists it, and the Activity row names it');
+        assert.equal(await ev(`[...document.querySelectorAll('.toast')].some(t=>/Dismissed: How agents ask you for things/.test(t.textContent)&&/Undo/.test(t.textContent))`),true,'the Dismiss says so with Undo (#17410)');
         console.log('PASS Getting started rows dismiss one at a time');
     } finally { await client.close(); }
 })().catch(e=>{console.error(e);process.exit(1);});

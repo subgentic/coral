@@ -114,6 +114,7 @@ func (h *SystemHandler) PutSettings(w http.ResponseWriter, r *http.Request) {
 	// One request's settings are written together (one transaction): a later PUT can never
 	// land between two of its keys and be half overwritten by the rest (#3547: the dashboard
 	// saved welcome_choice and welcome_pending, and a PUT in between lost its welcome_pending).
+	dismissed, restored := h.welcomeDismissal(r.Context(), values) // read before the save: what this write adds to the dismissed list (#17410)
 	if err := h.saveSettings(r.Context(), values); err != nil {
 		errInternalServer(w, err.Error())
 		return
@@ -122,11 +123,14 @@ func (h *SystemHandler) PutSettings(w http.ResponseWriter, r *http.Request) {
 	if setreg.Has(values, setreg.GoalDoneHidden) { // the Inbox's "goal looks done" row hidden (Not yet, Dismiss): the Inbox's numbers (#7512)
 		inboxActioned(r, tracking.InboxGoalDone, "", "hide", time.Time{})
 	}
+	if dismissed != "" { // a Dismiss that names the items: the Activity row says which (#17410)
+		noteActivity(r, board.ActInboxHide, "setting", "inbox_welcome_dismissed", "", dismissed, "")
+	}
 	for _, key := range []string{"goal_done_hidden", "inbox_welcome", "inbox_welcome_done"} { // a Dismiss or a Not yet kept in the settings is the Operator's click too (#13609)
 		if r.Header.Get(AutoSaveHeader) != "" { // the page keeping its own count (a Welcome step the person did elsewhere is marked done, #16972): not a click, so not a row of Activity
 			break
 		}
-		if _, ok := values[key]; ok {
+		if _, ok := values[key]; ok && dismissed == "" && !restored { // a restore (Undo, Restore) is not a dismissal; a write that names the dismissed items already has its row
 			noteActivity(r, board.ActInboxHide, "setting", key, "", welcomeDismissTitle(key, before, values), "")
 			break
 		}
@@ -490,4 +494,32 @@ func welcomeDismissTitle(key string, before, values map[string]string) string {
 		return strings.Join(names, ", ")
 	}
 	return ""
+}
+
+// welcomeDismissal compares the dismissed list a write carries with the saved one: the titles of the items it adds ("" when it adds none), and whether it only takes some away (a restore).
+func (h *SystemHandler) welcomeDismissal(ctx context.Context, values map[string]string) (added string, restored bool) {
+	if !setreg.Has(values, "inbox_welcome_dismissed") {
+		return "", false
+	}
+	old, _ := h.ss.GetSettings(ctx)
+	had := map[string]bool{}
+	for _, id := range strings.Split(old["inbox_welcome_dismissed"], ",") {
+		had[strings.TrimSpace(id)] = true
+	}
+	var names []string
+	kept := map[string]bool{}
+	for _, id := range strings.Split(setreg.Raw(values, "inbox_welcome_dismissed"), ",") {
+		id = strings.TrimSpace(id)
+		kept[id] = true
+		if title, ok := welcomeTitles[id]; ok && !had[id] {
+			names = append(names, title)
+		}
+	}
+	removed := false
+	for id := range had {
+		if id != "" && !kept[id] {
+			removed = true
+		}
+	}
+	return strings.Join(names, ", "), removed && len(names) == 0 // a list that only lost items is a restore; one that did not change adds nothing and is not one (the done list may still have closed an item)
 }

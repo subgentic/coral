@@ -69,7 +69,7 @@ const { coralReady } = require('./helpers/wait');
             await shot(`welcome-guide-${w}`);
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
             await waitFor(`!!document.querySelector('#group-table-view tr[data-welcome-id="guide"]')`, `${tag}: closing the guide keeps its row`, 6000);
-            await ev(`import(${S} + 'welcome_items.js').then(m => m.dismissWelcome('guide'))`); // explicit dismissal is covered through its real desktop button and phone menu in welcome_guide_dismiss_browser
+            await ev(`import(${S} + 'welcome_swipe.js').then(m => m.dismissQuietly('guide'))`); // explicit dismissal is covered through its real desktop button and phone menu in welcome_guide_dismiss_browser
             await waitFor(`!document.querySelector('#group-table-view tr[data-welcome-id="guide"]')`, `${tag}: explicitly dismissing the guide clears its row`, 6000);
             await press('Got it'); // the last one: the welcome's own button
             await waitFor(`/You are all caught up(?!r)/.test(document.getElementById('group-table-view').textContent)`, `${tag}: the empty Needs you says You are all caught up`, 6000);

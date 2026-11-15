@@ -22,7 +22,7 @@ export function closedGoalRows(goals, teamOf, { reopen, dismissed = () => {}, no
     const gone = new Set(read());
     return (goals || []).filter(g => closedByAgent(g, now) && teamOf(g) && !gone.has(keyOf(teamOf(g), g))).map(g => {
         const team = teamOf(g), title = `Goal #${g.id} closed as done by ${String(g.closed_by).trim()}`, text = String(g.closed_reason || '').trim() || String(g.title || '');
-        return { goalClosed: g, welcome: { id: `goalclosed:${team}:${g.id}`, title, text, go: 'Reopen', dismiss: true, run: () => reopen(g), onDismiss: () => { write([...read(), keyOf(team, g)]); dismissed(g); } },
+        return { goalClosed: g, welcome: { id: `goalclosed:${team}:${g.id}`, title, text, go: 'Reopen', dismiss: true, run: () => reopen(g), onDismiss: () => { write([...read(), keyOf(team, g)]); dismissed(g); }, onUndo: () => { write(read().filter(k => k !== keyOf(team, g))); dismissed(g); } },
             session_id: `goal_closed:${team}:${g.id}`, display_name: title, board_project: '', server: '', waiting_kind: 'goal_done', waiting_summary: text, waiting_since: '' };
     });
 }

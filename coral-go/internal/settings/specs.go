@@ -196,6 +196,7 @@ func init() {
 	register(Spec{Key: "inbox_welcome", Kind: KindEnum, Values: []string{"on", "off"}, Default: "off", Apply: ApplyClient, Doc: "The Inbox's welcome items for a new install (on until they are hidden or all done)."})
 	register(Spec{Key: "inbox_welcome_setup", Kind: KindEnum, Values: []string{"on", "off"}, Default: "off", Apply: ApplyClient, Doc: "The Inbox row that walks a new install through setting up Claude, Codex or Antigravity (on for a new install; the dashboard turns it off once one is ready)."})
 	text("inbox_welcome_done", ApplyClient, "The welcome items already done, read or dismissed (comma-separated ids).")
+	text("inbox_welcome_dismissed", ApplyClient, "The welcome items the Operator dismissed (comma-separated ids): the Inbox section of Settings lists them with Restore, and the Activity row names them.")
 	// The Operator's phone page for one agent (#11450): off by default; the team and session the Operator recorded as Chief, checked on every request.
 	boolOff("chief_page", ApplyLive, "Serve /chief, the phone page for the one agent recorded as Chief.")
 	text("chief_team", ApplyLive, "The team the Chief agent is on.")
