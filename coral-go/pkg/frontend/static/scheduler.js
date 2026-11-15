@@ -408,7 +408,7 @@ registerActions({
         const jobId = selectedJobId, job = scheduledJobs.find(j => j.id === jobId);
         const opened = await window.selectHistorySession(sid);
         if (opened === false) { // no conversation on file: a run whose agent never wrote a line has no chat to open, and the page must say so, not stay on "Loading chat..." (#17186)
-            const { showHistoryNote } = await importOnce('./history_pages.js');
+            const { showHistoryNote } = await importOnce('./history_note.js');
             const running = el.dataset.runStatus === 'running' || el.dataset.runStatus === 'pending';
             showHistoryNote(running ? "This run's agent has not written anything yet, so there is no conversation to show. If it stays like this, the agent did not start: stop the run from the job's page and run the job again." : "This run has no conversation: its agent never wrote anything, so it did not start. Run the job again from the job's page.", running ? () => el.click() : null);
         }
