@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/subgentic/coral/internal/board"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/board"
 )
 
 // #17648: a High task that waits behind its owner's lower-priority work for over 30 minutes is named in the orchestrator's check, with the suggestion to switch or reassign. Equal or higher work in hand,
