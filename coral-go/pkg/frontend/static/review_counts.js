@@ -44,5 +44,10 @@ export function refreshCounts(force = false) {
     return pending;
 }
 
-/* A team or folder header's count is the agents awake (group_cards.js sets data-of to how many there are in all): the first hover says of how many, so a count that fell from 3 to 2 says why (#16740). */
-globalThis.document?.addEventListener?.('pointerover', e => { const c = e.target instanceof Element && e.target.closest('.session-group-count[data-of]'); if (c && !c.title) c.title = `${c.textContent} awake of ${c.dataset.of}`; });
+/* A team or folder header's count is the agents awake: the first hover says how many sleep too, read from the group's own "N sleeping agents" line, so a count that fell from 3 to 2 says why (#16740). */
+globalThis.document?.addEventListener?.('pointerover', e => {
+    const c = e.target instanceof Element && e.target.closest('.session-group-count');
+    if (!c || c.title) return;
+    const g = c.closest('[data-group-name]')?.dataset.groupName, row = [...document.querySelectorAll('.sleeping-summary-row[data-group]')].find(r => r.dataset.group === g), n = parseInt(row?.textContent.trim(), 10);
+    if (n) c.title = `${c.textContent} awake, ${n} asleep`;
+});

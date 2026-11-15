@@ -141,8 +141,8 @@ function _renderWorkflowCard(wfName, wfSessions) {
 }
 
 const sleepIcon = on => on ? ' <span class="agent-icon" title="Team is sleeping">🌙</span>' : '';
-/** A header's count is the agents awake; of says how many there are in all, and review_counts.js (loaded at idle) turns that into the count's title (#16740). */
-const groupCount = ss => `<span class="session-group-count" data-of="${Number(ss.length)}">${ss.filter(s => !s.sleeping).length}</span>`;
+/** A header's count is the agents awake; review_counts.js (loaded at idle) says on hover how many sleep (#16740). */
+const groupCount = ss => `<span class="session-group-count">${ss.filter(s => !s.sleeping).length}</span>`;
 
 // Team-first mode: one folder group of the agents that are on no team or workflow.
 function _renderFolderGroup(groupName, groupSessions) {
