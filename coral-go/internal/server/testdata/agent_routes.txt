@@ -477,6 +477,7 @@ b POST /api/tasks/runs/{runID}/kill
 b POST /api/teams/detail/{name}/daily-knowledge/accept
 b POST /api/teams/detail/{name}/daily-knowledge/revert
 c POST /api/teams/detail/{name}/distill-knowledge
+b POST /api/teams/detail/{name}/knowledge
 b POST /api/teams/detail/{name}/resurrect
 b POST /api/teams/generate
 b POST /api/teams/import

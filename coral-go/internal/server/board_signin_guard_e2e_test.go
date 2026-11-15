@@ -74,6 +74,7 @@ var signInGuardedRoutes = []string{
 	"POST /api/teams/import",
 	"POST /api/teams/generate",
 	"PUT /api/teams/detail/{name}/knowledge/{agentName}",
+	"POST /api/teams/detail/{name}/knowledge",
 	"POST /api/tags",
 	"POST /api/folder-tags/{folderName}",
 	"POST /api/workflows",

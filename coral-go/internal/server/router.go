@@ -718,6 +718,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.With(routes.RefuseSignInLink).Post("/api/teams/detail/{name}/daily-knowledge/accept", sessHandler.AcceptDailyKnowledge)
 	r.With(routes.RefuseSignInLink).Post("/api/teams/detail/{name}/daily-knowledge/revert", sessHandler.RevertDailyKnowledge)
 	r.Get("/api/teams/detail/{name}/knowledge", sessHandler.GetTeamKnowledge)
+	r.With(routes.RefuseSignInLink).Post("/api/teams/detail/{name}/knowledge", sessHandler.AddKnowledgeNote)
 	r.Get("/api/teams/detail/{name}/knowledge/{agentName}", sessHandler.GetAgentKnowledge)
 	r.With(routes.RefuseSignInLink).Put("/api/teams/detail/{name}/knowledge/{agentName}", sessHandler.SaveAgentKnowledge)
 
