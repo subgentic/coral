@@ -273,7 +273,7 @@ function showHeldNote(n) {
     if (!p) { p = document.createElement('p'); p.className = 'item-meta group-table-held'; p.setAttribute('role', 'status'); host.append(p); }
     const b = document.createElement('button'); b.className = 'btn btn-small btn-quiet'; b.textContent = 'Show';
     b.onclick = () => { const k = deferredKind; deferredKind = null; hoverHeldSince = null; p.remove(); actedRefresh = true; try { refreshGroupTable(k); } finally { actedRefresh = false; } };
-    p.replaceChildren(`${n} new waiting. `, b);
+    p.replaceChildren(`${n || 'Some'} new waiting. `, b);
 }
 function leaveList() { hoverOver = false; const k = deferredKind, had = hoverHeldSince !== null; hoverHeldSince = null; document.querySelectorAll('.group-table-held').forEach(n => n.remove()); if (k && had && !holding()) { deferredKind = null; setTimeout(() => refreshGroupTable(k), 0); } }
 if (typeof document !== 'undefined') {
@@ -287,7 +287,7 @@ export function refreshGroupTable(kind) {
     const src = sources.get(kind);
     if (open && open.kind === kind) {
         if (src?.holdRedraw && holding()) { deferredKind = kind; if (actedRefresh) actedDeferred = true; flushLater(); return; } // the person's own result keeps being theirs while the press hold lets go of it (#14483)
-        if (src?.holdRedraw && hoverOver && !actedRefresh) { if (hoverHeldSince === null) hoverHeldSince = Date.now(); const n = src.newCount?.(), cap = n == null ? 1e4 : 2e3; if (n || Date.now() - hoverHeldSince < cap) { deferredKind = kind; if (n) showHeldNote(n); if (!n) setTimeout(() => { const k = deferredKind; if (k && !holding()) { deferredKind = null; refreshGroupTable(k); } }, cap + 100); return; } hoverHeldSince = null; }
+        if (src?.holdRedraw && hoverOver && !actedRefresh) { if (hoverHeldSince === null) hoverHeldSince = Date.now(); const n = src.newCount?.(), cap = n == null ? 1e4 : 2e3; if (n || Date.now() - hoverHeldSince < cap) { deferredKind = kind; if (n !== 0) showHeldNote(n); /* 0: nothing new, held quietly */ if (!n) setTimeout(() => { const k = deferredKind; if (k && !holding()) { deferredKind = null; refreshGroupTable(k); } }, cap + 100); return; } hoverHeldSince = null; }
         const host = document.getElementById('group-table-view');
         if (!host || host.style.display === 'none') { open = null; return; }
         if (drawTable()) return;
