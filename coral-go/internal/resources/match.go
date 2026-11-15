@@ -101,3 +101,38 @@ func canonPath(w string) string {
 	}
 	return w
 }
+
+// plainFilters are the programs that may stand around a matched command in a line that is run on another machine as it is: a change of folder and the filters a person puts after a test run to read less of it.
+var plainFilters = map[string]bool{"cd": true, "tail": true, "head": true, "grep": true, "wc": true}
+
+// OnlyMatched reports whether every simple command in command is one the patterns match, or a plain filter (cd, tail, head, grep, wc): nothing else rides along. A line that has any other command in it (a `;`
+// or `&&` after the test run, a $( ) or a backtick, `bash -c`, curl) is not OnlyMatched, so the hook does not run it on another machine in the agent's place (#17587, Security's MUST: the whole line is wrapped,
+// and a matched command anywhere in it is enough to match). False when the line cannot be read.
+func OnlyMatched(command string, patterns []string) bool {
+	cmds, ok := shellkill.Programs(command)
+	if !ok || len(cmds) == 0 {
+		return false
+	}
+	hit := false
+	for _, words := range cmds {
+		if len(words) == 0 {
+			return false
+		}
+		matched := false
+		for _, p := range patterns {
+			if want := strings.Fields(p); len(want) > 0 && inOrder(words, want) {
+				matched = true
+				break
+			}
+		}
+		switch {
+		case matched:
+			hit = true
+		case plainFilters[words[0]]:
+		case len(words) == 1 && words[0] == "1": // the parser reads the `1` of `2>&1` as a command of its own; it is no program
+		default:
+			return false
+		}
+	}
+	return hit
+}

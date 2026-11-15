@@ -488,6 +488,7 @@ func (h *Hook) before(ctx context.Context, session, name, toolUseID, command str
 	if claimsFirst(command, res) { // `coral-board resource claim X --wait && <work>`: the claim waits for the turn and is made in this very call, which is the supported shape; holding the command would stop the claim from running
 		return "", ""
 	}
+	canRewrite = canRewrite && OnlyMatched(command, res.Match) // a line with anything else in it is not run on the other machine in the agent's place: it is refused with the instruction, as for a CLI that cannot rewrite (#17587)
 	snap := h.snapshot()
 	h.mu.Lock()
 	defer h.mu.Unlock()

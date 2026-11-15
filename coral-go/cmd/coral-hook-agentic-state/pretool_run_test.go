@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -22,7 +23,7 @@ func TestARunAnswerBecomesClaudesUpdatedInputWithTheRestOfTheInputKept(t *testin
 	var got struct {
 		Hook struct {
 			Event    string         `json:"hookEventName"`
-			Decision string         `json:"permissionDecision"`
+			Decision *string        `json:"permissionDecision"`
 			Input    map[string]any `json:"updatedInput"`
 		} `json:"hookSpecificOutput"`
 	}
@@ -30,8 +31,11 @@ func TestARunAnswerBecomesClaudesUpdatedInputWithTheRestOfTheInputKept(t *testin
 	if err := json.Unmarshal(out, &got); err != nil {
 		t.Fatalf("%s: %v", out, err)
 	}
-	if got.Hook.Event != "PreToolUse" || got.Hook.Decision != "allow" || got.Hook.Input["command"] != run || got.Hook.Input["description"] != "run the tests" || got.Hook.Input["timeout"] != float64(600000) {
+	if got.Hook.Event != "PreToolUse" || got.Hook.Decision != nil || got.Hook.Input["command"] != run || got.Hook.Input["description"] != "run the tests" || got.Hook.Input["timeout"] != float64(600000) {
 		t.Errorf("output %s", out)
+	}
+	if strings.Contains(string(out), "permissionDecision") {
+		t.Errorf("the hook must make no permission decision: %s", out)
 	}
 	if in["command"] != "go test ./..." {
 		t.Error("the input the hook read was changed in place")

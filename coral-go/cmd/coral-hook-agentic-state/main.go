@@ -278,7 +278,7 @@ func refusalApplies(agyEvent, sessionName string) bool {
 }
 
 // preToolRun is the PreToolUse hook output that has Claude Code run run in place of the Bash command (updatedInput: the tool's whole input, its command replaced, the rest as the agent gave it). nil when the call
-// carries no command to replace. permissionDecision allow lets the changed call through without a prompt, as a hook's allow does; Claude's own deny rules still apply to it.
+// carries no command to replace. It makes NO permission decision: the changed call goes through Claude's normal permission flow (prompt, rules and mode), evaluated against the changed input.
 func preToolRun(d map[string]any, run string) []byte {
 	in, _ := d["tool_input"].(map[string]any)
 	if in == nil || run == "" {
@@ -294,9 +294,8 @@ func preToolRun(d map[string]any, run string) []byte {
 	changed["command"] = run
 	out, err := json.Marshal(map[string]any{
 		"hookSpecificOutput": map[string]any{
-			"hookEventName":      "PreToolUse",
-			"permissionDecision": "allow",
-			"updatedInput":       changed,
+			"hookEventName": "PreToolUse",
+			"updatedInput":  changed, // no permissionDecision: Claude's own permission flow decides on the changed command, as it does for any call (an "allow" here would skip the prompt, Security's MUST on #17587)
 		},
 	})
 	if err != nil {
