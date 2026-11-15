@@ -5,6 +5,7 @@ const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
 const { coralReady, framesJs } = require('./helpers/wait');
+const { safePaused } = require('./helpers/paused');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -20,7 +21,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         const g = await api('POST', `/api/board/${board}/goals`, { subscriber_id: 'Operator', title: 'A goal whose title is long enough to run onto a second line on a phone screen', outcome: 'One goal', done_when: 'A person chooses' }); assert.equal(g.status, 201);
         assert.equal((await api('PATCH', `/api/board/${board}/goals/${g.body.id}`, { subscriber_id: 'Operator', state: 'active' })).status, 200);
         await client.Fetch.enable({ patterns: [{ urlPattern: '*data_table_goals.css*', requestStage: 'Request' }] });
-        client.on('Fetch.requestPaused', p => held.push(p.requestId));
+        safePaused(client, p => { held.push(p.requestId); }); // the held request is released below
         await Page.navigate({ url: BASE + '/inbox/goals' });
         await new Promise(r => setTimeout(r, 2500)); // sleep-ok: nothing may be drawn while the stylesheet is held; the wait is the thing under test
         const early = await ev(`document.querySelectorAll('#inbox-page tbody tr, #group-table-view tbody tr').length`);
