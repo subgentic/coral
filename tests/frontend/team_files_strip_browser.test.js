@@ -16,7 +16,7 @@ const { safePaused } = require('./helpers/paused');
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const B = 'tf-' + Date.now().toString(36);
     const api = (method, p, body, headers) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(method)}, headers: ${JSON.stringify(headers || { 'Content-Type': 'application/json' })}, body: ${body === undefined ? 'undefined' : typeof body === 'string' ? JSON.stringify(body) : JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
-    let sid = null, sname = null;
+    let sid = null, sname = null, B2 = null, B3 = null, B4 = null;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -83,8 +83,59 @@ const { safePaused } = require('./helpers/paused');
         const chip = await ev(`(() => { const c = [...document.querySelectorAll('#team-panel-artifacts .artifact-tag')].find(x => x.textContent === 'superseded'); return c ? { title: c.title, d: c.getAttribute('aria-description') } : null; })()`);
         assert.ok(chip && /newer version of this file replaced it/.test(chip.title) && chip.d === chip.title, 'the chip says what replaced the file: ' + JSON.stringify(chip));
         console.log('PASS the Artifacts tab shows the team folder with Copy path, Download all as a zip, and what superseded means');
+
+        // #17814 SHOULD a: index.html preferred over a later .html file
+        console.log('prefer index.html');
+        B2 = 'tf2-' + Date.now().toString(36);
+        assert.ok((await api('POST', `/api/board/${B2}/subscribe`, { subscriber_id: 'Files QA', job_title: 'Backend Dev', session_name: sname })).status < 300);
+        await up('index.html', '<h1>App</h1>', 'text/html');
+        await up('report.html', '<h1>Coverage report</h1>', 'text/html'); // uploaded after index.html: newest first means report.html is first in the list
+        await up('style.css', 'body{}', 'text/css');
+        await ev(`window.__detailDelay = 0; window.openTeamPage(${JSON.stringify(B2)}, { tab: 'artifacts' }); true`);
+        await waitFor(`!!document.querySelector('#team-panel-artifacts .team-files-strip')`, 'the folder strip (B2)', 15000);
+        const strip2 = await ev(`document.querySelector('#team-panel-artifacts .team-files-strip')?.textContent || ''`);
+        assert.ok(/Open index\.html in that folder/.test(strip2), 'index.html is preferred over report.html: ' + strip2);
+        assert.ok(!/report\.html/.test(strip2), 'report.html is not named when index.html exists: ' + strip2);
+
+        // #17814 SHOULD d: a team with only app.html (no index.html)
+        console.log('app.html without index.html');
+        B3 = 'tf3-' + Date.now().toString(36);
+        assert.ok((await api('POST', `/api/board/${B3}/subscribe`, { subscriber_id: 'Files QA', job_title: 'Backend Dev', session_name: sname })).status < 300);
+        await up('app.html', '<h1>Newsletter</h1>', 'text/html');
+        await up('data.json', '{}', 'application/json');
+        await ev(`window.openTeamPage(${JSON.stringify(B3)}, { tab: 'artifacts' }); true`);
+        await waitFor(`!!document.querySelector('#team-panel-artifacts .team-files-strip')`, 'the folder strip (B3)', 15000);
+        const strip3 = await ev(`document.querySelector('#team-panel-artifacts .team-files-strip')?.textContent || ''`);
+        assert.ok(/Open app\.html in that folder/.test(strip3), 'app.html is named when it is the only .html file: ' + strip3);
+
+        // #17814 SHOULD d: a team with no HTML file
+        console.log('no HTML file');
+        B4 = 'tf4-' + Date.now().toString(36);
+        assert.ok((await api('POST', `/api/board/${B4}/subscribe`, { subscriber_id: 'Files QA', job_title: 'Backend Dev', session_name: sname })).status < 300);
+        await up('main.py', 'print("hello")', 'text/x-python');
+        await up('README.md', '# Hello', 'text/markdown');
+        await ev(`window.openTeamPage(${JSON.stringify(B4)}, { tab: 'artifacts' }); true`);
+        await waitFor(`!!document.querySelector('#team-panel-artifacts .team-files-strip')`, 'the folder strip (B4)', 15000);
+        const strip4 = await ev(`document.querySelector('#team-panel-artifacts .team-files-strip')?.textContent || ''`);
+        assert.ok(!/Open .* in that folder/.test(strip4), 'no HTML file: no "Open" hint: ' + strip4);
+        assert.ok(/The team works in the folder/.test(strip4), 'still shows the folder path: ' + strip4);
+
+        // #17814 SHOULD c: the ghost line holds enough space at 390 px
+        console.log('ghost at 390');
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 3, mobile: true });
+        await ev(`window.__detailDelay = 3000; window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`);
+        await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length >= 1`, 'the files at 390', 15000);
+        await waitFor(`!!document.querySelector('#team-panel-artifacts .team-files-strip-host')`, 'the ghost at 390', 8000);
+        const rowTop390 = () => ev(`Math.round(document.querySelector('#team-panel-artifacts [data-artifact-id]').getBoundingClientRect().top)`);
+        const before390 = await rowTop390();
+        await waitFor(`!!document.querySelector('#team-panel-artifacts .team-files-strip')`, 'the real strip at 390', 15000);
+        const after390 = await rowTop390();
+        assert.ok(Math.abs(after390 - before390) <= 1, `the first row does not move at 390 px when the strip arrives (${before390} -> ${after390})`);
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+
+        console.log('PASS prefer index.html, app.html fallback, no HTML, and ghost at 390');
     } finally {
         if (sid) await ev(`fetch('/api/sessions/live/${encodeURIComponent(sname || '')}/kill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_type: 'terminal', session_id: ${JSON.stringify(sid)} }) }).then(() => true)`).catch(() => {});
-        await removeBoards(ev, [B]).catch(() => {}); await client.close();
+        await removeBoards(ev, [B, B2, B3, B4].filter(Boolean)).catch(() => {}); await client.close();
     }
 })().catch(e => { console.error(e); process.exitCode = 1; });

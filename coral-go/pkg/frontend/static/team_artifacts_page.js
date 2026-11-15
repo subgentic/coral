@@ -241,7 +241,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             if (gen !== model.gen || e.name === 'AbortError') return;
             model.error = e.message || 'Unable to load artifacts.';
         } finally {
-            if (gen === model.gen) { model.controller = null; model.loading = false; model.loadingMore = false; draw();
+            if (gen === model.gen) { model.controller = null; model.loading = false; model.loadingMore = false; draw(); hooks.stripHint?.();
                 // Follow this same series only; a late refresh cannot replace another file's pane.
                 if (previousDetail && detailKey() === itemKey(previousDetail) && !model.error) {
                     const latest = model.items.find(it => serverOf(it) === serverOf(previousDetail) && it.board_id === previousDetail.board_id &&
@@ -415,7 +415,8 @@ export function createArtifactsList({ inbox = false } = {}) {
             // the strip's space is held before its module and the folder answer arrive: the same three parts, drawn but not seen, so the table under it does not move (#15618)
             strip.setAttribute('aria-hidden', 'true'); strip.append(el('div', 'team-files-strip-ghost', ''));
             strip.firstChild.append(el('p', 'goals-note', 'The team works in the folder . The app runs from there: open index.html in that folder.'), el('button', 'btn btn-small', 'Copy path'), el('button', 'btn btn-small', 'Download the 3 files listed (zip)'));
-            importOnce('./artifact_team_files.js').then(m => m.fillStrip(strip, { project: model.project, hasMore: () => model.hasMore, files: () => model.items.map(it => ({ it, link: linkOf(it) })).filter(x => x.link?.preview).map(x => ({ url: x.link.url, name: readableName(x.it) })) })).catch(() => { strip.remove(); }); // a failed load takes its held space with it: the table moves up once, only on failure (#15624)
+            const stripFiles = () => model.items.map(it => ({ it, link: linkOf(it) })).filter(x => x.link?.preview).map(x => ({ url: x.link.url, name: readableName(x.it) }));
+            importOnce('./artifact_team_files.js').then(m => { const up = m.fillStrip(strip, { project: model.project, hasMore: () => model.hasMore, files: stripFiles }); if (up) hooks.stripHint = up; }).catch(() => { strip.remove(); }); // a failed load takes its held space with it: the table moves up once, only on failure (#15624)
         }
         if (inbox && !model.error && (model.partial || (model.versionless && model.versionless.length))) body.append(partialLine());
         if (!model.error && !model.loading && !model.items.length && !F.isFiltered(model.filters) && !model.scope) status.append(el('span', 'empty-state-hint', 'An agent shares a file when it finishes a task with one; you can ask an agent to share a file as an artifact.')); // inside the line's own element: one block, the family's gap
