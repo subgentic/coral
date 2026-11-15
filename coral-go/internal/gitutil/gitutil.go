@@ -7,12 +7,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"github.com/subgentic/coral/internal/safefs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -82,12 +84,46 @@ func ResolveGitRoot(ctx context.Context, workdir string) string {
 
 // NoRepoMarkerFor says, from the file system alone (no git runs, so it answers at once), that a folder is not in a git repository: neither it nor any parent has a .git (a folder, or the
 // gitfile of a worktree), and none of its direct subfolders does (ResolveGitRoot looks one level down). A repository that git itself refuses is not caught here: that is the rare case, and
-// it keeps the slow answer. An unreadable folder is not said to be non-git.
+// it keeps the slow answer. An unreadable folder is not said to be non-git, and neither is one with more than noRepoMaxEntries entries (the poll must not list a huge folder every few seconds: it
+// takes the slow answer). A "not a repository" answer is kept for noRepoTTL, because the Branches tab asks every poll while no repository exists (#17599).
 func NoRepoMarkerFor(dir string) bool {
 	dir = filepath.Clean(dir)
 	if dir == "" || dir == "." || !filepath.IsAbs(dir) {
 		return false
 	}
+	now := noRepoNow()
+	noRepoMu.Lock()
+	until, hit := noRepoUntil[dir]
+	noRepoMu.Unlock()
+	if hit && now.Before(until) {
+		return true
+	}
+	if !noRepoScan(dir) {
+		return false
+	}
+	noRepoMu.Lock()
+	if len(noRepoUntil) >= noRepoMaxKept {
+		clear(noRepoUntil)
+	}
+	noRepoUntil[dir] = now.Add(noRepoTTL)
+	noRepoMu.Unlock()
+	return true
+}
+
+const (
+	noRepoTTL        = 5 * time.Second
+	noRepoMaxEntries = 500 // direct entries read in a folder; more is the slow answer
+	noRepoMaxKept    = 256 // folders remembered at once
+)
+
+var (
+	noRepoMu    sync.Mutex
+	noRepoUntil = map[string]time.Time{}
+	noRepoNow   = time.Now // tests replace it
+)
+
+// noRepoScan is the file-system check itself, with no memory.
+func noRepoScan(dir string) bool {
 	if _, err := os.Stat(dir); err != nil {
 		return false
 	}
@@ -99,8 +135,16 @@ func NoRepoMarkerFor(dir string) bool {
 			break
 		}
 	}
-	entries, err := os.ReadDir(dir)
+	f, err := os.Open(dir)
 	if err != nil {
+		return false
+	}
+	defer f.Close()
+	entries, err := f.ReadDir(noRepoMaxEntries + 1)
+	if err != nil && err != io.EOF {
+		return false
+	}
+	if len(entries) > noRepoMaxEntries {
 		return false
 	}
 	for _, e := range entries {
