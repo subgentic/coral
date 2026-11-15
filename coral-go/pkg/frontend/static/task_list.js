@@ -525,7 +525,9 @@ function _taskTable(tasks, footer) {
         const [stateCol, taskCol, whoCol] = columns;
         stateCol.sort = false;
         stateCol.width = 'content'; // the dock knows a review is asked for from the task's workflow, which the shared word reads from review_requested
-        stateCol.cell = t => { const word = taskStatusWord(t.status, reviewRequested(t), isParked(t)), chip = DT.chip(word, statusClass(word)), st = taskStatus(t); chip.classList.add('board-task-status-wrap'); chip.title = st.detail; chip.setAttribute('aria-label', spoken(word, st)); return chip; };
+        stateCol.cell = t => { const word = taskStatusWord(t.status, reviewRequested(t), isParked(t)), chip = DT.chip(word, statusClass(word)), st = taskStatus(t); chip.classList.add('board-task-status-wrap'); chip.title = st.detail; chip.setAttribute('aria-label', spoken(word, st));
+            if (st.className === 'blocked' && st.detail !== 'Blocked: waiting for prerequisites') { const wrap = DT.el('span'); wrap.append(chip); const note = DT.el('span', 'board-task-blocked-note'); note.textContent = st.detail.replace(/^Blocked:\s*/, ''); wrap.append(note); return wrap; }
+            return chip; };
         taskCol.firstDir = 'desc';
         taskCol.cell = t => {
             const cell = DT.el('span', 'dt-title-cell'), description = span('board-task-desc dt-title-content');

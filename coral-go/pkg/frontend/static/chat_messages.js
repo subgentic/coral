@@ -13,6 +13,7 @@ import { SAVE_BUTTON } from './saved_marks.js';
 import { messageTimeHtml } from './message_time.js';
 import { getToolIcon, renderToolCard, renderQuestionCard } from './chat_tool_cards.js';
 import { visibleName } from './artifact_names.js';
+import { importOnce } from './import_once.js';
 
 // Agent replies carry a copy button that copies the reply's markdown as the
 // agent wrote it (not the rendered text).
@@ -61,7 +62,7 @@ function renderOneMessage(msg, container, agentType) {
     } else if (msg.type === "user" && msg.local_command === true) {
         // A slash command the CLI ran by itself ("/model sonnet"): a small note of what was typed, not a bubble (#5488). Seeing it here is how the message the person sent is known to be taken.
         appendContent(container, makeBubble("chat-note chat-local-command", escapeHtml(markHidden(msg.content || ""))));
-    } else if (msg.type === "user" && (msg.content || '').includes('joined to message board')) {
+    } else if (msg.type === "user" && (msg.content || '').startsWith('You were automatically joined to message board')) {
         const e = document.createElement('div'); appendContent(container, e); importOnce('./chat_lp.js').then(m => m.render(e, msg));
 	} else if (msg.type === "user" && isCoralDelivery(msg)) {
 		const text = unwrapPastedContent(msg.content);
