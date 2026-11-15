@@ -26,9 +26,10 @@ export const VIEWS = [
     { key: 'agent', label: 'By agent', under: 'overview', hidden: true },
     { key: 'branch', label: 'By branch', under: 'overview', hidden: true },
     { key: 'task', label: 'By task', under: 'overview', hidden: true },
+    { key: 'goal', label: 'By goal', under: 'overview', hidden: true },
     { key: 'agent-detail', label: 'Agent', under: 'overview', hidden: true }, // one agent over the range: opened from the Agent grouping's Details, not listed (analytics_agent.js, #7930)
 ];
-export const GROUPS = [['all', 'All'], ['provider', 'Provider'], ['model', 'Model'], ['thinking', 'Thinking level'], ['team', 'Team'], ['agent', 'Agent'], ['branch', 'Branch'], ['task', 'Task']];
+export const GROUPS = [['all', 'All'], ['provider', 'Provider'], ['model', 'Model'], ['thinking', 'Thinking level'], ['team', 'Team'], ['agent', 'Agent'], ['branch', 'Branch'], ['task', 'Task'], ['goal', 'Goal']];
 
 let current = 'overview';
 let query = '';

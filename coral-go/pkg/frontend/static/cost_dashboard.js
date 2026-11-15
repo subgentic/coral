@@ -57,7 +57,7 @@ const _colFilters = {};
 
 // Raw data caches — populated on fetch, re-rendered on sort/filter
 const _rawData = {
-    provider: [], model: [], thinking: [], agent: [], team: [], branch: [], task: [],
+    provider: [], model: [], thinking: [], agent: [], team: [], branch: [], task: [], goal: [],
 };
 
 // Currently open dropdown (only one at a time)
@@ -72,6 +72,7 @@ function _rerender(table) {
         case 'team':    _renderTeamTable(_rawData.team); break;
         case 'branch':  _renderBranchTable(_rawData.branch); break;
         case 'task':    _renderTaskTable(_rawData.task); break;
+        case 'goal':    _renderGoalTable(_rawData.task); break;
     }
 }
 
@@ -95,7 +96,7 @@ function _hasActiveFilter(table, field) {
 }
 
 // What each table is called, as its section's heading says (#6432): a sort or filter button is named for its column and its table, so "Cost" is not six buttons that read the same.
-const TABLE_TITLES = { provider: 'By Provider', model: 'By Model', thinking: 'By Thinking Level', agent: 'By Agent', team: 'By Team', branch: 'By Branch', task: 'By Task' };
+const TABLE_TITLES = { provider: 'By Provider', model: 'By Model', thinking: 'By Thinking Level', agent: 'By Agent', team: 'By Team', branch: 'By Branch', task: 'By Task', goal: 'By Goal' };
 
 // Open/close the column filter dropdown
 function _openFilter(table, field, anchorEl) {
@@ -399,7 +400,9 @@ export async function _refreshCostDashboard({ force = false } = {}) {
 
         if (taskResp && taskResp.ok) {
             const data = await taskResp.json();
-            _renderTaskTable(data.tasks || []);
+            _rawData.task = data.tasks || [];
+            _renderTaskTable(_rawData.task);
+            _renderGoalTable(_rawData.task);
         }
     } catch (e) {
         console.error('[cost-dashboard] refresh error:', e);
@@ -653,7 +656,7 @@ function _renderAgentTable(rows) {
     ], filtered, noDataWords(_period()), _seriesOpts('agent'));
 }
 
-const COST_TASK_FIELDS = 'id,board_id,title,status,priority,assigned_to,claimed_at,completed_at,cost_usd,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens';
+const COST_TASK_FIELDS = 'id,board_id,title,status,priority,assigned_to,claimed_at,completed_at,cost_usd,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,goal_id,goal_title';
 const COST_TASK_QUERY = `?has_cost=true&limit=100&fields=${COST_TASK_FIELDS}`; // the tasks with a cost and the columns the table draws, not the whole rows of 100 tasks every 15 s (147 K, #9100)
 
 // Cached tasks for click-to-detail
@@ -665,12 +668,18 @@ function _showCostTaskDetail(taskId) {
     if (board) openTask(board, taskId); // the task's own page on its team's page (#7644)
 }
 
+/** The cost no task carries (an agent between tasks, chats, the Operator's own sessions): the page's total less what the tasks add up to, as a row of its own so the table's rows agree with Total cost (walk 80). */
+function _untaskedRow(costTasks) {
+    const left = _costTotal - costTasks.reduce((n, t) => n + (t.cost_usd || 0), 0);
+    return left >= 0.005 ? { id: 0, untasked: true, title: 'Not on a task', cost_usd: left } : null;
+}
+
 function _renderTaskTable(tasks) {
     const container = document.getElementById('cost-by-task');
     if (!container) return;
 
     // Only show tasks with cost data
-    const costTasks = tasks.filter(t => t.cost_usd > 0);
+    const costTasks = tasks.filter(t => t.cost_usd > 0 && !t.untasked);
     _rawData.task = costTasks;
 
     const filtered = _applyColFilters(costTasks, 'task', {
@@ -678,20 +687,41 @@ function _renderTaskTable(tasks) {
         priority: t => t.priority || 'medium',
     });
     _costTaskCache = filtered;
+    const rest = _untaskedRow(costTasks), shown = rest && !Object.values(_colFilters).some(f => f && f.size) ? [...filtered, rest] : filtered; // a filtered table is a part of the tasks: no rest row beside it
     const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
     const STATUS = { completed: 'Done', in_progress: 'In progress', skipped: 'Skipped' };
     const span = t => { const a = Date.parse(t.claimed_at); if (!Number.isFinite(a)) return -1; const b = t.completed_at ? Date.parse(t.completed_at) : Date.now(); return b - a; };
     _drawTable(container, 'task', [
-        { key: 'status', label: 'Status', cell: t => chip(STATUS[t.status] || 'Waiting', `status-${String(t.status || 'pending').replace('_', '-')}`), tone: 'secondary' },
-        { key: 'id', label: 'ID', cell: t => `#${t.id}`, tone: 'tertiary' },
         { key: 'title', label: 'Task', primary: true, sort: true, sortValue: t => t.title || '', cell: t => t.title || '', width: 'grow' },
-        _textCol('task', 'assigned_to', 'Agent', t => t.assigned_to || '', { cell: t => avatar(t.assigned_to, t.assigned_to || '—'), tone: 'secondary' }),
-        _textCol('task', 'priority', 'Priority', t => t.priority || 'medium', { sortValue: t => priorityOrder[t.priority] ?? 2, cell: t => tag(t.priority || 'medium'), tone: 'secondary', firstDir: 'asc' }),
+        _costCol(shown), // second, so a tablet keeps it: the last columns are the first to go (walk 80)
+        { key: 'id', label: 'ID', cell: t => (t.untasked ? '' : `#${t.id}`), tone: 'tertiary' },
+        { key: 'status', label: 'Status', cell: t => (t.untasked ? '' : chip(STATUS[t.status] || 'Waiting', `status-${String(t.status || 'pending').replace('_', '-')}`)), tone: 'secondary' },
+        _textCol('task', 'assigned_to', 'Agent', t => t.assigned_to || '', { cell: t => (t.untasked ? '' : avatar(t.assigned_to, t.assigned_to || '—')), tone: 'secondary' }),
+        _textCol('task', 'priority', 'Priority', t => t.priority || 'medium', { sortValue: t => priorityOrder[t.priority] ?? 2, cell: t => (t.untasked ? '' : tag(t.priority || 'medium')), tone: 'secondary', firstDir: 'asc' }),
         { key: 'claimed_at', label: 'Start time', sort: true, sortValue: t => t.claimed_at || '', cell: t => (t.claimed_at ? _formatTime(t.claimed_at) : '—'), tone: 'secondary' },
-        _numCol('duration', 'Duration', span, () => '', { cell: t => _formatDuration(t.claimed_at, t.completed_at) }),
+        _numCol('duration', 'Duration', span, () => '', { cell: t => (t.untasked ? '' : _formatDuration(t.claimed_at, t.completed_at)) }),
         _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
-        _costCol(tasks),
-    ], filtered, 'No task costs in this range yet. They appear once an agent has worked on a board task.', { rowKey: t => t.id, open: t => _showCostTaskDetail(t.id), rowName: t => t.title || '' });
+    ], shown, 'No task costs in this range yet. They appear once an agent has worked on a board task.', { rowKey: t => t.id, open: t => { if (t.untasked) return; _showCostTaskDetail(t.id); }, rowName: t => t.title || '' });
+}
+
+/** By goal: the tasks' cost added up per goal, the tasks of no goal together, and the cost no task carries. */
+function _renderGoalTable(tasks) {
+    const container = document.getElementById('cost-by-goal');
+    if (!container) return;
+    const costTasks = tasks.filter(t => t.cost_usd > 0 && !t.untasked), by = new Map();
+    for (const t of costTasks) {
+        const key = t.goal_id || 0, g = by.get(key) || { id: key, title: key ? (t.goal_title || `Goal ${key}`) : 'Tasks with no goal', tasks: 0, cost_usd: 0, input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 };
+        g.tasks++; for (const f of ['cost_usd', 'input_tokens', 'output_tokens', 'cache_read_tokens', 'cache_write_tokens']) g[f] += t[f] || 0;
+        by.set(key, g);
+    }
+    const rows = [...by.values()], rest = _untaskedRow(costTasks);
+    if (rest) rows.push({ id: -1, title: rest.title, tasks: 0, cost_usd: rest.cost_usd, input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, untasked: true });
+    _drawTable(container, 'goal', [
+        { key: 'title', label: 'Goal', primary: true, sort: true, sortValue: g => g.title || '', cell: g => g.title, width: 'grow' },
+        _costCol(rows),
+        _numCol('tasks', 'Tasks', g => g.tasks, g => (g ? String(g) : '')),
+        _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
+    ], rows, 'No goal costs in this range yet. They appear once an agent has worked on a board task.', { rowKey: g => g.id, rowName: g => g.title || '' });
 }
 
 // ── Live Indicator ───────────────────────────────────────────
