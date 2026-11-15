@@ -63,6 +63,8 @@ const MENU = (extra = {}) => ({ question: 'Claude wants to use your browser This
             // 1) the menu on the real row: one button, the sentence, reachable
             await show(MENU(), 1);
             assert.deepEqual(await rowButtons(), ['Not now'], `${at}only Not now is a button`);
+            const rowWords = await ev(`document.querySelector('#group-table-view tbody tr').textContent`);
+            check(/Claude wants to use your browser/.test(rowWords) && !/Notification:/.test(rowWords), `${at}the row's headline is what it asks, not the event's 'Notification:' prefix (#16658): ` + JSON.stringify(rowWords.slice(0, 120)));
             const note = await ev(`(() => { const n = document.querySelector('#group-table-view .inbox-answers .inbox-browser-note'); return n && n.textContent; })()`);
             check(note && /Not now: Claude goes on without browser tools; nothing is installed/.test(note) && /open the agent/.test(note), `${at}the sentence says what Not now does and where the rest is: ` + JSON.stringify(note));
             const geo = await ev(`(() => { const bs = [...document.querySelectorAll('#group-table-view .inbox-answers button:not(.inbox-dismiss)')].map(b => { b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { h: Math.round(r.height), w: Math.round(r.width), left: Math.round(r.left), right: Math.round(r.right) }; }); const n = document.querySelector('#group-table-view .inbox-browser-note'); n.scrollIntoView({ block: 'center' }); const nr = n.getBoundingClientRect(); return { bs, vw: innerWidth, noteLeft: Math.round(nr.left), noteRight: Math.round(nr.right), wide: document.documentElement.scrollWidth > innerWidth + 1 }; })()`);
