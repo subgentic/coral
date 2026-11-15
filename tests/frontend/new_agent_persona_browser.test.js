@@ -31,8 +31,8 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installNA(ev); await stubModels(ev);
         await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app'])); true`);
         await openNewAgent(ev, waitFor);
-        await type('input', N.folder, '/work/payments-app'); await click('button', N.next);
-        await waitFor(`/Step 2 of 3/.test(window.__na.dialog().textContent)`, 'step 2', 4000);
+        await type('input', N.folder, '/work/payments-app'); await ev(`window.__na.next(); true`);
+        
 
         // Save as persona is in the More menu (#9998): open it, then press it
         const saveAsPersona = async () => {
@@ -64,8 +64,8 @@ const BASE = require('./test_base').BASE;
         });
         await S.run('the saved persona is still a choice after the dialog is closed and opened again', async () => {
             await ev(`window.hideLaunchModal(); true`); await settle(200);
-            await openNewAgent(ev, waitFor); await type('input', N.folder, '/work/payments-app'); await click('button', N.next);
-            await waitFor(`/Step 2 of 3/.test(window.__na.dialog().textContent)`, 'step 2', 4000);
+            await openNewAgent(ev, waitFor); await type('input', N.folder, '/work/payments-app'); await ev(`window.__na.next(); true`);
+            
             assert.ok((await options()).includes(NAME), 'the persona is listed');
         });
         const openMore = async () => { await ev(`(() => { const d = [...window.__na.dialog().querySelectorAll('summary')].find(e => /^more$/i.test(window.__na.name(e))).closest('details'); d.open = true; return true; })()`); await settle(100); };

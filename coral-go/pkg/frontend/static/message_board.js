@@ -254,6 +254,7 @@ export function deleteMessageBoardProject() { deleteTeam(state.selectedTeam || b
 
 /** Remove team: the in-page dialog (what goes, what stays, which agents run), then the DELETE; with agents running its button is "Stop agents and remove", which stops them and then removes the team. A toast says it is done. From the team page's More menu and from the sidebar's team menu (#10318, #15277). */
 export function deleteTeam(project) {
+    document.dispatchEvent(new CustomEvent('coral:team-action', { detail: { team: project } }));
     const blocked = project ? launchBlockedReason(splitKey(project).server) : '';
     if (blocked) { showToast(blocked, true); return; }
     if (!project) return;

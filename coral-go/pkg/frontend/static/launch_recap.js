@@ -46,7 +46,10 @@ function syncFlags() {
     const body = flagsBody();
     if (!body) { flagsShown = ''; paintFlags(null); return; }
     const key = JSON.stringify(body);
-    if (flagsCache.has(key)) { flagsShown = key; paintFlags(flagsCache.get(key), body.agent_type); return; }
+    if (flagsCache.has(key)) { // the answer already on the screen is left alone: a redraw would replace the Copy button a person is on and the focus would fall to the page (#17097)
+        if (flagsShown !== key || !document.querySelector('#launch-recap .launch-recap-flags')) { flagsShown = key; paintFlags(flagsCache.get(key), body.agent_type); }
+        return;
+    }
     if (flagsShown !== key) { flagsShown = ''; paintFlags(null); } // the old answer is not this choice's: no line until the new one arrives, never a stale one
     clearTimeout(flagsTimer);
     const seq = ++flagsSeq;
@@ -55,7 +58,7 @@ function syncFlags() {
         const answer = await fetchFlags(server, body);
         if (!answer) return; // no line: the recap above still says the mode
         flagsCache.set(key, answer);
-        if (seq === flagsSeq) { flagsShown = key; paintFlags(answer, body.agent_type); }
+        if (seq === flagsSeq && (flagsShown !== key || !document.querySelector('#launch-recap .launch-recap-flags'))) { flagsShown = key; paintFlags(answer, body.agent_type); }
     }, 120);
 }
 

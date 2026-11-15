@@ -24,7 +24,7 @@ const { coralReady } = require('./helpers/wait');
 
         const addFor = async p => { await click('#settings-custom-models [data-cm-add]'); await ev(`(() => { const s = document.getElementById('cm-provider'); s.value = ${JSON.stringify(p)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); };
         console.log('1. add two models in Settings with immediate saves');
-        await ev(`window.showSettingsModal('agents'); true`);
+        await ev(`window.showSettingsModal('providers'); true`);
         await waitFor(`!!document.querySelector('#settings-custom-models [data-cm-add]')`, 'the section from the real route', 8000);
         const lim = await api('GET', '/api/custom-models');
         const claudeLevels = lim.body.limits.efforts.claude;
@@ -74,7 +74,7 @@ const { coralReady } = require('./helpers/wait');
         check(`a duplicate in one family is refused (${dup.status})`, dup.status === 400 || dup.status === 409);
 
         console.log('4. remove: gone from the list and from both catalogs');
-        await ev(`window.showSettingsModal('agents'); true`);
+        await ev(`window.showSettingsModal('providers'); true`);
         await waitFor(`!!document.querySelector('#settings-custom-models [data-cm-add]')`, 'the section again', 8000);
         check('the saved models are listed after a reopen', /e2e-claude-model/.test(await ev(`document.getElementById('settings-custom-models').innerText`)));
         for (const [id, left] of [['e2e-claude-model', 1], ['e2e/pi-model', 0]]) {

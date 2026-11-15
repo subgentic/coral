@@ -92,3 +92,5 @@
 @media (max-width: 767px), (pointer: coarse) {
     .update-waiting > summary, .update-notes > summary { min-height: var(--control-touch-height, 44px); }
 }
+/* At 200% text on a phone the ready notice alone is taller than the room under the bar, and the strip's "Update and relaunch" fell below the clipped main area (#17126): while a banner or the strip shows, the main area scrolls instead of cutting it */
+@media (max-width: 767px) { .main-content:has(> .leftover-tmux-banner:not([hidden]), > .update-strip:not([hidden])) { overflow-x: hidden; overflow-y: auto; } }

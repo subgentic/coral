@@ -800,7 +800,7 @@ Does the same as Prune by itself, once an hour. After you turn it on, nothing is
 
 ### Terminal logs
 
-Kept after an agent is killed.
+Kept after an agent is stopped.
 
 Each agent's terminal output stays in the logs folder of Coral's data folder. Deleting removes the logs of agents that have ended; the log of a live, sleeping or archived agent is never touched.
 

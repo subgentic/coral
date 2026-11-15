@@ -31,7 +31,7 @@ const LIMITS = { max_per_family: 50, max_total: 200, efforts: { claude: ['low', 
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev); await installAudit(ev); await setTheme(ev, theme);
         await ev(STUB(route));
-        await ev(`window.showSettingsModal('agents'); true`);
+        await ev(`window.showSettingsModal('providers'); true`);
         if (route) await waitFor(`document.querySelectorAll('#settings-custom-models .cm-row').length === 3 && !!document.querySelector('#settings-custom-models [data-cm-add]')`, 'the list and its one Add button', 8000);
         else await waitFor(`!!document.getElementById('settings-custom-models')`, 'the row', 5000);
     };

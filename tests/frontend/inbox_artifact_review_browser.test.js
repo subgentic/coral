@@ -154,7 +154,7 @@ const { coralReady } = require('./helpers/wait');
                 // Close the shared viewer using its visible control, retaining the list.
                 await ev(`document.querySelector('.artifact-viewer-close').click();true`);
                 // the viewer's review bar: a pending review shows Approve and Request changes; the row's own buttons are the same two (no Mark reviewed any more)
-                assert.deepEqual(await ev(`[...(${row('Review file 01.txt')}).querySelectorAll('.inbox-review-actions button:not(.dt-star):not(.inbox-bookmark):not(.menu-item)')].map(b=>(b.getAttribute('aria-label')||b.textContent).trim())`),['Approve: Review file 01.txt',(width>760?'Comment: Review file 01.txt':'Request changes: Review file 01.txt'),'More actions for Review file 01.txt'],'a read row has Approve, Changes and More (Mark unread is in it) at these widths (#11552)');
+                assert.deepEqual(await ev(`[...(${row('Review file 01.txt')}).querySelectorAll('.inbox-review-actions button:not(.dt-star):not(.inbox-bookmark):not(.menu-item)')].map(b=>(b.getAttribute('aria-label')||b.textContent).trim())`),['Approve: Review file 01.txt',(width>760?'Request changes: Review file 01.txt':'Request changes: Review file 01.txt'),'More actions for Review file 01.txt'],'a read row has Approve, Changes and More (Mark unread is in it) at these widths (#11552)');
                 if(width===1280){
                     await ev(`(${row('Review file 01.txt')}).querySelector('.inbox-review-name').click();true`);
                     await waitFor(`!!document.querySelector('.artifact-review-approve:not([hidden])')`,'the viewer shows Approve for a pending review',8000);

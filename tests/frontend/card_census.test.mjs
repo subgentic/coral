@@ -29,6 +29,7 @@ export const CARDS = {
     'launch-type-card': 'regular',    // a choice in New agent
     'provider-card': 'none',          // a provider of New agent's Agent step: its head and its body carry their own (#11235)
     'cloud-card': 'roomy',            // the sign-in page's card
+    'prov-card': 'regular',           // a provider of Settings > Providers: its rows, or one line when it is not installed (ST4)
     'note-card': 'none',              // a note: its head and body carry their own
     'session-board-card': 'none',     // a team in the sidebar: its header and rows carry their own
 };

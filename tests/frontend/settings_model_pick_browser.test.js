@@ -15,7 +15,7 @@ const { coralReady } = require('./helpers/wait');
     const MOD = `(window.__coralStatic || '/static/')`;
     const put = body => ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(${JSON.stringify(body)}) }).then(r => r.status)`);
     const open = async () => {
-        await ev(`import(${MOD} + 'state.js').then(async s => { const d = await fetch('/api/settings').then(r => r.json()); s.state.settings = d.settings; return true; }).then(() => import(${MOD} + 'modals.js')).then(m => m.showSettingsModal('agents')).then(() => true)`);
+        await ev(`import(${MOD} + 'state.js').then(async s => { const d = await fetch('/api/settings').then(r => r.json()); s.state.settings = d.settings; return true; }).then(() => import(${MOD} + 'modals.js')).then(m => m.showSettingsModal('providers')).then(() => true)`);
         await waitFor(`!!document.getElementById('settings-model-pick-claude') && document.getElementById('settings-model-pick-claude').options.length > 2`, 'the Claude model dropdown with its models', 15000);
         await new Promise(r => setTimeout(r, 300)); // sleep-ok: the rows settle
     };

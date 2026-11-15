@@ -60,16 +60,18 @@ const { coralReady } = require('./helpers/wait');
             const dc = await ev(`window.__copied[0]`);
             assert.equal(dc, `Docs: coral-agent docs board, section “${heads.section.replace(/\s*\(#\d+\)\s*$/, '')}”`, at + 'just the exact place');
 
-            console.log(`${at}4. Settings > General has no robot: a labelled Quiet button on the section's last row (#15993)`);
+            console.log(`${at}4. Settings > General has no robot: a labelled Quiet button in the section heading's row (#15993, #17591)`);
             await load('/');
             await ev(`window.showSettingsModal(); true`);
-            await waitFor(`!!document.querySelector('#settings-pane-general .settings-copy-last button')`, `${at}the General section's button`, 15000);
-            const gen = await ev(`(() => { const p = document.getElementById('settings-pane-general'), b = p.querySelector('.settings-copy-last button'); return { text: b.textContent.trim(), quiet: b.classList.contains('btn-quiet'), robot: !!p.querySelector('.agent-copy'), last: p.lastElementChild === b.parentElement, icon: !!b.querySelector('.material-icons') }; })()`);
-            assert.ok(gen.text === 'Copy for an agent' && gen.quiet && !gen.robot && gen.last && !gen.icon, at + 'words, Quiet, last, no robot: ' + JSON.stringify(gen));
+            await waitFor(`!!document.querySelector('#settings-pane-general .agent-copy-hrow > .agent-copy-labelled')`, `${at}the General section's button`, 15000);
+            const gen = await ev(`(() => { const p = document.getElementById('settings-pane-general'), b = p.querySelector('.agent-copy-hrow > .agent-copy-labelled'); return { text: b.textContent.trim(), quiet: b.classList.contains('btn-quiet'), robot: !!p.querySelector('.agent-copy'), last: b.parentElement.classList.contains('agent-copy-hrow') && b.previousElementSibling === p.querySelector('.settings-pane-title'), icon: !!b.querySelector('.material-icons') }; })()`);
+            assert.ok(gen.text === 'Copy for an agent' && gen.quiet && !gen.robot && gen.last && !gen.icon, at + 'words, Quiet, beside the heading, no robot: ' + JSON.stringify(gen));
             assert.ok(await ev(`!!document.querySelector('#settings-pane-updates .agent-copy, #settings-pane-agents .agent-copy')`), at + 'the other sections keep their robot');
-            await clip(); await ev(`document.querySelector('#settings-pane-general .settings-copy-last button').click(); true`);
+            await clip(); await ev(`document.querySelector('#settings-pane-general .agent-copy-hrow > .agent-copy-labelled').click(); true`);
             await waitFor(`window.__copied.length === 1`, `${at}General's line copied`, 8000);
-            assert.match(await ev(`window.__copied[0]`), /General/, at + 'names the section');
+            const genTitle = await ev(`document.getElementById('settings-pane-general').dataset.title`);
+            assert.ok(genTitle, at + 'the section has a title');
+            assert.ok((await ev(`window.__copied[0]`)).includes(`\u201c${genTitle}\u201d section`), at + 'names the section by its own title: ' + genTitle);
         }
         console.log('PASS agent copy robot');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }

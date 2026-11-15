@@ -28,7 +28,7 @@ const NOTE = (bin, type) => `Found but not used: ~/.local/bin/${bin} is in an ag
             await ev(`window.__coralLive = null; (async () => { const st = (await import((window.__coralStatic || '/static/') + 'state.js')).state; st.liveSessions = [{ session_id: 'sr1', name: 'coral-sr1', display_name: 'Security Reviewer', board_subscriber_id: 'Security Reviewer', agent_type: 'claude', server: 'local' }]; return true; })()`);
             await ev(`(async () => { await window.showLaunchModal(); const c = document.querySelector('#launch-step-chooser [data-arg="agent"]'); if (c && c.getClientRects().length) c.click(); return true; })()`);
             await waitFor(`!!document.getElementById('launch-dir') && document.getElementById('launch-dir').getClientRects().length > 0`, at + 'the folder step', 8000);
-            await ev(`(() => { const i = document.getElementById('launch-dir'); if (!i.value) { i.value = '/tmp'; i.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('launch-agent-next').click(); document.getElementById('launch-agent-next').click(); return true; })()`);
+            await ev(`(() => { const i = document.getElementById('launch-dir'); if (!i.value) { i.value = '/tmp'; i.dispatchEvent(new Event('input', { bubbles: true })); } window._launchStage('agent'); return true; })()`);
             await waitFor(`document.getElementById('launch-agent-pick') && document.getElementById('launch-agent-pick').dataset.probed === '1'`, at + 'the agent list', 10000);
             await settle(300);
             // every wording the server has (an agent's folder, a temporary folder, Coral's data folder, through the Hub, one never met) is drawn as one short line with a Why? fold

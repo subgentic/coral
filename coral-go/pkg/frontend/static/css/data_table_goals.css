@@ -1,0 +1,10 @@
+/* Phone goal cards shared by Team and Inbox (#15833). Loaded with Goals, outside start CSS. */
+.dt-box .dt-mail-cell:has(> .dt-mail-open[data-goal-id]) .dt-mail-open.dt-primary { flex-direction: column; align-items: stretch; justify-content: center; gap: 2px; text-align: start; }
+.dt-mail-cell:has(> .dt-mail-open[data-goal-id]) .dt-mail-open::before { content: none; }
+.dt-mail-cell:has(> .dt-mail-open[data-goal-id]) .dt-mail-text { flex: none; }
+.dt-mail-cell:has(> .dt-mail-open[data-goal-id]) .dt-mail-line { display: block; }
+.dt-mail-cell:has(> .dt-mail-open[data-goal-id]) .dt-mail-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; max-width: 100%; overflow: hidden; white-space: normal; overflow-wrap: anywhere; text-align: start; }
+.dt-mail-cell:has(> .dt-mail-open[data-goal-id]) .dt-mail-side { align-items: flex-start; text-align: start; }
+.dt-mail-cell:has(> .dt-mail-open[data-goal-id]) .dt-mail-time { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-size: var(--fs-md); color: var(--text-secondary); }
+.dt-mail-cell:has(> .dt-mail-open[data-goal-id]) .dt-mail-avatar:not(.dt-mail-tick) { width: 40px; height: 40px; color: var(--text-secondary); background: none !important; }
+.dt-box.dt-mail-on tr.dt-mailed .dt-mail-cell:has(> .dt-mail-open[data-goal-id]) .dt-mail-open.dt-primary { padding-block: 8px; }

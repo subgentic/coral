@@ -7,6 +7,7 @@
 // with Undo. A button is at the same x on every row; on a phone every target is 44 px. 1280 and 390 px; review files and a question stubbed in the page.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_notice');
 const BASE = require('./test_base').BASE;
 const { coralReady, framesJs } = require('./helpers/wait');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -21,7 +22,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         for (const [w, h, mobile, font] of [[1280, 800, false, 16], [1280, 800, false, 32], [390, 844, true, 16]]) {
             const at = `${w} px, ${font}px text: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await ev(`localStorage.clear(); sessionStorage.clear(); true`); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await ev(`localStorage.clear(); sessionStorage.clear(); true`); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, BASE + '/'); /* the unseen first-run notice sits in the phone Inbox pane now (#16460): acked on the test server */ await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`document.documentElement.style.fontSize='${font}px';true`);
             await ev(`fetch('/api/board/${team}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Writer', job_title: 'Writer' }) }).then(r => r.status)`);
             await ev(`(() => { const hex = n => n.toString(16).padStart(64, '0'), ago = m => new Date(Date.now() - m * 60000).toISOString(); const original = window.fetch, json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
@@ -44,7 +45,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
 
             assert.ok(await ev(`${ms}.scrollWidth <= ${ms}.clientWidth`), `${w}: the main stage fits its window before the menu opens`);
             await ev(`${one}.querySelector('.inbox-row-more-toggle').focus(); true`); await ev(framesJs(3)); // a phone's row shows its buttons while the keyboard is in them: the dots are focused before they are pressed
-            await ev(`${one}.querySelector('.inbox-row-more-toggle').click(); true`); await ev(framesJs(6));
+            // the menu is opened until it is open: a late re-render of the rows (a fetch that settles after the first paint) replaces the row or closes the menu once, and the old fixed six frames then measured a menu that was not there (#17187, a TypeError on null in 1 of 3 runs)
+            await waitFor(`(() => { if (document.querySelector('.inbox-row-more .menu:not([hidden])')) return true; const t = ${one}?.querySelector('.inbox-row-more-toggle'); if (t) t.click(); return false; })()`, at + 'the row menu opens', 10000); await ev(framesJs(6));
             const after = await ev(`(() => { const ms = document.getElementById('main-stage'), menu = document.querySelector('.inbox-row-more .menu:not([hidden])'), r = menu.getBoundingClientRect(), wrap = menu.parentElement; return { sw: ms.scrollWidth, cw: ms.clientWidth, left: ms.scrollLeft, wrapPos: getComputedStyle(wrap).position, menu: [Math.round(r.left), Math.round(r.right), Math.round(r.top), Math.round(r.bottom)], vw: innerWidth, vh: innerHeight }; })()`);
             assert.ok(['relative', 'absolute'].includes(after.wrapPos) /* absolute: a phone review card's dots hang at its top right (#14683) */ && after.left === 0 && after.sw <= after.cw, `${w}: opening a row's menu does not scroll the page sideways (the menu hangs from its dots): ` + JSON.stringify(after));
             assert.ok(after.menu[0] >= 0 && after.menu[1] <= after.vw && after.menu[2] >= 0 && after.menu[3] <= after.vh, `${w}: the whole menu is on the screen: ` + JSON.stringify(after));
@@ -61,7 +63,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await waitFor(`!document.querySelector('.inbox-row-more-toggle[aria-expanded="true"]')`,at+'Escape closes the menu');
             await removeBoards(ev, [team]).catch(() => {});
         }
-    } finally { await client.close(); }
+    } finally { try { await restoreLaunchNotice(ev); } catch (e) {} await client.close(); }
     assert.deepEqual(failures, [], 'Menus and prompt choices escape clipping: '+failures.join('; '));
     console.log('needs_menu_fit_browser: ok');
 })().catch(e => { console.error(e && e.message || e); process.exit(1); });

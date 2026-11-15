@@ -1,0 +1,10 @@
+/* The collapsed rail of Automations, Skills and Analytics (sidebar_folder_rail.js, #15820): an icon per row, as the Inbox's rail has. */
+.sidebar-rail-views { display: none; }
+@media (min-width: 1024px) {
+    .layout[data-sidebar-pane="automations"] #sidebar-rail-automations,
+    .layout[data-sidebar-pane="skills"] #sidebar-rail-skills,
+    .layout[data-sidebar-pane="tokens"] #sidebar-rail-tokens { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; min-height: 0; width: 100%; overflow-y: auto; scrollbar-width: none; }
+    .sidebar-rail-views .sidebar-rail-folder { position: relative; }
+    .sidebar-rail-views .sidebar-rail-folder[aria-current="page"] { background: var(--bg-hover); box-shadow: inset 3px 0 0 var(--accent); }
+    .sidebar-rail-views .view-list-icon { display: inline-flex; width: 18px; height: 18px; font-size: var(--fs-2xl); align-items: center; justify-content: center; }
+}

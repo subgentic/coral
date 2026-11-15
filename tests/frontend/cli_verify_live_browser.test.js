@@ -17,7 +17,7 @@ const { coralReady } = require('./helpers/wait');
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`(() => { window.__release = null; const real = window.fetch; const json = b => new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } });
                 window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href); if (p.pathname === '/api/system/cli-check' && p.searchParams.has('binary')) { const type = p.searchParams.get('type'); return new Promise(res => { const prev = window.__release; window.__release = () => { if (prev) prev(); res(json(type === 'agy' ? { found: false } : { found: true, version: 'v1.' + type })); }; }); } return real(u, o); }; return true; })()`);
-            await ev(`(async () => { await window.showSettingsModal('agents'); return true; })()`); await waitFor(`!!document.getElementById('settings-cli-path-agy')`, `${w}: Settings, Agents`, 8000);
+            await ev(`(async () => { await window.showSettingsModal('providers'); return true; })()`); await waitFor(`!!document.getElementById('settings-cli-path-agy')`, `${w}: Settings, Agents`, 8000);
             await ev(`document.getElementById('settings-cli-path-agy').closest('details').open = true; true`);
             await waitFor(`document.getElementById('verify-all-btn') && document.getElementById('verify-all-btn').getClientRects().length > 0`, `${w}: the Verify All button`, 8000);
             // (2) before anything is checked each verdict's place is already a live region (a region that appears already filled is not reliably said)

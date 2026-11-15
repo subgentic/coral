@@ -20,7 +20,6 @@ const DIALOGS = {
     'job-modal': { ...MODAL('job-modal'), open: `window.showJobModal()` },
     'default-prompts-modal': { ...MODAL('default-prompts-modal'), open: `window.showDefaultPromptsModal()` },
     'create-task-modal': { ...MODAL('create-task-modal'), open: `window.showCreateTaskModal()` },
-    'team-wizard-modal': { ...MODAL('team-wizard-modal'), open: `(async () => { await __M('modals.js'); await __M('team_wizard.js'); window.showTeamWizardModal(); })()` },
     'mobile-connect-modal': { ...MODAL('mobile-connect-modal'), open: `(async () => { await __M('modals.js'); await window._showMobileConnectModal(); })()` },
     'wf-create-modal': { ...MODAL('wf-create-modal'), open: `window.showWorkflowCreateModal()` },
     // Built by script (registerDialog) or native <dialog>: found by what they hold, not by an id in the page shell.
@@ -38,7 +37,7 @@ const SKIPPED = { 'restart-modal': 'needs a live session; opened by an unexporte
 // one focus must come back to, or to the control that opened the menu it was in). Each runs again with a real mouse click on the real opener (#6188: the census's own opener cannot see a real opener losing focus).
 const REAL = {
     'launch-modal': { prep: `window.switchNavTab('agents')`, steps: ['[data-on-click="launch-show"]'] },
-    'open-folder-modal': { prep: `window.switchNavTab('agents')`, steps: ['[data-on-click="launch-show"]', '#launch-type-open-folder'], returnsTo: 0 },
+    'open-folder-modal': { prep: `window.switchNavTab('agents')`, steps: ['[data-on-click="launch-show"]', '.launch-back-btn', '#launch-type-open-folder'], returnsTo: 0 },
     'settings-modal': { prep: `window.switchNavTab('agents')`, steps: ['[aria-controls="top-bar-settings-menu"]', '[data-on-click="m-close-top-bar-settings-then-show-settings-modal"]'], returnsTo: 0 },
     'wf-create-modal': { prep: `window.openAutomationsFolder('workflows')`, steps: ['[data-on-click="wf-create"]'] },
     'job-modal': { prep: `window.openAutomationsFolder('jobs')`, steps: ['[data-on-click="job-new"], [data-on-click="m-show-job-modal"], #scheduler-new-job-btn'] },

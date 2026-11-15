@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { launchStandIn } = require('./helpers/stand_in_agent');
 const BASE = require('./test_base').BASE;
+const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_notice');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -22,7 +23,7 @@ async function httpJson(method, path, body, headers = {}) {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         const S = `(window.__coralStatic || '/static/')`;
         const person = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body === undefined ? 'undefined' : JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, data: await r.json().catch(() => null) }))`);
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, BASE + '/'); /* the unseen first-run notice sits in the phone Inbox pane now (#16460) and shifts what these measure: acked on the test server */ await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         standIn = await launchStandIn(httpJson, { displayName: 'Button Walker' });
         if (!standIn.sid) throw new Error('no stand-in agent: ' + standIn.diag);
         const tok = { 'X-Coral-Session-Token': standIn.token };
@@ -47,7 +48,7 @@ async function httpJson(method, path, body, headers = {}) {
         for (const width of [1280, 390, 320, 1440]) {
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: width < 768 });
             await Emulation.setTouchEmulationEnabled({ enabled: width < 768 });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, BASE + '/'); /* the unseen first-run notice sits in the phone Inbox pane now (#16460) and shifts what these measure: acked on the test server */ await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`(()=>{const original=window.fetch;window.__maskAskButtons=true;window.fetch=async(u,o)=>{const mask=window.__maskAskButtons&&new URL(String(u),location.href).pathname==='/api/operator-asks',r=await original(u,o);if(!mask||!r.ok)return r;const rows=await r.json();for(const a of rows)if(a.id===${binary})delete a.buttons;return Response.json(rows);};return true;})()`);
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => import(${S} + 'inbox_tab.js')).then(m => m.selectInboxTab('needs')).then(() => true)`);
             await ev(`window.__maskAskButtons=false;true`);
@@ -200,7 +201,7 @@ async function httpJson(method, path, body, headers = {}) {
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `${w} px: `, which = mobile ? '(three)' : '(one)';
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, BASE + '/'); /* the unseen first-run notice sits in the phone Inbox pane now (#16460) and shifts what these measure: acked on the test server */ await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => import(${S} + 'inbox_tab.js')).then(m => m.selectInboxTab('needs')).then(() => true)`);
             const rowOf = text => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.textContent.includes(${JSON.stringify(text)}))`;
             await waitFor(`!!(${rowOf(which)})`, at + 'the question is in Needs you', 15000);
@@ -237,7 +238,7 @@ async function httpJson(method, path, body, headers = {}) {
                 const stillPending = (await mine()).find(a => a.id === q1);
                 assert.ok(stillPending && stillPending.buttons.every(b => b.state === 'pending'), at + 'opening the task keeps all choices pending');
             } else {
-                await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-buttons .btn:not(.btn-primary)').click(); true`); // Close: nothing runs on a phone walk of the layout
+                await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-buttons .btn')].find(b => b.textContent === 'Close').click(); true`); // Close by its label (Dismiss, no reply is first now, #16371): nothing runs on a phone walk of the layout
                 await waitFor(`!document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'closes', 6000);
             }
         }
@@ -245,7 +246,7 @@ async function httpJson(method, path, body, headers = {}) {
         // a reply button: the server posts the stored label as a click and closes the question
         await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => true)`);
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, BASE + '/'); /* the unseen first-run notice sits in the phone Inbox pane now (#16460) and shifts what these measure: acked on the test server */ await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => import(${S} + 'inbox_tab.js')).then(m => m.selectInboxTab('needs')).then(() => true)`);
         await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr')].some(r => r.textContent.includes('(two)'))`, 'the second question', 15000);
         await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.textContent.includes('(two)')).querySelector('button[aria-label^="Answer the question of"]').click(); true`);
@@ -262,5 +263,5 @@ async function httpJson(method, path, body, headers = {}) {
         assert.ok(reply.content.includes('@Button Walker') && reply.content.includes('"Yes, ship it"') && reply.content.includes('not a typed reply'), reply.content);
         assert.ok(!(await mine()).some(a => a.id === q2), 'the question is closed');
         console.log('inbox_ask_buttons_real_browser: ok');
-    } finally { if (standIn) await standIn.stop().catch(() => {}); if (evp) await removeBoards(evp, [B]).catch(() => {}); if (client) await client.close().catch(() => {}); }
+    } finally { try { await restoreLaunchNotice(evp); } catch (e) {} if (standIn) await standIn.stop().catch(() => {}); if (evp) await removeBoards(evp, [B]).catch(() => {}); if (client) await client.close().catch(() => {}); }
 })().catch(e => { console.error(e); process.exit(1); });

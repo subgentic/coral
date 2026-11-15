@@ -25,7 +25,11 @@ const SOURCE = `(() => {
     const radioName = r => { const n = name(r); if (n) return n; const l = r.closest('label'); return l ? text(l) : ''; };
     const box = e => { if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.left * 10) / 10, y: Math.round(r.top * 10) / 10, w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10 }; };
     const buttons = () => { const d = dialog(); return d ? [...d.querySelectorAll('button')].filter(vis).map(b => ({ name: name(b), ...box(b), disabled: b.disabled, ariaDisabled: b.getAttribute('aria-disabled') })) : []; };
-    window.__na = { vis, name, text, dialog, find, box, buttons, panel, radios, isChecked, radioName };
+    // next(): the dialog's next step. Where it still has a Next (a restart) it presses it; New agent is one page (#15911) with two folds, 'Name and instructions' (the old persona step) and 'More options' (the old agent step), so there next() opens the first one still closed.
+    const next = () => { const b = find('button', /^Next$/i); if (b) { b.click(); return true; } for (const id of ['launch-persona-more', 'launch-more-options']) { const d = document.getElementById(id); if (d && !d.open) { d.open = true; break; } } return true; };
+    // back(): the reverse: closes the last fold that is open (More options, then Name and instructions), or presses Back where there is one.
+    const back = () => { const b = find('button', /^Back$/i); if (b) { b.click(); return true; } for (const id of ['launch-more-options', 'launch-persona-more']) { const d = document.getElementById(id); if (d && d.open) { d.open = false; break; } } return true; };
+    window.__na = { next, back, vis, name, text, dialog, find, box, buttons, panel, radios, isChecked, radioName };
     return true;
 })()`;
 const install = ev => ev(SOURCE);

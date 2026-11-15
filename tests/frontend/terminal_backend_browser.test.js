@@ -155,11 +155,11 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await until(`!document.getElementById('default-notice-banner').hidden`, 'the default notice');
         check('the default notice is a note with a Dismiss, not a live region (it says nothing by itself when it appears)', await ev(`!document.getElementById('default-notice-banner').closest('[role=status], [aria-live]') && !document.querySelector('#default-notice-banner [role=status], #default-notice-banner [aria-live]') && !document.getElementById('default-notice-banner').getAttribute('role')`));
         const notice = await ev(`document.getElementById('default-notice-banner').textContent.replace(/\\s+/g, ' ').trim()`);
-        check('the line says agents now stop on quit and where to keep them running', notice === 'info Agents now stop when you quit Coral. To keep them running, choose tmux in Settings > Terminal. Got it', notice);
+        check('the line says agents now stop on quit and where to keep them running', notice === 'info Agents now stop when you quit Coral. To keep them running, choose tmux in Settings > Agents > Defaults > Advanced. Got it', notice);
         await ev(`document.querySelector('#default-notice-banner .default-notice-link').click(); true`);
         await until(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'Settings from the link');
-        await until(`!!document.getElementById('settings-pane-agents') && !document.getElementById('settings-pane-agents').hidden`, 'the Terminal tab');
-        check('its link opens Settings on the Terminal tab', await ev(`!!document.getElementById('settings-pane-agents') && !document.getElementById('settings-pane-agents').hidden && getComputedStyle(document.getElementById('settings-pane-agents')).display !== 'none'`));
+        await until(`!!document.getElementById('settings-pane-agents') && !document.getElementById('settings-pane-agents').hidden`, 'the Defaults pane');
+        check('its link opens Settings on the Defaults pane', await ev(`!!document.getElementById('settings-pane-agents') && !document.getElementById('settings-pane-agents').hidden && getComputedStyle(document.getElementById('settings-pane-agents')).display !== 'none'`));
         await ev(`window.hideSettingsModal(); window.__tbCalls.length = 0; document.getElementById('default-notice-dismiss').click(); true`);
         await until(`document.getElementById('default-notice-banner').hidden`, 'the notice dismissed');
         check('after Got it, focus is on the Agents search box, not the page body', await ev(`document.activeElement && document.activeElement.id === 'agent-search-input'`), await ev(`document.activeElement ? document.activeElement.tagName + '#' + document.activeElement.id : 'none'`));

@@ -130,7 +130,7 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await click('#wf-run-detail-container [data-on-click="wf-kill-run"]');
         await until(`!!document.getElementById('confirm-modal') && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirm dialog');
         const killAsked = await modalState();
-        check('Kill asks first, naming the run and its workflow', killAsked.open && killAsked.title === 'Kill run' && killAsked.message.includes('run #31') && killAsked.message.includes('"Nightly"'), JSON.stringify(killAsked));
+        check('Kill asks first, naming the run and its workflow', killAsked.open && killAsked.title === 'Stop run' && killAsked.message.includes('run #31') && killAsked.message.includes('"Nightly"'), JSON.stringify(killAsked));
         await click('#confirm-modal .btn:not(#confirm-modal-yes)');
         await sleep(300); // sleep-ok: shows that Cancel sends nothing (no condition to wait for)
         check('Cancel closes the dialog and kills nothing', !(await modalState()).open && !(await reqs()).some(r => r.includes('/kill')), JSON.stringify(await reqs()));
@@ -150,7 +150,7 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await click('#wf-run-detail-container [data-on-click="wf-kill-run"]');
         await until(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirm dialog for the agent run');
         const agentAsked = await modalState();
-        check('Kill Run with a running agent step says what happens to its terminal log', agentAsked.title === 'Kill run' && agentAsked.message.endsWith("Its terminal log is kept, in the logs folder of Coral's data folder."), JSON.stringify(agentAsked));
+        check('Kill Run with a running agent step says what happens to its terminal log', agentAsked.title === 'Stop run' && agentAsked.message.endsWith("Its terminal log is kept, in the logs folder of Coral's data folder."), JSON.stringify(agentAsked));
         await click('#confirm-modal .btn:not(#confirm-modal-yes)');
         check('...and Cancel kills nothing', !(await reqs()).some(r => r.includes('/kill')), JSON.stringify(await reqs()));
 

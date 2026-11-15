@@ -243,6 +243,17 @@ export function cancelSelectMode() {
     host.render();
 }
 
+// Selection belongs to this board. Escape also works from the composer; an action on
+// another team must leave this board's selection alone (#16360).
+document.addEventListener('keydown', e => {
+    if (e.defaultPrevented || e.key !== 'Escape' || !_selectMode || !document.getElementById('mb-board')?.getClientRects().length) return;
+    e.preventDefault();
+    cancelSelectMode();
+});
+document.addEventListener('coral:team-action', e => {
+    if (_selectMode && e.detail?.team === host?.project()) cancelSelectMode();
+});
+
 function updateSelectBar() {
     let bar = document.getElementById('mb-select-bar');
     if (!_selectMode) {

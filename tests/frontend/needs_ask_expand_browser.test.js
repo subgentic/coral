@@ -7,8 +7,9 @@ const assert = require('node:assert/strict');
 const { touchTap } = require('./helpers/touch_tap');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
+const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_notice');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, framesJs } = require('./helpers/wait');
 
 const PLAN = 'Plan for the Reading List app (task #1) — OK to proceed? 1) Scope: a single-page app that lists books, lets me mark one as read and keeps my notes. 2) Stack: plain HTML, CSS and JavaScript, no build step, data in localStorage. 3) Screens: the list, a book page, an add form. 4) Done when: I can add a book, mark it read and see it after a reload.';
 (async () => {
@@ -18,7 +19,7 @@ const PLAN = 'Plan for the Reading List app (task #1) — OK to proceed? 1) Scop
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Emulation.setFocusEmulationEnabled({ enabled: true });
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, BASE + '/'); /* the unseen first-run notice sits in the phone Inbox pane now (#16460) and shifts what these measure: acked on the test server */ await install();
             await coralReady(ev);
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.__answers = []; window.__multi = false;
                 const real = window.fetch; window.fetch = (u, o = {}) => { const url = String(u), m = (o.method || 'GET').toUpperCase();
@@ -94,11 +95,16 @@ const PLAN = 'Plan for the Reading List app (task #1) — OK to proceed? 1) Scop
             await waitFor(`(() => { const e = document.activeElement; return !!e && e.classList.contains('inbox-ask-expand') && e.getAttribute('aria-expanded') === 'true' && e.closest('tr').textContent.includes('Tester'); })()`, `${w}: Enter on Tester's toggle opens Tester's question and keeps the focus on it`, 6000);
             assert.equal((await state('Designer')).button.expanded, 'true', `${w}: Designer's question stayed as it was (open) while Tester's opened`);
             await key('Enter', 'Enter'); await new Promise(r => setTimeout(r, 400)); // sleep-ok: shut Tester again
-            const again = await state('Designer'); await tap(again.button);
+            // Keyboard focus on Tester may have scrolled Designer's toggle outside the phone viewport.
+            await ev(`${askRow('Designer')}.querySelector('.inbox-ask-expand').scrollIntoView({block:'center',behavior:'instant'}); true`);
+            await ev(framesJs(2));
+            const again = await state('Designer');
+            assert.ok(await ev(`document.elementFromPoint(${again.button.x},${again.button.y})?.closest('.inbox-ask-expand')?.dataset.askKey === ${askRow('Designer')}.querySelector('.inbox-ask-expand').dataset.askKey`), `${w}: the final tap hits Designer's toggle`);
+            await tap(again.button);
             await waitFor(`(() => { const tr = ${askRow('Designer')}; const b = tr && tr.querySelector('.inbox-ask-expand'); return !!b && b.getAttribute('aria-expanded') === 'false'; })()`, `${w}: a second tap shuts it`, 6000);
             const back = await state('Designer');
             assert.ok(back.text.endsWith('…') && back.len === shut.len, `${w}: shut again, the preview is back: ${back.len}`);
         }
         console.log('needs_ask_expand: ok');
-    } finally { await client.close(); }
+    } finally { try { await restoreLaunchNotice(ev); } catch (e) {} await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

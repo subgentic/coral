@@ -64,7 +64,7 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelector('#settings-modal #settings-tab-agents').click(); true`); await settle(300);
         const bk = await bx('#settings-modal .settings-back');
         assert.ok(bk && bk.h >= 56 && !(await bx('#settings-modal .settings-bar-back')), 'a section has ONE bar: its way back is 56 px and the list\'s arrow is not drawn: ' + JSON.stringify(bk));
-        assert.match(await ev(`document.querySelector('#settings-modal .settings-back').textContent.replace(/\\s+/g, ' ').trim()`), /Agents$/, 'the section\'s bar names the section beside the arrow');
+        assert.match(await ev(`document.querySelector('#settings-modal .settings-back').textContent.replace(/\\s+/g, ' ').trim()`), /Defaults$/, 'the section\'s bar names the section beside the arrow (the Agents tab\'s pane is titled Defaults since 428436bb5)');
         assert.ok(bk.t <= 8, 'the section\'s bar is the first row of the screen, not under an empty strip: ' + JSON.stringify(bk));
         await ev(`document.querySelector('#settings-modal .settings-back').click(); true`); await settle(300);
         await ev(`document.querySelector('#settings-modal .settings-bar-back').click(); true`); await settle(300);

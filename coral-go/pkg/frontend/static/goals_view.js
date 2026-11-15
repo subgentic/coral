@@ -18,8 +18,8 @@ const GC = await importOnce('./goal_columns.js');
 
 import * as W from './goal_words.js';
 import { looksDone } from './goal_done.js';
-const { shortTitle } = await importOnce('./goal_short.js');
 const { mountGoal } = await importOnce('./goal_view.js');
+await loadStyles('data_table_goals.css');
 await loadStyles('phone_lists.css'); // the phone form of a team list: edge-to-edge rows, a one-line toolbar (#12230); not at start (page_weight)
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 loadStyles('short_screen.css'); // what a short window needs (200% zoom, #15303)
@@ -176,7 +176,7 @@ function drawTableRaw(col) {
         ...(finished.length ? { groupBy: g => ({ key: g.state === 'done' ? 'done' : 'open', label: g.state === 'done' ? `Done (${finished.length})` : 'Active' }), groupSorted: true } : {}),
         open: g => g.noGoal ? window.openTeamPage?.(model.project, { tab: 'tasks', noGoal: true }) : openGoal(g.id, true),
         columns: GC.goalColumns({}, ['goal', 'state', 'progress', 'updated']), oneLine: true, resize: true, sortBar: false, bare: PHONE.matches, // a phone: no card around the rows (#12230)
-        ...(PHONE.matches ? { mail: g => (g.noGoal ? { lead: { icon: 'checklist', square: true, name: 'Tasks with no goal' }, title: g.title, snippet: '', state: '', time: '' } : { lead: { icon: 'flag', square: true, name: W.stateWord(g) }, title: shortTitle(g.title), data: { goalId: String(g.id) }, ask: g.outcome || '', state: W.stateWord(g), timeNode: GC.goalStateMark(g), time: `${looksDone(g) ? ', all tasks done' : ''}${totalOf(g.rollup) ? ` \u00b7 ${doneOf(g.rollup)}/${totalOf(g.rollup)}` : ''}` }) } : {}), // a phone's row, like the Inbox's Goals: a flag, the goal, its outcome, when it moved
+        ...(PHONE.matches ? { mail: g => (g.noGoal ? { lead: { icon: 'checklist', square: true, name: 'Tasks with no goal' }, title: g.title, snippet: '', state: '', time: '' } : { lead: { icon: 'flag', square: true, name: W.stateWord(g) }, title: `#${g.id} ${g.title}`, data: { goalId: String(g.id) }, state: W.stateWord(g), timeNode: GC.goalStateMark(g), time: `${looksDone(g) ? ', all tasks done' : ''}${totalOf(g.rollup) ? ` \u00b7 ${doneOf(g.rollup)}/${totalOf(g.rollup)}` : ''}` }) } : {}), // a phone's row, like the Inbox's Goals: a flag, the goal, its outcome, when it moved
     });
     if (PHONE.matches) { const bleed = el('div', 'goals-bleed'); bleed.append(table.el); col.append(bleed); } else col.append(table.el); // a phone: the rows run to the screen's edges (goals_phone.css)
     Toolbar.mountSelection(toolbar, goalsTableState.selected.size ? table.bar : null);

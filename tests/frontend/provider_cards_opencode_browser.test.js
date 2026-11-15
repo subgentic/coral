@@ -16,10 +16,7 @@ const GROUPED = `(() => { const R = window.fetch; window.fetch = (u, o = {}) => 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const toAgentStep = async () => {
-        for (let i = 0; i < 4 && !/Step 3 of 3/.test(await stepLine(ev)); i++) {
-            await ev(`(() => { const b = [...document.querySelectorAll('[role=dialog] button')].find(x => /^Next$/.test(x.textContent.trim()) && x.getClientRects().length); const f = document.getElementById('launch-dir'); if (f && !f.value) { f.value = '/tmp'; f.dispatchEvent(new Event('input', { bubbles: true })); } if (b) b.click(); return true; })()`);
-            await waitFor(`/Step ${i + 2} of 3|Step 3 of 3/.test(document.querySelector('[role=dialog]')?.textContent || '')`, 'the next step', 4000).catch(() => {});
-        }
+        await ev(`(() => { const f = document.getElementById('launch-dir'); if (f && !f.value) { f.value = '/tmp'; f.dispatchEvent(new Event('input', { bubbles: true })); } for (const id of ['launch-persona-more', 'launch-more-options']) { const d = document.getElementById(id); if (d) d.open = true; } return true; })()`); // the one page (#15911): the cards are in More options
         await waitFor(`document.getElementById('launch-agent-pick').dataset.probed === '1'`, 'the cards heard from the CLI checks', 8000);
     };
     try {

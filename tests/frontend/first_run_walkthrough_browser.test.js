@@ -155,6 +155,8 @@ setInterval(() => {}, 1 << 30);
         const before = (await live()).map(x => x.session_id);
         if (!mobile) {
             await clickVisible('[data-on-click="launch-show"]');
+            await waitFor(visible('#launch-dir'), `${tag}: New agent opens the form (#15888)`, { timeout: 8000 });
+            await ev(`document.querySelector('.launch-back-btn').click(); true`); // the choice of what to launch is one step back
             await waitFor(visible('#launch-step-chooser .launch-type-card'), `${tag}: the choice of what to launch`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
             const cards = await ev(`[...document.querySelectorAll('#launch-step-chooser .launch-type-card')].map(c => c.querySelector('.launch-type-label').textContent.trim() + ' ' + c.querySelector('.launch-type-desc').textContent.trim())`);
             assert.deepEqual(cards.slice(0, 3), ['New agent One agent in a folder you choose.', 'New team Launch a team of agents collaborating on a shared board.', 'Open folder Add a project folder to start agents in later.'], `${tag}: step one offers the kinds in this order, each with what it opens (#9253) (${JSON.stringify(cards)})`);
@@ -188,6 +190,8 @@ setInterval(() => {}, 1 << 30);
                 await waitFor(visible('[data-on-click="launch-show"]'), `${tag}: the Agents list with its New button`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
             }
             await clickVisible('[data-on-click="launch-show"]');
+            await waitFor(visible('#launch-dir'), `${tag}: New agent opens the form again`, { timeout: 8000 });
+            await ev(`document.querySelector('.launch-back-btn').click(); true`);
             await waitFor(visible('#launch-step-chooser .launch-type-card[data-arg="team"]'), `${tag}: the choice of what to launch, again`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
             await ev(`document.querySelector('#launch-step-chooser .launch-type-card[data-arg="team"]').click(); true`);
         } else { // on a phone the opened agent fills the page: back to the Agents list, where the + menu has New team
@@ -221,7 +225,7 @@ setInterval(() => {}, 1 << 30);
         assert.ok(posted.some(c => c.includes(GOAL)), `${tag}: the team's board holds the first task (${JSON.stringify(posted).slice(0, 300)})`);
         // The first task is also a real task assigned to the Orchestrator (#10007), so its CLI is told to claim it; the unread-message nudge for the board line waits for the end of that turn. Either tells it.
         const told = await gotContains(s, "coral-board task claim", 45000);
-        assert.ok(told.includes('coral-board task claim') || told.includes('unread message on the message board'), `${tag}: the Orchestrator's CLI was never told about the first task (it got ${JSON.stringify(await gotText(s))})`);
+        assert.ok(told.includes('coral-board task claim') || told.includes('unread message on the message board'), `${tag}: the Orchestrator's CLI was never told about the first task (it got ${JSON.stringify(await gotText(s))}; the server's lines about nudges and typed input: ${JSON.stringify(fs.readFileSync(s.log, 'utf8').split('\n').filter(l => /nudge|automated input|not typed|available|Task #|retry/i.test(l)).slice(-12).map(l => l.slice(0, 260)))})`);
         const tasks = await ev(`fetch('/api/board/' + encodeURIComponent(${JSON.stringify(orch.board)}) + '/tasks').then(r => r.json()).then(l => (Array.isArray(l) ? l : l.tasks || []).map(t => ({ title: String(t.title || ''), assigned_to: t.assigned_to })))`);
         assert.ok(tasks.some(t => t.title.includes(GOAL) && /orchestrator/i.test(String(t.assigned_to || ''))), `${tag}: the Tasks tab has the first task, assigned to the Orchestrator (${JSON.stringify(tasks).slice(0, 300)})`);
         assert.match(await ev(`location.pathname`), /^\/team\//, `${tag}: after Launch Team the person is on the team's page`);

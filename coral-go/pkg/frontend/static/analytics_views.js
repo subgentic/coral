@@ -6,19 +6,20 @@ import { isPhoneLayout } from './phone_layout.js';
 import { setText } from './dom_write.js';
 import { state } from './state.js';
 import { note } from './nav.js';
+import { importOnce } from './import_once.js';
 
 // One sidebar entry per metric (the Operator's design, #9236): Overview, Tokens per commit, Task time, Tool and API calls. The groupings (provider, model, thinking level, team, agent, branch, task) are a
 // Group by selector inside Overview, not entries of their own: each is still a page of its own under /analytics/<key> (a link keeps working), drawn as Overview with that grouping chosen.
 export const VIEWS = [
-    { key: 'overview', label: 'Overview', question: 'What am I spending?' }, // each page is subtitled by the question it answers (#10482)
-    { key: 'usage', label: 'Usage', question: 'Where does the usage go, day by day?' }, // the three below Overview (#11222): Overview stays the landing page
-    { key: 'operator', label: 'Operator interaction', question: 'How often does the Operator have to step in?' },
-    { key: 'inbox-' + 'chat', label: 'Inbox vs chat', question: 'Am I switching to the Inbox?' }, // #12158: the share of what the Operator does in the Inbox, and whether it is rising
-    { key: 'resource-queue', label: 'Resource queue', question: 'Is the queue helping us coordinate?' }, // #13671: how much the resource queue is used and whether heavy runs stopped overlapping
-    { key: 'comm', label: 'Team communication', question: 'Who talks to whom, and how much?' },
-    { key: 'per-commit', label: 'Tokens per commit', question: 'What did each commit cost?' },
-    { key: 'task-time', label: 'Task time', question: 'How long do tasks take?' },
-    { key: 'calls', label: 'Tool and API calls', question: 'Which calls does the work make?', advanced: true }, // Coral's own routes and tools, not what a person asks of spend: under Advanced (#10521)
+    { key: 'overview', label: 'Overview', icon: 'insights', section: 'Spend', question: 'What am I spending?' }, // each page is subtitled by the question it answers (#10482)
+    { key: 'usage', label: 'Usage', icon: 'timeline', section: 'Spend', question: 'Where does the usage go, day by day?' }, // the three below Overview (#11222): Overview stays the landing page
+    { key: 'operator', label: 'Operator interaction', icon: 'person', section: 'Team', question: 'How often does the Operator have to step in?' },
+    { key: 'inbox-' + 'chat', label: 'Inbox vs chat', icon: 'swap_vert', section: 'Team', question: 'Am I switching to the Inbox?' }, // #12158: the share of what the Operator does in the Inbox, and whether it is rising
+    { key: 'resource-queue', label: 'Resource queue', icon: 'queue', section: 'Team', question: 'Is the queue helping us coordinate?' }, // #13671: how much the resource queue is used and whether heavy runs stopped overlapping
+    { key: 'comm', label: 'Team communication', icon: 'forum', section: 'Team', question: 'Who talks to whom, and how much?' },
+    { key: 'per-commit', label: 'Tokens per commit', icon: 'commit', section: 'Work', question: 'What did each commit cost?' },
+    { key: 'task-time', label: 'Task time', icon: 'hourglass_top', section: 'Work', question: 'How long do tasks take?' },
+    { key: 'calls', label: 'Tool and API calls', icon: 'api', question: 'Which calls does the work make?', advanced: true }, // Coral's own routes and tools, not what a person asks of spend: under Advanced (#10521)
     { key: 'provider', label: 'By provider', under: 'overview', hidden: true },
     { key: 'model', label: 'By model', under: 'overview', hidden: true },
     { key: 'thinking', label: 'By thinking level', under: 'overview', hidden: true },
@@ -51,11 +52,12 @@ function drawViews() {
     if (!list) return;
     const held = list.contains(document.activeElement) ? document.activeElement.dataset.view : null; // the list is drawn again: the keyboard stays on its row
     const rows = shown(), on = (VIEWS.find(v => v.key === current) || {}).under || current; // a grouping and an agent's page are under Overview
-    const row = v => `<li class="session-list-item list-row${escapeAttr(v.key === on ? ' active list-row-current' : '')}"><button type="button" class="row-btn"${v.key === on ? ' aria-current="true"' : ''} data-on-click="analytics-view" data-view="${escapeAttr(v.key)}">${escapeHtml(v.label)}</button></li>`;
+    const row = v => `<li class="session-list-item list-row${escapeAttr(v.key === on ? ' active list-row-current' : '')}"><button type="button" class="row-btn"${v.key === on ? ' aria-current="true"' : ''}${v.icon ? ` data-icon="${escapeAttr(v.icon)}"` : ''} data-on-click="analytics-view" data-view="${escapeAttr(v.key)}">${escapeHtml(v.label)}</button></li>`;
     const open = advancedOpen || query.trim() || current === 'calls';
-    const toggle = query.trim() || !VIEWS.some(v => v.advanced) ? '' : `<li class="session-list-item list-row"><button type="button" class="row-btn" data-view="advanced-toggle" aria-expanded="${escapeAttr(open ? 'true' : 'false')}" data-on-click="analytics-advanced">Advanced</button></li>`;
-    list.innerHTML = rows.length ? rows.filter(v => !v.advanced).map(row).join('') + toggle + rows.filter(v => v.advanced).map(row).join('') : '<li class="empty-state empty-state-tight">No view matches the search.</li>';
+    const toggle = query.trim() || !VIEWS.some(v => v.advanced) ? '' : `<li class="session-list-item list-row"><button type="button" class="row-btn" data-view="advanced-toggle" data-icon="tune" aria-expanded="${escapeAttr(open ? 'true' : 'false')}" data-on-click="analytics-advanced">Advanced</button></li>`;
+    list.innerHTML = rows.length ? rows.filter(v => !v.advanced).map((v, i, all) => (!query.trim() && v.section && v.section !== all[i - 1]?.section ? `<li class="session-list-heading"><h2 class="group-head view-list-title">${escapeHtml(v.section)}</h2></li>` : '') + row(v)).join('') + toggle + rows.filter(v => v.advanced).map(row).join('') : '<li class="empty-state empty-state-tight">No view matches the search.</li>';
     if (held) list.querySelector(`.row-btn[data-view="${CSS.escape(held)}"]`)?.focus({ preventScroll: true });
+    importOnce('./sidebar_folder_rail.js').then(m => m.drawFolderRail('tokens', 'Analytics', rows.map(v => ({ key: v.key, label: v.label, icon: v.icon })), on, key => selectView(key, { focus: true }))).catch(() => {}); // the collapsed rail's icons (#15820)
 }
 
 export function filterViews(text) { query = String(text || ''); drawViews(); }

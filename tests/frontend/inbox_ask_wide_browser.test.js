@@ -27,7 +27,8 @@ const BASE=require('./test_base').BASE;
     await ev(`document.querySelector('.inbox-ask-box').scrollIntoView({block:'center'});true`);await ev(framesJs(2));
     const attach=await ev(`(()=>{const d=document.querySelector('.inbox-ask-dialog'),box=d.querySelector('textarea'),add=d.querySelector('.ac-add-image'),note=d.querySelector('.ac-images-hint'),foot=d.querySelector('.inbox-ask-foot'),rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,w:r.width,h:r.height};};const focusable=[...d.querySelectorAll('button:not([disabled]),textarea,a[href],input:not([disabled]),select:not([disabled]),[tabindex="0"]')].filter(e=>e.tabIndex>=0&&e.getClientRects().length&&!e.closest('[hidden]'));return {box:rect(box),add:rect(add),note:rect(note),text:note.textContent,near:!!add.closest('.inbox-ask-pics')&&!foot.contains(add),next:focusable[focusable.indexOf(box)+1]===add};})()`);
     check(attach.near&&attach.next,at+'Add image follows the reply in the composer and Tab order');
-    check(attach.add.y>=attach.box.bottom-1&&attach.add.y-attach.box.bottom<=24,at+'image button is attached beneath the reply');
+    // a phone's reply row has 8 px of top padding since it became the sticky one (#17241)
+    check(attach.add.y>=attach.box.bottom-1&&attach.add.y-attach.box.bottom<=(width===390?24+8:24),at+'image button is attached beneath the reply');
     check(attach.note.y>=attach.add.bottom-1&&attach.note.h>0,at+'sharing note is visible under the image button and Send row (#13148)');
     check(attach.add.w>=44&&attach.add.h>=44&&/Pictures are shared/.test(attach.text),at+'image target and sharing explanation remain available');
     await shot(`ask-attach-${width}-${theme}-${font}-${linked?'linked':'unlinked'}`);

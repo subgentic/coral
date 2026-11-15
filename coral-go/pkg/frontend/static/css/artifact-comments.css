@@ -105,6 +105,7 @@
     body.keyboard-open .ac-panel > .ac-composer { gap: 4px; padding-bottom: 4px; } /* with the keyboard up the composer is the box and its buttons: the two help lines under it (how to send, how to add a picture) are left out so the header and Show resolved stay on screen at 320 px (phone_pass_browser) */
     body.keyboard-open .ac-panel > .ac-composer :is(.ac-sendhint, .ac-images-hint) { display: none; }
     body.keyboard-open .ac-showresolved, body.keyboard-open .ac-showearlier { order: 1; flex: 1 1 0; }
+    body.keyboard-open .ac-hint[hidden] { display: none !important; } /* the line a hidden Approve hint keeps (#16399) is given back while the keyboard leaves little height (phone_pass at 320 px: the composer must not cover Show resolved) */
     body.keyboard-open .ac-sheet-close { order: 2; }
     .ac-panel .ac-showresolved, .ac-panel .ac-showearlier, .ac-panel .ac-replybox, .ac-panel .ac-resolve, .ac-panel .ac-act, .ac-panel .ac-jump, .ac-whole, .ac-lock, .ac-cancel, .ac-send, .ac-add-image, .ac-thumb-remove, .ac-thumb-markup, .ac-ask-label, .ac-ask-go { min-height: 44px; }
     .ac-panel .ac-resolve { padding: 0 14px; }

@@ -19,7 +19,7 @@ export function settingsDocsLink(help, field) {
         // A link out of a dialog closes the dialog first: the answer opens in Docs under it otherwise, and it looks as if nothing happened (#10906). Settings asks about unsaved changes before it closes: Discard
         // follows the link, Keep editing does not, and the answer is remembered only once the link is followed, so nothing is left waiting to scroll a Docs page opened by hand later.
         e.preventDefault();
-        const follow = () => { wantDocsAnswer(help.docs.answer); a.dataset.afterClose = '1'; a.click(); delete a.dataset.afterClose; }; // the router takes it now, with nothing over the page it opens
+        const follow = () => setTimeout(() => { wantDocsAnswer(help.docs.answer); a.dataset.afterClose = '1'; a.click(); delete a.dataset.afterClose; }); /* after this click has finished: a click on a link already being clicked is dropped when the dialog was already loaded and closes at once */ // the router takes it now, with nothing over the page it opens
         if (dlg.id === 'settings-modal') window.hideSettingsModal?.(false, follow);
         else { const { closeDialog } = await importOnce('./modal_chrome.js'); closeDialog(dlg); follow(); }
     });

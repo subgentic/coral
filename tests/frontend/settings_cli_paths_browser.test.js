@@ -17,18 +17,18 @@ const { coralReady } = require('./helpers/wait');
                 await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
                 await coralReady(ev);
                 await ev(`(() => { const real = window.fetch; window.fetch = (u, o) => /\\/api\\/system\\/cli-check/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ found: ${found}, status: ${found ? "'available'" : "'missing'"}, agent_type: new URL(String(u), location.href).searchParams.get('type') }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : real(u, o); return true; })()`);
-                await ev(`window.showSettingsModal('agents'); true`);
-                await waitFor(`!!document.querySelector('#settings-pane-agents #settings-cli-paths > summary') && document.querySelector('#settings-pane-agents #settings-cli-paths > summary').getClientRects().length > 0`, 'the CLI paths line', 8000);
+                await ev(`window.showSettingsModal('providers'); true`);
+                await waitFor(`!!document.querySelector('#settings-pane-providers #settings-provider-advanced-claude > summary') && document.querySelector('#settings-pane-providers #settings-provider-advanced-claude > summary').getClientRects().length > 0`, 'the CLI paths line', 8000);
                 await sleep(500); // sleep-ok: the check answers and the disclosure opens after the dialog fills
                 const tag = `${w} px, CLI ${found ? 'found' : 'missing'}`;
-                const marker = await ev(`(() => { const s = document.querySelector('#settings-pane-agents #settings-cli-paths > summary'); const c = getComputedStyle(s, '::before').content; return { content: c, display: getComputedStyle(s).display, listItem: getComputedStyle(s).display === 'list-item' }; })()`);
+                const marker = await ev(`(() => { const s = document.querySelector('#settings-pane-providers #settings-provider-advanced-claude > summary'); const c = getComputedStyle(s, '::before').content; return { content: c, display: getComputedStyle(s).display, listItem: getComputedStyle(s).display === 'list-item' }; })()`);
                 assert.ok(marker.content && marker.content !== 'none' && marker.content !== 'normal' || marker.listItem, `${tag}: the CLI paths line draws a disclosure marker: ` + JSON.stringify(marker));
-                const open = await ev(`document.querySelector('#settings-pane-agents #settings-cli-paths').open`);
+                const open = await ev(`document.querySelector('#settings-pane-providers #settings-provider-advanced-claude').open`);
                 assert.equal(open, !found, `${tag}: the disclosure is ${found ? 'closed' : 'open'} (open=${open})`);
                 // it sits under Defaults, not at the foot of the page (Beta Tester, #9955), and the closed row says whether the default CLI was found
-                const order = await ev(`(() => { const pane = document.getElementById('settings-pane-agents'), at = id => { const e = pane.querySelector(id); return e ? [...pane.querySelectorAll('*')].indexOf(e) : -1; }; return { cli: at('#settings-cli-paths'), defaults: at('#settings-agents-defaults'), models: at('#settings-agents-models'), behaviour: at('#settings-agents-behaviour'), note: ((pane.querySelector('#settings-cli-paths > summary .sv-fold-note') || {}).textContent || '').trim() }; })()`);
-                assert.ok(order.defaults >= 0 && order.cli > order.defaults && order.models < order.defaults && order.cli < order.behaviour, `${tag}: CLI paths are under Defaults, after Default models and before Behaviour: ` + JSON.stringify(order));
-                assert.equal(order.note, `· Claude ${found ? 'found' : 'not found'}`, `${tag}: the closed row says whether the default CLI was found`);
+                const order = await ev(`(() => { const pane = document.getElementById('settings-pane-providers'), card = document.getElementById('settings-provider-claude'), at = id => { const e = pane.querySelector(id); return e ? [...pane.querySelectorAll('*')].indexOf(e) : -1; }; return { cli: at('#settings-provider-advanced-claude'), model: at('#settings-default-model-claude'), codexCard: at('#settings-provider-codex'), inClaudeCard: card.contains(document.getElementById('settings-provider-advanced-claude')), note: ((pane.querySelector('#settings-provider-advanced-claude > summary .sv-fold-note') || {}).textContent || '').trim() }; })()`);
+                assert.ok(order.model >= 0 && order.cli > order.model && order.cli < order.codexCard && order.inClaudeCard, `${tag}: the CLI path fold is in Claude's card, under its model and before the next card: ` + JSON.stringify(order));
+                assert.equal(order.note, `· CLI ${found ? 'found' : 'not found'}`, `${tag}: the closed row says whether the default CLI was found`);
                 if (!found) assert.ok(await ev(`document.getElementById('settings-cli-path-claude').getClientRects().length > 0`), `${tag}: the Claude path field is on screen`);
             }
         }

@@ -1,7 +1,7 @@
 // The New agent wizard for a new user, on a desktop (#11289, QA Engineer's walkthrough #11256), at 1440 px with the keyboard and the mouse:
 //  1. Escape in the Browse folder picker closes the picker only; a second Escape closes the dialog.
 //  2. Enter in a single-line field is the step's primary button: the folder's Enter goes to the persona, the persona's name field's Enter goes to the agent step (and where Launch is the primary button, it launches); Enter in a multi-line field is a new line, not Next.
-//  3. The first step says there is a team to make ("Start a team instead"), a click goes to the team form; New agent from the sidebar opens the chooser with New agent and New team as equals.
+//  3. The first step says there is a team to make ("Start a team instead"), a click goes to the team form; New agent from the sidebar opens the form (#15888); the chooser with New agent and New team as equals is one step back.
 //  4. An agent whose name is left empty is offered a role-like name (Agent 1, then the next number not taken), not the folder's; a name typed is kept.
 // Drives Chrome over CDP through agent_view_harness.js against an isolated dev server.
 const assert = require('node:assert/strict');
@@ -37,19 +37,17 @@ const { coralReady } = require('./helpers/wait');
         await press('Escape', 27);
         assert.equal(await modalOpen(), false, 'a second Escape closes the dialog');
 
-        // 2. Enter advances
+        // 2. Enter is Launch on the one page (#15911): with no folder it says so under the field and the dialog stays
         await openAgent();
-        await ev(`document.getElementById('launch-dir').focus(); true`);
-        await type('/tmp'); await press('Enter', 13);
-        assert.equal(await stage(), 'persona', 'Enter in the folder goes to the persona step');
-        await ev(`document.getElementById('launch-agent-name-input').focus(); true`);
+        await ev(`(() => { const f = document.getElementById('launch-dir'); f.value = ''; f.dispatchEvent(new Event('input', { bubbles: true })); f.focus(); return true; })()`);
         await press('Enter', 13);
-        assert.equal(await stage(), 'agent', 'Enter in the persona step\'s name field goes to the agent step');
-        // the persona's prompt is multi-line: its Enter is a new line, not Next
-        await ev(`document.querySelector('#launch-step-agent [data-launch-stage-go="persona"], #launch-step-agent .launch-stage-tab[data-stage="persona"]')?.click(); true`);
-        await ev(`window._launchStage('persona'); true`); await settle(300);
+        assert.equal(await stage(), 'page', 'the one page is the only stage');
+        assert.equal(await modalOpen(), true, 'Enter with no folder does not launch');
+        assert.match(await ev(`document.getElementById('launch-dir').closest('.sv-row').querySelector('.sv-error').textContent`), /Choose a folder/, 'and the folder says what is missing');
+        // the persona's prompt is multi-line: its Enter is a new line, not Launch
+        await ev(`document.getElementById('launch-persona-more').open = true; true`); await settle(300);
         const ta = await ev(`(() => { const t = [...document.querySelectorAll('#launch-step-agent textarea')].find(e => e.getClientRects().length); if (!t) return false; t.focus(); return true; })()`);
-        if (ta) { await press('Enter', 13); assert.equal(await stage(), 'persona', 'Enter in a multi-line field does not advance'); }
+        if (ta) { await press('Enter', 13); assert.equal(await modalOpen(), true, 'Enter in a multi-line field does not launch'); }
         await close();
 
         // 3. the way to a team
@@ -60,7 +58,7 @@ const { coralReady } = require('./helpers/wait');
         assert.deepEqual(await stepsShown(), ['team'], 'a click on it opens the team form');
         await close();
         await ev(`document.querySelector('.sidebar-new-btn-full').click(); true`); await settle(500);
-        assert.deepEqual(await stepsShown(), ['chooser'], 'New agent opens the chooser');
+        assert.deepEqual(await stepsShown(), ['agent'], 'New agent opens the form, not the chooser (#15888)');
         const choices = await ev(`document.getElementById('launch-step-chooser').innerText.replace(/\\s+/g, ' ')`);
         assert.ok(/New agent/.test(choices) && /New team/.test(choices), 'New agent and New team are both on the chooser: ' + choices);
         await close();
@@ -69,7 +67,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`for (const n of ['Agent 1', 'shop-app']) window.__m.add(n, 'A', 2, { sleeping: false, session_id: n + '-id' }); true`);
         await waitFor(`(window.__qaState.liveSessions || []).length >= 2`, 'two agents', 8000).catch(() => {});
         await openAgent();
-        await ev(`document.getElementById('launch-dir').focus(); true`); await type('/tmp/shop-app'); await press('Enter', 13);
+        await ev(`document.getElementById('launch-dir').focus(); true`); await type('/tmp/shop-app'); await ev(`document.getElementById('launch-persona-more').open = true; true`); await settle(300);
         const field = await ev(`({ value: document.getElementById('launch-agent-name-input').value, placeholder: document.getElementById('launch-agent-name-input').placeholder })`);
         const name = field.placeholder;
         assert.equal(field.value, '', 'the suggestion is a placeholder, not a value: Save as persona still needs a typed name');
@@ -82,11 +80,11 @@ const { coralReady } = require('./helpers/wait');
         await close();
         // the suggestion is what the agent is called when the field stays empty
         await openAgent();
-        await ev(`document.getElementById('launch-dir').focus(); true`); await type('/tmp/nux-11289-agent'); await press('Enter', 13);
+        await ev(`document.getElementById('launch-dir').focus(); true`); await type('/tmp/nux-11289-agent'); await ev(`document.getElementById('launch-persona-more').open = true; true`); await settle(300);
         const suggested = await ev(`document.getElementById('launch-agent-name-input').placeholder`);
         await ev(`window.__launchBodies = []; const f = window.fetch; window.fetch = (u, o) => { if (/\\/api\\/sessions\\/launch\\b/.test(String(u && u.url || u)) && o && o.body) window.__launchBodies.push(String(o.body)); return f.call(window, u, o); }; window.launchSession(); true`);
         await waitFor(`window.__launchBodies.length > 0`, 'the launch request', 10000);
         assert.equal(JSON.parse(await ev(`window.__launchBodies[0]`)).display_name, suggested, 'the agent is launched under the suggestion when the field is empty, not the folder\'s name');
-        console.log('PASS New agent wizard: Escape closes the picker only, Enter advances, the team is one click from the first step, an agent is offered a role-like name');
+        console.log('PASS New agent wizard: Escape closes the picker only, Enter is Launch, the team is one click from the first step, an agent is offered a role-like name');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

@@ -253,7 +253,13 @@ export function defaultThemeChoice() { return "system"; }
 /** Apply a theme to the document */
 export function applyTheme(theme, { remember = true } = {}) {
     const resolved = resolveTheme(theme);
-    document.documentElement.setAttribute("data-theme", resolved);
+    const root = document.documentElement;
+    if (root.getAttribute("data-theme") !== resolved) { // a change of theme is one jump, never a 150 ms fade through the other theme's colours (a screenshot or a glance in that time saw dark buttons and near-white text on light, #16961)
+        root.classList.add("theme-switching");
+        const done = () => root.classList.remove("theme-switching");
+        requestAnimationFrame(() => requestAnimationFrame(done)); setTimeout(done, 400); // the timer for a hidden tab, which draws no frames
+    }
+    root.setAttribute("data-theme", resolved);
 
     // Store the *preference* (dark/light/system) so other pages can read it: only when the person chose it (the settings dialog), never when a page load applies what a hub says (#6087)
     if (remember) { try { browserLocal.set("coral-theme", theme); } catch (_) {} }

@@ -14,7 +14,7 @@ import { localFirst } from './server_status.js';
 import { killAllItem, deleteTeamItem, teamHealthBtn, _rowNameWithServer, _rowServerLine, _boardAccentStyle, _pinMenuItem, FOLDER_GROUP_ICON } from './list_card_parts.js';
 import { _pinMatchesFilter } from './list_filter_match.js';
 import { SVGO } from './svg_open.js';
-const _mk0 = "<line x1=\"4\" y1=\"4\" x2=\"12\" y2=\"12\"/><line x1=\"12\" y1=\"4\" x2=\"4\" y2=\"12\"/></svg>\n                    Kill all\n                </button>";
+const _mk0 = "<line x1=\"4\" y1=\"4\" x2=\"12\" y2=\"12\"/><line x1=\"12\" y1=\"4\" x2=\"4\" y2=\"12\"/></svg>\n                    Stop all\n                </button>";
 const _mk1 = "<rect x=\"2\" y=\"3\" width=\"12\" height=\"10\" rx=\"1.5\"/><polyline points=\"5 7 7 9 5 11\"/><line x1=\"9\" y1=\"11\" x2=\"11\" y2=\"11\"/></svg>\n                    <span class=\"menu-item-text\">Add Terminal<span class=\"menu-item-hint\">Opens a shell in this folder</span></span>\n                </button>\n                <hr class=\"overflow-menu-divider\">\n                ";
 const _mk2 = "<path d=\"M8 13V3\"/><path d=\"M4 9l4 4 4-4\"/></svg>\n                    Move Down\n                </button>\n                ";
 const _mk3 = "<rect x=\"5.5\" y=\"5.5\" width=\"8\" height=\"8\" rx=\"1.5\"/><path d=\"M5.5 10.5h-1a1.5 1.5 0 0 1-1.5-1.5v-5a1.5 1.5 0 0 1 1.5-1.5h5a1.5 1.5 0 0 1 1.5 1.5v1\"/></svg></button>";
@@ -123,7 +123,7 @@ function _renderWorkflowCard(wfName, wfSessions) {
                 </button>` : ''}
                 <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="group-kill" data-group="wf:${escapeAttr(wfName)}">
                     ${SVGO.o1}<line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
-                    Kill all
+                    Stop all
                 </button>
             </div>
         </div>`;

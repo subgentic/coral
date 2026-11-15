@@ -20,7 +20,7 @@ const BASE = require('./test_base').BASE;
         await t.type('input', N.teamName, 'alpha'); await t.type('input', N.folder, '/work/payments-app');
         await t.click('button', N.next); await t.step(2); await settle(400);
         await ev(`document.getElementById('team-describe').click(); true`);
-        await waitFor(`getComputedStyle(document.getElementById('team-wizard-modal')).display !== 'none'`, 'the Describe box', 5000);
+        await waitFor(`!document.getElementById('team-wizard-panel').hidden`, 'the Describe box', 5000);
         // what Try a sample's button calls: with members on the step (the default team since #9877) the first press says what it replaces and the second does it (#10658); then the draft goes to the Members step (#10517)
         await ev(`window.testTeamWizard(); true`);
         await waitFor(`/The sample replaces the/.test(document.getElementById('team-wizard-error').textContent)`, 'the preview of what the sample replaces', 4000);

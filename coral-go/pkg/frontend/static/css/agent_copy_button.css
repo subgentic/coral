@@ -7,8 +7,8 @@
 .agent-copy-hrow > .settings-pane-title { flex: 1 1 auto; min-width: 0; }
 .docs-hrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; } /* a document's heading with its robot (docs_agent_copy.js) */
 .docs-hrow > :is(h1, h2, h3) { flex: 1 1 auto; min-width: 0; }
-/* Settings > General has no More menu: its Copy for an agent is a labelled Quiet button on the section's last row (#15993). */
-.settings-copy-last { margin-top: 12px; display: flex; }
+/* Settings > General has no More menu: its Copy for an agent is a labelled Quiet button in the heading's row (#15993, #17591). */
+.agent-copy-hrow > .agent-copy-labelled { flex: none; height: 32px; min-height: 0; margin: 0; padding-block: 0; } /* the robot's height, so the heading's row is no taller than before */
 .agent-copy[hidden] { display: none; } /* the class's display would otherwise show a hidden robot */
 .agent-copy-hrow:has(> [hidden]:not(.agent-copy)) { display: none; } /* a title that is hidden (the Computers page on a machine's page) takes its robot with it */
 .agent-copy-hrow > .servers-tab-title { flex: 1 1 auto; min-width: 0; }

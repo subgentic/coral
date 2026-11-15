@@ -51,10 +51,11 @@ async function loadList() {
 function usedBy(r) { return Array.isArray(r.used_by) ? r.used_by.join(', ') : ''; }
 const KIND_OF = { imported: 'operator', 'agent-created': 'agent', 'coral-skills': 'coral' };
 const FOLDER_LABEL = { '': 'All skills', imported: 'Imported', 'agent-created': 'Agent created', 'coral-skills': 'Coral skills' };
+const FOLDER_ICON = { '': 'dataset', imported: 'download', 'agent-created': 'smart_toy', 'coral-skills': 'auto_awesome' }; // a skill folder's glyph, as the Inbox's folders have theirs (#15820)
 const inFolder = (r, f) => !f || r.publisher_kind === KIND_OF[f];
 const sections = () => [{ title: 'Skills', items: ['', ...SKILL_FOLDERS].map(key => {
     const mine = latestSkillRows(everyRow).filter(r => inFolder(r, key)), waiting = key === 'agent-created' ? mine.filter(r => r.pendingVersion).length : 0;
-    return { key: key || 'all', label: FOLDER_LABEL[key], count: waiting ? `${waiting} of ${mine.length}` : mine.length, alert: waiting > 0 }; // what waits on the Operator is said on Agent created, red, as Needs you says its unread
+    return { key: key || 'all', label: FOLDER_LABEL[key], icon: FOLDER_ICON[key], count: waiting ? `${waiting} of ${mine.length}` : mine.length, alert: waiting > 0 }; // what waits on the Operator is said on Agent created, red, as Needs you says its unread
 }) }];
 let sideFolders = null;
 function pickFolder(key) { folder = key === 'all' ? '' : key; open = null; note(folder ? { view: 'skills', folder } : { view: 'skills' }); draw(); }
@@ -64,6 +65,7 @@ function drawNav() {
     const spec = { sections: sections(), current: folder || 'all' };
     if (sideFolders && list.contains(sideFolders)) VL.update(sideFolders, spec);
     else { sideFolders = VL.build({ id: 'skills-folders', label: 'Skills folders', ...spec, onPick: pickFolder }); list.replaceChildren(sideFolders); }
+    importOnce('./sidebar_folder_rail.js').then(m => m.drawFolderRail('skills', 'Skills', spec.sections.flatMap(s => s.items), spec.current, pickFolder)).catch(() => {}); // the collapsed rail's icons (#15820)
 }
 export function filterSkills(v) { query = String(v || '').trim().toLowerCase(); if (!open) draw(); } // the sidebar's search box (its action is in app_actions.js, the page is loaded with the tab)
 const matches = r => !query || `${r.name} ${r.description} ${publisher(r)}`.toLowerCase().includes(query);

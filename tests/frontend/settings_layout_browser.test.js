@@ -7,8 +7,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
 const AGENT_PARTS = {
-    'settings-agents-defaults': ['settings-permission-mode', 'settings-working-dir', 'settings-cli-path-claude', 'settings-cli-path-codex', 'settings-cli-path-agy', 'settings-cli-path-pi'], // the CLI paths fold sits under Defaults now (#9955), not at the foot of the page
-    'settings-agents-models': ['settings-default-model-claude'],
+    'settings-agents-defaults': ['settings-permission-mode', 'settings-working-dir'], // the models and CLI paths moved to Settings > Providers (ST4)
     'settings-agents-behaviour': ['settings-auto-resume', 'settings-auto-goals', 'settings-agent-low-priority'],
 };
 
@@ -26,10 +25,12 @@ const AGENT_PARTS = {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
 
-        console.log('1. Agents: five headed parts, each control under its own heading');
+        console.log('1. Agents: its headed parts, each control under its own heading; the models and CLI paths are in Providers');
+
         await open('agents');
+        assert.equal(await paneOf('settings-cli-path-claude'), 'providers'); assert.equal(await paneOf('settings-default-model-claude'), 'providers');
         const heads = await ev(`[...document.querySelectorAll('#settings-pane-agents .sv-heading')].map(h => h.id + '=' + h.textContent.trim())`);
-        assert.deepEqual(heads, ['settings-agents-models=Default models', 'settings-agents-defaults=Defaults', 'settings-agents-behaviour=Behaviour']);
+        assert.deepEqual(heads, ['settings-agents-defaults=Defaults', 'settings-agents-behaviour=Behaviour']);
         for (const [head, ids] of Object.entries(AGENT_PARTS)) {
             // #8460 put CLI paths inside a settings_view fold. Its rows belong to the heading
             // before the disclosure (Defaults since #9955): at the first folded row, continue before it (#8530).

@@ -40,12 +40,14 @@ const SKILLS = [
             for (const x of m.rows) {
                 assert.ok(x.descTop >= x.nameBottom - 1, `${what}: the description is below the name, not beside it: ${JSON.stringify(x)}`);
                 assert.ok(x.descRight <= m.vw - 8, `${what}: the description stays inside the screen: ${JSON.stringify(x)}`);
-                assert.ok(x.tick >= 20, `${what}: the tick is at least 20 px: ${x.tick}`);
+                assert.ok(x.tick >= 20, `${what}: the tick is at least 20 px: ${JSON.stringify(x)}`);
             }
         };
 
         await ev(`window.showLaunchModal(); window._selectLaunchType('team'); true`);
         await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none' && !document.getElementById('team-skills-row').hidden`, 'the team step with its skills row', 8000);
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_steps.js'); m.showTeamStep('members'); document.getElementById('team-members-more').open = true; return true; })()`); // LT1 (#15892): the skills are on step 2, under More options
+        await waitFor(`!!document.querySelector('#team-skills-host details')`, 'the skills in More options', 5000);
         const team = await measure('team-skills-host');
         await new Promise(r => setTimeout(r, 300)); // sleep-ok: the opened list is laid out
         await shot('skills-team-390');
@@ -56,14 +58,11 @@ const SKILLS = [
         await ev(`window.showLaunchModal(); window._selectLaunchType('agent'); true`);
         await waitFor(`getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none' && !document.getElementById('launch-skills-row').hidden`, 'the agent step with its skills row', 8000);
         await ev(`(() => { const e = document.getElementById('launch-dir'); e.value = '/tmp/work'; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-        for (const stage of ['persona', 'agent']) {
-            await ev(`(() => { const b = [...document.querySelectorAll('#launch-step-agent button')].find(x => x.textContent.trim() === 'Next' && x.getClientRects().length); if (b) b.click(); return !!b; })()`);
-            await waitFor(`document.getElementById('launch-step-agent').dataset.stage === '${stage}'`, `step ${stage}`, 5000);
-        }
+        await ev(`window._launchStage('agent'); document.getElementById('launch-persona-more').open = true; true`); // the one page (#15911): More options opens the sections
         // step 3 opens on its Agent section: the skills are in it, with no other section to find first (a phone's section list is a dropdown)
-        const agent = await ev(`(() => { const h = document.getElementById('launch-skills-host'); const s = h.querySelector('details > summary'); const r = s && s.getBoundingClientRect(); return { has: !!s, text: s && s.textContent, shown: !!s && s.getClientRects().length > 0, inView: !!r && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth, section: (document.querySelector('#launch-agent-acf .settings-pane:not([hidden])') || {}).dataset?.section }; })()`);
+        const agent = await ev(`(() => { const h = document.getElementById('launch-skills-host'); h.scrollIntoView({ block: 'nearest' }); const s = h.querySelector('details > summary'); const r = s && s.getBoundingClientRect(); return { has: !!s, text: s && s.textContent, shown: !!s && s.getClientRects().length > 0, inView: !!r && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth, section: (document.querySelector('#launch-agent-acf .settings-pane:not([hidden])') || {}).dataset?.section }; })()`);
         assert.ok(agent.has && /Choose from 3 skills/.test(agent.text), 'New agent has the disclosure: ' + JSON.stringify(agent));
-        assert.ok(agent.shown && agent.section === 'agent' && agent.inView, 'step 3 shows it in its first section, on screen at 390: ' + JSON.stringify(agent));
+        assert.ok(agent.shown && agent.section === 'agent' && agent.inView, 'the page shows it in its first section, on screen at 390: ' + JSON.stringify(agent));
         await ev(`document.querySelector('#launch-skills-host details > summary').click(); true`);
         check('New agent', await measure('launch-skills-host'));
         await shot('skills-agent-390');

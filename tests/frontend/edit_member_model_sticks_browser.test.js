@@ -1,5 +1,5 @@
 // Edit member: a Model picked from the list stays picked when the form syncs again (a CLI re-check, a newer default fetch), and Save member keeps it (#16648, walk 28: the select stayed on "Default (recommended)", so a member could not be set to Haiku).
-// The real model list of the isolated server (no stub): the pick used to be put back to Default by the next sync because only a TYPED id counted as the person's own. Isolated dev server.
+// The account's model list, served in the server's own shape with a fixed set (#17576; the real list is the machine's CLI's): the pick used to be put back to Default by the next sync because only a TYPED id counted as the person's own. Isolated dev server.
 // #11826 (follow-up of #11821): Add/Edit member's form has ONE Model input and ONE Model row however many times a member is opened. A reopen used to draw a second Model row while the cards kept the previous open's
 // (two .sv-row[data-key=model], two .acf-model in the launch form); the form read the first and it worked, but a late default or a fix elsewhere could hit the other. Three opens of a worker: the counts stay one, and the
 // model chosen each time is on the member's row after Save member. 1280 px, isolated dev server.
@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installNT, M, N, T, openNewTeam, scenarios, stubModels } = require('./helpers/new_team');
 const BASE = require('./test_base').BASE;
+const { safePaused } = require('./helpers/paused');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -29,7 +30,15 @@ const BASE = require('./test_base').BASE;
     const save = async () => { await mem.save(); await settle(200); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+        // The list is the account's, in the shape the server serves it (source 'account', not the built-in list): the machine's own claude CLI decides what a real list holds, and in two full runs a shard's held only Opus,
+        // so the pick found no Haiku and the test failed on a machine fact, not on the form (#17576). A fixed list with Haiku keeps what #16648 needs (an account list, a picked id that is not typed) and drops the machine.
+        await client.Fetch.enable({ patterns: [{ urlPattern: '*/api/agents/models*' }] });
+        safePaused(client, async e => {
+            const u = new URL(e.request.url);
+            if (e.request.method !== 'GET' || u.pathname !== '/api/agents/models' || (u.searchParams.get('type') || 'claude') !== 'claude') { await client.Fetch.continueRequest({ requestId: e.requestId }); return; }
+            const models = [['claude-opus-5-5', 'Claude Opus 5.5'], ['claude-sonnet-5-5', 'Claude Sonnet 5.5'], ['claude-haiku-5-5', 'Claude Haiku 5.5']].map(([value, display_name]) => ({ value, display_name }));
+            await client.Fetch.fulfillRequest({ requestId: e.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from(JSON.stringify({ agent_type: 'claude', fetched_at: '2026-11-15T00:00:00Z', refreshing: false, source: 'account', models, thinking: [] })).toString('base64') });
+        });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installNT(ev);
         await ev(`for (const k of Object.keys(localStorage)) if (k.startsWith('coral-models:v1:')) localStorage.removeItem(k); true`);
         await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app'])); true`);
@@ -37,12 +46,14 @@ const BASE = require('./test_base').BASE;
         await t.to(2, { template: /Coding|\(\d+ members\)/ });
         const r0 = await roles();
         await openRow(r0[1]); await mtab('Agent');
-        await settle(1500);
         const dump = () => ev(`(() => { const d = window.__nt.dlg(${N.member}); const s = window.__nt.find(d, 'select', /^Model$/i); const i = d.querySelector('.acf-model'); return s ? { opts: [...s.options].map(o => o.value + '|' + o.textContent), val: s.value, input: i && i.value, inputHidden: i && i.hidden } : null; })()`);
-        await ev(`(() => { const s = window.__nt.find(window.__nt.dlg(${N.member}), 'select', /^Model$/i); const o = [...s.options].find(o => /haiku/i.test(o.value + ' ' + o.textContent)); if (!o) return false; s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-        await settle(1500);
+        // The model list is the server's real one and arrives when its CLI check ends: under a loaded machine that is later than any fixed pause (#17576: the pick found no Haiku yet and was silently skipped). Wait for the option, then for the pick to be on the select.
+        const haikuOption = `(() => { const s = window.__nt.find(window.__nt.dlg(${N.member}), 'select', /^Model$/i); return !!s && [...s.options].some(o => /haiku/i.test(o.value + ' ' + o.textContent)); })()`;
+        await waitFor(haikuOption, 'the real model list has a Haiku option', 30000);
+        await ev(`(() => { const s = window.__nt.find(window.__nt.dlg(${N.member}), 'select', /^Model$/i); const o = [...s.options].find(o => /haiku/i.test(o.value + ' ' + o.textContent)); s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+        await waitFor(`/haiku/i.test(window.__nt.find(window.__nt.dlg(${N.member}), 'select', /^Model$/i).value)`, 'the Haiku pick is on the select', 5000);
         await ev(`(() => { const t = window.__nt.dlg(${N.member}).querySelector('.acf-agent-type'); t.dispatchEvent(new Event('change', { bubbles: true })); return !!t; })()`);
-        await settle(1500);
+        await settle(1500); // what the test is about: a sync AFTER the pick (and a late default fetch with it) must leave the pick alone, so the pause stays; only the waits BEFORE the pick were guesses
         const d = await dump();
         assert.equal(d.val, 'claude-haiku-5-5', 'the pick survives a re-sync of the form: ' + JSON.stringify(d));
         assert.equal(d.input, 'claude-haiku-5-5');

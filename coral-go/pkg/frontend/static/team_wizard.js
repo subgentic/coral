@@ -1,6 +1,5 @@
 /* The AI team wizard (moved out of team_dialogs.js as it was, #5174; no behaviour change): the dialog, the generate job and its poll, and the generated draft handed to the Agent Team form. */
 import { importOnce } from './import_once.js';
-import { closeOnBackdropAndEscape, releaseEscape } from './dialog_close.js';
 import { showToast } from './utils.js';
 import { pollEvery } from './overload.js';
 const { launch } = await importOnce('./launch_state.js');
@@ -9,6 +8,7 @@ const { _syncFlagButtons } = await importOnce('./flag_shortcuts.js');
 const { _initTeamForm, _addTeamAgent } = await importOnce('./team_dialogs.js');
 const { markGeneratedTeam } = await importOnce('./team_templates_ui.js');
 const { showTeamStep } = await importOnce('./team_steps.js');
+const { showTeamDescribe } = await importOnce('./team_form.js');
 
 function _setTeamWizardError(message = '') {
     const errorEl = document.getElementById('team-wizard-error');
@@ -29,8 +29,8 @@ function _plainGenerateError(message) {
 }
 
 function showTeamWizardModal() {
-    const modal = document.getElementById('team-wizard-modal');
-    if (!modal) return;
+    const panel = document.getElementById('team-wizard-panel');
+    if (!panel) return;
 
     const directiveEl = document.getElementById('team-wizard-directive');
     const generateBtn = document.getElementById('team-wizard-generate-btn');
@@ -40,7 +40,6 @@ function showTeamWizardModal() {
         if (generateBtn) {
             generateBtn.disabled = true;
             generateBtn.textContent = 'Generating...';
-            generateBtn.style.display = '';
         }
     } else {
         _setTeamWizardError('');
@@ -48,29 +47,27 @@ function showTeamWizardModal() {
         if (generateBtn) {
             generateBtn.disabled = false;
             generateBtn.textContent = 'Generate team';
-            generateBtn.style.display = '';
         }
     }
     _samplePreviewed = false;
     { const tb = document.getElementById('team-wizard-test-btn'); if (tb) tb.textContent = 'Try a sample'; }
-    const from = document.activeElement; if (from && from !== document.body && !modal.contains(from)) modal._opener = from; // the keyboard goes back to the button that opened it (#10652)
-    modal.style.display = 'flex';
+    showTeamDescribe(true); // in place, under the template row: no second dialog
+    if (!panel._escapes) { // Escape closes the box and nothing else: the New team dialog stays
+        panel._escapes = true;
+        panel.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); hideTeamWizardModal(); } });
+    }
+    panel.scrollIntoView?.({ block: 'nearest' });
     if (!_activeGenerateJobId) directiveEl?.focus();
-
-    // Close on backdrop click and on Escape
-    closeOnBackdropAndEscape(modal, hideTeamWizardModal);
 }
 window.showTeamWizardModal = showTeamWizardModal;
 
 function hideTeamWizardModal() {
-    const modal = document.getElementById('team-wizard-modal');
-    if (!modal) return;
-    const back = modal._opener, held = modal.contains(document.activeElement) || document.activeElement === document.body;
-    modal._opener = null;
-    modal.style.display = 'none';
+    const panel = document.getElementById('team-wizard-panel');
+    if (!panel) return;
+    const held = panel.contains(document.activeElement) || document.activeElement === document.body;
+    showTeamDescribe(false);
     _setTeamWizardError('');
-    releaseEscape(modal);
-    if (back && back.isConnected && held) back.focus({ preventScroll: true }); // Escape, Cancel or a click outside: not the page, where the next Tab starts at the top (#10652)
+    if (held) document.getElementById('team-describe')?.focus({ preventScroll: true }); // Escape or Cancel: back to the button that opened the box
 }
 window.hideTeamWizardModal = hideTeamWizardModal;
 
@@ -244,8 +241,8 @@ function _startGeneratePolling(jobId) {
 }
 
 function _isWizardOpen() {
-    const modal = document.getElementById('team-wizard-modal');
-    return modal && modal.style.display !== 'none';
+    const panel = document.getElementById('team-wizard-panel');
+    return !!panel && !panel.hidden;
 }
 
 function _handleGenerateResult(payload) {

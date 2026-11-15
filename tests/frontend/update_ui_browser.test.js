@@ -85,7 +85,7 @@ const upToDate = { ...idle, not_ready_reason: 'up_to_date' }; // what the server
             let p = await pill();
             check(`${tag}: flag off: the control is not shown and nothing asked /api/system/update (${JSON.stringify(await ev('window.__upd.calls'))})`, p && p.hidden && (await ev('window.__upd.calls.length')) === 0);
             await ev(`window.showSettingsModal(); true`); await waitFor(`!!document.getElementById('settings-tabs') && document.getElementById('settings-tabs').childElementCount > 0`, 'the settings tabs', 8000);
-            check(`${tag}: flag off: Settings has no Updates tab`, await ev(`!document.getElementById('settings-tab-updates') && !document.getElementById('settings-pane-updates')`));
+            check(`${tag}: flag off: Settings keeps its Updates tab for the Check for updates row (428436bb5) but the update controls are not drawn`, await ev(`!!document.getElementById('settings-pane-updates') && !document.getElementById('update-pane-body')`));
             await ev(`window.hideSettingsModal(); true`);
 
             // ═══ the control, in its three ages

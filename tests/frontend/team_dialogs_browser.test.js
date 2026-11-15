@@ -50,7 +50,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await ev(`getComputedStyle(document.querySelector('#launch-step-team .empty-state.empty-state-tight')).display !== 'none'`), true, 'the line that says what to do');
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_steps.js'); m.showTeamStep('team'); return true; })()`);
         assert.equal(await ev(`/[\\\\/]Coral[\\\\/]first-team$/.test(document.getElementById('launch-team-dir').value) && document.getElementById('launch-team-dir').getAttribute('aria-required') === 'true' && document.getElementById('launch-team-dir').getBoundingClientRect().height > 0`), true, 'the folder is on the first screen, the suggested one (#11258) and required');
-        assert.equal(await ev(`!!document.getElementById('team-goal') && !!document.getElementById('team-goal').closest('#team-panel-start')`), true, 'the optional first task is on step 3, the Start tab');
+        assert.equal(await ev(`!!document.getElementById('team-goal') && !!document.getElementById('team-goal').closest('#team-start-host')`), true, 'the optional first task is on step 1 (LT1 #15892)');
         await ev(`window._addTeamAgent('Orchestrator', 'First.'); true`);
         // #4950: the team form is a sectioned dialog that opens on Members; the name is above the sections (#5589 finding 6), so every section has it and Launch Team without it stays where it is.
         assert.equal(await ev(`document.getElementById('launch-step-team').dataset.stage`), 'team'); // the three steps (#6397, #7407): the dialog opens on step 1; the name and the folder are there
@@ -199,7 +199,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(remote.team, '@box-b/crew-r', 'the team opens under its server-qualified key');
 
         console.log('The wizard: its one box is required, a failed request shows its error, a finished job is reviewed in the team form');
-        await ev(`window.hideLaunchModal(); window.showTeamWizardModal(); window.generateTeamFromWizard(); true`);
+        await ev(`window.showLaunchModal(); window._selectLaunchType('team'); window.showTeamWizardModal(); window.generateTeamFromWizard(); true`);
         assert.match(await ev(`document.getElementById('team-wizard-error').textContent`), /^Describe your team first/);
         await ev(`document.getElementById('team-wizard-directive').value = 'Ship it, with two devs'; window.generateTeamFromWizard(); true`);
         await waitFor(`/the model is down/.test(document.getElementById('team-wizard-error').textContent)`, 'the failure');
@@ -208,7 +208,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window.__generateAnswer = { status: 200, body: { team: { name: 'Gen Team', flags: ['--x'], agents: [{ name: 'Lead', prompt: 'lead it' }, { name: 'Dev', prompt: 'build it' }] } } }; window.generateTeamFromWizard(); true`);
         await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step, straight from the draft (no Review Team press, #10517)');
         assert.equal(await ev(`document.getElementById('team-drafted-note').textContent`), 'Drafted: 2 members. Change anything below before you launch.');
-        assert.equal(await ev(`getComputedStyle(document.getElementById('team-wizard-modal')).display`), 'none');
+        assert.equal(await ev(`document.getElementById('team-wizard-panel').hidden`), true);
         assert.deepEqual(await teamRows(), ['Lead', 'Dev']); assert.equal(await ev(`document.getElementById('team-board-name').value`), 'Gen Team');
         assert.equal(await ev(`getComputedStyle(document.getElementById('generated-team-banner')).display`), 'flex');
         const chosenTemplate = () => ev(`(() => { const s = document.getElementById('team-template-select'); return s.options[s.selectedIndex].textContent.trim(); })()`);
@@ -218,7 +218,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await chosenTemplate(), 'Blank team', 'and says Blank team; the Generated team choice is gone');
 
         console.log('A job that is polled: its result is shown when it finishes');
-        await ev(`window.hideLaunchModal(); window.showTeamWizardModal(); document.getElementById('team-wizard-directive').value = 'd';
+        await ev(`window.showLaunchModal(); window._selectLaunchType('team'); window.showTeamWizardModal(); document.getElementById('team-wizard-directive').value = 'd';
             window.__generateAnswer = { status: 200, body: { job_id: 'j1' } }; window.__jobAnswer = { status: 'done', result: { name: 'Polled', agents: [{ name: 'P1', prompt: 'p' }] } }; window.generateTeamFromWizard(); true`);
         await waitFor(`document.getElementById('team-drafted-note') && !document.getElementById('team-drafted-note').hidden && /Drafted: 1 member\\./.test(document.getElementById('team-drafted-note').textContent)`, 'the polled draft, straight on the Members step', { timeout: 9000 });
         console.log('PASS team dialogs');

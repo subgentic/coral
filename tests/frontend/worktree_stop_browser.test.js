@@ -73,7 +73,7 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); document.getElementById('notice-live').textContent = ''; window.__answer = ${JSON.stringify({ ok: true, worktree: { state: 'failed', path: '/tmp/wt/solo', branch: 'coral-team/solo', reason: 'git would not remove it' } })}; true`);
         await askOne(); await ev(`document.getElementById('confirm-modal-yes').click(); true`);
         await waitFor(`document.getElementById('notice-alert').textContent.includes('could not be removed')`, 'the single kill\'s worktree answer', 4000);
-        check('a single kill says it too (an alert when the worktree could not be removed)', (await ev(`document.getElementById('notice-alert').textContent`)).includes('The agent was killed, but its worktree could not be removed: git would not remove it. It is at /tmp/wt/solo, on branch coral-team/solo.'));
+        check('a single kill says it too (an alert when the worktree could not be removed)', (await ev(`document.getElementById('notice-alert').textContent`)).includes('The agent was stopped, but its worktree could not be removed: git would not remove it. It is at /tmp/wt/solo, on branch coral-team/solo.'));
         t = await stop({ ok: true, sessions_killed: 1, worktree: { state: 'removed', path: '/tmp/wt/team-k', branch: 'coral-team/team-k', reason: 'its branch is kept: it has commits that are not merged' } });
         check('removed with a branch kept: says the branch is kept and why', t.some(x => x.text === 'The team stopped and its worktree was removed. Its branch is kept: it has commits that are not merged.'), JSON.stringify(t));
     } finally { await client.close(); }

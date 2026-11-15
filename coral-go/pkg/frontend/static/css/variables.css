@@ -515,3 +515,6 @@
 }
 
 /* Dialog type scale (#7405, UI/UX): the sizes and weights every sectioned dialog uses (Settings, and New agent and New team as they adopt it): a text is one of these eight and Plus Jakarta Sans */
+
+/* A change of theme is one jump (applyTheme in settings_core.js): no element fades through the other theme's colours. */
+html.theme-switching *, html.theme-switching *::before, html.theme-switching *::after { transition: none !important; }

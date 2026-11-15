@@ -23,7 +23,7 @@ const {install:installNT,M,T,N,openNewTeam,stubModels}=require('./helpers/new_te
   assert.equal(row.mode,mode,'Save member retains the custom ID instead of Default');assert.match(row.text,/Edits ok/,'summary names the selected mode');
   await open();assert.equal(await ev(`document.querySelector('#launch-agent-acf .acf-permission-mode').value`),mode,'reopening retains custom selection');await member.save();
   await ev(`(()=>{const real=fetch;window.__teamLaunch=[];window.fetch=(u,o={})=>{if(new URL(String(u),location.origin).pathname==='/api/sessions/launch-team'){__teamLaunch.push(JSON.parse(o.body));return Promise.resolve(new Response(JSON.stringify({error:'Stopped by test'}),{status:400,headers:{'Content-Type':'application/json'}}));}return real(u,o);};return true;})()`);
-  await team.click('button',N.next);await team.step(3);await team.click('button',N.launch);await waitFor(`__teamLaunch.length===1`,'team launch request');
+  await team.click('button',N.launch);/* New team is two steps (LT1, #15892): step 2 of 2 has Launch, no Next */await waitFor(`__teamLaunch.length===1`,'team launch request');
   const sent=await ev(`__teamLaunch[0].agents.find(a=>a.name==='QA Engineer')`);assert.equal(sent.permission_mode,mode,'launch names custom member mode');assert.ok(!sent.flags||!sent.flags.includes('auto'),'member does not send Auto flags');
   console.log('PASS custom member mode survives save, summary, reopen and team launch');
  }finally{await ev(`fetch('/api/custom-modes',{method:'PUT',headers:{'Content-Type':'application/json'},body:'{"modes":[]}'}).then(()=>true)`).catch(()=>{});await client.close();}

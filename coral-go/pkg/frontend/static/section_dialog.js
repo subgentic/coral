@@ -94,7 +94,11 @@ export function revealField(el) {
     const pane = el?.closest?.('.settings-pane[data-section]');
     const shell = pane?.closest('.settings-shell');
     if (pane && shell && pane.hidden) showSection(shell, pane.dataset.section);
-    const options = el?.closest?.('#launch-more-options:not([open])'); if (options) options.open = true; // a field in the closed "More options" of a phone's New Agent (#7066)
+    const options = el?.closest?.('#launch-more-options:not([open])'); if (options) options.open = true;
+    if (el?.closest?.('#launch-step-agent[data-stage="page"]')) { // one-page New agent (LA1b): a field in the tabs opens More options, the name or the instructions open their switch
+        if (el.closest('.settings-panes') && !el.closest('.acf-persona-page')) { const m = document.getElementById('launch-more-options'); if (m) m.open = true; }
+        if (el.closest('.acf-persona-page, #agent-name-host')) { const m = document.getElementById('launch-persona-more'); if (m) m.open = true; }
+    } // a field in the closed "More options" of a phone's New Agent (#7066)
     el?.closest?.('[data-sd-more][hidden]')?.dispatchEvent(new CustomEvent('sd-more-open', { bubbles: true })); // the sections sit behind a "More options" button (New Agent, #5595): it opens
     el?.closest?.('.team-page[hidden]')?.dispatchEvent(new CustomEvent('team-page-open', { bubbles: true })); // a field on another page of New team (#7407): that step shows
 }

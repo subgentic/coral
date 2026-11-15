@@ -27,7 +27,7 @@
 /* a question: the sender on the top line, its words (the asker's whole question) under it, across the row; the line that said 'Needs your answer' is the icon's name now */
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) > td[data-key="agent"] > .inbox-review-item { display: contents; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) > td[data-key="agent"] .inbox-review-from { grid-column: 3 / 5; order: 3; }
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) > td[data-key="agent"] .inbox-ask-name { grid-column: 3 / -1; order: 7; min-width: 0; margin: 0; max-width: none; white-space: normal; overflow-wrap: anywhere; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) > td[data-key="agent"] .inbox-ask-name { grid-column: 3 / -1; order: 7; min-width: 0; margin: 0; max-width: none; white-space: pre-line; overflow-wrap: anywhere; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) > td[data-key="agent"] .inbox-review-wait { display: none; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="agent"] > .inbox-row-words.inbox-kind-words { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* still read out; the icon and the buttons say it to the eye */
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) .inbox-review-from::after { content: none; } /* the sender stands alone on the question's top line */

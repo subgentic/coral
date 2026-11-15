@@ -8,7 +8,7 @@ const { coralReady } = require('./helpers/wait');
 
 const CASES = [ // key, title, message, options, class, the button's words
     ['danger-delete-workflow', 'Delete workflow', 'Delete workflow "nightly-build"? This will also delete all run history.', { label: 'Delete workflow', danger: true }, 'btn-danger', 'Delete workflow'],
-    ['danger-kill-run', 'Kill run', 'Stop run #12? Its steps stop where they are and the run cannot be resumed.', { label: 'Kill run', danger: true }, 'btn-danger', 'Kill run'],
+    ['danger-kill-run', 'Stop run', 'Stop run #12? Its steps stop where they are and the run cannot be resumed.', { label: 'Stop run', danger: true }, 'btn-danger', 'Stop run'],
     ['danger-paste', 'Paste 3 lines?', 'This terminal isn\u2019t in paste mode, so each line is sent as if typed and runs on its own.', { label: 'Paste and run', danger: true }, 'btn-danger', 'Paste and run'],
     ['primary-sleep-agent', 'Sleep agent', 'Put "Backend Dev" to sleep?', { danger: false, label: 'Sleep agent' }, 'btn-primary', 'Sleep agent'],
     ['primary-archive', 'Archive agent', 'Archive "Backend Dev"? It stays out of the way until you unarchive it.', { danger: false, label: 'Archive' }, 'btn-primary', 'Archive'],

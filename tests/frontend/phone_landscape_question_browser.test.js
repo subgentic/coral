@@ -1,5 +1,5 @@
 // A question's choices stay visible in landscape (Mobile pass 30, #10385, #10388): the card (kicker, question, a button a row and Open terminal) was taller than the chat's 176 px and the composer hid its choices. At 844 x 390
-// the card is compact: its answers are one row of buttons (44 px tall), the whole card is no taller than 145 px, and every answer is inside the chat's area when the chat is scrolled to the end. A stubbed agent.
+// the card is compact: its answers are one row of buttons (44 px tall), the whole card is no taller than 160 px (its 44 px buttons, #16356, made it 158), and every answer is inside the chat's area when the chat is scrolled to the end. A stubbed agent.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -34,7 +34,7 @@ const { coralReady } = require('./helpers/wait');
             const r = e => { const b = e.getBoundingClientRect(); return { top: Math.round(b.top), bottom: Math.round(b.bottom), left: Math.round(b.left), h: Math.round(b.height) }; };
             const card = box.querySelector('.chat-needs-input');
             return { msgs: r(box), card: card ? r(card) : null, answers: [...box.querySelectorAll('.cni-answer')].map(r) }; })()`);
-        check(m.card && m.card.h <= 145, `the card is compact (145 px at most): ${JSON.stringify(m)}`);
+        check(m.card && m.card.h <= 160, `the card is compact (160 px at most): ${JSON.stringify(m)}`);
         check(m.answers.length === 2 && m.answers.every(a => a.top >= m.msgs.top - 1 && a.bottom <= m.msgs.bottom + 1 && a.h >= 44), `both answers are inside the chat's area and 44 px tall: ${JSON.stringify(m)}`);
         check(m.answers.length === 2 && Math.abs(m.answers[0].top - m.answers[1].top) <= 2, `and they sit in one row: ${JSON.stringify(m.answers)}`);
     } finally { await client.close(); }

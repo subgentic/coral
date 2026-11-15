@@ -519,3 +519,5 @@ dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-
 .team-links-list b { overflow-wrap: anywhere; }
 .team-links-sub { color: var(--text-secondary); font-size: var(--fs-base); overflow-wrap: anywhere; }
 @media (max-width: 760px) { .team-page-links { margin-left: 16px; margin-right: 16px; } }
+/* the "Open on team page" link of a task or an inbox item is a 44 px target on a phone (#17126; it was 22) */
+@media (max-width: 767px), (pointer: coarse) { .goal-back-row > .inbox-team-link { display: inline-flex; align-items: center; min-height: 44px; } }

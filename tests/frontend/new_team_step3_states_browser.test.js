@@ -1,5 +1,4 @@
-// New team step 3 says what it is and what each menu holds (#9971 b, UI/UX's triage): one line at the top (everything here is optional), and under each menu item its state
-// (Start: optional, Workflow: you approve goals (a new team starts on Operator approves goals, #11657), Health check: off: no stuck-agent checks, Messaging: on: other computers, both switches start on (#11788); #11368 gave the bare 'none' and 'off' their meaning), kept up as the settings change, so nobody opens a menu to find out. The tab keeps its name. 1280 px, isolated dev server.
+// New team's first page after LT1 (#15892, which folded the old step 3 into step 1; it replaces #9971 b's side-menu states): the first task and Workflow are on the page with the team name and folder; Health check and Messaging sit under a "More options" that starts closed and holds them with today's defaults (the check on, both Messaging switches on, #14091 and #11788). 1280 px, isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installNT, T, openNewTeam, stubModels, N } = require('./helpers/new_team');
@@ -14,24 +13,23 @@ const { coralReady } = require('./helpers/wait');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installNT(ev);
         await stubModels(ev); await openNewTeam(ev, waitFor);
-        await t.to(3);
-        const read = () => ev(`(() => ({ lead: document.querySelector('#team-start-host .team-start-lead')?.textContent,
-            states: Object.fromEntries([...document.querySelectorAll('#team-start-host .settings-tab')].map(b => [b.querySelector('.settings-tab-name').firstChild.textContent, b.querySelector('.menu-item-state')?.textContent])),
-            names: [...document.querySelectorAll('#team-start-host .settings-tab')].map(b => b.getAttribute('aria-label')) }))()`);
+        const read = () => ev(`(() => { const host = document.getElementById('team-start-host'); const vis = e => !!e && e.getClientRects().length > 0; const f = [...host.querySelectorAll('details')].find(x => /^More options/i.test(x.querySelector('summary').textContent.trim()));
+            const box = n => host.querySelector('[name="' + n + '"]');
+            return { step: /^Step 1 of 2/.test(window.__na.text(document.getElementById('launch-step-team'))), task: vis(document.getElementById('team-goal')), instructions: vis(document.getElementById('team-custom-instructions')), foldOpen: !!(f && f.open), health: !!f && f.contains(box('on')) && f.open && vis(box('on')), inFold: !!f && f.contains(box('on')) && f.contains(box('cross_team_messaging')), healthOn: !!box('on')?.checked, messaging: box('cross_team_messaging')?.checked, artifacts: box('cross_team_artifacts')?.checked, gone: !host.querySelector('.settings-tab, .team-start-lead') }; })()`);
+        await waitFor(`!!document.querySelector('#team-start-host input[name="on"]')`, 'the page has drawn its rows', 6000);
         let r = await read();
-        assert.equal(r.lead, 'Everything on this step is optional. The team starts with the settings shown here.');
-        // the template the helper picks names a working mode: Workflow says it (None when the team has none)
-        const mode = await ev(`(() => { const s = [...document.querySelectorAll('#team-start-host select')].find(x => [...x.options].some(o => o.textContent.trim() === 'Worktrees')); return s.options[s.selectedIndex].textContent.trim(); })()`);
-        assert.deepEqual(r.states, { Start: 'optional', Workflow: mode === 'None' ? 'you approve goals' : mode, 'Health check': 'on', Messaging: 'on: other computers' }, JSON.stringify(r)); // both switches start on, as a team launched with no change acts (#11788)
-        assert.deepEqual(r.names, ['Start', 'Workflow', 'Health check', 'Messaging'], 'each tab keeps its name');
-        // a change shows in the menu
-        await ev(`(() => { const g = document.getElementById('team-goal'); g.value = 'Ship it'; g.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+        assert.equal(r.task, true, 'the first task is on the page: ' + JSON.stringify(r));
+        assert.equal(r.instructions, true, 'Additional instructions are on the page: ' + JSON.stringify(r));
+        assert.equal(r.foldOpen, false, 'More options starts closed: ' + JSON.stringify(r));
+        assert.equal(r.health, false, 'the Health check is not shown while it is closed: ' + JSON.stringify(r));
+        assert.equal(r.inFold, true, 'the Health check and the Messaging switches are inside More options: ' + JSON.stringify(r));
+        assert.equal(r.gone, true, 'there is no side menu of tabs any more: ' + JSON.stringify(r));
+        await t.more(); await new Promise(res => setTimeout(res, 250)); // sleep-ok: the fold opens
         r = await read();
-        assert.equal(r.states.Start, 'set', 'a first task makes Start "set": ' + JSON.stringify(r));
-        await ev(`(() => { for (const n of ['cross_team_messaging', 'cross_team_artifacts']) { const c = document.querySelector('#team-start-host [name="' + n + '"]'); if (c.checked) c.click(); } return true; })()`);
-        r = await read();
-        assert.equal(r.states.Messaging, 'off: this team only', 'with both switches off the menu says so: ' + JSON.stringify(r));
-        if (process.env.CORAL_SCREENSHOT_DIR) { const fs = require('node:fs'); fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/new-team-step3-states.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
-        console.log('\nPASS New team step 3 says it is optional and each menu says what it holds');
+        assert.equal(r.foldOpen, true, 'More options opens: ' + JSON.stringify(r));
+        assert.equal(r.health, true, 'the Health check is in it: ' + JSON.stringify(r)); assert.equal(r.healthOn, true, 'the check starts on (#14091)');
+        assert.equal(r.messaging, true, 'Message teams on other computers starts on (#11788)'); assert.equal(r.artifacts, true, 'Share files starts on (#11788)');
+        if (process.env.CORAL_SCREENSHOT_DIR) { const fs = require('node:fs'); fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/new-team-more-options.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
+        console.log('\nPASS New team page 1: the first task and Workflow are shown, Health check and Messaging are under a closed More options with their defaults');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
