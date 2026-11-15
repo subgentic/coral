@@ -191,6 +191,7 @@ func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession
 		BoardName:       boardName,
 		BoardLabel:      h.boardLabel(boardName),
 		Role:            role,
+		PostedBefore:    h.postedBefore(ctx, boardName, role),
 		Prompt:          prompt,
 		PromptOverrides: promptOverrides(userSettings),
 		BoardType:       boardType,
