@@ -18,7 +18,7 @@ import (
 func sameAsRig(t *testing.T) (*BoardHandler, *board.Store, func(map[string]any) (int, map[string]any)) {
 	h, bs := operatorAsksRig(t)
 	ctx := context.Background()
-	for _, who := range []string{"Dev A", "Dev B", "Operator"} {
+	for _, who := range []string{"Dev A", "Dev B", "Dev C", "Operator"} {
 		_, err := bs.Subscribe(ctx, "team", who, who, "", nil, "all")
 		require.NoError(t, err)
 	}
@@ -93,6 +93,28 @@ func TestSameAsNeedsAnOpenAskAndAnAsk(t *testing.T) {
 	post(map[string]any{"subscriber_id": "Operator", "content": "@Dev A new one", "reply_to": sameAsID(first)})
 	code, out = post(map[string]any{"subscriber_id": "Dev B", "content": "@Operator parser please?", "ask": true, "same_as": sameAsID(first)})
 	assert.Equal(t, http.StatusBadRequest, code, "an answered ask is nothing to be the same as: %v", out)
+}
+
+// #17738 (Security and QA, round 1): a link is only for a question put to the same people. Dev B's question to the Operator linked to Dev A's question to Dev C is refused, so Dev C's reply can never read
+// as the Operator's answer; and the other way round.
+func TestSameAsNeedsTheSamePeopleAsked(t *testing.T) {
+	h, _, post := sameAsRig(t)
+	_, toC := post(map[string]any{"subscriber_id": "Dev A", "content": "@Dev C which parser?", "ask": true})
+	code, out := post(map[string]any{"subscriber_id": "Dev B", "content": "@Operator which parser?", "ask": true, "same_as": sameAsID(toC)})
+	assert.Equal(t, http.StatusBadRequest, code, "an ask to the Operator is not the same as one to a teammate: %v", out)
+	_, toOp := post(map[string]any{"subscriber_id": "Dev A", "content": "@Operator ship it?", "ask": true})
+	code, out = post(map[string]any{"subscriber_id": "Dev B", "content": "@Dev C ship it?", "ask": true, "same_as": sameAsID(toOp)})
+	assert.Equal(t, http.StatusBadRequest, code, "a teammate's ask is not the same as the Operator's: %v", out)
+	// A teammate answering must leave the Operator's question open and tell nobody.
+	post(map[string]any{"subscriber_id": "Dev C", "content": "@Dev A use the new one", "reply_to": sameAsID(toC)})
+	_, rows, _ := readOperatorAsks(t, h, asPerson)
+	found := false
+	for _, r := range rows {
+		if int64(r["id"].(float64)) == sameAsID(toOp) {
+			found = true
+		}
+	}
+	assert.True(t, found, "the Operator's question is still open")
 }
 
 // #17738: closing a goal resolves the open asks about it (closed, not answered) and tells their askers; asks about other goals are left.

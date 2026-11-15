@@ -154,8 +154,8 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 			errBadRequest(w, "--same-as links a question to an earlier one: use it with --ask")
 			return
 		}
-		if body.SameAs < 0 || h.checkSameAs(r.Context(), project, body.SameAs) != nil {
-			errBadRequest(w, fmt.Sprintf("message %d is not an open question of this team, so this one cannot be the same as it", body.SameAs))
+		if body.SameAs < 0 || h.checkSameAs(r.Context(), project, body.SameAs, asked) != nil {
+			errBadRequest(w, fmt.Sprintf("message %d is not an open question of this team put to the same people, so this one cannot be the same as it", body.SameAs))
 			return
 		}
 	}
@@ -221,7 +221,9 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 				slog.Warn("board ask not recorded", "board", project, "message", msg.ID, "error", err)
 			} else {
 				h.recordAskSubject(r.Context(), project, msg, body.AskGoal, body.AskTask)
-				if body.SameAs > 0 {
+				if body.SameAs > 0 && h.checkSameAs(r.Context(), project, body.SameAs, to) != nil {
+					slog.Warn("board ask not linked: not put to the same people", "board", project, "message", msg.ID, "same_as", body.SameAs)
+				} else if body.SameAs > 0 {
 					if err := h.bs.LinkAsk(r.Context(), project, msg.ID, body.SameAs); err != nil {
 						slog.Warn("board ask not linked", "board", project, "message", msg.ID, "same_as", body.SameAs, "error", err)
 					}
@@ -982,14 +984,23 @@ func (h *BoardHandler) answerDuplicateOperatorAsk(w http.ResponseWriter, r *http
 	return true
 }
 
-// checkSameAs: id is an ask of this team that nobody has answered or closed yet (#17738).
-func (h *BoardHandler) checkSameAs(ctx context.Context, project string, id int64) error {
+// checkSameAs: id is an ask of this team that nobody has answered or closed yet, put to exactly the people the new ask is put to (#17738). An answer to one counts for the other, so it must be an answer the other
+// would take: a question to a teammate can never stand in for the Operator's, nor the other way round.
+func (h *BoardHandler) checkSameAs(ctx context.Context, project string, id int64, asked []string) error {
 	m, err := h.bs.GetMessageByID(ctx, project, id)
 	if err != nil || m == nil || m.Ask == nil {
 		return board.ErrAskUnknown
 	}
 	if m.Ask.Answered || m.Ask.Closed {
 		return board.ErrAskUnknown
+	}
+	if len(asked) != len(m.Ask.To) {
+		return board.ErrAskUnknown
+	}
+	for _, a := range asked {
+		if !askedHas(m.Ask.To, a) {
+			return board.ErrAskUnknown
+		}
 	}
 	return nil
 }
