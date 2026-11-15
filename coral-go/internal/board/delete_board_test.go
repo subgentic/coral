@@ -60,7 +60,7 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	require.NoError(t, s.CloseAsk(ctx, project, hello.ID, "Dev", "answered in chat"))                                                                             // a question closed by hand goes with its board (#11417)
 	require.NoError(t, s.ReopenAskAnswer(ctx, project, hello.ID))                                                                                                 // and one the Operator reopened (#15792)
 	require.NoError(t, s.RecordAskButtons(ctx, project, hello.ID, []AskButton{{Label: "Yes", Action: ActionReply}}, time.Now()))                                  // the buttons an agent declared on it go too (#11643)
-	require.NoError(t, s.RecordAskSubject(ctx, project, hello.ID, 1, 2))                                                                                          // what a question is about goes with its board (#12164)
+	require.NoError(t, s.RecordAskSubject(ctx, project, hello.ID, 1, 2, true))                                                                                     // what a question is about goes with its board (#12164)
 	require.NoError(t, s.SetOrchGrant(ctx, OrchGrant{Project: project, Enabled: true, SeatSession: "seat-1", MaxPerHour: 5, MaxLive: 4, IdleMin: 5}, "Operator")) // #11432
 	_, err = s.ReserveLifecycle(ctx, project, LifecycleWake, "Orchestrator", "Dev", nil)
 	require.NoError(t, err)
@@ -68,7 +68,7 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	require.NoError(t, err)
 	first, err := s.CreateTask(ctx, project, "first", "body", "high", "Boss", "Dev")
 	require.NoError(t, err)
-	require.NoError(t, s.RecordAskSubject(ctx, project, hello.ID, 0, first.ID))
+	require.NoError(t, s.RecordAskSubject(ctx, project, hello.ID, 0, first.ID, true))
 	_, err = s.db.ExecContext(ctx, `INSERT INTO board_goal_task_moves (board_id, goal_id, task_id, moved_at) VALUES (?, 1, ?, ?)`, project, first.ID, nowUTC())
 	require.NoError(t, err)
 	second, err := s.CreateTaskWithOpts(ctx, project, "second", "body", "high", "Boss", &CreateTaskOpts{BlockedBy: []TaskDep{{TaskID: first.ID, BoardID: project}}}, "Dev")

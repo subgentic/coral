@@ -206,8 +206,6 @@ func (h *BoardHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 	h.announceGoalDriver(project, actor, g, "")
 	h.announceGoalToOrchestrator(project, actor, g)
 	h.markMadeByOrchestrator(r.Context(), project, g)
-	// Close asks overtaken by this goal's creation (#17338).
-	h.bs.CloseOvertakenAsks(r.Context(), project, 0, g.ID, fmt.Sprintf("Overtaken: goal #%d created", g.ID))
 	noteActivity(r, board.ActGoalCreate, "goal", strconv.FormatInt(g.ID, 10), project, g.Title, "") // the new goal's number, so the row opens it (#13621)
 	writeJSON(w, http.StatusCreated, g)
 }
