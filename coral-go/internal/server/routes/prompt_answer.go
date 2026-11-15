@@ -1043,10 +1043,6 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "trust_changed", "The folder to trust changed or cannot be trusted from here. Answer it in the agent's own chat.")
 		return
 	}
-	if screen.BrowserMenu && normalizeLabel(opt.Label) != normalizeLabel(browserNotNowLabel) { // Install extension opens the person's Chrome and Don't ask again is lasting: the row offers Not now only, and a direct request is held to it (#16684)
-		writeError(w, http.StatusConflict, "browser_choice", "Only Not now can be answered from here. Answer the rest in the agent's own chat.")
-		return
-	}
 	if body.RateLimitModel != "" && (body.AgentType != at.Codex || screen.rateLimitModel != body.RateLimitModel || !trustFolderCaller(r)) { // the row's lasting choice: only for the notice and model it showed, from the person's own dashboard (#14774); a changed screen types nothing
 		writeError(w, http.StatusConflict, "rate_limit_changed", "The rate-limit notice changed or cannot be answered from here. Answer it in the agent's own chat.")
 		return
