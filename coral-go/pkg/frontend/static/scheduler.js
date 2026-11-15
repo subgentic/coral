@@ -287,7 +287,7 @@ function renderRunsTable(page) {
             ...(!workflowHistory ? [{ key: 'conversation', label: 'Conversation', hideLabel: true, width: '6.5rem', when: r => !!r.session_id, cell: r => {
                 if (!r.session_id) return '';
                 // short, so the Result keeps its room at 390 (Started 9.5 rem, See result 6.5 rem); it is where a newcomer looks for what the run said (#10378)
-                const b = DT.link('See result'); b.setAttribute('aria-label', 'See what this run did: open its conversation'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = r.session_id; return b;
+                const b = DT.link('See result'); b.setAttribute('aria-label', 'See what this run did: open its conversation'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = r.session_id; b.dataset.runStatus = r.status || ''; return b;
             } }] : []),
         ],
     });
@@ -407,6 +407,11 @@ registerActions({
         const sid = uuidOf(el.dataset.sessionId); if (!sid) return;
         const jobId = selectedJobId, job = scheduledJobs.find(j => j.id === jobId);
         const opened = await window.selectHistorySession(sid);
+        if (opened === false) { // no conversation on file: a run whose agent never wrote a line has no chat to open, and the page must say so, not stay on "Loading chat..." (#17186)
+            const { showHistoryNote } = await importOnce('./history_pages.js');
+            const running = el.dataset.runStatus === 'running' || el.dataset.runStatus === 'pending';
+            showHistoryNote(running ? "This run's agent has not written anything yet, so there is no conversation to show. If it stays like this, the agent did not start: stop the run from the job's page and run the job again." : "This run has no conversation: its agent never wrote anything, so it did not start. Run the job again from the job's page.", running ? () => el.click() : null);
+        }
         const back = document.getElementById('history-back'); // the way back is the job it came from, not All chats (#10378)
         if (opened !== false && job && back) { back.hidden = false; back.textContent = `\u2190 ${job.name}`; back.setAttribute('data-on-click', 'job-result-back'); back.dataset.jobId = String(jobId); }
         const phoneBack = document.querySelector('.mobile-history-back'); // a phone shows its own back control, not that one (#10578)
