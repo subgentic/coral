@@ -53,9 +53,7 @@ export function scheduleFolderTrust(event) {
 }
 
 /** Trust ticked on a folder already in the field: the server refuses a shared place, so untick and say why before Launch (#17339 F5). */
-async function probeTrust(dir) {
-    try { const response = await fetch('/api/filesystem/trust-probe?path=' + encodeURIComponent(dir), { signal: AbortSignal.timeout(3000) }); return response.ok ? await response.json() : null; } catch { return null; }
-}
+const probeTrust = dir => fetch('/api/filesystem/trust-probe?path=' + encodeURIComponent(dir), { signal: AbortSignal.timeout(3000) }).then(r => r.ok ? r.json() : null).catch(() => null);
 
 /** True when the person ticked "Trust this folder" for the folder that is in the field now, and the switch shows: the one case the launch asks for trust (#11889). */
 export function trustTicked() {
@@ -149,7 +147,7 @@ function mount(modal) {
     ];
     _view = mountSettingsView(host, { mode: 'form', fields });
     // The folder the person ticked "Trust this folder" for: registered here, when the form is built, not at load (a page-wide listener at start shows in the startup golden, #11889).
-    modal.addEventListener('change', e => { if (!e.target || e.target.id !== 'launch-team-trust') return; clearTimeout(_trustTimer); _trustGeneration++; _defaultUsed = true; _trustFor = e.target.checked ? (document.getElementById('launch-team-dir')?.value.trim() || '') : ''; _view?.refresh(); const g = _trustGeneration; if (_trustFor && !isHub()) probeTrust(_trustFor).then(r => { if (g === _trustGeneration && r?.refused) { _trustNote = r.refused; _trustFor = ''; _view?.set('trust', false); _view?.refresh(); } }); }); // the sentence under the switch follows it
+    modal.addEventListener('change', e => { if (!e.target || e.target.id !== 'launch-team-trust') return; clearTimeout(_trustTimer); _trustGeneration++; _defaultUsed = true; _trustFor = e.target.checked ? (document.getElementById('launch-team-dir')?.value.trim() || '') : ''; _view?.refresh(); const g = _trustGeneration; if (_trustFor && !isHub()) probeTrust(_trustFor).then(r => { if (g === _trustGeneration && r?.refused) { _trustNote = r.refused; _trustFor = ''; _view?.set('trust', false); } }); }); // the sentence under the switch follows it
     joinBrowse('launch-team-dir', 'btn-browse-team'); // Browse at the input's right, as Open folder has it (#9489)
     const server = document.getElementById('team-board-server'); if (server) server.disabled = true; // the machine's own entry reveals it (launch_dialog.js _syncTeamAddress)
     showTeamAddress(false);
