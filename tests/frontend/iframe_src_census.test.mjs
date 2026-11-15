@@ -15,7 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const STATIC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'coral-go', 'pkg', 'frontend', 'static');
-const ALLOWED = { 'artifact_preview.js': 1, 'artifact_scripts.js': 1, 'panel_sandbox.js': 1, 'view_sandbox.js': 1, 'inbox_tab.js': 1, 'artifacts_tab.js': 1, 'inbox_sidebar.js': 1 };
+const ALLOWED = { 'artifact_preview.js': 1, 'artifact_scripts.js': 1, 'panel_sandbox.js': 1, 'view_sandbox.js': 1, 'inbox_tab.js': 1, 'artifacts_tab.js': 1, 'inbox_sidebar.js': 2 }; // inbox_sidebar.js: two, both from HUB_FRAMES (the constants below): the frame's creation, and the re-set when a kept frame's address changed (#17584)
 const found = {};
 for (const f of fs.readdirSync(STATIC).filter(n => n.endsWith('.js'))) {
     const src = fs.readFileSync(path.join(STATIC, f), 'utf8');
@@ -61,6 +61,8 @@ const sidebar = fs.readFileSync(path.join(STATIC, 'inbox_sidebar.js'), 'utf8');
 assert.match(sidebar, /const HUB_FRAMES = \{ needs: '\/inbox\/hub\/needs', tasks: '\/inbox\/hub\/tasks', saved: '\/inbox\/hub\/saved' \};/);
 assert.equal((sidebar.match(/setAttribute\('src', /g) || []).length, 1);
 assert.match(sidebar, /setAttribute\('src', HUB_FRAMES\[key\]\)/);
+assert.equal((sidebar.match(/\bframe\.src\s*=/g) || []).length, 1); // the kept frame's re-set (#17584): the same constant, only when its address changed
+assert.match(sidebar, /frame\.src = HUB_FRAMES\[key\]/);
 assert.match(sidebar, /createElement\('iframe'\)/);
 assert.match(sidebar, /f\.setAttribute\('referrerpolicy', 'no-referrer'\)/);
 assert.match(sidebar, /f\.setAttribute\('allow', ''\)/);
