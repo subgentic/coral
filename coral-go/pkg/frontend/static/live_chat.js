@@ -5,6 +5,7 @@ import './hooks_review.js';
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
 import { escapeHtml, showToast, copyText } from './utils.js';
+import { loadStyles } from './lazy_styles.js';
 import './actions.js';
 import './platform/detect.js';
 import './xterm_renderer.js';
@@ -117,6 +118,7 @@ document.addEventListener("click", async (e) => {
 });
 
 // #16701: tap a reply bubble to reveal its copy button; tap elsewhere to hide it.
+loadStyles('copy_reveal.css');
 document.addEventListener("click", (e) => {
     const bubble = e.target.closest && e.target.closest(".chat-bubble.assistant");
     for (const old of document.querySelectorAll(".chat-bubble.copy-revealed")) {

@@ -13,6 +13,10 @@ const MARKUP = `
     <div class="message-text">A reply whose copy icon used to sit below the bubble and cover the next row.</div>
     <button type="button" class="btn btn-quiet btn-icon btn-xs chat-copy-btn" title="Copy" aria-label="Copy message"><span class="material-icons" aria-hidden="true">content_copy</span></button>
   </div>
+  <div class="chat-bubble assistant" id="zz-short">
+    <div class="message-text">Sure.</div>
+    <button type="button" class="btn btn-quiet btn-icon btn-xs chat-copy-btn" title="Copy" aria-label="Copy message"><span class="material-icons" aria-hidden="true">content_copy</span></button>
+  </div>
   <div class="chat-bubble assistant" id="zz-next">
     <div class="message-text">The next reply: the copy icon above must never cover me.</div>
   </div>
@@ -60,6 +64,32 @@ async function runAt(width, Page, Emulation, ev, install) {
     assert.notEqual(afterTap.pe, 'none', `${width}px after tap: clickable`);
     assert.equal(afterTap.insideBubble, true, `${width}px after tap: button is inside the bubble, not below it`);
     assert.equal(afterTap.overlap, false, `${width}px after tap: no overlap with next row`);
+
+    // the button must not overlap the text of its own bubble (#17573)
+    const textOverlap = await ev(`(() => {
+        const txt = document.querySelector('#zz-reply .message-text');
+        const btn = document.querySelector('#zz-reply .chat-copy-btn');
+        const t = txt.getBoundingClientRect(), b = btn.getBoundingClientRect();
+        const overX = Math.min(t.right, b.right) - Math.max(t.left, b.left);
+        const overY = Math.min(t.bottom, b.bottom) - Math.max(t.top, b.top);
+        return { overlap: overX > 1 && overY > 1, textRight: Math.round(t.right), btnLeft: Math.round(b.left) };
+    })()`);
+    assert.equal(textOverlap.overlap, false, `${width}px after tap: button does not overlap the reply text: ${JSON.stringify(textOverlap)}`);
+
+    // a short one-line reply: the button must not cover its last words (#17573)
+    await ev(`(() => { document.getElementById('zz-short').click(); })()`);
+    const shortOverlap = await ev(`(() => {
+        const bubble = document.getElementById('zz-short');
+        const txt = bubble.querySelector('.message-text');
+        const btn = bubble.querySelector('.chat-copy-btn');
+        const t = txt.getBoundingClientRect(), b = btn.getBoundingClientRect();
+        const overX = Math.min(t.right, b.right) - Math.max(t.left, b.left);
+        const overY = Math.min(t.bottom, b.bottom) - Math.max(t.top, b.top);
+        return { overlap: overX > 1 && overY > 1, textRight: Math.round(t.right), btnLeft: Math.round(b.left), revealed: bubble.classList.contains('copy-revealed') };
+    })()`);
+    assert.equal(shortOverlap.revealed, true, `${width}px short reply: copy-revealed class on bubble`);
+    assert.equal(shortOverlap.overlap, false, `${width}px short reply: button does not overlap the text: ${JSON.stringify(shortOverlap)}`);
+    await ev(`(() => { document.body.click(); })()`);
 
     // tap elsewhere: the reveal clears
     await ev(`(() => { document.body.click(); })()`);
