@@ -280,3 +280,34 @@ func TestAnAskOnATaskClosesWhenTheTaskIsDecidedOrTheAskerPostsAgain(t *testing.T
 	post("Dev A", "not the asker", false, t3)
 	assert.Equal(t, []string{"Dev A"}, askOf(t, s, ctx, q4.ID).Open, "only the asker's own later post closes it")
 }
+
+// #16641 (Security INFO on #16617): askClosedBy compares completed_at > created_at as TEXT, so the two columns must be written in one layout (nowUTC: RFC3339, whole seconds). A task completed in the same
+// second as the question cannot be ordered after it, so the question stays open (the next second's completion closes it, as the test above shows); and a layout that differed (microseconds, +00:00) would
+// compare wrongly, so the layouts are pinned here.
+func TestAnAskAndACompletionInTheSameSecondShareOneLayoutAndTheAskStaysOpen(t *testing.T) {
+	s, ctx := askBoard(t)
+	tk, err := s.CreateTask(ctx, "alpha", "same second", "", "medium", "Lead", "Dev A")
+	require.NoError(t, err)
+	asked, err := s.AskTargets(ctx, "alpha", "Lead", "@Dev A same second?")
+	require.NoError(t, err)
+	tid := tk.ID
+	q, err := s.PostMessageForTask(ctx, "alpha", "Lead", "@Dev A same second?", nil, "", &tid)
+	require.NoError(t, err)
+	require.NoError(t, s.RecordAsk(ctx, "alpha", q, asked))
+	_, err = s.CompleteTask(ctx, "alpha", tk.ID, "Dev A", nil)
+	require.NoError(t, err)
+
+	var askAt, doneAt string
+	require.NoError(t, s.db.GetContext(ctx, &askAt, `SELECT created_at FROM board_asks WHERE message_id = ?`, q.ID))
+	require.NoError(t, s.db.GetContext(ctx, &doneAt, `SELECT completed_at FROM board_tasks WHERE id = ?`, tk.ID))
+	_, err = time.Parse(time.RFC3339, askAt)
+	require.NoError(t, err, "the ask's created_at is RFC3339: %q", askAt)
+	_, err = time.Parse(time.RFC3339, doneAt)
+	require.NoError(t, err, "the task's completed_at is RFC3339: %q", doneAt)
+	assert.Equal(t, len(askAt), len(doneAt), "one layout, so the text compares as a time: %q vs %q", askAt, doneAt)
+	if askAt == doneAt { // the same second (the usual case here): not ordered after the question
+		assert.Equal(t, []string{"Dev A"}, askOf(t, s, ctx, q.ID).Open, "a completion in the question's own second does not close it")
+	} else { // the second turned between the two calls: then it is after, and closes
+		assert.Empty(t, askOf(t, s, ctx, q.ID).Open)
+	}
+}
