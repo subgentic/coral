@@ -453,6 +453,7 @@ if (process.env.CORAL_STRIP_STATIC === '1') {
 }
 const goBuildArgs = ['build', ...overlayArgs, '-tags', prodTier ? 'fts5' : 'dev fts5', '-o', tmp + path.sep, ...toolPackages];
 const b = spawnSync('go', goBuildArgs, { cwd: goDir, stdio: 'inherit' });
+if (b.error) console.error(`cannot run go (${b.error.code === 'ENOENT' ? 'go not found on PATH' : b.error.message}): put Go's bin folder on PATH (#18147)`);
 if (b.status !== 0) process.exit(2);
 
 // The run's folder (Coral's binary, each shard's data, results.json) can be removed from under a run by something
