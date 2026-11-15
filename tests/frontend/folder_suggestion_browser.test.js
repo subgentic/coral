@@ -37,9 +37,9 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             await clearRecents(); await openNewAgent(ev, waitFor);
             await ev(`window.__posts.length = 0; true`);
             for (let i = 0; i < 3; i++) {
-                const hit = await ev(`(() => { const b = window.__na.find('button', /^(Next|Launch)$/i); if (!b) return ''; const n = window.__na.name(b); b.click(); return n; })()`);
+                const hit = await ev(`(() => { const b = window.__na.find('button', /^(Next|Choose model|Launch)$/i); if (!b) return ''; const n = window.__na.name(b); b.click(); return n; })()`);
                 if (/launch/i.test(hit)) break;
-                await waitFor(`!!window.__na.find('button', /^(Next|Launch)$/i)`, 'the next step', 4000);
+                await waitFor(`!!window.__na.find('button', /^(Next|Choose model|Launch)$/i)`, 'the next step', 4000);
             }
             await waitFor(`window.__posts.length > 0`, 'the launch request', 8000);
             const b = await ev(`window.__posts[0].body`);
