@@ -40,6 +40,7 @@ assert.deepEqual(parse('/team/qa/messages/104094'), { view: 'team', server: null
 for (const bad of ['/team/qa/goals/0', '/team/qa/goals/x', '/team/qa/goals/12/y', '/team/qa/settings/3', '/team/qa/agents/3', '/team/qa/files', '/team/qa/board/0', '/team/qa/board/x']) assert.equal(parse(bad), null, bad);
 // The Inbox folders' pages (#8652): needs, saved and the chat folders; goals, tasks and boards belong to other page families, a bare /inbox to Coral Hub
 rt('/inbox/needs', { view: 'inbox-folder', folder: 'needs' });
+rt('/inbox/activity', { view: 'inbox-folder', folder: 'activity' });
 rt('/inbox/saved', { view: 'inbox-folder', folder: 'saved' });
 rt('/inbox/artifacts', { view: 'inbox-folder', folder: 'artifacts' }); // every team's artifacts (Goal #62)
 rt('/inbox/chats/all', { view: 'inbox-folder', folder: 'chats' });

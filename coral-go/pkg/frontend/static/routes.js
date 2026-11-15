@@ -44,7 +44,7 @@ const NAME_MAX = 200; // board.MaxIdentityRunes
 const INBOX = 'in' + 'box'; // the path word, spelled in two parts: the icon-name lint reads that quoted word as an icon name
 // The Inbox folders' paths (#8652): /inbox/needs, /inbox/saved, /inbox/artifacts (every team's artifacts, Goal #62), /inbox/chats/<all|active|starred|notes|archived|cli-<cli>|tag-<n>>. The folder keys are the Inbox's own (inbox_sidebar.js): chats is All chats, the others chats-<word>.
 const INBOX_CHATS_RE = /^(?:all|active|starred|notes|archived|cli-[a-z0-9]{1,20}|tag-[1-9]\d{0,11})$/;
-const INBOX_FOLDER_RE = /^(?:needs|saved|artifacts|chats|chats-(?:active|starred|notes|archived|cli-[a-z0-9]{1,20}|tag-[1-9]\d{0,11}))$/;
+const INBOX_FOLDER_RE = /^(?:needs|saved|activity|artifacts|chats|chats-(?:active|starred|notes|archived|cli-[a-z0-9]{1,20}|tag-[1-9]\d{0,11}))$/;
 // The team page's tabs by the word their path uses: the Board tab was Messages (#7784), and /team/<t>/messages still opens it, as /board (#8652).
 const TAB_PATH = { messages: 'board' };
 const TAB_FROM_PATH = { board: 'messages', messages: 'messages' };
@@ -133,7 +133,7 @@ export function parse(pathname, search = '') {
             return rest.length === 3 && TEAM_ITEM_TABS.includes(tab) && INT_RE.test(rest[2]) ? { view: 'team', server: t.server, id: n, sub: tab, item: Number(rest[2]) } : null;
         }
         case INBOX:
-            if (rest.length === 1 && (rest[0] === 'needs' || rest[0] === 'saved' || rest[0] === 'artifacts')) return { view: 'inbox-folder', folder: rest[0] };
+            if (rest.length === 1 && (/^(needs|saved|activity|artifacts)$/.test(rest[0]))) return { view: 'inbox-folder', folder: rest[0] };
             if (rest[0] === 'needs' && (rest[1] === 'review' || rest[1] === 'ask' || rest[1] === 'goal')) { // one item of Needs you, for a link from a notification (#11797): /inbox/needs/<review|ask|goal>/[@<server>/]<team>/<file id | question id | goal id>
                 const kind = rest[1]; rest.splice(0, 2);
                 const t = take();
@@ -264,7 +264,7 @@ export function build(r) {
             return `/board/${srvSeg(r.server)}${seg(r.id)}`;
         case 'inbox-folder':
             if (r.need && r.folder === 'needs') return `/inbox/needs/${r.need.kind}/${srvSeg(r.need.server)}${seg(r.need.team)}/${seg(r.need.id)}`;
-            return INBOX_FOLDER_RE.test(String(r.folder)) ? `/inbox/${r.folder === 'needs' || r.folder === 'saved' || r.folder === 'artifacts' ? r.folder : 'chats/' + (r.folder === 'chats' ? 'all' : r.folder.slice(6))}${r.id && String(r.folder).startsWith('chats') ? '/' + srvSeg(r.server) + seg(r.id) : ''}` : '/';
+            return INBOX_FOLDER_RE.test(String(r.folder)) ? `/inbox/${String(r.folder).startsWith('chats') ? 'chats/' + (r.folder === 'chats' ? 'all' : r.folder.slice(6)) : r.folder}${r.id && String(r.folder).startsWith('chats') ? '/' + srvSeg(r.server) + seg(r.id) : ''}` : '/';
         case 'workflows':
             return r.id ? `/workflows/${r.id}${r.run ? '/runs/' + r.run : ''}` : '/workflows';
         case 'jobs':
