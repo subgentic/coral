@@ -435,3 +435,4 @@ node open_link.test.mjs
 
 node pending_kept_receipts.test.mjs
 node cdp_args.test.mjs
+node top_nav_actions.test.mjs
