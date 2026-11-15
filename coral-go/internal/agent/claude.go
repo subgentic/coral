@@ -178,7 +178,11 @@ func claudeSettingsFile(files *launchFiles, params LaunchParams, effectiveID str
 	if !params.KeepFullAccess {
 		if perms := TranslateToClaudePermissionsForMode(params.Capabilities, claudeLaunchMode(params, interactive)); perms != nil {
 			permMap := map[string]any{}
-			if allow := withCoralTools(perms.Allow, perms.Deny); len(allow) > 0 {
+			allow := perms.Allow
+			if !roleHasNoShell(allow) {
+				allow = withCoralTools(allow, perms.Deny)
+			}
+			if len(allow) > 0 {
 				permMap["allow"] = allow
 			}
 			if len(perms.Deny) > 0 {
@@ -593,6 +597,14 @@ func writeNoFollow(path string, data []byte) error {
 	return f.Close()
 }
 
+// coralToolRules are the commands a Claude launch may always run without a card (#17547, #17833): the board, and the harmless coral-agent subcommands. `coral-agent launch` and the
+// rest are not here: an injected worker in Auto could start team agents with no card.
+var coralToolRules = []string{
+	"Bash(coral-board *)",
+	"Bash(coral-agent artifact *)", "Bash(coral-agent skills *)", "Bash(coral-agent history *)",
+	"Bash(coral-agent check *)", "Bash(coral-agent docs *)", "Bash(coral-agent notify *)",
+}
+
 // withCoralTools adds Coral's own board and agent commands to an allow list (#17547): with no capabilities no rules were written and a team in Auto got a permission card for every
 // `coral-board post` and `coral-board read`. Left out when the capabilities deny the shell outright, and not doubled when a capability already allows them.
 func withCoralTools(allow, deny []string) []string {
@@ -601,7 +613,7 @@ func withCoralTools(allow, deny []string) []string {
 			return allow
 		}
 	}
-	for _, want := range []string{"Bash(coral-board *)", "Bash(coral-agent *)"} {
+	for _, want := range coralToolRules {
 		found := false
 		for _, a := range allow {
 			if a == want {
@@ -614,6 +626,20 @@ func withCoralTools(allow, deny []string) []string {
 		}
 	}
 	return allow
+}
+
+// roleHasNoShell reports a role's allow list that names entries but no shell among them (#17833): it cannot run a command, so Coral's command rules would only widen it. An empty list
+// (a role with only denies) is not that: its shell is as the person's rules leave it.
+func roleHasNoShell(allow []string) bool {
+	if len(allow) == 0 {
+		return false
+	}
+	for _, a := range allow {
+		if a == "Bash" || strings.HasPrefix(a, "Bash(") {
+			return false
+		}
+	}
+	return true
 }
 
 // anyStrings reads a settings list ([]any or []string) as strings; anything else is empty.
