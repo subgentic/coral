@@ -12,7 +12,7 @@ import (
 // recordAskSubject keeps the goal and the task a question is about (#12164): the ones the post named (checked before it was posted), else, for a member's own question, the one task the member has claimed and its goal
 // (nothing is guessed when it has two or none, and the Operator's own posts have no default). It only adds: a failure leaves the question as it was.
 func (h *BoardHandler) recordAskSubject(ctx context.Context, project string, msg *board.Message, goalID, taskID int64) {
-	explicit := goalID > 0 || taskID > 0
+	explicit := taskID > 0
 	if taskID == 0 && !strings.EqualFold(msg.SubscriberID, board.OperatorName) {
 		if id, goal, ok, err := h.bs.ClaimedTaskOf(ctx, project, msg.SubscriberID); err == nil && ok {
 			taskID = id
