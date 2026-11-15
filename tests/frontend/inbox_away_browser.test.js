@@ -1,6 +1,6 @@
 // #17537, walk 76: after ten minutes away the Inbox said nothing about what had happened. Coming back after five minutes or more, Needs you has one quiet line, "While you were away (12 min): 2 tasks
 // done, 1 goal done, 3 agents idle.": counts from GET /api/away (stubbed here) and the agents idle now from the live list, a Dismiss that stays dismissed, nothing when nothing happened, nothing when
-// the setting is off or the read fails, and the module is not loaded before Needs you is shown. The gap itself (window.__coralAway) is set by the page's input hook, pinned in fetch_share.test.mjs.
+// the setting is off or the read fails, and the module is not loaded before Needs you is shown. The gap is made by moving the page's clock (Date.now) forward and then pressing something: the module watches input itself.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -22,8 +22,10 @@ const { coralReady } = require('./helpers/wait');
                 window.fetch = (u, o) => { const s = String(u && u.url || u); if (/\\/api\\/away/.test(s)) { window.__asked.push(s); return Promise.resolve(new Response(JSON.stringify(window.__away || {}), { status: window.__awayStatus || 200, headers: { 'content-type': 'application/json' } })); } return R(u, o); }; }
             window.__away = ${JSON.stringify(away)}; window.__awayStatus = ${status};
             const st = await import(${S} + 'state.js'); st.state.liveSessions = ${JSON.stringify(agents)}; st.state.settings = Object.assign({}, st.state.settings, { inbox_away: ${JSON.stringify(setting)} });
-            window.__coralAway = Date.now() - ${minutes} * 60000 - Math.floor(Math.random() * 1000);
-            const m = await import(${S} + 'inbox_tab.js'); await m.selectInboxTab('needs'); document.dispatchEvent(new Event('pointerdown')); return true; })()`);
+            if (window.__off === undefined) { window.__off = 0; const RN = Date.now; Date.now = () => RN.call(Date) + window.__off; }
+            const m = await import(${S} + 'inbox_tab.js'); await m.selectInboxTab('needs'); await import(${S} + 'inbox_away.js'); await new Promise(r => setTimeout(r, 100)); // sleep-ok: the banner's own import of the module settles
+            document.dispatchEvent(new Event('pointerdown'));
+            window.__off += ${minutes} * 60000; document.dispatchEvent(new Event('pointerdown')); return true; })()`);
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
