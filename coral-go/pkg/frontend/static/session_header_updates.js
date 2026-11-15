@@ -5,12 +5,17 @@ import { syncQueuedFromRow, syncAnswerFromRow, paint as paintQueued } from './he
 import { syncSendsFromRow } from './pending_messages.js';
 import { _gitStateSummary, _repoBranch, _shortPath, presentationSessionState, goalAgeWords } from './session_state.js';
 import { startupSignedOut } from './signin_line.js';
-import { syncAgentKeys } from './agent_keys.js';
+import { importOnce } from './import_once.js';
 import { setText, setHidden, setTitle, setHtml, setDisplay, setClassName, setPill, setAttr } from './dom_write.js';
 import { modelName, sessionLevel } from './model_labels.js';
 import { sessionServer } from './server_base.js';
 import { escapeHtml, escapeAttr } from './utils.js';
 import { state } from './state.js';
+let keysUpdate = 0;
+function queueAgentKeys(row) {
+    const update = ++keysUpdate;
+    importOnce('./agent_keys.js').then(m => { if (update === keysUpdate) m.syncAgentKeys(row); }).catch(() => {});
+}
 
 export function updateSessionStatus(status) {
     const el = document.getElementById("session-status");
@@ -147,7 +152,7 @@ export function updateSessionBranch(branch, repoName, gitState, commit) {
 }
 
 export function updateWaitingIndicator(s) {
-    syncAgentKeys(s); // Stop in place of Send, and the strip that a question opens (#6802)
+    queueAgentKeys(s); // Stop in place of Send, and the strip that a question opens (#6802)
     syncWaitingNotice(s);
     syncNoticePause(s);
     syncSendsFromRow(s); // what another screen sent and the transcript does not have yet (#10467)
