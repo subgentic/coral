@@ -6,6 +6,7 @@ import { showConfirmModal } from './confirm_dialog.js';
 import { announceNotice } from './notifications.js';
 import { browserLocal } from './safe_storage.js';
 import { isPhoneLayout } from './phone_layout.js';
+import { importOnce } from './import_once.js';
 let readGeneration = 0;
 const HINT_KEY = 'coral-launch-notice'; // "p|57" or "d|73": this browser last saw the notice unseen, on a phone-sized or a wider screen, at that height (theme_init.js reserves its row before first paint)
 const hint = {
@@ -32,9 +33,14 @@ async function acknowledge(server, disclosure) {
     if (!response.ok || answer?.id !== disclosure.id || answer.seen !== true) throw new Error('Could not record that you have read this. Nothing was launched. Try again.');
     if (normServer(server) === 'local') { readGeneration++; document.getElementById('launch-disclosure-banner')?.remove(); shown = null; hint.clear(); hint.release(); }
 }
-export async function confirmLaunchDisclosure(server, disclosure) {
+export async function confirmLaunchDisclosure(server, disclosure, payload = null) {
     if (!valid(disclosure) || disclosure.seen !== false) { showToast('The launch disclosure could not be read. Nothing was launched.', true); return false; }
-    const accepted = await new Promise(resolve => showConfirmModal('Before starting: agents default to auto mode', disclosure.text, () => resolve(true), () => resolve(false), { danger: false, label: 'Continue launch', cancelLabel: 'Cancel' }));
+    // The members whose mode is their own are named (#16500); the two modules load now, not at start.
+    const hasOwn = payload && (payload.permission_mode || (payload.agents || []).some(a => a && a.permission_mode));
+    const { launchModeNotice } = await importOnce('./launch_disclosure_modes.js');
+    const customs = hasOwn ? await importOnce('./custom_modes.js') : null;
+    const { title, note } = launchModeNotice(payload, value => value === 'default' ? 'Default' : (customs?.customModeById(value)?.name || 'its own mode'));
+    const accepted = await new Promise(resolve => showConfirmModal(title, note ? `${disclosure.text} ${note}` : disclosure.text, () => resolve(true), () => resolve(false), { danger: false, label: 'Continue launch', cancelLabel: 'Cancel' }));
     if (!accepted) return false;
     try { await acknowledge(server, disclosure); return true; }
     catch (error) { showToast(error.message, true); return false; }

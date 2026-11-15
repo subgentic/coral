@@ -123,7 +123,7 @@ async function postLaunch(server, path, payload) {
     let result = await rawPostLaunch(server, path, snapshot);
     if (result.status === 409 && result.data?.code === 'launch_disclosure_required') {
         const { confirmLaunchDisclosure } = await importOnce('./launch_disclosure.js');
-        if (!(await confirmLaunchDisclosure(server, result.data.disclosure))) return { ok: false, cancelled: true, status: 0, data: {} };
+        if (!(await confirmLaunchDisclosure(server, result.data.disclosure, snapshot))) return { ok: false, cancelled: true, status: 0, data: {} };
         result = await rawPostLaunch(server, path, snapshot);
     }
     return result;
