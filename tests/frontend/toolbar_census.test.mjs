@@ -21,6 +21,7 @@ export const TOOLBARS = {
     'theme-save-bar': 'the theme save row',
 };
 export const NOT_A_TOOLBAR = {
+    'queue-tab-bar': 'the Queue tab\'s one line with its computer picker (queue_tab.css, #18093): a label and a menu above the table, not a row of controls',
     'team-pause-bar': 'the one status line under the team page header while the team is paused (team_pause.css, #15331): a sentence and a Resume button, not a row of controls',
     'av-bar': 'the version chip on the file viewer\'s one header row (artifact-comments.css, #12223): the previous and next buttons around the chip, not a row of its own',
     'cols-hidden-bar': 'the one quiet line over a table that says how many columns it left out to fit (data_table_hidden.css, #11943): a label and a menu, not a row of controls',
