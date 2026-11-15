@@ -33,11 +33,8 @@ export function switchNavTab(tab, opts = {}) {
     // A panel that loads on first use (lazy_panels.js) shows its view only if
     // nothing else was selected or shown while it loaded. Once loaded it shows at once.
     const generation = ++_navGeneration;
-    const showWhenLoaded = (load, fn) => {
-        if (load.module) { load.module[fn](); return; }
-        const views = viewChanges();
-        load().then(m => { if (generation === _navGeneration && views === viewChanges()) m[fn](); }, () => {});
-    };
+    const ifHere = (p, f, v = viewChanges()) => p.then(m => generation === _navGeneration && v === viewChanges() && f(m), () => {});
+    const showWhenLoaded = (load, fn) => load.module ? load.module[fn]() : ifHere(load(), m => m[fn]());
     // Clean up any active cost dashboard timer when leaving tokens tab
     stopCostDashboard();
     if (tab !== 'servers') importOnce('./servers_tab.js').then(m => m.leaveServersTab());
@@ -71,8 +68,7 @@ export function switchNavTab(tab, opts = {}) {
     } else if (tab === 'automations') {
         document.getElementById('scheduler-view')?.removeAttribute('data-phone-item'); // a phone opens Automations on its list
         showView('scheduler-view');
-        if (loadAutomations.module) loadAutomations.module.showAutomationsTab();
-        else { const views = viewChanges(); loadAutomations().then(m => { if (generation === _navGeneration && views === viewChanges()) m.showAutomationsTab(); }, () => {}); }
+        if (loadAutomations.module) loadAutomations.module.showAutomationsTab(); else ifHere(loadAutomations(), m => m.showAutomationsTab());
     } else if (tab === 'docs') {
         showWhenLoaded(loadDocs, 'showDocsTab');
     } else if (tab === 'servers') {
@@ -87,11 +83,11 @@ export function switchNavTab(tab, opts = {}) {
     } else if (tab === 'skills') {
         // The Skills Store: the Operator's list, the approval view and Import (skills_tab.js), local Coral only; it writes its own address.
         showView('skills-view');
-        importOnce('./skills_tab.js').then(m => m.showSkillsTab({ id: opts.skillId, folder: opts.skillFolder }));
+        ifHere(importOnce('./skills_tab.js'), m => m.showSkillsTab({ id: opts.skillId, folder: opts.skillFolder }));
     } else if (tab === 'queue') {
         // The resource queue of this computer or a linked one (queue_tab.js, #16030), local Coral only; it writes the address above.
         showView('queue-view');
-        importOnce('./queue_tab.js').then(m => m.showQueueTab());
+        ifHere(importOnce('./queue_tab.js'), m => m.showQueueTab());
     } else if (tab === 'artifacts') {
         // The hub's /artifacts page in a frame (artifacts_tab.js), the Inbox's way; the tab writes no address of its own.
         showView('artifacts-view');
@@ -103,11 +99,7 @@ export function switchNavTab(tab, opts = {}) {
         // have changed while another tab was active. Refresh it whenever the
         // user returns while preserving the current page and filters.
         loadHistoryFiltered();
-        if (state.currentSession && state.currentSession.type === 'history') {
-            showView('history-session-view');
-        } else {
-            showView('chats-empty-view');
-        }
+        showView(state.currentSession && state.currentSession.type === 'history' ? 'history-session-view' : 'chats-empty-view');
     } else if (tab === 'agents' && state.selectedTeam && !opts.fromHistory) {
         // The team page that was on screen when another tab was chosen is the Agents tab's page again, on the tab it was on (the Inbox and back no longer drops to Home, #10008)
         if (!document.getElementById('team-page-view')?.getClientRects().length) window.openTeamPage?.(state.selectedTeam, { tab: state.lastTeamTab, silent: true }); // the address was written above; a team page already on screen stays as it is (its tab is the one it is on, not the one it was last left on)
@@ -116,11 +108,7 @@ export function switchNavTab(tab, opts = {}) {
         showView('mobile-agent-list');
     } else if (tab === 'agents') {
         // Restore previously selected session or show welcome
-        if (state.currentSession && state.currentSession.type === 'live') {
-            showView('live-session-view');
-        } else {
-            showView('welcome-screen');
-        }
+        showView(state.currentSession && state.currentSession.type === 'live' ? 'live-session-view' : 'welcome-screen');
     }
     // A tab with groups that shows its empty page opens on its first group's table (sidebar_groups.js)
     if (tab === 'history') refreshGroupTable(tab); // Automations opens its folder itself (automations.js)
