@@ -29,8 +29,8 @@ var (
 )
 
 // headSHAFromText is the commit a task was submitted at: the hex word after "head" in the submit message or reason. Without a "head <sha>" it takes the first commit-looking word (7 to 40 hex digits holding a
-// letter and a digit; a plain word like "effaced" is not one) of the text, but only when that word is not named as someone else's commit ("base", "on", "parent", "stacked on", "main"...): a base taken for the
-// head would show the task as landed. "" when there is no safe one.
+// letter and a digit; a plain word like "effaced" is not one) that follows "at", "commit" or "sha" and nothing else (an allow list, #18302: "rebased <sha>" or "branched from <sha>" name someone else's commit, and a
+// base taken for the head would show the task as landed). "" when there is none.
 func headSHAFromText(texts ...string) string {
 	for _, t := range texts {
 		if m := unlandedHeadRe.FindStringSubmatch(t); m != nil && hasLetterAndDigit(m[1]) {
@@ -39,23 +39,22 @@ func headSHAFromText(texts ...string) string {
 	}
 	for _, t := range texts {
 		low := strings.ToLower(t)
-		for _, loc := range unlandedHexRe.FindAllStringIndex(low, 1) {
+		for _, loc := range unlandedHexRe.FindAllStringIndex(low, -1) {
 			w := low[loc[0]:loc[1]]
 			if !hasLetterAndDigit(w) {
 				continue
 			}
 			prev := strings.Fields(strings.Trim(low[:loc[0]], " \t(["))
-			if len(prev) > 0 && notTheHead[strings.Trim(prev[len(prev)-1], ":,;.([")] {
-				return ""
+			if len(prev) > 0 && headWords[strings.Trim(prev[len(prev)-1], ":,;.([")] {
+				return w
 			}
-			return w
 		}
 	}
 	return ""
 }
 
-// notTheHead are the words that put a commit's name in front of someone else's work: its base, its parent, what it is stacked on.
-var notTheHead = map[string]bool{"base": true, "on": true, "onto": true, "parent": true, "from": true, "main": true, "trial": true, "of": true, "after": true, "over": true}
+// headWords are the only words that put a commit's name in front of the work itself.
+var headWords = map[string]bool{"at": true, "commit": true, "sha": true}
 
 func hasLetterAndDigit(s string) bool {
 	return strings.Trim(s, "0123456789") != "" && strings.Trim(s, "abcdef") != ""

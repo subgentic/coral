@@ -24,11 +24,17 @@ func gitIn(t *testing.T, dir string, args ...string) string {
 func TestHeadSHAIsTheOneAfterHeadElseTheFirstRealHexWord(t *testing.T) {
 	assert.Equal(t, "593c17b672", headSHAFromText("", "Head 593c17b672 on qa-x (base 7ca240b821)"), "the base named after the head is not the head")
 	assert.Equal(t, "74da127ae8", headSHAFromText("Model column (head 74da127ae8, branch qa on 7ca240b821)"))
-	assert.Equal(t, "2010aa1b98", headSHAFromText("Download; 2010aa1b98, stacked on 5d2ffdd95f"), "no 'head': the first commit-looking word")
+	assert.Equal(t, "2010aa1b98", headSHAFromText("Download; at 2010aa1b98, stacked on 5d2ffdd95f"), "no 'head': the first commit-looking word after at, commit or sha")
+	assert.Equal(t, "2010aa1b98", headSHAFromText("fixed in commit 2010aa1b98"))
+	assert.Equal(t, "2010aa1b98", headSHAFromText("done, sha: 2010aa1b98"))
 	assert.Equal(t, "", headSHAFromText("it effaced a deadbeef-less word, 1234567 digits only", "review pending"), "a word with no letter, or no digit, is not a commit")
 	assert.Equal(t, "abc1234", headSHAFromText("", "Head: ABC1234."), "case and punctuation")
 	// a base is never taken for the head (#18255): it would show the task as landed
-	assert.Equal(t, "", headSHAFromText("ready on main 7ca240b821, fix at abc1234def"), "the first word is main's")
+	assert.Equal(t, "abc1234def", headSHAFromText("ready on main 7ca240b821, fix at abc1234def"), "main's word follows 'main', not an allow word")
+	// an allow list, not a block list (#18302): a word before the commit that is not at, commit or sha takes none
+	assert.Equal(t, "", headSHAFromText("rebased 7ca240b821"))
+	assert.Equal(t, "", headSHAFromText("branched at-ish 7ca240b821, then 2010aa1b98"))
+	assert.Equal(t, "", headSHAFromText("2010aa1b98 ready"), "a commit with no allow word before it")
 	assert.Equal(t, "", headSHAFromText("fixed (base 7ca240b821)"))
 	assert.Equal(t, "", headSHAFromText("", "based on 7ca240b821"))
 	assert.Equal(t, "", headSHAFromText("stacked on 5d2ffdd95f"))
