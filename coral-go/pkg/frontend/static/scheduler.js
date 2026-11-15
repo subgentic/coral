@@ -287,7 +287,7 @@ function renderRunsTable(page) {
             ...(!workflowHistory ? [{ key: 'conversation', label: 'Conversation', hideLabel: true, width: '6.5rem', when: r => !!r.session_id, cell: r => {
                 if (!r.session_id) return '';
                 // short, so the Result keeps its room at 390 (Started 9.5 rem, See result 6.5 rem); it is where a newcomer looks for what the run said (#10378)
-                const b = DT.link('See result'); b.setAttribute('aria-label', 'See what this run did: open its conversation'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = r.session_id; b.dataset.runStatus = r.status || ''; return b;
+                const b = DT.link('See result'); b.setAttribute('aria-label', 'See what this run did: open its conversation'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = r.session_id; return b;
             } }] : []),
         ],
     });
@@ -405,13 +405,7 @@ registerActions({
     'job-run-session': async (el, event) => {
         event.preventDefault();
         const sid = uuidOf(el.dataset.sessionId); if (!sid) return;
-        const jobId = selectedJobId, job = scheduledJobs.find(j => j.id === jobId);
-        const opened = await window.selectHistorySession(sid);
-        if (opened === false) (await importOnce('./history_note.js')).noChat(el.dataset.runStatus, () => el.click()); // #17186
-        const back = document.getElementById('history-back'); // the way back is the job it came from, not All chats (#10378)
-        if (opened !== false && job && back) { back.hidden = false; back.textContent = `\u2190 ${job.name}`; back.setAttribute('data-on-click', 'job-result-back'); back.dataset.jobId = String(jobId); }
-        const phoneBack = document.querySelector('.mobile-history-back'); // a phone shows its own back control, not that one (#10578)
-        if (opened !== false && job && phoneBack) { phoneBack.textContent = `\u2190 ${job.name}`; phoneBack.setAttribute('aria-label', `Back to ${job.name}`); phoneBack.setAttribute('data-on-click', 'job-result-back'); phoneBack.dataset.jobId = String(jobId); }
+        (await importOnce('./job_run_open.js')).openRun(sid, scheduledJobs.find(j => j.id === selectedJobId), () => el.click());
     },
     'job-result-back': el => { const id = Number(el.dataset.jobId); if (id) { window.switchNavTab?.('automations'); selectScheduledJob(id); } },
 });
