@@ -16,7 +16,7 @@ const { guardSettings } = require('./helpers/settings_guard');
     const S = `(window.__coralStatic || '/static/')`;
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD + require('./helpers/launch_notice_agent').PRELOAD });
         for (const [w, h, mobile, big, view] of [[390, 844, true, true, ''], [390, 844, true, true, 'automations'], [390, 844, true, true, 'settings'], [390, 844, true, true, 'analytics'], [390, 844, true, false, ''], [1280, 800, false, false, '']]) {
             const at = `${w} px${big ? ' at 200% text' : ''}${view ? ', ' + view : ''}: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
