@@ -16,7 +16,7 @@ export function askedRow(s) {
     if (s.waiting_for_input && waitIgnored(s) && !s.sleeping && !s.archived) return { ...s, waiting_summary: `Still waiting in its terminal. ${s.waiting_summary || "Open the agent to continue."}` };
     if (dialogDue(s) && !s.waiting_summary) { const d = dialogOf(s); return { ...s, waiting_summary: DIALOG_WORDS, waiting_kind: 'dialog', waiting_since: new Date(d.since).toISOString() }; } // at a dialog for the set minutes (#11430)
     const st = stalledOf(s); // the words are built here from the validated id, never taken from the payload (an older or linked Coral sends none, and a payload is untrusted)
-    if (st) return { ...s, waiting_summary: `Stopped with task #${st.id} in progress`, waiting_kind: 'stalled', waiting_since: st.since };
+    if (st) return { ...s, waiting_summary: `Idle with task #${st.id} in progress`, waiting_kind: 'stalled', waiting_since: st.since || undefined };
     const a = askedBefore(s);
     return a ? { ...s, waiting_summary: askedWords(a), waiting_kind: a.kind, waiting_since: a.at } : s;
 }

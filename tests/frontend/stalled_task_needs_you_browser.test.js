@@ -1,5 +1,5 @@
 // A stopped agent that holds an in-progress task is a Needs you item (#16921, walk 42 H1): the person pressed Stop on an agent that had claimed task #3, and for six minutes Needs you said 0, the team header said
-// All well and the task stayed In progress. The live row's stalled_task (the server's, after two minutes with no turn) makes the row an item "Stopped with task #3 in progress" with Restart (one tap) and
+// All well and the task stayed In progress. The live row's stalled_task (the server's, after two minutes with no turn) makes the row an item "Idle with task #3 in progress" with Restart (one tap) and
 // Reassign (opens the task), counts in the Inbox, makes the team header say "1 needs attention", and leaves with the row when the agent takes a turn. No Dismiss: nothing is waited on. 1280 and 390 px.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -26,7 +26,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const count = () => ev(`import(${S} + 'inbox_tab.js').then(m => m.waitingCount())`);
             assert.equal(await count(), 1, `${width}: a stopped agent holding a task counts in the Inbox`);
             const text = await ev(`document.querySelector('#group-table-view').textContent`);
-            assert.match(text, /Stopped with task #3 in progress/, `${width}: the row says what happened: ${text.slice(0, 200)}`);
+            assert.match(text, /Idle with task #3 in progress/, `${width}: the row says what happened: ${text.slice(0, 200)}`);
             assert.equal(await ev(`document.querySelector('#group-table-view .inbox-stalled-restart').textContent.trim()`), 'Restart');
             assert.equal(await ev(`document.querySelector('#group-table-view .inbox-stalled-restart').classList.contains('btn-primary')`), true, 'Restart is the one primary action');
             assert.match(await ev(`document.querySelector('#group-table-view .inbox-stalled-reassign').getAttribute('href')`), new RegExp(`/tasks/3$`), 'Reassign opens the task');

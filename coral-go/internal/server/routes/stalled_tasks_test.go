@@ -63,10 +63,62 @@ func TestAStoppedAgentHoldingATaskIsStalled(t *testing.T) {
 	rows := []map[string]any{{"session_id": qa, "display_name": "QA Engineer", "board_project": team, "stalled_task": h.stalls.field(qa)}}
 	items := needsYouAgentItems(rows, start)
 	require.Len(t, items, 1)
-	require.Equal(t, "Stopped with task #1 in progress", items[0].Line)
+	require.Equal(t, "Idle with task #1 in progress", items[0].Line)
 
 	_, err = h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "qa", SessionID: &qa, EventType: "tool_use"})
 	require.NoError(t, err)
 	h.stalledPass(ctx, start.Add(5*time.Minute), stalledTaskAfter)
 	require.Nil(t, h.stalls.field(qa), "it clears when the agent takes a turn")
+}
+
+// #17005: a restart forgets the table, not the board: the Orchestrator is not told again of an agent it was already told of; and a board with nobody idle on a task is read every 45 s, not every pass, yet a stall that begins on it is still seen.
+func TestAStalledNoticeSurvivesARestartAndAQuietBoardIsReadLess(t *testing.T) {
+	_, h, terminal, ss := setupSessionsTestServer(t)
+	h.SetBoardHandler(NewBoardHandler(h.bs))
+	ctx := context.Background()
+	team := "stall-restart"
+	reg := func(name, title string) string {
+		sid := uuid.NewString()
+		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentName: name, AgentType: "claude", BoardName: &team, WorkingDir: "/tmp"}))
+		_, err := h.bs.Subscribe(ctx, team, name, title, "claude-"+sid, nil, "all")
+		require.NoError(t, err)
+		terminal.addSession("claude-"+sid, "/tmp")
+		_, err = h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: name, SessionID: &sid, EventType: "stop"})
+		require.NoError(t, err)
+		return sid
+	}
+	reg("lead", "Orchestrator")
+	qa := reg("qa", "QA Engineer")
+	_, err := h.bs.CreateTask(ctx, team, "Check the calculator", "", "high", "lead", "qa")
+	require.NoError(t, err)
+	_, err = h.bs.ClaimTask(ctx, team, "qa")
+	require.NoError(t, err)
+	told := func() int {
+		msgs, err := h.bs.ListMessages(ctx, team, 100, 0, 0)
+		require.NoError(t, err)
+		n := 0
+		for _, m := range msgs {
+			if m.IsSystem && strings.Contains(m.Content, "@lead") && strings.Contains(m.Content, "task #1 in progress") {
+				n++
+			}
+		}
+		return n
+	}
+	start := time.Now()
+	h.stalledPass(ctx, start.Add(3*time.Minute), stalledTaskAfter)
+	require.NotNil(t, h.stalls.field(qa))
+	require.Equal(t, 1, told())
+
+	h.stalls = stalledWatch{} // the server restarted: the table is empty
+	h.stalledPass(ctx, start.Add(4*time.Minute), stalledTaskAfter)
+	require.NotNil(t, h.stalls.field(qa), "it is stalled again in the new table")
+	require.Equal(t, 1, told(), "but the board already says so: not said twice")
+
+	// the agent takes a turn: nobody is idle on the board, so it is left alone for 45 s
+	_, err = h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "qa", SessionID: &qa, EventType: "tool_use"})
+	require.NoError(t, err)
+	h.stalledPass(ctx, start.Add(5*time.Minute), stalledTaskAfter)
+	require.Nil(t, h.stalls.field(qa))
+	require.True(t, h.stalls.isQuiet(team, start.Add(5*time.Minute+20*time.Second)), "a board with nobody idle on a task is not read again for 45 s")
+	require.False(t, h.stalls.isQuiet(team, start.Add(5*time.Minute+50*time.Second)), "and is read again after that")
 }

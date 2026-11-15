@@ -105,7 +105,7 @@ func needsYouAgentItems(rows []map[string]any, now time.Time) []NeedsYouItem {
 					if at = needsYouTime(at); at == "" {
 						at = now.UTC().Format(time.RFC3339Nano)
 					}
-					out = append(out, NeedsYouItem{Kind: "agent", From: needsYouLine(name), Line: "Stopped with task #" + strconv.FormatInt(id, 10) + " in progress", Team: team, ID: "agent:" + sid, At: at, TaskID: id})
+					out = append(out, NeedsYouItem{Kind: "agent", From: needsYouLine(name), Line: "Idle with task #" + strconv.FormatInt(id, 10) + " in progress", Team: team, ID: "agent:" + sid, At: at, TaskID: id})
 				}
 			}
 			continue // a stalled agent is not waiting for input: its one row is this

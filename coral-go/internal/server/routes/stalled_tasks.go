@@ -16,7 +16,7 @@ import (
 // said All well and the Orchestrator wrote "QA is the one working, I'll wait". An agent that crashed, hit a limit or lost its laptop would have been waited on for ever the same way.
 //
 // An agent whose board status is task_idle (it holds a task in progress, has no turn going on, waits on nothing and asks for nothing) for stalledTaskAfter is STALLED. The pass keeps, per agent, the task and when
-// its turn ended; the live row serves it as stalled_task {team, task_id, title, since}, the dashboard turns it into a Needs you row ("Stopped with task #3 in progress": Restart, Reassign) and the team header
+// its turn ended; the live row serves it as stalled_task {team, task_id, title, since}, the dashboard turns it into a Needs you row ("Idle with task #3 in progress": Restart, Reassign) and the team header
 // counts it; the server's own needs-you read lists it too. The team's Orchestrator is told once, on the board, so it stops waiting. The row clears when the agent takes a turn or the task moves.
 
 // stalledTaskAfter is how long an agent holds an in-progress task with no turn before it is stalled.
@@ -39,7 +39,12 @@ type stalledTask struct {
 type stalledWatch struct {
 	mu   sync.Mutex
 	seen map[string]*stalledTask
+	// quietUntil: a board read with no task_idle agent on it is not read again until then (#17005): an agent needs stalledTaskAfter of idleness to be stalled, so a quiet board loses nothing by being read every 45 s instead of every 15.
+	quietUntil map[string]time.Time
 }
+
+// stalledQuietFor is how long a board with no task_idle agent is left alone.
+const stalledQuietFor = 45 * time.Second
 
 const stalledTitleMax = 80
 
@@ -90,6 +95,25 @@ func (w *stalledWatch) replace(found map[string]*stalledTask, read map[string]bo
 	return fresh
 }
 
+func (w *stalledWatch) isQuiet(project string, now time.Time) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return now.Before(w.quietUntil[project])
+}
+
+func (w *stalledWatch) setQuiet(project string, quiet bool, now time.Time) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.quietUntil == nil {
+		w.quietUntil = map[string]time.Time{}
+	}
+	if quiet {
+		w.quietUntil[project] = now.Add(stalledQuietFor)
+	} else {
+		delete(w.quietUntil, project)
+	}
+}
+
 // field is the live row's stalled_task: nil unless the agent is stalled.
 func (w *stalledWatch) field(sid string) any {
 	w.mu.Lock()
@@ -135,10 +159,14 @@ func (h *SessionsHandler) stalledPass(ctx context.Context, now time.Time, after 
 		for _, t := range tasks {
 			busy = busy || t.Status == "in_progress"
 		}
-		read[p.Project] = true
 		if !busy || (h.boardHandler != nil && h.boardHandler.IsPaused(p.Project)) {
+			read[p.Project] = true
 			continue // nothing in progress, or the person paused the team: nobody is expected to be taking turns
 		}
+		if h.stalls.isQuiet(p.Project, now) {
+			continue // read a moment ago with nobody idle on a task: what it held stays as it was (a stalled agent is never on a quiet board)
+		}
+		read[p.Project] = true
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "/", nil)
 		if err != nil {
 			continue
@@ -149,11 +177,14 @@ func (h *SessionsHandler) stalledPass(ctx context.Context, now time.Time, after 
 			continue
 		}
 		agents, _ := h.liveStatusAgents(ctx, snap, p.Project, false)
+		candidate := false
 		for _, a := range agents {
+			candidate = candidate || a.Availability == "task_idle"
 			if st := stalledOf(a, p.Project, now, after); st != nil {
 				found[st.SessionID] = st
 			}
 		}
+		h.stalls.setQuiet(p.Project, !candidate, now)
 	}
 	for _, st := range h.stalls.replace(found, read) {
 		h.tellOrchestratorStalled(ctx, st)
@@ -169,8 +200,12 @@ func (h *SessionsHandler) tellOrchestratorStalled(ctx context.Context, st *stall
 	if h.boardHandler == nil {
 		return
 	}
+	// A restart forgets what was said: the board remembers. A notice for this task and agent since it went idle is not said again (#17005).
+	if h.alreadyToldStalled(ctx, st) {
+		return
+	}
 	// Everything quoted went through noticeText (no mention can fire from a title or a name) and is posted by postNotice, the one place that posts defused text (the notice census).
-	line := fmt.Sprintf("@%s [Coral] %s is stopped with task #%d in progress (%s): no turn for 2 minutes. It is not working, so do not wait on it. The Operator has been asked to restart it; you can reassign the task.",
+	line := fmt.Sprintf("@%s [Coral] %s is idle with task #%d in progress (%s): no turn for 2 minutes. It may have been stopped, or be waiting on something it did not register, so ask it before you wait on it. It is on the Operator's Needs you with Restart and Reassign; you can reassign the task.",
 		orch, h.boardHandler.noticeText(ctx, st.Team, st.Agent), st.TaskID, quoteNotice(h.boardHandler.noticeText(ctx, st.Team, st.Title)))
 	h.boardHandler.postNotice(ctx, st.Team, line, "Coral")
 	h.stalls.mu.Lock()
@@ -178,4 +213,33 @@ func (h *SessionsHandler) tellOrchestratorStalled(ctx context.Context, st *stall
 		e.toldOrch = true
 	}
 	h.stalls.mu.Unlock()
+}
+
+// alreadyToldStalled is whether the board's recent messages hold this notice (this task, this agent) written after the agent went idle.
+func (h *SessionsHandler) alreadyToldStalled(ctx context.Context, st *stalledTask) bool {
+	msgs, err := h.bs.ListMessages(ctx, st.Team, 100, 0, 0)
+	if err != nil {
+		return false
+	}
+	name := h.boardHandler.noticeText(ctx, st.Team, st.Agent)
+	want := fmt.Sprintf("task #%d in progress", st.TaskID)
+	for _, m := range msgs {
+		if !m.IsSystem || !strings.Contains(m.Content, want) || !strings.Contains(m.Content, name+" is ") {
+			continue
+		}
+		if at, ok := boardMessageTime(m.CreatedAt); ok && !at.Before(st.Since) {
+			return true
+		}
+	}
+	return false
+}
+
+// boardMessageTime reads a message's created_at, RFC3339 or the store's "2006-01-02 15:04:05" (UTC).
+func boardMessageTime(s string) (time.Time, bool) {
+	for _, layout := range []string{time.RFC3339Nano, "2006-01-02 15:04:05", "2006-01-02T15:04:05"} {
+		if t, err := time.ParseInLocation(layout, s, time.UTC); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
 }
