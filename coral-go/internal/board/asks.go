@@ -650,3 +650,39 @@ func (s *Store) ReopenAskAnswer(ctx context.Context, project string, messageID i
 	_, err := s.db.ExecContext(ctx, `INSERT OR REPLACE INTO board_ask_reopened (message_id, project, after_id, reopened_at) VALUES (?, ?, ?, ?)`, messageID, project, newest, nowUTC())
 	return err
 }
+
+// CloseOvertakenAsks closes every open ask linked to the given task or goal (#17338):
+// when a task completes or a goal is created, the questions about it are overtaken by events.
+func (s *Store) CloseOvertakenAsks(ctx context.Context, project string, taskID, goalID int64, note string) (int, error) {
+	if taskID == 0 && goalID == 0 {
+		return 0, nil
+	}
+	var cond string
+	var args []any
+	if taskID > 0 && goalID > 0 {
+		cond = "(task_id = ? OR goal_id = ?)"
+		args = append(args, taskID, goalID)
+	} else if taskID > 0 {
+		cond = "task_id = ?"
+		args = append(args, taskID)
+	} else {
+		cond = "goal_id = ?"
+		args = append(args, goalID)
+	}
+	args = append(args, project)
+	var ids []int64
+	if err := s.reader().SelectContext(ctx, &ids,
+		`SELECT a.message_id FROM board_ask_subjects a
+		 WHERE a.`+cond+` AND a.project = ?
+		 AND a.message_id NOT IN (SELECT message_id FROM board_ask_closed WHERE project = a.project)`,
+		args...); err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, id := range ids {
+		if err := s.CloseAsk(ctx, project, id, "system", note); err == nil {
+			n++
+		}
+	}
+	return n, nil
+}

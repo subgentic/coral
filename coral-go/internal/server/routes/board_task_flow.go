@@ -179,6 +179,9 @@ func (h *BoardHandler) afterTaskCompleted(project, subscriberID string, complete
 		h.postNotice(ctx, project, notification)
 		h.notifyOrchestratorsTaskCompleted(ctx, project, subscriberID, completedTask, by)
 
+		// Close asks overtaken by this task's completion (#17338).
+		h.bs.CloseOvertakenAsks(ctx, project, completedTask.ID, 0, fmt.Sprintf("Overtaken: task #%d completed", completedTask.ID))
+
 		// Resolve downstream blocked tasks
 		h.notifyUnblockedTasks(ctx, project, completedTask.ID)
 
