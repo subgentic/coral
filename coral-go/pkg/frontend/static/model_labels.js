@@ -68,6 +68,6 @@ export const levelName = l => LEVEL_NAMES[l] || l;
 /** The thinking (effort) level a row has on record: { name, requested } or null. The level the newest turn ran at (thinking_actual, from the transcript) when there is one, else the level the
  *  agent was started with (thinking), marked requested: the same two fields and the same order as the chat bar's thinking chip. Nothing recorded is null, never a word for it. */
 export function sessionLevel(s) {
-    const lvl = s && (s.thinking_actual || s.thinking);
-    return lvl ? { name: levelName(lvl) + (s.thinking ? '' : ' (not set)'), requested: !s.thinking_actual } : null; // none asked for: the CLI's own default, named as the chat bar's chip does (#17925)
+    const lvl = s.thinking_actual || s.thinking;
+    return lvl ? { name: levelName(lvl) + (s.thinking ? '' : ' (auto)'), requested: !s.thinking_actual } : null; // none asked for: the CLI's own default, named as the chat bar's chip does (#17925)
 }

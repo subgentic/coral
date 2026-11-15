@@ -112,7 +112,7 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(th.state, '');
             // #17802: the wizard said Default thinking (none asked for) and the CLI ran at its own default: the chip says so, it does not read as a level somebody chose
             await feed('ch-a-id', { agent_type: 'claude', model: OPUS.value, thinking_actual: 'medium', thinking: '', model_switch: null });
-            await waitFor(`document.getElementById('thinking-chip-text').textContent === 'Medium (not set)'`, 'the CLI default level, named as the default', 4000);
+            await waitFor(`document.getElementById('thinking-chip-text').textContent === 'Medium (auto)'`, 'the CLI default level, named as the default', 4000);
             await feed('ch-a-id', { agent_type: 'claude', model: OPUS.value, thinking_actual: 'medium', thinking: 'medium', model_switch: null });
             await waitFor(`document.getElementById('thinking-chip-text').textContent === 'Medium'`, 'a level that was asked for stays plain', 4000);
             await feed('ch-a-id', { agent_type: 'claude', model: OPUS.value, thinking_actual: null, thinking: 'low', model_switch: null });
