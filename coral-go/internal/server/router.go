@@ -270,6 +270,7 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	s.sysHandler = sysHandler
 	sessHandler.SetPiModelCheck(sysHandler.PiModelProblem) // a Pi model that Pi does not list is said so at launch (#11105)
 	sysHandler.SetTerminal(s.terminal)
+	sysHandler.SetSigninTerminal(sessHandler.LaunchSigninTerminal)
 	if s.boardStore != nil {
 		sysHandler.SetBoardAuthor(func(ctx context.Context, project string, id int64) (string, bool, error) {
 			m, err := s.boardStore.GetMessageByID(ctx, project, id)

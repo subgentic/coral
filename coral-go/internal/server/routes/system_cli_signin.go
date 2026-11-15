@@ -8,6 +8,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/subgentic/coral/internal/agentsignin"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/executil"
+	"github.com/subgentic/coral/internal/opencode"
 )
 
 // signinLoginArgs are the fixed arguments each supported agent type's CLI takes to start its interactive login. Only agent types with a known
@@ -23,6 +25,10 @@ import (
 var signinLoginArgs = map[string][]string{
 	"claude": {"auth", "login"},
 }
+
+// signinTerminalTypes sign in through a terminal the person sees, because their login asks questions (OpenCode's `auth login` picks a provider, #16716): the server builds the command from its own
+// fixed shape (agent.OpencodeLoginCommand with Coral's own XDG folder) and types it into a plain Coral terminal; nothing the caller sends reaches it.
+var signinTerminalTypes = map[string]bool{"opencode": true}
 
 // signinStartGap is how often the same agent type's login may be started: once per gap, so a double-click or a script does not open two browsers.
 const signinStartGap = 10 * time.Second
@@ -56,6 +62,10 @@ func (h *SystemHandler) CLISignIn(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "local_only", "sign-in can only be started from this computer's dashboard")
 		return
 	}
+	if signinTerminalTypes[agentType] {
+		h.signinInTerminal(w, r, agentType)
+		return
+	}
 	args, ok := signinLoginArgs[agentType]
 	if !ok {
 		writeJSON(w, http.StatusOK, map[string]any{"started": false, "reason": "not_supported", "message": agentType + " does not have a supported sign-in command"})
@@ -87,4 +97,39 @@ func (h *SystemHandler) CLISignIn(w http.ResponseWriter, r *http.Request) {
 	go cmd.Wait()
 	agentsignin.Forget(agentType, bin)
 	writeJSON(w, http.StatusOK, map[string]any{"started": true})
+}
+
+// signinInTerminal opens a Coral terminal that runs the type's login command (#16716). The folder is Coral's own, private one for that CLI; the command is built here.
+func (h *SystemHandler) signinInTerminal(w http.ResponseWriter, r *http.Request, agentType string) {
+	if h.signinTerminal == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"started": false, "reason": "error", "message": "a terminal can't be opened here"})
+		return
+	}
+	if !claimSigninStart(agentType) {
+		writeJSON(w, http.StatusOK, map[string]any{"started": false, "reason": "too_soon", "message": "sign-in was started a moment ago; use the terminal that opened, then Check"})
+		return
+	}
+	settings, err := h.ss.GetSettingsForCLI(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"started": false, "reason": "error", "message": "could not read settings"})
+		return
+	}
+	bin, err := agent.FindCLI(settings, agentType)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"started": false, "reason": "cli_not_found", "message": "the " + agentType + " CLI was not found; install it first"})
+		return
+	}
+	dir := filepath.Join(h.cfg.CoralDir(), agentType)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"started": false, "reason": "error", "message": "could not make the sign-in folder"})
+		return
+	}
+	command := agent.OpencodeLoginCommand(bin, opencode.XDGVars(dir))
+	reply, err := h.signinTerminal(r.Context(), dir, command)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"started": false, "reason": "error", "message": "could not open the terminal"})
+		return
+	}
+	agentsignin.Forget(agentType, bin)
+	writeJSON(w, http.StatusOK, map[string]any{"started": true, "terminal": true, "session_name": reply["session_name"], "session_id": reply["session_id"]})
 }

@@ -64,12 +64,21 @@ const GROUPED = `(() => { const R = window.fetch; window.fetch = (u, o = {}) => 
         await waitFor(`!!${box} && !${box}.hidden && ${box}.getClientRects().length > 0`, 'the sign-in block in the open OpenCode card', 8000);
         const sb = await ev(`(() => { const b = ${box}; return { lead: b.querySelector('.provider-signin-lead').textContent, cmd: b.querySelector('.provider-signin-cmd').textContent, markup: !!b.querySelector('.provider-signin-cmd b'), buttons: [...b.querySelectorAll('button')].map(x => x.textContent), elsewhereShown: !b.querySelector('.provider-signin-elsewhere').hidden }; })()`);
         assert.equal(sb.lead, "OpenCode isn't signed in to any provider on this computer.");
+        { const shot = require('./helpers/scene_shots')(Page, 'opencode-signin'); // evidence for the card at the two widths (a no-op unless CORAL_SCREENSHOT_DIR is set)
+          for (const [w, h, mobile] of [[1440, 900, false], [390, 844, true]]) { await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await ev(`${box}.scrollIntoView({ block: 'center' }); true`); await shot(String(w)); }
+          await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }); }
         assert.equal(sb.elsewhereShown, false, 'the sentence for another computer is not shown beside a command');
         assert.equal(sb.cmd, CMD, 'the command is shown as the server gave it'); assert.equal(sb.markup, false, 'and as text: a tag in it is not markup');
-        assert.deepEqual(sb.buttons, ['Copy command', 'Check again']);
-        await ev(`${box}.querySelectorAll('button')[0].click(); true`); await waitFor(`window.__copied !== null`, 'the copy', 4000);
+        assert.deepEqual(sb.buttons, ['Sign in', 'Check again', 'Copy command'], 'Sign in first (#16716), the copyable command is the Advanced way');
+        const adv = await ev(`(() => { const d = ${box}.querySelector('details.provider-signin-adv'); return { summary: d.querySelector('summary').textContent, open: d.open, copyInside: !!d.querySelector('.provider-signin-copy'), cmdInside: !!d.querySelector('.provider-signin-cmd') }; })()`);
+        assert.deepEqual(adv, { summary: 'Advanced: sign in from your own terminal', open: false, copyInside: true, cmdInside: true }, 'the command and Copy sit in a closed Advanced fold');
+        await ev(`window.__posts = []; const f = window.fetch; window.fetch = (u, o) => { const url = new URL(u, location.href); if (url.pathname === '/api/system/cli-signin') { window.__posts.push({ method: o && o.method, q: url.search, body: o && o.body }); return Promise.resolve(new Response(JSON.stringify({ started: true, terminal: true, session_name: 'terminal-x', session_id: 'x' }), { status: 200, headers: { 'Content-Type': 'application/json' } })); } return f(u, o); }; true`);
+        await ev(`${box}.querySelector('.provider-signin-go').click(); true`); await waitFor(`window.__posts.length === 1`, 'the Sign in POST', 4000);
+        assert.deepEqual(await ev(`window.__posts[0]`), { method: 'POST', q: '?type=opencode' }, 'only the type is sent: the server builds the command');
+        await waitFor(`/Finish signing in in the terminal/.test(${box}.querySelector('.provider-signin-status').textContent)`, 'the line that says what to do next', 4000);
+        await ev(`${box}.querySelector('.provider-signin-copy').click(); true`); await waitFor(`window.__copied !== null`, 'the copy', 4000);
         assert.equal(await ev(`window.__copied`), CMD, 'Copy sends exactly the command');
-        await ev(`window.__oc.signed_in = true; ${box}.querySelectorAll('button')[1].click(); true`);
+        await ev(`window.__oc.signed_in = true; [...${box}.querySelectorAll('button')].find(x => x.textContent === 'Check again').click(); true`);
         await waitFor(`${box}.hidden`, 'the block gone after Check again finds it signed in', 6000);
         // the shape check (what the card will show or copy)
         const shape = await ev(`import((window.__coralStatic || '/static/') + 'launch_provider_cards.js').then(m => ({ ok: m.signinCommandIsSafe(${JSON.stringify(CMD)}), bin: m.signinCommandIsSafe("export XDG_CONFIG_HOME='/a' && export XDG_DATA_HOME='/a' && export XDG_CACHE_HOME='/a' && export XDG_STATE_HOME='/a' && '/opt/my tools/opencode' auth login"), ps: m.signinCommandIsSafe("$env:XDG_CONFIG_HOME='C:\\a b'; $env:XDG_DATA_HOME='C:\\a b'; $env:XDG_CACHE_HOME='C:\\a b'; $env:XDG_STATE_HOME='C:\\a b'; opencode auth login"),
@@ -90,8 +99,8 @@ const GROUPED = `(() => { const R = window.fetch; window.fetch = (u, o = {}) => 
             await ev(`document.querySelector('#launch-agent-pick input[value="opencode"]').click(); true`);
             const blk = `document.querySelector('.provider-card-body[data-type="opencode"]:not([hidden]) .provider-signin')`;
             await waitFor(`!!${blk} && !${blk}.hidden`, `${what}: the sign-in block`, 8000);
-            const r = await ev(`(() => { const b = ${blk}; const vis = sel => { const e = b.querySelector(sel); return !!e && !e.hidden && e.getClientRects().length > 0; }; return { lead: b.querySelector('.provider-signin-lead').textContent, elsewhere: vis('.provider-signin-elsewhere'), cmd: vis('.provider-signin-cmd'), copy: vis('.provider-signin-copy'), text: b.textContent }; })()`);
-            assert.equal(r.elsewhere, true, `${what}: the sentence is shown`); assert.equal(r.cmd || r.copy, false, `${what}: no command and no Copy`);
+            const r = await ev(`(() => { const b = ${blk}; const vis = sel => { const e = b.querySelector(sel); return !!e && !e.hidden && e.getClientRects().length > 0; }; return { lead: b.querySelector('.provider-signin-lead').textContent, elsewhere: vis('.provider-signin-elsewhere'), cmd: vis('.provider-signin-cmd'), copy: vis('.provider-signin-copy'), go: vis('.provider-signin-go'), adv: vis('.provider-signin-adv'), text: b.textContent }; })()`);
+            assert.equal(r.elsewhere, true, `${what}: the sentence is shown`); assert.equal(r.cmd || r.copy || r.go || r.adv, false, `${what}: no command, no Copy, no Sign in button`);
             assert.match(r.text, /Sign in on the computer that runs this Coral\./); assert.ok(!/curl evil|XDG_DATA_HOME/.test(r.text), `${what}: the command's text is nowhere in the block: ${r.text}`);
             assert.equal(r.lead, "OpenCode isn't signed in to any provider.", `${what}: the lead does not say "on this computer"`);
         }

@@ -79,7 +79,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
         const box = group.querySelector(`.provider-card-body[data-type="${signin.type}"] .provider-signin`); if (!box) return;
         const on = signin.signedIn === false, withCmd = !!signin.command;
         if (withCmd) box.querySelector('.provider-signin-cmd').textContent = signin.command;
-        for (const e of box.querySelectorAll('.provider-signin-how, .provider-signin-cmd, .provider-signin-copy')) if (e.hidden === withCmd) e.hidden = !withCmd;
+        for (const e of box.querySelectorAll('.provider-signin-go, .provider-signin-adv')) if (e.hidden === withCmd) e.hidden = !withCmd;
         const elsewhere = box.querySelector('.provider-signin-elsewhere'); if (elsewhere.hidden !== withCmd) elsewhere.hidden = withCmd;
         box.querySelector('.provider-signin-lead').textContent = `${signin.label} isn't signed in to any provider${withCmd ? ' on this computer' : ''}.`;
         if (box.hidden === on) box.hidden = !on;
@@ -89,15 +89,28 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
         const icon = el('span', 'material-icons', 'info'); icon.setAttribute('aria-hidden', 'true');
         const body = el('div', 'provider-signin-body');
         const lead = el('p', 'provider-signin-lead', `${signin.label} isn't signed in to any provider.`);
-        const how = el('p', 'provider-signin-how', 'Run this in a terminal, then press Check again.');
         const elsewhere = el('p', 'provider-signin-elsewhere', 'Sign in on the computer that runs this Coral.');
-        const cmd = el('code', 'provider-signin-cmd');
-        const row = el('div', 'provider-signin-actions');
-        const copy = el('button', 'btn provider-signin-copy', 'Copy command'); copy.type = 'button';
-        copy.addEventListener('click', async () => { const ok = await copyText(signin.command); copy.textContent = ok ? 'Copied' : 'Copy failed'; setTimeout(() => { copy.textContent = 'Copy command'; }, 2000); });
+        const status = el('p', 'provider-signin-status'); status.setAttribute('role', 'status');
+        const go = el('button', 'btn btn-primary provider-signin-go', 'Sign in'); go.type = 'button'; go.hidden = true; // opens a terminal on this computer that runs the login (the server builds the command, #16716)
+        go.addEventListener('click', async () => {
+            go.disabled = true; status.textContent = 'Opening a terminal\u2026';
+            try {
+                const r = await serverFetch(server, `/api/system/cli-signin?type=${signin.type}`, { method: 'POST', cache: 'no-store' });
+                const j = r.ok ? await r.json() : {};
+                status.textContent = j.started ? 'Finish signing in in the terminal that opened, then press Check again.' : j.message || 'Could not open a terminal.';
+                if (j.started && j.session_name) (await importOnce('./sessions.js')).selectLiveSession(j.session_name, 'terminal', j.session_id, server).catch(() => {}); // the terminal is open either way; the line above says so
+            } catch { status.textContent = 'Could not open a terminal.'; }
+            go.disabled = false;
+        });
         const again = el('button', 'btn', 'Check again'); again.type = 'button';
         again.addEventListener('click', async () => { again.disabled = true; again.textContent = 'Checking\u2026'; await askSignin(); again.disabled = false; again.textContent = 'Check again'; });
-        row.append(copy, again); body.append(lead, how, elsewhere, cmd, row); box.append(icon, body);
+        const adv = el('details', 'provider-signin-adv'); adv.hidden = true;
+        adv.append(el('summary', '', 'Advanced: sign in from your own terminal'), el('p', 'provider-signin-how', 'Run this in a terminal, then press Check again.'), el('code', 'provider-signin-cmd'));
+        const copy = el('button', 'btn provider-signin-copy', 'Copy command'); copy.type = 'button';
+        copy.addEventListener('click', async () => { const ok = await copyText(signin.command); copy.textContent = ok ? 'Copied' : 'Copy failed'; setTimeout(() => { copy.textContent = 'Copy command'; }, 2000); });
+        adv.append(copy);
+        const row = el('div', 'provider-signin-actions'); row.append(go, again);
+        body.append(lead, elsewhere, row, status, adv); box.append(icon, body);
         return box;
     }
 
