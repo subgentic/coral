@@ -26,6 +26,7 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 		Artifacts         []board.TaskArtifact `json:"artifacts"`
 		ExpectedRevision  *int                 `json:"expected_revision,omitempty"`
 		CandidateRevision string               `json:"candidate_revision,omitempty"`
+		HeadSHA           string               `json:"head_sha,omitempty"`  // the commit at the head of the author's branch (#17643)
 		Areas             []string             `json:"areas,omitempty"`     // the review's areas (#8957); absent: from paths when they are listed
 		Reviewers         int                  `json:"reviewers,omitempty"` // 1 (the default) or 2
 		Paths             []string             `json:"paths,omitempty"`     // the files the change touches, when the caller knows them
@@ -43,6 +44,10 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if h.refuseShortArtifactRefs(w, r, &body.Message) || h.refuseShortArtifactRefs(w, r, &body.Reason) { // #9841
+		return
+	}
+	if !board.ValidHead(body.HeadSHA) {
+		errBadRequest(w, "head_sha must be a commit id: 7 to 64 hex digits")
 		return
 	}
 	areas := body.Areas
@@ -66,6 +71,10 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 		} else {
 			errTaskStore(w, err)
 		}
+		return
+	}
+	if err := h.bs.SetSubmittedHead(r.Context(), project, id, body.HeadSHA); err != nil {
+		errTaskStore(w, err)
 		return
 	}
 	// #3725: the task goes to the team's orchestrator, who completes or delegates it; the
@@ -95,6 +104,9 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 	candidate := body.CandidateRevision
 	if candidate == "" {
 		candidate = fmt.Sprintf("%d artifacts", len(body.Artifacts))
+	}
+	if head := strings.ToLower(strings.TrimSpace(body.HeadSHA)); head != "" {
+		candidate += ", head " + board.ShortHead(head) // the commit every reviewer is to read (#17643)
 	}
 	if reopened != nil {
 		// Resubmitted after a rejection (#3787): its reviewers review the new revision, with no

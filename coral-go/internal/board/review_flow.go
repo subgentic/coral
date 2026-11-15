@@ -65,6 +65,8 @@ type ReviewerState struct {
 	State                 string             `json:"state"` // pending, approved or rejected
 	Note                  string             `json:"note,omitempty"`
 	At                    string             `json:"at,omitempty"`
+	// Head: the commit the round was of when this reviewer gave their verdict (#17643), so an approval says which commit it covers.
+	Head string `json:"head,omitempty"`
 }
 
 // ErrNoOrchestrator: the team has no active orchestrator to review the task.
@@ -193,7 +195,7 @@ func reopenReviews(ctx context.Context, tx *sqlx.Tx, project string, id int64, w
 	}
 	round := ReviewRound{Round: last.Round + 1, DelegatedBy: "resubmitted", DelegatedAt: nowUTC()}
 	for _, r := range last.Reviewers {
-		body := reviewTaskBody(id, title, w.OriginalAuthor, round.Round)
+		body := reviewTaskBody(id, title, w.OriginalAuthor, round.Round, headOf(w))
 		if _, err := tx.ExecContext(ctx, `UPDATE board_tasks SET status=CASE WHEN status IN ('pending','in_progress') THEN status ELSE 'pending' END,
 			completed_by=NULL, completion_message=NULL, completed_at=NULL, body=?, edited_at=? WHERE id=? AND board_id=?`, body, nowUTC(), r.ReviewTaskID, project); err != nil {
 			return nil, err
@@ -213,8 +215,11 @@ func reopenReviews(ctx context.Context, tx *sqlx.Tx, project string, id int64, w
 }
 
 // reviewTaskBody is a review task's text for a round.
-func reviewTaskBody(id int64, title, author string, round int) string {
-	return fmt.Sprintf("Review task #%d, %q, for %s (round %d).\nRead it: coral-board task detail %d\nThen: coral-board task approve %d --round %d [--note \"...\"], or coral-board task reject %d --round %d --note \"why\".",
+func reviewTaskBody(id int64, title, author string, round int, head string) string {
+	if head != "" {
+		head = "\nSubmitted head: " + ShortHead(head) + " (review this commit)."
+	}
+	return fmt.Sprintf("Review task #%d, %q, for %s (round %d)."+head+"\nRead it: coral-board task detail %d\nThen: coral-board task approve %d --round %d [--note \"...\"], or coral-board task reject %d --round %d --note \"why\".",
 		id, title, author, round, id, id, round, id, round)
 }
 
@@ -287,7 +292,7 @@ func (s *Store) DelegateReview(ctx context.Context, project string, id int64, ac
 			round.Reviewers = append(round.Reviewers, prev) // kept, with any verdict given
 			continue
 		}
-		rt, err := s.CreateTaskWithOpts(ctx, project, fmt.Sprintf("Review #%d: %s", id, task.Title), reviewTaskBody(id, task.Title, w.OriginalAuthor, round.Round), task.Priority, actor,
+		rt, err := s.CreateTaskWithOpts(ctx, project, fmt.Sprintf("Review #%d: %s", id, task.Title), reviewTaskBody(id, task.Title, w.OriginalAuthor, round.Round, headOf(&w)), task.Priority, actor,
 			&CreateTaskOpts{Workflow: TaskWorkflow{ReviewOf: id, ReviewRound: round.Round}, reviewTask: true}, r)
 		if err != nil {
 			return nil, nil, err
@@ -411,7 +416,11 @@ func (s *Store) reviewVerdictAt(ctx context.Context, project string, id int64, a
 		me.TaskVersion = textVersions[0]
 	}
 	me.State, me.Note, me.At = verdict, note, now
+	me.Head = headOf(&w)
 	msg := fmt.Sprintf("%s task #%d", strings.ToUpper(verdict[:1])+verdict[1:], id)
+	if me.Head != "" {
+		msg += " at " + ShortHead(me.Head)
+	}
 	if note != "" {
 		msg += ": " + note
 	}

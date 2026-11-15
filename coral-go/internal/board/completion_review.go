@@ -3,6 +3,7 @@ package board
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -11,17 +12,19 @@ import (
 // CompletionReview preserves an unaccepted candidate independently of the final
 // workflow result. Recording or releasing it never resolves dependencies.
 type CompletionReview struct {
-	SubmittedBy       string                 `json:"submitted_by"`
-	SubmittedAt       string                 `json:"submitted_at"`
-	Message           string                 `json:"message"`
-	ProposedOutcome   string                 `json:"proposed_outcome"`
-	Artifacts         []TaskArtifact         `json:"artifacts,omitempty"`
-	Reason            string                 `json:"reason"`
-	CandidateRevision string                 `json:"candidate_revision,omitempty"`
-	GateResults       []CompletionGateResult `json:"gate_results,omitempty"`
-	ReleasedBy        string                 `json:"released_by,omitempty"`
-	ReleasedAt        string                 `json:"released_at,omitempty"`
-	ReleaseReason     string                 `json:"release_reason,omitempty"`
+	SubmittedBy       string         `json:"submitted_by"`
+	SubmittedAt       string         `json:"submitted_at"`
+	Message           string         `json:"message"`
+	ProposedOutcome   string         `json:"proposed_outcome"`
+	Artifacts         []TaskArtifact `json:"artifacts,omitempty"`
+	Reason            string         `json:"reason"`
+	CandidateRevision string         `json:"candidate_revision,omitempty"`
+	// HeadSHA: the commit at the head of the author's branch when it was submitted (#17643), so the review brief and the reviewers name the same commit. Not the candidate revision: no gate reads it.
+	HeadSHA       string                 `json:"head_sha,omitempty"`
+	GateResults   []CompletionGateResult `json:"gate_results,omitempty"`
+	ReleasedBy    string                 `json:"released_by,omitempty"`
+	ReleasedAt    string                 `json:"released_at,omitempty"`
+	ReleaseReason string                 `json:"release_reason,omitempty"`
 }
 
 // RequireTaskReviewer uses the board's registered privilege, never an arbitrary
@@ -173,4 +176,57 @@ func (s *Store) ReleaseCompletionReview(ctx context.Context, project string, id 
 	}
 	s.NoteArtifactsChanged(project) // what the team's artifact list shows of this task changed (#13522: the kept list is built again when the revision moves)
 	return s.GetTask(ctx, project, id)
+}
+
+var headSHAPattern = regexp.MustCompile(`^[0-9a-f]{7,64}$`)
+
+// ValidHead is whether head is empty (none named) or a commit id: 7 to 64 hex digits.
+func ValidHead(head string) bool {
+	head = strings.ToLower(strings.TrimSpace(head))
+	return head == "" || headSHAPattern.MatchString(head)
+}
+
+// ShortHead is a head commit as it is written in a notice: its first 12 characters.
+func ShortHead(sha string) string {
+	if len(sha) > 12 {
+		return sha[:12]
+	}
+	return sha
+}
+
+// SetSubmittedHead records the commit the author submitted (#17643) on the task's completion review, which submit-review has just written. A value that is not a commit id
+// (7 to 64 hex digits) is refused, so a brief never carries free text as a commit.
+func (s *Store) SetSubmittedHead(ctx context.Context, project string, id int64, head string) error {
+	head = strings.ToLower(strings.TrimSpace(head))
+	if head == "" {
+		return nil
+	}
+	if !headSHAPattern.MatchString(head) {
+		return fmt.Errorf("the head commit must be 7 to 64 hex digits")
+	}
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	w, err := loadWorkflow(ctx, tx, id)
+	if err != nil {
+		return err
+	}
+	if w.CompletionReview == nil {
+		return nil
+	}
+	w.CompletionReview.HeadSHA = head
+	if err := saveWorkflow(ctx, tx, id, w); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// headOf is the commit the task's current review is of ("" when none was named).
+func headOf(w *TaskWorkflow) string {
+	if w == nil || w.CompletionReview == nil {
+		return ""
+	}
+	return w.CompletionReview.HeadSHA
 }

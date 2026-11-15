@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -9,9 +10,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/subgentic/coral/internal/clierr"
 	"github.com/subgentic/coral/internal/clihelp"
@@ -47,6 +50,7 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 	outcome := fs.String("outcome", "success", "Proposed outcome: success or failed")
 	manifest := fs.String("artifacts", "", "Candidate artifact manifest")
 	candidateRevision := fs.String("candidate-revision", "", "Exact source/build revision represented by candidate evidence")
+	sha := fs.String("sha", "", "The commit being submitted (submit-review): default is HEAD of the git checkout you run this in")
 	areas := fs.String("areas", "", "The review's areas, comma-separated (submit-review): who may take it from the review pool")
 	reviewers := fs.Int("reviewers", 0, "How many reviewers the review wants, 1 or 2 (submit-review)")
 	clihelp.ParseFlags(fs, args[1:], func() string { return commandUsage(os.Args[1], os.Args[2:]) })
@@ -58,6 +62,20 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 	body := map[string]any{"subscriber_id": resolveSubscriberID(), "reason": *reason, "message": *message, "outcome": *outcome}
 	if action != "submit-review" && (*areas != "" || *reviewers != 0) {
 		fmt.Fprintln(os.Stderr, "--areas and --reviewers belong to submit-review")
+		os.Exit(2) // usage
+	}
+	headFrom := ""
+	if action == "submit-review" {
+		head := strings.TrimSpace(*sha)
+		if head == "" {
+			head = currentGitHead()
+			headFrom = " (HEAD of this checkout; name another commit with --sha)"
+		}
+		if head != "" {
+			body["head_sha"] = head
+		}
+	} else if *sha != "" {
+		fmt.Fprintln(os.Stderr, "--sha belongs to submit-review")
 		os.Exit(2) // usage
 	}
 	if *areas != "" {
@@ -92,6 +110,11 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 		body["artifacts"] = artifacts
 	}
 	data, status, err := apiCallRaw("POST", fmt.Sprintf("/%s/tasks/%d/%s", url.PathEscape(st.Project), id, action), body)
+	if _, named := body["head_sha"]; named && err == nil && status == http.StatusBadRequest && strings.Contains(string(data), "head_sha") && !strings.Contains(string(data), "7 to 64") {
+		delete(body, "head_sha") // an older server that does not know the field: submit as before, without the commit (#17643)
+		headFrom = ""
+		data, status, err = apiCallRaw("POST", fmt.Sprintf("/%s/tasks/%d/%s", url.PathEscape(st.Project), id, action), body)
+	}
 	if err != nil || status != http.StatusOK {
 		fmt.Fprintln(os.Stderr, "Review action failed: "+clierr.Describe(err, status, data))
 		clierr.Exit1()
@@ -107,6 +130,12 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 			} `json:"workflow"`
 		}
 		_ = json.Unmarshal(data, &t)
+		if h, _ := body["head_sha"].(string); h != "" {
+			if len(h) > 12 {
+				h = h[:12]
+			}
+			fmt.Printf("Submitted commit %s%s.\n", h, headFrom)
+		}
 		switch {
 		case t.Status == "completed":
 			fmt.Printf("Task #%d completed: the team has no orchestrator to review it.\n", id)
@@ -320,4 +349,16 @@ func lastSeenRound(project string, id int64) int {
 // or none was recorded. An approval names it; the server refuses one that names an older revision.
 func lastSeenRevision(project string, id int64) int {
 	return loadSeenRounds()[fmt.Sprintf("%s/%d#revision", project, id)]
+}
+
+// currentGitHead is the commit at HEAD of the git checkout the command runs in, or "" when it is not one (or git is not there): the review brief names the commit the author
+// submitted, not one a person found on the branch afterwards (#17643).
+func currentGitHead() string {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "git", "rev-parse", "HEAD").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
