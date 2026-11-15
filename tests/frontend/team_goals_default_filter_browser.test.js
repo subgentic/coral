@@ -54,14 +54,16 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
                 await shot(`goals-default-no-active-${label}`);
             });
             await S.run(`${label}: a team with only finished goals stays on the default filter and its Done group shows (#18168)`, async () => {
-                await ev(`window.__goals = window.__goals.filter(g => g.state === 'done' || g.state === 'dropped'); true`);
-                await seed(ev, TEAM3); await openTeam(ev, waitFor, TEAM3).catch(() => {});
+                await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev); // a fresh page: no filter kept from the teams above
+                await seed(ev, TEAM3); if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
+                await ev(GOALS_STUB);
+                await ev(`window.__goals = window.__goals.filter(g => g.state === 'done' || g.state === 'dropped'); true`); await openTeam(ev, waitFor, TEAM3).catch(() => {});
                 await goTab(ev, settle, 'Goals'); await waitFor(`document.querySelectorAll('${panel} tbody tr').length >= 1`, 'the goals', 10000); await settle(300);
                 const p = await pills();
                 assert.deepEqual(p.filter(x => x[1]).map(x => x[0].replace(/\s*\d+$/, '').replace(/\s*\(\d+\)$/, '')), ['Active'], 'the default filter is kept, not All: ' + JSON.stringify(p));
                 const r = await rows();
-                assert.ok(r.some(x => x.group && /Done \(1\)/.test(x.text)), 'the Done group shows: ' + JSON.stringify(r));
-                assert.ok(r.some(x => !x.group && /Old cleanup/.test(x.text)), 'with the finished goal under it: ' + JSON.stringify(r));
+                assert.ok(r.some(x => /^Done \(1\)$/.test(x)), 'the Done group shows: ' + JSON.stringify(r));
+                assert.ok(r.some(x => /Old cleanup/.test(x)), 'with the finished goal under it: ' + JSON.stringify(r));
             });
         }
     } finally { await removeBoards(ev, [TEAM, TEAM2, TEAM3]).catch(() => {}); await client.close(); }
