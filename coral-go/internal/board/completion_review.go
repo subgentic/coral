@@ -51,6 +51,16 @@ func (s *Store) SubmitCompletionReview(ctx context.Context, project string, id i
 // SubmitCompletionReviewAtRevisionAndCandidate is SubmitCompletionReview against an expected
 // task revision (nil: any) and a submitted candidate revision ("" for none).
 func (s *Store) SubmitCompletionReviewAtRevisionAndCandidate(ctx context.Context, project string, id int64, actor, message, outcome, reason string, artifacts []TaskArtifact, expectedRevision *int, candidateRevision string) (*Task, error) {
+	return s.SubmitCompletionReviewAtHead(ctx, project, id, actor, message, outcome, reason, artifacts, expectedRevision, candidateRevision, "")
+}
+
+// SubmitCompletionReviewAtHead is that with the commit the author submits ("" for none), kept on the task: a resubmit after a
+// rejection must not name the commit that was rejected (#18135).
+func (s *Store) SubmitCompletionReviewAtHead(ctx context.Context, project string, id int64, actor, message, outcome, reason string, artifacts []TaskArtifact, expectedRevision *int, candidateRevision, head string) (*Task, error) {
+	head = strings.TrimSpace(head)
+	if len(head) > 64 {
+		return nil, fmt.Errorf("head must be at most 64 bytes")
+	}
 	if strings.TrimSpace(reason) == "" || len(reason) > 4096 || len(message) > 65536 {
 		return nil, fmt.Errorf("a review reason is required (maximum 4096 characters); message maximum is 65536")
 	}
@@ -97,6 +107,11 @@ func (s *Store) SubmitCompletionReviewAtRevisionAndCandidate(ctx context.Context
 		if w.CompletionReview != nil {
 			return w, fmt.Errorf("completion review evidence is already recorded and immutable")
 		}
+		if resubmit {
+			if err := checkResubmitHead(w.SubmittedHead, head); err != nil {
+				return w, err
+			}
+		}
 		return w, nil
 	}
 	w, snapshot, err := readForGates(ctx, s.db, project, id, validate)
@@ -118,6 +133,9 @@ func (s *Store) SubmitCompletionReviewAtRevisionAndCandidate(ctx context.Context
 	}
 	if err := requireUnchanged(ctx, tx, project, id, snapshot); err != nil {
 		return nil, err
+	}
+	if head != "" {
+		w.SubmittedHead = head
 	}
 	w.CompletionReview = &CompletionReview{SubmittedBy: actor, SubmittedAt: nowUTC(), Message: message, ProposedOutcome: outcome, Reason: reason, Artifacts: artifacts, CandidateRevision: candidateRevision, GateResults: gateResults}
 	if err := saveWorkflow(ctx, tx, id, w); err != nil {
@@ -173,4 +191,26 @@ func (s *Store) ReleaseCompletionReview(ctx context.Context, project string, id 
 	}
 	s.NoteArtifactsChanged(project) // what the team's artifact list shows of this task changed (#13522: the kept list is built again when the revision moves)
 	return s.GetTask(ctx, project, id)
+}
+
+// checkResubmitHead refuses a resubmit that names the commit the last round rejected, or none when that commit is known: a reviewer
+// otherwise spends a round finding that nothing changed (#18135). A task whose first submit named no head is not checked.
+func checkResubmitHead(rejected, head string) error {
+	if rejected == "" {
+		return nil
+	}
+	if head == "" {
+		return fmt.Errorf("this task was rejected at %s: name the commit you are submitting (--head SHA, or submit from your worktree)", shortHead(rejected))
+	}
+	if len(head) >= 7 && len(rejected) >= 7 && (strings.HasPrefix(rejected, head) || strings.HasPrefix(head, rejected)) {
+		return fmt.Errorf("this is the commit that was rejected (%s): push the fix first", shortHead(rejected))
+	}
+	return nil
+}
+
+func shortHead(h string) string {
+	if len(h) > 10 {
+		return h[:10]
+	}
+	return h
 }

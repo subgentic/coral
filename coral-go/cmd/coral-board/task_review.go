@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -12,10 +13,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/subgentic/coral/internal/clierr"
 	"github.com/subgentic/coral/internal/clihelp"
 	"github.com/subgentic/coral/internal/fsreplace"
+	"github.com/subgentic/coral/internal/gitutil"
 )
 
 // taskReviewRequested: a list item says review_requested; a full task (an older
@@ -49,6 +52,7 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 	candidateRevision := fs.String("candidate-revision", "", "Exact source/build revision represented by candidate evidence")
 	areas := fs.String("areas", "", "The review's areas, comma-separated (submit-review): who may take it from the review pool")
 	reviewers := fs.Int("reviewers", 0, "How many reviewers the review wants, 1 or 2 (submit-review)")
+	head := fs.String("head", "", "The commit you submit (submit-review; default: HEAD of the repository you run it in). A resubmit of the commit a reviewer rejected is refused")
 	clihelp.ParseFlags(fs, args[1:], func() string { return commandUsage(os.Args[1], os.Args[2:]) })
 	*message = flagText(*message, "completion message")
 	if strings.TrimSpace(*reason) == "" {
@@ -71,6 +75,18 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 	}
 	if *reviewers != 0 {
 		body["reviewers"] = *reviewers
+	}
+	if action == "submit-review" {
+		h := strings.TrimSpace(*head)
+		if h == "" {
+			h = worktreeHead()
+		}
+		if h != "" {
+			body["head"] = h
+		}
+	} else if *head != "" {
+		fmt.Fprintln(os.Stderr, "--head belongs to submit-review")
+		os.Exit(2) // usage
 	}
 	if *candidateRevision != "" {
 		body["candidate_revision"] = *candidateRevision
@@ -320,4 +336,15 @@ func lastSeenRound(project string, id int64) int {
 // or none was recorded. An approval names it; the server refuses one that names an older revision.
 func lastSeenRevision(project string, id int64) int {
 	return loadSeenRounds()[fmt.Sprintf("%s/%d#revision", project, id)]
+}
+
+// worktreeHead is the commit checked out where the command runs, or "" outside a repository (#18135).
+func worktreeHead() string {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	out, err := gitutil.Command(ctx, "", "rev-parse", "HEAD").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
