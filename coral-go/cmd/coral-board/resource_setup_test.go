@@ -23,6 +23,7 @@ type setupStub struct {
 	existing map[string]string         // GET answers by name; missing: 404
 	reqs     []string
 	refuse   bool // the caller may not define: a PUT ?check=1 answers 403
+	older    bool // an older server: a PUT ?check=1 is read as a definition and answers 400
 }
 
 func (s *setupStub) handler(w http.ResponseWriter, r *http.Request) {
@@ -33,6 +34,11 @@ func (s *setupStub) handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method == "PUT" && r.URL.Query().Get("check") == "1" {
 		s.reqs = append(s.reqs, "CHECK "+name)
+		if s.older {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"error":"name: letters, digits, dot, dash and underscore, up to 64; slots 1 to 100"}`))
+			return
+		}
 		if s.refuse {
 			w.WriteHeader(http.StatusForbidden)
 			w.Write([]byte(`{"error":"only the Operator or an Orchestrator can define, remove or reorder resources"}`))
@@ -263,4 +269,22 @@ func captureStderr(t *testing.T, fn func()) string {
 	w.Close()
 	b, _ := io.ReadAll(r)
 	return string(b)
+}
+
+// #18222: an older server reads ?check=1 as a definition and answers 400: setup stops there, with no box read over ssh and nothing defined.
+func TestSetupStopsWithNoBoxReadWhenAnOlderServerAnswers400ToTheProbe(t *testing.T) {
+	s := &setupStub{defined: map[string]map[string]any{}, existing: map[string]string{}, older: true}
+	out, exited := runSetup(t, s, map[string]string{"epoch|probe": epochAnswer, "epoch|check": "ok  \tcheck\t0.1s\ncheck-end\n"}, "epoch")
+	if !exited {
+		t.Fatalf("setup must exit 1 when the probe is refused: %q", out)
+	}
+	if lastSetupBoxCalls != 0 {
+		t.Fatalf("no box may be read over ssh, got %d calls", lastSetupBoxCalls)
+	}
+	if len(s.defined) != 0 {
+		t.Fatalf("nothing may be defined: %v", s.defined)
+	}
+	if !strings.Contains(lastSetupStderr, "no box was read") || !strings.Contains(lastSetupStderr, "400") {
+		t.Fatalf("the refusal says no box was read and the status: %q", lastSetupStderr)
+	}
 }

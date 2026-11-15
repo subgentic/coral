@@ -392,6 +392,10 @@ func (h *ResourcesHandler) Define(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.URL.Query().Get("check") == "1" { // may this caller define? Answers yes and defines nothing (resource setup asks before it reads a box, #17894)
+		if !resourceNameRe.MatchString(chi.URLParam(r, "name")) { // the same name check a definition gets, so setup stops before any box is read (#18222)
+			errBadRequest(w, "name: letters, digits, dot, dash and underscore, up to 64")
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "may_define": true})
 		return
 	}
