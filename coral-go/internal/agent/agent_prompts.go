@@ -200,7 +200,7 @@ func (p LaunchParams) startMessage() string {
 	if p.NoStartPrompt {
 		return ""
 	}
-	return BuildBoardActionPrompt(p.boardPromptName(), p.Role, p.Prompt, p.PromptOverrides, p.BoardType)
+	return BuildBoardActionPrompt(p.boardPromptName(), p.Role, p.Prompt, p.PromptOverrides, p.BoardType) + p.RestartNote
 }
 
 // StartMessage is the first message the launch starts the CLI with ("" when it sends none).

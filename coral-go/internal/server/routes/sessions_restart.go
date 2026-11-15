@@ -482,6 +482,7 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 		BoardLabel:      h.boardLabel(p.board),
 		Role:            naming.SubscriberID(p.displayName, p.agentType),
 		Prompt:          p.prompt,
+		RestartNote:     h.restartNote(ctx, p), // the restart tells the agent its name and tasks, and not to introduce itself again (#17411)
 		PromptOverrides: promptOverrides(userSettings),
 		BoardType:       p.boardType,
 		Capabilities:    p.caps,
