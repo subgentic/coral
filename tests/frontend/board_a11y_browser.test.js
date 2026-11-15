@@ -121,7 +121,7 @@ const { coralReady } = require('./helpers/wait');
         assert.deepEqual(names, [['ARTICLE', 'Frontend Developer'], ['ARTICLE', 'QA Engineer']], 'each card is named by its agent');
         assert.deepEqual(tv.remind, ['Remind agent for Frontend Developer', 'Remind agent for QA Engineer']);
         await ev(`document.querySelector('#team-availability-dialog .availability-toolbar button').click(); true`);
-        await waitFor(`/Team view updated: 2 agents, 1 free, 1 busy\\./.test(document.querySelector('#team-availability-dialog .availability-status').textContent)`, 'a Refresh says what changed', 8000);
+        await waitFor(`/Team view updated: 2 agents, 1 free, 1 working\\./.test(document.querySelector('#team-availability-dialog .availability-status').textContent)`, 'a Refresh says what changed', 8000);
         await installAudit(ev);
         for (const theme of ['dark', 'light']) {
             await setTheme(ev, theme);
