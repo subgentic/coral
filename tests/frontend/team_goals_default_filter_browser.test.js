@@ -8,7 +8,7 @@ const { install: installTP, seed, openTeam, goTab, scenarios } = require('./help
 const { GOALS_STUB } = require('./helpers/goals_stub');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
-const TEAM = `qa-goals-default-${Date.now() % 100000}`, TEAM2 = TEAM + '-b';
+const TEAM = `qa-goals-default-${Date.now() % 100000}`, TEAM2 = TEAM + '-b', TEAM3 = TEAM + '-c';
 const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
 
 (async () => {
@@ -53,7 +53,17 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
                 assert.equal((await rows()).length, 4, 'the four goals are listed: ' + JSON.stringify(await rows()));
                 await shot(`goals-default-no-active-${label}`);
             });
+            await S.run(`${label}: a team with only finished goals stays on the default filter and its Done group shows (#18168)`, async () => {
+                await ev(`window.__goals = window.__goals.filter(g => g.state === 'done' || g.state === 'dropped'); true`);
+                await seed(ev, TEAM3); await openTeam(ev, waitFor, TEAM3).catch(() => {});
+                await goTab(ev, settle, 'Goals'); await waitFor(`document.querySelectorAll('${panel} tbody tr').length >= 1`, 'the goals', 10000); await settle(300);
+                const p = await pills();
+                assert.deepEqual(p.filter(x => x[1]).map(x => x[0].replace(/\s*\d+$/, '').replace(/\s*\(\d+\)$/, '')), ['Active'], 'the default filter is kept, not All: ' + JSON.stringify(p));
+                const r = await rows();
+                assert.ok(r.some(x => x.group && /Done \(1\)/.test(x.text)), 'the Done group shows: ' + JSON.stringify(r));
+                assert.ok(r.some(x => !x.group && /Old cleanup/.test(x.text)), 'with the finished goal under it: ' + JSON.stringify(r));
+            });
         }
-    } finally { await removeBoards(ev, [TEAM, TEAM2]).catch(() => {}); await client.close(); }
+    } finally { await removeBoards(ev, [TEAM, TEAM2, TEAM3]).catch(() => {}); await client.close(); }
     S.finish();
 })().catch(e => { console.error(e); process.exit(1); });
