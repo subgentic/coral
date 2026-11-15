@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -400,7 +401,7 @@ func hermesFirstMessage(params LaunchParams) string {
 	if proto := protocolText(params); proto != "" {
 		sys = append(sys, proto)
 	}
-	if b := BuildBoardSystemPrompt(params.BoardName, params.Role, "", params.PromptOverrides, params.BoardType); b != "" {
+	if b := withBoardAbilities(BuildBoardSystemPrompt(params.BoardName, params.Role, "", params.PromptOverrides, params.BoardType), params, at.Hermes); b != "" {
 		sys = append(sys, b)
 	}
 	action := params.startMessage()

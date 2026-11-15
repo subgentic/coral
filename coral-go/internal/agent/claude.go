@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/json"
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/logsafe"
 	"io"
 	"log/slog"
@@ -165,7 +166,7 @@ func claudeSettingsFile(files *launchFiles, params LaunchParams, effectiveID str
 	if proto := protocolText(params); proto != "" {
 		sysParts = append(sysParts, proto)
 	}
-	boardSysPrompt := BuildBoardSystemPrompt(params.BoardName, params.Role, params.Prompt, params.PromptOverrides, params.BoardType)
+	boardSysPrompt := withBoardAbilities(BuildBoardSystemPrompt(params.BoardName, params.Role, params.Prompt, params.PromptOverrides, params.BoardType), params, at.Claude)
 	if boardSysPrompt != "" {
 		sysParts = append(sysParts, boardSysPrompt)
 	}
