@@ -118,15 +118,6 @@ export function initFileSearch() {
     importOnce('./file_search.js').then(m => m.bindFileSearch(input));
 }
 
-function _updateSearchSelection() {
-    const dropdown = document.getElementById('files-search-dropdown');
-    if (!dropdown) return;
-    dropdown.querySelectorAll('.file-mention-item').forEach((el, i) => {
-        el.classList.toggle('selected', i === _searchSelectedIdx);
-    });
-    const selected = dropdown.querySelector('.file-mention-item.selected');
-    if (selected) selected.scrollIntoView({ block: 'nearest' });
-}
 
 // The list was refused as too large to check through Coral Hub (#3718): it says so, not "No changed files".
 let _filesRefused = false;

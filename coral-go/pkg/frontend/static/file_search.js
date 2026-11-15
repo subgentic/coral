@@ -149,3 +149,13 @@ async function createFile(filePath) {
         showToast('Failed to create file', true);
     }
 }
+
+function _updateSearchSelection() {
+    const dropdown = document.getElementById('files-search-dropdown');
+    if (!dropdown) return;
+    dropdown.querySelectorAll('.file-mention-item').forEach((el, i) => {
+        el.classList.toggle('selected', i === _searchSelectedIdx);
+    });
+    const selected = dropdown.querySelector('.file-mention-item.selected');
+    if (selected) selected.scrollIntoView({ block: 'nearest' });
+}
