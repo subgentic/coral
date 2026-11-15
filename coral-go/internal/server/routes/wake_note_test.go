@@ -15,6 +15,9 @@ import (
 func TestAWakeOfAResumedConversationTypesAWakeNoteNotTheOriginalPrompt(t *testing.T) {
 	_, h, _, ss := setupSessionsTestServer(t)
 	ctx := context.Background()
+	// a test must not depend on an agent CLI being installed (epoch has no hermes, #17906): every type resolves to a stub
+	stubCLIPaths(t, ss)
+	require.NoError(t, ss.SetSetting(ctx, "cli_path_hermes", stubCLI(t)))
 	const id = "00000000-0000-0000-0000-000000017324"
 	team := "team-a"
 	original := "ORIGINAL-START-PROMPT: run the plan from step 1"
