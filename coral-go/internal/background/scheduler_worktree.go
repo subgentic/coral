@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"github.com/subgentic/coral/internal/coralnames"
 	"github.com/subgentic/coral/internal/logsafe"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -66,11 +68,9 @@ func (s *JobScheduler) trustRunFolder(runID int64, job store.ScheduledJob, dir s
 		s.logger.Warn("scheduled run: its folder is not the one made for it, so it is not trusted", "run_id", runID, "job", job.Name)
 		return
 	}
-	// A umask of 002 (the default for a user on most Linux distributions) makes git create the worktree group-writable, which CheckRunWorktree refuses: the folder is ours, made for this run a moment ago, so
-	// take group and other write away from it first (a real directory only, never through a link) rather than leave every such job's Trust box doing nothing.
-	if fi, lerr := os.Lstat(dir); lerr == nil && fi.IsDir() && fi.Mode().Perm()&0o022 != 0 {
-		_ = os.Chmod(dir, fi.Mode().Perm()&^0o022)
-	}
+	// A umask of 002 (the default for a user on most Linux distributions) makes git create the worktree group-writable, which CheckRunWorktree refuses; and every file and folder inside it is group-writable
+	// too, which a trusted run would then execute. The folder is ours, made for this run a moment ago: take group and other write away from everything in it (never following a link) before the check.
+	closeRunFolder(dir)
 	resolved, err := foldertrust.CheckRunWorktree(dir, s.worktreeRoot)
 	if err != nil {
 		s.logger.Warn("scheduled run: its folder was not trusted", "run_id", runID, "job", job.Name, "why", err.Error())
@@ -91,6 +91,26 @@ func (s *JobScheduler) trustRunFolder(runID int64, job store.ScheduledJob, dir s
 		return
 	}
 	s.logger.Info("scheduled run trusted its own folder because the job's Trust box is ticked", "run_id", runID, "job", job.Name, "agent_type", typ, "folder", filepath.Base(resolved))
+}
+
+// closeRunFolder clears the group and other write bits of dir and of every file and folder inside it. A link is neither followed nor changed (WalkDir does not descend into one, and a chmod is made only on a
+// regular file or a folder found by Lstat), so nothing outside dir is touched. Windows has no such bits.
+func closeRunFolder(dir string) {
+	if runtime.GOOS == "windows" {
+		return
+	}
+	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.Type()&fs.ModeSymlink != 0 {
+			return nil
+		}
+		if fi, lerr := os.Lstat(path); lerr == nil && fi.Mode()&fs.ModeSymlink == 0 && fi.Mode().Perm()&0o022 != 0 {
+			_ = os.Chmod(path, fi.Mode().Perm()&^0o022)
+		}
+		return nil
+	})
 }
 
 // untrustRunFolder removes the trust entries a run's worktree got, once the worktree is gone: only for a folder directly inside the worktrees root named for a run, so the settings files do not collect an
