@@ -2,7 +2,8 @@
 import { state } from './state.js';
 import { isCloud, sessionServer, serverFetch } from './server_base.js';
 import { blockedReason } from './hub_access.js';
-import { readTrustAsk } from './inbox_answer.js';
+import { importOnce } from './import_once.js';
+const { readTrustAsk } = await importOnce('./inbox_answer.js');
 import { resolveSessionIdentity } from './session_state.js';
 import { showToast } from './utils.js';
 const reads = new Map(), values = new Map();
