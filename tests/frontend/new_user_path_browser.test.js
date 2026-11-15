@@ -108,7 +108,7 @@ const REPLY = "Hi! I'm mock-agent, a stand-in for a real agent, so this reply is
             await t.type('input', NT.teamName, TEAM); await t.type('input', NT.folder, teamDir);
             await t.click('button', NT.next); await t.step(2);
             const roles = await ev(`window.__nt.roles(window.__nt.dlg(${NT.team}))`);
-            assert.deepEqual(roles, ['Orchestrator', 'Lead Developer', 'QA Engineer'], 'the default team is in Members');
+            assert.deepEqual(roles, ['Orchestrator', 'Lead', 'Reviewer'], 'the default team is in Members (#17817: generic roles)');
             await t.click('button', NT.next); await t.step(3);
             await t.type('textarea', /^What should the team work on/i, TASK, NT.team);
             const off = await ev(`(() => { const b = window.__nt.buttons(window.__nt.dlg(${NT.team})).find(x => ${NT.launch}.test(x.name)); return b ? b.disabled : null; })()`);

@@ -75,7 +75,15 @@ for (const template of BUILTIN_TEAM_TEMPLATES) for (const member of template.age
 
 function _allTemplates() { return [..._getSavedTeamTemplates(), ...BUILTIN_TEAM_TEMPLATES]; }
 
-/** The choice the dialog opens on (#9906): the default members it fills in (the Orchestrator, the Lead Developer, the QA Engineer). Not a template of its own: team_dialogs.js loads it. */
+/** The default team's members (#9877, #17817): generic roles that work for any goal, not just code. The Coding Team template has its own coding-specific set. */
+const DEFAULT_TEAM_MEMBERS = [
+    { name: "Orchestrator", prompt: "You are the orchestrator. Break down the goal, assign work to the team via the message board, and track progress. Delegate to the other agents — do not do the work yourself. Discuss your plan with the operator before posting assignments." },
+    { name: "Lead", prompt: "You are the lead. Do the main work the Orchestrator assigns: research, write, build, or create whatever the goal needs. Coordinate with the team via the message board. Wait for instructions from the Orchestrator before starting." },
+    { name: "Reviewer", prompt: "You are the reviewer. Check the team's work for quality, accuracy, and completeness. Suggest improvements and verify that the goal's requirements are met. Wait for instructions from the Orchestrator before starting." },
+];
+for (const m of DEFAULT_TEAM_MEMBERS) m.capabilities = { allow: [...SHIPPED_CAPABILITIES], deny: [] };
+
+/** The choice the dialog opens on (#9906): the default members it fills in (the Orchestrator, the Lead, the Reviewer). Not a template of its own: team_dialogs.js loads it. */
 const DEFAULT_TEAM_KEY = '__default';
 /** The choice after an AI-generated team filled Members (#9911): shown only while it is what is chosen, with the member count; Blank team clears the members and takes it away. */
 const GENERATED_TEAM_KEY = '__generated';
@@ -200,4 +208,4 @@ async function _confirmSaveTemplate() {
 }
 window._confirmSaveTemplate = _confirmSaveTemplate;
 
-export { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_KEY, GENERATED_TEAM_KEY, _renderTeamTemplateSelector, _syncTemplateMenu, markTeamTemplate, markGeneratedTeam, resetTeamTemplatePicker };
+export { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_MEMBERS, DEFAULT_TEAM_KEY, GENERATED_TEAM_KEY, _renderTeamTemplateSelector, _syncTemplateMenu, markTeamTemplate, markGeneratedTeam, resetTeamTemplatePicker };

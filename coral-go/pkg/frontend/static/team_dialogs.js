@@ -21,7 +21,7 @@ const { _syncFlagButtons } = await importOnce('./flag_shortcuts.js');
 const { showSettingsModal } = await importOnce('./settings_dialog.js');
 const { modelName, levelName } = await importOnce('./model_labels.js');
 const { launchedMode } = await importOnce('./preset_enforcement.js');
-const { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_KEY, GENERATED_TEAM_KEY, _renderTeamTemplateSelector, _syncTemplateMenu, markTeamTemplate, resetTeamTemplatePicker } = await importOnce('./team_templates_ui.js');
+const { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_MEMBERS, DEFAULT_TEAM_KEY, GENERATED_TEAM_KEY, _renderTeamTemplateSelector, _syncTemplateMenu, markTeamTemplate, resetTeamTemplatePicker } = await importOnce('./team_templates_ui.js');
 const { showTeamStep, currentTeamStep, TEAM_STEPS } = await importOnce('./team_steps.js');
 const { mountTeamLaunchSettings, readTeamLaunchSettings, applyTeamBoardSettings, setTeamLaunchMode } = await importOnce('./team_launch_settings.js');
 const { offerSuggestion, offerCreateFolder, syncSuggestionLine, usesSuggestion } = await importOnce('./folder_suggestion.js');
@@ -325,7 +325,7 @@ function _applyACFPresetFor(containerId, name) {
     }
 }
 
-// Default team: first 3 presets
+// Default team: the generic Orchestrator / Lead / Reviewer (DEFAULT_TEAM_MEMBERS)
 
 /** Step 1 checks the chosen folder before Next advances. A missing local folder can be made at Launch only when its parent is accessible and does not list it. Suggested folders use their existing create_dir path; remote folders are checked without requesting creation. */
 const NEW_FOLDER_NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$/;
@@ -488,7 +488,7 @@ async function _initTeamForm() {
         };
     }
 
-    // The default team is in Members when the dialog opens (#9877, the Operator): the Orchestrator, the Lead Developer and the QA Engineer, the first three of the Coding Team, each removable; a template still replaces them.
+    // The default team is in Members when the dialog opens (#9877, the Operator): the Orchestrator, the Lead and the Reviewer, each removable; a template still replaces them.
     // A team the AI generated fills the list itself (launch.skipDefaultTeamAgents). #5989 opened it empty after four agents nobody picked were launched; three a person can see and remove are not that.
     const defaultsOnOpen = !launch.skipDefaultTeamAgents;
     if (defaultsOnOpen) { _addDefaultMembers(); resetTeamTemplatePicker(); markTeamTemplate(DEFAULT_TEAM_KEY); } // marked now, not after the board names load: a pick made meanwhile must not be overwritten
@@ -507,9 +507,9 @@ async function _initTeamForm() {
 }
 
 
-/** The default team's members: the first three of the Coding Team (#9877). */
+/** The default team's members: generic roles that work for any goal (#9877, #17817). */
 function _addDefaultMembers() {
-    for (const a of BUILTIN_TEAM_TEMPLATES[0].agents.slice(0, 3)) _addTeamAgent(a.name, a.prompt, a.capabilities, a.agent_type, a.model, a.flags);
+    for (const a of DEFAULT_TEAM_MEMBERS) _addTeamAgent(a.name, a.prompt, a.capabilities, a.agent_type, a.model, a.flags);
 }
 
 function _loadTeamTemplate(name) {
