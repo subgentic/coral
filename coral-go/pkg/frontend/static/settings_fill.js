@@ -12,7 +12,7 @@ import { browserLocal } from './safe_storage.js';
 const { _fillModelDatalist, _getAgentModels } = await importOnce('./launch_models.js');
 const { _updatePermModeDescription } = await importOnce('./permission_flags.js');
 const { _setApiKey, _wireApiKeyControls, loadDatabaseEncryptionStatus } = await importOnce('./settings_machine.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
-const { loadArtifactStoreSize, loadMessageSearchIndex, loadTerminalLogs, loadExamples, loadChatImport, wireStorageActions } = await importOnce('./settings_storage.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
+const { loadArtifactStoreSize, loadMessageSearchIndex, loadTerminalLogs, loadExamples, loadChatImport, wireStorageActions, loadLocalBackup } = await importOnce('./settings_storage.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
 const { loadCodexTrustHooks } = await importOnce('./settings_codex_hooks.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
 const { settingsAtOpen } = await importOnce('./settings_snapshots.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 
@@ -86,6 +86,7 @@ export async function _fillMachineSettings(s) {
         loadChatImport(); // chats Coral did not start: import them or hold them back again (#11990)
         loadMessageSearchIndex(); // the board message search index: its setting, state and size (#9685)
         wireStorageActions(); // free space and automatic cleanup (#3554)
+        loadLocalBackup(); // the data folder path and how to copy it (#17538)
         const autoAttach = document.getElementById('settings-board-auto-attach');
         // Off unless the Operator turned it on (#3563); an empty value is unset.
         if (autoAttach) autoAttach.checked = settingBool(s.board_auto_attach || undefined, false);
