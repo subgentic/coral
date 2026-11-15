@@ -158,7 +158,7 @@ const { coralReady } = require('./helpers/wait');
                 if(width===1280){
                     await ev(`(${row('Review file 01.txt')}).querySelector('.inbox-review-name').click();true`);
                     await waitFor(`!!document.querySelector('.artifact-review-approve:not([hidden])')`,'the viewer shows Approve for a pending review',8000);
-                    assert.match(await ev(`document.querySelector('.artifact-review-state').textContent`),/Waiting for your review/);
+                    assert.match(await ev(`document.querySelector('.artifact-review-state').textContent`),/Read, waiting for your decision/, 'the plan was opened once already: it is read and still waiting (#16670)');
                     await ev(`document.querySelector('.artifact-review-changes').click();true`);
                     // the form opens under the viewer's header, not as a box inside its row (walk 3 N21: it squeezed the name to 'RE…'), its buttons in one row with Send request the only filled one
                     const place = await ev(`(() => { const f = document.querySelector('.artifact-review-form'), h = document.querySelector('#artifact-viewer .artifact-viewer-header'), t = document.querySelector('#artifact-viewer .artifact-viewer-title'); const bs = [...f.querySelectorAll(':scope > button')].filter(b => b.getClientRects().length), tops = new Set(bs.map(b => Math.round(b.getBoundingClientRect().top))); return { inHeader: h.contains(f), below: f.getBoundingClientRect().top >= h.getBoundingClientRect().bottom - 1, title: Math.round(t.getBoundingClientRect().width), primaries: bs.filter(b => b.classList.contains('btn-primary')).length, rows: tops.size }; })()`);

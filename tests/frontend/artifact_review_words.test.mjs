@@ -8,6 +8,9 @@ assert.match(reviewWords(['approved', 'final'], { state: 'approved', at }), /^Ap
 assert.notEqual(reviewWords(['approved'], { state: 'approved', at }), 'Approved', 'and the time is in it');
 assert.equal(reviewWords(['approved'], undefined), 'Approved', 'an approval with no recorded time says only Approved');
 assert.equal(reviewWords(['for review'], undefined), 'Waiting for your review');
+assert.equal(reviewWords(['for review', 'read'], undefined), 'Read, waiting for your decision', 'an opened plan that is not decided says so, not that it is unseen (#16670)');
+assert.equal(reviewWords(['for review', 'read', 'changes requested'], undefined), 'Changes requested', 'a change request is said as before');
+assert.equal(reviewWords(['approved', 'read'], undefined), 'Approved');
 assert.equal(reviewWords(['for review', 'changes requested'], undefined), 'Changes requested');
 assert.equal(reviewWords(['for review', 'changes requested'], undefined, 'Writer A'), 'Changes requested, waiting for Writer A', 'the agent whose turn it is (#11985)');
 assert.equal(reviewWords(['reviewed'], undefined), 'Reviewed');
