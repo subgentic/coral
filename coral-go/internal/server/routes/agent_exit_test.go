@@ -159,6 +159,22 @@ func TestExitNoticeOncePerBurstWithFixedLabels(t *testing.T) {
 	assert.Empty(t, r.takeTimers())
 }
 
+// #16664 (QA follow-up on #16596): an agent that stops right after its start with its terminal LOST is woken the usual way (Wake starts a new terminal), so its notice keeps "Wake resumes it"; the "check its terminal" plan is for a CLI that refused to start, where its terminal is still there.
+func TestRapidExitOfALostTerminalKeepsWakeResumesIt(t *testing.T) {
+	r := newExitRig(t)
+	gone := r.agent(1, "Lost", "")
+	require.NoError(t, r.ss.SetSessionSleepingFor(context.Background(), gone, store.SleepReasonTerminalGone))
+	refused := r.agent(2, "Refused", "")
+	r.h.AgentsSlept(context.Background(), []string{gone, refused})
+	timers := r.takeTimers()
+	require.Len(t, timers, 1)
+	timers[0].f()
+	notes := r.notices()
+	require.Len(t, notes, 1)
+	assert.Contains(t, notes[0], "Lost: exits right after it starts: its terminal was lost. Wake resumes it.")
+	assert.Contains(t, notes[0], "Refused: exits right after it starts: its CLI refused to start. Check its terminal for the error, then Wake it once that is fixed.", "the refused start keeps its plan")
+}
+
 func TestExitNoticeSkipsAgentsWokenAndCleansNames(t *testing.T) {
 	r := newExitRig(t)
 	a := r.agent(1, "@all \u200bWorker\u202e\x1b[31m", "429")
