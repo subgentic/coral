@@ -56,6 +56,7 @@ const (
 	InboxKindRelease         = "inbox_kind_release"
 	InboxKindDecided         = "inbox_kind_decided"
 	InboxKindDigest          = "inbox_kind_digest"
+	InboxAway                = "inbox_away"
 	InboxIncludedTeams       = "inbox_included_teams"
 	InboxDigestTime          = "inbox_digest_time"
 	BoardAutoAttach          = "board_auto_attach"
@@ -165,6 +166,7 @@ func init() {
 	boolOn(InboxKindRelease, ApplyLive, "Release summaries reach Needs you: one page per release.")
 	boolOn(InboxKindDecided, ApplyLive, "Decisions made on your behalf reach Needs you, once a day.")
 	boolOn(InboxKindDigest, ApplyLive, "The daily digest reaches Needs you.")
+	boolOn(InboxAway, ApplyLive, "Needs you shows a line 'While you were away' when you come back after a while: how many tasks and goals were finished and how many agents are idle. Counts only; it is not an item and does not change any count.")
 	register(Spec{Key: InboxIncludedTeams, Kind: KindText, Default: "all", Apply: ApplyLive, OwnCheck: true, MaxLen: 64 << 10, Doc: "The teams the Needs you switches apply to: the word all, or a JSON list of team ids. A team that is not on the list has its optional kinds muted; its questions and decisions still reach you."})
 	register(Spec{Key: InboxDigestTime, Kind: KindText, Default: "09:00", Apply: ApplyLive, OwnCheck: true, MaxLen: 5, Doc: "The time of day (HH:MM, 24 hours) the daily items are made."})
 	boolOff(LaunchInWorktree, ApplyLive, "Experimental: offer launching a team into its own git worktree, and accept a team launch that asks for one (#12746). Off by default for every install.")

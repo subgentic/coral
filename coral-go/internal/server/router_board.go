@@ -211,6 +211,7 @@ func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.B
 	r.Get("/api/thread", boardHandler.Thread)                                                                  // #14440: the story of one goal or task, owner only
 	r.Get("/api/threads", boardHandler.Threads)                                                                // #14440: one summary per task for the list pages, owner only
 	r.Get("/api/activity", boardHandler.ListActivity)                                                          // the Activity record of what the Operator did in Needs you (#12069): the Operator's alone, local, never through the Hub (not in the tunnel table)
+	r.Get("/api/away", boardHandler.Away)                                                                      // what happened since a time, as counts: the Needs you line "While you were away" (#17537)
 	r.Get("/api/needs-you", boardHandler.NeedsYou)                                                             // what waits for the Operator, in one read, for the Hub's phone push (#11596): the owner's alone
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/asks/{messageID}/close", boardHandler.CloseAsk) // close a question answered elsewhere (ask close, #11417)
 	r.Post("/api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim", boardHandler.ClaimAskButton)      // the Operator's click on a button an agent declared on a question: claims it once, answers with the stored action (#11643)

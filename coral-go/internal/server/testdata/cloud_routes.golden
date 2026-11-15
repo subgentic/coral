@@ -80,6 +80,7 @@ GET /api/auth/sessions never
 GET /api/auth/setup-code never
 GET /api/auth/setup-code/show never
 GET /api/automations/runs view
+GET /api/away never
 GET /api/board-seats/foreign never
 GET /api/board/projects view
 GET /api/board/remotes never
