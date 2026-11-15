@@ -67,7 +67,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`document.querySelectorAll('#group-table-view .dt-table tbody tr .dt-primary').forEach((b, i) => b.setAttribute('data-axp', b.querySelector('.dt-mail-title')?.textContent === ${JSON.stringify('#' + g1 + ' Ship the mailbox')} ? 'with-tasks' : String(i))); true`);
         // The first sorted goal can be Explore goals (no tasks, so its time/state is just Active).
         // Pin the goal with a known 0/3 rollup; never assume the first returned row has progress.
-        const axn = await axName(client, '[data-axp="with-tasks"]'); assert.equal(axn && axn.name, `#${g1} Ship the mailbox, Active, Active · 0/3 · ${A}`, `a goal's phone button is "<goal>, <state>, <time>" as Chrome computes it (its state is on the row's second line: #9747): ${axn && axn.name}`);
+        const axn = await axName(client, '[data-axp="with-tasks"]'); assert.equal(axn && axn.name, `Ship the mailbox, Active, Active · 0/3 · ${A}`, `a goal's phone button is "<goal>, <state>, <time>" as Chrome computes it (its state is on the row's second line: #9747): ${axn && axn.name}`);
         console.log('   ✓');
         console.log('PASS Inbox Goals folder: every team\'s open goals as the goal row with a Team column');
     } finally { await removeBoards(ev, [A, B]).catch(() => {}); await client.close(); }
