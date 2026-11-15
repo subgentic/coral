@@ -125,7 +125,7 @@ async function run() {
   check('completed: check icon, final cost', done.icon === 'Done' && !done.spinner, `${done.icon}`);
   check('running: spinner, live ~cost', running.icon === 'In progress', `${running.icon}`);
   check('stopped: skipped icon, no cost', bare.icon === 'Done', `${bare.icon}`);
-  check('count badge counts subagents', (await ev(`document.getElementById('task-bar-count').textContent`)) === '2/5', await ev(`document.getElementById('task-bar-count').textContent`));
+  check('count badge shows open tasks', (await ev(`document.getElementById('task-bar-count').textContent`)) === '3', await ev(`document.getElementById('task-bar-count').textContent`));
 
   // Escaping
   check('description HTML is escaped', !running.descHasImg && /<img/.test(running.desc) && !(await ev(`window.__xss === 1`)), running.desc);

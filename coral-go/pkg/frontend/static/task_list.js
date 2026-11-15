@@ -564,7 +564,7 @@ function _taskFooter(querying, scope, shown, total) {
         more: { label: error ? 'Retry' : 'Load more', busy: !!busy, run: loadMoreBoardTasks } };
 }
 
-/** The badge: done / all, from the server's totals for the board. */
+/** The badge: open count (pending + in progress; hidden when 0). */
 function _updateTaskCount(boardTasks, otherTasks, completedCount) {
     const countEl = document.getElementById('task-bar-count');
     if (countEl) {
@@ -572,12 +572,11 @@ function _updateTaskCount(boardTasks, otherTasks, completedCount) {
         const boardTotal = scope && _boardList.scopeKey !== scope.key ? 0 : _boardList.totalOpen !== null && _boardList.totalCompleted !== null
             ? _boardList.totalOpen + _boardList.totalCompleted : boardTasks.length;
         const total = boardTotal + otherTasks.length;
-        const count = scope ? Math.max(0, total - completedCount) : completedCount;
-        const word = scope ? 'open' : 'done';
-        const countText = total > 0 ? `${count}/${total}` : '';
-        if (countEl.textContent !== countText) countEl.textContent = countText; // same text: no new text node, no layout
-        const tab = document.getElementById('agentic-tab-tasks'); // the badge in words (#7182): "1/4" says nothing to a screen reader or a first look
-        if (tab) { const name = total > 0 ? `Tasks, ${count} of ${total} ${word}` : 'Tasks'; if (tab.getAttribute('aria-label') !== name) tab.setAttribute('aria-label', name); const tip = total > 0 ? `${count} of ${total} ${word}` : ''; if (countEl.title !== tip) countEl.title = tip; }
+        const openCount = Math.max(0, total - completedCount);
+        const countText = openCount > 0 ? `${openCount}` : '';
+        if (countEl.textContent !== countText) countEl.textContent = countText;
+        const tab = document.getElementById('agentic-tab-tasks');
+        if (tab) { const name = openCount > 0 ? `Tasks, ${openCount} open` : 'Tasks'; if (tab.getAttribute('aria-label') !== name) tab.setAttribute('aria-label', name); const tip = openCount > 0 ? `${openCount} queued or in progress` : ''; if (countEl.title !== tip) countEl.title = tip; }
     }
 }
 

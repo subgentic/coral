@@ -47,8 +47,8 @@ const BASE = require('./test_base').BASE;
         const rows = await ev(`document.querySelectorAll('#board-task-list [data-task-id], #board-task-list .board-task-row, #board-task-list tr').length`);
         assert.ok(rows >= 2 || (await ev(`document.getElementById('board-task-list').textContent.includes('First task')`)), 'the task rows are drawn');
         assert.ok(await ev(`document.getElementById('agentic-state-events').textContent.includes('go test')`), 'the events are drawn');
-        assert.equal(await ev(`document.getElementById('task-bar-count').textContent`), '1/2');
-        console.log('   ✓ tasks, events and the 1/2 count are drawn');
+        assert.equal(await ev(`document.getElementById('task-bar-count').textContent`), '1');
+        console.log('   ✓ tasks, events and the open count are drawn');
 
         console.log('2. Drawing again with nothing changed writes nothing');
         await settle();
@@ -66,10 +66,10 @@ const BASE = require('./test_base').BASE;
         await ev(`T.state.currentBoardTasks[0].status = 'completed'; T.state.currentAgentEvents.unshift({ id: 3, event_type: 'tool_use', tool_name: 'Edit', summary: 'render.js', created_at: '2026-10-16T10:03:00Z' }); true`);
         await redraw();
         await settle();
-        assert.equal(await ev(`document.getElementById('task-bar-count').textContent`), '2/2', 'the count follows');
+        assert.equal(await ev(`document.getElementById('task-bar-count').textContent`), '', 'all done: badge hidden');
         assert.ok(await ev(`document.getElementById('agentic-state-events').textContent.includes('render.js')`), 'the new event shows');
         assert.ok(await ev(`window.__muts`) > after, 'something was written');
-        console.log('   ✓ the count reads 2/2 and the new event is there');
+        console.log('   ✓ the badge is empty (0 open) and the new event is there');
 
         console.log('\nAll idle DOM write checks passed');
     } finally {
