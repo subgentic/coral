@@ -481,6 +481,7 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 		BoardName:       p.board,
 		BoardLabel:      h.boardLabel(p.board),
 		Role:            naming.SubscriberID(p.displayName, p.agentType),
+		PostedBefore:    h.postedBefore(ctx, p.board, naming.SubscriberID(p.displayName, p.agentType)),
 		Prompt:          p.prompt,
 		PromptOverrides: promptOverrides(userSettings),
 		BoardType:       p.boardType,
@@ -741,4 +742,9 @@ func modelOfFlags(flags []string) string {
 		return ""
 	}
 	return model
+}
+
+// postedBefore: the member has posted on the board already, so the start message of its new session does not ask it to introduce itself again (#17641).
+func (h *SessionsHandler) postedBefore(ctx context.Context, board, member string) bool {
+	return h.bs != nil && board != "" && member != "" && h.bs.HasPosted(ctx, board, member)
 }

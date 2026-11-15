@@ -636,3 +636,12 @@ func (s *Store) CountMessages(ctx context.Context, project string) (int, error) 
 // Such a notice @-names its agent; a subscriber reading everything counts it only when it is the
 // one named.
 const CoralSender = "Coral"
+
+// HasPosted reports whether the member has posted on the board before: a restarted agent is not asked to introduce itself again (#17641).
+func (s *Store) HasPosted(ctx context.Context, project, subscriberID string) bool {
+	var n int
+	if err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM board_messages WHERE project = ? AND subscriber_id = ? LIMIT 1`, project, subscriberID); err != nil {
+		return false
+	}
+	return n > 0
+}
