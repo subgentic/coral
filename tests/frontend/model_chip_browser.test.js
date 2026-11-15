@@ -226,6 +226,8 @@ const { coralReady } = require('./helpers/wait');
             const body = await ev(`window.__posts[0]`);
             assert.deepEqual(body, { session_id: 'ch-a-id', agent_type: 'claude', thinking: 'xhigh' });
             await waitFor(`/Switching to Extra high/.test(document.getElementById('thinking-chip-text').textContent)`, 'the switching state on the thinking chip', 4000);
+            await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Thinking set to Extra high: applies from the next turn\\. No restart needed/.test(t.textContent))`, 'the applies-from-the-next-turn toast (#17334)', 4000);
+            await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
             assert.equal(await text('model'), 'Claude · Opus 5.5', 'the model chip keeps saying the model');
             await ev(`(() => { const i = document.getElementById('command-input'); i.focus(); i.value = ''; return true; })()`);
             await ev(`(() => { const i = document.getElementById('command-input'); i.value = 'typed meanwhile'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
