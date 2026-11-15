@@ -43,7 +43,8 @@ const { install: installNA, N, stubModels } = require('./helpers/new_agent');
         const link = [...g.querySelectorAll('button, a')].find(b => /Set up another provider/.test(b.textContent));
         return { label: g.getAttribute('role') + ':' + (g.getAttribute('aria-label') || (document.getElementById(g.getAttribute('aria-labelledby')) || {}).textContent), names: segs.map(s => s.querySelector('.provider-name').textContent.trim()), checked: segs.filter(s => s.querySelector('input').checked).map(s => s.querySelector('input').value), selectValue: document.querySelector('#launch-step-agent .acf-agent-type').value,
             segBoxes: segs.map(box), strip: strip && box(strip), stripBorder: strip && parseFloat(getComputedStyle(strip).borderTopWidth), stripSideways: strip ? strip.scrollWidth > strip.clientWidth + 1 : null, pageSideways: document.documentElement.scrollWidth > innerWidth + 1,
-            missingList: !!g.querySelector('.provider-missing, .provider-list'), why: !!g.querySelector('details, .provider-why'), words: /Not installed or not used|Why\?|Install /.test(g.textContent), small, link: link ? { text: link.textContent.trim(), h: Math.round(link.getBoundingClientRect().height) } : null, fill: segs.map(s => getComputedStyle(s).backgroundColor) }; })()`;
+            missingList: !!g.querySelector('.provider-missing, .provider-list'), why: !!g.querySelector('details:not(.provider-signin-adv), .provider-why'), signinShown: [...g.querySelectorAll('.provider-signin, .provider-signin-adv')].some(vis), // the OpenCode sign-in help is a fold of its own (#16716), hidden while OpenCode is signed in (or not asked); it is not the Why? fold of the missing providers
+             words: /Not installed or not used|Why\?|Install /.test(g.textContent), small, link: link ? { text: link.textContent.trim(), h: Math.round(link.getBoundingClientRect().height) } : null, fill: segs.map(s => getComputedStyle(s).backgroundColor) }; })()`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile, theme, fontPx] of [[1440, 900, false, 'dark'], [1440, 900, false, 'light'], [390, 844, true, 'dark'], [390, 844, true, 'light'], [1440, 900, false, 'light', 32], [390, 844, true, 'dark', 32]]) {
@@ -57,6 +58,7 @@ const { install: installNA, N, stubModels } = require('./helpers/new_agent');
             check(d.stripSideways === false && !d.pageSideways, `${tag}: nothing scrolls sideways: ${JSON.stringify([d.stripSideways, d.pageSideways])}`);
             check(d.segBoxes.every(b => b.h >= (mobile ? 44 : 36)), `${tag}: a segment is ${mobile ? 44 : 36} px or more: ${JSON.stringify(d.segBoxes.map(b => b.h))}`);
             check(!d.missingList && !d.why && !d.words, `${tag}: no missing list, no Why? fold, no install steps in the dialog: ${JSON.stringify([d.missingList, d.why, d.words])}`);
+            check(!d.signinShown, `${tag}: no sign-in help shows while nothing says OpenCode is signed out: ${d.signinShown}`);
             check(d.link && d.link.text === 'Set up another provider' && d.link.h >= (mobile ? 44 : 36), `${tag}: one link, Set up another provider: ${JSON.stringify(d.link)}`);
             check(d.small.length === 0, `${tag}: no text in the strip or the link under 12 px: ${JSON.stringify(d.small)}`);
             check(new Set(d.fill).size === 2, `${tag}: the chosen segment alone is filled: ${JSON.stringify(d.fill)}`);
