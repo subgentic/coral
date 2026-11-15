@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -36,7 +37,12 @@ func newResRig(t *testing.T) *resRig {
 	t.Cleanup(func() { bs.Close() })
 	mgr, err := resources.Open(resources.Options{Priorities: resources.BoardPriorities{Store: bs}, AgeStep: -1})
 	require.NoError(t, err)
-	h := &ResourcesHandler{M: mgr, Board: bs}
+	h := &ResourcesHandler{M: mgr, Board: bs, Stats: &resources.StatsBoard{Run: func(_ context.Context, alias, _ string) (string, error) { // no ssh in a test: a box that answers (#17560)
+		if alias == "down" {
+			return "", errors.New("timed out")
+		}
+		return " up 1 day, load average: 4.00, 3.00, 2.00\n---\n8\n---\n/dev/sda1 1 1 52428800 1% /\n---\nMem: 1 1 1 1 1 24000\n", nil
+	}}}
 	r := chi.NewRouter()
 	r.Get("/api/resources", h.List)
 	r.Get("/api/resources/{name}", h.Get)
@@ -57,6 +63,11 @@ func (g *resRig) do(as, method, path string, body any) (int, map[string]any) {
 	if m, ok := body.(map[string]any); ok && len(as) > 6 && as[:6] == "token:" && method == "POST" {
 		if _, named := m["subscriber_id"]; !named {
 			m["subscriber_id"] = as[6:] // what coral-board sends: its own name
+		}
+	}
+	if m, ok := body.(map[string]any); ok && method == "PUT" && strings.Count(path, "/") == 3 { // a new resource needs a description (#17560): the tests that are about something else get a plain one
+		if _, said := m["description"]; !said {
+			m["description"] = "a test box"
 		}
 	}
 	if body != nil {
@@ -362,4 +373,42 @@ func TestAClaimOfAPlainSlotResourceNamesItsOwnMachine(t *testing.T) {
 	entry := out["entry"].(map[string]any)
 	assert.NotEmpty(t, entry["member"])
 	assert.NotEmpty(t, entry["machine"], "a pool's grant names its member's machine")
+}
+
+// #17560: a resource carries its own how-to. A new one needs a description; a redefine that leaves it out keeps it; the view carries it and the stats of its machine.
+func TestAResourceNeedsADescriptionWhenNewAndKeepsItOnRedefine(t *testing.T) {
+	g := newResRig(t)
+	g.subscribe("alpha", "The Orchestrator", "Orchestrator", true)
+	code, out := g.do("operator", "PUT", "/api/resources/epoch-go", map[string]any{"slots": 2, "machine": "epoch", "description": ""})
+	assert.Equal(t, 400, code, "a new resource with no description is refused: %v", out)
+	assert.Contains(t, out["error"], "description")
+	code, out = g.do("operator", "PUT", "/api/resources/epoch-go", map[string]any{"slots": 2, "machine": "epoch", "description": "Linux: Go only.\x1b[31m ssh epoch\nLine 2"})
+	require.Equal(t, 200, code, "%v", out)
+	assert.Equal(t, "Linux: Go only.[31m ssh epoch\nLine 2", out["description"], "control characters are dropped, a line break stays")
+	code, out = g.do("operator", "PUT", "/api/resources/epoch-go", map[string]any{"slots": 3, "machine": "epoch", "description": ""})
+	require.Equal(t, 200, code, "a redefine needs none: %v", out)
+	assert.Equal(t, "Linux: Go only.[31m ssh epoch\nLine 2", out["description"], "and keeps the stored one")
+	long := strings.Repeat("x", 900) + "\n2\n3\n4\n5\n6\n7\n8"
+	_, out = g.do("operator", "PUT", "/api/resources/epoch-go", map[string]any{"slots": 3, "machine": "epoch", "description": long})
+	assert.LessOrEqual(t, len([]rune(out["description"].(string))), 600, "cut at 600 characters")
+	_, out = g.do("operator", "PUT", "/api/resources/epoch-go", map[string]any{"slots": 3, "machine": "epoch", "description": "1\n2\n3\n4\n5\n6\n7\n8"})
+	assert.Equal(t, "1\n2\n3\n4\n5\n6", out["description"], "six lines at most")
+}
+
+// #17560: the view of a resource carries its machine's stats: read from the machine (a remote one over ssh to its name), "unreachable" when ssh fails, none for a resource that does not say where it is.
+func TestAResourceViewCarriesItsMachinesStats(t *testing.T) {
+	g := newResRig(t)
+	g.do("operator", "PUT", "/api/resources/epoch-go", map[string]any{"slots": 2, "machine": "epoch", "where": "remote"})
+	g.do("operator", "PUT", "/api/resources/gone", map[string]any{"slots": 1, "machine": "down", "where": "remote"})
+	g.do("operator", "PUT", "/api/resources/nowhere", map[string]any{"slots": 1, "machine": "somewhere"})
+	_, out := g.do("operator", "GET", "/api/resources/epoch-go", nil)
+	st, _ := out["stats"].(map[string]any)
+	require.NotNil(t, st, "%v", out)
+	assert.Equal(t, "ok", st["state"])
+	assert.EqualValues(t, 8, st["cpu_count"])
+	assert.EqualValues(t, 24000, st["mem_available_mb"])
+	_, out = g.do("operator", "GET", "/api/resources/gone", nil)
+	assert.Equal(t, "unreachable", out["stats"].(map[string]any)["state"])
+	_, out = g.do("operator", "GET", "/api/resources/nowhere", nil)
+	assert.Nil(t, out["stats"], "no where, no stats")
 }

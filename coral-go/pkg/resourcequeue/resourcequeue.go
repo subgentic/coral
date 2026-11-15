@@ -40,7 +40,9 @@ type Resource struct {
 	MaxLease time.Duration // a claim is held this long unless renewed (0: DefaultLease)
 	Allowed  []string      // agents that may claim it; empty: everyone
 	Members  []string      // a pool (#13719): the resources whose slots this one hands out, in the order they are tried; a pool has no slots of its own; its Match makes the shell hook claim the pool (a grant on another machine is told to the agent, #13751)
-	Match    []string      // shell commands that claim it by themselves (the hook, #13645): each a list of words that must appear in order in one simple command, such as "go test ./..."; empty: no hook
+	// Description is the resource's own how-to (#17560): what it runs, how to reach it and its rules, in a few lines of plain text, set by the Operator or an Orchestrator. A redefine that leaves it out keeps the stored one.
+	Description string
+	Match       []string // shell commands that claim it by themselves (the hook, #13645): each a list of words that must appear in order in one simple command, such as "go test ./..."; empty: no hook
 }
 
 // Claimant is who asks, and how much it matters.
@@ -289,6 +291,9 @@ func (q *Queue) Define(r Resource) error {
 	cp.Members = append([]string(nil), r.Members...)
 	cp.Allowed = append([]string(nil), r.Allowed...)
 	cp.Match = append([]string(nil), r.Match...)
+	if old, ok := q.res[r.Key]; ok && cp.Description == "" {
+		cp.Description = old.Description
+	}
 	q.res[r.Key] = &cp
 	granted := q.fill(r.Key)
 	err := q.save()

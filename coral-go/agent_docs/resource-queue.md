@@ -6,6 +6,8 @@ A **resource** is a shared thing with a number of **slots**, such as `mac-heavy`
 
 ## For an agent
 
+**Read what a resource is for before you pick one** (#17560): `coral-board resource info <name>` prints its description (what it runs, how to reach it, its rules) and its machine now (up or unreachable, load per core, memory and disk free). `resource list` shows the first lines of each, and a claim prints the first three when it grants a slot or gives you a place. A machine that is idle and can run your work (a Go-only box for a Go test) beats a line on a busy one.
+
 Claim before anything that loads the machine: a full `go test ./...`, a browser gate, the CDP suites, a release or installer build, anything that runs for minutes or starts many processes. Do not claim for a quick `go build`, a read, or a single small test.
 
 ```
@@ -32,7 +34,7 @@ Do not post "starting a heavy run" and "run finished" notes for a resource you c
 
 ## For the Orchestrator and the Operator
 
-- Define resources: `coral-board resource define mac-heavy --slots 1 --machine mac --lease 30m` (and one for each other machine). `--here` or `--remote` says where a run through the resource happens (`coral-board heavy run`): on the machine this Coral is on, or on another one, through the ssh alias `coral-heavy-<machine>`; a resource with neither is refused by `heavy run`. `--allow a,b` limits who may claim one. `--match "go test ./..."` (repeat it) turns on the shell hook for the resource (below). Names are letters, digits, dot, dash and underscore.
+- Define resources: `coral-board resource define mac-heavy --slots 1 --machine mac --lease 30m --description "Operator's Mac: Go, node and Chrome; run here: this machine; one heavy run at a time"` (and one for each other machine). **`--description` is required for a new resource** (plain text, up to 6 lines and 600 characters): what it runs, how to reach it (such as `ssh epoch`) and its rules. A redefine that leaves it out keeps the stored one. A resource that says `--here` or `--remote` also shows its machine's stats, sampled at most once a minute (a remote one over ssh to the machine's name; "unreachable" when ssh fails). `--here` or `--remote` says where a run through the resource happens (`coral-board heavy run`): on the machine this Coral is on, or on another one, through the ssh alias `coral-heavy-<machine>`; a resource with neither is refused by `heavy run`. `--allow a,b` limits who may claim one. `--match "go test ./..."` (repeat it) turns on the shell hook for the resource (below). Names are letters, digits, dot, dash and underscore.
 - Reorder the line: `coral-board resource move <entry-id> first|up|down` (entry ids are in `resource list`). After a move the line stands as set; later arrivals join behind it.
 - Free a slot: `coral-board resource kick <entry-id>` drops a holder or a waiting entry. `resource remove <name>` deletes a resource.
 - Only the Operator and a registered Orchestrator (the launch record, not a name or title) can define, remove, move or kick; an ordinary agent gets `manager_only` (403).

@@ -22,6 +22,7 @@ type resStub struct {
 	grantAt  int // the claim that is granted (1: at once)
 	status   int
 	respText string
+	how      string // the answer to GET /api/resources/<name> when set (#17560)
 }
 
 func (s *resStub) handler(w http.ResponseWriter, r *http.Request) {
@@ -45,6 +46,10 @@ func (s *resStub) handler(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusAccepted)
 		w.Write([]byte(`{"granted":false,"place":2,"entry":{"id":1}}`))
+		return
+	}
+	if s.how != "" && r.Method == "GET" && strings.Count(r.URL.Path, "/") == 3 {
+		w.Write([]byte(s.how))
 		return
 	}
 	w.Write([]byte(`{"resources":[{"name":"mac-heavy","slots":1,"machine":"mac","holders":[{"id":1,"agent":"Dev\u001b[31mA","task":7,"note":"gate","lease_until":"2999-01-01T00:00:00Z"}],"queue":[{"id":2,"agent":"Me","place":1}]}],"ok":true}`))
@@ -81,7 +86,7 @@ func TestResourceClaimThatMustWaitSaysSoAndExitsWithoutWait(t *testing.T) {
 	if !exited || !strings.Contains(out, "number 2 in line") || !strings.Contains(out, "--wait") {
 		t.Fatalf("exited=%v out=%q", exited, out)
 	}
-	if len(s.reqs) != 1 {
+	if n := strings.Count(strings.Join(s.reqs, " "), "POST "); n != 1 {
 		t.Fatalf("looked again without --wait: %v", s.reqs)
 	}
 }
@@ -185,6 +190,9 @@ func TestAClaimSendsItsParentProcessSoABackgroundJobCanKeepTheSlot(t *testing.T)
 		t.Fatalf("want a claim and a look again, got %d", len(s.bodies))
 	}
 	for _, b := range s.bodies {
+		if len(b) == 0 { // the read of the resource's description after the grant (#17560) has no body
+			continue
+		}
 		if got, _ := b["parent_pid"].(float64); int(got) != os.Getppid() {
 			t.Fatalf("parent_pid %v, want %d: %v", b["parent_pid"], os.Getppid(), b)
 		}
@@ -235,5 +243,40 @@ func TestTheListShowsAnIdleHolder(t *testing.T) {
 	})
 	if !strings.Contains(out, "Idle Dev [idle for 3 min") || strings.Contains(strings.Split(out, "Busy Dev")[1], "idle") {
 		t.Fatalf("the list: %q", out)
+	}
+}
+
+const howJSON = `{"name":"epoch-go","slots":2,"machine":"epoch","description":"Linux box: Go tests only, no node or Chrome.\nReach it: ssh epoch\nRule: nothing during a tag run.\nFourth line.","stats":{"state":"ok","load_per_core":0.5,"cpu_count":8,"mem_available_mb":24000,"disk_free_gb":50}}`
+
+// #17560: a claim tells the agent what the machine is for and how it is doing, in a few lines, before it runs; resource info says all of it.
+func TestAClaimPrintsTheResourcesHowToAndInfoPrintsAllOfIt(t *testing.T) {
+	s := &resStub{grantAt: 1, how: howJSON}
+	out, exited := runResource(t, s, "claim", "epoch-go")
+	if exited || !strings.Contains(out, "You hold a slot of epoch-go") || !strings.Contains(out, "Go tests only, no node or Chrome.") || !strings.Contains(out, "ssh epoch") {
+		t.Fatalf("exited=%v out=%q", exited, out)
+	}
+	if strings.Contains(out, "Fourth line.") || !strings.Contains(out, "more: coral-board resource info epoch-go") {
+		t.Fatalf("a claim says three lines and where the rest is: %q", out)
+	}
+	if !strings.Contains(out, "machine now: up; load 0.50 per core on 8 cores; 24000 MB memory free; 50 GB disk free") {
+		t.Fatalf("the stats line: %q", out)
+	}
+	info, exited := runResource(t, &resStub{how: howJSON}, "info", "epoch-go")
+	if exited || !strings.Contains(info, "Fourth line.") || !strings.Contains(info, "epoch-go on epoch: 2 slot(s)") || !strings.Contains(info, "machine now: up") {
+		t.Fatalf("info: exited=%v out=%q", exited, info)
+	}
+	none, _ := runResource(t, &resStub{how: `{"name":"old","slots":1}`}, "info", "old")
+	if !strings.Contains(none, "no description yet") {
+		t.Fatalf("a resource defined before descriptions says so: %q", none)
+	}
+}
+
+func TestResourceDefineSendsTheDescription(t *testing.T) {
+	s := &resStub{}
+	if out, exited := runResource(t, s, "define", "epoch-go", "--slots", "2", "--description", "Linux, Go only. ssh epoch"); exited {
+		t.Fatalf("out=%q", out)
+	}
+	if s.bodies[0]["description"] != "Linux, Go only. ssh epoch" {
+		t.Fatalf("body %v", s.bodies[0])
 	}
 }
