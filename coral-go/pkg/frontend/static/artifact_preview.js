@@ -165,33 +165,6 @@ function _renderSandboxed(body, { url, content, name, isStale }) {
     body.replaceChildren(wrapper);
 }
 
-function _addHtmlSourceToggle(body, opts) {
-    const { content, filename, path, source, ctx, options, opened } = opts;
-    const wrapper = body.querySelector('.artifact-linked-preview');
-    if (!wrapper) return;
-    const bar = wrapper.querySelector('.artifact-scripts-bar') || wrapper.querySelector('.artifact-linked-notice');
-    if (!bar) return;
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'inline-preview-mode-btn artifact-html-source-btn';
-    btn.textContent = 'View source';
-    btn.addEventListener('click', () => {
-        ctx.renderContent(body, content, path, source.server);
-        const back = document.createElement('button');
-        back.type = 'button';
-        back.className = 'back-link artifact-html-back';
-        back.textContent = '← HTML preview';
-        back.addEventListener('click', async () => {
-            _renderSandboxed(body, { content, name: filename, isStale: ctx.isStale });
-            if (ctx.resetContent) ctx.resetContent();
-            if (options.scripts && opened && !isCloud() && !ctx.isStale()) await _scriptsFor(body, { hex: opened[1], content, name: filename, server: source.server, board: options.board || '', ctx });
-            if (!ctx.isStale()) _addHtmlSourceToggle(body, opts);
-        });
-        body.insertBefore(back, body.firstChild);
-    });
-    bar.append(btn);
-}
-
 /** The preview of an HTML file with the person's choice about scripts (#14730): trusted (this exact version) runs them in the host frame; otherwise the plain preview gets the "Run scripts…" offer.
  *  Never throws and fails closed: a trust that cannot be read, a hash that does not match or a file over 2 MiB leaves the plain preview. */
 async function _scriptsFor(body, { hex, content, name, server, board, ctx }) {
@@ -325,7 +298,7 @@ async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
                 rendered = true;
                 // Scripts: only in the single-artifact viewer (it passes options.scripts), for a stored file, on a computer that is not the Hub (#14730: its host header is not live there yet).
                 if (options.scripts && opened && !isCloud() && !ctx.isStale()) await _scriptsFor(body, { hex: opened[1], content, name: filename, server: source.server, board: options.board || '', ctx });
-                if (!ctx.isStale() && ctx.renderContent) _addHtmlSourceToggle(body, { content, filename, path: artifactPath, source, ctx, options, opened });
+                if (!ctx.isStale() && ctx.renderContent) importOnce('./artifact_html_source.js').then(m => m.addToggle(body, { content, filename, path: artifactPath, source, ctx, options, opened, render: _renderSandboxed, scripts: _scriptsFor, isCloud })).catch(() => {});
                 return;
             }
             const delimited = [type, declaredType].some(v => v === 'text/tab-separated-values') || filenameHints.some(n => /\.tsv$/i.test(n)) ? 'tsv'

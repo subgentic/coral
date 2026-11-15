@@ -21,9 +21,8 @@ const HTML_CONTENT = '<h1>Hello</h1><p>World</p>';
         await ev(`import(${S} + 'artifact_viewer.js').then(v => v.openArtifactViewer('${HEX}', { filename: 'page.html', mediaType: 'text/html' })).then(() => true)`);
         await waitFor(`!!document.querySelector('#artifact-viewer .artifact-linked-preview iframe')`, 'rendered preview', 10000);
 
-        // 1. The View source button is on the notice bar
-        const hasBtn = await ev(`!!document.querySelector('#artifact-viewer .artifact-html-source-btn')`);
-        assert.ok(hasBtn, 'View source button is present on the HTML preview');
+        // 1. The View source button is on the notice bar (lazy-loaded via importOnce, so it appears asynchronously)
+        await waitFor(`!!document.querySelector('#artifact-viewer .artifact-html-source-btn')`, 'View source button', 5000);
 
         // 2. Click View source: the preview is replaced by code text and a back link
         await ev(`document.querySelector('#artifact-viewer .artifact-html-source-btn').click(); true`);
@@ -42,20 +41,19 @@ const HTML_CONTENT = '<h1>Hello</h1><p>World</p>';
         assert.ok(!sourceState.hasIframe, 'iframe is gone in source view');
         assert.ok(sourceState.codeText.includes('<h1>Hello</h1>'), 'source shows the HTML content');
 
-        // 3. Click back: the rendered preview is restored
+        // 3. Click back: the rendered preview is restored (the toggle re-attaches after the async restorePreview)
         await ev(`document.querySelector('#artifact-viewer .artifact-html-back').click(); true`);
         await waitFor(`!!document.querySelector('#artifact-viewer .artifact-linked-preview iframe')`, 'restored preview', 10000);
+        await waitFor(`!!document.querySelector('#artifact-viewer .artifact-html-source-btn')`, 'View source re-added', 5000);
         const restored = await ev(`(() => {
             const body = document.querySelector('#artifact-viewer .artifact-viewer-body');
             return {
                 hasIframe: !!body.querySelector('.artifact-linked-preview iframe'),
-                hasCode: !!body.querySelector('.preview-pane-code'),
-                hasSourceBtn: !!body.querySelector('.artifact-html-source-btn')
+                hasCode: !!body.querySelector('.preview-pane-code')
             };
         })()`);
         assert.ok(restored.hasIframe, 'iframe is back in rendered view');
         assert.ok(!restored.hasCode, 'code view is gone');
-        assert.ok(restored.hasSourceBtn, 'View source button is re-added');
 
         await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
     } finally { await client.close(); }
