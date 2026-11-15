@@ -1,6 +1,6 @@
 import { DOMPURIFY_CONFIG, sanitizeHtml, keepFragmentsInside } from './utils.js';
 
-/* A Markdown file's front matter (a skill's name, description, metadata) as a small key/value header (#16651). Loaded only for a text that starts with a --- line. */
+/* A Markdown file's front matter (a skill's name, description, metadata) as a small key/value header (#16651). A workspace file can be agent-written, so its links follow the file policy as in preview_content.js (#3542). Loaded after a Markdown preview is drawn; it acts only on a text that starts with a --- line. */
 
 /** { facts: [[key, value]], rest }: the leading `---` block of `key: value` lines split from the Markdown after it. Indented lines continue the key above; an unclosed block (40 lines) or one with no key is not front matter. */
 export function splitMarkdownFrontMatter(text) {
