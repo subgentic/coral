@@ -14,11 +14,15 @@ const { coralReady } = require('./helpers/wait');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(STUB);
+        await ev(`window.__m.add('coral-go', 'm', 6, { sleeping: false, session_id: 'o1' }); true`);
+        await new Promise(r => setTimeout(r, 600));
+        await ev(`window.selectLiveSession('coral-go', 'claude', 'o1', 'local'); true`);
+        await waitFor(`!!document.getElementById('command-input')`, 'the agent is selected', 10000);
 
         // open the artifact in the preview pane as a tab
         await ev(`import(${S} + 'preview_pane.js').then(m => { m.openArtifactTab('coral://artifacts/${H3}', { filename: 'release-plan.md', board: 'team-a' }); return true; })`);
-        await waitFor(`document.querySelectorAll('.preview-tab[data-kind="artifact"]').length > 0`, 'the preview tab exists', 5000);
-        const before = await ev(`document.querySelectorAll('.preview-tab[data-kind="artifact"]').length`);
+        await waitFor(`document.querySelectorAll('#preview-tabs .preview-tab').length > 0`, 'the preview tab exists', 5000);
+        const before = await ev(`document.querySelectorAll('#preview-tabs .preview-tab').length`);
         assert.ok(before >= 1, 'the artifact has a preview tab before the viewer opens: ' + before);
 
         // open the same artifact in the full viewer
@@ -26,7 +30,7 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`!document.querySelector('#artifact-viewer').hidden`, 'the full viewer is open', 8000);
 
         // the preview tab for that artifact should be gone
-        const after = await ev(`document.querySelectorAll('.preview-tab[data-kind="artifact"]').length`);
+        const after = await ev(`document.querySelectorAll('#preview-tabs .preview-tab').length`);
         assert.equal(after, 0, 'the preview tab closed when the full viewer opened: ' + after);
 
         // close the viewer
