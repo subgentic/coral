@@ -81,7 +81,7 @@ const { settle, coralReady } = require('./helpers/wait');
             assert.equal(into[0], 'Message', `${w} px: Tab from the control before the composer reaches the text box first (got ${into[0]})`);
             const after = await tabs(mobile ? 3 : 12);
             if (mobile) {
-                assert.deepEqual(after, ['Attach an image; type @ for a file in this folder', 'Send options', 'Send'], `${w} px: after the text box come the attach button, Send options (the team reminder is in it, #7063) and Send`);
+                assert.deepEqual(after, ['Attach an image; type @ for a file in this folder', 'Model, thinking and send options', 'Send'], `${w} px: after the text box come the attach button, Send options (the team reminder is in it, #7063) and Send`);
             } else {
                 const iStop = after.indexOf('Stop (Escape)'), iSend = after.indexOf('Send command'), iOpts = after.indexOf('Send options');
                 assert.ok(iStop >= 0 && iSend > iStop && iOpts > iSend, `${w} px: after the text box Tab reaches Stop, then Send, then Send options (got ${JSON.stringify(after)})`);

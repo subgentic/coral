@@ -5,6 +5,8 @@ import { teamLabel } from './server_status.js';
 import { splitKey } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { visibleName } from './artifact_names.js';
+import { allStarredFiles } from './local_store.js';
+import { state as appState } from './state.js';
 const DT = await importOnce('./data_table.js');
 
 const STALE_MS = 30000;
@@ -47,6 +49,31 @@ export const starredArtifactsSignature = () => JSON.stringify([state.busy, state
 export const hasStarredArtifacts = () => state.rows.length > 0 || !!state.error;
 
 const hexOf = row => String(row.id || '').replace(/^sha256:/, '').toLowerCase();
+
+/** Files starred in an agent's Files panel (kept on this browser, per agent): one row each, the file's name, its folder and the agent; a click opens the agent. */
+export function starredFileRows() {
+    const live = appState.liveSessions || [];
+    return allStarredFiles().flatMap(({ sid, files }) => { const s = live.find(x => x.session_id === sid); return files.map(path => ({ sid, path, agent: s ? (s.display_name || s.name) : '', session: s })); });
+}
+export const starredFileCount = () => starredFileRows().length;
+export const starredFilesSignature = () => JSON.stringify(starredFileRows().map(r => [r.sid, r.path, r.agent]));
+export function starredFilesSection() {
+    const rows = starredFileRows(); if (!rows.length) return null;
+    const section = DT.el('section', 'inbox-starred-files');
+    section.setAttribute('aria-label', 'Starred files');
+    section.append(DT.el('h3', 'group-head group-head-lg', 'Starred files'));
+    const base = p => String(p).split(/[\\/]/).filter(Boolean).pop() || p;
+    const table = DT.dataTable({
+        label: `Starred files, ${rows.length}`, rows, rowKey: r => `${r.sid}:${r.path}`, state: DT.tableState(), oneLine: true, resize: true, sortBar: false,
+        open: r => { if (!r.session) return; window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(r.session.name, r.session.agent_type, r.session.session_id)).catch(() => {}); },
+        columns: [
+            { key: 'name', label: 'Name', primary: true, width: 'grow', cell: r => { const b = DT.primaryButton(base(r.path), r.session ? `Open ${base(r.path)} in ${r.agent}` : base(r.path)); b.title = r.path; return b; } },
+            { key: 'agent', label: 'Agent', width: '10rem', dropAt: 36, cell: r => r.agent || 'An agent that is not running' },
+        ],
+    });
+    section.append(table.el);
+    return section;
+}
 
 /** The Starred artifacts part of the folder, or null when there are none (and nothing failed). */
 export function starredArtifactsSection() {

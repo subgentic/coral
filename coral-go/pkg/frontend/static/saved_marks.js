@@ -12,8 +12,8 @@ import { setInboxCount } from './inbox_tab.js'; // the count on the Inbox's Save
 
 // The bookmark is an inline SVG (the shape the Team Artifacts' Keep button uses), filled when saved: the Material Icons subset has no bookmark.
 const BOOKMARK_SVG = '<svg class="bm" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h8v11L8 10.5l-4 3z"/></svg>';
-export const SAVE_BUTTON = `<button type="button" class="btn btn-quiet btn-icon btn-xs chat-save-btn" title="Save for later" aria-label="Save for later" aria-pressed="false">${BOOKMARK_SVG}</button>`;
-export const BOARD_SAVE_BUTTON = (ref, title, said, author = '') => `<button type="button" class="btn btn-quiet btn-icon btn-xs mb-save-btn" data-conv-ref="${escapeAttr(ref)}" data-conv-title="${escapeAttr(title)}" data-said="${escapeAttr(said)}" data-author="${escapeAttr(author)}" title="Save for later" aria-label="Save for later" aria-pressed="false">${BOOKMARK_SVG}</button>`;
+export const SAVE_BUTTON = `<button type="button" class="btn btn-quiet btn-icon btn-xs chat-save-btn" title="Save message" aria-label="Save message" aria-pressed="false">${BOOKMARK_SVG}</button>`;
+export const BOARD_SAVE_BUTTON = (ref, title, said, author = '') => `<button type="button" class="btn btn-quiet btn-icon btn-xs mb-save-btn" data-conv-ref="${escapeAttr(ref)}" data-conv-title="${escapeAttr(title)}" data-said="${escapeAttr(said)}" data-author="${escapeAttr(author)}" title="Save message" aria-label="Save message" aria-pressed="false">${BOOKMARK_SVG}</button>`;
 
 // The conversation a message button belongs to: {kind, ref, server, agentType, title}, or null where there is nothing to save to. ref is the id or name the server
 // that has the conversation knows it by (a board's bare name, not the hub's server/name key); server is that server ("local" for this one).
@@ -83,7 +83,7 @@ export function aboutRow(btn) {
 
 /** The button's name for its state, with the message it is on (a list of these must not read as the same button). */
 export function nameSaveButton(btn) {
-    const label = btn.getAttribute('aria-pressed') === 'true' ? 'Remove from saved' : 'Save for later';
+    const label = btn.getAttribute('aria-pressed') === 'true' ? 'Remove from Saved messages' : 'Save message';
     const about = aboutRow(btn);
     btn.setAttribute('aria-label', about ? `${label}: message from ${about}` : label);
     return label;
@@ -241,13 +241,13 @@ document.addEventListener('click', async (e) => {
             if (!r.ok && r.status !== 404) throw new Error(`HTTP ${r.status}`);
             entry.items.delete(key);
             paint(btn, false);
-            showToast('Removed from saved.', false, 6000, { action: { label: 'Undo', onClick: async () => {
+            showToast('Removed from Saved messages.', false, 6000, { action: { label: 'Undo', onClick: async () => {
                 try { await save(c, key, body); syncSavedButtons(btn.closest('#live-history-messages, #history-messages, #mb-messages')); document.dispatchEvent(new CustomEvent('coral:saved-changed')); } catch (err) { showToast(`Could not save the message again: ${err.message}`, true); }
             } } });
         } else {
             await save(c, key, body);
             paint(btn, true);
-            showToast('Saved.', false, 5000, { action: { label: 'View saved', onClick: () => importOnce('./saved.js').then(m => m.openSaved()).catch(() => {}) } });
+            showToast('Saved.', false, 5000, { action: { label: 'View Saved messages', onClick: () => importOnce('./saved.js').then(m => m.openSaved()).catch(() => {}) } });
         }
         document.dispatchEvent(new CustomEvent('coral:saved-changed'));
     } catch (err) {

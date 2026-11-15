@@ -31,7 +31,7 @@ const TEAM = `qa-paths-${Date.now() % 100000}`;
             await ev(`window.switchNavTab('hub-inbox'); true`); await inboxReady(); await settle(300);
             await pickFolder('needs', mobile); await folderTitle('Needs you');
             check(`${label}: opening Needs you writes /inbox/needs`, (await path()) === '/inbox/needs', await path());
-            await pickFolder('saved', mobile); await folderTitle('Saved');
+            await pickFolder('saved', mobile); await folderTitle('Saved messages');
             check(`${label}: opening Saved writes /inbox/saved`, (await path()) === '/inbox/saved', await path());
             await pickFolder('chats-starred', mobile); await folderTitle('Starred');
             check(`${label}: opening Starred writes /inbox/chats/starred`, (await path()) === '/inbox/chats/starred', await path());
@@ -41,7 +41,7 @@ const TEAM = `qa-paths-${Date.now() % 100000}`;
             // Back goes to the folder before, and shows it
             await ev(`history.back(); true`); await folderTitle('Starred');
             check(`${label}: Back from All chats shows Starred, at its path`, (await path()) === '/inbox/chats/starred', await path());
-            await ev(`history.back(); true`); await folderTitle('Saved');
+            await ev(`history.back(); true`); await folderTitle('Saved messages');
             check(`${label}: Back again shows Saved`, (await path()) === '/inbox/saved', await path());
             await ev(`history.forward(); true`); await folderTitle('Starred');
             check(`${label}: Forward shows Starred again`, (await path()) === '/inbox/chats/starred', await path());
@@ -53,7 +53,7 @@ const TEAM = `qa-paths-${Date.now() % 100000}`;
             // a reload and a pasted link open the folder
             await load('/inbox/chats/starred'); await inboxReady(); await folderTitle('Starred');
             check(`${label}: a reload of /inbox/chats/starred opens Starred and keeps the address`, (await path()) === '/inbox/chats/starred', await path());
-            await load('/inbox/saved'); await inboxReady(); await folderTitle('Saved');
+            await load('/inbox/saved'); await inboxReady(); await folderTitle('Saved messages');
             check(`${label}: a link to /inbox/saved opens Saved`, (await path()) === '/inbox/saved', await path());
             await load('/inbox/artifacts'); await inboxReady(); await folderTitle('Artifacts');
             check(`${label}: a link to /inbox/artifacts opens Artifacts`, (await path()) === '/inbox/artifacts', await path());

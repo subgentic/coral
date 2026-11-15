@@ -228,9 +228,10 @@ function _renderMenu(kind) {
     let html = '';
     if (kind === 'model') {
         const models = (_data && _data.models) || [];
+        const cur = models.map(m => m.value).find(v => s.model?.startsWith(v) && /^(-\d{8})?$/.test(s.model.slice(v.length))); // the value that is the agent's model or its dated id (-YYYYMMDD) and nothing longer: claude-opus-5-5 is not claude-opus-5, nor is claude-opus-5-6 (#17751)
         if (models.length) {
             html = `<div class="model-chip-group" role="group" aria-label="Model"><div class="model-chip-head">Model ${how}</div>`
-                + models.map(m => item('model', m.value, (m.display_name || m.value) + (m.group ? ` (${m.group})` : '') + (m.custom === true ? ' (custom)' : ''), m.value === s.model)).join('') + '</div>';
+                + models.map(m => item('model', m.value, (m.display_name || m.value) + (m.group ? ` (${m.group})` : '') + (m.custom === true ? ' (custom)' : ''), m.value === cur)).join('') + '</div>';
         }
     } else {
         const levels = _levelsFor(s.model);
@@ -353,7 +354,7 @@ async function _apply(change) {
         const resp = await serverFetch(_cur.server, `/api/sessions/live/${encodeURIComponent(name)}/model`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
         });
-        if (resp.status === 202) return; // the row's model_switch takes over
+        if (resp.status === 202) return showToast((await importOnce('./model_chip_refusal.js')).appliedWords(change, target)); // the row's model_switch takes over; say when it lands, so nobody wonders about a restart (#17334)
         _local = null;
         const out = await resp.json().catch(() => ({}));
         if (resp.status === 409 && out.code === 'needs_restart') { _viaRestart(change); return; }
@@ -365,20 +366,9 @@ async function _apply(change) {
     updateModelChip(s, _cur && _cur.server);
 }
 
-/** "Apply with restart": the Restart dialog, opened with the choice filled in (the dialog is the confirmation). */
+/** "Apply with restart": the Restart dialog, opened with the choice filled in (the dialog is the confirmation); its own lazy module, a restart is rare. */
 async function _viaRestart(change) {
-    if (typeof window.restartSession !== 'function' || !_cur) return;
-    const running = _cur.session;
-    window.restartSession();
-    for (let i = 0; i < 50 && !document.querySelector('#restart-acf .acf-model'); i++) await new Promise(r => setTimeout(r, 100));
-    const { setAgentConfig, getAgentConfig } = await importOnce('./agent_config_form.js');
-    const cfg = getAgentConfig('restart-acf');
-    // The choice, over what the agent runs now: a level chosen for a model it is not yet on belongs to the model it is on.
-    setAgentConfig('restart-acf', {
-        ...cfg,
-        model: change.model !== undefined ? change.model : (running.model || cfg.model),
-        ...(change.thinking !== undefined ? { thinking: change.thinking } : {}),
-    });
+    if (typeof window.restartSession === 'function' && _cur) (await importOnce('./model_chip_restart.js')).viaRestart(change, _cur.session);
 }
 
 // ── Add a model… ─────────────────────────────────────────────────────────

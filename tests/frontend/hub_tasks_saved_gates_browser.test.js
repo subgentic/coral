@@ -69,7 +69,7 @@ const {coralReady}=require('./helpers/wait');
    const savedCheck=await ev(`import((window.__coralStatic||'/static/')+'saved.js').then(async m=>{await m.setSavedQuery('private snippet m1');const view=m.savedView(),it=view.shown[0];return {sources:view.shown.map(i=>i.server),capped:view.capped,notice:view.notice,done:await m.savedSetDone(it,true),remove:await m.savedRemove(it)}})`);
    assert.deepEqual(savedCheck.sources,['m1'],'colliding bookmark ids remain source-qualified and filters stay in memory');assert.equal(savedCheck.capped,true);assert.match(savedCheck.notice,/owner sees/);assert.equal(savedCheck.done,false);assert.equal(savedCheck.remove,false);
    assert.equal(await ev('window.__personalCalls.length'),before,'search and read-only actions issue no request');
-   assert.equal(await ev(`!![...document.querySelectorAll('#group-table-view button')].find(b=>/^(Mark done|Reopen, move|Remove from saved)/.test(b.getAttribute('aria-label')||''))`),false,'read-only native Saved has no mutation buttons');
+   assert.equal(await ev(`!![...document.querySelectorAll('#group-table-view button')].find(b=>/^(Mark done|Reopen, move|Remove from Saved)/.test(b.getAttribute('aria-label')||''))`),false,'read-only native Saved has no mutation buttons');
    const expanded=await ev(`import((window.__coralStatic||'/static/')+'inbox_coral.js').then(async m=>{const result=await m.coralInboxAdapter.readSavedMessage({server:'m1',id:1});let refused=false;try{await m.coralInboxAdapter.readSavedMessage({server:'m3',id:1})}catch{refused=true}return {result,refused}})`);
    assert.deepEqual(expanded,{result:{text:'Stored source m1',partial:true,reason:'too_long'},refused:true});
    const versionBefore=await ev('window.__personalCalls.length');

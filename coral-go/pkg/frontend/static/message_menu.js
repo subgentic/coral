@@ -37,7 +37,7 @@ export async function openMessageMenu(btn) {
     if (bubble.classList.contains('assistant')) { const src = (await importOnce('./chat_messages.js')).bubbleSource.get(bubble); if (src) text = src.trim(); } // a reply is copied and sent as the agent wrote it (its markdown), as its Copy button does (#10540)
     item(menu, 'Copy', async () => { if (!(await copyText(text))) showToast('Could not copy', true); });
     const save = bubble.querySelector('.chat-save-btn');
-    if (save) item(menu, save.getAttribute('aria-pressed') === 'true' ? 'Remove from saved' : 'Save for later', () => save.click());
+    if (save) item(menu, save.getAttribute('aria-pressed') === 'true' ? 'Remove from Saved messages' : 'Save message', () => save.click());
     if (!bubble.classList.contains('assistant')) item(menu, 'Edit as a new message', () => editAsNew(text)); // the text goes in the box to change and send (#10533)
     const r = btn.getBoundingClientRect();
     openMenu(btn);
