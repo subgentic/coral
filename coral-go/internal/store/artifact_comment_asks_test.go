@@ -101,21 +101,24 @@ func TestDeletingAnArtifactsCommentsDropsItsAsks(t *testing.T) {
 	assert.True(t, found, "another artifact's ask stays")
 }
 
-// #17361: an agent that answers a comment with a new version of the file has answered it: its open asks on the older versions end, so the question does not stay open for the old file.
-func TestANewVersionByTheAskedAgentClosesItsOpenAsksOnTheOlderVersions(t *testing.T) {
+// #17361: a new version of the file answers the question about the older one: the team's open asks on the older versions end, whichever of its agents they were put to; another team's stay.
+func TestANewVersionClosesTheTeamsOpenAsksOnTheOlderVersions(t *testing.T) {
 	ctx := context.Background()
 	s := newCommentStore(t)
 	now := time.Now()
 	for _, c := range []struct {
-		id    int64
-		agent string
-	}{{1, "sess-1"}, {2, "sess-2"}} {
-		_, _, err := s.CreateArtifactAsk(ctx, c.id, artA, "team-a", c.agent, "x", now)
+		id           int64
+		board, agent string
+	}{{1, "team-a", "sess-1"}, {2, "team-a", "sess-2"}, {3, "team-b", "sess-3"}} {
+		_, _, err := s.CreateArtifactAsk(ctx, c.id, artA, c.board, c.agent, "x", now)
 		require.NoError(t, err)
 	}
-	require.NoError(t, s.CloseOpenAsksOfVersions(ctx, []string{artA}, "sess-1", now.Add(time.Minute)))
-	a1, _, _ := s.GetArtifactAsk(ctx, 1, "sess-1")
-	a2, _, _ := s.GetArtifactAsk(ctx, 2, "sess-2")
-	assert.False(t, a1.OpenAt(now.Add(2*time.Minute)), "the agent that uploaded the new version has answered")
-	assert.True(t, a2.OpenAt(now.Add(2*time.Minute)), "another agent's ask stays open")
+	require.NoError(t, s.CloseOpenAsksOfVersions(ctx, []string{artA}, "team-a", now.Add(time.Minute)))
+	later := now.Add(2 * time.Minute)
+	for id, agent := range map[int64]string{1: "sess-1", 2: "sess-2"} {
+		a, _, _ := s.GetArtifactAsk(ctx, id, agent)
+		assert.False(t, a.OpenAt(later), "the team's ask %d on the older version is answered", id)
+	}
+	b, _, _ := s.GetArtifactAsk(ctx, 3, "sess-3")
+	assert.True(t, b.OpenAt(later), "another team's ask stays open")
 }

@@ -149,10 +149,11 @@ func (s *SessionStore) CloseArtifactAsks(ctx context.Context, commentID int64, n
 	return err
 }
 
-// CloseOpenAsksOfVersions ends the open asks of agentSession on the comments of the given artifact versions: the agent answered by uploading a new version of the file (#17361).
-func (s *SessionStore) CloseOpenAsksOfVersions(ctx context.Context, artifactIDs []string, agentSession string, now time.Time) error {
+// CloseOpenAsksOfVersions ends the open asks of a team (board) on the comments of the given artifact versions: someone on that team answered by uploading the next version of the file, so the question
+// about the older version is answered, whichever of the team's agents it was put to (#17361, walk 67). Another team's asks stay.
+func (s *SessionStore) CloseOpenAsksOfVersions(ctx context.Context, artifactIDs []string, board string, now time.Time) error {
 	for _, id := range artifactIDs {
-		if _, err := s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET closed_at = ? WHERE artifact_id = ? AND agent_session = ? AND closed_at IS NULL`, now.UTC().Format(ISOFormat), id, agentSession); err != nil {
+		if _, err := s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET closed_at = ? WHERE artifact_id = ? AND board = ? AND closed_at IS NULL`, now.UTC().Format(ISOFormat), id, board); err != nil {
 			return err
 		}
 	}
