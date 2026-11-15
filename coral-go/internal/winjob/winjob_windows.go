@@ -8,6 +8,7 @@ package winjob
 import (
 	"errors"
 	"os/exec"
+	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -66,3 +67,44 @@ func (j *Job) Kill() error { return windows.TerminateJobObject(j.h, 1) }
 
 // Close ends every process still in the job and releases it.
 func (j *Job) Close() error { return windows.CloseHandle(j.h) }
+
+// Suspended makes c start with its main thread suspended (#17721): nothing of the command runs until Resume, so Assign puts it in the job before it can start a child that would be outside it. Call it before Start.
+func Suspended(c *exec.Cmd) {
+	if c.SysProcAttr == nil {
+		c.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	c.SysProcAttr.CreationFlags |= windows.CREATE_SUSPENDED
+}
+
+// Resume lets a command started with Suspended run: a new process has the one thread, found by the process id.
+func Resume(c *exec.Cmd) error {
+	if c.Process == nil {
+		return errors.New("winjob: the command is not started")
+	}
+	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPTHREAD, 0)
+	if err != nil {
+		return err
+	}
+	defer windows.CloseHandle(snap)
+	te := windows.ThreadEntry32{Size: uint32(unsafe.Sizeof(windows.ThreadEntry32{}))}
+	resumed := 0
+	for e := windows.Thread32First(snap, &te); e == nil; e = windows.Thread32Next(snap, &te) {
+		if te.OwnerProcessID != uint32(c.Process.Pid) {
+			continue
+		}
+		th, err := windows.OpenThread(windows.THREAD_SUSPEND_RESUME, false, te.ThreadID)
+		if err != nil {
+			return err
+		}
+		_, err = windows.ResumeThread(th)
+		windows.CloseHandle(th)
+		if err != nil {
+			return err
+		}
+		resumed++
+	}
+	if resumed == 0 {
+		return errors.New("winjob: the suspended command has no thread to resume")
+	}
+	return nil
+}
