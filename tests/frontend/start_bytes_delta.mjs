@@ -3,7 +3,7 @@
 // TestStartPathWeight only checks the ceilings (baseline + 2 percent), so a change that adds 100 bytes passes it again and again until the room is gone. The net-zero rule is this check.
 //   node tests/frontend/start_bytes_delta.mjs [base-ref]        (run it inside your worktree; default base: the merge-base of HEAD and origin/main)
 // `npm run test:cloud` runs it (#18186), so every author sees a growth before submitting. It builds both trees with the Go test TestStartPathWeight (the same numbers the gate uses): the base in a temporary git worktree, removed again. Needs go and git on the PATH; no packages.
-import { execFileSync } from 'node:child_process';
+import { execFileSync } from './helpers/child_process.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -49,7 +49,7 @@ function main() {
         git('worktree', 'add', '--detach', '-q', wt, base);
         const result = compare(weighTree(wt), weighTree(top));
         console.log(result.line);
-        if (result.grew) { console.error('the start path grew: move the code into a lazy module (importOnce) or remove as much as you add (net zero)'); process.exitCode = 1; }
+        if (result.grew) { console.error('the start path grew: move the code into a lazy module (importOnce) or remove as much as you add (net zero); if origin/main is old here, `git fetch origin main` first, growth that already landed counts against you otherwise'); process.exitCode = 1; }
     } finally {
         try { git('worktree', 'remove', '--force', wt); } catch { /* already gone */ }
         rmSync(tmp, { recursive: true, force: true });
