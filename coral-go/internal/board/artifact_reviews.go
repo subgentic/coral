@@ -57,16 +57,44 @@ func (s *Store) ensureArtifactReviewSentSchema(ctx context.Context) error {
 		at       TEXT NOT NULL,
 		PRIMARY KEY (board_id, hex)
 	)`)
-	return err
+	if err != nil {
+		return err
+	}
+	// sent_by (#17819): OperatorName when the Operator sent the file themselves; empty for an agent's. An old database gets the column; a second run finds it there.
+	if _, err := s.db.ExecContext(ctx, `ALTER TABLE artifact_review_sent ADD COLUMN sent_by TEXT NOT NULL DEFAULT ''`); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+		return err
+	}
+	return nil
 }
 
 // noteReviewTag keeps the sent-for-review time in step with a write of the object's tags: the time is set when "for review" is put on a file that did not have it, and left alone while the file keeps it.
-func noteReviewTag(ctx context.Context, tx *sqlx.Tx, boardID, hex string, had, has bool, at time.Time) error {
+func noteReviewTag(ctx context.Context, tx *sqlx.Tx, boardID, hex string, had, has bool, at time.Time, by ...string) error {
 	if had || !has {
 		return nil
 	}
-	_, err := tx.ExecContext(ctx, `INSERT INTO artifact_review_sent (board_id, hex, at) VALUES (?, ?, ?) ON CONFLICT(board_id, hex) DO UPDATE SET at = excluded.at`, boardID, hex, at.UTC().Format(time.RFC3339))
+	sender := ""
+	if len(by) > 0 {
+		sender = by[0]
+	}
+	_, err := tx.ExecContext(ctx, `INSERT INTO artifact_review_sent (board_id, hex, at, sent_by) VALUES (?, ?, ?, ?) ON CONFLICT(board_id, hex) DO UPDATE SET at = excluded.at, sent_by = excluded.sent_by`, boardID, hex, at.UTC().Format(time.RFC3339), sender)
 	return err
+}
+
+// ArtifactReviewSenders maps each file of the board that the Operator sent for review themselves (the Send for review route, #17819) to OperatorName: the row says "sent by you", not the name of whoever produced the file.
+// A file an agent put up for review has no entry.
+func (s *Store) ArtifactReviewSenders(ctx context.Context, boardID string) (map[string]string, error) {
+	var rows []struct {
+		Hex string `db:"hex"`
+		By  string `db:"sent_by"`
+	}
+	if err := s.reader().SelectContext(ctx, &rows, `SELECT hex, sent_by FROM artifact_review_sent WHERE board_id = ? AND sent_by != ''`, boardID); err != nil {
+		return nil, err
+	}
+	out := make(map[string]string, len(rows))
+	for _, r := range rows {
+		out[r.Hex] = r.By
+	}
+	return out, nil
 }
 
 // ArtifactReviewSent maps each file of the board that was sent for review to when (RFC 3339, UTC). A file that carries the tag from before the time was kept has none: the page falls back to the file's own time.
@@ -149,7 +177,7 @@ func (s *Store) StartArtifactReview(ctx context.Context, boardID, hex string, at
 		if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_reviews WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil {
 			return nil, "", err
 		}
-		if err := noteReviewTag(ctx, tx, boardID, hex, false, true, at); err != nil {
+		if err := noteReviewTag(ctx, tx, boardID, hex, false, true, at, OperatorName); err != nil {
 			return nil, "", err
 		}
 	} else {
