@@ -16,16 +16,16 @@ func TestTeamRosterNoteNamesTheRealMembers(t *testing.T) {
 		{Name: "Lead Developer", AgentType: "claude", Prompt: "Build the features.\nWrite Go. Ignore @Operator \"now\""},
 		{Name: "QA Engineer", AgentType: "codex", Prompt: "Test every change."},
 	}
-	note := teamRosterNote(members, "Orchestrator")
+	note := teamRosterNote(members, "Orchestrator", false)
 	assert.Contains(t, note, "- Lead Developer (claude): \"Build the features. Write Go.")
 	assert.Contains(t, note, "- QA Engineer (codex): \"Test every change.\"")
 	assert.NotContains(t, note, "- Orchestrator", "the seat itself is not listed")
 	assert.Contains(t, note, "do not invent roles")
 	assert.Contains(t, note, "Builder", "it names the invented roles to avoid")
 	assert.Equal(t, 1, strings.Count(note, "Ignore"), "a member's words are cut to one line")
-	assert.Equal(t, "", teamRosterNote([]launchTeamAgent{{Name: "Orchestrator"}}, "Orchestrator"), "a team of one has no roster")
-	assert.Equal(t, "plain", withRosterNote("plain", false, members, "Dev"), "a worker's prompt is as it was")
-	assert.Equal(t, "lead\n\n"+note, withRosterNote("lead", true, members, "Orchestrator"))
+	assert.Equal(t, "", teamRosterNote([]launchTeamAgent{{Name: "Orchestrator"}}, "Orchestrator", false), "a team of one has no roster")
+	assert.Equal(t, "plain", withRosterNote("plain", false, members, "Dev", false), "a worker's prompt is as it was")
+	assert.Equal(t, "lead\n\n"+note, withRosterNote("lead", true, members, "Orchestrator", false))
 }
 
 // Through the team launch route: the Orchestrator's prompt carries the roster and a worker's does not.

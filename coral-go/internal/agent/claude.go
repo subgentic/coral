@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/logsafe"
 	"io"
 	"log/slog"
@@ -165,7 +166,7 @@ func claudeSystemText(params LaunchParams) string {
 	if proto := protocolText(params); proto != "" {
 		sysParts = append(sysParts, proto)
 	}
-	if board := BuildBoardSystemPrompt(params.BoardName, params.Role, "", params.PromptOverrides, params.BoardType); board != "" {
+	if board := withBoardAbilities(BuildBoardSystemPrompt(params.BoardName, params.Role, "", params.PromptOverrides, params.BoardType), params, at.Claude); board != "" {
 		sysParts = append(sysParts, board)
 	}
 	return strings.Join(appendCoralSessionMarker(sysParts, params.SessionID), "\n\n")

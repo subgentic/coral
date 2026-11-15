@@ -335,7 +335,11 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		}
 		// A member that names no mode starts in the new default of its type (#14336: Auto for Claude and Codex, Bypass for Hermes and opencode), or the Operator's saved default, as a single launch does;
 		// for an agent's launch it is the default CAPPED by the launching agent (above). A member whose form says Default sends it, and starts in Default (#10362, the form's own pick).
+		if seedGrant { // the seat of a team the Operator is starting gets its grant right after it starts (#13891): its first prompt is built as if it were on already (#17622)
+			grantStarting.Store(body.BoardName, true)
+		}
 		entry, category := h.launchTeamMember(ctx, body, agentDef, userSettings, workingDir, worktreePath, teamID, !fromAgent && !teamIsRelaunch(body) && autoDefaultAllowed(ctx, r, h.ss), !fromAgent && memberAt == seatAt)
+		grantStarting.Delete(body.BoardName)
 		_, memberFailed := entry["error"]
 		sidMade, _ := entry["session_id"].(string)
 		h.endAgentLaunch(ctx, h.accountingBoard(r, body.BoardName, body.BoardServer), lifeID, !memberFailed, launcherWords(h.orchActorOf(r))+" started "+orchName(agentDef.Name), sidMade)
@@ -797,11 +801,13 @@ func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamR
 		agentFlags = append(agentFlags, modelArgs...)
 	}
 	effectiveThinking := defaultThinkingForRole(userSettings, agentType, def.Thinking, seat)
+	// The roster note says to add a member itself when the Operator's grant of this team is on (#17622); the "What you can do on this team" section itself is built each time the command is.
+	mayLaunch := seat && grantIsOn(ctx, h.bs, body.BoardName)
 	skillRows, _ := h.resolveSkillIDs(ctx, unionSkillIDs(body.Skills, def.Skills)) // checked before the launch started; one that changed since is simply not told
 	skillRows = h.withTeamBuilderSkill(ctx, skillRows, def.Name)                   // the Orchestrator seat also gets the team-builder skill (#13894)
 	result, err := h.launchSession(ctx, launchSpec{
 		WorkDir: workingDir, AgentType: agentType, DisplayName: def.Name, Flags: agentFlags,
-		Prompt:    withSkillNote(withRosterNote(InjectKnowledgeIntoPrompt(h.cfg.CoralDir(), body.BoardName, def.Name, def.Prompt), seat, body.Agents, def.Name), launchSkillNote(skillRows)),
+		Prompt:    withSkillNote(withRosterNote(InjectKnowledgeIntoPrompt(h.cfg.CoralDir(), body.BoardName, def.Name, def.Prompt), seat, body.Agents, def.Name, mayLaunch), launchSkillNote(skillRows)),
 		BoardName: body.BoardName, BoardServer: body.BoardServer, Backend: body.Backend, BoardType: body.BoardType,
 		Model: effectiveModel, Thinking: effectiveThinking, Capabilities: def.Capabilities, Tools: def.Tools, Hooks: def.Hooks,
 		// The member's flags carry the mode as the expanded flags of its type (--sandbox workspace-write -a never for Codex's auto), which PermissionModeFromFlags does not read
@@ -924,12 +930,13 @@ func modeNamed(m string) bool {
 	return m == "default" || custom
 }
 
-// withRosterNote adds the team's roster to the Orchestrator seat's prompt (#17168); every other member's prompt is as it was.
-func withRosterNote(prompt string, seat bool, members []launchTeamAgent, self string) string {
+// withRosterNote adds the team's roster to the Orchestrator seat's prompt (#17168); every other member's prompt is as it was. mayLaunch is whether the seat may add a member itself (#17622): the roster then says so
+// instead of asking the Operator.
+func withRosterNote(prompt string, seat bool, members []launchTeamAgent, self string, mayLaunch bool) string {
 	if !seat {
 		return prompt
 	}
-	note := teamRosterNote(members, self)
+	note := teamRosterNote(members, self, mayLaunch)
 	if note == "" {
 		return prompt
 	}

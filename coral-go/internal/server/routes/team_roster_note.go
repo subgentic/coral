@@ -9,7 +9,7 @@ const maxRosterRole = 120
 
 // teamRosterNote is what the Orchestrator seat is told about the team it leads (#17168): each other member's name, type and a cut of what it was set up to do, so its plan uses those names and roles and does not invent others
 // ("Builder", "Reviewer"). "" when the team has no other named member. The members' words are the team's own, cut to one line each.
-func teamRosterNote(members []launchTeamAgent, self string) string {
+func teamRosterNote(members []launchTeamAgent, self string, mayLaunch bool) string {
 	var lines []string
 	for _, m := range members {
 		name := strings.TrimSpace(m.Name)
@@ -28,5 +28,9 @@ func teamRosterNote(members []launchTeamAgent, self string) string {
 	if len(lines) == 0 {
 		return ""
 	}
-	return "Your team's members, by their exact names and roles. Plan with these members and these names; do not invent roles the team does not have (such as a Builder or a Reviewer), and if the work needs a role nobody here has, say so and ask the Operator to add that agent.\n" + strings.Join(lines, "\n")
+	missing := "say so and ask the Operator to add that agent."
+	if mayLaunch {
+		missing = "add that member yourself, as described below, and say so." // the Operator's grant is on (#17622)
+	}
+	return "Your team's members, by their exact names and roles. Plan with these members and these names; do not invent roles the team does not have (such as a Builder or a Reviewer), and if the work needs a role nobody here has, " + missing + "\n" + strings.Join(lines, "\n")
 }

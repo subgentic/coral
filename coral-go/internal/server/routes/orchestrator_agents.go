@@ -116,6 +116,13 @@ func (h *SessionsHandler) OrchestratorGrant(w http.ResponseWriter, r *http.Reque
 			_ = h.bs.FinishLifecycle(r.Context(), id, "ok", "")
 		}
 	}
+	if cur.Enabled != g.Enabled { // the running Orchestrator is told at once, once per change and only the seat: turned on, how to launch; turned off, to ask the Operator (#17622)
+		seat := g.SeatSession
+		if !g.Enabled {
+			seat = cur.SeatSession
+		}
+		h.tellSeatOfChange(r.Context(), project, seat, g.Enabled)
+	}
 	saved, _ := h.bs.GetOrchGrant(r.Context(), project)
 	writeJSON(w, http.StatusOK, saved)
 }
