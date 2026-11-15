@@ -379,8 +379,8 @@ export function attachComments(dialog, body, host, opts = {}) {
         const who = nameSaid(c);
         if (c.can.edit) row.append(act('Edit', `Edit the comment by ${who}`, () => { st.composing = { editId: c.id }; st.error = ''; render(); focusComposer(); }));
         if (c.can.delete) row.append(act('Delete', `Delete the comment by ${who}`, () => confirmThen(`Delete this comment?${(() => { const read = [...new Set((c.asks || []).filter(k => k.agent && (k.seen || k.readAt || k.replies)).map(k => k.agent))]; return read.length ? ` ${read.join(' and ')} already read it, and keeps what it read.` : ''; })()}`, () => run(() => api.deleteComment(ownHex(c), st.server, c.id), 'Comment deleted'))));
-        // Send to agent (#6357, #6456): the owner, on this computer, for a thread of this board that is open; never through Coral Hub
-        if (top && canAsk(c)) { const b = act('Send to agent', () => openAsk(c)); b.classList.add('ac-ask-open'); b.setAttribute('aria-label', `Send the comment by ${nameSaid(c)} to an agent`); b.setAttribute('aria-expanded', String(!!st.ask && st.ask.id === c.id)); row.append(b); }
+        // Send to agent (#6357, #6456): the owner, on this computer, for a thread of this board that is open; never through Coral Hub. Hidden while an ask is queued (sent but not yet read or replied: the status line says where it stands, and the button would just confuse; #17734).
+        if (top && canAsk(c) && !(c.asks || []).some(k => k.open && k.agent && !k.replies && !(k.readAt || k.seen))) { const b = act('Send to agent', () => openAsk(c)); b.classList.add('ac-ask-open'); b.setAttribute('aria-label', `Send the comment by ${nameSaid(c)} to an agent`); b.setAttribute('aria-expanded', String(!!st.ask && st.ask.id === c.id)); row.append(b); }
         // not an .ac-act: it writes nothing, so a read-only viewer has it too
         if (top && st.ranges.has(c.id)) { const j = btn('ac-jump', 'Show in text', `Show the text of the comment by ${who} in the document`); j.addEventListener('click', () => jumpTo(c.id)); row.append(j); }
         return row;
