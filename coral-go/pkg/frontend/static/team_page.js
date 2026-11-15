@@ -136,11 +136,11 @@ function openSettings() { importOnce('./team_settings_modal.js').then(m => m.ope
 /** Stopping a team: one menu, the same words and the same actions as the team's row in the sidebar (Sleep team or Wake team, Reset team, Kill all; the last two apart, each asks first). A wide header has the Stop button; a phone's has the same items in More (#10008, Beta Tester and Mobile tester). */
 const teamAsleep = () => { const m = (state.liveSessions || []).filter(s => inTeam(s, S.team)); return m.length > 0 && m.every(s => s.sleeping); };
 function stopItems() {
-    const asleep = teamAsleep();
-    const none = !(state.liveSessions || []).some(s => inTeam(s, S.team)); // a team with no live agent has nothing to put to sleep, reset or kill: say so, do not offer a button that does nothing (#10187)
-    const why = none ? 'No agent of this team is running' : '';
+    const m = (state.liveSessions || []).filter(s => inTeam(s, S.team));
+    const why = m.length ? '' : 'No agent of this team is running'; // a team with no live agent has nothing to put to sleep, reset or kill: say so, do not offer a button that does nothing (#10187)
+    // Sleep team while any agent is awake, Wake team while any sleeps: a half-asleep team has both (#17536).
     return [
-        { key: 'sleep', label: asleep ? 'Wake team' : 'Sleep team', hint: asleep ? 'Starts the sleeping agents again' : 'Stops every agent for now; Wake team starts them again', why, run: () => window.toggleTeamSleep?.(S.team, asleep ? 'wake' : 'sleep') },
+        ...[['sleep', 'Sleep team', 'Stops every agent for now; Wake team starts them again', !m.length || m.some(s => !s.sleeping)], ['wake', 'Wake team', 'Starts the sleeping agents again', m.some(s => s.sleeping)]].filter(x => x[3]).map(([mode, label, hint]) => ({ key: mode, label, hint, why, run: () => window.toggleTeamSleep?.(S.team, mode) })),
         { key: 'reset', label: 'Reset team (clear context)', hint: 'Clears every agent\'s context; each starts in a new chat', why, run: () => window.resetTeam?.(S.team) },
         { key: 'kill', label: 'Kill all', hint: 'Ends every agent now; their chats stay in History', danger: true, why, run: () => window.killBoard?.(S.team) },
     ];
