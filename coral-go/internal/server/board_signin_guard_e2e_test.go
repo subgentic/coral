@@ -20,6 +20,8 @@ import (
 // the server side of #232). A route added to this list must be registered with r.With(routes.RefuseSignInLink); the test fails otherwise.
 var signInGuardedRoutes = []string{
 	"POST /api/notifications",
+	"POST /api/agent-asks",
+	"POST /api/agent-asks/{id}/answer",
 	"POST /api/saved",
 	"PATCH /api/saved/{id}",
 	"POST /api/board/remotes",
@@ -346,7 +348,7 @@ func TestEveryWriteRouteIsGuardedOrSaysWhyNot(t *testing.T) {
 
 // guardCensusCovers is which routes TestEveryWriteRouteIsGuardedOrSaysWhyNot looks at.
 func guardCensusCovers(route string) bool {
-	for _, p := range []string{"/api/board/", "/api/saved", "/api/tasks/", "/api/artifacts", "/api/agent/", "/api/sessions/", "/api/scheduled/",
+	for _, p := range []string{"/api/board/", "/api/saved", "/api/tasks/", "/api/artifacts", "/api/agent/", "/api/agent-asks", "/api/sessions/", "/api/scheduled/",
 		"/api/teams/", "/api/workflows", "/api/settings", "/api/tags", "/api/folder-tags", "/api/views", "/api/custom-models", "/api/custom-modes", "/api/upload",
 		"/api/themes", "/api/pinned-folders", "/api/system/hub-operator"} {
 		if strings.HasPrefix(route, p) {

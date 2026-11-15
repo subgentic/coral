@@ -134,6 +134,8 @@ type BoardHandler struct {
 	commentReadStamp func(ctx context.Context, project, readerSession string, messageIDs []int64)
 	// needsYouAgents lists the agents waiting on the Operator for GET /api/needs-you (SetNeedsYouAgents). Nil: none.
 	needsYouAgents func(r *http.Request) ([]NeedsYouItem, error)
+	// agentAsks lists the open questions of single agents (no team) for GET /api/operator-asks and Needs you (#18106). Nil: none.
+	agentAsks func(r *http.Request) []operatorAskRow
 	// needsYouRemotes: on a self-hosted Hub, how GET /api/needs-you reads its computers too (SetNeedsYouRemotes, #15380). Nil: this Coral's own answer alone.
 	needsYouRemotes *NeedsYouRemotes
 	// needsYouSkills lists the skills waiting for approval for GET /api/needs-you (SetNeedsYouSkills). Nil: none.

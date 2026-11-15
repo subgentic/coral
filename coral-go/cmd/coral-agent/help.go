@@ -12,7 +12,7 @@ import (
 // commands are the top-level commands main dispatches.
 var commands = map[string]bool{
 	"bind-codex": true, "ui": true, "launch": true, "artifact": true,
-	"task": true, "history": true, "search": true, "notify": true, "docs": true, "skills": true,
+	"task": true, "history": true, "search": true, "notify": true, "ask": true, "docs": true, "skills": true,
 }
 
 // textFlags take free text that is sent to the server.
@@ -87,6 +87,8 @@ func commandUsage(cmd string, rest []string) string {
 		return artifactUsage(rest)
 	case "notify":
 		return notifyUsageText
+	case "ask":
+		return askUsageText
 	case "docs":
 		return docsUsageText
 	case "skills":

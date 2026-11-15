@@ -40,6 +40,7 @@ func TestTypedNoticeCensus(t *testing.T) {
 		typedcensus.C("no-team approval with a note", typedNoTeamApproved("report.md", strings.Repeat("a", 64), "Tidy the title."), typedNoTeamApproved(h, strings.Repeat("a", 64), h)),
 		typedcensus.C("no-team denial", typedNoTeamDenied("report.md", strings.Repeat("a", 64), "Wrong template."), typedNoTeamDenied(h, strings.Repeat("a", 64), h)),
 		typedcensus.C("no-team comment", typedNoTeamComment(strings.Repeat("a", 64), "Please add the Q4 table.", "report.md"), typedNoTeamComment(strings.Repeat("a", 64), h, h)),
+		typedcensus.C("single agent answer", typedAgentAskAnswer("Which database?", "Postgres"), typedAgentAskAnswer(h, h)),
 		typedcensus.C("dialog timeout", dialogTimeoutNotice, dialogTimeoutNotice),
 		typedcensus.C("auto recommend", autoRecommendNotice, autoRecommendNotice),
 	}
@@ -94,6 +95,7 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("dialog_timeout_opencode.go", `dialogTimeoutNotice, "dialog timeout notice"`, 1, "census: dialog timeout (fixed, no digit)"),
 		typedcensus.S("agent_exited.go", `text, what, wanted)`, 1, "deliverAutomatedWhile: forwards the text of its callers, listed here"),
 		typedcensus.S("agent_exited.go", `text, what, nil)`, 1, "deliverNoticeRetrying: forwards the text of its callers, listed here"),
+		typedcensus.S("agent_asks.go", `ask.SessionName, agentType, sessionID, text, "operator answer"`, 1, "typedAgentAskAnswer (census: single agent answer)"),
 		typedcensus.S("auto_recommend.go", `autoRecommendNotice, "recommended-pick notice"`, 1, "census: auto-recommend (fixed, no digit)"),
 	})
 }

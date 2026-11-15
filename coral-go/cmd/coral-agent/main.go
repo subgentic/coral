@@ -63,6 +63,7 @@ Commands:
   search <query> [flags]         Shortcut for 'history search'
   notify --title T [--message M] [--level L] [--alert]
                                  Show a notification on the dashboard
+  ask "<question>" [--option L]...  Ask the Operator (an agent on no team); the answer arrives here
   check state ID --state STATE  Report your scheduled check outcome
   docs [topic|all]               List Coral's docs for agents, or print one
   skills search <words>          Find the skills the Operator approved
@@ -131,6 +132,11 @@ func main() {
 		cmdHistorySearch(os.Args[2:])
 	case "docs":
 		if err := cmdDocs(os.Args[2:], os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			clierr.Exit1()
+		}
+	case "ask":
+		if err := cmdAsk(os.Args[2:], os.Stdout); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			clierr.Exit1()
 		}
