@@ -3915,7 +3915,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-wizard .team-page { padding: 20px 24px; }
 .team-wizard .team-page-start { flex: 1; min-height: 0; display: flex; padding: 0; }
 .team-wizard .team-page-start.team-page { display: flex; }
-.team-wizard[data-stage="team"] .team-page-start, .team-wizard[data-stage="members"] .team-page-start { display: none; }
 .team-page-start .launch-shell, #team-start-host { flex: 1; min-width: 0; min-height: 0; display: flex; }
 .team-page-team .dir-input-row input { flex: 1; }
 .team-field-hint:empty { display: none; }

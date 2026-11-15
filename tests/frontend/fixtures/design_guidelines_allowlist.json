@@ -69,7 +69,6 @@
    "height: input.check { height: 16px }": 1,
    "height: input.switch { height: 1.4rem }": 1,
    "height: input.switch::before { height: calc(1.4rem - 8px) }": 1,
-   "radius: 14px": 1,
    "radius: 19px": 1,
    "radius: 1rem": 1,
    "radius: 22px": 2,
