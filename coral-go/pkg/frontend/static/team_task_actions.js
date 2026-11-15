@@ -112,9 +112,11 @@ export async function editForm(task, ctx) {
         labelled('Assigned To', assignee, 'task-edit-assignee'),
         labelled('Priority', priority, 'task-edit-priority'),
         labelled('Description', area('task-edit-body', task.body || ''), 'task-edit-body'),
-        labelled('Workflow instructions', area('task-edit-instructions', instructions), 'task-edit-instructions'),
+        Object.assign(el('details', 'task-edit-advanced'), { id: 'task-edit-advanced' }),
         labelled('Amendment reason', Object.assign(input('task-edit-reason'), { placeholder: 'Why should this instruction change?' }), 'task-edit-reason'),
         goalLabel, goalError);
+    const adv = form.querySelector('#task-edit-advanced'); // the agent's own instructions are written for a CLI (--outcome, --message): shut behind Advanced, not the first thing a person reads
+    adv.append(el('summary', null, 'Advanced: the agent\'s workflow instructions'), labelled('Workflow instructions', area('task-edit-instructions', instructions), 'task-edit-instructions'));
     fillGoalSelect(goal, { goals: goalRead.goals, requireGoal: goalRead.requireGoal, selectedId: task.goal_id, current: currentGoal });
     const showDeps = task.status === 'blocked' || task.status === 'pending' || task.status === 'draft';
     if (showDeps) {

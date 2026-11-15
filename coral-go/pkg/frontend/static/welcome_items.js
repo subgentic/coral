@@ -5,7 +5,6 @@
 import { state } from './state.js';
 import { serverFetch, currentServer } from './server_base.js';
 import { importOnce } from './import_once.js';
-import { registerActions } from './actions.js';
 import { browserSession } from './safe_storage.js';
 
 export const WELCOME_IDS = ['agent', 'welcome', 'team', 'asks', 'guide'];
@@ -104,5 +103,3 @@ export function landOnWelcome() {
     browserSession.set('coral-welcome-landed', '1');
     window.switchNavTab?.('hub-inbox');
 }
-
-registerActions({ 'inbox-go-agents': () => window.switchNavTab?.('agents') });

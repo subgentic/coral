@@ -40,6 +40,14 @@ const BASE = require('./test_base').BASE;
             await openNeeds();
             assert.equal(await note(), null, `${w}: back from another tab the pill is All and nothing is hidden`);
             assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length`), 2, `${w}: both rows listed again`);
+            // 2. a search that matches nothing says so and has its own Show all (walk 52, #17160)
+            await ev(`(() => { const i = document.getElementById('inbox-search'); i.value = 'zzz-no-such-item'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`); await settle(500);
+            const empty = () => ev(`(() => { const e = [...document.querySelectorAll('.empty-state')].find(x => /matches/.test(x.textContent)); const b = e && [...e.querySelectorAll('button')].find(x => x.textContent.trim() === 'Show all'); return { text: e ? e.textContent.replace(/\\s+/g, ' ').trim() : null, button: !!b }; })()`);
+            const e1 = await empty();
+            assert.ok(/matches the search and filters/.test(e1.text || '') && e1.button, `${w}: the empty result has a Show all: ` + JSON.stringify(e1));
+            await ev(`[...document.querySelectorAll('.empty-state button')].find(x => x.textContent.trim() === 'Show all').click(); true`); await settle(500);
+            assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length`), 2, `${w}: Show all brings both rows back`);
+            assert.equal(await ev(`document.getElementById('inbox-search').value`), '', `${w}: and empties the search box`);
         }
         console.log('PASS Needs you says what a filter hides and names the teams');
     } finally { await client.close(); }
