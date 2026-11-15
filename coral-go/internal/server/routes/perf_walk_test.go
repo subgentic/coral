@@ -30,9 +30,9 @@ const (
 	goalNeedsYouWalkMs   = 4000
 	goalNeedsYouWalkCIMs = 8000
 	// The CPU the walk may use on a developer's machine (#16035). The wall clock is the machine's as much as the code's: a box with four pinned cores or other agents' go tests took 5.6 and 6.1 s for a walk that
-	// takes 1.6 s alone (epoch), and the best of three was no help. The walk's CPU time moves little with load (3.05 s alone, 3.55 s beside eight busy loops on the Mac). 7 s is twice what the walk uses
-	// and the cache-less code (every page builds the list: 14 s on the fastest machine) is far over it.
-	goalNeedsYouWalkCPUMs = 7000
+	// takes 1.6 s alone (epoch), and the best of three was no help. The walk's CPU time moves little with load (3.05 s alone, 3.55 s beside eight busy loops on the Mac). The measure is the lesser of CPU and wall (walkTime, #18354).
+	// epoch (36 cores, slow) reads 6.2 to 6.7 s of wall for it, so 9 s leaves 2.3 s of room there, like CI's 8 s, and the cache-less code (every page builds the list: 14 s on the fastest machine) is still over it.
+	goalNeedsYouWalkCPUMs = 9000
 )
 
 // needsYouWalkCeilingMs is the ceiling for this machine: the CI one when CI is set.
