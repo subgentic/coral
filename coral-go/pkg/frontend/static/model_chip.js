@@ -215,12 +215,6 @@ function _addHtml(s) {
         + `<div class="model-chip-add-actions"><button type="submit" class="btn btn-small btn-primary"${escapeAttr(dis)}>${a.busy ? 'Adding…' : 'Add'}</button><button type="button" class="btn btn-small" data-add-cancel${escapeAttr(dis)}>Cancel</button></div></form>`;
 }
 
-/** The row's model is the id the agent reported (a dated id, an alias) and the list's value may be the short form: a prefix either way is the same model, so the tick lands on it (#17334). */
-function _isCurrentModel(value, model) {
-    if (!value || !model) return value === model;
-    return value === model || model.startsWith(value + '-') || value.startsWith(model + '-');
-}
-
 function _renderMenu(kind) {
     const { menu } = parts()[kind];
     if (!menu || !_cur) return;
