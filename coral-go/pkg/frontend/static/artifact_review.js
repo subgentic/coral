@@ -13,14 +13,14 @@ const HEX = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i;
 const rowHex = a => HEX.exec(a.uri || a.digest || a.id || '')?.[1]?.toLowerCase() || '';
 
 /** The team's row for the artifact and the state of its review: pending, changes, approved or reviewed (the old Mark reviewed); null when it was never for review. */
-export async function reviewStateOf(team, hex) {
+export async function reviewStateOf(team, hex, { fresh = false } = {}) {
     const { reviewOfTeam } = await importOnce('./inbox_reviews.js');
     const row = await reviewOfTeam(team, hex, { anyState: true });
     if (!row) return null;
     const tags = row.tags || [];
     if (!['approved', 'for review', 'reviewed'].some(t => tags.includes(t))) return null;
     const state = tags.includes('approved') ? 'approved' : tags.includes('for review') ? (tags.includes('changes requested') ? 'changes' : 'pending') : 'reviewed';
-    return { row, state, at: row.review?.at || '', newer: await (await importOnce('./artifact_version_list.js')).newerOf(team, hex) };
+    return { row, state, at: row.review?.at || '', newer: await (await importOnce('./artifact_version_list.js')).newerOf(team, hex, { fresh }) };
 }
 
 /** Ask the uploader to put an older version back as the newest (#15285): the words go to them as a change request on the newest version; the series keeps one entry per set of bytes, so the agent does the upload. */
@@ -283,12 +283,12 @@ export function attachReview(d, { reload }) {
     // is read once more and the viewer says what it is now (Approved, no Approve button), instead of leaving a decision that the server would only refuse.
     document.addEventListener('coral:reviews-changed', async () => {
         const was = cur, g = gen;
-        if (!was || was.state !== 'pending') return;
+        if (!was || (was.state !== 'pending' && was.state !== 'changes')) return;
         try {
-            const m = await importOnce('./inbox_reviews.js');
-            if (m.reviewItems().some(a => a.team === was.team && a.hex === was.hex)) return; // still waiting in the list
-            const s = await reviewStateOf(was.team, was.hex);
-            if (g === gen && cur === was && s && s.state !== was.state) show({ ...s, team: was.team, hex: was.hex, server: was.server, name: was.name });
+            const s = await reviewStateOf(was.team, was.hex, { fresh: true }); // read again: a newer version may have arrived, and the file may be settled or no longer waiting (#17460, walk 69 M4: Approve stayed live on v1 after v2 came)
+            if (g !== gen || cur !== was) return;
+            const next = s || { ...was, state: 'reviewed', newer: await (await importOnce('./artifact_version_list.js')).newerOf(was.team, was.hex, { fresh: true }) }; // no longer waiting for review: no Approve, and the newer version offered
+            if (next.state !== was.state || (next.newer?.hex || '') !== (was.newer?.hex || '')) show({ ...next, team: was.team, hex: was.hex, server: was.server, name: was.name });
         } catch { /* the viewer keeps what it shows; a decision the server refuses says so */ }
     });
     approve.addEventListener('click', async () => {
