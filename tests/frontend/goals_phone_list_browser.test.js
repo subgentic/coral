@@ -10,13 +10,23 @@ const { coralReady, framesJs } = require('./helpers/wait');
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const B = 'goalsphone-' + Date.now().toString(36), failures = [], check = (ok, what) => { if (!ok) failures.push(what); };
     const api = (m, path, body) => ev(`fetch('/api/board/${B}' + ${JSON.stringify(path)}, { method: ${JSON.stringify(m)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, json: await r.json().catch(() => null) }))`);
-    const P = '#team-panel-goals';
+    const P = '#team-panel-goals', SEED = B + '-earlier';
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+        // Another suite may already have created (and removed) goals on this shared shard.
+        // Reserve one on a separate board so this suite cannot accidentally depend on global id 1.
+        await ev(`fetch('/api/board/${SEED}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Boss', job_title: 'Orchestrator' }) }).then(() => true)`);
+        await ev(`fetch('/api/board/${SEED}/goals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', title: 'Earlier suite goal', outcome: 'Reserve an earlier goal identity', done_when: 'Created' }) }).then(r => { if (r.status !== 201) throw new Error('could not reserve earlier goal'); return true; })`);
         await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B });
-        for (const t of ['Ship the pilot with a clear phone goal list and room for a two-line title', 'Fix the phone Goals list', 'Write the docs']) check((await api('POST', '/goals', { subscriber_id: 'Operator', title: t, outcome: 'The outcome of ' + t + ' in one line, which is long enough to be cut on a phone.', done_when: 'it is done' })).status === 201, 'made goal ' + t);
-        check((await api('POST', '/tasks', { created_by: 'Boss', title: 'Prepare pilot', goal_id: 1 })).status === 201, 'made task progress for the long-title goal');
+        let firstGoalId;
+        for (const t of ['Ship the pilot with a clear phone goal list and room for a two-line title', 'Fix the phone Goals list', 'Write the docs']) {
+            const created = await api('POST', '/goals', { subscriber_id: 'Operator', title: t, outcome: 'The outcome of ' + t + ' in one line, which is long enough to be cut on a phone.', done_when: 'it is done' });
+            check(created.status === 201, 'made goal ' + t);
+            if (firstGoalId === undefined) firstGoalId = created.json.id || created.json.goal?.id;
+        }
+        if (!Number.isSafeInteger(firstGoalId)) throw new Error('Goal creation did not return its identity');
+        check((await api('POST', '/tasks', { created_by: 'Boss', title: 'Prepare pilot', goal_id: firstGoalId })).status === 201, 'made task progress for the long-title goal');
         const setReq = await api('PUT', '/settings', { subscriber_id: 'Operator', require_goal: true }); check(setReq.status < 300, 'the board requires a goal: ' + setReq.status);
         // #15833: the same quiet goal card in Team and Inbox, narrow phones and large text.
         for (const place of ['team', 'inbox']) for (const w of [320, 390]) for (const theme of ['light', 'dark']) for (const zoom of [100, 200]) {
@@ -30,9 +40,9 @@ const { coralReady, framesJs } = require('./helpers/wait');
             const scope = place === 'team' ? P : '#group-table-view';
             await waitFor(`document.querySelectorAll('${scope} tbody tr').length >= 3`, at + ' rows');
             await ev(`document.documentElement.setAttribute('data-theme','${theme}');document.documentElement.style.fontSize='${zoom}%';true`);
-            if (zoom === 200) await ev(`document.querySelector('${scope} tr:has(.dt-mail-open[data-goal-id="1"])').scrollIntoView({block:'center'});true`);
+            if (zoom === 200) await ev(`document.querySelector('${scope} tr:has(.dt-mail-open[data-goal-id="${firstGoalId}"])').scrollIntoView({block:'center'});true`);
             await ev(framesJs(6));
-            const card = await ev(`(()=>{const row=document.querySelector('${scope} tr:has(.dt-mail-open[data-goal-id="1"])'), body=row.querySelector('.dt-mail-open'), title=row.querySelector('.dt-mail-title'), meta=row.querySelector('.dt-mail-time'), icon=row.querySelector('.dt-mail-avatar:not(.dt-mail-tick)'), style=getComputedStyle(icon), rect=e=>e.getBoundingClientRect();return {title:title.textContent,number:getComputedStyle(title,'::before').content,meta:meta.textContent,titleAlign:getComputedStyle(title).textAlign,metaAlign:getComputedStyle(meta).textAlign,left:[rect(title).left,rect(meta).left],stacked:rect(meta).top>=rect(title).bottom-1,iconColor:style.color,neutral:getComputedStyle(row).getPropertyValue('--text-secondary').trim(),bg:style.backgroundColor,ask:!!row.querySelector('.dt-mail-ask'),overflow:document.documentElement.scrollWidth>innerWidth+1,clamp:getComputedStyle(title).webkitLineClamp};})()`);
+            const card = await ev(`(()=>{const row=document.querySelector('${scope} tr:has(.dt-mail-open[data-goal-id="${firstGoalId}"])'), body=row.querySelector('.dt-mail-open'), title=row.querySelector('.dt-mail-title'), meta=row.querySelector('.dt-mail-time'), icon=row.querySelector('.dt-mail-avatar:not(.dt-mail-tick)'), style=getComputedStyle(icon), rect=e=>e.getBoundingClientRect();return {title:title.textContent,number:getComputedStyle(title,'::before').content,meta:meta.textContent,titleAlign:getComputedStyle(title).textAlign,metaAlign:getComputedStyle(meta).textAlign,left:[rect(title).left,rect(meta).left],stacked:rect(meta).top>=rect(title).bottom-1,iconColor:style.color,neutral:getComputedStyle(row).getPropertyValue('--text-secondary').trim(),bg:style.backgroundColor,ask:!!row.querySelector('.dt-mail-ask'),overflow:document.documentElement.scrollWidth>innerWidth+1,clamp:getComputedStyle(title).webkitLineClamp};})()`);
             check(card.titleAlign !== 'center' && card.metaAlign !== 'center' && Math.abs(card.left[0]-card.left[1])<2 && card.stacked, at+' left-aligned title and metadata: '+JSON.stringify(card));
             check(card.bg === 'rgba(0, 0, 0, 0)' && card.iconColor === await ev(`getComputedStyle(document.querySelector('${scope}')).getPropertyValue('--text-secondary').trim().startsWith('#') ? (()=>{const e=document.createElement('span');e.style.color='var(--text-secondary)';document.body.append(e);const c=getComputedStyle(e).color;e.remove();return c})() : getComputedStyle(document.querySelector('${scope}')).getPropertyValue('--text-secondary').trim()`), at+' grey icon with no tile: '+JSON.stringify(card));
             check(!card.ask && card.clamp === '2' && !card.overflow && /^Active/.test(card.meta) && /0\/1/.test(card.meta) && /^#\d+ /.test(card.title), at+' number before two-line title and one state/progress line: '+JSON.stringify(card));
@@ -102,7 +112,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await waitFor(`/1 selected/.test(document.querySelector('#group-table-view .gt-toolbar')?.textContent || document.querySelector('.dt-bar')?.textContent || '')`, at + 'a long press selects the goal', 5000).catch(() => check(false, at + 'a long press selects the goal (no "1 selected" bar); the page is on ' + location.pathname));
             check(!(await ev(`location.pathname`)).includes('/goals/'), at + 'and does not open it');
         }
-    } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
+    } finally { await removeBoards(ev, [B, SEED]).catch(() => {}); await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
     console.log('goals_phone_list_browser: ok');
 })().catch(e => { console.error(e); process.exit(1); });
