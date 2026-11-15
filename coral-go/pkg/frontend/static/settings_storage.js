@@ -1,7 +1,7 @@
 /* The Settings dialog's Storage and cleanup group: the artifact store, the terminal logs, free space and automatic cleanup, the received files limit (moved out of settings_dialog.js, #8374; no behaviour change). */
 import { plural } from './format.js';
 import { importOnce } from './import_once.js';
-import { showToast } from './utils.js';
+import { copyText, showToast } from './utils.js';
 import { isCloud } from './server_base.js';
 import { requestJson } from './api.js';
 const { isExample } = await importOnce('./job_words.js'); // lazy like this file
@@ -441,6 +441,30 @@ export function receivedMaxSetting() {
     if (String(input.value).trim() === '') return {}; // an emptied field is unchanged, never 0 (no limit) saved by accident
     const gib = Math.max(0, Math.floor(Number(input.value) || 0));
     return { received_artifacts_max_bytes: String(gib * GIB) };
+}
+
+/** Settings > Storage: the data folder path and how to back it up (#17538). */
+export async function loadLocalBackup() {
+    const el = document.getElementById('settings-local-backup');
+    if (!el || isCloud()) return;
+    try {
+        const resp = await fetch('/api/system/status');
+        if (!resp.ok) return;
+        const d = await resp.json();
+        const dir = d.data_dir;
+        if (!dir) return;
+        el.hidden = false;
+        const path = document.createElement('code');
+        path.className = 'settings-mono-input';
+        path.textContent = dir;
+        const btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'btn btn-small'; btn.textContent = 'Copy path';
+        btn.addEventListener('click', async () => { showToast((await copyText(dir)) ? 'Copied' : 'Could not copy', false); });
+        const note = document.createElement('p');
+        note.className = 'settings-hint sv-help';
+        note.textContent = 'To back up, copy this folder while Coral is stopped. It holds sessions, settings, agents and artifacts.';
+        el.replaceChildren(path, ' ', btn, note);
+    } catch { /* the path is absent; the section stays hidden */ }
 }
 
 /** The limit to save, in bytes ({} when the field isn't on this page). */

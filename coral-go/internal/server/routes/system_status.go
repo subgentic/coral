@@ -131,6 +131,7 @@ func (h *SystemHandler) Status(w http.ResponseWriter, r *http.Request) {
 		"firewall_warning": firewall.Warning(),
 		// Damage the integrity check found a minute after start (#4157); "" when none.
 		"database_warning": background.DatabaseWarning(),
+		"data_dir":         h.cfg.CoralDir(),
 	}
 	// Claude's sign-in as the last background check found it (#5469): present only once a check was made. false is the dashboard's one quiet line, "Claude is not signed in:
 	// background jobs are waiting"; it clears itself once a check finds Claude signed in.

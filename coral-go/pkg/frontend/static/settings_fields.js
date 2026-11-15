@@ -176,7 +176,8 @@ export const CLEANUP_FIELDS = [
     live('settings-message-search-status'),
     { key: 'worktrees', type: 'heading', id: 'wt-title', label: 'Kept worktrees', help: { text: 'Kept because they still hold your work.', more: 'Git worktrees Coral made for teams and jobs and kept when they stopped. Remove one when you no longer need it: Coral never forces a removal, so unsaved changes or unmerged commits keep it.' } },
     { key: 'worktrees_list', type: 'notice', render: slot => { slot.id = 'settings-worktrees-row'; const el = document.getElementById('settings-worktrees-live'); if (el) slot.append(el); } },
-    // The Dropbox backup block (#14609): drawn into its own row, out of the hidden holder it is written in (it was never shown before this row).
+    { key: 'local_backup', type: 'heading', id: 'settings-local-backup-title', label: 'Local backup' },
+    live('settings-local-backup'),
     { key: 'dropbox_backup', type: 'notice', render: slot => { slot.id = 'settings-dropbox-row'; const el = document.getElementById('settings-dropbox'); if (el) slot.append(el); } },
 ];
 
