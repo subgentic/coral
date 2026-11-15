@@ -39,9 +39,9 @@ func TestTheCheckNamesAHighTaskWaitingBehindLowerPriorityWork(t *testing.T) {
 	_, err := h.s.ClaimTask(ctx, "team", "Dev", medium)
 	require.NoError(t, err)
 	high := mk("High work", "high", "Dev")
-	_ = mk("Low behind medium", "low", "Dev")        // lower than what it is doing: not waiting behind lower-priority work
-	_ = mk("Unowned high", "high", "")               // nobody to switch
-	equal := mk("Other medium", "medium", "Dev2")     // Dev2: medium in hand, a medium waiting
+	_ = mk("Low behind medium", "low", "Dev")     // lower than what it is doing: not waiting behind lower-priority work
+	_ = mk("Unowned high", "high", "")            // nobody to switch
+	equal := mk("Other medium", "medium", "Dev2") // Dev2: medium in hand, a medium waiting
 	_, err = h.s.ClaimTask(ctx, "team", "Dev2", equal)
 	require.NoError(t, err)
 	_ = mk("Second medium", "medium", "Dev2")

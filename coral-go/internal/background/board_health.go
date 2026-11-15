@@ -238,7 +238,7 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 	items = append(items, sleeperItems(sleepers, subs, now)...) // asleep with something for it: a wake, once acknowledged it stays off (#11803)
 	items = append(items, m.askItems(ctx, project, now)...)
 	items = append(items, m.parkItems(ctx, project, all, now)...) // an agent with a park over a day old, or more parks than the cap (#11660)
-	items = append(items, priorityWaitItems(tasks, now)...)        // a High task waiting behind its owner's lower-priority work (#17648)
+	items = append(items, priorityWaitItems(tasks, now)...)       // a High task waiting behind its owner's lower-priority work (#17648)
 	// 4. Queue problems (task numbers only).
 	issues, _, _ := taskQueueIssues(tasks)
 	for _, is := range issues {
