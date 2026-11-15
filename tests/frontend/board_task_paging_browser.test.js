@@ -80,7 +80,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         check('list items are light: no body, no workflow', rows.every(r => !r.hasBody && !r.hasWorkflow));
         let d = await dom();
         check('"Load more" offers the 10 done tasks not loaded', !!d.more && /Showing 53 of 63/.test(d.more), JSON.stringify(d.more));
-        check('the counts are the board totals (60 done of 63), not the loaded rows', d.count === '60/63' && /\(60\)/.test(d.hide), JSON.stringify(d));
+        check('the badge is the open count (3), not the loaded rows', d.count === '3' && /\(60\)/.test(d.hide), JSON.stringify(d));
 
         // ── Load more ──
         await ev(`(() => { const host = document.createElement('div'); host.id = 'paging-dock'; host.style.cssText = 'position:fixed;inset:0 auto 0 0;width:680px;overflow:auto;background:var(--bg-primary);z-index:99999'; host.append(document.getElementById('board-task-list')); document.body.append(host); document.querySelector('#paging-dock .dt-foot').scrollIntoView({block:'center'}); return true; })()`);
@@ -100,7 +100,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         check('a refresh keeps the loaded older pages, without duplicates', rows.length === 63 && new Set(rows.map(r => r.id)).size === 63, `${rows.length} rows`);
         check('the task finished meanwhile is listed as done', rows.some(r => r.id === openIds[2] && r.status === 'completed'));
         d = await dom();
-        check('counts follow (61 done of 63)', d.count === '61/63', d.count);
+        check('counts follow (2 open of 63)', d.count === '2', d.count);
 
         // ── Detail and Edit use the full task ──
         await ev(`window.openTeamPage(${JSON.stringify(BOARD)}, { tab: 'tasks', item: ${openIds[0]} }); true`);
