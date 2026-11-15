@@ -257,6 +257,12 @@ func (c *Collector) Observe(ctx context.Context, roots []string) {
 		}
 		c.mu.Unlock()
 	}
+	canonicalRoots := make(map[string]bool, len(roots))
+	for _, root := range roots {
+		if rc := canonical(root); rc != "" {
+			canonicalRoots[rc] = true
+		}
+	}
 	c.mu.Lock()
 	for key := range c.repos { // a repository no agent works in any more is forgotten
 		if !seen[key] {
@@ -265,14 +271,7 @@ func (c *Collector) Observe(ctx context.Context, roots []string) {
 		}
 	}
 	for cr := range c.notRepo { // a non-git folder no agent works in any more is forgotten too
-		still := false
-		for _, root := range roots {
-			if rc := canonical(root); rc == cr {
-				still = true
-				break
-			}
-		}
-		if !still {
+		if !canonicalRoots[cr] {
 			delete(c.notRepo, cr)
 		}
 	}
