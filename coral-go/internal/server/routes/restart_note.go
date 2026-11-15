@@ -20,12 +20,15 @@ func (h *SessionsHandler) restartNote(ctx context.Context, p *restartPlan) strin
 	}
 	var mine []board.Task
 	for _, t := range tasks {
-		if t.AssignedTo != nil && *t.AssignedTo == p.subscription.SubscriberID && (t.Status == "in_progress" || t.Status == "pending") {
+		if t.AssignedTo != nil && *t.AssignedTo == p.subscription.SubscriberID && heldStatus[t.Status] {
 			mine = append(mine, t)
 		}
 	}
 	return restartNoteText(p.displayName, p.subscription.SubscriberID, mine)
 }
+
+// heldStatus are the states of a task its assignee still owns: one waiting on review or blocked is not "no task" (#17478).
+var heldStatus = map[string]bool{"in_progress": true, "pending": true, "blocked": true, "review_pending": true}
 
 // restartNoteText is the words of the note; tasks are the ones assigned to the agent that are not finished.
 func restartNoteText(name, subscriber string, tasks []board.Task) string {
@@ -47,7 +50,7 @@ func restartNoteText(name, subscriber string, tasks []board.Task) string {
 			fmt.Fprintf(&b, "\n- and %d more (coral-board task list)", len(tasks)-5)
 			break
 		}
-		fmt.Fprintf(&b, "\n- #%d %s (%s)", t.ID, t.Title, strings.ReplaceAll(t.Status, "_", " "))
+		fmt.Fprintf(&b, "\n- #%d %s (%s)", t.ID, noteLine(t.Title, 100), strings.ReplaceAll(t.Status, "_", " ")) // one clean line: a title is a person's or an agent's text
 	}
 	return b.String()
 }
