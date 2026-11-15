@@ -1,6 +1,7 @@
 // The affected-suites finder (#17652): a diff that rewords text lists the suites that still assert the old words, and leaves out the ones that do not; a changed helper lists its importers.
+import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
-import { removedTokens, affected, tokensOf } from './affected_suites.mjs';
+import { removedTokens, affected, tokensOf, revArg, escapeRe } from './affected_suites.mjs';
 
 const diff = `diff --git a/coral-go/pkg/frontend/static/modes.js b/coral-go/pkg/frontend/static/modes.js
 --- a/coral-go/pkg/frontend/static/modes.js
@@ -38,4 +39,14 @@ assert.deepEqual(tokensOf('<button class="btn btn-small sched-more-btn" aria-lab
 // #16357: the diff removed 'Everything, with safety checks.' and two suites said it lower-cased inside a longer sentence
 const re = affected({ tokens: new Map([['Everything, with safety checks.', 'permission_flags.js']]), helpers: [] }, new Map([['tests/frontend/a_browser.test.js', "'Auto mode: everything, with safety checks.'"]]));
 assert.deepEqual([...re.keys()], ['tests/frontend/a_browser.test.js'], 'a case difference and a longer sentence still match');
+// Security on #17652 (#17737): a revision that starts with '-' is refused (git would take it as an option), and a helper's name is a literal inside the RegExp
+assert.throws(() => revArg('--output=/tmp/x'), /refusing/);
+assert.throws(() => revArg('-p'), /refusing/);
+assert.equal(revArg('origin/main'), 'origin/main');
+assert.equal(revArg(undefined), undefined);
+assert.equal(escapeRe('a.b(c)+[d]'), 'a\\.b\\(c\\)\\+\\[d\\]');
+const odd = affected({ tokens: new Map(), helpers: ['tests/frontend/helpers/wa(it.js'] }, new Map([['tests/frontend/x_browser.test.js', "require('./helpers/wa(it')"], ['tests/frontend/y_browser.test.js', "require('./helpers/wait')"]]));
+assert.deepEqual([...odd.keys()], ['tests/frontend/x_browser.test.js'], 'a helper name with a regexp character neither throws nor matches loosely');
+const bad = spawnSync(process.execPath, [new URL('./affected_suites.mjs', import.meta.url).pathname, '--output=/tmp/affected-should-not-exist'], { encoding: 'utf8' });
+assert.equal(bad.status, 2, 'the script exits 2 on an option-shaped revision'); assert.match(bad.stderr, /refusing/);
 console.log('PASS the affected-suites finder lists what a reworded string breaks');
