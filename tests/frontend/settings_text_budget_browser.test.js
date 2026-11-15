@@ -1,7 +1,7 @@
 // How much text each Settings group shows before anything is opened (the usability pass, #5985: "help people get to the setting, then expand it with more info if necessary"). The words a person
 // can see in a group are counted (text nodes whose whole path is shown; a select's options are not text); a group that has been cut has a budget, so a paragraph that creeps back fails here. The
 // long explanations are behind each row's (i): a button with aria-expanded that controls its text, and the text still describes its control. Read as a computer connected to Coral Hub at Launch, with
-// every Hub row shown (the largest the Network and Hub group gets). What the server holds is stood in for too: no terminal logs and no kept worktrees (a suite that ran before on the same server leaves a log of an ended agent, which adds its row's words). Drives Chrome over CDP against the isolated dev server; the cloud routes are stood in for the page's fetch.
+// every Hub row shown (the largest the Coral Hub and remote access group gets). What the server holds is stood in for too: no terminal logs and no kept worktrees (a suite that ran before on the same server leaves a log of an ended agent, which adds its row's words). Drives Chrome over CDP against the isolated dev server; the cloud routes are stood in for the page's fetch.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
@@ -11,8 +11,8 @@ const { coralReady } = require('./helpers/wait');
 // #15950: Agents 262 to 269 (+7: the Custom permission modes block, its title (3), Learn more (2) and Add a custom mode (4)).
 // Keep the old section budgets plus the words in those authored lines (HELP_LINES /
 // HINTS); long explanations remain in Docs and never inflate the dialog.
-const BEFORE = { 'Network and Hub':186, Agents:269, 'Storage and cleanup':151, Terminal:70, General:39, Notifications:72, 'Files and Git':40, 'Security and privacy':59 };
-const HELP_WORDS = { 'Network and Hub':80, Agents:73, 'Storage and cleanup':21, Terminal:16, General:6, 'Files and Git':8, 'Security and privacy':17 };
+const BEFORE = { 'Coral Hub and remote access':188, Agents:269, 'Storage and cleanup':151, Terminal:70, General:39, Notifications:72, 'Files and Git':40, 'Security and privacy':59 };
+const HELP_WORDS = { 'Coral Hub and remote access':80, Agents:73, 'Storage and cleanup':21, Terminal:16, General:6, 'Files and Git':8, 'Security and privacy':17 };
 const BUDGET = Object.fromEntries(Object.entries(BEFORE).map(([k,v])=>[k,v+(HELP_WORDS[k]||0)]));
 
 (async () => {

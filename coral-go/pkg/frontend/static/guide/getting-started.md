@@ -105,7 +105,7 @@ The **Docs** tab explains how Coral works, with search. Open it when you want th
 
 ### Settings
 
-General, Agents, Terminal, Notifications, Inbox, Files and Git, Network and Hub, Chief, and Security and privacy. Coral looks for updates in the background and always asks before it installs one; there is a switch for that in Settings.
+General, Agents, Terminal, Notifications, Inbox, Files and Git, Coral Hub and remote access, Chief, and Security and privacy. Coral looks for updates in the background and always asks before it installs one; there is a switch for that in Settings.
 
 ## If something is stuck
 

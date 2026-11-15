@@ -216,7 +216,7 @@ const CLOUD_PRELOAD = `(() => {
         assert.equal(s.posts + s.frames.length, 0, 'machine-limited: nothing sent');
         t = await toasts();
         const mach = t.find(x => /^Blocked: Box M2/.test(x.text));
-        assert.ok(mach && /Change it in Coral on that computer \(Settings > Network and Hub\)\.$/.test(mach.text), `machine text (${JSON.stringify(t)})`);
+        assert.ok(mach && /Change it in Coral on that computer \(Settings > Coral Hub and remote access\)\.$/.test(mach.text), `machine text (${JSON.stringify(t)})`);
         assert.equal(mach.action, null, 'no Open Computers when the machine is the limit');
         assert.equal(await draft(), 'machine draft');
         console.log(`   ✓ '${c.text}', machine text, no action button, draft kept`);

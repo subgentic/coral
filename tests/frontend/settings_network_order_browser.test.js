@@ -1,4 +1,4 @@
-// Settings > Network and Hub (#10481 point 4, Beta): the pane starts with how to use Coral from a phone or another computer (Remote access and the setup code), the health card (Status) comes below, and
+// Settings > Coral Hub and remote access (#10481 point 4, Beta): the pane starts with how to use Coral from a phone or another computer (Remote access and the setup code), the health card (Status) comes below, and
 // Coral Hub has one way in: one "Connect to Coral Hub" button, not two with the same name. Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -25,6 +25,6 @@ const { coralReady } = require('./helpers/wait');
         assert.ok(phone < (status < 0 ? 99 : status), 'it comes before the health card (Status): ' + JSON.stringify(texts));
         assert.ok(phone <= 1, 'it is the first group of the pane (after the pane title): ' + JSON.stringify(texts));
         assert.ok(pane.connect.length <= 1, 'Coral Hub has one Connect button, not several: ' + JSON.stringify(pane.connect));
-        console.log('PASS Network and Hub: phone and other computers first, Status below, one Connect button');
+        console.log('PASS Coral Hub and remote access: phone and other computers first, Status below, one Connect button');
     } finally { await client.close(); }
 })().catch(e => { console.error(e.message); process.exit(1); });

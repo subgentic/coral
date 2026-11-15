@@ -260,7 +260,7 @@ func init() {
 	ownRoute(HubRelaunchUpdates, KindBool, "false", "The Hub's owner may relaunch this Coral to install a staged update (#5280). Off until the person at this computer turns it on (#6290): an install the person here was not asked about is never the default.")
 	optIn(HubRelaunchUpdates)
 	ownRoute(HubCrossTeamSettings, KindBool, "true", "Coral Hub's owner may turn cross-team messaging and file sharing on or off for this computer's teams (#5572); off, Coral Hub changes neither, in either direction.")
-	coral(HubAutoAcceptChanged, "Who last changed the Coral Hub auto-accept switch, the Coral Hub owner or this computer, and when, as JSON: written by Coral, shown beside the switch in Settings > Network and Hub (#5840).")
+	coral(HubAutoAcceptChanged, "Who last changed the Coral Hub auto-accept switch, the Coral Hub owner or this computer, and when, as JSON: written by Coral, shown beside the switch in Settings > Coral Hub and remote access (#5840).")
 	coral(CrossTeamLinksSeen, "Set once, by Coral, when a Coral Hub advertised cross_team_links/1 to this computer: from then on a connection without it is refused, never sent back to the old path (#5572).")
 	ownRoute(HubRedactTokens, KindBool, "true", "Redact tokens in what the Hub sees.")
 	ownRoute("hub_signin_enabled", KindBool, "false", "Sign in with the Hub.")

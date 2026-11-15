@@ -134,7 +134,7 @@ func openFolderWords(f openFolderFacts) string {
 		left = append(left, "the API keys of the other Corals stored here ("+strings.Join(names, ", ")+"): make a new key on each of those computers and enter it here again")
 	}
 	if f.hubLinked {
-		left = append(left, "the Coral Hub link: unlink and link again in Settings > Network and Hub")
+		left = append(left, "the Coral Hub link: unlink and link again in Settings > Coral Hub and remote access")
 	}
 	if f.password {
 		left = append(left, "the password: set a new one")

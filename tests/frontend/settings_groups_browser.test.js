@@ -8,7 +8,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
 const GROUPS = {
-    general: ['settings-theme', 'settings-agent-type', 'settings-group-by-team', 'settings-show-scrollbars', 'settings-check-updates'], // Render engine moved to Terminal, About to Network and Hub (#7040)
+    general: ['settings-theme', 'settings-agent-type', 'settings-group-by-team', 'settings-show-scrollbars', 'settings-check-updates'], // Render engine moved to Terminal, About to Coral Hub and remote access (#7040)
     agents: ['settings-permission-mode', 'settings-working-dir', 'settings-cli-path-claude', 'settings-default-model-claude', 'settings-auto-resume', 'settings-auto-goals', 'settings-agent-low-priority', 'settings-board-auto-attach', 'settings-board-health-monitor'],
     terminal: ['settings-terminal-font-size', 'settings-terminal-scrollback', 'settings-fit-pane-width', 'tb-choice', 'settings-renderer-select'],
     notifications: ['settings-notify-needs-input', 'settings-desktop-notify', 'settings-alert-needs-input', 'settings-alert-reply', 'settings-alert-sound'],
@@ -40,7 +40,7 @@ const GROUPS = {
         assert.deepEqual(await shownGroup(), ['cleanup'], 'the group asked for is the one shown');
         await waitFor(`document.activeElement && document.activeElement.id === 'settings-tab-cleanup'`, "focus on the open group's tab, not the first tab");
         const tabs = await ev(`[...document.querySelectorAll('#settings-tabs [role=tab]')].map(t => ({ id: t.id, name: t.querySelector('.settings-tab-name').textContent.trim(), sel: t.getAttribute('aria-selected'), ctl: t.getAttribute('aria-controls'), ti: t.tabIndex }))`);
-        assert.deepEqual(tabs.map(t => t.name), ['General', 'Agents', 'Terminal', 'Notifications', 'Inbox', 'Files and Git', 'Storage and cleanup', 'Network and Hub', 'Chief', 'Security and privacy']);
+        assert.deepEqual(tabs.map(t => t.name), ['General', 'Agents', 'Terminal', 'Notifications', 'Inbox', 'Files and Git', 'Storage and cleanup', 'Coral Hub and remote access', 'Chief', 'Security and privacy']);
         assert.deepEqual(tabs.filter(t => t.sel === 'true').map(t => t.id), ['settings-tab-cleanup'], 'one tab selected');
         assert.deepEqual(tabs.filter(t => t.ti === 0).map(t => t.id), ['settings-tab-cleanup'], 'only the selected tab is in the Tab order');
         for (const [g, ids] of Object.entries(GROUPS)) {

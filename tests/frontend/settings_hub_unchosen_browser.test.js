@@ -1,4 +1,4 @@
-// Two things the Coral Hub controls of Settings > Network and Hub say about a computer that has not connected yet (#5962), both themes are the page's own:
+// Two things the Coral Hub controls of Settings > Coral Hub and remote access say about a computer that has not connected yet (#5962), both themes are the page's own:
 //  (A) before Connect the level question has an answer, View, held on the page and sent with Connect (#6579); a computer linked without ever choosing (status max_mode_saved false, connected) shows
 //      "Not chosen yet (View)", not a plain View that contradicts the first-run screen's Launch; choosing a value there saves it (PUT /api/cloud/max-mode) and the placeholder goes; a saved choice shows as itself;
 //  (B) a hub that could not be reached is said in a sentence ("Coral could not reach Coral Hub. Check your connection and try again."), with the seconds until the next try counted down beside it

@@ -9,7 +9,7 @@ ensureBuilt('settings-modal');
 const settingsDialog = await importOnce('./settings_dialog.js');
 export const { showSettingsModal, hideSettingsModal, applySettings } = settingsDialog;
 
-// The robot on each section's heading (#15152): the section's name, and where in the docs to read (Notifications and Network and Hub have a topic of their own).
+// The robot on each section's heading (#15152): the section's name, and where in the docs to read (Notifications and Coral Hub and remote access have a topic of their own).
 const { agentCopyBeside } = await importOnce('./agent_copy_button.js');
 const PANE_DOCS = { notifications: 'notifications', network: 'hub' };
 for (const pane of document.querySelectorAll('#settings-modal .settings-pane[data-group]')) agentCopyBeside(pane.querySelector(':scope > .settings-pane-title'), PANE_DOCS[pane.dataset.group] || 'settings', `Coral Settings, \u201c${pane.dataset.title}\u201d section.`);

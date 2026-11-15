@@ -38,7 +38,7 @@ type cloudStatus struct {
 	HubRelaunchAvailable bool `json:"hub_relaunch_available"`
 	// HubCrossTeamSettings is the local lock "Let Coral Hub change cross-team settings" (#5572); on, the Coral Hub owner may turn a team's cross-team messaging and file sharing on or off.
 	HubCrossTeamSettings bool `json:"hub_cross_team_settings"`
-	// AllowHubAutoAcceptChanged is who last changed the auto-accept switch and when ({by: "hub"|"local", user, at}), shown beside it in Settings > Network and Hub (#5840); absent until it was changed.
+	// AllowHubAutoAcceptChanged is who last changed the auto-accept switch and when ({by: "hub"|"local", user, at}), shown beside it in Settings > Coral Hub and remote access (#5840); absent until it was changed.
 	AllowHubAutoAcceptChanged json.RawMessage `json:"allow_hub_auto_accept_changed,omitempty"`
 	// Bootstrap is the last one-time-credential enrollment's outcome
 	// ({status, detail, at}); absent when there was none.
@@ -47,7 +47,7 @@ type cloudStatus struct {
 	// screen only when this server was started to offer it (#3459).
 	OfferAtLaunch bool `json:"offer_at_launch"`
 	// OwnerLabelMissing: this computer is linked to Coral Hub but its enrolment recorded no owner (linked before Coral recorded one), so the owner-only routes refuse the owner through the Hub until it is
-	// recorded (Settings > Network and Hub offers to, #6108).
+	// recorded (Settings > Coral Hub and remote access offers to, #6108).
 	OwnerLabelMissing bool `json:"owner_label_missing,omitempty"`
 	// OwnerKind is what this computer is enrolled as: "personal" (a person's, and every enrolment made before teams) or "team" (a Coral Hub organisation's, #7061). Never the organisation's id.
 	OwnerKind string `json:"owner_kind"`

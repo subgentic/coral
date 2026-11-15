@@ -51,7 +51,7 @@ const win = (version, over = {}, relaunch = {}) => ({ enabled: true, relaunch_av
     const setStatus = async (st) => { await ev(`window.__upd.status = ${JSON.stringify(st)}; import(${S} + 'update_ui.js').then(m => m.startUpdateUi && m.startUpdateUi()).then(() => import(${S} + 'update_ui.js')).then(m => m.refreshUpdateStatus()).then(() => true)`); await settle(150); };
     const pill = () => ev(`(() => { const p = document.getElementById('update-pill'); if (!p) return null; const r = p.getBoundingClientRect(); return { hidden: p.hidden || r.width === 0, name: p.getAttribute('aria-label'), ariaDisabled: p.getAttribute('aria-disabled'), text: [...p.querySelectorAll('span')].filter(e => getComputedStyle(e).display !== 'none').map(e => e.textContent).join('').replace(/\\s+/g, ' ').trim() }; })()`);
     const pane = async () => { await ev(`Promise.resolve(window.showSettingsModal('updates')).then(() => import(${S} + 'update_settings.js')).then(m => m.showUpdatesPane()).then(() => true)`); await settle(250);
-        return ev(`(() => { const b = document.getElementById('update-pane-body'); const act = b.querySelector('.update-act'); return { text: b.textContent.replace(/\\s+/g, ' ').trim(), act: act ? { text: act.textContent.trim(), disabled: act.disabled, ariaDisabled: act.getAttribute('aria-disabled'), primary: act.classList.contains('btn-primary') } : null, hubButton: [...b.querySelectorAll('button')].some(x => /Change in Network and Hub/.test(x.textContent)) }; })()`); };
+        return ev(`(() => { const b = document.getElementById('update-pane-body'); const act = b.querySelector('.update-act'); return { text: b.textContent.replace(/\\s+/g, ' ').trim(), act: act ? { text: act.textContent.trim(), disabled: act.disabled, ariaDisabled: act.getAttribute('aria-disabled'), primary: act.classList.contains('btn-primary') } : null, hubButton: [...b.querySelectorAll('button')].some(x => /Change in Coral Hub and remote access/.test(x.textContent)) }; })()`); };
     const dialog = () => ev(`(() => { const d = document.getElementById('update-confirm-modal'); if (!d || getComputedStyle(d).display === 'none') return null; return { title: (document.getElementById('update-confirm-title') || {}).textContent, text: d.textContent.replace(/\\s+/g, ' ').trim(), go: (d.querySelector('.update-go') || {}).textContent }; })()`);
     const calls = () => ev(`JSON.stringify(window.__upd.calls.filter(c => c.path !== '/status'))`).then(JSON.parse);
 
@@ -110,7 +110,7 @@ const win = (version, over = {}, relaunch = {}) => ({ enabled: true, relaunch_av
             await ev(`window.hideSettingsModal(); true`);
 
             // ═══ #7343: a build without the Hub's relaunch feature (every shipping build): the status says relaunch_available is false, so Settings draws no Hub row (the automatic switch stays: Coral checks by itself in every build),
-            // the Network and Hub pane draws no switch or sentence for it, and Install update is still there
+            // the Coral Hub and remote access pane draws no switch or sentence for it, and Install update is still there
             await load(view, win('1.4.126', { relaunch_available: false }));
             await ev(`window.__upd.hubAvail = false; true`);
             pn = await ev(`(async () => { await window.showSettingsModal('updates'); const m = await import(${S} + 'update_settings.js'); await m.showUpdatesPane(); const b = document.getElementById('update-pane-body'); const act = b.querySelector('.update-act'); return { text: b.textContent.replace(/\\s+/g, ' ').trim(), auto: !!document.getElementById('settings-update-auto'), act: act ? act.textContent.trim() : null }; })()`);
@@ -121,7 +121,7 @@ const win = (version, over = {}, relaunch = {}) => ({ enabled: true, relaunch_av
                 await ev(`import(${S} + 'cloud_connect.js').then(m => m.loadCloudStatus()).then(() => true)`);
                 await waitFor(`(() => { const r = document.getElementById('settings-cloud-hub-relaunch-row'); return !!r && r.hidden === ${!avail}; })()`, `the Hub relaunch row ${avail ? 'drawn' : 'hidden'}`, 8000); await settle(150);
                 const net = await ev(`(() => { const row = document.getElementById('settings-cloud-hub-relaunch-row'), st = document.getElementById('settings-cloud-hub-relaunch-state'); const vis = e => !!e && !e.hidden && e.getClientRects().length > 0; return { row: vis(row), state: vis(st), exists: !!row }; })()`);
-                check(`${tag}: Network and Hub with the Hub's feature ${avail ? 'on' : 'off'}: the relaunch switch and its sentence are ${want ? 'drawn' : 'not drawn'} (${JSON.stringify(net)})`, net.exists && net.row === want && (want ? true : net.state === false));
+                check(`${tag}: Coral Hub and remote access with the Hub's feature ${avail ? 'on' : 'off'}: the relaunch switch and its sentence are ${want ? 'drawn' : 'not drawn'} (${JSON.stringify(net)})`, net.exists && net.row === want && (want ? true : net.state === false));
             }
             await ev(`window.hideSettingsModal(); true`);
 

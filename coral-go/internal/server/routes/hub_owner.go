@@ -195,7 +195,7 @@ const textCustomModelsOwnerOnly = "through Coral Hub only the account this compu
 const textStarOwnerOnly = "through Coral Hub only the account this computer is linked to can star an artifact (#9819)"
 const textSavedOwnerOnly = "through Coral Hub the saved messages are for the account this computer is linked to only (#5753)"
 
-const textHubAutoAcceptOwnerOnly = "through Coral Hub only the account this computer is linked to can turn Coral Hub auto-accept on or off; on this computer use Settings > Network and Hub"
+const textHubAutoAcceptOwnerOnly = "through Coral Hub only the account this computer is linked to can turn Coral Hub auto-accept on or off; on this computer use Settings > Coral Hub and remote access"
 
 const textCommentsOwnerOnly = "through Coral Hub only the account this computer is linked to can comment on artifacts (#7052)"
 
@@ -265,7 +265,7 @@ func adoptOwnerFromRequest(r *http.Request) bool {
 // ownerLabelMissingCode is the refusal code of an owner-marked request to a machine that recorded no owner label (#6108); the dashboard says what to do about it.
 const ownerLabelMissingCode = "owner_label_missing"
 
-const textOwnerLabelMissing = "Coral Hub can't confirm you own this computer yet. On the computer, open Settings > Network and Hub and choose Confirm owner."
+const textOwnerLabelMissing = "Coral Hub can't confirm you own this computer yet. On the computer, open Settings > Coral Hub and remote access and choose Confirm owner."
 
 // ownerLabelMissingFor reports whether r is a stamped owner request refused only because no owner label is recorded: the stamp passes every owner check (identifyOwner), the label was read
 // without an error and is empty. An unreadable record is not "missing": that stays a plain refusal.

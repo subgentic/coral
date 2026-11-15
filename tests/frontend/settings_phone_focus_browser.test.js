@@ -21,7 +21,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`document.getElementById('settings-tab-network').focus(); true`);
         await key('Enter', 13, '\r');
         const at = await where();
-        if (!/^in the Network and Hub section/.test(at)) problems.push(`Enter on a section's row puts the keyboard in that section (it is on ${at})`);
+        if (!/^in the Coral Hub and remote access section/.test(at)) problems.push(`Enter on a section's row puts the keyboard in that section (it is on ${at})`);
         await ev(`document.querySelector('#settings-modal .settings-back').focus(); true`); await key('Enter', 13, '\r');
         const back = await where();
         if (!/#settings-tab-network$/.test(back)) problems.push(`Back puts the keyboard on the row it came from (it is on ${back})`);

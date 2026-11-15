@@ -1,7 +1,7 @@
 // UI audit #5589, third batch (findings 16, 19, 21, 24, 27), on the real server and the real dialogs:
 //   16  Settings > Terminal: each backend is one line, the whole explanation (Security's wording) opens under "Learn more";
 //   19  Settings > General: the machine health is part of About;
-//   21  Settings > Network and Hub, a server with no hub: the command to start with has a Copy button;
+//   21  Settings > Coral Hub and remote access, a server with no hub: the command to start with has a Copy button;
 //   24  the launch chooser draws the robot the start page draws, in the page's font;
 //   27  Settings' footer button says "Save settings", as Team settings does.
 const assert = require('node:assert/strict');
@@ -52,7 +52,7 @@ const { coralReady } = require('./helpers/wait');
             assert.deepEqual(await ev(`(() => { const a = document.getElementById('about-section'); const h = document.getElementById('machine-health-local'); return { inAbout: a.contains(h), order: [...a.children].map(c => c.id || c.className.split(' ')[0]) }; })()`).then(r => r.inAbout), true);
             await shot('general-about', w);
 
-            console.log(`3. (${w}) Network and Hub: with no hub, the command has a Copy button`);
+            console.log(`3. (${w}) Coral Hub and remote access: with no hub, the command has a Copy button`);
             await ev(`window.hideSettingsModal(); true`); await open('network');
             await waitFor(`!!document.querySelector('#settings-cloud [data-cloud=command-row]:not([hidden])') || /connect|configured|Ready/.test(document.getElementById('settings-cloud-status').textContent)`, 'the Coral Hub status', 10000);
             const hubOff = await ev(`/isn't configured/.test(document.getElementById('settings-cloud-status').textContent)`);

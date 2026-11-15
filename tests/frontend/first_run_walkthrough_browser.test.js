@@ -7,7 +7,7 @@
 //   3. New Agent in two steps: "+ New Agent" opens the choice (AI Agent / Agent Team / Terminal), AI Agent opens the form, a folder and Launch start the agent and OPEN it; a first prompt
 //      reaches the CLI.
 //   2b. A Hub question answered in the TERMINAL (#6381: Enter skips, only "yes" connects; the skip is stored as welcome_choice skipped and welcome_pending False, the answer the dashboard's own Skip saves):
-//      a page loaded after it does not ask again, while Settings > Network and Hub and the home Coral Hub card still offer Connect. (The terminal side itself, Enter and yes on a real pty, is
+//      a page loaded after it does not ask again, while Settings > Coral Hub and remote access and the home Coral Hub card still offer Connect. (The terminal side itself, Enter and yes on a real pty, is
 //      cmd/coral's TestCloudStartupPrompt* in cloud_startup_pty_unix_test.go.)
 //   4. Launch Team: the choice, then Agent Team: a name, a folder, a first task, Launch; the team's agents start and the first task reaches the CLI.
 //
@@ -253,9 +253,9 @@ setInterval(() => {}, 1 << 30);
         const st = await ev(`fetch('/api/settings').then(r => r.json()).then(j => ({ choice: String((j.settings || j).welcome_choice), pending: String((j.settings || j).welcome_pending) }))`);
         assert.deepEqual(st, { choice: 'skipped', pending: 'False' }, `${tag}: the answer stays stored (${JSON.stringify(st)})`);
         console.log(`   ✓ ${tag}: a page loaded after a terminal skip does not ask again`);
-        // Settings > Network and Hub still offers Connect
+        // Settings > Coral Hub and remote access still offers Connect
         await ev(`window.showSettingsModal('network'); true`);
-        await waitFor(visible('#settings-cloud-connect'), `${tag}: Connect in Settings > Network and Hub`, { timeout: 10000, diag: `document.body.innerText.slice(0, 300)` });
+        await waitFor(visible('#settings-cloud-connect'), `${tag}: Connect in Settings > Coral Hub and remote access`, { timeout: 10000, diag: `document.body.innerText.slice(0, 300)` });
         await ev(`window.hideSettingsModal(); true`);
         await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display === 'none'`, `${tag}: Settings closing`, { timeout: 5000 });
         // the home Hub card still opens the Connect screen (a phone has no such home: it shows the agent list, #4497, so there Settings is the way)
@@ -265,7 +265,7 @@ setInterval(() => {}, 1 << 30);
             await clickVisible('#editions-home [data-editions="home-hub"]');
             await waitFor(visible('.editions-connect[data-cloud="connect"]'), `${tag}: Connect on the Hub card's screen`, { timeout: 10000, diag: `document.body.innerText.slice(0, 300)` });
         }
-        console.log(`   ✓ ${tag}: Settings > Network and Hub${mobile ? '' : ' and the home Coral Hub card'} still offer Connect`);
+        console.log(`   ✓ ${tag}: Settings > Coral Hub and remote access${mobile ? '' : ' and the home Coral Hub card'} still offer Connect`);
     };
 
     try {

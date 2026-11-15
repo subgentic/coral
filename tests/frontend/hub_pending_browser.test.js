@@ -1,6 +1,6 @@
 // (#11463 F2, coral-hub's first-time-user walk) A computer approved on the Hub that has not connected yet: the home card, the empty agent list and the Computers page say what is going on (name as text, the three
 // things to check, 'Never connected: start again' once it ran out), and the first-run card does not. A hub that has no pending route yet is the plain first run. Built on the first-run suite below.
-// Coral Hub's first run (#4586, coral-hub's copy): an account whose machine list loaded and is empty gets "Connect your first computer" (install Coral on each, then Settings > Network and Hub > Connect to Coral Hub) with an Add a computer link (the hub's /machines/add, same tab, #6351)
+// Coral Hub's first run (#4586, coral-hub's copy): an account whose machine list loaded and is empty gets "Connect your first computer" (install Coral on each, then Settings > Coral Hub and remote access > Connect to Coral Hub) with an Add a computer link (the hub's /machines/add, same tab, #6351)
 // instead of launch cards that go nowhere, and the empty agent list says so too (it is the phone's Agents page); computers that are all offline get "Your computers are offline"; a usable
 // machine with no agents gets "No agents yet"; a list that failed to load is never shown as a first run. A folder Browse says "Connect a computer first" instead of "Failed to load".
 // A local Coral never shows any of it. Served as the hub would serve it (the boot flag says mode

@@ -147,7 +147,7 @@ func TestOpenFolderWordsNameOnlyWhatApplies(t *testing.T) {
 	assert.Contains(t, all, " needs a restart. Only you can replace the rest: ")
 	for _, want := range []string{
 		"the API keys of the other Corals stored here (a, b): make a new key on each of those computers and enter it here again",
-		"the Coral Hub link: unlink and link again in Settings > Network and Hub",
+		"the Coral Hub link: unlink and link again in Settings > Coral Hub and remote access",
 		"the password: set a new one",
 		"the database key (.db_key): it can't be changed without re-encrypting the databases",
 	} {

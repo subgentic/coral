@@ -3019,7 +3019,7 @@ dialog.auto-accept-confirm h3 { margin: 0 0 6px; font-size: var(--fs-xl); }
 #stop-all-auto-accept[hidden] { display: none; }
 .auto-accept-confirm-duration { display: flex; align-items: center; gap: 8px; margin: 0 0 18px; color: var(--text-secondary); }
 .auto-accept-confirm-duration select { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); padding: 4px 8px; font: inherit; }
-/* A switch row in Network and Hub: the words on the left, the switch on the right, as every other Settings row (UI audit #5589); the switch look comes from ".settings-row .check-hit" and, now the pane is a settings_view whose live parts are not .settings-row, from this row's own .check-hit (#8542). */
+/* A switch row in Coral Hub and remote access: the words on the left, the switch on the right, as every other Settings row (UI audit #5589); the switch look comes from ".settings-row .check-hit" and, now the pane is a settings_view whose live parts are not .settings-row, from this row's own .check-hit (#8542). */
 .settings-cloud-switch-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; align-items: start; margin-top: 12px; }
 .settings-cloud-switch-row[hidden] { display: none; }
 .settings-cloud-switch-text { min-width: 0; }
@@ -3470,7 +3470,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-row > dd { min-width: 0; margin: 0; }
 .settings-row > dd:has(> .check-hit) { align-items: flex-end; }
 .settings-row > dd:has(> .check-hit) .settings-hint { align-self: stretch; text-align: right; }
-/* Settings > Network and Hub (#6579 part 2): the groups are sections with an h3 title, so the headings list reads Remote access, Setup code, Coral Hub, Manage other computers; a section is a row like the others
+/* Settings > Coral Hub and remote access (#6579 part 2): the groups are sections with an h3 title, so the headings list reads Remote access, Setup code, Coral Hub, Manage other computers; a section is a row like the others
    (a title where a term was, a body where a definition was). On a phone Coral Hub, the reason most people open the pane, comes first. */
 .net-group > .net-body { min-width: 0; margin: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; color: var(--text-primary); word-break: normal; overflow-wrap: anywhere; font-size: var(--fs-md); }
 .net-group[hidden] { display: none; }
@@ -3687,7 +3687,7 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 .cli-recheck-status { color: var(--text-secondary); font-size: var(--fs-md); line-height: var(--lh-body); margin: 0; }
 .cli-recheck-status:not(:empty) { margin-top: 10px; }
 
-/* Network and Hub layout nits (#5985): a status line that is empty takes no room; "Run as a hub" is label left, switch right like every other row; Disconnect aligns with the row's left edge. */
+/* Coral Hub and remote access layout nits (#5985): a status line that is empty takes no room; "Run as a hub" is label left, switch right like every other row; Disconnect aligns with the row's left edge. */
 #settings-remote-access-status:empty, #settings-hub-mode-status:empty, #settings-debug-input-log-status:empty { display: none; }
 #settings-cloud .settings-cloud-actions { margin: 6px 0; padding: 0; justify-content: flex-start; }
 #settings-cloud .settings-cloud-actions .btn { margin-left: 0; }
@@ -3704,7 +3704,7 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 #settings-cloud .settings-cloud-warn .material-icons { font-size: var(--fs-xl); vertical-align: text-bottom; }
 #settings-cloud .settings-cloud-saved { margin: 4px 0 0; }
 @media (pointer: coarse), (max-width: 767px) { #settings-cloud-link { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); } } /* the link to approve the code is a 44 px target on a phone */
-/* Network and Hub on the settings row (#7626): every switch is at the far end of its head (the Manage switch had lost its auto margin to a rule written for the old grid), Status is a group with the machine's state at the right of its row, the level question is the label with its hint at the left and the select at the right, and the Hub command is a full-width box with Copy at its end. */
+/* Coral Hub and remote access on the settings row (#7626): every switch is at the far end of its head (the Manage switch had lost its auto margin to a rule written for the old grid), Status is a group with the machine's state at the right of its row, the level question is the label with its hint at the left and the select at the right, and the Hub command is a full-width box with Copy at its end. */
 #about-section { display: grid; } /* a group like the others, but not a .settings-row: the hub page hides it and the settings trace counts hidden rows */
 #about-section[hidden] { display: none; }
 #about-section .net-body > :not(.settings-editions-btn) { align-self: stretch; }

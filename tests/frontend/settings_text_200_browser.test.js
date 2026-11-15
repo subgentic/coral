@@ -1,4 +1,4 @@
-// Settings at 200% text (#8277): every group, at 1280 and at 390 px with the text doubled (root font-size 32px), plus Network and Hub and Updates in hub mode.
+// Settings at 200% text (#8277): every group, at 1280 and at 390 px with the text doubled (root font-size 32px), plus Coral Hub and remote access and Updates in hub mode.
 // In each pane no control is clipped by its own container, runs past the dialog's edge, or sits on top of another control; the pane never scrolls sideways.
 // Drives Chrome over CDP through agent_view_harness.js against an isolated dev server; run_cdp_suites.mjs finds it by name. A shot of each pane goes to CORAL_SCREENSHOT_DIR, else RUNNER_TEMP/out/shots (what the gate uploads).
 const fs = require('node:fs');
@@ -58,7 +58,7 @@ const SCAN = `(() => {
             const listed = await ev(`[...document.querySelectorAll('#settings-tabs [role=tab]')].map(t => t.id.replace('settings-tab-', ''))`);
             if (!hub) allGroups = listed;
             assert.ok(allGroups.length >= 8, `${label}: the groups are listed (${allGroups}; the dialog has ${listed})`);
-            // in hub mode a group whose rows are all machine settings is empty and its tab hidden: walk the groups the hub dialog still shows (Network and Hub and Updates are the ones its changes touch)
+            // in hub mode a group whose rows are all machine settings is empty and its tab hidden: walk the groups the hub dialog still shows (Coral Hub and remote access and Updates are the ones its changes touch)
             const shown = hub ? await ev(`[...document.querySelectorAll('#settings-tabs [role=tab]:not([hidden])')].map(t => t.id.replace('settings-tab-', ''))`) : allGroups;
             if (hub && process.env.WALK_LOG) fs.appendFileSync(process.env.WALK_LOG, `${label} groups shown by the hub dialog: ${shown}\n`);
             const groups = hub ? shown.filter(g => g === 'network' || g === 'updates' || g === 'general') : allGroups;
