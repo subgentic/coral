@@ -102,7 +102,7 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 			}
 		}
 	})
-	h := &routes.ResourcesHandler{M: mgr, Board: s.boardStore, Hook: hook, Watch: watch}
+	h := &routes.ResourcesHandler{M: mgr, Board: s.boardStore, Hook: hook, Watch: watch, Stats: &resources.StatsBoard{}}
 	if sess != nil {
 		h.ToolCalls = sess.ToolCallsInFlight // an agent's hand claim is tied to the tool call it is made in (#13718)
 		h.AgentPID = s.sessionPID
