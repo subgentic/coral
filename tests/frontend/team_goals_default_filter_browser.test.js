@@ -7,7 +7,6 @@ const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam, goTab, scenarios } = require('./helpers/team_page');
 const { GOALS_STUB } = require('./helpers/goals_stub');
 const { removeBoards } = require('./helpers/board_cleanup');
-const { coralReady } = require('./helpers/wait');
 const BASE = require('./test_base').BASE;
 const TEAM = `qa-goals-default-${Date.now() % 100000}`, TEAM2 = TEAM + '-b', TEAM3 = TEAM + '-c';
 const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
@@ -55,7 +54,7 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
                 await shot(`goals-default-no-active-${label}`);
             });
             await S.run(`${label}: a team with only finished goals stays on the default filter and its Done group shows (#18168)`, async () => {
-                await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); await installTP(ev); // a fresh page: no filter kept from the teams above
+                await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'liveListLoaded', 'settings'); await installTP(ev); // a fresh page: no filter kept from the teams above
                 await seed(ev, TEAM3); if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
                 await ev(GOALS_STUB);
                 await ev(`window.__goals = window.__goals.filter(g => g.state === 'done' || g.state === 'dropped'); true`); await openTeam(ev, waitFor, TEAM3).catch(() => {});
