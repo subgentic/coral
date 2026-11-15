@@ -18,6 +18,8 @@ const TEAMS = [{ board_name: 'coral-go-team', num_agents: 6, input_tokens: 9000,
     { board_name: 'docs-sprint', num_agents: 2, input_tokens: 900, output_tokens: 90, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 0.9 }];
 const BRANCHES = [{ repo_name: 'coral', branch: 'main', board_name: 'coral-go-team', pr_number: 0, num_agents: 6, input_tokens: 9000, output_tokens: 1000, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 8.5 },
     { repo_name: 'coral', branch: 'fix/cost', board_name: 'docs-sprint', pr_number: 12, num_agents: 2, input_tokens: 900, output_tokens: 90, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 0.9 }];
+const SERIES = [{ time: '2026-10-18T00:00:00Z', series: [{ key: 'coral-go-team', label: 'coral-go-team', cost_usd: 5.0, num_requests: 10 }, { key: 'docs-sprint', label: 'docs-sprint', cost_usd: 1.0, num_requests: 3 }] },
+    { time: '2026-10-19T00:00:00Z', series: [{ key: 'coral-go-team', label: 'coral-go-team', cost_usd: 3.5, num_requests: 8 }, { key: 'docs-sprint', label: 'docs-sprint', cost_usd: 0.9, num_requests: 2 }] }];
 // The original column order of each table, as a wide window shows it.
 const WIDE = {
     'cost-by-provider': ['Provider', 'Requests', 'Input', 'Output', 'Cache read', 'Cache write', 'Cost', 'Share'],
@@ -41,6 +43,7 @@ const WIDE = {
                 if (url.includes('/api/token-usage/summary')) return json({ totals: { input_tokens: 10, output_tokens: 20, cost_usd: 4 }, by_model: ${JSON.stringify(MODEL)}, by_thinking: ${JSON.stringify(THINKING)}, by_agent_type: ${JSON.stringify(PROVIDER)}, by_agent: ${JSON.stringify(AGENT)} });
                 if (url.includes('/api/token-usage/by-team')) return json({ teams: ${JSON.stringify(TEAMS)} });
                 if (url.includes('/api/token-usage/by-branch')) return json({ branches: ${JSON.stringify(BRANCHES)} });
+                if (url.includes('/api/token-usage/timeseries')) return json({ buckets: ${JSON.stringify(SERIES)} });
                 if (url.includes('/api/token-usage/')) return json({});
                 return R(u, o); }; return true; })()`);
         await ev(`window.switchNavTab('tokens'); true`);
@@ -88,6 +91,30 @@ const WIDE = {
         for (const [id, heads] of Object.entries(WIDE)) assert.deepEqual(t[id].allHeads.map(h => h.replace(/[↕↑↓]/g, '').trim()), heads, `${id}: the wide order is back`);
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await waitFor(`document.querySelector('#cost-by-thinking .dt-box').classList.contains('dt-one-line')`, 'one line again', 6000);
+        console.log('   ✓');
+
+        // 4. #17734: the sticky .cost-header stays at the top after scrolling at 390 px, and the legend buttons are vertically centred (#17734 legend gap fix)
+        console.log('4. Sticky header and legend gap fix at 390 px');
+        // show every section (the default overview tab) so the page is tall enough to scroll, with the series chart's legend
+        await ev(`(() => { const v = document.getElementById('cost-dashboard-view'); v.setAttribute('data-phone-item', ''); v.querySelectorAll('[data-cview]').forEach(e => { e.hidden = false; }); return true; })()`);
+        await waitFor(`!!document.querySelector('.viz-legend-btn')`, 'the overview legend to render', 8000);
+        const fs = require('node:fs'), path = require('node:path');
+        const shotDir = process.env.CORAL_SCREENSHOT_DIR;
+        const shot = async name => { if (!shotDir) return; fs.mkdirSync(shotDir, { recursive: true }); fs.writeFileSync(path.join(shotDir, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+        await shot('cost-390-before-scroll');
+        // scroll the cost-dashboard-view container (overflow-y: auto) past the header
+        await ev(`document.getElementById('cost-dashboard-view').scrollBy(0, 400); true`);
+        await waitFor(`document.getElementById('cost-dashboard-view').scrollTop > 100`, 'the scroll to settle', 3000);
+        const headerRect = await ev(`(() => { const v = document.getElementById('cost-dashboard-view'); const h = v.querySelector('.cost-header'); if (!h) return null; const vr = v.getBoundingClientRect(); const hr = h.getBoundingClientRect(); const s = getComputedStyle(h); return { offset: Math.round(hr.top - vr.top), pos: s.position }; })()`);
+        assert.ok(headerRect && headerRect.offset <= 5 && headerRect.pos === 'sticky', 'the .cost-header is sticky at the top of its scroll container after scrolling: ' + JSON.stringify(headerRect));
+        await shot('cost-390-after-scroll-sticky');
+        // legend gap: viz-legend-btn must be inline-flex with centered items
+        const legendStyle = await ev(`(() => { const b = document.querySelector('.viz-legend-btn'); if (!b) return null; const s = getComputedStyle(b); return { display: s.display, alignItems: s.alignItems }; })()`);
+        assert.ok(legendStyle, 'the legend button exists in the overview: ' + JSON.stringify(legendStyle));
+        assert.ok(legendStyle.display === 'inline-flex' && legendStyle.alignItems === 'center', 'the legend button is inline-flex and centred: ' + JSON.stringify(legendStyle));
+        await shot('cost-390-legend');
+        // scroll back
+        await ev(`document.getElementById('cost-dashboard-view').scrollTo(0, 0); true`);
         console.log('   ✓');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
