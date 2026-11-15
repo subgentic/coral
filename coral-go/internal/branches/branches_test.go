@@ -236,3 +236,40 @@ func TestAnUntrackedScanThatDidNotFinishIsNotCounted(t *testing.T) {
 	assert.Zero(t, w.Untracked)
 	assert.False(t, w.Unreadable, "the tracked changes were read")
 }
+
+// #17129: a repo created on a non-standard branch has history even without main/master.
+func TestNoBaseStillReportsBranchHistory(t *testing.T) {
+	dir := t.TempDir()
+	runGit(t, dir, "init", "-q", "-b", "lisbon-planner")
+	c := New()
+	unborn := c.read(context.Background(), dir)
+	require.Empty(t, unborn.Base)
+	require.Len(t, unborn.Worktrees, 1)
+	require.NotNil(t, unborn.Worktrees[0].CommitCount)
+	assert.Equal(t, 0, *unborn.Worktrees[0].CommitCount)
+	for i := 0; i < 3; i++ {
+		runGit(t, dir, "commit", "-q", "--allow-empty", "-m", "saved work")
+	}
+	repo := c.read(context.Background(), dir)
+	require.Empty(t, repo.Base)
+	require.NotNil(t, repo.Worktrees[0].CommitCount)
+	assert.Equal(t, 3, *repo.Worktrees[0].CommitCount)
+}
+
+func TestHistoryCountBoundFailureAndCache(t *testing.T) {
+	c := New()
+	tip := strings.Repeat("a", 40)
+	calls := 0
+	c.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+		calls++
+		assert.Equal(t, []string{"rev-list", "--count", "--max-count=1001", "--end-of-options", tip}, args)
+		assert.True(t, readAllowed(args))
+		return []byte("1001\n"), nil
+	}
+	require.NotNil(t, c.historyCount(context.Background(), "", tip))
+	assert.Equal(t, 1001, *c.historyCount(context.Background(), "", tip))
+	assert.Equal(t, 1, calls)
+	assert.Nil(t, c.historyCount(context.Background(), "", "--bad-ref"))
+	c.run = func(context.Context, string, ...string) ([]byte, error) { return nil, errNotRead }
+	assert.Nil(t, c.historyCount(context.Background(), "", strings.Repeat("b", 40)))
+}

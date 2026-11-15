@@ -40,12 +40,13 @@ const (
 // Worktree is one worktree of a repository, as the tab shows it.
 type Worktree struct {
 	// Branch is the checked-out branch's name, cleaned; "" when detached, or when the name had characters the cleaning would change (NameHidden).
-	Branch     string `json:"branch"`
-	NameHidden bool   `json:"name_hidden,omitempty"`
-	Detached   bool   `json:"detached,omitempty"`
-	Head       string `json:"head"` // the short commit id
-	Ahead      int    `json:"ahead"`
-	Behind     int    `json:"behind"`
+	Branch      string `json:"branch"`
+	NameHidden  bool   `json:"name_hidden,omitempty"`
+	Detached    bool   `json:"detached,omitempty"`
+	Head        string `json:"head"`                   // the short commit id
+	CommitCount *int   `json:"commit_count,omitempty"` // branch history, only without a comparison base; nil means unreadable, capped at 1001 (shown as 1000+)
+	Ahead       int    `json:"ahead"`
+	Behind      int    `json:"behind"`
 	// NothingToMerge: every commit it has over the base is already in the base (merged, rebased or cherry-picked), so it has no commits left to merge. A label, not advice.
 	NothingToMerge bool `json:"nothing_to_merge,omitempty"`
 	Changed        int  `json:"changed"`   // tracked files with changes
@@ -125,7 +126,7 @@ var errNotRead = errors.New("branches: not a read command")
 var readCommands = map[string][]string{
 	"rev-parse":    {"--path-format=absolute", "--git-common-dir", "--show-toplevel", "--verify", "--quiet", "--abbrev-ref", "--end-of-options"},
 	"worktree":     {"list", "--porcelain", "-z"},
-	"rev-list":     {"--left-right", "--cherry-pick", "--right-only", "--count", "--end-of-options"},
+	"rev-list":     {"--left-right", "--cherry-pick", "--right-only", "--count", "--max-count=1001", "--end-of-options"},
 	"status":       {"--porcelain=v1", "-z", "--untracked-files=no", "--untracked-files=normal", "--no-renames", "--ignore-submodules=all"},
 	"for-each-ref": {refsFormat},
 	"config":       {"--get"},
@@ -347,6 +348,9 @@ func (c *Collector) read(ctx context.Context, root string) *Repo {
 			n := c.count(ctx, root, baseTip, w.Head)
 			w.Ahead, w.Behind, w.NothingToMerge = n.ahead, n.behind, n.ahead > 0 && n.nothing
 		}
+		if baseTip == "" && !w.NotLocal {
+			w.CommitCount = c.historyCount(ctx, root, w.Head)
+		}
 		c.status(ctx, &w)
 		if len(w.Head) > 12 {
 			w.Head = w.Head[:12]
@@ -403,7 +407,7 @@ func (c *Collector) count(ctx context.Context, root, base, tip string) counts {
 	n.behind, _ = strconv.Atoi(f[0])
 	n.ahead, _ = strconv.Atoi(f[1])
 	if n.ahead > 0 {
-		left, err := c.run(ctx, root, "rev-list", "--cherry-pick", "--right-only", "--count", "--end-of-options", base+"..."+tip)
+		left, err := c.run(ctx, root, "rev-list", "--cherry-pick", "--right-only", "--count", "--max-count=1001", "--end-of-options", base+"..."+tip)
 		if err == nil {
 			k, _ := strconv.Atoi(strings.TrimSpace(string(left)))
 			n.nothing = k == 0
@@ -416,6 +420,41 @@ func (c *Collector) count(ctx context.Context, root, base, tip string) counts {
 	c.counts[key] = n
 	c.mu.Unlock()
 	return n
+}
+
+// historyCount reads at most 1001 reachable commits, never a user-supplied ref or author.
+// Successful results are cached by immutable tip with the existing bounded count cache.
+func (c *Collector) historyCount(ctx context.Context, root, tip string) *int {
+	if !validSHA(tip) {
+		return nil
+	}
+	if strings.Trim(tip, "0") == "" {
+		n := 0
+		return &n
+	} // git's unborn worktree
+	key := "history:" + tip
+	c.mu.Lock()
+	n, ok := c.counts[key]
+	c.mu.Unlock()
+	if ok {
+		value := n.ahead
+		return &value
+	}
+	out, err := c.run(ctx, root, "rev-list", "--count", "--max-count=1001", "--end-of-options", tip)
+	if err != nil {
+		return nil
+	}
+	value, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil || value < 0 || value > 1001 {
+		return nil
+	}
+	c.mu.Lock()
+	if len(c.counts) > 4096 {
+		c.counts = map[string]counts{}
+	}
+	c.counts[key] = counts{ahead: value}
+	c.mu.Unlock()
+	return &value
 }
 
 // status counts w's changed tracked files, then its untracked entries up to maxUntracked (a big tree's untracked scan is the slow part, so it is separate and capped).
