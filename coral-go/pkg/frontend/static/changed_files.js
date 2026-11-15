@@ -5,7 +5,7 @@ import { state } from './state.js';
 import { isSignedOut } from './overload.js';
 import { worktreeMode, setWorktreeMode } from './agent_file_api.js';
 import { deriveSessionState } from './render.js';
-import { escapeHtml, escapeAttr, showToast, refusedTooLarge, canDownload } from './utils.js';
+import { escapeHtml, escapeAttr, showToast, refusedTooLarge } from './utils.js';
 import { registerActions, textOf } from './actions.js';
 import { initFilesSourcePicker, syncFilesSourceTeam } from './team_artifacts.js';
 import { fileIconHtml } from './file_explorer.js';
@@ -28,7 +28,7 @@ const moreButton = (path, name) => { const label = `More for ${name}`; return `<
 /** A file row's Share as artifact button (#10269): it names its file, as the row's other buttons do. */
 const iconButton = (on, icon, title, label, path, extra = '') => `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" ${on} data-path="${escapeAttr(path)}" ${extra} title="${title}" aria-label="${escapeAttr(label)}"><span class="material-icons" aria-hidden="true">${icon}</span></button>`;
 const shareButton = (path, name) => iconButton('data-on-click="file-share"', 'link', 'Share as artifact', `Share ${name} as an artifact`, path);
-const downloadButton = (path, name) => !canDownload(path) ? '' : iconButton('data-on-click="file-download"', 'download', 'Download', `Download ${name}`, path); // #17632
+const downloadButton = (path, name) => iconButton('data-on-click="file-download"', 'download', 'Download', `Download ${name}`, path); // #17632
 /* ── Starred files (persisted in localStorage per session) ── */
 
 // The signed-in account's (local_store.js, #3681), stored with when they were last changed, so an
