@@ -90,7 +90,7 @@ function _renderTeamCard(boardName, boardSessions) {
         const sleepingClass = boardIsSleeping ? ' team-sleeping' : '';
         html += `<li class="session-board-card session-team-group session-board-card-toplevel${sleepingClass}"${accentStyle}>
             <div class="session-group-header board-card-header${escapeAttr(state.selectedTeam === boardName ? ' team-selected' : '')}"${state.selectedTeam === boardName ? ' aria-current="true"' : ''} data-group-name="${escapeAttr(boardName)}" data-on-click="team-name-open" data-board="${escapeAttr(boardName)}" data-group="${escapeAttr(boardName)}"${_teamHeaderAttrs(boardName)}>${_chevron(boardName, boardCollapsed)}
-                <div class="group-header-text"><div class="group-name-line"><svg class="team-group-icon" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg><span class="group-name-text" title="${escapeAttr(keyLabel(boardName))}">${_rowNameWithServer(boardName)}</span>${boardSleepIcon}${distillChip(boardName)} <span class="session-group-count">${boardSessions.filter(s => !s.sleeping).length}</span></div>${_rowServerLine(boardName)}</div><span class="session-name-spacer"></span>${teamHealthBtn(boardName, boardSessions)}${bKebab}
+                <div class="group-header-text"><div class="group-name-line"><svg class="team-group-icon" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg><span class="group-name-text" title="${escapeAttr(keyLabel(boardName))}">${_rowNameWithServer(boardName)}</span>${boardSleepIcon}${distillChip(boardName)} <span class="session-group-count">${boardSessions.filter(s => !s.sleeping).length}</span>${loadedModule('./active_teams.js')?.chip(boardName) || ''}</div>${_rowServerLine(boardName)}</div><span class="session-name-spacer"></span>${teamHealthBtn(boardName, boardSessions)}${bKebab}
             </div>
             <ul class="board-card-agents${boardCollapsed ? ' board-card-collapsed' : ''}">`;
 
@@ -238,9 +238,7 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
             const unboardedItems = [];
             for (const s of sorted) {
                 if (s.board_project) {
-                    const tk = sessionTeamKey(s);
-                    if (!boardSubs[tk]) boardSubs[tk] = [];
-                    boardSubs[tk].push(s);
+                    (boardSubs[sessionTeamKey(s)] ||= []).push(s);
                 } else {
                     unboardedItems.push(s);
                 }
@@ -337,17 +335,11 @@ export function _renderGroups(sessions, groupByTeam, withPins = true) {
     const standaloneByFolder = {};
     for (const s of sessions) {
         if (s.board_project) {
-            const tk = sessionTeamKey(s);
-            if (!teamGroups[tk]) teamGroups[tk] = [];
-            teamGroups[tk].push(s);
+            (teamGroups[sessionTeamKey(s)] ||= []).push(s);
         } else if (s.workflow_name) {
-            const wfKey = s.workflow_name;
-            if (!workflowGroups[wfKey]) workflowGroups[wfKey] = [];
-            workflowGroups[wfKey].push(s);
+            (workflowGroups[s.workflow_name] ||= []).push(s);
         } else {
-            const key = sessionFolderKey(s);
-            if (!standaloneByFolder[key]) standaloneByFolder[key] = [];
-            standaloneByFolder[key].push(s);
+            (standaloneByFolder[sessionFolderKey(s)] ||= []).push(s);
         }
     }
     // Pinned folders with no agent here are listed as empty folder entries (#3630).
@@ -361,11 +353,10 @@ export function _renderGroups(sessions, groupByTeam, withPins = true) {
     // Apply saved group order first, then sort active before sleeping
     const teamEntries = localFirst(_sortGroups(Object.entries(teamGroups)));
     // Secondary sort: if no saved order, put sleeping teams after active
-    const hasOrder = _getGroupOrder().length > 0;
-    if (!hasOrder) teamEntries.sort((a, b) => a[1].every(s => s.sleeping) - b[1].every(s => s.sleeping)); // false - true: a stable sort that keeps the order inside each kind
+    if (!_getGroupOrder().length) teamEntries.sort((a, b) => a[1].every(s => s.sleeping) - b[1].every(s => s.sleeping)); // false - true: a stable sort that keeps the order inside each kind
 
-    const AT = loadedModule('./active_teams.js'), shown = AT ? AT.pick(teamEntries) : teamEntries; // the idle teams are one row away (#15744), once the module is in
-    if (!AT && teamEntries.length > 4) importOnce('./active_teams.js');
+    const AT = loadedModule('./active_teams.js'), shown = AT?.pick(teamEntries) ?? teamEntries; // the idle teams are one row away (#15744), once the module is in
+    if (!AT && teamEntries.length) importOnce('./active_teams.js');
     for (const [boardName, boardSessions] of shown) html += _renderTeamCard(boardName, boardSessions);
     html += shown.row || '';
 
@@ -386,9 +377,7 @@ export function _renderGroups(sessions, groupByTeam, withPins = true) {
     // Group sessions by folder name (primary grouping)
     const groups = {};
     for (const s of sessions) {
-        const key = sessionFolderKey(s);
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(s);
+        (groups[sessionFolderKey(s)] ||= []).push(s);
     }
     if (withPins) {
         const empty = emptyPins(sessions, new Set(Object.keys(groups)));

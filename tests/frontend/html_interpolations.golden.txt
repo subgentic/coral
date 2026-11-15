@@ -228,6 +228,7 @@
 2	group_cards.js	distillChip(boardName)
 2	group_cards.js	groupKebab
 2	group_cards.js	killAllItem(boardName)
+1	group_cards.js	loadedModule('./active_teams.js')?.chip(boardName) || ''
 2	group_cards.js	sleepLabel
 1	group_cards.js	sleepingClass
 2	group_cards.js	sorted.length ? `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-cl
