@@ -24,7 +24,19 @@ try {
   assert.equal(r.status, 7, 'the failing check\'s exit code is the run\'s: ' + r.stderr);
   assert.equal(fs.readFileSync(path.join(tmp, 'ran.txt'), 'utf8'), 'one\ntwo\n', 'the first failure stops the run: three never ran');
   assert.match(r.stderr, /test:cloud FAILED at: node two\.js/);
+  // --keep-going (#18260): every line runs, every failure is listed with the count, the exit is non-zero (the first failure's code)
+  write('four.js', "require('fs').appendFileSync('ran.txt', 'four\\n'); process.exit(9);");
+  write('cloud_checks.txt', 'node one.js\nnode two.js\nnode four.js\n');
+  fs.rmSync(path.join(tmp, 'ran.txt'));
+  const k = spawnSync(process.execPath, [runner, '--dir', tmp, '--keep-going'], { encoding: 'utf8' });
+  assert.equal(k.status, 7, '--keep-going exits non-zero, with the first failure\'s code: ' + k.stderr);
+  assert.equal(fs.readFileSync(path.join(tmp, 'ran.txt'), 'utf8'), 'one\ntwo\nfour\n', '--keep-going runs every line');
+  assert.match(k.stderr, /test:cloud FAILED: 2 of 3/, 'the count');
+  assert.match(k.stderr, /node two\.js/); assert.match(k.stderr, /node four\.js/);
+  assert.doesNotMatch(k.stderr.split('test:cloud FAILED: 2 of 3')[1] || '', /node one\.js/, 'only the failing commands are listed');
   write('cloud_checks.txt', 'node one.js\nnode three.js\n');
+  fs.rmSync(path.join(tmp, 'ran.txt'));
+  assert.equal(spawnSync(process.execPath, [runner, '--dir', tmp, '--keep-going']).status, 0, '--keep-going with all passing is exit 0');
   fs.rmSync(path.join(tmp, 'ran.txt'));
   assert.equal(spawnSync(process.execPath, [runner, '--dir', tmp]).status, 0, 'all passing is exit 0');
   assert.equal(fs.readFileSync(path.join(tmp, 'ran.txt'), 'utf8'), 'one\nthree\n');
