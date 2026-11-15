@@ -379,6 +379,7 @@ var operatorOnlyRoutes = map[string]string{
 	"PUT /api/board/{project}/working-mode/presets/{presetID}":        "change a working-mode preset",
 	"POST /api/board/{project}/working-mode/presets/{presetID}/reset": "reset a working-mode preset",
 	"PUT /api/teams/detail/{name}/knowledge/{agentName}":              "change a team's knowledge",
+	"POST /api/teams/detail/{name}/knowledge":                         "add a note to a team's knowledge",
 	"PUT /api/teams/detail/{name}/daily-knowledge":                    "switch a team's daily knowledge on or off",
 	"PUT /api/teams/detail/{name}/daily-knowledge/auto-apply":         "change whether a team's daily knowledge is applied by itself",
 	"POST /api/teams/detail/{name}/daily-knowledge/accept":            "accept a team's new knowledge",

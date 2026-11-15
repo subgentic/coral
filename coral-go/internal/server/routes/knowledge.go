@@ -367,6 +367,33 @@ func (h *SessionsHandler) SaveAgentKnowledge(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "redacted": redacted})
 }
 
+// AddKnowledgeNote adds a note a person wrote by hand to the team's knowledge (#17485).
+// POST /api/teams/detail/{name}/knowledge  {"title": "...", "text": "..."}
+func (h *SessionsHandler) AddKnowledgeNote(w http.ResponseWriter, r *http.Request) {
+	teamName := chi.URLParam(r, "name")
+	var body struct {
+		Title string `json:"title"`
+		Text  string `json:"text"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		errBadRequest(w, "invalid JSON")
+		return
+	}
+	name, redacted, err := background.AddKnowledgeNote(h.cfg.CoralDir(), teamName, body.Title, body.Text)
+	switch {
+	case errors.Is(err, background.ErrBadKnowledgeTeam):
+		errBadRequest(w, "invalid team name")
+	case errors.Is(err, background.ErrBadNoteTitle), errors.Is(err, background.ErrBadNoteText):
+		errBadRequest(w, err.Error())
+	case errors.Is(err, background.ErrNoteExists):
+		writeError(w, http.StatusConflict, "exists", err.Error())
+	case err != nil:
+		errInternalServer(w, err.Error())
+	default:
+		writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "name": name, "redacted": redacted})
+	}
+}
+
 // InjectKnowledgeIntoPrompt appends relevant knowledge to an agent's prompt.
 func InjectKnowledgeIntoPrompt(coralDir, teamName, agentName, prompt string) string {
 	knowledge := background.LoadAgentKnowledge(coralDir, teamName, agentName)

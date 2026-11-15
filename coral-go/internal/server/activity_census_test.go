@@ -333,6 +333,7 @@ var activityNotAnInboxAction = map[string]string{
 	"PUT /api/team-members/{memberID}/search-access":                       "the Teams pages",
 	"PUT /api/teams/detail/{name}/home-folder":                             "the Teams pages",
 	"PUT /api/teams/detail/{name}/knowledge/{agentName}":                   "the Teams pages",
+	"POST /api/teams/detail/{name}/knowledge":                              "the Teams pages",
 	"PUT /api/themes/{name}":                                               "themes",
 	"PUT /api/views/{id}":                                                  "saved views",
 	"PUT /api/workflows/{workflowID}":                                      "the Automations tab",
