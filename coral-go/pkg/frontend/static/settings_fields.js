@@ -93,13 +93,13 @@ const TERMINAL_FIELDS = [
 ];
 
 const PERMISSION_OPTIONS = [{ value: '', label: 'Not set (Auto)' }, { value: 'default', label: 'Default' }, { value: 'plan', label: 'Plan' }, { value: 'acceptEdits', label: 'Accept edits' }, { value: 'auto', label: 'Auto' }, { value: 'bypassPermissions', label: 'Bypass permissions (turns off safety checks)' }, { value: 'dontAsk', label: "Don't ask" }];
-const THINKING_OPTIONS = [{ value: '', label: "The CLI's own default" }, { value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }, { value: 'xhigh', label: 'Extra high' }, { value: 'max', label: 'Max' }];
+const THINKING_OPTIONS = [{ value: '', label: "Each agent's own default" }, { value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }, { value: 'xhigh', label: 'Extra high' }, { value: 'max', label: 'Max' }];
 // The levels Coral passes to each CLI (agentmodels/thinking.go, #4969): a type with none (Gemini, terminal) has no row. Pinned to the Go table by settings_orchestrator_defaults.test.mjs.
 const THINKING_LEVELS = { claude: ['low', 'medium', 'high', 'xhigh', 'max'], codex: ['minimal', 'low', 'medium', 'high', 'xhigh'], agy: ['low', 'medium', 'high', 'xhigh', 'max'], pi: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] };
 const LEVEL_WORD = { minimal: 'Minimal', off: 'Off', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' };
 const thinkingOptions = (type, empty) => [{ value: '', label: empty }, ...THINKING_LEVELS[type].map(v => ({ value: v, label: LEVEL_WORD[v] }))];
 // Workers' thinking for the types that take levels (Claude's row is the first one, kept as it was), and the Orchestrator's model and thinking for each (#13899): empty means the same as the workers.
-const workersThinking = (type, label) => ({ key: `default_thinking_${type}`, type: 'select', id: `settings-default-thinking-${type}`, label: `${label} default thinking`, options: thinkingOptions(type, "The CLI's own default"), attrs: { 'aria-label': `${label} default thinking` } });
+const workersThinking = (type, label) => ({ key: `default_thinking_${type}`, type: 'select', id: `settings-default-thinking-${type}`, label: `${label} default thinking`, options: thinkingOptions(type, "Each agent's own default"), attrs: { 'aria-label': `${label} default thinking` } });
 const orchestratorModel = (type, label) => ({ key: `default_orchestrator_model_${type}`, type: 'text', id: `settings-orchestrator-model-${type}`, label: `${label} Orchestrator model`, placeholder: 'Same as workers',
     attrs: { autocomplete: 'off', 'aria-label': `${label} Orchestrator model` }, setup: el => el.classList.add('settings-mono-input') });
 const orchestratorThinking = (type, label) => ({ key: `default_orchestrator_thinking_${type}`, type: 'select', id: `settings-orchestrator-thinking-${type}`, label: `${label} Orchestrator thinking`, options: thinkingOptions(type, 'Same as workers'), attrs: { 'aria-label': `${label} Orchestrator thinking` } });
