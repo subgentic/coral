@@ -165,3 +165,18 @@ func TestTheTrustBoxIsOnlyForAWorktreeJobOfClaudeOrCodex(t *testing.T) {
 	code, out := callAs(t, "dash", http.MethodPost, srv.URL+"/api/scheduled/jobs", newJob(repo, map[string]any{"trust_worktree": 1, "agent_type": "codex"}))
 	assert.Equal(t, http.StatusOK, code, "a Codex job may: %v", out)
 }
+
+// #17396: a job saved with no agent_type runs as Claude, so an unrelated edit of it keeps its tick; it must not read as "not Claude or Codex".
+func TestAnEmptyAgentTypeIsClaudeForTheStaleCheck(t *testing.T) {
+	existing := &store.ScheduledJob{TrustWorktree: 1, AgentType: "", RepoPath: "/r"}
+	fields := map[string]interface{}{"name": "renamed"}
+	w := httptest.NewRecorder()
+	require.True(t, applyTrustTick(w, httptest.NewRequest(http.MethodPut, "/", nil), fields, existing))
+	_, cleared := fields["trust_worktree"]
+	assert.False(t, cleared, "an unrelated save keeps the tick of a Claude-by-default job")
+
+	existing.AgentType = "gemini"
+	fields = map[string]interface{}{"name": "renamed"}
+	require.True(t, applyTrustTick(w, httptest.NewRequest(http.MethodPut, "/", nil), fields, existing))
+	assert.EqualValues(t, 0, fields["trust_worktree"], "an agent with no card Coral can set still clears it")
+}

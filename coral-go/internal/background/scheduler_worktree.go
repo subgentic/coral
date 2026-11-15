@@ -297,3 +297,21 @@ func branchHasCommits(ctx context.Context, repoPath, base, branch string) bool {
 	}
 	return n > 0
 }
+
+// sweepRunTrust removes the trust entries of run worktrees that are gone, once at startup (#17396): git keeps a worktree with unsaved work, so the entry its run got stayed with nothing to remove it later.
+func (s *JobScheduler) sweepRunTrust() {
+	if s.worktreeRoot == "" {
+		return
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	n, err := foldertrust.SweepGoneRunFolders(foldertrust.ClaudeConfigPath(home), foldertrust.CodexConfigPath(home), s.worktreeRoot)
+	if err != nil {
+		s.logger.Warn("could not remove the trust entries of run folders that are gone", "error", err.Error())
+	}
+	if n > 0 {
+		s.logger.Info("removed the trust entries of run folders that are gone", "count", n)
+	}
+}

@@ -277,7 +277,7 @@ function jobFields(host) {
         { key: 'cleanup_worktree', type: 'toggle', id: 'job-modal-cleanup', label: 'Remove the worktree when the run ends', default: true, visibleWhen: v => prompt(v) && !v.no_worktree },
         {
             key: 'trust_worktree', type: 'toggle', id: 'job-modal-trust', label: 'Trust this folder, so runs need no one to answer', default: false,
-            help: 'Claude and Codex ask before working in a new folder, and a run on a schedule has no one to answer. Ticked, each run trusts only the worktree it made for itself. That lets the code in the folder run its own settings and tools with no question: tick it only for a folder you wrote or trust.',
+            help: 'Claude and Codex ask before working in a new folder, and a run on a schedule has no one to answer. Ticked, each run trusts only the worktree it made for itself. That lets the code in the folder run its own settings and tools with no question: tick it only for a folder you wrote or trust. It trusts what the repository\'s branch holds at each run, and the tick stays when you change the prompt, so a change merged to that branch runs the same way.',
             visibleWhen: v => prompt(v) && !v.no_worktree && (v.agent_type === 'claude' || v.agent_type === 'codex'),
         },
     ];

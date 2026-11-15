@@ -192,6 +192,7 @@ func (s *JobScheduler) Run(ctx context.Context) error {
 
 	// Reap stale runs from a previous crash
 	s.reapStaleRuns(ctx)
+	s.sweepRunTrust()
 
 	return runOnTicker(ctx, s.interval, func() {
 		if err := s.tick(ctx); err != nil {

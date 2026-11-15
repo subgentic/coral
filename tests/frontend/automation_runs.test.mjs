@@ -88,4 +88,11 @@ assert.deepEqual(AR.runRoute(items[3]), { view: 'automations', folder: 'workflow
 assert.equal(AR.failureWords({ run: { error_msg: 'step 2 (Test) failed:\n exit code 3' } }), 'step 2 (Test) failed: exit code 3');
 assert.equal(AR.failureWords({ run: { failure_reason: 'x'.repeat(200) } }).length, 140);
 assert.equal(AR.failureWords({ run: {} }), '');
+// #17396: a scheduled run whose agent stopped at a card nobody answered (error_code held_at_prompt) ends failed with its fixed sentence, so it is a Needs you row with those words, not only a log line.
+jobList = [{ id: 11, job_id: 3, job_name: 'nightly-fix', status: 'failed', started_at: at(50), finished_at: at(51), exit_reason: 'held_at_prompt', error_code: 'held_at_prompt', error_msg: "Needs you: the agent stopped at a question (such as 'trust this folder?') and nobody was there to answer, so the run ended without its prompt. Answer it once by hand, or tick the job's Trust this folder box." }];
+wfList = [];
+await AR.refreshRuns(true);
+const held = AR.failedUnread().find(i => i.runId === 11);
+assert.ok(held, 'a run held at a card is a Needs you row');
+assert.match(AR.failureWords(held), /^Needs you: the agent stopped at a question/, 'and says why');
 console.log('automation_runs: ok');
