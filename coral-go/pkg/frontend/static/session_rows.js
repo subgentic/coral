@@ -285,7 +285,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     // collapses to the dot's ring, which survives on every glyph.
     // A message the paste gate held (the last automated one Coral did not type, #7727) is a state a person must see: the row's one chip, "Message held", when no attention chip owns it (Needs you wins; the hold stays in the tip and on the page).
     const skipped = s.sleeping || !(Number(s.board_unread) > 0) ? null : skippedOf(s);
-    const heldChip = !waitingBadge && skipped ? ` <span class="chip chip-caps session-state-pill neutral session-held-chip" title="${escapeAttr(skipped.why)}">Message held</span>` : '';
+    const heldChip = !waitingBadge && skipped ? ` <span class="chip chip-caps session-state-pill neutral session-held-chip" title="${escapeAttr(skipped.why)}" data-on-click="held-why">Message held</span>` : '';
     // Terminal-gone sleepers already have their restart chip. A sleeping agent is a row like any other (#10062): its one quiet chip says Sleeping (when no other chip owns the row; titled when Coral stopped it), and Wake is on the row at a hover or the keyboard, named for the agent
     const sleepChip = s.sleeping && !isGoneAsleep(s) && !isExitedAsleep(s) && !waitingBadge && !heldChip ? ` <span class="chip chip-caps session-state-pill neutral"${s.sleep_reason === 'coral_stopped' ? ' title="Asleep since Coral restarted"' : ''}>Sleeping</span>` : '';
     // An ended agent (its CLI exited, #15777) has one word, Ended (no moon, no Sleeping pill); at a hover it offers Restart, Wake and Sleep in the chip's place
