@@ -204,6 +204,10 @@ func TestTheLastApplyAndRollbackAreInTheRoutesVocabulary(t *testing.T) {
 	assert.True(t, rec.LastRollback.RestartFailed)
 	assert.Equal(t, "did_not_start", rec.LastRollback.Reason)
 
+	for updater, routes := range map[string]string{"health": "not_healthy", "interrupted": "interrupted", "installed_folder": "swap_failed", "did_not_start": "did_not_start", "verify_failed": "verify_failed"} {
+		out.LastRolled.Reason = updater
+		assert.Equal(t, routes, recordFrom(out, relaunchState{}, time.Now()).LastRollback.Reason, "the updater writes %q: the status says %q, not other (#17686)", updater, routes)
+	}
 	out.LastRolled.Reason = "some free text"
 	assert.Equal(t, rollbackOtherTag, recordFrom(out, relaunchState{}, time.Now()).LastRollback.Reason, "a reason that is not a fixed word is 'other'")
 	out.LastApply.Result = "coral_running"

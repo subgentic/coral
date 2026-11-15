@@ -117,11 +117,13 @@ type UpdateTrust struct {
 
 // installKinds, notReadyReasons and rollbackReasons are the vocabularies the status sends for the #5388 fields: anything else is not sent (or, for a roll-back's reason, is "other").
 var (
-	installKinds     = map[string]bool{installApp: true, installMSI: true, installPortable: true, installTarball: true, installHomebrew: true, installUnwritable: true, installUnregistered: true}
-	checkedResults   = map[string]bool{"up_to_date": true, "staged": true, "already_staged": true, "not_promoted": true, "failed": true, "rate_limited": true, "unknown": true}
-	notReadyReasons  = map[string]bool{"not_checked": true, "up_to_date": true, "not_promoted": true, "backoff": true, "rate_limited": true, "check_failed": true, "unsupported_install": true, "switch_off": true, "applying": true}
-	rollbackReasons  = map[string]bool{"did_not_start": true, "not_healthy": true, "swap_failed": true, "verify_failed": true}
-	rollbackOtherTag = "other"
+	installKinds    = map[string]bool{installApp: true, installMSI: true, installPortable: true, installTarball: true, installHomebrew: true, installUnwritable: true, installUnregistered: true}
+	checkedResults  = map[string]bool{"up_to_date": true, "staged": true, "already_staged": true, "not_promoted": true, "failed": true, "rate_limited": true, "unknown": true}
+	notReadyReasons = map[string]bool{"not_checked": true, "up_to_date": true, "not_promoted": true, "backoff": true, "rate_limited": true, "check_failed": true, "unsupported_install": true, "switch_off": true, "applying": true}
+	rollbackReasons = map[string]bool{"did_not_start": true, "not_healthy": true, "swap_failed": true, "verify_failed": true, "interrupted": true}
+	// updaterRollbackWords are the reasons the updater writes into its apply history that have a different word in the routes' vocabulary (#17686): its health check failing is not_healthy, and an MSI install whose folder could not be found is swap_failed.
+	updaterRollbackWords = map[string]string{"health": "not_healthy", "installed_folder": "swap_failed"}
+	rollbackOtherTag     = "other"
 )
 
 // UpdateRollback is the last apply that was rolled back: the previous version was put back.
