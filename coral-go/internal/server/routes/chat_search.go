@@ -69,6 +69,10 @@ func (h *HistoryHandler) SearchChats(w http.ResponseWriter, r *http.Request) {
 		chatType = "all"
 	}
 
+	onlySession := r.URL.Query().Get("session_id") // one chat's matches, for a chat the Chats page opens at its first hit (#17912)
+	if onlySession != "" {
+		chatType = "agent"
+	}
 	phrases, terms := parseSearchQuery(q)
 	results := make([]ChatSearchResult, 0)
 	status := "complete"
@@ -82,6 +86,9 @@ func (h *HistoryHandler) SearchChats(w http.ResponseWriter, r *http.Request) {
 			status = "unavailable"
 		} else {
 			for _, idx := range listed.Sessions {
+				if onlySession != "" && idx.SessionID != onlySession {
+					continue
+				}
 				if idx.SourceFile == "" || agent.IsLabelSource(idx.SourceFile) || !fileExists(idx.SourceFile) { // a label (opencode) is not a file
 					unavailable++
 					continue

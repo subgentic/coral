@@ -29,4 +29,7 @@ assert.equal(md, 'Use <mark>bold</mark> and <mark>code</mark> here', md);
 assert.equal(highlightExcerpt('## Plan\nthe **plan** holds', [[3, 7]]), '<mark>Plan</mark>\nthe plan holds');
 assert.equal(highlightExcerpt('a **b', [[0, 1]]), '<mark>a</mark> b', 'a mark with no partner is dropped too');
 assert.equal(highlightExcerpt('2 ** 3 = 8', [[9, 10]]), '2  3 = <mark>8</mark>', 'a stray pair is a mark: dropped (the words around it are intact)');
+// A double underscore is emphasis only around words (#17912): snake__case and __init__ keep theirs, "__two words__" loses them and its match offsets follow.
+assert.equal(highlightExcerpt('__init__ and snake__case', [[0, 8]]), '<mark>__init__</mark> and snake__case');
+assert.equal(highlightExcerpt('a __two words__ b', [[4, 7]]), 'a <mark>two</mark> words b');
 console.log('chat_search_unit: ok');

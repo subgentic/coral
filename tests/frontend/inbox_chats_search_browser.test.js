@@ -33,7 +33,7 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
             await ev(`try { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-inbox-chats-filters')) localStorage.removeItem(k); } catch {} true`);
             await ev(`(() => { const R = window.fetch; window.__hist = [];
                 window.fetch = (u, o) => { const url = new URL(String(u), location.href), json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } }));
-                    if (url.pathname === '/api/sessions/history/search') { window.__searchAsked = (window.__searchAsked || 0) + 1; return json({ status: 'complete', results: [{ type: 'agent', session_id: 'sess-1', hits: [{ role: 'user', excerpt: 'x', match_offsets: [], locator: { session_id: 'sess-1', message_index: 42 } }] }] }); }
+                    if (url.pathname === '/api/sessions/history/search') { window.__searchAsked = (window.__searchAsked || 0) + 1; window.__searchUrl = url.search; return json({ status: 'complete', results: [{ type: 'agent', session_id: 'sess-1', hits: [{ role: 'user', excerpt: 'x', match_offsets: [], locator: { session_id: 'sess-1', message_index: 42 } }] }] }); }
                     if (url.pathname === '/api/sessions/history/counts') return json(${JSON.stringify(COUNTS)});
                     if (url.pathname === '/api/sessions/history') { const q = url.searchParams.get('q') || url.searchParams.get('search') || ''; window.__hist.push(Object.fromEntries(url.searchParams));
                         if (q === 'BROKEN') return json({ error: 'search_failed', detail: 'Search failed: try other words' }, 400);
@@ -52,6 +52,7 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
             await ev(`window.__opened = null; window.selectHistorySession = (id, locator) => { window.__opened = { id, locator }; return true; }; document.querySelector('button.dt-primary').click(); true`);
             await waitFor(`!!window.__opened`, 'the chat opening', 8000);
             check(`${label}: a found chat opens at its matching message`, (await ev(`JSON.stringify(window.__opened)`)) === '{"id":"sess-1","locator":{"session_id":"sess-1","message_index":42}}', await ev(`JSON.stringify(window.__opened)`));
+            check(`${label}: the open asks the search for that chat only (a chat past the first page of results is found too, #17912)`, /[?&]session_id=sess-1(&|$)/.test(await ev(`window.__searchUrl || ''`)), await ev(`window.__searchUrl || ''`));
             await ev(`window.switchNavTab('hub-inbox'); true`); await openFolder('chats', mobile, 'All chats');
             await search('BROKEN');
             check(`${label}: a search the server refuses says "Search failed", not "Loading chats"`, /Search failed/.test(await body()) && !/Loading chats/.test(await body()), (await body()).slice(0, 200));
