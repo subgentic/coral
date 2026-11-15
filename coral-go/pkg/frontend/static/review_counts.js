@@ -43,3 +43,6 @@ export function refreshCounts(force = false) {
     });
     return pending;
 }
+
+/* A team or folder header's count is the agents awake (group_cards.js sets data-of to how many there are in all): the first hover says of how many, so a count that fell from 3 to 2 says why (#16740). */
+document.addEventListener('pointerover', e => { const c = e.target instanceof Element && e.target.closest('.session-group-count[data-of]'); if (c && !c.title) c.title = `${c.textContent} awake of ${c.dataset.of}`; });

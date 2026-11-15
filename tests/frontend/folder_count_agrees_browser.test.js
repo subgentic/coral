@@ -17,7 +17,8 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`!!document.querySelector('${list} .session-group-header:not(.board-card-header) .session-group-count') && document.querySelectorAll('${list} .session-group-item').length >= 3`, `${w}: the folder and its rows`, 8000);
             const r = await ev(`({ count: document.querySelector('${list} .session-group-header:not(.board-card-header) .session-group-count').textContent.trim(), sleeping: (document.querySelector('${list} .sleeping-summary-label') || { textContent: '' }).textContent.trim() || (document.querySelectorAll('${list} .session-group-item.sleeping').length === 1 ? '1 sleeping agent' : '') })`); // a folded line, or (a few sleeping agents) the one sleeping row itself (#10062)
             assert.equal(r.count, '3', `${w}: the folder header counts the awake agents: ` + JSON.stringify(r));
-            assert.equal(await ev(`document.querySelector('${list} .session-group-header:not(.board-card-header) .session-group-count').title`), '3 awake of 4', `${w}: the count says why it is lower than the rows (#16740)`);
+            await ev(`import((window.__coralStatic || '/static/') + 'review_counts.js').then(() => { document.querySelector('${list} .session-group-header:not(.board-card-header) .session-group-count').dispatchEvent(new PointerEvent('pointerover', { bubbles: true })); return true; })`);
+            assert.equal(await ev(`document.querySelector('${list} .session-group-header:not(.board-card-header) .session-group-count').title`), '3 awake of 4', `${w}: the count says of how many on hover (#16740)`);
             assert.equal(r.sleeping, '1 sleeping agent', `${w}: and the sleeping line the rest: ` + JSON.stringify(r));
         }
         console.log('PASS');
