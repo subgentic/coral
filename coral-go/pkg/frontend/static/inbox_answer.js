@@ -11,13 +11,13 @@ import { showToast } from './utils.js';
 import { blockedReason, hubBlocked } from './hub_access.js';
 import { resolveSessionIdentity } from './session_state.js';
 import { waitIgnored } from './asked_before_restart.js';
-import { stalledOf } from './asked_row.js';
 import { build, keyRoute } from './routes.js';
 import { boardTeamKey, keyLabel } from './server_base.js';
 import { openAgent } from './agent_live.js';
 import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('inbox_answer.css'); // the step line's rules (#11981) are a sheet of their own: not in the start's stylesheet, and here before any step is drawn
+const { stalledOf } = await importOnce('./asked_row.js');
 const { canDismissWait, dismissButton, dismissWait, canRemoveWait, removeWait, REMOVE_WAIT_LINE } = await importOnce('./dismiss_wait.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
 const MAX_CHOICES = 4;

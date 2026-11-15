@@ -3,11 +3,11 @@
 import { waitIgnored, askedBefore, askedWords } from './asked_before_restart.js';
 import { dialogOf, dialogDue, DIALOG_WORDS } from './at_dialog.js';
 
-/** An awake agent that holds a task in progress and has taken no turn for the server's bound (#16921): { id, title, since }, by the same reading of the id as needsYou's count (a positive safe integer; a test sweeps odd payloads through both). Stopped by the person, crashed, out of limit: it is not working, so it needs the person. Strings only: payloads are untrusted. */
+/** An awake agent that holds a task in progress and has taken no turn for the server's bound (#16921): { id, title, since }, by the same reading of the id as needsYou's count (a positive safe integer, a number, not a string; a test sweeps odd payloads through both). Stopped by the person, crashed, out of limit: it is not working, so it needs the person. Strings only: payloads are untrusted. */
 export function stalledOf(s) {
     const t = s && !s.sleeping && !s.archived && s.stalled_task;
-    const id = t ? +t.task_id : 0;
-    if (!(id > 0 && Number.isSafeInteger(id))) return null;
+    const id = t?.task_id;
+    if (!(Number.isSafeInteger(id) && id > 0)) return null;
     return { id, title: typeof t.title === 'string' ? t.title : '', since: typeof t.since === 'string' ? t.since : '' };
 }
 
