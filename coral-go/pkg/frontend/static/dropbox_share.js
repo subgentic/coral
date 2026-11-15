@@ -120,6 +120,7 @@ function frame(titleText) {
     return { h, body, say, acts };
 }
 
+const primary = (text, onClick) => btn(text, 'btn btn-primary', onClick); // a dialog state shows one primary at a time (each state replaces the actions)
 const btn = (text, cls, onClick) => { const b = mk('button', cls || 'btn', text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 const sayIt = (say, text) => { if (!text) { say.hidden = true; say.textContent = ''; return; } say.hidden = false; say.textContent = text; }; // shown first, then its words: a screen reader hears the change (UI Accessibility's SHOULD 5)
 
@@ -167,7 +168,7 @@ function hubView(f, hex, hub, filename) {
     const open = () => { window.open(hub.url, '_blank', 'noopener,noreferrer'); };
     const stop = btn('Stop sharing\u2026', 'btn', open);
     f.acts.prepend(stop);
-    f.acts.prepend(btn('Share on Coral Hub\u2026', 'btn btn-primary', open));
+    f.acts.prepend(primary('Share on Coral Hub\u2026', open));
     f.body.append(mk('p', 'settings-hint', 'Stop sharing opens Coral Hub\u2019s page. Coral Hub deletes the file from Dropbox.'));
 }
 
@@ -259,7 +260,7 @@ function form(f, info, send, whatText) {
     const secretOK = mk('label', 'dropbox-share-tick'); const secretTick = mk('input'); secretTick.type = 'checkbox'; secretTick.id = `${idb}-secret-ok`;
     secretOK.append(secretTick, mk('span', null, 'This file looks like it contains a key or token. Share it by link anyway.'));
     f.body.append(nameL, name, meta, group, peopleBox, linkOK, secretOK);
-    const go = btn('Share', 'btn btn-primary', null);
+    const go = primary('Share', null);
     f.acts.replaceChildren(btn('Cancel', 'btn', close), go);
 
     const parseEmails = () => emails.value.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
@@ -312,7 +313,7 @@ function shared(f, res, a) {
         f.body.append(link);
         const exp = res.expires_at ? new Date(res.expires_at) : null;
         f.body.append(mk('p', 'dropbox-share-who', `${a === 'team' ? 'Anyone in your Dropbox team who has this link' : 'Anyone with this link'} can view and download this file. ${exp && !Number.isNaN(exp.getTime()) ? 'It expires on ' + exp.toLocaleDateString() + '.' : 'It does not expire.'}`));
-        acts.push(btn('Copy link', 'btn btn-primary', async () => { try { await navigator.clipboard.writeText(res.link); sayIt(f.say, ''); let ok = f.body.querySelector('.dropbox-share-copied'); if (!ok) { ok = mk('p', 'settings-hint dropbox-share-copied'); ok.setAttribute('role', 'status'); f.body.append(ok); } ok.textContent = ''; ok.textContent = 'Copied.'; } catch { link.select(); sayIt(f.say, 'Copy it from the box above.'); } }));
+        acts.push(primary('Copy link', async () => { try { await navigator.clipboard.writeText(res.link); sayIt(f.say, ''); let ok = f.body.querySelector('.dropbox-share-copied'); if (!ok) { ok = mk('p', 'settings-hint dropbox-share-copied'); ok.setAttribute('role', 'status'); f.body.append(ok); } ok.textContent = ''; ok.textContent = 'Copied.'; } catch { link.select(); sayIt(f.say, 'Copy it from the box above.'); } }));
         if (typeof navigator.share === 'function') acts.push(btn('Share…', 'btn', () => { navigator.share({ url: res.link }).catch(() => {}); }));
         const open = mk('a', 'btn', 'Open in Dropbox'); open.href = res.link; open.target = '_blank'; open.rel = 'noopener noreferrer'; open.setAttribute('aria-label', 'Open in Dropbox (opens a new tab)'); open.title = 'Opens a new tab'; acts.push(open); // it says it opens a new tab (SHOULD 4)
     } else {
@@ -348,7 +349,7 @@ async function stopOne(f, id) {
     busy(false);
     if (res.status === 200) {
         f.body.replaceChildren(mk('p', null, 'Sharing stopped: the link no longer works and the copy was deleted from Dropbox.'));
-        f.acts.replaceChildren(btn('Done', 'btn btn-primary', close));
+        f.acts.replaceChildren(primary('Done', close));
         f.acts.querySelector('button')?.focus();
         return;
     }
@@ -358,7 +359,7 @@ async function stopOne(f, id) {
 // signInAgain is an older Dropbox sign-in (it predates sharing): one way on, the existing Reconnect.
 function signInAgain(f) {
     f.body.replaceChildren(mk('p', null, 'Dropbox does not allow this sign-in to share. In the Dropbox App Console, the Coral app needs the sharing.write and sharing.read permissions; then sign in to Dropbox again. Your backup keeps running meanwhile.'));
-    const go = btn('Sign in again', 'btn btn-primary', async () => {
+    const go = primary('Sign in again', async () => {
         busy(true);
         const res = await call('POST', '/api/dropbox/connect', {});
         if (!f.body.isConnected) return; // closed (or opened again) meanwhile: this answer is not the dialog's any more
@@ -368,7 +369,7 @@ function signInAgain(f) {
         if (res.status !== 200 || !url.startsWith('https://www.dropbox.com/')) { sayIt(f.say, String(res.body.error || "Dropbox sign-in didn't start. Try again from Settings.")); return; }
         window.open(url, '_blank', 'noopener');
         f.body.replaceChildren(mk('p', null, 'Click Allow in the Dropbox tab, then share again.'));
-        f.acts.replaceChildren(btn('Done', 'btn btn-primary', close));
+        f.acts.replaceChildren(primary('Done', close));
     });
     f.acts.replaceChildren(btn('Cancel', 'btn', close), go);
     go.focus();
