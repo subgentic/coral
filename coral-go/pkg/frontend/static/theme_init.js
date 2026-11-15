@@ -25,12 +25,12 @@
         if (hint && (hint[1] === 'p') === phoneScreen) room_px = hint[2];
         else { // no hint for this kind of screen (a new profile, a phone after a wide window): when the server says the notice is unseen, a typical height is reserved (#14935, 57 px on a phone since the longer headline of #15079; the notice's real height is kept as the hint once it is shown)
             var unseen = false; try { unseen = JSON.parse(document.getElementById('coral-boot').textContent).launch_unseen === true; } catch (_) {}
-            if (unseen) room_px = phoneScreen ? '57' : '73';
+            if (unseen) room_px = phoneScreen ? '57' : window.innerWidth <= 767 ? '53' : '73'; // 601-767 px (the drawer layout, #16557): the notice is 53 px there, not the 73 of a wide window
         }
         if (room_px && mode !== 'cloud' && location.pathname.indexOf('/agent/') !== 0 && document.head) {
             var room = document.createElement('style'); room.id = 'launch-notice-room';
             // The notice sits just above the layout (after the sign-in banner, hidden until shown); on a phone's Inbox (#16460) it is in the pane under its heading, and so is the room
-            var pane = window.innerWidth <= 767 && /^\/inbox(\/|$)/.test(location.pathname); // the layout's phone breakpoint (phone_layout.js), the one placeNotice puts the notice in the pane by (#16557); phoneScreen (600) only picks the hint's kind and typical height
+            var pane = phoneScreen && /^\/inbox(\/|$)/.test(location.pathname);
             room.textContent = 'html[data-launch-notice]' + (pane ? ' #group-table-view' : '') + ':not(:has(#launch-disclosure-banner)) ' + (pane ? '>.inbox-folder-toolbar{margin-bottom:' : '.layout{margin-top:') + room_px + 'px}';
             document.head.appendChild(room); document.documentElement.setAttribute('data-launch-notice', '1');
         }

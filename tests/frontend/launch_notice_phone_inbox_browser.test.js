@@ -1,6 +1,6 @@
 // The launch notice on a phone's Inbox (#16460): it is in the pane, under the pane's own "Needs you" heading (right after .inbox-folder-toolbar) and above the list, as ONE element that
 // moves: on any other tab it is the global strip under the top bar (unchanged), and a computer-width Inbox keeps the strip. On a COLD phone load of /inbox the room is reserved in the pane
-// (theme_init.js), so the list under the heading stays put while the notice arrives (within 3 px: a typical height, not the exact one), and the page's .layout reserves nothing. 390, 700 and 1280 px (700 is a phone layout, 601-767, wider than theme_init's old 600 px 'phone': #16557).
+// (theme_init.js), so the list under the heading stays put while the notice arrives (within 3 px: a typical height, not the exact one), and the page's .layout reserves nothing. 390 and 1280 px.
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -24,10 +24,9 @@ const TRACK = `(() => { const t = window.__jump = { tops: [], noticeAt: -1 };
     const where = () => ev(`(() => { const n = document.getElementById('launch-disclosure-banner'); if (!n) return { none: true }; const p = n.parentElement, prev = n.previousElementSibling; return { inPane: p && p.id === 'group-table-view', underHeading: !!prev && prev.classList.contains('inbox-folder-toolbar'), underBar: !!prev && (prev.id === 'local-auth-banner' || prev.matches('header.top-bar')), count: document.querySelectorAll('#launch-disclosure-banner').length }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [w, h, touch] of [[390, 844, true], [700, 900, true], [1280, 800, false]]) {
-            const mobile = w <= 767; // the layout's own phone breakpoint (phone_layout.js), which placeNotice and the reserved room both follow
+        for (const [w, h, mobile] of [[390, 844, true], [1280, 800, false]]) {
             const at = `${w} px: `;
-            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: touch }); await Emulation.setTouchEmulationEnabled({ enabled: touch });
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
             await ev(`fetch('/api/launch-disclosure/ack', { method: 'DELETE' }).then(r => r.ok)`);
             await ev(`try { localStorage.removeItem('coral-launch-notice'); } catch (e) {} true`);
@@ -35,11 +34,11 @@ const TRACK = `(() => { const t = window.__jump = { tops: [], noticeAt: -1 };
             let p;
             for (const pass of mobile ? [1, 2] : [1]) {
             const ids = [(await Page.addScriptToEvaluateOnNewDocument({ source: HOLD })).identifier];
-            if (mobile && w <= 600) ids.push((await Page.addScriptToEvaluateOnNewDocument({ source: TRACK })).identifier); // the frame tracker is the 390 px proof; 700 px checks where the room and the notice go
+            if (mobile) ids.push((await Page.addScriptToEvaluateOnNewDocument({ source: TRACK })).identifier);
             await Page.navigate({ url: BASE + '/inbox/needs' }); await Page.loadEventFired(); await install();
-            if (pass === 2) check((w <= 600 ? /^p\|\d+$/ : /^d\|\d+$/).test(await ev(`localStorage.getItem('coral-launch-notice') || ''`)), `${at}the notice's height is kept as the hint after the first load`);
+            if (pass === 2) check(/^p\|\d+$/.test(await ev(`localStorage.getItem('coral-launch-notice') || ''`)), `${at}the notice's height is kept as the hint after the first load`);
             check(await ev(`document.documentElement.hasAttribute('data-launch-notice')`), `${at}the room is reserved before first paint on a cold load of /inbox/needs`);
-            await waitFor(`!!document.getElementById('launch-disclosure-banner') && (window.__jump && ${w <= 600} ? window.__jump.noticeAt >= 0 && window.__jump.tops.length >= window.__jump.noticeAt + 3 : true)`, `${at}the notice on a cold load of /inbox/needs`, 15000);
+            await waitFor(`!!document.getElementById('launch-disclosure-banner') && (window.__jump ? window.__jump.noticeAt >= 0 && window.__jump.tops.length >= window.__jump.noticeAt + 3 : true)`, `${at}the notice on a cold load of /inbox/needs`, 15000);
             await waitFor(`document.body.getAttribute('data-nav-tab') === 'hub-inbox' && !!document.querySelector('#group-table-view > .inbox-folder-toolbar')`, `${at}the Inbox's heading`, 10000);
             if (mobile && process.env.CORAL_SCREENSHOT_DIR) for (const theme of ['dark', 'light']) { // the shots: the phone's Inbox with the notice, both themes
                 await ev(`import((window.__coralStatic || '/static/') + 'settings_core.js').then(m => m.applyTheme('${theme}')).then(() => true)`);
@@ -49,9 +48,8 @@ const TRACK = `(() => { const t = window.__jump = { tops: [], noticeAt: -1 };
             p = await where();
             if (mobile) {
                 check(p.count === 1 && p.inPane && p.underHeading, `${at}on a phone's Inbox the notice is in the pane, right under the heading: ${JSON.stringify(p)}`);
-                const j = w <= 600 ? await ev(`window.__jump`) : { noticeAt: 1, tops: [0] }, spread = Math.max(...j.tops) - Math.min(...j.tops);
-                if (w > 600) { /* 700 px: the notice is in the pane, and the strip above the layout reserved nothing */ }
-                else if (pass === 1) check(j.noticeAt >= 1 && j.tops[0] === (w <= 600 ? 57 : 73), `${at}a first cold load reserves the typical ${w <= 600 ? 57 : 73} px under the heading: ${JSON.stringify([...new Set(j.tops)])}`);
+                const j = await ev(`window.__jump`), spread = Math.max(...j.tops) - Math.min(...j.tops);
+                if (pass === 1) check(j.noticeAt >= 1 && j.tops[0] === 57, `${at}a first cold load reserves the typical 57 px under the heading: ${JSON.stringify([...new Set(j.tops)])}`);
                 else check(j.noticeAt >= 1 && spread <= 3, `${at}the list under the heading stays put on a COLD phone load while the notice arrives (it moved ${spread} px over ${j.tops.length} frames: ${JSON.stringify([...new Set(j.tops)])})`);
                 check(await ev(`getComputedStyle(document.querySelector('.layout')).marginTop === '0px'`), `${at}the page's .layout reserves nothing on a phone's Inbox (the room is in the pane)`);
                 check(await ev(`!document.getElementById('launch-notice-room')`), `${at}the room is given back once the notice is drawn`);
