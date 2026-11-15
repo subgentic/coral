@@ -18,7 +18,7 @@ export function launchSkillIds(rowId) {
 }
 
 /** Draw the row: the approved skills with a tick each. local is false for another computer's launch (its skills are its own: not offered here). */
-export async function mountLaunchSkills(rowId, local) {
+export async function mountLaunchSkills(rowId, local, selectedName = '') {
     const row = document.getElementById(`${rowId}-row`), host = document.getElementById(`${rowId}-host`);
     if (!row || !host) return;
     const mine = (generation.get(rowId) || 0) + 1; generation.set(rowId, mine);
@@ -37,6 +37,7 @@ export async function mountLaunchSkills(rowId, local) {
     const ul = el('ul', 'skills-pick-list');
     const rows = list.map(s => {
         const li = el('li', 'skills-pick'), label = el('label', 'skills-pick-label'), box = el('input'); box.type = 'checkbox'; box.value = s.id;
+        if (s.name === selectedName) { box.checked = true; chosen.add(s.id); }
         const name = el('span', 'skills-pick-name', `${s.name} v${s.version}`), desc = el('span', 'skills-pick-desc', s.description);
         label.append(box, name, desc);
         if (s.has_scripts || s.not_reviewable) label.append(el('span', 'skills-pick-flag', s.has_scripts ? 'includes scripts' : 'includes files not shown as text'));

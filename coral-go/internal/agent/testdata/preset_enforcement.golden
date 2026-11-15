@@ -1,4 +1,7 @@
 # preset<TAB>agent<TAB>what the CLI enforces (go test ./internal/agent -run TestPresetEnforcementTable -update)
+Getting started	claude	allow=- deny=-
+Getting started	codex	sandbox=default approval=default
+Getting started	agy	mode=default
 Lead Developer	claude	allow=Agent,Bash,Edit,Glob,Grep,Read,WebFetch,WebSearch,Write deny=-
 Lead Developer	codex	sandbox=workspace-write approval=never search
 Lead Developer	agy	mode=skip-permissions

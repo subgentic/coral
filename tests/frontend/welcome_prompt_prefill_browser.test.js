@@ -22,6 +22,10 @@ const shots=process.env.CORAL_GUIDE_SHOTS; if(shots)fs.mkdirSync(shots,{recursiv
  await waitFor(`!!document.getElementById('launch-step-${kind}') && document.getElementById('launch-step-${kind}').style.display !== 'none' && !!document.querySelector('${selector}')`,'guide form opens before reading its field');
  if(before)assert.equal(await ev(`document.querySelector('${selector}').value`),'');
  else assert.ok((await ev(`document.querySelector('${selector}').value`)).trim().length>20,`${width}: Inbox ${kind} guide supplies instructions`);
+ if(!before){
+ if(kind==='agent')assert.equal(await ev(`document.getElementById('launch-persona-select').value`),'Getting started','Inbox agent selects Getting started persona');
+ await waitFor(`!!document.querySelector('#${kind==='agent'?'launch-skills':'team-skills'}-host input[type=checkbox]:checked')`,'Getting started skill selected');
+ }
  if(shots){
  await ev(kind==='agent'?`window._launchStage('persona');true`:`import((window.__coralStatic||'/static/')+'team_steps.js').then(m=>{m.showTeamStep('start');return true})`);
  await waitFor(`document.querySelector('${selector}').getClientRects().length>0`,'prompt visible in screenshot');
@@ -35,6 +39,7 @@ const shots=process.env.CORAL_GUIDE_SHOTS; if(shots)fs.mkdirSync(shots,{recursiv
  await ev(`Promise.resolve(window.${kind==='agent'?'launchSession':'launchTeam'}()).then(()=>true)`);
  await waitFor(`!!window.__guideLaunch`,'cleared prompt reaches intercepted launch request');
  const request=await ev(`window.__guideLaunch`);
+ assert.equal(request.body.skills?.length,1,'selected Getting started skill reaches launch request');
  if(kind==='agent')assert.equal(request.body.prompt||'','','cleared prompt is empty in real launch request');
  else assert.ok(!JSON.stringify(request.body).includes('getting-started-team'),'cleared team guide is absent from launch request');
  }

@@ -8,6 +8,11 @@ export const SHIPPED_CAPABILITIES = ['file_read', 'file_write', 'shell', 'web_ac
 
 export const AGENT_PRESETS = [
     {
+        name: "Getting started",
+        capabilities: { allow: [], deny: [] },
+        prompt: "Use the getting-started-agent skill to guide me through Coral, one step at a time.",
+    },
+    {
         name: "Lead Developer",
         prompt: "You are the lead developer. Implement features, write code, and coordinate with the team via the message board.",
         roleLimits: { allow: ['file_read', 'file_write', 'shell', 'git_write', 'agent_spawn'] },
