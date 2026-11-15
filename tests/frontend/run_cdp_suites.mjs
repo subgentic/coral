@@ -108,6 +108,8 @@ import { redactEvidence as redactEvidenceText } from './helpers/redact_evidence.
 import { snapshot as serverSnapshot, diff as serverDiff, rowLeaks, restoreSettings, leftovers, cleanup as cleanupLeftovers } from './helpers/server_state.mjs';
 import { profileEnv, profileLeaks, writeStub } from './sandbox_profile.mjs';
 import { wsCloseNote } from './helpers/ws_close_note.mjs';
+import { badArgs } from './helpers/cdp_args.mjs';
+{ const bad = badArgs(process.argv.slice(2)); if (bad.length) { console.error(bad.join('\n') + '\nusage: node run_cdp_suites.mjs [--only substring[,substring...]] [--retries N] ... (see the top of this file)'); process.exit(2); } } // before the namespace re-exec and before anything starts (#18145)
 
 // Linux: the run goes in a private network namespace with only loopback (#3466). Chrome cancels
 // every request in flight, even to 127.0.0.1, when the host's addresses change (ERR_NETWORK_CHANGED;
