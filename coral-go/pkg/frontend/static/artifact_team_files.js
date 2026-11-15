@@ -80,9 +80,15 @@ export async function fillStrip(host, { project, files, hasMore }) {
     const dir = await teamFolder(project);
     if (!host.isConnected && !host.parentNode) return;
     const row = document.createElement('div'); row.className = 'team-files-strip';
+    let updateHint = null;
     if (dir) {
         const note = document.createElement('p'); note.className = 'goals-note'; note.append('The team works in the folder ');
-        const code = document.createElement('code'); code.textContent = dir; note.append(code, '. The app runs from there: open index.html in that folder.');
+        const code = document.createElement('code'); code.textContent = dir;
+        const hint = document.createTextNode('.');
+        const preferHtml = () => { const list = files() || []; return (list.find(f => /^index\.html?$/i.test(f.name)) || list.find(f => /\.html?$/i.test(f.name))); };
+        updateHint = () => { if (!host.isConnected) return; const h = preferHtml(); hint.textContent = h ? `. Open ${h.name} in that folder.` : '.'; };
+        updateHint();
+        note.append(code, hint);
         const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'btn btn-small'; copy.textContent = 'Copy path'; copy.setAttribute('aria-label', 'Copy the team folder path');
         copy.addEventListener('click', async () => { showToast((await copyText(dir)) === false ? 'Could not copy. Select the path and copy it.' : 'Folder path copied', false); });
         row.append(note, copy);
@@ -98,4 +104,5 @@ export async function fillStrip(host, { project, files, hasMore }) {
     if (host.offsetHeight) host.style.minHeight = host.offsetHeight + 'px'; // a team with no folder has a shorter strip: it still holds the reserved height
     host.classList.remove('team-files-strip-reserve'); host.removeAttribute('aria-hidden');
     host.replaceChildren(row);
+    return updateHint; // the caller re-calls this when the file list changes, so a late-arriving .html name appears without a full redraw (#17814)
 }
