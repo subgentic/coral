@@ -67,6 +67,9 @@ function buildOnce() {
     }
     buildTabsMore(tabs);
     drawTabEdges = watchScrollCue(tabs);
+    const next = el('button', 'team-tabs-next'); next.type = 'button'; next.id = 'team-tabs-next'; next.setAttribute('aria-label', 'Show more tabs'); // a phone's strip says it scrolls: this shows while tabs wait past its end (css, off the strip's data-more) (#17816)
+    next.addEventListener('click', () => tabs.scrollBy({ left: tabs.clientWidth * 0.7, behavior: 'smooth' }));
+    tabs.after(next);
     window.addEventListener('resize', () => { syncTabStop(); drawTabEdges(); });
     tabs.addEventListener('keydown', (e) => {
         const list = [...tabs.querySelectorAll('[role=tab]')].filter(b => b.getClientRects().length), i = list.indexOf(document.activeElement); // a phone's tabs behind More are not in the row

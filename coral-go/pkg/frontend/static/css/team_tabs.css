@@ -2,3 +2,10 @@
 .team-tabs .team-tab-count:empty::before { content: '0'; }
 .team-tabs .team-tab-count { font-variant-numeric: tabular-nums; box-sizing: border-box; min-width: 2.1em; text-align: center; } /* one glyph, whichever: the room kept for 0 is also the room of 1 to 9 and of the '…' a count shows while it loads (it was 1.6 px wider, so the tabs after Needs moved 2 px when the number came: walk21_part2 M4, 6 of 10 runs) */ /* every digit one width: the room kept for 0 is the room of 1 to 9 */
 .team-tabs .tab { transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease; } /* not 'all': a tab's weight, and so its width, does not animate, so the strip is scrolled to the pressed tab's final place, not to where it started (#15494) */
+/* a phone's strip scrolls: while tabs wait past its end this button says so and scrolls it (#17816); a desktop strip fits and has none */
+.team-tabs-next { display: none; }
+@media (max-width: 600px) {
+    .team-tabs-next { position: absolute; right: 0; bottom: 0; width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); border: 0; background: none; color: var(--text-secondary); font-size: var(--fs-display); line-height: 1; }
+    .team-tabs-next::before { content: '\203A'; }
+    .team-tabs[data-more="end"] ~ .team-tabs-next, .team-tabs[data-more="both"] ~ .team-tabs-next { display: block; }
+}
