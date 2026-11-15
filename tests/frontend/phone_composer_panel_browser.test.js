@@ -28,6 +28,8 @@ const S = `(window.__coralStatic || '/static/')`;
         assert.equal(await ev(`!document.querySelector('.mobile-send-team-btn')`), true, 'no second round button beside Send');
         assert.equal(await shown('.mobile-send-options-btn'), true);
         assert.equal(await ev(`document.querySelector('.mobile-send-options-btn').getAttribute('aria-label')`), 'Model, thinking and send options');
+        assert.match(await ev(`document.querySelector('.mobile-send-options-btn .mobile-send-options-label').innerText`), /^Model$/, 'the chevron says Model in visible text (#17596)');
+        assert.ok(await ev(`(() => { const b = document.querySelector('.mobile-send-options-btn').getBoundingClientRect(), l = document.querySelector('.mobile-send-options-label').getBoundingClientRect(); return l.width > 0 && l.left >= b.left - 1 && l.right <= b.right + 1 && b.width >= 44; })()`), 'the label sits inside a 44 px button');
         assert.equal(await shown('.mobile-send-menu'), false, 'closed');
         await ev(`document.querySelector('.mobile-send-options-btn').click(); true`);
         await waitFor(`getComputedStyle(document.querySelector('.mobile-send-menu')).display !== 'none'`, 'the menu', 3000);
