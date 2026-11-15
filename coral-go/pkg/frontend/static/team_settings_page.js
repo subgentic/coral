@@ -146,7 +146,7 @@ function settingsGroups(st) {
             { key: 'goals_need_approval', type: 'toggle', label: 'New goals need my approval', help: 'An agent\'s new goal waits in Needs you until you approve it. Yours are never held.' },
             { key: 'tasks_need_approval', type: 'toggle', label: 'New tasks need my approval', help: 'An agent\'s new task waits in Needs you until you approve it. Yours are never held.' },
             { key: 'wf_instr', type: 'heading', level: 1, label: 'Instructions and presets' },
-            { key: 'custom_instructions', type: 'textarea', label: 'Additional instructions', help: 'Team-specific conventions, given to agents with each task.', wide: true, rows: 4, placeholder: 'Team-specific conventions' },
+            { key: 'custom_instructions', type: 'textarea', label: 'Additional instructions', help: 'Team-specific conventions, given to each agent with each task it claims. A change reaches an agent at its next task.', wide: true, rows: 4, placeholder: 'Team-specific conventions' },
             { key: 'presets', type: 'custom', label: 'Presets', help: 'A preset saves with Save preset, not Save settings.', wide: true, render: slot => { slot.innerHTML = PRESET_EDITOR; } },
         ] },
         { id: 'health', domId: 'team-settings-health', label: 'Health check', icon: 'notifications', hint: 'When an agent that stopped working is noticed.', fields: healthFields({ members: () => st.membersReady, hasHeld: () => Boolean(st.healthBase && st.healthBase.held_notice), hasRecommend: () => Boolean(st.healthBase && st.healthBase.auto_recommend), monitorOff: () => !st.healthMonitorOn, onReset: resetHealth, openSettings: () => window.showSettingsModal?.('agents') }) },
@@ -244,7 +244,9 @@ function saveSettings(st) {
         }
         if ('planning_approval' in changes && ['require_goal', ...PLAN_KEYS].every(k => !(k in changes) || saved.includes(k))) saved.push('planning_approval'); // the row is a name for those switches: it is saved when they are
         if (failures.length) throw Object.assign(new Error(failures[0]), { saved, fields: fieldErrors });
-        return { note: modeChanged ? 'Saved. Working mode applies on first claim.' : null, rebase: saved.filter(k => HEALTH_KEYS.includes(k) || XT_KEYS.includes(k) || OG_KEYS.includes(k) || GR_KEYS.includes(k)) };
+        // the note names what was saved: the working mode takes effect on first claim, the instructions at each agent's next task (an agent mid-task, or answering a chat request, keeps the ones it was given; #17675)
+        const saidNow = [['mode', 'dependency_guidance', 'asks_are_tasks'].some(k => k in changes) && 'Working mode applies on first claim.', 'custom_instructions' in changes && "Additional instructions reach each agent with the next task it claims."].filter(Boolean);
+        return { note: saidNow.length ? 'Saved. ' + saidNow.join(' ') : null, rebase: saved.filter(k => HEALTH_KEYS.includes(k) || XT_KEYS.includes(k) || OG_KEYS.includes(k) || GR_KEYS.includes(k)) };
     };
 }
 
