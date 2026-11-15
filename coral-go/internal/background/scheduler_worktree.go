@@ -66,6 +66,11 @@ func (s *JobScheduler) trustRunFolder(runID int64, job store.ScheduledJob, dir s
 		s.logger.Warn("scheduled run: its folder is not the one made for it, so it is not trusted", "run_id", runID, "job", job.Name)
 		return
 	}
+	// A umask of 002 (the default for a user on most Linux distributions) makes git create the worktree group-writable, which CheckRunWorktree refuses: the folder is ours, made for this run a moment ago, so
+	// take group and other write away from it first (a real directory only, never through a link) rather than leave every such job's Trust box doing nothing.
+	if fi, lerr := os.Lstat(dir); lerr == nil && fi.IsDir() && fi.Mode().Perm()&0o022 != 0 {
+		_ = os.Chmod(dir, fi.Mode().Perm()&^0o022)
+	}
 	resolved, err := foldertrust.CheckRunWorktree(dir, s.worktreeRoot)
 	if err != nil {
 		s.logger.Warn("scheduled run: its folder was not trusted", "run_id", runID, "job", job.Name, "why", err.Error())
