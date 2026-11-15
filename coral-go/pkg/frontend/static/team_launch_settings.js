@@ -109,7 +109,7 @@ export function mountTeamLaunchSettings() {
     const state = document.createElement('p'); state.className = 'sv-hint team-goal-state'; state.id = 'team-goal-state'; state.setAttribute('role', 'status');
     const syncGoalState = () => {
         const sw = document.getElementById('team-save-goal'), task = document.getElementById('team-goal');
-        if (!sw) return;
+        if (!sw || signal.aborted) return; // a replaced mount's late ready must not draw its line again
         if (!state.isConnected) (sw.closest('.sv-row') || sw.parentNode).after(state);
         sw.setAttribute('aria-describedby', state.id);
         state.textContent = !sw.checked ? "Off: the first task will not be saved as a goal." : task && task.value.trim() ? "On: the first task will also be the team's goal." : "On: a first task, once you write one, will also be the team's goal.";
