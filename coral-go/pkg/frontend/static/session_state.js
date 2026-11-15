@@ -76,7 +76,7 @@ export function resolveSessionIdentity(s) {
 /** The name an unnamed agent shows: its folder's name (not the home folder, the root or a drive), else the CLI's name, else "Agent". */
 export function defaultAgentName(dir, agentType) {
     const trim = p => String(p || '').trim().replace(/[\\/]+$/, '');
-    const d = trim(dir), root = trim(typeof document !== 'undefined' ? document.body?.dataset?.coralRoot : '');
+    const d = trim(dir), root = trim(globalThis.document?.body?.dataset?.coralRoot);
     const folder = d && d !== '~' && d !== root && !/^[A-Za-z]:$/.test(d) ? d.split(/[\\/]/).pop() : '';
     return oneLine(folder, 60) || typeName(agentType) || 'Agent';
 }
@@ -102,7 +102,7 @@ export function goalAgeWords(at, nowMs = Date.now()) {
 }
 
 function formatStaleness(seconds) {
-    if (seconds === null || seconds === undefined) return "Unknown";
+    if (seconds == null) return "Unknown";
     if (seconds < 5) return "Just now";
     if (seconds < 60) return `${Math.floor(seconds)}s ago`;
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
