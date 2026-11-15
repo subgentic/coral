@@ -31,7 +31,7 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.textContent.includes(${JSON.stringify(rowText)}))`, 'the agent-closed goal has its row', 20000);
 
         // (3) the More menu: Pause team's words are under Pause team
-        await ev(`window.openTeamPage(${JSON.stringify(B)}).then(() => true)`);
+        await Page.navigate({ url: BASE + '/team/' + B + '/messages' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); // the Messages tab first: its board controls make Pause's words before the menu adopts the button
         await waitFor(`!!document.getElementById('team-page-title') && document.getElementById('team-page-title').textContent.includes('trc-')`, 'the team page', 15000);
         await ev(`document.getElementById('team-page-more').click(); true`);
         await waitFor(`!!document.getElementById('mb-pause-note')?.getClientRects().length`, 'the menu with Pause team and its words', 8000);
@@ -42,7 +42,7 @@ const { coralReady } = require('./helpers/wait');
 
         // (2) the dialog, then (1) the row goes with the team
         await ev(`document.getElementById('mb-delete-btn').click(); true`);
-        await waitFor(`document.getElementById('confirm-modal').getClientRects().length > 0`, 'the Remove dialog', 8000);
+        await waitFor(`document.getElementById('confirm-modal').getClientRects().length > 0`, 'the Remove dialog', 8000, `JSON.stringify({ btn: !!document.getElementById('mb-delete-btn'), hidden: document.getElementById('mb-delete-btn')?.hidden, disp: document.getElementById('mb-delete-btn') && getComputedStyle(document.getElementById('mb-delete-btn')).display, modal: getComputedStyle(document.getElementById('confirm-modal')).display, toasts: [...document.querySelectorAll('.toast')].map(t => t.textContent.slice(0, 80)) })`);
         const d = await ev(`(() => { const m = document.getElementById('confirm-modal-message'); const lines = m.innerText.split('\\n').map(l => l.trim()).filter(Boolean); return { lines, longest: Math.max(...lines.map(l => l.length)), h: Math.round(m.getBoundingClientRect().height) }; })()`);
         await shot('team-remove-dialog');
         assert.ok(d.lines.length >= 5 && d.longest <= 150, 'the Remove dialog is short lines, not one paragraph: ' + JSON.stringify(d));
