@@ -47,7 +47,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('saved')).then(() => true)`);
         await waitFor(`!!document.querySelector('#group-table-view iframe.inbox-frame')`, 'the Saved frame', 10000);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('artifacts')).then(() => true)`);
-        await waitFor(`!document.querySelector('#group-table-view iframe.inbox-frame')`, 'Artifacts is not a frame', 10000);
+        await waitFor(`!document.querySelector('#group-table-view iframe.inbox-frame')`, 'Artifacts is not a frame (the Saved frame stays attached, hidden)', 10000);
         console.log('   ✓');
         console.log('PASS hub inbox sidebar: the Hub-served sidebar uses local\'s groups, order and words');
     } finally { await client.close(); }
