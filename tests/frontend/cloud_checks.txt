@@ -186,6 +186,7 @@ node inbox_phone_mail_rows.test.mjs
 node phone_inbox_a11y.test.mjs
 node standing_option.test.mjs
 node markdown_headings.test.mjs
+node markdown_tilde.test.mjs
 node button_a11y_census.test.mjs
 node focus_trap.test.mjs
 node nav_unit.test.mjs

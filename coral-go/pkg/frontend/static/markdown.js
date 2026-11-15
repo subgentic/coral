@@ -347,7 +347,7 @@ export function renderMarkdown(content, options, links, headings) { // headings:
 }
 
 // A single ~ is a character, not strikethrough (#18435): marked's gfm strikes ~a~ too, so 'cd ~/a && ls ~/b' drew a line through the text between the two paths. ~~a~~ still strikes.
-const noTilde = { tokenizer: { del: s => (s.startsWith('~~') ? false : undefined) } };
+const noTilde = { tokenizer: { del: s => (s[1] == '~' ? false : null) } };
 if (typeof marked !== 'undefined') marked.use(noTilde); // the shared instance (chat, board, notes, file preview); the strict and docs instances below take it too
 
 export function _renderMarkdownUncached(content, options, links, headings) {
@@ -390,7 +390,7 @@ let _strictMarked = null;
 
 function strictMarked() {
     if (_strictMarked || typeof marked === 'undefined' || typeof marked.Marked !== 'function') return _strictMarked;
-    _strictMarked = new marked.Marked({ gfm: true }, noTilde);
+    _strictMarked = new marked.Marked(noTilde);
     _strictMarked.use({ renderer: { html({ text }) { return escapeHtml(text); } } });
     return _strictMarked;
 }
@@ -417,7 +417,7 @@ let _docsMarked = null;
 
 export function renderDocsMarkdown(md) {
     if (!_docsMarked && typeof marked !== 'undefined' && typeof marked.Marked === 'function') {
-        _docsMarked = new marked.Marked({ gfm: true }, noTilde);
+        _docsMarked = new marked.Marked(noTilde);
         _docsMarked.use({
             walkTokens(token) {
                 if (token.type === 'image') {
