@@ -50,7 +50,7 @@ const GOALS = [
             const g = await geometry();
             check(`${label}: the Goals page has a search box named "Search goals" and the Filters icon in the same row, to its right`, g && g.qName === 'Search goals' && (mobile ? g.searchW === 0 : g.sameRow && g.right) && /Filters/.test(g.toggleName), JSON.stringify(g));
             if (mobile) check(`${label}: the pills are not in the row (one select in the Filters sheet since #8700), the page's box is not drawn (the top pill is the search, #13591), nothing is wider than the screen`, g && !g.select && !g.pills && g.searchW === 0 && g.over <= 0, JSON.stringify(g));
-            else check(`${label}: the state pills are in the row (All, Active, Blocked, Proposed, Done, Dropped) with their counts`, g && g.pills && (await ev(`[...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.trim()).join('|')`)) === 'All 4|Active 2|Blocked 1|Proposed 1|Done|Dropped');
+            else check(`${label}: the state pills are in the row (Open, Active, Blocked, Proposed, Done, Dropped) with their counts`, g && g.pills && (await ev(`[...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.trim()).join('|')`)) === 'Open 4|Active 2|Blocked 1|Proposed 1|Done|Dropped');
 
             await pick('blocked'); await settle(300);
             check(`${label}: the Blocked pill shows only the blocked goal`, JSON.stringify(await titles()) === JSON.stringify(['Cut the cold start']), JSON.stringify(await titles()));
@@ -90,7 +90,7 @@ const GOALS = [
             else await ev(`document.querySelector('.view-list-item[data-key="goals"]').click(); true`);
             await waitFor(`/Close the old board/.test(document.body.innerText)`, `${label}: the saved Done pill lists the finished goal`, 10000); await settle(600);
             const saved = await ev(`(() => { const s = document.querySelector('.inbox-folder-toolbar .team-tb-select'); const sel = s && s.getClientRects().length ? [...s.options].map(o => o.textContent.trim()) : null; return (sel || [...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.trim())).join('|'); })()`);
-            check(`${label}: after a reload with Done saved, the other pills still count the open goals (#14663)`, /All 4/.test(saved) && /Active 2/.test(saved) && /Blocked 1/.test(saved) && /Proposed 1/.test(saved) && /Done 1/.test(saved), saved);
+            check(`${label}: after a reload with Done saved, the other pills still count the open goals (#14663)`, /Open 4/.test(saved) && /Active 2/.test(saved) && /Blocked 1/.test(saved) && /Proposed 1/.test(saved) && /Done 1/.test(saved), saved);
             await pick('all'); await settle(600);
         }
     } finally { await client.close(); }
