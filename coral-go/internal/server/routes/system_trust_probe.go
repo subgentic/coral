@@ -40,6 +40,8 @@ func (h *SystemHandler) TrustFolderProbe(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, probeProjectTrust(r.URL.Query().Get("path"), home))
 }
 
+const trustRefusedAdvice = " Each agent will ask about the folder when it starts. To have Coral trust it for them, pick a project folder inside your home folder instead."
+
 func probeProjectTrust(path, home string) map[string]any {
 	unchecked := map[string]any{"checked": false}
 	if len(path) > 4096 || !filepath.IsAbs(path) || safefs.RefuseRemote(path) != nil || strings.IndexFunc(path, unicode.IsControl) >= 0 {
@@ -52,6 +54,12 @@ func probeProjectTrust(path, home string) map[string]any {
 	}
 	path = filepath.Clean(path) // a trailing separator must not turn Lstat(link/) into a followed link
 	fi, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) { // a folder the launch will make: warned about now when it would sit in a shared place (#17422)
+		if plain := foldertrust.PlainReason(foldertrust.CheckPlanned(path, home)); plain != "" {
+			return map[string]any{"checked": false, "refused": plain + trustRefusedAdvice}
+		}
+		return unchecked
+	}
 	if err != nil || !fi.IsDir() || fi.Mode()&os.ModeSymlink != 0 {
 		return unchecked
 	}
@@ -59,7 +67,7 @@ func probeProjectTrust(path, home string) map[string]any {
 	if err != nil {
 		if plain := foldertrust.PlainReason(err); plain != "" {
 			// A folder Coral will never trust (home, a top or hidden folder, a shared one): the dialog hides the Trust switch and says why before launch, not in a toast after it (#15091). One plain sentence, no path.
-			return map[string]any{"checked": false, "refused": plain + " Each agent will ask about the folder when it starts. To have Coral trust it for them, pick a project folder inside your home folder instead."}
+			return map[string]any{"checked": false, "refused": plain + trustRefusedAdvice}
 		}
 		return unchecked
 	}
