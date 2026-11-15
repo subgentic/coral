@@ -23,7 +23,7 @@ export function _renderContentView(body, content, filepath, line, interpretHtml)
         // A workspace file can be agent-written: its links follow the file policy (#3542).
         const safe = sanitizeHtml(html, DOMPURIFY_CONFIG, { links: 'file', headings: 2 });
         body.innerHTML = `<div class="prose preview-pane-markdown">${safe}</div>`;
-        if (/^\uFEFF?---\r?\n/.test(content)) importOnce('./preview_front_matter.js').then(m => body.isConnected && m.showFrontMatter(body, content)).catch(() => {}); // #16651
+        if (content.startsWith('---')) importOnce('./preview_front_matter.js').then(m => m.showFrontMatter(body, content)).catch(() => {}); // #16651
         keepFragmentsInside(body);
         if (line > 0) _scrollToLine(body, content, line);
         return;
@@ -38,7 +38,7 @@ export function _renderContentView(body, content, filepath, line, interpretHtml)
 function _renderSandboxedPreview(body, content, filepath) {
     const frame = document.createElement('iframe');
     frame.className = 'preview-pane-iframe';
-    frame.setAttribute('aria-label', `Preview of ${_fileName(filepath)}`); // the frame's name for a screen reader; a title would show as a tooltip over the content (a ghost tooltip)
+    frame.setAttribute('aria-label', `Preview of ${_fileName(filepath)}`); // a title would be a ghost tooltip
     frame.setAttribute('sandbox', '');
     frame.referrerPolicy = 'no-referrer';
     frame.srcdoc = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'">${content}`;

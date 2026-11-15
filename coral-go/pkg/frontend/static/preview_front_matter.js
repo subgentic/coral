@@ -23,7 +23,7 @@ export function splitMarkdownFrontMatter(text) {
 /** Redraws a rendered Markdown preview without its front matter, under a key/value header. Values are text, never markup. */
 export function showFrontMatter(body, content) {
     const { facts, rest } = splitMarkdownFrontMatter(content), prose = body.firstElementChild;
-    if (!facts.length || !prose) return false;
+    if (!facts.length || !prose || !body.isConnected) return false;
     prose.innerHTML = sanitizeHtml(marked.parse(rest), DOMPURIFY_CONFIG, { links: 'file', headings: 2 });
     const dl = document.createElement('dl'); dl.className = 'preview-front-matter';
     for (const [k, v] of facts) { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); }
