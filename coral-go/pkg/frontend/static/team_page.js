@@ -394,13 +394,13 @@ const teamHooks = () => ({
 });
 
 /** A goal or task the address names is not on this team: say so by name, with the way back to the list (#15295). */
-async function itemNotFound(what, id, tab) {
+async function itemNotFound(what, id, tab, retry = null) {
     const team = S.team;
     // The address asked for this view, so a module that fails to load is not dropped quietly (#16376: one dropped request left the route on /tasks/77 with nothing on screen): it is tried once more, and a second failure says so in a toast.
     let m;
     try { m = await importOnce('./np.js'); } catch { m = await importOnce('./np.js', 'the page that says it was not found').catch(() => null); }
     if (!m) return;
-    return m.showNotFound({ what, id: `#${id}`, back: { view: 'team', id: splitKey(team).name, server: splitKey(team).server, sub: tab }, backLabel: `Back to ${what === 'goal' ? 'Goals' : 'Tasks'}` }).catch(e => console.error('[coral]', e));
+    return m.showNotFound({ what, id: `#${id}`, back: { view: 'team', id: splitKey(team).name, server: splitKey(team).server, sub: tab }, backLabel: `Back to ${what === 'goal' ? 'Goals' : 'Tasks'}`, unread: retry }).catch(e => console.error('[coral]', e));
 }
 
 async function fillTab(tab, item = 0) {
@@ -462,9 +462,9 @@ async function openTaskById(id) {
     const team = S.team, seq = S.navSeq;
     const m = await importOnce('./team_tasks_page.js');
     const host = $('team-panel-item');
-    let missing = false;
-    const full = await m.readTask(team, id, () => { missing = true; });
-    if ((missing || !full) && seq === S.navSeq && team === S.team && S.tab === 'tasks') { itemNotFound('task', id, 'tasks'); return; } // a task that could not be read at all (both tries failed) is said too, never a blank route (#16403)
+    let missing = false, unread = false;
+    const full = await m.readTask(team, id, () => { missing = true; }, () => { unread = true; });
+    if ((missing || !full) && seq === S.navSeq && team === S.team && S.tab === 'tasks') { itemNotFound('task', id, 'tasks', unread && !missing ? () => openTask(team, id) : null); return; } // a task that could not be read at all (both tries failed) is said too, never a blank route (#16403)
     if (!full || seq !== S.navSeq || team !== S.team || S.tab !== 'tasks') return;
     const origin = panel('tasks');
     S.item = { kind: 'task', id, origin };

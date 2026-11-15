@@ -334,10 +334,12 @@ export function showTasks(host, project, h = {}) {
 export function focusTaskRow(id) { const b = root && rowFocusTarget(root, `t${id}`); if (b) { b.focus(); return true; } return false; }
 
 /** A task by id: the list's item when it is read, else the route's. */
-export async function readTask(project, id, onMissing) {
+export async function readTask(project, id, onMissing, onUnread) {
     const have = model.project === project ? model.rows.find(t => t.id === Number(id)) : null;
     // A read that throws or is answered 5xx is tried once more (#16403: a Windows runner's one dropped request left /tasks/77 with nothing on screen); only a 404 says the task is not there.
+    let unread = false;
     for (let attempt = 0; attempt < 2; attempt++) try {
+        unread = false;
         const r = await boardFetch(project, `/tasks/${pathId(id)}`);
         if (r.status >= 500 && attempt === 0) { await new Promise(res => setTimeout(res, 300)); continue; } // sleep-ok: one pause before the second read
         if (r.ok) {
@@ -350,8 +352,10 @@ export async function readTask(project, id, onMissing) {
             return task;
         }
         if (r.status === 404) onMissing?.(); // the task is not on this team (the address named one that is not there, #15295)
+        if (r.status >= 500) unread = true;
         break;
-    } catch { if (attempt === 0) await new Promise(res => setTimeout(res, 300)); /* the list's item below */ } // sleep-ok: one pause before the second read
+    } catch { unread = true; if (attempt === 0) await new Promise(res => setTimeout(res, 300)); /* the list's item below */ } // sleep-ok: one pause before the second read
+    if (unread && !have) onUnread?.(); // the read failed (not a 404) and the list has no copy: the caller says it could not be read (#16418)
     return have || null;
 }
 
