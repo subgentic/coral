@@ -97,6 +97,8 @@ type TaskWorkflow struct {
 	// its review to when it enters review, if the task's creator was the orchestrator or the
 	// Operator (AutoReviewers).
 	Reviewers []string `json:"reviewers,omitempty"`
+	// Notify names members who get the completion notice too (task add --notify, #17739): the one who merges the work, say, when the creator is someone else. At most maxNotify, each a clean label.
+	Notify []string `json:"notify,omitempty"`
 	// How the creator's and each amendment's names were backed (#4175, Security's caveat on
 	// #4176 rule 13): "token" (an agent token whose session holds that name on this board),
 	// "operator" (the Operator, with no agent token) or "claimed" (only the name the request
@@ -774,6 +776,24 @@ func isLocalArtifactPath(uri string) bool {
 // ValidLabel reports whether s is a label a client may set on something the dashboard shows and agents are told about (an artifact's
 // name, media type, kind...): at most maxBytes bytes of valid UTF-8 with no control character (C0, DEL, C1, a line or paragraph separator)
 // and no format character (a direction override, a zero-width mark). Empty is fine: whether a field is required is its own rule.
+// maxNotify is how many members one task can name to be told of its completion.
+const maxNotify = 5
+
+// CleanNotify keeps the names a task may notify: clean labels, once each, at most maxNotify.
+func CleanNotify(names []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, n := range names {
+		n = strings.TrimSpace(n)
+		if n == "" || !ValidLabel(n, 80) || seen[strings.ToLower(n)] || len(out) == maxNotify {
+			continue
+		}
+		seen[strings.ToLower(n)] = true
+		out = append(out, n)
+	}
+	return out
+}
+
 func ValidLabel(s string, maxBytes int) bool {
 	if len(s) > maxBytes || !utf8.ValidString(s) {
 		return false

@@ -45,6 +45,7 @@ func cmdTaskAdd(st *boardState, args []string) {
 	stage := fs.String("stage", "", "Stage name")
 	instructions := fs.String("workflow-instructions", "", "Additional instructions appended to Coral's default task workflow")
 	reviewers := fs.String("reviewers", "", "Who reviews it, comma separated (\"Security Reviewer,QA Engineer\"): Coral delegates the review to them when the task is submitted (used when the orchestrator or the Operator adds the task)")
+	notify := fs.String("notify", "", "Members told when the task completes or is approved, comma separated (\"DevOps,QA Engineer\"): they get the same notice with the head SHA, not only its creator")
 	completionGates := fs.String("completion-gates", "", "JSON completion gates (experimental and disabled by default)")
 	remindAt := fs.String("remind-at", "", "A one-time reminder to the assignee (or the orchestrator) at that time: \"2026-10-19 21:58\", 21:58, 2026-10-19, 30m, 2h or 3d")
 	parent := fs.Int64("parent", 0, "Parent task ID")
@@ -162,6 +163,15 @@ func cmdTaskAdd(st *boardState, args []string) {
 			}
 		}
 		workflowBody["reviewers"] = names
+	}
+	if *notify != "" {
+		var names []string
+		for _, n := range strings.Split(*notify, ",") {
+			if n = strings.TrimSpace(n); n != "" {
+				names = append(names, n)
+			}
+		}
+		workflowBody["notify"] = names
 	}
 	if *goalProposal > 0 {
 		reqBody["goal_proposal_id"] = *goalProposal
