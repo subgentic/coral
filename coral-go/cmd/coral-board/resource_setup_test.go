@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,11 +14,15 @@ import (
 
 // #17588: resource setup reads each box, checks it, and defines its resource; a re-run updates it and keeps what a person wrote.
 
+var lastSetupStderr, lastSetupOut string
+var lastSetupBoxCalls int
+
 type setupStub struct {
 	mu       sync.Mutex
 	defined  map[string]map[string]any // PUT bodies by name
 	existing map[string]string         // GET answers by name; missing: 404
 	reqs     []string
+	refuse   bool // the caller may not define: a PUT ?check=1 answers 403
 }
 
 func (s *setupStub) handler(w http.ResponseWriter, r *http.Request) {
@@ -26,6 +31,16 @@ func (s *setupStub) handler(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimPrefix(r.URL.Path, "/api/resources/")
 	s.reqs = append(s.reqs, r.Method+" "+name)
 	w.Header().Set("Content-Type", "application/json")
+	if r.Method == "PUT" && r.URL.Query().Get("check") == "1" {
+		s.reqs = append(s.reqs, "CHECK "+name)
+		if s.refuse {
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte(`{"error":"only the Operator or an Orchestrator can define, remove or reorder resources"}`))
+			return
+		}
+		w.Write([]byte(`{"ok":true,"may_define":true}`))
+		return
+	}
 	if r.Method == "PUT" {
 		var body map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&body)
@@ -49,7 +64,9 @@ func runSetup(t *testing.T, s *setupStub, answers map[string]string, args ...str
 	defer srv.Close()
 	serverURL = srv.URL
 	prev := boxRun
+	lastSetupBoxCalls = 0
 	boxRun = func(alias string, here bool, script string, _ time.Duration) (string, error) {
+		lastSetupBoxCalls++
 		a, ok := answers[alias+"|"+firstWord(script)]
 		if !ok {
 			return "", os.ErrDeadlineExceeded
@@ -61,8 +78,11 @@ func runSetup(t *testing.T, s *setupStub, answers map[string]string, args ...str
 	defer func() { os.Args = before }()
 	os.Args = append([]string{"coral-board", "resource", "setup"}, args...)
 	var exited bool
-	out := captureStdout(t, func() { exited = captureExit(t, cmdResource) })
-	return out, exited
+	lastSetupStderr = captureStderr(t, func() {
+		out := captureStdout(t, func() { exited = captureExit(t, cmdResource) })
+		lastSetupOut = out
+	})
+	return lastSetupOut, exited
 }
 
 // firstWord tells the probe script from the check script by its second line.
@@ -106,7 +126,7 @@ func TestSetupAgainUpdatesAndKeepsWhatAPersonWrote(t *testing.T) {
 	s := &setupStub{defined: map[string]map[string]any{}, existing: map[string]string{
 		"epoch": `{"name":"epoch","slots":2,"max_lease_seconds":2700,"allowed":["QA"],"match":["go test ./..."],"description":"Linux, Go only. Rig and CI live here."}`,
 	}}
-	out, exited := runSetup(t, s, map[string]string{"epoch|probe": epochAnswer, "epoch|check": "check-end\n"}, "epoch")
+	out, exited := runSetup(t, s, map[string]string{"epoch|probe": epochAnswer, "epoch|check": "ok  \tcheck\t0.1s\ncheck-end\n"}, "epoch")
 	if exited {
 		t.Fatalf("out %q", out)
 	}
@@ -124,14 +144,14 @@ func TestSetupAgainUpdatesAndKeepsWhatAPersonWrote(t *testing.T) {
 		t.Fatalf("out %q", out)
 	}
 	s.defined = map[string]map[string]any{}
-	if _, exited := runSetup(t, s, map[string]string{"epoch|probe": epochAnswer, "epoch|check": "check-end\n"}, "epoch", "--slots", "3"); exited || s.defined["epoch"]["slots"] != float64(3) {
+	if _, exited := runSetup(t, s, map[string]string{"epoch|probe": epochAnswer, "epoch|check": "ok  \tcheck\t0.1s\ncheck-end\n"}, "epoch", "--slots", "3"); exited || s.defined["epoch"]["slots"] != float64(3) {
 		t.Fatalf("--slots changes them: %v", s.defined["epoch"])
 	}
 }
 
 func TestSetupDryRunAndAnUnreadableBoxDefineNothing(t *testing.T) {
 	s := &setupStub{defined: map[string]map[string]any{}, existing: map[string]string{}}
-	out, exited := runSetup(t, s, map[string]string{"epoch|probe": epochAnswer, "epoch|check": "check-end\n"}, "epoch", "gone", "--dry-run")
+	out, exited := runSetup(t, s, map[string]string{"epoch|probe": epochAnswer, "epoch|check": "ok  \tcheck\t0.1s\ncheck-end\n"}, "epoch", "gone", "--dry-run")
 	if !exited || len(s.defined) != 0 || !strings.Contains(out, "would define") {
 		t.Fatalf("exited=%v defined=%v out=%q", exited, s.defined, out)
 	}
@@ -141,7 +161,7 @@ func TestSetupAddsTheBoxesToAPoolKeepingItsMembers(t *testing.T) {
 	s := &setupStub{defined: map[string]map[string]any{}, existing: map[string]string{
 		"heavy": `{"name":"heavy","members":["mac-heavy"],"machine":"pool","match":["go test ./..."],"max_lease_seconds":1800}`,
 	}}
-	_, exited := runSetup(t, s, map[string]string{"epoch|probe": epochAnswer, "epoch|check": "check-end\n"}, "epoch", "--pool", "heavy")
+	_, exited := runSetup(t, s, map[string]string{"epoch|probe": epochAnswer, "epoch|check": "ok  \tcheck\t0.1s\ncheck-end\n"}, "epoch", "--pool", "heavy")
 	if exited {
 		t.Fatal("exited")
 	}
@@ -177,4 +197,70 @@ func TestTheFlagCheckKnowsEveryResourceDefineAndSetupOption(t *testing.T) {
 	if err := checkKnownFlags([]string{"resource", "setup", "epoch", "--dry-runs"}); err == nil {
 		t.Fatal("a misspelt option is still refused")
 	}
+}
+
+// Security on #17588 (#17894): a toolchain error is not a pass, a hostile box cannot print control characters into the terminal, a caller who may not define reaches no ssh, and a pool is not turned into a box.
+func TestSetupCheckPassesOnlyOnAnOkLine(t *testing.T) {
+	s := &setupStub{defined: map[string]map[string]any{}, existing: map[string]string{}}
+	_, exited := runSetup(t, s, map[string]string{"epoch|probe": epochAnswer, "epoch|check": "go: command not found\ncheck-end\n"}, "epoch")
+	if !exited || s.defined["epoch"] != nil {
+		t.Fatalf("a toolchain error is not a pass: exited=%v defined=%v", exited, s.defined)
+	}
+}
+
+func TestSetupPrintsNoControlCharactersFromTheBox(t *testing.T) {
+	s := &setupStub{defined: map[string]map[string]any{}, existing: map[string]string{}}
+	hostile := "\x1b]0;owned\x07\x1b[2Jlast words\x00\u202e\ncheck-end\n"
+	out, _ := runSetup(t, s, map[string]string{"epoch|probe": epochAnswer, "epoch|check": hostile}, "epoch")
+	errOut := lastSetupStderr
+	for _, r := range out + errOut {
+		if r != '\n' && (r < 0x20 || r == 0x7f || (r >= 0x80 && r < 0xa0) || r == 0x202e) {
+			t.Fatalf("control character %U reached the terminal: %q %q", r, out, errOut)
+		}
+	}
+	if !strings.Contains(errOut, "last words") {
+		t.Fatalf("the words stay: %q", errOut)
+	}
+}
+
+func TestSetupByACallerWhoMayNotDefineProbesNothing(t *testing.T) {
+	s := &setupStub{defined: map[string]map[string]any{}, existing: map[string]string{}, refuse: true}
+	probed := false
+	out, exited := runSetup(t, s, map[string]string{}, "epoch", "--dry-run")
+	_ = probed
+	if !exited || !strings.Contains(out+lastSetupStderr, "Orchestrator") {
+		t.Fatalf("refused with the reason: exited=%v %q %q", exited, out, lastSetupStderr)
+	}
+	if lastSetupBoxCalls != 0 {
+		t.Fatalf("ssh was reached %d time(s) before the permission was checked", lastSetupBoxCalls)
+	}
+}
+
+func TestSetupRefusesANameThatIsAPoolWithMembers(t *testing.T) {
+	s := &setupStub{defined: map[string]map[string]any{}, existing: map[string]string{
+		"heavy": `{"name":"heavy","members":["mac-heavy","epoch"],"machine":"pool"}`,
+	}}
+	_, exited := runSetup(t, s, map[string]string{"heavy|probe": epochAnswer, "heavy|check": "ok  \tcheck\t0.1s\ncheck-end\n"}, "heavy")
+	if !exited || s.defined["heavy"] != nil {
+		t.Fatalf("setup must not redefine a pool as a box: exited=%v defined=%v", exited, s.defined)
+	}
+	if lastSetupBoxCalls != 0 {
+		t.Fatalf("the pool is refused before any ssh: %d", lastSetupBoxCalls)
+	}
+}
+
+// captureStderr returns what fn printed to os.Stderr.
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	old := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stderr = w
+	defer func() { os.Stderr = old }()
+	fn()
+	w.Close()
+	b, _ := io.ReadAll(r)
+	return string(b)
 }
