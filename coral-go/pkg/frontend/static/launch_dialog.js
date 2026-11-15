@@ -111,7 +111,7 @@ function _selectLaunchType(type) {
             wizard: true, // the persona page for step 2 and three panes for step 3 (#7391)
             adopt: { persona: 'launch-persona-top', agent: 'launch-agent-provider', advanced: 'launch-advanced-extra' },
             adoptEnd: { agent: 'launch-note-slot' }, // the provider's notes have their room at the END of the Agent pane, under Thinking: nothing above it moves when a note appears (#8528)
-            value: launch.member ? launch.member.value : { agentType: _settingsFor(_effectiveServer(launch.server)).default_agent_type || 'claude' }, // a member's own values (#7861)
+            value: launch.member ? launch.member.value : { prompt: launch.welcomePrompt?.kind === 'agent' ? launch.welcomePrompt.text : '', agentType: _settingsFor(_effectiveServer(launch.server)).default_agent_type || 'claude' }, // a member's own values (#7861)
         });
         { // the skills are the agent's own choice: they sit at the end of the Agent section (step 3's first), not behind the Advanced entry of the section list, which a phone shows as a dropdown nobody opens (#12569)
             const pane = document.querySelector('#launch-agent-acf [data-section="agent"]'), skills = document.getElementById('launch-skills-row'), slot = document.getElementById('launch-note-slot');
@@ -155,7 +155,8 @@ window._selectLaunchType = _selectLaunchType;
  * `lock` the dropdown is fixed to it (launches started from inside a remote
  * context). Default is the hub itself with a free choice.
  */
-export function showLaunchModal(server, lock = false) {
+export function showLaunchModal(server, lock = false, welcomePrompt = null) {
+    launch.welcomePrompt = welcomePrompt;
     reportLaunchDialogOpened();
     launch.mode = null;
     launch.addTo = null; // a New Agent dialog is not an Add agent one (#7778)
