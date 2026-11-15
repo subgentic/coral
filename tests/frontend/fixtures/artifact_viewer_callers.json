@@ -35,7 +35,7 @@
     "note": "Call supplies the source computer, including local, from its own row/team"
   },
   "team_artifacts_page.js": {
-    "calls": 3,
+    "calls": 2,
     "policy": "named",
     "note": "Call supplies the source computer, including local, from its own row/team"
   }
