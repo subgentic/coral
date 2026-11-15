@@ -6,6 +6,7 @@
 import { importOnce } from './import_once.js';
 import { teamFetch } from './server_base.js';
 import { refusedTooLarge } from './utils.js';
+import { loadStyles } from './lazy_styles.js';
 import { whenText } from './when_text.js';
 import { refreshDistill, startDistill, distillJob } from './knowledge_distill.js';
 const { splitFrontMatter, entryForLink } = await importOnce('./knowledge_text.js'); // the entry's front matter and its links (pure)
@@ -38,6 +39,8 @@ function entriesOf(data) {
 
 async function load() {
     const team = model.team; if (!team) return;
+    await loadStyles('knowledge_note.css'); // the two actions' margins and the note form, not at start (page_weight)
+    if (team !== model.team) return;
     if (!model.data) { model.loading = true; draw(); }
     let refused = false;
     const data = await teamFetch(team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge`)
