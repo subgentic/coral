@@ -69,6 +69,17 @@ async function runAt(width, Page, Emulation, ev, install) {
         return { opacity: parseFloat(s.opacity), revealed: reply.classList.contains('copy-revealed') };
     })()`);
     assert.ok(afterClear.opacity < 0.1, `${width}px after clear: hidden again (opacity ${afterClear.opacity})`);
+
+    // keyboard focus on the copy button reveals it (focus-within)
+    const afterFocus = await ev(`(() => {
+        const btn = document.querySelector('#zz-reply .chat-copy-btn');
+        btn.focus();
+        const s = getComputedStyle(btn);
+        return { opacity: parseFloat(s.opacity), pe: s.pointerEvents };
+    })()`);
+    assert.ok(afterFocus.opacity >= 0.9, `${width}px focus-within: visible (opacity ${afterFocus.opacity})`);
+    assert.notEqual(afterFocus.pe, 'none', `${width}px focus-within: clickable`);
+    await ev(`document.activeElement?.blur()`);
 }
 
 (async () => {

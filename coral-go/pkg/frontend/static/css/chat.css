@@ -1340,9 +1340,9 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
         opacity: 0.6;
     }
 }
-/* #16701: on a phone (narrow prose + no hover device) the below-bubble copy icon
+/* #16701: on a phone (narrow prose + touch device) the below-bubble copy icon
    overlaps the next row. Move it inside the bubble and hide until tap or focus. */
-@media (max-width: 767px) and (hover: none) {
+@media (max-width: 767px) and (pointer: coarse) {
     .chat-prose.chat-messages .chat-bubble.assistant .chat-copy-btn {
         top: 6px;
         right: 6px;

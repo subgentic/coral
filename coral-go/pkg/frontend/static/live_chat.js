@@ -117,7 +117,7 @@ document.addEventListener("click", async (e) => {
 });
 
 // #16701: on a touch device, tap a reply bubble to reveal its copy button; tap elsewhere to hide it.
-if (matchMedia("(hover: none)").matches) {
+if (matchMedia("(pointer: coarse)").matches) {
     document.addEventListener("click", (e) => {
         const bubble = e.target.closest && e.target.closest(".chat-bubble.assistant");
         for (const old of document.querySelectorAll(".chat-bubble.copy-revealed")) {
