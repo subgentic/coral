@@ -25,9 +25,10 @@ func (h *SessionsHandler) SetBranches(src BranchesSource) { h.branches = src }
 
 // branchAgent is an agent shown on a worktree's card.
 type branchAgent struct {
-	Name      string `json:"name"`
-	SessionID string `json:"session_id"`
-	AgentType string `json:"agent_type"`
+	Name        string `json:"name"`
+	DisplayName string `json:"display_name,omitempty"`
+	SessionID   string `json:"session_id"`
+	AgentType   string `json:"agent_type"`
 }
 
 type branchWorktree struct {
@@ -86,7 +87,7 @@ func (h *SessionsHandler) Branches(w http.ResponseWriter, r *http.Request) {
 				}
 				for i := range rows {
 					if h.branches.Holds(repo, i, ls.WorkingDir) {
-						rows[i].Agents = append(rows[i].Agents, branchAgent{Name: ls.AgentName, SessionID: ls.SessionID, AgentType: ls.AgentType})
+						rows[i].Agents = append(rows[i].Agents, branchAgent{Name: ls.AgentName, DisplayName: ptrOr(ls.DisplayName), SessionID: ls.SessionID, AgentType: ls.AgentType})
 						break
 					}
 				}
@@ -147,7 +148,7 @@ func (h *SessionsHandler) TeamBranches(w http.ResponseWriter, r *http.Request) {
 			sections = append(sections, sec)
 		}
 		if own < len(sec.rows) {
-			sec.rows[own].Agents = append(sec.rows[own].Agents, branchAgent{Name: ls.AgentName, SessionID: ls.SessionID, AgentType: ls.AgentType})
+			sec.rows[own].Agents = append(sec.rows[own].Agents, branchAgent{Name: ls.AgentName, DisplayName: ptrOr(ls.DisplayName), SessionID: ls.SessionID, AgentType: ls.AgentType})
 		}
 	}
 	out := make([]map[string]any, 0, len(sections))

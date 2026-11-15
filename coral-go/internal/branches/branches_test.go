@@ -68,6 +68,9 @@ func TestARepositorysWorktreesAreReadWithTheirCountsAgainstTheBase(t *testing.T)
 	}
 	assert.Equal(t, "feature", repo.Worktrees[i].Branch, "the agent's own worktree")
 	assert.True(t, byBranch["main"].Main)
+	assert.True(t, byBranch["main"].IsBase, "the main worktree IS the base branch")
+	assert.False(t, byBranch["feature"].IsBase, "a feature branch is not the base")
+	assert.False(t, byBranch["picked"].IsBase, "a picked branch is not the base")
 	f := byBranch["feature"]
 	assert.Equal(t, 2, f.Ahead)
 	assert.Equal(t, 2, f.Behind, "main moved, then took the cherry-pick")
