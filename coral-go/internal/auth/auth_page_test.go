@@ -224,7 +224,7 @@ func TestAuthPageSaysWhyAPasswordIsNeededAndOffersNoSkip(t *testing.T) {
 	for _, skip := range []string{"do not need one", "You do not need", "opens without", "without one", "continue without", "skip", "Only you use this computer"} {
 		assert.NotContains(t, strings.ToLower(create), strings.ToLower(skip), "the create screen suggests no way around the password: "+skip)
 	}
-	assert.Contains(t, create, `Your password manager can save it. <a class="link" href="/static/password-reset.html"`, "the note keeps the password-manager advice and recovery Docs (#15858)")
+	assert.Contains(t, create, `Your password manager can save it.</p>`, "the note keeps the password-manager advice; no \"Forgot password\" before a password exists (#15858, #17169)")
 	// Sign-in links to recovery Docs and does not suggest bypassing the browser password.
 	signin := AuthPage(PageState{PasswordSet: true, Local: true, Strict: true})
 	assert.NotContains(t, strings.ToLower(signin), "opens without a password", "the forgot-password note no longer says the app opens without one")
@@ -311,7 +311,7 @@ func TestCreatePasswordPageIsOneClearPath(t *testing.T) {
 		if s.HubSignin == "unpaired" {
 			assert.Contains(t, ways, `id="hub-link-open"`, "%s: the Hub link is under Other ways in", name)
 		}
-		assert.Contains(t, create, `href="/static/password-reset.html"`, "%s: recovery Docs stay reachable", name)
+		assert.NotContains(t, create, `href="/static/password-reset.html"`, "%s: no Forgot password link before a password exists; the sign-in how-to under Other ways in has its own anchor (#17169)", name)
 	}
 	// the sign-in page keeps its primary same-computer button: this is the create page's change only
 	assert.Contains(t, AuthPage(PageState{PasswordSet: true, Local: true, LocalOpen: true}), `btn btn-primary wide" id="local-open"`)
@@ -355,7 +355,11 @@ func TestCreatePasswordPageHasOneFoldInOneOrder(t *testing.T) {
 func TestPasswordRecoveryDocsLink(t *testing.T) {
 	for _, state := range []PageState{{PasswordSet: true}, {Local: true}, {}} {
 		page := AuthPage(state)
-		assert.Contains(t, page, `href="/static/password-reset.html"`)
+		if state.PasswordSet {
+			assert.Contains(t, page, `href="/static/password-reset.html"`)
+		} else {
+			assert.NotContains(t, page, `href="/static/password-reset.html"`, "no Forgot password link before a password exists (#17169)")
+		}
 		assert.NotContains(t, page, "coral reset-password")
 		assert.NotContains(t, page, "coral open")
 		assert.NotContains(t, page, "coral setup-code")
