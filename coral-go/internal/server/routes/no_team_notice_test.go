@@ -212,3 +212,34 @@ func TestTheIdleWakerAndTheMissingUploaderBeforeANoTeamNoticeIsTyped(t *testing.
 	assert.Equal(t, "no_uploader", why, "a file no session of an agent on no team holds")
 	assert.Len(t, mock.sentTo(name), 1, "only the woken one was typed")
 }
+
+// Send to agent on a comment of a no-team file (#18105): the one uploader is asked, the words are typed into its session, and the answer says so; a gone session says "unavailable".
+func TestSendToAgentOnANoTeamFileTypesTheCommentIntoTheUploader(t *testing.T) {
+	bh, mock, name, id, setLive := noTeamNoticeRig(t)
+	_, sh, _, _ := setupSessionsTestServer(t)
+	sh.SetBoardHandler(bh)
+	req := httptest.NewRequest(http.MethodPost, "/api/artifacts/"+id+"/comments/1/send", nil)
+	caller := commentCaller{Kind: commentCallerOwner, Issuer: "local", Subject: "owner"}
+	c := store.ArtifactComment{Body: "Please add the Q4 table."}
+	ask := func() (int, map[string]any) {
+		rec := httptest.NewRecorder()
+		sh.sendNoTeamComment(rec, req, caller, c, id, []string{"The agent that uploaded this file"})
+		var out map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+		return rec.Code, out
+	}
+	code, out := ask()
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, true, out["ok"])
+	assert.Equal(t, "sent", out["results"].([]any)[0].(map[string]any)["state"])
+	sent := mock.sentTo(name)
+	require.Len(t, sent, 1)
+	assert.Contains(t, sent[0], "Please add the Q4 table.")
+	setLive(false)
+	code, out = ask()
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Equal(t, "unavailable", out["results"].([]any)[0].(map[string]any)["state"])
+	rec := httptest.NewRecorder()
+	sh.sendNoTeamComment(rec, req, caller, c, id, []string{"a", "b"})
+	assert.Equal(t, http.StatusBadRequest, rec.Code, "one agent, never two")
+}

@@ -310,6 +310,10 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 		commentRefuse(w, http.StatusConflict, "comments_locked", "comments on this artifact are locked")
 		return
 	}
+	if t.Board == noTeamBoardID { // a file of an agent on no team (#18105): no board to post on, so the comment is typed into the session that uploaded it, as it is when it is written (#13539)
+		h.sendNoTeamComment(w, r, caller, t, id, names)
+		return
+	}
 	if h.bs == nil {
 		errInternalServer(w, "the message board is not available")
 		return
@@ -482,4 +486,32 @@ func sendReplyCommand(artifactID string, commentID int64) string {
 		return fmt.Sprintf("coral-agent artifact reply coral://goals/%s/%d %d \"your reply\"", team, gid, commentID)
 	}
 	return fmt.Sprintf("coral-agent artifact reply coral://artifacts/%s %d \"your reply\"", artifactID, commentID)
+}
+
+// sendNoTeamComment is Send to agent on a comment of the reserved no-team key (#18105): the picker offers the one agent that uploaded the file, and the comment is typed into its session through the
+// same path as an automatic delivery. No ask is recorded (there is no board for the agent to reply on); the answer names the one agent as asked, or says why not.
+func (h *SessionsHandler) sendNoTeamComment(w http.ResponseWriter, r *http.Request, caller commentCaller, t store.ArtifactComment, id string, names []string) {
+	if len(names) != 1 {
+		errBadRequest(w, "a file of an agent on no team is sent to the agent that uploaded it: name one")
+		return
+	}
+	res := sendResult{Agent: names[0]}
+	d := h.deliverNoTeamComment(r, caller, t, id)
+	switch d.Reason {
+	case "":
+		res.State = "sent"
+	case "asleep_or_gone":
+		res.State = "unavailable"
+	case "no_uploader", "ambiguous_uploader":
+		res.State, res.Reason = "not_on_board", "Coral cannot tell which agent uploaded this file"
+	case "rate_limited":
+		res.State, res.Reason = "failed", "too many comments sent to agents; try again later"
+	default:
+		res.State = "failed"
+	}
+	status := http.StatusOK
+	if res.State != "sent" {
+		status = http.StatusConflict
+	}
+	writeJSON(w, status, map[string]any{"ok": res.State == "sent", "results": []sendResult{res}})
 }

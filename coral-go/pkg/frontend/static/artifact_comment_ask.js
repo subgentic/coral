@@ -46,6 +46,8 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
     /** The line under a comment that says where an agent has it (#14129): Sent to A, then Read by A (with the time the server saw its own read call return the comment), then A replied; at rest, and again as soon as a send answers (#12112: it kept saying "Not sent to an agent yet" beside "Asked just now"). Each name as written, a button to the agent's chat (#12168). */
     const fillStatus = (p, id) => {
         const rows = [...statusNow(id)]; p.replaceChildren();
+        if (!rows.length && st.noTeamSent?.has(id)) { p.textContent = 'Sent to the agent that uploaded this file'; return; } // typed into its session when the comment was written (#18105): the thread agrees with the toast
+        if (rows.length === 1 && rows[0][0] === askUi.NO_TEAM_AGENT) { p.textContent = 'Sent to the agent that uploaded this file'; return; } // asked from the sheet: no board, so no ask to read or reply to
         if (!rows.length) { p.textContent = st.undelivered && st.undelivered.get(id) ? `Not delivered: ${st.undelivered.get(id)}` : 'Not sent to an agent yet'; return; } // why it went nowhere (#15034)
         const all = (st.data && st.data.comments) || [], top = all.find(x => x.id === id);
         const newest = [top, ...all.filter(x => x.parentId === id && !x.deleted)].filter(Boolean).reduce((a, x) => (!a || Date.parse(x.createdAt) >= Date.parse(a.createdAt) ? x : a), null); // the newest message of the thread (#15119): a read mark says whether THIS was read, not an older one
@@ -81,7 +83,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
     const redrawStatus = id => { const p = panel.querySelector(`.ac-card[data-id="${id}"] .ac-ask-status`); if (p) fillStatus(p, id); };
     function askBlock() {
         const k = st.ask;
-        return askUi.buildSendBlock({ id: k.id, board: st.board, agents: k.agents, empty: k.empty, picked: k.picked, asked: k.queue.length > 1 ? new Map() : askedNow(k.id), count: k.queue.length, long: k.queue.some(q => String(q.body || '').length > askUi.SEND_COMMENT_CAP), results: k.results, busy: k.busy, now: k.now, onNow: v => { k.now = v; }, error: k.error,
+        return askUi.buildSendBlock({ id: k.id, board: st.board, title: st.board === '~no-team' ? (k.queue.length > 1 ? `Send ${k.queue.length} open comments to ${askUi.NO_TEAM_AGENT}, in time order` : `Send this comment to ${askUi.NO_TEAM_AGENT}`) : undefined, note: st.board === '~no-team' ? 'It is typed into that agent\'s session. There is no board to answer on: it applies the comment.' : undefined, agents: k.agents, empty: k.empty, picked: k.picked, asked: k.queue.length > 1 ? new Map() : askedNow(k.id), count: k.queue.length, long: k.queue.some(q => String(q.body || '').length > askUi.SEND_COMMENT_CAP), results: k.results, busy: k.busy, now: k.now, onNow: st.board === '~no-team' ? undefined : v => { k.now = v; }, error: k.error,
             onToggle: (role) => { if (k.picked.has(role)) k.picked.delete(role); else if (k.picked.size < askUi.MAX_AGENTS) k.picked.add(role); redrawAsk(role); },
             onCancel: () => { st.ask = null; render(); panel.querySelector(`.ac-card[data-id="${k.id}"] .ac-ask-open`)?.focus(); },
             onSend: () => sendAsk() });
@@ -108,6 +110,10 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
         const k = st.ask = { queue: queue.map(c => ({ ...c, artifactId: ownHex(c) })), context: { hex: st.hex, server: st.server, board: st.board }, lifetime: st.lifetime, id: c.id, hex: ownHex(c), agents: null, picked: new Set(), now: false, results: null, busy: false, error: '' };
         render();
         panel.querySelector('.ac-ask')?.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() });
+        if (k.context.board === '~no-team') { // an agent on no team (#18105): no board to list, one agent to ask, the one that uploaded the file; the server finds it and types the comment into its session
+            k.agents = [{ role: askUi.NO_TEAM_AGENT, name: askUi.NO_TEAM_AGENT, type: '', can: true, why: '' }]; k.picked.add(askUi.NO_TEAM_AGENT);
+            redrawAsk(); panel.querySelector('.ac-ask input[type="checkbox"]:not(:disabled)')?.focus(); return;
+        }
         try {
             const { refreshTeamAvailability } = await importOnce('./team_availability.js');
             const data = await refreshTeamAvailability(boardTeamKey(k.context.server, k.context.board), true); // the team of the computer the FILE is on (#13687): a bare board id is asked of this computer, which has no such board for a remote computer's team
