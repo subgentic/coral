@@ -33,6 +33,7 @@ import { syncAutoAcceptHeader, noteAutoAcceptPauses } from './auto_accept.js';
 import { pruneTerminalGone, syncTerminalGoneHeader } from './terminal_gone.js';
 import { setText } from './dom_write.js';
 import { withTeam } from './team_names.js';
+import { isPhoneLayout } from './phone_layout.js';
 
 // Reconnect pacing for the live feed. A fixed 5 s retry made every open dashboard reconnect in the same second after
 // a hub restart or deploy, and kept retrying forever after the sign-in ended. Retries now back off exponentially
@@ -460,6 +461,7 @@ function _syncViewedSession(data) {
             if (!isPopout()) {
                 if (!!s.sleeping !== !!state.currentSession.sleeping) {
                     const cur = state.currentSession;
+                    if (isPhoneLayout() && !document.body.classList.contains('live-session-active')) return; // a phone's list or another page: a team Wake does not open its chat (#17243)
                     window.selectLiveSession(cur.name, cur.agent_type, cur.session_id, sessionServer(cur));
                 } else if (s.sleeping) {
                     // The placeholder above was the awake one; archived may have changed.
