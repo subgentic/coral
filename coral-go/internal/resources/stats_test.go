@@ -41,9 +41,9 @@ func TestStatsAreCachedAndUnreachableIsSaid(t *testing.T) {
 		gotAlias, gotScript = alias, script
 		return linuxOut, nil
 	}}
-	st := b.Get("Epoch", "remote")
-	require.NotNil(t, st)
-	assert.Equal(t, "ok", st.State)
+	assert.Equal(t, "checking", b.Get("Epoch", "remote").State, "a first look at a remote box never waits on ssh (#17656)")
+	var st *Stats
+	require.Eventually(t, func() bool { st = b.Get("Epoch", "remote"); return st.State == "ok" }, 5*time.Second, 5*time.Millisecond)
 	assert.Equal(t, "epoch", gotAlias, "the machine's name as an ssh host, nothing else")
 	assert.Equal(t, statsScript, gotScript, "the command is the fixed one: no text from a description or an agent")
 	assert.False(t, strings.ContainsAny(gotScript, "$`\\"), "and it has no substitution")
@@ -52,14 +52,15 @@ func TestStatsAreCachedAndUnreachableIsSaid(t *testing.T) {
 	assert.Equal(t, int32(1), calls.Load(), "three looks inside the minute are one ssh call")
 
 	down := &StatsBoard{Run: func(context.Context, string, string) (string, error) { return "", errors.New("timed out") }}
-	assert.Equal(t, "unreachable", down.Get("mini", "remote").State)
+	require.Eventually(t, func() bool { return down.Get("mini", "remote").State == "unreachable" }, 5*time.Second, 5*time.Millisecond)
 	assert.Contains(t, down.Get("mini", "remote").Words(), "unreachable")
 
 	assert.Nil(t, b.Get("Epoch", ""), "a resource that does not say where it is has no stats")
-	assert.Equal(t, "unavailable", (&StatsBoard{Run: b.Run}).Get("!!!", "remote").State, "a name with no host in it is never passed to ssh")
+	noHost := &StatsBoard{Run: b.Run}
+	require.Eventually(t, func() bool { return noHost.Get("!!!", "remote").State == "unavailable" }, 5*time.Second, 5*time.Millisecond)
 	var seen string
 	odd := &StatsBoard{Run: func(_ context.Context, alias, _ string) (string, error) { seen = alias; return linuxOut, nil }}
-	odd.Get("-oProxyCommand=x; rm -rf /", "remote")
+	require.Eventually(t, func() bool { return odd.Get("-oProxyCommand=x; rm -rf /", "remote").State == "ok" }, 5*time.Second, 5*time.Millisecond)
 	assert.Equal(t, "oproxycommand-x-rm-rf", seen, "any other name becomes a plain slug that cannot be an ssh option")
 	assert.Equal(t, "ok", (&StatsBoard{}).Get("here", "here").State, "this machine is read directly")
 }
@@ -73,4 +74,30 @@ func TestAPoolVetoReadsOnlyWhatIsAlreadyKnown(t *testing.T) {
 	assert.True(t, b.Closed("full", "remote"), "under 2 GB of disk")
 	assert.True(t, b.Closed("gone", "remote"))
 	assert.False(t, b.Closed("fine", "remote"))
+}
+
+// Several unreachable boxes and several looks at once must not hold a list or a claim: a cold look answers "checking" at once and starts one read per box (#17656); ssh output is cut at a cap.
+func TestAColdLookNeverWaitsOnSshAndStartsOneReadPerBox(t *testing.T) {
+	release := make(chan struct{})
+	var calls atomic.Int32
+	b := &StatsBoard{Run: func(context.Context, string, string) (string, error) { calls.Add(1); <-release; return linuxOut, nil }}
+	start := time.Now()
+	for i := 0; i < 20; i++ {
+		for _, m := range []string{"epoch", "mini", "frontier"} {
+			assert.Equal(t, "checking", b.Get(m, "remote").State)
+		}
+	}
+	assert.Less(t, time.Since(start), 2*time.Second, "sixty cold looks at three blocked boxes returned without waiting")
+	require.Eventually(t, func() bool { return calls.Load() == 3 }, 5*time.Second, 5*time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
+	assert.Equal(t, int32(3), calls.Load(), "one read in flight per box, not one per look")
+	assert.Nil(t, b.Cached("epoch", "remote"), "a box not yet read is not closed by the veto")
+	close(release)
+	require.Eventually(t, func() bool { return b.Get("epoch", "remote").State == "ok" }, 5*time.Second, 5*time.Millisecond)
+
+	c := &cappedBuffer{max: 10}
+	n, err := c.Write([]byte(strings.Repeat("x", 25)))
+	assert.NoError(t, err)
+	assert.Equal(t, 25, n, "the writer is never told it was cut, so ssh does not block")
+	assert.Len(t, c.b.String(), 10)
 }
