@@ -298,11 +298,6 @@ export function dataTable(cfg) {
     let tightKeys = new Set(); // the columns dropped because the box is narrow (applyWidths, below): their <col> is hidden too, or the widths of the colgroup shift onto the wrong columns (#10443)
     st.widths ||= cfg.oneLine && !cfg.resize ? {} : readWidths();
     const remPx = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    /** What the last resizable column takes: its own width, or what the others leave of the box. */
-    function fillPx(c, shown) {
-        const t = thead.querySelector('th.dt-check'), rest = (sel && t ? Math.round(t.getBoundingClientRect().width) : 0) + shown.filter(x => x !== c).reduce((n, x) => n + (wOf(x) || (fixedW(x) ? parseFloat(fixedW(x)) * remPx() : 0)), 0);
-        return Math.max(wOf(c), Math.floor(box.clientWidth - rest));
-    }
     /** Every column's width is decided here, in one place (#11943, the operator's table rules, design note 9ced561a): the table always fits its box; ONE column (the primary, or the one that grows) is elastic and takes what the others leave; a column is never narrower than its whole header; a kept width is fitted to the box it meets; Time and Actions (fixed, in rem) keep their width. The columns have the width their content needs (at most their own max), a kept width wins; when they do not fit, the optional ones go by priority (`drop`, lowest first), then the others are squeezed, last first, down to their header, and only then does the table scroll. A phone's folded rows are laid out by CSS: nothing here. */
     function syncHidden(dropped) {
         const gone = columns.filter(c => dropped.has(c.key));
