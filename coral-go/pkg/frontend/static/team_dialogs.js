@@ -740,7 +740,7 @@ function _setAllModel(value) {
         if (!s || ![...s.options].some(o => o.value === value)) continue;
         s.value = value; s.dispatchEvent(new Event('change', { bubbles: true })); n++;
     }
-    _clearTeamUndo(); const line = document.getElementById('team-undo'); if (line) line.textContent = n ? `Set the model of ${n} ${n === 1 ? 'worker' : 'workers'}.` : 'No worker offers that model.';
+    _clearTeamUndo(); const line = document.getElementById('team-undo'); if (line) line.textContent = n ? `Set the model of ${n} ${n === 1 ? 'worker' : 'workers'}. The Orchestrator keeps its own.` : 'No worker offers that model.';
     _syncTeamMembers();
 }
 

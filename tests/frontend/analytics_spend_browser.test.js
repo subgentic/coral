@@ -136,7 +136,7 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
             await ev(`window.__spend = { ...window.__spend, commits: { available: false, reason: "no repository found for this board's agents", window: 0, usual: 0, unattributed: 0 } }; true`);
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             await waitFor(`/git folder/.test((document.querySelector('#cost-spend .spend-headline') || {}).textContent || '')`, 'the git folder line', 6000);
-            assert.equal(await text('#cost-spend .spend-headline'), 'Tokens per commit needs a git folder, and none of this team\'s agents is in one. 3.1M tokens were spent.');
+            assert.equal(await text('#cost-spend .spend-headline'), 'Tokens per commit needs a git folder, and none of this team\'s agents is in one. 3.1M tokens were spent. Start the team in a folder that is a git repository (run git init in it) to see this.');
             await ev(`window.__spend = ${JSON.stringify(FIX)}; true`);
         });
         await run('the 7 day range asks range=7d; a 404 says there is no data', async () => {
