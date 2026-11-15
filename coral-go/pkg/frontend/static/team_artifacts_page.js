@@ -412,7 +412,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             const strip = el('div', 'team-files-strip-host team-files-strip-reserve'); body.append(strip);
             // the strip's space is held before its module and the folder answer arrive: the same three parts, drawn but not seen, so the table under it does not move (#15618)
             strip.setAttribute('aria-hidden', 'true'); strip.append(el('div', 'team-files-strip-ghost', ''));
-            strip.firstChild.append(el('p', 'goals-note', 'The team works in the folder . The app runs from there: open index.html in that folder.'), el('button', 'btn btn-small', 'Copy path'), el('button', 'btn btn-small', 'Download the 3 files listed (zip)'));
+            strip.firstChild.append(el('p', 'goals-note', 'The team works in the folder . The app runs from there: open its .html page in that folder.'), el('button', 'btn btn-small', 'Copy path'), el('button', 'btn btn-small', 'Download the files listed (zip)'));
             importOnce('./artifact_team_files.js').then(m => m.fillStrip(strip, { project: model.project, hasMore: () => model.hasMore, files: () => model.items.map(it => ({ it, link: linkOf(it) })).filter(x => x.link?.preview).map(x => ({ url: x.link.url, name: readableName(x.it) })) })).catch(() => { strip.remove(); }); // a failed load takes its held space with it: the table moves up once, only on failure (#15624)
         }
         if (inbox && !model.error && (model.partial || (model.versionless && model.versionless.length))) body.append(partialLine());

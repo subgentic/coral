@@ -84,7 +84,7 @@ export async function fillStrip(host, { project, files, hasMore }) {
     if (dir) {
         const note = document.createElement('p'); note.className = 'goals-note'; note.append('The team works in the folder ');
         // a phone cannot open a folder of the computer Coral runs on: it is told so, and how the page reaches it (#17458, walk 69 H1)
-        const code = document.createElement('code'); code.textContent = dir; note.append(code, isPhoneLayout() ? ', on the computer that runs Coral. A phone cannot open that folder: ask an agent to share the finished page as a file, and it is listed here.' : '. The app runs from there: open index.html in that folder.');
+        const code = document.createElement('code'); code.textContent = dir; note.append(code, isPhoneLayout() ? ', on the computer that runs Coral. A phone cannot open that folder: ask an agent to share the finished page as a file, and it is listed here.' : '. The app runs from there: open its .html page in that folder.');
         const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'btn btn-small'; copy.textContent = 'Copy path'; copy.setAttribute('aria-label', 'Copy the team folder path');
         copy.addEventListener('click', async () => { showToast((await copyText(dir)) === false ? 'Could not copy. Select the path and copy it.' : 'Folder path copied', false); });
         row.append(note, copy);
