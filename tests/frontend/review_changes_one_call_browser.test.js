@@ -12,7 +12,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
     const failures = [];
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const mode of ['one', 'older', 'older-comment-refused', 'older-comment-lost', 'older-send-refused', 'older-send-lost', 'older-send-lost-file', 'older-send-lost-words', 'pictures', 'in-progress', 'not-delivered', 'queued', 'already-sent', 'hub', 'held-close', 'held-switch', 'text-not-kept', 'unsupported-images', 'other-refusal', 'cloud', 'cloud-older', 'too-long']) {
+        for (const mode of ['one', 'older', 'older-comment-refused', 'older-comment-lost', 'older-send-refused', 'older-send-lost', 'older-send-lost-file', 'older-send-lost-words', 'pictures', 'in-progress', 'not-delivered', 'queued', 'queued-two', 'already-sent', 'hub', 'held-close', 'held-switch', 'text-not-kept', 'unsupported-images', 'other-refusal', 'cloud', 'cloud-older', 'too-long']) {
             try {
                 if (mode === 'cloud' || mode === 'cloud-older') await setupHubWorld({ client, Page, Emulation, width: 1280, height: 900, mobile: false, inbox: true, hubFeed: true });
                 await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
@@ -37,7 +37,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                                 if (mode === 'unsupported-images' && body.text) return json({code:'images_not_in_this_slice',message:'Use a comment for pictures.'},400);
                                 if (mode === 'in-progress') return json({code:'already_in_progress',message:'retry in a moment'},409);
                                 if (mode.startsWith('older') || mode === 'pictures' || mode === 'cloud-older') return json({state:'changes requested',delivered:false});
-                                return json({state:'changes requested',text_kept:true,comment_id:7,delivered:mode!=='not-delivered' && mode!=='already-sent' && mode!=='queued',...(mode==='queued'?{queued:'Writer A'}:mode==='not-delivered'?{reason:'agent_unavailable'}:mode==='already-sent'?{reason:'already_sent'}:{to:'Writer A'})});
+                                return json({state:'changes requested',text_kept:true,comment_id:7,delivered:mode!=='not-delivered' && mode!=='already-sent' && mode!=='queued' && mode!=='queued-two',...(mode==='queued'?{queued:'Writer A'}:mode==='queued-two'?{queued:'Writer A, Writer B'}:mode==='not-delivered'?{reason:'agent_unavailable'}:mode==='already-sent'?{reason:'already_sent'}:{to:'Writer A'})});
                             }
                             if (path.endsWith('/comments') && mode === 'cloud-older') return json({error:'not_found'},404); // the Hub keeps comment writes closed until its flag is on (#14797)
                             if (path.endsWith('/comments') && mode === 'older-comment-refused') return json({error:'Comment refused'},403);
@@ -136,7 +136,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                 } else {
                     await waitFor(`window.__reloads === 1`, mode + ' finishes');
                     const writes = await ev(`window.__writes`);
-                    if (['one', 'not-delivered', 'queued', 'already-sent', 'hub', 'cloud'].includes(mode)) {
+                    if (['one', 'not-delivered', 'queued', 'queued-two', 'already-sent', 'hub', 'cloud'].includes(mode)) {
                         assert.equal(writes.length,1,mode+' is one call');
                         assert.ok(writes[0].path.endsWith('/review')); assert.equal(writes[0].body.text,'Keep these exact words.');
                         assert.equal(writes[0].body.decision,'changes');
@@ -161,6 +161,12 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                     if (mode === 'hub' || mode === 'cloud') assert.ok(writes.every(w=>w.path.startsWith('/api/remote/review-box/')),'all writes retain the captured computer');
                     if (mode === 'cloud' || mode === 'cloud-older') assert.equal(await ev(`import((window.__coralStatic || '/static/')+'server_base.js').then(m=>m.isCloud())`),true,'the Cloud Hub boot mode is exercised');
                     if (mode === 'already-sent') assert.match(await ev(`[...document.querySelectorAll('.toast')].map(t=>t.textContent).join(' ')`),/Writer A was already told/);
+                    if (mode === 'queued' || mode === 'queued-two') { // #17730: the viewer's banner says Queued while the copy is held, not 'waiting for a new version'; two held copies read 'A and B'
+                        const names = mode === 'queued' ? 'Writer A' : 'Writer A and Writer B';
+                        const banner = await ev(`document.querySelector('.artifact-review-state').textContent`);
+                        assert.match(banner, new RegExp('Changes requested: queued for ' + names + ", delivers when it's free")); assert.doesNotMatch(banner, /waiting for a new version/);
+                        assert.match(await ev(`[...document.querySelectorAll('.toast')].map(t=>t.textContent).join(' ')`), new RegExp('Queued for ' + names + ", delivers when it's free"));
+                    }
                     if (mode === 'queued') { // #17689: the toast tells the delivery record's story, the thread's "Queued for ..., delivers when it's free"
                         const toast=await ev(`[...document.querySelectorAll('.toast')].map(t=>t.textContent).join(' ')`);
                         assert.match(toast,/Queued for Writer A, delivers when it's free/); assert.doesNotMatch(toast,/not told|not confirmed|was asked/i);
