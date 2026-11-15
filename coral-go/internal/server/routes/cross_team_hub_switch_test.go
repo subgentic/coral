@@ -214,7 +214,7 @@ func TestTheLockRefusesTheHubInBothDirectionsAndFailsClosed(t *testing.T) {
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &refused))
 		assert.Equal(t, "hub_changes_off", refused["code"], route)
 		assert.Equal(t, textHubChangesOff, refused["error"], route)
-		assert.Contains(t, refused["error"], "Settings > Network and Hub", route)
+		assert.Contains(t, refused["error"], "Settings > Coral Hub and remote access", route)
 	}
 	s := e.settings("team")
 	assert.True(t, s.CrossTeamMessaging && s.CrossTeamArtifacts, "locked: turning OFF is refused too")

@@ -11,12 +11,12 @@ Chief is the one agent you talk to. It sits in front of your dev team: you tell 
 - **It does not grant things for you.** Only you approve a permission, change a setting or turn on a permissive mode. If the dev team asks for one, Chief asks you and waits for your answer.
 - **It never says you approved something you did not.** A relayed line is always marked as a relay.
 
-## Set it up: Settings > Chief
+## Set it up: Settings > Teams and Chief
 
 Chief's screen is in Settings, on this computer only (it is not available through Coral Hub).
 
 1. **Start the agent** that will be Chief, on a team of its own (a team of one). Any running agent can be picked; it is the agent you chose that is Chief, never a team an agent made.
-2. Open **Settings > Chief** and fill in:
+2. Open **Settings > Teams and Chief** and fill in:
    - **Name** and **Avatar** (one of eight colours and one letter): they show on the Chief page and in its chat.
    - **Which agent**: the running agent that is Chief. The model it runs is shown, with a link to change it on the agent's own page.
    - **Chief's actions**: *Ask first* (Chief asks before each action; the default) or *Act* (Chief edits without asking; a shell command still asks). It applies when Chief restarts.

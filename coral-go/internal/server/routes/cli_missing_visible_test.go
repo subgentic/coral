@@ -71,7 +71,7 @@ func TestARefusedWakeMarksTheAgentFailedToStartAndPostsOneBoardLine(t *testing.T
 	}
 	require.Len(t, mine, 1, "one line for the refused wake, not one per retry: %v", lines)
 	assert.Contains(t, mine[0], "the Codex CLI was not found")
-	assert.Contains(t, mine[0], "Settings > CLI paths > Codex")
+	assert.Contains(t, mine[0], "Settings > Providers > Codex")
 	assert.Less(t, len(mine[0]), 300, "bounded")
 	nothingTyped(t, term, "a refused wake")
 }
@@ -82,7 +82,7 @@ func TestTheWordsOfARefusedStartAreFixedAndCarryNoEnvironmentValue(t *testing.T)
 	wantWords := map[string]string{
 		store.StartFailureCLIMissing:     "CLI was not found",
 		store.StartFailureUntrustedMount: "Windows will not open the folder",
-		store.StartFailureCLIPath:        "CLI path in Settings > CLI paths can't be run",
+		store.StartFailureCLIPath:        "CLI path in Settings > Providers can't be run",
 	}
 	for _, typ := range []string{"claude", "codex", "agy", "pi", "terminal-like-unknown"} {
 		for _, err := range []error{
@@ -101,7 +101,7 @@ func TestTheWordsOfARefusedStartAreFixedAndCarryNoEnvironmentValue(t *testing.T)
 			assert.Less(t, len(s), 300)
 		}
 	}
-	assert.Contains(t, startFailureSentence("codex", store.StartFailureCLIMissing), "Settings > CLI paths > Codex to its codex")
+	assert.Contains(t, startFailureSentence("codex", store.StartFailureCLIMissing), "Settings > Providers > Codex to its codex")
 	assert.Empty(t, startFailureSentence("codex", ""), "no failure, no sentence")
 	_, ok := startRefusal(assert.AnError)
 	assert.False(t, ok, "another error is not a refused start")
@@ -116,7 +116,7 @@ func TestWakingAfterTheCLIIsFixedClearsFailedToStart(t *testing.T) {
 	ls, _ := ss.GetLiveSession(ctx, missingWakeSID)
 	require.NotNil(t, ls.StartFailure)
 
-	cliOnlyOnPath(t, "codex") // Settings > CLI paths, or an install, makes the CLI findable
+	cliOnlyOnPath(t, "codex") // Settings > Providers, or an install, makes the CLI findable
 	code, body := postBody(t, srv+"/api/sessions/live/"+missingWakeSID+"/wake", map[string]any{})
 	require.Equal(t, http.StatusOK, code, "%v", body)
 	ls, err := ss.GetLiveSession(ctx, missingWakeSID)

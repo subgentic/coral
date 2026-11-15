@@ -65,11 +65,11 @@ func (h *SystemHandler) putSettingsBefore4599(w http.ResponseWriter, r *http.Req
 	// The terminal backend is written only by its own route, which needs a person (#3634).
 	for k := range body {
 		if isTerminalBackendKey(k) {
-			errBadRequest(w, "terminal_backend is set with Settings > Terminal backend (PUT /api/system/terminal-backend)")
+			errBadRequest(w, "terminal_backend is set with Settings > Defaults (PUT /api/system/terminal-backend)")
 			return
 		}
 	}
-	// cli_path_<type> (Settings > CLI paths) is the program Coral runs for that agent
+	// cli_path_<type> (Settings > Providers) is the program Coral runs for that agent
 	// type: only a known type, and only an absolute path to an executable file with no
 	// shell metacharacters (#3364). Checked before anything is saved; a value that is
 	// unchanged is not re-checked, so a CLI that was uninstalled since doesn't block
@@ -83,7 +83,7 @@ func (h *SystemHandler) putSettingsBefore4599(w http.ResponseWriter, r *http.Req
 	// only a local Operator may change them, and turning it off ends Hub sessions.
 	for k := range body {
 		if hubSigninSettingKey(k) {
-			errBadRequest(w, k+" is set in Settings > Browser sign-in (PUT /api/auth/hub-signin or /api/auth/hub-origins)")
+			errBadRequest(w, k+" is set in Settings > Security and privacy > Browser sign-in (PUT /api/auth/hub-signin or /api/auth/hub-origins)")
 			return
 		}
 		// The Coral Hub link's trust settings have their own routes, which a Coral Hub sign-in

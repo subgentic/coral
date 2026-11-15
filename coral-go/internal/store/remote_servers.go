@@ -65,7 +65,7 @@ type RemoteServer struct {
 	LastSeen     *string `json:"last_seen" db:"last_seen"`
 	LastError    *string `json:"last_error" db:"last_error"`
 	// KeyRenewSince is when Coral made its data folder private while this server's key was stored in it (UTC); nil when it never was,
-	// or a different key has been entered since. Settings > Servers shows it until then.
+	// or a different key has been entered since. the Computers tab shows it until then.
 	KeyRenewSince *string `json:"key_renew_since,omitempty" db:"key_renew_since"`
 	// Transport is "http" (reached by its URL) or "ssh" (reached over the owner's SSH session, #11370). The three after it are set only for ssh and never leave the hub in JSON but the target.
 	Transport  string `json:"transport" db:"transport"`

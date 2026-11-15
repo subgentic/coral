@@ -61,7 +61,7 @@ A team's health check is **on by default** (a team that turned it off keeps it o
 - **Turn it off or on** in the Health check tab of Team settings (**Send a health check to this team**). It is on for a new team, and a quiet team hears little: a check goes out only when something changed, so an orchestrator alone gets none and a new team of three gets one or two in its first hour.
 - **Also in that tab:** how often, who receives it, whether to post a short line when nothing needs attention, and each automatic rule (nudge an idle agent to claim its work, ask a quiet agent for a status, report a held delivery). Those rules act only while the check is on. Handing a review to the default reviewers works whether or not it is on.
 
-A separate switch, **Team health checks** in Settings > Agents, is on by default and is read when Coral starts: turning it off stops the background monitor for every team, and each team's Health check tab then says it needs that switch, with a link to Settings. See [Teams](teams.md#board-health-monitor-setting).
+A separate switch, **Team health checks** in Settings > Defaults, is on by default and is read when Coral starts: turning it off stops the background monitor for every team, and each team's Health check tab then says it needs that switch, with a link to Settings. See [Teams](teams.md#board-health-monitor-setting).
 
 ## Filter and sort the agent list
 

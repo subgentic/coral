@@ -148,7 +148,7 @@ func (l *AgentLauncher) launchAgent(ctx context.Context, workingDir, agentType, 
 	var launchCmd, runTag string
 	if !isTerminal {
 		protocolPath := FindProtocolMD()
-		// Settings > CLI paths applies to job and scheduled runs like a dashboard
+		// Settings > Providers applies to job and scheduled runs like a dashboard
 		// launch: the macOS app started from Finder has no Homebrew PATH (#3205).
 		var settings map[string]string
 		if l.sessDB != nil {

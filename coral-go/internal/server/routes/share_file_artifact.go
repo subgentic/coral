@@ -88,7 +88,7 @@ func (h *SessionsHandler) ShareFileArtifact(w http.ResponseWriter, r *http.Reque
 	if errors.Is(err, errStoreFull) {
 		b, _, max := st.size()
 		artifactRefusal(w, http.StatusRequestEntityTooLarge, "artifact_quota", "store",
-			fmt.Sprintf("the artifact store is full (%s of %s): delete old artifacts or raise the limit in Settings > Storage and cleanup", humanBytes(b), humanBytes(max)))
+			fmt.Sprintf("the artifact store is full (%s of %s): delete old artifacts or raise the limit in Settings > Storage and backup", humanBytes(b), humanBytes(max)))
 		return
 	}
 	if err != nil {

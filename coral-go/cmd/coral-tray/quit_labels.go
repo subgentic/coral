@@ -25,7 +25,7 @@ type exitItems struct {
 	shutTip  string
 }
 
-// wakeRule is Settings > Terminal "Wake agents after a restart" and its cap: Coral wakes the agents it stopped only when the setting is on and no more than cap were running (above the cap it asks first).
+// wakeRule is Settings > Defaults "Wake agents after a restart" and its cap: Coral wakes the agents it stopped only when the setting is on and no more than cap were running (above the cap it asks first).
 type wakeRule struct {
 	on  bool
 	cap int

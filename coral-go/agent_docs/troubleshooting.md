@@ -56,7 +56,7 @@ That is the one-time first-launch screen. Click **Skip for now** (or press Escap
 Coral local; it does not come back, and nothing is sent to the hub. The server marks a new
 install `welcome_pending` in its settings and the dashboard clears it with your answer
 (`welcome_choice`: `connected`, `skipped` or `own-hub`), so another browser does not ask
-again. **Settings › Network and Hub › Connect to Coral Hub…** reopens it. It only opens when a hub is
+again. **Settings › Coral Hub and remote access › Connect to Coral Hub…** reopens it. It only opens when a hub is
 configured and Coral was started to offer it (a hub URL passed with `--cloud-url` or
 `CORAL_CLOUD_URL`, or `--cloud-connect prompt` or `auto`; not for the release build's default
 URL alone), and test servers set `CORAL_NO_WELCOME=1` and never show it.
@@ -72,12 +72,12 @@ Release builds offer **https://app.coralhub.dev**; dev builds offer none. `--clo
 `CORAL_CLOUD_URL`, then the build's default. A configured hub is only an address: Coral
 makes no connection to it until you click **Connect** (or run `coral cloud connect`). The
 startup log says which hub it is: `[CLOUD] Coral Hub: https://app.coralhub.dev (nothing is
-sent until this server is connected: Settings > Network and Hub)`.
+sent until this server is connected: Settings > Coral Hub and remote access)`.
 
 ### "This server is enrolled with a different hub" (Coral Hub moved to app.coralhub.dev)
 
 Coral Hub moved from app.coralai.ai to **app.coralhub.dev**. A server enrolled with the old
-host stops connecting after the upgrade and says so in Settings > Network and Hub (Coral never
+host stops connecting after the upgrade and says so in Settings > Coral Hub and remote access (Coral never
 sends its token to a host it wasn't enrolled with, and never follows a redirect to a hub).
 Connect it again, then remove the old entry:
 
@@ -260,7 +260,7 @@ On macOS and Linux a tool checks that the program on Coral's port is your Coral 
 ### Terminal backend and tmux launch errors
 
 Coral runs each agent in its own built-in terminal (pty) by default, so agents stop when you quit
-Coral. tmux is a choice: Settings > Terminal, or `--backend tmux`, keeps agents running when Coral
+Coral. tmux is a choice: Settings > Defaults, or `--backend tmux`, keeps agents running when Coral
 quits, restarts or upgrades, and lets you attach from your own terminal. tmux is needed only when
 you chose it. An install that ran on the older tmux default and still has agents running in tmux
 keeps tmux for that one start, so nothing is hidden; the first start without them runs the built-in
@@ -304,7 +304,7 @@ separately.
 
 Coral checks an executable `CORAL_TMUX_BIN` override first, then the bundled tmux
 on macOS, then `PATH`, common install locations, and your login shell. For a build
-without bundled tmux, install it or choose the built-in terminal (`--backend pty`, or Settings > Terminal).
+without bundled tmux, install it or choose the built-in terminal (`--backend pty`, or Settings > Defaults).
 
 A running tmux server can outlive Coral. If an app upgrade reports a tmux client/server
 version mismatch, preserve your running sessions and use `CORAL_TMUX_BIN` to select
@@ -564,7 +564,7 @@ session's process) and everything started in it run at nice +10 on macOS and Lin
 normal priority on Windows, as do workflow steps and hooks. The Coral server and the tmux server
 keep normal priority.
 
-It's **Settings > Agents > Behaviour > Run agents at lower priority**: on (**Low**, the default) or off (**Normal**). `--agent-priority low|normal`
+It's **Settings > Defaults > Behaviour > Run agents at lower priority**: on (**Low**, the default) or off (**Normal**). `--agent-priority low|normal`
 or `CORAL_AGENT_PRIORITY` override the setting. A change applies to agents started afterwards:
 an agent already running keeps its priority until it is restarted, because a process can lower
 its priority but not raise it back. At startup Coral lowers the panes of its own tmux server that
@@ -680,7 +680,7 @@ On Windows Coral checks three things at start-up and tells you, in words, when o
 
 - **A "Windows Firewall" warning** in the corner of the dashboard. Windows made a rule for one of Coral's programs when someone clicked **Allow** on its first prompt, and the rule lets other computers reach Coral on every port. The warning names each rule and gives two PowerShell commands (run PowerShell as an administrator): `Set-NetFirewallRule -Name '<rule>' -Profile Private` limits the rule to Private networks, and `Remove-NetFirewallRule -Name '<rule>'` removes it. Copy the commands from the warning: they carry the rule's real name.
 - **A "Security warning" about the data folder.** Coral's data folder (`.coral` in your profile, or the folder named by `CORAL_DATA_DIR`) can be read by other accounts, and it holds the API key, the command-line token and the databases. Move it to a folder only you can read, or remove those accounts from its permissions (Properties > Security).
-- **An "Agent tools folder" row in Settings > Terminal** (shown only when there is something to say, and written in the start-up log). Accounts other than the system and administrators can change the folder that holds `coral-board` and Coral's hooks, which every agent runs by its full path. This happens with a portable copy unpacked in your own profile. Install Coral with the installer: it goes in Program Files, where only an administrator can change it.
+- **An "Agent tools folder" row in Settings > Defaults** (shown only when there is something to say, and written in the start-up log). Accounts other than the system and administrators can change the folder that holds `coral-board` and Coral's hooks, which every agent runs by its full path. This happens with a portable copy unpacked in your own profile. Install Coral with the installer: it goes in Program Files, where only an administrator can change it.
 
 Dismiss a warning with its **×**. See also [Auth](auth.md) and [Hub](hub.md).
 

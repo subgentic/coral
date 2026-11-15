@@ -63,7 +63,7 @@ func isUntrustedMount(err error) bool {
 }
 
 // CLIUntrustedMountError is an agent CLI that is on PATH only through a folder Windows refuses to open (an untrusted mount point, such as Codex's chain of junctions after a Windows
-// update). A launch answers it with a 422 and the fixed code cli_untrusted_mount, naming the folder and the fix: the real executable's path in Settings > CLI paths (#340).
+// update). A launch answers it with a 422 and the fixed code cli_untrusted_mount, naming the folder and the fix: the real executable's path in Settings > Providers (#340).
 type CLIUntrustedMountError struct {
 	AgentType string
 	Binary    string
@@ -83,5 +83,5 @@ func (e *CLIUntrustedMountError) text(dir string) string {
 		where = "the PATH folder " + dir
 	}
 	return e.Binary + " CLI not found: it is on PATH only through " + where + ", which Windows will not open (an untrusted mount point). Set the real " + e.Binary +
-		".exe in Settings > CLI paths (the setting " + CLIPathSettingKey(e.AgentType) + "); Coral does not follow the junctions itself."
+		".exe in Settings > Providers (the setting " + CLIPathSettingKey(e.AgentType) + "); Coral does not follow the junctions itself."
 }

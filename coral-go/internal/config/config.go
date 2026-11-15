@@ -39,7 +39,7 @@ type Config struct {
 	// Host is the --host value: one address or a comma list (Hosts, ListenHosts; #3594).
 	Host string
 	// HostExplicit is true when the host was asked for (--host or CORAL_HOST): the default, this computer only
-	// (127.0.0.1), is widened to every interface when remote access is turned on (Settings > Network and Hub, #5124); an asked-for host is not.
+	// (127.0.0.1), is widened to every interface when remote access is turned on (Settings > Coral Hub and remote access, #5124); an asked-for host is not.
 	HostExplicit bool
 	Port         int
 	// NoAutoLoopback (--no-auto-loopback or CORAL_NO_AUTO_LOOPBACK=1): don't add the 127.0.0.1
@@ -78,11 +78,11 @@ type Config struct {
 	// so a command that finds the recorded address can tell this Coral from whatever listens on that port later (config.VerifiedServer). Empty until Start sets it.
 	InstanceID string
 	// HubModeForced: HubMode came from --hub or CORAL_HUB=1, which win over the saved
-	// Settings > Run as a hub (#3460); turning it off then means starting without them.
+	// Settings > Coral Hub and remote access > Run as a hub (#3460); turning it off then means starting without them.
 	HubModeForced bool
 	// TerminalBackend is the backend this run uses, "tmux" or "pty" (#3634), and
 	// TerminalBackendForced says it came from --backend, which wins over the saved
-	// Settings > Terminal backend. Startup sets both.
+	// Settings > Defaults. Startup sets both.
 	TerminalBackend       string
 	TerminalBackendForced bool
 
@@ -100,13 +100,13 @@ type Config struct {
 	// it (the dashboard's first-launch screen, and the startup step), off never does,
 	// and unset offers it only for an explicitly given URL (see EffectiveCloudConnect).
 	// The build's default URL alone offers nothing. Coral Hub stays reachable either
-	// way, from the home screen, Settings > Network and Hub and 'coral cloud connect', and an
+	// way, from the home screen, Settings > Coral Hub and remote access and 'coral cloud connect', and an
 	// enrolled server reconnects on its own.
 	CloudConnect string
 
 	// CloudMaxMode is the most Coral Hub may do on this computer when the process was started
 	// with one: --cloud-max-mode or CORAL_CLOUD_MAX_MODE (view, interact or launch). It is the
-	// launch-time form of Settings > Network and Hub > "Most the hub may do on this computer", for a
+	// launch-time form of Settings > Coral Hub and remote access > "Most the hub may do on this computer", for a
 	// machine nobody sits at (a container, a CI runner). Whoever starts the process is the
 	// machine's owner; the hub, a tunneled request and the API still cannot change the cap.
 	// Empty leaves the saved setting alone (view if none).

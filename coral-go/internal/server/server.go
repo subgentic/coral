@@ -184,8 +184,8 @@ func NewWithKey(cfg *config.Config, db *store.DB, backend ptymanager.TerminalBac
 		}
 		return nil, fmt.Errorf("could not read or create the API key (%s): %w", filepath.Join(cfg.CoralDir(), "api_key"), err)
 	}
-	// Never log any part of the key (#3356): Settings > Remote Access shows it on this machine.
-	log.Printf("API key loaded (Settings > Remote Access shows it on this computer)")
+	// Never log any part of the key (#3356): Settings > Coral Hub and remote access shows it on this machine.
+	log.Printf("API key loaded (Settings > Coral Hub and remote access shows it on this computer)")
 	// Browser sign-ins live in sessions.db, so they survive a restart (#3949).
 	if db != nil {
 		keyStore.SetSessionBackend(store.NewBrowserSessions(db))

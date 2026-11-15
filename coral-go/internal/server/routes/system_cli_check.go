@@ -86,7 +86,7 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 						"agent_type": agentType,
 						"configured": true,
 						"setting":    agent.CLIPathSettingKey(agentType), // launch refuses the same way (#115)
-						"message":    fmt.Sprintf("the CLI path set in Settings > CLI paths (%s = \"%s\") can't be run; Coral does not run another program in its place: fix it or clear it to use the one on PATH", agent.CLIPathSettingKey(agentType), p),
+						"message":    fmt.Sprintf("the CLI path set in Settings > Providers (%s = \"%s\") can't be run; Coral does not run another program in its place: fix it or clear it to use the one on PATH", agent.CLIPathSettingKey(agentType), p),
 					}))
 					return
 				}
@@ -296,7 +296,7 @@ func hubCLIReply(r *http.Request, m map[string]any) map[string]any {
 	}
 	delete(m, "path")
 	if key, ok := m["setting"].(string); ok { // the message names the path; through the Hub it names the setting only
-		m["message"] = fmt.Sprintf("the CLI path set in Settings > CLI paths (%s) can't be run; Coral does not run another program in its place: fix it or clear it to use the one on PATH", key)
+		m["message"] = fmt.Sprintf("the CLI path set in Settings > Providers (%s) can't be run; Coral does not run another program in its place: fix it or clear it to use the one on PATH", key)
 	}
 	if info := agent.GetCLIInfo(r.URL.Query().Get("type")); info != nil {
 		if _, ok := m["binary"]; ok {
@@ -421,10 +421,10 @@ func configuredCLIRunnable(p, agentType string) error {
 
 // cliRefusedNote is the note of a CLI that was found and not used: where it is, why a launch refuses it, and what to do. The page's launch dialog reads it back (static/cli_refused_words.js).
 func cliRefusedNote(tildePath, reason, settingKey string) string {
-	return fmt.Sprintf("Found but not used: %s is %s, so a launch refuses it. Install it somewhere else, or set its path in Settings > CLI paths (the setting %s).", tildePath, reason, settingKey)
+	return fmt.Sprintf("Found but not used: %s is %s, so a launch refuses it. Install it somewhere else, or set its path in Settings > Providers (the setting %s).", tildePath, reason, settingKey)
 }
 
 // cliRefusedNoteTunneled is the same note through the Coral Hub, with no agent and no folder named (Security's SHOULD).
 func cliRefusedNoteTunneled(settingKey string) string {
-	return fmt.Sprintf("Found but not used: it is in a folder a launch refuses (an agent's working folder, a temporary folder or Coral's data folder). Install it somewhere else, or set its path in Settings > CLI paths (the setting %s).", settingKey)
+	return fmt.Sprintf("Found but not used: it is in a folder a launch refuses (an agent's working folder, a temporary folder or Coral's data folder). Install it somewhere else, or set its path in Settings > Providers (the setting %s).", settingKey)
 }

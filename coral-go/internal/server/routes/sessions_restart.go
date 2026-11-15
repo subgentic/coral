@@ -483,7 +483,7 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 		ProtocolPath:   h.protocolPath(), EmbeddedProtocol: true,
 		Flags:           p.flags,
 		WorkingDir:      p.workdir,
-		CLIPath:         cliPath, // Settings > CLI paths (#3205)
+		CLIPath:         cliPath, // Settings > Providers (#3205)
 		BoardName:       p.board,
 		BoardLabel:      h.boardLabel(p.board),
 		Role:            naming.SubscriberID(p.displayName, p.agentType),

@@ -60,7 +60,7 @@ func TestTheOwnerOfAComputerWithNoRecordedLabelIsToldWhatToDo(t *testing.T) {
 	require.Equal(t, "owner_label_missing", refusalCode(t, rec))
 	text := decodeStrings(t, rec.Body.String())["error"]
 	assert.Contains(t, text, "Confirm owner")
-	assert.Contains(t, text, "Settings > Network and Hub")
+	assert.Contains(t, text, "Settings > Coral Hub and remote access")
 	assert.NotContains(t, strings.ToLower(text), "link this computer again", "the refusal points at the local fix first; re-linking is the Settings row's fallback")
 
 	// A grantee, an unreadable record and a different recorded account keep the plain refusal.

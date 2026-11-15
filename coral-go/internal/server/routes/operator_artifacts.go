@@ -309,7 +309,7 @@ func (h *BoardHandler) UploadOperatorArtifact(w http.ResponseWriter, r *http.Req
 		rec.GoalID = goalID
 	})
 	if errors.Is(err, errStoreFull) {
-		artifactRefusal(w, http.StatusRequestEntityTooLarge, "artifact_quota", "store", "the artifact store is full: delete old artifacts or raise the limit (Settings > Storage and cleanup)")
+		artifactRefusal(w, http.StatusRequestEntityTooLarge, "artifact_quota", "store", "the artifact store is full: delete old artifacts or raise the limit (Settings > Storage and backup)")
 		return
 	}
 	if err != nil {

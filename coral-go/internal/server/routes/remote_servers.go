@@ -167,7 +167,7 @@ func viewRemote(s *store.RemoteServer) remoteServerView {
 	return remoteServerView{RemoteServer: *s, Warning: warn}
 }
 
-// keyRenewWarning is the warning of a server marked by store.KeyRenewSince, until a different key is entered: Settings > Servers
+// keyRenewWarning is the warning of a server marked by store.KeyRenewSince, until a different key is entered: the Computers tab
 // shows it with the server, after the one-time notice of that start is gone.
 func keyRenewWarning(since *string) string {
 	if since == nil || *since == "" {

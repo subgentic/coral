@@ -629,7 +629,7 @@ const SleepReasonAgentExited = "agent_exited"
 const (
 	StartFailureCLIMissing     = "cli_missing"            // the CLI is on neither PATH nor a common place
 	StartFailureUntrustedMount = "cli_untrusted_mount"    // Windows will not open a folder on PATH or the CLI's own (#340)
-	StartFailureCLIPath        = "cli_path_unusable"      // the configured Settings > CLI paths entry can't be run (#115)
+	StartFailureCLIPath        = "cli_path_unusable"      // the configured Settings > Providers entry can't be run (#115)
 	StartFailureFolderGone     = "folder_gone"            // an auto-asleep agent's folder is gone: it is not woken (#12111)
 	StartFailureWakeFailed     = "wake_failed"            // a delivery's wake of an auto-asleep agent did not start it (#12111)
 	StartFailureHermesGateway  = "hermes_gateway_refused" // Hermes's own gateway start was refused (another gateway held the host's lock) and its CLI exited (#12052)

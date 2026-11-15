@@ -54,7 +54,7 @@ func TestCLICheckShowsAnUntrustedMountBeforeALaunch(t *testing.T) {
 	note, _ := out["install_note"].(string)
 	assert.Contains(t, note, "untrusted mount point")
 	assert.Contains(t, note, `C:\Codex\bin`)
-	assert.Contains(t, note, "Settings > CLI paths")
+	assert.Contains(t, note, "Settings > Providers")
 
 	agent.UntrustedMountDir = func(string) (string, bool) { return "", false }
 	out = cliCheck(t, h, "type=codex")

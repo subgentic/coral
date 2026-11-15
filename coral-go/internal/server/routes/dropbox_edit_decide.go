@@ -186,7 +186,7 @@ func (b *DropboxBackup) decide(ctx context.Context, doc string, promote bool, wh
 			return nil, http.StatusConflict, "no_team", "This file belongs to no team, so it cannot take a new version. Keep the edit separate instead."
 		}
 		if errors.Is(err, errStoreFull) {
-			return nil, http.StatusRequestEntityTooLarge, "store_full", "The artifact store is full: free space or raise the limit (Settings > Storage and cleanup)"
+			return nil, http.StatusRequestEntityTooLarge, "store_full", "The artifact store is full: free space or raise the limit (Settings > Storage and backup)"
 		}
 		return nil, http.StatusInternalServerError, "", "could not record the decision"
 	}

@@ -41,7 +41,7 @@ func TestAuthPageStates(t *testing.T) {
 	assert.Contains(t, remote, `id="create-form"`)
 	assert.Contains(t, remote, `id="setup-code"`, "from another computer the one-time setup code is asked for")
 	assert.NotContains(t, remote, "coral setup-code", "commands live in Docs")
-	assert.Contains(t, remote, "Settings &rsaquo; Network and Hub</b> (or the tray menu)", "the setup code is reachable in Coral")
+	assert.Contains(t, remote, "Settings &rsaquo; Coral Hub and remote access</b> (or the tray menu)", "the setup code is reachable in Coral")
 	assert.NotContains(t, remote, "startup log", "the code is never in a log, so the page does not send anyone to one")
 
 	assert.Contains(t, AuthPage(PageState{PasswordSet: true, Strict: true}), "The Coral app signs in by itself")
@@ -125,7 +125,7 @@ func TestAuthPageHubStates(t *testing.T) {
 	assert.Contains(t, unpaired, "Not now, use a password", "always an exit to the password")
 	remote := AuthPage(PageState{PasswordSet: true, HubSignin: "unpaired"})
 	assert.NotRegexp(t, `id="hub-setup-field" hidden`, remote, "from another computer the setup code field shows")
-	assert.Contains(t, remote, "Settings &rsaquo; Network and Hub")
+	assert.Contains(t, remote, "Settings &rsaquo; Coral Hub and remote access")
 
 	off := AuthPage(PageState{PasswordSet: true, Local: true, HubSignin: "disabled_in_hub", HubURL: "https://app.coralhub.dev"})
 	assert.Contains(t, off, "Sign in with Coral Hub is off for this computer.")
