@@ -77,7 +77,8 @@ function hitOf(d) {
     const titleAll = words.every(w => title.includes(w));
     // where the best of the words found sits: 1 the title, 2 a heading, 3 a step or paragraph, 4 code (#10303); a word the topic does not have counts for nothing here and a little against it below
     const place = Math.min(...found.map(w => (title.includes(w) ? 1 : (placeOf(d, w)?.kind ?? 4))));
-    const base = d.name === 'key-concepts' && place <= 2 ? -2 : d.name === 'how-do-i' ? -1 : titleAll ? 0 : place;
+    const kcBoost = d.name === 'key-concepts' && place <= 2 && (words.length >= 3 || (words.length >= 2 && linesOf(d).some(l => l.kind === 2 && words.every(w => l.low.includes(w)))));
+    const base = kcBoost ? -2 : d.name === 'how-do-i' ? -1 : titleAll ? 0 : place;
     return { rank: base + (words.length - found.length) / 100, titleAll };
 }
 /** The sentence of a topic's text to show for a hit: in the best place a word is (a heading, else a step or paragraph, else code, #10303; the line with more of the words first), the sentence of that line that has the most of the query's words (the first, when two have as many), without the Markdown marks, cut to about 180 characters around the first word found; '' when no word is in the text. */

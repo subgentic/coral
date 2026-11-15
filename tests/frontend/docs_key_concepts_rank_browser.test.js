@@ -22,6 +22,11 @@ const { coralReady } = require('./helpers/wait');
             const top = await first();
             assert.equal(top, 'key-concepts', `"${q}" → first result must be key-concepts, got ${top}`);
         }
+        // "goal" alone must NOT put key-concepts first (docs_second_goal_browser pins how-do-i)
+        await search('goal');
+        await waitFor(`document.querySelectorAll('#docs-nav-list [data-doc]').length > 0`, 'results for "goal"', 15000);
+        const goalTop = await first();
+        assert.notEqual(goalTop, 'key-concepts', `"goal" alone must not boost key-concepts first, got ${goalTop}`);
         console.log('PASS key-concepts ranks first for definition queries');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
