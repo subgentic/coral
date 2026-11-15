@@ -7,4 +7,15 @@ for (const [id, name] of [['claude-opus-5-5', 'Opus 5.5'], ['claude-sonnet-5-5',
 }
 assert.equal(modelLabel('claude', 'claude-fable-5-1', 'local'), 'Claude · Fable 5.1');
 assert.equal(modelName('claude', 'some-new-model', 'local'), 'some-new-model', 'an id nothing here knows is shown as it is');
+
+// The Agents row and the chat's chip say the same model and level because both take them from model_labels.js, never from the fields (#17597, QA5 on #17427):
+// a row or a chip that built its own level or name text could drift from the other.
+import fs from 'node:fs';
+const dir = new URL('../../coral-go/pkg/frontend/static/', import.meta.url);
+const strip = f => fs.readFileSync(new URL(f, dir), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+for (const f of ['session_rows.js', 'model_chip.js']) {
+    const src = strip(f);
+    assert.ok(/\bsessionLevel\(/.test(src), f + ' reads the level through sessionLevel');
+    assert.ok(/\bmodel(Name|Label)\(/.test(src), f + ' names the model through modelName / modelLabel');
+}
 console.log('model_labels: ok');
