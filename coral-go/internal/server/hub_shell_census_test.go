@@ -66,6 +66,7 @@ var shellNeverRoutes = map[string]shellNever{
 	"dropbox_share.js POST /api/dropbox/connect":                {bHidden, `not offered through Coral Hub`, "Share via Dropbox (#14944): the dialog's Sign in again; the dialog opens only from the viewer's item, which is never offered through a Hub", 0},
 	"needs_skills.js GET /api/skills":                           {bExplains, `approve at the computer`, "through a Hub the skills come from one read of GET /api/needs-you?kind=skill, drawn as plain rows that say to approve at the computer, with no buttons; this read is the computer's own list (#13841)", 0},
 	"settings_fields.js POST /api/system/cli-signin":             {bHidden, `signIn\.hidden = cloud`, "the Sign in button is hidden through a Hub (cloud || !canSignIn); the POST is never sent and the text says to sign in on the computer (#16714)", 0},
+	"run_signin.js POST /api/system/cli-signin":                  {bExplains, `Sign in on the computer that runs Coral`, "through a Hub the POST is never sent: the notice says to sign in on the computer that runs Coral, then press Retry (#16715)", 0},
 }
 
 // shellNeverFiles: every other never call of a script that nobody has read yet for what it does through a Hub. This is the starting list of #13860 ("what is true today"): it is a worklist, and
