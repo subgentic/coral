@@ -15,7 +15,7 @@ const recordTiming=row=>{timings.push(row);if(process.env.CORAL_LAUNCH_TIMING_RE
  const full=['agent_spawn','file_read','file_write','shell','web_access'];
  const dismissChecks=[];
  try{
-  await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
+  await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD+require('./helpers/launch_notice_agent').PRELOAD});
   for(const width of [1280,390]){
    await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
    await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','settings');await installTeam(ev);await stubModels(ev);
