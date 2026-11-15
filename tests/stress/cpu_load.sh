@@ -8,7 +8,8 @@
 # inside $( ), whose subshell ends at once; checked every second) and after SECONDS at most (default 600). A timeout or a killed tool shell used to orphan the
 # old `( while :; do :; done ) &` loops for a day; these end within about a second of their owner, whatever
 # way it ended (even SIGKILL). Run it as one step of the same command as the test, not from a shell that
-# outlives the work. Output is the PIDs, one line; the loops write nothing.
+# outlives the work. A loop killed early takes its watcher with it (within a second), so the watcher never
+# signals a PID that was reused. Output is the PIDs, one line; the loops write nothing.
 usage() { echo "usage: cpu_load.sh N [SECONDS [OWNER_PID]]  (N 1-64, SECONDS 1-86400)" >&2; exit 2; }
 n=${1:-}; secs=${2:-600}; owner=${3:-$PPID}
 case "$n$secs$owner" in *[!0-9]*) usage ;; esac
@@ -17,7 +18,7 @@ pids=""; i=0
 while [ "$i" -lt "$n" ]; do
   ( while :; do :; done ) >/dev/null 2>&1 &
   busy=$!
-  ( t=0; while kill -0 "$owner" 2>/dev/null && [ "$t" -lt "$secs" ]; do sleep 1; t=$((t + 1)); done; kill "$busy" 2>/dev/null ) >/dev/null 2>&1 &
+  ( t=0; while kill -0 "$owner" 2>/dev/null && kill -0 "$busy" 2>/dev/null && [ "$t" -lt "$secs" ]; do sleep 1; t=$((t + 1)); done; kill -0 "$busy" 2>/dev/null && kill "$busy" 2>/dev/null ) >/dev/null 2>&1 &
   pids="$pids $busy"; i=$((i + 1))
 done
 echo $pids
