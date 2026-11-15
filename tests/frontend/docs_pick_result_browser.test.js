@@ -12,7 +12,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 820, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
-        await ev(`window.switchNavTab('docs'); true`);
+        await ev(`localStorage.setItem('coral-sidebar-groups-docs', '[]'); window.switchNavTab('docs'); true`);
         await waitFor(`document.querySelectorAll('#docs-nav-list [data-doc]').length > 10`, 'the topics', 12000);
 
         // search for a word that returns results but do NOT click a topic
