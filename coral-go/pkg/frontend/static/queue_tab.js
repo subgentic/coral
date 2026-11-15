@@ -6,6 +6,7 @@ import { state } from './state.js';
 import { importOnce } from './import_once.js';
 import { formatLastSeen } from './server_status.js';
 import { loadStyles } from './lazy_styles.js';
+const { agentCopyBeside } = await importOnce('./agent_copy_button.js');
 const AQ = await importOnce('./automations_queue.js');
 const { machineChoices, machineLabel, machineOnline } = await importOnce('./analytics_machine.js');
 const V = await importOnce('./analytics_viz.js');
@@ -39,7 +40,9 @@ function statusLines(id) {
 export function drawQueueTab() {
     const host = body(); if (!host) return;
     const id = current(); if (id !== AQ.queueMachine()) AQ.setQueueMachine(id);
-    const parts = [el('h2', 'queue-tab-title', 'Resource queue')];
+    const title = el('h2', 'queue-tab-title', 'Resource queue');
+    agentCopyBeside(title, 'resources', 'The resource queue: run coral-board resource list.'); // the robot beside the title: where the queue is documented (#18357)
+    const parts = [title.parentElement, el('p', 'queue-tab-note', 'It shows the queue of this computer and of each linked one.')];
     if (choices().length > 1) {
         const bar = el('div', 'queue-tab-bar');
         bar.append(V.selectField('Computer', choices().map(c => [c, machineLabel(c) + (machineOnline(c) ? '' : ' (offline)')]), id, v => { chosen = v; drawQueueTab(); }));

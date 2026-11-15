@@ -87,10 +87,9 @@ state.servers[1] = { id: 'new-1', label: '<img src=x onerror=alert(1)>', status:
 QT.drawQueueTab();
 assert.equal(document.querySelector('#queue-tab-body img'), null);
 
-// the Automations folder is the way to the tab
-const moved = AQ.movedTable();
-assert.deepEqual(moved.rows, []);
-assert.match(moved.empty.line, /own tab/);
-assert.equal(moved.empty.go.action, 'queue-tab-open'); // the browser suite presses it
-console.log('PASS Queue tab: picker, linked computer read-only through the hub link, last queue kept, refusal said, Automations links to it');
+// the page says what it shows, and the robot beside its title opens where the queue is documented (#18357); the Automations folder is gone
+assert.match(document.querySelector('#queue-tab-body .queue-tab-note').textContent, /shows the queue of this computer and of each linked one/);
+assert.ok(document.querySelector('#queue-tab-body .agent-copy-hrow > .queue-tab-title + .agent-copy'), 'the robot sits beside the title');
+assert.equal(AQ.movedTable, undefined, 'the Automations folder that linked here is gone');
+console.log('PASS Queue tab: picker, linked computer read-only through the hub link, last queue kept, refusal said, the explanation and the robot');
 process.exit(0);

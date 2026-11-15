@@ -67,12 +67,25 @@ const { setTheme } = require('./helpers/contrast');
         await Emulation.setTouchEmulationEnabled({ enabled: false });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
 
-        // Automations keeps a link to the tab
-        await ev(`window.openAutomationsFolder('queue'); true`);
-        await waitFor(`!![...document.querySelectorAll('button')].find(b => /Open the Queue tab/.test(b.textContent))`, 'the Automations link', 8000);
-        await ev(`[...document.querySelectorAll('button')].find(b => /Open the Queue tab/.test(b.textContent)).click(); true`);
-        await waitFor(`location.pathname === '/queue'`, 'the link opens the tab', 6000).catch(e => problems.push(e.message.slice(0, 200)));
+        // Automations no longer has a Queue folder (#18357): the old address goes to the tab, the page explains itself and has the robot
+        await ev(`window.switchNavTab('automations'); true`);
+        await waitFor(`!!document.querySelector('#automations-nav-list')`, 'the Automations sidebar', 8000);
+        const sideWords = await ev(`document.getElementById('automations-nav-list').textContent`);
+        if (/Queue|Resources/.test(sideWords)) problems.push('Automations still lists the queue: ' + sideWords.replace(/\s+/g, ' ').slice(0, 200));
+        await ev(`history.pushState({}, '', '/automations/queue'); window.dispatchEvent(new PopStateEvent('popstate')); true`);
+        await waitFor(`location.pathname === '/queue'`, 'the old Queue address goes to the tab', 8000).catch(e => problems.push(e.message.slice(0, 200)));
+        await waitFor(`!!document.querySelector('#queue-tab-body .queue-tab-note')`, 'the Queue page', 8000);
+        const page = await ev(`(() => { const b = document.getElementById('queue-tab-body'); return { note: b.querySelector('.queue-tab-note').textContent, robot: !!b.querySelector('.agent-copy-hrow > .queue-tab-title + .agent-copy'), label: b.querySelector('.agent-copy')?.getAttribute('aria-label') }; })()`);
+        if (page.note !== 'It shows the queue of this computer and of each linked one.') problems.push('the explanation: ' + page.note);
+        if (!page.robot) problems.push('no robot beside the title');
+        for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) { // evidence: the Queue page and Automations' sidebar at both widths (#18357)
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            await shot(`queue-page-${w}`);
+            await ev(`window.switchNavTab('automations'); true`); await waitFor(`!!document.querySelector('#automations-nav-list')`, 'Automations', 8000); await shot(`automations-${w}`);
+            await ev(`window.switchNavTab('queue'); true`); await waitFor(`!!document.querySelector('#queue-tab-body .queue-tab-note')`, 'the Queue page again', 8000);
+        }
+        await Emulation.setTouchEmulationEnabled({ enabled: false }); await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         assert.deepEqual(problems, [], problems.join('\n'));
-        console.log('PASS Queue tab: this computer, a linked computer read only, last queue kept, Automations link, 1280 and 390 light and dark');
+        console.log('PASS Queue tab: this computer, a linked computer read only, last queue kept, the explanation and the robot, the old address, 1280 and 390 light and dark');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

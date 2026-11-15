@@ -8,7 +8,6 @@ import { compactDuration } from './format.js';
 import { announceNotice } from './notifications.js';
 import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
-import { registerActions } from './actions.js';
 import { isCloud, serverFetch } from './server_base.js';
 const HUB_WORDS = 'The queue is kept by each computer: open this computer\'s own Coral to see it, and move or remove an entry there.';
 const DT = await importOnce('./data_table.js');
@@ -51,9 +50,6 @@ const emit = () => {
     if (pendingFocus) setTimeout(() => restoreFocus(), 60);
 };
 export const onQueueChanged = fn => { listeners.add(fn); };
-export const queueDenied = () => denied;
-/** Changes every half minute: the table's key carries it, so the lease left and the waiting times keep counting between data changes. */
-export const queueTick = () => Math.floor(Date.now() / TICK_MS);
 
 /** Read the queue. A failed read keeps what was shown (and says nothing: the next poll tries again). */
 export async function refreshQueue() {
@@ -224,9 +220,4 @@ export function queueTable(rows, narrowed) {
                 actions: [...linkActions(r), ...rowActions(r)].map(a => ({ label: a.label, title: a.title, off: a.off, ...(a.kick ? { confirm: 'Confirm kick', onArm: () => announceNotice(`Press Confirm kick to remove ${r.agent} from ${r.resource}.`) } : {}), run: () => { noteFocus(a.kick ? neighbour(r)[0] : r.id, a.label); a.run(); } })) }),
         }).el };
 }
-
-/** The Automations folder that was the queue's home (#16030): the queue has its own tab, and this is the link to it. */
-export const movedTable = () => ({ title: 'Queue', noun: ['entry', 'entries'], rows: [], signature: 'moved',
-    empty: { line: 'The resource queue has its own tab.', hint: 'It shows the queue of this computer and of each linked one.', go: { action: 'queue-tab-open', label: 'Open the Queue tab' } } });
-registerActions({ 'queue-tab-open': () => window.switchNavTab?.('queue') });
 

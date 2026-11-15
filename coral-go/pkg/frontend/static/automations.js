@@ -23,7 +23,6 @@ const AF = await importOnce('./automation_filters.js');
 const W = await importOnce('./workflows.js');
 const AR = await importOnce('./automation_runs.js');
 const SM = await importOnce('./status_mark.js'); // the one status mark: shape and word (#15813)
-const AQ = await importOnce('./automations_queue.js'); // the Queue folder: this computer's resource queue (#13651)
 
 const $ = id => document.getElementById(id);
 const FOLDERS = [
@@ -32,7 +31,6 @@ const FOLDERS = [
     { key: 'recent', label: 'Recent runs', noun: ['run', 'runs'], search: 'Search recent runs', attention: true, icon: 'history' },
     { key: 'jobs', label: 'Jobs', noun: ['job', 'jobs'], search: 'Search jobs', icon: 'schedule' },
     { key: 'workflows', label: 'Workflows', noun: ['workflow', 'workflows'], search: 'Search workflows', icon: 'account_tree' },
-    { key: 'queue', label: 'Queue (experimental)', noun: ['entry', 'entries'], search: 'Search the queue', resources: true, icon: 'queue' },
 ];
 const folderOf = key => FOLDERS.find(f => f.key === key) || null;
 const routeOf = (folder, id, run) => ({ view: 'automations', folder, ...(id ? { id } : {}), ...(run ? { run } : {}) });
@@ -62,22 +60,21 @@ const runningItems = () => { const live = liveJobIds(); return [...allJobs().fil
 const failedItems = () => [...allJobs(), ...allWorkflows()].filter(i => i.result === 'failed');
 /** Every run of every job and workflow, newest first, one page at a time (automation_runs.js, GET /api/automations/runs): the computer applies the search and the Result filter before it cuts the page, so the rows are not filtered again here (#13183). */
 const recentItems = () => AR.pagedRuns().map(r => ({ ...r, id: r.key, enabled: true, runs: '', agent: '', does: '', stepTypes: [], last: r.atMs })); // at stays the run's start time (a string: the Started column)
-const ITEMS = { jobs: allJobs, workflows: allWorkflows, running: runningItems, failed: failedItems, recent: recentItems, queue: () => [] };
+const ITEMS = { jobs: allJobs, workflows: allWorkflows, running: runningItems, failed: failedItems, recent: recentItems };
 const folderFilters = key => { const f = filtersOf(key); return folderOf(key).attention && f.sort === 'next' ? { ...f, sort: 'last' } : f; }; // what needs attention is read newest first unless the person chose an order
-const rowsOf = key => key === 'queue' ? [] : AF.ordered(ITEMS[key]().filter(i => key === 'recent' || AF.matches(i, filtersOf(key))), folderFilters(key)); // Recent runs: the computer already filtered (the page of the search and Result asked for)
+const rowsOf = key => AF.ordered(ITEMS[key]().filter(i => key === 'recent' || AF.matches(i, filtersOf(key))), folderFilters(key)); // Recent runs: the computer already filtered (the page of the search and Result asked for)
 const runsWords = i => i.runs === 'workflow' ? `Workflow ${nameOfWorkflow(i.job.workflow_id) || i.job.workflow_id}` : `Agent prompt (${AF.AGENT_LABEL[i.agent] || i.agent})`;
 const stepsWords = i => `${i.stepCount} step${i.stepCount === 1 ? '' : 's'}`;
 const usedByWords = i => (i.usedBy ? `${i.usedBy} job${i.usedBy === 1 ? '' : 's'}` : 'No jobs');
-const countOf = key => (key === 'recent' ? AR.unreadCount() : key === 'queue' ? 0 : ITEMS[key]().length); // Recent runs counts the runs not opened yet, the others their rows
+const countOf = key => (key === 'recent' ? AR.unreadCount() : ITEMS[key]().length); // Recent runs counts the runs not opened yet, the others their rows
 
 // ── The folders ──────────────────────────────────────────────────────────
 const sections = () => [{ title: 'Needs attention', items: FOLDERS.filter(f => f.attention).map(f => ({ key: f.key, label: f.label, icon: f.icon, count: countOf(f.key), alert: f.key === 'failed' })) },
-    { title: 'Library', items: FOLDERS.filter(f => !f.attention && !f.resources).map(f => ({ key: f.key, label: f.label, icon: f.icon, count: countOf(f.key) })) },
-    { title: 'Resources', items: FOLDERS.filter(f => f.resources).map(f => ({ key: f.key, label: f.label, icon: f.icon, count: countOf(f.key) })) }];
+    { title: 'Library', items: FOLDERS.filter(f => !f.attention).map(f => ({ key: f.key, label: f.label, icon: f.icon, count: countOf(f.key) })) }];
 function renderNav(force = false) {
     const list = $('automations-nav-list');
     if (!list) return;
-    const key = JSON.stringify([folder, sections(), filtersOf('jobs'), filtersOf('workflows'), filtersOf('running'), filtersOf('failed'), openJobId(), W.openWorkflowId(), liveRuns().map(r => r.id), filtersOf('recent'), AR.recentRuns().map(r => [r.key, r.run.status, AR.isUnread(r)]), AR.pagedSignature(), AQ.queueDenied(), AQ.queueTick(), AQ.queueItems().map(r => [r.key, r.state, r.place, r.lease_until, r.agent, r.member, r.heldOn, r.stuck, r.stuck_min, r.project, r.task, r.goal_id, r.goal_title, r.note]), // every field the table draws: a change in one of them is a redraw even when no clock moved
+    const key = JSON.stringify([folder, sections(), filtersOf('jobs'), filtersOf('workflows'), filtersOf('running'), filtersOf('failed'), openJobId(), W.openWorkflowId(), liveRuns().map(r => r.id), filtersOf('recent'), AR.recentRuns().map(r => [r.key, r.run.status, AR.isUnread(r)]), AR.pagedSignature(),
         rowsOf('jobs').map(i => [i.id, i.name, i.enabled, i.at, i.run && i.run.status, i.run && i.run.id, runsWords(i)]), rowsOf('workflows').map(i => [i.id, i.name, i.enabled, i.stepCount, i.usedBy, i.run && i.run.status, i.run && i.run.id])]);
     if (!force && key === navKey) return;
     navKey = key;
@@ -93,7 +90,6 @@ function pickFolder(key) { if (folderOf(key)) go(routeOf(key)); }
 function setFolder(key) {
     if (!folderOf(key)) key = 'jobs';
     folder = key;
-    AQ.watchQueue(false); // the queue is read by its own tab (queue_tab.js, #16030), not from here
     const input = $('automations-search'), f = folderOf(key);
     if (input) {
         if (input.getAttribute('aria-label') !== f.search) input.setAttribute('aria-label', f.search);
@@ -107,7 +103,6 @@ const resultSelect = key => ({ type: 'select', key: 'result', id: `automations-$
 const FIELDS = {
     running: () => [],
     failed: () => [],
-    queue: () => [],
     recent: () => [resultSelect('recent')],
     jobs: () => [resultSelect('jobs'),
         { type: 'select', key: 'runs', id: 'automations-jobs-runs', label: 'Runs', values: AF.RUNS, labels: AF.RUNS_LABEL, any: 'Anything' },
@@ -134,7 +129,6 @@ function newMenu() {
 /** The create actions at the toolbar's right: New job, or New workflow with Build with agent beside it (the agent that builds a workflow with you). */
 function createAction(key) {
     if (key === 'jobs') return button('New job', 'job-new');
-    if (key === 'queue') return null; // nothing to create: an Orchestrator defines resources with coral-board resource
     if (folderOf(key).attention) return newMenu();
     const box = document.createElement('span'); box.className = 'automations-create';
     box.append(button('Build with agent', 'wf-build-agent', 'btn', 'smart_toy'), button('New workflow', 'wf-create'));
@@ -145,23 +139,23 @@ function toolbarOf(key) {
     if (!bars.has(key)) {
         bars.set(key, IT.folderToolbar({
             idp: `automations-${key}`, noun: f.noun[0], searchLabel: f.search,
-            ...(f.resources ? {} : { sorts: { values: AF.SORTS, labels: AF.SORT_LABEL, aria: `Sort ${f.noun[1]}` } }), // the queue is in the line's order, not sorted
+            sorts: { values: AF.SORTS, labels: AF.SORT_LABEL, aria: `Sort ${f.noun[1]}` },
             fields: FIELDS[key](),
             model: { EMPTY: AF.EMPTY, clean: AF.clean, chips: AF.chips, isFiltered: AF.isFiltered, without: AF.without },
         }, next => { setFilters(key, next); renderNav(true); }));
     }
-    const filt = filtersOf(key), rows = f.resources ? [] : ITEMS[key]().filter(i => AF.matches(i, { ...filt, state: '' }));
+    const filt = filtersOf(key), rows = ITEMS[key]().filter(i => AF.matches(i, { ...filt, state: '' }));
     const counts = AF.STATES.map(s => rows.filter(i => i.enabled === (s === 'active')).length);
     const node = bars.get(key).draw({
         filters: filt,
-        pills: f.attention || f.resources ? null : { label: `Show ${f.noun[1]} that are`, current: filt.state || 'all',
+        pills: f.attention ? null : { label: `Show ${f.noun[1]} that are`, current: filt.state || 'all',
             items: [{ key: 'all', label: 'All', count: rows.length }, ...AF.STATES.map((s, i) => ({ key: s, label: AF.STATE_LABEL[s], count: counts[i] }))],
             onPick: pick => { setFilters(key, { ...filtersOf(key), state: pick === 'all' ? '' : pick }); renderNav(true); } },
         action: createAction(key),
     });
-    const copySubject = () => (f.resources ? 'The resource queue: run coral-board resource list.' : `Coral\u2019s scheduled ${f.noun[1]} (the Automations tab).`); // where in the docs to read (#15063)
-    if (node.querySelector('.list-bar-search-row')) PH.pageHeader(node.querySelector('.list-bar-search-row'), { idp: `automations-${key}`, agentCopy: { key: f.resources ? 'resources' : 'jobs', subject: copySubject } }); // every folder is on the page header (guidelines 4.2): Copy for an agent is in More, not a robot of its own (#15814); Workflows, Failed and Recent runs had search and filters on the title row, Jobs on a second one (#16422)
-    else if (!node.querySelector('.agent-copy')) node.append(agentCopyButton(f.resources ? 'resources' : 'jobs', copySubject));
+    const copySubject = () => `Coral\u2019s scheduled ${f.noun[1]} (the Automations tab).`; // where in the docs to read (#15063)
+    if (node.querySelector('.list-bar-search-row')) PH.pageHeader(node.querySelector('.list-bar-search-row'), { idp: `automations-${key}`, agentCopy: { key: 'jobs', subject: copySubject } }); // every folder is on the page header (guidelines 4.2): Copy for an agent is in More, not a robot of its own (#15814); Workflows, Failed and Recent runs had search and filters on the title row, Jobs on a second one (#16422)
+    else if (!node.querySelector('.agent-copy')) node.append(agentCopyButton('jobs', copySubject));
     return { node, signature: JSON.stringify([filt, counts, rows.length]) };
 }
 
@@ -275,7 +269,6 @@ export function noteJobDeleted(name) {
 }
 function folderTable(key) {
     const f = folderOf(key), rows = rowsOf(key), filt = filtersOf(key), narrowed = AF.isFiltered(filt) || filt.q;
-    if (key === 'queue') return AQ.movedTable(); // the queue has its own tab (#16030): this folder is the way there
     if (key === 'recent') { AR.ensureRunsPage({ q: filt.q, result: filt.result }); return recentTable(rows, narrowed); } // the page of this search and Result filter (a no-op when it is the one loaded or on its way)
     if (f.attention) return attentionTable(key, rows, narrowed);
     const base = { title: f.label, noun: f.noun, rows, status: key === 'jobs' ? _gone : '',
@@ -359,6 +352,7 @@ export function showAutomationsTab() {
 
 /** The route handler's call (app_routes.js): the folder, or the job, workflow or run, the address names. false when the item is not there. */
 export async function openAutomationsRoute(r) {
+    if (r.folder === 'queue') { go({ view: 'queue' }, { replace: true }); return; } // the old Queue folder: the queue has its own tab
     mount();
     renderNav(true);
     const key = folderOf(r.folder) ? r.folder : folder;
