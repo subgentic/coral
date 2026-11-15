@@ -1,0 +1,18 @@
+/* The Branches tab (goal #11, #17433): loaded with branches_tab.js, not at start (#17746). */
+#agentic-panel-branches { overflow:auto; min-width:0; padding:12px; }
+#team-panel-branches { overflow:auto; padding:16px 24px 24px; } /* the team page's tab starts where the other tabs' bodies do (#17433) */
+@media (max-width:760px) { #team-panel-branches { padding:12px 16px 16px; } }
+.branches-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+.branches-row { padding:8px 0; border-bottom:1px solid var(--border); min-width:0; }
+.branches-row:last-child { border-bottom:0; padding-bottom:0; }
+.branches-row[aria-current="true"] .branches-name { color:var(--accent); }
+.branches-name { font-weight:var(--fw-strong); color:var(--text-primary); overflow-wrap:anywhere; }
+.branches-meta, .branches-note { color:var(--text-secondary); font-size:var(--fs-sm); overflow-wrap:anywhere; }
+.branches-note { margin:0 0 8px; }
+.branches-repo { min-width:0; padding:12px 16px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius-lg); } /* one repository, one card (#17433) */
+.branches-repo + .branches-repo { margin-top:16px; }
+.branches-remote { margin:0 0 4px; font-size:var(--fs-md); font-weight:var(--fw-strong); color:var(--text-primary); overflow-wrap:anywhere; }
+.branches-mark { color:var(--text-muted); font-size:var(--fs-sm); font-weight:var(--fw-regular); }
+.branches-more { background:none; border:0; padding:4px 0; margin-top:4px; color:var(--accent); font:inherit; font-size:var(--fs-sm); cursor:pointer; min-height:32px; }
+.branches-commits { list-style:none; margin:4px 0 8px; padding:0; display:flex; flex-direction:column; gap:4px; font-size:var(--fs-sm); overflow-wrap:anywhere; }
+.branches-sha { font-family:var(--font-mono, monospace); color:var(--text-secondary); }
