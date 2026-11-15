@@ -9,7 +9,7 @@ const { AFTER_OVERHANG } = require('./helpers/touch_area');
 const { SCAN } = require('./helpers/phone_scan'); // the page scan the phone suites share (#5273 moved it out of phone_layout_browser)
 const FONTS = stage => `(() => { const out = []; const vis = e => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
     const root = window.__scanRoot ? document.querySelector(window.__scanRoot) : document.body;
-    for (const e of root.querySelectorAll('svg[width][height]')) { if (!vis(e) || !/^[0-9.]+$/.test(e.getAttribute('width'))) continue; const w = e.getBoundingClientRect().width; if ('${stage}' === 'a') e.__w16 = w; else if (e.__w16 && w / e.__w16 < 1.6 && e.__w16 > 0) out.push('svg[' + e.getAttribute('width') + '] in ' + (e.parentElement.id ? '#' + e.parentElement.id : e.parentElement.tagName.toLowerCase() + '.' + String(e.parentElement.className).trim().split(/\\s+/)[0]) + ' ' + Math.round(e.__w16) + '->' + Math.round(w)); }
+    for (const e of root.querySelectorAll('svg[width][height]')) { if (!vis(e) || !/^[0-9.]+$/.test(e.getAttribute('width'))) continue; const w = e.getBoundingClientRect().width; if ('${stage}' === 'a') e.__w16 = w; else if (e.__w16 && w / e.__w16 < 1.6 && e.__w16 > 0 && !e.querySelector('text') && !e.closest('[id^=cost-spark]')) out.push('svg[' + e.getAttribute('width') + '] in ' + (e.parentElement.id ? '#' + e.parentElement.id : e.parentElement.tagName.toLowerCase() + '.' + String(e.parentElement.className).trim().split(/\\s+/)[0]) + ' ' + Math.round(e.__w16) + '->' + Math.round(w)); }
     for (const e of root.querySelectorAll('*')) { if (!vis(e)) continue; const own = [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()); if (!own) continue;
         const fs = parseFloat(getComputedStyle(e).fontSize);
         if ('${stage}' === 'a') e.__fs16 = fs; else if (e.__fs16 && fs / e.__fs16 < 1.6) out.push((e.id ? '#' + e.id : e.tagName.toLowerCase()) + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\\s+/).slice(0, 2).join('.') : '') + ' ' + e.__fs16 + '->' + fs + ' "' + e.textContent.trim().slice(0, 24) + '"'); }
@@ -124,6 +124,19 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`document.getElementById('launch-modal').style.display = 'none'; window.switchNavTab('agents'); true`);
         };
         if (group === 'wide') {
+            // #17869: History, Workflows and the Analytics chart are checked FILLED every run (a table's column handles, a chart's text): on an empty server they hold nothing, and the same suite failed in a full set only when an earlier suite had left rows and token usage on the shared server.
+            await ev(`(() => { const R = window.fetch.bind(window); const json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'content-type': 'application/json' } }));
+                const row = n => ({ session_id: 'wide-chat-' + n, type: 'agent', title: 'A seeded chat number ' + n + ' with a rather long title', summary: 'a chat', agent_type: 'claude', source_type: 'claude', last_timestamp: new Date().toISOString(), duration_sec: 60, starred: false, archived: false, active: false, tags: [], server: 'local' });
+                const wf = n => ({ id: 900 + n, name: 'Seeded workflow ' + n, description: 'd', enabled: true, steps: [{ name: 's1', type: 'shell', command: 'echo hi' }] });
+                const hours = Array.from({ length: 24 }, (_, h) => new Date(Date.now() - (23 - h) * 3600000).toISOString().replace(/:\\d\\d:\\d\\d\\.\\d+Z$/, ':00:00Z'));
+                const agent = (id, name, c) => ({ session_id: id, agent_name: name, board_name: 't', folder: 'c', requests: 2, input_tokens: 5, output_tokens: 10, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: c, first_seen: '2026-10-27T00:00:00Z', last_seen: '2026-10-27T01:00:00Z' });
+                window.fetch = (u, o = {}) => { const url = new URL(String(u && u.url || u), location.origin), m = String((o && o.method) || (u && u.method) || 'GET').toUpperCase();
+                    if (m === 'GET' && url.pathname === '/api/sessions/history/counts') return json({ all: 3, group: 0, notes: 0, active: 0, starred: 0, archived: 0, by_agent_type: {}, tags: [] });
+                    if (m === 'GET' && url.pathname === '/api/sessions/history') return json({ sessions: [row(1), row(2), row(3)], total: 3, page: 1, page_size: 50 });
+                    if (m === 'GET' && url.pathname === '/api/workflows') return json({ workflows: [wf(1), wf(2)] });
+                    if (url.pathname === '/api/token-usage/summary') return json({ totals: { input_tokens: 10, output_tokens: 20, cost_usd: 0.0375, num_requests: 4 }, by_model: [], by_thinking: [], by_agent_type: [], by_agent: [agent('a', 'Frontend Dev', 0.019), agent('b', 'QA Engineer', 0.0185)] });
+                    if (url.pathname === '/api/token-usage/timeseries') return json({ buckets: hours.map(b => ({ bucket: b, cost_usd: 0.0015625, series: [{ key: 'Frontend Dev', label: 'Frontend Dev', cost_usd: 0.019 / 24, num_requests: 1 }, { key: 'QA Engineer', label: 'QA Engineer', cost_usd: 0.0185 / 24, num_requests: 1 }] })) });
+                    return R(u, o); }; return true; })()`);
             await Emulation.setDeviceMetricsOverride({ width: 820, height: 1180, deviceScaleFactor: 1, mobile: true }); await settle(600);
             await subset('tablet 820');
             await Emulation.setDeviceMetricsOverride({ width: 844, height: 390, deviceScaleFactor: 1, mobile: true }); await settle(600);
