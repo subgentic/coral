@@ -81,7 +81,9 @@ type fakeDropbox struct {
 	folders     map[string][]string   // #16170: shared folder id -> the addresses of its members (list_folders, list_folder_members)
 	foldersFail bool                  // list_folders refuses (a Dropbox that is down or rate-limited)
 	folderCalls int                   // list_folders calls
-	checkFail   string                // the sharing check (list_shared_links with no path) answers 409 with this summary
+	foldersHold chan struct{}         // #16575: when set, list_folders says it arrived on foldersIn and answers only when this is closed
+	foldersIn   chan struct{}
+	checkFail   string // the sharing check (list_shared_links with no path) answers 409 with this summary
 }
 
 type fakeLink struct {

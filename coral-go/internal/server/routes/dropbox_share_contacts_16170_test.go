@@ -137,3 +137,41 @@ func TestForgettingTheSharesEmptiesTheFolderMemberCache(t *testing.T) {
 	assert.Empty(t, be.b.contactsFor)
 	be.b.contactsMu.Unlock()
 }
+
+// #16575 (QA's SHOULD on #16230): a folder read that began before a Disconnect, Switch or Rekey is dropped, not cached: the generation check in folderContacts. The mutant that removes it passed.
+func TestAFolderReadBegunBeforeDisconnectIsDroppedNotCached(t *testing.T) {
+	be, _ := newDropboxShareEnv(t)
+	be.dbx.folders = map[string][]string{"f1": {"lee@work.org"}}
+	be.dbx.foldersHold, be.dbx.foldersIn = make(chan struct{}), make(chan struct{}, 1)
+	done := make(chan []string, 1)
+	go func() {
+		code, out := be.shareCall(http.MethodGet, "/api/dropbox/share-contacts?q=", "", callerDashCookie)
+		var got []string
+		if code == http.StatusOK {
+			for _, e := range out["emails"].([]any) {
+				got = append(got, e.(string))
+			}
+		}
+		done <- got
+	}()
+	select {
+	case <-be.dbx.foldersIn:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the folder read never began")
+	}
+	(&dropboxRoutes{backup: be.b}).forgetShares(context.Background()) // the account goes while the read is under way
+	close(be.dbx.foldersHold)
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the read did not end")
+	}
+	be.b.contactsMu.Lock()
+	assert.Empty(t, be.b.contactsList, "what the old account's read found is not kept")
+	assert.Empty(t, be.b.contactsFor)
+	be.b.contactsMu.Unlock()
+	be.dbx.foldersHold = nil
+	be.dbx.folderCalls = 0
+	assert.Equal(t, []string{"lee@work.org"}, be.contacts(""))
+	assert.Equal(t, 1, be.dbx.folderCalls, "the next keystroke asks Dropbox again, as nothing was kept")
+}
