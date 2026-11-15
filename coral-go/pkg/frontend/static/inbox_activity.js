@@ -193,7 +193,7 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
                 open: toggle,
                 detail: { id: r => `activity-detail-${encodeURIComponent(keyOf(r))}`, open: r => expanded.has(keyOf(r)), render: r => {
                     const p = partsOf(r), node = DT.el('div', 'activity-expanded');
-                    node.append(DT.el('strong', '', p.on), DT.el('p', '', [p.did, p.detail].filter(Boolean).join(' · ')));
+                    node.append(DT.el('strong', '', markHidden(p.on, { strict: true })), DT.el('p', '', [p.did, p.detail].filter(Boolean).join(' · ')));
                     if (p.about) node.append(DT.el('p', 'activity-about', markHidden(p.about, { strict: true })));
                     for (const kind of ['goal', 'task']) if (Number(r[`${kind}_id`]) > 0 && !(r.item_kind === kind && String(r.item_id) === String(r[`${kind}_id`]))) { const link = DT.el('button', 'btn btn-small', `${kind === 'goal' ? 'Goal' : 'Task'} #${r[`${kind}_id`]}`); link.type = 'button'; link.onclick = () => open[kind]({ ...r, item_id: String(r[`${kind}_id`]) }); node.append(link); }
                     node.append(DT.el('p', '', `${markHidden(AF.agentOf(r) || 'You', { strict: true })} · ${teamOf(r)} · ${fromCell(r)}`));
