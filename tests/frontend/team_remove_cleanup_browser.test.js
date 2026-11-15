@@ -51,19 +51,20 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`/^Pause/.test(document.getElementById('mb-pause-btn').textContent)`, 'the board is resumed', 8000);
         await ev(`document.getElementById('team-page-more').click(); true`);
         await waitFor(`!!document.getElementById('mb-delete-btn')?.getClientRects().length`, 'the menu with Remove team', 8000);
+        await ev(`document.getElementById('team-page-more').click(); true`);
+        await ev(`window.exitTeamPage?.({ force: true }); window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
+        await waitFor(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.textContent.includes(${JSON.stringify(rowText)}))`, 'the row is on screen in the Inbox, where the removal is done from (the sidebar team menu does the same)', 20000);
         // the stood-in terminal is stopped first (a team with an agent on it is not removed, #5043): the page does not list it as running, so the dialog is the plain Remove team one
         await ev(`fetch('/api/sessions/live/${encodeURIComponent(sname || '')}/kill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_type: 'terminal', session_id: ${JSON.stringify(sid)} }) }).then(() => true)`); sid = null;
         // (2) the dialog, then (1) the row goes with the team
-        await ev(`document.getElementById('mb-delete-btn').click(); true`);
+        await ev(`import(${S} + 'message_board.js').then(m => { m.deleteTeam(${JSON.stringify(B)}); return true; })`);
         await waitFor(`document.getElementById('confirm-modal').getClientRects().length > 0`, 'the Remove dialog', 8000, `JSON.stringify({ btn: !!document.getElementById('mb-delete-btn'), hidden: document.getElementById('mb-delete-btn')?.hidden, disp: document.getElementById('mb-delete-btn') && getComputedStyle(document.getElementById('mb-delete-btn')).display, modal: getComputedStyle(document.getElementById('confirm-modal')).display, toasts: [...document.querySelectorAll('.toast')].map(t => t.textContent.slice(0, 80)) })`);
         const d = await ev(`(() => { const m = document.getElementById('confirm-modal-message'); const lines = m.innerText.split('\\n').map(l => l.trim()).filter(Boolean); return { lines, longest: Math.max(...lines.map(l => l.length)), h: Math.round(m.getBoundingClientRect().height) }; })()`);
         await shot('team-remove-dialog');
         await ev(`window.__net = []; const rf = window.fetch; window.fetch = (u, o = {}) => { const m = (o.method || 'GET').toUpperCase(); const p = rf(u, o); if (m !== 'GET') p.then(r => window.__net.push(m + ' ' + String(u).slice(0, 80) + ' ' + r.status)).catch(e => window.__net.push(m + ' ' + String(u).slice(0, 60) + ' ' + e)); return p; }; window.__toasts = []; new MutationObserver(() => { for (const t of document.querySelectorAll('.toast')) if (!window.__toasts.includes(t.textContent)) window.__toasts.push(t.textContent.slice(0, 120)); }).observe(document.body, { childList: true, subtree: true }); true`);
         await ev(`document.getElementById('confirm-modal-yes').click(); true`);
         await waitFor(`fetch('/api/board/projects').then(r => r.json()).then(l => !JSON.stringify(l).includes(${JSON.stringify(B)}))`, 'the team is removed on the server', 25000, `JSON.stringify({ net: window.__net, toasts: window.__toasts })`);
-        await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
-        await new Promise(r => setTimeout(r, 1500)); // sleep-ok: the Inbox draws from what it already read; a second would be a refetch, which is what the fix avoids
-        assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.textContent.includes(${JSON.stringify(rowText)}))`), false, 'the removed team leaves no "Goal closed ... Reopen" row in the Inbox');
+        await waitFor(`![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.textContent.includes(${JSON.stringify(rowText)}))`, 'the removed team leaves no "Goal closed ... Reopen" row in the Inbox (without a reload or a new visit)', 5000);
         // the dialog's words, asserted last so the row's check above is reached on its own
         assert.ok(d.lines.length >= 5 && d.longest <= 150, 'the Remove dialog is short lines, not one paragraph: ' + JSON.stringify(d));
         assert.ok(d.lines.some(l => /uploaded/i.test(l) && /not deleted|stay/i.test(l)), "it says what happens to the files the team's agents uploaded: " + JSON.stringify(d.lines));
