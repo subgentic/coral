@@ -188,7 +188,7 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
                     node.append(DT.el('strong', '', p.on), DT.el('p', '', [p.did, p.detail].filter(Boolean).join(' · ')));
                     if (p.about) node.append(DT.el('p', 'activity-about', markHidden(p.about, { strict: true })));
                     for (const kind of ['goal', 'task']) if (Number(r[`${kind}_id`]) > 0 && !(r.item_kind === kind && String(r.item_id) === String(r[`${kind}_id`]))) { const link = DT.el('button', 'btn btn-small', `${kind === 'goal' ? 'Goal' : 'Task'} #${r[`${kind}_id`]}`); link.type = 'button'; link.onclick = () => open[kind]({ ...r, item_id: String(r[`${kind}_id`]) }); node.append(link); }
-                    node.append(DT.el('p', '', `${AF.agentOf(r) || 'You'} · ${teamOf(r)} · ${fromCell(r)}`));
+                    node.append(DT.el('p', '', `${markHidden(AF.agentOf(r) || 'You', { strict: true })} · ${teamOf(r)} · ${fromCell(r)}`));
                     if (opens(r)) { const b = DT.el('button', 'btn btn-small activity-open-item', 'Open item'); b.type = 'button'; b.onclick = () => openItem(r); node.append(b); }
                     return node;
                 } },
