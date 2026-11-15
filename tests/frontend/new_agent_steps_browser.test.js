@@ -160,10 +160,10 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             for (const n of [1, 2, 3]) {
                 if (n === 1) await setFolder('/work/payments-app'); else await click('button', N.next);
                 await waitFor(`/Step ${n} of 3/.test(window.__na.dialog().textContent)`, `phone step ${n}`, 4000);
-                const b = await ev(`window.__na.buttons().filter(x => /^(Cancel|Back|Next|Launch)$/i.test(x.name))`);
+                const b = await ev(`window.__na.buttons().filter(x => /^(Cancel|Back|Next|Choose model|Launch)$/i.test(x.name))`);
                 assert.ok(b.length >= 2, `phone step ${n}: footer buttons`);
                 for (const x of b) assert.ok(x.h >= 44, `phone step ${n}: ${x.name} is ${x.h}px tall`);
-                const cancel = b.find(x => /^Cancel$/i.test(x.name)), prim = b.find(x => /^(Next|Launch)$/i.test(x.name)); const pl = await ev(`window.__na.box(window.__na.panel())`); assert.ok(cancel && prim && cancel.x < prim.x && Math.abs(cancel.y - prim.y) < 4 && cancel.x >= pl.x, `phone step ${n}: Cancel sits left of ${prim && prim.name} with it, on one row, inside the dialog (#16361): ${JSON.stringify({ cancel: [cancel.x, cancel.y], prim: prim && [prim.x, prim.y], dialogLeft: pl.x })}`);
+                const cancel = b.find(x => /^Cancel$/i.test(x.name)), prim = b.find(x => /^(Next|Choose model|Launch)$/i.test(x.name)); const pl = await ev(`window.__na.box(window.__na.panel())`); assert.ok(cancel && prim && cancel.x < prim.x && Math.abs(cancel.y - prim.y) < 4 && cancel.x >= pl.x, `phone step ${n}: Cancel sits left of ${prim && prim.name} with it, on one row, inside the dialog (#16361): ${JSON.stringify({ cancel: [cancel.x, cancel.y], prim: prim && [prim.x, prim.y], dialogLeft: pl.x })}`);
                 assert.ok(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), `phone step ${n}: no sideways scroll`);
                 if (n === 3) { assert.ok(await ev(`(() => { const d = window.__na.dialog(), n = d.querySelector('.launch-recap-note'), r = n && n.closest('.launch-recap'); if (!n || !r) return false; const a = n.getBoundingClientRect(), b = r.getBoundingClientRect(); return a.height > 0 && a.bottom <= b.bottom + 1 && r.scrollHeight <= r.clientHeight + 1; })()`), 'phone step 3: the mode note is whole inside the recap, not cut off by its line clamp'); await shotIf('new-agent-mode-note-390'); }
             }

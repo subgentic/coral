@@ -31,7 +31,7 @@ const { install: installNA, stubModels } = require('./helpers/new_agent');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         const LONG = '/private/tmp/claude-501/-Users-cknorowski-Software-coral-coral-go/8e42ea4f-3af8-38c9-938f-4a4bf9e53fae/scratchpad/d452/home/Coral/first-agent';
-        const recap = () => ev(`(() => { const r = document.getElementById('launch-recap'); return { text: r.textContent, h: Math.round(r.getBoundingClientRect().height) }; })()`);
+        const recap = () => ev(`(() => { const r = document.getElementById('launch-recap'); return { text: r.textContent, h: (r => { const f = r.querySelector('.launch-recap-flags'); const b = r.getBoundingClientRect(); return Math.round((f ? f.getBoundingClientRect().top : b.bottom) - b.top); })(r) }; })()`);
         const short = (r, at) => assert.ok(r.text.includes('\u2026') && r.h <= 90, at + 'the long folder is shortened and the recap is short: ' + JSON.stringify(r));
         // a phone from the start: the first draw
         await open(390, 844, true, 'dark', [], false, 0, LONG);
