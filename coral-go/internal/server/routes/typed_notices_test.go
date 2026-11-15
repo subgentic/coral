@@ -94,6 +94,7 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("dialog_timeout_opencode.go", `dialogTimeoutNotice, "dialog timeout notice"`, 1, "census: dialog timeout (fixed, no digit)"),
 		typedcensus.S("agent_exited.go", `text, what, wanted)`, 1, "deliverAutomatedWhile: forwards the text of its callers, listed here"),
 		typedcensus.S("agent_exited.go", `text, what, nil)`, 1, "deliverNoticeRetrying: forwards the text of its callers, listed here"),
+		typedcensus.S("agent_asks.go", `ask.SessionName, agentType, sessionID, text, "operator answer"`, 1, "exception: the Operator's own answer to a single agent's question (#18106), typed as their own send is: the Operator only (an agent's token is refused, identity_routes), through the gate"),
 		typedcensus.S("auto_recommend.go", `autoRecommendNotice, "recommended-pick notice"`, 1, "census: auto-recommend (fixed, no digit)"),
 	})
 }
