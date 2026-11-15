@@ -73,26 +73,30 @@ export function mountTeamLaunchSettings() {
     _defaultMode = 'none'; _defaultExtra = {};
     host.replaceChildren();
     _view = mountSettingsView(host, {
-        mode: 'form', // LT1 (#15892): one page on step 1: the first task, Workflow, and under More options the Health check and Messaging (defaults unchanged)
+        mode: 'settings', saveBar: false, group: 'start', label: 'Team settings sections', groupLabel: 'Team settings section', groupPickText: 'Jump to a section',
         load: async () => startValues(),
-        fields: [
-                { key: 'first_task', type: 'textarea', id: 'team-goal', label: 'What should the team work on?', help: 'Optional. It goes to the Orchestrator as the first task.', wide: true, rows: 2, placeholder: 'For example: build a small invoice calculator', attrs: { maxlength: '2000' } },
+        groups: [
+            { id: 'start', label: 'Start', icon: 'play_arrow', fields: [
+                { key: 'first_task', type: 'textarea', id: 'team-goal', label: 'What should the team work on?', help: 'Optional. It goes to the Orchestrator as the first task.', wide: true, rows: 4, placeholder: 'For example: build a small invoice calculator', attrs: { maxlength: '2000' } },
                 { key: 'save_goal', type: 'toggle', id: 'team-save-goal', label: "Also save this as the team's goal", help: 'The first task is then listed under that goal on the Goals tab.' },
-            { key: 'more_title', type: 'heading', id: 'team-more-options', label: 'More options', fold: true },
                 { key: 'custom_instructions', type: 'textarea', id: 'team-custom-instructions', label: 'Additional instructions', help: 'Optional.', wide: true, rows: 4, placeholder: 'Team-specific conventions' },
-            { key: 'workflow_title', type: 'notice', render: slot => { const h = document.createElement('h5'); h.className = 'sv-heading'; h.id = 'team-workflow-title'; h.textContent = 'Workflow'; slot.append(h); } }, // under More options: the page holds the name, the folder and the first task, and fits a 720 px dialog (#16298)
+            ] },
+            { id: 'workflow', label: 'Workflow', icon: 'account_tree', fields: [
                 { key: 'mode', type: 'select', label: 'Working mode', help: WORKFLOW_HINT, options: [{ value: 'none', label: 'None' }, { value: 'shared_checkout', label: 'Shared checkout' }, { value: 'worktrees', label: 'Worktrees' }, { value: 'task_queue', label: 'Task queue' }] },
                 { key: 'dependency_guidance', type: 'toggle', label: 'Help with tasks that wait on others' },
                 { key: 'asks_are_tasks', type: 'toggle', label: 'Turn requests for work into tasks', help: ASKS_ARE_TASKS_HINT },
                 approvalField({ custom: false, id: 'team-approval' }),
                 { key: 'require_goal', type: 'toggle', label: 'Require a goal', help: requireGoalSentence, disabledWhen: v => (v.planning_approval === 'auto' ? false : 'The approval choice above needs it: without a goal on every task, an agent could add tasks that skip the gate.') },
-            { key: 'health_title', type: 'notice', render: slot => { const h = document.createElement('h5'); h.className = 'sv-heading'; h.textContent = 'Health check'; slot.append(h); } }, // not a heading field: a heading closes the More options fold
-            ...healthRows().map(f => f.type !== 'heading' ? f : { key: f.key, type: 'notice', render: slot => { const h = document.createElement('h5'); h.className = 'sv-heading'; h.textContent = f.label; slot.append(h); if (f.help) { const p = document.createElement('p'); p.className = 'sv-help'; p.textContent = f.help; slot.append(p); } } }), // a heading would end the More options disclosure: the Health check's own sub-headings are labels inside it
-            { key: 'messaging_title', type: 'notice', render: slot => { const h = document.createElement('h5'); h.className = 'sv-heading'; h.textContent = 'Messaging'; slot.append(h); } },
+            ] },
+            { id: 'health', label: 'Health check', icon: 'health_and_safety', fields: healthRows() },
+            { id: 'messaging', label: 'Messaging', icon: 'forum', fields: [
                 ...XT_SWITCHES.map(sw => ({ ...sw, type: 'toggle' })),
                 { key: 'xt_here', type: 'notice', render: slot => { slot.innerHTML = `<p class="xt-reach xt-reach-here">${HERE_NOT_YET} Allow it in the team's settings once the team has started.</p>`; } },
+            ] },
         ],
     });
+    // the line above the open pane, inside the scrolling panes (the host lays its view out as a row: a sibling would take a column of it)
+    host.querySelector('.settings-panes')?.prepend(Object.assign(document.createElement('p'), { className: 'team-start-lead', textContent: 'Everything on this step is optional. The team starts with the settings shown here.' }));
     wireApproval(_view, host, { flagKeys: ['require_goal'], follow: false, autoClearsRequireGoal: true }); // a choice sets Require a goal as it needs; the two approval switches are Team settings'
     host.addEventListener('input', syncMenuStates); host.addEventListener('change', syncMenuStates);
     // the goal switch's state in words, so ticking it twice is seen (#11336: a newcomer clicks it to "tick" it and turns it off)

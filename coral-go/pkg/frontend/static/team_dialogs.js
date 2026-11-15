@@ -141,6 +141,7 @@ function _launchBlockReason() {
 /** What is wrong on this step, in words, and Next (or Launch team) cannot go on; '' when it can. Steps 1 and 2 say it only after Next was pressed, and Next is never off there. */
 function _teamGateReason() {
     const step = currentTeamStep();
+    if (step === 'start') return _launchBlockReason();
     if (step === 'team') {
         if (!_teamStepPressed) return '';
         const name = (document.getElementById('team-board-name')?.value || '').trim(), dir = (document.getElementById('launch-team-dir')?.value || '').trim();
@@ -149,7 +150,6 @@ function _teamGateReason() {
         if (!dir) return 'Choose a folder for the team';
     } else if (step === 'members') {
         if (_membersPressed && !hasOrchestrator()) return 'Add an Orchestrator to continue';
-        return _launchBlockReason(); // the last step is the one that launches: a member's CLI that is missing holds it
     }
     return '';
 }
@@ -172,7 +172,7 @@ function _syncTeamGate() {
     const put = hasButton => { const same = document.createElement('div'); same.append(line.cloneNode(true)); if (!hasButton && same.innerHTML === recap.innerHTML) return; recap.replaceChildren(line); };
     if (reason) {
         line.append(reason);
-        const blocked = step === 'members' ? (document.querySelector('#launch-step-team [data-blocks-launch]:not(#team-tmux-slot)')?.textContent || '').trim().match(/^(claude|codex|agy|antigravity|gemini|pi)\b/i) : null; // a member's CLI blocks Launch team: the fix is one tap away, on this line (#10013)
+        const blocked = step === 'start' ? (document.querySelector('#launch-step-team [data-blocks-launch]:not(#team-tmux-slot)')?.textContent || '').trim().match(/^(claude|codex|agy|antigravity|gemini|pi)\b/i) : null; // a member's CLI blocks Launch team: the fix is one tap away, on this line (#10013)
         const setPath = blocked && cliPathButton(blocked[1].toLowerCase(), () => document.querySelectorAll('#launch-step-team [data-blocks-launch]:not(#team-tmux-slot) button:not(.cli-set-path)').forEach(b => b.click()), () => !!document.querySelector('#launch-step-team [data-blocks-launch]:not(#team-tmux-slot)')); // when Settings closes: every blocked member's own Check again (a team has one warning per member), again while it is still blocked
         if (setPath) line.append(' ', setPath);
         put(!!setPath);
@@ -883,7 +883,7 @@ async function launchTeam() {
     const rows = document.querySelectorAll("#team-agents-list .team-agent-row");
     const members = () => showTeamStep('members'); // the problem is in Members: open it
     if (rows.length === 0 || !hasOrchestrator()) {
-        _membersPressed = true; members(); document.getElementById('team-add-orchestrator')?.focus(); _syncTeamGate(); // Launch team is the press: the button that fixes it takes the focus and the one red line says what is missing
+        _membersPressed = true; members(); document.getElementById('team-add-orchestrator')?.focus(); _syncTeamGate(); // the press that cannot launch: the button that fixes it takes the focus and the one red line says what is missing
         return;
     }
 
@@ -919,9 +919,7 @@ async function launchTeam() {
 
     const settings = readTeamLaunchSettings(); // step 3's tabs (#7407)
     if (settings.problem) { // the form has opened its tab and focused the field
-        showTeamStep('team');
-        const bad = document.querySelector('#team-start-host .sv-error:not(:empty)')?.closest('.sv-row, .sv')?.querySelector('input, select, textarea'); // the check ran while step 1 was away: its focus did not land, so put it on the field now that the page is back
-        bad?.closest('details')?.setAttribute('open', ''); bad?.focus();
+        showTeamStep('start');
         showToast(settings.problem.text, true);
         return;
     }

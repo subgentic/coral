@@ -1,6 +1,6 @@
-/* The Launch Agent Team dialog's three steps (#6397, #7407): 1 Team (name, folder, first task, workflow, More options), 2 Members (Everyone runs as, More options: skills). Pure DOM: `data-stage` on the step says which page shows (css), and the buttons and the line under the title follow it. */
-export const TEAM_STEPS = ['team', 'members'];
-const STEP_NAMES = { team: 'Your team', members: 'Members' };
+/* The Launch Agent Team dialog's three steps (#6397, #7407): 1 Name and where it launches, 2 Members, 3 Start and team settings. Pure DOM: `data-stage` on the step says which page shows (css), and the buttons and the line under the title follow it. */
+export const TEAM_STEPS = ['team', 'members', 'start'];
+const STEP_NAMES = { team: 'Your team', members: 'Members', start: 'Start and team settings' };
 
 export function currentTeamStep() {
     return document.getElementById('launch-step-team')?.dataset.stage || 'team';
@@ -50,6 +50,6 @@ export function showTeamStep(step, { focus = false } = {}) {
     document.dispatchEvent(new CustomEvent('team-step-shown', { detail: { step } }));
     if (focus) {
         const first = { team: '#team-board-name', members: '#team-template-select' }[step];
-        document.querySelector(first)?.focus();
+        (step === 'start' ? document.getElementById('team-goal') : document.querySelector(first))?.focus();
     }
 }
