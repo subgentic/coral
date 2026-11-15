@@ -76,11 +76,11 @@ function fmtTime(ts) {
 }
 
 (async function init() {
+    const pairing = readPairingHook(); // at load, before the first await: a script that sets the hook while the session is read is not honoured (#16728); only a frozen hook defined before this file ran counts
     const here = location.pathname + location.search;
     const s = await getSession();
     if (!s.authenticated) { location.replace('/signin?next=' + encodeURIComponent(safeNext(here, '/enroll'))); return; }
 
-    const pairing = readPairingHook(); // before anything else on the page can replace it
     const entry = $('entry'), review = $('review'), done = $('done');
     const status = $('status');
     const codeInput = $('code');
