@@ -185,6 +185,12 @@ func TestTeamConfigDocPresetTableMatchesTheLaunch(t *testing.T) {
 			t.Errorf("team-config.md has no row for the %q preset", p.Name)
 			continue
 		}
+		if row == [2]string{"no capability flags", "no capability flags"} {
+			if TranslateToCodexPermissions(p.Caps) != nil || TranslateToAgyPermissions(p.Caps) != nil {
+				t.Errorf("%s: the doc says no capability flags, but the preset translates to permission flags", p.Name)
+			}
+			continue
+		}
 		codex := buildLaunch(&CodexAgent{}, LaunchParams{Capabilities: p.Caps})
 		agy := buildLaunch(&AgyAgent{}, LaunchParams{Capabilities: p.Caps})
 		if !strings.Contains(codex, " "+row[0]) {
