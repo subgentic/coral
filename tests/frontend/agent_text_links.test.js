@@ -82,7 +82,7 @@ for (const file of walk(STATIC)) {
         else if (MARKED_PARSE[name] === 'links' && !/sanitizeHtml\([^;]*\{\s*links:\s*'(board|chat|file)'/.test(src)) problems.push(`${name}: marked.parse output must go through sanitizeHtml(..., { links: mode })`);
     }
     if (/DOMPurify\.sanitize\(/.test(src) && !(name in DOMPURIFY_SANITIZE)) problems.push(`${name}: calls DOMPurify.sanitize directly; use sanitizeHtml(html, config, { links: mode }) or add it to DOMPURIFY_SANITIZE with a reason`);
-    if (/new\s+marked\.Marked\(/.test(src) && name !== 'markdown.js') problems.push(`${name}: makes its own marked instance; render through markdown.js`);
+    if (/new\s+marked\.Marked\(/.test(src) && name !== 'markdown.js' && name !== 'docs_markdown.js') problems.push(`${name}: makes its own marked instance; render through markdown.js`); // docs_markdown.js is markdown.js's Docs renderer, moved out to load lazily (#18435): same sanitizer, same link policy
 }
 
 if (checkedCalls < 8) problems.push(`only ${checkedCalls} renderMarkdown/sanitizeMarkdown calls found: the scan is broken`);
