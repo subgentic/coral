@@ -38,8 +38,19 @@ var waitPhrases = []string{"operator decides", "needs the operator", "needs oper
 
 var operatorWordRe = regexp.MustCompile(`(?i)\boperator\b`)
 
-// WaitsOnOperator reports whether the post's words wait on the Operator: it @mentions them, or says a waiting phrase and names the Operator. It reads words only; whether the post is also an --ask is the caller's question.
+var (
+	codeBlockRe  = regexp.MustCompile("(?s)```.*?(```|$)")
+	codeInlineRe = regexp.MustCompile("`[^`\\n]*`")
+)
+
+// withoutCode is the post's own words: fenced blocks (an unclosed one runs to the end) and backtick spans are quoted text, such as the command `post --ask "@Operator <question>"` told to someone, and say nothing about the author waiting (#17942).
+func withoutCode(content string) string {
+	return codeInlineRe.ReplaceAllString(codeBlockRe.ReplaceAllString(content, " "), " ")
+}
+
+// WaitsOnOperator reports whether the post's words wait on the Operator: it @mentions them, or says a waiting phrase and names the Operator. It reads words only, not what sits in a code span or block; whether the post is also an --ask is the caller's question.
 func WaitsOnOperator(content string) bool {
+	content = withoutCode(content)
 	if mentionsOperator(content) {
 		return true
 	}
