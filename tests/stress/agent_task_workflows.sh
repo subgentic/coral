@@ -178,7 +178,7 @@ review_round() { workflow_detail "$1" | jget "len(d['workflow']['review_rounds']
 review_task() { workflow_detail "$1" | jget "d['workflow']['review_rounds'][-1]['reviewers'][$2]['review_task_id']"; }
 REV=$(planner task add "Reviewed change" --assignee Builder --body "Two reviewers check it." | task_id)
 builder task claim "$REV" >/dev/null
-builder task submit-review "$REV" --reason "ready for review" --message "candidate 1" >/dev/null
+builder task submit-review "$REV" --reason "ready for review" --message "candidate 1" --no-tests "stress fixture" >/dev/null
 check "submit-review hands the task to the orchestrator" '[[ $(workflow_status "$REV") == review_pending ]]'
 planner task review "$REV" --to "Tester,Reviewer" >/dev/null
 TESTER_REVIEW=$(review_task "$REV" 0)
@@ -189,7 +189,7 @@ check "a rejection sends the task back to its author" '[[ $(workflow_status "$RE
 check "the other reviewer's review task stays open" '[[ $(workflow_status "$TESTER_REVIEW") == pending ]]'
 check "no verdict while the author has it" 'reject_board tester task approve "$REV" --round 1 && grep -q "back with Builder" "$TMPDIR_AT/last-rejection.log"'
 builder task claim "$REV" >/dev/null
-builder task submit-review "$REV" --reason "fixed" --message "candidate 2" >/dev/null
+builder task submit-review "$REV" --reason "fixed" --message "candidate 2" --no-tests "stress fixture" >/dev/null
 check "a resubmission opens round 2 with no orchestrator step" '[[ $(workflow_status "$REV") == review_pending && $(review_round "$REV") == 2 ]]'
 check "both review tasks reopen, the rejecter's too" '[[ $(review_task "$REV" 0) == "$TESTER_REVIEW" && $(review_task "$REV" 1) == "$REVIEWER_REVIEW" && $(workflow_status "$REVIEWER_REVIEW") == pending ]]'
 check "the reviewers are told on the board" 'wait_board_message "[Task #$REV resubmitted for review, round 2]"'
@@ -200,20 +200,20 @@ check "both approvals complete the task" 'wait_task_status "$REV" completed'
 check "the completion names both approvers" 'wait_board_message "approved by Tester, Reviewer"'
 PLAIN=$(planner task add "Unreviewed change" --assignee Builder | task_id)
 builder task claim "$PLAIN" >/dev/null
-builder task submit-review "$PLAIN" --reason "small change" >/dev/null
+builder task submit-review "$PLAIN" --reason "small change" --no-tests "stress fixture" >/dev/null
 planner task complete "$PLAIN" --message "accepted without reviewers" >/dev/null
 check "the orchestrator completes a task in review with no reviewers" 'wait_task_status "$PLAIN" completed'
 
 log "Test 13c: A busy author resubmits a rejected task without claiming it (#3889)..."
 REV2=$(planner task add "Reviewed change, author busy" --assignee Builder | task_id)
 builder task claim "$REV2" >/dev/null
-builder task submit-review "$REV2" --reason "ready for review" --message "candidate 1" >/dev/null
+builder task submit-review "$REV2" --reason "ready for review" --message "candidate 1" --no-tests "stress fixture" >/dev/null
 planner task review "$REV2" --to "Reviewer" >/dev/null
 reviewer task reject "$REV2" --round 1 --note "needs a test" >/dev/null
 BUSY=$(planner task add "Something else meanwhile" --assignee Builder | task_id)
 builder task claim "$BUSY" >/dev/null
 check "the busy author can't claim the rejected task back" 'reject_board builder task claim "$REV2"'
-builder task submit-review "$REV2" --reason "fixed" --message "candidate 2" >/dev/null
+builder task submit-review "$REV2" --reason "fixed" --message "candidate 2" --no-tests "stress fixture" >/dev/null
 check "the author resubmits it unclaimed: round 2 opens" '[[ $(workflow_status "$REV2") == review_pending && $(review_round "$REV2") == 2 ]]'
 check "the author's other task is untouched" '[[ $(workflow_status "$BUSY") == in_progress ]]'
 reviewer task approve "$REV2" --round 2 --note "test added" >/dev/null
