@@ -1,6 +1,6 @@
 // A short dialog does not scroll (#9878, the operator: the New Terminal dialog showed a vertical scrollbar though its content fits). For each of the launch dialog's pages (chooser, agent, team, terminal) and Open folder, at 1280 x 900: no element inside the dialog is a scroll
 // container (overflow auto or scroll) whose content is taller than its box while the dialog is shorter than the window: a dialog scrolls only when the window cannot hold it. The cause in the terminal page: the footer's -24 px bottom margin (a bleed into the dialog's padding)
-// put its box 24 px below the page's scroll area. Isolated dev server.
+// put its box 24 px below the page's scroll area. New agent is not probed: it is one fixed-size dialog (the smaller of 640 px and the window, #7374, pinned by new_agent_dialog_size), so its body scrolls inside it by design (#17593). Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -21,7 +21,7 @@ const { coralReady } = require('./helpers/wait');
         for (const type of ['chooser', 'agent', 'team', 'terminal']) {
             await ev(`window.showLaunchModal(); ${type === 'chooser' ? '' : `window._selectLaunchType('${type}');`} true`); await settle();
             const r = await probe('launch-modal');
-            if (!r) found.push(`launch ${type}: the dialog is not showing`); else if (r.dialogH < r.windowH - 40 && r.bad.length) found.push(`launch ${type}: a ${r.dialogH} px dialog in a ${r.windowH} px window has a scrolling part: ${r.bad.join(' | ')}`);
+            if (!r) found.push(`launch ${type}: the dialog is not showing`); else if (r.dialogH < r.windowH - 40 && r.bad.length && type !== 'agent') found.push(`launch ${type}: a ${r.dialogH} px dialog in a ${r.windowH} px window has a scrolling part: ${r.bad.join(' | ')}`);
             await ev(`window.hideLaunchModal(); true`);
         }
         const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
