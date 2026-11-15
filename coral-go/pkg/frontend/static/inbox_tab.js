@@ -135,11 +135,11 @@ function announceNewlyWaiting(tab) {
     const shown = !!live && tab.classList.contains('active') && !document.getElementById('inbox-local')?.hidden;
     const fresh = rows.filter(s => !before.has(waitingKey(s)));
     if (!shown || !fresh.length) return;
-    importOnce('./asked_row.js').then(({ askedRow }) => { // the row's words come from the lazy module (#18010)
+    importOnce('./asked_row.js').then(m => {
         const span = document.createElement('span'); // a new node each time: the same words for the same agent waiting again are said again
-        span.textContent = fresh.map(askedRow).map(s => `${resolveSessionIdentity(s)} needs you: ${needsWords(s)}`).join('. ');
+        span.textContent = fresh.map(s => `${resolveSessionIdentity(s)} needs you: ${needsWords(m.askedRow(s))}`).join('. ');
         live.replaceChildren(span);
-    });
+    }).catch(Object);
 }
 
 /** What a Needs you row says an agent waits for, in one string: the state's words, then the agent's own ask when it has one (the same words as the row's two lines, so the announcement never differs from the row). */

@@ -11,6 +11,7 @@ import { showToast } from './utils.js';
 import { blockedReason, hubBlocked } from './hub_access.js';
 import { resolveSessionIdentity } from './session_state.js';
 import { waitIgnored } from './asked_before_restart.js';
+import { stalledOf } from './asked_row.js';
 import { build, keyRoute } from './routes.js';
 import { boardTeamKey, keyLabel } from './server_base.js';
 import { openAgent } from './agent_live.js';
@@ -334,13 +335,6 @@ const answerable = s => askable(s) && !blockedReason(sessionServer(s), 'interact
 /** A question the person could answer but for the Hub's access to that computer (View only): the reason, so a row with no buttons says why (#15010). */
 const viewOnlyWhy = s => (askable(s) ? blockedReason(sessionServer(s), 'interact') : '');
 
-/** An awake agent that holds a task in progress and has taken no turn for the server's bound (#16921): { id, title, since }. Stopped by the person, crashed, out of limit: it is not working, so it needs the person. Strings only: payloads are untrusted. */
-export function stalledOf(s) {
-    const t = s && !s.sleeping && !s.archived && s.stalled_task;
-    const id = t && typeof t === 'object' ? Number(t.task_id) : 0;
-    if (!Number.isSafeInteger(id) || id < 1) return null;
-    return { id, title: typeof t.title === 'string' ? t.title : '', since: typeof t.since === 'string' ? t.since : '' };
-}
 
 
 /** The actions of a phone Needs you row's ⋯ menu (#137104): the Dismiss of a wait that is no longer true, offered by the rule the desktop row's button follows. */

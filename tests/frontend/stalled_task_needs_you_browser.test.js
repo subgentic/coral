@@ -19,7 +19,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`fetch('/api/board/'+${JSON.stringify(team)}+'/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'QA Engineer',job_title:'QA Engineer'})}).then(r=>r.ok)`);
             await ev(`(() => { localStorage.removeItem('coral-inbox-needs-filters'); window.__m.add('stalled-agent', 'QA Engineer', 3, { sleeping: false });
                 const row = window.T.state.liveSessions.find(s => s.session_id === 'stalled-agent-id'); window.__stalled = row;
-                Object.assign(row, { board_project: ${JSON.stringify(team)}, stalled_task: { team: ${JSON.stringify(team)}, task_id: 3, words: 'Stopped with task #3 in progress', title: 'Check the calculator', since: new Date(Date.now() - 180000).toISOString(), agent: 'QA Engineer' } });
+                Object.assign(row, { board_project: ${JSON.stringify(team)}, stalled_task: { team: ${JSON.stringify(team)}, task_id: 3, title: 'Check the calculator', since: new Date(Date.now() - 180000).toISOString(), agent: 'QA Engineer' } });
                 window.T.render.renderLiveSessions(window.T.state.liveSessions); return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`!!document.querySelector('#group-table-view .inbox-stalled-restart')`, `${width}: the stalled row's Restart`, 8000);
@@ -45,6 +45,17 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             assert.equal(await count(), 0, `${width}: the row leaves when the agent takes a turn`);
         }
+        // #18046: the count (needsYou, start path) and the row (stalledOf, lazy) read a payload the same way, and the row's words are built from the validated id, never taken from the payload.
+        const agree = await ev(`Promise.all([import(${S} + 'asked_before_restart.js'), import(${S} + 'asked_row.js')]).then(([a, r]) => {
+            const ids = [3, '3', ' 7 ', 0, -1, 1.5, 1e300, 2 ** 53, NaN, Infinity, null, undefined, true, 'x', '', [], [9], {}];
+            const odd = ids.map(id => ({ task_id: id, title: 't', since: 'now' })).concat(['x', 5, true, null, [], undefined].map(v => v));
+            return odd.map(t => { const row = { session_id: 'a', name: 'a', sleeping: false, stalled_task: t }; return [String(t && t.task_id), a.needsYou(row), !!r.stalledOf(row)]; })
+                .filter(([, n, o]) => n !== o);
+        })`);
+        assert.deepEqual(agree, [], 'needsYou and stalledOf accept the same stalled_task payloads');
+        const words = await ev(`import(${S} + 'asked_row.js').then(r => [r.askedRow({ session_id: 'a', name: 'a', sleeping: false, stalled_task: { task_id: 3, title: 't', since: 's', words: 'EVIL words' } }).waiting_summary, r.askedRow({ session_id: 'a', name: 'a', sleeping: false, stalled_task: { task_id: 'x', words: 'EVIL' } }).waiting_summary || ''])`);
+        assert.equal(words[0], 'Stopped with task #3 in progress', 'the words are built from the id, not taken from the payload');
+        assert.doesNotMatch(words[1], /EVIL/, 'a payload with no usable id has no stalled words at all');
         console.log('PASS a stopped agent that holds a task is a Needs you item with Restart and Reassign, counted in the header, and clears with its next turn');
     } finally { await removeBoards(ev, teams).catch(() => {}); await client.close(); }
 })().catch(e => { console.error('FAIL', e); process.exit(1); });
