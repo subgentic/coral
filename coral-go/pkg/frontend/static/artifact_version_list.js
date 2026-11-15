@@ -33,7 +33,7 @@ export async function openVersionList(opts) {
     const versions = await versionsOf(opts);
     const dlg = document.createElement('dialog');
     dlg.className = 'modal-content dlg-form version-list-dialog'; dlg.setAttribute('aria-labelledby', 'version-list-title');
-    const title = document.createElement('h2'); title.id = 'version-list-title'; title.textContent = `Versions of ${shown(opts.name)}`;
+    const title = document.createElement('h2'); title.id = 'version-list-title'; title.tabIndex = -1; title.textContent = `Versions of ${shown(opts.name)}`;
     const list = document.createElement('ul'); list.className = 'version-list';
     const status = document.createElement('p'); status.className = 'inbox-ask-error'; status.setAttribute('role', 'status');
     const finish = () => { dlg.close(); dlg.remove(); };
@@ -50,7 +50,7 @@ export async function openVersionList(opts) {
         });
         sure.append(q, yes, no); li.append(sure); yes.focus();
     };
-    for (const v of versions) {
+    for (const [i, v] of versions.entries()) {
         const li = document.createElement('li'); li.className = 'version-list-entry'; li.dataset.version = String(v.n); if (v.current) li.setAttribute('aria-current', 'true');
         const name = document.createElement('span'); name.className = 'version-list-name'; name.textContent = `v${v.n}${v.current ? ' (newest)' : ''}`;
         const who = document.createElement('span'); who.className = 'version-list-who'; who.textContent = [when(v.at), v.you ? 'You' : shown(v.who) ? `${shown(v.who)}, an agent` : ''].filter(Boolean).join(' · '); // who made it: you (an edit in the dashboard) or an agent (#15329)
@@ -58,6 +58,18 @@ export async function openVersionList(opts) {
         const open = document.createElement('button'); open.type = 'button'; open.className = 'btn btn-small version-list-open'; open.textContent = 'Open'; open.setAttribute('aria-label', `Open v${v.n}`);
         open.addEventListener('click', () => { finish(); opts.open(v); });
         actions.append(open);
+        if (i > 0) {
+            const compare = document.createElement('button'); compare.type = 'button'; compare.className = 'btn btn-small version-list-compare';
+            compare.textContent = `Compare with v${versions[i - 1].n}`;
+            compare.addEventListener('click', async () => {
+                if (dlg.dataset.comparing) return;
+                dlg.dataset.comparing = '1'; compare.disabled = true;
+                try { await (await importOnce('./artifact_list_compare.js')).showComparison(dlg, opts, versions[i - 1], v); }
+                catch (e) { status.textContent = e.message || 'Could not compare these versions.'; }
+                finally { delete dlg.dataset.comparing; compare.disabled = false; }
+            });
+            actions.append(compare);
+        }
         if (!v.current && opts.restore) {
             const rb = document.createElement('button'); rb.type = 'button'; rb.className = 'btn btn-small version-list-restore'; rb.textContent = 'Restore'; rb.setAttribute('aria-label', `Restore v${v.n}`);
             rb.addEventListener('click', () => confirmRestore(v, li)); actions.append(rb);
@@ -69,7 +81,7 @@ export async function openVersionList(opts) {
     buttons.append(close);
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     dlg.append(title, list, status, buttons);
-    document.body.append(dlg); dlg.showModal(); (list.querySelector('.version-list-open') || close).focus();
+    document.body.append(dlg); dlg.showModal(); title.focus();
     return dlg;
 }
 
