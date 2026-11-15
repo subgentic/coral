@@ -245,7 +245,7 @@ func formatWaitTarget(waitType, targetID string) string {
 		if targetID != "" {
 			return fmt.Sprintf("message from '%s'", targetID)
 		}
-		return "any board message"
+		return "a message for you"
 	case "task":
 		if targetID != "" {
 			return fmt.Sprintf("task #%s", targetID)
