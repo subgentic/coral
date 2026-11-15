@@ -24,7 +24,7 @@ const MENU={ask_id:'trust-ask',unnumbered:true,question:'Quick safety check',tru
    if(process.env.CORAL_SCREENSHOT_DIR){fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/trust-group-${width}-${theme}.png`,Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
    // The second member moved to another menu, the third now names another folder.
    await ev(`window.__trustMenus.b={...window.__trustMenus.b,ask_id:'bash',unnumbered:false,trust_offer:false,options:[{n:1,label:'Yes'},{n:2,label:'No'}]};window.__trustMenus.c={...window.__trustMenus.c,trust_folder:'/Users/qa/work/other'};document.querySelector('.inbox-trust-group .inbox-trust-go').click();true`);
-   await waitFor(`document.querySelector('.inbox-trust-results')?.textContent.includes('not answered')`,'changed members reported');
+   await waitFor(`document.querySelector('.inbox-trust-results')?.textContent.includes('Not answered')`,'changed members reported');
    const posts=await ev(`window.__trustPosts`);assert.equal(posts.length,1,'only unchanged member answered');assert.equal(posts[0].session_id,'a');assert.equal(posts[0].trust_folder,FOLDER);assert.equal(posts[0].ask_id,'trust-ask');
   }
   console.log('PASS grouped trust with fresh per-agent checks at desktop/phone in both themes');
