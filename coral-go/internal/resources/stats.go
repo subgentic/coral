@@ -34,6 +34,8 @@ func (s Stats) Words() string {
 		return fmt.Sprintf("up; load %.2f per core on %d cores; %d MB memory free; %.0f GB disk free", s.LoadPerCore, s.CPUCount, s.MemAvailMB, s.DiskFreeGB)
 	case "unreachable":
 		return "unreachable (ssh failed or timed out)"
+	case "checking":
+		return "checking"
 	default:
 		return "stats not available for this machine"
 	}
@@ -86,8 +88,31 @@ func ParseRemoteStats(out string) Stats {
 type SSHRunner func(ctx context.Context, alias, script string) (string, error)
 
 func realSSH(ctx context.Context, alias, script string) (string, error) {
-	out, err := exec.CommandContext(ctx, "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=yes", "--", alias, script).Output()
-	return string(out), err
+	cmd := exec.CommandContext(ctx, "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=yes", "--", alias, script)
+	out := &cappedBuffer{max: maxSSHOutput}
+	cmd.Stdout = out
+	err := cmd.Run()
+	return out.b.String(), err
+}
+
+// maxSSHOutput is the most a machine's answer is read: the fixed script prints a few lines, so more is a broken or hostile box, and the rest is dropped.
+const maxSSHOutput = 64 << 10
+
+// cappedBuffer keeps the first max bytes written and drops the rest without an error, so the ssh process is never blocked on a full pipe.
+type cappedBuffer struct {
+	b   strings.Builder
+	max int
+}
+
+func (c *cappedBuffer) Write(p []byte) (int, error) {
+	if room := c.max - c.b.Len(); room > 0 {
+		if len(p) > room {
+			c.b.Write(p[:room])
+		} else {
+			c.b.Write(p)
+		}
+	}
+	return len(p), nil
 }
 
 // StatsBoard keeps one sample per machine for a minute, so a page or a claim never starts a probe of its own.
@@ -125,7 +150,8 @@ func statsAlias(machine string) string {
 	return s
 }
 
-// Get answers the machine's stats: a fresh sample at once, a stale one while it is read again in the background, and (the first time only) one read, waiting up to 8 s. where is the resource's: here, remote or "" (nil).
+// Get answers the machine's stats: a fresh sample at once, a stale one while it is read again in the background, and for a remote machine never seen before "checking" while one read runs in the
+// background (#17656: a list or a claim never waits on ssh, and concurrent first looks start one read, not one each). This machine is read directly. where is the resource's: here, remote or "" (nil).
 func (b *StatsBoard) Get(machine, where string) *Stats {
 	if where != "here" && where != "remote" {
 		return nil
@@ -148,6 +174,14 @@ func (b *StatsBoard) Get(machine, where string) *Stats {
 		}
 		b.mu.Unlock()
 		return &st
+	}
+	if where == "remote" {
+		if !b.flight[key] {
+			b.flight[key] = true
+			go b.refresh(machine, where, key)
+		}
+		b.mu.Unlock()
+		return &Stats{State: "checking"}
 	}
 	b.mu.Unlock()
 	b.refresh(machine, where, key)

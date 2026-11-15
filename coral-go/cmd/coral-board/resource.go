@@ -135,6 +135,8 @@ func (s resStats) words() string {
 		return fmt.Sprintf("up; load %.2f per core on %d cores; %d MB memory free; %.0f GB disk free", s.LoadPerCore, s.CPUCount, s.MemAvailMB, s.DiskFreeGB)
 	case "unreachable":
 		return "unreachable (ssh failed or timed out)"
+	case "checking":
+		return "checking"
 	}
 	return "stats not available for this machine"
 }
