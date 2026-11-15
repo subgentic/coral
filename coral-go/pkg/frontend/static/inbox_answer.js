@@ -73,7 +73,7 @@ const browserMenu = po => {
     if (!o.every((x, i) => String(x && x.label || '').trim().toLowerCase() === BROWSER_LABELS[i] && Number.isInteger(Number(x.n)))) return null;
     return { notNow: o[1] };
 };
-const BROWSER_NOTE = 'Not now: Claude goes on without browser tools; nothing is installed. To install the extension, or to stop being asked, open the agent.';
+const BROWSER_NOTE = 'Not now: Claude goes on without browser tools; nothing is installed. Dismiss only hides this notice; Claude keeps waiting. To install the extension, or to stop being asked, open the agent.';
 
 /** The card's one-time choices and the ask they belong to: { ask, picks, onlyReject } ({ ask: '', picks: [] } when the card cannot be answered by one choice). onlyReject: the request can only be rejected, and picks are then only the No form. */
 async function readAsk(s) {
