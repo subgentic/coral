@@ -5,7 +5,7 @@ import { renderMarkdownStrict } from './utils.js';
 import { markHidden } from './visible_marks.js';
 import { lockFrame, sandboxedDoc } from './sandbox_frame.js';
 const { diffLines } = await importOnce('./artifact_versions.js');
-const { renderArtifact } = await importOnce('./artifact_preview.js');
+import { renderArtifact } from './artifact_preview.js'; // the existing startup stub; no new startup namespace registration
 const LIMIT = 2 * 1024 * 1024;
 const node = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
 
