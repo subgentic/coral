@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -49,13 +50,22 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 	candidateRevision := fs.String("candidate-revision", "", "Exact source/build revision represented by candidate evidence")
 	areas := fs.String("areas", "", "The review's areas, comma-separated (submit-review): who may take it from the review pool")
 	reviewers := fs.Int("reviewers", 0, "How many reviewers the review wants, 1 or 2 (submit-review)")
+	noTests := fs.String("no-tests", "", "Why the note carries no test result, e.g. a docs-only change (submit-review)")
 	clihelp.ParseFlags(fs, args[1:], func() string { return commandUsage(os.Args[1], os.Args[2:]) })
 	*message = flagText(*message, "completion message")
 	if strings.TrimSpace(*reason) == "" {
 		fmt.Fprintln(os.Stderr, "--reason is required")
 		clierr.Exit1()
 	}
+	if action == "submit-review" && strings.TrimSpace(*noTests) == "" && !hasTestResult(*message+"\n"+*reason) {
+		fmt.Fprintln(os.Stderr, "paste the last line of the test run you did (npm test:cloud, go test, or the one browser suite) into the note; a docs-only change says why with --no-tests \"why\"")
+		clierr.Exit1()
+	}
 	body := map[string]any{"subscriber_id": resolveSubscriberID(), "reason": *reason, "message": *message, "outcome": *outcome}
+	if action != "submit-review" && *noTests != "" {
+		fmt.Fprintln(os.Stderr, "--no-tests belongs to submit-review")
+		os.Exit(2) // usage
+	}
 	if action != "submit-review" && (*areas != "" || *reviewers != 0) {
 		fmt.Fprintln(os.Stderr, "--areas and --reviewers belong to submit-review")
 		os.Exit(2) // usage
@@ -321,3 +331,9 @@ func lastSeenRound(project string, id int64) int {
 func lastSeenRevision(project string, id int64) int {
 	return loadSeenRounds()[fmt.Sprintf("%s/%d#revision", project, id)]
 }
+
+// testResultLine matches a line of a test run pasted into a note: pass/fail counts, PASS/FAIL, a go test "ok  pkg" line or an exit code (#18292).
+var testResultLine = regexp.MustCompile(`(?i)(\b\d+\s+(passed|failed|passing|failing|tests?)\b|\b(passed|failed)\b\s*[:=]?\s*\d+|\bPASS\b|\bFAIL\b|\bok\s+\S*/|\bexit(\s+code)?\s*[:=]?\s*\d+\b|\ball passed\b|\d+/\d+ suites? passed)`)
+
+// hasTestResult reports whether the text has a line that looks like a test result: a plain text check, no state.
+func hasTestResult(text string) bool { return testResultLine.MatchString(text) }
