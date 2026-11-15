@@ -244,13 +244,14 @@ function drawStatus(data) {
     if (!unknown) stopWaking(S.team);
     const tp = state.teamPause, paused = tp?.paused && tp.team === S.team; // the person's Pause (#15331): the header says so, with the way out in the line under it (team_pause.js)
     // every task done, none open, nobody working and nothing needs the person: not the same as "All well" while the team is still at it (walk 21 H2, #15304)
-    const finished = !shown && !unknown && S.counts.tasks === 0 && S.tasksDone > 0 && data.agents.every(a => a.availability !== 'busy' && a.availability !== 'needs_input' && a.availability !== 'waiting');
-    const text = paused ? 'Paused' : uncertainAttention ? 'Checking' : asleep ? 'Asleep' : wakingNow ? `Waking · ${data.agents.length - unknown} of ${data.agents.length} ready` : shown ? `${shown} ${shown === 1 ? 'needs' : 'need'} attention` : unknown ? (unknown === data.agents.length ? 'No first message yet' : `${data.agents.length - unknown} of ${data.agents.length} ready`) : finished ? 'Finished: your turn' : 'All well';
+    const total = data.agents.length;
+    const finished = !shown && !unknown && S.counts.tasks === 0 && S.tasksDone > 0 && data.agents.every(a => !['busy','needs_input','waiting'].includes(a.availability));
+    const text = paused ? 'Paused' : uncertainAttention ? 'Checking' : asleep ? 'Asleep' : wakingNow ? `Waking · ${total - unknown} of ${total} ready` : shown ? `${shown} ${shown === 1 ? 'needs' : 'need'} attention` : unknown ? (unknown === total ? 'No first message yet' : `${total - unknown} of ${total} ready`) : finished ? 'Finished: your turn' : 'All well';
     // When agents need attention the visible status is a button to the Agents tab (beside the live region, which keeps saying it and is then only for a screen reader: the button's name is not announced twice); "All well" is plain text.
     const b = $('team-page-health');
     if (b) {
         b.hidden = !shown || uncertainAttention;
-        if (shown && !uncertainAttention) { b.replaceChildren(Object.assign(el('span', 'team-status-dot'), {}), document.createTextNode(text)); b.firstChild.setAttribute('aria-hidden', 'true'); b.setAttribute('aria-label', `Team health: ${text}`); }
+        if (shown && !uncertainAttention) { b.replaceChildren(el('span', 'team-status-dot'), document.createTextNode(text)); b.firstChild.setAttribute('aria-hidden', 'true'); b.setAttribute('aria-label', `Team health: ${text}`); }
     }
     if (s.textContent === text) return; // the same words are not said again
     s.className = `team-page-status ${paused || uncertainAttention || asleep ? 'unknown' : shown ? 'needs sr-only' : unknown ? 'unknown' : 'well'}`; // Asleep takes the neutral dot, as waiting does

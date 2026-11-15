@@ -40,7 +40,6 @@
 1	board_chat.js	parts.actions
 1	board_chat.js	parts.attrs
 1	board_chat.js	parts.classes
-1	board_chat.js	parts.quickReply
 1	board_chat.js	parts.tagsOpen
 1	board_chat.js	parts.toggle
 1	board_chat.js	renderBoardMessageBody(m, _activeBoardChat || '')
@@ -82,7 +81,6 @@
 1	board_window.js	parts.actions
 1	board_window.js	parts.attrs
 1	board_window.js	parts.classes
-1	board_window.js	parts.quickReply
 1	board_window.js	parts.tagsOpen
 1	board_window.js	parts.toggle
 1	board_window.js	renderBoardMessageBody(m, bs.currentProject || '')
