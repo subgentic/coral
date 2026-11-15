@@ -1,0 +1,49 @@
+/* "While you were away" (#17537): one quiet line at the top of Needs you when the person comes back after five minutes or more without touching the page: how many tasks and goals were finished
+ * meanwhile and how many agents are idle. Counts only. The start code keeps two numbers for it (fetch_share.js: window.__coralAway, the person's last input before the gap, in ms); this lazy module asks the server once for what happened since then (GET /api/away, this computer's, the person's alone), says it, and keeps it until Dismiss or the next gap.
+ * Switched off in Settings > Inbox (inbox_away). It is no item of Needs you and changes no count. Built with textContent only. */
+import { state } from './state.js';
+import { el } from './dom_el.js';
+import { loadStyles } from './lazy_styles.js';
+import { settingBool } from './settings_core.js';
+
+let result = null, asking = 0, dismissed = 0, listening = 0, newest = null; // result: { from, text }; newest: the last slot to ask for the line
+
+const idleAgents = () => (state.liveSessions || []).filter(s => s && s.session_id && s.agent_type !== 'terminal' && !s.sleeping && !s.archived && !s.not_started && !s.working && !s.waiting_for_input).length;
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const span = ms => { const m = Math.max(1, Math.round(ms / 60000)); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`; };
+
+/** The words of the line for the counts, "" when nothing happened. */
+export function awayText(away, idle, ms) {
+    const parts = [];
+    if (away.tasks_done > 0) parts.push(`${plural(away.tasks_done, 'task', 'tasks')} done`);
+    if (away.goals_done > 0) parts.push(`${plural(away.goals_done, 'goal', 'goals')} done`);
+    if (idle > 0) parts.push(`${plural(idle, 'agent', 'agents')} idle`);
+    return parts.length ? `While you were away (${span(ms)}): ${parts.join(', ')}.` : '';
+}
+
+function draw(slot) {
+    if (!result || !result.text) { slot.replaceChildren(); return; }
+    const box = el('div', 'inbox-away'); box.setAttribute('role', 'status');
+    const close = el('button', 'btn btn-small inbox-away-dismiss', 'Dismiss'); close.type = 'button'; close.setAttribute('aria-label', 'Dismiss the while you were away line');
+    close.addEventListener('click', () => { dismissed = result.from; for (const n of document.querySelectorAll('.inbox-away')) n.remove(); });
+    box.append(el('span', 'inbox-away-text', result.text), close);
+    slot.replaceChildren(box);
+}
+
+/** Fills `slot` (the Needs you list's banner) with the line, or leaves it empty. Safe to call at every redraw: the answer is asked for once per gap. */
+export function mountAway(slot) {
+    if (!slot) return;
+    newest = slot;
+    if (!listening) { listening = 1; for (const t of ['pointerdown', 'keydown', 'touchstart']) document.addEventListener(t, () => { if (newest && newest.isConnected) mountAway(newest); }); } // the person's return is an input: the gap is known only then
+    const from = Number(window.__coralAway);
+    if (!(from > 0) || from === dismissed || !settingBool(state.settings?.inbox_away, true)) { slot.replaceChildren(); return; }
+    if (result && result.from === from) { if (!slot.firstChild) draw(slot); return; }
+    if (asking === from) return;
+    asking = from;
+    loadStyles('inbox_away.css').catch(() => {});
+    fetch(`/api/away?since=${encodeURIComponent(new Date(from).toISOString())}`).then(r => (r.ok ? r.json() : null)).then(a => {
+        if (!a || typeof a.tasks_done !== 'number') { asking = 0; return; }
+        result = { from, text: awayText(a, idleAgents(), Date.now() - from) };
+        if (newest && newest.isConnected) draw(newest);
+    }).catch(() => { asking = 0; });
+}

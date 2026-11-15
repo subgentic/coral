@@ -1,0 +1,3 @@
+/* The Needs you line "While you were away" (inbox_away.js, #17537). Lazy: loaded with the line. */
+.inbox-away { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); margin: 0 0 var(--space-md); padding: var(--space-xs) var(--space-sm); color: var(--text-secondary); font-size: var(--fs-md); border-radius: var(--radius-md, 6px); background: var(--bg-secondary, transparent); }
+.inbox-away-text { min-width: 0; overflow-wrap: anywhere; }

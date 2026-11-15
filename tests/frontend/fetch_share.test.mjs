@@ -119,6 +119,12 @@ for (const type of ['pointerdown', 'keydown', 'touchstart']) {
 hits = 0; clock += 2500;
 await Promise.all([window.fetch('/api/workflows'), window.fetch('/api/workflows')]);
 assert.equal(hits, 1, 'two seconds after the input the page\'s own reads are shared again');
+// #17537: the last input before a gap of five minutes is left for the Needs you line "While you were away"; a shorter gap leaves it alone
+clock += 60000; document.dispatchEvent(new Event('click')); const before = clock;
+clock += 6 * 60000; document.dispatchEvent(new Event('keydown'));
+assert.equal(window.__coralAway, before, 'after a gap of six minutes, the input before the gap is kept');
+clock += 60000; document.dispatchEvent(new Event('click'));
+assert.equal(window.__coralAway, before, 'a gap of one minute is not being away: it stays what it was');
 delete globalThis.document;
 
 // a hub-proxied route and the plain one are never shared
