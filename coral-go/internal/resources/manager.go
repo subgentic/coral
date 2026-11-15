@@ -44,7 +44,8 @@ type Options struct {
 	OnGrant     func(resourcequeue.Entry) // told when a waiting agent gets its slot
 	AgeStep     time.Duration             // see resourcequeue.Config
 	MaxPerAgent int
-	HistoryPath string // the file that keeps the record of the queue's use (#13671; "": none). A file that cannot be opened loses the record only.
+	Veto        func(member resourcequeue.Resource) bool // see resourcequeue.Config.Veto (#17586)
+	HistoryPath string                                   // the file that keeps the record of the queue's use (#13671; "": none). A file that cannot be opened loses the record only.
 }
 
 // Manager is the queue plus the board's ranking.
@@ -56,7 +57,7 @@ type Manager struct {
 
 // Open makes the Manager, loading the state file when there is one. A file that cannot be read is an error, never an empty queue: an agent holding the Mac would be forgotten.
 func Open(o Options) (*Manager, error) {
-	cfg := resourcequeue.Config{Now: o.Now, Alive: o.Alive, OnGrant: o.OnGrant, AgeStep: o.AgeStep, MaxPerAgent: o.MaxPerAgent, WaitStale: resourcequeue.WaitStale}
+	cfg := resourcequeue.Config{Now: o.Now, Alive: o.Alive, OnGrant: o.OnGrant, AgeStep: o.AgeStep, MaxPerAgent: o.MaxPerAgent, WaitStale: resourcequeue.WaitStale, Veto: o.Veto}
 	var hist *History
 	if o.HistoryPath != "" {
 		if h, err := OpenHistory(o.HistoryPath); err != nil {
@@ -115,6 +116,9 @@ func (m *Manager) claim(ctx context.Context, resource string, who resourcequeue.
 		if task, project, prio, err := m.pri.Of(ctx, agent); err == nil {
 			who.Task, who.Project, who.Priority = task, project, prio
 		}
+	}
+	if st, err := m.q.Status(resource); err == nil && len(st.Resource.Needs) > 0 { // a pool's needs travel with the claim (#17586)
+		who.Needs = st.Resource.Needs
 	}
 	return m.q.Claim(resource, who)
 }

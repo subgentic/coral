@@ -30,7 +30,7 @@ func poolClaim(t *testing.T, q *Queue, key, agent string, prio int) Result {
 	return r
 }
 
-func TestAPoolGrantsTheFirstFreeSlotOfAnyMemberInMemberOrderAndWaitsInOneLine(t *testing.T) {
+func TestAPoolGrantsTheLeastUsedMemberAndWaitsInOneLine(t *testing.T) {
 	q, _ := poolFixture(t, Config{})
 	a := poolClaim(t, q, "heavy", "a", 0)
 	b := poolClaim(t, q, "heavy", "b", 0)
@@ -38,20 +38,20 @@ func TestAPoolGrantsTheFirstFreeSlotOfAnyMemberInMemberOrderAndWaitsInOneLine(t 
 	d := poolClaim(t, q, "heavy", "d", 0)
 	assert.True(t, a.Granted)
 	assert.Equal(t, "mac-heavy", a.Entry.Member)
-	assert.Equal(t, "mac-heavy", b.Entry.Member, "the Mac has two slots")
-	assert.Equal(t, "mini", cc.Entry.Member, "then the next member")
+	assert.Equal(t, "mini", b.Entry.Member, "the Mac is busier for its size now: the next goes to the mini (#17586; it was the Mac's second slot when a pool took members in listed order)")
+	assert.Equal(t, "mac-heavy", cc.Entry.Member, "then the Mac's second slot")
 	assert.False(t, d.Granted)
 	assert.Equal(t, 1, d.Place, "nothing free: one line for the pool")
 	e := poolClaim(t, q, "heavy", "e", 0)
 	assert.Equal(t, 2, e.Place)
-	require.NoError(t, q.Release("heavy", "c")) // the mini's slot frees: the next in the pool's line gets THAT member
+	require.NoError(t, q.Release("heavy", "b")) // the mini's slot frees: the next in the pool's line gets THAT member
 	st, err := q.Status("heavy")
 	require.NoError(t, err)
 	var got []string
 	for _, h := range st.Holders {
 		got = append(got, h.Agent+"@"+h.Member)
 	}
-	assert.ElementsMatch(t, []string{"a@mac-heavy", "b@mac-heavy", "d@mini"}, got)
+	assert.ElementsMatch(t, []string{"a@mac-heavy", "c@mac-heavy", "d@mini"}, got)
 	require.Len(t, st.Queue, 1)
 	assert.Equal(t, "e", st.Queue[0].Agent)
 }
@@ -178,9 +178,8 @@ func TestAFreedSlotGoesToTheBestWaiterAcrossTheLinesThatShareIt(t *testing.T) {
 func TestAPoolHoldOnTheMiniRenewsForTheMinisShorterLease(t *testing.T) {
 	q, c := poolFixture(t, Config{})
 	poolClaim(t, q, "heavy", "a", 0)
-	poolClaim(t, q, "heavy", "b", 0)
 	cc := poolClaim(t, q, "heavy", "c", 0)
-	require.Equal(t, "mini", cc.Entry.Member)
+	require.Equal(t, "mini", cc.Entry.Member, "the second claim goes to the member with less use (#17586)")
 	c.add(7 * time.Minute)
 	e, err := q.Renew("heavy", "c")
 	require.NoError(t, err)

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -29,7 +30,7 @@ The queue is cooperation, not isolation: it tells the team who is using a machin
                                                   A slot now (exit 0), or a place in line: with --wait the command waits until the slot is yours
   resource release <name>                         Give the slot back, or leave the line
   resource renew <name>                           A full lease from now
-  resource define <name> (--slots N | --pool a,b) [--machine M] [--here | --remote] [--lease 30m] [--allow a,b] [--match "go test ./..."]... --description "what it runs, how to reach it, its rules"
+  resource define <name> (--slots N | --pool a,b) [--machine M] [--here | --remote] [--lease 30m] [--allow a,b] [--match "go test ./..."]... [--facts os=linux]... [--weight N] [--needs go>=1.26]... --description "what it runs, how to reach it, its rules"
                                                   The Operator or an Orchestrator: make or change a resource
   resource remove <name>                          The Operator or an Orchestrator
   resource move <entry-id> first|up|down          The Operator or an Orchestrator: reorder the line
@@ -111,10 +112,13 @@ type resView struct {
 	MaxLease int      `json:"max_lease_seconds"`
 	Members  []string `json:"members"`
 	// Description and Stats are the resource's how-to and its machine now (#17560).
-	Description string     `json:"description"`
-	Stats       *resStats  `json:"stats"`
-	Holders     []resEntry `json:"holders"`
-	Queue       []resEntry `json:"queue"`
+	Description string            `json:"description"`
+	Facts       map[string]string `json:"facts"`
+	Weight      int               `json:"weight"`
+	Needs       []string          `json:"needs"`
+	Stats       *resStats         `json:"stats"`
+	Holders     []resEntry        `json:"holders"`
+	Queue       []resEntry        `json:"queue"`
 }
 
 type resStats struct {
@@ -176,6 +180,25 @@ func resourceInfo(rest []string) {
 		where = " on " + v.Machine
 	}
 	fmt.Printf("%s%s: %d slot(s)\n", plainText(v.Name), plainText(where), v.Slots)
+	if len(v.Facts) > 0 || v.Weight > 0 || len(v.Needs) > 0 {
+		keys := make([]string, 0, len(v.Facts))
+		for k := range v.Facts {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		var parts []string
+		for _, k := range keys {
+			parts = append(parts, k+"="+v.Facts[k])
+		}
+		line := "  facts: " + strings.Join(parts, " ")
+		if v.Weight > 0 {
+			line += fmt.Sprintf("  weight: %d", v.Weight)
+		}
+		if len(v.Needs) > 0 {
+			line += "  needs: " + strings.Join(v.Needs, " ")
+		}
+		fmt.Println(plainText(line))
+	}
 	howTo(v, 6)
 }
 
@@ -392,9 +415,13 @@ func resourceDefine(rest []string) {
 	here := fs.Bool("here", false, "a run through it happens on the machine this Coral is on (coral-board heavy run)")
 	remote := fs.Bool("remote", false, "a run through it happens on another machine, through the ssh alias coral-heavy-<machine> (coral-board heavy run)")
 	lease := fs.Duration("lease", 0, "how long a claim lasts unless renewed (default 30m)")
-	pool := fs.String("pool", "", "a pool: comma-separated resources whose slots it hands out, first free one in order (no --slots)")
+	pool := fs.String("pool", "", "a pool: comma-separated resources whose slots it hands out, the least used box that meets --needs first (no --slots)")
 	allow := fs.String("allow", "", "comma-separated agents that may claim it (default: everyone)")
 	desc := fs.String("description", "", "what it runs, how to reach it (such as ssh epoch) and its rules: a few lines of plain text; required for a new resource")
+	weight := fs.Int("weight", 0, "its share when a pool spreads work: the cores lent to tests (default 1)")
+	var facts, needs listFlag
+	fs.Var(&facts, "facts", `what the box can run, name=value (repeat for more): os=linux, go=1.26, cores=16`)
+	fs.Var(&needs, "needs", `on a pool: what a command it claims needs of the box that runs it (repeat): os=linux, go>=1.26, os!=windows`)
 	var match listFlag
 	fs.Var(&match, "match", `a shell command that claims it by itself, such as "go test ./..." (repeat for more; the hook, off without one)`)
 	clihelp.ParseFlags(fs, rest[1:], func() string { return resourceUsageText })
@@ -430,6 +457,25 @@ func resourceDefine(rest []string) {
 	}
 	if *desc != "" {
 		body["description"] = *desc
+	}
+	if *weight != 0 {
+		body["weight"] = *weight
+	}
+	if len(facts) > 0 {
+		fm := map[string]string{}
+		for _, f := range facts {
+			k, v, ok := strings.Cut(f, "=")
+			if !ok || k == "" || v == "" {
+				fmt.Fprintf(os.Stderr, "--facts wants name=value, not %q\n", f)
+				exitFn(1)
+				return
+			}
+			fm[k] = v
+		}
+		body["facts"] = fm
+	}
+	if len(needs) > 0 {
+		body["needs"] = []string(needs)
 	}
 	data, status, err := resourceCall("PUT", "/"+name, body)
 	if err != nil || status != http.StatusOK {
