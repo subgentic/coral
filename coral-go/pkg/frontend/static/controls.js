@@ -126,7 +126,7 @@ export async function sendCommand({ nudge = false } = {}) {
 
         const command = parts.join(" ");
         if (!command) { if (nudge) nudgeEmptyInput(); return; }
-        if (targetAgentType !== 'terminal') dashboardPromptRequested();
+        if (targetAgentType !== 'terminal') { state.autoScroll = true; dashboardPromptRequested(); }
         const sentSessionId = targetSessionId;
         const sentAt = Date.now();
         const hasAttachments = sessionAttachments.length > 0;

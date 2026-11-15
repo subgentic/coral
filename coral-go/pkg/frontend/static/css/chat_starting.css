@@ -1,0 +1,3 @@
+/* Launch instructions are a quiet disclosure, separate from the person's messages. */
+.chat-starting summary { cursor: pointer; min-height: 44px; line-height: 44px; color: var(--text-secondary); }
+.chat-starting .message-text { white-space: normal; overflow-wrap: anywhere; }
