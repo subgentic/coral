@@ -20,16 +20,14 @@ Each answer names the button as it reads on screen. The topics after this one go
 ## Change the default model
 
 1. Click the gear at the top right to open **Settings**, then **Agents**.
-2. Under **Default models**, pick a model for each agent type, or **Other…** to type any model id.
-3. Press **Save settings**.
+2. Under **Default models**, pick a model for each agent type, or **Other…** to type any model id. The change applies at once.
 
 New agents use it unless you choose a model when you launch them.
 
 ## Switch to the light theme
 
 1. Click the gear at the top right to open **Settings**. **General** is the first group.
-2. Next to **Theme**, pick **Light**. **System** follows your computer instead, and **Customize theme** beside it makes your own.
-3. Press **Save settings**.
+2. Next to **Theme**, pick **Light**. The change applies at once. **System** follows your computer instead, and **Customize theme** beside it makes your own.
 
 ## Copy a chat, or keep part of it
 
