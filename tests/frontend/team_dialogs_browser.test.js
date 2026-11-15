@@ -132,7 +132,7 @@ const { coralReady } = require('./helpers/wait');
         const sent = await ev(`window.__teamLaunches[0]`);
         assert.equal(sent.board_name, 'crew-1'); assert.equal(sent.working_dir, '/work/project'); assert.ok(Array.isArray(sent.flags)); assert.ok(sent.agents.length >= 8 && sent.agents.every(a => a.name));
         await waitFor(`getComputedStyle(document.getElementById('launch-modal')).display === 'none'`, 'the dialog closed');
-        await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Launched team: 1 agents on "crew-1"/.test(t.textContent))`, 'the launched toast');
+        await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Launched team: 1 agent on "crew-1"/.test(t.textContent))`, 'the launched toast');
         // #5989: the team opens (its board with the Team view), and the first task is the Operator's first message to the lead.
         await waitFor(`window.__posts.length === 1`, 'the first task is posted to the board');
         const post = await ev(`window.__posts[0]`), leadName = sent.agents.find(a => a.name === 'Orchestrator')?.name || sent.agents[0].name;
