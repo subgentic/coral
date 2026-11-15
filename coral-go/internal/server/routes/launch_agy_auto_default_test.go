@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -17,6 +18,9 @@ import (
 // #14741 end to end through the team launch: an agy, Antigravity or Gemini member that names no mode starts in Auto, and its line carries agy's own --mode auto when that CLI's --help lists it and no mode flag
 // when it does not; in neither case a skip flag. The row records Auto.
 func TestAnAgyTeamMemberThatNamesNoModeStartsInAutoWhenItsCLIListsIt(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the mock agy CLI is a #!/bin/sh script: Windows cannot start it (a .cmd wrapper is refused by design), so the launch line it lists --mode auto from cannot be read there (#18070)")
+	}
 	const help = "#!/bin/sh\nif [ \"$1\" = \"--help\" ]; then\ncat <<'EOF'\nUsage of agy:\n  --dangerously-skip-permissions  Auto-approve all tool permission requests without prompting\n  --mode                          Set the agent execution mode for this session (accept-edits, auto, plan)\nEOF\nexit 0\nfi\nexit 0\n"
 	for _, cli := range []string{at.Agy, at.Antigravity, at.Gemini} {
 		t.Run(cli, func(t *testing.T) {

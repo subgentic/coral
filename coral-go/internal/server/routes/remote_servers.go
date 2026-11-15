@@ -209,7 +209,7 @@ func probeFailure(err error) string {
 		return "remote TLS certificate was not accepted: check the certificate and the host name in the URL"
 	case errors.As(err, &notTLS), strings.Contains(err.Error(), "server gave HTTP response to HTTPS client"):
 		return "remote does not speak TLS at that address (it looks like plain http): use an http:// URL"
-	case probeRefused(err):
+	case probeRefused(err), strings.Contains(err.Error(), "actively refused it"): // Windows also says it in words (#18070); the errno check is rc4's per-OS probeRefused
 		return "remote refused the connection: nothing is listening at that address and port (is Coral running there, and is a port forward or tunnel to it up?)"
 	case probeNetUnreachable(err):
 		return "remote network or host is unreachable from this hub: check the route, VPN or tailnet"

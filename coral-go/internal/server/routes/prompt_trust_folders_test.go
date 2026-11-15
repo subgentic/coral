@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,9 +23,11 @@ func TestTheTrustRowForFoldersUnderAFakeHome(t *testing.T) {
 	const sid = "00000000-0000-0000-0000-00000000c662"
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home) // Windows reads its home from here (#18070)
 	if resolved, err := filepath.EvalSymlinks(home); err == nil {
 		home = resolved
 		t.Setenv("HOME", home)
+		t.Setenv("USERPROFILE", home) // Windows reads its home from here (#18070)
 	}
 	mk := func(parts ...string) string {
 		p := filepath.Join(append([]string{home}, parts...)...)
@@ -54,6 +57,9 @@ func TestTheTrustRowForFoldersUnderAFakeHome(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			if runtime.GOOS == "windows" && c.folder == outside {
+				t.Skip("Windows has no mode bits: no folder is writable by everyone in the way the row checks (#18070)")
+			}
 			server, _, terminal, ss := setupSessionsTestServer(t)
 			require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "claude-trust", WorkingDir: c.folder}))
 			terminal.addSession("claude-trust", "/tmp/test")
