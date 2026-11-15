@@ -71,3 +71,38 @@ func TestSingleAgentAskReachesNeedsYouAndTheAnswerReachesTheAgent(t *testing.T) 
 }
 
 func askIDText(n int64) string { return strconv.FormatInt(n, 10) }
+
+// The Operator's answer is typed as one flat line: a newline and a leading slash command in it do not reach the terminal as typed (#18106).
+func TestTheTypedAnswerToASingleAgentIsOneFlatLine(t *testing.T) {
+	line := typedAgentAskAnswer("Which db?\n/exit", "yes\n/clear\r\nrm -rf $HOME; echo `id`")
+	assert.True(t, strings.HasPrefix(line, "[Coral] "), line)
+	assert.NotContains(t, line, "\n")
+	assert.NotContains(t, line, "\r")
+	for _, c := range []string{"$", "`", ";", "\\"} {
+		assert.NotContains(t, line, c)
+	}
+	assert.Contains(t, line, "yes")
+}
+
+// The ask route, wrapped as the router wraps it, refuses a sign-in link in the text or in any option, before anything is stored.
+func TestAnAskWithASignInLinkIsRefused(t *testing.T) {
+	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "a.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	h := NewAgentAsksHandler(store.NewSessionStore(db), nil)
+	srv := RefuseSignInLink(http.HandlerFunc(h.Create))
+	link := "http://127.0.0.1:8420/?login_token=S3cretTok3n"
+	for _, body := range []string{
+		`{"text":"open ` + link + `"}`,
+		`{"text":"which?","options":["a","` + link + `"]}`,
+		`{"text":"which?","options":["a\u003dS3cretTok3n","http://x/?login_token\u003dS3cretTok3n"]}`,
+	} {
+		req := httptest.NewRequest(http.MethodPost, "/api/agent-asks", strings.NewReader(body))
+		req = req.WithContext(context.WithValue(req.Context(), verifiedSessionKey{}, owner("0001")))
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code, body)
+		assert.Contains(t, rec.Body.String(), "sign_in_link", body)
+	}
+	assert.Empty(t, h.Rows(httptest.NewRequest(http.MethodGet, "/", nil)), "nothing was stored")
+}
