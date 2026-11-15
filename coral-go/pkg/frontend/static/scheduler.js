@@ -177,6 +177,8 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
         ? `<div class="notice notice-error sched-fail-banner" role="status"><div class="sched-fail-text">
              <strong>The last run did not start: ${escapeHtml(noSignIn.text)}.</strong>
              ${escapeHtml(noSignIn.hint)} This job keeps its schedule and ${escapeHtml(noSignIn.again)}.
+             ${noSignIn.signIn ? `<div class="sched-fail-actions"><button class="btn btn-small btn-primary" data-on-click="job-signin" data-cli="${escapeAttr(noSignIn.signIn)}" aria-label="Sign in to ${escapeAttr(noSignIn.name)}">Sign in</button>
+             <button class="btn btn-small run-signin-retry" data-on-click="job-run-now" data-job-id="${Number(job.id)}" hidden>Retry</button> <span class="run-signin-status settings-hint" role="status"></span></div>` : ''}
            </div></div>`
         : fails >= 1
         ? `<div class="notice notice-error sched-fail-banner" role="status"><div class="sched-fail-text">
@@ -398,6 +400,7 @@ registerActions({
     'job-edit': el => withId(el.dataset.jobId, id => importOnce('./job_form.js', 'the job form').then(m => m.editScheduledJob(id)).catch(() => {})),
     'job-open': el => withId(el.dataset.jobId, selectScheduledJob), // a run's page links back to the job that started it
     'job-toggle': el => withId(el.dataset.jobId, toggleScheduledJob),
+    'job-signin': el => importOnce('./run_signin.js', 'sign-in').then(m => m.signInFromRun(el)).catch(() => {}),
     'job-run-now': el => withId(el.dataset.jobId, id => runScheduledJobNow(id, el)),
     'job-delete': el => withId(el.dataset.jobId, deleteScheduledJob),
     'job-more': el => toggleJobMore(el),

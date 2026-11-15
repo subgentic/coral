@@ -6,7 +6,7 @@ import { escapeHtml } from './utils.js';
 // agent_type -> the CLI's name and the command that signs it in; agy, antigravity and the old gemini are one CLI (agy)
 const CLI = { claude: ['Claude', 'claude'], codex: ['Codex', 'codex'], agy: ['Antigravity', 'agy'], antigravity: ['Antigravity', 'agy'], gemini: ['Antigravity', 'agy'] };
 
-/** { text, short, again, hint } for a run record that failed for want of a sign-in, or because the CLI did not answer the sign-in check (a slow CLI is not "signed out"), else null (a stranger code is not one). */
+/** { text, short, again, hint, name, signIn } (signIn: the CLI a Sign in button starts, only where one has a local login: Claude, #16714) for a run record that failed for want of a sign-in, or because the CLI did not answer the sign-in check (a slow CLI is not "signed out"), else null (a stranger code is not one). */
 export function runFailure(rec) {
     if (!rec || (rec.error_code !== 'not_signed_in' && rec.error_code !== 'signin_check_timeout')) return null;
     const timeout = rec.error_code === 'signin_check_timeout';
@@ -15,7 +15,7 @@ export function runFailure(rec) {
     const [name, cmd] = known ? CLI[rec.agent_type] : ["The agent's CLI", ''];
     if (timeout) return { text: `${name} did not answer the sign-in check`, short: 'sign-in check timed out', again: 'runs again on its next turn', hint: known ? `Check that ${cmd} works in a terminal, then run this again.` : 'Check that it works in a terminal, then run this again.' };
     if (!known) return { text: `${name} is not signed in`, short: 'not signed in', again: 'runs again once you are signed in', hint: 'Sign in to it in a terminal, then run this again.' };
-    return { text: `${name} is not signed in`, short: 'not signed in', again: 'runs again once you are signed in', hint: `Sign in with ${cmd} in a terminal, then run this again.` };
+    return { text: `${name} is not signed in`, short: 'not signed in', again: 'runs again once you are signed in', hint: `Sign in with ${cmd} in a terminal, then run this again.`, name, signIn: rec.agent_type === 'claude' ? 'claude' : '' };
 }
 
 /** The line shown under a failed run: the words and what to do. */

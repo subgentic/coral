@@ -32,6 +32,8 @@ const JOB = { id: 5, name: 'Nightly review', enabled: true, cron_expr: '0 3 * * 
                 if (p === '/api/workflows' && m === 'GET') return json({ workflows: [{ id: 7, name: 'Nightly', enabled: true, step_count: 1, last_run: RUNS[91] }] });
                 if (p === '/api/scheduled/jobs' && m === 'GET') return json({ jobs: [JOB] });
                 if (p.startsWith('/api/scheduled/jobs/5/runs')) return json({ runs: [{ id: 3, status: 'failed', error_msg: 'Codex is not signed in', error_code: 'not_signed_in', agent_type: 'codex', started_at: '${T0}' }] });
+                if (p === '/api/system/cli-signin' && m === 'POST') { (window.__signins = window.__signins || []).push(new URL(String(u && u.url || u), location.origin).search); return json({ started: true }); }
+                if (p === '/api/scheduled/jobs/5/run' && m === 'POST') { window.__retried = (window.__retried || 0) + 1; return json({ started: true }); }
                 if (p === '/api/themes/generate' && m === 'POST') return json({ error: 'Claude is not signed in', code: 'not_signed_in' }, 409);
                 return R(u, o); };
             return true; })()`);
@@ -83,6 +85,16 @@ const JOB = { id: 5, name: 'Nightly review', enabled: true, cron_expr: '0 3 * * 
         const banner = await text('.sched-fail-banner');
         check(`the banner does not say it twice (${banner})`, banner.split('is not signed in').length === 2);
         check(`the job's banner says it and what to do, though a refused run does not count as a failure (${banner})`, /did not start: Claude is not signed in\./.test(banner) && /Sign in with claude in a terminal, then run this again\./.test(banner) && /runs again once you are signed in/.test(banner));
+        // #16715: the notice offers Sign in (Claude has a local login), then Retry; no command to type
+        check('the notice has a Sign in button and Retry is not there yet', await ev(`(() => { const b = document.querySelector('.sched-fail-banner [data-on-click="job-signin"]'), r = document.querySelector('.sched-fail-banner .run-signin-retry'); return !!b && /Sign in/.test(b.textContent) && !!r && r.hidden; })()`));
+        await ev(`document.querySelector('.sched-fail-banner [data-on-click="job-signin"]').click(); true`);
+        await waitFor(`!document.querySelector('.sched-fail-banner .run-signin-retry').hidden`, 'Retry after the sign-in started');
+        check('Sign in started the Claude login on this computer', JSON.stringify(await ev('window.__signins')) === JSON.stringify(['?type=claude']), JSON.stringify(await ev('window.__signins')));
+        check(`and said what to do next (${await text('.run-signin-status')})`, /complete it in the browser that opened, then press Retry/.test(await text('.run-signin-status')));
+        await ev(`document.querySelector('.sched-fail-banner .run-signin-retry').click(); true`);
+        await waitFor(`window.__retried === 1`, 'Retry runs the job');
+        check('Retry is the job\'s own run', true);
+        check('a CLI with no local login (Codex, Pi, unknown) gets no Sign in button', await ev(`import(${S} + 'run_failure.js').then(m => ['codex', 'agy', 'pi', 'zzz', undefined].every(t => !m.runFailure({ error_code: 'not_signed_in', agent_type: t }).signIn) && !m.runFailure({ error_code: 'signin_check_timeout', agent_type: 'claude' }).signIn)`));
         const hist = await ev(`document.querySelector('.sched-runs-section').textContent.replace(/\\s+/g, ' ').trim()`);
         check(`the job's run history tags the not-signed-in run (${hist.slice(0, 120)})`, /not signed in/.test(hist));
 
