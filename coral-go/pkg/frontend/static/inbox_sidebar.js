@@ -1,3 +1,4 @@
+await importOnce('./inbox_press_guard.js'); // refuse a press on a row that moved before the lift (#16616)
 import { multipleServers, serverColumns, serverMatches, syncServerField, serverLabel as pagingServerLabel, serverOf, inboxSources, serverChoices } from './inbox_servers.js';
 import { onAccountForgotten } from './local_store.js';
 import { keepMenuOnScreen } from './menu_fit.js';
