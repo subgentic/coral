@@ -232,20 +232,23 @@
                 </div>
             </div>
 
-            <!-- Step 2c: Agent Team form (#7407): two steps in the one fixed-size dialog (LT1): 1 Team (name, where it launches, the first task, Workflow, More options: Health check, Messaging), 2 Members (Everyone runs as, More options: skills) -->
+            <!-- Step 2c: Agent Team form (#7407): three steps in the one fixed-size dialog: 1 Name and where it launches, 2 Members, 3 Start and team settings (tabs Start, Workflow, Health check, Messaging) -->
             <div id="launch-step-team" class="launch-modal-step launch-wizard team-wizard" style="display:none" data-stage="team">
                 <div class="sd-step-header">
                     <div class="sd-step-title-row">
                         <button class="launch-back-btn" data-on-click="m-select-launch-type" data-arg="back" title="Back" aria-label="Back to the choices">&larr;</button>
                         <h3 id="launch-team-title"><span id="launch-team-title-text">New team</span></h3>
                     </div>
-                    <p id="team-stage-sub" class="sd-sub launch-stage-sub">Step 1 of 2: Your team</p>
+                    <p id="team-stage-sub" class="sd-sub launch-stage-sub">Step 1 of 3: Your team</p>
                 </div>
-                <p class="sr-only" id="team-step-live" role="status">Step 1 of 2</p>
+                <p class="sr-only" id="team-step-live" role="status">Step 1 of 3</p>
                 <div class="settings-modal-body team-steps-body">
                     <section class="launch-page team-page team-page-team" id="team-panel-team" data-page="team" aria-label="Name and where it launches">
                         <div id="team-form-host" data-coral-root="{{ .CoralRoot }}"></div>
-                        <div id="team-start-host"></div><!-- LT1: the first task, Workflow and, under More options, Health check and Messaging: step 3 folded into step 1 -->
+                        <div class="form-row" id="team-skills-row" hidden>
+                            <span class="form-label" id="team-skills-label">Skills for every member <span class="launch-optional">optional</span></span>
+                            <div id="team-skills-host" role="group" aria-labelledby="team-skills-label"></div>
+                        </div>
                         <div id="team-form-parts" hidden>
                             <div id="team-board-name-hint" class="team-field-hint"></div>
                             <button class="btn" id="btn-browse-team" data-on-click="m-toggle-browser" data-browser="launch-team-dir dir-browser-team browser-list-team browser-current-path-team">Browse</button>
@@ -285,7 +288,7 @@
                                 <input type="file" id="team-folder-input" webkitdirectory directory multiple style="display:none" data-on-change="m-handle-team-folder-import">
                             </div>
                         </div>
-                        <div class="team-wizard-body team-wizard-panel" id="team-wizard-panel" role="group" aria-labelledby="team-describe" hidden>
+                        <div class="team-wizard-body team-wizard-panel" id="team-wizard-panel" role="group" aria-labelledby="team-wizard-title" hidden>
                             <p id="team-wizard-title" class="sv-help">Say what the team should do and, if you like, who should be on it. Coral drafts the members; you change any of them before anything starts.</p>
                             <label class="sr-only" for="team-wizard-directive">Describe your team</label>
                             <textarea id="team-wizard-directive" rows="5" placeholder="For example: Build a launch plan for a developer tool aimed at small engineering teams. I want an orchestrator, a product strategist, a marketer and a copywriter."></textarea>
@@ -318,12 +321,9 @@
                             </div>
                         </div>
                         </div>
-                        <details class="disclosure team-more-options" id="team-members-more"><summary>More options</summary>
-                        <div class="form-row" id="team-skills-row" hidden>
-                            <span class="form-label" id="team-skills-label">Skills for every member <span class="launch-optional">optional</span></span>
-                            <div id="team-skills-host" role="group" aria-labelledby="team-skills-label"></div>
-                        </div>
-                        </details>
+                    </section>
+                    <section class="launch-page team-page team-page-start" id="team-panel-start" data-page="start" aria-label="Start and team settings">
+                        <div id="team-start-host"></div>
                     </section>
                 </div>
                 <div hidden aria-hidden="true">
@@ -335,8 +335,8 @@
                 <div id="team-tmux-slot" class="launch-cli-slot"></div>
                 <p id="team-recap" class="launch-recap" role="status" aria-live="polite"></p>
                 <div class="modal-actions">
-                    <button class="btn btn-quiet" id="launch-team-back" data-on-click="team-step-back" hidden>Back</button>
                     <button class="btn" id="launch-team-cancel" data-on-click="m-hide-launch-modal">Cancel</button>
+                    <button class="btn" id="launch-team-back" data-on-click="team-step-back" hidden>Back</button>
                     <button class="btn btn-primary" id="launch-team-next" data-on-click="team-step-next">Next</button>
                     <button class="btn btn-primary" id="launch-team-go" data-on-click="m-launch-team" hidden>Launch team</button>
                 </div>
