@@ -2,6 +2,8 @@
  * Every item gets its line as a description a screen reader reads on focus (aria-describedby). A mouse or the keyboard shows the line of the item under it in a footer of the menu; a touch screen or a phone shows every item's line under its
  * label, since neither hovers (css/menu_help.css). Restart and Wake say what #15465 says, word for word. */
 import { loadStyles } from './lazy_styles.js';
+import { state } from './state.js';
+import { inTeam } from './server_base.js';
 
 await loadStyles('menu_help.css'); // before any line is drawn: a line without its sheet would show as plain text
 
@@ -29,7 +31,21 @@ let serial = 0;
 export const labelOf = item => { const t = item.textContent.trim().replace(/\s+/g, ' ').toLowerCase(); return LABELS.find(l => { const k = l.toLowerCase(); return t === k || t.startsWith(k + ' ') || t.startsWith(k + '…'); }); };
 
 /** Give every item of `menu` its line (once) and the menu its footer. */
+/** A half-asleep team's menu has both Sleep team and Wake team (#17536): the card draws the one its agents mostly say, and this adds the other, here so the start page does not carry it. */
+function bothSleepItems(menu) {
+    const it = menu.querySelector('[data-on-click="team-sleep"]:not([data-both])');
+    if (!it) return;
+    it.dataset.both = '1';
+    const wake = it.dataset.mode === 'wake', ss = (state.liveSessions || []).filter(x => inTeam(x, it.dataset.board));
+    if (!ss.some(x => !!x.sleeping === !wake)) return; // the other kind is here: some agent is awake when the item says Wake, asleep when it says Sleep
+    const other = it.cloneNode(true);
+    other.dataset.mode = wake ? 'sleep' : 'wake';
+    other.lastChild.textContent = ` ${wake ? 'Sleep' : 'Wake'} team`;
+    it.after(other);
+}
+
 export function describe(menu) {
+    bothSleepItems(menu);
     for (const item of menu.querySelectorAll('.overflow-menu-item:not([data-help])')) {
         const label = labelOf(item);
         item.dataset.help = label ? '1' : '0';
