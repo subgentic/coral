@@ -120,6 +120,22 @@ const { safePaused } = require('./helpers/paused');
         assert.ok(!/Open .* in that folder/.test(strip4), 'no HTML file: no "Open" hint: ' + strip4);
         assert.ok(/The team works in the folder/.test(strip4), 'still shows the folder path: ' + strip4);
 
+        // #17814 MUST: a second load (the finally branch) must not throw when hooks.stripHint is called
+        console.log('second load no throw');
+        const exceptions = []; client.Runtime.exceptionThrown(e => { const d = e.exceptionDetails || {}; exceptions.push(String((d.exception && d.exception.description) || d.text || '').split('\n')[0].slice(0, 200)); });
+        await ev(`window.__detailDelay = 0; window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`);
+        await waitFor(`!!document.querySelector('#team-panel-artifacts .team-files-strip')`, 'the strip on second load', 15000);
+        // upload a new .html file and reload: the hint must update without error
+        await up('dashboard.html', '<h1>Dashboard</h1>', 'text/html');
+        await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`);
+        await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length >= 4`, 'at least four files after adding dashboard.html', 15000);
+        await waitFor(`!!document.querySelector('#team-panel-artifacts .team-files-strip')`, 'the strip after the late .html', 15000);
+        const stripAfterLate = await ev(`document.querySelector('#team-panel-artifacts .team-files-strip')?.textContent || ''`);
+        assert.ok(/Open index\.html in that folder/.test(stripAfterLate), 'index.html still preferred after adding dashboard.html: ' + stripAfterLate);
+        const typeErrors = exceptions.filter(e => /TypeError/.test(e));
+        assert.equal(typeErrors.length, 0, 'no TypeError on second load (hooks.stripHint must be a function, not a Promise): ' + typeErrors.join('; '));
+        console.log('PASS second load no throw, late .html file appears');
+
         // #17814 SHOULD c: the ghost line holds enough space at 390 px
         console.log('ghost at 390');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 3, mobile: true });
