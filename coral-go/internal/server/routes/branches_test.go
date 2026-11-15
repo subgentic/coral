@@ -20,11 +20,13 @@ import (
 // reads only its own team's agents.
 
 type fakeBranches struct {
-	repo  branches.Repo
-	own   int
-	dirs  map[string]int // a folder -> the worktree that holds it
-	asked []string
-	none  map[string]bool // folders the snapshot has no repository for
+	repo     branches.Repo
+	own      int
+	dirs     map[string]int // a folder -> the worktree that holds it
+	asked    []string
+	notFound map[string]bool   // dirs where For returns false
+	states   map[string]string // dir -> "pending" or "done" for ReadState
+	notGit   map[string]bool   // dirs that are not git repos
 }
 
 func (f *fakeBranches) Holds(_ branches.Repo, i int, dir string) bool {
@@ -36,10 +38,17 @@ func (f *fakeBranches) Same(a, b branches.Repo) bool { return a.Base == b.Base }
 
 func (f *fakeBranches) For(dir string) (branches.Repo, int, bool) {
 	f.asked = append(f.asked, dir)
-	if dir == "" || f.none[dir] {
+	if dir == "" || f.notFound[dir] {
 		return branches.Repo{}, -1, false
 	}
 	return f.repo, f.own, true
+}
+
+func (f *fakeBranches) ReadState(dir string) (string, bool) {
+	if s, ok := f.states[dir]; ok {
+		return s, f.notGit[dir]
+	}
+	return "pending", false
 }
 
 type branchesRig struct {
@@ -68,7 +77,7 @@ func newBranchesRig(t *testing.T) *branchesRig {
 		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: s.sid, AgentType: "claude", AgentName: s.name, WorkingDir: s.dir, BoardName: s.board}))
 		mock.addSession("claude-"+s.sid, s.dir)
 	}
-	src := &fakeBranches{none: map[string]bool{plain: true}, own: 0, repo: branches.Repo{Base: "main", At: time.Date(2026, 11, 1, 6, 0, 0, 0, time.UTC), Worktrees: []branches.Worktree{
+	src := &fakeBranches{notFound: map[string]bool{plain: true}, own: 0, repo: branches.Repo{Base: "main", At: time.Date(2026, 11, 1, 6, 0, 0, 0, time.UTC), Worktrees: []branches.Worktree{
 		{Branch: "main", Head: "0123456789ab", Main: true},
 		{Branch: "feature", Head: "abcdef012345", Ahead: 2, Behind: 1, Changed: 3},
 	}}}
@@ -189,6 +198,42 @@ func TestTheTeamViewShowsItsAgentsRepositoriesAndOnlyItsOwnTeam(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, code, "an agent of team B")
 	code, _ = get("team-a", asBranchesAgent("aaaaaaaa-0423-4000-8000-000000000002"))
 	assert.Equal(t, http.StatusOK, code, "an agent of team A")
+
+	assert.Equal(t, "done", body["read_state"], "a team with repos is done")
+	assert.Equal(t, false, body["not_git"], "the team's agents are in a git repo")
+}
+
+// #17058: the team branches say 'pending' before the first read and 'not a git folder' after.
+func TestTeamBranchesPendingAndNotGit(t *testing.T) {
+	r := newBranchesRig(t)
+	rt := chi.NewRouter()
+	rt.Get("/api/board/{project}/branches", r.h.TeamBranches)
+	get := func(team string) map[string]any {
+		req := httptest.NewRequest(http.MethodGet, "/api/board/"+team+"/branches", nil)
+		req = asBranchesDashboard(req)
+		rec := httptest.NewRecorder()
+		rt.ServeHTTP(rec, req)
+		var body map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &body)
+		return body
+	}
+
+	r.src.notFound = map[string]bool{"/work/repo": true, "/work/feature": true, r.plain: true} // dev-plain is team A's third agent (#17483): a real folder with no .git, said done at once
+	body := get("team-a")
+	assert.Equal(t, "pending", body["read_state"], "before any read: pending")
+	assert.Equal(t, false, body["not_git"], "pending is not not-git")
+	assert.Len(t, body["repos"].([]any), 0)
+
+	r.src.states = map[string]string{"/work/repo": "done", "/work/feature": "done"}
+	r.src.notGit = map[string]bool{"/work/repo": true, "/work/feature": true}
+	body = get("team-a")
+	assert.Equal(t, "done", body["read_state"], "after read: done")
+	assert.Equal(t, true, body["not_git"], "no git repo found")
+
+	r.src.states["/work/repo"] = "pending"
+	body = get("team-a")
+	assert.Equal(t, "pending", body["read_state"], "one agent pending keeps it pending")
+	assert.Equal(t, false, body["not_git"], "not done yet: not_git is false")
 }
 
 // #17483: a folder with no .git in it or above it is said so at once; a folder that may still be read is only "not found yet".
@@ -198,8 +243,9 @@ func TestAFolderThatIsNotARepositoryIsSaidAtOnce(t *testing.T) {
 	require.Equal(t, http.StatusOK, code, "%v", body)
 	assert.Equal(t, false, body["found"])
 	assert.Equal(t, true, body["not_git"], "no .git here or above: not a repository, no waiting")
+	assert.Equal(t, "done", body["read_state"], "#17600: one meaning with #17058's read_state: a folder the file system shows is not a repository is done, never pending")
 	// a folder that does not exist on this computer is not claimed to be non-git
-	r.src.none["/work/repo"] = true
+	r.src.notFound["/work/repo"] = true
 	_, body = r.get("dev-a", "aaaaaaaa-0423-4000-8000-000000000001", asBranchesDashboard)
 	assert.Equal(t, false, body["found"])
 	assert.Equal(t, false, body["not_git"])

@@ -19,6 +19,7 @@ type BranchesSource interface {
 	For(dir string) (branches.Repo, int, bool)
 	Holds(repo branches.Repo, i int, dir string) bool
 	Same(a, b branches.Repo) bool // the same repository (the team view groups by it)
+	ReadState(dir string) (state string, notGit bool)
 }
 
 // SetBranches wires the snapshot in.
@@ -53,6 +54,16 @@ func (h *SessionsHandler) agentMayReadAgent(r *http.Request, caller, target stri
 	return err == nil && them != nil && them.BoardName != nil && *them.BoardName == *me.BoardName
 }
 
+// folderReadState is the one meaning of read_state and not_git for a folder with no repository picture yet (#17058, #17483, #17600): not_git is true when no git repository is there, whether the collector read
+// the folder and found none or the file system shows no .git in it or above it (said at once, not after a minute of "reading"); a folder with no .git marker is then "done", not "pending".
+func (h *SessionsHandler) folderReadState(dir string) (state string, notGit bool) {
+	state, notGit = h.branches.ReadState(dir)
+	if !notGit && gitutil.NoRepoMarkerFor(dir) {
+		return "done", true
+	}
+	return state, notGit
+}
+
 // Branches answers GET /api/sessions/live/{name}/branches?session_id=&agent_type=
 func (h *SessionsHandler) Branches(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
@@ -72,8 +83,11 @@ func (h *SessionsHandler) Branches(w http.ResponseWriter, r *http.Request) {
 	dir := h.resolveWorkdir(agentCtx(r), name, agentType, sessionID)
 	repo, own, ok := h.branches.For(dir)
 	if dir == "" || !ok {
-		// A folder with no .git in it or above it is said so at once (#17483), not after a minute of "reading".
-		writeJSON(w, http.StatusOK, map[string]any{"available": true, "found": false, "not_git": dir != "" && gitutil.NoRepoMarkerFor(dir)})
+		rs, ng := "pending", false
+		if dir != "" {
+			rs, ng = h.folderReadState(dir)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"available": true, "found": false, "read_state": rs, "not_git": ng})
 		return
 	}
 	rows := make([]branchWorktree, len(repo.Worktrees))
@@ -126,19 +140,26 @@ func (h *SessionsHandler) TeamBranches(w http.ResponseWriter, r *http.Request) {
 		rows []branchWorktree
 	}
 	var sections []*section
-	agentFolders, nonGit := 0, 0 // the team's agents with a folder, and those whose folder is not in a git repository (#17483)
+	readState := "done"
+	anyDir := false
+	allNotGit := true
 	for _, ls := range lives {
 		if ls.IsArchived == 1 || ls.WorkingDir == "" || ls.BoardName == nil || *ls.BoardName != project {
 			continue
 		}
-		agentFolders++
+		anyDir = true
 		repo, own, ok := h.branches.For(ls.WorkingDir)
 		if !ok || own < 0 {
-			if gitutil.NoRepoMarkerFor(ls.WorkingDir) {
-				nonGit++
+			st, ng := h.folderReadState(ls.WorkingDir)
+			if st == "pending" {
+				readState = "pending"
+			}
+			if !ng {
+				allNotGit = false
 			}
 			continue
 		}
+		allNotGit = false
 		var sec *section
 		for _, s := range sections {
 			if h.branches.Same(s.repo, repo) {
@@ -162,5 +183,6 @@ func (h *SessionsHandler) TeamBranches(w http.ResponseWriter, r *http.Request) {
 		out = append(out, map[string]any{"base": s.repo.Base, "more": s.repo.More, "unreadable": s.repo.Unreadable, "remote": s.repo.Remote, "remote_unknown": s.repo.RemoteUnknown,
 			"pr_note": s.repo.PRNote, "at": s.repo.At.UTC().Format(time.RFC3339), "worktrees": s.rows})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"available": true, "repos": out, "not_git": len(out) == 0 && agentFolders > 0 && nonGit == agentFolders})
+	notGit := anyDir && allNotGit && readState == "done"
+	writeJSON(w, http.StatusOK, map[string]any{"available": true, "repos": out, "read_state": readState, "not_git": notGit})
 }
