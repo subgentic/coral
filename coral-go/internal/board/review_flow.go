@@ -192,7 +192,23 @@ func reopenReviews(ctx context.Context, tx *sqlx.Tx, project string, id int64, w
 		return nil, err
 	}
 	round := ReviewRound{Round: last.Round + 1, DelegatedBy: "resubmitted", DelegatedAt: nowUTC()}
+	var priority string
+	if err := tx.GetContext(ctx, &priority, "SELECT priority FROM board_tasks WHERE id=? AND board_id=?", id, project); err != nil {
+		return nil, err
+	}
+	taken := map[string]bool{}
 	for _, r := range last.Reviewers {
+		taken[normalizeName(r.Reviewer)] = true
+	}
+	for _, r := range last.Reviewers {
+		if to, why := idleSeatFor(ctx, tx, project, w.OriginalAuthor, priority, r, taken); to != "" {
+			if _, err := tx.ExecContext(ctx, "UPDATE board_tasks SET assigned_to=? WHERE id=? AND board_id=?", to, r.ReviewTaskID, project); err != nil {
+				return nil, err
+			}
+			taken[normalizeName(to)] = true
+			round.DelegatedBy += "; " + why
+			r.Reviewer = to
+		}
 		body := reviewTaskBody(id, title, w.OriginalAuthor, round.Round)
 		if _, err := tx.ExecContext(ctx, `UPDATE board_tasks SET status=CASE WHEN status IN ('pending','in_progress') THEN status ELSE 'pending' END,
 			completed_by=NULL, completion_message=NULL, completed_at=NULL, body=?, edited_at=? WHERE id=? AND board_id=?`, body, nowUTC(), r.ReviewTaskID, project); err != nil {
@@ -210,6 +226,47 @@ func reopenReviews(ctx context.Context, tx *sqlx.Tx, project string, id int64, w
 	}
 	w.ReviewRounds = append(w.ReviewRounds, round)
 	return &w.ReviewRounds[len(w.ReviewRounds)-1], nil
+}
+
+// idleSeatFor moves a high or critical round's seat off a reviewer who is busy on lower-priority work (#18089): a round offered "when their task ends" waited 15 minutes behind a medium
+// task while a member of the same role sat idle. It returns the idle member (same job title, active, not the author, not already in the round, no task in progress) and the line for the
+// round notice, or "" when the seat stays: a medium or low task, a reviewer who is not busy, or on equal or higher work, or nobody idle.
+func idleSeatFor(ctx context.Context, tx *sqlx.Tx, project, author, priority string, r ReviewerState, taken map[string]bool) (string, string) {
+	if priorityRank(priority) > 1 {
+		return "", ""
+	}
+	var own string
+	if err := tx.GetContext(ctx, &own, "SELECT status FROM board_tasks WHERE id=? AND board_id=?", r.ReviewTaskID, project); err != nil || own == "in_progress" {
+		return "", "" // the reviewer has started this review: it stays
+	}
+	var busy []struct {
+		ID       int64  `db:"id"`
+		Priority string `db:"priority"`
+	}
+	if err := tx.SelectContext(ctx, &busy, "SELECT id, priority FROM board_tasks WHERE board_id=? AND status='in_progress' AND assigned_to=? AND id<>?", project, r.Reviewer, r.ReviewTaskID); err != nil || len(busy) == 0 {
+		return "", ""
+	}
+	for _, b := range busy {
+		if priorityRank(b.Priority) <= priorityRank(priority) {
+			return "", "" // busy on work as urgent as this: it stays
+		}
+	}
+	var role string
+	if err := tx.GetContext(ctx, &role, "SELECT job_title FROM board_subscribers WHERE project=? AND subscriber_id=? AND is_active=1", project, r.Reviewer); err != nil || strings.TrimSpace(role) == "" {
+		return "", ""
+	}
+	var peers []string
+	if err := tx.SelectContext(ctx, &peers, `SELECT subscriber_id FROM board_subscribers WHERE project=? AND is_active=1 AND LOWER(TRIM(job_title))=LOWER(TRIM(?))
+		AND subscriber_id NOT IN (SELECT assigned_to FROM board_tasks WHERE board_id=? AND status='in_progress' AND assigned_to IS NOT NULL) ORDER BY subscribed_at, id`, project, role, project); err != nil {
+		return "", ""
+	}
+	for _, p := range peers {
+		if taken[normalizeName(p)] || SameIdentity(p, author) {
+			continue
+		}
+		return p, fmt.Sprintf("the review moved from %s (busy on #%d, a lower-priority task) to %s (idle)", r.Reviewer, busy[0].ID, p)
+	}
+	return "", ""
 }
 
 // reviewTaskBody is a review task's text for a round.
