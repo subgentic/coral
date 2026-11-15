@@ -607,12 +607,13 @@ func isVersionArg(a string) bool {
 	return false
 }
 
-// printVersion prints "coral <version>", or "coral (development build)" for a build
+// printVersion prints "coral <version>", or "coral (development build) <stamp>" for a build
 // without one.
 func printVersion(w io.Writer) {
 	v := config.Version
 	if v == "" {
-		fmt.Fprintln(w, "coral (development build)"+config.BuildFlavor)
+		// The stamp /api/health reports ("<next patch>-dev+<commit>[.dirty]"), so a dev build says which commit it is (walk 53, #17169); the leading words stay for what reads them.
+		fmt.Fprintln(w, "coral (development build) "+config.ReportedVersion())
 		return
 	}
 	fmt.Fprintln(w, "coral "+v+config.BuildFlavor)

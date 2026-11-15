@@ -54,7 +54,8 @@ function chipView(s, server) {
         if (sw.asking) view.note = `Claude asks: ${sw.asking}`;
         return view;
     }
-    if (_local && Date.now() < _local.until && !(sw && sw.state !== 'pending')) { view[_local.kind] = { text: _local.text, state: 'pending' }; return view; }
+    if (_local && sw && sw.state !== 'pending') _local = null; // the row says how it went: the next pick is free
+    if (_local && Date.now() < _local.until) { view[_local.kind] = { text: _local.text, state: 'pending' }; return view; }
     if (sw && sw.state === 'failed') {
         const k = sw.model ? 'model' : (sw.thinking !== undefined && sw.thinking !== null ? 'thinking' : '');
         for (const kk of k ? [k] : KINDS) view[kk].state = 'failed';
@@ -342,13 +343,13 @@ async function _apply(change) {
     if (fromMenu) _chipFocus(fromMenu); // the item that had the keyboard is gone with the menu: focus goes back to its own chip (the Options button on a phone)
     const name = s.name;
     if (!LIVE_SWITCH_TYPES.has(s.agent_type)) { _viaRestart(change); return; }
+    if (_local?.until > Date.now()) return; // a switch is already on its way: a second pick would type /model twice (walk 53, #17169)
     const body = { session_id: s.session_id, agent_type: s.agent_type };
     if (change.model !== undefined) body.model = change.model;
     if (change.thinking !== undefined) body.thinking = change.thinking;
     const target = change.model !== undefined ? modelLabel(s.agent_type, change.model, _cur.server).replace(/^[^·]*· /, '') : (change.thinking ? levelName(change.thinking) : 'Default');
-    _local = { until: Date.now() + 2000, text: `Switching to ${target}…`, kind: change.model !== undefined ? 'model' : 'thinking' }; // until the feed's row says it (a tick or two)
+    _local = { until: Date.now() + 30000, text: `Switching to ${target}…`, kind: change.model !== undefined ? 'model' : 'thinking' }; // until the row says how it went (its model_switch: done or failed) or 30 s pass; an agent mid-reply takes ~10 s, a refusal clears it below
     updateModelChip(s, _cur.server);
-    setTimeout(() => { if (_cur) updateModelChip(_cur.session, _cur.server); }, 2100);
     try {
         const resp = await serverFetch(_cur.server, `/api/sessions/live/${encodeURIComponent(name)}/model`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),

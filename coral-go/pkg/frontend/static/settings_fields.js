@@ -26,7 +26,8 @@ const NOTIFICATIONS_FIELDS = [
     { key: 'desktop_notify', type: 'toggle', id: 'settings-desktop-notify', label: 'Desktop alerts',
         help: { text: 'An alert on this computer while this tab is in the background.', more: 'This browser only. Shows the agent and computer names (your OS may keep them in its notification history), never agent output. May duplicate a local alert.' } },
     // Why the switch above did not turn on (#10068): a browser that blocks alerts, or a permission box that was dismissed. Filled by settings_fill.js.
-    { key: 'desktop_notify_blocked', type: 'notice', render: slot => { const p = document.createElement('p'); p.id = 'settings-desktop-blocked'; p.className = 'sv-help'; p.setAttribute('role', 'status'); p.hidden = true; slot.append(p); } },
+    { key: 'desktop_notify_blocked', type: 'notice', render: slot => { const p = document.createElement('p'); p.id = 'settings-desktop-blocked'; p.className = 'sv-help'; p.setAttribute('role', 'status'); p.hidden = true; slot.append(p);
+        const t = document.createElement('button'); t.type = 'button'; t.id = 'settings-desktop-test'; t.className = 'btn btn-small'; t.textContent = 'Send a test alert'; t.hidden = true; slot.append(t); } }, // shown while the switch is on (walk 53, #17169)
     // This browser's own choices about those alerts (not saved on the server); they apply while Desktop alerts is on.
     { key: 'alert_needs_input', type: 'toggle', id: 'settings-alert-needs-input', label: 'Alert when an agent needs input', help: 'Needs Desktop alerts on.', disabledWhen: () => alertsOff() },
     { key: 'alert_reply', type: 'toggle', id: 'settings-alert-reply', label: 'Alert when an agent finishes a reply', help: 'Needs Desktop alerts on.', disabledWhen: () => alertsOff() },
