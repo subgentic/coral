@@ -16,7 +16,7 @@ export const importSignature = () => (offer ? offer.found : -1);
 export function importEmpty(redraw) {
     if (!offer || !offer.found) return {};
     const from = Object.keys(offer.sources || {}).map(k => NAMES[k] || k).join(', ');
-    return { hint: `${offer.found} earlier ${offer.found === 1 ? 'chat was' : 'chats were'} found on this computer, in the history folders of ${from} (not in Coral's own data). They are not listed until you import them.`, action: { label: `Import ${offer.found} earlier ${offer.found === 1 ? 'chat' : 'chats'} from ${from}`, run: () => importEarlier(redraw) } };
+    return { hint: `${offer.found} earlier ${offer.found === 1 ? 'chat was' : 'chats were'} found on this computer (${from} history, not Coral's data). They are not listed until you import them.`, action: { label: `Import ${offer.found} earlier ${offer.found === 1 ? 'chat' : 'chats'} from ${from}`, run: () => importEarlier(redraw) } };
 }
 /** One line above a list that has chats, while earlier ones wait: a function that builds it, or null. */
 export function importBanner(redraw) {

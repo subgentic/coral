@@ -35,9 +35,9 @@ export function deleteTeamItem(boardName) {
                     Remove team <span class="overflow-menu-note">needs Launch</span>
                 </button>`;
     }
-    return `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="team-delete" data-board="${escapeAttr(boardName)}" title="Removes the team and its messages, tasks and goals for good; you are asked first">
+    return `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="team-delete" data-board="${escapeAttr(boardName)}">
                     ${icon}
-                    Remove team <span class="overflow-menu-note">messages and tasks go too</span>
+                    Remove team
                 </button>`;
 }
 
@@ -54,7 +54,7 @@ export function teamHealthBtn(boardName, boardSessions) {
     // A remote/Hub header keeps the on-state signal without offering unavailable settings.
     if (isCloud() || splitKey(boardName).server !== LOCAL_SERVER) return `<span class="team-health-btn is-on" role="img" aria-label="Health monitor is on" title="Health monitor is on">${SVGO.o5}<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg></span>`;
     const label = `Health monitor settings for ${keyLabel(boardName)}`;
-    return `<button type="button" class="btn btn-quiet btn-icon btn-xs folder-copy-btn team-health-btn is-on" data-on-click="team-health" data-board="${escapeAttr(boardName)}" title="${escapeAttr(`Health monitor is on for ${keyLabel(boardName)}: opens Team settings, Health check`)}" aria-label="${escapeAttr(label)}">${SVGO.o5}<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg></button>`;
+    return `<button type="button" class="btn btn-quiet btn-icon btn-xs folder-copy-btn team-health-btn is-on" data-on-click="team-health" data-board="${escapeAttr(boardName)}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">${SVGO.o5}<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg></button>`;
 }
 
 // A folder icon on folder groups, as teams have the people icon (#3507 v4, the operator's

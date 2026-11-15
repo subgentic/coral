@@ -14,7 +14,7 @@ const ASKS_ARE_TASKS_HINT = 'When an agent needs another agent to do something, 
 const WORKFLOW_HINT = 'Guidance the agents get on how to share the folder. It does not create worktrees.';
 
 let _view = null;
-let _listening = null; // the listeners a mount put on the persistent host (aborted by the next mount)
+let _listening = null;
 let _defaultExtra = {};
 let _defaultMode = 'none'; // the working mode a new team starts with: 'none', or the one the chosen team template names (#8919)
 
@@ -71,7 +71,7 @@ export function mountTeamLaunchSettings() {
     const host = document.getElementById('team-start-host');
     if (!host) return;
     if (_view) _view.destroy();
-    if (_listening) _listening.abort(); // the host outlives each mount: the last mount's listeners would put its own goal line back beside this one's (#17339, F12: the line showed twice)
+    _listening?.abort(); // #17339 F12
     _listening = new AbortController();
     const { signal } = _listening;
     _defaultMode = 'none'; _defaultExtra = {};

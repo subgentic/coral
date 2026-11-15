@@ -40,11 +40,7 @@ export function scheduleFolderTrust(event) {
     if (!chosen || _defaultUsed || isHub() || d.dataset.dirServer) return;
     _choicePath = dir;
     _trustTimer = setTimeout(async () => {
-        let result = null;
-        try {
-            const response = await fetch('/api/filesystem/trust-probe?path=' + encodeURIComponent(dir), { signal: AbortSignal.timeout(3000) });
-            if (response.ok) result = await response.json();
-        } catch { /* unchecked stays off */ }
+        const result = await probeTrust(dir); // unchecked stays off
         if (generation !== _trustGeneration || d.value.trim() !== dir) return;
         if (result?.refused) { _trustNote = result.refused; _view?.refresh(); return; }
         const names = ['.claude/settings.json', '.claude/settings.local.json', '.mcp.json', '.codex/config.toml'];
@@ -56,16 +52,9 @@ export function scheduleFolderTrust(event) {
     }, 400);
 }
 
-/** The Trust switch ticked on a folder that is already in the field (typed or filled by a link, so the folder's own check did not run): ask the same question now. A folder the server refuses (a shared place such as /tmp,
- *  too close to a disk's root) unticks the switch and says why here, before Launch, not as a toast after it (#17339, F5). */
-export async function checkTickedTrust() {
-    const t = document.getElementById('launch-team-trust'), d = document.getElementById('launch-team-dir'), dir = d?.value.trim();
-    if (!t || !t.checked || !dir || isHub() || d.dataset.dirServer || dir === _trustFor) return;
-    const generation = _trustGeneration;
-    let result = null;
-    try { const response = await fetch('/api/filesystem/trust-probe?path=' + encodeURIComponent(dir), { signal: AbortSignal.timeout(3000) }); if (response.ok) result = await response.json(); } catch { /* the launch decides */ }
-    if (generation !== _trustGeneration || d.value.trim() !== dir || !result?.refused) return;
-    _trustNote = result.refused; _view?.set('trust', false); _view?.refresh();
+/** Trust ticked on a folder already in the field: the server refuses a shared place, so untick and say why before Launch (#17339 F5). */
+async function probeTrust(dir) {
+    try { const response = await fetch('/api/filesystem/trust-probe?path=' + encodeURIComponent(dir), { signal: AbortSignal.timeout(3000) }); return response.ok ? await response.json() : null; } catch { return null; }
 }
 
 /** True when the person ticked "Trust this folder" for the folder that is in the field now, and the switch shows: the one case the launch asks for trust (#11889). */
@@ -160,7 +149,7 @@ function mount(modal) {
     ];
     _view = mountSettingsView(host, { mode: 'form', fields });
     // The folder the person ticked "Trust this folder" for: registered here, when the form is built, not at load (a page-wide listener at start shows in the startup golden, #11889).
-    modal.addEventListener('change', e => { if (!e.target || e.target.id !== 'launch-team-trust') return; clearTimeout(_trustTimer); _trustGeneration++; _defaultUsed = true; _trustFor = e.target.checked ? (document.getElementById('launch-team-dir')?.value.trim() || '') : ''; _view?.refresh(); }); // the sentence under the switch follows it
+    modal.addEventListener('change', e => { if (!e.target || e.target.id !== 'launch-team-trust') return; clearTimeout(_trustTimer); _trustGeneration++; _defaultUsed = true; _trustFor = e.target.checked ? (document.getElementById('launch-team-dir')?.value.trim() || '') : ''; _view?.refresh(); const g = _trustGeneration; if (_trustFor && !isHub()) probeTrust(_trustFor).then(r => { if (g === _trustGeneration && r?.refused) { _trustNote = r.refused; _trustFor = ''; _view?.set('trust', false); _view?.refresh(); } }); }); // the sentence under the switch follows it
     joinBrowse('launch-team-dir', 'btn-browse-team'); // Browse at the input's right, as Open folder has it (#9489)
     const server = document.getElementById('team-board-server'); if (server) server.disabled = true; // the machine's own entry reveals it (launch_dialog.js _syncTeamAddress)
     showTeamAddress(false);
