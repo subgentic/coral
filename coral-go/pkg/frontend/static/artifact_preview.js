@@ -6,8 +6,7 @@ import { CORAL_ARTIFACT_URI_RE, resolveArtifactSource, manifestDownload } from '
 export { resolveArtifactSource, manifestDownload };
 import { escapeHtml, escapeAttr, renderImagePanes } from './utils.js';
 const { renderJSONReport } = await importOnce('./artifact_report.js'); // lazy, retried if it fails to load
-import { splitKey, serverUrl, contextServer, isCloud, artifactPath, boardTeamKey } from './server_base.js';
-import { inlineArtifactPath } from './artifact_paths.js';
+import { serverUrl, isCloud, artifactPath, boardTeamKey } from './server_base.js';
 import { isSvg, svgDataUrl } from './image_source.js';
 import { wireDownloads } from './artifact_download.js';
 import { lockFrame, sandboxedDoc } from './sandbox_frame.js';
