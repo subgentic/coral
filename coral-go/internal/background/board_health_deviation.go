@@ -116,6 +116,9 @@ func (m *BoardHealthMonitor) deviationItems(ctx context.Context, project string,
 		}
 		on := target.label
 		if target.sub != nil {
+			if board.SameIdentity(target.sub.SubscriberID, w.SubscriberID) {
+				continue // a wait on one's own task is not a wait (#18064)
+			}
 			if rcpt != nil && board.SameIdentity(target.sub.SubscriberID, rcpt.SubscriberID) {
 				continue // a wait on the recipient is a line of its own
 			}
