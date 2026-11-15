@@ -14,6 +14,7 @@ const ASKS_ARE_TASKS_HINT = 'When an agent needs another agent to do something, 
 const WORKFLOW_HINT = 'Guidance the agents get on how to share the folder. It does not create worktrees.';
 
 let _view = null;
+let _listening = null; // the listeners a mount put on the persistent host (aborted by the next mount)
 let _defaultExtra = {};
 let _defaultMode = 'none'; // the working mode a new team starts with: 'none', or the one the chosen team template names (#8919)
 
@@ -70,6 +71,9 @@ export function mountTeamLaunchSettings() {
     const host = document.getElementById('team-start-host');
     if (!host) return;
     if (_view) _view.destroy();
+    if (_listening) _listening.abort(); // the host outlives each mount: the last mount's listeners would put its own goal line back beside this one's (#17339, F12: the line showed twice)
+    _listening = new AbortController();
+    const { signal } = _listening;
     _defaultMode = 'none'; _defaultExtra = {};
     host.replaceChildren();
     _view = mountSettingsView(host, {
@@ -100,7 +104,7 @@ export function mountTeamLaunchSettings() {
     lead.textContent = 'Everything on this step is optional. The team starts with the settings shown here.';
     host.querySelector('.settings-panes')?.prepend(lead);
     wireApproval(_view, host, { flagKeys: ['require_goal'], follow: false, autoClearsRequireGoal: true }); // a choice sets Require a goal as it needs; the two approval switches are Team settings'
-    host.addEventListener('input', syncMenuStates); host.addEventListener('change', syncMenuStates);
+    host.addEventListener('input', syncMenuStates, { signal }); host.addEventListener('change', syncMenuStates, { signal });
     // the goal switch's state in words, so ticking it twice is seen (#11336: a newcomer clicks it to "tick" it and turns it off)
     const state = document.createElement('p'); state.className = 'sv-hint team-goal-state'; state.id = 'team-goal-state'; state.setAttribute('role', 'status');
     const syncGoalState = () => {
@@ -110,7 +114,7 @@ export function mountTeamLaunchSettings() {
         sw.setAttribute('aria-describedby', state.id);
         state.textContent = !sw.checked ? "Off: the first task will not be saved as a goal." : task && task.value.trim() ? "On: the first task will also be the team's goal." : "On: a first task, once you write one, will also be the team's goal.";
     };
-    host.addEventListener('input', syncGoalState); host.addEventListener('change', syncGoalState);
+    host.addEventListener('input', syncGoalState, { signal }); host.addEventListener('change', syncGoalState, { signal });
     _view.ready.then(syncGoalState);
     _view.ready.then(syncMenuStates);
 }

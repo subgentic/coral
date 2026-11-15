@@ -87,6 +87,13 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         check(/^On: the first task will also be the team's goal/.test(gs.withTask || ''), `with a task written: ${JSON.stringify(gs.withTask)}`);
         check(/^Off: the first task will not be saved as a goal/.test(gs.off || '') && gs.read === false, `clicked once it says Off and sends no goal: ${JSON.stringify([gs.off, gs.read])}`);
         check(/^On: the first task will also/.test(gs.backOn || '') && gs.readOn === true, `clicked again it says On: ${JSON.stringify([gs.backOn, gs.readOn])}`);
+        // (5b) #17339 F12: the team dialog mounts this step every time it opens, on a host that stays: the goal line is still one line after the dialog was opened twice and a field was typed in
+        await ev(`import(${S} + 'team_launch_settings.js').then(m => { const h = document.createElement('div'); h.id = 'team-start-host'; document.body.append(h); m.mountTeamLaunchSettings(); m.mountTeamLaunchSettings(); return true; })`);
+        await waitFor(`!!document.getElementById('team-goal-state')`, 'the goal state line after two mounts', 8000);
+        await ev(`(() => { const task = document.getElementById('team-goal'); task.value = 'x'; task.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+        const lines = await ev(`document.querySelectorAll('#team-start-host .team-goal-state').length`);
+        check(lines === 1, `the goal line is drawn once after the dialog was opened twice: ${lines}`);
+        await ev(`document.getElementById('team-start-host').remove(); true`);
         // (6) New Agent says Claude is not signed in, with how (#11336): a notice under the provider, Launch stays on, nothing for another provider
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
