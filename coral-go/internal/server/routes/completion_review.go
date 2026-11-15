@@ -26,10 +26,11 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 		Artifacts         []board.TaskArtifact `json:"artifacts"`
 		ExpectedRevision  *int                 `json:"expected_revision,omitempty"`
 		CandidateRevision string               `json:"candidate_revision,omitempty"`
-		HeadSHA           string               `json:"head_sha,omitempty"`  // the commit at the head of the author's branch (#17643)
-		Areas             []string             `json:"areas,omitempty"`     // the review's areas (#8957); absent: from paths when they are listed
-		Reviewers         int                  `json:"reviewers,omitempty"` // 1 (the default) or 2
-		Paths             []string             `json:"paths,omitempty"`     // the files the change touches, when the caller knows them
+		HeadOrigin        string               `json:"head_origin,omitempty"` // what the author's checkout found on origin: found, missing or unchecked (#17992)
+		HeadSHA           string               `json:"head_sha,omitempty"`    // the commit at the head of the author's branch (#17643)
+		Areas             []string             `json:"areas,omitempty"`       // the review's areas (#8957); absent: from paths when they are listed
+		Reviewers         int                  `json:"reviewers,omitempty"`   // 1 (the default) or 2
+		Paths             []string             `json:"paths,omitempty"`       // the files the change touches, when the caller knows them
 	}
 	derr := decodeJSON(r, &body)
 	if derr == nil {
@@ -44,6 +45,10 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if h.refuseShortArtifactRefs(w, r, &body.Message) || h.refuseShortArtifactRefs(w, r, &body.Reason) { // #9841
+		return
+	}
+	if o := body.HeadOrigin; o != "" && o != "found" && o != "missing" && o != "unchecked" {
+		errBadRequest(w, "head_origin must be found, missing or unchecked")
 		return
 	}
 	if !board.ValidHead(body.HeadSHA) {
@@ -73,7 +78,7 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 		}
 		return
 	}
-	if err := h.bs.SetSubmittedHead(r.Context(), project, id, body.HeadSHA); err != nil {
+	if err := h.bs.SetSubmittedHead(r.Context(), project, id, body.HeadSHA, body.HeadOrigin); err != nil {
 		errTaskStore(w, err)
 		return
 	}
@@ -106,7 +111,7 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 		candidate = fmt.Sprintf("%d artifacts", len(body.Artifacts))
 	}
 	if head := strings.ToLower(strings.TrimSpace(body.HeadSHA)); head != "" {
-		candidate += ", head " + board.ShortHead(head) // the commit every reviewer is to read (#17643)
+		candidate += ", head " + board.ShortHead(head) + board.HeadOriginWords(body.HeadOrigin) // the commit every reviewer is to read (#17643)
 	}
 	if reopened != nil {
 		// Resubmitted after a rejection (#3787): its reviewers review the new revision, with no

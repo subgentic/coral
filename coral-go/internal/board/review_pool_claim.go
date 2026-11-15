@@ -192,7 +192,7 @@ func (s *Store) takePoolReview(ctx context.Context, project string, id int64, re
 	} else {
 		round = len(w.ReviewRounds) + 1
 	}
-	rt, err := s.CreateTaskWithOpts(ctx, project, fmt.Sprintf("Review #%d: %s", id, task.Title), reviewTaskBody(id, task.Title, w.OriginalAuthor, round, headOf(&w)), task.Priority, "Coral Task Queue",
+	rt, err := s.CreateTaskWithOpts(ctx, project, fmt.Sprintf("Review #%d: %s", id, task.Title), reviewTaskBody(id, task.Title, w.OriginalAuthor, round, headOf(&w), originOf(&w)), task.Priority, "Coral Task Queue",
 		&CreateTaskOpts{Workflow: TaskWorkflow{ReviewOf: id, ReviewRound: round}, reviewTask: true}, reviewer)
 	if err != nil {
 		return nil, err

@@ -73,6 +73,12 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 		}
 		if head != "" {
 			body["head_sha"] = head
+			origin := headOnOrigin(head)
+			body["head_origin"] = origin
+			headFrom += map[string]string{"found": "; at the tip of a branch on origin", "missing": "; NOT at the tip of any branch on origin: push it first", "unchecked": "; origin could not be checked"}[origin]
+		}
+		if *sha == "" && inSharedCheckout() {
+			fmt.Fprintln(os.Stderr, "Warning: this is the shared checkout, not a worktree: other agents commit here, so HEAD may not be your commit. Name yours with --sha <commit>.")
 		}
 	} else if *sha != "" {
 		fmt.Fprintln(os.Stderr, "--sha belongs to submit-review")
@@ -361,4 +367,34 @@ func currentGitHead() string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// headOnOrigin asks origin for its branch and tag tips and says whether head is one of them: "found", "missing" (unpushed, or behind a newer tip), or "unchecked" (no origin, no network, git slow). A short head
+// matches by prefix. The answer is this checkout's, which the review brief words as such (#17992).
+func headOnOrigin(head string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "git", "ls-remote", "origin").Output()
+	if err != nil {
+		return "unchecked"
+	}
+	head = strings.ToLower(head)
+	for _, line := range strings.Split(string(out), "\n") {
+		if f := strings.Fields(line); len(f) >= 1 && strings.HasPrefix(strings.ToLower(f[0]), head) {
+			return "found"
+		}
+	}
+	return "missing"
+}
+
+// inSharedCheckout reports whether the command runs in a repository's main checkout rather than a linked worktree: git's own folder and the common one are the same there (#17992).
+func inSharedCheckout() bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "git", "rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir").Output()
+	if err != nil {
+		return false
+	}
+	lines := strings.Fields(string(out))
+	return len(lines) == 2 && lines[0] == lines[1]
 }

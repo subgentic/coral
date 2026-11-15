@@ -195,7 +195,7 @@ func reopenReviews(ctx context.Context, tx *sqlx.Tx, project string, id int64, w
 	}
 	round := ReviewRound{Round: last.Round + 1, DelegatedBy: "resubmitted", DelegatedAt: nowUTC()}
 	for _, r := range last.Reviewers {
-		body := reviewTaskBody(id, title, w.OriginalAuthor, round.Round, headOf(w))
+		body := reviewTaskBody(id, title, w.OriginalAuthor, round.Round, headOf(w), originOf(w))
 		if _, err := tx.ExecContext(ctx, `UPDATE board_tasks SET status=CASE WHEN status IN ('pending','in_progress') THEN status ELSE 'pending' END,
 			completed_by=NULL, completion_message=NULL, completed_at=NULL, body=?, edited_at=? WHERE id=? AND board_id=?`, body, nowUTC(), r.ReviewTaskID, project); err != nil {
 			return nil, err
@@ -215,9 +215,9 @@ func reopenReviews(ctx context.Context, tx *sqlx.Tx, project string, id int64, w
 }
 
 // reviewTaskBody is a review task's text for a round.
-func reviewTaskBody(id int64, title, author string, round int, head string) string {
+func reviewTaskBody(id int64, title, author string, round int, head, origin string) string {
 	if head != "" {
-		head = "\nSubmitted head: " + ShortHead(head) + " (review this commit)."
+		head = "\nSubmitted head: " + ShortHead(head) + HeadOriginWords(origin) + " (review this commit)."
 	}
 	return fmt.Sprintf("Review task #%d, %q, for %s (round %d)."+head+"\nRead it: coral-board task detail %d\nThen: coral-board task approve %d --round %d [--note \"...\"], or coral-board task reject %d --round %d --note \"why\".",
 		id, title, author, round, id, id, round, id, round)
@@ -292,7 +292,7 @@ func (s *Store) DelegateReview(ctx context.Context, project string, id int64, ac
 			round.Reviewers = append(round.Reviewers, prev) // kept, with any verdict given
 			continue
 		}
-		rt, err := s.CreateTaskWithOpts(ctx, project, fmt.Sprintf("Review #%d: %s", id, task.Title), reviewTaskBody(id, task.Title, w.OriginalAuthor, round.Round, headOf(&w)), task.Priority, actor,
+		rt, err := s.CreateTaskWithOpts(ctx, project, fmt.Sprintf("Review #%d: %s", id, task.Title), reviewTaskBody(id, task.Title, w.OriginalAuthor, round.Round, headOf(&w), originOf(&w)), task.Priority, actor,
 			&CreateTaskOpts{Workflow: TaskWorkflow{ReviewOf: id, ReviewRound: round.Round}, reviewTask: true}, r)
 		if err != nil {
 			return nil, nil, err

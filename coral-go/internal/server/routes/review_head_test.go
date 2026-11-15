@@ -27,3 +27,15 @@ func TestSubmitReviewRecordsAndNamesTheSubmittedHead(t *testing.T) {
 	assert.Equal(t, head, got.Workflow.CompletionReview.HeadSHA)
 	assert.Contains(t, boardText(t, h, "head"), "head "+head[:12], "the notice names the commit")
 }
+
+// #17992: the notice says what the author's checkout found about the head on origin; an unknown value is refused before anything is recorded.
+func TestSubmitReviewNoticeSaysWhetherTheHeadIsOnOrigin(t *testing.T) {
+	base, h, task, _ := poolTeam(t, "headorigin")
+	head := "0123456789abcdef0123456789abcdef01234567"
+	code, out := submitWith(t, base, task.ID, map[string]any{"head_sha": head, "head_origin": "trust me"})
+	require.Equal(t, http.StatusBadRequest, code, "%v", out)
+
+	code, out = submitWith(t, base, task.ID, map[string]any{"head_sha": head, "head_origin": "missing"})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Contains(t, boardText(t, h, "headorigin"), "head "+head[:12]+" (NOT at the tip of any branch on origin: ask the author to push it)")
+}

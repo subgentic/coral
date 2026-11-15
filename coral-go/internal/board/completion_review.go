@@ -20,7 +20,9 @@ type CompletionReview struct {
 	Reason            string         `json:"reason"`
 	CandidateRevision string         `json:"candidate_revision,omitempty"`
 	// HeadSHA: the commit at the head of the author's branch when it was submitted (#17643), so the review brief and the reviewers name the same commit. Not the candidate revision: no gate reads it.
-	HeadSHA       string                 `json:"head_sha,omitempty"`
+	HeadSHA string `json:"head_sha,omitempty"`
+	// HeadOrigin: what the author's checkout found when it asked origin for its branch tips (#17992): "found" (the head is a branch tip there), "missing" (it is not: unpushed or behind), "unchecked" (it could not ask). A claim of the author's checkout, worded as one.
+	HeadOrigin    string                 `json:"head_origin,omitempty"`
 	GateResults   []CompletionGateResult `json:"gate_results,omitempty"`
 	ReleasedBy    string                 `json:"released_by,omitempty"`
 	ReleasedAt    string                 `json:"released_at,omitempty"`
@@ -196,8 +198,11 @@ func ShortHead(sha string) string {
 
 // SetSubmittedHead records the commit the author submitted (#17643) on the task's completion review, which submit-review has just written. A value that is not a commit id
 // (7 to 64 hex digits) is refused, so a brief never carries free text as a commit.
-func (s *Store) SetSubmittedHead(ctx context.Context, project string, id int64, head string) error {
+func (s *Store) SetSubmittedHead(ctx context.Context, project string, id int64, head, origin string) error {
 	head = strings.ToLower(strings.TrimSpace(head))
+	if origin != "" && origin != "found" && origin != "missing" && origin != "unchecked" {
+		return fmt.Errorf("head_origin must be found, missing or unchecked")
+	}
 	if head == "" {
 		return nil
 	}
@@ -217,6 +222,7 @@ func (s *Store) SetSubmittedHead(ctx context.Context, project string, id int64, 
 		return nil
 	}
 	w.CompletionReview.HeadSHA = head
+	w.CompletionReview.HeadOrigin = origin
 	if err := saveWorkflow(ctx, tx, id, w); err != nil {
 		return err
 	}
@@ -229,4 +235,25 @@ func headOf(w *TaskWorkflow) string {
 		return ""
 	}
 	return w.CompletionReview.HeadSHA
+}
+
+// originOf is what the author's checkout said about the head on origin ("" when it said nothing).
+func originOf(w *TaskWorkflow) string {
+	if w == nil || w.CompletionReview == nil {
+		return ""
+	}
+	return w.CompletionReview.HeadOrigin
+}
+
+// HeadOriginWords is what a notice or a review task says about the head on origin, in plain words: it is the author's checkout that asked (git ls-remote), so a reader can weigh it.
+func HeadOriginWords(origin string) string {
+	switch origin {
+	case "found":
+		return " (the author's checkout found it at the tip of a branch on origin)"
+	case "missing":
+		return " (NOT at the tip of any branch on origin: ask the author to push it)"
+	case "unchecked":
+		return " (the author's checkout could not check origin)"
+	}
+	return ""
 }

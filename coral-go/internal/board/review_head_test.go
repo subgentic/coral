@@ -1,6 +1,7 @@
 package board
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -23,9 +24,9 @@ func TestTheSubmittedHeadIsNamedForReviewersAndStampedOnTheirVerdict(t *testing.
 	_, err = s.SubmitCompletionReviewAtRevisionAndCandidate(ctx, "team", task.ID, "Dev", "built", "", "ready", []TaskArtifact{{Name: "c.md", Content: "c"}}, nil, "")
 	require.NoError(t, err)
 
-	require.Error(t, s.SetSubmittedHead(ctx, "team", task.ID, "the trial merge"), "free text is not a commit")
+	require.Error(t, s.SetSubmittedHead(ctx, "team", task.ID, "the trial merge", ""), "free text is not a commit")
 	head := "0123456789abcdef0123456789abcdef01234567"
-	require.NoError(t, s.SetSubmittedHead(ctx, "team", task.ID, strings.ToUpper(head)))
+	require.NoError(t, s.SetSubmittedHead(ctx, "team", task.ID, strings.ToUpper(head), ""))
 	_, _, err = s.HandToOrchestrator(ctx, "team", task.ID, "Dev")
 	require.NoError(t, err)
 	_, reviewTasks, err := s.DelegateReview(ctx, "team", task.ID, "lead", []string{"QA"})
@@ -51,5 +52,18 @@ func TestATaskSubmittedWithNoHeadReadsAsBefore(t *testing.T) {
 	assert.False(t, ValidHead("not a sha"))
 	assert.Equal(t, "", headOf(nil))
 	assert.Equal(t, "0123456789ab", ShortHead("0123456789abcdef"))
-	assert.NotContains(t, reviewTaskBody(1, "t", "a", 1, ""), "Submitted head")
+	assert.NotContains(t, reviewTaskBody(1, "t", "a", 1, "", ""), "Submitted head")
+}
+
+// #17992: the brief says whether the author's checkout found the head on origin, in words that name the author's checkout as the one that asked, and an unknown value is refused.
+func TestTheReviewTaskSaysWhetherTheHeadIsOnOrigin(t *testing.T) {
+	head := "0123456789abcdef0123456789abcdef01234567"
+	found := reviewTaskBody(1, "t", "a", 1, head, "found")
+	assert.Contains(t, found, "Submitted head: 0123456789ab (the author's checkout found it at the tip of a branch on origin)")
+	assert.Contains(t, reviewTaskBody(1, "t", "a", 1, head, "missing"), "NOT at the tip of any branch on origin: ask the author to push it")
+	assert.Contains(t, reviewTaskBody(1, "t", "a", 1, head, "unchecked"), "could not check origin")
+	assert.NotContains(t, reviewTaskBody(1, "t", "a", 1, head, ""), "origin", "an older client names nothing")
+
+	s := testStore(t)
+	require.Error(t, s.SetSubmittedHead(context.Background(), "team", 1, head, "trust me"), "free text is not an origin state")
 }
