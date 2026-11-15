@@ -117,8 +117,8 @@ document.addEventListener("click", async (e) => {
 });
 
 // #16701: tap a reply bubble to reveal its copy button; tap elsewhere to hide it.
-const _cr = import('./copy_reveal.js');
-document.addEventListener("click", (e) => { _cr.then(m => m.reveal(e.target)); });
+importOnce('./copy_reveal.js');
+document.addEventListener("click", (e) => { importOnce('./copy_reveal.js').then(m => m.reveal(e.target)); });
 
 // The intent: pointer over, touch or keyboard focus on the Terminal button (it exists in the page from the start).
 for (const type of ["pointerover", "touchstart", "focusin"]) {
