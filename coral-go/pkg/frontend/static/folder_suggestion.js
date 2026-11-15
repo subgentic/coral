@@ -34,6 +34,7 @@ function freshFolder(root, name, recents) {
  *  folders being only ones Coral itself made (the first agent's) is no reason to leave the field empty: a team is offered its own new folder beside them (#11336). */
 export function offerSuggestion(input, line, name, { afterCoralMade = false } = {}) {
     if (!input || input.dataset.dirServer) return;
+    if (!input.dataset.typeOver) { input.dataset.typeOver = '1'; input.addEventListener('beforeinput', e => { if (e.inputType?.startsWith('insert') && usesSuggestion(input) && input.selectionStart === input.selectionEnd) input.select(); }); } // typing over the suggestion replaces it, never appends to it (#16652)
     const now = input.value.trim();
     if (now && !usesSuggestion(input)) { showLine(input, line, false); return; }
     const recents = getRecentDirs(LOCAL_SERVER), mayOffer = !recents.length || (afterCoralMade && onlyCoralMadeRecents(input.dataset.coralRoot, recents));
