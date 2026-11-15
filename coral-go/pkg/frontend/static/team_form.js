@@ -56,6 +56,18 @@ export function scheduleFolderTrust(event) {
     }, 400);
 }
 
+/** The Trust switch ticked on a folder that is already in the field (typed or filled by a link, so the folder's own check did not run): ask the same question now. A folder the server refuses (a shared place such as /tmp,
+ *  too close to a disk's root) unticks the switch and says why here, before Launch, not as a toast after it (#17339, F5). */
+export async function checkTickedTrust() {
+    const t = document.getElementById('launch-team-trust'), d = document.getElementById('launch-team-dir'), dir = d?.value.trim();
+    if (!t || !t.checked || !dir || isHub() || d.dataset.dirServer || dir === _trustFor) return;
+    const generation = _trustGeneration;
+    let result = null;
+    try { const response = await fetch('/api/filesystem/trust-probe?path=' + encodeURIComponent(dir), { signal: AbortSignal.timeout(3000) }); if (response.ok) result = await response.json(); } catch { /* the launch decides */ }
+    if (generation !== _trustGeneration || d.value.trim() !== dir || !result?.refused) return;
+    _trustNote = result.refused; _view?.set('trust', false); _view?.refresh();
+}
+
 /** True when the person ticked "Trust this folder" for the folder that is in the field now, and the switch shows: the one case the launch asks for trust (#11889). */
 export function trustTicked() {
     const t = document.getElementById('launch-team-trust'), d = document.getElementById('launch-team-dir');
