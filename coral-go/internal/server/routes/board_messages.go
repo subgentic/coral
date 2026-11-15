@@ -149,15 +149,9 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if derr == nil && body.SameAs != 0 {
-		if !body.Ask {
-			errBadRequest(w, "--same-as links a question to an earlier one: use it with --ask")
-			return
-		}
-		if body.SameAs < 0 || h.checkSameAs(r.Context(), project, body.SameAs, asked) != nil {
-			errBadRequest(w, fmt.Sprintf("message %d is not an open question of this team put to the same people, so this one cannot be the same as it", body.SameAs))
-			return
-		}
+	if derr == nil && body.SameAs != 0 && !body.Ask {
+		errBadRequest(w, "--same-as links a question to an earlier one: use it with --ask")
+		return
 	}
 	if derr == nil && (body.AskGoal != 0 || body.AskTask != 0) {
 		if !body.Ask {
@@ -185,6 +179,12 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 	if derr == nil && len(body.Buttons) > 0 {
 		var ok bool
 		if buttons, ok = h.checkAskButtons(w, r, project, body, asked); !ok {
+			return
+		}
+	}
+	if derr == nil && body.SameAs != 0 {
+		if body.SameAs < 0 || h.checkSameAs(r.Context(), project, body.SameAs, asked, body.SubscriberID, clitext.Clean(unescapeLineBreaks(body.Content)), buttons) != nil {
+			errBadRequest(w, fmt.Sprintf("message %d is not an open question of this team put to the same people, by you or in the same words and buttons, so this one cannot be the same as it", body.SameAs))
 			return
 		}
 	}
@@ -221,7 +221,7 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 				slog.Warn("board ask not recorded", "board", project, "message", msg.ID, "error", err)
 			} else {
 				h.recordAskSubject(r.Context(), project, msg, body.AskGoal, body.AskTask)
-				if body.SameAs > 0 && h.checkSameAs(r.Context(), project, body.SameAs, to) != nil {
+				if body.SameAs > 0 && h.checkSameAs(r.Context(), project, body.SameAs, to, msg.SubscriberID, msg.Content, buttons) != nil {
 					slog.Warn("board ask not linked: not put to the same people", "board", project, "message", msg.ID, "same_as", body.SameAs)
 				} else if body.SameAs > 0 {
 					if err := h.bs.LinkAsk(r.Context(), project, msg.ID, body.SameAs); err != nil {
@@ -985,8 +985,9 @@ func (h *BoardHandler) answerDuplicateOperatorAsk(w http.ResponseWriter, r *http
 }
 
 // checkSameAs: id is an ask of this team that nobody has answered or closed yet, put to exactly the people the new ask is put to (#17738). An answer to one counts for the other, so it must be an answer the other
-// would take: a question to a teammate can never stand in for the Operator's, nor the other way round.
-func (h *BoardHandler) checkSameAs(ctx context.Context, project string, id int64, asked []string) error {
+// would take: a question to a teammate can never stand in for the Operator's, nor the other way round. And it is the same question (#17882): asked by the same agent, or in the same words with the same buttons;
+// otherwise 'may I delete X?' could be linked to an open 'which database?' and be told it got that answer.
+func (h *BoardHandler) checkSameAs(ctx context.Context, project string, id int64, asked []string, asker, content string, buttons []board.AskButton) error {
 	m, err := h.bs.GetMessageByID(ctx, project, id)
 	if err != nil || m == nil || m.Ask == nil {
 		return board.ErrAskUnknown
@@ -999,6 +1000,21 @@ func (h *BoardHandler) checkSameAs(ctx context.Context, project string, id int64
 	}
 	for _, a := range asked {
 		if !askedHas(m.Ask.To, a) {
+			return board.ErrAskUnknown
+		}
+	}
+	if strings.EqualFold(m.SubscriberID, asker) {
+		return nil
+	}
+	if !strings.EqualFold(strings.Join(strings.Fields(m.Content), " "), strings.Join(strings.Fields(content), " ")) {
+		return board.ErrAskUnknown
+	}
+	theirs, err := h.bs.AskButtonsOf(ctx, project, []int64{id})
+	if err != nil || len(theirs[id]) != len(buttons) {
+		return board.ErrAskUnknown
+	}
+	for i, b := range theirs[id] {
+		if b.Label != buttons[i].Label || b.Action != buttons[i].Action || b.Arg != buttons[i].Arg {
 			return board.ErrAskUnknown
 		}
 	}

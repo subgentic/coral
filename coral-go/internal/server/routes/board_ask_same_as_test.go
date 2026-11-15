@@ -45,7 +45,7 @@ func TestSameAsLinksAsksAndOneAnswerClosesBoth(t *testing.T) {
 	h, bs, post := sameAsRig(t)
 	code, first := post(map[string]any{"subscriber_id": "Dev A", "content": "@Operator which parser do we ship?", "ask": true})
 	require.Equal(t, 200, code, "%v", first)
-	code, second := post(map[string]any{"subscriber_id": "Dev B", "content": "@Operator which parser should I use?", "ask": true, "same_as": sameAsID(first)})
+	code, second := post(map[string]any{"subscriber_id": "Dev B", "content": "@Operator  which parser do we ship?\n", "ask": true, "same_as": sameAsID(first)})
 	require.Equal(t, 200, code, "%v", second)
 	_, alone := post(map[string]any{"subscriber_id": "Dev B", "content": "@Operator unrelated question?", "ask": true})
 
@@ -156,4 +156,24 @@ func TestClosingAGoalRetiresItsAsksAndTellsTheAskers(t *testing.T) {
 		}
 	}
 	assert.True(t, told, "the asker is told")
+}
+
+// #17882 (Security's SHOULD on #17769): --same-as links only the same question: by the same asker, or in the same words with the same buttons. A different agent's different question is refused, so an
+// agent cannot tell the Operator's open 'which database?' answered 'may I delete X?'.
+func TestSameAsNeedsTheSameAskerOrTheSameWords(t *testing.T) {
+	_, _, post := sameAsRig(t)
+	_, open := post(map[string]any{"subscriber_id": "Dev A", "content": "@Operator which database do we use?", "ask": true})
+	code, out := post(map[string]any{"subscriber_id": "Dev B", "content": "@Operator may I delete the production table?", "ask": true, "same_as": sameAsID(open)})
+	assert.Equal(t, http.StatusBadRequest, code, "another agent's different words are not the same question: %v", out)
+	code, out = post(map[string]any{"subscriber_id": "Dev A", "content": "@Operator and which cache?", "ask": true, "same_as": sameAsID(open)})
+	assert.Equal(t, 200, code, "the same asker may link their own later question: %v", out)
+	code, out = post(map[string]any{"subscriber_id": "Dev B", "content": "@Operator WHICH database   do we use?", "ask": true, "same_as": sameAsID(open)})
+	assert.Equal(t, 200, code, "the same words (spacing and case aside) are the same question: %v", out)
+	// buttons are part of the question: the same words with other buttons are not the same
+	_, withBtn := post(map[string]any{"subscriber_id": "Dev A", "content": "@Operator ship it?", "ask": true, "buttons": []string{"Yes=reply", "No=reply"}})
+	require.Contains(t, withBtn, "id", "%v", withBtn)
+	code, out = post(map[string]any{"subscriber_id": "Dev B", "content": "@Operator ship it?", "ask": true, "buttons": []string{"Yes=wake:Dev C", "No=reply"}, "same_as": sameAsID(withBtn)})
+	assert.Equal(t, http.StatusBadRequest, code, "other buttons are another question: %v", out)
+	code, out = post(map[string]any{"subscriber_id": "Dev B", "content": "@Operator ship it?", "ask": true, "buttons": []string{"Yes=reply", "No=reply"}, "same_as": sameAsID(withBtn)})
+	assert.Equal(t, 200, code, "the same buttons are the same question: %v", out)
 }

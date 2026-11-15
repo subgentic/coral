@@ -124,9 +124,18 @@ export function openAskDialog(a, onDone, runners = {}) {
         if (offered && !binary) reading.append(offered);
         if (offered && binary) { offered.classList.add('inbox-ask-yes-no'); offered.replaceChildren(offered.querySelector('.inbox-ask-offers-list')); sendRow.insertBefore(offered, send); }
     };
+    // Linked asks (post --same-as): an agent who put the question in other words or with other buttons has them listed here, as written, so the Operator sees each one's own words and not only the oldest's (#17882).
+    const norm = t => String(t || '').replace(/\s+/g, ' ').trim().toLowerCase(), sig = x => (x.buttons || []).map(b => `${b.label}=${b.action}:${b.arg || ''}`).join('|');
+    const others = (a.duplicates || []).filter(x => norm(x.text) !== norm(a.text) || sig(x) !== sig(a));
     const foot = document.createElement('div'); foot.className = 'inbox-ask-foot'; foot.append(row); // Reply attachments belong with the reply box; the footer holds its final actions
     const reading = document.createElement('div'); reading.className = 'inbox-ask-reading'; reading.tabIndex = -1;
     if (!whole.hidden) reading.append(whole);
+    if (others.length) {
+        const sec = document.createElement('section'); sec.className = 'inbox-ask-others'; sec.setAttribute('aria-label', 'Also asked, in their own words');
+        const h = document.createElement('h3'); h.textContent = 'Also asked, in their own words'; sec.append(h);
+        others.forEach(x => { const p = document.createElement('p'); p.textContent = `${markHidden(x.asker || 'Agent', { strict: true })}: ${markHidden(String(x.text || '').slice(0, 300), { strict: true })}${(x.buttons || []).length ? ` (buttons: ${x.buttons.map(b => markHidden(b.label, { strict: true })).join(', ')})` : ''}`; sec.append(p); });
+        reading.append(sec);
+    }
     const compose = document.createElement('div'); compose.className = 'inbox-ask-compose';
     const addSlot = document.createElement('div'); addSlot.className = 'inbox-ask-attach'; pics.append(addSlot);
     const sendRow = document.createElement('div'); sendRow.className = 'inbox-ask-sendrow'; const pickSlot = document.createElement('span'); pickSlot.className = 'inbox-ask-pick'; sendRow.append(pickSlot, send); addSlot.append(sendRow); // Add image on the left, Send reply on the right, the pictures note under them (#13148)
