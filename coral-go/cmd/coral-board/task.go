@@ -27,6 +27,7 @@ Subcommands:
   review <id> --to "Security Reviewer,QA Engineer"   (orchestrator: delegate a task in review)
   approve <id> [--round N] [--note "..."] / reject <id> [--round N] --note "why"   (a delegated reviewer)
   attach <id> --artifacts manifest.json / send-back <id> --note "why" / mark-landed <id> --digest D [--commit SHA[:subject]]   (the merge queue)
+  unlanded [--since DATE] [--json]   (completed tasks whose commit is not on main)
   complete <id> [--message "note"]`)
 		clierr.Exit1()
 	}
@@ -105,6 +106,8 @@ Subcommands:
 		cmdTaskReview(st, taskArgs, sub)
 	case "review", "approve", "reject":
 		cmdTaskReviewFlow(st, taskArgs, sub)
+	case "unlanded":
+		cmdTaskUnlanded(st, taskArgs)
 	case "attach", "send-back", "mark-landed":
 		cmdTaskQueueVerb(st, taskArgs, sub)
 	case "complete":
@@ -155,6 +158,7 @@ Subcommands:
   attach <id> --artifacts manifest.json    Add patch rows to a task in review (a next revision, a reviewer's fix); a reviewer who had approved reviews the new bytes again
   send-back <id> --note "why"              The orchestrator returns an approved, completed task to its author (a fix after approval, a patch that would not apply)
   mark-landed <id> --digest D [--digest D2] [--commit SHA[:subject]]  The orchestrator (or the Operator) records that the approved patches with these digests landed, and the commits that landed them; a digest its round did not approve is refused
+  unlanded [--since YYYY-MM-DD] [--main REF] [--repo DIR] [--json]  Completed tasks whose commit (from the submit reason or note, else a branch named for the task) is not an ancestor of main (default origin/main); read-only, runs git in the repo
   release-review <id> --reason "slot released pending review" (orchestrator only; for a candidate submitted before v1.4.56)
   complete <id> [--revision N] [--message "note"] [--outcome success|failed] [--candidate-revision REVISION] [--artifacts manifest.json]
   cancel <id> [--message "reason"]
