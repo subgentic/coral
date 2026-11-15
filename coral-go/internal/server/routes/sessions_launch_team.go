@@ -339,11 +339,13 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		}
 		// A member that names no mode starts in the new default of its type (#14336: Auto for Claude and Codex, Bypass for Hermes and opencode), or the Operator's saved default, as a single launch does;
 		// for an agent's launch it is the default CAPPED by the launching agent (above). A member whose form says Default sends it, and starts in Default (#10362, the form's own pick).
-		if seedGrant { // the seat of a team the Operator is starting gets its grant right after it starts (#13891): its first prompt is built as if it were on already (#17622)
-			grantStarting.Store(body.BoardName, true)
-		}
-		entry, category := h.launchTeamMember(ctx, body, agentDef, userSettings, workingDir, worktreePath, teamID, !fromAgent && !teamIsRelaunch(body) && autoDefaultAllowed(ctx, r, h.ss), !fromAgent && memberAt == seatAt)
-		grantStarting.Delete(body.BoardName)
+		entry, category := func() (map[string]any, string) {
+			if seedGrant { // the seat of a team the Operator is starting gets its grant right after it starts (#13891): its first prompt is built as if it were on already (#17622)
+				grantStarting.Store(body.BoardName, true)
+				defer grantStarting.Delete(body.BoardName) // also when the start panics: the mark never outlives the member's start (#17662)
+			}
+			return h.launchTeamMember(ctx, body, agentDef, userSettings, workingDir, worktreePath, teamID, !fromAgent && !teamIsRelaunch(body) && autoDefaultAllowed(ctx, r, h.ss), !fromAgent && memberAt == seatAt)
+		}()
 		_, memberFailed := entry["error"]
 		sidMade, _ := entry["session_id"].(string)
 		h.endAgentLaunch(ctx, h.accountingBoard(r, body.BoardName, body.BoardServer), lifeID, !memberFailed, launcherWords(h.orchActorOf(r))+" started "+orchName(agentDef.Name), sidMade)

@@ -138,8 +138,8 @@ func NewWithKey(cfg *config.Config, db *store.DB, backend ptymanager.TerminalBac
 		}
 	}
 	if boardStore != nil {
-		agent.SetBoardGoalsBrief(boardGoalsPromptBlock(boardStore))       // an agent's board system prompt lists the board's open goals (#7296)
-		agent.SetBoardAbilities(routes.BoardAbilitiesSection(boardStore)) // an Orchestrator's system prompt lists what its team's settings let it do (#17622)
+		agent.SetBoardGoalsBrief(boardGoalsPromptBlock(boardStore))                                  // an agent's board system prompt lists the board's open goals (#7296)
+		agent.SetBoardAbilities(routes.BoardAbilitiesSection(boardStore, store.NewSessionStore(db))) // an Orchestrator's system prompt lists what its team's settings let it do (#17622)
 	}
 	if db != nil {
 		routes.SetUploaderLookup(routes.NewUploaderLookup(store.NewSessionStore(db), boardStore))       // each upload records its board, agent and role
