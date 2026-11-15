@@ -49,7 +49,9 @@ function paintFlags(answer, type) {
     const el = document.getElementById('launch-recap');
     if (!el) return;
     el.querySelectorAll('.launch-recap-flags').forEach(n => n.remove());
-    el.append(...flagsNodes(answer, type)); // why what is added is not what the pick stands for (#15735): a role's rule, kept Full access, or Codex's own settings; the server says it
+    const nodes = flagsNodes(answer, type), at = nodes.findIndex(n => n.classList.contains('launch-recap-command'));
+    if (answer?.skips_prompts && type !== 'pi' && !el.textContent.includes('\u26a0')) nodes.splice(at < 0 ? nodes.length : at, 0, Object.assign(document.createElement('span'), { className: 'launch-recap-note launch-recap-flags launch-recap-risk', textContent: '\u26a0 Acts without asking first: this mode skips permission prompts.' })); // a mode that skips them says so, a custom one too (#18286); Bypass's own warning and Pi's sentence stand alone
+    el.append(...nodes); // why what is added is not what the pick stands for (#15735): a role's rule, kept Full access, or Codex's own settings; the server says it
 }
 function syncFlags() {
     const body = flagsBody();

@@ -80,5 +80,6 @@ func (h *SessionsHandler) PostLaunchPermissionArgs(w http.ResponseWriter, r *htt
 	if cerr != nil {
 		command = ""
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"args": args, "text": strings.Join(args, " "), "note": note, "command": command})
+	// skips_prompts: whether these arguments could let the agent act without asking (agent.SkipsPermissionPrompts, the allowlist the Hub gate uses), so the dialog says so for a mode it has no sentence for, a custom one (#18286).
+	writeJSON(w, http.StatusOK, map[string]any{"args": args, "text": strings.Join(args, " "), "note": note, "command": command, "skips_prompts": agent.SkipsPermissionPrompts(body.AgentType, args)})
 }
