@@ -83,7 +83,7 @@ export function openMenu(toggle, { focusFirst = true } = {}) {
     closeMenus();
     menu.hidden = false;
     toggle.setAttribute('aria-expanded', 'true');
-    current = { toggle, menu, scrolled: scrollPositions(toggle) };
+    current = { toggle, menu, scrolled: scrollPositions(toggle) }; openWidth = innerWidth;
     const previous = current;
     const trackFocus = () => {
         const active = document.activeElement;
@@ -142,7 +142,8 @@ document.addEventListener('keydown', e => {
 
 // An open table menu belongs to its current row and position, never to the next page or a scrolled-away row.
 onViewShown(() => closeMenus());
-window.addEventListener('resize', () => closeMenus());
+let openWidth = 0;
+window.addEventListener('resize', () => { if (current && openWidth && innerWidth === openWidth) return; closeMenus(); }); // a phone's address bar showing or hiding (or the keyboard) changes only the height: the menu stays, a rotation or a window resize (the width) closes it (#17712)
 // Where every scrolled ancestor of the toggle (and the page) is, when the menu opens: a scroll event is dispatched a frame after the scroll, so one for a scroll that ended before the menu opened (a click that
 // follows a scrollIntoView, a poll's redraw) arrives with the menu open and nothing moved since. Only a container that moved since the open closes the menu (#12880).
 function scrollPositions(toggle) {
