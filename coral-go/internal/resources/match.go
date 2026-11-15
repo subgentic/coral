@@ -110,7 +110,7 @@ var plainFilters = map[string]bool{"cd": true, "tail": true, "head": true, "grep
 // and a matched command anywhere in it is enough to match). False when the line cannot be read.
 func OnlyMatched(command string, patterns []string) bool {
 	cmds, ok := shellkill.Programs(command)
-	if !ok || len(cmds) == 0 || hasFileRedirect(command) {
+	if !ok || len(cmds) == 0 || hasFileRedirect(command) || hasWrapper(command) {
 		return false
 	}
 	hit := false
@@ -120,7 +120,7 @@ func OnlyMatched(command string, patterns []string) bool {
 		}
 		matched := false
 		for _, p := range patterns {
-			if want := strings.Fields(p); len(want) > 0 && words[0] == want[0] && inOrder(words, want) { // the matched program starts the command: `env -S '...' go test` and `sudo go test` do not count (#17709)
+			if want := strings.Fields(p); len(want) > 0 && inOrder(words, want) {
 				matched = true
 				break
 			}
@@ -176,6 +176,20 @@ func hasFileRedirect(command string) bool {
 				i = j
 				continue
 			}
+			return true
+		}
+	}
+	return false
+}
+
+// wrappers are programs that run the rest of their line as a command of their own: the line reader looks through them (so `env X=1 go test ./...` reads as go test), but `env -S '<text>'` splits and runs text the reader
+// does not see, and sudo, xargs, exec and the like run what follows with other rights or other arguments. A line with one of them as a word is not run on the other machine in the agent's place (#17709): it keeps the
+// refusal text and the agent decides. A word of that name anywhere in the line counts (a `grep env` too): the refusal is the safe side.
+var wrappers = map[string]bool{"env": true, "sudo": true, "doas": true, "xargs": true, "exec": true, "nohup": true, "nice": true, "time": true, "timeout": true, "stdbuf": true, "setsid": true, "command": true, "builtin": true, "eval": true, "watch": true, "su": true}
+
+func hasWrapper(command string) bool {
+	for _, w := range strings.FieldsFunc(command, func(r rune) bool { return strings.ContainsRune(" \t\n;|&()`'\"", r) }) {
+		if wrappers[w] {
 			return true
 		}
 	}
