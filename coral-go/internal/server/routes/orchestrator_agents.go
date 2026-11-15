@@ -329,10 +329,10 @@ func (h *SessionsHandler) OrchestratorSleep(w http.ResponseWriter, r *http.Reque
 }
 
 // OrchestratorStop: POST /api/board/{project}/agents/{subscriber}/stop. Stop the agent's current turn (the same as the composer's Stop button: Escape for Claude/Codex, Ctrl-C for Hermes). An agent that is
-// idle or asleep gets a plain sentence, not an error. No body is read.
+// idle or asleep gets a plain sentence, not an error; one at a prompt or a dialog is refused (a stop there can answer it by accident). No body is read.
 func (h *SessionsHandler) OrchestratorStop(w http.ResponseWriter, r *http.Request) {
 	project := chi.URLParam(r, "project")
-	_, seat, ok := h.orchSeat(w, r, project)
+	g, seat, ok := h.orchSeat(w, r, project)
 	if !ok {
 		return
 	}
@@ -346,8 +346,21 @@ func (h *SessionsHandler) OrchestratorStop(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	st := h.deriveSingleSessionState(r.Context(), target.SessionID, 0)
+	if st.NeedsInput {
+		orchRefusal(w, http.StatusConflict, "waiting_for_the_person", "that agent waits for the person's answer (a permission prompt or a question): stopping it could answer the dialog by accident")
+		return
+	}
+	if skip, ok := ptymanager.SkippedOf(naming.SessionName(target.AgentType, target.SessionID)); ok && strings.HasPrefix(skip.Why, ptymanager.SkipPrompt) {
+		orchRefusal(w, http.StatusConflict, "at_a_dialog", "that agent is at a dialog at its terminal: stopping it could answer the dialog by accident")
+		return
+	}
 	if !st.InTurn && !st.Working {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "stopped": false, "name": who, "note": who + " is not working; nothing to stop"})
+		return
+	}
+	id, err := h.reserveForBoard(r.Context(), project, board.LifecycleStop, actor, who, g)
+	if err != nil {
+		h.refuseCap(w, err, g)
 		return
 	}
 	pane := naming.SessionName(target.AgentType, target.SessionID)
@@ -357,12 +370,13 @@ func (h *SessionsHandler) OrchestratorStop(w http.ResponseWriter, r *http.Reques
 	}
 	if err := h.terminal.SendRawInput(r.Context(), terminalinput.Internal, pane, keys, target.AgentType, target.SessionID); err != nil {
 		slog.Warn("orchestrator stop failed", "board", project, "error", err)
+		_ = h.bs.FinishLifecycle(r.Context(), id, "failed", err.Error())
 		orchRefusal(w, http.StatusBadGateway, "stop_failed", "Coral could not send the stop to that agent's terminal")
 		return
 	}
-	id, err := h.bs.ReserveLifecycle(r.Context(), project, board.LifecycleStop, actor, who, nil)
-	if err == nil {
-		_ = h.bs.FinishLifecycle(r.Context(), id, "ok", "")
+	_ = h.bs.FinishLifecycle(r.Context(), id, "ok", "")
+	if h.touches != nil {
+		h.touches.Touch(r.Context(), target.SessionID, board.TouchStop, board.TouchLocal)
 	}
 	h.sayLifecycle(r.Context(), project, actor+" stopped "+who+"'s turn")
 	h.kickWS()

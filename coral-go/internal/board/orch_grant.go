@@ -226,7 +226,7 @@ func (s *Store) ReserveLifecycle(ctx context.Context, project, kind, actor, targ
 	flightAgo := now.Add(-inFlightFor).Format(time.RFC3339)
 	res, err := s.db.ExecContext(ctx, `INSERT INTO board_lifecycle_log (project, kind, actor, target, status, at)
 		SELECT ?, ?, ?, ?, 'reserved', ?
-		WHERE (SELECT COUNT(*) FROM board_lifecycle_log WHERE project = ? AND kind IN ('launch', 'wake', 'restart') AND status != 'failed' AND at > ?) < ?
+		WHERE (SELECT COUNT(*) FROM board_lifecycle_log WHERE project = ? AND kind IN ('launch', 'wake', 'restart', 'stop') AND status != 'failed' AND at > ?) < ?
 		  AND ? + (SELECT COUNT(*) FROM board_lifecycle_log WHERE project = ? AND kind IN ('launch', 'wake') AND status = 'reserved' AND at > ?) < ?`,
 		project, kind, actor, target, now.Format(time.RFC3339),
 		project, hourAgo, caps.MaxPerHour,
@@ -236,7 +236,7 @@ func (s *Store) ReserveLifecycle(ctx context.Context, project, kind, actor, targ
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		var inHour int
-		_ = s.reader().GetContext(ctx, &inHour, `SELECT COUNT(*) FROM board_lifecycle_log WHERE project = ? AND kind IN ('launch', 'wake', 'restart') AND status != 'failed' AND at > ?`, project, hourAgo)
+		_ = s.reader().GetContext(ctx, &inHour, `SELECT COUNT(*) FROM board_lifecycle_log WHERE project = ? AND kind IN ('launch', 'wake', 'restart', 'stop') AND status != 'failed' AND at > ?`, project, hourAgo)
 		if inHour >= caps.MaxPerHour {
 			return 0, ErrLifecycleCapHour
 		}

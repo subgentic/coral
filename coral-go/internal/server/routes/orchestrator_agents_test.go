@@ -18,6 +18,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/naming"
+	"github.com/subgentic/coral/internal/operatortouch"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
@@ -895,4 +896,69 @@ func TestStopIsRefusedWithTheSwitchOff(t *testing.T) {
 	code, out := r.agentPost("Orchestrator", "stop", "Dev2", "")
 	assert.Equal(t, http.StatusForbidden, code)
 	assert.Equal(t, "orchestrator_switch_off", out["code"])
+}
+
+func TestStopRefusesAnAgentAtAPrompt(t *testing.T) {
+	r := newOrchRig(t)
+	ctx := context.Background()
+	r.usualBoard()
+	code, _ := r.operatorGrant("Orchestrator", nil)
+	require.Equal(t, http.StatusOK, code)
+
+	// Make Dev2 have an open permission_request: NeedsInput is true.
+	d2 := r.sid["Dev2"]
+	now := time.Now().UTC()
+	_, err := r.h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "Dev2", SessionID: &d2, EventType: "permission_request", Summary: "Waiting for the user", CreatedAt: now.Add(-5 * time.Second).Format(store.ISOFormat)})
+	require.NoError(t, err)
+	code, out := r.agentPost("Orchestrator", "stop", "Dev2", "")
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Equal(t, "waiting_for_the_person", out["code"], "a prompt refuses the stop")
+	assert.Contains(t, out["message"], "dialog by accident", "the refusal says stopping could answer the dialog")
+}
+
+func TestStopRecordsTouchStopAndUsesHourlyCap(t *testing.T) {
+	r := newOrchRig(t)
+	ctx := context.Background()
+	r.usualBoard()
+	code, _ := r.operatorGrant("Orchestrator", map[string]any{"max_per_hour": 2})
+	require.Equal(t, http.StatusOK, code)
+
+	ss := r.ss
+	r.h.SetTouches(operatortouch.New(r.h.bs, func(ctx context.Context, sessionID string) (string, string, bool) {
+		ls, err := ss.GetLiveSession(ctx, sessionID)
+		if err != nil || ls == nil || ls.BoardName == nil || *ls.BoardName == "" {
+			return "", "", false
+		}
+		return *ls.BoardName, ls.AgentName, true
+	}))
+
+	// Make Dev2 working.
+	d2 := r.sid["Dev2"]
+	bash := "Bash"
+	_, err := r.h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "Dev2", SessionID: &d2, EventType: "tool_use", ToolName: &bash, Summary: "Bash", RefID: &bash, CreatedAt: time.Now().UTC().Add(-5 * time.Second).Format(store.ISOFormat)})
+	require.NoError(t, err)
+
+	code, out := r.agentPost("Orchestrator", "stop", "Dev2", "")
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, true, out["stopped"])
+
+	// A TouchStop was recorded.
+	since := time.Now().UTC().Add(-time.Minute).Format(time.RFC3339)
+	until := time.Now().UTC().Add(time.Minute).Format(time.RFC3339)
+	touches, err := r.h.bs.OperatorTouches(ctx, orchBoard, since, until)
+	require.NoError(t, err)
+	assert.Equal(t, 1, touches.Kinds.Stop, "the stop is recorded as a TouchStop")
+
+	// The stop counts toward the hourly cap: make Dev2 working again and stop it.
+	_, err = r.h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "Dev2", SessionID: &d2, EventType: "tool_use", ToolName: &bash, Summary: "Bash", RefID: &bash, CreatedAt: time.Now().UTC().Add(-2 * time.Second).Format(store.ISOFormat)})
+	require.NoError(t, err)
+	code, _ = r.agentPost("Orchestrator", "stop", "Dev2", "")
+	require.Equal(t, http.StatusOK, code)
+
+	// Third stop hits the cap (max_per_hour: 2, two stops already used).
+	_, err = r.h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "Dev2", SessionID: &d2, EventType: "tool_use", ToolName: &bash, Summary: "Bash", RefID: &bash, CreatedAt: time.Now().UTC().Add(-1 * time.Second).Format(store.ISOFormat)})
+	require.NoError(t, err)
+	code, out = r.agentPost("Orchestrator", "stop", "Dev2", "")
+	assert.Equal(t, http.StatusTooManyRequests, code, "the hourly cap is reached")
+	assert.Equal(t, "board_hourly_limit", out["code"])
 }
