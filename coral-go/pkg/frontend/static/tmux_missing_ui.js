@@ -1,4 +1,5 @@
 /** Lazy-loaded UI for the tmux-missing banner and launch notice (#16713): keeps the start weight net zero. */
+import { setHidden } from './dom_write.js';
 
 export function ptyOfferNodes(container) {
     container.replaceChildren();
@@ -8,7 +9,7 @@ export function ptyOfferNodes(container) {
 }
 
 export function renderTmuxMissingLaunch(element, data, recheck) {
-    element.replaceChildren(); element.style.display = '';
+    element.replaceChildren(); setHidden(element, false);
     element.setAttribute('role', 'status'); element.setAttribute('aria-live', 'polite');
     const label = document.createElement('span'); label.textContent = 'tmux is not installed.'; element.append(label);
     const pty = document.createElement('span'); ptyOfferNodes(pty); element.append(pty);

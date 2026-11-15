@@ -54,13 +54,13 @@ const { coralReady } = require('./helpers/wait');
         await setTheme(ev, 'dark');
 
         console.log('2. Check again looks again (a fresh status); still missing: the line stays, Launch stays off');
-        await ev(`window.__status.length = 0; ${slot}.querySelector('button').click(); true`);
+        await ev(`window.__status.length = 0; ${slot}.querySelector('button:not(.btn-link)').click(); true`);
         await waitFor(`window.__status.includes('no-store')`, 'a fresh status request', 8000);
         assert.equal(await ev(`${slot}.dataset.blocksLaunch`), '1');
         assert.equal(await ev(`document.getElementById('launch-agent-go').disabled`), true);
 
         console.log('3. installed: Check again clears the line, Launch comes back and works');
-        await ev(`window.__tmux = { tmux_available: true, tmux_required: true, effective_backend: 'tmux', tmux_install_command: 'brew install tmux' }; ${slot}.querySelector('button').click(); true`);
+        await ev(`window.__tmux = { tmux_available: true, tmux_required: true, effective_backend: 'tmux', tmux_install_command: 'brew install tmux' }; ${slot}.querySelector('button:not(.btn-link)').click(); true`);
         await waitFor(`getComputedStyle(${slot}).display === 'none' && !document.getElementById('launch-agent-go').disabled`, 'the line gone and Launch on', 8000);
         assert.equal(await ev(`document.getElementById('launch-agent-go').hasAttribute('aria-describedby')`), false);
         await ev(`document.getElementById('launch-agent-go').click(); true`);
