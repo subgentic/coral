@@ -151,7 +151,7 @@ func (h *SessionsHandler) flushExits(ctx context.Context, team string) {
 				continue // the same stop, said before (#15062)
 			}
 			a.label = label
-			if strings.HasPrefix(label, "exits right after it starts") {
+			if strings.HasPrefix(label, "exits right after it starts") && !strings.HasSuffix(label, exitTerminalLostReason) { // a lost terminal is what Wake fixes (#16664)
 				a.plan = exitRapidPlan
 			}
 		}
