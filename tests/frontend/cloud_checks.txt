@@ -271,6 +271,7 @@ node job_words.test.mjs
 node settings_saved_words.test.mjs
 node time_limit.test.mjs
 node knowledge_text.test.mjs
+node lazy_styles_failure.test.mjs
 node display_activity_hint.test.mjs
 node display_hint_expiry.test.mjs
 node comment_swallow_lint.test.mjs

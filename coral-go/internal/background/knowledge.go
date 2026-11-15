@@ -785,7 +785,17 @@ func Slugify(name string) string {
 	return slugify(name)
 }
 
+// slugify is an agent's file name in the knowledge folder. A hand-written note is note-<slug>.md (knowledge_note.go): an agent named "note-x" would have written the same file and been read as a note, so an agent's slug
+// that starts with "note-" gets a '_' at the end. A note's name never ends in '_' (noteSlug), so the two can never be the same file (#17974).
 func slugify(name string) string {
+	slug := slugifyBase(name)
+	if strings.HasPrefix(slug, NoteFilePrefix) {
+		slug += "_"
+	}
+	return slug
+}
+
+func slugifyBase(name string) string {
 	s := strings.ToLower(name)
 	s = strings.ReplaceAll(s, " ", "-")
 	var clean strings.Builder

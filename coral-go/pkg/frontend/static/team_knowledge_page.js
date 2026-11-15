@@ -30,7 +30,7 @@ function entriesOf(data) {
     const out = [];
     if (data.index) out.push({ key: 'index', name: 'Index', file: 'index', text: data.index, from: 'The whole team' });
     for (const a of [...(data.agents || [])].sort((x, y) => String(x.name).localeCompare(String(y.name)))) {
-        const text = a.content || '', note = /^note-/.test(String(a.name));
+        const text = a.content || '', note = /^note-.*[^_]$/.test(String(a.name)); // a note's file never ends in '_', an agent named note-... does (#17974)
         const title = note ? (splitFrontMatter(text).facts || {}).title : '';
         out.push({ key: `agent:${a.name}`, name: title || a.name, file: a.name, text, from: note ? 'Added by hand' : `${a.name}'s sessions` });
     }
