@@ -178,8 +178,8 @@ function buildMore() {
     menu.addEventListener('click', (e) => { if (e.target.closest('button')) set(false); });
     document.addEventListener('keydown', (e) => { if (moreOpen && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); set(false, { focus: true }); } }, true);
     document.addEventListener('click', (e) => { if (moreOpen && !menu.contains(e.target) && !b.contains(e.target)) set(false); });
-    // The menu keyboard (menu_keys.js, #16432): Up, Down, Home and End move between the items that are shown; Tab closes the menu and goes on from its button, as every other menu does.
-    menu.addEventListener('keydown', (e) => {
+    // The menu keyboard (menu_keys.js, #16432): Up, Down, Home and End move between the items that are shown, from the button or from an item; Tab closes the menu and goes on from its button, as every other menu does.
+    host.addEventListener('keydown', (e) => { // on the host: the focus is on the button, not in the menu, when the menu opens (QA2 on #16432)
         if (!moreOpen) return;
         if (e.key === 'Tab') { set(false, { focus: true }); return; }
         const list = [...menu.querySelectorAll('button:not([hidden]):not([disabled])')].filter(i => i.getClientRects().length > 0);
