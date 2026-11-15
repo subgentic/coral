@@ -445,8 +445,13 @@ export function createArtifactsList({ inbox = false } = {}) {
                 details: model.scope ? detailsLink : null,
                 star: item => { const hex = managedHex(item); return hex ? starControl(item, { hex, name: readableName(item) }) : null; },
                 nameBadge: item => {
-                    const origin = originBadge(item), n = Math.max(item.earlier_versions || 0, (item.version || 1) - 1), badge = item.new_comments > 0 ? 'New comments' : origin || (n > 0 ? `v${item.version || n + 1}, ${n} earlier version${n > 1 ? 's' : ''}` : ''); if (!badge) return null; // agents replied in the Operator's thread on this file and it is not opened (#12026)
+                    const origin = originBadge(item), n = Math.max(item.earlier_versions || 0, (item.version || 1) - 1), newest = supersededBy(item), badge = item.new_comments > 0 ? 'New comments' : newest ? `Superseded by v${item.versions}` : origin || (n > 0 ? `v${item.version || n + 1}, ${n} earlier version${n > 1 ? 's' : ''}` : ''); if (!badge) return null; // agents replied in the Operator's thread on this file and it is not opened (#12026)
                     const note = DT.tag(badge); note.classList.add('dt-note', 'team-artifact-badge');
+                    if (item.new_comments > 0) note.classList.add('team-artifact-badge-news'); // a short fixed word: it is not cut to 'New comme...' (#17454)
+                    if (newest && !(item.new_comments > 0)) { // an older version says what replaced it, and the badge opens that version when the list has it (#17454)
+                        note.title = 'A newer version of this file replaced this one.'; note.classList.add('team-artifact-badge-news');
+                        if (newest !== true) { note.tabIndex = 0; note.setAttribute('role', 'link'); const go = e => { e.stopPropagation(); openArtifact(newest, note); }; note.addEventListener('click', go); note.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e); } }); }
+                    }
                     if (origin) note.classList.add(`team-artifact-badge-${isUnverified(item) ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`);
                     if (isUnverified(item)) note.classList.add('dt-warning'); return note;
                 },
@@ -521,6 +526,12 @@ export function createArtifactsList({ inbox = false } = {}) {
         const b = DT.link(taskText(item), () => { importOnce('./task_navigation.js').then(m => m.openTask(inbox ? item.board_id : model.project, item.task_id)).catch(() => {}); });
         b.dataset.taskLink = String(item.task_id);
         return b;
+    }
+
+    /** An older version of a file that a newer one replaced: the newer version's row when this list has it, else true; false for any other row. */
+    function supersededBy(item) {
+        if (!item.tags?.includes('superseded') || !(item.versions > item.version)) return false;
+        return model.items.find(o => o.file_id && o.file_id === item.file_id && o.version === item.versions) || true;
     }
 
     function openArtifact(item, opener) {

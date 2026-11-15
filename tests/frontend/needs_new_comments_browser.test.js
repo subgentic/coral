@@ -60,6 +60,7 @@ const { coralReady } = require('./helpers/wait');
                 assert.equal(await badge(), '4', 'the file with new comments counts again, once: ' + await badge());
                 assert.ok(await marker('Decided file.txt'), 'a file the Operator already approved comes back as its own row, marked');
                 assert.ok(await marker('Replied file.txt'), 'its row says New comments');
+                assert.ok(await ev(`(() => { const t = [...(${row('Replied file.txt')}).querySelectorAll('.inbox-new-comments')].find(x => /new comments?/.test(x.textContent)); return !!t && t.scrollWidth <= t.clientWidth + 1; })()`), 'the badge is whole, not cut to New comme... (#17454)');
                 assert.ok(!(await marker('Quiet file.txt')), 'a file with no news carries no marker');
                 assert.ok(await ev(`(() => { const r = ${row('Replied file.txt')}; return r.classList.contains('dt-unread') && !r.classList.contains('dt-read') && /unread/.test(r.querySelector('.inbox-review-item .sr-only').textContent); })()`), 'the row is unread again');
                 assert.equal(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].filter(r => /Replied file/.test(r.textContent)).length`), 1, 'one row, not a second item');
