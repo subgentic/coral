@@ -110,37 +110,6 @@ export async function checkAgentCLI(type, element, {force = false, command = '',
     }
 }
 
-export async function checkTmux(force = false) {
-    const banner = document.getElementById('tmux-missing-banner');
-    if (!banner) return;
-    const controller = start(banner);
-    const title = banner.querySelector('strong');
-    const message = document.getElementById('tmux-check-message');
-    const command = banner.querySelector('.tmux-missing-banner-cmd');
-    const button = document.getElementById('tmux-check-again');
-    button.disabled = true; button.textContent = 'Checking…';
-    try {
-        const response = await fetchSystemStatus({fresh:force});
-        if (!response.ok) throw new Error(`Could not check tmux (HTTP ${response.status}).`);
-        const data = await response.json();
-        if (!data || typeof data.tmux_available !== 'boolean') throw new Error('Could not check tmux: unexpected response.');
-        if (!current(banner,controller)) return;
-        if (data.tmux_available || data.tmux_required === false || data.effective_backend === 'pty') { banner.style.display='none'; return; }
-        title.textContent = 'tmux is not installed.';
-        message.textContent = 'Coral needs it to run agents.';
-        const install = data.tmux_install_command;
-        command.hidden = !install;
-        document.getElementById('tmux-missing-banner-cmd-text').textContent = install || '';
-        banner.style.display = '';
-    } catch (error) {
-        if (!current(banner,controller) || error.name === 'AbortError') return;
-        title.textContent = 'tmux check failed.'; message.textContent = error instanceof SyntaxError ? 'The server returned an invalid response.' : error.message;
-        command.hidden = true; banner.style.display = '';
-    } finally {
-        if (current(banner,controller)) { button.disabled=false;button.textContent='Check again'; }
-    }
-}
-
 /** First run: tmux missing is said once in the launch form, with the one command for this OS and a Check again; Launch stays off with it as the reason (#6046).
  *  Only where the backend needs tmux and the launch is on this computer; nothing is installed. */
 export async function checkTmuxForLaunch(element, {force = false, isLocal = () => true} = {}) {
@@ -165,7 +134,4 @@ export async function checkTmuxForLaunch(element, {force = false, isLocal = () =
     }
 }
 
-export function initPrerequisiteChecks() {
-    document.getElementById('tmux-check-again')?.addEventListener('click',()=>checkTmux(true));
-    checkTmux();
-}
+export { checkTmux, initPrerequisiteChecks } from './tmux_banner.js';
