@@ -86,7 +86,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(body.thinking, 'high', 'and a restart keeps it too: ' + JSON.stringify(body));
         s = await noteFor({ model: 'opus-x', thinking: '', thinking_actual: 'max' });
         assert.equal(s.thinking, '', 'no stored level: Default');
-        assert.equal(s.note, "The agent last ran at Max, which is the default for this agent.", 'no stored level: it does not claim a change, and says why Default shows a level');
+        assert.equal(s.note, "The agent last ran at Max, its default.", 'no stored level: it does not claim a change, and says why Default shows a level');
         s = await noteFor({ model: 'opus-x', thinking: 'max', thinking_actual: 'max' });
         assert.equal(s.note, '', 'the same level: no note');
         s = await noteFor({ model: 'opus-x', thinking: 'high', thinking_actual: '' });

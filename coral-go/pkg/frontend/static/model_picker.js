@@ -299,7 +299,7 @@ function thinkingParts(container) {
 /** What the agent last ran at when that is not the level the form holds (a restart keeps the stored one): "The agent last ran at Max (changed inside the CLI)." */
 function ranNote(r) {
     if (!r || !r.actual || r.actual === (r.stored || '')) return '';
-    return `The agent last ran at ${LEVEL_NAMES[r.actual] || r.actual}${r.stored ? ' (changed inside the CLI)' : ', which is the default for this agent'}.`;
+    return `The agent last ran at ${LEVEL_NAMES[r.actual] || r.actual}${r.stored ? ' (changed inside the CLI)' : ', its default'}.`;
 }
 
 /** Tell the form what the agent's transcript shows it running at, beside the level it was given (setThinking): the two can differ after a change made inside the CLI. */
