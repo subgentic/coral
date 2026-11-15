@@ -101,6 +101,7 @@ function _syncTeamMembers() {
     if (count) count.textContent = rows.length ? `${rows.length} ${rows.length === 1 ? 'member' : 'members'}. Select one to edit it. The Orchestrator plans the work and hands tasks to the others.` : '';
     const line = document.getElementById('team-orchestrator-line'); if (line) line.hidden = hasOrchestrator();
     showTeamWorkers(rows.some(r => !isOrchestrator(rowRole(r))));
+    _fillAllModels(); // the model list is there from the first worker on, not only after a provider is chosen (walk 49)
     _syncTeamGate();
 }
 
