@@ -290,7 +290,7 @@ func (s *Store) DelegateReview(ctx context.Context, project string, id int64, ac
 		title, body := fmt.Sprintf("Review #%d: %s", id, task.Title), reviewTaskBody(id, task.Title, w.OriginalAuthor, round.Round)
 		rt, err := s.CreateTaskWithOpts(ctx, project, title, body, task.Priority, actor,
 			&CreateTaskOpts{Workflow: TaskWorkflow{ReviewOf: id, ReviewRound: round.Round}, reviewTask: true, GoalID: task.GoalID}, r) // a review serves the goal of the task it reviews (#17612)
-		if err != nil && task.GoalID != nil { // the goal may have closed since: the review is made without one rather than not at all
+		if errors.Is(err, ErrGoalClosed) && task.GoalID != nil { // the goal closed since: the review is made without one rather than not at all (any other refusal is still an error)
 			rt, err = s.CreateTaskWithOpts(ctx, project, title, body, task.Priority, actor,
 				&CreateTaskOpts{Workflow: TaskWorkflow{ReviewOf: id, ReviewRound: round.Round}, reviewTask: true}, r)
 		}

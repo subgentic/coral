@@ -135,6 +135,11 @@ func (s *Store) AutoReviewers(ctx context.Context, project string, task *Task, o
 				source = ReviewersTeamDefault
 			}
 			source = strings.Replace(source, ReviewersTeamDefault, "the team's default reviewers", 1) + "; " + pick + " picked from the pool: " + why
+		} else {
+			if source == "" {
+				source = ReviewersTeamDefault
+			}
+			source = strings.Replace(source, ReviewersTeamDefault, "the team's default reviewers", 1) + "; pool: nobody free" // asleep, the author, or already named: the hand-off line says so rather than saying nothing
 		}
 	}
 	if len(names) == 0 {
