@@ -2,6 +2,7 @@
 // the previous row's, at the end of the list). A long list of 40 review rows, the team's artifact list and the approve write stubbed in the page. 1280 (the table) and 390 (the phone's rows).
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
+const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_notice');
 const BASE = require('./test_base').BASE;
 const { coralReady, framesJs } = require('./helpers/wait');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -26,7 +27,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         for (const [w, h, mobile] of [[1280, 700, false], [390, 700, true]]) {
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, BASE + '/'); /* the unseen first-run notice sits in the phone Inbox pane now (#16460) and shifts what these measure: acked on the test server */ await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`fetch('/api/board/${team}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Plan Writer', job_title: 'Writer' }) }).then(r => r.status)`);
             await ev(`(() => { const original = window.fetch, json = (b, st = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: st, headers: { 'Content-Type': 'application/json' } }));
                 const hex = n => n.toString(16).padStart(64, '0');
@@ -65,7 +66,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             check(last.top > 200, at + 'and the list is not at the top (scroll ' + last.top + ')');
             await removeBoards(ev, [team]).catch(() => {});
         }
-    } finally { await ev(`localStorage.removeItem('coral-inbox-needs-filters'); true`).catch(() => {}); await client.close(); }
+    } finally { try { await restoreLaunchNotice(ev); } catch (e) {} await ev(`localStorage.removeItem('coral-inbox-needs-filters'); true`).catch(() => {}); await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
     console.log('inbox_keep_place_browser: ok');
 })().catch(e => { console.error(e); process.exit(1); });
