@@ -408,3 +408,17 @@ func TestAnApprovalThenAJoinOpensANewRoundInstead(t *testing.T) {
 	_, err = e.s.ApproveReview(e.ctx, "team", id, "rev1", "ok", 3)
 	require.NoError(t, err)
 }
+
+// #18203: a round number AHEAD of the task is a typo, not a resubmission: the refusal says the round the task is at, and does not claim it was resubmitted. An earlier number still says it was.
+func TestAVerdictOnARoundAheadOfTheTaskNamesTheCurrentRound(t *testing.T) {
+	e := newVerEnv(t)
+	id := e.inReview("p", []TaskArtifact{patchRow("fix", "d1")}, "rev1")
+	_, err := e.s.ApproveReview(e.ctx, "team", id, "rev1", "ok", 5)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "is at round 1, not round 5")
+	assert.Contains(t, err.Error(), "--round 1")
+	assert.NotContains(t, err.Error(), "resubmitted", "nothing was resubmitted: the number is ahead")
+	_, err = e.s.RejectReviewTextVersion(e.ctx, "team", id, "rev1", "why", 0, 0)
+	_ = err
+	assert.Equal(t, "review_pending", e.task(id).Status, "a refused verdict changes nothing")
+}
