@@ -221,7 +221,8 @@ func TestTheFolderRuleDoesNotApplyWhereTheGrantIsOffOrAbsent(t *testing.T) {
 	code, _ = r.do("PUT", "/api/board/"+orchBoard+"/orchestrator-grant", `{"enabled":false,"max_live":8,"max_per_hour":10,"idle_minutes":5}`, operatorClient, "")
 	require.Equal(t, http.StatusOK, code)
 	code, out = launch(t.TempDir())
-	assert.Equal(t, http.StatusOK, code, "off again: today's behaviour: %v", out)
+	assert.Equal(t, http.StatusForbidden, code, "off again: an agent's launch is refused (#17661): %v", out)
+	assert.Equal(t, "orchestrator_access_off", out["code"])
 }
 
 // A session's repo and its worktree folder are the team's: a helper in a sibling worktree of the team's repo is accepted, a folder outside the repo is not.
@@ -307,12 +308,12 @@ func TestAnAgentsLaunchWithNoBoardGoesOntoItsOwnTeamWhereTheGrantIsOn(t *testing
 	code, out = launch(nil)
 	assert.Equal(t, http.StatusTooManyRequests, code, "the cap holds for a launch that forgot the board: %v", out)
 	assert.Equal(t, "board_live_limit", out["code"])
-	// off again: as it was
+	// off again: an agent's launch is refused (#17661), whether or not it names a board
 	code, _ = r.do("PUT", "/api/board/"+orchBoard+"/orchestrator-grant", `{"enabled":false,"max_live":2,"max_per_hour":50,"idle_minutes":5}`, operatorClient, "")
 	require.Equal(t, http.StatusOK, code)
 	code, out = launch(nil)
-	require.Equal(t, http.StatusOK, code, out)
-	assert.Equal(t, "", boardOf(out), "the grant off: unchanged")
+	assert.Equal(t, http.StatusForbidden, code, "the grant off: refused: %v", out)
+	assert.Equal(t, "orchestrator_access_off", out["code"])
 	// the Operator's launch with no board is never put on a team
 	b, _ := json.Marshal(map[string]any{"working_dir": r.work, "agent_type": "claude", "display_name": "Mine"})
 	code, out = r.do("POST", "/api/sessions/launch", string(b), operatorClient, "")
