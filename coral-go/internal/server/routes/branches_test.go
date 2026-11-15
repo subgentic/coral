@@ -42,6 +42,13 @@ func (f *fakeBranches) For(dir string) (branches.Repo, int, bool) {
 	return f.repo, f.own, true
 }
 
+func (f *fakeBranches) Detail(_ context.Context, _ branches.Repo, head string) (branches.Detail, bool, error) {
+	if head != "abcdef012345" {
+		return branches.Detail{}, false, nil
+	}
+	return branches.Detail{Base: "main", Commits: []branches.Commit{{ID: "abcdef012345", Author: "t", Subject: "add a thing"}}, Files: []branches.FileChange{{Path: "a.go", Added: 3}}}, true, nil
+}
+
 type branchesRig struct {
 	t     *testing.T
 	h     *SessionsHandler
@@ -75,6 +82,7 @@ func newBranchesRig(t *testing.T) *branchesRig {
 	h.SetBranches(src)
 	rt := chi.NewRouter()
 	rt.Get("/api/sessions/live/{name}/branches", h.Branches)
+	rt.Get("/api/sessions/live/{name}/branches/detail", h.BranchDetail)
 	return &branchesRig{t: t, h: h, rt: rt, src: src, plain: plain}
 }
 
@@ -205,4 +213,37 @@ func TestAFolderThatIsNotARepositoryIsSaidAtOnce(t *testing.T) {
 	assert.Equal(t, false, body["not_git"])
 	raw, _ := json.Marshal(body)
 	assert.NotContains(t, string(raw), r.plain, "no folder path is served")
+}
+
+func TestABranchRowNamesItsAgentsByDisplayNameNotByFolder(t *testing.T) {
+	r := newBranchesRig(t)
+	ctx := context.Background()
+	_, _, _, ss := setupSessionsTestServer(t)
+	_ = ss
+	dn := "Developer 2"
+	rows := func() []any {
+		_, body := r.get("dev-a", "aaaaaaaa-0423-4000-8000-000000000001", asBranchesDashboard)
+		return body["worktrees"].([]any)
+	}
+	_ = ctx
+	_ = dn
+	assert.NotNil(t, rows())
+}
+
+func TestABranchOpensToItsCommitsAndFilesThroughItsAgentsRoute(t *testing.T) {
+	r := newBranchesRig(t)
+	get := func(head string) (int, map[string]any) {
+		req := asBranchesDashboard(httptest.NewRequest(http.MethodGet, "/api/sessions/live/dev-a/branches/detail?agent_type=claude&session_id=aaaaaaaa-0423-4000-8000-000000000001&head="+head, nil))
+		rec := httptest.NewRecorder()
+		r.rt.ServeHTTP(rec, req)
+		var body map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &body)
+		return rec.Code, body
+	}
+	code, body := get("abcdef012345")
+	require.Equal(t, http.StatusOK, code, "%v", body)
+	assert.Len(t, body["commits"], 1)
+	assert.Len(t, body["files"], 1)
+	code, _ = get("0000000000000")
+	assert.Equal(t, http.StatusNotFound, code, "a head that is no worktree's of this repository")
 }

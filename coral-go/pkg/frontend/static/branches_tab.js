@@ -39,7 +39,7 @@ export async function loadBranches() {
     if (!data || data.available === false) emptyState(el, 'Branches are not available from this computer.');
     else if (notGit) emptyState(el, NOT_GIT_AGENT);
     else if (!data.found) emptyState(el, waitingText(overdue));
-    else el.replaceChildren(drawRepo(data, s.session_id));
+    else el.replaceChildren(drawRepo(data, s.session_id, { name: s.name, session_id: s.session_id, agent_type: s.agent_type || '' }));
     // past the limit the folder is likely not a repository: ask once a minute, so an open tab on it does not start a pass every 15 s (Security's INFO on #531)
     timer = setTimeout(loadBranches, notYet && !overdue ? FIRST_READ_STEPS[Math.min(waiting.tries++, FIRST_READ_STEPS.length - 1)] : REFRESH_MS);
 }
@@ -69,7 +69,7 @@ export async function showTeamBranches(host, team) {
     else if (none) emptyState(host, overdue
         ? "Coral has not read a repository for this team's agents. Their folders may not be in git repositories, or a slow read is paused for a few minutes."
         : "Reading the repositories this team's agents work in. The first read can take up to a minute on a large repository.");
-    else host.replaceChildren(...data.repos.map(r => drawRepo(r, '')));
+    else host.replaceChildren(...data.repos.map(r => drawRepo(r, '', r.ask)));
     // past the limit, ask once a minute like the agent's tab, so a page left open on folders that are not repositories does not start a pass every 15 s (Security's INFO on #531)
     teamTimer = setTimeout(() => { if (host.isConnected && host.offsetParent !== null) showTeamBranches(host, team); }, none && !overdue ? FIRST_READ_MS : REFRESH_MS);
 }
@@ -115,8 +115,48 @@ function prLine(pr) {
     return parts.filter(Boolean).join(' · ');
 }
 
+/** A branch's detail: the commits it has over the base and the files they change, read when the row's button is pressed (GET .../branches/detail), set with textContent only (#17543).
+ * The author is what git records, the machine's git user: Coral does not know which agent made a commit, so the agents working in the branch are named on the row. */
+function detailToggle(ask, w, base) {
+    const wrap = document.createElement('div');
+    wrap.className = 'branches-detail';
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'branches-more'; btn.textContent = 'Show commits and files'; btn.setAttribute('aria-expanded', 'false');
+    const body = document.createElement('div');
+    body.className = 'branches-detail-body'; body.hidden = true; body.setAttribute('role', 'region'); body.setAttribute('aria-label', 'Commits and files of this branch');
+    let loaded = false;
+    btn.addEventListener('click', async () => {
+        const open = body.hidden;
+        body.hidden = !open; btn.setAttribute('aria-expanded', String(open)); btn.textContent = open ? 'Hide commits and files' : 'Show commits and files';
+        if (!open || loaded) return;
+        body.replaceChildren(text('div', 'branches-meta', 'Reading the branch...'));
+        let d = null, failed = '';
+        try {
+            const qs = new URLSearchParams({ session_id: ask.session_id || '', agent_type: ask.agent_type || '', head: w.head });
+            const resp = await serverFetch(serverForSession(ask.name, ask.session_id), `/api/sessions/live/${encodeURIComponent(ask.name)}/branches/detail?${qs}`);
+            if (resp.ok) d = await resp.json(); else if (resp.status === 404) failed = 'This branch has moved since the last read. Close this and open it again in a minute.';
+        } catch { /* said below */ }
+        if (!d) { body.replaceChildren(text('div', 'branches-meta', failed || 'Could not read this branch. Close this and open it again to retry.')); return; }
+        loaded = true;
+        const parts = [];
+        parts.push(text('div', 'branches-meta', d.commits.length ? `${d.commits.length}${d.more_commits ? '+' : ''} ${d.commits.length === 1 && !d.more_commits ? 'commit' : 'commits'} over ${base}:` : `No commits over ${base}.`));
+        const log = document.createElement('ul'); log.className = 'branches-commits';
+        for (const c of d.commits) { const li = document.createElement('li'); li.append(text('span', 'branches-sha', c.id.slice(0, 7)), ' ', c.subject, ' ', text('span', 'branches-mark', `${c.author}${c.at ? ' · ' + new Date(c.at).toLocaleDateString() : ''}`)); log.append(li); }
+        if (d.commits.length) parts.push(log);
+        if (d.files.length) {
+            parts.push(text('div', 'branches-meta', `${d.files.length}${d.more_files ? '+' : ''} ${d.files.length === 1 && !d.more_files ? 'file' : 'files'} changed:`));
+            const fl = document.createElement('ul'); fl.className = 'branches-commits';
+            for (const f of d.files) { const li = document.createElement('li'); li.append(text('span', 'branches-sha', f.path), ' ', text('span', 'branches-mark', f.binary ? 'binary' : `+${f.added} −${f.removed}`)); fl.append(li); }
+            parts.push(fl);
+        }
+        body.replaceChildren(...parts);
+    });
+    wrap.append(btn, body);
+    return wrap;
+}
+
 /** One repository's section: its remote and base, then a row per worktree. currentSid marks the asking agent's own worktree ('' on the team's page). */
-function drawRepo(data, currentSid) {
+function drawRepo(data, currentSid, ask) {
     const box = document.createElement('section');
     box.className = 'branches-repo';
     if (data.remote) box.append(text('h3', 'branches-remote', `${data.remote.host}/${data.remote.owner}/${data.remote.name}`));
@@ -144,6 +184,7 @@ function drawRepo(data, currentSid) {
         const agents = (w.agents || []).filter(a => !currentSid || a.session_id !== currentSid).map(a => a.name);
         if (agents.length) row.append(text('div', 'branches-meta', `${currentSid ? 'Agents here' : 'Agents'}: ${agents.join(', ')}`));
         if (w.current && w.changed) row.append(text('div', 'branches-meta', 'The Files tab lists the changes.'));
+        if (ask && data.base && w.head && !w.not_local && !w.unreadable) row.append(detailToggle(ask, w, data.base));
         list.append(row);
     }
     box.append(list);
