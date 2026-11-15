@@ -23,7 +23,7 @@ export function _renderContentView(body, content, filepath, line, interpretHtml)
         // A workspace file can be agent-written: its links follow the file policy (#3542).
         const safe = sanitizeHtml(html, DOMPURIFY_CONFIG, { links: 'file', headings: 2 });
         body.innerHTML = `<div class="prose preview-pane-markdown">${safe}</div>`;
-        if (content.startsWith('---')) importOnce('./preview_front_matter.js').then(m => m.showFrontMatter(body, content)).catch(() => {}); // #16651
+        importOnce('./preview_front_matter.js').then(m => m.show(body, content)).catch(() => {});
         keepFragmentsInside(body);
         if (line > 0) _scrollToLine(body, content, line);
         return;

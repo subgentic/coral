@@ -20,8 +20,8 @@ export function splitMarkdownFrontMatter(text) {
     return { facts, rest: lines.slice(end + 1).join('\n').replace(/^\s*\n/, '') };
 }
 
-/** Redraws a rendered Markdown preview without its front matter, under a key/value header. Values are text, never markup. */
-export function showFrontMatter(body, content) {
+/** Redraws a rendered Markdown preview (a text with front matter) without it, under a key/value header; anything else is left as drawn. Values are text, never markup. */
+export function show(body, content) {
     const { facts, rest } = splitMarkdownFrontMatter(content), prose = body.firstElementChild;
     if (!facts.length || !prose || !body.isConnected) return false;
     prose.innerHTML = sanitizeHtml(marked.parse(rest), DOMPURIFY_CONFIG, { links: 'file', headings: 2 });
