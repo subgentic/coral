@@ -12,9 +12,9 @@ func TestAnAskKeepsTheGoalAndTaskItIsAbout(t *testing.T) {
 	s, ctx := askBoard(t)
 	plain := askPost(t, s, ctx, "Lead", "@Dev A which parser?", true, 0)
 	about := askPost(t, s, ctx, "Lead", "@Dev B ship it?", true, 0)
-	require.NoError(t, s.RecordAskSubject(ctx, "alpha", about.ID, 7, 42))
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", about.ID, 7, 42, true))
 	goalOnly := askPost(t, s, ctx, "Lead", "@Dev A which design?", true, 0)
-	require.NoError(t, s.RecordAskSubject(ctx, "alpha", goalOnly.ID, 7, 0))
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", goalOnly.ID, 7, 0, true))
 
 	got, err := s.AskSubjectsOf(ctx, "alpha", []int64{plain.ID, about.ID, goalOnly.ID, 9999})
 	require.NoError(t, err)
@@ -30,7 +30,7 @@ func TestAnAskKeepsTheGoalAndTaskItIsAbout(t *testing.T) {
 	// nothing is recorded for a message that is not an ask
 	msg, err := s.PostMessage(ctx, "alpha", "Lead", "just a post", nil)
 	require.NoError(t, err)
-	require.NoError(t, s.RecordAskSubject(ctx, "alpha", msg.ID, 7, 42))
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", msg.ID, 7, 42, true))
 	again, err := s.AskSubjectsOf(ctx, "alpha", []int64{msg.ID})
 	require.NoError(t, err)
 	assert.Empty(t, again, "a post that is not a question carries no subject")
@@ -46,7 +46,7 @@ func TestAskTaskContextWarnsWithoutClosingTheQuestion(t *testing.T) {
 	task, err := s.CreateTask(ctx, "alpha", "Check the build", "", "medium", "Lead", "Dev A")
 	require.NoError(t, err)
 	q := askPost(t, s, ctx, "Lead", "@Dev B restart the build?", true, 0)
-	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 0, task.ID))
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 0, task.ID, true))
 	read := func() AskSubject {
 		rows, err := s.AskSubjectsOf(ctx, "alpha", []int64{q.ID})
 		require.NoError(t, err)
@@ -56,7 +56,7 @@ func TestAskTaskContextWarnsWithoutClosingTheQuestion(t *testing.T) {
 	_, err = s.ReassignTask(ctx, "alpha", task.ID, "Dev B")
 	require.NoError(t, err)
 	assert.Equal(t, "task_reassigned", read().MayNoLongerApply)
-	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 0, task.ID))
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 0, task.ID, true))
 	assert.Equal(t, "task_reassigned", read().MayNoLongerApply, "recording the same subject again preserves its original assignee")
 	// A pre-upgrade question has no assignee snapshot: do not invent its earlier assignment.
 	_, err = s.db.ExecContext(ctx, `DELETE FROM board_ask_task_snapshots WHERE message_id=?`, q.ID)
@@ -79,7 +79,7 @@ func TestAskTaskContextWarnsWithoutClosingTheQuestion(t *testing.T) {
 	_, err = s.db.ExecContext(ctx, `UPDATE board_tasks SET status='completed' WHERE board_id='beta' AND id=?`, foreign.ID)
 	require.NoError(t, err)
 	forged := askPost(t, s, ctx, "Lead", "@Dev B unrelated question", true, 0)
-	require.NoError(t, s.RecordAskSubject(ctx, "alpha", forged.ID, 0, foreign.ID))
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", forged.ID, 0, foreign.ID, true))
 	guarded, err := s.AskSubjectsOf(ctx, "alpha", []int64{forged.ID})
 	require.NoError(t, err)
 	assert.Empty(t, guarded[forged.ID].MayNoLongerApply, "the other board's completed state is never disclosed through the caution")
@@ -89,7 +89,7 @@ func TestAskTaskContextWarnsWithoutClosingTheQuestion(t *testing.T) {
 	deleted, err := s.CreateTask(ctx, "alpha", "Removed task", "", "medium", "Lead", "Dev A")
 	require.NoError(t, err)
 	gone := askPost(t, s, ctx, "Lead", "@Dev B check this task?", true, 0)
-	require.NoError(t, s.RecordAskSubject(ctx, "alpha", gone.ID, 0, deleted.ID))
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", gone.ID, 0, deleted.ID, true))
 	_, err = s.db.ExecContext(ctx, `DELETE FROM board_tasks WHERE board_id='alpha' AND id=?`, deleted.ID)
 	require.NoError(t, err)
 	goneContext, err := s.AskSubjectsOf(ctx, "alpha", []int64{gone.ID})
@@ -104,7 +104,7 @@ func TestCancelledLinkedTaskMayNoLongerApply(t *testing.T) {
 	task, err := s.CreateTask(ctx, "alpha", "Obsolete build", "", "medium", "Lead", "Dev A")
 	require.NoError(t, err)
 	q := askPost(t, s, ctx, "Lead", "@Dev B restart the build?", true, 0)
-	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 0, task.ID))
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 0, task.ID, true))
 	_, err = s.CancelTask(ctx, "alpha", task.ID, "Lead", nil)
 	require.NoError(t, err)
 	rows, err := s.AskSubjectsOf(ctx, "alpha", []int64{q.ID})
@@ -121,7 +121,7 @@ func TestAskSubjectSaysWhenItsTaskIsInReview(t *testing.T) {
 	task, err := s.CreateTask(ctx, "alpha", "Review the app", "", "medium", "Lead", "Dev A")
 	require.NoError(t, err)
 	q := askPost(t, s, ctx, "Lead", "@Dev B approve the app?", true, 0)
-	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 0, task.ID))
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 0, task.ID, true))
 	read := func() AskSubject {
 		rows, err := s.AskSubjectsOf(ctx, "alpha", []int64{q.ID})
 		require.NoError(t, err)
@@ -140,9 +140,9 @@ func TestCloseOvertakenAsks_TaskCompleted(t *testing.T) {
 	require.NoError(t, err)
 
 	q1 := askPost(t, s, ctx, "Lead", "@Dev B deploy now?", true, 0)
-	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q1.ID, 0, task.ID))
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q1.ID, 0, task.ID, true))
 	q2 := askPost(t, s, ctx, "Lead", "@Dev A ready?", true, 0)
-	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q2.ID, 0, task.ID))
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q2.ID, 0, task.ID, true))
 	unrelated := askPost(t, s, ctx, "Lead", "@Dev B unrelated?", true, 0)
 
 	n, err := s.CloseOvertakenAsks(ctx, "alpha", task.ID, 0, "Overtaken: task completed")
@@ -165,7 +165,7 @@ func TestCloseOvertakenAsks_GoalCreated(t *testing.T) {
 	s, ctx := askBoard(t)
 
 	q := askPost(t, s, ctx, "Lead", "@Dev A should we create a goal?", true, 0)
-	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 7, 0))
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 7, 0, true))
 
 	n, err := s.CloseOvertakenAsks(ctx, "alpha", 0, 7, "Overtaken: goal #7 created")
 	require.NoError(t, err)
@@ -183,7 +183,7 @@ func TestCloseOvertakenAsks_AlreadyClosed(t *testing.T) {
 	require.NoError(t, err)
 
 	q := askPost(t, s, ctx, "Lead", "@Dev B check?", true, 0)
-	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 0, task.ID))
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 0, task.ID, true))
 	require.NoError(t, s.CloseAsk(ctx, "alpha", q.ID, "Operator", "answered in chat"))
 
 	n, err := s.CloseOvertakenAsks(ctx, "alpha", task.ID, 0, "Overtaken: task completed")
@@ -197,4 +197,22 @@ func TestCloseOvertakenAsks_NoIDs(t *testing.T) {
 	n, err := s.CloseOvertakenAsks(ctx, "alpha", 0, 0, "nothing")
 	require.NoError(t, err)
 	assert.Equal(t, 0, n)
+}
+
+// #17338: an auto-linked ask (explicit=false) stays open when its claimed task completes.
+func TestCloseOvertakenAsks_AutoLinkedStaysOpen(t *testing.T) {
+	s, ctx := askBoard(t)
+	task, err := s.CreateTask(ctx, "alpha", "Background work", "", "medium", "Lead", "Dev A")
+	require.NoError(t, err)
+
+	q := askPost(t, s, ctx, "Lead", "@Dev B question while working?", true, 0)
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 0, task.ID, false))
+
+	n, err := s.CloseOvertakenAsks(ctx, "alpha", task.ID, 0, "Overtaken: task completed")
+	require.NoError(t, err)
+	assert.Equal(t, 0, n, "auto-linked ask must not be closed")
+
+	closed, err := s.AskIsClosed(ctx, "alpha", q.ID)
+	require.NoError(t, err)
+	assert.False(t, closed, "auto-linked ask stays open")
 }
