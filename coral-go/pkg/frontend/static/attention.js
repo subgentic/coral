@@ -4,6 +4,9 @@
  * It carries a number, never a name or text. */
 import { notifyAttention } from './desktop_notify.js';
 import { importOnce } from './import_once.js';
+import { state } from './state.js';
+import { sessionServer } from './server_base.js';
+import { withTeam } from './team_names.js';
 
 export const KIND_NEEDS_INPUT = 'needs_input';
 export const KIND_REPLY = 'finished';
@@ -27,6 +30,11 @@ export function noteAttention(kind, who = {}) {
     paint();
     notifyAttention(kind, who);
     return true;
+}
+
+/** An agent's row wants the person (noteAttention with the names the dashboard shows: the agent, with its team when there are two, and the Coral it is on). */
+export function noteRow(kind, s, id, onClick) {
+    return noteAttention(kind, { agent: withTeam(s.display_name || s.name, s), where: (state.servers || []).find(x => x.id === sessionServer(s))?.label || '', tag: id, onClick });
 }
 
 /** The Inbox's number of things waiting for the person (the tab badge's): in the title while the tab is in the background. */
