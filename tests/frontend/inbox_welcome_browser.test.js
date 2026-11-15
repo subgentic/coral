@@ -74,6 +74,11 @@ const { coralReady } = require('./helpers/wait');
             await press('Go to Agents');
             await waitFor(`(() => { const t = document.querySelector('.top-nav-tab.active'); if (t && t.dataset.arg === 'agents') return true; const m = document.getElementById('mobile-agent-list'); return !!m && getComputedStyle(m).display !== 'none'; })()`, `${tag}: Go to Agents`, 5000);
 
+            // an install whose saved list still names the removed 'connect' item (#18115): no error, no blank row, the other items as before
+            await ev(`T.state.settings = { ...T.state.settings, inbox_welcome: 'on', inbox_welcome_done: 'connect,welcome,agent,team,asks' }; T.state.liveSessions = []; window.__teams = []; true`);
+            await open();
+            await waitFor(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].length === 1`, `${tag}: an old 'connect' id is ignored and the rest are as saved`, 6000);
+            check(JSON.stringify(await titles()) === JSON.stringify(['Read the Coral guide']), `${tag}: only the guide is left, no blank row: ` + JSON.stringify(await titles()));
             // an install that has run before: no setting, no items
             await ev(`T.state.settings = { ...T.state.settings, inbox_welcome: undefined, inbox_welcome_done: '' }; T.state.liveSessions = []; true`);
             await open();
