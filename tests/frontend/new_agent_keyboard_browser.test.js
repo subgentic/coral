@@ -110,10 +110,12 @@ const BASE = require('./test_base').BASE;
             await click('button', N.back); await waitFor(`/Step 1 of 3/.test(window.__na.dialog().textContent)`, 'step 1', 4000); assert.deepEqual(await bad(), [], 'step 1: unnamed controls');
         });
         await S.run('a late sync of the form does not take the focus from the Copy button (the flags line is not redrawn when its answer is already shown; was an intermittent focus loss in the Shift+Tab loop, #17097)', async () => {
+            for (const s of [2, 3]) { await click('button', N.next); await waitFor(`/Step ${s} of 3/.test(window.__na.dialog().textContent)`, `step ${s}`, 4000); } // the recap is shown from step 2
             await waitFor(`!!document.querySelector('#launch-recap .lrc-copy')`, 'the start command line', 6000);
             await ev(`document.querySelector('#launch-recap .lrc-copy').focus(); true`);
             await ev(`(() => { const f = document.getElementById('launch-agent-acf'); for (let i = 0; i < 3; i++) f.dispatchEvent(new Event('acf-synced', { bubbles: true })); return true; })()`); await settle(400); // sleep-ok: the recap redraws after a 120 ms debounce
             assert.equal(await ev(`document.activeElement && document.activeElement.className`), 'btn btn-small lrc-copy', 'the Copy button still has the focus after the form synced again');
+            for (const s of [2, 1]) { await click('button', N.back); await waitFor(`/Step ${s} of 3/.test(window.__na.dialog().textContent)`, `back to step ${s}`, 4000); }
         });
         await S.run('Tab and Shift+Tab stay inside the dialog (40 presses each way)', async () => {
             await focusEl('input', N.folder);
