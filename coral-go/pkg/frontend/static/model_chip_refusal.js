@@ -15,3 +15,6 @@ export function refusedWords(server, status, out) {
     if (row && row.transport) return `${name} did not take the change: approvals are not set up for it. In Settings > Computers press Approve through this hub for ${name}.`;
     return `${name} did not take the change: ${text}`;
 }
+
+/** The toast of a switch the server took (#17334): when it applies, so nobody wonders about a restart. */
+export const appliedWords = (change, target) => `${change.model === undefined ? 'Thinking' : 'Model'} set to ${target}: applies from the next turn. No restart needed.`;

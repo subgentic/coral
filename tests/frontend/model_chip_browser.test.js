@@ -188,6 +188,10 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(m.label, 'Model');
             assert.deepEqual(m.groups.map(g => g.name), ['Model'], 'the model menu lists only models');
             assert.deepEqual(m.groups[0].items, ['Opus 5.5*', 'Sonnet 5.5']);
+            // #17334: the agent reports a dated id ('claude-opus-5-5-20260101') and the list holds the short one: the tick is still on that model
+            await feed('ch-a-id', { agent_type: 'claude', model: OPUS.value + '-20260101', thinking_actual: null, thinking: 'low', model_switch: null });
+            assert.deepEqual((await menu()).groups[0].items, ['Opus 5.5*', 'Sonnet 5.5'], 'the tick finds the current model by its dated id');
+            await feed('ch-a-id', { agent_type: 'claude', model: OPUS.value, thinking_actual: null, thinking: 'low', model_switch: null });
             assert.ok(!/restart/i.test(m.groups[0].head), 'Claude switches live: no "Apply with restart"');
             if (label !== 'Desktop') { assert.ok(m.rect.l >= 0 && m.rect.r <= m.vw && m.rect.b <= m.vh, 'the sheet is inside the screen: ' + JSON.stringify(m.rect)); assert.ok(m.minItem >= 44, 'items are 44 px: ' + m.minItem); }
             await shot('model-chip-menu-' + label.split(' ')[0].toLowerCase());
