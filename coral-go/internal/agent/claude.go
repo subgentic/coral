@@ -165,7 +165,7 @@ func claudeSystemText(params LaunchParams) string {
 	if proto := protocolText(params); proto != "" {
 		sysParts = append(sysParts, proto)
 	}
-	if board := BuildBoardSystemPrompt(params.BoardName, params.Role, params.Prompt, params.PromptOverrides, params.BoardType); board != "" {
+	if board := BuildBoardSystemPrompt(params.BoardName, params.Role, "", params.PromptOverrides, params.BoardType); board != "" {
 		sysParts = append(sysParts, board)
 	}
 	return strings.Join(appendCoralSessionMarker(sysParts, params.SessionID), "\n\n")
