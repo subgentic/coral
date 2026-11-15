@@ -47,16 +47,9 @@ export function snippetOf(content) {
     return chars.length > SNIPPET_CHARS ? chars.slice(0, SNIPPET_CHARS).join('') : text;
 }
 
-/** The task numbers a text names ("#7740"), each once: those written after the word task first, then the rest in the order written; a number after "message", "msg", "post", "reply" or "comment" is a message's, never a task's (#17339: "Open task #25" opened the message number). */
-export function taskRefs(content) {
-    const named = [], other = [], text = String(content || '').replace(/```[\s\S]*?```/g, ' ');
-    for (const m of text.matchAll(/(?<![\w&#/])#(\d{1,7})(?![\w-])/g)) {
-        if (named.includes(m[1]) || other.includes(m[1])) continue;
-        const before = text.slice(Math.max(0, m.index - 16), m.index);
-        if (/\b(?:messages?|msgs?|posts?|repl(?:y|ies|ying)(?: to)?|comments?)\s*$/i.test(before)) continue;
-        (/\btasks?\s*$/i.test(before) ? named : other).push(m[1]);
-    }
-    return [...named, ...other];
+/** The task a text names ("#7740"): the first number that is not a message's (after message, post, reply or comment) (#17339). */
+export function taskRef(content) {
+    return (content || '').replace(/```[\s\S]*?```/g, ' ').match(/(?<![\w&#/])(?<!\b(?:message|msg|post|repl|comment)[a-z ]{0,6})#(\d{1,7})(?![\w-])/i)?.[1] || '';
 }
 
 /** What marks a message in its row: who it mentions (two, then "+N"), the first task it names, that it is a question, and whom it answers. Quiet tags, never louder text. */
@@ -64,7 +57,7 @@ export function tagsOf(m, { replyName = '', self = 'operator' } = {}) {
     const names = mentionedNames(m && m.content);
     return {
         mentions: names.map(n => ({ name: n, self: n.toLowerCase() === self })),
-        task: taskRefs(m && m.content)[0] || '',
+        task: taskRef(m && m.content),
         ask: !!(m && m.ask && typeof m.ask === 'object'),
         mine: names.some(n => n.toLowerCase() === self),
         replyName,
