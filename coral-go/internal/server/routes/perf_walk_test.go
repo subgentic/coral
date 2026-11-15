@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"runtime"
-	"runtime/debug"
 	"strconv"
 	"testing"
 	"time"
@@ -34,6 +33,8 @@ const (
 	// takes 1.6 s alone (epoch), and the best of three was no help. The walk's CPU time moves little with load (3.05 s alone, 3.55 s beside eight busy loops on the Mac). 7 s is twice what the walk uses
 	// and the cache-less code (every page builds the list: 14 s on the fastest machine) is far over it.
 	goalNeedsYouWalkCPUMs = 7000
+	// The CPU the board's seed (bigBoardWalkRig) takes on the Mac the goal was set on: 5.7 to 6.5 s, against the walk's 3.0 s. See the walk below (#17719).
+	walkSeedCPUOnMacMs = 6000
 )
 
 // needsYouWalkCeilingMs is the ceiling for this machine: the CI one when CI is set.
@@ -136,22 +137,25 @@ func TestNeedsYouWalkOfABigBoardIsUnderTheGoal(t *testing.T) {
 		s0, _ := processCPU()
 		_, srv, _ := bigBoardWalkRig(t, true)
 		s1, _ := processCPU()
-		t.Logf("PERF seed %d: %s CPU", attempt+1, (s1 - s0).Round(time.Millisecond))
 		var m0, m1 runtime.MemStats
 		runtime.GC()
 		runtime.ReadMemStats(&m0)
-		// The collector's background workers are spread over every core (a quarter of GOMAXPROCS), so the same walk reads about twice the CPU on epoch's 36 cores as on an 18-core Mac, and more with other
-		// work beside it (#17719). The walk's own cost is what the goal is about; what it allocates has its own bound below. So the collector is off for the timed walk (about 550 MB) and back on after.
-		prevGC := debug.SetGCPercent(-1)
 		cpu0, _ := processCPU()
 		t0 := time.Now()
 		files, pages = walkForReview(t, srv)
 		d := time.Since(t0)
-		cpu1, ok := processCPU()
-		debug.SetGCPercent(prevGC)
-		if ok && byCPU {
-			t.Logf("PERF walk %d: %s wall, %s CPU (GC off, GOMAXPROCS %d)", attempt+1, d.Round(time.Millisecond), (cpu1 - cpu0).Round(time.Millisecond), runtime.GOMAXPROCS(0))
-			d = cpu1 - cpu0
+		if cpu1, ok := processCPU(); ok && byCPU {
+			// The goal is in the CPU of the Mac it was set on. A slower or wider box (epoch: 36 cores, the walk reads 5 to 8 s there against 3 s) is measured against the same fixed work done there a moment before: the
+			// seed of this very board (about 6 s on the Mac), whose cost is the machine's and not the walk's. The walk's CPU is scaled by seedOnMac over this box's seed (#17719). The old code (every page builds the
+			// list: 14 s on the fastest machine, over twice the Mac's seed) is far over the goal on any box.
+			raw := cpu1 - cpu0
+			seed := s1 - s0
+			if seed > 0 {
+				d = time.Duration(float64(raw) * float64(time.Duration(walkSeedCPUOnMacMs)*time.Millisecond) / float64(seed))
+			} else {
+				d = raw
+			}
+			t.Logf("PERF walk %d: %s wall, %s CPU, seed %s CPU, scaled to the Mac %s (GOMAXPROCS %d)", attempt+1, time.Since(t0).Round(time.Millisecond), raw.Round(time.Millisecond), seed.Round(time.Millisecond), d.Round(time.Millisecond), runtime.GOMAXPROCS(0))
 		}
 		runtime.ReadMemStats(&m1)
 		if a := float64(m1.TotalAlloc-m0.TotalAlloc) / (1 << 20); attempt == 0 || a > allocMB {
