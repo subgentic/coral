@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -271,6 +272,33 @@ func (h *SessionsHandler) OrchestratorWake(w http.ResponseWriter, r *http.Reques
 	}
 	actor, who := h.orchActor(seat), orchName(member)
 	id, err := h.reserveForBoard(r.Context(), project, board.LifecycleWake, actor, who, g)
+	if errors.Is(err, board.ErrLifecycleCapLive) {
+		// At the live limit: name who has been idle longest, and with ?swap=1 put the idlest to sleep first and try again (#18114).
+		idlest := h.idlestSleepers(r.Context(), project, g, target, 3)
+		if r.URL.Query().Get("swap") == "1" && len(idlest) > 0 {
+			if sid, serr := h.bs.ReserveLifecycle(r.Context(), project, board.LifecycleSleep, actor, orchName(idlest[0].Member), nil); serr == nil {
+				h.sleepNow(r.Context(), idlest[0].Session)
+				_ = h.bs.FinishLifecycle(r.Context(), sid, "ok", "")
+				h.sayLifecycle(r.Context(), project, actor+" put "+orchName(idlest[0].Member)+" to sleep to make room for "+who)
+				id, err = h.reserveForBoard(r.Context(), project, board.LifecycleWake, actor, who, g)
+			}
+		}
+		if err != nil {
+			code, msg := capRefusal(err, g)
+			body := map[string]string{"error": msg, "message": msg, "code": code}
+			if code == "board_live_limit" && len(idlest) > 0 {
+				names := make([]string, len(idlest))
+				for i, c := range idlest {
+					names[i] = orchName(c.Member)
+				}
+				body["idlest"] = strings.Join(names, ", ")
+				body["message"] = msg + fmt.Sprintf(". Idle longest (no task, no activity): %s. To put %s to sleep and wake %s in one step: coral-board wake %s --swap", strings.Join(names, ", "), names[0], who, who)
+				body["error"] = body["message"]
+			}
+			httputil.WriteActionLimitBody(w, 0, body)
+			return
+		}
+	}
 	if err != nil {
 		h.refuseCap(w, err, g)
 		return
@@ -422,6 +450,59 @@ func (h *SessionsHandler) refuseSleepNow(ctx context.Context, project string, ta
 		}
 	}
 	return "", ""
+}
+
+// sleeper is an awake agent that may be put to sleep to make room: who, its session, and how long it has been without activity.
+type sleeper struct {
+	Member  string
+	Session *store.LiveSession
+	Idle    time.Duration
+}
+
+// idlestSleepers are up to n awake agents of the board that could be put to sleep now (the sleep rules pass: not waiting on the person, not working, not at a dialog) and hold no task in progress, the one idle
+// longest first (#18114). The seat, the agent being woken and terminals are never named.
+func (h *SessionsHandler) idlestSleepers(ctx context.Context, project string, g board.OrchGrant, target *store.LiveSession, n int) []sleeper {
+	rows, err := h.ss.GetBoardSessions(ctx, project)
+	if err != nil {
+		return nil
+	}
+	subs, err := h.bs.ListSubscribers(ctx, project)
+	if err != nil {
+		return nil
+	}
+	memberOf := map[string]string{}
+	for _, sub := range subs {
+		if sub.SessionName != "" {
+			memberOf[naming.SessionIDFromName(sub.SessionName)] = sub.SubscriberID
+		}
+	}
+	var out []sleeper
+	for _, row := range rows {
+		member := memberOf[row.SessionID]
+		if member == "" || row.IsSleeping != 0 || row.IsArchived != 0 || row.SessionID == g.SeatSession || row.SessionID == target.SessionID || row.AgentType == at.Terminal {
+			continue
+		}
+		live, err := h.ss.GetLiveSession(ctx, row.SessionID)
+		if err != nil || live == nil {
+			continue
+		}
+		if code, _ := h.refuseSleepNow(ctx, project, live, member, g); code != "" {
+			continue
+		}
+		if ids, err := h.bs.InProgressTaskIDsOf(ctx, project, member); err != nil || len(ids) > 0 {
+			continue
+		}
+		idle := time.Duration(1<<62 - 1) // no event on record: idle as long as can be told
+		if st := h.deriveSingleSessionState(ctx, live.SessionID, 0); !st.LastEvent.IsZero() {
+			idle = time.Since(st.LastEvent)
+		}
+		out = append(out, sleeper{Member: member, Session: live, Idle: idle})
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Idle > out[j].Idle })
+	if len(out) > n {
+		out = out[:n]
+	}
+	return out
 }
 
 // reserveForBoard writes a launch or wake into the log, within the grant's caps when the switch is on (the caps and the write are one statement).

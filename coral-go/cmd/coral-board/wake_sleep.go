@@ -17,11 +17,13 @@ import (
 // switch; #11452's route POST /api/board/{project}/agents/{member}/wake|sleep). It had no command, so an Orchestrator called the route by hand. The server decides everything: an agent token, the grant being on, the seat,
 // the hourly and live caps, a paused board, an agent that is archived or already in that state; its sentence is what is printed.
 
-const wakeUsageText = `Usage: coral-board wake <member> [--board <project>]
+const wakeUsageText = `Usage: coral-board wake <member> [--swap] [--board <project>]
        coral-board sleep <member> [--board <project>]
 
   wake    Wake an agent of this board that is asleep (it resumes its conversation and is told to read the board first).
   sleep   Put an awake agent of this board to sleep (it is woken again by wake, a task or a message for it that wakes it).
+
+  --swap  At the board's live-agent limit, put the agent that has been idle longest (no task in progress, nothing waiting on the person) to sleep first, then wake. Without it a refused wake names those agents.
 
   Only the board's Orchestrator, and only while the Operator has switched on "the orchestrator may wake, sleep, stop and start agents" for the board: any other caller, or the switch off, is refused with
   the server's reason. The grant's hourly and live-agent caps apply to wake; a refused wake says which cap.`
@@ -47,6 +49,7 @@ func cmdWakeSleep(sleep bool) {
 	}
 	fs := flag.NewFlagSet(verb, flag.ContinueOnError)
 	boardFlag := fs.String("board", "", "The board (default: the one you joined)")
+	swap := fs.Bool("swap", false, "At the live limit, sleep the idlest agent first (wake only)")
 	clihelp.ParseFlags(fs, args, func() string { return wakeUsageText })
 	member = strings.TrimSpace(member)
 	if member == "" || strings.HasPrefix(member, "-") {
@@ -63,6 +66,9 @@ func cmdWakeSleep(sleep bool) {
 		project = st.Project
 	}
 	path := fmt.Sprintf("/%s/agents/%s/%s", url.PathEscape(project), url.PathEscape(member), verb)
+	if *swap && !sleep {
+		path += "?swap=1"
+	}
 	data := goalCall("POST", path, nil, verb+"ing "+member, 200)
 	var out struct {
 		Woke  string `json:"woke"`

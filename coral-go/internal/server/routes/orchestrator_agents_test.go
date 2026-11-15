@@ -980,3 +980,41 @@ func TestStopRecordsTouchStopAndUsesHourlyCap(t *testing.T) {
 	assert.Equal(t, http.StatusTooManyRequests, code, "the hourly cap is reached")
 	assert.Equal(t, "board_hourly_limit", out["code"])
 }
+
+// #18114: a wake refused at the live limit names the agents idle longest (no task, no activity, nothing waiting on the person) and says how to swap; ?swap=1 puts the idlest to sleep and wakes the one asked for.
+func TestAWakeAtTheLiveLimitNamesTheIdlestAndSwapPutsItToSleep(t *testing.T) {
+	r := newOrchRig(t)
+	ctx := context.Background()
+	r.usualBoard() // Orchestrator (seat), Dev asleep, Dev2 awake
+	r.seat("Dev3", "Developer", orchBoard, "claude", false, 4)
+	r.seat("Dev4", "Developer", orchBoard, "claude", false, 5)
+	code, _ := r.operatorGrant("Orchestrator", map[string]any{"max_per_hour": 50, "max_live": 3, "idle_minutes": 5})
+	require.Equal(t, http.StatusOK, code)
+	// Dev3 holds a task: never offered. Dev2 was active an hour ago, Dev4 a minute ago: both idle past nothing working; Dev2 is the idlest.
+	task, err := r.h.bs.CreateTask(ctx, orchBoard, "held", "", "medium", "Orchestrator", "Dev3")
+	require.NoError(t, err)
+	_, err = r.h.bs.ClaimTask(ctx, orchBoard, "Dev3", task.ID)
+	require.NoError(t, err)
+	now := time.Now().UTC()
+	bash := "Bash"
+	for member, ago := range map[string]time.Duration{"Dev2": time.Hour, "Dev4": time.Minute} {
+		sid := r.sid[member]
+		_, err = r.h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: member, SessionID: &sid, EventType: "stop", ToolName: &bash, Summary: "Stop", RefID: &bash, CreatedAt: now.Add(-ago).Format(store.ISOFormat)})
+		require.NoError(t, err)
+	}
+
+	code, out := r.agentPost("Orchestrator", "wake", "Dev", "")
+	assert.Equal(t, http.StatusTooManyRequests, code)
+	assert.Equal(t, "board_live_limit", out["code"])
+	assert.Equal(t, "Dev2, Dev4", out["idlest"], "the idlest first; the agent holding a task is not named")
+	assert.Contains(t, out["message"], "coral-board wake Dev --swap")
+	assert.True(t, r.asleep("Dev"), "a plain wake changes nothing")
+	assert.False(t, r.asleep("Dev2"))
+
+	code, out = r.do("POST", "/api/board/"+orchBoard+"/agents/Dev/wake?swap=1", "", nil, r.tok["Orchestrator"])
+	assert.Equal(t, http.StatusOK, code, out)
+	assert.False(t, r.asleep("Dev"), "the one asked for is awake")
+	assert.True(t, r.asleep("Dev2"), "the idlest was put to sleep to make room")
+	assert.False(t, r.asleep("Dev3"))
+	assert.False(t, r.asleep("Dev4"))
+}
