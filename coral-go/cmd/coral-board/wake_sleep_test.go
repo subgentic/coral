@@ -88,3 +88,9 @@ func TestWakeEscapesTheMemberNameInThePathAndCleansTheNameItPrints(t *testing.T)
 	assert.Equal(t, "/api/board/team/agents/Dev%20A/wake", uris[0])
 	assert.Equal(t, "/api/board/team/agents/Dev%2FOps/sleep", uris[1], "a slash is not a second path segment")
 }
+
+// #18114: wake takes --swap, and the flag check knows it (an unknown flag is refused before any call).
+func TestWakeKnowsTheSwapFlag(t *testing.T) {
+	assert.Contains(t, wakeUsageText, "--swap")
+	assert.Contains(t, wakeUsageText, "idle longest")
+}
