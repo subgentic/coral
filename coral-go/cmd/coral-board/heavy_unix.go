@@ -8,10 +8,14 @@ import (
 )
 
 // heavyOwnGroup runs the command in its own process group and, when the run is stopped (its context ends), kills the whole group: the shell alone dying leaves what it started running beside the next agent's run.
-func heavyOwnGroup(c *exec.Cmd) {
+func heavyOwnGroup(c *exec.Cmd) (afterStart func() error, closeJob func()) {
 	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	c.Cancel = func() error { return syscall.Kill(-c.Process.Pid, syscall.SIGKILL) }
+	return func() error { return nil }, func() {}
 }
 
 // heavyUnsupportedHere: the heavy pool is this machine and a remote one, and a run can be stopped here (its command's whole process group is killed), so nothing is refused.
 func heavyUnsupportedHere() string { return "" }
+
+// heavyShell is the shell a run's command line goes to.
+func heavyShell() string { return "sh" }

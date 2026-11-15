@@ -238,10 +238,21 @@ func heavyRenewEvery(lease time.Duration) time.Duration {
 
 // heavyRunLocal runs the command here, in this folder, with this environment: the pool gave this machine.
 func heavyRunLocal(ctx context.Context, command string) int {
-	c := exec.CommandContext(ctx, "sh", "-c", command)
-	heavyOwnGroup(c) // its own process group, killed whole when the run is stopped: the shell dying alone would leave the command running
+	c := exec.CommandContext(ctx, heavyShell(), "-c", command)
+	afterStart, closeJob := heavyOwnGroup(c)
+	defer closeJob() // its own process group, killed whole when the run is stopped: the shell dying alone would leave the command running
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
-	if err := c.Run(); err != nil {
+	err := c.Start()
+	if err == nil {
+		if aerr := afterStart(); aerr != nil { // not in its job: it must not run loose
+			_ = c.Process.Kill()
+			_ = c.Wait()
+			fmt.Fprintln(os.Stderr, "[heavy] could not contain the command: "+aerr.Error())
+			return 1
+		}
+		err = c.Wait()
+	}
+	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
 			return ee.ExitCode()
 		}
