@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/subgentic/coral/internal/logsafe"
 	"io"
 	"log/slog"
@@ -297,7 +298,35 @@ func (a *ClaudeAgent) PrintArgs(params LaunchParams) (args []string, settingsFil
 	}
 	args = []string{"--print", "--no-session-persistence", "--settings", settingsFile}
 	args = append(args, params.Flags...)
-	return appendPermissionMode(args, params, false), settingsFile, nil
+	args = appendPermissionMode(args, params, false)
+	// Coral's text goes in a file named by --append-system-prompt-file, as a launch's does: Claude Code ignores systemPrompt in a settings file (#18151).
+	if sys := claudeSystemText(params); sys != "" {
+		sf := PrintSystemFile(settingsFile)
+		if err := writeNewFile(sf, []byte(sys)); err != nil {
+			os.Remove(settingsFile)
+			return nil, "", fmt.Errorf("can't write the step's system text file: %w", err)
+		}
+		args = append(args, "--append-system-prompt-file", sf)
+	}
+	return args, settingsFile, nil
+}
+
+// PrintSystemFile is the system-text file PrintArgs wrote beside a settings file (it exists only when there was text): the caller removes both once the command has exited.
+func PrintSystemFile(settingsFile string) string { return settingsFile + ".sys.md" }
+
+func writeNewFile(path string, b []byte) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(b)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		os.Remove(path)
+	}
+	return err
 }
 
 func (a *ClaudeAgent) PrepareResume(sessionID, workingDir string) {
