@@ -39,6 +39,10 @@ assert.match(whatStaysReset([claude, hermes]), /old chats stay in History/i); as
 const d = deleteTeamWords('alpha');
 assert.match(d, /Remove team "alpha"\?/); for (const lost of ['messages', 'tasks', 'goals', 'members', 'reminders', 'waits', 'presets', 'settings', 'artifact tags', 'health data']) assert.match(d, new RegExp('\\b' + lost + '\\b', 'i'), 'what the delete removes is listed: ' + lost); assert.match(d, /cannot be undone/i);
 assert.match(d, /chats stay in History/i); assert.match(d, /files in the team's folder and the logs are not touched/i);
+// the dialog is short lines (#16895), and says what happens to the files the team's agents uploaded
+const dl = deleteTeamWords('alpha').split('\n');
+assert.ok(dl.length >= 5 && Math.max(...dl.map(l => l.length)) <= 150, 'the Remove dialog is short lines, not one paragraph: ' + JSON.stringify(dl));
+assert.ok(dl.some(l => /uploaded/i.test(l) && /not deleted/i.test(l)), "the files the team's agents uploaded are said to stay");
 // agents still running: said in a dialog, with the way out
 const r = deleteTeamWords('alpha', ['QA Engineer', 'Lead Developer']);
 assert.match(r, /2 agents are running on it: QA Engineer, Lead Developer/); assert.match(r, /Stop agents and remove stops them first/); assert.match(r, /cannot be undone/i); assert.doesNotMatch(d, /running/);
