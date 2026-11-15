@@ -9,17 +9,20 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** The two numbers from `go test -v` output: "start_weight_test.go:66: app.js N (…), css N (…)". Null when the line is not there (the test skipped: no baseline file beside the module). */
+/** The numbers from `go test -v` output: "start_weight_test.go:66: app.js N (…), css N (…), go go1.26.1". Null when the line is not there (the test skipped: no baseline file beside the module). The Go version is on the line because gzip output differs between toolchains (#17930). */
 export function parseWeights(out) {
-    const m = /app\.js (\d+) \([^)]*\), css (\d+) \(/.exec(String(out));
-    return m ? { app: Number(m[1]), css: Number(m[2]) } : null;
+    const m = /app\.js (\d+) \([^)]*\), css (\d+) \([^)]*\)(?:, go (go\S+))?/.exec(String(out));
+    return m ? { app: Number(m[1]), css: Number(m[2]), go: m[3] || null } : null;
 }
 
 /** The report line, and whether the change grew the start path. */
 export function compare(base, head) {
     const grew = head.app > base.app || head.css > base.css;
     const d = n => (n > 0 ? '+' : '') + n;
-    return { grew, line: `app.js base ${base.app} head ${head.app} (${d(head.app - base.app)}), start CSS base ${base.css} head ${head.css} (${d(head.css - base.css)}) (gz -9)` };
+    const verdict = grew
+        ? `GREW: app.js ${d(head.app - base.app)} gz / CSS ${d(head.css - base.css)} gz (MUST) (${head.go || 'go version unknown'})`
+        : `start bytes: OK (${head.go || 'go version unknown'})`;
+    return { grew, verdict, line: `app.js base ${base.app} head ${head.app} (${d(head.app - base.app)}), start CSS base ${base.css} head ${head.css} (${d(head.css - base.css)}) (gz -9)` };
 }
 
 /** The ref to compare against: the argument, else CORAL_START_BASE (a branch on a trial charges itself for growth since its own base, not the trial's), else '' (the merge-base with origin/main) (#18287). */
@@ -55,9 +58,14 @@ function main() {
     const wt = path.join(tmp, 'base');
     try {
         git('worktree', 'add', '--detach', '-q', wt, base);
-        const result = compare(weighTree(wt), weighTree(top));
+        // One `go` on the PATH measures both trees, and the line carries the toolchain that ran (runtime.Version): a go.mod `toolchain` that differs between base and head would flip the sign (#17930), so that is refused below, not compared.
+        const [b, h] = [weighTree(wt), weighTree(top)];
+        const result = compare(b, h);
         console.log(result.line);
-        if (result.grew) { console.error(GROWTH_HINT); process.exitCode = 1; }
+        if (b.go && h.go && b.go !== h.go) { console.log(`start bytes: UNKNOWN (base measured with ${b.go}, head with ${h.go}: run again with one toolchain)`); process.exitCode = 1; return; }
+        if (result.grew) console.error(GROWTH_HINT);
+        console.log(result.verdict); // the last line: "start bytes: OK (go1.x)" or "GREW: app.js +N gz / CSS +N gz (MUST) (go1.x)"
+        if (result.grew) process.exitCode = 1;
     } finally {
         try { git('worktree', 'remove', '--force', wt); } catch { /* already gone */ }
         rmSync(tmp, { recursive: true, force: true });

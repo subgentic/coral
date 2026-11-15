@@ -1,9 +1,12 @@
 // start_bytes_delta.mjs (#17762): the parsing of the Go test's line and the verdict, on fixtures.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { parseWeights, compare, baseRefFrom, GROWTH_HINT } from './start_bytes_delta.mjs';
 
 const LINE = '    start_weight_test.go:66: app.js 426186 (baseline 418000, ceiling 426360), css 106042 (baseline 106000, ceiling 108120)\n--- PASS: TestStartPathWeight (0.67s)\n';
-assert.deepEqual(parseWeights(LINE), { app: 426186, css: 106042 });
+assert.deepEqual(parseWeights(LINE), { app: 426186, css: 106042, go: null }, 'an old line without a version still parses');
+// The line the Go test logs, pinned on both sides by one fixture (start_weight_test.go checks it is what startWeightLine builds).
+assert.deepEqual(parseWeights(readFileSync(new URL('./fixtures/start_weight_line.txt', import.meta.url), 'utf8')), { app: 426186, css: 106042, go: 'go1.26.1' });
 assert.equal(parseWeights('--- SKIP: TestStartPathWeight\n'), null, 'a skipped test has no numbers');
 assert.equal(parseWeights(''), null);
 
@@ -22,4 +25,8 @@ assert.equal(baseRefFrom(undefined, { CORAL_START_BASE: '' }), '');
 // a failure says to fetch, and how a trial branch sets its base
 assert.match(GROWTH_HINT, /git fetch origin main/);
 assert.match(GROWTH_HINT, /CORAL_START_BASE/);
+const ok = compare({ app: 100, css: 50, go: 'go1.26.1' }, { app: 100, css: 50, go: 'go1.26.1' });
+assert.equal(ok.verdict, 'start bytes: OK (go1.26.1)');
+assert.equal(compare({ app: 100, css: 50, go: 'go1.27.0' }, { app: 141, css: 50, go: 'go1.27.0' }).verdict, 'GREW: app.js +41 gz / CSS 0 gz (MUST) (go1.27.0)');
+assert.equal(compare({ app: 100, css: 50, go: 'x' }, { app: 100, css: 60, go: 'x' }).verdict, 'GREW: app.js 0 gz / CSS +10 gz (MUST) (x)');
 console.log('start_bytes_delta: ok');

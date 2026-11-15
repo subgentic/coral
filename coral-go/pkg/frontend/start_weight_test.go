@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"math"
 	"os"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -63,12 +66,27 @@ func TestStartPathWeightIsWithinThePageWeightBaseline(t *testing.T) {
 		t.Fatalf("page_weight_baseline.json: %v (appJs %d, css %d)", err, base.AppJs, base.CSS)
 	}
 	appJs, css := startWeights(t)
-	t.Logf("app.js %d (baseline %d, ceiling %d), css %d (baseline %d, ceiling %d)", appJs, base.AppJs, ceilWeight(base.AppJs), css, base.CSS, ceilWeight(base.CSS))
+	t.Log(startWeightLine(appJs, css, base.AppJs, base.CSS, runtime.Version()))
 	if appJs > ceilWeight(base.AppJs) {
 		t.Errorf("app.js at start is %d bytes encoded, over the baseline %d plus 2 percent (%d): a module joined the startup graph; load it lazily with importOnce, or the Operator raises the baseline (page_weight_baseline.json)", appJs, base.AppJs, ceilWeight(base.AppJs))
 	}
 	if css > ceilWeight(base.CSS) {
 		t.Errorf("the start stylesheet is %d bytes encoded, over the baseline %d plus 2 percent (%d): move styles into the stylesheet of the view that needs them, or the Operator raises the baseline", css, base.CSS, ceilWeight(base.CSS))
+	}
+}
+
+// startWeightLine is the one line tests/frontend/start_bytes_delta.mjs parses (fixtures/start_weight_line.txt pins both sides): the gzip sizes depend on the Go toolchain's compress/flate (#17930), so the version is on it.
+func startWeightLine(appJs, css, baseApp, baseCSS int64, goVersion string) string {
+	return fmt.Sprintf("app.js %d (baseline %d, ceiling %d), css %d (baseline %d, ceiling %d), go %s", appJs, baseApp, ceilWeight(baseApp), css, baseCSS, ceilWeight(baseCSS), goVersion)
+}
+
+func TestTheStartWeightLineIsTheOneTheDeltaScriptReads(t *testing.T) {
+	raw, err := os.ReadFile("../../../tests/frontend/fixtures/start_weight_line.txt")
+	if err != nil {
+		t.Skip("no tests/frontend fixtures beside this module")
+	}
+	if got, want := startWeightLine(426186, 106042, 418000, 106000, "go1.26.1"), strings.TrimSpace(string(raw)); got != want {
+		t.Errorf("the log line drifted from fixtures/start_weight_line.txt (start_bytes_delta.mjs parses it):\n got  %s\n want %s", got, want)
 	}
 }
 
