@@ -140,8 +140,8 @@ func TestToPrefixesTheNamesAsMentions(t *testing.T) {
 		args []string
 		want string
 	}{
-		"one name":     {[]string{"post", "--to", "Dev A", "the result is ready"}, `"content":"@Dev A the result is ready"`},
-		"two names":    {[]string{"post", "--to", "Dev B, Dev C", "all done"}, `"content":"@Dev B @Dev C all done"`},
+		"one name":      {[]string{"post", "--to", "Dev A", "the result is ready"}, `"content":"@Dev A the result is ready"`},
+		"two names":     {[]string{"post", "--to", "Dev B, Dev C", "all done"}, `"content":"@Dev B @Dev C all done"`},
 		"a stray comma": {[]string{"post", "--to", "Dev A,,", "hi"}, `"content":"@Dev A hi"`},
 	} {
 		srv := newRecordingServer(t)
