@@ -40,6 +40,11 @@ const S = `(window.__coralStatic || '/static/')`;
                 assert.ok(recent, `${w}: the Recent runs row`);
                 assert.match(recent.title, /A run counts here once it has finished/, `${w}: its tooltip says what the number counts: ${JSON.stringify(recent)}`);
             }
+            await Page.navigate({ url: BASE + '/automations/recent' }); await Page.loadEventFired(); await install(); await coralReady(ev); // a fresh page on Recent runs; a phone has no hover: the sentence is a visible line on the page, not only the row's tooltip (#17706)
+            await waitFor(`!!document.querySelector('.group-table-status')`, `${w}: the Recent runs line`, 6000);
+            const line = await ev(`(() => { const p = document.querySelector('.group-table-status'), r = p.getBoundingClientRect(); return { text: p.textContent, shown: r.width > 0 && r.height > 0 && getComputedStyle(p).visibility !== 'hidden' }; })()`);
+            assert.match(line.text, /not opened yet\. A run counts here once it has finished/, `${w}: the page says what the number counts: ${JSON.stringify(line)}`);
+            assert.ok(line.shown, `${w}: the line is on screen: ${JSON.stringify(line)}`);
         }
         console.log('PASS a turned-off job with a run going says so, and Recent runs says what it counts');
     } finally { await client.close(); }

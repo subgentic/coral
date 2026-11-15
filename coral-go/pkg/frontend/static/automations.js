@@ -232,7 +232,7 @@ function openRun(i) {
 /** Recent runs: every run, newest first, one line each: the run's name (a dot before it while unread), what it is, its result, when it started and how long it took. */
 function recentTable(rows, narrowed) {
     const info = AR.pagedInfo(), filt = filtersOf('recent');
-    return { title: 'Recent runs', noun: ['run', 'runs'], rows,
+    return { title: 'Recent runs', noun: ['run', 'runs'], rows, status: recentWords(), // a phone has no hover: what the number counts is a visible line under the title too (#17706)
         empty: info.loaded ? { line: narrowed ? 'No run matches the search and filters.' : 'Nothing has run yet.', hint: narrowed ? '' : 'Every run of a job or workflow shows here, newest first. A dot marks one you have not opened.', ...(narrowed ? {} : firstRun()) } : (info.failed ? { line: 'Could not read the runs.', hint: narrowed ? 'The runs of an earlier search are not shown as this one\'s results.' : '', retry: { action: 'automations-runs-retry', label: 'Try again' } } : { line: 'Loading runs…', hint: '' }),
         signature: JSON.stringify([!!firstRun().cards, info.total, info.hasMore, info.loading, info.loaded, info.failed, info.failedMore, info.stale, rows.map(i => [i.key, i.run.status, AR.isUnread(i), i.name, AR.resultWords(i.run).full])]),
         node: () => DT.dataTable({
