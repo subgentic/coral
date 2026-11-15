@@ -2,6 +2,9 @@ package routes
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -13,6 +16,14 @@ import (
 
 // #17324 (#17318): a person's Wake of a resumed conversation types a short note, not the original starting prompt, which an agent that remembers an old plan took as a reason to restart it.
 func TestAWakeOfAResumedConversationTypesAWakeNoteNotTheOriginalPrompt(t *testing.T) {
+	// #17984: the Hermes case below needs a hermes program to be found, so the test puts a fake one first on PATH and does not depend on the box having the real CLI
+	bin := t.TempDir()
+	fake := "hermes"
+	if runtime.GOOS == "windows" {
+		fake += ".cmd" // Windows finds a program only by a PATHEXT name (#12266)
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(bin, fake), []byte("#!/bin/sh\n"), 0o755))
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	_, h, _, ss := setupSessionsTestServer(t)
 	ctx := context.Background()
 	const id = "00000000-0000-0000-0000-000000017324"
@@ -42,9 +53,8 @@ func TestAWakeOfAResumedConversationTypesAWakeNoteNotTheOriginalPrompt(t *testin
 	fresh.AgentType = "hermes" // no Hermes session of its own: nothing to resume
 	plan2, err := h.prepareWake(ctx, &fresh, false)
 	require.NoError(t, err)
-	if plan2.params.ResumeSessionID == "" {
-		assert.True(t, strings.Contains(plan2.params.Prompt, "ORIGINAL-START-PROMPT"), "a new conversation gets the original prompt")
-	}
+	require.Empty(t, plan2.params.ResumeSessionID, "a Hermes agent with no session of its own resumes nothing")
+	assert.True(t, strings.Contains(plan2.params.Prompt, "ORIGINAL-START-PROMPT"), "a new conversation gets the original prompt")
 }
 
 // #17607: the note tells an agent that did read some messages before sleeping to read the unread ones (not that anything is handled, and no time of Coral's own), and an agent on no board is not pointed at board commands.
