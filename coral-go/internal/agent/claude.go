@@ -597,12 +597,15 @@ func writeNoFollow(path string, data []byte) error {
 	return f.Close()
 }
 
-// coralToolRules are the commands a Claude launch may always run without a card (#17547, #17833): the board, and the harmless coral-agent subcommands. `coral-agent launch` and the
-// rest are not here: an injected worker in Auto could start team agents with no card.
+// coralToolRules are the commands a Claude launch may always run without a card (#17547, #17833): the board, and the coral-agent subcommands that only read, post or upload. Left out on purpose:
+// `launch` (an injected worker in Auto could start team agents with no card), `artifact download` (--output FILE --force writes the bytes over any path: a shell profile, a hook file), `skills publish`,
+// `bind-codex`, `ui` and `task`. The names are coral-agent's own dispatch (cmd/coral-agent/main.go).
 var coralToolRules = []string{
 	"Bash(coral-board *)",
-	"Bash(coral-agent artifact *)", "Bash(coral-agent skills *)", "Bash(coral-agent history *)",
-	"Bash(coral-agent check *)", "Bash(coral-agent docs *)", "Bash(coral-agent notify *)",
+	"Bash(coral-agent artifact upload *)", "Bash(coral-agent artifact reply *)", "Bash(coral-agent artifact comments *)",
+	"Bash(coral-agent skills search *)", "Bash(coral-agent skills list *)", "Bash(coral-agent skills get *)",
+	"Bash(coral-agent history search *)", "Bash(coral-agent history context *)", "Bash(coral-agent search *)",
+	"Bash(coral-agent check state *)", "Bash(coral-agent docs *)", "Bash(coral-agent notify *)",
 }
 
 // withCoralTools adds Coral's own board and agent commands to an allow list (#17547): with no capabilities no rules were written and a team in Auto got a permission card for every

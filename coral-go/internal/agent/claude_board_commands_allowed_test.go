@@ -44,12 +44,12 @@ func TestClaudeAlwaysAllowsCoralsOwnBoardCommands(t *testing.T) {
 	}
 	for _, mode := range []string{"auto", "default", "acceptEdits"} {
 		allow, _ := allowOf(LaunchParams{PermissionMode: mode})
-		for _, want := range []string{"Bash(coral-board *)", "Bash(coral-agent artifact *)", "Bash(coral-agent skills *)", "Bash(coral-agent history *)", "Bash(coral-agent check *)", "Bash(coral-agent docs *)", "Bash(coral-agent notify *)"} {
+		for _, want := range []string{"Bash(coral-board *)", "Bash(coral-agent artifact upload *)", "Bash(coral-agent artifact reply *)", "Bash(coral-agent artifact comments *)", "Bash(coral-agent skills get *)", "Bash(coral-agent history context *)", "Bash(coral-agent search *)", "Bash(coral-agent check state *)", "Bash(coral-agent docs *)", "Bash(coral-agent notify *)"} {
 			if !has(allow, want) {
 				t.Errorf("mode %q, no capabilities: %q is not allowed: %v", mode, want, allow)
 			}
-			// #17833: coral-agent is not allowed whole: launch would start team agents with no card for an injected worker in Auto
-			for _, bad := range []string{"Bash(coral-agent *)", "Bash(coral-agent launch *)", "Bash(coral-agent)"} {
+			// #17833: coral-agent is not allowed whole, nor its artifact, skills, history or check as a family: launch would start team agents with no card, and artifact download --output FILE --force overwrites any path (QA3)
+			for _, bad := range []string{"Bash(coral-agent *)", "Bash(coral-agent launch *)", "Bash(coral-agent)", "Bash(coral-agent artifact *)", "Bash(coral-agent artifact download *)", "Bash(coral-agent skills *)", "Bash(coral-agent skills publish *)", "Bash(coral-agent history *)", "Bash(coral-agent check *)"} {
 				if has(allow, bad) {
 					t.Errorf("mode %q: %q must not be allowed: %v", mode, bad, allow)
 				}
