@@ -203,7 +203,7 @@ ${_archiveItem}            <hr class="overflow-menu-divider">
             <div class="overflow-menu-note" role="note">Restart starts a new conversation. Sleep and Wake keep the old one.</div>
             <button class="menu-item overflow-menu-item" type="button" data-on-click="team-menu-more" aria-expanded="false" aria-controls="agent-more-${escapeAttr(sid)}">More</button>
             <div id="agent-more-${escapeAttr(sid)}" class="team-menu-more" role="group" aria-label="More for ${escapeAttr(s.display_name || s.name)}" hidden>
-            <button class="menu-item overflow-menu-item" data-local-only data-on-click="agent-attach" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" title="Opens a Terminal window on this computer">
+            <button class="menu-item overflow-menu-item" data-local-only data-on-click="agent-attach" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o0}<polyline points="4,4 8,8 4,12"/><line x1="9" y1="12" x2="13" y2="12"/></svg>
                 Attach
             </button>

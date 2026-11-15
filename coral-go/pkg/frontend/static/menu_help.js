@@ -62,3 +62,4 @@ document.addEventListener('click', e => { // a tap on a menu's button: the lines
     setTimeout(() => { for (const m of document.querySelectorAll('.sidebar-kebab-menu')) if (m.style.display !== 'none') describe(m); }, 0);
 }, true);
 for (const m of document.querySelectorAll('.sidebar-kebab-menu')) if (m.style.display !== 'none') describe(m); // opened before this loaded
+window.menuHelp = describe; // sidebar_menus.js draws the lines with a menu it opens, before it measures it (#17492)
