@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"sort"
 	"strconv"
 	"testing"
 	"time"
@@ -34,6 +35,72 @@ const (
 	// and the cache-less code (every page builds the list: 14 s on the fastest machine) is far over it.
 	goalNeedsYouWalkCPUMs = 7000
 )
+
+// #17951: the CPU goal of the walk is the Mac's; a slower box (epoch-go's cores take 5.4 to 8.8 s for the same walk) is not a slower algorithm. machineSlowdown times a fixed single-thread job of the same
+// kind of work as the walk (many small allocations, sorting, JSON) and compares it with its time on the Mac (calibrationRefMs, measured on the Mac and on epoch-go: the ratio of the two boxes' walks is about the
+// ratio of the two boxes' calibration). It is the fastest of five runs, so a box that is loaded does not read slow, and it never lowers the goal (below 1) or raises it past 3: the cache-less code is 4 or more times the goal
+// whatever the machine, and the allocation bound below catches losing the fast path with no clock at all.
+const (
+	calibrationRefMs = 0 // set from the Mac's measurement below
+	maxSlowdown      = 3.0
+)
+
+func calibrationJob() int {
+	n := 0
+	for pass := 0; pass < 10; pass++ {
+		n += calibrationPass()
+	}
+	return n
+}
+
+func calibrationPass() int {
+	type row struct {
+		ID    string   `json:"id"`
+		Name  string   `json:"name"`
+		Tags  []string `json:"tags"`
+		Bytes int      `json:"bytes"`
+	}
+	rows := make([]row, 0, 20000)
+	for i := 0; i < 20000; i++ {
+		rows = append(rows, row{ID: fmt.Sprintf("up-%08d", (i*7919)%20000), Name: "file-" + strconv.Itoa(i), Tags: []string{"for review", "x" + strconv.Itoa(i%13)}, Bytes: i})
+	}
+	sort.Slice(rows, func(a, b int) bool { return rows[a].ID < rows[b].ID })
+	n := 0
+	for i := 0; i < len(rows); i += 100 {
+		b, _ := json.Marshal(rows[i : i+100])
+		var back []row
+		_ = json.Unmarshal(b, &back)
+		n += len(back)
+	}
+	return n
+}
+
+// machineSlowdown is how many times slower this box runs the calibration job than the Mac, between 1 and maxSlowdown.
+func machineSlowdown(t testing.TB) float64 {
+	best := time.Duration(0)
+	prev := runtime.GOMAXPROCS(1)
+	defer runtime.GOMAXPROCS(prev)
+	for i := 0; i < 5; i++ {
+		t0 := time.Now()
+		calibrationJob()
+		if d := time.Since(t0); i == 0 || d < best {
+			best = d
+		}
+	}
+	ms := float64(best) / float64(time.Millisecond)
+	t.Logf("PERF calibration job: %.0f ms (the Mac's: %d ms)", ms, calibrationRefMs)
+	if calibrationRefMs == 0 {
+		return 1
+	}
+	f := ms / calibrationRefMs
+	if f < 1 {
+		f = 1
+	}
+	if f > maxSlowdown {
+		f = maxSlowdown
+	}
+	return f
+}
 
 // needsYouWalkCeilingMs is the ceiling for this machine: the CI one when CI is set.
 func needsYouWalkCeilingMs() int {
@@ -129,7 +196,9 @@ func TestNeedsYouWalkOfABigBoardIsUnderTheGoal(t *testing.T) {
 	_, haveCPU := processCPU()
 	byCPU := haveCPU && os.Getenv("CI") == ""
 	if byCPU {
-		ceiling = time.Duration(float64(goalNeedsYouWalkCPUMs)*scale) * time.Millisecond
+		slow := machineSlowdown(t)
+		ceiling = time.Duration(float64(goalNeedsYouWalkCPUMs)*scale*slow) * time.Millisecond
+		t.Logf("PERF the goal is %dms x %.2f for this machine", goalNeedsYouWalkCPUMs, slow)
 	}
 	elapsed := fastestWithin(3, ceiling, func(attempt int) time.Duration {
 		_, srv, _ := bigBoardWalkRig(t, true)
