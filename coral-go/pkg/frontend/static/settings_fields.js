@@ -125,7 +125,7 @@ const providerCard = (type, name) => [
     { key: `provider_advanced_${type}`, type: 'heading', fold: true, id: `settings-provider-advanced-${type}`, label: 'Advanced (3)' },
     { ...orchestratorModel(type, name), label: 'Orchestrator model' },
     { ...orchestratorThinking(type, name), label: 'Orchestrator thinking' },
-    { ...cliPath(type, name), label: 'CLI path' },
+    { ...cliPath(type, name), label: 'CLI path', attrs: { 'aria-label': `${name} CLI path` } },
 ];
 const PROVIDERS_FIELDS = [
     { key: 'default_models_notice', type: 'notice', render: slot => { slot.innerHTML = '<span id="settings-default-models-notice" class="settings-hint" role="status"></span>'; } },
