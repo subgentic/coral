@@ -138,7 +138,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const sendRow = document.createElement('div'); sendRow.className = 'inbox-ask-sendrow'; const pickSlot = document.createElement('span'); pickSlot.className = 'inbox-ask-pick'; sendRow.append(pickSlot, send); addSlot.append(sendRow); // Add image on the left, Send reply on the right, the pictures note under them (#13148)
     compose.append(label, pics, err);
     if (missingCloudSource) dlg.setAttribute('aria-describedby', err.id);
-    const contextNote = document.createElement('p'); contextNote.className = 'inbox-ask-sub'; contextNote.textContent = questionContextNote(a) || (a.superseded ? `Older: ${who} asked again since. Dismiss this one if the newer question replaces it.` : ''); /* an older question is never closed on its own (#15078) */ contextNote.hidden = !contextNote.textContent;
+    const contextNote = document.createElement('p'); contextNote.className = 'inbox-ask-sub'; contextNote.textContent = questionContextNote(a) || (a.superseded ? `Older: ${who} has asked something newer. Answer this one too, or Dismiss it if the newer question covers it.` : ''); /* an older question is never closed on its own (#15078) */ contextNote.hidden = !contextNote.textContent;
     dlg.append(title, sub, ...(contextNote.hidden ? [] : [contextNote]), ...(links.hidden ? [] : [links]), reading, compose, foot);
     drawOffers();
     if (!missingCloudSource && !fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
