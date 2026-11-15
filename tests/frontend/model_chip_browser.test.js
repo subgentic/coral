@@ -196,6 +196,8 @@ const { coralReady } = require('./helpers/wait');
             assert.deepEqual((await menu()).groups[0].items, ['Opus 5.5', 'Opus 5*', 'Sonnet 5.5'], 'Opus 5 (dated) ticks Opus 5 only');
             await feed('ch-a-id', { agent_type: 'claude', model: 'claude-opus-5-6', thinking_actual: null, thinking: 'low', model_switch: null });
             assert.deepEqual((await menu()).groups[0].items, ['Opus 5.5', 'Opus 5', 'Sonnet 5.5'], 'a newer id the list does not know ticks nothing: claude-opus-5-6 is not Opus 5 (#17751)');
+            await feed('ch-a-id', { agent_type: 'claude', model: '', thinking_actual: null, thinking: 'low', model_switch: null });
+            assert.deepEqual((await menu()).groups[0].items, ['Opus 5.5', 'Opus 5', 'Sonnet 5.5'], 'a just-launched agent has no model yet: the menu still draws and ticks nothing (#17751, Security)');
             await feed('ch-a-id', { agent_type: 'claude', model: OPUS.value, thinking_actual: null, thinking: 'low', model_switch: null });
             assert.ok(!/restart/i.test(m.groups[0].head), 'Claude switches live: no "Apply with restart"');
             if (label !== 'Desktop') { assert.ok(m.rect.l >= 0 && m.rect.r <= m.vw && m.rect.b <= m.vh, 'the sheet is inside the screen: ' + JSON.stringify(m.rect)); assert.ok(m.minItem >= 44, 'items are 44 px: ' + m.minItem); }
