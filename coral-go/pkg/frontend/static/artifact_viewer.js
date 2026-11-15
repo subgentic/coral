@@ -509,7 +509,7 @@ export function openArtifactViewer(hex, opts = {}) {
     paintLine(d);
     readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { _details.add(readersBlock(hex, opts.server, _details)); if (opts.sourceNamed) _details.add(privateBlock(hex, opts.server, _details)); _details.add(dropboxBlock(hex, opts.server, _details)); } }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
-    const restore = _restore; _restore = null; // the scroll of the document we came Back to
+    const scrollBack = _restore; _restore = null; // the scroll of the document we came Back to
     let textShown = false; // the strict text view drew it: comments can point into it. Anything else (a frame, a picture, a PDF, a table, a video, a download) takes whole-document comments (#11444).
     Promise.resolve(renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, board: opts.board, sourceNamed: opts.sourceNamed, filename: opts.filename, mediaType: opts.mediaType, scripts: true }, {
         signal: _abort.signal,
@@ -541,7 +541,7 @@ export function openArtifactViewer(hex, opts = {}) {
             dl.href = target.url; dl.setAttribute('download', target.name);
             dl.onclick = isCloud() ? (e) => { e.preventDefault(); if (dl.getAttribute('aria-disabled') === 'true') return; downloadArtifact(target.url, sanitizeDownloadName(target.name)).catch(err => { title.textContent = err.message; }); } : null;
         },
-    })).then(() => { if (gen !== _gen) return; syncSandbox(d, body); syncScripts(d, body); d.classList.toggle('is-image', !!body.querySelector('.image-panes')); d._markUp.picture(!!body.querySelector('.image-panes')); if (!textShown) _comments.docWhole(); if (restore != null) bodyScroller(d).scrollTop = restore; setContentPending(d, false); }, () => { if (gen === _gen) setContentPending(d, false); }); // the content is on screen (or could not be drawn): Approve and the opened count go on (#15636) // a picture opens taller (css), not as a strip of its own height
+    })).then(() => { if (gen !== _gen) return; syncSandbox(d, body); syncScripts(d, body); d.classList.toggle('is-image', !!body.querySelector('.image-panes')); d._markUp.picture(!!body.querySelector('.image-panes')); if (!textShown) _comments.docWhole(); if (scrollBack != null) bodyScroller(d).scrollTop = scrollBack; setContentPending(d, false); }, () => { if (gen === _gen) setContentPending(d, false); }); // the content is on screen (or could not be drawn): Approve and the opened count go on (#15636) // a picture opens taller (css), not as a strip of its own height
     return true;
 }
 
