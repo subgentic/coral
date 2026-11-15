@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -80,6 +81,9 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 		h := strings.TrimSpace(*head)
 		if h == "" {
 			h = worktreeHead()
+			if h != "" {
+				announceHead(os.Stderr, "", h)
+			}
 		}
 		if h != "" {
 			body["head"] = h
@@ -347,4 +351,26 @@ func worktreeHead() string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// announceHead says on stderr which commit, from which folder, goes to the review, and warns when that folder is not a task worktree: the shared
+// checkout (it has no linked-worktree .git file) or a branch named main. A head taken from the wrong folder is stored and a later unchanged resubmit
+// is refused for it (#18457; the task's own branch is not known here, so the check is on the folder).
+func announceHead(w io.Writer, dir, h string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	git := func(args ...string) string {
+		out, err := gitutil.Command(ctx, dir, args...).Output()
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(string(out))
+	}
+	top := git("rev-parse", "--show-toplevel")
+	fmt.Fprintf(w, "submitting %s from %s\n", h, top)
+	branch := git("rev-parse", "--abbrev-ref", "HEAD")
+	shared := git("rev-parse", "--git-dir") == git("rev-parse", "--git-common-dir")
+	if shared || branch == "main" || branch == "master" {
+		fmt.Fprintf(w, "warning: this is %s (branch %q), not a worktree of the task's branch: if %s is not the commit you mean, resubmit with --head <sha>\n", map[bool]string{true: "the shared checkout", false: "a worktree"}[shared], branch, h[:min(len(h), 10)])
+	}
 }

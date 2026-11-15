@@ -3,6 +3,7 @@ package board
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -58,8 +59,8 @@ func (s *Store) SubmitCompletionReviewAtRevisionAndCandidate(ctx context.Context
 // rejection must not name the commit that was rejected (#18135).
 func (s *Store) SubmitCompletionReviewAtHead(ctx context.Context, project string, id int64, actor, message, outcome, reason string, artifacts []TaskArtifact, expectedRevision *int, candidateRevision, head string) (*Task, error) {
 	head = strings.TrimSpace(head)
-	if len(head) > 64 {
-		return nil, fmt.Errorf("head must be at most 64 bytes")
+	if head != "" && !commitHead.MatchString(head) {
+		return nil, fmt.Errorf("head must be a commit id: 7 to 64 hex characters (got %q)", clipHead(head)) // a folder that is not the task's repo stores a word, not a commit, and a later unchanged resubmit is then wrongly refused (#18457)
 	}
 	if strings.TrimSpace(reason) == "" || len(reason) > 4096 || len(message) > 65536 {
 		return nil, fmt.Errorf("a review reason is required (maximum 4096 characters); message maximum is 65536")
@@ -211,6 +212,15 @@ func checkResubmitHead(rejected, head string) error {
 func shortHead(h string) string {
 	if len(h) > 10 {
 		return h[:10]
+	}
+	return h
+}
+
+var commitHead = regexp.MustCompile(`^[0-9a-fA-F]{7,64}$`)
+
+func clipHead(h string) string {
+	if len(h) > 20 {
+		return h[:20] + "..."
 	}
 	return h
 }

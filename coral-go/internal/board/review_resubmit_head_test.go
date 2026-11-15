@@ -1,6 +1,7 @@
 package board
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -47,4 +48,24 @@ func TestAResubmitIsNotCheckedWhenNoHeadWasRecorded(t *testing.T) {
 	require.NoError(t, err)
 	_, err = e.s.SubmitCompletionReviewAtHead(e.ctx, "team", id, "Dev", "c", "success", "again", []TaskArtifact{{Name: "out", Content: "y", Revision: "r2"}}, nil, "", "")
 	require.NoError(t, err)
+}
+
+// A head that is not a commit id (7 to 64 hex characters) is refused at the first submit (#18457): a stored word would make a later unchanged resubmit pass or fail for the wrong reason.
+func TestASubmitHeadMustBeACommitId(t *testing.T) {
+	e := newPoolEnv(t, map[string][]string{"RevA": {}})
+	task, err := e.s.CreateTask(e.ctx, "team", "Head shape", "", "medium", "Lead", "Dev")
+	require.NoError(t, err)
+	_, err = e.s.ClaimTask(e.ctx, "team", "Dev", task.ID)
+	require.NoError(t, err)
+	arts := []TaskArtifact{{Name: "out", Content: "x", Revision: "r1"}}
+	submit := func(head string) error {
+		_, err := e.s.SubmitCompletionReviewAtHead(e.ctx, "team", task.ID, "Dev", "c", "success", "ready", arts, nil, "", head)
+		return err
+	}
+	for _, bad := range []string{"main", "abc123", "3922878e7c1g", "HEAD~1", "3922878e 7c1f", strings.Repeat("a", 65)} {
+		err := submit(bad)
+		require.Error(t, err, bad)
+		assert.Contains(t, err.Error(), "7 to 64 hex characters", bad)
+	}
+	require.NoError(t, submit(strings.Repeat("A", 64)), "a full 64-hex id, upper case")
 }
