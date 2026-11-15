@@ -137,10 +137,10 @@ function iconBtn(cls, icon, name, run) { const b = btn(`btn btn-primary btn-icon
 /** A goal card's cell content: grey icon, title, outcome, pills (Goal #N, State) and progress bar (#16709). */
 function goalCardCell(g) {
     if (g.noGoal) { const b = DT.primaryButton(g.title); b.classList.add('goals-no-goal'); return b; }
-    const wrap = el('span', 'goal-row-card');
+    const wrap = el('span', 'goal-row-wrap');
     const icon = el('span', 'material-icons goal-card-icon', 'flag'); icon.setAttribute('aria-hidden', 'true');
     const body = el('span', 'goal-card-body');
-    const title = DT.primaryButton(g.title ? shortTitle(g.title) : `Goal ${g.id}`); if (g.title) title.title = g.title; title.dataset.goalId = String(g.id);
+    const title = DT.primaryButton(g.title ? shortTitle(g.title) : `Goal ${g.id}`); title.classList.add('goal-card-title'); if (g.title) title.title = g.title; title.dataset.goalId = String(g.id);
     body.append(title);
     if (g.outcome) { const sub = el('span', 'goal-card-outcome'); sub.textContent = g.outcome; body.append(sub); }
     const meta = el('span', 'goal-card-meta');
@@ -148,7 +148,7 @@ function goalCardCell(g) {
     meta.append(statusMark(MARK[String(g.state || '').toLowerCase()] || 'idle', W.stateWord(g)));
     body.append(meta);
     const n = totalOf(g.rollup);
-    if (n) { const prog = DT.progressCell(doneOf(g.rollup), n); prog.classList.add('goal-card-progress'); body.append(prog); }
+    if (n) { const prog = DT.progressCell(doneOf(g.rollup), n); prog.classList.add('goal-card-progress'); const meter = prog.querySelector('progress'); if (meter) meter.classList.add('goal-card-meter'); body.append(prog); }
     wrap.append(icon, body);
     return wrap;
 }
@@ -244,7 +244,7 @@ export function closeGoal() {
     model.openId = 0;
     if (layout === 'page') hooks.onItem?.(0);
     draw();
-    (root.querySelector(`.goal-row-card[data-goal-id="${id}"]`) || root.querySelector(`.dt-primary[data-goal-id="${id}"]`))?.focus();
+    root.querySelector(`.dt-primary[data-goal-id="${id}"]`)?.focus();
 }
 
 /** The goal page's own id (0 on the list): the team page asks it to put the address and the Back button right. */
