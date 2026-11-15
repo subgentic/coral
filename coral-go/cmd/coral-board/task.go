@@ -101,6 +101,8 @@ Subcommands:
 		fmt.Println(string(pretty))
 	case "show":
 		cmdTaskShow(st, taskArgs)
+	case "unlanded":
+		cmdTaskUnlanded(st, taskArgs)
 	case "submit-review", "release-review":
 		cmdTaskReview(st, taskArgs, sub)
 	case "review", "approve", "reject":
@@ -147,6 +149,8 @@ Subcommands:
   detail <id> [--version K] [--json]             Read task instructions, inputs and results (always JSON; --json is accepted)
   show <id> [--json]               A task for a person: title, status, assignee, body, outcome, result message and its
                                    artifacts' coral:// links (--json: those fields as one JSON object)
+  unlanded [--ref main] [--since 7d] [--repo DIR] [--json]
+                                   Tasks approved in the window whose head commit (the 'Head <sha>' in the submit text) is not on the ref, or that name none; read-only, git runs in this folder
   submit-review <id> --reason "review pending" [--revision N] [--message "note"] [--outcome success|failed] [--artifacts manifest.json] [--areas ui,go] [--reviewers 1|2]
                                    Hands the task to the team's orchestrator (frees your slot); with no orchestrator, completes it
   review <id> --to "Security Reviewer,QA Engineer"  The orchestrator delegates a task in review: one review task each
