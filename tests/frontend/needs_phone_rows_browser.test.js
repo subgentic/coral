@@ -75,8 +75,8 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await ev(`window.__calls.filter(c => c.review === '${(5).toString(16).padStart(64, '0')}' && c.decision === 'ignore').length`), 1, at + 'after the folder switches one drag is one ignore request');
             assert.equal(await ev(`[...document.querySelectorAll('.toast')].filter(t => /Dismissed: Phone review 5/.test(t.textContent)).length`), 1, at + 'and one toast');
             assert.ok(await ev(`!${rowOf('Phone review 5.txt')}`), at + 'and its row is gone');
-            await drag('Connect a second computer or the Hub');
-            await waitFor(`(window.__puts || []).some(b => /connect/.test(String(b.inbox_welcome_done || '')))`, at + 'a drag from 350 to 40 px ignores a welcome item (its id is saved as done)', 6000);
+            await drag('How agents ask you for things');
+            await waitFor(`(window.__puts || []).some(b => /asks/.test(String(b.inbox_welcome_done || '')))`, at + 'a drag from 350 to 40 px ignores a welcome item (its id is saved as done)', 6000);
             await ev('window.__calls = []; true');
             // a long press selects a review file; a tap adds the question; the bar shows what fits
             await press('Phone review 1.txt');
