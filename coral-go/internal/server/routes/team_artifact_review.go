@@ -191,6 +191,9 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "could not record the review")
 		return
 	}
+	if change.Changed {
+		h.settleOlderVersions(r, project, id, item) // a decision on the newest version leaves no older version of the file waiting (#18166)
+	}
 	var wordsDone ChangeWords
 	if words != "" && h.changeWords != nil {
 		var werr error
@@ -463,4 +466,27 @@ func (h *BoardHandler) hasDecision(ctx context.Context, project, id string) (boo
 	}
 	rv, ok := reviews[id]
 	return ok && (rv.State == board.ReviewApproved || rv.State == board.ReviewChangesRequested || rv.State == board.ReviewDenied), nil
+}
+
+// settleOlderVersions closes the review rows of the older versions of a file once a decision is on a newer one (#18166): the Operator
+// approved v2 and v1's row stayed in Needs you. Each older version of the series on this team that is still waiting is settled as an older
+// version, with the same Activity row an automatic settlement has; one that is not waiting, or cannot be settled, is left as it is.
+func (h *BoardHandler) settleOlderVersions(r *http.Request, project, id string, item teamArtifact) {
+	if h.coralDir == "" {
+		return
+	}
+	self := artifactStoreID(item)
+	sid, n, ok := digestSeriesOnBoard(h.coralDir, self, project)
+	if !ok {
+		return
+	}
+	for _, m := range seriesMembers(h.coralDir, sid) {
+		if m.Board != project || m.N >= n || m.Digest == self {
+			continue
+		}
+		octx := board.WithActivity(r.Context(), withFileTask(activityMetaFor(r, item.Name, "Automatic settlement of an older version"), item))
+		if _, err := h.bs.SettleOlderArtifactReview(octx, project, m.Digest, []string{id}, time.Now()); err != nil && !errors.Is(err, board.ErrNotOlderReview) {
+			slog.Warn("[artifact review] an older version was not settled", "board", project, "artifact", m.Digest, "error", err)
+		}
+	}
 }
