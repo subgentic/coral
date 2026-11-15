@@ -18,6 +18,12 @@ import (
 // row lost the line while a Claude row with a stored model kept it. The model the replaced row showed is carried to the new session (display only).
 func restartSame(t *testing.T, h *SessionsHandler, term *mockSessionTerminal, ls *store.LiveSession) *store.LiveSession {
 	t.Helper()
+	return restartWithBody(t, h, term, ls, "")
+}
+
+// restartWithBody is restartSame with more JSON in the request (`,"model":""`).
+func restartWithBody(t *testing.T, h *SessionsHandler, term *mockSessionTerminal, ls *store.LiveSession, more string) *store.LiveSession {
+	t.Helper()
 	ctx := context.Background()
 	require.NoError(t, h.ss.RegisterLiveSession(ctx, ls))
 	if ls.ObservedModel != nil { // a register does not store it: a hook reports it later
@@ -25,7 +31,7 @@ func restartSame(t *testing.T, h *SessionsHandler, term *mockSessionTerminal, ls
 	}
 	name := ls.AgentType + "-" + ls.SessionID
 	term.addSession(name, ls.WorkingDir)
-	req := httptest.NewRequest(http.MethodPost, "/api/sessions/live/"+name+"/restart", strings.NewReader(`{"session_id":"`+ls.SessionID+`","agent_type":"`+ls.AgentType+`"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/sessions/live/"+name+"/restart", strings.NewReader(`{"session_id":"`+ls.SessionID+`","agent_type":"`+ls.AgentType+`"`+more+`}`))
 	req.Header.Set("Content-Type", "application/json")
 	rc := chi.NewRouteContext()
 	rc.URLParams.Add("name", name)
@@ -51,6 +57,16 @@ func TestARestartedAgentWithAStoredModelIsNotGivenAnObservedOne(t *testing.T) {
 	require.NotNil(t, fresh)
 	assert.Equal(t, stored, ptrValue(fresh.Model))
 	assert.Empty(t, ptrValue(fresh.ObservedModel), "a stored model already names the row")
+}
+
+// #17551: choosing the CLI default in the restart form is a choice of no model: the row must not name the model the replaced one ran (it is not what the new one will run).
+func TestARestartThatChoosesTheCLIDefaultDoesNotCarryTheOldModelLine(t *testing.T) {
+	_, h, term, _ := setupSessionsTestServer(t)
+	stored, seen := "sonnet", "Sonnet 5.5"
+	fresh := restartWithBody(t, h, term, &store.LiveSession{SessionID: "model-line-0003", AgentType: "claude", AgentName: "cl", WorkingDir: t.TempDir(), Model: &stored, ObservedModel: &seen}, `,"model":""`)
+	require.NotNil(t, fresh)
+	assert.Empty(t, ptrValue(fresh.Model), "the default is chosen: no model is stored")
+	assert.Empty(t, ptrValue(fresh.ObservedModel), "and the old model is not shown for the new session")
 }
 
 func ptrValue(s *string) string {

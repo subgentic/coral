@@ -697,7 +697,7 @@ func (h *SessionsHandler) restartRecord(ctx context.Context, p *restartPlan) {
 	})
 	// The model line of the row (#16434): an agent started on its CLI's own default has no model stored, and the line came from what the CLI reported (the transcript, a hook). The new session has none of that until
 	// its first turn, so the row lost the line while a Claude row with a stored model kept it. The model the replaced row showed is kept as the new one's observed model (display only, never a launch setting).
-	if p.model == "" {
+	if p.model == "" && !(p.req.Model != nil && strings.TrimSpace(*p.req.Model) == "") { // not when the form chose the CLI default: the old model is not what the new session runs (#17551)
 		if shown := h.shownModel(p.req.SessionID, p.stored); shown != "" {
 			if err := h.ss.SetObservedModel(ctx, p.newSessionID, shown); err != nil {
 				log.Printf("[restart] could not carry the shown model to %s: %v", p.newSessionID, err)
