@@ -24,6 +24,7 @@ const BASE = require('./test_base').BASE;
         const check = async answer => { await ev(`window.__answer = ${JSON.stringify(answer)}; document.getElementById('settings-accounts-check').click(); true`); await waitFor(`document.getElementById('settings-pi-account-status').textContent !== 'Checking...' && document.getElementById('settings-pi-account-status').textContent !== ''`, 'the answer'); return ev(`document.getElementById('settings-pi-account-status').textContent`); };
         assert.equal(await check({ found: true, signed_in: true, provider: 'openai' }), 'Signed in to openai');
         assert.equal(await check({ found: true, signed_in: false, provider: 'anthropic' }), 'Not signed in to anthropic: start pi and run /login');
+        assert.equal(await ev(`(() => { const b = document.querySelector('#settings-accounts button[aria-label="Sign in to Pi"]'); return b ? b.hidden : 'absent'; })()`), true, 'Pi has no Sign in button (canSignIn: false, #16714): its login is interactive');
         assert.equal(await check({ found: true, signed_in: true }), 'Signed in', 'no provider named: nothing invented');
         assert.match(await check({ found: true, signin_timeout: true }), /^Could not tell if Pi is signed in/);
         assert.equal(await ev(`window.__asks.length`), 8, 'each Check asks Claude and Pi (4 Checks)');

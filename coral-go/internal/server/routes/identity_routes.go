@@ -121,6 +121,7 @@ var operatorOnlyRoutes = map[string]string{
 	// #3445, found by QA: routes whose only guard was "this looks like the dashboard" (an Origin and
 	// a Sec-Fetch-Site header any local caller can send, so an agent token plus two forged headers
 	// minted a sign-in link and became the Operator), and Coral's configuration and outbound paths.
+	"POST /api/system/cli-signin":         "start an agent CLI's interactive sign-in on this computer (#16714)",
 	"POST /api/system/login-token":        "mint a dashboard sign-in link",
 	"POST /api/system/api-key/regenerate": "regenerate the API key",
 	"PUT /api/system/database-security":   "change the database security setting",
