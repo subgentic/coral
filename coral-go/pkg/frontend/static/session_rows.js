@@ -209,12 +209,12 @@ ${['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access
             ${autoAcceptMenuItem(s)}
             ${!instructionsOffered(s, isCloud()) ? '' : `<button class="menu-item overflow-menu-item" data-on-click="agent-instructions" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" title="What this agent is told each time it starts; saved now, used at its next restart">
                 ${SVGO.o0}${_mk0}`}
-            <button class="menu-item overflow-menu-item" data-local-only data-on-click="agent-attach" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+            <button class="menu-item overflow-menu-item" type="button" data-on-click="team-menu-more" aria-expanded="false" aria-controls="agent-more-${escapeAttr(sid)}">More</button>
+            <div id="agent-more-${escapeAttr(sid)}" class="team-menu-more" role="group" aria-label="More for ${escapeAttr(s.display_name || s.name)}" hidden>
+            <button class="menu-item overflow-menu-item" data-local-only data-on-click="agent-attach" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" title="Opens a Terminal window on this computer">
                 ${SVGO.o0}<polyline points="4,4 8,8 4,12"/><line x1="9" y1="12" x2="13" y2="12"/></svg>
                 Attach
             </button>
-            <button class="menu-item overflow-menu-item" type="button" data-on-click="team-menu-more" aria-expanded="false" aria-controls="agent-more-${escapeAttr(sid)}">More</button>
-            <div id="agent-more-${escapeAttr(sid)}" class="team-menu-more" role="group" aria-label="More for ${escapeAttr(s.display_name || s.name)}" hidden>
             <button class="menu-item overflow-menu-item" data-on-click="agent-icon" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o0}<circle cx="8" cy="8" r="6.5"/><path d="M5.5 9.5c0 0 1 1.5 2.5 1.5s2.5-1.5 2.5-1.5"/><circle cx="6" cy="6.5" r="0.5" fill="currentColor" stroke="none"/><circle cx="10" cy="6.5" r="0.5" fill="currentColor" stroke="none"/></svg>
                 Set Icon
