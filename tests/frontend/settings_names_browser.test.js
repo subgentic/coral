@@ -1,5 +1,5 @@
 // Settings names and heading order (#7282, UI Accessibility's #7281): the two "What to prune" selects and their number fields are told apart by their section, the Default thinking select says which CLI, the Terminal
-// backend choices are named "tmux" and "pty" (the sentence describes them) inside a radiogroup, a password field's name is its label (the Show button is beside the label, not inside it), Network and Hub's headings go
+// backend choices are named "tmux" and "pty" (the sentence describes them) inside a radiogroup, a password field's name is its label (the Show button is beside the label, not inside it), Coral Hub and remote access's headings go
 // h4, then h5 sections with h6 under them (no jumping up and down), and the CLI paths disclosure has one marker. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -27,7 +27,7 @@ const BASE = require('./test_base').BASE;
         await open('terminal');
         const tb = await ev(`(() => { const e = document.getElementById('tb-choice'); const by = e && e.getAttribute('aria-labelledby'); return { tag: e && e.tagName, name: by ? document.getElementById(by).textContent.trim() : (e.labels[0] || {}).textContent ? e.labels[0].textContent.trim().replace(/\\s+/g, ' ') : null, radios: document.querySelectorAll('input[type=radio]').length }; })()`);
         assert.deepEqual(tb, { tag: 'SELECT', name: 'Terminal backend', radios: 0 }, 'the terminal backend is a select named by its label (#9490: no radio buttons)');
-        console.log('4. Network and Hub: headings h4, then h5 sections, h6 below; no jumps');
+        console.log('4. Coral Hub and remote access: headings h4, then h5 sections, h6 below; no jumps');
         await open('network');
         const levels = await ev(`[...document.querySelectorAll('#settings-pane-network h1, #settings-pane-network h2, #settings-pane-network h3, #settings-pane-network h4, #settings-pane-network h5, #settings-pane-network h6')].filter(h => h.getClientRects().length > 0).map(h => Number(h.tagName[1]))`);
         assert.equal(levels[0], 4, 'the pane title is the first heading: ' + levels);

@@ -29,7 +29,7 @@ const { pathToFileURL } = require('url');
     assert.strictEqual(m.effectiveMode({ access_mode: 'launch' }), 'view', 'a computer that has not announced counts as View');
 
     // What the row says (fixed words, never machine text): what the computer allows, and what applies only when lower than the choice.
-    assert.strictEqual(m.launchNote({ access_mode: 'launch', local_mode: 'interact' }), 'This computer allows up to Interact; change it in Coral on that computer (Settings > Network and Hub).');
+    assert.strictEqual(m.launchNote({ access_mode: 'launch', local_mode: 'interact' }), 'This computer allows up to Interact; change it in Coral on that computer (Settings > Coral Hub and remote access).');
     assert.strictEqual(m.launchNote({ access_mode: 'launch', local_mode: 'launch' }), '');
     assert.strictEqual(m.launchNote({ access_mode: 'view' }), '', 'nothing announced: no machine note (the row says View until it connects)');
     assert.strictEqual(m.effectiveNote({ access_mode: 'launch', local_mode: 'interact' }), 'Effective: Interact, limited by this computer');

@@ -1,7 +1,7 @@
 // How much text each Settings group shows before anything is opened (the usability pass, #5985: "help people get to the setting, then expand it with more info if necessary"). The words a person
 // can see in a group are counted (text nodes whose whole path is shown; a select's options are not text); a group that has been cut has a budget, so a paragraph that creeps back fails here. The
 // long explanations are behind each row's (i): a button with aria-expanded that controls its text, and the text still describes its control. Read as a computer connected to Coral Hub at Launch, with
-// every Hub row shown (the largest the Network and Hub group gets). What the server holds is stood in for too: no terminal logs and no kept worktrees (a suite that ran before on the same server leaves a log of an ended agent, which adds its row's words). Drives Chrome over CDP against the isolated dev server; the cloud routes are stood in for the page's fetch.
+// every Hub row shown (the largest the Coral Hub and remote access group gets). What the server holds is stood in for too: no terminal logs and no kept worktrees (a suite that ran before on the same server leaves a log of an ended agent, which adds its row's words). Drives Chrome over CDP against the isolated dev server; the cloud routes are stood in for the page's fetch.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');

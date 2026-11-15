@@ -1,5 +1,5 @@
 // UI audit #5589, fourth batch, on the real server and dialogs, at 1280 and 390 px:
-//   - Settings > Network and Hub, a server with no hub: the sentence says it once and the row holds the whole sequence, which Copy takes;
+//   - Settings > Coral Hub and remote access, a server with no hub: the sentence says it once and the row holds the whole sequence, which Copy takes;
 //   - the launch chooser's Cancel is in view (it was clipped by the dialog's edge on a phone);
 //   - Settings' footer shows "Unsaved changes" while Save would write something, and not otherwise;
 //   - Settings > Agents: the CLI paths are behind one line, and Edit Default Prompts has an icon, not an emoji.

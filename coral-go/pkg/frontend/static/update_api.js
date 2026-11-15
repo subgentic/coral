@@ -110,9 +110,9 @@ function normalizeRelaunch(r) {
 const REASON_TEXT = {
     max_mode: 'This Coral is not allowed to restart agents from here.',
     owner_only: 'Only the owner can relaunch this Coral.',
-    hub_relaunch_off: 'Relaunching from Coral Hub is switched off on this computer. Change it in Settings > Network and Hub.',
+    hub_relaunch_off: 'Relaunching from Coral Hub is switched off on this computer. Change it in Settings > Coral Hub and remote access.',
     relink_needed: 'This computer was linked to Coral Hub before it recorded its owner. Link it to Coral Hub again to update it from here.',
-    switch_off: 'Relaunching from Coral Hub is switched off on this computer. Change it in Settings > Network and Hub.',
+    switch_off: 'Relaunching from Coral Hub is switched off on this computer. Change it in Settings > Coral Hub and remote access.',
     nothing_staged: 'There is no update ready to install.',
     not_verified: 'The update has not been verified, so it was not installed.',
     busy: 'Another relaunch is already running.',
@@ -322,7 +322,7 @@ export async function requestHubCheck(server) {
 export function hubUpdateAction(s) {
     if (!s) return { kind: 'hint', text: 'Could not read that computer\'s update status.' };
     switch (s.hubState) {
-        case 'hub_relaunch_off': return { kind: 'hint', text: 'Turn on "relaunch to install updates" in Settings > Network and Hub on that computer, then try again.' };
+        case 'hub_relaunch_off': return { kind: 'hint', text: 'Turn on "relaunch to install updates" in Settings > Coral Hub and remote access on that computer, then try again.' };
         case 'staged':
             if (s.staged && s.staged.verified && s.relaunch.available) return { kind: 'dialog' };
             if (s.staged && !s.staged.verified) return { kind: 'hint', text: 'The update is downloaded but not verified yet. Try again in a moment.' };

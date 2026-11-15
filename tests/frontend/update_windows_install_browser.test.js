@@ -110,7 +110,7 @@ const win = (version, over = {}, relaunch = {}) => ({ enabled: true, relaunch_av
             await ev(`window.hideSettingsModal(); true`);
 
             // ═══ #7343: a build without the Hub's relaunch feature (every shipping build): the status says relaunch_available is false, so Settings draws no Hub row (the automatic switch stays: Coral checks by itself in every build),
-            // the Network and Hub pane draws no switch or sentence for it, and Install update is still there
+            // the Coral Hub and remote access pane draws no switch or sentence for it, and Install update is still there
             await load(view, win('1.4.126', { relaunch_available: false }));
             await ev(`window.__upd.hubAvail = false; true`);
             pn = await ev(`(async () => { await window.showSettingsModal('updates'); const m = await import(${S} + 'update_settings.js'); await m.showUpdatesPane(); const b = document.getElementById('update-pane-body'); const act = b.querySelector('.update-act'); return { text: b.textContent.replace(/\\s+/g, ' ').trim(), auto: !!document.getElementById('settings-update-auto'), act: act ? act.textContent.trim() : null }; })()`);
@@ -121,7 +121,7 @@ const win = (version, over = {}, relaunch = {}) => ({ enabled: true, relaunch_av
                 await ev(`import(${S} + 'cloud_connect.js').then(m => m.loadCloudStatus()).then(() => true)`);
                 await waitFor(`(() => { const r = document.getElementById('settings-cloud-hub-relaunch-row'); return !!r && r.hidden === ${!avail}; })()`, `the Hub relaunch row ${avail ? 'drawn' : 'hidden'}`, 8000); await settle(150);
                 const net = await ev(`(() => { const row = document.getElementById('settings-cloud-hub-relaunch-row'), st = document.getElementById('settings-cloud-hub-relaunch-state'); const vis = e => !!e && !e.hidden && e.getClientRects().length > 0; return { row: vis(row), state: vis(st), exists: !!row }; })()`);
-                check(`${tag}: Network and Hub with the Hub's feature ${avail ? 'on' : 'off'}: the relaunch switch and its sentence are ${want ? 'drawn' : 'not drawn'} (${JSON.stringify(net)})`, net.exists && net.row === want && (want ? true : net.state === false));
+                check(`${tag}: Coral Hub and remote access with the Hub's feature ${avail ? 'on' : 'off'}: the relaunch switch and its sentence are ${want ? 'drawn' : 'not drawn'} (${JSON.stringify(net)})`, net.exists && net.row === want && (want ? true : net.state === false));
             }
             await ev(`window.hideSettingsModal(); true`);
 

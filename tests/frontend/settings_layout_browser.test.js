@@ -1,6 +1,6 @@
 // Settings layout (#7040, UI/UX's #7036 audit): Agents has five headed parts (Defaults, Default models, Behaviour, Team and board, Tools); the render
-// engine is a Terminal setting, Customize Theme sits in the Theme row, About and Connect to Coral Hub are in Network and Hub, "Log terminal
-// input" is in Security and privacy, Notifications' first row says what it does, Network and Hub keeps one row order at every width, and
+// engine is a Terminal setting, Customize Theme sits in the Theme row, About and Connect to Coral Hub are in Coral Hub and remote access, "Log terminal
+// input" is in Security and privacy, Notifications' first row says what it does, Coral Hub and remote access keeps one row order at every width, and
 // the needless lines are gone. Drives Chrome over CDP through agent_view_harness.js against an isolated dev server; run_cdp_suites.mjs finds it by name.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -49,9 +49,9 @@ const AGENT_PARTS = {
         assert.equal(await paneOf('settings-renderer-select'), 'general');
         await open('general');
         assert.equal(await ev(`(() => { const b = document.querySelector('.settings-theme-btn'); return !!b && b.closest('.settings-pane').dataset.group === 'general' && b.closest('dd') === document.getElementById('settings-theme').closest('dd'); })()`), true, 'Customize Theme shares the Theme row');
-        assert.equal(await paneOf('about-section'), 'network', 'About moved to Network and Hub');
+        assert.equal(await paneOf('about-section'), 'network', 'About moved to Coral Hub and remote access');
         assert.equal(await ev(`!document.querySelector('#settings-pane-general #about-section')`), true);
-        console.log('3. Network and Hub keeps one row order at 1280 and at 390');
+        console.log('3. Coral Hub and remote access keeps one row order at 1280 and at 390');
         for (const w of [1280, 390]) {
             await open('network', w, 800);
             const moved = await ev(`[...document.querySelectorAll('#settings-pane-network *')].filter(e => { const o = getComputedStyle(e).order; return o !== '0'; }).map(e => e.id || e.className)`);
