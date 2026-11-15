@@ -6,8 +6,7 @@ import { browserLocal } from './safe_storage.js';
 import { ensureBuilt, onBuilt } from './lazy_dom.js';
 import { importOnce } from './import_once.js';
 
-// What each item does (menu_help.js, lazy): fetched once the page is up, so a menu's help lines are drawn with the menu, before it is measured and before a pointer can be aimed at it; a phone shows them under the
-// labels and drawing them a tick later moved the items under the pointer (#17492).
+// Help lines (menu_help.js, lazy): drawn with the menu so nothing shifts under the pointer (#17492).
 let describeMenu = null;
 setTimeout(() => importOnce('./menu_help.js').then(m => { describeMenu = m.describe; }).catch(() => {}), 0);
 
