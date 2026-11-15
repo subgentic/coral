@@ -50,7 +50,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const ids = [3, '3', ' 7 ', 0, -1, 1.5, 1e300, 2 ** 53, NaN, Infinity, null, undefined, true, 'x', '', [], [9], {}];
             const odd = ids.map(id => ({ task_id: id, title: 't', since: 'now' })).concat(['x', 5, true, null, [], undefined].map(v => v));
             return odd.map(t => { const row = { session_id: 'a', name: 'a', sleeping: false, stalled_task: t }; return [String(t && t.task_id), a.needsYou(row), !!r.stalledOf(row)]; })
-                .filter(([, n, o]) => n !== o);
+                .filter(([, n, o]) => !n !== !o);
         })`);
         assert.deepEqual(agree, [], 'needsYou and stalledOf accept the same stalled_task payloads');
         const words = await ev(`import(${S} + 'asked_row.js').then(r => [r.askedRow({ session_id: 'a', name: 'a', sleeping: false, stalled_task: { task_id: 3, title: 't', since: 's', words: 'EVIL words' } }).waiting_summary, r.askedRow({ session_id: 'a', name: 'a', sleeping: false, stalled_task: { task_id: 'x', words: 'EVIL' } }).waiting_summary || ''])`);
