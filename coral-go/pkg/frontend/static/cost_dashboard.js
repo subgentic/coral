@@ -362,6 +362,7 @@ export async function _refreshCostDashboard({ force = false } = {}) {
             if (none) { none.textContent = nothing ? COUNTS_NOTE : ''; if (nothing) delete none.dataset.empty; else none.dataset.empty = '1'; none.hidden = !nothing || state.analyticsView !== 'overview'; } // a read that arrives while another view is open leaves the Overview's note hidden (#10988) // data-empty: the view switcher (analytics_views.js) leaves a note with nothing to say hidden, as it un-hid it with the Overview (#10979)
             _flashLiveIndicator(); // the figures were read: say when
             _costTotal = t.cost_usd || 0;
+            _costSince = Date.parse(since) || 0;
 
             // By provider (#5120): the agent types' totals, from by_agent_type: the one source for them (by_model and by_thinking split them).
             _renderProviderTable(providerRows(data.by_agent_type));
@@ -668,10 +669,14 @@ function _showCostTaskDetail(taskId) {
     if (board) openTask(board, taskId); // the task's own page on its team's page (#7644)
 }
 
+/** The tasks of the range: claimed or finished in it (a task with neither stamp is kept), the same window as Total cost. The list is the 100 most recent with a cost: a full list may be missing older ones. */
+const _tasksInRange = tasks => tasks.filter(t => t.cost_usd > 0 && !t.untasked && (!_costSince || !(t.completed_at || t.claimed_at) || Date.parse(t.completed_at || t.claimed_at) >= _costSince));
+const _listFull = tasks => tasks.length >= 100;
+
 /** The cost no task carries (an agent between tasks, chats, the Operator's own sessions): the page's total less what the tasks add up to, as a row of its own so the table's rows agree with Total cost (walk 80). */
-function _untaskedRow(costTasks) {
+function _untaskedRow(costTasks, full) {
     const left = _costTotal - costTasks.reduce((n, t) => n + (t.cost_usd || 0), 0);
-    return left >= 0.005 ? { id: 0, untasked: true, title: 'Not on a task', cost_usd: left } : null;
+    return left >= 0.005 ? { id: 0, untasked: true, title: full ? 'Other cost in this range' : 'Not on a task', cost_usd: left } : null; // a full list may leave tasks out: then the rest is not only what no task carries
 }
 
 function _renderTaskTable(tasks) {
@@ -679,15 +684,15 @@ function _renderTaskTable(tasks) {
     if (!container) return;
 
     // Only show tasks with cost data
-    const costTasks = tasks.filter(t => t.cost_usd > 0 && !t.untasked);
-    _rawData.task = costTasks;
+    const costTasks = _tasksInRange(tasks);
+    _rawData.task = tasks.filter(t => !t.untasked); // all of them: a range change reads them again
 
     const filtered = _applyColFilters(costTasks, 'task', {
         assigned_to: t => t.assigned_to || '',
         priority: t => t.priority || 'medium',
     });
     _costTaskCache = filtered;
-    const rest = _untaskedRow(costTasks), shown = rest && !Object.values(_colFilters).some(f => f && f.size) ? [...filtered, rest] : filtered; // a filtered table is a part of the tasks: no rest row beside it
+    const rest = _untaskedRow(costTasks, _listFull(tasks)), shown = rest && !Object.values(_colFilters).some(f => f && f.size) ? [...filtered, rest] : filtered; // a filtered table is a part of the tasks: no rest row beside it
     const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
     const STATUS = { completed: 'Done', in_progress: 'In progress', skipped: 'Skipped' };
     const span = t => { const a = Date.parse(t.claimed_at); if (!Number.isFinite(a)) return -1; const b = t.completed_at ? Date.parse(t.completed_at) : Date.now(); return b - a; };
@@ -708,13 +713,13 @@ function _renderTaskTable(tasks) {
 function _renderGoalTable(tasks) {
     const container = document.getElementById('cost-by-goal');
     if (!container) return;
-    const costTasks = tasks.filter(t => t.cost_usd > 0 && !t.untasked), by = new Map();
+    const costTasks = _tasksInRange(tasks), by = new Map();
     for (const t of costTasks) {
         const key = t.goal_id || 0, g = by.get(key) || { id: key, title: key ? (t.goal_title || `Goal ${key}`) : 'Tasks with no goal', tasks: 0, cost_usd: 0, input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 };
         g.tasks++; for (const f of ['cost_usd', 'input_tokens', 'output_tokens', 'cache_read_tokens', 'cache_write_tokens']) g[f] += t[f] || 0;
         by.set(key, g);
     }
-    const rows = [...by.values()], rest = _untaskedRow(costTasks);
+    const rows = [...by.values()], rest = _untaskedRow(costTasks, _listFull(tasks));
     if (rest) rows.push({ id: -1, title: rest.title, tasks: 0, cost_usd: rest.cost_usd, input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, untasked: true });
     _drawTable(container, 'goal', [
         { key: 'title', label: 'Goal', primary: true, sort: true, sortValue: g => g.title || '', cell: g => g.title, width: 'grow' },
@@ -751,6 +756,7 @@ function _spendInnerWidth(container) {
 }
 
 let _costTotal = 0; // the page's Total cost, as the summary read it
+let _costSince = 0; // the range's start (ms), 0 for no start: the By task and By goal tables take the tasks worked on in it, so they add up to Total cost over the same window
 function _renderSpendChart(buckets) {
     const container = document.getElementById('cost-spend-chart');
     if (!container) return;

@@ -5,8 +5,10 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 
-const task = (id, cost, goal, title) => ({ id, board_id: 'b', title: `Task ${id}`, status: 'completed', priority: 'medium', assigned_to: 'Dev', cost_usd: cost, input_tokens: 10, output_tokens: 5, cache_read_tokens: 0, cache_write_tokens: 0, goal_id: goal || undefined, goal_title: title });
-const TASKS = [task(1, 0.28, 7, 'Ship it'), task(2, 0.27, 7, 'Ship it'), task(3, 0.04, 8, 'Polish'), task(4, 0.03, 0)];
+const task = (id, cost, goal, title, ago) => ({ id, board_id: 'b', title: `Task ${id}`, status: 'completed', priority: 'medium', assigned_to: 'Dev', cost_usd: cost, input_tokens: 10, output_tokens: 5, cache_read_tokens: 0, cache_write_tokens: 0, goal_id: goal || undefined, goal_title: title, completed_at: ago || new Date(Date.now() - 600000).toISOString() });
+const old = new Date(Date.now() - 30 * 86400000).toISOString(); // finished a month ago: outside the day the page opens on, so its $5 is in neither the total nor a row
+const TASKS = [task(1, 0.28, 7, 'Ship it'), task(2, 0.27, 7, 'Ship it'), task(3, 0.04, 8, 'Polish'), task(4, 0.03, 0), task(5, 5, 7, 'Ship it', old)];
+const MANY = Array.from({ length: 100 }, (_, i) => task(100 + i, 0.001, 0)); // a full list: some tasks may be missing from it
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,10 +17,11 @@ const TASKS = [task(1, 0.28, 7, 'Ship it'), task(2, 0.27, 7, 'Ship it'), task(3,
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 820, height: 1180, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+        await ev(`window.__tasks = ${JSON.stringify(TASKS)}; true`);
         await ev(`(() => { const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o) => { const url = String(u && u.url || u);
                 if (url.includes('/api/token-usage/summary')) return json({ totals: { input_tokens: 300, output_tokens: 30, cost_usd: 2.14, num_requests: 3 }, by_model: [], by_thinking: [], by_agent_type: [], by_agent: [] });
-                if (url.includes('/api/board/tasks')) return json({ tasks: ${JSON.stringify(TASKS)} });
+                if (url.includes('/api/board/tasks')) return json({ tasks: window.__tasks });
                 if (url.includes('/api/call-metrics/summary')) return json({ rows: [] });
                 if (url.includes('/api/token-usage/by-team')) return json({ teams: [] });
                 if (url.includes('/api/token-usage/by-branch')) return json({ branches: [] });
@@ -26,7 +29,7 @@ const TASKS = [task(1, 0.28, 7, 'Ship it'), task(2, 0.27, 7, 'Ship it'), task(3,
                 return R(u, o); }; return true; })()`);
         await ev(`window.switchNavTab('tokens'); true`);
         await ev(`import((window.__coralStatic || '/static/') + 'analytics_views.js').then(m => m.selectView('task')).then(() => true)`);
-        await waitFor(`document.querySelectorAll('#cost-by-task tbody tr').length === 5`, 'four tasks and the rest row', 15000);
+        await waitFor(`document.querySelectorAll('#cost-by-task tbody tr').length === 5`, 'four tasks and the rest row (the task outside the range is not a row)', 15000);
         const t = await cells('#cost-by-task');
         const ci = t.head.findIndex(h => /^Cost/.test(h));
         assert.ok(ci >= 0, `Cost is shown on a tablet: ${JSON.stringify(t.head)}`);
@@ -43,6 +46,11 @@ const TASKS = [task(1, 0.28, 7, 'Ship it'), task(2, 0.27, 7, 'Ship it'), task(3,
         assert.deepEqual(names, ['Not on a task', 'Polish', 'Ship it', 'Tasks with no goal'], JSON.stringify(g.rows));
         const gi = g.head.findIndex(h => /^Cost/.test(h));
         assert.equal(g.rows.find(r => r[0] === 'Ship it')[gi], '$0.55');
+        // a full list (100 tasks) may be missing older ones: the rest says so
+        await ev(`window.__tasks = ${JSON.stringify(MANY)}; import((window.__coralStatic || '/static/') + 'cost_dashboard.js').then(m => m._refreshCostDashboard({ force: true })).then(() => true)`);
+        await ev(`import((window.__coralStatic || '/static/') + 'analytics_views.js').then(m => m.selectView('task')).then(() => true)`);
+        await waitFor(`[...document.querySelectorAll('#cost-by-task tbody tr')].some(r => r.textContent.includes('Other cost in this range'))`, 'a full list calls the rest "Other cost in this range"', 15000);
+        assert.ok(![...await ev(`[...document.querySelectorAll('#cost-by-task tbody tr')].map(r => r.textContent)`)].some(x => x.includes('Not on a task')), 'and not "Not on a task"');
         console.log('PASS by task and by goal add up');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
