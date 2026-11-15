@@ -121,14 +121,10 @@ func (h *SystemHandler) IsGitDir(w http.ResponseWriter, r *http.Request) {
 		resp["branch"] = branch
 	}
 	if branch == "" { // no repository, or one with no commit: how much is in the folder (the entries of its top level, .git aside)
-		if entries, rerr := os.ReadDir(expanded); rerr == nil {
-			n := 0
-			for _, e := range entries {
-				if e.Name() != ".git" {
-					n++
-				}
-			}
-			resp["files"] = n
+		n, capped := countFolderFiles(expanded, maxFirstCommitFiles) // the files in it, subfolders too (#17211: a folder holding one big subfolder said "1 file")
+		resp["files"] = n
+		if capped {
+			resp["files_capped"] = true
 		}
 	}
 	writeJSON(w, http.StatusOK, resp)

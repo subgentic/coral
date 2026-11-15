@@ -16,6 +16,8 @@ let view = null;
 let editingJobId = null;  // non-null when editing an existing job
 let openedJob = null;     // what the editor showed for the job it opened (#4423): Save sends only what the person changed since
 let repoOffer = '';      // the server refused the folder for a missing repository or first commit (#10276): the form offers to make it one
+const BIG_FOLDER = 5000; // files above which the first commit's box starts unticked (#17211)
+let repoCapped = false; // the folder holds more files than a first commit takes (#17211)
 let repoFiles = null;    // how many files and folders the chosen folder holds, when it is not yet a job's folder (is-git says so, #17150): the first commit's choice names it
 let folderSeq = 0, folderTimer = 0; // the newest folder check wins; a typed path is checked a moment after the last key
 let noWorkflows = false;  // the workflow list came back empty: the form says so and offers to make one
@@ -322,6 +324,7 @@ async function checkFolder() {
     if (mine !== folderSeq) return;
     const why = !data.is_git ? 'a git repository' : data.branch === '' ? 'commit yet' : '';
     repoFiles = typeof data.files === 'number' ? data.files : null;
+    repoCapped = !!data.files_capped;
     if (!why || !(data.is_git || repoFiles !== null)) { clear(); return; } // fine as it is, or a folder the server could not read: Create job says why
     repoOffer = why;
     view.error('repo_path', folderWords(why, dir));
@@ -334,14 +337,17 @@ function makeRepo() {
     const dir = String(view.values().repo_path || '').trim();
     if (!dir) return;
     const files = repoFiles, fresh = repoOffer === 'a git repository';
-    const choice = files === 0 ? undefined : { label: `Include the files that are in this folder now${files ? ` (${plural(files, 'file')})` : ''}`, checked: fresh && files !== null }; // ticked by default for a folder that is not a repository yet and has files
-    const says = `Coral will run git init in ${dir} if it is not a repository yet, and make a first commit on this computer only; nothing is pushed anywhere. Each run of the job works in a copy made from that commit, so the commit is empty unless the box is ticked: then a run starts without the folder's files. Files that .gitignore lists are left out. Then the job is created.`;
+    const big = repoCapped || (files || 0) > BIG_FOLDER; // a big folder is not staged unless the person asks: git add takes a while, and the repository would hold all of it (#17211)
+    const choice = files === 0 || repoCapped ? undefined : { label: `Include the files that are in this folder now${files ? ` (${plural(files, 'file')})` : ''}`, checked: fresh && files !== null && !big }; // ticked by default for a folder that is not a repository yet and has files
+    const bigNote = repoCapped ? ` This folder holds more than 20,000 files, too many to include: the first commit will be empty. Pick a smaller project folder to include its files.` : big ? ` This folder holds ${plural(files, 'file')}: including them takes a while, so the box is not ticked.` : '';
+    const says = `Coral will run git init in ${dir} if it is not a repository yet, and make a first commit on this computer only; nothing is pushed anywhere. Each run of the job works in a copy made from that commit, so the commit is empty unless the box is ticked: then a run starts without the folder's files. Files that .gitignore lists are left out, and so are files named like secrets (.env, keys, certificates, credentials).${bigNote} Then the job is created.`;
     window.showConfirmModal('Make this folder a git repo', files === 0 ? `Coral will run git init in ${dir} if it is not a repository yet, and make an empty first commit, so each run of the job has a branch to start from. The folder has no files yet. Then the job is created.` : says, async (_ack, include) => {
         try {
             const resp = await fetch('/api/scheduled/jobs/init-repo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repo_path: dir, include_files: !!include }) });
             const data = await resp.json().catch(() => ({}));
             if (!resp.ok || data.error) { showToast(data.error || 'Could not make the folder a git repo.', true); return; }
             repoOffer = ''; view.error('repo_path', ''); view.refresh();
+            if (Array.isArray(data.left_out) && data.left_out.length) showToast(`Left out of the first commit, as they look like secrets: ${data.left_out.slice(0, 4).join(', ')}${data.left_out.length > 4 ? ` and ${data.left_out.length - 4} more` : ''}.`);
             submitJob(); // the person asked for this job: it is created now, not asked for again (#10783)
         } catch { showToast('Could not make the folder a git repo.', true); }
     }, undefined, { label: 'Make it a git repo', danger: false, choice });
@@ -434,7 +440,7 @@ export function showJobModal() {
     repoOffer = '';
     v.reset(); // every field at its default, no errors, an empty status line
     // No folder is chosen for the person: the Settings default if they set one, else empty and required, never the home folder (as New Agent has it, #5989; #9958).
-    repoFiles = null;
+    repoFiles = null; repoCapped = false;
     if (state.settings?.default_working_dir) { v.set('repo_path', state.settings.default_working_dir); checkFolder(); }
     v.fold(false);
     openModal('New job', 'Create job');

@@ -5,6 +5,7 @@ package routes
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -97,18 +98,33 @@ func (h *ScheduleHandler) InitJobRepo(w http.ResponseWriter, r *http.Request) {
 			args = append(args, "-c", key+"="+fallback)
 		}
 	}
+	var left []string // files a first commit leaves out for their names (#17211)
 	if body.IncludeFiles {
-		if out, err := gitutil.Command(ctx, dir, "add", "-A").CombinedOutput(); err != nil {
-			errBadRequest(w, "adding the folder's files failed: "+strings.TrimSpace(string(out)))
+		if n, capped := countFolderFiles(dir, maxFirstCommitFiles); capped {
+			errBadRequest(w, fmt.Sprintf("This folder holds more than %d files, too many for a first commit. Pick a smaller project folder, or make the first commit empty.", maxFirstCommitFiles))
+			return
+		} else if n == 0 {
+			body.IncludeFiles = false
+		}
+	}
+	if body.IncludeFiles {
+		var serr error
+		var sout string
+		if left, serr, sout = stageFirstCommit(ctx, dir); serr != nil {
+			if ctx.Err() != nil {
+				sout = "it took too long"
+			}
+			errBadRequest(w, "adding the folder's files failed: "+sout+". Nothing was committed and the folder's index is as it was.")
 			return
 		}
 	}
 	args = append(args, "-c", "commit.gpgsign=false", "commit", "--allow-empty", "--no-verify", "-m", "Initial commit") // never a signing prompt or a failed signature on Coral's own placeholder commit (#10534)
 	if out, err := gitutil.Command(ctx, dir, args...).CombinedOutput(); err != nil {
+		unstage(dir)
 		errBadRequest(w, "the first commit failed: "+strings.TrimSpace(string(out)))
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "repo_path": dir, "created": true})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "repo_path": dir, "created": true, "left_out": left})
 }
 
 // sameDir reports whether two directories are the same, links resolved.

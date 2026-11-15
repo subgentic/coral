@@ -128,3 +128,67 @@ func TestInitJobRepoCanIncludeTheFoldersFiles(t *testing.T) {
 	require.Equal(t, http.StatusOK, code, "%v", body)
 	assert.Equal(t, "index.html", tracked(full), "with the choice the first commit holds the folder's files, so a run's worktree has them")
 }
+
+// #17211: a first commit that includes the folder's files leaves out the ones named like secrets, even when .gitignore does not list them, and says which.
+func TestInitJobRepoLeavesOutSecretLookingFiles(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	srv, _ := scheduleTestServer(t)
+	dir := t.TempDir()
+	for name, text := range map[string]string{"main.go": "package main", ".env": "TOKEN=1", "deploy.pem": "x", "id_rsa": "x", "credentials.json": "{}", ".env.example": "TOKEN=", "sub/server.key": "x", "sub/ok.txt": "ok"} {
+		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(text), 0o600))
+	}
+	code, body := sendJSON(t, http.MethodPost, srv.URL+"/api/scheduled/jobs/init-repo", map[string]any{"repo_path": dir, "include_files": true})
+	require.Equal(t, http.StatusOK, code, "%v", body)
+	out, err := consoletest.HiddenCommand("git", "-C", dir, "ls-tree", "-r", "--name-only", "HEAD").Output()
+	require.NoError(t, err)
+	committed := strings.Fields(string(out))
+	assert.ElementsMatch(t, []string{"main.go", ".env.example", "sub/ok.txt"}, committed, "no secret-looking file is in the commit")
+	left, _ := body["left_out"].([]any)
+	assert.Len(t, left, 5, "and the answer names them: %v", body["left_out"])
+	_, err = os.Stat(filepath.Join(dir, ".env"))
+	assert.NoError(t, err, "the files themselves stay where they are")
+}
+
+// #17211: the count the dialog shows is of files, subfolders included, and a folder past the limit is refused for a first commit with its files (nothing staged).
+func TestInitJobRepoCountsFilesAndRefusesAHugeFolder(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	srv, _ := scheduleTestServer(t)
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "big", "deep"), 0o755))
+	for i := 0; i < 7; i++ {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "big", "deep", "f"+strconv.Itoa(i)), []byte("x"), 0o644))
+	}
+	n, capped := countFolderFiles(dir, 100)
+	assert.Equal(t, 7, n, "one folder holding seven files is seven files, not one")
+	assert.False(t, capped)
+	old := maxFirstCommitFiles
+	maxFirstCommitFiles = 5
+	t.Cleanup(func() { maxFirstCommitFiles = old })
+	n, capped = countFolderFiles(dir, 5)
+	assert.True(t, capped, "past the limit it says so, and stops counting")
+	code, body := sendJSON(t, http.MethodPost, srv.URL+"/api/scheduled/jobs/init-repo", map[string]any{"repo_path": dir, "include_files": true})
+	assert.Equal(t, http.StatusBadRequest, code)
+	assert.Contains(t, body["error"], "too many for a first commit")
+	_, err := os.Stat(filepath.Join(dir, ".git", "index"))
+	assert.True(t, err != nil, "nothing was staged")
+}
+
+// #17211: when the first commit fails after the files were staged, the index is put back, so the folder is as before.
+func TestAFailedFirstCommitLeavesNothingStaged(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	dir := t.TempDir()
+	require.NoError(t, consoletest.HiddenCommand("git", "init", "-q", dir).Run())
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a"), 0o644))
+	require.NoError(t, consoletest.HiddenCommand("git", "-C", dir, "add", "-A").Run()) // half-staged, as after a timeout
+	unstage(dir)
+	out, err := consoletest.HiddenCommand("git", "-C", dir, "diff", "--cached", "--name-only").Output()
+	require.NoError(t, err)
+	assert.Empty(t, strings.TrimSpace(string(out)), "the index is empty again")
+}
