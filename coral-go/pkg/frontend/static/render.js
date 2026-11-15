@@ -467,7 +467,7 @@ registerActions({
     'agent-keep-full-access': withAgent('setKeepFullAccess', ['on', 'off', 'use']), // the Operator's per-Codex-agent Full access across restarts (#14061)
     'agent-archive': withAgent('toggleAgentArchive', ['archive', 'unarchive']),
     'agent-move': menu(el => { const sid = textOf(el.dataset.sessionId); if (sid && UPDOWN[el.dataset.dir]) W(el.dataset.dir === 'up' ? 'moveSessionUp' : 'moveSessionDown')(sid); }),
-    'team-sleep': menu(el => { const b = textOf(el.dataset.board); if (b && ['sleep', 'wake'].includes(el.dataset.mode)) W('toggleTeamSleep')(b, el.dataset.mode); }),
+    'team-sleep': menu(el => { const b = textOf(el.dataset.board); if (b && ['sleep', 'wake', 'archive', 'restore'].includes(el.dataset.mode)) W('toggleTeamSleep')(b, el.dataset.mode); }),
     'team-working-mode': withBoard('showTeamWorkingModeWorkspace'),
     'team-link': withBoard('showTeamLinkDialog'),
     'team-tokens': withBoard('showTeamTokenUsage'),

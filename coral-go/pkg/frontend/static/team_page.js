@@ -134,14 +134,17 @@ let moreOpen = false;
 function openSettings() { importOnce('./team_settings_modal.js').then(m => m.openTeamSettings(S.team)).catch(e => console.error('team settings', e)); }
 
 /** Stopping a team: one menu, the same words and the same actions as the team's row in the sidebar (Sleep team or Wake team, Reset team, Stop agents; the last two apart, each asks first). A wide header has the Stop button; a phone's has the same items in More (#10008, Beta Tester and Mobile tester). */
+const teamArchived = () => { const m = (state.liveSessions || []).filter(s => inTeam(s, S.team)); return m.length > 0 && m.every(s => s.archived); }; // every agent is archived: the team is (#17491)
 const teamAsleep = () => { const m = (state.liveSessions || []).filter(s => inTeam(s, S.team)); return m.length > 0 && m.every(s => s.sleeping); };
 function stopItems() {
     const asleep = teamAsleep();
     const none = !(state.liveSessions || []).some(s => inTeam(s, S.team)); // a team with no live agent has nothing to put to sleep, reset or stop: say so, do not offer a button that does nothing (#10187)
     const why = none ? 'No agent of this team is running' : '';
+    if (teamArchived()) return [{ key: 'restore', label: 'Restore team', hint: 'Brings every agent back, asleep; Wake Team starts them', why: '', run: () => window.toggleTeamSleep?.(S.team, 'restore') }]; // an archived team has nothing to sleep, reset or stop (#17491)
     return [
         { key: 'sleep', label: asleep ? 'Wake team' : 'Sleep team', hint: asleep ? 'Starts the sleeping agents again' : 'Stops every agent for now; Wake team starts them again', why, run: () => window.toggleTeamSleep?.(S.team, asleep ? 'wake' : 'sleep') },
         { key: 'reset', label: 'Reset team (clear context)', hint: 'Clears every agent\'s context; each starts in a new chat', why, run: () => window.resetTeam?.(S.team) },
+        { key: 'archive', label: 'Archive team', hint: 'Puts every agent away; goals, tasks and files stay, Restore team brings them back', why, run: () => window.toggleTeamSleep?.(S.team, 'archive') },
         { key: 'kill', label: 'Stop agents', hint: 'Ends every agent now; their chats stay in History', danger: true, why, run: () => window.killBoard?.(S.team) },
     ];
 }
