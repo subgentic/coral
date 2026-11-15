@@ -34,8 +34,9 @@ func TestSubmitReviewNamesTheHeadAndWarnsFromTheSharedCheckout(t *testing.T) {
 	assert.Contains(t, linked.String(), "submitting abc1234567 from ")
 	assert.NotContains(t, linked.String(), "warning", "a worktree on its own branch is not warned about")
 
-	run(wt, "checkout", "-q", "-B", "main")
+	wt2 := filepath.Join(t.TempDir(), "other-wt")
+	run(root, "worktree", "add", "-q", "-b", "master", wt2)
 	var onMain bytes.Buffer
-	announceHead(&onMain, wt, "abc1234567")
+	announceHead(&onMain, wt2, "abc1234567")
 	assert.Contains(t, onMain.String(), "warning: this is a worktree")
 }
