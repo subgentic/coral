@@ -139,6 +139,26 @@ const G1 = 'Explore goals with two teams', G2 = 'Plan the release notes';
                 assert.deepEqual(await chips(), [`Goal: ${G1} ×`]);
                 assert.match(await ev(`location.pathname + location.search`), new RegExp(`^/team/${TEAM}/tasks\\?goal=\\d+$`));
             });
+            await S.run(`${label}: a kept filter that matches nothing says so beside its chip and offers Clear filters (#16690)`, async () => {
+                await ev(`localStorage.removeItem('coral-task-filters:${TEAM}'); true`);
+                await installTP(ev); await seed(ev, TEAM); await openTeam(ev, waitFor, TEAM).catch(() => {}); await goTab(ev, settle, 'Tasks');
+                await ev(`localStorage.removeItem('coral-list-bar-open:team-tasks:${TEAM}'); true`);
+                await ev(`document.getElementById('tk-toggle').click(); true`); await settle(400);
+                const goals = await ev(`[...document.querySelectorAll('#tk-goal option')].map(o => o.value).filter(Boolean)`);
+                let empty = false;
+                for (const agent of ['Backend Dev', 'Orchestrator']) for (const g of goals) {
+                    if (empty) break;
+                    await pick('tk-assignee', agent); await pick('tk-goal', g); await settle(700);
+                    empty = (await rows()).length === 0;
+                }
+                assert.ok(empty, 'an agent and goal that match no task were found');
+                await waitFor(`!!document.querySelector('${panel} .empty-state')`, 'the empty line', 8000);
+                assert.ok((await chips()).length >= 1, 'the chips are still shown: ' + JSON.stringify(await chips()));
+                assert.deepEqual(await ev(`[...document.querySelectorAll('${panel} .empty-state .empty-state-action')].map(b => b.textContent)`), ['Clear filters'], 'the empty line has Clear filters');
+                await shot(`tasks-filters-empty-${label}`);
+                await ev(`document.querySelector('${panel} .empty-state .empty-state-action').click(); true`);
+                await waitFor(`document.querySelectorAll('${panel} .dt-primary').length === 5 && !document.querySelector('${panel} .team-tb-chip')`, 'every task again, no chip', 8000);
+            });
         }
         console.log('PASS team tasks filters');
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }

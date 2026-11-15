@@ -252,7 +252,7 @@ function draw() {
     if (query && L.total != null && L.total > all.length && all.length && !model.loading) body.append(el('p', 'goals-note team-count-line', `Showing ${all.length} of ${L.total}${L.truncated ? '+' : ''}`));
     if (failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, failed), btn('btn btn-small', 'Retry', loadTasks)); body.append(f); }
     if (model.loading) body.append(el('p', 'goals-note', 'Loading tasks…'));
-    else if (!all.length) { if (!failed) { const e = el('div', 'empty-state empty-state-tight'); e.append(el('p', 'empty-state-line', query && TF.isFiltered(model.filters) ? 'No tasks match this search.' : noTasksYet())); body.append(e); } }
+    else if (!all.length) { if (!failed) { const e = el('div', 'empty-state empty-state-tight'); e.append(el('p', 'empty-state-line', query && TF.isFiltered(model.filters) ? 'No tasks match this search.' : noTasksYet())); if (TF.isFiltered(model.filters)) e.append(btn('btn empty-state-action', 'Clear filters', () => { say('Filters cleared'); setFilters(TF.EMPTY); })); body.append(e); } } // a filter kept from before shows its chip; the empty line offers the way out (#16690)
     else {
         const shown = all.filter(t => (model.filter === 'all' || (model.filter === 'needs_review' ? needsReview(t) : model.filter === 'open' ? bucket(t) !== 'done' || doneToday(t) : bucket(t) === model.filter)));
         if (!shown.length) {
