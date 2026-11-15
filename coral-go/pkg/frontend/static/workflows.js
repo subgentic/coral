@@ -202,10 +202,7 @@ function renderWorkflowDetail(wf, runs) {
     container.innerHTML = `
         <button type="button" class="back-link" id="wf-back-btn" data-on-click="automations-back" data-folder="workflows">\u2190 Workflows</button>
         <button type="button" class="back-link wf-phone-back" data-on-click="automations-back" data-folder="workflows"><span>&larr; Workflows</span></button>
-        <div class="sched-header">
-            <h2 class="wf-item-title" id="wf-title">${esc(wf.name)}</h2>
-            <button class="btn btn-small btn-primary" data-on-click="wf-trigger" data-workflow-id="${Number(wf.id)}"><span class="material-icons" style="font-size:var(--fs-lg)" aria-hidden="true">play_arrow</span> Run</button>
-        </div>
+        <div class="sched-header"><h2 class="wf-item-title" id="wf-title">${esc(wf.name)}</h2><button class="btn btn-primary" data-on-click="wf-trigger" data-workflow-id="${Number(wf.id)}"><span class="material-icons" style="font-size:var(--fs-lg)" aria-hidden="true">play_arrow</span> Run</button></div>
         <p class="item-meta wf-status-line">${esc(status)}</p>
         ${wf.description ? `<p class="wf-desc">${esc(wf.description)}</p>` : ''}
         <dl class="facts wf-facts"></dl>
