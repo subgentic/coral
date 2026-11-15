@@ -13,7 +13,7 @@ const open = [
     { id: 1, title: 'Pending', status: 'pending', priority: 'low', created_at: '2026-09-01T10:00:00Z' },
     { id: 2, title: 'Running', status: 'in_progress', priority: 'high', assigned_to: 'Dev', claimed_at: '2026-09-02T10:00:00Z', created_at: '2026-09-02T10:00:00Z' },
     { id: 3, title: 'In review', status: 'review_pending', priority: 'medium', assigned_to: 'Dev', reviewers: ['QA', 'UX', 'Sec'], created_at: '2026-09-03T10:00:00Z' },
-    { id: 4, title: 'Blocked', status: 'blocked', priority: 'medium', created_at: '2026-09-04T10:00:00Z' },
+    { id: 4, title: 'Blocked', status: 'blocked', priority: 'medium', created_at: '2026-09-04T10:00:00Z', blocked_by: [{ task_id: 42, satisfied: false }, { task_id: 43, satisfied: false }] },
     { id: 5, title: 'Draft', status: 'draft', priority: 'low', created_at: '2026-09-05T10:00:00Z' },
 ];
 
@@ -36,6 +36,10 @@ const open = [
             await T.tasks.loadBoardTasks('team-a'); return true; })()`);
         const ids = () => ev(`[...document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)')].map(r => Number(r.dataset.taskId))`);
         await waitFor(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 45`, 'the 45 rows');
+
+        console.log('#17069: a blocked row shows which tasks it waits on');
+        assert.equal(await ev(`document.querySelector('#board-task-list tr[data-task-id="4"] .board-task-blocked-note')?.textContent`),
+            'waiting on #42, #43', 'the blocked note names the unsatisfied blockers');
 
         console.log('Columns put Status and the primary Task before the facts');
         assert.deepEqual(await ev(`[...document.querySelectorAll('#board-task-list thead th')].map(h => h.querySelector('.dt-sort > span, .dt-head-text').textContent.trim())`),
