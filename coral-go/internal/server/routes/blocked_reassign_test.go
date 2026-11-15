@@ -22,6 +22,8 @@ func TestBlockedTaskReassignPreservesDependencies(t *testing.T) {
 	h.SetTerminal(terminal)
 	_, err := h.bs.Subscribe(ctx, "team", "new-owner", "Developer", "new-owner", nil, "all", false)
 	require.NoError(t, err)
+	_, err = h.bs.Subscribe(ctx, "team", "old-owner", "Developer", "old-owner", nil, "all", false)
+	require.NoError(t, err)
 	up, err := h.bs.CreateTask(ctx, "team", "Upstream", "", "medium", "Orchestrator", "builder")
 	require.NoError(t, err)
 	child, err := h.bs.CreateTaskWithOpts(ctx, "team", "Blocked", "", "medium", "Orchestrator", &board.CreateTaskOpts{BlockedBy: []board.TaskDep{{TaskID: up.ID, BoardID: "team", Condition: "success"}}, MaxDepth: 3})

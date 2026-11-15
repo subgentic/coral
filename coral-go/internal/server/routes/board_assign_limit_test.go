@@ -2,6 +2,7 @@ package routes
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -203,4 +204,50 @@ func TestTheRefusalNamesAtMostFiveLessLoadedAgents(t *testing.T) {
 	}
 	assert.NotContains(t, out["error"], "Dev 1 (")
 	assert.NotContains(t, out["error"], "Dev 2 (")
+}
+
+// #18294: a name that is no one on the board (a git author's name, a typo) is refused on add, edit and reassign, with the closest members; the Operator and a member are not.
+func TestAssigningToANameThatIsNotOnTheBoardIsRefusedWithTheClosestMembers(t *testing.T) {
+	server, handler := setupBoardTestServer(t)
+	registerTaskPlanner(t, handler, "team", "Orchestrator")
+	base := server.URL + "/api/board/team"
+	for _, n := range []string{"QA Engineer", "QA Engineer 2", "Frontend Dev"} {
+		postJSON(t, base+"/subscribe", map[string]string{"subscriber_id": n, "job_title": n, "session_name": "claude-" + strings.ReplaceAll(n, " ", "-")}).Body.Close()
+	}
+	add := func(who string) *http.Response {
+		return postJSON(t, base+"/tasks", map[string]any{"title": "work", "created_by": "Orchestrator", "assigned_to": who})
+	}
+	resp := add("qa")
+	require.Equal(t, http.StatusConflict, resp.StatusCode)
+	out := readBody(t, resp)
+	assert.Equal(t, "assignee_unknown", out["code"])
+	msg := out["error"].(string)
+	assert.Contains(t, msg, "qa is not on this board")
+	assert.Contains(t, msg, "Closest: QA Engineer, QA Engineer 2, Frontend Dev.", msg)
+	for _, ok := range []string{"QA Engineer 2", "qa engineer", "Operator"} {
+		resp := add(ok)
+		require.Equal(t, http.StatusCreated, resp.StatusCode, ok)
+		resp.Body.Close()
+	}
+	// the same refusal on the task's edit and reassign
+	created := add("QA Engineer")
+	var task map[string]any
+	require.NoError(t, json.NewDecoder(created.Body).Decode(&task))
+	created.Body.Close()
+	id := strings.TrimSuffix(strings.TrimSpace(fmt.Sprint(task["id"])), ".0")
+	for _, route := range []struct {
+		method, path string
+		body         map[string]any
+	}{
+		{"PATCH", "/tasks/" + id, map[string]any{"assigned_to": "qa", "subscriber_id": "Orchestrator"}},
+		{"POST", "/tasks/" + id + "/reassign", map[string]any{"assignee": "qa", "subscriber_id": "Orchestrator"}},
+	} {
+		raw, _ := json.Marshal(route.body)
+		req, _ := http.NewRequest(route.method, base+route.path, strings.NewReader(string(raw)))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusConflict, resp.StatusCode, route.method+" "+route.path)
+		assert.Equal(t, "assignee_unknown", readBody(t, resp)["code"], route.path)
+	}
 }

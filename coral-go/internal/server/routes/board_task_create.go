@@ -203,6 +203,9 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	if h.refuseArchivedAssignee(w, r.Context(), project, body.AssignedTo) {
 		return
 	}
+	if !body.Self && h.refuseUnknownAssignee(w, r, project, body.AssignedTo, createdBy) {
+		return
+	}
 	forcedPast := 0
 	if !body.Self && !board.SameIdentity(createdBy, body.AssignedTo) { // a task for oneself is one's own plan, not an assignment to the agent (#14862)
 		var refused bool

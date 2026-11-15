@@ -61,6 +61,9 @@ func (h *BoardHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		if t, err := h.bs.GetTask(r.Context(), project, taskID); err == nil && t != nil && t.AssignedTo != nil {
 			current = *t.AssignedTo
 		}
+		if !board.SameIdentity(*edit.AssignedTo, current) && h.refuseUnknownAssignee(w, r, project, *edit.AssignedTo, "") {
+			return
+		}
 		var refused bool
 		if refused, forcedPast = h.refuseOverloaded(w, r, project, *edit.AssignedTo, current, edit.Force); refused {
 			return
@@ -317,6 +320,9 @@ func (h *BoardHandler) ReassignTask(w http.ResponseWriter, r *http.Request) {
 	current := ""
 	if t, err := h.bs.GetTask(r.Context(), project, taskID); err == nil && t != nil && t.AssignedTo != nil {
 		current = *t.AssignedTo
+	}
+	if !board.SameIdentity(body.Assignee, current) && h.refuseUnknownAssignee(w, r, project, body.Assignee, "") {
+		return
 	}
 	refused, forcedPast := h.refuseOverloaded(w, r, project, body.Assignee, current, body.Force)
 	if refused {
