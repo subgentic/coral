@@ -51,6 +51,8 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`/^Pause/.test(document.getElementById('mb-pause-btn').textContent)`, 'the board is resumed', 8000);
         await ev(`document.getElementById('team-page-more').click(); true`);
         await waitFor(`!!document.getElementById('mb-delete-btn')?.getClientRects().length`, 'the menu with Remove team', 8000);
+        // the stood-in terminal is stopped first (a team with an agent on it is not removed, #5043): the page does not list it as running, so the dialog is the plain Remove team one
+        await ev(`fetch('/api/sessions/live/${encodeURIComponent(sname || '')}/kill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_type: 'terminal', session_id: ${JSON.stringify(sid)} }) }).then(() => true)`); sid = null;
         // (2) the dialog, then (1) the row goes with the team
         await ev(`document.getElementById('mb-delete-btn').click(); true`);
         await waitFor(`document.getElementById('confirm-modal').getClientRects().length > 0`, 'the Remove dialog', 8000, `JSON.stringify({ btn: !!document.getElementById('mb-delete-btn'), hidden: document.getElementById('mb-delete-btn')?.hidden, disp: document.getElementById('mb-delete-btn') && getComputedStyle(document.getElementById('mb-delete-btn')).display, modal: getComputedStyle(document.getElementById('confirm-modal')).display, toasts: [...document.querySelectorAll('.toast')].map(t => t.textContent.slice(0, 80)) })`);
