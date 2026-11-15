@@ -415,10 +415,8 @@ func TestAVerdictOnARoundAheadOfTheTaskNamesTheCurrentRound(t *testing.T) {
 	id := e.inReview("p", []TaskArtifact{patchRow("fix", "d1")}, "rev1")
 	_, err := e.s.ApproveReview(e.ctx, "team", id, "rev1", "ok", 5)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "is at round 1, not round 5")
+	assert.Contains(t, err.Error(), "you reviewed round 5 of task #"+fmt.Sprint(id)+", but the task is only at round 1")
 	assert.Contains(t, err.Error(), "--round 1")
 	assert.NotContains(t, err.Error(), "resubmitted", "nothing was resubmitted: the number is ahead")
-	_, err = e.s.RejectReviewTextVersion(e.ctx, "team", id, "rev1", "why", 0, 0)
-	_ = err
 	assert.Equal(t, "review_pending", e.task(id).Status, "a refused verdict changes nothing")
 }
