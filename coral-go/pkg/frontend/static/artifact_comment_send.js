@@ -3,6 +3,8 @@
  * Local only: it is never offered through Coral Hub. An agent that is asleep or not running cannot be picked (the server refuses it too); one already asked into this thread says so; the agent's reply is a reply in the thread. */
 
 export const MAX_AGENTS = 10;
+/** The one agent offered on a file of an agent on no team (#18105): the server finds its uploader. */
+export const NO_TEAM_AGENT = 'the agent that uploaded this file';
 /** The most characters of a comment an agent is sent (the computer's own cap, sendCommentCap): the owner reads all of it, the agent the first this many (#14549). */
 export const SEND_COMMENT_CAP = 700;
 
