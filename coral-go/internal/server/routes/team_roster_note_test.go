@@ -47,3 +47,16 @@ func TestTeamLaunchGivesTheOrchestratorTheRoster(t *testing.T) {
 	assert.Equal(t, 1, withRoster, "only the Orchestrator's prompt")
 	assert.Equal(t, 2, without)
 }
+
+// #17610: an opening "You are the <name>." only repeats the name, so the role is what follows; a secret in a member's prompt is redacted before it reaches the Orchestrator's prompt.
+func TestTheRosterRoleSkipsAnOpeningThatRepeatsTheNameAndRedactsSecrets(t *testing.T) {
+	assert.Equal(t, "Build the features.", rosterRole("Lead Developer", "You are the Lead Developer. Build the features."))
+	assert.Equal(t, "You are a careful engineer. Build the features.", rosterRole("Lead Developer", "You are a careful engineer. Build the features."), "an opening that is not the name stays")
+	assert.Equal(t, "You are the Lead Developer.", rosterRole("Lead Developer", "You are the Lead Developer."), "nothing after it: keep it")
+	key := "sk-ant-" + "api03-" + strings.Repeat("A", 40)
+	role := rosterRole("Dev", "Deploy with token "+key+" and then report.")
+	assert.NotContains(t, role, key)
+	assert.Contains(t, role, "Deploy with token")
+	note := teamRosterNote([]launchTeamAgent{{Name: "Orchestrator"}, {Name: "Dev", Prompt: "Deploy with token " + key}}, "Orchestrator", false)
+	assert.NotContains(t, note, key)
+}
