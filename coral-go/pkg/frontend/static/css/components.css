@@ -3970,7 +3970,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-agents-footer { margin-top: 10px; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .team-wizard .team-page { padding: 16px; }
-    .team-wizard .team-page-start { padding: 0; }
     .team-agent-open { grid-template-columns: 1fr auto; row-gap: 2px; }
     .team-agent-summary { grid-column: 1 / -1; order: 3; }
     .team-agent-badge { display: block; width: max-content; margin: 4px 0 0; }
