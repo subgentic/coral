@@ -480,7 +480,7 @@ func sendReplyCommand(artifactID string, commentID int64) string {
 }
 
 // newVersionLine is the line that tells an agent how to answer a comment on a file with a fix (#17361, walk 67): upload the next version of this file under its own name (a new file would be a
-// second row for one document), and say everything that changed in the reply, not only the main edit. Only a file has versions: a comment on changes or a goal gets none.
+// second row for one document), and say everything that changed in the reply, not only the main edit. Only a file has versions: a comment on changes or a goal gets none. The "say everything you changed" part is advisory (#17455): nothing reads the reply against the version, so it is a line in the message and in agent_docs/artifacts.md, not a check.
 func newVersionLine(kind sendKind) string {
 	if kind != sendOnArtifact {
 		return ""
