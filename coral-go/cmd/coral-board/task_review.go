@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -19,6 +18,7 @@ import (
 	"github.com/subgentic/coral/internal/clierr"
 	"github.com/subgentic/coral/internal/clihelp"
 	"github.com/subgentic/coral/internal/fsreplace"
+	"github.com/subgentic/coral/internal/gitutil"
 )
 
 // taskReviewRequested: a list item says review_requested; a full task (an older
@@ -362,7 +362,7 @@ func lastSeenRevision(project string, id int64) int {
 func currentGitHead() string {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "git", "rev-parse", "HEAD").Output()
+	out, err := gitutil.Command(ctx, "", "rev-parse", "HEAD").Output()
 	if err != nil {
 		return ""
 	}
@@ -374,7 +374,7 @@ func currentGitHead() string {
 func headOnOrigin(head string) string {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "git", "ls-remote", "origin").Output()
+	out, err := gitutil.Command(ctx, "", "ls-remote", "origin").Output()
 	if err != nil {
 		return "unchecked"
 	}
@@ -391,7 +391,7 @@ func headOnOrigin(head string) string {
 func inSharedCheckout() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "git", "rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir").Output()
+	out, err := gitutil.Command(ctx, "", "rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir").Output()
 	if err != nil {
 		return false
 	}
