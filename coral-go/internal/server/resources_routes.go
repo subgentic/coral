@@ -14,6 +14,7 @@ import (
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/resources"
 	"github.com/subgentic/coral/internal/server/routes"
+	"github.com/subgentic/coral/pkg/resourcequeue"
 )
 
 // registerResources serves the resource queue (#13613). Its state is one file under the data folder; a file that cannot be read leaves the routes out and says why, never an empty queue (an agent that holds
@@ -24,7 +25,9 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 	if s.boardStore == nil {
 		return
 	}
+	stats := &resources.StatsBoard{}
 	mgr, err := resources.Open(resources.Options{
+		Veto:        func(m resourcequeue.Resource) bool { return stats.Closed(m.Machine, m.Where) }, // a pool takes no new run on a box that is unreachable or out of memory or disk (#17586)
 		Path:        filepath.Join(s.cfg.CoralDir(), "resources.json"),
 		HistoryPath: filepath.Join(s.cfg.CoralDir(), "resource_history.db"), // the record of the queue's use (#13671): its own small file, so a file that fails loses analytics only
 		Priorities:  resources.BoardPriorities{Store: s.boardStore},
@@ -102,7 +105,26 @@ func (s *Server) registerResources(r chi.Router, sess *routes.SessionsHandler) {
 			}
 		}
 	})
-	h := &routes.ResourcesHandler{M: mgr, Board: s.boardStore, Hook: hook, Watch: watch, Stats: &resources.StatsBoard{}}
+	s.goBackground(func(ctx context.Context) { // every minute: each box's numbers are read in the background so a pool's veto always has them (#17586), and a page or a claim never waits on a first read
+		t := time.NewTicker(time.Minute)
+		defer t.Stop()
+		for {
+			for _, st := range mgr.Queue().All() {
+				if ctx.Err() != nil {
+					return
+				}
+				if len(st.Resource.Members) == 0 && st.Resource.Where != "" {
+					stats.Get(st.Resource.Machine, st.Resource.Where)
+				}
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+			}
+		}
+	})
+	h := &routes.ResourcesHandler{M: mgr, Board: s.boardStore, Hook: hook, Watch: watch, Stats: stats}
 	if sess != nil {
 		h.ToolCalls = sess.ToolCallsInFlight // an agent's hand claim is tied to the tool call it is made in (#13718)
 		h.AgentPID = s.sessionPID

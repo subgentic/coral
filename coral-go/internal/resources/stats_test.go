@@ -63,3 +63,14 @@ func TestStatsAreCachedAndUnreachableIsSaid(t *testing.T) {
 	assert.Equal(t, "oproxycommand-x-rm-rf", seen, "any other name becomes a plain slug that cannot be an ssh option")
 	assert.Equal(t, "ok", (&StatsBoard{}).Get("here", "here").State, "this machine is read directly")
 }
+
+// A pool takes no new run on a box whose last sample says it is unreachable or short of memory or disk; with no sample it stays open (#17586).
+func TestAPoolVetoReadsOnlyWhatIsAlreadyKnown(t *testing.T) {
+	b := &StatsBoard{Run: func(context.Context, string, string) (string, error) { return "", errors.New("down") }}
+	assert.False(t, b.Closed("epoch", "remote"), "nothing known yet: open, and no read is started")
+	b.cache = map[string]Stats{"remote:epoch": {State: "ok", MemAvailMB: 500, DiskFreeGB: 50}, "remote:full": {State: "ok", MemAvailMB: 9000, DiskFreeGB: 1}, "remote:fine": {State: "ok", MemAvailMB: 9000, DiskFreeGB: 50}, "remote:gone": {State: "unreachable"}}
+	assert.True(t, b.Closed("epoch", "remote"), "under 1 GB of memory")
+	assert.True(t, b.Closed("full", "remote"), "under 2 GB of disk")
+	assert.True(t, b.Closed("gone", "remote"))
+	assert.False(t, b.Closed("fine", "remote"))
+}

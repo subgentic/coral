@@ -165,3 +165,19 @@ func TestAClaimShowsOnlyATaskFromTheBoardTheClaimingSessionIsOn(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, [3]any{0, "", 0}, [3]any{task, project, rank}, "a session on no board: no task shown, rather than a wrong one")
 }
+
+// A pool's needs travel with every claim on it, so a Linux-only command never gets a Mac (#17586).
+func TestAClaimOnAPoolCarriesThePoolsNeeds(t *testing.T) {
+	m, err := Open(Options{})
+	require.NoError(t, err)
+	q := m.Queue()
+	require.NoError(t, q.Define(resourcequeue.Resource{Key: "mac", Slots: 1, Facts: map[string]string{"os": "darwin"}}))
+	require.NoError(t, q.Define(resourcequeue.Resource{Key: "epoch", Slots: 1, Facts: map[string]string{"os": "linux"}}))
+	require.NoError(t, q.Define(resourcequeue.Resource{Key: "linux", Members: []string{"mac", "epoch"}, Needs: []string{"os=linux"}}))
+	a, err := m.Claim(context.Background(), "linux", "a", "")
+	require.NoError(t, err)
+	assert.Equal(t, "epoch", a.Entry.Member)
+	b, err := m.Claim(context.Background(), "linux", "b", "")
+	require.NoError(t, err)
+	assert.False(t, b.Granted, "epoch is full: b waits, the free Mac is not its to take")
+}

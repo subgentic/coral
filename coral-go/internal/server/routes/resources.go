@@ -76,10 +76,13 @@ type resourceView struct {
 	Allowed  []string `json:"allowed,omitempty"`
 	Match    []string `json:"match,omitempty"`
 	// Description is the resource's own how-to (#17560); Stats the machine as it is now (a minute old at most). Plain text: the page and the CLI escape it.
-	Description string           `json:"description,omitempty"`
-	Stats       *resources.Stats `json:"stats,omitempty"`
-	Holders     []entryView      `json:"holders"`
-	Queue       []entryView      `json:"queue"`
+	Description string            `json:"description,omitempty"`
+	Facts       map[string]string `json:"facts,omitempty"` // #17586: what the box can run (os, go, cores ...), its weight when work is spread, and what a pool's commands need of a member
+	Weight      int               `json:"weight,omitempty"`
+	Needs       []string          `json:"needs,omitempty"`
+	Stats       *resources.Stats  `json:"stats,omitempty"`
+	Holders     []entryView       `json:"holders"`
+	Queue       []entryView       `json:"queue"`
 }
 
 func viewEntry(e resourcequeue.Entry, place int) entryView {
@@ -96,7 +99,7 @@ func viewStatus(st resourcequeue.Status) resourceView {
 	if lease <= 0 {
 		lease = resourcequeue.DefaultLease
 	}
-	v := resourceView{Name: st.Resource.Key, Slots: st.Resource.Slots, Machine: st.Resource.Machine, Where: st.Resource.Where, MaxLease: int(lease / time.Second), Members: st.Resource.Members, Allowed: st.Resource.Allowed, Match: st.Resource.Match, Description: st.Resource.Description, Holders: []entryView{}, Queue: []entryView{}}
+	v := resourceView{Name: st.Resource.Key, Slots: st.Resource.Slots, Machine: st.Resource.Machine, Where: st.Resource.Where, MaxLease: int(lease / time.Second), Members: st.Resource.Members, Allowed: st.Resource.Allowed, Match: st.Resource.Match, Description: st.Resource.Description, Facts: st.Resource.Facts, Weight: st.Resource.Weight, Needs: st.Resource.Needs, Holders: []entryView{}, Queue: []entryView{}}
 	for _, e := range st.Holders {
 		v.Holders = append(v.Holders, viewEntry(e, 0))
 	}
@@ -118,8 +121,10 @@ func (h *ResourcesHandler) fail(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "not_holder", err.Error())
 	case errors.Is(err, resourcequeue.ErrInPool):
 		writeError(w, http.StatusConflict, "in_pool", err.Error())
-	case errors.Is(err, resourcequeue.ErrBadResource), errors.Is(err, resourcequeue.ErrBadMatch):
+	case errors.Is(err, resourcequeue.ErrBadResource), errors.Is(err, resourcequeue.ErrBadMatch), errors.Is(err, resourcequeue.ErrBadFacts), errors.Is(err, resourcequeue.ErrBadNeeds), errors.Is(err, resourcequeue.ErrBadWeight):
 		errBadRequest(w, err.Error())
+	case errors.Is(err, resourcequeue.ErrNoCapable):
+		writeError(w, http.StatusConflict, "no_capable_member", err.Error())
 	default:
 		errInternalServer(w, err.Error())
 	}
@@ -395,7 +400,10 @@ func (h *ResourcesHandler) Define(w http.ResponseWriter, r *http.Request) {
 		Match     []string `json:"match"`
 		Members   []string `json:"members"` // a pool (#13719)
 		// Description is the how-to (#17560): required for a resource that is new, and kept when a redefine leaves it out.
-		Description string `json:"description"`
+		Description string            `json:"description"`
+		Facts       map[string]string `json:"facts"`  // #17586
+		Weight      int               `json:"weight"` // its share when work is spread (0: 1)
+		Needs       []string          `json:"needs"`  // a pool: what a command it claims needs of the member that runs it
 	}
 	if err := decodeJSONMax(w, r, &body, 8192); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -421,7 +429,7 @@ func (h *ResourcesHandler) Define(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "description: a new resource needs one: what it runs, how to reach it (such as ssh epoch) and its rules, in a few lines of plain text (--description)")
 		return
 	}
-	if err := h.M.Queue().Define(resourcequeue.Resource{Description: desc, Key: name, Slots: body.Slots, Members: cleanMembers(body.Members), Machine: cleanText(body.Machine, 128), Where: body.Where, MaxLease: time.Duration(body.MaxLeaseS) * time.Second, Allowed: allowed, Match: body.Match}); err != nil {
+	if err := h.M.Queue().Define(resourcequeue.Resource{Description: desc, Key: name, Slots: body.Slots, Members: cleanMembers(body.Members), Machine: cleanText(body.Machine, 128), Where: body.Where, MaxLease: time.Duration(body.MaxLeaseS) * time.Second, Allowed: allowed, Match: body.Match, Facts: body.Facts, Weight: body.Weight, Needs: body.Needs}); err != nil {
 		h.fail(w, err)
 		return
 	}

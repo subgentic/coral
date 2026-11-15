@@ -412,3 +412,22 @@ func TestAResourceViewCarriesItsMachinesStats(t *testing.T) {
 	_, out = g.do("operator", "GET", "/api/resources/nowhere", nil)
 	assert.Nil(t, out["stats"], "no where, no stats")
 }
+
+// A resource states facts and a weight, a pool states needs, and a redefine without them keeps them (#17586).
+func TestAResourceCarriesFactsWeightAndNeedsAndRefusesBadOnes(t *testing.T) {
+	g := newResRig(t)
+	code, out := g.do("operator", "PUT", "/api/resources/epoch-go", map[string]any{"slots": 2, "machine": "epoch", "facts": map[string]string{"os": "linux", "go": "1.26"}, "weight": 16})
+	require.Equal(t, 200, code, "%v", out)
+	assert.EqualValues(t, 16, out["weight"])
+	assert.Equal(t, map[string]any{"os": "linux", "go": "1.26"}, out["facts"])
+	code, out = g.do("operator", "PUT", "/api/resources/linux", map[string]any{"members": []string{"epoch-go"}, "needs": []string{"os=linux", "go>=1.26"}})
+	require.Equal(t, 200, code, "%v", out)
+	assert.Equal(t, []any{"os=linux", "go>=1.26"}, out["needs"])
+	_, out = g.do("operator", "PUT", "/api/resources/epoch-go", map[string]any{"slots": 3, "machine": "epoch"})
+	assert.EqualValues(t, 16, out["weight"], "a redefine that leaves them out keeps them")
+	assert.Equal(t, "linux", out["facts"].(map[string]any)["os"])
+	code, out = g.do("operator", "PUT", "/api/resources/bad", map[string]any{"slots": 1, "facts": map[string]string{"bad key": "x"}})
+	assert.Equal(t, 400, code, "%v", out)
+	code, _ = g.do("operator", "PUT", "/api/resources/bad2", map[string]any{"members": []string{"epoch-go"}, "needs": []string{"nonsense"}})
+	assert.Equal(t, 400, code)
+}

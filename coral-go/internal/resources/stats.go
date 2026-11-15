@@ -204,3 +204,30 @@ func localStats() Stats {
 	}
 	return st
 }
+
+// Cached is the last sample of a machine and never reads one (nil when there is none yet): the pool's veto must answer at once, under the queue's lock.
+func (b *StatsBoard) Cached(machine, where string) *Stats {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	st, ok := b.cache[where+":"+machine]
+	if !ok {
+		return nil
+	}
+	return &st
+}
+
+// Closed reports whether what is known of a machine closes it to new runs through a pool (#17586): under 1 GB of free memory or 2 GB of free disk. Nothing known, or unreachable-but-never-sampled, leaves it open;
+// a machine whose last sample says unreachable is closed, as a run sent there would fail.
+func (b *StatsBoard) Closed(machine, where string) bool {
+	st := b.Cached(machine, where)
+	if st == nil {
+		return false
+	}
+	switch st.State {
+	case "unreachable":
+		return true
+	case "ok":
+		return st.MemAvailMB > 0 && st.MemAvailMB < 1024 || st.DiskFreeGB > 0 && st.DiskFreeGB < 2
+	}
+	return false
+}
