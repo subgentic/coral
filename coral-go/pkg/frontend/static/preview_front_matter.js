@@ -1,3 +1,5 @@
+import { DOMPURIFY_CONFIG, sanitizeHtml, keepFragmentsInside } from './utils.js';
+
 /* A Markdown file's front matter (a skill's name, description, metadata) as a small key/value header (#16651). Loaded only for a text that starts with a --- line. */
 
 /** { facts: [[key, value]], rest }: the leading `---` block of `key: value` lines split from the Markdown after it. Indented lines continue the key above; an unclosed block (40 lines) or one with no key is not front matter. */
@@ -18,13 +20,14 @@ export function splitMarkdownFrontMatter(text) {
     return { facts, rest: lines.slice(end + 1).join('\n').replace(/^\s*\n/, '') };
 }
 
-/** Redraws a rendered Markdown preview without its front matter, under a key/value header. `render(markdown)` gives the sanitized HTML. Values are text, never markup. */
-export function showFrontMatter(prose, content, render) {
-    const { facts, rest } = splitMarkdownFrontMatter(content);
-    if (!facts.length) return false;
-    prose.innerHTML = render(rest);
+/** Redraws a rendered Markdown preview without its front matter, under a key/value header. Values are text, never markup. */
+export function showFrontMatter(body, content) {
+    const { facts, rest } = splitMarkdownFrontMatter(content), prose = body.firstElementChild;
+    if (!facts.length || !prose) return false;
+    prose.innerHTML = sanitizeHtml(marked.parse(rest), DOMPURIFY_CONFIG, { links: 'file', headings: 2 });
     const dl = document.createElement('dl'); dl.className = 'preview-front-matter';
     for (const [k, v] of facts) { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); }
     prose.prepend(dl);
+    keepFragmentsInside(body);
     return true;
 }

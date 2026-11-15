@@ -2,7 +2,6 @@
 import { escapeHtml, DOMPURIFY_CONFIG, sanitizeHtml, keepFragmentsInside } from './utils.js';
 import { getLangFromPath } from './cm_util.js';
 import { loadHighlight } from './vendor_loader.js';
-import { importOnce } from './import_once.js';
 
 
 export function _fileName(filepath) {
@@ -24,7 +23,7 @@ export function _renderContentView(body, content, filepath, line, interpretHtml)
         // A workspace file can be agent-written: its links follow the file policy (#3542).
         const safe = sanitizeHtml(html, DOMPURIFY_CONFIG, { links: 'file', headings: 2 });
         body.innerHTML = `<div class="prose preview-pane-markdown">${safe}</div>`;
-        if (/^\uFEFF?---\r?\n/.test(content)) importOnce('./preview_front_matter.js').then(m => body.isConnected && m.showFrontMatter(body.firstElementChild, content, t => sanitizeHtml(marked.parse(t), DOMPURIFY_CONFIG, { links: 'file', headings: 2 })) && keepFragmentsInside(body)).catch(() => {}); // front matter: a key/value header (#16651)
+        if (/^\uFEFF?---\r?\n/.test(content)) import('./preview_front_matter.js').then(m => body.isConnected && m.showFrontMatter(body, content)).catch(() => {}); // #16651
         keepFragmentsInside(body);
         if (line > 0) _scrollToLine(body, content, line);
         return;
