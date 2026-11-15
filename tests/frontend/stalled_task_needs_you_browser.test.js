@@ -54,7 +54,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         })`);
         assert.deepEqual(agree, [], 'needsYou and stalledOf accept the same stalled_task payloads');
         const words = await ev(`import(${S} + 'asked_row.js').then(r => [r.askedRow({ session_id: 'a', name: 'a', sleeping: false, stalled_task: { task_id: 3, title: 't', since: 's', words: 'EVIL words' } }).waiting_summary, r.askedRow({ session_id: 'a', name: 'a', sleeping: false, stalled_task: { task_id: 'x', words: 'EVIL' } }).waiting_summary || ''])`);
-        assert.equal(words[0], 'Stopped with task #3 in progress', 'the words are built from the id, not taken from the payload');
+        assert.equal(words[0], 'Idle with task #3 in progress', 'the words are built from the id, not taken from the payload');
         assert.doesNotMatch(words[1], /EVIL/, 'a payload with no usable id has no stalled words at all');
         console.log('PASS a stopped agent that holds a task is a Needs you item with Restart and Reassign, counted in the header, and clears with its next turn');
     } finally { await removeBoards(ev, teams).catch(() => {}); await client.close(); }
