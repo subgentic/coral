@@ -32,7 +32,7 @@ Subcommands:
   complete <id> [--message "note"] [--outcome success|failed]
        [--artifacts manifest.json] [--candidate-revision REVISION]
                                  Complete with outcome/evidence
-  cancel <id> [--message "reason"]
+  cancel <id> --message "reason"
 
 Add options:
   --blocked-by '[{"task_id":1,"condition":"success","required_artifacts":["build"]}]'

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -195,7 +196,10 @@ func (h *BoardHandler) afterTaskCompleted(project, subscriberID string, complete
 	})
 }
 
-// CancelTaskByID marks a task as skipped/cancelled.
+// noReasonGiven is what is kept on a task the Operator skipped from the dashboard without typing a reason.
+const noReasonGiven = "Skipped by the Operator (no reason given)"
+
+// CancelTaskByID marks a task as skipped/cancelled. A reason is required from anyone but the Operator (#17614).
 // POST /api/board/{project}/tasks/{taskID}/cancel
 func (h *BoardHandler) CancelTaskByID(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
@@ -228,7 +232,21 @@ func (h *BoardHandler) CancelTaskByID(w http.ResponseWriter, r *http.Request) {
 	} else if !h.requirePlannerOrAssignee(w, r.Context(), project, current, body.SubscriberID, "cancel it") {
 		return
 	}
-	if body.Message != nil && h.refuseShortArtifactRefs(w, r, body.Message) { // #9841
+	reason := ""
+	if body.Message != nil {
+		reason = strings.TrimSpace(*body.Message)
+	}
+	if reason == "" {
+		// A skipped task with no words behind it was how a release blocker was dropped unseen (#17614). The Operator's dashboard buttons ask for no reason, so theirs is
+		// stored as plain words; everyone else says why.
+		if !board.SameIdentity(body.SubscriberID, "Operator") {
+			writeError(w, http.StatusBadRequest, "reason_required", "say why this task is being skipped: coral-board task cancel "+strconv.FormatInt(taskID, 10)+" --message \"reason\" (the reason is kept on the task and posted on the board)")
+			return
+		}
+		reason = noReasonGiven
+	}
+	body.Message = &reason
+	if h.refuseShortArtifactRefs(w, r, body.Message) { // #9841
 		return
 	}
 	task, err := h.bs.CancelTask(r.Context(), project, taskID, body.SubscriberID, body.Message)
@@ -243,8 +261,11 @@ func (h *BoardHandler) CancelTaskByID(w http.ResponseWriter, r *http.Request) {
 	}
 	h.goBG(func() {
 		ctx := context.Background()
-		notification := fmt.Sprintf("[Task #%d cancelled by %s] %s", task.ID, h.noticeText(ctx, project, body.SubscriberID), h.noticeText(ctx, project, task.Title))
+		notification := fmt.Sprintf("[Task #%d cancelled by %s] %s: %s", task.ID, h.noticeText(ctx, project, body.SubscriberID), h.noticeText(ctx, project, task.Title), h.noticeText(ctx, project, reason))
 		h.postNotice(ctx, project, notification)
+		if task.Priority == "high" || task.Priority == "critical" {
+			h.postNotice(ctx, project, fmt.Sprintf("@Orchestrator [%s task #%d skipped] %s was skipped by %s: %s", task.Priority, task.ID, h.noticeText(ctx, project, task.Title), h.noticeText(ctx, project, body.SubscriberID), h.noticeText(ctx, project, reason)))
+		}
 		// Reconcile the full descendant graph immediately. Pending descendants
 		// become blocked/stalled and retain their owner for orchestrator repair.
 		if stallErr == nil {
