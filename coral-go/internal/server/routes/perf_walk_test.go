@@ -41,7 +41,7 @@ const (
 // ratio of the two boxes' calibration). It is the fastest of five runs, so a box that is loaded does not read slow, and it never lowers the goal (below 1) or raises it past 3: the cache-less code is 4 or more times the goal
 // whatever the machine, and the allocation bound below catches losing the fast path with no clock at all.
 const (
-	calibrationRefMs = 290 // the Mac: 287 to 307 ms (epoch-go: 716 to 792 ms, so a goal of about 2.5 times)
+	calibrationRefMs = 290 // the Mac: 287 to 307 ms (wall time; re-measure as CPU time, see machineSlowdown) (epoch-go: 716 to 792 ms, so a goal of about 2.5 times)
 	maxSlowdown      = 3.0
 )
 
@@ -75,31 +75,40 @@ func calibrationPass() int {
 	return n
 }
 
-// machineSlowdown is how many times slower this box runs the calibration job than the Mac, between 1 and maxSlowdown.
+// slowdownFor is how many times slower than the Mac a calibration job of ms milliseconds is, between 1 and maxSlowdown.
+func slowdownFor(ms float64) float64 {
+	f := ms / calibrationRefMs
+	if f < 1 {
+		return 1
+	}
+	if f > maxSlowdown {
+		return maxSlowdown
+	}
+	return f
+}
+
+// machineSlowdown is how many times slower this box runs the calibration job than the Mac, between 1 and maxSlowdown. It reads the job's CPU time, as the walk's goal does (a box that is loaded
+// for all five runs stretches the wall clock, not the CPU, and would otherwise be handed a lenient goal): the fastest of five. To measure calibrationRefMs again (a new Mac, or the job changed), run
+// `go test -v -run TestNeedsYouWalkOfABigBoardIsUnderTheGoal ./internal/server/routes` on the Mac with nothing else running and take the lowest "PERF calibration job: N ms" of a few runs.
+// Only called where processCPU says (the walk reads it first).
 func machineSlowdown(t testing.TB) float64 {
 	best := time.Duration(0)
 	prev := runtime.GOMAXPROCS(1)
 	defer runtime.GOMAXPROCS(prev)
 	for i := 0; i < 5; i++ {
-		t0 := time.Now()
+		c0, _ := processCPU()
 		calibrationJob()
-		if d := time.Since(t0); i == 0 || d < best {
+		c1, _ := processCPU()
+		if d := c1 - c0; i == 0 || d < best {
 			best = d
 		}
 	}
 	ms := float64(best) / float64(time.Millisecond)
-	t.Logf("PERF calibration job: %.0f ms (the Mac's: %d ms)", ms, calibrationRefMs)
+	t.Logf("PERF calibration job: %.0f ms CPU (the Mac's: %d ms)", ms, calibrationRefMs)
 	if calibrationRefMs == 0 {
 		return 1
 	}
-	f := ms / calibrationRefMs
-	if f < 1 {
-		f = 1
-	}
-	if f > maxSlowdown {
-		f = maxSlowdown
-	}
-	return f
+	return slowdownFor(ms)
 }
 
 // needsYouWalkCeilingMs is the ceiling for this machine: the CI one when CI is set.
@@ -236,11 +245,12 @@ func TestNeedsYouWalkOfABigBoardIsUnderTheGoal(t *testing.T) {
 	_ = fmt.Sprint
 }
 
-// #17951: the calibration never lowers the goal and never raises it past maxSlowdown times.
-func TestMachineSlowdownIsBetweenOneAndTheCap(t *testing.T) {
-	f := machineSlowdown(t)
-	if f < 1 || f > maxSlowdown {
-		t.Fatalf("slowdown %.2f is outside [1, %.0f]", f, maxSlowdown)
+// #17951, #17998: the slowdown never lowers the goal and never raises it past maxSlowdown times, and is the plain ratio between.
+func TestSlowdownIsTheRatioClampedToOneAndTheCap(t *testing.T) {
+	for _, c := range []struct{ ms, want float64 }{{100, 1}, {calibrationRefMs, 1}, {calibrationRefMs * 2, 2}, {calibrationRefMs * 2.5, 2.5}, {calibrationRefMs * 10, maxSlowdown}} {
+		if got := slowdownFor(c.ms); got != c.want {
+			t.Errorf("slowdownFor(%.0f) = %.2f, want %.2f", c.ms, got, c.want)
+		}
 	}
 }
 
