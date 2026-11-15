@@ -154,3 +154,15 @@ test('rendered policy exposes additional invisible controls but retains variatio
  for(const cp of selectors){const c=String.fromCodePoint(cp);assert.equal(HIDDEN.test(c),false);assert.equal(visibleSpecials(c),c);const source='Words'+c+'.\n';assert.ok(mapped(source).length);assert.equal(editRun(source,mapped(source)[0],'New'+c+'.').source,'New'+c+'.\n');}
  for(const source of ['Heart ❤️.\n','Mongolian ᠠ\u180b.\n','Ideograph 禰\u{e0100}.\n'])assert.ok(!analyze(source,marked).blocks[0].reason);
 });
+
+// #18467 (QA4 on #18435): the model lexes with the same single-tilde rule as the renderer, so a block with a lone ~ maps exactly and keeps its line-comment anchors.
+test('a single ~ is text in the model too: such blocks map exactly', () => {
+    for (const source of ['export P=~/bin:~/go/bin\n', 'A ~one~ and ~/x\n', 'mount -o ro ~/a:~/b\n']) {
+        const model = analyze(source, marked);
+        assert.equal(model.blocks[0].reason, undefined, source + ': ' + model.blocks[0].reason);
+        const runs = mapped(source);
+        assert.ok(runs.length && runs.every(r => r.text.includes('~') || r.text.length), source);
+        assert.equal(runs.map(r => r.text).join('').replace(/\s/g, ''), source.replace(/\s/g, ''), source + ': every character is in a run, none dropped as strike');
+    }
+    assert.ok(mapped('a ~~gone~~ b\n').length, 'a double tilde still maps');
+});
