@@ -54,4 +54,14 @@ func TestAJobRunWithNoConversationIsAChatRow(t *testing.T) {
 	assert.Equal(t, map[string]string{"run-a": "Starting"}, got)
 	_, got = list("type=agent&starred=1")
 	assert.Empty(t, got, "a run is never starred")
+
+	// Paging: runs are merged by time, not prepended on every page (#17557).
+	total, p1 := list("type=agent&page=1&page_size=2")
+	assert.Equal(t, 3, total)
+	assert.Len(t, p1, 2, "page 1 has page_size rows")
+	_, p2 := list("type=agent&page=2&page_size=2")
+	assert.Len(t, p2, 1, "page 2 has the remainder")
+	for id := range p2 {
+		assert.NotContains(t, p1, id, "page 2 does not repeat page 1's rows")
+	}
 }
