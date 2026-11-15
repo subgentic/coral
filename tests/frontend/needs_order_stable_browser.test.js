@@ -60,6 +60,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             // the page's own click on a row opens its question: the held presses below are counted and swallowed here, so the table stays in view
             await ev(`window.__clicks = []; document.addEventListener('click', e => { const row = e.target.closest && e.target.closest('${T} tbody tr:not(.dt-group)'); if (!row) return; window.__clicks.push({ connected: e.target.isConnected && document.contains(row), row: (/Q-(\\w+)-end/.exec(row.textContent) || [])[1] }); e.stopImmediatePropagation(); e.preventDefault(); }, true); true`);
             // a row under the pointer never moves: hold the mouse down on a row, a late older row arrives, the row is where it was
+            const beforeLate = await order();
             const target = await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(t => /Q-(\\w+)-end/.exec(t.textContent)[1] === ${JSON.stringify(sorted[1])}); const b = row.getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2), top: Math.round(b.top) }; })()`);
             await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: target.x, y: target.y, button: 'left', clickCount: 1 });
             await ev(`window.__asks.push(${JSON.stringify(ask(6, 'Aaron', 90))}); true`);
@@ -67,10 +68,9 @@ const { coralReady, framesJs } = require('./helpers/wait');
             const held = await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(t => /Q-(\\w+)-end/.exec(t.textContent)[1] === ${JSON.stringify(sorted[1])}); return Math.round(row.getBoundingClientRect().top); })()`);
             await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: target.x, y: target.y, button: 'left', clickCount: 1 });
             assert.equal(held, target.top, at + 'the row under the held pointer did not move when a late row arrived');
-
-            // the late row took its place on release (the limit shows the oldest five, so it can sit above): measure the row again, scrolled into the window (a press below it would hold nothing)
-            const target2 = await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(t => /Q-(\\w+)-end/.exec(t.textContent)[1] === ${JSON.stringify(sorted[1])}); row.scrollIntoView({ block: 'center' }); const b = row.getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2), top: Math.round(b.top) }; })()`);
-            Object.assign(target, target2);
+            // the late row is the oldest, and the kind limit reads oldest first: but it goes after the rows on screen, which keep their places (#17516); it waits behind Show more
+            await refresh();
+            assert.deepEqual(await order(), beforeLate, at + 'a late older row does not take a place among the rows already on screen: ' + JSON.stringify({ now: await order(), beforeLate }));
 
             // and when a row ABOVE it is answered elsewhere while the pointer is held: it stays on screen until the pointer goes up, then it goes
             await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: target.x, y: target.y, button: 'left', clickCount: 1 });
