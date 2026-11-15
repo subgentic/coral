@@ -232,6 +232,7 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 	items = append(items, idle...)
 	items = append(items, m.offBooksItems(ctx, project, orch, subs, bySession, tasks, now)...) // work done off the books (#7793)
 	items = append(items, reviewItems(reviews, reviewers, parked, idleNoWork)...)
+	items = append(items, m.noReviewTaskItems(ctx, project, now)...)                                // a task in review nobody was asked to review (#17832)
 	items = append(items, m.poolReviewItems(ctx, project, now)...)                                  // a review that has waited in the pool (#8957)
 	items = append(items, m.deviationItems(ctx, project, rcpt, tasks, parked, waits, subs, now)...) // far past their own usual (#11729)
 	sleepers := m.sleeperTagsOf(ctx, project, subs, rcpt, tasks)
@@ -563,6 +564,32 @@ func (m *BoardHealthMonitor) askItems(ctx context.Context, project string, now t
 		items = append(items, teamhealth.Item{Rank: 4, Agent: "Board", Key: fmt.Sprintf("ask|%d|%s", o.MessageID, strings.ToLower(o.Member)), State: "open",
 			Problem: fmt.Sprintf("Asked by %s, waiting on %s, %d min (message #%d)", teamhealth.Name(o.Asker), teamhealth.Name(o.Member), int(waited.Minutes()), o.MessageID),
 			Said:    teamhealth.ShownText(o.Content, nil)})
+	}
+	return items
+}
+
+// NoReviewTaskWait is how long a task may sit in review with no Review task open before the check says so (#17832): the submitter's "in review" notice can be lost among many messages.
+const NoReviewTaskWait = 10 * time.Minute
+
+// noReviewTaskItems is a line for each task in review that has waited NoReviewTaskWait or more with no round of review open and no place in the pool: nobody has been asked to review it. Task numbers only.
+func (m *BoardHealthMonitor) noReviewTaskItems(ctx context.Context, project string, now time.Time) []teamhealth.Item {
+	waits, err := m.store.ReviewWaits(ctx, project)
+	if err != nil {
+		return nil
+	}
+	return noReviewTaskItems(waits, now)
+}
+
+// noReviewTaskItems is the line for each of the reviews already read.
+func noReviewTaskItems(waits []board.ReviewWait, now time.Time) []teamhealth.Item {
+	var items []teamhealth.Item
+	for _, w := range waits {
+		if w.Started || w.Pooled || w.Since.IsZero() || now.Sub(w.Since) < NoReviewTaskWait {
+			continue
+		}
+		items = append(items, teamhealth.Item{Rank: 2, Agent: "Board", Key: fmt.Sprintf("noreview|%d", w.Task), State: "open",
+			Problem: fmt.Sprintf("the review of #%d has waited %d min and no Review task is open: nobody has been asked to review it", w.Task, int(now.Sub(w.Since)/time.Minute)),
+			Suggest: fmt.Sprintf("coral-board task review %d --to \"...\"", w.Task)})
 	}
 	return items
 }
