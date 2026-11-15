@@ -29,12 +29,11 @@ function versionCheckRow(slot, s) {
         const answer = await requestCheckNow();
         await refreshUpdateStatus();
         const fresh = getUpdateStatus();
-        if (answer.ok) { result.textContent = ''; }
+        if (answer.ok) { result.textContent = ''; btn.disabled = false; showUpdatesPane(); return; }
         else if (answer.busy) { result.textContent = checkingWords(fresh || {}).sub.replace(' It is not finished yet.', ''); }
         else if (answer.tooSoon) { result.textContent = 'Checked a moment ago. Try again in a minute.'; }
         else { result.textContent = 'Could not check for updates.'; result.dataset.error = '1'; }
         btn.disabled = false;
-        showUpdatesPane();
     });
     slot.append(' ', btn, ' ', result);
 }
