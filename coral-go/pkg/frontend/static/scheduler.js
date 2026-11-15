@@ -199,7 +199,9 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
 
     const moreId = `sched-more-${Number(job.id)}`;
     // One status line: the state and the last result. When it runs next is the Next fact below, not said twice (#9294, the Operator's audit).
-    const status = [job.enabled ? 'Active' : (job.paused_reason ? 'Paused: failing' : 'Turned off'), lastWords(job.last_run)].filter(Boolean).join(' \u00b7 ');
+    // a turned-off job whose last run is still going says so plainly: the run goes on, the job starts no new ones (#17572, walk 74 L17: 'Turned off · running now' read as a contradiction)
+    const goingOn = !job.enabled && job.last_run && (job.last_run.status === 'running' || job.last_run.status === 'pending');
+    const status = [job.enabled ? 'Active' : (job.paused_reason ? 'Paused: failing' : 'Turned off'), goingOn ? 'the last run is still going; no new runs will start' : lastWords(job.last_run)].filter(Boolean).join(' \u00b7 ');
     // A short prompt is shown; a long one is folded (it would push the runs off the page)
     const longPrompt = (job.prompt || '').length > 600 || (job.prompt || '').split('\n').length > 10;
     const promptHtml = !isWorkflow && job.prompt

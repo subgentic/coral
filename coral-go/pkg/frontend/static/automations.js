@@ -71,7 +71,9 @@ const usedByWords = i => (i.usedBy ? `${i.usedBy} job${i.usedBy === 1 ? '' : 's'
 const countOf = key => (key === 'recent' ? AR.unreadCount() : key === 'queue' ? 0 : ITEMS[key]().length); // Recent runs counts the runs not opened yet, the others their rows
 
 // ── The folders ──────────────────────────────────────────────────────────
-const sections = () => [{ title: 'Needs attention', items: FOLDERS.filter(f => f.attention).map(f => ({ key: f.key, label: f.label, icon: f.icon, count: countOf(f.key), alert: f.key === 'failed' })) },
+/** What the Recent runs number is, in words (#17572, walk 74 L20): the finished runs not opened yet, so a run still going does not count until it ends (the row said 0 beside Running now 1). */
+const recentWords = () => { const n = AR.unreadCount(), going = liveRuns().length; return `${n} not opened yet. A run counts here once it has finished${going ? `; ${going} still going` : ''}.`; };
+const sections = () => [{ title: 'Needs attention', items: FOLDERS.filter(f => f.attention).map(f => ({ key: f.key, label: f.label, icon: f.icon, count: countOf(f.key), alert: f.key === 'failed', ...(f.key === 'recent' ? { words: recentWords() } : {}) })) },
     { title: 'Library', items: FOLDERS.filter(f => !f.attention && !f.resources).map(f => ({ key: f.key, label: f.label, icon: f.icon, count: countOf(f.key) })) },
     { title: 'Resources', items: FOLDERS.filter(f => f.resources).map(f => ({ key: f.key, label: f.label, icon: f.icon, count: countOf(f.key) })) }];
 function renderNav(force = false) {
