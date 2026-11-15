@@ -35,9 +35,9 @@ export function deleteTeamItem(boardName) {
                     Remove team <span class="overflow-menu-note">needs Launch</span>
                 </button>`;
     }
-    return `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="team-delete" data-board="${escapeAttr(boardName)}">
+    return `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="team-delete" data-board="${escapeAttr(boardName)}" title="Removes the team and its messages, tasks and goals for good; you are asked first">
                     ${icon}
-                    Remove team
+                    Remove team <span class="overflow-menu-note">messages and tasks go too</span>
                 </button>`;
 }
 
