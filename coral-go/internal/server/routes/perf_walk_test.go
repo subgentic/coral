@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"testing"
 	"time"
@@ -136,12 +137,17 @@ func TestNeedsYouWalkOfABigBoardIsUnderTheGoal(t *testing.T) {
 		var m0, m1 runtime.MemStats
 		runtime.GC()
 		runtime.ReadMemStats(&m0)
+		// The collector's background workers are spread over every core (a quarter of GOMAXPROCS), so the same walk reads about twice the CPU on epoch's 36 cores as on an 18-core Mac, and more with other
+		// work beside it (#17719). The walk's own cost is what the goal is about; what it allocates has its own bound below. So the collector is off for the timed walk (about 550 MB) and back on after.
+		prevGC := debug.SetGCPercent(-1)
 		cpu0, _ := processCPU()
 		t0 := time.Now()
 		files, pages = walkForReview(t, srv)
 		d := time.Since(t0)
-		if cpu1, ok := processCPU(); ok && byCPU {
-			t.Logf("PERF walk %d: %s wall, %s CPU", attempt+1, d.Round(time.Millisecond), (cpu1 - cpu0).Round(time.Millisecond))
+		cpu1, ok := processCPU()
+		debug.SetGCPercent(prevGC)
+		if ok && byCPU {
+			t.Logf("PERF walk %d: %s wall, %s CPU (GC off, GOMAXPROCS %d)", attempt+1, d.Round(time.Millisecond), (cpu1 - cpu0).Round(time.Millisecond), runtime.GOMAXPROCS(0))
 			d = cpu1 - cpu0
 		}
 		runtime.ReadMemStats(&m1)
