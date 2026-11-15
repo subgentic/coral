@@ -3625,7 +3625,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 
 /* The Servers list's search box (#4778): the shared list bar above the list, from six machines up. */
 .servers-bar[hidden] { display: none; }
-.servers-bar { max-width: 880px; margin: 0 auto var(--space-md, 8px); }
+.servers-bar { margin: 0 0 var(--space-md, 8px); }
 .servers-bar .list-bar-bar { padding-left: 0; padding-right: 0; } /* the bar lines up with the list's own edges */
 
 /* The Inbox's live region for the agents that start waiting (#4926): read aloud, never drawn. */

@@ -1,4 +1,5 @@
 /* The one table (#7743, data_table.js). Every size and colour is a --table-* token: a styling change is one token here or one rule below, and no surface styles a table, a row, a cell or a header (a census test checks that).
+ * A table has no max width: it fills its content area like the toolbar above it (the Operator, #18358); a long line is cut in its text column, never by capping the table.
  * The levels are the #7736 scheme: primary 14/600, secondary 13/400, tertiary 12/400, the head 11/600 uppercase. */
 :root {
     --table-row-h: 36px;
