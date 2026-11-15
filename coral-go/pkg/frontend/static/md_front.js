@@ -1,3 +1,4 @@
+import { loadStyles } from './lazy_styles.js';
 import { DOMPURIFY_CONFIG, sanitizeHtml, keepFragmentsInside } from './utils.js';
 
 /* A Markdown file's front matter (a skill's name, description, metadata) as a small key/value header (#16651). A workspace file can be agent-written, so its links follow the file policy as in preview_content.js (#3542). Loaded after a Markdown preview is drawn; it acts only on a text that starts with a --- line. */
@@ -21,9 +22,11 @@ export function splitMarkdownFrontMatter(text) {
 }
 
 /** Redraws a rendered Markdown preview (a text with front matter) without it, under a key/value header; anything else is left as drawn. Values are text, never markup. */
-export function show(body, content) {
+export async function show(body, content) {
     const { facts, rest } = splitMarkdownFrontMatter(content), prose = body.firstElementChild;
     if (!facts.length || !prose || !body.isConnected) return false;
+    await loadStyles('md_front.css'); // the header's rules load with it, not at start (#16651)
+    if (!body.isConnected) return false;
     prose.innerHTML = sanitizeHtml(marked.parse(rest), DOMPURIFY_CONFIG, { links: 'file', headings: 2 });
     const dl = document.createElement('dl'); dl.className = 'preview-front-matter';
     for (const [k, v] of facts) { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); }
