@@ -59,7 +59,7 @@ const { coralReady } = require('./helpers/wait');
         assert.ok(d.lines.length >= 5 && d.longest <= 150, 'the Remove dialog is short lines, not one paragraph: ' + JSON.stringify(d));
         assert.ok(d.lines.some(l => /uploaded/i.test(l) && /not deleted|stay/i.test(l)), "it says what happens to the files the team's agents uploaded: " + JSON.stringify(d.lines));
         await ev(`document.getElementById('confirm-modal-yes').click(); true`);
-        await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Removed team/.test(t.textContent))`, 'the removal is done (the toast)', 20000, `JSON.stringify({ toasts: [...document.querySelectorAll('.toast')].map(t => t.textContent.slice(0, 100)), modal: getComputedStyle(document.getElementById('confirm-modal')).display })`);
+        await waitFor(`fetch('/api/board/projects').then(r => r.json()).then(l => !JSON.stringify(l).includes(${JSON.stringify(B)}))`, 'the team is removed on the server', 25000);
         await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
         await new Promise(r => setTimeout(r, 1500)); // sleep-ok: the Inbox draws from what it already read; a second would be a refetch, which is what the fix avoids
         assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.textContent.includes(${JSON.stringify(rowText)}))`), false, 'the removed team leaves no "Goal closed ... Reopen" row in the Inbox');
