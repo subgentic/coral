@@ -202,7 +202,10 @@ function renderWorkflowDetail(wf, runs) {
     container.innerHTML = `
         <button type="button" class="back-link" id="wf-back-btn" data-on-click="automations-back" data-folder="workflows">\u2190 Workflows</button>
         <button type="button" class="back-link wf-phone-back" data-on-click="automations-back" data-folder="workflows"><span>&larr; Workflows</span></button>
-        <h2 class="wf-item-title" id="wf-title">${esc(wf.name)}</h2>
+        <div class="sched-header">
+            <h2 class="wf-item-title" id="wf-title">${esc(wf.name)}</h2>
+            <button class="btn btn-small btn-primary" data-on-click="wf-trigger" data-workflow-id="${Number(wf.id)}"><span class="material-icons" style="font-size:var(--fs-lg)" aria-hidden="true">play_arrow</span> Run</button>
+        </div>
         <p class="item-meta wf-status-line">${esc(status)}</p>
         ${wf.description ? `<p class="wf-desc">${esc(wf.description)}</p>` : ''}
         <dl class="facts wf-facts"></dl>
@@ -229,15 +232,12 @@ function renderWorkflowDetail(wf, runs) {
                 <span class="material-icons" style="font-size:var(--fs-lg)" aria-hidden="true">smart_toy</span> Edit with agent
             </button>
             <button class="btn wf-foot-secondary" data-on-click="wf-edit" data-workflow-id="${Number(wf.id)}">Edit</button>
-            <button class="btn btn-primary" data-on-click="wf-trigger" data-workflow-id="${Number(wf.id)}">
-                <span class="material-icons" style="font-size:var(--fs-lg)" aria-hidden="true">play_arrow</span> Run
-            </button>
         </div>
     `;
     for (const [k, v] of factRows) { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; container.querySelector('.wf-facts').append(dt, dd); } // text, not markup
     container.querySelector('#wf-step-table').append(workflowStepsTable(steps));
     container.querySelector('#wf-run-table').append(workflowRunsTable(runsPage));
-    foldWayBack(container, '.wf-phone-back', '#wf-title');
+    foldWayBack(container, '.wf-phone-back', '.sched-header');
 }
 
 // ── Run detail ─────────────────────────────────────────────────────────
