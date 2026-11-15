@@ -26,7 +26,8 @@ export function nodeSuites(dir) {
 }
 
 export function classifySuites(dir) {
-  const files = fs.readdirSync(dir).filter(f => TEST_FILE.test(f)).sort();
+  // macOS AppleDouble files (._x.test.js, from a Mac tarball or a copy to a non-HFS disk) are metadata, not suites.
+  const files = fs.readdirSync(dir).filter(f => !f.startsWith('._') && TEST_FILE.test(f)).sort();
   const node = new Set(nodeSuites(dir));
   const server = new Set(SERVER_SUITES);
   const out = { cdp: [], cdpByName: 0, server: [], node: [], unclassified: [], conflicts: [], missing: [] };

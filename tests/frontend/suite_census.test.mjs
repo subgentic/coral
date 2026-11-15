@@ -27,6 +27,8 @@ try {
   write('orphan.test.js', '// no runner');
   write('agent_task_cli.test.js');
   write('helper.js', '// not a suite');
+  write('._x.test.js', 'AppleDouble bytes'); // a Mac tarball's metadata file: not a suite, changes nothing
+  write('._y_browser.test.js', 'AppleDouble bytes');
   const f = classifySuites(tmp);
   assert.deepEqual(f.node, ['plain.test.js']);
   assert.deepEqual(f.cdp, ['imports.test.js', 'named_browser.test.mjs']);
