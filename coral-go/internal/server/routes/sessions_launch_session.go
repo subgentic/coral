@@ -70,6 +70,8 @@ type launchSpec struct {
 	AutoByDefault bool
 	// KeepFullAccess: the Operator's "keep Full access when this agent restarts" choice (#14061, #14085): the launch is Full access after the capabilities. Set only by a relaunch of an agent that has it.
 	KeepFullAccess bool
+	// SigninCommand is typed into a plain terminal once it is ready (#16716): only the sign-in route sets it, from a command the server built itself (never request text).
+	SigninCommand string
 }
 
 // launchSession creates a new agent session using the specified backend (tmux or pty).
@@ -201,7 +203,9 @@ func (h *SessionsHandler) launchSession(ctx context.Context, spec launchSpec) (_
 	// The launch command is built before any terminal is made: when its prompt or settings
 	// files can't be written, the launch fails with nothing left behind (#3601 W12).
 	var cmd string
-	if !isTerminal {
+	if isTerminal {
+		cmd = spec.SigninCommand // "" for an ordinary terminal
+	} else {
 		if cmd, err = h.launchCommand(ctx, agentImpl, launchParams); err != nil {
 			return nil, err
 		}
@@ -474,7 +478,7 @@ func (h *SessionsHandler) startOnTmux(ctx context.Context, params agent.LaunchPa
 	h.terminal.StartLogging(ctx, sessionName, logFile)
 	// Set pane title using native tmux command (avoids shell echo)
 	h.terminal.SetPaneTitle(ctx, sessionName+".0", fmt.Sprintf("%s — %s", folderName, agentType))
-	if agentType == at.Terminal {
+	if agentType == at.Terminal && cmd == "" {
 		return nil
 	}
 	log.Printf("[launch] tmux session=%s agent=%s cmd=%s", sessionName, agentType, cmd)
@@ -646,4 +650,10 @@ func effectivePermissionMode(mode string) string {
 		return "default"
 	}
 	return mode
+}
+
+// LaunchSigninTerminal opens a plain Coral terminal in dir and types command into it (#16716: OpenCode's `auth login` is interactive, so it needs a terminal the person can see).
+// The command is the caller's own: only the sign-in route calls this, with a command it built from a fixed shape, never from request text.
+func (h *SessionsHandler) LaunchSigninTerminal(ctx context.Context, dir, command string) (map[string]any, error) {
+	return h.launchSession(ctx, launchSpec{WorkDir: dir, AgentType: at.Terminal, DisplayName: "OpenCode sign-in", SigninCommand: command})
 }

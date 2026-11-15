@@ -39,6 +39,8 @@ type SystemHandler struct {
 	trustProbeAt time.Time
 	// models lists each agent CLI's models (#4065).
 	models  *agentmodels.Service
+	// signinTerminal opens a terminal session that runs a server-built sign-in command (#16716); set by the server wiring.
+	signinTerminal func(ctx context.Context, dir, command string) (map[string]any, error)
 	db      *store.DB
 	ss      *store.SessionStore
 	cfg     *config.Config
@@ -76,6 +78,11 @@ type SystemHandler struct {
 
 // SetTerminal tells the handler which terminal backend the server is running.
 func (h *SystemHandler) SetTerminal(t ptymanager.SessionTerminal) { h.terminal = t }
+
+// SetSigninTerminal gives the sign-in route a way to open a Coral terminal in a folder and type a command the server built into it (#16716).
+func (h *SystemHandler) SetSigninTerminal(fn func(ctx context.Context, dir, command string) (map[string]any, error)) {
+	h.signinTerminal = fn
+}
 
 // effectiveBackend reports the backend in use: "tmux", "pty", or "unknown".
 func (h *SystemHandler) effectiveBackend() string { return TerminalKind(h.terminal) }
