@@ -25,7 +25,7 @@ export const operatorAsks = () => {
     return [...groups.values()];
 };
 // Exact whitespace-normalized words only; never infer identity from prose or a shared goal alone.
-const duplicateKey = a => a.kind !== 'ask' || a.cut || !String(a.text || '').trim() ? askKey(a) : JSON.stringify([
+const duplicateKey = a => a.kind === 'ask' && Number.isSafeInteger(a.key) && a.key > 0 ? JSON.stringify(['linked', normServer(a.server), a.board, a.key]) : a.kind !== 'ask' || a.cut || !String(a.text || '').trim() ? askKey(a) : JSON.stringify([
     normServer(a.server), a.board, a.goal_id || 0, a.task_id || 0,
     String(a.text).replace(/\s+/g, ' ').trim(),
     (a.buttons || []).map(b => [b.label, b.action, b.arg || '', b.state]),
@@ -135,15 +135,7 @@ export async function replyToAsk(a, text) {
 }
 
 /** Only after an answer succeeded: retire matching source asks with an explicit note, never another approval. Failed closes remain visible on refresh. */
-export async function closeAnsweredDuplicates(a) {
-    for (const other of a.duplicates || []) {
-        try {
-            const m = await importOnce('./ask_ignore.js');
-            await m.closeAnsweredAsk(other, a.id);
-            forgetAsk(other);
-        } catch { showToast('Reply sent. A duplicate question could not be closed; it remains in Needs you.', true); }
-    }
-}
+export async function closeAnsweredDuplicates(a) { return (await importOnce('./ask_ignore.js')).finishAnsweredDuplicates(a); }
 
 // ── Buttons an agent put on a question (#11445, #11643) ─────────────────────────────────────────────────
 // The agent DECLARES up to three buttons; nothing runs until the Operator clicks one here. The label is the agent's text, so it is drawn with textContent after markHidden (strict), and the ACTION is named in
