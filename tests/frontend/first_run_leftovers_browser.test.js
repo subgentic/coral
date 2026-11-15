@@ -1,4 +1,4 @@
-// Two first-run leftovers from the phone check (#11304, Mobile Beta Tester's #11301 and #11257): the "Set a password" dialog has no empty gap between the Password and the Confirm fields (the strength advice sits under both fields and holds no room until something is typed), at 390 and 320 px, 100% and 200% text, light and dark; and in the Change password form of Settings too.
+// Two first-run leftovers from the phone check (#11304, Mobile Beta Tester's #11301 and #11257): the "Set a password" dialog has no empty gap between the Password and the Confirm fields (the strength advice sits under both fields, invisible until something is typed, its room kept so the buttons do not move, #16650), at 390 and 320 px, 100% and 200% text, light and dark; and in the Change password form of Settings too.
 // Drives Chrome over CDP through agent_view_harness.js against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -22,11 +22,12 @@ const { coralReady, framesJs } = require('./helpers/wait');
             if (!g.meterAfterConfirm) problems.push(`${tag}: the strength advice is under the Confirm field, not between the two`);
             // nothing typed: the advice holds no room; typing brings it
             const idle = await ev(`Math.round(document.getElementById('set-password-strength').closest('.pw-strength').getBoundingClientRect().height)`);
-            if (idle !== 0) problems.push(`${tag}: the empty advice holds ${idle} px under Confirm (it holds none until there is something to say)`);
+            const idleVis = await ev(`getComputedStyle(document.getElementById('set-password-strength').closest('.pw-strength')).visibility`);
+            if (idleVis !== 'hidden' || !(idle > 0)) problems.push(`${tag}: the empty advice is ${idleVis}, ${idle} px (it is invisible and keeps its room so the buttons do not move, #16650)`);
             await ev(`(() => { const i = document.getElementById('set-password-new'); i.focus(); i.value = 'abc'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await new Promise(r => setTimeout(r, 200)); // sleep-ok: the advice is drawn on the input event
             const shown = await ev(`Math.round(document.getElementById('set-password-strength').closest('.pw-strength').getBoundingClientRect().height)`);
-            if (!(shown > 0)) problems.push(`${tag}: the advice appears once a password is typed (it is ${shown} px)`);
+            if (!(shown > 0) || shown !== idle) problems.push(`${tag}: the advice appears once a password is typed in the room it kept (idle ${idle} px, shown ${shown} px)`);
             await ev(`document.getElementById('set-password-modal').remove(); true`); // no Not now (#11892): this check goes on without the dialog
             // the same spacing in Settings' Change password form
             const cp = await ev(`(async () => { const R = window.fetch; window.fetch = (u, o = {}) => { const p = String(u); if (p.startsWith('/api/system/auth-status')) return Promise.resolve(new Response(JSON.stringify({ authenticated: true, method: 'session', password_set: true, local: true }), { status: 200, headers: { 'content-type': 'application/json' } })); if (p.startsWith('/api/auth/sessions') && !o.method) return Promise.resolve(new Response(JSON.stringify({ sessions: [], recent: [] }), { status: 200, headers: { 'content-type': 'application/json' } })); return R(u, o); };
@@ -41,7 +42,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 window.fetch = R; window.hideSettingsModal && window.hideSettingsModal(); return out; })()`);
             if (!(cp.gap >= 0 && cp.gap <= Math.round(cp.em * 1.5))) problems.push(`${tag}: Settings' Change password: ${cp.gap} px between New password and Confirm (under ${Math.round(cp.em * 1.5)} is normal)`);
             if (cp.moved.some(d => d !== 0)) problems.push(`${tag}: Settings' Change password: typing moves the fields (${JSON.stringify(cp.moved)} px)`);
-            if (!cp.meterAfter || cp.idleH !== 0) problems.push(`${tag}: Settings' Change password: the advice is under Confirm and holds no room while empty (after: ${cp.meterAfter}, ${cp.idleH} px)`);
+            if (!cp.meterAfter || !(cp.idleH > 0)) problems.push(`${tag}: Settings' Change password: the advice is under Confirm and keeps its room while empty (after: ${cp.meterAfter}, ${cp.idleH} px)`);
         }
         // a chat that cannot open: the caller is told, and says the agent launched
         const seam = await ev(`import((window.__coralStatic || '/static/') + 'launch_dialog.js').then(async m => ({ failed: await m._openLaunched({ session_name: 'x', session_id: 'x' }, 'claude', null, { select: async () => { throw new Error('no chat'); } }), opened: await m._openLaunched({ session_name: 'x', session_id: 'x' }, 'claude', null, { select: async () => {} }) }))`);
