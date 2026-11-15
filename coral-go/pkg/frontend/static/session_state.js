@@ -18,14 +18,15 @@ const GOAL_LINE_MAX = 140;
 
 /** Collapse whitespace/newlines and truncate to one line. */
  function oneLine(text, max = GOAL_LINE_MAX) {
-    const flat = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!text) return '';
+    const flat = String(text).replace(/\s+/g, ' ').trim();
     if (flat.length <= max) return flat;
     return flat.slice(0, max - 1).trimEnd() + '\u2026';
 }
 
 /** Goal text for a session row: summary, else the first user prompt (Show summary, #10816). */
  export function sessionGoalText(s) {
-    return oneLine(s?.summary || s?.first_prompt);
+    return s ? oneLine(s.summary || s.first_prompt || '') : '';
 }
 
 /**
@@ -36,7 +37,10 @@ const GOAL_LINE_MAX = 140;
  * name (task #85). Both are rendered as goal text only.
  */
  function sessionIdentitySource(s) {
-    return (s?.display_name || '').trim() || (s?.auto_name || '').trim() || (s?.board_job_title || '').trim();
+    if (!s) return '';
+    return (s.display_name || '').trim()
+        || (s.auto_name || '').trim()
+        || (s.board_job_title || '').trim();
 }
 
 // Placeholder of the command box: who it goes to, and that an image can be pasted. The agent's type is in the header and the board's name in the sidebar, so neither is repeated here
@@ -58,8 +62,8 @@ export function startingPlaceholder(identity) {
 
 /** What an agent waits for, in words a person reads: the tool's name is not one ("Wants to use AskUserQuestion" is a question for the person; the sentence with the question in it, "Wants to know: Pick a color", is kept as it is). Display text only (#10195). */
 export function askWords(summary) {
-    const t = String(summary || '').replace(/\s+/g, ' ').trim().replace(/^Notification: (?=Claude wants to use your browser$)/, ''); // the browser menu's own headline (#16658)
-    return /^(Notification: )?Wants to use AskUserQuestion$/i.test(t) ? 'Has a question for you' : t;
+    const t = String(summary || '').replace(/\s+/g, ' ').trim().replace(/^Notification:\s*/, ''); // the event's own prefix is not what the agent asks (#16658)
+    return /^Wants to use AskUserQuestion$/i.test(t) ? 'Has a question for you' : t;
 }
 
 /** Shared identity resolver used by row label, avatar, header, terminal label and placeholder. */
@@ -76,7 +80,7 @@ export function resolveSessionIdentity(s) {
 /** The name an unnamed agent shows: its folder's name (not the home folder, the root or a drive), else the CLI's name, else "Agent". */
 export function defaultAgentName(dir, agentType) {
     const trim = p => String(p || '').trim().replace(/[\\/]+$/, '');
-    const d = trim(dir), root = trim(globalThis.document?.body?.dataset?.coralRoot);
+    const d = trim(dir), root = trim(typeof document !== 'undefined' ? document.body?.dataset?.coralRoot : '');
     const folder = d && d !== '~' && d !== root && !/^[A-Za-z]:$/.test(d) ? d.split(/[\\/]/).pop() : '';
     return oneLine(folder, 60) || typeName(agentType) || 'Agent';
 }
@@ -84,8 +88,10 @@ export function defaultAgentName(dir, agentType) {
 export function formatShortTime(isoStr) {
     const d = new Date(isoStr);
     if (isNaN(d)) return "";
-    const p = n => String(n).padStart(2, "0");
-    return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${p(d.getFullYear() % 100)}`;
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yy = String(d.getFullYear()).slice(-2);
+    return `${dd}/${mm}/${yy}`;
 }
 
 /** How old a goal line is, "25 min ago": the generator refreshes a goal at most every 30 minutes, so a goal can be stale and the card says how much (#10123). '' when there is no usable time. */
@@ -102,7 +108,7 @@ export function goalAgeWords(at, nowMs = Date.now()) {
 }
 
 function formatStaleness(seconds) {
-    if (seconds == null) return "Unknown";
+    if (seconds === null || seconds === undefined) return "Unknown";
     if (seconds < 5) return "Just now";
     if (seconds < 60) return `${Math.floor(seconds)}s ago`;
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;

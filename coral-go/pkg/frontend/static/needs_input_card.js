@@ -53,7 +53,7 @@ const MOVED_ON_MS = 3000;
 function agentMovedOn(row, pt, screen) {
     // Only an identified stale QUESTION is told it is over this way, and never by agent-written text alone against newer evidence (Security, UI Reviewer): a permission card, a screen prompt that is not a question, and a
     // pending call or prompt that started after the old question all stay actionable.
-    const summary = askWords(String((row && row.waiting_summary) || "").replace(/^Notification:\s*/, ""));
+    const summary = askWords(row && row.waiting_summary);
     const questionTool = !!(pt && BLOCKING_TOOLS[pt.tool_name] === "question");
     const asksQuestion = questionTool || /^(Wants to know:|Has a question for you$)/.test(summary) || !!(screen && screen.kind === "question");
     if (!asksQuestion) return false;
@@ -82,10 +82,10 @@ function needsInputInfoOf(session) {
     const pt = pendingToolBySession.get(session.session_id) || null;
     const screen = promptOptionsBySession.get(session.session_id) || null;
     if (agentMovedOn(row, pt, screen)) return null; // the agent said something after it asked: the question is over (#14340)
-    if (pt && BLOCKING_TOOLS[pt.tool_name]) return { kind: BLOCKING_TOOLS[pt.tool_name], tool: pt, screen, summary: askWords(String((row && row.waiting_summary) || "").replace(/^Notification:\s*/, "")) }; // the event's words stay: a question with no options on the screen (Hermes' free-text clarify) is its summary
+    if (pt && BLOCKING_TOOLS[pt.tool_name]) return { kind: BLOCKING_TOOLS[pt.tool_name], tool: pt, screen, summary: askWords(row && row.waiting_summary) }; // the event's words stay: a question with no options on the screen (Hermes' free-text clarify) is its summary
     if (hasWorkingDisplayHint(row) && !(screen && screen.options.length)) return null;
     if (row.waiting_for_input && row.waiting_kind !== "login") {
-        const summary = askWords(String(row.waiting_summary || "").replace(/^Notification:\s*/, ""));
+        const summary = askWords(row.waiting_summary);
         // The event says it is a question ("Wants to know: ...", or the tool's own name): the card is headed Question, not Permission needed (#10195).
         return { kind: /^(Wants to know:|Has a question for you$)/.test(summary) || (screen && screen.kind === "question") ? "question" : "permission", tool: pt, screen, summary };
     }
