@@ -94,7 +94,7 @@ export function openGoalEditor(opts = {}) {
     const chips = el('div', 'goal-scopes');
     if (teams) { pick.value = project; chips.append(chip('Team', pick, 'goal-new-team')); }
     else { const c = el('span', 'goal-scope goal-scope-fixed'); c.append(el('span', 'goal-scope-lab', 'Team'), el('b', null, keyLabel(project))); chips.append(c); }
-    const driverHint = 'The agent who looks after this goal';
+    const driverHint = 'The agent who looks after this goal. The Orchestrator unless you pick another';
     const driverChip = chip('Driver', dr, 'goal-new-driver');
     driverChip.title = dr.title = driverHint; dr.setAttribute('aria-description', driverHint);
     if (!edit) chips.append(driverChip); // an edit changes the goal's words; Change driver is its own button on the page
