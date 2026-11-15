@@ -1,9 +1,10 @@
-/* One request for the same read, at load (#9111, the #9090 audit): the dashboard asks for the same few reads from several places in its first seconds. A GET of one of these routes that is asked again
+/* One request for the same read, at load (#9111, the #9090 audit): the dashboard asks for the same few reads from several places in its first seconds (the hub status, the live
+ * sessions, a board's status, a board's goals, the project list...: each was fetched two or three times on every screen). A GET of one of these routes that is asked again
  * while the first is in flight, or within a second after it answered, gets the first one's answer (each caller a clone of it, so each reads its own body). Only these named
  * reads, only a plain read (no abort signal, headers, cache mode, credentials, mode, referrer or redirect, and not a Request object: a caller that asks for a fresh read
  * gets one), and a write to Coral's /api forgets everything when it starts AND when it ends, and no read is shared while one is in flight, so a read after a change is never
- * the answer from before it. A failed answer is not kept. A person's own input forgets everything too, and a read made within two seconds of it
- * is never shared (a Refresh, a Retry reads fresh). After a gap of five minutes it leaves the last input before it in window.__coralAway (inbox_away.js, #17537). And reads share only while the page is loading (its first three seconds): a
+ * the answer from before it. A failed answer is not kept. A person's own input (a click, a key, a touch) forgets everything too, and a read made within two seconds of it
+ * is never shared: a Refresh, a Retry, or a reload after the person's own action reads fresh. And reads share only while the page is loading (its first three seconds): a
  * reload the page makes by itself later, after a live event, is never answered from an earlier read (#9167). The test harness turns the share off for a page by setting
  * window.__coralNoFetchShare before the app runs (tests/frontend/agent_view_harness.js, #9181): a suite that changes a stub and lets the page reload itself reads the stub. */
 const SHARE_MS = 1000;
@@ -38,7 +39,7 @@ export function installFetchShare(now = () => Date.now(), loadMs = LOAD_MS) {
     let writing = 0; // writes to /api in flight
     let lastInput = -Infinity; // when a person last pressed, clicked or touched something
     if (typeof document !== 'undefined' && document.addEventListener) {
-        for (const t of INPUT_EVENTS) document.addEventListener(t, () => { const n = now(); if (lastInput > 0 && n - lastInput > 3e5) window.__coralAway = lastInput; lastInput = n; entries.clear(); }, true);
+        for (const t of INPUT_EVENTS) document.addEventListener(t, () => { lastInput = now(); entries.clear(); }, true);
     }
     window.fetch = function (input, init) {
         const u = localApi(input);
