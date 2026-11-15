@@ -65,7 +65,6 @@
 .team-panel .team-tb-chips .team-tb-chip-more { flex: none; font-weight: var(--fw-strong); }
 .team-panel .team-tb-chips .team-tb-chip:not(:first-child):not(.team-tb-chip-more) { display: none; }
 .team-panel .team-tb-select { display: none; flex: 0 1 auto; min-height: var(--toolbar-control-h); max-width: 14em; }
-.team-panel .team-tb-action + .team-tb-action { margin-left: 8px; } /* two actions on one line (Knowledge: Add note, Distill knowledge): the first takes the auto margin, the second sits beside it (#17485) */
 .team-panel .team-tb-action { flex: none; margin-left: auto; min-height: var(--toolbar-control-h); padding: 0 12px; font-size: var(--fs-md); }
 /* While something is selected the selection bar (team_toolbar.js mountSelection) replaces the line's controls (#7743); the field stays. */
 .team-panel .team-toolbar-selecting > :is(.team-tb-pills, .team-tb-select, .team-tb-chip, .team-tb-chips, .team-tb-action, .list-bar-toggle, .list-bar-more, .list-bar-count) { display: none !important; }
@@ -74,7 +73,6 @@
 @container (max-width: 62rem) { .team-panel .list-bar-search-row:has(.team-tb-pills-many) .team-tb-pills { display: none; } .team-panel .list-bar-search-row:has(.team-tb-pills-many) .team-tb-select { display: block; } } /* seven pills and their counts take about 42 rem: with the search, the Filters icon and the action they need 62 (#9861) */
 @media (max-width: 760px) {
     .team-panel .list-bar-search-row { flex-wrap: wrap; }
-    .team-panel .team-tb-action + .team-tb-action { margin-left: auto; } /* the row wraps: the second action may land alone on the next line, and it belongs at the right like every tab's action (#17485) */
     .team-panel .list-bar-search-wrap, .team-panel .list-bar-search-row:has(.team-tb-pills) .list-bar-search-wrap { flex: 1 1 8em; max-width: none; }
     .team-panel .team-tb-chip, .team-panel .goals-chip.team-tb-chip { min-height: var(--control-touch-height, 44px); } /* the second: a chip in the Tasks table page (.goals-table-page .goals-chip, below) was 32 px on a phone (#8244) */
     .team-panel .list-bar-search, .team-panel .team-tb-select, .team-panel .team-tb-action, .team-panel .list-bar-toggle, .team-panel .list-bar-more-btn { min-height: var(--control-touch-height, 44px); }
@@ -180,8 +178,6 @@
 }
 
 /* Knowledge: an entry's notes as a text box in the documents pane */
-.knowledge-note-form { display: flex; flex-direction: column; gap: 12px; }
-.knowledge-note-label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-md); color: var(--text-secondary); }
 .knowledge-editor { width: 100%; box-sizing: border-box; min-height: 14rem; font: inherit; font-size: var(--fs-md); resize: vertical; }
 .detail-status { flex: 1 1 12rem; min-width: 0; align-self: center; font-size: var(--fs-base); font-weight: var(--fw-medium); color: var(--text-secondary); overflow-wrap: anywhere; }
 .detail-status:empty { display: none; }

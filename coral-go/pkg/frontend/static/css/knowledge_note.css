@@ -1,0 +1,5 @@
+/* The Knowledge tab's Add note: two actions on one line and the note form (#17485). A sheet of its own, loaded by team_knowledge_page.js, so the start stylesheet carries none of it. */
+.team-panel .team-tb-action + .team-tb-action { margin-left: 8px; } /* the first takes the auto margin, the second sits beside it */
+@media (max-width: 760px) { .team-panel .team-tb-action + .team-tb-action { margin-left: auto; } } /* the row wraps: the second action may land alone on the next line, and it belongs at the right like every tab's action */
+.knowledge-note-form { display: flex; flex-direction: column; gap: 12px; }
+.knowledge-note-label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-md); color: var(--text-secondary); }
