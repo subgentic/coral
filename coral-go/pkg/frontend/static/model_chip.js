@@ -228,7 +228,7 @@ function _renderMenu(kind) {
     let html = '';
     if (kind === 'model') {
         const models = (_data && _data.models) || [];
-        const cur = models.map(m => m.value).filter(v => (s.model + '-').startsWith(v + '-')).sort((x, y) => y.length - x.length)[0]; // the one longest value that is the agent's model or its prefix (a dated id): claude-opus-5-5 is not also claude-opus-5
+        const cur = models.map(m => m.value).find(v => s.model.startsWith(v) && /^(-\d{8})?$/.test(s.model.slice(v.length))); // the value that is the agent's model or its dated id (-YYYYMMDD) and nothing longer: claude-opus-5-5 is not claude-opus-5, nor is claude-opus-5-6 (#17751)
         if (models.length) {
             html = `<div class="model-chip-group" role="group" aria-label="Model"><div class="model-chip-head">Model ${how}</div>`
                 + models.map(m => item('model', m.value, (m.display_name || m.value) + (m.group ? ` (${m.group})` : '') + (m.custom === true ? ' (custom)' : ''), m.value === cur)).join('') + '</div>';
