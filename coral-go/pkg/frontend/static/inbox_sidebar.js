@@ -829,6 +829,7 @@ async function readGoals() {
     if (!isCloud() && Date.now() - closedReadAt > 60000) { // the goals an agent closed lately, for their row; its own read, before the main one so a failure here never marks that read failed
         closedReadAt = Date.now();
         try { closedGoals = (await listInboxGoals(true)).filter(g => String(g.state || '').toLowerCase() === 'done' && g.closed_by); } catch { /* the rows stay as they were */ }
+        syncGoalDoneCount(); // the count moves with the rows it counts: they are drawn from closedGoals as soon as it is read, and the sync at the end of this read waits for the settings and the skills (#18067: goal_closed_row read the count between the two)
     }
     try {
         const want = GF.CLOSED.includes(goalFilters.state) ? goalFilters.state : '', fresh = openAt > 0 && Date.now() - openAt < 60000, kind = want && fresh ? want : '', read = await listInboxGoals(kind || false); ok = !goalsReadFailed();
