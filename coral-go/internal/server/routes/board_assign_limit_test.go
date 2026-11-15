@@ -251,3 +251,11 @@ func TestAssigningToANameThatIsNotOnTheBoardIsRefusedWithTheClosestMembers(t *te
 		assert.Equal(t, "assignee_unknown", readBody(t, resp)["code"], route.path)
 	}
 }
+
+// Security's SHOULD on #18294: a candidate name is cut to 64 characters before the edit distance, so a long name cannot cost quadratic time. Two names equal in their first 64 characters are the same to it.
+func TestNameDistanceCutsLongNamesBeforeComparing(t *testing.T) {
+	long := strings.Repeat("x", 100)
+	assert.Equal(t, 0, nameDistance(long+"a", long+"b"), "past 64 characters nothing is compared")
+	assert.Equal(t, 0, nameDistance(strings.Repeat("é", 70)+"a", strings.Repeat("é", 70)+"b"), "the cut is in characters, not bytes")
+	assert.Equal(t, 1, nameDistance("Dev A", "Dev B"), "short names are compared as before")
+}
