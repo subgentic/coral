@@ -30,7 +30,7 @@
         if (room_px && mode !== 'cloud' && location.pathname.indexOf('/agent/') !== 0 && document.head) {
             var room = document.createElement('style'); room.id = 'launch-notice-room';
             // The notice sits just above the layout (after the sign-in banner, hidden until shown); on a phone's Inbox (#16460) it is in the pane under its heading, and so is the room
-            var pane = phoneScreen && /^\/inbox(\/|$)/.test(location.pathname);
+            var pane = window.innerWidth <= 767 && /^\/inbox(\/|$)/.test(location.pathname); // the layout's phone breakpoint (phone_layout.js), the one placeNotice puts the notice in the pane by (#16557); phoneScreen (600) only picks the hint's kind and typical height
             room.textContent = 'html[data-launch-notice]' + (pane ? ' #group-table-view' : '') + ':not(:has(#launch-disclosure-banner)) ' + (pane ? '>.inbox-folder-toolbar{margin-bottom:' : '.layout{margin-top:') + room_px + 'px}';
             document.head.appendChild(room); document.documentElement.setAttribute('data-launch-notice', '1');
         }
