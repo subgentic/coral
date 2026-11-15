@@ -106,15 +106,13 @@ export async function replyToAsk(a, text) {
     const body = String(text || '').trim();
     if (!body) throw new Error('Write a reply first.');
     const content = `@${a.asker} ${body}`;
-    const resp = a.kind === 'agent' // a single agent's question (no team): the answer is typed into its conversation
-        ? await serverFetch(a.server, `/api/agent-asks/${encodeURIComponent(a.id)}/answer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answer: body }) })
-        : await serverFetch(a.server, `/api/board/${encodeURIComponent(a.board)}/messages`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content, ...(a.kind === 'ask' ? { reply_to: a.id } : {}) }),
-        });
+    const resp = a.kind === 'agent' ? await (await importOnce('./agent_ask_answer.js')).answerAgentAsk(a, body) : await serverFetch(a.server, `/api/board/${encodeURIComponent(a.board)}/messages`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content, ...(a.kind === 'ask' ? { reply_to: a.id } : {}) }),
+    });
     if (!resp.ok) {
         let why = '';
-        try { const b = await resp.json(); if (b && typeof b.message === 'string') why = b.message; else if (b && typeof b.error === 'string') why = b.error; } catch { /* not JSON */ }
+        try { const b = await resp.json(); if (b && typeof b.error === 'string') why = b.error; } catch { /* not JSON */ }
         throw new Error(why ? `Not sent: ${why}` : `Not sent (HTTP ${resp.status}).`);
     }
     asks = asks.filter(x => askKey(x) !== askKey(a)); // gone at once; the next read confirms it
