@@ -67,3 +67,42 @@ func TestUnlandedOptions(t *testing.T) {
 		assert.Error(t, err, "%v", bad)
 	}
 }
+
+// #18191: a task the board records as landed is not listed whatever the ref holds, only a reviewed code submit is a candidate, and a title is cleaned before it is printed.
+func TestUnlandedSkipsWhatTheBoardRecordsLandedAndCleansTitles(t *testing.T) {
+	repo := t.TempDir()
+	git(t, repo, "init", "-q", "-b", "main")
+	git(t, repo, "commit", "-q", "--allow-empty", "-m", "base")
+	git(t, repo, "checkout", "-q", "-b", "fix-17632")
+	git(t, repo, "commit", "-q", "--allow-empty", "-m", "squashed away on main")
+	stranded := git(t, repo, "rev-parse", "HEAD")
+	git(t, repo, "checkout", "-q", "main")
+	git(t, repo, "update-ref", "refs/remotes/origin/main", "main")
+
+	rows, checked := findUnlanded(context.Background(), repo, "origin/main", []landTask{
+		{ID: 17632, Title: "marked landed on the board", Texts: []string{"done " + stranded[:9], "", ""}, Landed: true},
+		{ID: 17633, Title: "evil \x1b]0;pwned\x07title\nsecond line", Texts: []string{"done " + stranded[:9], "", ""}},
+	})
+	assert.Equal(t, 2, checked)
+	require.Len(t, rows, 1, "%+v", rows)
+	assert.Equal(t, int64(17633), rows[0].Task, "the task marked landed is not listed")
+	assert.NotContains(t, rows[0].Title, "\x1b", "a title is printed through clitext.Clean")
+	assert.NotContains(t, rows[0].Title, "\x07")
+	assert.NotContains(t, rows[0].Title, "\n")
+
+	reviewed := map[string]any{"status": "completed", "outcome": "success", "title": "Fix", "reviewers": []any{"Security Reviewer"}}
+	assert.True(t, isReviewedSubmit(reviewed))
+	for name, mutate := range map[string]func(map[string]any){
+		"no reviewers":     func(m map[string]any) { m["reviewers"] = []any{} },
+		"a review task":    func(m map[string]any) { m["title"] = "Review #1: Fix" },
+		"not completed":    func(m map[string]any) { m["status"] = "in_progress" },
+		"a failed outcome": func(m map[string]any) { m["outcome"] = "failed" },
+	} {
+		m := map[string]any{}
+		for k, v := range reviewed {
+			m[k] = v
+		}
+		mutate(m)
+		assert.False(t, isReviewedSubmit(m), name)
+	}
+}

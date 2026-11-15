@@ -15,15 +15,17 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/clierr"
+	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/gitutil"
 )
 
-// task unlanded is the landing check (#18181): every completed task whose commit is not an ancestor of main. Read-only: it reads the board and runs git in the repository.
+// task unlanded is the landing check (#18181): every reviewed completed task whose commit is not an ancestor of main. Read-only: it reads the board and runs git in the repository.
 
 const unlandedUsage = `task unlanded [--since YYYY-MM-DD] [--main REF] [--repo DIR] [--json]
-  Lists the tasks completed since DATE (default: 14 days ago) whose commit is not on main: the commit named in the
+  Lists the code submits (completed tasks that went through review) since DATE (default: 14 days ago) whose commit is not on main: the commit named in the
   task's submit reason, note or completion message, else the head of a branch whose name holds the task's id.
-  Prints the task, the commit and the branch; a task with no commit to check is counted, not listed.
+  Prints the task, the commit and the branch; a task with no commit to check is counted, not listed, and so is one the
+  orchestrator marked landed (mark-landed).
   --main is the ref a commit must be an ancestor of, or have its subject on (default origin/main); --repo is the checkout git runs in (default: here).`
 
 var hexWordRe = regexp.MustCompile(`\b[0-9a-f]{7,40}\b`)
@@ -45,6 +47,8 @@ type landTask struct {
 	ID    int64
 	Title string
 	Texts []string // the author's words, in order of trust: submit reason, submit note, completion message
+	// Landed: the orchestrator recorded it landed (mark-landed): the board says so, whatever git shows on this ref (#18191).
+	Landed bool
 }
 
 // unlandedRow is a completed task whose commit is not on main.
@@ -115,6 +119,10 @@ func findUnlanded(ctx context.Context, repo, mainRef string, tasks []landTask) (
 		return ok && subj != "" && subjects[subj]
 	}
 	for _, t := range tasks {
+		if t.Landed {
+			checked++
+			continue // recorded landed on the board (mark-landed): not listed, whatever this ref holds
+		}
 		var sha string
 		for _, text := range t.Texts {
 			for _, w := range shaCandidates(text) {
@@ -129,7 +137,7 @@ func findUnlanded(ctx context.Context, repo, mainRef string, tasks []landTask) (
 		if sha != "" {
 			checked++
 			if !onMain(sha) {
-				row := unlandedRow{Task: t.ID, Title: t.Title, SHA: sha}
+				row := unlandedRow{Task: t.ID, Title: titleLine(t.Title), SHA: sha}
 				for name, head := range branches[t.ID] {
 					if head == sha {
 						row.Branch = strings.TrimPrefix(name, "origin/")
@@ -151,11 +159,16 @@ func findUnlanded(ctx context.Context, repo, mainRef string, tasks []landTask) (
 		sort.Strings(names)
 		for _, n := range names {
 			if !onMain(heads[n]) {
-				rows = append(rows, unlandedRow{Task: t.ID, Title: t.Title, SHA: heads[n], Branch: strings.TrimPrefix(n, "origin/")})
+				rows = append(rows, unlandedRow{Task: t.ID, Title: titleLine(t.Title), SHA: heads[n], Branch: strings.TrimPrefix(n, "origin/")})
 			}
 		}
 	}
 	return rows, checked
+}
+
+// titleLine is a task title as one printable line: a title is another agent's text, so control sequences go (clitext.Clean) and a newline cannot start a fake row.
+func titleLine(s string) string {
+	return strings.Join(strings.Fields(clitext.Clean(s)), " ")
 }
 
 // unlandedArgs reads the options of task unlanded.
@@ -224,7 +237,7 @@ func cmdTaskUnlanded(st *boardState, args []string) {
 	var ids []int64
 	titles := map[int64]string{}
 	for _, t := range fetchTasks(st, 0) {
-		if t["status"] != "completed" || t["outcome"] != "success" || strings.HasPrefix(fmt.Sprint(t["title"]), "Review #") { // a review task has no commit of its own
+		if !isReviewedSubmit(t) {
 			continue
 		}
 		at, perr := time.Parse(time.RFC3339, fmt.Sprint(t["completed_at"]))
@@ -244,7 +257,8 @@ func cmdTaskUnlanded(st *boardState, args []string) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			tasks[i] = landTask{ID: id, Title: titles[id], Texts: readSubmitTexts(st, id)}
+			texts, landed := readSubmitRecord(st, id)
+			tasks[i] = landTask{ID: id, Title: titles[id], Texts: texts, Landed: landed}
 		}()
 	}
 	wg.Wait()
@@ -271,15 +285,29 @@ func cmdTaskUnlanded(st *boardState, args []string) {
 	}
 }
 
-// readSubmitTexts are the author's words on a completed task: the reason and the note of its submit for review, then its completion message. A task that cannot be read has none.
-func readSubmitTexts(st *boardState, id int64) []string {
+// isReviewedSubmit is a completed, successful code submit: one that went through review (the list names its reviewers). A review task, a plain task done with a message and a goal have no
+// commit of their own to find on main, and listing them buried the real ones (536 candidates, #18191).
+func isReviewedSubmit(t map[string]any) bool {
+	if t["status"] != "completed" || t["outcome"] != "success" || strings.HasPrefix(fmt.Sprint(t["title"]), "Review #") {
+		return false
+	}
+	rv, _ := t["reviewers"].([]any)
+	return len(rv) > 0
+}
+
+// readSubmitRecord is the author's words on a completed task (the reason and the note of its submit for review, then its completion message) and whether the board records it landed
+// (a mark-landed artifact). A task that cannot be read has no words and is not landed.
+func readSubmitRecord(st *boardState, id int64) ([]string, bool) {
 	data, status, err := apiCallRaw("GET", fmt.Sprintf("/%s/tasks/%d", url.PathEscape(st.Project), id), nil)
 	if err != nil || status != http.StatusOK {
-		return nil
+		return nil, false
 	}
 	var d struct {
 		CompletionMessage string `json:"completion_message"`
 		Workflow          struct {
+			Artifacts []struct {
+				LandedAt string `json:"landed_at"`
+			} `json:"artifacts"`
 			CompletionReview struct {
 				Reason  string `json:"reason"`
 				Message string `json:"message"`
@@ -287,7 +315,13 @@ func readSubmitTexts(st *boardState, id int64) []string {
 		} `json:"workflow"`
 	}
 	if json.Unmarshal(data, &d) != nil {
-		return nil
+		return nil, false
 	}
-	return []string{d.Workflow.CompletionReview.Reason, d.Workflow.CompletionReview.Message, d.CompletionMessage}
+	landed := false
+	for _, a := range d.Workflow.Artifacts {
+		if a.LandedAt != "" { // a patch or a commit mark-landed recorded
+			landed = true
+		}
+	}
+	return []string{d.Workflow.CompletionReview.Reason, d.Workflow.CompletionReview.Message, d.CompletionMessage}, landed
 }
