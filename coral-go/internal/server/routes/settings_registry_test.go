@@ -52,6 +52,7 @@ var settingRows = map[string]struct{ good, bad string }{
 	"inbox_kind_release":          {`"off"`, `"nope"`},
 	"inbox_kind_decided":          {`"off"`, `"nope"`},
 	"inbox_kind_digest":           {`"off"`, `"nope"`},
+	"inbox_away":                  {`"off"`, `"nope"`},
 	"refuse_pattern_kill":         {`"off"`, `"nope"`},
 	"update_auto_install":         {`"off"`, `"nope"`},
 	"turn_end_handoff":            {`"off"`, `"later"`},
