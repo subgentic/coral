@@ -29,6 +29,7 @@ func TestAWakeOfAResumedConversationTypesAWakeNoteNotTheOriginalPrompt(t *testin
 	for _, want := range []string{"asleep", "awake", "coral-board read", "coral-board task list", "--ask"} {
 		assert.Contains(t, plan.params.Prompt, want, "the wake note says %q", want)
 	}
+	assert.NotContains(t, plan.params.Prompt, "handled", "it does not tell the agent that messages are handled: some came while it slept")
 	assert.Less(t, len(plan.params.Prompt), 700, "it is a short note")
 
 	// an auto-wake by a delivery types nothing, as before (#12358)

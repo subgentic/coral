@@ -253,7 +253,7 @@ func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession
 	launchParams.NoStartPrompt = noStartPrompt && launchParams.ResumeSessionID != ""
 	// A person's wake of a conversation that is resumed types a short note, not the original starting prompt: an agent that remembers an old plan took that prompt as a reason to restart it (#17324, #17318).
 	if !launchParams.NoStartPrompt && launchParams.ResumeSessionID != "" {
-		launchParams.Prompt = wakeNote(time.Now())
+		launchParams.Prompt = wakeNote()
 	}
 	return &wakePlan{agentImpl: agentImpl, params: launchParams, backend: backend, sessionName: sessionName, logFile: logFile, boardName: boardName, displayName: displayName, freshStart: freshStart}, nil
 }
@@ -402,7 +402,7 @@ func regularFile(path string) bool {
 
 // wakeNote is what a woken agent that resumed its conversation is told (#17324): it was asleep, what it was told before the time given is handled, and it reads the board and the task list before it acts on
 // anything it remembers. A question for the Operator goes through post --ask: text in the chat never reaches their Needs you.
-func wakeNote(at time.Time) string {
-	return "You were asleep and are awake again. Messages before " + at.Format("15:04 on 2 Jan") + " are handled; run coral-board read and coral-board task list before acting on anything you remember. " +
+func wakeNote() string {
+	return "You were asleep and are awake again. Run coral-board read and coral-board task list before acting on anything you remember: messages may have arrived while you slept. " +
 		"If you need an answer from the Operator, ask with coral-board post --ask \"@Operator <question>\": text in the chat never reaches their Needs you."
 }
