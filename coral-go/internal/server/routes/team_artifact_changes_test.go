@@ -241,6 +241,22 @@ func TestTheWordsAreRedactedAndTheActivityRowIsCut(t *testing.T) {
 	}
 }
 
+// #17689 (walk 80): the uploader is mid-turn, so the words are held and delivered when it is free. The answer says so ("queued", who), not "not told: delivery was not confirmed", so the toast, the
+// viewer and the thread tell one story: the delivery record's.
+func TestRequestChangesForABusyUploaderSaysQueued(t *testing.T) {
+	c := newChangesEnv(t)
+	sid := sessAlice
+	_, err := c.sh.ts.InsertAgentEvent(context.Background(), &store.AgentEvent{AgentName: "Alice", SessionID: &sid, EventType: "prompt_submit", Summary: "prompt_submit"}) // mid-turn
+	require.NoError(t, err)
+	code, out := c.changes(t, `{"decision":"changes","text":"Use 5,000 rows per batch."}`)
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Equal(t, true, out["text_kept"])
+	assert.Equal(t, false, out["delivered"], "nothing is posted while the agent is mid-turn")
+	assert.Equal(t, "Alice", out["queued"], "the answer says who it is held for")
+	assert.Nil(t, out["reason"], "a held request is not a failed one")
+	assert.Empty(t, c.messages(t))
+}
+
 func TestPicturesAreNotInThisSlice(t *testing.T) {
 	c := newChangesEnv(t)
 	for _, body := range []string{`{"decision":"changes","text":"x","images":["` + strings.Repeat("a", 64) + `"]}`, `{"decision":"changes","text":"x","images":[]}`, `{"decision":"changes","text":"x","images":null}`} {

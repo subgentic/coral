@@ -218,6 +218,8 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 			if h.sessionAsleep != nil && item.SessionID != nil && h.sessionAsleep(r.Context(), *item.SessionID) { // a sleeping uploader has the notice stored and reads it when it wakes: said as the plain notice says it (an archived, ended or gone one is not stored for: asleep_or_gone, delivered false)
 				out["asleep"] = true
 			}
+		} else if wordsDone.Delivery.Queued != "" { // the uploader is busy: the words are held and posted when it is free (#14860); said as queued, not as a failure (#17689)
+			out["queued"] = wordsDone.Delivery.Queued
 		} else if wordsDone.Delivery.Reason != "" {
 			out["reason"] = wordsDone.Delivery.Reason
 		}

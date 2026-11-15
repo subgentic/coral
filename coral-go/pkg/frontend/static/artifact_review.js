@@ -369,8 +369,8 @@ export function attachReview(d, { reload }) {
             importOnce('./inbox_reviews.js').then(m => { m.reviewsChangedOnServer(); return m.refreshReviews(true); }).catch(() => {});
             const recipient = shown(out.to || who || 'The agent');
             const reason = { no_uploader: 'no agent is recorded for this artifact', board_paused: 'the board is paused', rate_limited: 'the sending limit was reached', not_owner: 'only the owner can send this', redaction_unavailable: 'the words could not be checked', failed: 'delivery failed' }[out.reason] || String(out.reason || 'delivery was not confirmed').replaceAll('_', ' ');
-            const notice = out.delivered ? `${recipient} was asked.` : out.reason === 'already_sent' ? `${recipient} was already told.` : `${recipient} was not told: ${reason}.`;
-            showToast(hubNoComments ? (out.text_kept === true ? 'Changes requested. Your words are on the file.' : 'Changes requested. Your words were not added to the thread: this Hub does not carry comments yet, so the agent was not told.') : `Changes requested. ${!out.delivered && kept ? 'Your words are in the thread. ' : ''}${notice}`);
+            const notice = out.delivered ? `${recipient} was asked.` : out.queued ? `Queued for ${shown(out.queued)}, delivers when it's free.` : out.reason === 'already_sent' ? `${recipient} was already told.` : `${recipient} was not told: ${reason}.`;
+            showToast(hubNoComments ? (out.text_kept === true ? 'Changes requested. Your words are on the file.' : 'Changes requested. Your words were not added to the thread: this Hub does not carry comments yet, so the agent was not told.') : `Changes requested. ${!out.delivered && !out.queued && kept ? 'Your words are in the thread. ' : ''}${notice}`);
             text.value = ''; tray.clear(); done = true; openForm(false); show({ ...was, state: 'changes' }); changes.focus({ preventScroll: true }); reload();
         } catch (err) {
             if (!current()) return;
