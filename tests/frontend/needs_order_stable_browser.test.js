@@ -68,6 +68,10 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: target.x, y: target.y, button: 'left', clickCount: 1 });
             assert.equal(held, target.top, at + 'the row under the held pointer did not move when a late row arrived');
 
+            // the late row took its place on release (the limit shows the oldest five, so it can sit above): measure the row again, scrolled into the window (a press below it would hold nothing)
+            const target2 = await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].find(t => /Q-(\\w+)-end/.exec(t.textContent)[1] === ${JSON.stringify(sorted[1])}); row.scrollIntoView({ block: 'center' }); const b = row.getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2), top: Math.round(b.top) }; })()`);
+            Object.assign(target, target2);
+
             // and when a row ABOVE it is answered elsewhere while the pointer is held: it stays on screen until the pointer goes up, then it goes
             await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: target.x, y: target.y, button: 'left', clickCount: 1 });
             await ev(`window.__asks = window.__asks.filter(a => !(new RegExp('Q-' + ${JSON.stringify(sorted[0])} + '-end')).test(a.text)); true`);

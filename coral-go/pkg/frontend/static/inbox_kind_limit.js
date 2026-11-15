@@ -15,9 +15,9 @@ export function makeKindLimit(env) {
     const at = s => Date.parse(s.waiting_since) || Infinity;
     const kindOf = s => (s.welcome || s.review?.starred || (s.review && waitingOnAgent(s.review)) ? -1 : env.index(s));
     /** A kind group longer than the limit reads oldest first (so the five it shows are the five oldest); shorter ones keep their order. */
-    const oldest = list => {
+    const oldest = (list, fresh) => {
         const out = [...list];
-        for (const i of [0, 1, 2]) { const idx = out.map((s, n) => (kindOf(s) === i ? n : -1)).filter(n => n >= 0); if (idx.length > KIND_LIMIT) [...idx.map(n => out[n])].sort((a, b) => at(a) - at(b)).forEach((s, k) => { out[idx[k]] = s; }); }
+        for (const i of [0, 1, 2]) { const all = out.map((s, n) => (kindOf(s) === i ? n : -1)).filter(n => n >= 0), idx = all.filter(n => fresh(out[n])); if (all.length > KIND_LIMIT) [...idx.map(n => out[n])].sort((a, b) => at(a) - at(b)).forEach((s, k) => { out[idx[k]] = s; }); }
         return out;
     };
     /** Read all N: mark the group's unread rows read in place, only through the existing mark-read path. */
