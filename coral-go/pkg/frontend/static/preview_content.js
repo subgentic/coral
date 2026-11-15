@@ -19,9 +19,8 @@ export function _renderContentView(body, content, filepath, line, interpretHtml)
     const lang = getLangFromPath(filepath);
 
     if (lang === 'markdown' && typeof marked !== 'undefined') {
-        const html = marked.parse(content);
         // A workspace file can be agent-written: its links follow the file policy (#3542).
-        const safe = sanitizeHtml(html, DOMPURIFY_CONFIG, { links: 'file', headings: 2 });
+        const safe = sanitizeHtml(marked.parse(content), DOMPURIFY_CONFIG, { links: 'file', headings: 2 });
         body.innerHTML = `<div class="prose preview-pane-markdown">${safe}</div>`;
         keepFragmentsInside(body);
         importOnce('./md_front.js').then(m => m.show(body, content)); // the front matter as a key/value header (#16651); a failed load leaves the preview as drawn
