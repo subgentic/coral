@@ -9,8 +9,8 @@ const read = () => { try { return JSON.parse(browserLocal.get(KEY) || '{}') || {
 
 /** The open request a sleeping agent had when it went away, or null (awake, archived, none, or dismissed). */
 export function askedBefore(s) {
-    const a = s && s.sleeping && !s.archived && s.asked_before_restart;
-    if (!a || !a.text) return null;
+    const a = s?.sleeping && !s.archived && s.asked_before_restart;
+    if (!a?.text) return null;
     return read()[s.session_id] === a.at ? null : a;
 }
 
@@ -23,10 +23,10 @@ export function dismissAsked(s) {
 }
 
 /** Whether the Operator hid this agent's open request from Needs you (#11946): the machine keeps it, per agent and request (the row says wait_ignored), so the page, the tab's number and the phone push agree; the agent's next request is not hidden by it. */
-export const waitIgnored = s => !!(s && s.wait_ignored);
+export const waitIgnored = s => !!s?.wait_ignored;
 
 /* Dismiss never answers a live terminal: retain the active wait until the agent clears it (#14152). */
-export const needsYou = s => (!!s && !s.sleeping && !s.archived && (!s.wait_removed && needsInputAttention(s) || +s.stalled_task?.task_id > 0 && Number.isSafeInteger(+s.stalled_task.task_id))) || !!askedBefore(s);
+export const needsYou = s => (!!s && !s.sleeping && !s.archived && (!s.wait_removed && needsInputAttention(s) || Number.isSafeInteger(s.stalled_task?.task_id) && s.stalled_task.task_id > 0)) || askedBefore(s);
 
 /** The words that open what it asked: "before Coral restarted" when Coral's stop put it to sleep, else "before it went to sleep" (an operator's Sleep, an ended CLI). */
-export const askedWords = a => `Asked ${a && a.after_restart ? 'before Coral restarted' : 'before it went to sleep'}: ${a ? a.text : ''}`;
+export const askedWords = a => `Asked ${a?.after_restart ? 'before Coral restarted' : 'before it went to sleep'}: ${a ? a.text : ''}`;
