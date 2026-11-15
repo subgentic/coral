@@ -33,6 +33,25 @@ const SESSIONS = [
         assert.equal(half.count, '2', 'the members, not the agents awake: ' + JSON.stringify(half));
         assert.deepEqual(awake.labels, ['Sleep team:sleep'], JSON.stringify(awake)); assert.equal(awake.count, '2');
         console.log('   ok   half-asleep team: both items, count 2');
+
+        // The added item is a copy of the drawn one with its text changed (#17909, QA3's SHOULD on #17536): its icon survives, its label and mode are the other's, and clicking it posts that mode.
+        const items = await ev(`(() => { const li = [...document.querySelectorAll('li.session-team-group')].find(l => l.querySelector('[data-group-name]')?.dataset.groupName === 'half');
+            return [...li.querySelectorAll(':scope > .board-card-header .sidebar-kebab-menu button[data-on-click="team-sleep"]')].map(b => ({ mode: b.dataset.mode, text: b.textContent.replace(/\\s+/g, ' ').trim(), svgs: b.querySelectorAll('svg').length, svgFirst: b.firstElementChild && b.firstElementChild.tagName.toLowerCase(), paths: [...b.querySelectorAll('svg path')].map(p => p.getAttribute('d')).join('|'), board: b.dataset.board })); })()`);
+        assert.equal(items.length, 2, JSON.stringify(items));
+        const [drawn, added] = items;
+        assert.deepEqual([drawn.mode, drawn.text, drawn.svgs], ['sleep', 'Sleep team', 1], 'the drawn item is untouched: ' + JSON.stringify(drawn));
+        assert.deepEqual([added.mode, added.text, added.svgs], ['wake', 'Wake team', 1], 'the added item has the other mode and label and keeps its one icon: ' + JSON.stringify(added));
+        assert.equal(added.paths, drawn.paths, 'the added item draws the same icon');
+        assert.equal(added.svgFirst, 'svg', 'the icon still comes first');
+        assert.equal(added.board, drawn.board, 'for the same team');
+        await ev(`(() => { window.__posts = []; const orig = window.fetch.bind(window); window.fetch = (u, o) => { const url = String(u); if (/\\/api\\/sessions\\/live\\/team\\/[^/]+\\/(wake|sleep)$/.test(url)) { window.__posts.push([url, o && o.method]); return Promise.resolve(new Response(JSON.stringify({ sleeping: false }), { status: 200, headers: { 'Content-Type': 'application/json' } })); } return orig(u, o); }; return true; })()`);
+        await ev(`(() => { const li = [...document.querySelectorAll('li.session-team-group')].find(l => l.querySelector('[data-group-name]')?.dataset.groupName === 'half'); li.querySelector(':scope > .board-card-header .sidebar-kebab-menu button[data-on-click="team-sleep"][data-mode="wake"]').click(); return true; })()`);
+        await waitFor(`window.__posts && window.__posts.length >= 1`, 'the wake is posted', 4000);
+        const posts = await ev(`window.__posts`);
+        assert.equal(posts.length, 1, JSON.stringify(posts));
+        assert.match(posts[0][0], /\/api\/sessions\/live\/team\/half\/wake$/, 'the added item posts a wake for its team: ' + posts[0][0]);
+        assert.equal(posts[0][1], 'POST');
+        console.log('   ok   the added item has the other mode, keeps its icon and posts that mode');
     } catch (e) { failed = e; console.log('   FAIL ' + String(e.message).slice(0, 500)); }
     try { client.close(); } catch {}
     process.exit(failed ? 1 : 0);
