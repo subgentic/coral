@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 )
@@ -103,7 +104,9 @@ func (s *Store) ensureOrchSchema(ctx context.Context) error {
 			return err
 		}
 	}
-	s.db.ExecContext(ctx, `ALTER TABLE board_orch_grant ADD COLUMN stop_enabled INTEGER NOT NULL DEFAULT 0`) // #17348: separate stop switch, added after the table existed
+	if _, err := s.db.ExecContext(ctx, `ALTER TABLE board_orch_grant ADD COLUMN stop_enabled INTEGER NOT NULL DEFAULT 0`); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+		log.Printf("board: ALTER board_orch_grant ADD stop_enabled: %v", err)
+	}
 	return nil
 }
 
