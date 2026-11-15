@@ -133,3 +133,21 @@ func TestAPostThatReachedNoOneIsWarnedAbout(t *testing.T) {
 		}
 	}
 }
+
+// --to puts the names in front of the text as @mentions (#17561): the server's wait resolution reads the content, so a --to post ends a mentions-mode wait because of this prefix.
+func TestToPrefixesTheNamesAsMentions(t *testing.T) {
+	for name, tc := range map[string]struct {
+		args []string
+		want string
+	}{
+		"one name":         {[]string{"post", "--to", "Dev A", "the result is ready"}, `"content":"@Dev A the result is ready"`},
+		"two names":        {[]string{"post", "--to", "Dev B, Dev C", "all done"}, `"content":"@Dev B @Dev C all done"`},
+		"a stray comma":    {[]string{"post", "--to", "Dev A,,", "hi"}, `"content":"@Dev A hi"`},
+	} {
+		srv := newRecordingServer(t)
+		res := runBoard(t, srv.URL, subscribedDataDir(t, srv.URL), tc.args...)
+		require.Equal(t, 0, res.code, "%s: %q", name, res.stderr)
+		require.Len(t, srv.requests(), 1, name)
+		assert.Contains(t, srv.requests()[0], tc.want, name)
+	}
+}
