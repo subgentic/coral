@@ -23,9 +23,12 @@ import (
 // repeats from someone else's post, or one the Operator posted, reminds nobody.
 
 // claudeArtifactNudgeText is the reminder: one line, fixed. It has no ';', which in PowerShell starts a second command (here coral, goal #7).
-const claudeArtifactNudgeText = "You published a claude.ai artifact. Make it a Coral artifact instead: run 'coral-agent artifact upload FILE' and post the coral:// link on the board. This is a reminder only: Coral did nothing for you."
+const claudeArtifactNudgeText = "You published a claude.ai artifact. Make it a Coral artifact instead: run 'coral-agent artifact upload FILE' and give the person the coral:// link (a team posts it on the board). Add --tag \"for review\" and --question when they asked to review it. This is a reminder only: Coral did nothing for you."
 
 const claudeArtifactToolName = "Artifact"
+
+// claudeArtifactMCPPrefix starts the tool names of the claude-artifacts MCP server, which publishes to claude.ai like the Artifact tool does (#18098).
+const claudeArtifactMCPPrefix = "mcp__claude-artifacts__"
 
 // ClaudeArtifactNudger types the reminder.
 type ClaudeArtifactNudger struct {
@@ -55,7 +58,17 @@ func (n *ClaudeArtifactNudger) enabled(ctx context.Context) bool {
 // PublishKey is what names the artifact an Artifact tool call published: its page's url (an update), else the file it was made from (a republish of the same
 // file), else the call itself. ok is false when the call is not a publish (read, list, open, delete, pin, unpin, quickstart) or it failed.
 func PublishKey(toolName string, detail map[string]any, toolUseID string) (key string, ok bool) {
-	if toolName != claudeArtifactToolName {
+	mcp := strings.HasPrefix(toolName, claudeArtifactMCPPrefix)
+	if toolName != claudeArtifactToolName && !mcp {
+		return "", false
+	}
+	if mcp { // a write of the server's: a read or a list publishes nothing; each call is its own publish
+		switch strings.TrimPrefix(toolName, claudeArtifactMCPPrefix) {
+		case "create_from_type", "publish_files", "publish":
+			if failed, _ := detail["failed"].(bool); !failed && toolUseID != "" {
+				return "call:" + toolUseID, true
+			}
+		}
 		return "", false
 	}
 	if failed, _ := detail["failed"].(bool); failed {

@@ -137,6 +137,12 @@ func (a *ClaudeAgent) LaunchCommand(params LaunchParams) (string, error) {
 
 	parts = appendPermissionMode(parts, params, true)
 
+	if sys := claudeSystemText(params); sys != "" {
+		arg := files.promptArg("claude_sys", effectiveID, "md", "", sys)
+		raw = append(raw, arg)
+		parts = append(parts, "--append-system-prompt", arg)
+	}
+
 	// Pass the prompt as a CLI positional argument so the agent starts immediately
 	// without relying on fragile tmux send-keys delivery.
 	cliPrompt := params.startMessage()
@@ -153,6 +159,18 @@ func (a *ClaudeAgent) LaunchCommand(params LaunchParams) (string, error) {
 	return files.done(ShellJoin(parts, raw...))
 }
 
+// claudeSystemText is Coral's section of an agent's system prompt: the protocol, the board's prompt and the session marker.
+func claudeSystemText(params LaunchParams) string {
+	var sysParts []string
+	if proto := protocolText(params); proto != "" {
+		sysParts = append(sysParts, proto)
+	}
+	if board := BuildBoardSystemPrompt(params.BoardName, params.Role, params.Prompt, params.PromptOverrides, params.BoardType); board != "" {
+		sysParts = append(sysParts, board)
+	}
+	return strings.Join(appendCoralSessionMarker(sysParts, params.SessionID), "\n\n")
+}
+
 // claudeSettingsFile writes the agent's merged settings (hooks, system prompt, permissions,
 // tools, Coral's environment) to a temp file and returns its path. MCP servers are never among
 // them: Coral doesn't configure MCP servers (#3644); the CLI's own configuration does.
@@ -160,18 +178,10 @@ func claudeSettingsFile(files *launchFiles, params LaunchParams, effectiveID str
 	// Build merged settings with hooks and system prompt
 	merged := buildMergedSettings(params.Hooks)
 
-	// Combine protocol + board system prompt into systemPrompt
-	var sysParts []string
-	if proto := protocolText(params); proto != "" {
-		sysParts = append(sysParts, proto)
-	}
-	boardSysPrompt := BuildBoardSystemPrompt(params.BoardName, params.Role, params.Prompt, params.PromptOverrides, params.BoardType)
-	if boardSysPrompt != "" {
-		sysParts = append(sysParts, boardSysPrompt)
-	}
-	sysParts = appendCoralSessionMarker(sysParts, params.SessionID)
-	if len(sysParts) > 0 {
-		merged["systemPrompt"] = strings.Join(sysParts, "\n\n")
+	// Kept in the settings too (harmless), but Claude Code does not read systemPrompt from a settings file: the
+	// text reaches it through --append-system-prompt (#18098).
+	if sys := claudeSystemText(params); sys != "" {
+		merged["systemPrompt"] = sys
 	}
 
 	// Inject permissions from capabilities
@@ -288,6 +298,9 @@ func (a *ClaudeAgent) PrintArgs(params LaunchParams) (args []string, settingsFil
 	}
 	args = []string{"--print", "--no-session-persistence", "--settings", settingsFile}
 	args = append(args, params.Flags...)
+	if sys := claudeSystemText(params); sys != "" {
+		args = append(args, "--append-system-prompt", sys)
+	}
 	return appendPermissionMode(args, params, false), settingsFile, nil
 }
 
