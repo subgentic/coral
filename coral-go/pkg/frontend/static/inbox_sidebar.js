@@ -1200,6 +1200,8 @@ async function openChat(c) {
     if (live) { openInAgents(live); return; }
     const { setHistorySource } = await importOnce('./history_source.js');
     if (!setHistorySource(c.server || 'local')) return;
+    const q = chatFiltersOf(group).q; // a search that found this chat opens at its matching message, not the newest (#17801)
+    if (q) return importOnce('./chat_search.js').then(m => m.openAtMatch(q, c)).catch(() => window.selectHistorySession?.(c.session_id, null, c));
     window.selectHistorySession?.(c.session_id, null, c);
 }
 
