@@ -34,7 +34,7 @@ export async function loadBranches() {
     else if (waiting.session !== s.session_id) waiting = { session: s.session_id, since: Date.now(), tries: 0 };
     const overdue = notYet && Date.now() - waiting.since > FIRST_READ_LIMIT_MS;
     if (!data || data.available === false) emptyState(el, 'Branches are not available from this computer.');
-    else if (!data.found) emptyState(el, waitingText(overdue));
+    else if (!data.found) emptyState(el, waitingText(overdue, waiting.since));
     else el.replaceChildren(drawRepo(data, s.session_id));
     // past the limit the folder is likely not a repository: ask once a minute, so an open tab on it does not start a pass every 15 s (Security's INFO on #531)
     timer = setTimeout(loadBranches, notYet && !overdue ? FIRST_READ_STEPS[Math.min(waiting.tries++, FIRST_READ_STEPS.length - 1)] : REFRESH_MS);
@@ -62,7 +62,7 @@ export async function showTeamBranches(host, team) {
     if (!data || data.available === false) emptyState(host, 'Branches are not available from this computer.');
     else if (none) emptyState(host, overdue
         ? "Coral has not read a repository for this team's agents. Their folders may not be in git repositories, or a slow read is paused for a few minutes."
-        : "Reading the repositories this team's agents work in: the first read takes a few seconds.");
+        : `Reading the repositories this team's agents work in${Math.round((Date.now() - teamWaiting.since) / 1000) >= 5 ? `, ${Math.round((Date.now() - teamWaiting.since) / 1000)} s so far` : ''}: the first read takes a few seconds, and a large repository can take a minute.`);
     else host.replaceChildren(...data.repos.map(r => drawRepo(r, '')));
     // past the limit, ask once a minute like the agent's tab, so a page left open on folders that are not repositories does not start a pass every 15 s (Security's INFO on #531)
     teamTimer = setTimeout(() => { if (host.isConnected && host.offsetParent !== null) showTeamBranches(host, team); }, none && !overdue ? FIRST_READ_MS : REFRESH_MS);
@@ -92,10 +92,11 @@ function numbers(w, base) {
 }
 
 /** What the tab says while its repository has not been read: the first read takes seconds (the tab's ask starts a pass on the server); past a minute it says it has not read one. */
-function waitingText(overdue) {
+function waitingText(overdue, since = 0) {
+    const secs = since ? Math.round((Date.now() - since) / 1000) : 0; // the cause and the time so far, not a silent 'reading' (#17433)
     return overdue
         ? "Coral has not read a repository for this agent's folder. Its folder may not be in a git repository, or git took too long and the read is paused for a few minutes."
-        : "Reading this agent's repository: the first read takes a few seconds.";
+        : `Reading this agent's repository${secs >= 5 ? `, ${secs} s so far` : ''}: the first read takes a few seconds, and a large repository can take a minute.`;
 }
 
 const PR_STATE = { open: 'open', merged: 'merged', closed: 'closed' };
