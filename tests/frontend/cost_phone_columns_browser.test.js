@@ -18,8 +18,8 @@ const TEAMS = [{ board_name: 'coral-go-team', num_agents: 6, input_tokens: 9000,
     { board_name: 'docs-sprint', num_agents: 2, input_tokens: 900, output_tokens: 90, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 0.9 }];
 const BRANCHES = [{ repo_name: 'coral', branch: 'main', board_name: 'coral-go-team', pr_number: 0, num_agents: 6, input_tokens: 9000, output_tokens: 1000, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 8.5 },
     { repo_name: 'coral', branch: 'fix/cost', board_name: 'docs-sprint', pr_number: 12, num_agents: 2, input_tokens: 900, output_tokens: 90, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 0.9 }];
-const SERIES = [{ time: '2026-10-18T00:00:00Z', series: [{ key: 'coral-go-team', label: 'coral-go-team', cost_usd: 5.0, num_requests: 10 }, { key: 'docs-sprint', label: 'docs-sprint', cost_usd: 1.0, num_requests: 3 }] },
-    { time: '2026-10-19T00:00:00Z', series: [{ key: 'coral-go-team', label: 'coral-go-team', cost_usd: 3.5, num_requests: 8 }, { key: 'docs-sprint', label: 'docs-sprint', cost_usd: 0.9, num_requests: 2 }] }];
+const SERIES = [{ bucket: '2026-10-18T00:00:00Z', series: [{ key: 'coral-go-team', label: 'coral-go-team', cost_usd: 5.0, num_requests: 10 }, { key: 'docs-sprint', label: 'docs-sprint', cost_usd: 1.0, num_requests: 3 }] },
+    { bucket: '2026-10-19T00:00:00Z', series: [{ key: 'coral-go-team', label: 'coral-go-team', cost_usd: 3.5, num_requests: 8 }, { key: 'docs-sprint', label: 'docs-sprint', cost_usd: 0.9, num_requests: 2 }] }];
 // The original column order of each table, as a wide window shows it.
 const WIDE = {
     'cost-by-provider': ['Provider', 'Requests', 'Input', 'Output', 'Cache read', 'Cache write', 'Cost', 'Share'],
@@ -106,12 +106,14 @@ const WIDE = {
         await ev(`document.getElementById('cost-dashboard-view').scrollBy(0, 400); true`);
         await waitFor(`document.getElementById('cost-dashboard-view').scrollTop > 100`, 'the scroll to settle', 3000);
         const headerRect = await ev(`(() => { const v = document.getElementById('cost-dashboard-view'); const h = v.querySelector('.cost-header'); if (!h) return null; const vr = v.getBoundingClientRect(); const hr = h.getBoundingClientRect(); const s = getComputedStyle(h); return { offset: Math.round(hr.top - vr.top), pos: s.position }; })()`);
-        assert.ok(headerRect && headerRect.offset <= 5 && headerRect.pos === 'sticky', 'the .cost-header is sticky at the top of its scroll container after scrolling: ' + JSON.stringify(headerRect));
         await shot('cost-390-after-scroll-sticky');
         // legend gap: viz-legend-btn must be inline-flex with centered items
         const legendStyle = await ev(`(() => { const b = document.querySelector('.viz-legend-btn'); if (!b) return null; const s = getComputedStyle(b); return { display: s.display, alignItems: s.alignItems }; })()`);
-        assert.ok(legendStyle, 'the legend button exists in the overview: ' + JSON.stringify(legendStyle));
-        assert.ok(legendStyle.display === 'inline-flex' && legendStyle.alignItems === 'center', 'the legend button is inline-flex and centred: ' + JSON.stringify(legendStyle));
+        const errs = [];
+        if (!(headerRect && headerRect.offset <= 5 && headerRect.pos === 'sticky')) errs.push('the .cost-header is sticky at the top of its scroll container after scrolling: ' + JSON.stringify(headerRect));
+        if (!legendStyle) errs.push('the legend button does not exist in the overview');
+        else if (!(legendStyle.display === 'inline-flex' && legendStyle.alignItems === 'center')) errs.push('the legend button is not inline-flex and centred: ' + JSON.stringify(legendStyle));
+        assert.equal(errs.length, 0, errs.join('; '));
         await shot('cost-390-legend');
         // scroll back
         await ev(`document.getElementById('cost-dashboard-view').scrollTo(0, 0); true`);
