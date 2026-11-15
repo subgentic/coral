@@ -2,9 +2,11 @@ package background
 
 import (
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/subgentic/coral/internal/secfile"
@@ -112,4 +114,56 @@ func noteSlug(title string) string {
 // IsKnowledgeNote reports whether a knowledge file name is a hand-written note: "note-" and no '_' at the end (an agent named note-... is written with one, #17974).
 func IsKnowledgeNote(name string) bool {
 	return strings.HasPrefix(name, NoteFilePrefix) && !strings.HasSuffix(name, "_")
+}
+
+var legacyNoteChecked sync.Map // folders already looked at in this process
+
+// keepLegacyAgentFilesAgentFiles is the one-time step for a folder the release before #17974 wrote (#18293): an agent named note-x had its file at note-x.md, which now reads as
+// a hand-written note. A note- file whose front matter is not "type: note" is an agent's: its name gets the '_' agents' names carry now, so it is found as the agent's file.
+// A taken name or a failed rename leaves the file as it is and logs a warning: an upgrade is never blocked.
+func keepLegacyAgentFilesAgentFiles(dir string) {
+	if _, done := legacyNoteChecked.LoadOrStore(dir, true); done {
+		return
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		legacyNoteChecked.Delete(dir) // no folder yet: look again when there is one
+		return
+	}
+	for _, e := range entries {
+		n := e.Name()
+		stem := strings.TrimSuffix(n, ".md")
+		if e.IsDir() || stem == n || !IsKnowledgeNote(stem) || handWrittenNote(filepath.Join(dir, n)) {
+			continue
+		}
+		to := filepath.Join(dir, stem+"_.md")
+		if _, err := os.Lstat(to); err == nil {
+			slog.Warn("knowledge: an agent's file named like a note was left as it is: its new name is taken", "file", n)
+			continue
+		}
+		if err := os.Rename(filepath.Join(dir, n), to); err != nil {
+			slog.Warn("knowledge: an agent's file named like a note was not renamed", "file", n, "error", err)
+		}
+	}
+}
+
+// handWrittenNote reports whether a file's front matter says "type: note" (AddKnowledgeNote writes it); an unreadable file counts as a note, so it is never moved.
+func handWrittenNote(path string) bool {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return true
+	}
+	lines := strings.Split(strings.ReplaceAll(string(b), "\r\n", "\n"), "\n")
+	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
+		return false
+	}
+	for _, l := range lines[1:] {
+		if strings.TrimSpace(l) == "---" {
+			break
+		}
+		if strings.TrimSpace(l) == "type: note" {
+			return true
+		}
+	}
+	return false
 }
