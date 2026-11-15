@@ -85,7 +85,7 @@ const bodyScroller = d => d.querySelector('.artifact-viewer-body');
 function showTrail(d) {
     const row = d.querySelector('.artifact-viewer-trail'), last = _trail[_trail.length - 1];
     row.hidden = !last;
-    if (last) { const b = row.querySelector('.artifact-viewer-back'); b.textContent = `\u2190 Back to ${last.name || 'the document'}`; b.setAttribute('aria-label', `Back to ${last.name || 'the document'}`); }
+    if (last) { const b = row.querySelector('.artifact-viewer-back'); b.textContent = `Back to ${last.name || 'the document'}`; b.setAttribute('aria-label', `Back to ${last.name || 'the document'}`); }
 }
 function backInViewer() {
     const last = _trail[_trail.length - 1];
