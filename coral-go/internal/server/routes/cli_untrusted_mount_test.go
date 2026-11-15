@@ -31,7 +31,7 @@ func TestLaunchRefusesAnUntrustedMountPathWithTheFix(t *testing.T) {
 	answer(rec)
 	assert.Equal(t, http.StatusUnprocessableEntity, rec.Code)
 	assert.Contains(t, rec.Body.String(), "cli_untrusted_mount")
-	assert.Contains(t, rec.Body.String(), "CLI paths") // the ">" is JSON-escaped
+	assert.Contains(t, rec.Body.String(), "Providers") // the ">" is JSON-escaped
 	assert.Contains(t, rec.Body.String(), "Codex")
 
 	// An ordinary missing CLI keeps the install answer.
