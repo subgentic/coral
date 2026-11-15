@@ -30,3 +30,4 @@ new MutationObserver(muts => {
         else if (n.querySelector) for (const msg of n.querySelectorAll('.mb-message')) add(msg);
     }
 }).observe(document.body, { childList: true, subtree: true });
+mount(document);

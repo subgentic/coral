@@ -31,7 +31,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
-        for (const [id, t] of [['Orchestrator', 'Orchestrator'], ['QA Engineer', 'QA Engineer'], ['Backend Dev', 'Backend Dev'], ['Lead Developer', 'Lead Developer']]) assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: t, session_name: id + '-s' })).status, 200);
+        for (const [id, t] of [['Orchestrator', 'Orchestrator'], ['QA Engineer', 'QA Engineer'], ['Backend Dev', 'Backend Dev'], ['Lead Developer', 'Lead Developer'], ['Operator', 'Operator']]) assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: t, session_name: id + '-s' })).status, 200);
         const firstId = await post('QA Engineer', 'Review of the Inbox patch: approved with two small follow-ups for the empty states. @Orchestrator #7740');
         const qid = await post('Lead Developer', 'Question for @Backend Dev: should group posts reach members, or only the ones they tag?\n\nToday a plain read returns tagged messages.\n\n- the read includes the group\'s posts\n- group posts stay tagged-only\n\nI lean to the second. #7757', { ask: true });
         const rid = await post('Backend Dev', 'Agreed with the second; the count already follows the read.', { reply_to: qid });
@@ -195,6 +195,18 @@ const BASE = require('./test_base').BASE;
             assert.ok(under.open && under.gap >= 8, `${theme}: the opened row starts 8 px or more below the day line: ` + JSON.stringify(under));
             await shot(`board-table-open-below-day-390-${theme}`);
         }
+        console.log('11. Reply on an Operator row writes @Operator, not @You (#17960)');
+        await open(1280, 800, false, 'dark');
+        const opId = await post('Operator', 'Check the release notes before tagging.');
+        await waitFor(`!!document.querySelector('#mb-messages > .mb-message[data-message-id="${opId}"]')`, 'the Operator row', 15000);
+        const opRow = await ev(`(() => { const r = document.querySelector('#mb-messages > .mb-message[data-message-id="${opId}"]'); const who = r.querySelector('.mb-row-who'); return { text: who.textContent, title: who.getAttribute('title') }; })()`);
+        assert.equal(opRow.text, 'You', 'the row says You');
+        assert.equal(opRow.title, 'Operator', 'the title is the real sender');
+        const qr = await ev(`(() => { const r = document.querySelector('#mb-messages > .mb-message[data-message-id="${opId}"]'); const b = r.querySelector('.mb-qr') || r.querySelector('button[data-on-click="mb-msg-reply"]'); return b ? { sender: b.dataset.sender, label: b.getAttribute('aria-label') } : null; })()`);
+        assert.ok(qr, 'the Reply button exists on the Operator row');
+        assert.equal(qr.sender, 'Operator', 'Reply targets @Operator, not @You: ' + JSON.stringify(qr));
+        assert.match(qr.label, /Reply to Operator/, 'the aria-label names Operator: ' + qr.label);
+        console.log('   ✓');
         console.log('PASS the Board as a table');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(err => { console.error(err); process.exit(1); });
