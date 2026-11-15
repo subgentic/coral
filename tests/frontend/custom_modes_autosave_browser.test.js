@@ -49,7 +49,7 @@ const { coralReady } = require('./helpers/wait');
             assert.deepEqual(await rows(), ['Plan, renamed'], at + 'closing Settings did not lose it');
 
             // a refused save: the server's reason, the list back to what the server has
-            await ev(`(() => { const f = window.fetch; window.__putRefused = true; window.fetch = (u, o) => String(u).includes('/api/custom-modes') && o && o.method === 'PUT' && window.__putRefused ? Promise.resolve(new Response(JSON.stringify({ error: 'That mode is refused today.' }), { status: 400, headers: { 'content-type': 'application/json' } })) : f(u, o); return true; })()`);
+            await ev(`(() => { window.__realFetch = window.__realFetch || window.fetch; const f = window.fetch; window.__putRefused = true; window.fetch = (u, o) => String(u).includes('/api/custom-modes') && o && o.method === 'PUT' && window.__putRefused ? Promise.resolve(new Response(JSON.stringify({ error: 'That mode is refused today.' }), { status: 400, headers: { 'content-type': 'application/json' } })) : f(u, o); return true; })()`);
             await add('Second', '--permission-mode\nplan');
             await waitFor(`/Not saved/.test(document.querySelector('#settings-custom-modes .cm-status').textContent)`, 'the refusal said');
             assert.equal(await status(), 'Not saved. That mode is refused today. Try again.', at + 'the server\'s reason is said');
@@ -79,7 +79,8 @@ const { coralReady } = require('./helpers/wait');
             await new Promise(r => setTimeout(r, 800)); // sleep-ok: waiting for a second request that must NOT come; there is no event for an absence
             assert.equal(await ev(`window.__puts`), 1, at + 'two presses on Remove sent one request');
             assert.equal(await ev(`getComputedStyle(document.getElementById('confirm-modal')).display`), 'none', at + 'Remove opened no confirm, as the custom models do');
-            await ev(`window.fetch = window.fetch.__orig || window.fetch; true`);
+            await ev(`window.fetch = window.__realFetch || window.fetch; true`); // both stubs (the refusal and the 400 ms delay) come off: later steps get the real fetch (#17575)
+            assert.equal(await ev(`window.fetch === window.__realFetch`), true, 'the real fetch is back');
 
             // remove: saved at once, gone after a reload
             await ev(`document.querySelector('#settings-custom-modes .cm-row[data-type] button[aria-label^="Remove"]').click(); true`);
