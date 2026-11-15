@@ -23,7 +23,6 @@ const BASE = require('./test_base').BASE;
             document.getElementById('board-tasks-section')?.remove();
             document.getElementById('board-task-list')?.remove();
             document.body.insertAdjacentHTML('beforeend', '<section id="board-tasks-section" style="display:block"><div class="board-tasks-header"><span></span></div><div id="board-task-hide-toggle-container"></div><div id="board-task-list"></div></section>');
-            if (!document.getElementById('task-bar-count')) document.body.insertAdjacentHTML('beforeend', '<span id="task-bar-count"></span>');
             state.currentBoardTasks = [
                 {id:1497, title:'Assigned working fixture', status:'in_progress', assigned_to:'Frontend Dev'},
                 {id:1498, title:'Blocked fixture', status:'blocked', assigned_to:'QA Engineer', blocked_by:[1496]},
