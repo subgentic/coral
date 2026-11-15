@@ -5,9 +5,11 @@
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
 import { formatLastSeen } from './server_status.js';
+import { loadStyles } from './lazy_styles.js';
 const AQ = await importOnce('./automations_queue.js');
 const { machineChoices, machineLabel, machineOnline } = await importOnce('./analytics_machine.js');
 const V = await importOnce('./analytics_viz.js');
+await loadStyles('queue_tab.css'); // the page's rules load with the tab, not at start (#18093: it had none)
 const { el } = V;
 
 let chosen = 'local', active = false, wired = false, drawn = '';
