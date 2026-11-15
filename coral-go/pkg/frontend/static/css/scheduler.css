@@ -250,4 +250,3 @@
 .queue-actions { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
 .queue-act:disabled, .queue-act:disabled:hover { border-color: transparent; background: transparent; }
 .queue-act.queue-sure { color: var(--danger, var(--text-primary)); border-color: currentColor; }
-.sched-fail-actions { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } /* Sign in and Retry under a run that did not start for want of a sign-in (#16715) */

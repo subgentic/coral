@@ -82,12 +82,13 @@ const JOB = { id: 5, name: 'Nightly review', enabled: true, cron_expr: '0 3 * * 
         check('the job is read', await ev(`import(${S} + 'scheduler.js').then(async m => { await m.refreshJobs(); return m.jobList().length >= 1; })`));
         await ev(`import(${S} + 'scheduler.js').then(m => m.selectScheduledJob(5)).then(() => true)`);
         await waitFor(`!!document.querySelector('.sched-runs-section')`, 'the job view');
+        await waitFor(`!!document.querySelector('.sched-fail-banner .sched-fail-text')`, 'the notice is drawn');
         const banner = await text('.sched-fail-banner');
         check(`the banner does not say it twice (${banner})`, banner.split('is not signed in').length === 2);
         check(`the job's banner says it and what to do, though a refused run does not count as a failure (${banner})`, /did not start: Claude is not signed in\./.test(banner) && /Sign in with claude in a terminal, then run this again\./.test(banner) && /runs again once you are signed in/.test(banner));
         // #16715: the notice offers Sign in (Claude has a local login), then Retry; no command to type
-        check('the notice has a Sign in button and Retry is not there yet', await ev(`(() => { const b = document.querySelector('.sched-fail-banner [data-on-click="job-signin"]'), r = document.querySelector('.sched-fail-banner .run-signin-retry'); return !!b && /Sign in/.test(b.textContent) && !!r && r.hidden; })()`));
-        await ev(`document.querySelector('.sched-fail-banner [data-on-click="job-signin"]').click(); true`);
+        check('the notice has a Sign in button and Retry is not there yet', await ev(`(() => { const b = document.querySelector('.sched-fail-banner .run-signin'), r = document.querySelector('.sched-fail-banner .run-signin-retry'); return !!b && /Sign in/.test(b.textContent) && !!r && r.hidden; })()`));
+        await ev(`document.querySelector('.sched-fail-banner button.run-signin').click(); true`);
         await waitFor(`!document.querySelector('.sched-fail-banner .run-signin-retry').hidden`, 'Retry after the sign-in started');
         check('Sign in started the Claude login on this computer', JSON.stringify(await ev('window.__signins')) === JSON.stringify(['?type=claude']), JSON.stringify(await ev('window.__signins')));
         check(`and said what to do next (${await text('.run-signin-status')})`, /complete it in the browser that opened, then press Retry/.test(await text('.run-signin-status')));
