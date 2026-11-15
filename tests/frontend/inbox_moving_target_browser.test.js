@@ -1,0 +1,29 @@
+// #16616: a press must not activate a control that reflows during the gesture.
+const assert=require('node:assert/strict');
+const {connect}=require('./agent_view_harness');
+const {coralReady}=require('./helpers/wait');
+const BASE=require('./test_base').BASE;
+(async()=>{const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();try{
+ await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
+ for(const width of [1280,390]){
+ await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
+ await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev);
+ await ev(`window.switchNavTab('hub-inbox');true`);
+ await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(()=>true)`);
+ await waitFor(`!!document.getElementById('group-table-view')`,'Inbox list');
+ await ev(`(()=>{const host=document.getElementById('group-table-view');host.replaceChildren();const b=document.createElement('button');b.id='moving-card-action';b.textContent='Open agent';b.style.cssText='position:fixed;left:40px;top:160px;width:240px;height:70px;z-index:99999';window.__opened=0;b.addEventListener('click',()=>window.__opened++);host.append(b);return true})()`);
+ const mouse=client.Input;
+ await mouse.dispatchMouseEvent({type:'mousePressed',x:120,y:190,button:'left',clickCount:1});
+ await ev(`document.getElementById('moving-card-action').style.top='180px';true`);
+ await mouse.dispatchMouseEvent({type:'mouseReleased',x:120,y:190,button:'left',clickCount:1});
+ assert.equal(await ev(`window.__opened`),0,`${width}: moving Inbox target must not activate`);
+ await mouse.dispatchMouseEvent({type:'mousePressed',x:120,y:210,button:'left',clickCount:1});
+ await mouse.dispatchMouseEvent({type:'mouseReleased',x:120,y:210,button:'left',clickCount:1});
+ assert.equal(await ev(`window.__opened`),1,'deliberate stable click works');
+ await ev(`document.getElementById('moving-card-action').focus();true`);
+ await mouse.dispatchKeyEvent({type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r'});
+ await mouse.dispatchKeyEvent({type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+ assert.equal(await ev(`window.__opened`),2,'keyboard activation works');
+ }
+ console.log('PASS Inbox moved-target guard, stable clicks and keyboard');
+}finally{await client.close()}})().catch(e=>{console.error(e);process.exitCode=1});
