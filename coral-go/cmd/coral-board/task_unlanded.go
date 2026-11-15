@@ -45,13 +45,24 @@ func headSHAFromText(texts ...string) string {
 				continue
 			}
 			prev := strings.Fields(strings.Trim(low[:loc[0]], " \t(["))
-			if len(prev) > 0 && headWords[strings.Trim(prev[len(prev)-1], ":,;.([")] {
-				return w
+			if len(prev) == 0 {
+				continue
 			}
+			word := strings.Trim(prev[len(prev)-1], ":,;.([")
+			if !headWords[word] {
+				continue
+			}
+			if word == "at" && len(prev) > 1 && baseVerbs[strings.Trim(prev[len(prev)-2], ":,;.([")] {
+				continue // "branched at <sha>" is where the work started, not where it is
+			}
+			return w
 		}
 	}
 	return ""
 }
+
+// baseVerbs put "at <sha>" on the commit the work started from (#18302).
+var baseVerbs = map[string]bool{"branched": true, "based": true, "rebased": true, "forked": true, "cut": true, "stacked": true, "merged": true, "started": true, "built": true, "branch": true, "base": true}
 
 // headWords are the only words that put a commit's name in front of the work itself.
 var headWords = map[string]bool{"at": true, "commit": true, "sha": true}

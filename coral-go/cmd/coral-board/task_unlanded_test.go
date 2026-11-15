@@ -33,6 +33,9 @@ func TestHeadSHAIsTheOneAfterHeadElseTheFirstRealHexWord(t *testing.T) {
 	assert.Equal(t, "abc1234def", headSHAFromText("ready on main 7ca240b821, fix at abc1234def"), "main's word follows 'main', not an allow word")
 	// an allow list, not a block list (#18302): a word before the commit that is not at, commit or sha takes none
 	assert.Equal(t, "", headSHAFromText("rebased 7ca240b821"))
+	assert.Equal(t, "", headSHAFromText("branched at 7ca240b821"), "the base, even after 'at'")
+	assert.Equal(t, "", headSHAFromText("based at 7ca240b821; rebased at 5d2ffdd95f"))
+	assert.Equal(t, "2010aa1b98", headSHAFromText("branched at 7ca240b821, fixed at 2010aa1b98"))
 	assert.Equal(t, "", headSHAFromText("branched at-ish 7ca240b821, then 2010aa1b98"))
 	assert.Equal(t, "", headSHAFromText("2010aa1b98 ready"), "a commit with no allow word before it")
 	assert.Equal(t, "", headSHAFromText("fixed (base 7ca240b821)"))
