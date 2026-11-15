@@ -2,7 +2,6 @@ package routes
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -48,7 +47,7 @@ func (h *AgentAsksHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Text    string   `json:"text"`
 		Options []string `json:"options"`
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&body); err != nil {
+	if err := decodeJSONMax(w, r, &body, 64<<10); err != nil {
 		errBadRequest(w, "invalid JSON")
 		return
 	}
@@ -91,7 +90,7 @@ func (h *AgentAsksHandler) Answer(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Answer string `json:"answer"`
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&body); err != nil {
+	if err := decodeJSONMax(w, r, &body, 64<<10); err != nil {
 		errBadRequest(w, "invalid JSON")
 		return
 	}
