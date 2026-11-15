@@ -17,7 +17,7 @@ assert.equal(host.querySelector('[id^="inbox-tk-"]'), null, 'Tasks controls do n
 assert.ok(host.querySelector('.inbox-folder-toolbar .list-bar-toggle'), 'Needs you has its own toolbar with its own Filters (#8604)');
 assert.equal(host.querySelectorAll('input[type="search"]').length, 1, 'and one page search');
 await inbox.openInboxGroup('tasks');
-assert.equal(host.querySelector('input[type="search"]').value, 'release', 'folder retains its search');
+assert.equal(host.querySelector('input[type="search"]').value, '', 'the search belongs to the folder it was typed in: coming back to Tasks does not find the words of Needs you (#17020)');
 inbox.filterInbox('');
 const { coralInboxAdapter } = await importUi('inbox_coral');
 coralInboxAdapter.listTasks = async () => [
