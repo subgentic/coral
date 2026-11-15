@@ -170,7 +170,8 @@ func TestLaunchPermissionArgsRouteSaysWhetherTheChoiceSkipsPrompts(t *testing.T)
 		return m["skips_prompts"]
 	}
 	assert.Equal(t, false, skips(`{"agent_type":"claude","permission_mode":"default"}`), "Default asks")
-	assert.Equal(t, false, skips(`{"agent_type":"claude","permission_mode":"plan"}`), "Claude's Plan asks")
+	assert.Equal(t, true, skips(`{"agent_type":"claude","permission_mode":"plan"}`), "Claude's Plan runs classifier-approved commands without asking (#5894), as the Hub gate counts it")
+	assert.Equal(t, false, skips(`{"agent_type":"codex","permission_mode":"plan"}`), "Codex's Plan asks")
 	assert.Equal(t, true, skips(`{"agent_type":"claude","permission_mode":"bypassPermissions"}`), "Bypass does not")
 	assert.Equal(t, true, skips(`{"agent_type":"claude","permission_mode":"acceptEdits"}`), "accepting edits is acting without asking")
 	assert.Equal(t, true, skips(`{"agent_type":"pi","permission_mode":"default"}`), "Pi has no mode that asks")
