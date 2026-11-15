@@ -1,6 +1,7 @@
 /* Documentation: browsable agent_docs viewer */
 
-import { escapeHtml as esc, showView, showToast, renderDocsMarkdown, escapeAttr, copyText } from './utils.js';
+import { escapeHtml as esc, showView, showToast, escapeAttr, copyText } from './utils.js';
+import { renderDocsMarkdown } from './docs_markdown.js';
 import { registerActions, textOf } from './actions.js';
 import { apiFetch } from './api.js';
 import { loadHighlight } from './vendor_loader.js';

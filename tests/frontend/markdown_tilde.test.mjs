@@ -13,7 +13,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 assert.equal(typeof globalThis.marked?.parse, 'function', 'the real marked is loaded');
 if (typeof window !== 'undefined') window.marked = globalThis.marked;
 globalThis.DOMPurify = { sanitize(html) { const t = document.createElement('template'); t.innerHTML = html; return t.content; }, addHook() {}, removeHook() {}, removeAllHooks() {}, setConfig() {}, isSupported: true };
-const { renderMarkdown, renderMarkdownStrict, renderDocsMarkdown } = await importUi('utils');
+const { renderMarkdown, renderMarkdownStrict } = await importUi('utils');
+const { renderDocsMarkdown } = await importUi('docs_markdown');
 const html = h => String(h);
 const CMD = 'cd ~/coral-test-data3 && ls ~/Coral-rc2-mnt';
 for (const [what, render] of [['chat', md => renderMarkdown(md, undefined, 'chat')], ['board', md => renderMarkdown(md, { breaks: true }, 'board')], ['a viewed file', renderMarkdownStrict], ['a Docs page', renderDocsMarkdown], ['the shared marked (notes, file preview)', md => globalThis.marked.parse(md)]]) {

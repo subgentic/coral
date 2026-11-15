@@ -91,10 +91,6 @@ export function artifactRefHex(url) {
     return m ? m[1].toLowerCase() : '';
 }
 
-// A Docs page may show its own screenshots (#5038): ![alt](docs-img/<name>.png) names a file in static/docs-img, which renderDocsMarkdown turns into this server's own
-// versioned URL for it. That exact shape (a lower-case name, .png, no query or fragment, under this server's /static) is the one image source besides an artifact, data: or blob: that
-// survives; it is a file embedded in Coral itself, never one an author names.
-const DOC_IMAGE = /^docs-img\/([a-z0-9][a-z0-9-]*\.png)$/;
 
 const DOC_IMAGE_SRC = /^\/static\/(?:(?:b|bb)\/[A-Za-z0-9_-]+\/)?docs-img\/[a-z0-9][a-z0-9-]*\.png$/;
 
@@ -347,7 +343,7 @@ export function renderMarkdown(content, options, links, headings) { // headings:
 }
 
 // A single ~ is a character, not strikethrough (#18435): marked's gfm strikes ~a~ too, so 'cd ~/a && ls ~/b' drew a line through the text between the two paths. ~~a~~ still strikes.
-const noTilde = { tokenizer: { del: s => (s[1] == '~' ? false : null) } };
+export const noTilde = { tokenizer: { del: s => (s[1] == '~' ? false : null) } };
 if (typeof marked !== 'undefined') marked.use(noTilde); // the shared instance (chat, board, notes, file preview); the strict and docs instances below take it too
 
 export function _renderMarkdownUncached(content, options, links, headings) {
@@ -405,34 +401,6 @@ export function renderMarkdownStrict(md) {
     } catch {
         return escapeHtml(md);
     }
-}
-
-// The Docs tab (#3622 F4): Coral's bundled docs through the same sanitizer and link policy as
-// everything else. A link from one doc to another ("auth.md", "board.md#tasks") becomes that doc's
-// dashboard page (/docs/<name>), which the 'board' link policy keeps as a router link. Its own
-// marked instance, so chat and board rendering keep their options. null when marked is missing.
-const DOC_LINK = /^([A-Za-z0-9][A-Za-z0-9_-]*)\.md(?:#\S*)?$/;
-
-let _docsMarked = null;
-
-export function renderDocsMarkdown(md) {
-    if (!_docsMarked && typeof marked !== 'undefined' && typeof marked.Marked === 'function') {
-        _docsMarked = new marked.Marked(noTilde);
-        _docsMarked.use({
-            walkTokens(token) {
-                if (token.type === 'image') {
-                    const img = DOC_IMAGE.exec(token.href || '');
-                    if (img) token.href = new URL(`./docs-img/${img[1]}`, import.meta.url).pathname; // inherits a versioned static prefix, as cm_util.js's stylesheet does
-                    return;
-                }
-                if (token.type !== 'link') return;
-                const m = DOC_LINK.exec(token.href || '');
-                if (m) token.href = `/docs/${m[1]}`;
-            },
-        });
-    }
-    if (!_docsMarked) return null;
-    return sanitizeHtml(_docsMarked.parse(String(md || '')), DOMPURIFY_CONFIG, { links: 'board', headings: 0 }); // a Docs page owns its h1: the outline is the page's own
 }
 
 // A fenced code block that names a language (```js, ~~~ python).

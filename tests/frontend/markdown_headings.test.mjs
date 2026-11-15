@@ -14,7 +14,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 assert.equal(typeof globalThis.marked?.parse, 'function', 'the real marked is loaded');
 if (typeof window !== 'undefined') window.marked = globalThis.marked;
 globalThis.DOMPurify = { sanitize(html) { const t = document.createElement('template'); t.innerHTML = html; return t.content; }, addHook() {}, removeHook() {}, removeAllHooks() {}, setConfig() {}, isSupported: true };
-const { renderMarkdown, renderMarkdownStrict, renderDocsMarkdown } = await importUi('utils');
+const { renderMarkdown, renderMarkdownStrict } = await importUi('utils');
+const { renderDocsMarkdown } = await importUi('docs_markdown');
 const MD = '# One\n\n## Two\n\n### Three\n\n#### Four\n\n###### Six\n';
 const levels = html => { const box = document.createElement('div'); box.innerHTML = html; return [...box.querySelectorAll('h1,h2,h3,h4,h5,h6')].map(h => `${h.nodeName.toLowerCase()}:${h.getAttribute('aria-level')}`); };
 
