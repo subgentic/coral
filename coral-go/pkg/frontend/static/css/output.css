@@ -781,3 +781,8 @@ body.panel-dragging .xterm-container {
 .capture-wrapper.chat-mode .terminal-fit-width-btn, .capture-wrapper.chat-mode .terminal-copy-screen-btn { display: none; }
 /* 44x44 on touch screens: beats the header's own min-height (popout.css). */
 @media (pointer: coarse) { .terminal-header-actions .terminal-header-btn.terminal-fit-width-btn, .terminal-header-actions .terminal-header-btn.terminal-copy-screen-btn { min-width: 44px; min-height: 44px; justify-content: center; } }
+
+/* A Markdown file's front matter (a skill's name, description, metadata) as a small key/value header (#16651) */
+.preview-front-matter { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 0 0 1em; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-secondary); font-size: var(--fs-base); }
+.preview-front-matter dt { color: var(--text-secondary); font-weight: var(--fw-strong); }
+.preview-front-matter dd { margin: 0; min-width: 0; overflow-wrap: anywhere; color: var(--text-primary); }
