@@ -109,15 +109,14 @@ async function loadUnread() {
 const foldersOf = s => [isGroup(s) ? 'chats-group' : 'chats', ...(s.starred ? ['chats-starred'] : []), ...(s.active ? ['chats-active'] : []), ...(s.archived ? ['chats-archived'] : []),
     ...(isGroup(s) ? [] : CLIS.filter(([t]) => (t === 'agy' ? ['agy', 'antigravity', 'gemini'] : [t]).includes(s.source_type)).map(([t]) => `chats-cli-${t}`))];
 const bump = (keys, by) => { if (unread) for (const k of keys) unread[k] = Math.max(0, (unread[k] || 0) + by); };
-/** A chat was opened from the Inbox: marked read, and the numbers of the folders it is in go down by one, in memory, with no request (#9703). */
 /** A chat opened from the list, on its computer; a job run with no conversation yet opens to a page that says why (#17447): its agent has not written a line (Starting) or never started (Did not start). */
 export async function openHistory(c) {
     if (!setHistorySource(c.server || 'local')) return;
     if (await window.selectHistorySession?.(c.session_id, null, c) !== false || !c.run_state) return;
-    const { showHistoryNote } = await importOnce('./history_note.js');
-    showHistoryNote(c.run_state === 'Starting' ? "This run's agent has not written anything yet, so there is no conversation to show. If it stays like this, the agent did not start: stop the run from the job's page and run the job again." : "This run has no conversation: its agent never wrote anything, so it did not start. Run the job again from the job's page.", null);
+    (await importOnce('./history_note.js')).noChat(c.run_state, () => openHistory(c));
 }
 
+/** A chat was opened from the Inbox: marked read, and the numbers of the folders it is in go down by one, in memory, with no request (#9703). */
 export function chatOpened(s) {
     if (chatUnread(s)) bump(foldersOf(s), -1);
     IR.markRead(readKind(s), readKey(s), stampOf(s) || Date.now());
