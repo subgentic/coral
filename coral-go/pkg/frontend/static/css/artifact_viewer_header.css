@@ -134,9 +134,10 @@
     .artifact-review-form > label, .artifact-review-form > textarea, .artifact-review-form > .ac-picker, .artifact-review-form > .ac-thumbs, .artifact-review-form > .artifact-review-error, .artifact-review-form > .artifact-review-pending, .artifact-review-form > .ac-note { flex: 1 1 100%; }
     .artifact-review-form > .btn { flex: none; }
 }
-@media (min-width: 769px) { /* after Request changes the status is a long sentence (#16618, walk 26 L3): the chip wraps in at most 18rem and the name keeps the rest of the row, instead of a one-line chip crushing the name to a letter or running past the dialog */
+@media (min-width: 769px) { /* after Request changes the status is a long sentence (#16618, walk 26 L3): the chip wraps in at most 18rem and the name keeps at least 10rem (the controls wrap under it when the row is full), instead of a one-line chip crushing the name to a letter or running past the dialog */
     .artifact-viewer-chips { min-width: 0; max-width: 100%; }
-    .artifact-review-state { flex: 0 1 auto; min-width: 0; max-width: 18rem; white-space: normal; border-radius: var(--radius-xl); }
+    .artifact-viewer-chips > .artifact-review-state { flex: 0 1 auto; min-width: 0; max-width: 18rem; white-space: normal; overflow: visible; text-overflow: clip; border-radius: var(--radius-xl); }
+    .artifact-viewer-header > .artifact-viewer-title { min-width: min(10rem, 100%); }
 }
 @media (min-width: 769px) and (max-width: 1100px) { /* a narrow computer window: the name gets the first line to itself, the controls wrap under it (#15190) */
     .artifact-viewer-header { flex-wrap: wrap; row-gap: 6px; }
