@@ -45,6 +45,7 @@ export function setLaunchStage(stage) {
     const sub = launch.member ? (stage === 'agent' ? memberRole : STAGE_NAMES[stage]) : `Step ${n} of ${total}: ${STAGE_NAMES[stage]}${allOptional ? ', all optional' : ''}`; // a member dialog is one step of the team wizard (3 steps): it names its page and never counts its own two (#15143) // the folder is said once, in the footer's recap (#10835)
     const subEl = document.getElementById("launch-stage-sub");
     if (subEl) subEl.textContent = sub;
+    const arrow = step.querySelector('.launch-back-btn'); if (arrow) arrow.style.display = launch.member ? 'none' : ''; // display-ok: a member's ways back are Back (a step) and Cancel (the team form): the header arrow is a third (#16553)
     const back = document.getElementById("launch-agent-back"), next = document.getElementById("launch-agent-next"), go = document.getElementById("launch-agent-go"), save = document.getElementById("launch-agent-save");
     if (back) back.hidden = stage === stages[0];
     if (next) { next.hidden = stage === 'agent'; next.textContent = stages[n] === 'agent' && !launch.member ? 'Choose model' : 'Next'; } // the button that opens the agent step names it (Operator, v2.0.69 trial); n is this stage's place counted from 1, so stages[n] is the next one
