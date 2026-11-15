@@ -277,7 +277,7 @@ document.addEventListener('coral:cloud-status', e => {
     title.textContent = 'Coral Hub moved';
     const text = document.createElement('span');
     text.textContent = `Connect this computer again${host ? ` at ${host}` : ''}.`;
-    const again = document.createElement('button'); again.type = 'button'; again.className = 'btn btn-small'; again.textContent = 'Reconnect'; again.dataset.editions = 'home-hub'; // the Connect flow; its code approved in Coral Hub is the consent to replace the old enrollment (#16718)
+    const again = document.createElement('button'); again.className = 'btn btn-small'; again.textContent = 'Reconnect'; again.dataset.editions = 'home-hub';
     copy.replaceChildren(title, ' ', text, ' ', again); // the space keeps the two apart for a screen reader
     copy.dataset.moved = '1';
 });

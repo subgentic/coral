@@ -99,7 +99,7 @@ const STATES = {
         const movedHome = await ev(homeHub);
         check('the home section says to connect again, not the never-enrolled offer', /^Coral Hub moved Connect this computer again at app\.coralhub\.dev\. Reconnect$/.test(movedHome) && !/coral cloud|--force|run /.test(movedHome) && movedHome !== offer, movedHome);
         await ev(`document.querySelector('#editions-home [data-editions="home-hub"] button[data-editions="home-hub"]').click(); true`);
-        await waitFor(`getComputedStyle(document.getElementById('editions-modal')).display !== 'none' && /Connect to Coral Hub/.test(document.getElementById('editions-modal').textContent)`, 'Reconnect opens the Connect flow');
+        await waitFor(`!!document.getElementById('editions-modal') && getComputedStyle(document.getElementById('editions-modal')).display !== 'none' && /Connect to Coral Hub/.test(document.getElementById('editions-modal').textContent)`, 'Reconnect opens the Connect flow');
         await ev(`document.getElementById('editions-modal').style.display = 'none'; true`);
         await show('movedFailed'); l = await look();
         check('after a failed attempt to enroll again (its own code): still amber, still "connect again"', !l.hidden && l.state === 'disconnected'
