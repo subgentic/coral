@@ -203,6 +203,10 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		body.BoardName = key
 		boardCreated = created
 	}
+	if h.refuseAgentLaunchWhileAccessOff(w, r, body.BoardName) {
+		h.rollBackTeamLaunch(context.WithoutCancel(r.Context()), body, 0, "", false, boardCreated)
+		return
+	}
 	// An agent on a team whose grant is on starts agents in that team's folders, wherever they are placed (#13891, #13903).
 	if h.refuseAgentLaunchOutsideTeam(w, r, body.WorkingDir) {
 		h.rollBackTeamLaunch(context.WithoutCancel(r.Context()), body, 0, "", false, boardCreated)

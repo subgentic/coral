@@ -112,6 +112,10 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		}
 		body.BoardName = key
 	}
+	if h.refuseAgentLaunchWhileAccessOff(w, r, body.BoardName) {
+		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+		return
+	}
 	// An agent on a team whose grant is on starts agents in that team's folders, wherever the agent is placed (#13891, #13903).
 	if h.refuseAgentLaunchOutsideTeam(w, r, body.WorkingDir) {
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
