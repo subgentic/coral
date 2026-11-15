@@ -60,6 +60,7 @@ async function persist(e) {
         e.dispatchEvent(new Event('change', {bubbles:true})); // repaint dependent help/rows while saving blocks another request
         say(row,error?.userMessage ? `Not saved. ${error.userMessage} Try again.` : 'Not saved. Try again.',true);
         if (e.id === 'settings-theme') (await importOnce('./settings_core.js')).restoreSavedTheme().catch(() => {});
+        if (e.classList.contains('settings-model-text')) (await importOnce('./settings_model_pick.js')).syncModelPicks(); // a failed save puts the dropdown back on the saved model too, not only its box (#16772)
     } finally { group.forEach(i => { i.disabled = false; }); delete e.dataset.saving; }
 }
 export function wireSettingsAutosave(modal) {

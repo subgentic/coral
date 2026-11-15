@@ -40,6 +40,13 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await pick(''), '');
         const t1 = Date.now(); while (Date.now() - t1 < 10000 && (v = await saved()) !== '') await new Promise(r => setTimeout(r, 200)); // sleep-ok: poll the store
         assert.equal(v, '', 'the CLI default clears it');
+        // a save that fails puts the dropdown back on the saved model (#16772, Security INFO on #16667): it kept the new pick beside 'Not saved'
+        await ev(`window.__failPut = true; const F = window.fetch; window.fetch = (u, o = {}) => (window.__failPut && String(u).includes('/api/settings') && o.method === 'PUT') ? Promise.resolve(new Response(JSON.stringify({ error: 'no' }), { status: 500, headers: { 'Content-Type': 'application/json' } })) : F(u, o); true`);
+        assert.equal(await pick(hk), hk);
+        await waitFor(`!!document.querySelector('#settings-model-pick-claude').closest('.sv-row').querySelector('.settings-save-status[data-error]')`, 'Not saved after the failed PUT', 10000);
+        assert.deepEqual(await ev(`({ pick: document.getElementById('settings-model-pick-claude').value, box: document.getElementById('settings-default-model-claude').value, boxHidden: document.getElementById('settings-default-model-claude').hidden })`), { pick: '', box: '', boxHidden: true }, 'the dropdown is back on the CLI default beside Not saved, as the box is');
+        assert.equal(await saved(), '', 'nothing was stored');
+        await ev(`window.__failPut = false; true`);
         console.log('\nPASS A model picked in Default models is saved, shown on reopen, and a typed id saves');
     } finally { await guard.restore?.().catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e.message); process.exit(1); });
