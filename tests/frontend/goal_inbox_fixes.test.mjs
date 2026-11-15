@@ -5,14 +5,15 @@
 import assert from 'node:assert/strict';
 import { installDom, importUi } from './helpers/jsdom_env.mjs';
 
-const waitForText = async (sel, expected, label, ms = 5000) => {
+const waitForText = async (sel, expected, label, { scope, ms = 5000 } = {}) => {
+    const root = scope ? document.querySelector(scope) || document : document;
     const end = Date.now() + ms;
     while (Date.now() < end) {
-        const text = document.querySelector(sel)?.textContent || null;
+        const text = root.querySelector(sel)?.textContent || null;
         if (text === expected) return;
         await new Promise(r => setTimeout(r, 100));
     }
-    assert.equal(document.querySelector(sel)?.textContent || null, expected, label);
+    assert.equal(root.querySelector(sel)?.textContent || null, expected, label);
 };
 
 // --- Bug 3: closed-goal notice items have no waiting_since ---
@@ -71,11 +72,12 @@ const IS = await importUi('inbox_sidebar');
 // no goals at all: "No open goals."
 goalsReply = [];
 await IS.showInbox({ folder: 'goals' });
-await waitForText('.empty-state-line', 'No open goals.', 'the empty Goals folder says "No open goals." when there are none');
+await waitForText('.empty-state-line', 'No open goals.', 'the empty Goals folder says "No open goals." when there are none', { scope: '#group-table-view' });
 
 // only done goals (the default All view excludes them, so the table is empty): "All goals are done."
 goalsReply = [{ id: 1, board_id: 'team-a', title: 'Ship v2', state: 'done', rollup: { done: 2 }, updated_at: new Date().toISOString() }];
 await IS.showInbox({ folder: 'goals' });
-await waitForText('.empty-state-line', 'All goals are done.', 'the empty Goals folder says "All goals are done." when done goals exist');
+await waitForText('.empty-state-line', 'All goals are done.', 'the empty Goals folder says "All goals are done." when done goals exist', { scope: '#group-table-view' });
 
 console.log('PASS goal_inbox_fixes: closed-goal notice has no waiting text, columns say All N done, empty state names the done goals');
+process.exit(0);
