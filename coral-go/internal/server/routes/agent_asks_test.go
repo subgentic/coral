@@ -34,6 +34,8 @@ func TestSingleAgentAskReachesNeedsYouAndTheAnswerReachesTheAgent(t *testing.T) 
 		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
 		if withOwner {
 			req = req.WithContext(context.WithValue(req.Context(), verifiedSessionKey{}, o))
+		} else { // the dashboard: the Operator
+			req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
 		}
 		rec := httptest.NewRecorder()
 		rr := chi.NewRouter()
