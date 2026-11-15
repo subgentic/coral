@@ -33,6 +33,29 @@ const NOT_FRONT = '---\n\nA document that starts with a rule and never closes it
             if (out.over) problems.push(`${tag}: the header is wider than its box`);
             if (out.notDl || out.notHr !== 1) problems.push(`${tag}: an unclosed --- is a rule in the document, not front matter (dl ${out.notDl}, rules ${out.notHr})`);
         }
+        // #17927 (Security INFO on #16651): a header module that cannot load leaves the preview as drawn and raises no unhandled rejection
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList');
+        await client.Network.enable(); await client.Network.setBlockedURLs({ urls: ['*md_front.js*'] });
+        const blocked = await ev(`(async () => { window.__unh = 0; window.addEventListener('unhandledrejection', () => { window.__unh++; });
+            const m = await import((window.__coralStatic || '/static/') + 'preview_content.js'); const host = document.createElement('div'); document.body.append(host);
+            m._renderContentView(host, ${JSON.stringify(SKILL)}, 'SKILL.md', 0, false); await new Promise(r => setTimeout(r, 2500)); // sleep-ok: the failed load is tried once more, then given up
+            const r = { unhandled: window.__unh, h1: (host.querySelector('h1') || {}).textContent, dl: !!host.querySelector('dl'), failed: true }; host.remove(); return r; })()`);
+        await client.Network.setBlockedURLs({ urls: [] });
+        if (blocked.unhandled !== 0) problems.push(`a header module that cannot load raised ${blocked.unhandled} unhandled rejection(s)`);
+        if (blocked.h1 !== 'PDF tools' || blocked.dl) problems.push(`a header module that cannot load leaves the preview as drawn (h1 ${blocked.h1}, header ${blocked.dl})`);
+        // #17927 (QA5 SHOULD): the block in view stays where it is when the front matter is swapped for the header
+        const keys = Array.from({ length: 14 }, (_, i) => `key${i}: a value that is long enough to take its own line in the old run-together paragraph ${i}`).join('\n');
+        const LONG = '---\n' + keys + '\n---\n\n' + Array.from({ length: 60 }, (_, i) => `Paragraph ${i}: some body text that fills a line or two of the preview.`).join('\n\n') + '\n';
+        const kept = await ev(`(async () => { const host = document.createElement('div'); host.style.cssText = 'height:300px;overflow:auto;position:fixed;top:0;left:0;width:600px;background:#fff'; document.body.append(host);
+            host.innerHTML = '<div class="prose preview-pane-markdown">' + marked.parse(${JSON.stringify(LONG)}) + '</div>'; // the first render: the front matter run together
+            const prose = host.firstElementChild, top = el => el.getBoundingClientRect().top - host.getBoundingClientRect().top;
+            host.scrollTop = 900; await new Promise(r => requestAnimationFrame(r));
+            const pick = Array.from(prose.querySelectorAll('p')).find(p => /^Paragraph \\d+/.test(p.textContent) && top(p) >= 0), label = pick.textContent.slice(0, 14), before = top(pick);
+            const fm = await import((window.__coralStatic || '/static/') + 'md_front.js?t=1'); await fm.show(host, ${JSON.stringify(LONG)}); await new Promise(r => requestAnimationFrame(r));
+            const again = Array.from(host.querySelectorAll('p')).find(p => p.textContent.startsWith(label)); const r = { label, before: Math.round(before), after: again ? Math.round(top(again)) : null, dl: !!host.querySelector('dl') }; host.remove(); return r; })()`);
+        if (!kept.dl) problems.push('the header was not drawn in the scroll check');
+        else if (kept.after === null || Math.abs(kept.after - kept.before) > 2) problems.push(`the block in view moved when the header was drawn: ${kept.label} was ${kept.before} px from the top, now ${kept.after}`);
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'the front matter header:\n  ' + problems.join('\n  '));
     console.log('PASS Markdown front matter shows as a key/value header');

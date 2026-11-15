@@ -23,14 +23,22 @@ export function splitMarkdownFrontMatter(text) {
 
 /** Redraws a rendered Markdown preview (a text with front matter) without it, under a key/value header; anything else is left as drawn. Values are text, never markup. */
 export async function show(body, content) {
-    const { facts, rest } = splitMarkdownFrontMatter(content), prose = body.firstElementChild;
-    if (!facts.length || !prose || !body.isConnected) return false;
-    await loadStyles('md_front.css'); // the header's rules load with it, not at start (#16651)
-    if (!body.isConnected) return false;
-    prose.innerHTML = sanitizeHtml(marked.parse(rest), DOMPURIFY_CONFIG, { links: 'file', headings: 2 });
-    const dl = document.createElement('dl'); dl.className = 'preview-front-matter';
-    for (const [k, v] of facts) { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); }
-    prose.prepend(dl);
-    keepFragmentsInside(body);
-    return true;
+    try {
+        const { facts, rest } = splitMarkdownFrontMatter(content), prose = body.firstElementChild;
+        if (!facts.length || !prose || !body.isConnected) return false;
+        await loadStyles('md_front.css'); // the header's rules load with it, not at start (#16651)
+        if (!body.isConnected) return false;
+        // The block in view stays where it is: the redraw swaps the run-together front matter for the header, which is another height (#17927). The blocks after the front matter are the same in both renders, so the block is found again by its place from the end.
+        const topOf = el => el.getBoundingClientRect().top - body.getBoundingClientRect().top;
+        let anchor = null;
+        if (body.scrollTop > 0) { const kids = Array.from(prose.children), i = kids.findIndex(k => topOf(k) + k.getBoundingClientRect().height > 1); if (i >= 0) anchor = { fromEnd: kids.length - i, offset: topOf(kids[i]) }; }
+        prose.innerHTML = sanitizeHtml(marked.parse(rest), DOMPURIFY_CONFIG, { links: 'file', headings: 2 });
+        const dl = document.createElement('dl'); dl.className = 'preview-front-matter';
+        for (const [k, v] of facts) { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); }
+        prose.prepend(dl);
+        keepFragmentsInside(body);
+        const kid = anchor && prose.children[prose.children.length - anchor.fromEnd];
+        if (kid) body.scrollTop += topOf(kid) - anchor.offset;
+        return true;
+    } catch { return false; } // a header that cannot be drawn leaves the preview as it was
 }
