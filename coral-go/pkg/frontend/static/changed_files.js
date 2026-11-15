@@ -27,7 +27,9 @@ let _actionsOpenFor = ''; // the path whose row has its Copy, Preview and Edit o
 // A phone's row has one "More" button in place of the three icon buttons, so the name keeps the row (#7652); it opens them on a line under the row.
 const moreButton = (path, name) => { const label = `More for ${name}`; return `<button type="button" class="btn btn-quiet btn-icon btn-xs file-more-btn ic-more" data-on-click="file-more" data-path="${escapeAttr(path)}" aria-expanded="${escapeAttr(String(_actionsOpenFor === path))}" aria-label="${escapeAttr(label)}" title="More"></button>`; }; // the three dots are drawn in CSS (.ic-more): no icon font name to subset
 /** A file row's Share as artifact button (#10269): it names its file, as the row's other buttons do. */
-const shareButton = (path, name) => { const label = `Share ${name} as an artifact`; return `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-share" data-path="${escapeAttr(path)}" title="Share as artifact" aria-label="${escapeAttr(label)}"><span class="material-icons" aria-hidden="true">link</span></button>`; };
+const iconButton = (on, icon, title, label, path, extra = '') => `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="${on}" data-path="${escapeAttr(path)}" ${extra} title="${title}" aria-label="${escapeAttr(label)}"><span class="material-icons" aria-hidden="true">${icon}</span></button>`;
+const shareButton = (path, name) => iconButton('file-share', 'link', 'Share as artifact', `Share ${name} as an artifact`, path);
+const downloadButton = (path, name) => iconButton('file-download', 'download', 'Download', `Download ${name}`, path); // #17632
 let _searchTimeout = null;
 let _renderTimer = null;
 
@@ -93,10 +95,10 @@ function renderStarredFiles() {
             const { dir, name } = splitPath(filepath);
             const unstarLabel = `Unstar ${name}`, copyLabel = `Copy path of ${name}`, previewLabel = `Preview ${name}`, editLabel = `Edit ${name}`;
             const starBtn = `<button class="btn btn-quiet btn-icon btn-xs file-star-btn starred" data-filepath="${escapeAttr(filepath)}" data-on-click="file-star" data-path="${escapeAttr(filepath)}" title="Unstar" aria-label="${escapeAttr(unstarLabel)}">★</button>`; // each button names its file: a list of rows must not read as the same four buttons (#6152)
-            const copyBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-copy" data-path="${escapeAttr(filepath)}" title="Copy path" aria-label="${escapeAttr(copyLabel)}"><span class="material-icons" aria-hidden="true">content_copy</span></button>`;
-            const previewBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-preview" data-path="${escapeAttr(filepath)}" title="Preview" aria-label="${escapeAttr(previewLabel)}"><span class="material-icons" aria-hidden="true">visibility</span></button>`;
-            const editBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-edit" data-path="${escapeAttr(filepath)}" title="Edit" aria-label="${escapeAttr(editLabel)}"><span class="material-icons" aria-hidden="true">edit</span></button>`;
-            const shareBtn = shareButton(filepath, name);
+            const copyBtn = iconButton('file-copy', 'content_copy', 'Copy path', copyLabel, filepath);
+            const previewBtn = iconButton('file-preview', 'visibility', 'Preview', previewLabel, filepath);
+            const editBtn = iconButton('file-edit', 'edit', 'Edit', editLabel, filepath);
+            const shareBtn = downloadButton(filepath, name) + shareButton(filepath, name);
             return `<div class="file-item file-starred${escapeAttr(_actionsOpenFor === filepath ? ' actions-open' : '')}" data-on-click="file-open" role="button" tabindex="0" data-key-click data-path="${escapeAttr(filepath)}">
                 ${starBtn}
                 <div class="file-path-wrap">
@@ -311,16 +313,13 @@ export async function loadChangedFiles(agentName, sessionId, quiet = false) { //
     refreshOpenFiles().catch(() => {}); // an open preview follows its file (#10334)
 }
 
-// The Files list follows the agent (#10268): it was read when the tab opened and on Refresh, so a reply that changed files left a stale "+2" until the button was pressed. The session feed
-// carries each agent's changed-file count and its state: the list is read again when the open agent's count moves or its turn ends (working to anything else), once for a burst of rows.
+// The Files list follows the agent (#10268): the session feed carries each agent's changed-file count and state; the list is read again when the open agent's count moves or its turn ends, once for a burst of rows.
 let _followed = { id: '', count: null, working: false };
 let _followTimer = null;
 let _filesStale = false; // the agent changed files while the Files panel was not showing: the next look reads the list
 const filesPanelShowing = () => { const p = document.getElementById('agentic-panel-files'); return !!p && p.classList.contains('active') && p.getClientRects().length > 0; };
 const FOLLOW_DELAY_MS = 300;
-// The follow's read: the route's refresh, not its cached list (the server keeps a list for 30 s or more, and the change that moved the count may be inside it). The refresh computes the diff, so it is
-// one at a time with at least about 2 s between two (a reply and its edits come as a burst), and a request that comes while one runs is one more after it, not one each. A view-only viewer on a Hub
-// has no refresh to call: it reads the list (#10268). Each read of the owner's watch is that refresh, so a few git commands about every 4 s while the panel shows (#10485).
+// The follow's read is the route's refresh, not its cached list (the change that moved the count may be inside it): one at a time, at least about 2 s apart, a request during one is one more after it. A view-only Hub viewer has no refresh: it reads the list (#10268, #10485).
 const MIN_REFRESH_GAP_MS = 2000;
 let _refreshBusy = false, _refreshQueued = false, _queuedQuiet = true, _refreshAt = 0;
 // A folder git is too slow for is paused by the server (#13079): live updates stop, the list is the last one, and Refresh asks for one pass. The page makes no automatic request for it meanwhile.
@@ -791,10 +790,10 @@ document.addEventListener('keydown', e => {
         const rowTitle = plain ? f.filepath : `${f.filepath} (${statusLabel})`;
         const starLabel = `${isStarred ? 'Unstar' : 'Star'} ${rowName}`, copyLabel = `Copy path of ${rowName}`, previewLabel = `Preview ${rowName}`, editLabel = `Edit ${rowName}`;
         const starBtn = `<button class="btn btn-quiet btn-icon btn-xs file-star-btn ${escapeAttr(isStarred ? 'starred' : '')}" data-filepath="${escapeAttr(f.filepath)}" data-on-click="file-star" data-path="${escapeAttr(f.filepath)}" title="${escapeAttr(isStarred ? 'Unstar' : 'Star')}" aria-label="${escapeAttr(starLabel)}">${isStarred ? '★' : '☆'}</button>`;
-        const copyBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-copy" data-path="${escapeAttr(f.filepath)}" title="Copy path" aria-label="${escapeAttr(copyLabel)}"><span class="material-icons" aria-hidden="true">content_copy</span></button>`;
-        const previewBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-preview" data-path="${escapeAttr(f.filepath)}" ${plain ? '' : 'data-diff="1"'} title="Preview" aria-label="${escapeAttr(previewLabel)}"><span class="material-icons" aria-hidden="true">visibility</span></button>`;
-        const editBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-edit" data-path="${escapeAttr(f.filepath)}" ${plain ? '' : 'data-diff="1"'} title="Edit" aria-label="${escapeAttr(editLabel)}"><span class="material-icons" aria-hidden="true">edit</span></button>`;
-        const shareBtn = shareButton(f.filepath, rowName);
+        const copyBtn = iconButton('file-copy', 'content_copy', 'Copy path', copyLabel, f.filepath);
+        const previewBtn = iconButton('file-preview', 'visibility', 'Preview', previewLabel, f.filepath, plain ? '' : 'data-diff="1"');
+        const editBtn = iconButton('file-edit', 'edit', 'Edit', editLabel, f.filepath, plain ? '' : 'data-diff="1"');
+        const shareBtn = downloadButton(f.filepath, rowName) + shareButton(f.filepath, rowName);
         const open = !plain && _expandedFiles.has(f.filepath);
         const expandTitle = `${open ? 'Hide' : 'Show'} the changes`, expandLabel = `${expandTitle} in ${rowName}`;
         const expandBtn = plain ? '' : `<button type="button" class="btn btn-quiet btn-icon btn-xs file-expand-btn" data-on-click="file-expand" data-path="${escapeAttr(f.filepath)}" aria-expanded="${escapeAttr(String(open))}" aria-controls="file-diff-${Number(i)}" title="${escapeAttr(expandTitle)}" aria-label="${escapeAttr(expandLabel)}"><span class="material-icons" aria-hidden="true">${open ? 'keyboard_arrow_up' : 'keyboard_arrow_down'}</span></button>`;
@@ -850,6 +849,7 @@ registerActions({
     'file-more': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (!p) return; _actionsOpenFor = _actionsOpenFor === p ? '' : p; const row = el.closest('.file-item'); if (row) row.classList.toggle('actions-open', _actionsOpenFor === p); el.setAttribute('aria-expanded', String(_actionsOpenFor === p)); },
     'file-copy': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) copyFilePath(p); },
     'file-preview': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) openFilePreview(p, ...diffOpts(el)); },
+    'file-download': async (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) (await importOnce('./file_download.js')).downloadFile(p); },
     'file-share': async (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) (await importOnce('./share_file.js')).shareFileAsArtifact(p); },
     'file-edit': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) openFileEdit(p, ...diffOpts(el)); },
     // On mousedown, as before: the @-mention list closes on the input's blur, which a click comes after.
