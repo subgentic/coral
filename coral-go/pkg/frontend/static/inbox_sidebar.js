@@ -607,7 +607,7 @@ function skillActions(r) {
     const box = DT.el('div', 'inbox-review-actions'), name = skillName(r);
     const btn = (cls, text, fn) => { const b = DT.el('button', `btn btn-small ${cls}`.trim(), text); b.type = 'button'; b.setAttribute('aria-label', `${text} the skill ${name}`); b.addEventListener('click', e => { e.stopPropagation(); fn(b); }); return b; };
     box.append(btn('', 'Review', () => openSkill(r)));
-    if (!r.has_scripts && !r.not_reviewable) {
+    if (!r.has_scripts && !r.not_reviewable && r.file_count > 0) {
         const n = r.file_count || 0, pl = n === 1 ? '' : 's';
         box.append(btn('btn-primary', 'Approve', a => {
             showConfirmModal(`Approve ${n} file${pl} without opening?`, `${name} has ${n} file${pl} you have not read. Approve it anyway?`,
