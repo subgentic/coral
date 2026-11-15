@@ -955,6 +955,7 @@ const ALLOWED_SETTING_ROWS = {
   'needs_one_number_browser.test.js': ['inbox_welcome_done'], // it puts the welcome tile away (Got it, and the bulk Dismiss) and the first save of that setting makes the row; the runner puts the value back
   'chief_setup_browser.test.js': ['chief_actions', 'chief_avatar', 'chief_avatar_letter', 'chief_fronts', 'chief_name', 'chief_page', 'chief_session', 'chief_team'],
   'goal_closed_row_browser.test.js': ['goal_closed_dismissed'],
+  'goal_closed_merge_browser.test.js': ['goal_closed_dismissed'],
 };
 const allowedSettingLeak = (test, l) => { const m = /^setting (\S+) added /.exec(l); return !!m && (ALLOWED_SETTING_ROWS[test] || []).includes(m[1]); };
 // noteLeaks records what these attempts of one suite left in the shared server state (and what the runner put back or stopped) in the end summary, and returns the LEAK line to print ('' for none).

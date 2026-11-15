@@ -6,7 +6,12 @@ const KEY = 'coral_goal_closed_dismissed', SETTING = 'goal_closed_dismissed', WI
 const keyOf = (team, g) => `${team}|${g.id}|${g.closed_at || ''}`;
 const read = () => { try { const v = JSON.parse(browserLocal.get(KEY) || '[]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; } catch { return []; } };
 let _saving = Promise.resolve();
-const write = list => { const trimmed = list.slice(-MAX); browserLocal.set(KEY, JSON.stringify(trimmed)); _saving = _saving.then(() => fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [SETTING]: JSON.stringify(trimmed) }) })).catch(() => {}); };
+const write = list => { const trimmed = list.slice(-MAX); browserLocal.set(KEY, JSON.stringify(trimmed)); _saving = _saving.then(async () => {
+    let server = [];
+    try { const r = await fetch('/api/settings'); if (r.ok) { const v = (await r.json()).settings[SETTING]; const a = JSON.parse(v || '[]'); if (Array.isArray(a)) server = a.filter(x => typeof x === 'string'); } } catch { /* use local only */ }
+    const merged = [...new Set([...server, ...trimmed])].slice(-MAX);
+    await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [SETTING]: JSON.stringify(merged) }) });
+}).catch(() => {}); };
 
 /** Whether the goal was closed as done by an agent (not by the Operator, not unknown) within the last 14 days. */
 export const closedByAgent = (g, now = Date.now()) => {
