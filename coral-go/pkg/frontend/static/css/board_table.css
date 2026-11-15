@@ -5,10 +5,9 @@
 :is(.mb-messages-scroll, .board-chat-messages):not(.mb-table) :is(.mb-row-toggle, .mb-row-tags-open, .mb-row-actions, .mb-row-replies, .mb-day) { display: none; }
 
 /* ── The controls: the pills at the left, the Table | Chat switch at the right ── */
-.mb-table-tools { display: flex; align-items: center; gap: 0.5rem 0.75rem; flex-wrap: wrap; padding: 0.25rem 0 0.5rem; }
+.mb-table-tools { display: flex; align-items: center; gap: 0.5rem 0.75rem; flex-wrap: nowrap; padding: 0.25rem 0 0.5rem; } /* one line: the pills scroll in their strip (goals.css), the switch keeps its size (320 and 360 px wrapped to two lines, #17733) */
 .mb-table-tools .mb-pills { flex: 1 1 auto; min-width: 0; }
-.mb-view-switch { margin-inline-start: auto; }
-@media (max-width: 767px) { .mb-table-tools { flex-wrap: nowrap; } .mb-view-switch { flex: none; } } /* a phone: one line, the pills scroll inside their strip (320 and 360 px wrapped to two lines, #17733) */
+.mb-view-switch { margin-inline-start: auto; flex: none; }
 
 /* In the agent dock's head line the switch sits between the title and the buttons. */
 .board-chat-header .mb-table-tools { padding: 0; margin-inline-start: auto; flex: none; }
