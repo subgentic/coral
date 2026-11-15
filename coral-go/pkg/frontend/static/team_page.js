@@ -103,6 +103,9 @@ function buildTabsMore(tabs) {
         menu.append(m);
     }
     row.append(b, menu);
+    const next = el('button', 'team-tabs-next'); next.type = 'button'; next.id = 'team-tabs-next'; next.setAttribute('aria-label', 'Show more tabs'); // a tappable cue at the strip's end while tabs wait past it (css, off the strip's data-more); it replaces the end chevron then (#17816)
+    next.addEventListener('click', () => tabs.scrollBy({ left: tabs.clientWidth * 0.7, behavior: 'smooth' }));
+    tabs.append(next);
     for (const [side, glyph] of [['start', '‹'], ['end', '›']]) {
         const cue = el('span', `team-strip-edge team-strip-edge-${side}`, glyph);
         cue.setAttribute('aria-hidden', 'true'); row.append(cue);
