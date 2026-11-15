@@ -69,5 +69,5 @@ export const levelName = l => LEVEL_NAMES[l] || l;
  *  agent was started with (thinking), marked requested: the same two fields and the same order as the chat bar's thinking chip. Nothing recorded is null, never a word for it. */
 export function sessionLevel(s) {
     const lvl = s && (s.thinking_actual || s.thinking);
-    return lvl ? { name: levelName(lvl) + (s.thinking ? '' : ' (default)'), requested: !s.thinking_actual } : null; // none asked for: the CLI's own default, named as the chat bar's chip does (#17925)
+    return lvl ? { name: levelName(lvl) + (s.thinking ? '' : ' (not set)'), requested: !s.thinking_actual } : null; // none asked for: the CLI's own default, named as the chat bar's chip does (#17925)
 }
