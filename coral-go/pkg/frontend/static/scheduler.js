@@ -213,6 +213,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
         ${failBanner}
         <div class="sched-header">
             <h2>${escapeHtml(job.name)}${isExample(job.name, job.description) ? ' <span class="chip chip-tag dt-tag">Example</span>' : ''}</h2>
+            <button class="btn btn-small${job.enabled ? ' btn-primary' : ''}" data-on-click="job-run-now" data-job-id="${Number(job.id)}">Run now</button>
         </div>
         <p class="item-meta sched-status-line">${escapeHtml(status)}</p>
         ${savedLine}
@@ -246,10 +247,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
             </div>
             ${job.enabled ? '' : `<button class="btn btn-small btn-primary" data-on-click="job-toggle" data-job-id="${Number(job.id)}">Turn on</button>`}
             <button class="btn btn-small sched-foot-secondary" data-on-click="job-edit" data-job-id="${Number(job.id)}">Edit</button>
-            ${job.enabled
-                ? `<button class="btn btn-small sched-foot-secondary" data-on-click="job-toggle" data-job-id="${Number(job.id)}" aria-label="Turn off ${escapeAttr(job.name)}">Turn off</button>
-            <button class="btn btn-small btn-primary" data-on-click="job-run-now" data-job-id="${Number(job.id)}">Run now</button>`
-                : `<button class="btn btn-small" data-on-click="job-run-now" data-job-id="${Number(job.id)}">Run now</button>`}
+            ${job.enabled ? `<button class="btn btn-small sched-foot-secondary" data-on-click="job-toggle" data-job-id="${Number(job.id)}" aria-label="Turn off ${escapeAttr(job.name)}">Turn off</button>` : ''}
         </div>
     `;
     container.querySelector('#sched-run-history').append(renderRunsTable(runsPage));
