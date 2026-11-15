@@ -105,15 +105,14 @@ export async function refreshReviewAskVisibility() { await prepareAskReviews(ask
 export async function replyToAsk(a, text) {
     const body = String(text || '').trim();
     if (!body) throw new Error('Write a reply first.');
-    const content = `@${a.asker} ${body}`;
     const resp = a.kind === 'agent' ? await (await importOnce('./agent_ask_answer.js')).answerAgentAsk(a, body) : await serverFetch(a.server, `/api/board/${encodeURIComponent(a.board)}/messages`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content, ...(a.kind === 'ask' ? { reply_to: a.id } : {}) }),
+        body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content: `@${a.asker} ${body}`, ...(a.kind === 'ask' ? { reply_to: a.id } : {}) }),
     });
     if (!resp.ok) {
         let why = '';
-        try { const b = await resp.json(); if (b && typeof b.error === 'string') why = b.error; } catch { /* not JSON */ }
-        throw new Error(why ? `Not sent: ${why}` : `Not sent (HTTP ${resp.status}).`);
+        try { why = (await resp.json()).error; } catch { /* not JSON */ }
+        throw new Error(typeof why === 'string' && why ? `Not sent: ${why}` : `Not sent (HTTP ${resp.status}).`);
     }
     asks = asks.filter(x => askKey(x) !== askKey(a)); // gone at once; the next read confirms it
     fire();
