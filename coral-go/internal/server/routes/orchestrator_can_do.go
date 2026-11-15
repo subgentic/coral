@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/board"
@@ -37,14 +38,14 @@ func launchAbility(a teamAbilities) string {
 	if !a.MayLaunch {
 		return "Adding a member: the Operator has not allowed you to launch agents, so when your plan needs a role the team lacks, ask the Operator to add that agent."
 	}
-	cmd := "coral-agent launch " + shellWord(a.Dir) + ` --name "<Role>"`
-	if a.AgentType != "" {
-		cmd += " --type " + shellWord(a.AgentType)
+	cmd := "coral-agent launch " + shellWord(promptValue(a.Dir)) + ` --name "<Role>"`
+	if t := promptValue(a.AgentType); t != "" {
+		cmd += " --type " + shellWord(t)
 	}
-	if a.Model != "" {
-		cmd += " --model " + shellWord(a.Model)
+	if m := promptValue(a.Model); m != "" {
+		cmd += " --model " + shellWord(m)
 	}
-	cmd += ` --prompt "<its job>" --board ` + shellWord(a.BoardID)
+	cmd += ` --prompt "<its job>" --board ` + shellWord(promptValue(a.BoardID))
 	return "Adding a member: when your plan needs a role the team lacks, run " + cmd + ". Keep the type and model shown: they are the team's own. Then post one line naming who you added and why."
 }
 
@@ -112,9 +113,15 @@ func grantIsOn(ctx context.Context, bs *board.Store, boardID string) bool {
 }
 
 // BoardAbilitiesSection is the source agent.SetBoardAbilities takes: the section for the Orchestrator being launched, from the team's settings as they are now.
-func BoardAbilitiesSection(bs *board.Store) func(p agent.LaunchParams, agentType string) string {
+func BoardAbilitiesSection(bs *board.Store, ss *store.SessionStore) func(p agent.LaunchParams, agentType string) string {
 	return func(p agent.LaunchParams, agentType string) string {
-		a := teamAbilities{MayLaunch: grantIsOn(context.Background(), bs, p.BoardName), BoardID: p.BoardName, Dir: p.WorkingDir, AgentType: agentType, Model: modelInFlags(p.Flags)}
+		model := modelInFlags(p.Flags)
+		if model == "" && ss != nil && p.SessionID != "" { // a restart or wake passes no --model when the agent runs on its CLI's default or the stored flags lack it: the row's own model is the team's (#17662)
+			if sess, err := ss.GetLiveSession(context.Background(), p.SessionID); err == nil && sess != nil && sess.Model != nil {
+				model = *sess.Model
+			}
+		}
+		a := teamAbilities{MayLaunch: grantIsOn(context.Background(), bs, p.BoardName), BoardID: p.BoardName, Dir: p.WorkingDir, AgentType: agentType, Model: model}
 		return canDoSection(orchestratorCanDo(a))
 	}
 }
@@ -166,4 +173,15 @@ func (h *SessionsHandler) callersTeamModel(r *http.Request, agentType, boardName
 		return ""
 	}
 	return strings.TrimSpace(*sess.Model)
+}
+
+// promptValue is a stored value (a folder, a model, a board name) made safe to write into the prompt's one line: every control character, line or paragraph separator and format character (zero-width, bidi) is dropped, so a
+// value cannot start a line of its own or hide text (#17662, Security).
+func promptValue(v string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || unicode.Is(unicode.Zl, r) || unicode.Is(unicode.Zp, r) || unicode.Is(unicode.Cf, r) {
+			return -1
+		}
+		return r
+	}, v)
 }

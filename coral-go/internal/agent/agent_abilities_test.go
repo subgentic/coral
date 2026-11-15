@@ -64,3 +64,11 @@ func TestEveryAgentTypesOrchestratorCommandCarriesTheSection(t *testing.T) {
 		assert.NotContains(t, commandAndFiles(worker), "ABILITIES-SECTION-17622", name+": a worker's command")
 	}
 }
+
+// Hermes is told its system prompt in its first message (#17662): the Orchestrator's carries the section, a worker's does not.
+func TestHermesFirstMessageCarriesTheSectionForAnOrchestratorOnly(t *testing.T) {
+	defer SetBoardAbilities(nil)
+	SetBoardAbilities(func(LaunchParams, string) string { return "ABILITIES-SECTION-17622" })
+	assert.Contains(t, hermesFirstMessage(LaunchParams{BoardName: "team", Role: "Orchestrator"}), "ABILITIES-SECTION-17622")
+	assert.NotContains(t, hermesFirstMessage(LaunchParams{BoardName: "team", Role: "Developer"}), "ABILITIES-SECTION-17622")
+}
