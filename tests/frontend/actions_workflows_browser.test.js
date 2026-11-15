@@ -193,8 +193,10 @@ const JOB_RUNS = { runs: [{ id: 44, status: 'completed', scheduled_at: '2026-10-
         await Input.dispatchKeyEvent({type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
         check('Space opens the complete prompt in a bounded scroll region', await ev(`(() => { const d=document.querySelector('.sched-prompt-section'),p=d.querySelector('pre');return d.open && p.checkVisibility() && p.textContent==='${LONG_PROMPT}' && getComputedStyle(p).overflowY==='auto' && parseFloat(getComputedStyle(p).maxHeight)<=innerHeight*0.4+1; })()`));
         await click('#scheduler-view [data-on-click="job-run-session"]');
+        await until(`window.__hist.length === 1`, 'the lazily loaded open to ask for the session', 5000);
         check('a run\'s session link opens that session\'s history', JSON.stringify(await ev(`window.__hist`)) === JSON.stringify([SID]), JSON.stringify(await ev(`window.__hist`)));
         await ev(`(() => { const b = document.createElement('a'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = '../../etc'; document.body.appendChild(b); b.click(); b.remove(); return true; })()`);
+        await sleep(300); // sleep-ok: shows that nothing is asked for (no condition to wait for)
         check('...and a session link that is not a session id does nothing', (await ev(`window.__hist.length`)) === 1);
         await openJob(5);
         await until(`!!document.querySelector('#scheduler-view .sched-runs-table tr.dt-row[data-key="31"]')`, 'the workflow job again', 5000);
