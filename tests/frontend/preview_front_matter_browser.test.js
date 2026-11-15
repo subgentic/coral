@@ -19,6 +19,7 @@ const NOT_FRONT = '---\n\nA document that starts with a rule and never closes it
             const out = await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'preview_content.js');
                 const draw = t => { const host = document.createElement('div'); document.body.append(host); m._renderContentView(host, t, 'SKILL.md', 0, false); return host; };
                 const a = draw(${JSON.stringify(SKILL)}), b = draw(${JSON.stringify(NOT_FRONT)});
+                for (let i = 0; i < 60 && !a.querySelector('dl.preview-front-matter'); i++) await new Promise(r => setTimeout(r, 50)); // sleep-ok: the header module loads on first use
                 const dl = a.querySelector('dl.preview-front-matter');
                 const r = { keys: dl ? Array.from(dl.querySelectorAll('dt')).map(e => e.textContent) : null, vals: dl ? Array.from(dl.querySelectorAll('dd')).map(e => e.textContent) : null, h1: (a.querySelector('h1') || {}).textContent, hr: a.querySelectorAll('hr').length, para: Array.from(a.querySelectorAll('p')).map(e => e.textContent), img: a.querySelectorAll('img').length, pwn: !!window.__pwn, notDl: !!b.querySelector('dl'), notHr: b.querySelectorAll('hr').length, over: dl ? dl.scrollWidth > dl.clientWidth + 1 : null };
                 a.remove(); b.remove(); return r; })()`);
