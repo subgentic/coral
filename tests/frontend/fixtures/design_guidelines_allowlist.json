@@ -59,7 +59,6 @@
   },
   "coral-go/pkg/frontend/static/css/components.css": {
    "height: #launch-agent-pick .launch-agent-opt input { height: 1px }": 1,
-   "height: #team-start-host textarea#team-goal { min-height: 2.5rem }": 1,
    "height: .btn-icon.btn-xs { height: max(24px, calc(var(--fs-lg) + 10px)) }": 1,
    "height: .btn-icon.btn-xs { min-height: max(24px, calc(var(--fs-lg) + 10px)) }": 2,
    "height: .jumpbar .btn { min-height: 26px }": 1,
@@ -70,6 +69,7 @@
    "height: input.check { height: 16px }": 1,
    "height: input.switch { height: 1.4rem }": 1,
    "height: input.switch::before { height: calc(1.4rem - 8px) }": 1,
+   "radius: 14px": 1,
    "radius: 19px": 1,
    "radius: 1rem": 1,
    "radius: 22px": 2,
