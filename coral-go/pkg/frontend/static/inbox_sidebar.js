@@ -166,7 +166,8 @@ let page = null; // { kind: 'task', project, id } | { kind: 'saved', id }: the i
 // ── Needs you ────────────────────────────────────────────────────────────
 const waitingSessions = () => (state.liveSessions || []).filter(needsYou).map(askedRow); // an agent that asked something before Coral restarted is listed with its words (#10368)
 const teamOf = s => s.board_project ? teamLabel(identityKey(sessionServer(s), s.board_project), s.board_label || '') : ''; // with its computer when a hub has more than one (#8774)
-const fromOf = (s, withTeam) => { if (s.operatorAsk) return [`from ${markHidden(s.operatorAsk.asker, { strict: true }).trim() || 'an agent'}`, teamOf(s)].filter(Boolean).join(' \u00b7 '); if (!s.review) return ''; const who = markHidden(s.review.produced_by, { strict: true }).trim(), team = withTeam ? teamOf(s) : ''; const n = (s.review.earlier || []).length; return [who ? `from ${who}` : 'sender unknown', team, versionLineOf(s.review), n ? `${n} earlier version${n === 1 ? '' : 's'}` : ''].filter(Boolean).join(' \u00b7 '); }; // who uploaded a file for review, from the upload's record, what hides or reorders the name written out (markHidden strict), and its team (#11456)
+const sentByYou = r => !!r && r.review_sent_by === 'operator'; // the person sent this file for review themselves: the row says so, not who produced the file
+const fromOf = (s, withTeam) => { if (s.operatorAsk) return [`from ${markHidden(s.operatorAsk.asker, { strict: true }).trim() || 'an agent'}`, teamOf(s)].filter(Boolean).join(' \u00b7 '); if (!s.review) return ''; const who = markHidden(s.review.produced_by, { strict: true }).trim(), team = withTeam ? teamOf(s) : ''; const n = (s.review.earlier || []).length; return [sentByYou(s.review) ? 'sent by you' : who ? `from ${who}` : 'sender unknown', team, versionLineOf(s.review), n ? `${n} earlier version${n === 1 ? '' : 's'}` : ''].filter(Boolean).join(' \u00b7 '); }; // who uploaded a file for review, from the upload's record, what hides or reorders the name written out (markHidden strict), and its team (#11456)
 /** The line under a review row that says who sent it: "from <agent> · <earlier versions>", the agent's name the shared link (#12168). */
 /** The wait, again, inside the item cell (#13795): a phone's row puts it at the right of the sender's line, so the Waiting column is hidden there; hidden everywhere else (the column says it). */
 const waitMark = s => {
@@ -191,7 +192,7 @@ const addComputerChip = (s, tr) => {
 };
 const introNode = text => DT.el('span', 'inbox-review-from', text);
 const fromNode = s => {
-    const p = DT.el('span', 'inbox-review-from'), who = String(s.review.produced_by || '').trim(), n = Math.max((s.review.earlier || []).length, (s.review.version || 1) - 1), rest = [versionLineOf(s.review), n ? `${n} earlier version${n === 1 ? '' : 's'}` : ''].filter(Boolean).join(' \u00b7 ');
+    const p = DT.el('span', 'inbox-review-from'), who = sentByYou(s.review) ? '' : String(s.review.produced_by || '').trim(), n = Math.max((s.review.earlier || []).length, (s.review.version || 1) - 1), rest = [versionLineOf(s.review), n ? `${n} earlier version${n === 1 ? '' : 's'}` : ''].filter(Boolean).join(' \u00b7 ');
     if (!who) { p.textContent = [fromOf(s, false), versionLineOf(s.review)].filter(Boolean).join(' \u00b7 '); return p; } // an unknown sender still has its file's version line (#14145)
     p.append('from ', agentLink(who, { board: boardTeamKey(sessionServer(s), s.review.team) }), rest ? ' \u00b7 ' + rest : '');
     return p;
@@ -1366,7 +1367,7 @@ export function needsListSpec() {
     if (waitingOnAgent(s.review)) reasons.unshift(`Changes requested · waiting on ${markHidden(s.review.produced_by || 'the agent', { strict: true })}`);
     for (const text of reasons) { if (isPhoneLayout() && hasNewVersion(s.review) && text.startsWith('New version')) continue; const reason = DT.el('span', 'inbox-review-reason', ` · ${text}`); if (/^\d+ new comments?$/.test(text)) reason.classList.add('inbox-new-comments'); name.append(reason); }
     name.setAttribute('aria-label', [`Open ${markTitle(s.review.name)}`, ...(versionOf(s.review) > 1 && !hasNewVersion(s.review) ? [`version ${versionOf(s.review)}`] : []), ...reasons].join(', '));
-    const wrap = DT.el('span', 'inbox-review-item inbox-agent-first'), sender = agentLink(markHidden(s.review.produced_by, { strict: true }).trim() || 'sender unknown', { board: boardTeamKey(sessionServer(s), s.review.team), cls: 'inbox-review-from' });
+    const wrap = DT.el('span', 'inbox-review-item inbox-agent-first'), sender = sentByYou(s.review) ? DT.el('span', 'inbox-review-from', 'sent by you') : agentLink(markHidden(s.review.produced_by, { strict: true }).trim() || 'sender unknown', { board: boardTeamKey(sessionServer(s), s.review.team), cls: 'inbox-review-from' });
     const readWords = `${isRead(s.review) ? ', read' : ', unread'}${waitingOnAgent(s.review) && !(s.review.new_comments > 0) ? ', waiting on agent, not counted' : ''}`;
     if (isPhoneLayout()) {
 const tags = DT.el('span', 'inbox-review-tags');
