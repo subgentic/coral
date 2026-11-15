@@ -91,6 +91,8 @@ export async function approveRow(team, row, note = '') { // note (#11888): one s
 }
 
 const shown = name => markHidden(name, { strict: true }); // the uploader's file name is an agent's text: hidden characters are written out wherever it is drawn or spoken (Security's SHOULD, #11552)
+const andList = csv => { const n = String(csv || '').split(', ').map(shown); return n.length > 1 ? `${n.slice(0, -1).join(', ')} and ${n[n.length - 1]}` : n[0] || ''; }; // 'A, B' from the server reads 'A and B' (#17730)
+let held = null; // {row, names}: the request that is held for a busy uploader, so the banner says Queued, not 'waiting for a new version' (#17730)
 // An action of the person's names the table it started in and, when the server has accepted it and the list is read again, asks that table (only) for one redraw that is not held under a resting pointer (#14373): the table on screen at the START is captured, so a slow answer that arrives after the person went elsewhere releases nothing there.
 const begin = () => { const h = { table: null }; document.dispatchEvent(new CustomEvent('coral:action-start', { detail: h })); return h; };
 const finish = h => document.dispatchEvent(new CustomEvent('coral:action-result', { detail: h }));
@@ -270,7 +272,7 @@ export function attachReview(d, { reload }) {
         paintApprove(); // changes were asked for: Approve is still the Operator's, and says it approves this version as it is; with a newer version in the series it names the one it approves (#15197)
         if (!pending) form.hidden = true;
         bar.hidden = !s || (slotted && form.hidden); // on the header row the strip under it is the change-request form: there only while it is open
-        stateEl.textContent = !s ? '' : s.newer && s.state !== 'approved' ? `An older version: v${s.newer.n} is newer.${s.state === 'changes' ? ' Changes were asked for on this one.' : ''}` : s.state === 'approved' && s.newer ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}. An older version: v${s.newer.n} is newer.` : s.state === 'approved' ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}` : s.state === 'reviewed' ? 'Reviewed' : s.state === 'denied' ? 'Refused' : s.state === 'changes' ? `Changes requested${s.row.produced_by ? `: waiting for a new version from ${shown(s.row.produced_by)}` : ''}. Approving now approves this version as it is.` : waiting && !pending ? 'Waiting for your review. Approve it on that computer\'s own dashboard.' : 'Waiting for your review';
+        stateEl.textContent = !s ? '' : s.newer && s.state !== 'approved' ? `An older version: v${s.newer.n} is newer.${s.state === 'changes' ? ' Changes were asked for on this one.' : ''}` : s.state === 'approved' && s.newer ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}. An older version: v${s.newer.n} is newer.` : s.state === 'approved' ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}` : s.state === 'reviewed' ? 'Reviewed' : s.state === 'denied' ? 'Refused' : s.state === 'changes' && held && held.row === s.row ? `Changes requested: queued for ${held.names}, delivers when it's free. Approving now approves this version as it is.` : s.state === 'changes' ? `Changes requested${s.row.produced_by ? `: waiting for a new version from ${shown(s.row.produced_by)}` : ''}. Approving now approves this version as it is.` : waiting && !pending ? 'Waiting for your review. Approve it on that computer\'s own dashboard.' : 'Waiting for your review';
         stateEl.hidden = !stateEl.textContent; // no status, no chip
         newerHex = s && s.newer ? s.newer.hex : ''; newest.hidden = !newerHex; if (newerHex) newest.textContent = `Open v${s.newer.n}`;
     };
@@ -369,9 +371,9 @@ export function attachReview(d, { reload }) {
             importOnce('./inbox_reviews.js').then(m => { m.reviewsChangedOnServer(); return m.refreshReviews(true); }).catch(() => {});
             const recipient = shown(out.to || who || 'The agent');
             const reason = { no_uploader: 'no agent is recorded for this artifact', board_paused: 'the board is paused', rate_limited: 'the sending limit was reached', not_owner: 'only the owner can send this', redaction_unavailable: 'the words could not be checked', failed: 'delivery failed' }[out.reason] || String(out.reason || 'delivery was not confirmed').replaceAll('_', ' ');
-            const notice = out.delivered ? `${recipient} was asked.` : out.queued ? `Queued for ${shown(out.queued)}, delivers when it's free.` : out.reason === 'already_sent' ? `${recipient} was already told.` : `${recipient} was not told: ${reason}.`;
+            const notice = out.delivered ? `${recipient} was asked.` : out.queued ? `Queued for ${andList(out.queued)}, delivers when it's free.` : out.reason === 'already_sent' ? `${recipient} was already told.` : `${recipient} was not told: ${reason}.`;
             showToast(hubNoComments ? (out.text_kept === true ? 'Changes requested. Your words are on the file.' : 'Changes requested. Your words were not added to the thread: this Hub does not carry comments yet, so the agent was not told.') : `Changes requested. ${!out.delivered && !out.queued && kept ? 'Your words are in the thread. ' : ''}${notice}`);
-            text.value = ''; tray.clear(); done = true; openForm(false); show({ ...was, state: 'changes' }); changes.focus({ preventScroll: true }); reload();
+            held = out.queued && !out.delivered ? { row: was.row, names: andList(out.queued) } : null; text.value = ''; tray.clear(); done = true; openForm(false); show({ ...was, state: 'changes' }); changes.focus({ preventScroll: true }); reload();
         } catch (err) {
             if (!current()) return;
             if (err.status === 409 && err.code === 'already_in_progress') {
