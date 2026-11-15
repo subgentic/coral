@@ -1,7 +1,7 @@
 // run_cdp_suites.mjs refuses what it does not know instead of starting every suite (#18145): a bare suite name, an unknown flag, a flag with no value, and the real runner exits 2 on them; --only <name> and every known flag pass.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { spawnSync } from './helpers/child_process.js';
 import { fileURLToPath } from 'node:url';
 import { badArgs, FLAGS, VALUE_FLAGS } from './helpers/cdp_args.mjs';
 
