@@ -492,6 +492,15 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         focusDetail();
     }
 
+    /** A goal closed as done is the moment what the team learned is fresh (#18034): one toast offers Distill knowledge, one click; it spends model usage, so it says so and never starts by itself. */
+    function offerDistill() {
+        const team = model.project;
+        showToast('Goal closed. Distill what the team learned? It uses your Claude plan.', false, 20000, { action: { label: 'Distill knowledge', onClick: async () => {
+            try { const { startDistill } = await importOnce('./knowledge_distill.js'); await startDistill(team); showToast('Distilling the team’s knowledge…'); }
+            catch (e) { showToast(`Could not start: ${e && e.message ? e.message : 'no answer'}`, true); }
+        } } });
+    }
+
     /** The Close dialog: a real dialog (focus trapped, Escape closes), described by the open-tasks warning when there is one. `preset` chooses Done (the all-done strip). */
     function openClose(g, preset) {
         if (model.creating) return;
@@ -532,6 +541,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
                 if (!r.ok) throw await failure(r);
                 dlg.close();
                 say(W.closedAsText(as, open));
+                if (as === 'done') offerDistill();
                 await loadGoals();
                 focusDetail();
             } catch (ex) {

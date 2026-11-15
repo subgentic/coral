@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/agentsignin"
@@ -178,12 +179,37 @@ var boardIDName = regexp.MustCompile(`^b-[a-z0-9]{6,}$`)
 // teamTitle is the team's name as a person reads it: a board id (a team made from a folder has no name of its own) becomes the folder's name, or "This team" with none (#17544).
 func teamTitle(name, workingDir string) string {
 	if !boardIDName.MatchString(name) {
-		return name
+		return cleanTeamTitle(name)
 	}
 	if base := filepath.Base(strings.TrimRight(workingDir, "/\\")); workingDir != "" && base != "." && base != "/" && base != "" {
-		return base
+		return cleanTeamTitle(base)
 	}
 	return "This team"
+}
+
+// MaxTeamTitle is the longest title the documents carry.
+const MaxTeamTitle = 80
+
+// cleanTeamTitle is a name that goes into a document's front matter and into the model's prompts (#18034, Security on #17544): one line, with no control, format or line-separator character (a newline in a team's
+// name or folder would have started a new front-matter field or a new instruction), at most MaxTeamTitle characters; "This team" when nothing is left.
+func cleanTeamTitle(s string) string {
+	s = strings.Map(func(r rune) rune {
+		switch {
+		case r == '\n' || r == '\r' || r == '\t':
+			return ' '
+		case r < 0x20 || r == 0x7f || (r >= 0x80 && r < 0xa0) || unicode.In(r, unicode.Cf, unicode.Zl, unicode.Zp):
+			return -1
+		}
+		return r
+	}, s)
+	s = strings.Join(strings.Fields(s), " ")
+	if rs := []rune(s); len(rs) > MaxTeamTitle {
+		s = strings.TrimSpace(string(rs[:MaxTeamTitle]))
+	}
+	if s == "" {
+		return "This team"
+	}
+	return s
 }
 
 var frontMatterStart = regexp.MustCompile(`(?m)^---[ \t]*\n(?:[^\n]*\n){0,6}?type:`)
