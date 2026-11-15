@@ -1,0 +1,79 @@
+package resources
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// #17587: a Claude agent's command whose pool slot is on another machine is not refused with "type coral-board heavy run": the hook changes the command Claude runs to that, around the agent's own line, so the
+// agent changes nothing. Agents whose CLI cannot take a changed command (Before) are told as before.
+
+func TestAClaudeCommandGrantedTheMiniRunsThereAsItIsWithNoRefusal(t *testing.T) {
+	g := poolRig(t)
+	refuse, run := g.h.BeforeRun(t.Context(), "s-a", "s-a", "call-1", heavy)
+	require.Equal(t, "", refuse)
+	require.Equal(t, "", run, "A is granted the Mac: it runs here, unchanged")
+
+	refuse, run = g.h.BeforeRun(t.Context(), "s-b", "s-b", "call-2", heavy) // B is granted the mini
+	assert.Equal(t, "", refuse, "no refusal: the agent is not asked to retype anything")
+	assert.Equal(t, RemoteCommand(heavy), run, "the same command, run there")
+	assert.Contains(t, holdersOf(g, "heavy"), "Agent B@mini", "the slot is the call's")
+	assert.Equal(t, "ran_there", g.events[len(g.events)-1].Kind)
+
+	g.h.After("s-b", "call-2")
+	assert.NotContains(t, holdersOf(g, "heavy"), "Agent B@mini", "and goes back when the call ends")
+}
+
+func TestAHoldingAgentAskedAgainStillRunsThere(t *testing.T) {
+	g := poolRig(t)
+	_, _ = g.h.BeforeRun(t.Context(), "s-a", "s-a", "call-1", heavy)
+	_, run := g.h.BeforeRun(t.Context(), "s-b", "s-b", "call-2", heavy)
+	require.NotEmpty(t, run)
+	g.h.After("s-b", "call-2")
+	// B asks again with a new call: a new slot on the mini (or the line), never a refusal that tells it to retype
+	_, run = g.h.BeforeRun(t.Context(), "s-b", "s-b", "call-3", heavy)
+	assert.Equal(t, RemoteCommand(heavy), run)
+}
+
+func TestABusyPoolStillHoldsTheCommandAndANonClaudeCliIsStillTold(t *testing.T) {
+	g := poolRig(t)
+	_, _ = g.h.BeforeRun(t.Context(), "s-a", "s-a", "call-1", heavy)
+	_, _ = g.h.BeforeRun(t.Context(), "s-b", "s-b", "call-2", heavy)
+	refuse, run := g.h.BeforeRun(t.Context(), "s-c", "s-c", "call-3", heavy)
+	assert.Contains(t, refuse, "in line", "a third agent waits as before")
+	assert.Equal(t, "", run)
+
+	g2 := poolRig(t)
+	require.Equal(t, "", g2.h.Before(t.Context(), "s-a", "s-a", "call-1", heavy))
+	msg := g2.h.Before(t.Context(), "s-b", "s-b", "call-2", heavy) // Before is what a CLI that cannot change the command gets
+	assert.Contains(t, msg, "coral-board heavy run --")
+}
+
+func TestTheRemoteCommandIsTheAgentsLineQuotedWholeAndNothingElse(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a POSIX shell is needed")
+	}
+	dir := t.TempDir()
+	script := "#!/bin/sh\n[ \"$1\" = heavy ] && [ \"$2\" = run ] && [ \"$3\" = -- ] && [ $# -eq 4 ] || exit 9\nprintf %s \"$4\"\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "coral-board"), []byte(script), 0o755))
+	for _, line := range []string{
+		"cd coral-go && go test ./... | tail -3",
+		`echo "it's $HOME" ; echo 'a b' \ "$(whoami)" ` + "`id`",
+		"go test ./... #'; touch /tmp/should-not-exist-17587",
+		"a\nb",
+	} {
+		cmd := exec.Command("sh", "-c", RemoteCommand(line))
+		cmd.Env = append(os.Environ(), "PATH="+dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+		out, err := cmd.Output()
+		require.NoError(t, err, "%q", line)
+		assert.Equal(t, line, string(out), "the heavy run gets the line as ONE argument, byte for byte")
+	}
+	_, err := os.Stat("/tmp/should-not-exist-17587")
+	assert.True(t, os.IsNotExist(err))
+}

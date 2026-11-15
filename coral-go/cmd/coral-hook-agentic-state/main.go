@@ -101,10 +101,15 @@ func handle(d map[string]any, opts hookArgs, agyModel, agyConversation string) {
 	postAgyModel(base, agentName, sessionID, agyModel)
 
 	if hookType == "PreToolUse" {
-		why := recordPendingTool(base, agentName, sessionID, d, agyEvent, hooksRev)
+		why, run := recordPendingToolRun(base, agentName, sessionID, d, agyEvent, hooksRev)
 		if why != "" && refusalApplies(agyEvent, os.Getenv("CORAL_SESSION_NAME")) {
 			os.Stdout.Write(preToolDeny(why)) // the command is not run (#11157)
 			hooks.DebugLog(fmt.Sprintf("PRETOOL_REFUSED: agent=%s", agentName))
+		} else if run != "" && agyEvent == "" && strings.HasPrefix(os.Getenv("CORAL_SESSION_NAME"), "claude-") {
+			if out := preToolRun(d, run); out != nil {
+				os.Stdout.Write(out) // the agent's own command runs on the machine its slot is on (#17587)
+				hooks.DebugLog(fmt.Sprintf("PRETOOL_RAN_THERE: agent=%s", agentName))
+			}
 		}
 		return
 	}
@@ -227,9 +232,15 @@ func postAgyModel(base, agentName, sessionID, agyModel string) {
 // recordPendingTool records the tool call that is starting (PreToolUse), so the chat can show what a permission prompt, question or plan approval is asking. It is not
 // an activity event; its PostToolUse is.
 func recordPendingTool(base, agentName, sessionID string, d map[string]any, agyEvent string, hooksRev int) (refuse string) {
+	refuse, _ = recordPendingToolRun(base, agentName, sessionID, d, agyEvent, hooksRev)
+	return refuse
+}
+
+// recordPendingToolRun is recordPendingTool, and also the command Coral says to run instead (run): the agent's own command wrapped to run on the machine its slot is on (#17587).
+func recordPendingToolRun(base, agentName, sessionID string, d map[string]any, agyEvent string, hooksRev int) (refuse, run string) {
 	pending := parsePendingTool(d, sessionID)
 	if pending == nil {
-		return ""
+		return "", ""
 	}
 	raw, err := hooks.CoralAPI(base, "POST", hooks.LivePath(agentName, "/pending-tool"), pending)
 	if err != nil {
@@ -238,9 +249,12 @@ func recordPendingTool(base, agentName, sessionID string, d map[string]any, agyE
 		// Coral answers "refuse" with the reason when the command stops processes by a pattern (pkill, killall): it is not a pending tool and the CLI is told not to run it.
 		var r struct {
 			Refuse string `json:"refuse"`
+			Run    string `json:"run"`
 		}
 		if json.Unmarshal(raw, &r) == nil && r.Refuse != "" {
-			return r.Refuse
+			return r.Refuse, ""
+		} else if r.Run != "" {
+			run = r.Run
 		}
 	}
 	// agy sends no hook for a question to the user, only this PreToolUse: its ask_question always waits for the user, so the
@@ -254,13 +268,41 @@ func recordPendingTool(base, agentName, sessionID string, d map[string]any, agyE
 			hooks.DebugLog(fmt.Sprintf("POST_FAILED: base=%s agent=%s event_type=%s err=%v", hooks.RedactedURL(base), agentName, event["event_type"], err))
 		}
 	}
-	return ""
+	return "", run
 }
 
 // refusalApplies is whether Coral's refusal is written as this CLI's PreToolUse answer: a Claude or a Codex session (Codex 0.166.0's PreToolUse takes Claude's permissionDecision deny, #13647), and not an agy hook. Any other
 // CLI is never told to hold a command: it runs.
 func refusalApplies(agyEvent, sessionName string) bool {
 	return agyEvent == "" && (strings.HasPrefix(sessionName, "claude-") || strings.HasPrefix(sessionName, "codex-"))
+}
+
+// preToolRun is the PreToolUse hook output that has Claude Code run run in place of the Bash command (updatedInput: the tool's whole input, its command replaced, the rest as the agent gave it). nil when the call
+// carries no command to replace. permissionDecision allow lets the changed call through without a prompt, as a hook's allow does; Claude's own deny rules still apply to it.
+func preToolRun(d map[string]any, run string) []byte {
+	in, _ := d["tool_input"].(map[string]any)
+	if in == nil || run == "" {
+		return nil
+	}
+	if _, ok := in["command"].(string); !ok {
+		return nil
+	}
+	changed := make(map[string]any, len(in))
+	for k, v := range in {
+		changed[k] = v
+	}
+	changed["command"] = run
+	out, err := json.Marshal(map[string]any{
+		"hookSpecificOutput": map[string]any{
+			"hookEventName":      "PreToolUse",
+			"permissionDecision": "allow",
+			"updatedInput":       changed,
+		},
+	})
+	if err != nil {
+		return nil
+	}
+	return out
 }
 
 // preToolDeny is the PreToolUse hook output that stops the tool call and tells the agent why: Claude Code's permissionDecision "deny" with the reason.

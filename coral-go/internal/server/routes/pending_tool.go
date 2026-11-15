@@ -325,9 +325,13 @@ func (h *SessionsHandler) SetPendingTool(w http.ResponseWriter, r *http.Request)
 	body.ToolUseID = truncateUTF8(body.ToolUseID, 200)
 	if body.GateOnly { // the verified session only (above): the queue's answer for this call, and nothing recorded
 		answer := map[string]any{"ok": true}
-		if refuse := h.resourceRefusal(r.Context(), owner, body.ToolName, body.ToolUseID, body.ToolInput); refuse != "" {
+		refuse, run := h.resourceRefusal(r.Context(), owner, body.ToolName, body.ToolUseID, body.ToolInput)
+		if refuse != "" {
 			slog.Info("[resource] a command was held for a slot", "session", owner.SessionName)
 			answer["refuse"] = refuse
+		} else if run != "" {
+			slog.Info("[resource] a command runs on the machine its slot is on", "session", owner.SessionName)
+			answer["run"] = run
 		}
 		writeJSON(w, http.StatusOK, answer)
 		return
@@ -338,18 +342,24 @@ func (h *SessionsHandler) SetPendingTool(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "refuse": shellkill.Message(why)})
 		return
 	}
-	if refuse := h.resourceRefusal(r.Context(), owner, body.ToolName, body.ToolUseID, body.ToolInput); refuse != "" {
+	refuse, run := h.resourceRefusal(r.Context(), owner, body.ToolName, body.ToolUseID, body.ToolInput)
+	if refuse != "" {
 		// A heavy command that must wait for a slot of a shared machine (#13645): held with its place in line. Not run, so not pending; the log has the resource, never the command.
 		slog.Info("[resource] a command was held for a slot", "session", owner.SessionName)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "refuse": refuse})
 		return
 	}
+	// a command whose slot is on another machine runs there: the hook changes the command it runs (#17587); it is still a tool call, so it is recorded as pending below
 	h.hints.forget(body.SessionID) // a blocking tool may open a prompt: read the screen again
 	t := newPendingTool(body.ToolUseID, body.ToolName, body.ToolInput, time.Now())
 	h.pending.set(body.SessionID, t)
 	h.noteToolStart(r.Context(), body.SessionID, body.ToolName, body.ToolUseID, body.ToolInput)
 	h.watchForPrompt(body.SessionID, owner.SessionName, t) // agy sends no hook for a permission prompt (#4819)
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	answer := map[string]any{"ok": true}
+	if run != "" {
+		answer["run"] = run
+	}
+	writeJSON(w, http.StatusOK, answer)
 }
 
 // notePendingToolEvent clears the pending tool when the event log shows it
@@ -541,13 +551,13 @@ func (h *SessionsHandler) SetResourceHook(hook *resources.Hook) { h.resourceHook
 // resourceRefusal is the text a heavy shell command is held with when the shared machine it needs is busy (#13645, #13647), or "" to let it run. Everything cheap that decides whether to read the command comes
 // first, as for the pattern-kill guard: no hook, a tool that is no shell command and an agent that is neither Claude nor Codex (the refusal is the CLI's own hook answer: Claude's permissionDecision deny, which
 // Codex's PreToolUse takes in the same words) never make the server read an agent's command.
-func (h *SessionsHandler) resourceRefusal(ctx context.Context, owner *store.SessionTokenOwner, tool, toolUseID string, input map[string]any) string {
+func (h *SessionsHandler) resourceRefusal(ctx context.Context, owner *store.SessionTokenOwner, tool, toolUseID string, input map[string]any) (refuse, run string) {
 	if h.resourceHook == nil || !shellToolNames[tool] || input == nil || owner == nil || !h.resourceHook.Active() { // Active: no resource has a match, so nothing below is read
-		return ""
+		return "", ""
 	}
 	ls, err := h.ss.GetLiveSession(ctx, owner.SessionID)
 	if err != nil || ls == nil {
-		return ""
+		return "", ""
 	}
 	command := ""
 	switch ls.AgentType {
@@ -565,9 +575,12 @@ func (h *SessionsHandler) resourceRefusal(ctx context.Context, owner *store.Sess
 		}
 	}
 	if command == "" || len(command) > 64<<10 {
-		return ""
+		return "", ""
 	}
-	return h.resourceHook.Before(ctx, owner.SessionID, owner.SessionName, toolUseID, command)
+	if ls.AgentType == at.Claude && tool == "Bash" { // Claude's PreToolUse can change the command it runs (updatedInput); the others are told to run `coral-board heavy run` themselves
+		return h.resourceHook.BeforeRun(ctx, owner.SessionID, owner.SessionName, toolUseID, command)
+	}
+	return h.resourceHook.Before(ctx, owner.SessionID, owner.SessionName, toolUseID, command), ""
 }
 
 // shellToolNames are the tools a shell command comes in: Claude's Bash, and the names Codex's hooks give one (0.155.1 says Bash; codexShellTools in the hook program is the same list).
