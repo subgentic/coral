@@ -228,9 +228,10 @@ function _renderMenu(kind) {
     let html = '';
     if (kind === 'model') {
         const models = (_data && _data.models) || [];
+        const cur = models.map(m => m.value).filter(v => (s.model + '-').startsWith(v + '-')).sort((x, y) => y.length - x.length)[0]; // the one longest value that is the agent's model or its prefix (a dated id): claude-opus-5-5 is not also claude-opus-5
         if (models.length) {
             html = `<div class="model-chip-group" role="group" aria-label="Model"><div class="model-chip-head">Model ${how}</div>`
-                + models.map(m => item('model', m.value, (m.display_name || m.value) + (m.group ? ` (${m.group})` : '') + (m.custom === true ? ' (custom)' : ''), (s.model + '-').startsWith(m.value + '-'))).join('') + '</div>';
+                + models.map(m => item('model', m.value, (m.display_name || m.value) + (m.group ? ` (${m.group})` : '') + (m.custom === true ? ' (custom)' : ''), m.value === cur)).join('') + '</div>';
         }
     } else {
         const levels = _levelsFor(s.model);

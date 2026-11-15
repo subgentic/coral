@@ -16,6 +16,7 @@ const { coralReady } = require('./helpers/wait');
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install, select } = await connect();
     const LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'];
     const OPUS = { value: 'claude-opus-5-5', display_name: 'Opus 5.5', efforts: LEVELS };
+    const OPUS5 = { value: 'claude-opus-5', display_name: 'Opus 5', efforts: LEVELS }; // its id is the front of Opus 5.5's: one tick, on the longest match
     const SONNET = { value: 'claude-sonnet-5-5', display_name: 'Sonnet 5.5', efforts: ['low', 'medium', 'high'] };
     const shot = async (name) => {
         if (!process.env.CORAL_SCREENSHOT_DIR) return;
@@ -33,7 +34,7 @@ const { coralReady } = require('./helpers/wait');
             const json = (b, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } });
             window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); const m = (o.method || 'GET').toUpperCase();
                 if (url.pathname === '/api/agents/models') { const type = url.searchParams.get('type');
-                    return Promise.resolve(json(type === 'claude' ? { agent_type: type, models: [${JSON.stringify(OPUS)}, ${JSON.stringify(SONNET)}], thinking: ${JSON.stringify(LEVELS)} } : { agent_type: type, models: [{ value: 'gpt-x', display_name: 'GPT X', efforts: ['low', 'high'] }, { value: 'gpt-y', display_name: 'GPT Y' }] })); }
+                    return Promise.resolve(json(type === 'claude' ? { agent_type: type, models: [${JSON.stringify(OPUS)}, ${JSON.stringify(OPUS5)}, ${JSON.stringify(SONNET)}], thinking: ${JSON.stringify(LEVELS)} } : { agent_type: type, models: [{ value: 'gpt-x', display_name: 'GPT X', efforts: ['low', 'high'] }, { value: 'gpt-y', display_name: 'GPT Y' }] })); }
                 if (/\\/api\\/sessions\\/live\\/[^/]+\\/model$/.test(url.pathname) && m === 'POST') { window.__posts.push(JSON.parse(o.body)); return Promise.resolve(json(window.__switchAnswer.body, window.__switchAnswer.status)); }
                 return R(u, o); };
             for (const [n, type] of [['ch-a', 'claude'], ['ch-codex', 'codex'], ['ch-sleep', 'claude'], ['ch-term', 'terminal']]) window.__m.add(n, n.slice(-1).toUpperCase(), 3, { sleeping: n === 'ch-sleep', agent_type: type });
@@ -187,10 +188,12 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(m.open, true);
             assert.equal(m.label, 'Model');
             assert.deepEqual(m.groups.map(g => g.name), ['Model'], 'the model menu lists only models');
-            assert.deepEqual(m.groups[0].items, ['Opus 5.5*', 'Sonnet 5.5']);
+            assert.deepEqual(m.groups[0].items, ['Opus 5.5*', 'Opus 5', 'Sonnet 5.5'], 'Opus 5.5 is ticked and Opus 5, whose id starts it, is not');
             // #17334: the agent reports a dated id ('claude-opus-5-5-20260101') and the list holds the short one: the tick is still on that model
             await feed('ch-a-id', { agent_type: 'claude', model: OPUS.value + '-20260101', thinking_actual: null, thinking: 'low', model_switch: null });
-            assert.deepEqual((await menu()).groups[0].items, ['Opus 5.5*', 'Sonnet 5.5'], 'the tick finds the current model by its dated id');
+            assert.deepEqual((await menu()).groups[0].items, ['Opus 5.5*', 'Opus 5', 'Sonnet 5.5'], 'the tick finds the current model by its dated id, on that one model');
+            await feed('ch-a-id', { agent_type: 'claude', model: OPUS5.value + '-20260101', thinking_actual: null, thinking: 'low', model_switch: null });
+            assert.deepEqual((await menu()).groups[0].items, ['Opus 5.5', 'Opus 5*', 'Sonnet 5.5'], 'Opus 5 (dated) ticks Opus 5 only');
             await feed('ch-a-id', { agent_type: 'claude', model: OPUS.value, thinking_actual: null, thinking: 'low', model_switch: null });
             assert.ok(!/restart/i.test(m.groups[0].head), 'Claude switches live: no "Apply with restart"');
             if (label !== 'Desktop') { assert.ok(m.rect.l >= 0 && m.rect.r <= m.vw && m.rect.b <= m.vh, 'the sheet is inside the screen: ' + JSON.stringify(m.rect)); assert.ok(m.minItem >= 44, 'items are 44 px: ' + m.minItem); }
