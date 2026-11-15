@@ -23,3 +23,10 @@ is no network inside. Where namespaces aren't allowed it prints a note and runs 
 ## Fake keys in fixtures
 
 gitleaks' `generic-api-key` rule (CI's "secrets" step, `.gitleaks.toml`) reads a key-like name (`app_key`, `api_key`) assigned a value of 16 or more letters and digits as a secret, and a hit in history stays a hit. Build a key-shaped fixture at run time and never write it as one literal: a `join('')` of short parts in JS, a `+` of short string parts in Go (see `dropbox_settings.test.js` and `dropbox_app_key_test.go`), or give it an obvious `test-` prefix with words, not random characters. Check before pushing: `go run github.com/zricethezav/gitleaks/v8@v8.21.2 detect --source . --config .gitleaks.toml --no-git`, and look for your file in the report.
+
+## Which suites can my change break?
+
+Before `submit-review`, run `node tests/frontend/affected_suites.mjs <base> [<head>]` (base is `origin/main` or what you branched from). It diffs the change, takes the strings, class names, ids and labels
+it removed or reworded, and lists every suite under `tests/frontend` that still contains one, plus the importers of a changed helper. It prints the `run_cdp_suites.mjs --only ...` command for the browser
+ones: run it, not only your failing-first suite (#17652: a reworded Auto line and a changed count each bounced a review for suites the author never ran). A suite it does not list is not proof; it is a git
+diff and a grep, not a parser.
