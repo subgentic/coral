@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 	"sync"
@@ -145,4 +146,24 @@ func (h *SessionsHandler) tellSeatOfChange(ctx context.Context, project, seatSes
 	bh := &BoardHandler{bs: h.bs}
 	notice := settingsChangedNotice(bh.noticeText(ctx, project, launchAbility(abilitiesOf(sess, project, mayLaunch))))
 	bh.postNotice(ctx, project, fmt.Sprintf("@%s %s", orchName(member), notice), board.CoralSender)
+}
+
+// callersTeamModel is the model an agent's launch that names none runs on (#17545): the model of the calling agent's own session, when that agent is seated on the board the new agent joins, that board's grant is on and the
+// new agent is of the same type (a model name means nothing to another type). "" for everyone else: the Operator, the dashboard, a launch onto another board or computer, another type, a seat with no stored model.
+func (h *SessionsHandler) callersTeamModel(r *http.Request, agentType, boardName, boardServer string) string {
+	if boardName == "" || (boardServer != "" && boardServer != "local") || h.ss == nil || h.bs == nil {
+		return ""
+	}
+	owner, ok := VerifiedSession(r.Context())
+	if !ok {
+		return ""
+	}
+	sess, err := h.ss.GetLiveSession(r.Context(), owner.SessionID)
+	if err != nil || sess == nil || sess.Model == nil || strings.TrimSpace(*sess.Model) == "" || sess.AgentType != agentType || ptr.Value(sess.BoardName) != boardName {
+		return ""
+	}
+	if !grantIsOn(r.Context(), h.bs, boardName) {
+		return ""
+	}
+	return strings.TrimSpace(*sess.Model)
 }
