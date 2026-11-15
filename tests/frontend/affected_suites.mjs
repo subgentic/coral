@@ -48,7 +48,7 @@ export function affected({ tokens, helpers }, suites) {
     for (const [path, full] of suites) {
         const why = [], text = full.toLowerCase(); // a suite often says the words inside a longer sentence, in another case
         for (const [t, from] of tokens) if (text.includes(t.toLowerCase().replace(/[.:]$/, ''))) { why.push(`"${t.length > 60 ? t.slice(0, 57) + '...' : t}" (removed from ${basename(from)})`); if (why.length >= 3) break; }
-        for (const h of helpers) { const name = basename(h).replace(/\.[cm]?js$/, ''); if (new RegExp(`require\\(['"]\\./(?:helpers/)?${name}(?:\\.js)?['"]\\)|from ['"]\\./(?:helpers/)?${name}(?:\\.[cm]?js)?['"]`).test(full)) why.push(`imports ${h}`); }
+        for (const h of helpers) { const name = basename(h).replace(/\.[cm]?js$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); if (new RegExp(`require\\(['"]\\./(?:helpers/)?${name}(?:\\.js)?['"]\\)|from ['"]\\./(?:helpers/)?${name}(?:\\.[cm]?js)?['"]`).test(full)) why.push(`imports ${h}`); }
         if (why.length) out.set(path, why);
     }
     return out;
@@ -57,8 +57,9 @@ export function affected({ tokens, helpers }, suites) {
 function main() {
     const [base, head] = process.argv.slice(2);
     if (!base) { console.error('usage: node tests/frontend/affected_suites.mjs <base> [<head>]'); process.exit(2); }
+    for (const ref of [base, head]) if (ref && ref.startsWith('-')) { console.error(`not a revision: ${ref}`); process.exit(2); } // a ref that looks like an option must not reach git
     const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-    const diff = execFileSync('git', ['diff', '-U0', '--no-color', base, ...(head ? [head] : [])], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 28 });
+    const diff = execFileSync('git', ['diff', '-U0', '--no-color', base, ...(head ? [head] : []), '--'], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 28 });
     const dir = join(root, 'tests/frontend');
     const suites = new Map(readdirSync(dir).filter(f => /\.test\.(js|mjs)$/.test(f)).map(f => ['tests/frontend/' + f, readFileSync(join(dir, f), 'utf8')]));
     const hit = affected(removedTokens(diff), suites);

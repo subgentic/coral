@@ -38,4 +38,6 @@ assert.deepEqual(tokensOf('<button class="btn btn-small sched-more-btn" aria-lab
 // #16357: the diff removed 'Everything, with safety checks.' and two suites said it lower-cased inside a longer sentence
 const re = affected({ tokens: new Map([['Everything, with safety checks.', 'permission_flags.js']]), helpers: [] }, new Map([['tests/frontend/a_browser.test.js', "'Auto mode: everything, with safety checks.'"]]));
 assert.deepEqual([...re.keys()], ['tests/frontend/a_browser.test.js'], 'a case difference and a longer sentence still match');
+// a helper's name is text, not a pattern: wait+.js must not match waitttjs
+assert.equal(affected({ tokens: new Map(), helpers: ['tests/frontend/helpers/a+b.js'] }, new Map([['tests/frontend/x_browser.test.js', "require('./helpers/aab')"]])).size, 0, 'the + is not a quantifier');
 console.log('PASS the affected-suites finder lists what a reworded string breaks');
