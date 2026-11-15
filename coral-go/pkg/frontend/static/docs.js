@@ -77,7 +77,8 @@ function hitOf(d) {
     const titleAll = words.every(w => title.includes(w));
     // where the best of the words found sits: 1 the title, 2 a heading, 3 a step or paragraph, 4 code (#10303); a word the topic does not have counts for nothing here and a little against it below
     const place = Math.min(...found.map(w => (title.includes(w) ? 1 : (placeOf(d, w)?.kind ?? 4))));
-    const kcBoost = d.name === 'key-concepts' && place <= 2 && (words.length >= 3 || (words.length >= 2 && linesOf(d).some(l => l.kind === 2 && words.every(w => l.low.includes(w)))));
+    const allQ = docsQuery.split(/\s+/).filter(Boolean);
+    const kcBoost = d.name === 'key-concepts' && place <= 2 && (/^what\s+(is|are|does)\s/i.test(docsQuery) || (allQ.length >= 2 && linesOf(d).some(l => l.kind === 2 && allQ.every(w => l.low.includes(w)))));
     const base = kcBoost ? -2 : d.name === 'how-do-i' ? -1 : titleAll ? 0 : place;
     return { rank: base + (words.length - found.length) / 100, titleAll };
 }
