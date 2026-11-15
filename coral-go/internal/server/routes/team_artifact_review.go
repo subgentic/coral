@@ -208,6 +208,9 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if change.Changed {
+		h.settleAsksAbout(context.WithoutCancel(r.Context()), project, id, item.Name, body.Decision)
+	}
 	inboxActioned(r, tracking.InboxReview, "", body.Decision, inboxTime(item.CreatedAt)) // the Inbox's numbers (#7512): a person's own decision, by kind and action only
 	reviews, _ := h.bs.ArtifactReviews(r.Context(), project)
 	out := map[string]any{"id": id, "state": state, "changed": change.Changed, "tags": tags, "review": reviews[id], "delivered": false}
@@ -463,4 +466,46 @@ func (h *BoardHandler) hasDecision(ctx context.Context, project, id string) (boo
 	}
 	rv, ok := reviews[id]
 	return ok && (rv.State == board.ReviewApproved || rv.State == board.ReviewChangesRequested || rv.State == board.ReviewDenied), nil
+}
+
+// settleAsksAbout closes the open questions to the Operator that name the file just decided (#17634, walk 78): an agent that sent a plan for review and also asked about it in words made one decision two items in Needs
+// you, and answering one left the other waiting. The file's name (at least five characters, as a whole word of the question) or its id in the question is what ties them; wording is never read for a meaning.
+func (h *BoardHandler) settleAsksAbout(ctx context.Context, project, id, name, decision string) {
+	name = strings.ToLower(strings.TrimSpace(name))
+	asks, err := h.bs.OpenAsksOf(ctx, project, board.OperatorName, time.Now())
+	if err != nil {
+		return
+	}
+	words := map[string]string{"approve": "approved", "changes": "sent back for changes", "deny": "denied"}[decision]
+	for _, a := range asks {
+		text := strings.ToLower(a.Content)
+		if !strings.Contains(text, id) && !(len([]rune(name)) >= 5 && mentionsWord(text, name)) {
+			continue
+		}
+		if err := h.bs.CloseAsk(ctx, project, a.MessageID, board.OperatorName, "settled: the file "+name+" was "+words+" in Needs you"); err != nil {
+			slog.Warn("[artifact review] the question about a decided file was not closed", "board", project, "ask", a.MessageID, "error", err)
+		}
+	}
+}
+
+// mentionsWord reports whether word is in text as a whole word, not inside a longer name (plan.md is not in superplan.md).
+func mentionsWord(text, word string) bool {
+	for from := 0; ; {
+		i := strings.Index(text[from:], word)
+		if i < 0 {
+			return false
+		}
+		i += from
+		end := i + len(word)
+		before := i == 0 || !isNameChar(text[i-1])
+		after := end == len(text) || !isNameChar(text[end])
+		if before && after {
+			return true
+		}
+		from = i + 1
+	}
+}
+
+func isNameChar(c byte) bool {
+	return c == '_' || c == '-' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 0x80
 }
