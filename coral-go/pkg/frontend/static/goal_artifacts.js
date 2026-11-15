@@ -12,7 +12,7 @@ const { fileContext } = await importOnce('./artifact_file_context.js');
 const DT = await importOnce('./data_table.js');
 const { artifactTable, serverArtifactSort } = await importOnce('./artifact_table.js');
 const { itemKey, isUnverified, readableName, sizeText, typeText, createdText, taskText, linkOfItem, renderText, orderByGroup, groupHead } = await importOnce('./artifact_item.js');
-import { renderArtifact } from './artifact_preview.js';
+const { renderArtifact } = await importOnce('./artifact_preview.js');
 const { openDetailPane } = await importOnce('./detail_pane.js');
 
 // the first 20 and Load more; on a phone the first 5, so the button is on screen without scrolling (UI/UX, #8616)

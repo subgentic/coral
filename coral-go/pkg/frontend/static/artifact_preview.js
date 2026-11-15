@@ -5,14 +5,14 @@ import { importOnce } from './import_once.js';
 import { CORAL_ARTIFACT_URI_RE, resolveArtifactSource, manifestDownload } from './artifact_address.js'; // the two the preview pane needs at once live there (start); the renderer below loads on first use (#17351)
 export { resolveArtifactSource, manifestDownload };
 import { escapeHtml, escapeAttr, renderImagePanes } from './utils.js';
-import { renderJSONReport } from './artifact_report.js';
+const { renderJSONReport } = await importOnce('./artifact_report.js'); // lazy, retried if it fails to load
 import { splitKey, serverUrl, contextServer, isCloud, artifactPath, boardTeamKey } from './server_base.js';
 import { inlineArtifactPath } from './artifact_paths.js';
 import { isSvg, svgDataUrl } from './image_source.js';
 import { wireDownloads } from './artifact_download.js';
 import { lockFrame, sandboxedDoc } from './sandbox_frame.js';
 import { visibleName } from './artifact_names.js';
-import { responseFilename as contentDispositionName } from './content_disposition.js'; // Content-Disposition describes the stored file; the artifact label may be extensionless or entirely different. Keep it independent of the UI title.
+const { responseFilename: contentDispositionName } = await importOnce('./content_disposition.js'); // Content-Disposition describes the stored file; the artifact label may be extensionless or entirely different. Keep it independent of the UI title.
 
 const MAX_ARTIFACT_PREVIEW_BYTES = 2 * 1024 * 1024;
 const MAX_ARTIFACT_MANIFEST_ENTRIES = 200;
