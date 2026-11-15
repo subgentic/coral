@@ -462,6 +462,7 @@ function _syncViewedSession(data) {
             if (!isPopout()) {
                 if (!!s.sleeping !== !!state.currentSession.sleeping) {
                     const cur = state.currentSession;
+                    if (isPhoneLayout() && !document.body.classList.contains('live-session-active')) return; // a phone's list or another page: a team Wake does not open its chat (#17243)
                     window.selectLiveSession(cur.name, cur.agent_type, cur.session_id, sessionServer(cur));
                 } else if (s.sleeping) {
                     // The placeholder above was the awake one; archived may have changed.
