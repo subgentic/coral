@@ -16,7 +16,9 @@ const B = `team-b-${Date.now() % 100000}`;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
-        await seed(ev, A); await seed(ev, B);
+
+        // seed A, open A and check — then seed B (which replaces the sidebar) and open B
+        await seed(ev, A);
 
         const selected = () => ev(`[...document.querySelectorAll('.board-card-header.team-selected')].map(h => h.dataset.groupName)`);
 
@@ -25,7 +27,10 @@ const B = `team-b-${Date.now() % 100000}`;
         const afterA = await selected();
         assert.deepEqual(afterA, [A], 'after opening team A, only A is highlighted: ' + JSON.stringify(afterA));
 
-        // switch to team B's Artifacts tab
+        // seed B (replaces sidebar with B's agents; A's check is done)
+        await seed(ev, B);
+
+        // open team B's Artifacts tab
         await openTeam(ev, waitFor, B);
         await goTab(ev, settle, 'Artifacts');
         await waitFor(`(() => { const h = document.querySelectorAll('.board-card-header.team-selected'); return h.length === 1 && h[0].dataset.groupName === ${JSON.stringify(B)}; })()`, 'B is highlighted', 5000);
