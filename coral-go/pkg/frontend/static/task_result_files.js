@@ -3,14 +3,15 @@
  * agent the result stays plain text, as it was. The text is shown as text (textContent, no markup from it). */
 import { serverFetch, sessionServer } from './server_base.js';
 import { attachDialogFocus } from './dialog_focus.js';
-import { split } from './task_result_paths.js';
+import { importOnce } from './import_once.js';
 
 /** Turn the paths in the text of `host` (a node holding one text node) into buttons that open the file. `session` is the live agent that did the work. */
-export function linkPaths(host, session) {
+export async function linkPaths(host, session) {
     const node = host && host.firstChild;
     if (!session || !session.name || !session.working_directory || !node || node.nodeType !== 3) return;
+    const { split } = await importOnce('./task_result_paths.js');
     const parts = split(node.textContent, session.working_directory);
-    if (!parts.some(p => p.rel)) return;
+    if (!node.isConnected || !parts.some(p => p.rel)) return;
     node.replaceWith(...parts.map(p => {
         if (!p.rel) return document.createTextNode(p.text);
         const b = document.createElement('button'); b.type = 'button'; b.className = 'team-link'; b.textContent = p.text; b.title = 'Open this file';
