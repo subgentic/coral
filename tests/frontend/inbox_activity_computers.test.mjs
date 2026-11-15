@@ -11,6 +11,7 @@ const dom = new JSDOM('<!doctype html><body><script id="coral-boot" type="applic
 for (const k of ['window', 'document', 'navigator', 'localStorage', 'location', 'sessionStorage', 'getComputedStyle', 'HTMLElement', 'Element', 'Node', 'Event', 'CustomEvent', 'MutationObserver', 'AbortController']) {
     Object.defineProperty(globalThis, k, { value: dom.window[k] ?? globalThis[k], configurable: true, writable: true });
 }
+globalThis.matchMedia = () => ({ matches: false }); // jsdom has none: the table's head asks whether the screen is a touch one (#17869); this is a mouse's
 const asked = [];
 let plan = {};
 const json = (b, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } });
