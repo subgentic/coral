@@ -52,4 +52,4 @@ assert.deepEqual(checks.filter(c => c.length > 200 || /&&|;|\|/.test(c)), [], 'o
 const script = JSON.parse(fs.readFileSync(path.join(here, 'package.json'), 'utf8')).scripts['test:cloud'];
 assert.equal(script, 'node run_cloud_checks.mjs', 'test:cloud is the runner, not a chain that grows past the Windows limit');
 
-console.log(`PASS cloud checks runner: stops at the first failure; ${checks.length} checks in cloud_checks.txt`);
+console.log(`PASS cloud checks runner: stops at the first failure, --keep-going lists them all; ${checks.length} checks in cloud_checks.txt`);

@@ -31,7 +31,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       console.error(`test:cloud FAILED at: ${command}${r.error ? ` (${r.error.message})` : ''}`);
       process.exit(r.status || 1);
     }
-  }  if (failed.length) {
+  }
+  if (failed.length) {
     console.error(`test:cloud FAILED: ${failed.length} of ${checks.length}\n${failed.map(f => `  FAILED: ${f.command}${f.why} (exit ${f.code})`).join('\n')}`);
     process.exit(failed[0].code);
   }
