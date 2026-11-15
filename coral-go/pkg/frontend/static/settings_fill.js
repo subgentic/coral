@@ -350,7 +350,7 @@ export function _fillTerminalAndBrowserPrefs(s) {
         for (const [id, name] of kinds) {
             const box = document.getElementById(id);
             if (!box) continue;
-            box.checked = !!prefs[name];
+            box.checked = on && !!prefs[name]; // with Desktop alerts off no alert will fire: the kinds read off, and their saved choices come back when it is turned on (#17022)
             box.disabled = !on;
             if (!box.dataset.bound) {
                 box.dataset.bound = "1";
