@@ -3,6 +3,8 @@ import { plural } from './format.js';
  * drawn from the status each time it is shown. The switches and channel save on change; the card's buttons act at once: "Update and relaunch" opens the
  * confirmation (a dialog over this one), "Check now" asks the updater to look. A Homebrew or unsupported install says so and why, with the command to run. */
 import { importOnce } from './import_once.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('update_check.css');
 import { isSignedOut } from './overload.js';
 import { copyText, showToast } from './utils.js';
 import { isCloud } from './server_base.js';
