@@ -13,16 +13,18 @@ import (
 // #4176 rules 16 and 17: PUT /api/board/{project}/settings); every value is clamped on the
 // server (rule 7), and the recipient must be a member of this board (rule 18).
 type HealthSettings struct {
-	On               bool               `json:"on"`
-	IntervalMin      int                `json:"interval_min"`  // the check's cadence
-	Recipient        string             `json:"recipient"`     // "" = the team's orchestrator
-	AllClear         bool               `json:"all_clear"`     // send the one-line check when nothing needs the orchestrator
-	HeartbeatMin     int                `json:"heartbeat_min"` // 0 (the default): a check goes out only when something changed, never to say "no change"; else it also goes out at least this often (#11431)
-	DefaultReviewers []string           `json:"default_reviewers"`
-	AutoDelegate     HealthRuleOn       `json:"auto_delegate"`
-	ClaimNudge       HealthClaimNudge   `json:"claim_nudge"`
-	StatusNudge      HealthStatusNudge  `json:"status_nudge"`
-	MentionRenudge   HealthMentionNudge `json:"mention_renudge"`
+	On               bool     `json:"on"`
+	IntervalMin      int      `json:"interval_min"`  // the check's cadence
+	Recipient        string   `json:"recipient"`     // "" = the team's orchestrator
+	AllClear         bool     `json:"all_clear"`     // send the one-line check when nothing needs the orchestrator
+	HeartbeatMin     int      `json:"heartbeat_min"` // 0 (the default): a check goes out only when something changed, never to say "no change"; else it also goes out at least this often (#11431)
+	DefaultReviewers []string `json:"default_reviewers"`
+	// ReviewerPool (#17612): "pick one from": each submit also goes to the ONE of these with the fewest open reviews (DefaultReviewers are the ones who always review). Its members take review tasks on a bare claim.
+	ReviewerPool   []string           `json:"reviewer_pool"`
+	AutoDelegate   HealthRuleOn       `json:"auto_delegate"`
+	ClaimNudge     HealthClaimNudge   `json:"claim_nudge"`
+	StatusNudge    HealthStatusNudge  `json:"status_nudge"`
+	MentionRenudge HealthMentionNudge `json:"mention_renudge"`
 	// HeldNotice tells the Operator about an agent whose automated messages have waited at a
 	// dialog for AfterMin (#4175 step 3).
 	HeldNotice HealthMentionNudge `json:"held_notice"`
@@ -436,6 +438,13 @@ func (h HealthSettings) Clamp() HealthSettings {
 		}
 	}
 	h.DefaultReviewers = revs
+	var pool []string
+	for _, r := range h.ReviewerPool {
+		if r = strings.TrimSpace(r); r != "" && len(pool) < 12 {
+			pool = append(pool, r)
+		}
+	}
+	h.ReviewerPool = pool
 	return h
 }
 

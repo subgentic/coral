@@ -30,7 +30,7 @@ const RULES = ['claim_nudge', 'status_nudge', 'mention_renudge', 'held_notice', 
 
 /** The health object as the flat values of the fields. */
 export function healthToValues(h) {
-    const v = { on: !!h.on, interval_min: h.interval_min, heartbeat_min: h.heartbeat_min ?? 0, recipient: h.recipient || '', all_clear: !!h.all_clear, default_reviewers: (h.default_reviewers || []).join(', '), auto_delegate_on: !!(h.auto_delegate && h.auto_delegate.on) };
+    const v = { on: !!h.on, interval_min: h.interval_min, heartbeat_min: h.heartbeat_min ?? 0, recipient: h.recipient || '', all_clear: !!h.all_clear, default_reviewers: (h.default_reviewers || []).join(', '), reviewer_pool: (h.reviewer_pool || []).join(', '), auto_delegate_on: !!(h.auto_delegate && h.auto_delegate.on) };
     for (const k of RULES) if (h[k]) for (const [p, val] of Object.entries(h[k])) v[`${k}_${p}`] = val;
     if (h.assign_limit !== undefined) v.assign_limit = h.assign_limit;
     if (h.stale_sweep_hours !== undefined) v.stale_sweep_hours = h.stale_sweep_hours;
@@ -47,6 +47,7 @@ export function valuesToHealth(v, base) {
     h.recipient = v.recipient || '';
     h.all_clear = !!v.all_clear;
     h.default_reviewers = String(v.default_reviewers || '').split(',').map(s => s.trim()).filter((s, i, a) => s && a.indexOf(s) === i);
+    h.reviewer_pool = String(v.reviewer_pool || '').split(',').map(s => s.trim()).filter((s, i, a) => s && a.indexOf(s) === i);
     h.auto_delegate = { ...h.auto_delegate, on: !!v.auto_delegate_on };
     if (h.assign_limit !== undefined && v.assign_limit !== undefined) h.assign_limit = Number.isInteger(v.assign_limit) ? v.assign_limit : h.assign_limit;
     if (h.stale_sweep_hours !== undefined && v.stale_sweep_hours !== undefined) h.stale_sweep_hours = Number.isInteger(v.stale_sweep_hours) ? v.stale_sweep_hours : h.stale_sweep_hours;
@@ -100,6 +101,8 @@ export function healthFields(ctx) {
         { key: 'auto_delegate_on', type: 'toggle', label: 'Hand reviews to the default reviewers', help: 'When a task is submitted for review and nobody is assigned, Coral delegates it to the default reviewers; with none named, reviews wait for the orchestrator. Works whether or not the health check is on.' },
         { key: 'default_reviewers', type: 'text', label: 'Default reviewers', wide: true, help: `Names of agents on this team, up to ${HEALTH_LIMITS.reviewers}, separated by commas.`, placeholder: `Agent names (up to ${HEALTH_LIMITS.reviewers})`,
             validate: v => (new Set(String(v).split(',').map(s => s.trim()).filter(Boolean)).size > HEALTH_LIMITS.reviewers ? `at most ${HEALTH_LIMITS.reviewers} names.` : '') },
+        { key: 'reviewer_pool', type: 'text', label: 'Reviewer pool', wide: true, help: 'Each submitted task also goes to the one of these with the fewest open reviews (not its author, not a sleeping agent). They are offered only reviews when they claim a task without a number.', placeholder: 'Agent names, such as the QA engineers',
+            validate: v => (new Set(String(v).split(',').map(s => s.trim()).filter(Boolean)).size > 12 ? 'at most 12 names.' : '') },
         { key: 'stale_sweep_hours', type: 'number', label: 'Stale task sweep every', unit: 'hours (0: off)', help: 'The orchestrator gets one message that lists stale tasks (pending over 3 days, in progress over a day with no post, in review over a day, owner asleep or gone, goal closed) and the commands to deal with them. Coral changes nothing itself.', min: 0, max: 720, integer: true, compact: true, visibleWhen: v => v.stale_sweep_hours !== undefined },
         { key: 'assign_limit', type: 'number', label: 'Most waiting tasks per agent', unit: 'tasks (0: no limit)', help: 'Assigning a task to an agent that already has this many waiting is refused, and the answer names the less loaded agents; the person assigning can use --force.', min: 0, max: 50, integer: true, compact: true, visibleWhen: v => v.assign_limit !== undefined },
         { key: 'park_limit', type: 'number', label: 'Most parked tasks per agent', unit: 'tasks', help: 'Parking is for a wait outside the team. Parking another task past this is refused; the person parking can use --force.', min: 1, max: 20, integer: true, compact: true, visibleWhen: v => v.park_limit !== undefined },

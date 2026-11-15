@@ -12,7 +12,7 @@ export const HEALTH_LIMITS = { recommendGrace: [1, 9], minutes: [5, 1440], nudge
 
 // The server's defaults (DefaultHealthSettings); held_notice is the Lead's #4225 field, filled in only when the server returns it.
 export const HEALTH_DEFAULTS = {
-    on: true, interval_min: 10, heartbeat_min: 0, recipient: '', all_clear: true, default_reviewers: [], // the check is on for a new team (#14091, reverses #4962); a team that stored off keeps it
+    on: true, interval_min: 10, heartbeat_min: 0, recipient: '', all_clear: true, default_reviewers: [], reviewer_pool: [], // the check is on for a new team (#14091, reverses #4962); a team that stored off keeps it
     auto_delegate: { on: true },
     claim_nudge: { on: true, after_min: 10, nudges: 2 },
     status_nudge: { on: true, after_min: 20, escalate_after_min: 10 },
