@@ -18,8 +18,8 @@ const stopUsageText = `Usage: coral-board stop <member> [--board <project>]
   Stop an agent's current turn (the same as the red Stop in its composer: the agent reads "Interrupted" and waits with its conversation; it is not put to sleep).
   An agent that is idle or asleep gets a plain sentence, not an error.
 
-  Only the board's Orchestrator, and only while the Operator has switched on "the orchestrator may wake, sleep, stop and start agents" for the board: any other caller, or the switch off, is refused with
-  the server's reason.`
+  Only the board's Orchestrator, and only while BOTH the main orchestrator switch AND the separate "stop" setting are on in the board's orchestrator grant: any other caller, either switch off, is refused
+  with the server's reason.`
 
 func cmdStop() {
 	if len(os.Args) < 3 {

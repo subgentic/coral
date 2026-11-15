@@ -45,6 +45,7 @@ func operatorWrites(w http.ResponseWriter, r *http.Request, what string) bool {
 
 type orchGrantBody struct {
 	Enabled     bool   `json:"enabled"`
+	StopEnabled bool   `json:"stop_enabled"`
 	SeatSession string `json:"seat_session"`
 	MaxPerHour  int    `json:"max_per_hour"`
 	MaxLive     int    `json:"max_live"`
@@ -82,7 +83,7 @@ func (h *SessionsHandler) OrchestratorGrant(w http.ResponseWriter, r *http.Reque
 		errInternalServer(w, "could not read the grant")
 		return
 	}
-	g := board.OrchGrant{Project: project, Enabled: body.Enabled, SeatSession: strings.TrimSpace(body.SeatSession), MaxPerHour: body.MaxPerHour, MaxLive: body.MaxLive, IdleMin: body.IdleMinutes}
+	g := board.OrchGrant{Project: project, Enabled: body.Enabled, StopEnabled: body.StopEnabled, SeatSession: strings.TrimSpace(body.SeatSession), MaxPerHour: body.MaxPerHour, MaxLive: body.MaxLive, IdleMin: body.IdleMinutes}
 	if g.MaxPerHour == 0 {
 		g.MaxPerHour = cur.MaxPerHour
 	}
@@ -109,7 +110,7 @@ func (h *SessionsHandler) OrchestratorGrant(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	noteSettingsChange(h.bs, r, project, orchGrantShown(cur), orchGrantShown(g)) // what the Orchestrator is told changed (#13173)
-	if cur.Enabled != g.Enabled || cur.SeatSession != g.SeatSession || cur.MaxPerHour != g.MaxPerHour || cur.MaxLive != g.MaxLive || cur.IdleMin != g.IdleMin {
+	if cur.Enabled != g.Enabled || cur.StopEnabled != g.StopEnabled || cur.SeatSession != g.SeatSession || cur.MaxPerHour != g.MaxPerHour || cur.MaxLive != g.MaxLive || cur.IdleMin != g.IdleMin {
 		if id, err := h.bs.ReserveLifecycle(r.Context(), project, "grant", "Operator", h.orchGrantWords(r.Context(), g), nil); err == nil {
 			_ = h.bs.FinishLifecycle(r.Context(), id, "ok", "")
 		}
@@ -123,6 +124,9 @@ func (h *SessionsHandler) orchGrantWords(ctx context.Context, g board.OrchGrant)
 	words := "switch off"
 	if g.Enabled {
 		words = "switch on"
+	}
+	if g.StopEnabled {
+		words += ", stop on"
 	}
 	if g.SeatSession != "" {
 		seat := "a session that is gone"
@@ -334,6 +338,10 @@ func (h *SessionsHandler) OrchestratorStop(w http.ResponseWriter, r *http.Reques
 	project := chi.URLParam(r, "project")
 	g, seat, ok := h.orchSeat(w, r, project)
 	if !ok {
+		return
+	}
+	if !g.StopEnabled {
+		orchRefusal(w, http.StatusForbidden, "stop_not_enabled", "the Operator has not enabled the stop setting for this board's orchestrator (orchestrator-grant stop_enabled)")
 		return
 	}
 	target, member, ok := h.orchTarget(w, r, project, seat)
@@ -579,7 +587,7 @@ func launcherWords(name string) string {
 
 // orchGrantShown is a grant as the settings notice compares it: its settings, not who set it or when.
 func orchGrantShown(g board.OrchGrant) map[string]any {
-	return map[string]any{"orchestrator_grant.enabled": g.Enabled, "orchestrator_grant.seat_session": g.SeatSession, "orchestrator_grant.max_per_hour": g.MaxPerHour, "orchestrator_grant.max_live": g.MaxLive, "orchestrator_grant.idle_minutes": g.IdleMin}
+	return map[string]any{"orchestrator_grant.enabled": g.Enabled, "orchestrator_grant.stop_enabled": g.StopEnabled, "orchestrator_grant.seat_session": g.SeatSession, "orchestrator_grant.max_per_hour": g.MaxPerHour, "orchestrator_grant.max_live": g.MaxLive, "orchestrator_grant.idle_minutes": g.IdleMin}
 }
 
 // launchedByOperator says a launch is the Operator's own (#13891): a person at the dashboard, the command line or an API key, or the Coral Hub owner. Never an agent's token or session, and never a Hub

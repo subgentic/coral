@@ -1,5 +1,5 @@
 // The Orchestrator access group's pure words (#11432), apart from the group so a unit test can read them without a browser.
-export const OG_KEYS = ['og_enabled', 'og_seat', 'og_max_per_hour', 'og_max_live', 'og_idle_minutes'];
+export const OG_KEYS = ['og_enabled', 'og_stop_enabled', 'og_seat', 'og_max_per_hour', 'og_max_live', 'og_idle_minutes'];
 const KIND_WORDS = { launch: 'started', wake: 'woke', sleep: 'put to sleep', grant: 'setting changed' };
 
 /** The session id a board member's session name carries (the part after the agent type: "claude-<id>"). */

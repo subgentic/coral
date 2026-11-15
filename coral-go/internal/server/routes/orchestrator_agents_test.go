@@ -799,7 +799,7 @@ func TestStopRefusesNonAgentsAndSendsEscapeToAWorkingClaude(t *testing.T) {
 	r.usualBoard()
 	r.seat("Elsewhere", "Developer", "other-board", "claude", true, 4)
 	r.seat("Shell", "Terminal", orchBoard, "terminal", false, 6)
-	code, _ := r.operatorGrant("Orchestrator", nil)
+	code, _ := r.operatorGrant("Orchestrator", map[string]any{"stop_enabled": true})
 	require.Equal(t, http.StatusOK, code)
 
 	// refusals: the same as wake/sleep
@@ -870,7 +870,7 @@ func TestStopSendsCtrlCToAWorkingHermesAgent(t *testing.T) {
 	ctx := context.Background()
 	r.seat("Orchestrator", "Orchestrator", orchBoard, "claude", false, 1)
 	r.seat("HermesBot", "Developer", orchBoard, "hermes", false, 2)
-	code, _ := r.operatorGrant("Orchestrator", nil)
+	code, _ := r.operatorGrant("Orchestrator", map[string]any{"stop_enabled": true})
 	require.Equal(t, http.StatusOK, code)
 
 	// make HermesBot working
@@ -898,11 +898,29 @@ func TestStopIsRefusedWithTheSwitchOff(t *testing.T) {
 	assert.Equal(t, "orchestrator_switch_off", out["code"])
 }
 
+func TestStopIsRefusedWhenStopNotEnabled(t *testing.T) {
+	r := newOrchRig(t)
+	r.usualBoard()
+	code, _ := r.operatorGrant("Orchestrator", nil) // main switch on, stop_enabled defaults to false
+	require.Equal(t, http.StatusOK, code)
+
+	code, out := r.agentPost("Orchestrator", "stop", "Dev2", "")
+	assert.Equal(t, http.StatusForbidden, code)
+	assert.Equal(t, "stop_not_enabled", out["code"], "stop is off by default even when the main switch is on")
+
+	// Turn stop on: the same request now passes orchSeat and the stop_enabled check.
+	code, _ = r.operatorGrant("Orchestrator", map[string]any{"stop_enabled": true})
+	require.Equal(t, http.StatusOK, code)
+	code, out = r.agentPost("Orchestrator", "stop", "Dev2", "")
+	assert.Equal(t, http.StatusOK, code, "stop_enabled: true allows the stop")
+	assert.Equal(t, false, out["stopped"], "Dev2 is idle, so stopped=false (not an error)")
+}
+
 func TestStopRefusesAnAgentAtAPrompt(t *testing.T) {
 	r := newOrchRig(t)
 	ctx := context.Background()
 	r.usualBoard()
-	code, _ := r.operatorGrant("Orchestrator", nil)
+	code, _ := r.operatorGrant("Orchestrator", map[string]any{"stop_enabled": true})
 	require.Equal(t, http.StatusOK, code)
 
 	// Make Dev2 have an open permission_request: NeedsInput is true.
@@ -920,7 +938,7 @@ func TestStopRecordsTouchStopAndUsesHourlyCap(t *testing.T) {
 	r := newOrchRig(t)
 	ctx := context.Background()
 	r.usualBoard()
-	code, _ := r.operatorGrant("Orchestrator", map[string]any{"max_per_hour": 2})
+	code, _ := r.operatorGrant("Orchestrator", map[string]any{"max_per_hour": 2, "stop_enabled": true})
 	require.Equal(t, http.StatusOK, code)
 
 	ss := r.ss
