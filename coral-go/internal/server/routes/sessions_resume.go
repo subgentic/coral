@@ -233,7 +233,7 @@ func (h *SessionsHandler) resumeCommand(ctx context.Context, p *restartPlan, age
 		ResumeSessionID: resumeID,
 		Flags:           p.flags,
 		WorkingDir:      p.workdir,
-		CLIPath:         cliPath, // Settings > CLI paths (#3205)
+		CLIPath:         cliPath, // Settings > Providers (#3205)
 		BoardName:       p.board,
 		BoardLabel:      h.boardLabel(p.board),
 		Role:            naming.SubscriberID(p.displayName, p.agentType),

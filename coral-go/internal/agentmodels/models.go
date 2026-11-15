@@ -29,7 +29,7 @@ type Model struct {
 	DisplayName string   `json:"display_name"`
 	Description string   `json:"description,omitempty"`
 	Efforts     []string `json:"efforts,omitempty"`
-	// Custom marks a model the operator added in Settings > Custom models (#5480); its Efforts are the levels they set for it.
+	// Custom marks a model the operator added in Settings > Providers > Custom models (#5480); its Efforts are the levels they set for it.
 	Custom bool `json:"custom,omitempty"`
 	// Group is the provider a model is listed under (Pi lists many: a picker shows one group of choices per provider, #11338); empty for a CLI whose models have no provider.
 	Group string `json:"group,omitempty"`

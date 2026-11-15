@@ -145,7 +145,7 @@ func shareUploadedImage(ctx context.Context, coralDir, sessionID, name, ext stri
 	id, meta, err := storeArtifactVia(coralDir, sessionID, name, mt, uploadedByOwner, sourcePaste, via.User, data)
 	if err != nil {
 		if errors.Is(err, errStoreFull) {
-			return nil, "the artifact store is full (its limit is in Settings > Storage and cleanup)", time.Time{}
+			return nil, "the artifact store is full (its limit is in Settings > Storage and backup)", time.Time{}
 		}
 		return nil, "the image could not be stored as an artifact", time.Time{}
 	}

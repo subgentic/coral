@@ -11,7 +11,7 @@ import (
 	"github.com/subgentic/coral/internal/httputil"
 )
 
-// newAgentModels finds each CLI the way a launch does (Settings > CLI paths, then PATH).
+// newAgentModels finds each CLI the way a launch does (Settings > Providers, then PATH).
 func (h *SystemHandler) newAgentModels() *agentmodels.Service {
 	return agentmodels.NewService(func(agentType string) (string, error) {
 		settings, err := h.ss.GetSettingsForCLI(context.Background())

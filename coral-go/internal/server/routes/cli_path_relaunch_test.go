@@ -33,7 +33,7 @@ func cliPathStub(t *testing.T, name string) string {
 	return p
 }
 
-// Restarting an agent runs the CLI from Settings > CLI paths, like its launch
+// Restarting an agent runs the CLI from Settings > Providers, like its launch
 // did, not whatever binary is first on PATH (#3205).
 func TestRestartUsesTheConfiguredCLIPath(t *testing.T) {
 	t.Parallel() // no shared state: these ran one after another (#5622)

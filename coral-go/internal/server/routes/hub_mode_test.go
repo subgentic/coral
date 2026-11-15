@@ -15,7 +15,7 @@ import (
 	"github.com/subgentic/coral/internal/store/storetest"
 )
 
-// Settings > Run as a hub (#3460): saved from the dashboard on this computer only, applied
+// Settings > Coral Hub and remote access > Run as a hub (#3460): saved from the dashboard on this computer only, applied
 // at the next start; --hub keeps it on; Restart only where the process can.
 func TestHubModeSetting(t *testing.T) {
 	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "c.db"))

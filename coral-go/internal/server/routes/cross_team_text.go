@@ -18,10 +18,10 @@ import (
 const teamSettingsMessaging = "Team settings > Messaging"
 
 // settingsCoralHub is where a Coral is connected to Coral Hub.
-const settingsCoralHub = "Settings > Network and Hub"
+const settingsCoralHub = "Settings > Coral Hub and remote access"
 
 // settingsNetworkHub is where the local lock "Let Coral Hub change cross-team settings" is (#5572, Security's condition 8).
-const settingsNetworkHub = "Settings > Network and Hub"
+const settingsNetworkHub = "Settings > Coral Hub and remote access"
 
 // What a sender on another Coral is told, whatever the cause: no such team, unlinked, switched off, stale or nobody to tell. The status and the bytes are the same for all.
 const (

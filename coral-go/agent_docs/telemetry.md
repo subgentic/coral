@@ -1,6 +1,6 @@
 # Telemetry
 
-Coral sends a fixed set of product usage events to help identify startup and agent-launch problems. **Settings → Usage analytics** disables outgoing analytics immediately. Release builds enable analytics by default; builds without an injected analytics key send nothing. Remote access is a separate setting.
+Coral sends a fixed set of product usage events to help identify startup and agent-launch problems. **Settings → Security and privacy → Usage analytics** disables outgoing analytics immediately. Release builds enable analytics by default; builds without an injected analytics key send nothing. Remote access is a separate setting.
 
 Set `CORAL_TELEMETRY_DISABLED=1` before starting Coral to suppress analytics regardless of the saved setting. Release verification and frontend test runners use this override. No PostHog browser SDK, session replay, or automatic page-content capture is installed.
 
@@ -99,7 +99,7 @@ Every event carries `version`, `edition`, `os`, `arch`, `platform` (the operatin
 
 For tests only, a `-tags dev` build reads `CORAL_TELEMETRY_TEST_SINK=<url>`: it gives that server a dummy key and sends its events to the local capture endpoint at that URL. The code is in a `//go:build dev` file; `TestDefaultBuildHasNoTestSinkSeam` fails if a default-tags build contains the variable's name, so a release binary cannot be redirected.
 
-Events use a random installation UUID stored in `<coralDir>/.install_id`. This identifies a data directory, not necessarily a person. It is not derived from hardware, hostname, username, or email. Deleting it changes the analytics identity. In **Settings → Usage analytics**, copy the **Install ID** and send it with a deletion request. Viewing or copying it does not create or change the ID, and an existing ID stays available when analytics is off. If no ID has been created, Settings says so.
+Events use a random installation UUID stored in `<coralDir>/.install_id`. This identifies a data directory, not necessarily a person. It is not derived from hardware, hostname, username, or email. Deleting it changes the analytics identity. In **Settings → Security and privacy → Usage analytics**, copy the **Install ID** and send it with a deletion request. Viewing or copying it does not create or change the ID, and an existing ID stays available when analytics is off. If no ID has been created, Settings says so.
 
 Event properties are validated against per-event schemas. Provider, backend, outcome, and failure codes use controlled values; counts and durations are bounded and typed. Unknown properties and invalid values are dropped. Unknown event names are not emitted.
 

@@ -26,7 +26,7 @@ const MaxModeSetting = "cloud_max_mode"
 // owner turned it off (the Operator's decision, #5840: Coral Hub is the primary source
 // for a connected computer; an explicit off stays off): Launch lets the hub start agents,
 // this lets them act without asking. The owner of this computer sets it here (Settings >
-// Network and Hub, PUT /api/cloud/allow-auto-accept, local only), and the Coral Hub OWNER
+// Coral Hub and remote access, PUT /api/cloud/allow-auto-accept, local only), and the Coral Hub OWNER
 // (the account this computer is linked to) through POST /api/hub-auto-accept {"allow": bool}; turning it off ends every enable that came from the hub.
 const AllowHubAutoAcceptSetting = "cloud_allow_hub_auto_accept"
 
@@ -156,6 +156,6 @@ func MaxModeFromSettings(ss *store.SessionStore) func() tunnel.Mode {
 	}
 }
 
-// HubModeSetting is Settings > Run as a hub (#3460): "true" starts this Coral as a
+// HubModeSetting is Settings > Coral Hub and remote access > Run as a hub (#3460): "true" starts this Coral as a
 // multi-server hub, like --hub. It applies at the next start.
 const HubModeSetting = "hub_mode"

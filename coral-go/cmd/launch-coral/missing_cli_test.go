@@ -30,7 +30,7 @@ func TestLaunchAgentSessionsSkipsAFolderWhenTheCLIIsMissing(t *testing.T) {
 	require.Empty(t, names, "no session was made for an agent whose CLI is missing")
 }
 
-// A CLI path saved in Settings > CLI paths is used: with PATH empty and the CLI nowhere else, the launch is not refused (the tmux client is nil, so reaching it is the proof the
+// A CLI path saved in Settings > Providers is used: with PATH empty and the CLI nowhere else, the launch is not refused (the tmux client is nil, so reaching it is the proof the
 // CLI step passed), and the settings come from the data folder's database read-only: nothing is created and a missing database means no settings.
 func TestSavedCLIPathIsReadFromTheDataFolderAndUsed(t *testing.T) {
 	empty := t.TempDir()

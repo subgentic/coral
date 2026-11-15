@@ -54,9 +54,9 @@ func replaceAfterOpenDataDir(ctx context.Context, dir string, ks *auth.KeyStore,
 		} else {
 			marked = true
 			if n == 1 {
-				log.Printf("[security] 1 stored remote server's key could be read by others: Settings > Servers says so until it gets a new key")
+				log.Printf("[security] 1 stored remote server's key could be read by others: the Computers tab says so until it gets a new key")
 			} else if n > 1 {
-				log.Printf("[security] %d stored remote servers' keys could be read by others: Settings > Servers says so until each gets a new key", n)
+				log.Printf("[security] %d stored remote servers' keys could be read by others: the Computers tab says so until each gets a new key", n)
 			}
 		}
 		if list, err := rs.List(ctx); err == nil {
@@ -134,7 +134,7 @@ func openFolderWords(f openFolderFacts) string {
 		left = append(left, "the API keys of the other Corals stored here ("+strings.Join(names, ", ")+"): make a new key on each of those computers and enter it here again")
 	}
 	if f.hubLinked {
-		left = append(left, "the Coral Hub link: unlink and link again in Settings > Network and Hub")
+		left = append(left, "the Coral Hub link: unlink and link again in Settings > Coral Hub and remote access")
 	}
 	if f.password {
 		left = append(left, "the password: set a new one")

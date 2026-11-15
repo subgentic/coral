@@ -564,7 +564,7 @@ func (h *SessionsHandler) resumeBefore4809(w http.ResponseWriter, r *http.Reques
 		EmbeddedProtocol: true, // #13523: a resumed team agent carries the compiled-in protocol when no file reads, as the real resume does
 		ResumeSessionID:  body.SessionID,
 		WorkingDir:       workdir,
-		CLIPath:          agent.ResolveCLIPath(userSettings, agentType), // Settings > CLI paths (#3205)
+		CLIPath:          agent.ResolveCLIPath(userSettings, agentType), // Settings > Providers (#3205)
 		BoardName:        storedBoard,
 		BoardLabel:       h.boardLabel(storedBoard),
 		Role:             role,

@@ -12,7 +12,7 @@ import (
 )
 
 // ReadSettingsReadOnly reads the user settings from the sessions database at dbPath without opening it as the server does: read-only, nothing created, no schema step, no
-// migration and no write. For a command-line tool that is not the server (launch-coral) and only needs what the person saved, such as Settings > CLI paths. A database that
+// migration and no write. For a command-line tool that is not the server (launch-coral) and only needs what the person saved, such as Settings > Providers. A database that
 // does not exist yet has no settings: (nil, nil). A database that is there but cannot be read (encrypted, locked, damaged) is an error; the caller decides what to do.
 func ReadSettingsReadOnly(ctx context.Context, dbPath string) (map[string]string, error) {
 	if _, err := os.Stat(dbPath); errors.Is(err, os.ErrNotExist) {

@@ -42,7 +42,7 @@ func (c *cancelAfterTerminal) CreateSession(ctx context.Context, name, workDir s
 	return err
 }
 
-// #4350: a team launch's agents all start on the CLI Settings > CLI paths names, also when the
+// #4350: a team launch's agents all start on the CLI Settings > Providers names, also when the
 // request's context ends partway (a client that times out or hangs up): the settings were read
 // with that context, so the later agents read none and started the CLI found on PATH.
 func TestTeamLaunchUsesTheConfiguredCLIForEveryAgent(t *testing.T) {

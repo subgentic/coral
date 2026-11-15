@@ -11,7 +11,7 @@ import (
 	"github.com/subgentic/coral/internal/store"
 )
 
-// Custom models (#5480): the model ids the operator adds in Settings > Custom models, per provider, with the thinking levels each takes. They are merged, at read time and after the
+// Custom models (#5480): the model ids the operator adds in Settings > Providers > Custom models, per provider, with the thinking levels each takes. They are merged, at read time and after the
 // CLI's own models, into BOTH catalogs the dashboard's pickers read: GET /api/agent-models (the curated list the launch, team, workflow-step and defaults pickers use) and
 // GET /api/agents/models?type= (the CLI's list the running agent's model chip reads). A custom id reaches a command line as --model's one argument, so it passes
 // agentmodels.ValidModelValue when it is saved and again whenever it is read (a row that no longer passes is not served).

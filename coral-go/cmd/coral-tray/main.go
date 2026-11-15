@@ -55,15 +55,15 @@ func main() {
 	// macOS requires Cocoa calls on the main thread
 	runtime.LockOSThread()
 
-	host := flag.String("host", "", "Host to bind to (default: this computer only, or every interface when Settings > Network and Hub allows remote access)")
+	host := flag.String("host", "", "Host to bind to (default: this computer only, or every interface when Settings > Coral Hub and remote access allows remote access)")
 	port := flag.Int("port", config.DefaultPort, "Port to bind to")
 	homeDir := flag.String("home", "", "Home directory for Coral")
 	foreground := flag.Bool("foreground", false, "Run in foreground (used internally)")
 	stop := flag.Bool("stop", false, "Stop a running tray instance")
 	noBrowser := flag.Bool("no-browser", false, "Don't open the browser on startup")
 	debugMode := flag.Bool("debug", false, "Enable debug logging to ~/.coral/tray.log")
-	// "" = not given: Settings > Terminal backend, else the built-in terminal, pty (#3634, #6064).
-	backendFlag := flag.String("backend", "", "Terminal backend: pty or tmux (default: Settings > Terminal backend, else pty: agents stop when you quit Coral)")
+	// "" = not given: Settings > Defaults, else the built-in terminal, pty (#3634, #6064).
+	backendFlag := flag.String("backend", "", "Terminal backend: pty or tmux (default: Settings > Defaults, else pty: agents stop when you quit Coral)")
 	serverChild := flag.Bool("server-child", false, "Run Coral's server for the tray (used internally, #4163)")
 	fromInstaller := flag.Bool(installerLaunchFlag, false, "Started by the installer's Launch Coral: starts nothing when elevated (used internally, #5883)")
 	flag.Parse()
@@ -1003,7 +1003,7 @@ func waitForExit(pid int, limit time.Duration) {
 }
 
 // hostArgs is the --host the tray hands the server: none when the host was not asked for, so that the server's default
-// (this computer only, or every interface once Settings > Network and Hub allows remote access, #5124) applies.
+// (this computer only, or every interface once Settings > Coral Hub and remote access allows remote access, #5124) applies.
 func hostArgs(host string) []string {
 	if host == "" {
 		return nil

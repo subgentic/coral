@@ -147,7 +147,7 @@ func TestChiefIsToldOfAnAnswerThroughTheButtonRoute(t *testing.T) {
 	require.NotContains(t, got[0], "Hold", "the chosen option is not in it")
 }
 
-// The team the Operator named in Settings > Chief ("Team it fronts") is one Chief hears about even when that team's own list of allowed senders does not hold Chief's board: the list is not what makes a team
+// The team the Operator named in Settings > Teams and Chief ("Team it fronts") is one Chief hears about even when that team's own list of allowed senders does not hold Chief's board: the list is not what makes a team
 // Chief's (the Operator's choice is), and while the allowlist is off a Chief that messages the team needs no entry (#12411, Mobile Beta Tester's walk of v2.0.35).
 func TestChiefHearsDecisionsOnTheTeamTheOperatorNamedWithoutAnAllowedSenderEntry(t *testing.T) {
 	e := newCrossTeamEnv(t)

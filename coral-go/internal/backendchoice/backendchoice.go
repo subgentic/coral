@@ -1,5 +1,5 @@
 // Package backendchoice picks the terminal backend a Coral run uses (#3634, #6064). The built-in terminal (pty) is the default on every system: quitting Coral ends its agents, which is
-// what people expect. tmux is a choice (Settings > Terminal, or --backend tmux) for people who want agents to outlive Coral.
+// what people expect. tmux is a choice (Settings > Defaults, or --backend tmux) for people who want agents to outlive Coral.
 package backendchoice
 
 import "strings"

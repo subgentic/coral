@@ -22,7 +22,7 @@ import (
 	"github.com/subgentic/coral/internal/tmux"
 )
 
-// Settings > Terminal backend (#3634).
+// Settings > Defaults (#3634).
 
 type backendRig struct {
 	t  *testing.T

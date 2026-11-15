@@ -35,7 +35,7 @@ func (h *BoardHandler) tellChief(ctx context.Context, action, kind, team, title,
 	if err != nil || !ok {
 		return
 	}
-	// Chief hears about a team the Operator named in Settings > Chief, or one whose list of allowed senders holds Chief's board. The list alone was the rule at first; but while the allowlist is off a Chief
+	// Chief hears about a team the Operator named in Settings > Teams and Chief, or one whose list of allowed senders holds Chief's board. The list alone was the rule at first; but while the allowlist is off a Chief
 	// that messages a team needs no entry, so a team the Operator had set Chief to front heard nothing (#12411).
 	if !h.frontedByChief(ctx, team) {
 		st, err := h.bs.GetBoardSettings(ctx, team)

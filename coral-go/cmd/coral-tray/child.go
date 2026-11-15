@@ -116,7 +116,7 @@ func runServerChild(host string, port int, backendType string) {
 	rs, err := startup.Start(ctx, cfg, startup.Options{
 		Instance:    instance,
 		BackendType: backendType,
-		// Settings > Run as a hub's Restart button (#3460): this server stops and the tray
+		// Settings > Coral Hub and remote access > Run as a hub's Restart button (#3460): this server stops and the tray
 		// starts a new one at once.
 		Restart: func() error {
 			restart.Store(true)

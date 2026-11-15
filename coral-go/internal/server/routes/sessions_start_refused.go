@@ -48,9 +48,9 @@ func startFailureSentence(agentType, code string) string {
 			prog += ".exe"
 		}
 	}
-	fix := "Set its path in Settings > CLI paths."
+	fix := "Set its path in Settings > Providers."
 	if name != "" && prog != "" {
-		fix = "Set Settings > CLI paths > " + name + " to its " + prog + "."
+		fix = "Set Settings > Providers > " + name + " to its " + prog + "."
 	}
 	cli := "agent's"
 	if name != "" {
@@ -66,7 +66,7 @@ func startFailureSentence(agentType, code string) string {
 	case store.StartFailureHermesSetup:
 		return "failed to start: Hermes stopped during its first-use setup (it could not finish setting up its dependencies, often a network problem). Wake the agent to try again."
 	case store.StartFailureCLIPath:
-		return "failed to start: the " + cli + " CLI path in Settings > CLI paths can't be run. " + fix + " Or clear it."
+		return "failed to start: the " + cli + " CLI path in Settings > Providers can't be run. " + fix + " Or clear it."
 	case store.StartFailureFolderGone:
 		return "failed to wake: the folder this agent worked in is gone, so it was not started. Restore the folder, or restart the agent in another one."
 	case store.StartFailureWakeFailed:

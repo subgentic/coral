@@ -191,7 +191,7 @@ func cleanOldLogs(logDir string) {
 func savedSettings(ctx context.Context, dbPath string) map[string]string {
 	settings, err := store.ReadSettingsReadOnly(ctx, dbPath)
 	if err != nil {
-		log.Printf("Warning: Coral's saved settings could not be read (%v); the agent CLI is looked up without Settings > CLI paths", err)
+		log.Printf("Warning: Coral's saved settings could not be read (%v); the agent CLI is looked up without Settings > Providers", err)
 		return nil
 	}
 	return settings
@@ -241,7 +241,7 @@ func launchAgentSessions(ctx context.Context, tc *tmux.Client, cfg *config.Confi
 		// Build the launch command first: its prompt and settings files must be written
 		// before a session is made for it (#3601 W12).
 		// The agent's CLI is resolved here, not left to the shell: a launch line that types a bare name the shell does not know ends in "codex is not recognized" in the pane (#353).
-		cliPath, err := agent.LaunchCLI(settings, agentType) // a path saved in Settings > CLI paths is used, and refused if it cannot be run
+		cliPath, err := agent.LaunchCLI(settings, agentType) // a path saved in Settings > Providers is used, and refused if it cannot be run
 		if err != nil {
 			log.Printf("Warning: not launching %s: %v", sessionName, err)
 			continue

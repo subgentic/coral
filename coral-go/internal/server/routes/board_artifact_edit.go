@@ -255,7 +255,7 @@ func (h *BoardHandler) SaveArtifactEdit(w http.ResponseWriter, r *http.Request) 
 		rec.UploadedBy, rec.Source = "owner", sourceOperatorEdit
 	})
 	if errors.Is(serr, errStoreFull) {
-		artifactRefusal(w, http.StatusRequestEntityTooLarge, "artifact_quota", "store", "the artifact store is full: delete old artifacts or raise the limit (Settings > Storage and cleanup)")
+		artifactRefusal(w, http.StatusRequestEntityTooLarge, "artifact_quota", "store", "the artifact store is full: delete old artifacts or raise the limit (Settings > Storage and backup)")
 		return
 	}
 	if serr != nil {
