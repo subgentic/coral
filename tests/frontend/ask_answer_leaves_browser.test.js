@@ -7,7 +7,8 @@ const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 
 (async () => {
-    const { client, Page, Emulation, Input, ev, waitFor, PRELOAD, install } = await connect();
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { Input } = client;
     const problems = [];
     const check = (label, cond, detail) => { if (!cond) problems.push(`${label}${detail !== undefined ? ': ' + detail : ''}`); };
     try {
