@@ -53,8 +53,8 @@ func AddKnowledgeNote(coralDir, team, title, text string) (name string, redacted
 	if text == "" || utf8.RuneCountInString(text) > MaxNoteText {
 		return "", false, ErrBadNoteText
 	}
-	slug := slugify(title)
-	if slug == "" || slug == "_" {
+	slug := noteSlug(title)
+	if slug == "" {
 		return "", false, ErrBadNoteTitle
 	}
 	name = NoteFilePrefix + slug
@@ -69,6 +69,9 @@ func AddKnowledgeNote(coralDir, team, title, text string) (name string, redacted
 	if _, err := os.Lstat(path); err == nil {
 		return "", false, ErrNoteExists
 	}
+	if noteBeforeCreate != nil {
+		noteBeforeCreate() // a test's seam: the moment between looking and creating
+	}
 	body := "---\ntype: note\ntitle: " + yamlQuote(title) + "\n---\n\n" + text + "\n"
 	md, err := redactKnowledge(body) // never written unredacted (#4414)
 	if err != nil {
@@ -79,11 +82,34 @@ func AddKnowledgeNote(coralDir, team, title, text string) (name string, redacted
 			return "", false, err
 		}
 	}
-	if err := secfile.WriteFileNoFollow(path, []byte(md), 0o600); err != nil {
+	// O_EXCL: the create itself refuses a file that is there, so two saves of one title cannot overwrite each other (the look above only gives the common case its message) (#17974).
+	f, err := secfile.OpenNoFollow(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return "", false, ErrNoteExists
+		}
+		return "", false, err
+	}
+	if _, err := f.WriteString(md); err != nil {
+		f.Close()
+		os.Remove(path)
+		return "", false, err
+	}
+	if err := f.Close(); err != nil {
 		return "", false, err
 	}
 	return name, md != body, nil
 }
 
-// IsKnowledgeNote reports whether a knowledge file name is a hand-written note.
-func IsKnowledgeNote(name string) bool { return strings.HasPrefix(name, NoteFilePrefix) }
+// noteBeforeCreate is nil outside tests.
+var noteBeforeCreate func()
+
+// noteSlug is a title as a file name part: the agents' rules, without a device-name '_' (the "note-" in front makes the name safe) and with no '_' at the end, which an agent's "note-" file always has (see slugify).
+func noteSlug(title string) string {
+	return strings.TrimRight(slugifyBase(title), "_")
+}
+
+// IsKnowledgeNote reports whether a knowledge file name is a hand-written note: "note-" and no '_' at the end (an agent named note-... is written with one, #17974).
+func IsKnowledgeNote(name string) bool {
+	return strings.HasPrefix(name, NoteFilePrefix) && !strings.HasSuffix(name, "_")
+}
