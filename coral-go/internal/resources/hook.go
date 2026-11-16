@@ -446,12 +446,28 @@ func (h *Hook) event(e HookEvent) {
 
 // Before is called for a Bash call about to run: session is the session's id (what After and SessionEnded are given), name its name on the board and in the terminal. It returns the text to refuse the call with, or "" to let it run.
 func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command string) (refuse string) {
+	refuse, _ = h.before(ctx, session, name, toolUseID, command, false)
+	return refuse
+}
+
+// BeforeRun is Before for a CLI that lets the hook change the command it runs (Claude's PreToolUse updatedInput, #17587): a slot granted on a remote machine does not refuse the command and ask the agent to
+// type `coral-board heavy run`: run is the SAME command wrapped in it, which the CLI runs instead, so the agent's own command is what runs, on the machine its slot is on. Everything else is Before's answer.
+func (h *Hook) BeforeRun(ctx context.Context, session, name, toolUseID, command string) (refuse, run string) {
+	return h.before(ctx, session, name, toolUseID, command, true)
+}
+
+// RemoteCommand is command as `coral-board heavy run` runs it: one argument, which that command takes as a shell line. The agent's own line is quoted whole and never read or changed.
+func RemoteCommand(command string) string {
+	return "coral-board heavy run -- '" + strings.ReplaceAll(command, "'", `'\''`) + "'"
+}
+
+func (h *Hook) before(ctx context.Context, session, name, toolUseID, command string, canRewrite bool) (refuse, run string) {
 	if h == nil || h.m == nil || h.o.Agent == nil {
-		return ""
+		return "", ""
 	}
 	agent, ok := h.o.Agent(ctx, name)
 	if !ok {
-		return ""
+		return "", ""
 	}
 	var res resourcequeue.Resource
 	pattern, matchedWords := "", ""
@@ -467,11 +483,12 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 		if _, hit := MatchCommand(command, []string{"coral-board heavy run"}); hit {
 			h.attachHeavyRun(session, agent, toolUseID) // the follow-up of a redirect: the same hold, running now
 		}
-		return ""
+		return "", ""
 	}
 	if claimsFirst(command, res) { // `coral-board resource claim X --wait && <work>`: the claim waits for the turn and is made in this very call, which is the supported shape; holding the command would stop the claim from running
-		return ""
+		return "", ""
 	}
+	canRewrite = canRewrite && OnlyMatched(command, res.Match) // a line with anything else in it is not run on the other machine in the agent's place: it is refused with the instruction, as for a CLI that cannot rewrite (#17587)
 	snap := h.snapshot()
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -479,7 +496,7 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 	key := holdKey{res.Key, agent}
 	st, err := h.m.Queue().Status(res.Key)
 	if err != nil {
-		return ""
+		return "", ""
 	}
 	// already in the line or holding?
 	mine, holding := entryOf(st, agent)
@@ -491,10 +508,14 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 			}
 			if where == whereUnknown {
 				h.event(HookEvent{Kind: "refused", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
-				return unplaced(res.Key, machine, h.o.ClaimWindow)
+				return unplaced(res.Key, machine, h.o.ClaimWindow), ""
+			}
+			if ah := h.hold[key]; ah != nil && canRewrite {
+				h.runThereLocked(res, ah, agent, session, toolUseID, pattern)
+				return "", RemoteCommand(command)
 			}
 			h.event(HookEvent{Kind: "redirected", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
-			return redirection(res.Key, machine, h.o.ClaimWindow)
+			return redirection(res.Key, machine, h.o.ClaimWindow), ""
 		}
 		if ah := h.hold[key]; ah != nil {
 			ah.calls[toolUseID] = true
@@ -505,13 +526,13 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 			ah.window = time.Time{}
 			_, _ = h.m.Queue().Renew(res.Key, agent)
 		} // an explicit claim keeps its slot until the agent releases it: nothing to track
-		return ""
+		return "", ""
 	}
 	if mine == nil {
 		slog.Info("[resource-hook] auto claim", "resource", res.Key, "pattern", pattern, "matched", matchedWords, "agent", name) // the program words that matched, redacted and cut at 80: never the command (#14170)
 		r, err := h.m.Claim(WithSession(ctx, name), res.Key, agent, "auto: "+pattern)
 		if err != nil {
-			return "" // queue trouble never stops a command
+			return "", "" // queue trouble never stops a command
 		}
 		ah := &autoHold{entry: r.Entry.ID, session: session, name: name, pattern: pattern, calls: map[string]bool{}, refused: map[string]bool{}}
 		h.hold[key] = ah
@@ -521,19 +542,23 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 				ah.window = ah.granted.Add(h.o.ClaimWindow)
 				if where == whereUnknown {
 					h.event(HookEvent{Kind: "refused", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
-					return unplaced(res.Key, machine, h.o.ClaimWindow)
+					return unplaced(res.Key, machine, h.o.ClaimWindow), ""
+				}
+				if canRewrite && where == whereRemote {
+					h.runThereLocked(res, ah, agent, session, toolUseID, pattern)
+					return "", RemoteCommand(command)
 				}
 				h.event(HookEvent{Kind: "redirected", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
-				return redirection(res.Key, machine, h.o.ClaimWindow)
+				return redirection(res.Key, machine, h.o.ClaimWindow), ""
 			}
 			ah.calls[toolUseID] = true
 			ah.granted = h.o.Now()
 			h.event(HookEvent{Kind: "claimed", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
-			return ""
+			return "", ""
 		}
 		ah.refused[toolUseID] = true
 		h.event(HookEvent{Kind: "refused", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
-		return refusal(res.Key, r.Place)
+		return refusal(res.Key, r.Place), ""
 	}
 	// in the line already (this agent's earlier refused call, or an explicit claim): still waiting
 	if mine != nil && !mine.Away.IsZero() { // the agent is back with the command (#13706): its kept place is its own again, no grace runs on it
@@ -548,7 +573,21 @@ func (h *Hook) Before(ctx context.Context, session, name, toolUseID, command str
 	}
 	_, place := placeOf(st, agent)
 	h.event(HookEvent{Kind: "refused", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
-	return refusal(res.Key, place)
+	return refusal(res.Key, place), ""
+}
+
+// runThereLocked ties the agent's hold to the call that is about to run its command on the machine the slot is on (what attachHeavyRun does for the follow-up of a redirect): the slot is the call's, kept while it
+// runs and given back when it ends. The caller holds h.mu.
+func (h *Hook) runThereLocked(res resourcequeue.Resource, ah *autoHold, agent, session, toolUseID, pattern string) {
+	ah.calls[toolUseID] = true
+	ah.session = session
+	ah.remote = true
+	ah.window = time.Time{}
+	if ah.granted.IsZero() {
+		ah.granted = h.o.Now()
+	}
+	_, _ = h.m.Queue().Renew(res.Key, agent)
+	h.event(HookEvent{Kind: "ran_there", Resource: res.Key, Pattern: pattern, Agent: agent, Session: session})
 }
 
 // redirection is what an agent is told when the pool gave it a slot on another machine: the command did not run here. It names the pool and the machine, never the command.

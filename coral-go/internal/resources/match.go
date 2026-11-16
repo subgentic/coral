@@ -101,3 +101,97 @@ func canonPath(w string) string {
 	}
 	return w
 }
+
+// plainFilters are the programs that may stand around a matched command in a line that is run on another machine as it is: a change of folder and the filters a person puts after a test run to read less of it.
+var plainFilters = map[string]bool{"cd": true, "tail": true, "head": true, "grep": true, "wc": true}
+
+// OnlyMatched reports whether every simple command in command is one the patterns match, or a plain filter (cd, tail, head, grep, wc): nothing else rides along. A line that has any other command in it (a `;`
+// or `&&` after the test run, a $( ) or a backtick, `bash -c`, curl) is not OnlyMatched, so the hook does not run it on another machine in the agent's place (#17587, Security's MUST: the whole line is wrapped,
+// and a matched command anywhere in it is enough to match). False when the line cannot be read.
+func OnlyMatched(command string, patterns []string) bool {
+	cmds, ok := shellkill.Programs(command)
+	if !ok || len(cmds) == 0 || hasFileRedirect(command) || hasWrapper(command) {
+		return false
+	}
+	hit := false
+	for _, words := range cmds {
+		if len(words) == 0 {
+			return false
+		}
+		matched := false
+		for _, p := range patterns {
+			if want := strings.Fields(p); len(want) > 0 && inOrder(words, want) {
+				matched = true
+				break
+			}
+		}
+		switch {
+		case matched:
+			hit = true
+		case plainFilters[words[0]]:
+		case len(words) == 1 && words[0] == "1": // the parser reads the `1` of `2>&1` as a command of its own; it is no program
+		default:
+			return false
+		}
+	}
+	return hit
+}
+
+// hasFileRedirect reports whether the line redirects to or from a file: `> out`, `>> out`, `2> err`, `< in`, or a here-document. A redirect would be made on the other machine, in a run folder that is deleted afterwards, not
+// where the agent asked, and `> /etc/...` is written there as the run's user. Only `2>&1` (and `N>&M`) and a redirect to /dev/null stay (#17709). A quoted < or > is text, not a redirect.
+func hasFileRedirect(command string) bool {
+	rs := []rune(command)
+	var quote rune
+	for i := 0; i < len(rs); i++ {
+		c := rs[i]
+		switch {
+		case quote != 0:
+			if c == quote {
+				quote = 0
+			} else if c == '\\' && quote == '"' {
+				i++
+			}
+		case c == '\'' || c == '"':
+			quote = c
+		case c == '\\':
+			i++
+		case c == '<' || c == '>':
+			j := i + 1
+			for j < len(rs) && (rs[j] == '>' || rs[j] == '|') { // >>, >|, <<
+				j++
+			}
+			if c == '<' && j < len(rs) && rs[j] == '(' || c == '>' && j < len(rs) && rs[j] == '(' {
+				return true // process substitution
+			}
+			if c == '>' && j < len(rs) && rs[j] == '&' { // 2>&1, >&2: one stream into another
+				k := j + 1
+				if k < len(rs) && rs[k] >= '0' && rs[k] <= '9' {
+					i = k
+					continue
+				}
+				return true // >&file
+			}
+			rest := strings.TrimLeft(string(rs[j:]), " \t")
+			if c == '>' && (rest == "/dev/null" || strings.HasPrefix(rest, "/dev/null ") || strings.HasPrefix(rest, "/dev/null\t")) {
+				i = j
+				continue
+			}
+			return true
+		}
+	}
+	return false
+}
+
+// wrappers are programs that run the rest of their line as a command of their own: the line reader looks through them (so `env X=1 go test ./...` reads as go test), but `env -S '<text>'` splits and runs text the reader
+// does not see, and sudo, xargs, exec and the like run what follows with other rights or other arguments. A line with one of them as a word is not run on the other machine in the agent's place (#17709): it keeps the
+// refusal text and the agent decides. A word of that name anywhere in the line counts (a `grep env` too): the refusal is the safe side.
+var wrappers = map[string]bool{"env": true, "sudo": true, "doas": true, "xargs": true, "exec": true, "nohup": true, "nice": true, "time": true, "timeout": true, "stdbuf": true, "setsid": true, "command": true, "builtin": true, "eval": true, "watch": true, "su": true}
+
+func hasWrapper(command string) bool {
+	for _, w := range strings.FieldsFunc(command, func(r rune) bool { return strings.ContainsRune(" \t\n;|&()`'\"", r) }) {
+		if wrappers[w] {
+			return true
+		}
+	}
+	return false
+}
