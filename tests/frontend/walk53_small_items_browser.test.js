@@ -29,11 +29,13 @@ const TEAM = `qa-w53-${Date.now() % 100000}`;
             d.agents = d.agents.map(a => ({ ...a, availability: 'unknown', available: false, reason: '' }));
             return new Response(JSON.stringify(d), { status: 200, headers: { 'content-type': 'application/json' } }); }; return true; })()`);
         await openTeam(ev, waitFor, TEAM); await settle(1500);
+        await waitFor(`/first message/.test((document.getElementById('team-page-status') || {}).textContent || '')`, 'the status has settled (it reads "Checking attention status" until the read answers or its deadline passes)', 20000);
         const words = () => ev(`(document.getElementById('team-page-status') || {}).textContent || ''`);
         const before = await words();
         check(/first message/.test(before), 'with the feed up an unread team says it has no first message yet: ' + JSON.stringify(before));
         await ev(`(() => { const b = document.createElement('div'); b.id = 'connection-bar'; b.className = 'notice notice-warn notice-bar connection-bar'; b.textContent = 'No connection, retrying'; document.body.prepend(b); document.dispatchEvent(new CustomEvent('coral:needs-updated')); return true; })()`);
         await settle(400);
+        await waitFor(`/Reconnecting/.test((document.getElementById('team-page-status') || {}).textContent || '')`, 'the header says Reconnecting', 10000).catch(() => {}); // the check below says what it read if not
         const down = await words();
         check(/Reconnecting/.test(down) && !/first message/.test(down), 'with the connection bar up the header says Reconnecting, not that no agent has written: ' + JSON.stringify(down));
         await ev(`(() => { document.getElementById('connection-bar').remove(); document.dispatchEvent(new CustomEvent('coral:needs-updated')); return true; })()`);

@@ -22,6 +22,7 @@ const TEAM = `qa-finished-${Date.now() % 100000}`;
                     if (url.pathname === '/api/board/${TEAM}/tasks' && url.searchParams.get('counts')) return J({ tasks: [], next_cursor: '', total_open: ${open}, total_completed: ${done} });
                     return R(u, o); }; return true; })()`);
             await openTeam(ev, waitFor, TEAM); await settle(1000);
+            await waitFor(`!!(document.getElementById('team-page-status') || {}).textContent && !/^Checking/.test(document.getElementById('team-page-status').textContent)`, 'the attention status has settled (it reads "Checking" until the read answers or its deadline passes)', 20000);
             const head = await ev(`(document.getElementById('team-page-status') || {}).textContent.trim()`);
             assert.equal(head, want, `open ${open}, done ${done}: ${head}`);
         }
