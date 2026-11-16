@@ -98,10 +98,10 @@ const (
 	CmdRecordDataDir
 )
 
-// ourCoralPids lists, one per line, the PIDs of this user's processes that run a Coral from the install folder: the program is the first word of the command line and is exactly <install>/<version>/root/coral.
+// ourCoralPids lists, one per line, the PIDs of this user's processes that run a Coral from the install folder: the program is the first word of the command line and is exactly <install>/<version>/root/coral (the version folder is one name that does not start with a dot, so "." and ".." are not one, #16041).
 // It is what the stop and the check mean by "this install's Coral", whatever coral.pid says: a Coral that restarted itself runs under a PID the file never learned (#15997, the Operator's upgrade to v2.0.67).
 // The program is read as a word of its own, so the shell that runs this very command (its text is in its arguments) is never taken for one.
-const ourCoralPids = "ps -u \"$(id -u)\" -o pid= -o args= 2>/dev/null | awk -v d=\"$HOME/" + InstallDir + "/\" 'index($2, d) == 1 && substr($2, length(d) + 1) ~ /^[^\\/]+\\/root\\/coral$/ { print $1 }'"
+const ourCoralPids = "ps -u \"$(id -u)\" -o pid= -o args= 2>/dev/null | awk -v d=\"$HOME/" + InstallDir + "/\" 'index($2, d) == 1 && substr($2, length(d) + 1) ~ /^[^\\/.][^\\/]*\\/root\\/coral$/ { print $1 }'"
 
 // aliveTest is true (exit 0) when <install>/coral.pid names a live process of this user whose command line is a Coral from the install folder: the daemon a start left. A recycled PID of another program fails the
 // command-line test, so it is never taken for Coral (and never signalled).
@@ -201,7 +201,7 @@ var specs = map[Command]spec{
 	CmdStopDaemon:       {template: aliveTest + " && kill \"$(cat \"$HOME/" + InstallDir + "/coral.pid\")\" 2>/dev/null; for p in $(" + ourCoralPids + "); do kill \"$p\" 2>/dev/null; done; true"},
 	CmdListInstalled:    {template: "cd \"$HOME/" + InstallDir + "\" 2>/dev/null && for d in [0-9]*; do if [ -d \"$d\" ] && [ ! -L \"$d\" ] && [ -f \"$d/root/coral\" ] && [ -x \"$d/root/coral\" ]; then printf '%%s\\n' \"$d\"; fi; done; true"},
 	CmdKillStuck:        {template: "for p in $(" + ourCoralPids + "); do kill -9 \"$p\" 2>/dev/null; done; true"},
-	CmdReadRunningHome: {template: "h=$(ps -u \"$(id -u)\" -o pid= -o args= 2>/dev/null | awk -v d=\"$HOME/" + InstallDir + "/\" 'index($2, d) == 1 && substr($2, length(d) + 1) ~ /^[^\\/]+\\/root\\/coral$/ { for (i = 3; i <= NF; i++) { if ($i == \"--home\" && i < NF) { print $(i + 1); exit } if (index($i, \"--home=\") == 1) { print substr($i, 8); exit } } }'); " +
+	CmdReadRunningHome: {template: "h=$(ps -u \"$(id -u)\" -o pid= -o args= 2>/dev/null | awk -v d=\"$HOME/" + InstallDir + "/\" 'index($2, d) == 1 && substr($2, length(d) + 1) ~ /^[^\\/.][^\\/]*\\/root\\/coral$/ { for (i = 3; i <= NF; i++) { if ($i == \"--home\" && i < NF) { print $(i + 1); exit } if (index($i, \"--home=\") == 1) { print substr($i, 8); exit } } }'); " +
 		"while [ \"${h%%/}\" != \"$h\" ]; do h=${h%%/}; done; case \"$h\" in \"\") ;; \"$HOME\"/*) printf 'rel %%s' \"${h#\"$HOME\"/}\";; /*) printf 'abs %%s' \"$h\";; *) printf 'relative %%s' \"$h\";; esac; true"},
 	CmdCheckDataDir:   {template: "[ -d '%[1]s' ] && [ ! -L '%[1]s' ] && [ -O '%[1]s' ] && [ -f '%[1]s/sessions.db' ]", args: []*regexp.Regexp{absDirRe}},
 	CmdRecordDataDir:  {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "\" && printf %%s '%[1]s' > \"$HOME/" + InstallDir + "/datadir\"", args: []*regexp.Regexp{recordDirRe}},

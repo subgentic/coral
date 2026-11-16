@@ -43,6 +43,24 @@ func TestStopMatchesOnlyAnInstalledReleaseAndNotAProgramDeeperInTheFolder(t *tes
 		t.Cleanup(func() { _ = syscall.Kill(-c.Process.Pid, syscall.SIGKILL); _, _ = c.Process.Wait() })
 		return c
 	}
+	startAs := func(rel string) *exec.Cmd { // a program named by a path spelled as given, with "." or ".." as the folder: the real file is where it leads
+		real := filepath.Dir(filepath.Join(home, InstallDir, rel)) // where the spelled path really leads
+		if err := os.MkdirAll(real, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(sleepBin, filepath.Join(real, "coral")); err != nil && !os.IsExist(err) {
+			t.Fatal(err)
+		}
+		c := exec.Command("sh", "-c", "exec \"$0\" 300", home+"/"+InstallDir+"/"+rel)
+		c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		if err := c.Start(); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = syscall.Kill(-c.Process.Pid, syscall.SIGKILL); _, _ = c.Process.Wait() })
+		return c
+	}
+	dot := startAs("./root/coral")              // <install>/./root/coral: the one folder is "." (#16041)
+	dotdot := startAs("../root/coral")          // <install>/../root/coral
 	nested := start("backup", "2.0.60", "root") // <install>/backup/2.0.60/root/coral
 	mine := start("2.0.65", "root")             // <install>/2.0.65/root/coral
 	time.Sleep(400 * time.Millisecond)
@@ -58,6 +76,11 @@ func TestStopMatchesOnlyAnInstalledReleaseAndNotAProgramDeeperInTheFolder(t *tes
 	time.Sleep(500 * time.Millisecond)
 	if alive(mine) {
 		t.Fatal("the installed release was not stopped")
+	}
+	for name, c := range map[string]*exec.Cmd{"<install>/./root/coral": dot, "<install>/../root/coral": dotdot} {
+		if !alive(c) {
+			t.Fatalf("the stop ended a program at %s: \".\" and \"..\" are not a version folder", name)
+		}
 	}
 	if !alive(nested) {
 		t.Fatal("the stop ended a program deeper in the install folder that is not an installed release")
