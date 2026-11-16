@@ -234,6 +234,7 @@ func TestCloseOvertakenAsks_GoalOnlyWithAutoFilledTask(t *testing.T) {
 	closed, err := s.AskIsClosed(ctx, "alpha", q.ID)
 	require.NoError(t, err)
 	assert.False(t, closed, "ask stays open because the task link was not explicit")
+}
 
 // #18714: every open question about a finished task leaves Needs you at once (several on one team, not only one); a question about a task still going stays; a second sweep closes nothing more.
 func TestQuestionsAboutFinishedTasksAreClosedTogether(t *testing.T) {
