@@ -10,6 +10,7 @@ import { boardFetch, serverFetch, serverUrl, isCloud, splitKey, keyLabel, isBoar
 import { whenText } from './when_text.js';
 import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
+const { fileContext } = await importOnce('./artifact_file_context.js');
 import { nameSpan } from './agent_live.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('team_artifact_badge.css'); // the badges' rules load with the page, not at start (#17746)
@@ -540,6 +541,16 @@ export function createArtifactsList({ inbox = false } = {}) {
         return model.items.find(o => o.file_id && o.file_id === item.file_id && o.version === item.versions) || true;
     }
 
+    function viewerOptions(item) {
+        const link = linkOf(item), hex = link?.hex, team = inbox ? item.board_id : model.project;
+        return { hex, server: link?.server, board: splitKey(team).name, filename: readableName(item), mediaType: item.media_type, fileId: item.file_id, versionLine: item.version_line,
+            ...(item.produced_by ? { uploader: { role: String(item.produced_by), hex, server: link?.server, board: splitKey(team).name, seriesId: String(item.series_id || '') } } : {}),
+            ...(item.goal_id && item.goal_title ? { goal: String(item.goal_title), goalId: String(item.goal_id), goalTeam: team } : {}) };
+    }
+    function viewerContext(item, opener) {
+        const by = !model.scope && !inbox ? model.filters.group : '';
+        return fileContext(by ? orderByGroup(model.items, by) : model.items, item, { key: itemKey, options: viewerOptions, opener });
+    }
     function openArtifact(item, opener) {
         const key = itemKey(item), link = linkOf(item), name = readableName(item);
         if (model.scope && link) {
@@ -588,7 +599,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         });
         if (link) {
             if (link.inline) actions.push({ label: 'Open', primary: true, run: () => importOnce('./preview_pane.js').then(m => m.openArtifactTab(item.uri || '', { server: link.server, board: splitKey(inbox ? item.board_id : model.project).name, contentURL: item.content_url, mediaType: item.media_type, filename: name, phoneFull: true })) });
-            else if (hex) actions.push({ label: 'Open', primary: true, run: () => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hex, { server: link.server, filename: name, mediaType: item.media_type, fileId: item.file_id, versionLine: item.version_line, board: splitKey(inbox ? item.board_id : model.project).name, ...(item.produced_by ? { uploader: { role: String(item.produced_by), hex, server: link.server, board: splitKey(inbox ? item.board_id : model.project).name, seriesId: String(item.series_id || '') } } : {}), ...(item.goal_id && item.goal_title ? { goal: String(item.goal_title), goalId: String(item.goal_id), goalTeam: inbox ? item.board_id : model.project } : {}) }), () => window.open(link.url, '_blank', 'noopener,noreferrer')) });
+            else if (hex) actions.push({ label: 'Open', primary: true, run: () => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hex, { ...viewerOptions(item), server: link.server, ...viewerContext(item, opener) }), () => window.open(link.url, '_blank', 'noopener,noreferrer')) });
             if (link.preview) actions.push(isCloud() ? { label: 'Download', run: () => importOnce('./artifact_download.js').then(m => m.downloadArtifact(link.url, m.sanitizeDownloadName(name))).catch(() => showToast('The artifact could not be downloaded', true)) } : { label: 'Download', href: link.url, download: true });
             else actions.push({ label: 'Open link', primary: true, href: link.url });
             actions.push({ label: 'Copy link', menu: 2, run: () => { navigator.clipboard?.writeText(hex ? `coral://artifacts/${hex}` : new URL(link.url, location.href).href).then(() => showToast('Link copied'), () => showToast('The link could not be copied', true)); } });

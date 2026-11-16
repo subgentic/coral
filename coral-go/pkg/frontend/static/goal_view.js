@@ -287,9 +287,9 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         });
         if (shown) opened(opener, `task:${task.id}`);
     }
-    function openPreviewArtifact(item, opener) {
+    function openPreviewArtifact(item, opener, files) {
         importOnce('./goal_artifacts.js').then(m => {
-            const shown = m.openArtifactInPane(item, { team: model.project, host: previewEl, opener, backLabel: 'Artifacts', onClose: paneClosed(opener) });
+            const shown = m.openArtifactInPane(item, { files, team: model.project, host: previewEl, opener, backLabel: 'Artifacts', onClose: paneClosed(opener) });
             if (shown) opened(opener, `artifact:${item.id || item.uri || item.name}`);
         }).catch(() => {});
     }
