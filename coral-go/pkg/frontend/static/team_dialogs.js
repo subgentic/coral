@@ -988,7 +988,7 @@ async function launchTeam() {
             if (tf && Array.isArray(tf.no_settings) && tf.no_settings.length) { const who = tf.no_settings.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' and '); showToast(`${who} has no settings file on this computer yet, so Coral could not record trust for this folder. That is normal the first time. Each agent asks once: answer Yes on its card in the agent's chat, or in Needs you.`); }
             if (launched.length - failed.length > 0) {
                 const wtNote = result.worktree_path ? ` in worktree ${result.worktree_path}` : '';
-                showToast(`Launched team: ${launched.length - failed.length} agents on "${boardName}"${_onServerSuffix(server)}${wtNote}`);
+                showToast(`Launched team: ${launched.length - failed.length} ${launched.length - failed.length === 1 ? 'agent' : 'agents'} on "${boardName}"${_onServerSuffix(server)}${wtNote}`);
             }
             // A team in which nobody started (the server answered an error, #122): the dialog stays open, to fix the setup and launch again.
             if (result.ok !== false) {
