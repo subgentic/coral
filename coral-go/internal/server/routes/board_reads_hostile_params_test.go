@@ -80,6 +80,7 @@ func (e *readsEnv) get(path string, q url.Values) (int, []byte) {
 // seed makes a board of 60 tasks in every state the list tells apart, two goals' worth of tasks, and artifacts on the completed ones. It returns the model: ids by state.
 type readsSeed struct {
 	open, done, all []int64 // by id
+	totalOpen       int     // pending + in_progress + review_pending only (#16686: TotalOpen excludes draft and blocked)
 	byPriority      map[string][]int64
 	goalA, goalB    int64
 	goalATasks      []int64
@@ -127,6 +128,9 @@ func (e *readsEnv) seed(project string) readsSeed {
 		} else {
 			s.open = append(s.open, task.ID)
 			s.byPriority[p] = append(s.byPriority[p], task.ID)
+			if !opts.Draft {
+				s.totalOpen++
+			}
 		}
 		s.all = append(s.all, task.ID)
 		if opts.GoalID != nil {
@@ -145,6 +149,7 @@ func (e *readsEnv) seed(project string) readsSeed {
 		s.open = append(s.open, f.ID)
 		s.all = append(s.all, f.ID)
 		s.byPriority["medium"] = append(s.byPriority["medium"], f.ID)
+		s.totalOpen++
 	}
 	// one skipped and one blocked task in Goal A, so the rollup's split by status is pinned at the route: skipped counts as done, blocked as blocked, the rest queued
 	skipped, err := bs.CreateTaskWithOpts(ctx, project, "skipped", "", "medium", "lead", &board.CreateTaskOpts{GoalID: &s.goalA})
@@ -167,6 +172,7 @@ func (e *readsEnv) seed(project string) readsSeed {
 	s.followUps2 = []int64{f2.ID}
 	s.open, s.all = append(s.open, f2.ID), append(s.all, f2.ID)
 	s.byPriority["medium"] = append(s.byPriority["medium"], f2.ID)
+	s.totalOpen++
 	return s
 }
 
@@ -380,7 +386,7 @@ func TestBoardTaskListMatchesTheSeededModel(t *testing.T) {
 		// open and all: by id
 		got, totals := walk("open", limit)
 		assert.Equal(t, sortedCopy(seed.open), got, "status=open limit %d: every open task, oldest id first, once", limit)
-		assert.Equal(t, [2]int{len(seed.open), len(seed.done)}, totals, "the totals are the board's")
+		assert.Equal(t, [2]int{seed.totalOpen, len(seed.done)}, totals, "the totals are the board's")
 		got, _ = walk("all", limit)
 		assert.Equal(t, newestFirst(seed.all), got, "status=all limit %d: every task, newest id first, once", limit)
 		// completed: every done task once, newest first
@@ -398,7 +404,7 @@ func TestBoardTaskListMatchesTheSeededModel(t *testing.T) {
 	require.Equal(t, 200, code)
 	var c taskListReply
 	require.NoError(t, json.Unmarshal(body, &c))
-	assert.Equal(t, [2]int{len(seed.open), len(seed.done)}, [2]int{c.TotalOpen, c.TotalCompleted})
+	assert.Equal(t, [2]int{seed.totalOpen, len(seed.done)}, [2]int{c.TotalOpen, c.TotalCompleted})
 	assert.Empty(t, c.Tasks)
 	for _, limit := range []int{1, 3, 50} {
 		var ids []int64

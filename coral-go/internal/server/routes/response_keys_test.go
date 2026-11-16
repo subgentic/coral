@@ -206,7 +206,7 @@ func TestTaskListsSendTheKeysTheFrontendReads(t *testing.T) {
 
 	// the default list: the wrapper and each row (tasks_view.js taskColumns, task_list.js, team_tasks_page.js)
 	list := get("/api/board/keys-team/tasks?limit=50")
-	requireKeys(t, "GET /api/board/{p}/tasks", list, "tasks", "next_cursor", "total_open", "total_completed")
+	requireKeys(t, "GET /api/board/{p}/tasks", list, "tasks", "next_cursor", "total_open", "total_completed", "total")
 	rows, _ := list["tasks"].([]any)
 	require.NotEmpty(t, rows)
 	requireKeys(t, "a task of the default list", rows[0].(map[string]any), "id", "title", "status", "priority", "created_by", "created_at", "assigned_to", "revision", "board_id", "body_preview") // review_requested is sent only while a review is requested (task_list.js reads it as a truthy flag)

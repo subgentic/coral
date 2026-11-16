@@ -100,6 +100,7 @@ type TaskListPage struct {
 	NextCursor     string `json:"next_cursor"`
 	TotalOpen      int    `json:"total_open"`
 	TotalCompleted int    `json:"total_completed"`
+	Total          int    `json:"total"`
 	// CompletedSince: with counts=1 and a since, the tasks completed (done, not skipped) at or after it: the client's "finished today", which its Open count adds to the open tasks (#15340).
 	CompletedSince *int `json:"completed_since,omitempty"`
 }
@@ -168,40 +169,43 @@ func (s *Store) ListTaskPage(ctx context.Context, project string, q TaskListQuer
 	if err := s.loadListBlockedBy(ctx, page.Tasks); err != nil {
 		return nil, err
 	}
-	if page.TotalOpen, page.TotalCompleted, err = s.taskListTotals(ctx, project); err != nil {
+	if page.TotalOpen, page.TotalCompleted, page.Total, err = s.taskListTotals(ctx, project); err != nil {
 		return nil, err
 	}
 	return page, nil
 }
 
-// taskListTotals counts the board's open and done tasks with one grouped count over its (board_id, status) index entries, never a task row: the whole-board SUM it replaced took 0.9 ms on 5,000 tasks, this 0.4 ms (#9113).
-func (s *Store) taskListTotals(ctx context.Context, project string) (open, done int, err error) {
+// taskListTotals counts the board's tasks by category: open (pending, in_progress, review_pending),
+// done (completed, skipped) and total (all statuses). Draft and blocked tasks are neither open nor
+// done: the Open pill shows the tasks an agent is working on or waiting for, not the ones held back.
+func (s *Store) taskListTotals(ctx context.Context, project string) (open, done, total int, err error) {
 	var rows []struct {
 		Status string `db:"status"`
 		N      int    `db:"n"`
 	}
 	if err = s.reader().SelectContext(ctx, &rows, `SELECT status, COUNT(*) AS n FROM board_tasks WHERE board_id = ? GROUP BY status`, project); err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	for _, r := range rows {
+		total += r.N
 		switch r.Status {
 		case "completed", "skipped":
 			done += r.N
-		default:
+		case "pending", "in_progress", "review_pending":
 			open += r.N
 		}
 	}
-	return open, done, nil
+	return open, done, total, nil
 }
 
 // TaskCounts is a page with no tasks and the board's two totals (GET /api/board/{project}/tasks?counts=1, #9100): the team page's tab
 // counts read only these, and the page they used to ask for held every open task of the board.
 func (s *Store) TaskCounts(ctx context.Context, project, since string) (*TaskListPage, error) {
-	open, done, err := s.taskListTotals(ctx, project)
+	open, done, total, err := s.taskListTotals(ctx, project)
 	if err != nil {
 		return nil, err
 	}
-	page := &TaskListPage{Tasks: []TaskListItem{}, TotalOpen: open, TotalCompleted: done}
+	page := &TaskListPage{Tasks: []TaskListItem{}, TotalOpen: open, TotalCompleted: done, Total: total}
 	if since != "" {
 		n, err := s.completedSince(ctx, project, since)
 		if err != nil {

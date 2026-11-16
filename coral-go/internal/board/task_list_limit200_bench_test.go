@@ -96,7 +96,7 @@ func BenchmarkTaskListLimit200(b *testing.B) {
 	})
 	b.Run("totals", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			if _, _, err := s.taskListTotals(ctx, "team"); err != nil {
+			if _, _, _, err := s.taskListTotals(ctx, "team"); err != nil {
 				b.Fatal(err)
 			}
 		}
