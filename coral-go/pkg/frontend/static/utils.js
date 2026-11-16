@@ -10,7 +10,7 @@ import { markHidden } from './visible_marks.js';
 export { MORE_DOTS_SVG, escapeAttr, escapeHtml, tagColor } from './html_escape.js';
 export { notificationLinkTarget, showAlertNotification, showNotificationToast, showToast, showWorkflowNotification } from './notifications.js';
 export { buildWelcome, showView, viewChanges } from './view_switch.js';
-export { DOMPURIFY_CONFIG, artifactRefHex, highlightCodeIn, keepFragmentsInside, renderDocsMarkdown, renderMarkdown, renderMarkdownStrict, sanitizeHtml, sanitizeMarkdown } from './markdown.js';
+export { DOMPURIFY_CONFIG, artifactRefHex, highlightCodeIn, keepFragmentsInside, renderMarkdown, renderMarkdownStrict, sanitizeHtml, sanitizeMarkdown } from './markdown.js';
 export { isImagePath, isMediaPath, renderImagePanes, renderMediaPanes } from './media_panes.js';
 export { _boardBodyCacheStatsForTests, boardMessageDisplayText, askBadge, externalMessageBadge, replyWithHtml, hubUserBadge, boardSenderName, labelCodeBlocks, renderBoardMessageBody, setBoardMentionNames, highlightMentionsIn } from './board_message_text.js';
 export { AGENT_NAME_PALETTE, agentNameColor, boardMessageColorStyle, boardTextColor, getAgentColor, hexToRgba } from './agent_colors.js';

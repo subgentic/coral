@@ -176,7 +176,8 @@ export function analyze(source, marked) {
         blocks.push(block);
     };
     if (front) { add(front[0], 0, 'frontmatter'); offset = front[0].length; }
-    const lexer = new marked.Lexer({ gfm: true }), tokens = lexer.lex(text.slice(offset)); let cursor = offset;
+    // marked.defaults carries the page's one tokenizer change (markdown.js, #18435): a single ~ is text, as the rendered block reads it, so the block maps exactly (#18467).
+    const lexer = new marked.Lexer({ ...marked.defaults, gfm: true }), tokens = lexer.lex(text.slice(offset)); let cursor = offset;
     for (const token of tokens) {
         if (token.type === 'space') continue;
         // Marked omits reference definitions from its token array. Consume their exact

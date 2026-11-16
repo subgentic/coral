@@ -16,7 +16,7 @@ const { coralReady } = require('./helpers/wait');
         await load('/');
 
         console.log('1. Only the docs-img shape keeps its image');
-        const r = await ev(`import((window.__coralStatic || '/static/') + 'utils.js').then(u => {
+        const r = await ev(`import((window.__coralStatic || '/static/') + 'docs_markdown.js').then(u => {
             const show = md => { const d = document.createElement('div'); d.innerHTML = u.renderDocsMarkdown(md); const i = d.querySelector('img'); return { src: i ? i.getAttribute('src') : null, links: d.querySelectorAll('.blocked-remote-image').length }; };
             return { ok: show('![shot](docs-img/display-panel.png)'), walk: show('![x](docs-img/../display-panel.png)'), upper: show('![x](docs-img/Display-Panel.png)'),
                 svg: show('![x](docs-img/display-panel.svg)'), query: show('![x](docs-img/display-panel.png?x=1)'), nested: show('![x](docs-img/a/b.png)'),

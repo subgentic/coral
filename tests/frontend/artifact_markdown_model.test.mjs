@@ -6,7 +6,7 @@ const dom = installDom({ mode: 'local' });
 dom.window.eval(fs.readFileSync(STATIC + 'vendor/marked.min.js', 'utf8')); globalThis.marked = dom.window.marked;
 dom.window.eval(fs.readFileSync(STATIC + 'vendor/purify.min.js', 'utf8')); globalThis.DOMPurify = dom.window.DOMPurify;
 import { analyze, mapRenderedBlock, editRun } from '../../coral-go/pkg/frontend/static/artifact_markdown_model.js';
-import { renderMarkdownStrict } from '../../coral-go/pkg/frontend/static/markdown.js';
+import { renderMarkdownStrict, noTilde } from '../../coral-go/pkg/frontend/static/markdown.js';
 function bytePatch(before, after) {
     const a = new TextEncoder().encode(before), b = new TextEncoder().encode(after); let prefix = 0, suffix = 0;
     while (prefix < a.length && prefix < b.length && a[prefix] === b[prefix]) prefix++;
@@ -153,4 +153,17 @@ test('rendered policy exposes additional invisible controls but retains variatio
  const selectors=[0x180b,0x180c,0x180d,0x180f,...Array.from({length:16},(_,i)=>0xfe00+i),...Array.from({length:240},(_,i)=>0xe0100+i)];
  for(const cp of selectors){const c=String.fromCodePoint(cp);assert.equal(HIDDEN.test(c),false);assert.equal(visibleSpecials(c),c);const source='Words'+c+'.\n';assert.ok(mapped(source).length);assert.equal(editRun(source,mapped(source)[0],'New'+c+'.').source,'New'+c+'.\n');}
  for(const source of ['Heart ❤️.\n','Mongolian ᠠ\u180b.\n','Ideograph 禰\u{e0100}.\n'])assert.ok(!analyze(source,marked).blocks[0].reason);
+});
+
+// #18467 (QA4 on #18435): the model lexes with the same single-tilde rule as the renderer, so a block with a lone ~ maps exactly and keeps its line-comment anchors.
+test('a single ~ is text in the model too: such blocks map exactly', () => {
+    marked.use(noTilde); // markdown.js does this when the page loads (marked is a script there; here it is set after the static imports ran)
+    for (const source of ['export P=~/bin:~/go/bin\n', 'A ~one~ and ~/x\n', 'mount -o ro ~/a:~/b\n']) {
+        const model = analyze(source, marked);
+        assert.ok(!model.blocks[0].reason, source + ': ' + model.blocks[0].reason);
+        const runs = mapped(source);
+        assert.ok(runs.length && runs.every(r => r.text.includes('~') || r.text.length), source);
+        assert.equal(runs.map(r => r.text).join('').replace(/\s/g, ''), source.replace(/\s/g, ''), source + ': every character is in a run, none dropped as strike');
+    }
+    assert.ok(mapped('a ~~gone~~ b\n').length, 'a double tilde still maps');
 });

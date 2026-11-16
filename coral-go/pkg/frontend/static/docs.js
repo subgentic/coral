@@ -1,6 +1,6 @@
 /* Documentation: browsable agent_docs viewer */
 
-import { escapeHtml as esc, showView, showToast, renderDocsMarkdown, escapeAttr, copyText } from './utils.js';
+import { escapeHtml as esc, showView, showToast, escapeAttr, copyText } from './utils.js';
 import { registerActions, textOf } from './actions.js';
 import { apiFetch } from './api.js';
 import { loadHighlight } from './vendor_loader.js';
@@ -16,6 +16,7 @@ import { menuMove } from './menu_keys.js';
 import { takeDocsAnswer } from './docs_answer.js';
 
 const DT = await importOnce('./data_table.js');
+const { renderDocsMarkdown } = await importOnce('./docs_markdown.js'); // the Docs page's renderer is not in the start's bundle (#18435)
 const docTableStates = new Map();
 
 /** The line the "Copy docs line for agents" button copies: what a user pastes to an agent so it can read
