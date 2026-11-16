@@ -47,3 +47,28 @@ func TestAllChatsPastTheMergeWindowSaysSo(t *testing.T) {
 	assert.Equal(t, true, big["window_capped"])
 	assert.EqualValues(t, 100, big["max_page"])
 }
+
+// #17780: the page-past-the-cap check applies to every chat type, not only "all".
+func TestAgentChatsPastTheMergeWindowSaysSo(t *testing.T) {
+	db, err := storetest.Open(t, t.TempDir()+"/chats.db")
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	h := NewHistoryHandler(db, &config.Config{}, nil)
+	stamp := "2026-10-25T20:00:00Z"
+	require.NoError(t, h.ss.UpsertSessionIndex(t.Context(), &store.SessionIndex{SessionID: "agent-chat", SourceType: "codex", SourceFile: "/fixture/agent", LastTimestamp: &stamp}))
+	r := chi.NewRouter()
+	r.Get("/api/sessions/history", h.ListSessions)
+	get := func(q string) map[string]any {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/sessions/history?type=agent&date_from=2000-01-01"+q, nil))
+		require.Equal(t, http.StatusOK, w.Code)
+		var out map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &out))
+		return out
+	}
+	in := get("&page=400&page_size=50")
+	assert.NotContains(t, in, "window_capped", "the last page inside the window is fine")
+	past := get("&page=401&page_size=50")
+	assert.Equal(t, true, past["window_capped"], "agent type past the cap says so")
+	assert.EqualValues(t, 400, past["max_page"])
+}
