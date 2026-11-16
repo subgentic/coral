@@ -1,4 +1,4 @@
-// run_cloud_checks.mjs runs the lines of cloud_checks.txt in order, stops at the first failure and exits with its code; and the
+// run_cloud_checks.mjs runs the lines of cloud_checks.txt in order, runs every one, prints a summary of the failures at the end and exits non-zero if any failed; and the
 // real list and package.json keep to what Windows allows: one short command line each (#11042, "The command line is too long").
 //   node run_cloud_checks.test.mjs
 import assert from 'node:assert/strict';
@@ -22,8 +22,8 @@ try {
   assert.deepEqual(cloudChecks(tmp), ['node one.js', 'node two.js', 'node three.js'], 'blank lines, comments and CRLF are skipped');
   const r = spawnSync(process.execPath, [runner, '--dir', tmp], { encoding: 'utf8' });
   assert.equal(r.status, 7, 'the failing check\'s exit code is the run\'s: ' + r.stderr);
-  assert.equal(fs.readFileSync(path.join(tmp, 'ran.txt'), 'utf8'), 'one\ntwo\n', 'the first failure stops the run: three never ran');
-  assert.match(r.stderr, /test:cloud FAILED at: node two\.js/);
+  assert.equal(fs.readFileSync(path.join(tmp, 'ran.txt'), 'utf8'), 'one\ntwo\nthree\n', 'a failure does not stop the run: three still ran (#17620)');
+  assert.match(r.stderr, /test:cloud: 1 of 3 checks FAILED[\s\S]*node two\.js/);
   write('cloud_checks.txt', 'node one.js\nnode three.js\n');
   fs.rmSync(path.join(tmp, 'ran.txt'));
   assert.equal(spawnSync(process.execPath, [runner, '--dir', tmp]).status, 0, 'all passing is exit 0');
@@ -40,4 +40,4 @@ assert.deepEqual(checks.filter(c => c.length > 200 || /&&|;|\|/.test(c)), [], 'o
 const script = JSON.parse(fs.readFileSync(path.join(here, 'package.json'), 'utf8')).scripts['test:cloud'];
 assert.equal(script, 'node run_cloud_checks.mjs', 'test:cloud is the runner, not a chain that grows past the Windows limit');
 
-console.log(`PASS cloud checks runner: stops at the first failure; ${checks.length} checks in cloud_checks.txt`);
+console.log(`PASS cloud checks runner: runs every check, summarizes the failures; ${checks.length} checks in cloud_checks.txt`);

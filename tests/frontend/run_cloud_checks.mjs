@@ -1,5 +1,5 @@
-// `npm run test:cloud`: runs each line of cloud_checks.txt in order and stops at the first one that fails (what the `&&` chain
-// did). The list is a file, not one package.json script, because Windows refuses a command line over 8,191 characters (#11042).
+// `npm run test:cloud`: runs every line of cloud_checks.txt in order: a red check no longer hides the ones after it (#17620). The run ends with a
+// summary of every failure and exits with the first failing code (what the `&&` chain did stopped at the first). The list is a file, not one package.json script, because Windows refuses a command line over 8,191 characters (#11042).
 //   node run_cloud_checks.mjs            run every check
 //   node run_cloud_checks.mjs --list     print the checks and exit
 //   node run_cloud_checks.mjs --dir D    use D's cloud_checks.txt and run from D (the runner's own test)
@@ -20,12 +20,17 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const dir = at > 0 ? path.resolve(process.argv[at + 1]) : here;
   const checks = cloudChecks(dir);
   if (process.argv.includes('--list')) { console.log(checks.join('\n')); process.exit(0); }
+  const failed = [];
   for (const command of checks) {
     // A shell, so `npm run ...` finds npm.cmd on Windows; each command is one short line of this file.
     const r = spawnSync(command, { cwd: dir, shell: true, stdio: 'inherit' });
     if (r.status !== 0) {
+      failed.push({ command, code: r.status || 1 });
       console.error(`test:cloud FAILED at: ${command}${r.error ? ` (${r.error.message})` : ''}`);
-      process.exit(r.status || 1);
     }
+  }
+  if (failed.length) {
+    console.error(`\ntest:cloud: ${failed.length} of ${checks.length} checks FAILED:\n` + failed.map(f => `  exit ${f.code}  ${f.command}`).join('\n'));
+    process.exit(failed[0].code);
   }
 }
