@@ -425,7 +425,7 @@ function drawSectionedAcf(container, uid, opts, { f: { showPreset, showName, pro
             `<div class="acf-persona-page" data-adopt="persona"><div class="acf-prompt-host" data-rows="8"></div></div>`,
             pane('agent', 'Agent', 'smart_toy', '', topHTML),
             pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
-            ...(opts.skillsPane ? [pane('skills', 'Skills', 'extension', 'Skills this member is told about, besides the team\'s.', '')] : []), // Edit member (#18657): its own skills, in a section of their own
+            ...(opts.skillsPane ? [pane('skills', 'Skills', 'auto_awesome', 'Skills this member is told about, besides the team\'s.', '')] : []), // Edit member (#18657): its own skills, in a section of their own
             pane('advanced', 'Advanced', 'tune', '', `${_mk1}${flagsInput}</label>`),
         ].join('');
     } else if (opts.restart) {

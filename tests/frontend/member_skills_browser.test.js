@@ -83,6 +83,15 @@ const SKILLS = [
             assert.deepEqual(state[SKILLS[1].id], { checked: true, disabled: false }, 'Edit member shows the member\'s own skill ticked');
             assert.deepEqual(state[SKILLS[0].id], { checked: true, disabled: true }, 'and the team\'s as the team\'s');
             assert.match(await ev(`document.querySelector('#launch-skills-host .skills-pick-summary').textContent`), /1 chosen, 1 from the team/);
+            // Unticking and saving takes the member's skill off again, and the row carries none; ticking it again puts it back
+            assert.equal(await tick('launch-skills-host', SKILLS[1].id), false, 'unticked');
+            await saveMember();
+            assert.equal(await ev(`document.querySelector('#team-agents-list .team-agent-row').dataset.skills === undefined`), true, 'the member keeps no skills');
+            await openMember(`window.showTeamAgentModal(document.querySelector('#team-agents-list .team-agent-row'))`, 'the Edit member dialog again');
+            await toSkills();
+            assert.equal(await tick('launch-skills-host', SKILLS[1].id), true, 'ticked again');
+            await saveMember();
+            await openMember(`window.showTeamAgentModal(document.querySelector('#team-agents-list .team-agent-row'))`, 'Edit member to cancel');
             await ev(`window.cancelTeamMember(); true`);
             await waitFor(`!document.getElementById('launch-modal').hasAttribute('data-member')`, 'the dialog closed without saving', 8000);
 
@@ -95,14 +104,6 @@ const SKILLS = [
             assert.deepEqual(orch.skills, [SKILLS[1].id], 'the first member carries its own skill');
             assert.equal('skills' in rev, false, 'a member with none sends no skills field: its request is what it was');
 
-            // Unticking and saving takes the member's skill off again, and the row carries none
-            await ev(`window.showLaunchModal(); true`);
-            await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team form again', 8000);
-            await openMember(`window.showTeamAgentModal(document.querySelector('#team-agents-list .team-agent-row'))`, 'the Edit member dialog again');
-            await toSkills();
-            assert.equal(await tick('launch-skills-host', SKILLS[1].id), false, 'unticked');
-            await saveMember();
-            assert.equal(await ev(`document.querySelector('#team-agents-list .team-agent-row').dataset.skills === undefined`), true, 'the member keeps no skills');
             await removeBoards(ev, ['skills-team']);
             console.log(`PASS Edit member Skills at ${label}`);
         }

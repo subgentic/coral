@@ -106,7 +106,7 @@ const BASE = require('./test_base').BASE;
             assert.equal(await rowText('Orchestrator'), orchBefore, 'the Orchestrator keeps its own model when the workers are set');
             for (const w of r0.slice(1)) assert.match(await rowText(w), /small/i, `${w}: the model is the one picked for all`);
         });
-        await S.run('Edit member is a dialog named "Edit member": it opens on the member\'s settings (the sections Agent, Permissions, Advanced), the persona page (Role) is one Back away; Cancel is leftmost and Save member the rightmost; it is the same size as New team', async () => {
+        await S.run('Edit member is a dialog named "Edit member": it opens on the member\'s settings (the sections Agent, Permissions, Skills, Advanced), the persona page (Role) is one Back away; Cancel is leftmost and Save member the rightmost; it is the same size as New team', async () => {
             const roles0 = await roles(); const tt = await t.rect(); await openRow(roles0[1]);
             assert.match(await ev(`window.__na.name(window.__nt.dlg(${N.member}))`), /^Edit member/, 'the dialog is named Edit member');
             assert.ok(!(await mem.onPersona()), 'it opens on the settings page');
