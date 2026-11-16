@@ -18,7 +18,9 @@ func TestNeedsYouKindListsOnlyThatKindAndKeepsTheCounts(t *testing.T) {
 	h.SetNeedsYouSkills(func(context.Context) ([]NeedsYouItem, error) {
 		return []NeedsYouItem{{Kind: "skill", From: "Dev", Line: "Dev published skill deploy", Team: "t", ID: "skill:1", At: old}}, nil
 	})
+	agentReads := 0
 	h.SetNeedsYouAgents(func(*http.Request) ([]NeedsYouItem, error) {
+		agentReads++
 		var out []NeedsYouItem
 		for i := 0; i < 25; i++ { // 25 newer agents: the skill is past the default page of 20
 			out = append(out, NeedsYouItem{Kind: "agent", Line: "waiting", Team: "t", ID: "agent:" + strconv.Itoa(i), At: time.Date(2026, 6, 1, 0, 0, i, 0, time.UTC).Format(time.RFC3339Nano)})
@@ -35,9 +37,10 @@ func TestNeedsYouKindListsOnlyThatKindAndKeepsTheCounts(t *testing.T) {
 	items := needsYouItems(out)
 	require.Len(t, items, 1)
 	assert.Equal(t, "skill", items[0]["kind"])
-	assert.EqualValues(t, 26, out["count"], "count is the whole answer's, true")
-	assert.EqualValues(t, 25, out["counts"].(map[string]any)["agent"])
+	assert.EqualValues(t, 1, out["count"], "#18623: ?kind=skill reads the skills only: count and counts are what that read holds")
+	assert.EqualValues(t, 0, out["counts"].(map[string]any)["agent"])
 	assert.EqualValues(t, 1, out["counts"].(map[string]any)["skill"])
+	assert.Equal(t, 1, agentReads, "and the agents were not read for it (only the whole list's read above did)")
 	for _, bad := range []string{"?kind=SKILL", "?kind=skills", "?kind=%20", "?kind=proposals"} {
 		code, _ = readNeedsYou(t, h, bad, asPerson)
 		assert.Equal(t, http.StatusBadRequest, code, bad)

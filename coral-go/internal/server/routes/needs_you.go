@@ -180,7 +180,7 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "kind is one of agent, question, wait, proposal, review, goal_done, skill")
 		return
 	}
-	items, unread, muted, err := h.needsYouItems(r)
+	items, unread, muted, err := h.needsYouItemsOf(r, kind == "skill") // ?kind=skill reads the skills only: count and counts then say what that read holds (#18623)
 	if err != nil {
 		errInternalServer(w, "could not read the boards")
 		return
@@ -371,23 +371,31 @@ func onlyFileLinks(text string) []string {
 // needsYouItems is everything waiting for the Operator that the server can see, and the parts it could not read (unread). r is the person's own request:
 // the agent rows are read as that person sees them. muted counts the files the Operator's settings keep out, by kind. An error is the boards themselves not reading.
 func (h *BoardHandler) needsYouItems(r *http.Request) (items []NeedsYouItem, unread []string, muted map[string]int, err error) {
+	return h.needsYouItemsOf(r, false)
+}
+
+// needsYouItemsOf is needsYouItems; onlySkills reads nothing but the skills that wait (#18623): the agent rows, every team's questions, waits, proposals, review files and finished goals are not read, as a Hub's
+// shell reading ?kind=skill threw them away after the scans (0.1 to 0.6 s of the first dashboard load).
+func (h *BoardHandler) needsYouItemsOf(r *http.Request, onlySkills bool) (items []NeedsYouItem, unread []string, muted map[string]int, err error) {
 	ctx := r.Context()
 	muted = map[string]int{} // the files the Operator's settings mute, by kind: counted here and nowhere else (#12144)
-	if h.agentAsks != nil {  // a single agent's question (#18106): kind question, no team
+	if h.agentAsks != nil && !onlySkills { // a single agent's question (#18106): kind question, no team
 		for _, a := range h.agentAsks(r) {
 			items = append(items, NeedsYouItem{Kind: "question", From: needsYouLine(a.Asker), Line: needsYouLine(a.Text), ID: "agent-ask:" + strconv.FormatInt(a.ID, 10), At: needsYouTime(a.At)})
 		}
 	}
-	if h.needsYouAgents != nil {
+	if h.needsYouAgents != nil && !onlySkills {
 		if rows, err := h.needsYouAgents(r); err != nil {
 			unread = append(unread, "agents")
 		} else {
 			items = append(items, rows...)
 		}
 	}
-	projects, err := h.bs.ListProjects(ctx)
-	if err != nil {
-		return nil, nil, nil, err
+	var projects []board.ProjectInfo
+	if !onlySkills {
+		if projects, err = h.bs.ListProjects(ctx); err != nil {
+			return nil, nil, nil, err
+		}
 	}
 	now := time.Now().UTC()
 	for _, p := range projects {
@@ -470,9 +478,12 @@ func (h *BoardHandler) needsYouItems(r *http.Request) (items []NeedsYouItem, unr
 		}
 	}
 
-	hiddenGoals, readGoals := h.goalDoneHiddenSet(ctx), h.goalDoneReadSet(ctx)
+	var hiddenGoals, readGoals map[string]bool
+	if !onlySkills {
+		hiddenGoals, readGoals = h.goalDoneHiddenSet(ctx), h.goalDoneReadSet(ctx)
+	}
 	var goalNews map[string]int // replies agents left in the Operator's threads on a goal, unseen (#12073): the goal's item carries the count, and a read goal with news counts again
-	if h.commentNews != nil {
+	if h.commentNews != nil && !onlySkills {
 		goalNews, _ = h.commentNews(ctx)
 	}
 	for _, p := range projects {
