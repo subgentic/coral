@@ -124,6 +124,8 @@ type ContextCompact struct {
 	deliver func(ctx context.Context, a AgentInfo, text string) (bool, error)
 	now     func() time.Time
 	logger  *slog.Logger
+	// compactedSince says whether the CLI's own session file records a compaction after the time (Codex writes a "compacted" event for /compact, which starts no turn); nil when it cannot be read (#17562).
+	compactedSince func(sessionID string, since time.Time) bool
 
 	Interval time.Duration
 
@@ -198,6 +200,7 @@ func (c *ContextCompact) Attach(ts *store.TaskStore, usage *store.TokenUsageStor
 		return 0
 	}
 	c.active = c.busy
+	c.compactedSince = codexCompactedSince
 }
 
 // LastCompacted is when a session was last compacted by this service and the context it had then; false when it was not.
@@ -259,7 +262,7 @@ func (c *ContextCompact) skipOnce(project string, a AgentInfo, name, reason stri
 func compactMakesNoTurn(agentType string) bool { return agentType == at.Codex }
 
 // confirm settles a typed command: the agent started a turn after it (the CLI took it), or two minutes passed and it did not.
-func (c *ContextCompact) confirm(project string, a AgentInfo, name string, sig agentSignal, now time.Time) {
+func (c *ContextCompact) confirm(ctx context.Context, project string, a AgentInfo, name string, sig agentSignal, now time.Time) {
 	c.mu.Lock()
 	sent, ok := c.awaiting[name]
 	c.mu.Unlock()
@@ -277,13 +280,41 @@ func (c *ContextCompact) confirm(project string, a AgentInfo, name string, sig a
 		delete(c.awaiting, name)
 		c.mu.Unlock()
 		if compactMakesNoTurn(a.AgentType) {
-			c.note(name, "typed at "+sent.Local().Format("15:04")+", Coral cannot confirm it (this CLI shows no turn for it)")
-			c.logger.Info("a compaction was typed and cannot be confirmed: this CLI starts no turn for it", "project", project, "agent", a.DisplayName, "type", a.AgentType, "session", name)
+			c.confirmWithoutATurn(ctx, project, a, name, sent)
 			return
 		}
 		c.note(name, "typed at "+sent.Local().Format("15:04")+", not taken by the CLI")
 		c.logger.Warn("a compaction was typed but the agent did not start a turn", "project", project, "agent", a.DisplayName, "session", name)
 	}
+}
+
+// confirmWithoutATurn settles a Codex /compact two minutes after it was typed, from what Codex leaves instead of a turn (#17562): the "compacted" event in its session file after the time it was typed, or a
+// context that fell well below what it was. With either it is confirmed; with neither, and the file readable, it is said not to have been taken (the warning of #16861 is kept for exactly that); with no way to
+// read the file, Coral says it cannot confirm.
+func (c *ContextCompact) confirmWithoutATurn(ctx context.Context, project string, a AgentInfo, name string, sent time.Time) {
+	at := sent.Local().Format("15:04")
+	if c.compactedSince != nil && c.compactedSince(a.SessionID, sent) {
+		c.note(name, "compacted "+at)
+		return
+	}
+	c.mu.Lock()
+	before := c.last[name].tokens
+	c.mu.Unlock()
+	if before > 0 && c.tokens != nil {
+		if got, err := c.tokens(ctx, []string{a.SessionID}); err == nil {
+			if now := got[a.SessionID]; now > 0 && now < before*3/4 {
+				c.note(name, fmt.Sprintf("compacted %s (its context fell from %dk to %dk)", at, before/1000, now/1000))
+				return
+			}
+		}
+	}
+	if c.compactedSince == nil {
+		c.note(name, "typed at "+at+", Coral cannot confirm it (this CLI shows no turn for it)")
+		c.logger.Info("a compaction was typed and cannot be confirmed: this CLI starts no turn for it", "project", project, "agent", a.DisplayName, "type", a.AgentType, "session", name)
+		return
+	}
+	c.note(name, "typed at "+at+", not taken by the CLI (no compacted event and no fall in its context)")
+	c.logger.Warn("a compaction was typed but the CLI shows no compacted event and its context did not fall", "project", project, "agent", a.DisplayName, "session", name)
 }
 
 // Run scans until ctx ends.
@@ -371,7 +402,7 @@ func (c *ContextCompact) runProject(ctx context.Context, project string, hs boar
 			c.skipOnce(project, a, sub.SessionName, "no hook or transcript event says whether it is idle yet")
 			continue
 		}
-		c.confirm(project, a, sub.SessionName, sig, now)
+		c.confirm(ctx, project, a, sub.SessionName, sig, now)
 		if sig.InTurn || sig.NeedsInput || now.Sub(sig.Since) < compactSettle {
 			held = append(held, gated{a, sub.SessionName, "the agent is busy or waiting for input"})
 			continue
