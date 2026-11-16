@@ -45,6 +45,29 @@ func TestCodingTeamTemplateHasTheSixRolesAndStartsInTaskQueue(t *testing.T) {
 	require.NotRegexp(t, `\bmode: "`, src[end:], "only the Coding Team names a working mode")
 }
 
+// #17817: the default team the dialog opens with has generic roles, not coding-specific ones: a newsletter team should not start with Lead Developer and QA Engineer.
+func TestDefaultTeamMembersAreGenericNotCodingSpecific(t *testing.T) {
+	src := frontendSource(t, "team_templates_ui.js")
+	require.Contains(t, src, "const DEFAULT_TEAM_MEMBERS", "the default team is its own array, not a slice of the Coding Team")
+
+	names := []string{}
+	start := strings.Index(src, "const DEFAULT_TEAM_MEMBERS")
+	require.True(t, start >= 0)
+	end := strings.Index(src[start:], "];")
+	require.True(t, end > 0)
+	block := src[start : start+end]
+	for _, m := range regexp.MustCompile(`name: "([^"]+)"`).FindAllStringSubmatch(block, -1) {
+		names = append(names, m[1])
+	}
+	require.Equal(t, []string{"Orchestrator", "Lead", "Reviewer"}, names,
+		"the default team has generic roles that work for any goal")
+
+	// team_dialogs.js uses DEFAULT_TEAM_MEMBERS, not the Coding Team slice
+	dialogs := frontendSource(t, "team_dialogs.js")
+	require.Contains(t, dialogs, "for (const a of DEFAULT_TEAM_MEMBERS)", "_addDefaultMembers uses the generic array")
+	require.Contains(t, dialogs, "DEFAULT_TEAM_MEMBERS,", "the import includes it")
+}
+
 func TestChoosingATemplateSetsTheLaunchFormsWorkingMode(t *testing.T) {
 	dialogs := frontendSource(t, "team_dialogs.js")
 	require.Contains(t, dialogs, "setTeamLaunchMode(tmpl.mode || tmpl.working_mode?.mode || 'none', tmpl.working_mode)", "loading a template applies the mode it names, or None: a Coding Team picked first does not leave Task queue on another template")
