@@ -25,7 +25,8 @@ const TEAM = `qa-hint-${Date.now() % 100000}`;
             assert.equal(s.scrolls, true, 'a phone strip scrolls: ' + JSON.stringify(s));
             assert.ok(s.shown && s.name === 'Show more tabs' && s.w >= 44 && s.h >= 44 && s.atEnd, 'a 44 px "Show more tabs" button sits beside the strip\'s end (right of it, over no tab: #18867) while tabs wait past the edge: ' + JSON.stringify(s));
             await ev(`document.getElementById('team-tabs-next').click(); true`);
-            await waitFor(`document.getElementById('team-tabs').scrollLeft > 100`, 'the strip scrolled to the next tabs', 5000);
+            // > 0, not > 100: with narrower fonts (Ubuntu CI) the tabs overflow by little, and the button hides at the end, which widens the strip and lowers its largest scroll (#18963)
+            await waitFor(`document.getElementById('team-tabs').scrollLeft > 0`, 'the strip scrolled to the next tabs', 5000).catch(async e => { throw new Error(e.message + ': ' + JSON.stringify(await state())); });
             for (let i = 0; i < 4 && (await state()).shown; i++) { await ev(`document.getElementById('team-tabs-next').click(); true`); await settle(500); }
             s = await state();
             assert.ok(s.last && !s.shown, 'at the last tab (Branches) the button is gone: ' + JSON.stringify(s));
