@@ -41,6 +41,7 @@ export function offerSuggestion(input, line, name, { afterCoralMade = false } = 
     const dir = recents.length ? freshFolder(input.dataset.coralRoot, name, recents) : suggestedFolder(input.dataset.coralRoot, name);
     if (!dir) return;
     input.value = dir; input.dataset.suggested = dir;
+    input.onfocus = () => input.dataset.suggested === input.value && input.select(); // a folder Coral suggested is selected on focus: typing replaces it (Walk 34)
     input.dispatchEvent(new Event('input', { bubbles: true }));
     showLine(input, line, true);
 }

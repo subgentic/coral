@@ -58,9 +58,9 @@ const BASE = require('./test_base').BASE;
             out.shown = $('set-password-new').type;
             document.querySelector('#set-password-modal .pw-toggle').click();
             out.hiddenAgain = $('set-password-new').type;
-            out.meterEmpty = getComputedStyle(document.querySelector('#set-password-modal .pw-strength')).display; out.skipWords = document.querySelector('#set-password-modal').textContent;
+            { const m = document.querySelector('#set-password-modal .pw-strength'); out.meterEmpty = getComputedStyle(m).display; out.meterEmptyH = m.getBoundingClientRect().height; out.meterEmptyAttr = m.hidden; } out.skipWords = document.querySelector('#set-password-modal').textContent;
             type('set-password-new', 'a');
-            out.meterTyped = getComputedStyle(document.querySelector('#set-password-modal .pw-strength')).visibility;
+            { const m = document.querySelector('#set-password-modal .pw-strength'); out.meterTyped = getComputedStyle(m).display; out.meterTypedH = m.getBoundingClientRect().height; out.meterTypedAttr = m.hidden; }
             out.weak = { level: document.querySelector('#set-password-modal .pw-strength').getAttribute('data-level'), disabled: $('set-password-save').disabled };
             // empty and mismatch send nothing
             type('set-password-new', ''); submit();
@@ -170,7 +170,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(out.lead2, out.lead1, 'the same words on a later visit, and no "nothing changed" notice');
         assert.doesNotMatch(out.lead1 + out.lead2, /nothing changed|now asks browsers/);
         assert.deepEqual(out.weak, { level: 'weak', disabled: false }, 'the meter advises and never blocks');
-        assert.equal(out.meterEmpty, 'none', 'no strength bar is drawn before anything is typed (#9971) and it holds no room: it sits under Confirm, so typing moves nothing above it (#10281, #11304)'); assert.equal(out.meterTyped, 'visible', 'the bar shows once something is typed');
+        assert.equal(out.meterEmpty, 'none', 'no strength bar is drawn before anything is typed (#9971) and it holds no room: it sits under Confirm, so typing moves nothing above it (#10281, #11304)'); assert.equal(out.meterEmptyH, 0, 'and takes no height'); assert.equal(out.meterEmptyAttr, true, 'it is hidden by the hidden attribute, not a CSS rule (#17895)'); assert.notEqual(out.meterTyped, 'none', 'the meter shows once a character is typed'); assert.ok(out.meterTypedH > 0, 'and takes room: ' + out.meterTypedH); assert.equal(out.meterTypedAttr, false);
         assert.doesNotMatch(out.skipWords, /skip|without a password|Only you use this computer|Not now/i, 'the prompt says nothing that reads as a way around the password (#11892)');
         assert.equal(out.emptyErr, 'Enter a password.'); assert.equal(out.callsAfterEmpty, 0);
         assert.match(out.mismatchErr, /do not match/); assert.equal(out.callsAfterMismatch, 0, 'nothing is sent for a mismatch');

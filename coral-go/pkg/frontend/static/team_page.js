@@ -250,7 +250,7 @@ function drawStatus(data) {
     const b = $('team-page-health');
     if (b) {
         b.hidden = !shown || uncertainAttention;
-        if (shown && !uncertainAttention) { b.replaceChildren(Object.assign(el('span', 'team-status-dot'), {}), document.createTextNode(text)); b.firstChild.setAttribute('aria-hidden', 'true'); b.setAttribute('aria-label', `Team health: ${text}`); }
+        if (shown && !uncertainAttention) { b.replaceChildren(el('span', 'team-status-dot'), document.createTextNode(text)); b.firstChild.setAttribute('aria-hidden', 'true'); b.setAttribute('aria-label', `Team health: ${text}`); }
     }
     if (s.textContent === text) return; // the same words are not said again
     s.className = `team-page-status ${stopped || uncertainAttention || asleep ? 'unknown' : shown ? 'needs sr-only' : unknown ? 'unknown' : 'well'}`; // Asleep takes the neutral dot, as waiting does
