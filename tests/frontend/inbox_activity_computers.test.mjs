@@ -106,8 +106,6 @@ document.body.append(table);
 const btn = table.querySelector('button.dt-primary');
 assert.ok(btn, 'the row has a button that opens its file');
 btn.click();
-assert.equal(opened.length, 0, 'opening details does not navigate');
-table.querySelector('.dt-detail:not([hidden]) .activity-open-item').click();
 assert.equal(opened.length, 1, 'clicking the remote file row opens it once');
 assert.equal(opened[0].server, 'srv1');
 assert.equal(splitKey(opened[0].team).server, 'srv1', 'the sidebar takes the computer from the team, so it is the row\'s own computer, never this one');

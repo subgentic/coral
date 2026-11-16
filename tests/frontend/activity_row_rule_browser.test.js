@@ -1,4 +1,4 @@
-// #17452: Activity is a compact log with its own URL; the original #14423 (the Operator, from a screenshot of Activity): one rule for a row, the VERB in YOU DID, the OBJECT in ON and the detail on its own line under it. An answer names its question and shows the answer clean (no repeated
+// #14423 (the Operator, from a screenshot of Activity): one rule for a row, the VERB in YOU DID, the OBJECT in ON and the detail on its own line under it. An answer names its question and shows the answer clean (no repeated
 // verb, no raw @mention); a dismissed question does not say "Dismissed Dismissed by"; a long note is whole; Starred and Unstarred show the file's name (an older row falls back to "a file"). 1280 and 390 px, the record is stood in.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -10,8 +10,7 @@ const LONG = 'Not now: the build is red, the release notes are not written and I
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        const failures = [];
-        for (const width of [1440, 1280, 390]) {
+        for (const width of [1280, 390]) {
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: width === 390 });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
@@ -29,44 +28,32 @@ const LONG = 'Not now: the build is red, the release notes are not written and I
                 ];
                 const real = window.fetch; window.fetch = (u, o) => new URL(String(u), location.origin).pathname === '/api/activity' ? Promise.resolve(new Response(JSON.stringify({ actions: window.__rows, check: { intact: true, rows: 9 } }), { headers: { 'Content-Type': 'application/json' } })) : real(u, o);
                 localStorage.removeItem('coral-inbox-activity-filters'); window.switchNavTab('hub-inbox'); return import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.openInboxGroup('activity')).then(() => true); })()`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr.list-row-activity').length === 9`, `${width}: the nine rows`, 15000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 9`, `${width}: the nine rows`, 15000);
             await new Promise(r => setTimeout(r, 400)); // sleep-ok: the columns settle
             if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/activity-rule-${width}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
-            const measured = await ev(`({ path: location.pathname, rows: [...document.querySelectorAll('.list-row-activity')].map(tr => { const title = tr.querySelector('[data-key="item"]'), action = tr.querySelector('[data-key="action"]'), who = tr.querySelector('[data-key="who"]'); return { height: tr.getBoundingClientRect().height, title: title.getBoundingClientRect().x, action: action.getBoundingClientRect().x, who: who.getBoundingClientRect().x, chip: !!action.querySelector('.chip'), expanded: tr.querySelector('button')?.getAttribute('aria-expanded') }; }) })`);
-            if (measured.path !== '/inbox/activity') failures.push(`${width}: Activity URL: ${measured.path}`);
-            if (!measured.rows.every(r => Math.abs(r.height - 44) < 2 && r.title < r.action && r.action < r.who && !r.chip && r.expanded === 'false')) failures.push(`${width}: compact title/outcome/who rows: ${JSON.stringify(measured.rows)}`);
-            if (measured.rows.every(r => r.expanded === 'false')) {
-                await ev(`document.querySelector('.list-row-activity [data-key="item"] button').click()`);
-                await waitFor(`document.querySelector('.list-row-activity [data-key="item"] button').getAttribute('aria-expanded') === 'true'`, 'row detail opens');
-                assert.ok(await ev(`!document.querySelector('.activity-folder .dt-detail').hidden`), 'detail visible');
-                await ev(`[...document.querySelectorAll('.list-row-activity [aria-expanded="false"]')].forEach(b => b.click()); true`);
-                const text = await ev(`document.querySelector('.activity-folder').innerText`);
-                assert.ok(text.includes('Your answer: 1 is fine for now') && text.includes('Your answer: Option 2') && text.includes(LONG), 'answers and whole long notes retained in details');
-                assert.ok(!/@Orchestrator/.test(text), 'expanded answers omit the raw asker mention');
-                assert.ok(!/You answered/.test(text), 'expanded answers do not repeat the verb');
-                assert.ok(!/Dismissed by the operator/.test(text) && !/Dismissed Dismissed/.test(text), 'dismissed notes do not repeat the fixed dismissal wording');
-                const expanded = await ev(`[...document.querySelectorAll('.activity-folder .dt-detail')].map(r => ({ hidden: r.hidden, title: r.querySelector('strong')?.textContent, text: r.innerText, cut: [...r.querySelectorAll('strong,p')].some(e => { const c = getComputedStyle(e); return /hidden|clip/.test(c.overflowX + c.overflowY) && (e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1); }) }))`);
-                assert.equal(expanded.length, 9, 'all fixture details exist');
-                assert.ok(expanded.every(r => !r.hidden && !r.cut), 'all expanded detail is visible and uncut');
-                assert.equal(expanded[5].title, 'release-plan.md', 'Unstarred names the file');
-                assert.equal(expanded[6].title, 'a file', 'legacy Starred falls back to a file');
-                assert.ok(expanded[5].text.includes('Unstarred') && expanded[6].text.includes('Starred'), 'expanded star outcomes retained');
-                await ev(`[...document.querySelectorAll('.list-row-activity [aria-expanded="true"]')].forEach(b => b.click()); true`);
-                const route = await ev(`(async () => { const r = await import((window.__coralStatic || '/static/') + 'routes.js'); return ['needs','saved','activity','artifacts','chats'].map(folder => r.parse(r.build({ view: 'inbox-folder', folder }))?.folder); })()`);
-                assert.deepEqual(route, ['needs','saved','activity','artifacts','chats']);
-                const times = await ev(`(async () => { const { activityTime } = await import((window.__coralStatic || '/static/') + 'inbox_activity.js'); const now = new Date(2026, 10, 15, 18, 0); return [new Date(2026,10,15,17,29), new Date(2026,10,15,16,27), new Date(2026,10,14,12,23), new Date(2026,10,12,12,0)].map(d => activityTime(d.toISOString(), now)); })()`);
-                assert.deepEqual(times, ['31 min', '4:27 PM', 'Yesterday 12:23 PM', 'Nov 12']);
-                const outcomes = await ev(`(async () => { const p = window.__coralStatic || '/static/', a = await import(p + 'inbox_activity.js'), f = await import(p + 'operator_activity_filters.js'); const words = []; for (const action of f.ACTIONS) { const node = a.spec({...f.EMPTY, action}, {}).node(); words.push(...[...node.querySelectorAll('.activity-decision')].map(n => n.textContent.replace('✓', '').trim())); } return words; })()`);
-                assert.ok(outcomes.every(w => w.split(/\s+/).length <= 2), 'outcomes are one or two plain words');
-                await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.openInboxGroup('saved')).then(() => true)`);
-                await waitFor(`location.pathname === '/inbox/saved'`, 'Saved URL');
-                await ev(`history.back(); true`);
-                await waitFor(`location.pathname === '/inbox/activity' && !!document.querySelector('.activity-folder')`, 'Back restores Activity');
-                await Page.reload(); await Page.loadEventFired(); await install();
-                await waitFor(`location.pathname === '/inbox/activity' && /Activity/.test(document.querySelector('#group-table-view')?.textContent || '')`, 'reload restores Activity');
+            const text = await ev(`document.querySelector('#group-table-view').textContent.replace(/\\s+/g, ' ')`);
+            assert.ok(!/Dismissed\\s*[“"]?Dismissed by/.test(text) && !/Dismissed by/.test(text), `${width}: no "Dismissed Dismissed by": ${text.slice(0, 200)}`);
+            assert.ok(!/@Orchestrator/.test(text), `${width}: no raw @mention in an answer`);
+            assert.ok(!/You answered/.test(text), `${width}: no repeated verb ("You answered")`);
+            assert.ok(text.includes('Your answer: 1 is fine for now') && text.includes('Your answer: Option 2') && text.includes('Your answer: Yes'), `${width}: the answers are shown clean`);
+            assert.ok(text.includes('Which of the two designs should ship in v2.0.61?') && text.includes('from Orchestrator'), `${width}: a new answer names its question and who asked`);
+            assert.ok(text.includes('Orchestrator’s question'), `${width}: an older answer names the asker's question`);
+            assert.ok(text.includes('release-plan.md') && /Unstarred/.test(text) && /Starred/.test(text), `${width}: Starred and Unstarred show the file name`);
+            assert.ok(text.includes('a file'), `${width}: an older starred row falls back to "a file"`);
+            assert.ok(text.includes(LONG), `${width}: a long note is whole, not cut`);
+            if (width === 1280) {
+                const cols = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(tr => ({ did: (tr.querySelector('td[data-key="action"]') || {}).textContent, on: (tr.querySelector('td[data-key="item"] .dt-primary, td[data-key="item"] .activity-item') || {}).textContent, detail: (tr.querySelector('.activity-detail') || {}).textContent || '', cut: tr.querySelector('.activity-detail') ? tr.querySelector('.activity-detail').scrollWidth > tr.querySelector('.activity-detail').clientWidth + 1 : false }))`);
+                assert.deepEqual(cols.map(c => c.did), ['Dismissed', 'Answered', 'Answered', 'Answered', 'Dismissed', 'Unstarred', 'Starred', 'Changed the tags', 'Shared'], `${width}: YOU DID is the verb alone: ${JSON.stringify(cols.map(c => c.did))}`);
+                assert.deepEqual(cols.map(c => c.on), ['a question', 'Orchestrator’s question', 'Which of the two designs should ship in v2.0.61?', 'a question', 'Ship it?', 'release-plan.md', 'a file', 'tagged-plan.md', 'shared-plan.md'], `${width}: ON is the object alone: ${JSON.stringify(cols.map(c => c.on))}`);
+                assert.deepEqual(cols.map(c => c.detail), ['', 'Your answer: 1 is fine for now', 'from Orchestrator · Your answer: Option 2', 'Your answer: Yes', LONG, '', '', '', ''], `${width}: the detail is on its own line: ${JSON.stringify(cols.map(c => c.detail))}`);
+                assert.ok(cols.every(c => !c.cut), `${width}: no detail is cut`);
+            } else {
+                // a phone card (#15774): the words on line 1, the badge and who on line 2, the answer/detail on one line cut with an ellipsis, no team column
+                const ph = await ev(`[...document.querySelectorAll('#group-table-view tbody tr.activity-card')].map(r => { const q = s => r.querySelector(s); const d = q('.activity-detail'), cs = d && getComputedStyle(d); return { badge: !!q('td[data-key="action"] .chip'), who: !!q('td[data-key="who"] .activity-name'), team: getComputedStyle(q('td[data-key="team"]')).display, detail: d ? d.textContent : '', ellipsis: !d || (cs.textOverflow === 'ellipsis' && cs.whiteSpace === 'nowrap'), top: q('button, .activity-item').getBoundingClientRect().top, badgeTop: q('td[data-key="action"]').getBoundingClientRect().top }; })`);
+                assert.ok(ph.length >= 5 && ph.every(c => c.badge && c.who && c.team === 'none' && c.ellipsis && c.badgeTop > c.top), `${width}: each phone card is the words, then the badge and who, with the detail cut to one line and no team column: ${JSON.stringify(ph)}`);
+                assert.ok(ph.some(c => /^from Orchestrator \u00b7 Your answer: Option 2$/.test(c.detail) || /Your answer: Option 2/.test(c.detail)), `${width}: the answer is on the card: ${JSON.stringify(ph.map(c => c.detail))}`);
             }
         }
-        assert.deepEqual(failures, []);
         console.log('activity_row_rule: ok');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

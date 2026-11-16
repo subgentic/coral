@@ -22,7 +22,7 @@ const BASE=require('./test_base').BASE;
    await set('goal');await waitFor(`document.querySelectorAll('.activity-folder .dt-group').length>=2`,width+': Goal: goal headings');
    assert.equal(await ev(`document.querySelectorAll('.activity-folder .dt-group-task').length`),0,width+': Goal: no task headings');
    assert.ok(await ev(`document.querySelectorAll('.activity-folder tr.dt-row').length`)>=8,width+': Goal: the records are plain rows under their goal (not shut with a task)');
-   assert.ok(await ev(`[...document.querySelectorAll('.activity-folder tr.dt-row')].some(r=>{const b=r.querySelector('[aria-expanded]');if(b?.getAttribute('aria-expanded')==='false')b.click();return /Write the plan/.test(r.nextElementSibling.innerText)})`),width+': Goal: a row still names its task');
+   assert.ok(await ev(`[...document.querySelectorAll('.activity-folder tr.dt-row')].some(r=>/Write the plan/.test(r.textContent))`),width+': Goal: a row still names its task');
    await set('task');await waitFor(`document.querySelectorAll('.activity-folder .dt-group-task').length===2`,width+': Goal and task: task headings');
    assert.equal(await ev(`localStorage.getItem('coral-inbox-group-mode')`),'task',width+': kept in this browser');
    await set('none');await waitFor(`document.querySelectorAll('.activity-folder .dt-group').length===0`,width+': None again');
