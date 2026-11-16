@@ -52,8 +52,10 @@ export async function openSetupDialog({ onReady } = {}) {
     for (const [type, label] of PROVIDERS) {
         const info = CLI_INSTALL_INSTRUCTIONS[type] || {}, cmd = (win && info.winCmd) || info.cmd || '';
         const row = el('div', 'setup-agent-row'), top = el('div', 'setup-agent-top'), status = el('span', 'setup-agent-status', 'Checking…'), more = el('button', 'btn btn-secondary', 'Show steps');
-        more.type = 'button'; top.append(el('b', null, label), status, more);
-        const steps = el('div', 'setup-agent-steps'); steps.hidden = true;
+        more.type = 'button'; top.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 0'; row.style.cssText = 'border-top:1px solid var(--border-color, rgba(128,128,128,.3))';
+        const name = el('b', null, label); name.style.minWidth = '110px'; status.style.cssText = 'flex:1;font-size:13px;opacity:.8';
+        more.type = 'button'; top.append(name, status, more);
+        const steps = el('div', 'setup-agent-steps'); steps.hidden = true; steps.style.cssText = 'padding:0 0 10px 4px;font-size:13px;line-height:1.6;overflow-wrap:anywhere';
         const line = el('p'), code = el('code', null, cmd), copy = el('button', 'btn btn-secondary', 'Copy'); copy.type = 'button';
         copy.onclick = () => { navigator.clipboard?.writeText(cmd).then(() => { copy.textContent = 'Copied'; }).catch(() => {}); };
         line.append('1. Run this in a terminal: ', code, ' ', copy);
@@ -63,7 +65,7 @@ export async function openSetupDialog({ onReady } = {}) {
         more.onclick = () => { steps.hidden = !steps.hidden; more.textContent = steps.hidden ? 'Show steps' : 'Hide steps'; };
         row.append(top, steps); body.append(row); rows[type] = { status, label };
     }
-    const result = el('p', 'setup-agent-result'); result.setAttribute('role', 'status'); body.append(result);
+    const result = el('p', 'setup-agent-result'); result.style.minHeight = '1.4em'; result.setAttribute('role', 'status'); body.append(result);
     const check = el('button', 'btn btn-secondary', 'Check again'), go = el('button', 'btn btn-primary', 'Continue'), close = el('button', 'btn btn-secondary', 'Not now');
     for (const b of [check, go, close]) b.type = 'button';
     go.hidden = true; actions.append(close, check, go);
