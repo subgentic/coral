@@ -257,7 +257,9 @@ func TestUndoDoesNotReopenAnAnsweredAgentQuestion(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	ss := store.NewSessionStore(db)
 	h := NewAgentAsksHandler(ss, nil)
-	h.deliver = func(context.Context, ptymanager.SessionTerminal, string, string, string, string, string) error { return nil }
+	h.deliver = func(context.Context, ptymanager.SessionTerminal, string, string, string, string, string) error {
+		return nil
+	}
 	o := owner("0001")
 	registerAsker(t, ss, o)
 	id, err := ss.CreateAgentAsk(context.Background(), o.SessionID, o.SessionName, "Which?", nil, time.Now())
