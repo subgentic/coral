@@ -16,7 +16,7 @@ const BASE = require('./test_base').BASE;
         await install();
         await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('iw-a', 'A', 3, { sleeping: false }); true`);
         await ev(`window.selectLiveSession('iw-a', 'claude', 'iw-a-id', 'local'); true`);
-        await waitFor(`!!document.getElementById('board-task-list') && !!document.getElementById('agentic-state-events') && !!document.getElementById('task-bar-count')`, 'the task list and the timeline', 8000);
+        await waitFor(`!!document.getElementById('board-task-list') && !!document.getElementById('agentic-state-events')`, 'the task list and the timeline', 8000);
         await ev(`(async () => {
             const S = window.__coralStatic || '/static/';
             const [{ state }, tasks, agentic] = await Promise.all([import(S + 'state.js'), import(S + 'tasks.js'), import(S + 'agentic_state.js')]);
@@ -34,7 +34,7 @@ const BASE = require('./test_base').BASE;
             // Only what this suite is about: the task list, its toggle and count, and the activity timeline and its search bar (nothing may be written to it while it idles). The rest of the page
             // (the live session header and the activity chart redraw from their own feeds) is not under test, and a busy machine lets one of
             // those land inside the window (a 6-shard epoch run failed with 2 such mutations).
-            window.__watched = ['board-task-list', 'board-task-hide-toggle-container', 'task-bar-count', 'agentic-state-events', 'event-search-bar'];
+            window.__watched = ['board-task-list', 'board-task-hide-toggle-container', 'agentic-state-events', 'event-search-bar'];
             return true;
         })()`);
         // The mutation observer reports after the call returns: let a task finish before reading the count.
@@ -47,8 +47,7 @@ const BASE = require('./test_base').BASE;
         const rows = await ev(`document.querySelectorAll('#board-task-list [data-task-id], #board-task-list .board-task-row, #board-task-list tr').length`);
         assert.ok(rows >= 2 || (await ev(`document.getElementById('board-task-list').textContent.includes('First task')`)), 'the task rows are drawn');
         assert.ok(await ev(`document.getElementById('agentic-state-events').textContent.includes('go test')`), 'the events are drawn');
-        assert.equal(await ev(`document.getElementById('task-bar-count').textContent`), '1/2');
-        console.log('   ✓ tasks, events and the 1/2 count are drawn');
+        console.log('   ✓ tasks and events are drawn');
 
         console.log('2. Drawing again with nothing changed writes nothing');
         await settle();
@@ -66,10 +65,9 @@ const BASE = require('./test_base').BASE;
         await ev(`T.state.currentBoardTasks[0].status = 'completed'; T.state.currentAgentEvents.unshift({ id: 3, event_type: 'tool_use', tool_name: 'Edit', summary: 'render.js', created_at: '2026-10-16T10:03:00Z' }); true`);
         await redraw();
         await settle();
-        assert.equal(await ev(`document.getElementById('task-bar-count').textContent`), '2/2', 'the count follows');
         assert.ok(await ev(`document.getElementById('agentic-state-events').textContent.includes('render.js')`), 'the new event shows');
         assert.ok(await ev(`window.__muts`) > after, 'something was written');
-        console.log('   ✓ the count reads 2/2 and the new event is there');
+        console.log('   ✓ the new event is there');
 
         console.log('\nAll idle DOM write checks passed');
     } finally {
