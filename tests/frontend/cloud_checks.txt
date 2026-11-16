@@ -441,3 +441,5 @@ node cpu_load.test.js
 node patch_leftovers.test.mjs
 node start_bytes_delta.test.mjs
 node start_bytes_delta.mjs
+node settings_inbox_off_line.test.mjs
+node menu_dialog_motion_lint.test.mjs

@@ -134,7 +134,7 @@ const TEAM = `qa-agents-${Date.now() % 100000}`;
                     await ev(`window.mobileBack(); true`);
                     await waitFor(`!!window.__tp.sidebar()`, 'the phone Agents list');
                 }
-                assert.ok(await ev(`(() => { const s = window.__tp.sidebar() || document; const b = [...s.querySelectorAll('button')].filter(window.__na.vis).find(x => /^Health monitor settings for /.test(window.__na.name(x))); if (!b) return false; b.click(); return true; })()`), 'a button named Health monitor settings for the team');
+                assert.ok(await ev(`(() => { const s = window.__tp.sidebar() || document; const b = [...s.querySelectorAll('button')].filter(window.__na.vis).find(x => /^Health check settings for /.test(window.__na.name(x))); if (!b) return false; b.click(); return true; })()`), 'a button named Health check settings for the team');
                 await waitFor(`!!document.querySelector('.team-settings-modal #team-settings-workspace .sv[data-ready]') && document.querySelector('.team-settings-modal #team-settings-health')?.hidden === false`, 'the pulse opens Health check settings', 15000);
                 assert.ok(await ev(`document.querySelector('.team-settings-modal h3')?.textContent.includes(${JSON.stringify(TEAM)})`), 'settings belong to the chosen team');
                 await ev(`document.querySelector('.team-settings-modal .sv-cancel').click(); true`);

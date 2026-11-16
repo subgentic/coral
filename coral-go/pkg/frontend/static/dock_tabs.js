@@ -22,19 +22,18 @@ let menuOpen = false;
 export function fitWords() {
     const row = strip();
     if (!row) return;
-    const on = row.hasAttribute('data-words');
     const tabs = [...row.querySelectorAll('.agentic-tab')].filter(shown).filter(b => !b.classList.contains('tab-more'));
     if (tabs.length === 0) return;
-    if (!on) row.setAttribute('data-words', '');
+    row.toggleAttribute('data-words', true); // on, to look (no write when already on)
     const top = tabs[0].offsetTop;
-    const crowded = () => tabs.some(b => b.offsetTop !== top || b.scrollWidth > b.clientWidth + 1) || row.scrollWidth > row.clientWidth;
-    if (!crowded()) { if (row.hasAttribute('data-active-word')) row.removeAttribute('data-active-word'); return; }
+    const crowded = () => tabs.some(b => b.offsetTop !== top || b.scrollWidth > b.clientWidth + 1) || (row.scrollWidth > row.clientWidth && !row.closest('.mobile-panel-overlay'));
+    if (!crowded()) { row.removeAttribute('data-active-word'); return; }
     row.removeAttribute('data-words'); // not all on one line, or a word clipped in its tab: icons alone
     // ...but the open tab still says its word when that fits, whichever tab is open (#9999: eight icons and a newcomer guessing which one is Artifacts): each tab is tried as the open one
     // each tab on its own (#10876): one whose word does not fit at the panel's narrowest (Artifacts) does not take the word from Files; a tab that fits is marked, and the marked open one says its word
-    const fit = tabs.map(b => { b.setAttribute('data-probe', ''); const ok = !crowded(); b.removeAttribute('data-probe'); if (b.hasAttribute('data-word-ok') !== ok) b.toggleAttribute('data-word-ok', ok); return ok; });
+    const fit = tabs.map(b => { b.setAttribute('data-probe', ''); const ok = !crowded(); b.removeAttribute('data-probe'); b.toggleAttribute('data-word-ok', ok); return ok; });
     const fits = fit.some(Boolean);
-    if (fits !== row.hasAttribute('data-active-word')) { if (fits) row.setAttribute('data-active-word', ''); else row.removeAttribute('data-active-word'); }
+    row.toggleAttribute('data-active-word', fits);
 }
 
 let lastShape = '';
