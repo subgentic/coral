@@ -13,6 +13,10 @@ const { coralReady } = require('./helpers/wait');
     const B = 'bdr-' + Date.now().toString(36);
     try {
         await Page.enable();
+        // The board's own code (message_board.js) loads lazily, and Remove team's click must wait for it, not be dropped (#18903: a slow Windows runner clicked before the file was in and nothing happened). It is held here, then let go.
+        const { Fetch } = client; const held = [];
+        await Fetch.enable({ patterns: [{ urlPattern: '*/message_board.js*', requestStage: 'Request' }] });
+        Fetch.requestPaused(e => { held.push(e.requestId); });
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.addScriptToEvaluateOnNewDocument({ source: `window.__qaSeed = [{ name: 'bd-agent', prefix: 'A', n: 2, sleeping: false, board_project: ${JSON.stringify(B)}, session_id: 'bd-agent-id' }];` });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -36,6 +40,16 @@ const { coralReady } = require('./helpers/wait');
         const toasts = () => ev(`[...document.querySelectorAll('.toast')].map(t => t.textContent)`);
         const clickDelete = () => ev(`document.getElementById('mb-delete-btn').click(); true`);
         const boardListed = () => ev(`fetch('/api/board/projects').then(r => r.json()).then(p => (Array.isArray(p) ? p : p.projects || []).some(x => x.project === ${JSON.stringify(B)}))`);
+
+        console.log('0. Remove team clicked while the board code is still loading is not lost: the dialog comes once it is in');
+        await waitFor(`true`, 'settle', 100);
+        for (let i = 0; i < 30 && !held.length; i++) await new Promise(r => setTimeout(r, 100));
+        assert.ok(held.length > 0, 'the board code was asked for and is held');
+        await clickDelete();
+        await new Promise(r => setTimeout(r, 500));
+        for (const requestId of held) await Fetch.continueRequest({ requestId }); await Fetch.disable();
+        await waitFor(`!!window.__confirm`, 'the dialog after the held file arrives', 10000);
+        await ev(`window.__confirm = null; true`);
 
         console.log('1. An agent is running on the board: Remove team asks in a dialog, names it, says what goes and stays, and sends nothing until it is answered');
         await clickDelete();
