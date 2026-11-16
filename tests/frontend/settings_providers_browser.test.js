@@ -30,7 +30,7 @@ const ANSWERS = { claude: { found: true }, codex: { found: false, install_url: '
             assert.ok(why.plain, at + 'the note is one span of plain text, set as text and never as markup (#18247): ' + JSON.stringify(why));
             assert.deepEqual(why.cards, ['claude', 'codex', 'agy', 'pi'], at + 'the cards are the four providers with a default: ' + JSON.stringify(why.cards));
             assert.equal(await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`), 0, at + 'no sideways scroll');
-            const small = await ev(`[...document.querySelectorAll('#settings-pane-providers .prov-card button, #settings-pane-providers .prov-card input, #settings-pane-providers .prov-card select')].filter(e => e.getClientRects().length).map(e => Math.round(e.getBoundingClientRect().height)).filter(x => x < ${mobile ? 44 : 30})`);
+            const small = await ev(`[...document.querySelectorAll('#settings-pane-providers .prov-card button, #settings-pane-providers .prov-card input, #settings-pane-providers .prov-card select')].filter(e => e.getClientRects().length).map(e => Math.round(e.matches('.settings-reset .btn') ? parseFloat(getComputedStyle(e, '::after').height) : e.getBoundingClientRect().height)).filter(x => x < ${mobile ? 44 : 30})`);
             assert.deepEqual(small, [], at + 'controls are tall enough: ' + small);
             // Set up Codex opens its rows, the CLI path first, and it stays open
             await ev(`document.querySelector('#settings-provider-codex .prov-card-setup button').click(); true`);

@@ -61,7 +61,7 @@ const KEYWORD = 'zephyr';
 
         await S.run('the search box has the keyword', async () => {
             const val = await ev(`(document.querySelector('${panel} .list-bar-search') || {}).value || ''`);
-            assert.equal(val, '${KEYWORD}', 'the search box shows the keyword');
+            assert.equal(val, KEYWORD, 'the search box shows the keyword');
         });
 
         await shot('task-search-url-pill');
@@ -104,7 +104,7 @@ const KEYWORD = 'zephyr';
         await shot('task-search-url-pill-reload');
 
     } finally {
-        await removeBoards(ev, TEAM);
+        await removeBoards(ev, [TEAM]);
         await client.close();
     }
     console.log('task_search_url_pill_browser: ok');
