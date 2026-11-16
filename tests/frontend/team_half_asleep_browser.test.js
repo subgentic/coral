@@ -26,7 +26,7 @@ const SESSIONS = [
         const open = async name => { await ev(`(() => { const li = [...document.querySelectorAll('li.session-team-group')].find(l => l.querySelector('[data-group-name]')?.dataset.groupName === ${JSON.stringify(name)}); li.querySelector(':scope > .board-card-header .sidebar-kebab-btn').click(); return true; })()`); await new Promise(r => setTimeout(r, 600)); }; // sleep-ok: the menu opens and its lazy helper adds the item
         await open('half'); await open('awake');
         const card = name => ev(`(() => { const li = [...document.querySelectorAll('li.session-team-group')].find(l => l.querySelector('[data-group-name]')?.dataset.groupName === ${JSON.stringify(name)}); if (!li) return null;
-            const c = li.querySelector('.session-group-count'); return { labels: [...li.querySelectorAll(':scope > .board-card-header .sidebar-kebab-menu button[data-on-click="team-sleep"]')].map(b => b.textContent.trim() + ':' + b.dataset.mode), count: c.textContent, title: c.title }; })()`);
+            const c = li.querySelector('.session-group-count'); return { labels: [...li.querySelectorAll(':scope > .board-card-header .sidebar-kebab-menu button[data-on-click="team-sleep"]')].filter(b => b.dataset.mode !== 'archive').map(b => b.textContent.trim() + ':' + b.dataset.mode), count: c.textContent, title: c.title }; })()`);
         const half = await card('half'), awake = await card('awake');
         assert.ok(half && awake, 'both team cards drawn: ' + JSON.stringify([half, awake]));
         assert.deepEqual(half.labels, ['Sleep team:sleep', 'Wake team:wake'], 'a half-asleep team offers both: ' + JSON.stringify(half));
