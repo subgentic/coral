@@ -71,7 +71,7 @@ function buildOnce() {
     drawTabEdges = watchScrollCue(tabs);
     window.addEventListener('resize', () => { syncTabStop(); revealInStrip(tabs, $(`team-tab-${S.tab}`)); drawTabEdges(); });
     let stripW = tabs.clientWidth; tabs.addEventListener('scroll', () => { if (tabs.clientWidth === stripW && Math.abs(tabs.scrollLeft - (tabs._revealedTo ?? tabs.scrollLeft)) > 1) tabs._moved = true; }, { passive: true });
-    let flips = []; new ResizeObserver(() => { const w = tabs.clientWidth; if (w === stripW) return; stripW = w; if (tabs._moved) return; const now = performance.now(); flips = flips.filter(t => now - t < 500); flips.push(now); if (flips.length > 4) { tabs._moved = true; return; } revealInStrip(tabs, $(`team-tab-${S.tab}`)); }).observe(tabs); // the Show more tabs arrow takes room beside the strip once the cue draws: the strip rests on a tab's edge at its new width, unless a person has scrolled it since the last reveal (#18906); more than four width changes within half a second mean the reveal and the arrow disagree (the arrow shows at one position and hides at the other: the strip flickered every frame), so it stays where it is (#18972)
+    const ro = new ResizeObserver(() => { if (!tabs.isConnected) { ro.disconnect(); return; } const w = tabs.clientWidth; if (w === stripW || tabs._moved) { stripW = w; return; } stripW = w; revealInStrip(tabs, $(`team-tab-${S.tab}`)); }); ro.observe(tabs); // the strip's width changes when the page does (a turned phone, the text size): it rests on a tab's edge at its new width, unless a person has scrolled it since the last reveal (#18906); the Show more tabs arrow keeps its room while tabs wait past the strip's end, so it never changes the width itself (#18972); the observer is let go with the strip
     tabs.addEventListener('keydown', (e) => {
         const list = [...tabs.querySelectorAll('[role=tab]')].filter(b => b.getClientRects().length), i = list.indexOf(document.activeElement); // a phone's tabs behind More are not in the row
         if (i < 0) return;
@@ -109,7 +109,6 @@ function buildTabsMore(tabs) {
     const next = el('button', 'team-tabs-next'); next.type = 'button'; next.id = 'team-tabs-next'; next.setAttribute('aria-label', 'Show more tabs'); // a tappable cue at the strip's end while tabs wait past it (css, off the strip's data-more); it replaces the end chevron then (#17816)
     next.addEventListener('click', () => { tabs._moved = true; /* a person's scroll, even before its first scroll event: the strip is not put back by a width change (#18963) */ tabs.scrollBy({ left: tabs.clientWidth * 0.7, behavior: scrollBehavior() }); });
     b.before(next); // beside the scrolling strip, before More: a tab never lies under it (#18867)
-    new MutationObserver(() => { if (document.activeElement === next && !next.getClientRects().length) b.focus(); }).observe(tabs, { attributes: true, attributeFilter: ['data-more'] }); // the arrow hides when the strip reaches its end: focus on it goes to More, the next stop, not to a button that is no longer there (#18972)
     for (const [side, glyph] of [['start', '‹'], ['end', '›']]) {
         const cue = el('span', `team-strip-edge team-strip-edge-${side}`, glyph);
         cue.setAttribute('aria-hidden', 'true'); row.append(cue);
