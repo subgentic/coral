@@ -3,6 +3,7 @@
 //     the Hub's header limit, while the agent already got the text;
 //   - the agent's live row lists what Coral typed in the last 90 s (pending_sends); when the text is there, the bubble says Sent,
 //     the box and the saved draft are empty and no error shows (a second send would type it twice);
+//   - an earlier message with the same words (listed 60 s before this send) is not this one: it is put back;
 //   - when the row does not list it, the text still goes back in the box with the error, as before.
 // The agent and its send route are mocked in the page (agent_view_harness.js). Drives Chrome over CDP.
 const assert = require('node:assert/strict');
@@ -32,7 +33,7 @@ const MOCK = `(() => {
     const composerError = () => ev(`(() => { const e = document.getElementById('composer-error'); return e.hidden ? '' : e.textContent; })()`);
     const bubbles = sel => ev(`document.querySelectorAll('#live-history-messages ${sel} .chat-bubble').length`);
     const settle = () => ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: a text put back, if any, would be within this
-    const typedIs = text => ev(`(() => { const e = window.__m.entry.bind(window.__m); window.__m.entry = a => Object.assign(e(a), { pending_sends: ${JSON.stringify(text)} ? [{ id: 'p1', text: ${JSON.stringify(text)}, at: Date.now() / 1000 }] : [] }); return true; })()`);
+    const typedIs = (text, ageMs = 0) => ev(`(() => { const e = window.__m.entry.bind(window.__m); window.__m.entry = a => Object.assign(e(a), { pending_sends: ${JSON.stringify(text)} ? [{ id: 'p1', text: ${JSON.stringify(text)}, at: new Date(Date.now() - ${ageMs}).toISOString() }] : [] }); return true; })()`);
     const fresh = async () => {
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev);
@@ -66,7 +67,16 @@ const MOCK = `(() => {
         }
 
         await fresh();
-        console.log('2. the row does not list the text: it was not typed, the text goes back with an error');
+        console.log('2. the row lists the same words from 60 s before this send: an earlier message, so this one was not typed');
+        await ev(`window.__mode = 'drop'; true`);
+        await typedIs('ok', 60000);
+        await type('ok');
+        await ev(`window.sendCommand(); true`);
+        await waitFor(`document.getElementById('command-input').value === 'ok'`, 'the text back in the box');
+        assert.notEqual(await composerError(), '', 'the error shows');
+
+        await fresh();
+        console.log('3. the row does not list the text: it was not typed, the text goes back with an error');
         await ev(`window.__mode = '504'; true`);
         await typedIs('');
         await type('never arrived');
