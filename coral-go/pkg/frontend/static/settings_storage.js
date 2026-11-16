@@ -456,7 +456,7 @@ export async function loadLocalBackup() {
         el.hidden = false;
         const path = document.createElement('code');
         path.className = 'settings-mono-input';
-        path.textContent = dir;
+        path.textContent = dir; path.style.overflowWrap = 'anywhere'; // a long folder path wraps; at 200% text it was cut by the pane (#18867)
         const btn = document.createElement('button');
         btn.type = 'button'; btn.className = 'btn btn-small'; btn.textContent = 'Copy path';
         btn.addEventListener('click', async () => { showToast((await copyText(dir)) ? 'Copied' : 'Could not copy', false); });
