@@ -129,6 +129,8 @@ type BoardHandler struct {
 	clearBoardChatFlags func(ctx context.Context, project string) error
 	// memberRest says why a member's agent will not read a message now: asleep, terminal gone, ended or archived (SetMemberRestLookup, #13189). Nil: not known.
 	memberRest func(ctx context.Context, project, member string) string
+	// memberNames maps a renamed member's board id to the display name the dashboard gave their agent (SetMemberNameLookup, #17421). Nil: none.
+	memberNames func(ctx context.Context, project string) map[string]string
 	// sessionAsleep reports whether a live session is asleep, ended or archived: an approval's message waits for it (SetSessionAsleepLookup). Nil: not known.
 	sessionAsleep func(ctx context.Context, sessionID string) bool
 	// commentReadStamp is told which messages a member's coral-board read returned, to stamp the comments they delivered (#14130, SetCommentReadStamp). Nil: none.

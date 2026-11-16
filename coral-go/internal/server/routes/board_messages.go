@@ -397,6 +397,7 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 	if refuseNewBoardName(w, r, h.bs, project) {
 		return nil, false
 	}
+	body.Content = h.useBoardIDs(r.Context(), project, body.Content) // a renamed agent named by its new name is stored under its board id (#17421)
 	if problems := h.bs.UnknownMentions(r.Context(), project, body.Content); len(problems) > 0 {
 		msg := "not posted: " + strings.Join(problems, "; ") + ". Mention a member of this board (coral-board targets lists them), or take the @ out of the text"
 		writeJSON(w, http.StatusBadRequest, map[string]any{
@@ -745,6 +746,7 @@ func (h *BoardHandler) ListAllMessages(w http.ResponseWriter, r *http.Request) {
 		h.noteMemberReads(r, project, messages) // coral-board read --last: the same (#15034)
 	}
 	if format == "dashboard" {
+		h.showCurrentNames(r.Context(), project, messages) // a renamed agent's rows say the name it has now (#17421)
 		total, _ := h.bs.CountMessages(r.Context(), project)
 		resp := map[string]any{
 			"messages": messages,
@@ -813,6 +815,7 @@ func (h *BoardHandler) listMessagesFor(w http.ResponseWriter, r *http.Request, p
 		writeJSON(w, http.StatusOK, emptyIfNil(messages))
 		return
 	}
+	h.showCurrentNames(r.Context(), project, messages)        // (#17421)
 	boardTotal, _ := h.bs.CountMessages(r.Context(), project) // "12 of 184 messages": the whole board's count beside this reader's
 	resp := map[string]any{"messages": emptyIfNil(messages), "total": page.Scanned, "board_total": boardTotal, "limit": limit, "offset": 0, "paging": "keyset", "before_count": page.Remaining}
 	if page.HasAfter && len(messages) > 0 {
