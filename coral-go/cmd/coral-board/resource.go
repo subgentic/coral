@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -24,12 +25,15 @@ The queue is cooperation, not isolation: it tells the team who is using a machin
 
   resource list [--json]                          Every resource: slots, who holds them, the line in order
   resource status <name> [--json]                 One resource, and your place
+  resource info <name> [--json]                   What it is for: its description (what it runs, how to reach it, its rules) and the machine's stats now
   resource claim <name> [--wait] [--timeout 30m] [--note "why"]
                                                   A slot now (exit 0), or a place in line: with --wait the command waits until the slot is yours
   resource release <name>                         Give the slot back, or leave the line
   resource renew <name>                           A full lease from now
-  resource define <name> (--slots N | --pool a,b) [--machine M] [--here | --remote] [--lease 30m] [--allow a,b] [--match "go test ./..."]...
+  resource define <name> (--slots N | --pool a,b) [--machine M] [--here | --remote] [--lease 30m] [--allow a,b] [--match "go test ./..."]... [--facts os=linux]... [--weight N] [--needs go>=1.26]... --description "what it runs, how to reach it, its rules"
                                                   The Operator or an Orchestrator: make or change a resource
+  resource setup <box>... [--pool NAME] [--dry-run]
+                                                  The Operator or an Orchestrator: read each computer over ssh (or "here"), run a tiny check test on it, and define its resource with slots, facts and a description (run it again to update)
   resource remove <name>                          The Operator or an Orchestrator
   resource move <entry-id> first|up|down          The Operator or an Orchestrator: reorder the line
   resource kick <entry-id>                        The Operator or an Orchestrator: drop a holder or a waiting entry`
@@ -59,12 +63,16 @@ func cmdResource() {
 		resourceList(rest)
 	case "status":
 		resourceStatus(rest)
+	case "info":
+		resourceInfo(rest)
 	case "claim":
 		resourceClaim(rest)
 	case "release", "renew":
 		resourceSimple(sub, rest)
 	case "define":
 		resourceDefine(rest)
+	case "setup":
+		resourceSetup(rest)
 	case "remove":
 		resourceRemove(rest)
 	case "move":
@@ -101,14 +109,115 @@ type resEntry struct {
 }
 
 type resView struct {
-	Name     string     `json:"name"`
-	Slots    int        `json:"slots"`
-	Machine  string     `json:"machine"`
-	Where    string     `json:"where"` // here or remote; empty says nothing (#14354)
-	MaxLease int        `json:"max_lease_seconds"`
-	Members  []string   `json:"members"`
-	Holders  []resEntry `json:"holders"`
-	Queue    []resEntry `json:"queue"`
+	Name     string   `json:"name"`
+	Slots    int      `json:"slots"`
+	Machine  string   `json:"machine"`
+	Where    string   `json:"where"` // here or remote; empty says nothing (#14354)
+	MaxLease int      `json:"max_lease_seconds"`
+	Members  []string `json:"members"`
+	// Description and Stats are the resource's how-to and its machine now (#17560).
+	Description string            `json:"description"`
+	Facts       map[string]string `json:"facts"`
+	Weight      int               `json:"weight"`
+	Needs       []string          `json:"needs"`
+	Stats       *resStats         `json:"stats"`
+	Holders     []resEntry        `json:"holders"`
+	Queue       []resEntry        `json:"queue"`
+}
+
+type resStats struct {
+	State       string  `json:"state"`
+	LoadPerCore float64 `json:"load_per_core"`
+	CPUCount    int     `json:"cpu_count"`
+	MemAvailMB  int64   `json:"mem_available_mb"`
+	DiskFreeGB  float64 `json:"disk_free_gb"`
+}
+
+func (s resStats) words() string {
+	switch s.State {
+	case "ok":
+		return fmt.Sprintf("up; load %.2f per core on %d cores; %d MB memory free; %.0f GB disk free", s.LoadPerCore, s.CPUCount, s.MemAvailMB, s.DiskFreeGB)
+	case "unreachable":
+		return "unreachable (ssh failed or timed out)"
+	case "checking":
+		return "checking"
+	}
+	return "stats not available for this machine"
+}
+
+// howTo prints a resource's description (its first maxLines lines) and its machine's stats, each line indented, for a claim, a place in line and info.
+func howTo(v resView, maxLines int) {
+	if v.Description == "" {
+		fmt.Println("  (no description yet: ask the Orchestrator to add one with resource define --description)")
+	} else {
+		lines := strings.Split(v.Description, "\n")
+		for i, l := range lines {
+			if i == maxLines {
+				fmt.Println("  ... more: coral-board resource info " + plainText(v.Name))
+				break
+			}
+			fmt.Println("  " + plainText(l))
+		}
+	}
+	if v.Stats != nil {
+		fmt.Println("  machine now: " + v.Stats.words())
+	}
+}
+
+// resourceInfo is resource info <name>: one command that says what the resource is for and how it is doing.
+func resourceInfo(rest []string) {
+	name := resourceName(rest, "info")
+	data, status, err := resourceCall("GET", "/"+name, nil)
+	if err != nil || status != http.StatusOK {
+		resourceFail("Could not read the resource", err, status, data)
+		return
+	}
+	if len(rest) > 1 && rest[1] == "--json" {
+		fmt.Println(string(data))
+		return
+	}
+	var v resView
+	if json.Unmarshal(data, &v) != nil {
+		fmt.Println(string(data))
+		return
+	}
+	where := ""
+	if v.Machine != "" {
+		where = " on " + v.Machine
+	}
+	fmt.Printf("%s%s: %d slot(s)\n", plainText(v.Name), plainText(where), v.Slots)
+	if len(v.Facts) > 0 || v.Weight > 0 || len(v.Needs) > 0 {
+		keys := make([]string, 0, len(v.Facts))
+		for k := range v.Facts {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		var parts []string
+		for _, k := range keys {
+			parts = append(parts, k+"="+v.Facts[k])
+		}
+		line := "  facts: " + strings.Join(parts, " ")
+		if v.Weight > 0 {
+			line += fmt.Sprintf("  weight: %d", v.Weight)
+		}
+		if len(v.Needs) > 0 {
+			line += "  needs: " + strings.Join(v.Needs, " ")
+		}
+		fmt.Println(plainText(line))
+	}
+	howTo(v, 6)
+}
+
+// claimHowTo prints the how-to after a claim is granted or given a place (a few lines, so it does not flood the output); a failed read prints nothing.
+func claimHowTo(name string) {
+	data, status, err := resourceCall("GET", "/"+name, nil)
+	if err != nil || status != http.StatusOK {
+		return
+	}
+	var v resView
+	if json.Unmarshal(data, &v) == nil {
+		howTo(v, 3)
+	}
 }
 
 func printResource(v resView, me string) {
@@ -199,6 +308,7 @@ func resourceList(rest []string) {
 	me := resolveSubscriberID()
 	for _, v := range out.Resources {
 		printResource(v, me)
+		howTo(v, 2)
 	}
 }
 
@@ -219,6 +329,7 @@ func resourceStatus(rest []string) {
 		return
 	}
 	printResource(v, resolveSubscriberID())
+	howTo(v, 3)
 }
 
 func resourceClaim(rest []string) {
@@ -246,9 +357,11 @@ func resourceClaim(rest []string) {
 	_ = json.Unmarshal(data, &res)
 	if res.Granted {
 		fmt.Printf("You hold a slot of %s%s. As an agent, it goes back when THIS command (tool call) ends: claim and run the work in the same command. Release early with: coral-board resource release %s\n", rest[0], onWords(res.Entry.Machine, res.Entry.Member), rest[0])
+		claimHowTo(name)
 		return
 	}
 	fmt.Printf("%s is busy: you are number %d in line.\n", rest[0], res.Place)
+	claimHowTo(name)
 	if !*wait {
 		fmt.Println("Run the claim again with --wait to wait for your turn, or coral-board resource status " + rest[0] + " to look.")
 		exitFn(3)
@@ -270,6 +383,7 @@ func resourceClaim(rest []string) {
 		_ = json.Unmarshal(data, &res)
 		if res.Granted {
 			fmt.Printf("Your turn: you hold a slot of %s%s. As an agent, it goes back when THIS command (tool call) ends: claim and run the work in the same command. Release early with: coral-board resource release %s\n", rest[0], onWords(res.Entry.Machine, res.Entry.Member), rest[0])
+			claimHowTo(name)
 			return
 		}
 		if res.Place != last {
@@ -307,8 +421,13 @@ func resourceDefine(rest []string) {
 	here := fs.Bool("here", false, "a run through it happens on the machine this Coral is on (coral-board heavy run)")
 	remote := fs.Bool("remote", false, "a run through it happens on another machine, through the ssh alias coral-heavy-<machine> (coral-board heavy run)")
 	lease := fs.Duration("lease", 0, "how long a claim lasts unless renewed (default 30m)")
-	pool := fs.String("pool", "", "a pool: comma-separated resources whose slots it hands out, first free one in order (no --slots)")
+	pool := fs.String("pool", "", "a pool: comma-separated resources whose slots it hands out, the least used box that meets --needs first (no --slots)")
 	allow := fs.String("allow", "", "comma-separated agents that may claim it (default: everyone)")
+	desc := fs.String("description", "", "what it runs, how to reach it (such as ssh epoch) and its rules: a few lines of plain text; required for a new resource")
+	weight := fs.Int("weight", 0, "its share when a pool spreads work: the cores lent to tests (default 1)")
+	var facts, needs listFlag
+	fs.Var(&facts, "facts", `what the box can run, name=value (repeat for more): os=linux, go=1.26, cores=16`)
+	fs.Var(&needs, "needs", `on a pool: what a command it claims needs of the box that runs it (repeat): os=linux, go>=1.26, os!=windows`)
 	var match listFlag
 	fs.Var(&match, "match", `a shell command that claims it by itself, such as "go test ./..." (repeat for more; the hook, off without one)`)
 	clihelp.ParseFlags(fs, rest[1:], func() string { return resourceUsageText })
@@ -341,6 +460,28 @@ func resourceDefine(rest []string) {
 	}
 	if len(match) > 0 {
 		body["match"] = []string(match)
+	}
+	if *desc != "" {
+		body["description"] = *desc
+	}
+	if *weight != 0 {
+		body["weight"] = *weight
+	}
+	if len(facts) > 0 {
+		fm := map[string]string{}
+		for _, f := range facts {
+			k, v, ok := strings.Cut(f, "=")
+			if !ok || k == "" || v == "" {
+				fmt.Fprintf(os.Stderr, "--facts wants name=value, not %q\n", f)
+				exitFn(1)
+				return
+			}
+			fm[k] = v
+		}
+		body["facts"] = fm
+	}
+	if len(needs) > 0 {
+		body["needs"] = []string(needs)
 	}
 	data, status, err := resourceCall("PUT", "/"+name, body)
 	if err != nil || status != http.StatusOK {

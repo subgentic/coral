@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -36,7 +37,12 @@ func newResRig(t *testing.T) *resRig {
 	t.Cleanup(func() { bs.Close() })
 	mgr, err := resources.Open(resources.Options{Priorities: resources.BoardPriorities{Store: bs}, AgeStep: -1})
 	require.NoError(t, err)
-	h := &ResourcesHandler{M: mgr, Board: bs}
+	h := &ResourcesHandler{M: mgr, Board: bs, Stats: &resources.StatsBoard{Run: func(_ context.Context, alias, _ string) (string, error) { // no ssh in a test: a box that answers (#17560)
+		if alias == "down" {
+			return "", errors.New("timed out")
+		}
+		return " up 1 day, load average: 4.00, 3.00, 2.00\n---\n8\n---\n/dev/sda1 1 1 52428800 1% /\n---\nMem: 1 1 1 1 1 24000\n", nil
+	}}}
 	r := chi.NewRouter()
 	r.Get("/api/resources", h.List)
 	r.Get("/api/resources/{name}", h.Get)
@@ -57,6 +63,11 @@ func (g *resRig) do(as, method, path string, body any) (int, map[string]any) {
 	if m, ok := body.(map[string]any); ok && len(as) > 6 && as[:6] == "token:" && method == "POST" {
 		if _, named := m["subscriber_id"]; !named {
 			m["subscriber_id"] = as[6:] // what coral-board sends: its own name
+		}
+	}
+	if m, ok := body.(map[string]any); ok && method == "PUT" && strings.Count(path, "/") == 3 { // a new resource needs a description (#17560): the tests that are about something else get a plain one
+		if _, said := m["description"]; !said {
+			m["description"] = "a test box"
 		}
 	}
 	if body != nil {
@@ -362,4 +373,101 @@ func TestAClaimOfAPlainSlotResourceNamesItsOwnMachine(t *testing.T) {
 	entry := out["entry"].(map[string]any)
 	assert.NotEmpty(t, entry["member"])
 	assert.NotEmpty(t, entry["machine"], "a pool's grant names its member's machine")
+}
+
+// #17560: a resource carries its own how-to. A new one needs a description; a redefine that leaves it out keeps it; the view carries it and the stats of its machine.
+func TestAResourceNeedsADescriptionWhenNewAndKeepsItOnRedefine(t *testing.T) {
+	g := newResRig(t)
+	g.subscribe("alpha", "The Orchestrator", "Orchestrator", true)
+	code, out := g.do("operator", "PUT", "/api/resources/epoch-go", map[string]any{"slots": 2, "machine": "epoch", "description": ""})
+	assert.Equal(t, 400, code, "a new resource with no description is refused: %v", out)
+	assert.Contains(t, out["error"], "description")
+	code, out = g.do("operator", "PUT", "/api/resources/epoch-go", map[string]any{"slots": 2, "machine": "epoch", "description": "Linux: Go only.\x1b[31m ssh epoch\nLine 2"})
+	require.Equal(t, 200, code, "%v", out)
+	assert.Equal(t, "Linux: Go only.[31m ssh epoch\nLine 2", out["description"], "control characters are dropped, a line break stays")
+	code, out = g.do("operator", "PUT", "/api/resources/epoch-go", map[string]any{"slots": 3, "machine": "epoch", "description": ""})
+	require.Equal(t, 200, code, "a redefine needs none: %v", out)
+	assert.Equal(t, "Linux: Go only.[31m ssh epoch\nLine 2", out["description"], "and keeps the stored one")
+	long := strings.Repeat("x", 900) + "\n2\n3\n4\n5\n6\n7\n8"
+	_, out = g.do("operator", "PUT", "/api/resources/epoch-go", map[string]any{"slots": 3, "machine": "epoch", "description": long})
+	assert.LessOrEqual(t, len([]rune(out["description"].(string))), 600, "cut at 600 characters")
+	_, out = g.do("operator", "PUT", "/api/resources/epoch-go", map[string]any{"slots": 3, "machine": "epoch", "description": "1\n2\n3\n4\n5\n6\n7\n8"})
+	assert.Equal(t, "1\n2\n3\n4\n5\n6", out["description"], "six lines at most")
+}
+
+// #17560: the view of a resource carries its machine's stats: read from the machine (a remote one over ssh to its name), "unreachable" when ssh fails, none for a resource that does not say where it is.
+func TestAResourceViewCarriesItsMachinesStats(t *testing.T) {
+	g := newResRig(t)
+	g.do("operator", "PUT", "/api/resources/epoch-go", map[string]any{"slots": 2, "machine": "epoch", "where": "remote"})
+	g.do("operator", "PUT", "/api/resources/gone", map[string]any{"slots": 1, "machine": "down", "where": "remote"})
+	g.do("operator", "PUT", "/api/resources/nowhere", map[string]any{"slots": 1, "machine": "somewhere"})
+	// a first look at a remote box answers "checking" and reads it in the background (#17656): look again until it has answered
+	settled := func(name string) map[string]any {
+		var out map[string]any
+		require.Eventually(t, func() bool {
+			_, out = g.do("operator", "GET", "/api/resources/"+name, nil)
+			st, _ := out["stats"].(map[string]any)
+			return st != nil && st["state"] != "checking"
+		}, 5*time.Second, 5*time.Millisecond, "%s: the background read answered", name)
+		return out
+	}
+	out := settled("epoch-go")
+	st, _ := out["stats"].(map[string]any)
+	require.NotNil(t, st, "%v", out)
+	assert.Equal(t, "ok", st["state"])
+	assert.EqualValues(t, 8, st["cpu_count"])
+	assert.EqualValues(t, 24000, st["mem_available_mb"])
+	out = settled("gone")
+	assert.Equal(t, "unreachable", out["stats"].(map[string]any)["state"])
+	_, out = g.do("operator", "GET", "/api/resources/nowhere", nil)
+	assert.Nil(t, out["stats"], "no where, no stats")
+}
+
+// A resource states facts and a weight, a pool states needs, and a redefine without them keeps them (#17586).
+func TestAResourceCarriesFactsWeightAndNeedsAndRefusesBadOnes(t *testing.T) {
+	g := newResRig(t)
+	code, out := g.do("operator", "PUT", "/api/resources/epoch-go", map[string]any{"slots": 2, "machine": "epoch", "facts": map[string]string{"os": "linux", "go": "1.26"}, "weight": 16})
+	require.Equal(t, 200, code, "%v", out)
+	assert.EqualValues(t, 16, out["weight"])
+	assert.Equal(t, map[string]any{"os": "linux", "go": "1.26"}, out["facts"])
+	code, out = g.do("operator", "PUT", "/api/resources/linux", map[string]any{"members": []string{"epoch-go"}, "needs": []string{"os=linux", "go>=1.26"}})
+	require.Equal(t, 200, code, "%v", out)
+	assert.Equal(t, []any{"os=linux", "go>=1.26"}, out["needs"])
+	_, out = g.do("operator", "PUT", "/api/resources/epoch-go", map[string]any{"slots": 3, "machine": "epoch"})
+	assert.EqualValues(t, 16, out["weight"], "a redefine that leaves them out keeps them")
+	assert.Equal(t, "linux", out["facts"].(map[string]any)["os"])
+	code, out = g.do("operator", "PUT", "/api/resources/bad", map[string]any{"slots": 1, "facts": map[string]string{"bad key": "x"}})
+	assert.Equal(t, 400, code, "%v", out)
+	code, _ = g.do("operator", "PUT", "/api/resources/bad2", map[string]any{"members": []string{"epoch-go"}, "needs": []string{"nonsense"}})
+	assert.Equal(t, 400, code)
+}
+
+// PUT ?check=1 answers whether the caller may define and defines nothing (resource setup asks before it reads a box, #17894).
+func TestAskingMayIDefineAnswersForTheCallerAndDefinesNothing(t *testing.T) {
+	g := newResRig(t)
+	g.subscribe("alpha", "Plain Dev", "Developer", false)
+	g.subscribe("alpha", "The Orchestrator", "Orchestrator", true)
+	body := map[string]any{"slots": -1}
+	code, out := g.do("token:Plain Dev", "PUT", "/api/resources/newbox?check=1", body)
+	assert.Equal(t, 403, code, "an ordinary agent is told no")
+	assert.Equal(t, "manager_only", out["code"])
+	code, out = g.do("token:The Orchestrator", "PUT", "/api/resources/newbox?check=1", body)
+	assert.Equal(t, 200, code, "an Orchestrator is told yes")
+	assert.Equal(t, true, out["may_define"])
+	code, _ = g.do("operator", "PUT", "/api/resources/newbox?check=1", body)
+	assert.Equal(t, 200, code)
+	code, _ = g.do("operator", "GET", "/api/resources/newbox", nil)
+	assert.Equal(t, 404, code, "asking defined nothing")
+}
+
+// #18222: ?check=1 runs the name check a definition gets: a name that would be refused is a 400 before any box is read, and a good one is still a 200.
+func TestAskingMayIDefineRefusesABadNameLikeADefinitionWould(t *testing.T) {
+	g := newResRig(t)
+	body := map[string]any{"slots": -1}
+	code, _ := g.do("operator", "PUT", "/api/resources/bad%20name?check=1", body)
+	assert.Equal(t, 400, code, "a name with a space is refused")
+	code, _ = g.do("operator", "PUT", "/api/resources/-leading?check=1", body)
+	assert.Equal(t, 400, code, "a name that starts with a dash is refused")
+	code, _ = g.do("operator", "PUT", "/api/resources/good-box.1?check=1", body)
+	assert.Equal(t, 200, code, "a good name is told yes")
 }

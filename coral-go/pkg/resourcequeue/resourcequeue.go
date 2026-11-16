@@ -40,19 +40,27 @@ type Resource struct {
 	MaxLease time.Duration // a claim is held this long unless renewed (0: DefaultLease)
 	Allowed  []string      // agents that may claim it; empty: everyone
 	Members  []string      // a pool (#13719): the resources whose slots this one hands out, in the order they are tried; a pool has no slots of its own; its Match makes the shell hook claim the pool (a grant on another machine is told to the agent, #13751)
-	Match    []string      // shell commands that claim it by themselves (the hook, #13645): each a list of words that must appear in order in one simple command, such as "go test ./..."; empty: no hook
+	// Description is the resource's own how-to (#17560): what it runs, how to reach it and its rules, in a few lines of plain text, set by the Operator or an Orchestrator. A redefine that leaves it out keeps the stored one.
+	Description string
+	// Facts and Weight say what a member can run and how big it is (#17586): Facts are name=value pairs ("os=linux", "go=1.26", "cores=16"), Weight is its share when work is spread (the cores lent to tests; 0 counts as 1).
+	// Needs, on a pool, are what a command it claims must have from the member that runs it ("os=linux", "go>=1.26"): only a member whose facts meet every need is chosen.
+	Facts  map[string]string
+	Weight int
+	Needs  []string
+	Match  []string // shell commands that claim it by themselves (the hook, #13645): each a list of words that must appear in order in one simple command, such as "go test ./..."; empty: no hook
 }
 
 // Claimant is who asks, and how much it matters.
 type Claimant struct {
-	Agent    string // who (a session or member id)
-	Task     int    // what it is working on, for people to read (0: none)
-	Project  string // the board that task is on (task numbers repeat across boards; #13704 links to it), "" when there is no task
-	Priority int    // bigger goes first; supplied by the caller from the agent's task and goal
-	Note     string // why, for people to read
-	Via      string // how the claim came: "hook" for the shell hook's own, "" for a person's or an agent's (#13671)
-	Polls    bool   // #14170: the claim came from a command that keeps asking about its place (the CLI, every 3 s); only such a place can be taken for abandoned
-	Pattern  string // for a hook claim, the resource's match pattern that fired (never the command)
+	Agent    string   // who (a session or member id)
+	Task     int      // what it is working on, for people to read (0: none)
+	Project  string   // the board that task is on (task numbers repeat across boards; #13704 links to it), "" when there is no task
+	Priority int      // bigger goes first; supplied by the caller from the agent's task and goal
+	Note     string   // why, for people to read
+	Via      string   // how the claim came: "hook" for the shell hook's own, "" for a person's or an agent's (#13671)
+	Polls    bool     // #14170: the claim came from a command that keeps asking about its place (the CLI, every 3 s); only such a place can be taken for abandoned
+	Pattern  string   // for a hook claim, the resource's match pattern that fired (never the command)
+	Needs    []string // what the member that takes this claim must have (a pool's Needs, copied when the claim is made); empty: any member
 }
 
 // Entry is one agent's place in a resource's line, or its hold of a slot.
@@ -90,15 +98,16 @@ type Status struct {
 
 // Config tunes a Queue; the zero value is usable.
 type Config struct {
-	Now         func() time.Time        // the clock (default time.Now)
-	Alive       func(agent string) bool // false: the agent's session is gone, and its entries are dropped on the next Reap (default: everyone is alive)
-	MaxPerAgent int                     // entries one agent may have waiting per resource (0: DefaultMaxPerAgent)
-	AgeStep     time.Duration           // every AgeStep spent waiting is worth one point of priority (0: DefaultAgeStep; negative: no aging)
-	AgeCap      int                     // aging adds at most this many points (0: DefaultAgeCap)
-	OnGrant     func(Entry)             // called, outside the lock, for each entry that is granted by a release, a reap or a reorder (not for a claim answered at once: its Result says so)
-	OnEvent     func(Event)             // called, outside the lock, for each change (#13671, the analytics' record): a panic in it is dropped, and it must not block (the Manager's history queues and returns)
-	Persist     Persister               // optional: the state is saved after each change
-	WaitStale   time.Duration           // #14170: a waiting entry nobody has asked about for this long is taken for abandoned (0: never, as before). The server sets WaitStale (30 s) as its waiting CLI asks every 3 s
+	Now         func() time.Time           // the clock (default time.Now)
+	Alive       func(agent string) bool    // false: the agent's session is gone, and its entries are dropped on the next Reap (default: everyone is alive)
+	MaxPerAgent int                        // entries one agent may have waiting per resource (0: DefaultMaxPerAgent)
+	AgeStep     time.Duration              // every AgeStep spent waiting is worth one point of priority (0: DefaultAgeStep; negative: no aging)
+	AgeCap      int                        // aging adds at most this many points (0: DefaultAgeCap)
+	OnGrant     func(Entry)                // called, outside the lock, for each entry that is granted by a release, a reap or a reorder (not for a claim answered at once: its Result says so)
+	OnEvent     func(Event)                // called, outside the lock, for each change (#13671, the analytics' record): a panic in it is dropped, and it must not block (the Manager's history queues and returns)
+	Persist     Persister                  // optional: the state is saved after each change
+	Veto        func(member Resource) bool // #17586: true closes a member to new grants through a pool (a stalled box, no memory or disk); it must answer from what is already known and never block
+	WaitStale   time.Duration              // #14170: a waiting entry nobody has asked about for this long is taken for abandoned (0: never, as before). The server sets WaitStale (30 s) as its waiting CLI asks every 3 s
 }
 
 // Event is one change in a queue, for the record of its use (#13671): who, which resource, how long it waited or held. It carries no command and no note.
@@ -188,7 +197,8 @@ type Queue struct {
 	res     map[string]*Resource
 	entries []*Entry
 	nextID  int64
-	pend    []Event // events noted under the lock, told to the sink after it (OnEvent)
+	spans   map[string][]span // finished holds per member over the last UseWindow, for the spread (#17586)
+	pend    []Event           // events noted under the lock, told to the sink after it (OnEvent)
 }
 
 // New makes an empty Queue, or one loaded from cfg.Persist.
@@ -280,6 +290,15 @@ func (q *Queue) Define(r Resource) error {
 	if err := ValidMatch(r.Match); err != nil {
 		return err
 	}
+	if err := ValidFacts(r.Facts); err != nil {
+		return err
+	}
+	if err := ValidNeeds(r.Needs); err != nil {
+		return err
+	}
+	if r.Weight < 0 || r.Weight > 1000 {
+		return ErrBadWeight
+	}
 	q.mu.Lock()
 	if err := q.checkPoolLocked(r); err != nil {
 		q.mu.Unlock()
@@ -289,6 +308,25 @@ func (q *Queue) Define(r Resource) error {
 	cp.Members = append([]string(nil), r.Members...)
 	cp.Allowed = append([]string(nil), r.Allowed...)
 	cp.Match = append([]string(nil), r.Match...)
+	cp.Needs = append([]string(nil), r.Needs...)
+	cp.Facts = map[string]string{}
+	for k, v := range r.Facts {
+		cp.Facts[k] = v
+	}
+	if old, ok := q.res[r.Key]; ok { // a redefine that leaves these out keeps them (#17560, #17586)
+		if cp.Description == "" {
+			cp.Description = old.Description
+		}
+		if len(r.Facts) == 0 {
+			cp.Facts = old.Facts
+		}
+		if r.Weight == 0 {
+			cp.Weight = old.Weight
+		}
+		if len(r.Needs) == 0 {
+			cp.Needs = old.Needs
+		}
+	}
 	q.res[r.Key] = &cp
 	granted := q.fill(r.Key)
 	err := q.save()
@@ -396,6 +434,10 @@ func (q *Queue) Claim(key string, who Claimant) (Result, error) {
 		err := q.save()
 		q.unlockEmit()
 		return res, err
+	}
+	if !q.capable(r, who.Needs) {
+		q.unlockEmit()
+		return Result{}, ErrNoCapable
 	}
 	waiting := 0 // across every resource: one agent cannot fill the lines
 	for _, e := range q.entries {
@@ -719,6 +761,13 @@ func (q *Queue) entryFor(key, agent string) *Entry {
 }
 
 func (q *Queue) drop(id int64) {
+	if e := q.byID(id); e != nil {
+		if m := e.Member; m != "" {
+			q.record(m, e)
+		} else {
+			q.record(e.Resource, e)
+		}
+	}
 	kept := q.entries[:0]
 	for _, e := range q.entries {
 		if e.ID != id {
@@ -792,6 +841,9 @@ func (q *Queue) bestWaiter(m string) *Entry {
 	var best *Entry
 	for _, key := range append([]string{m}, q.poolsWith(m)...) {
 		for _, x := range q.line(key) {
+			if !q.eligible(x, m) {
+				continue // not this member's to take (its needs, a veto): a later entry of the line may be
+			}
 			if !x.Away.IsZero() || q.abandoned(x) { // an agent that is away is skipped (#13706): the slot goes to the next one who is here, and the absent one keeps its place at the front; so is one whose waiting command ended (#14170)
 				continue
 			}
@@ -810,30 +862,32 @@ func (q *Queue) fill(key string) []Entry {
 	if !ok {
 		return nil
 	}
-	members := []string{key}
-	if len(r.Members) > 0 {
-		members = r.Members
-	}
 	var granted []Entry
-	for progress := true; progress; {
-		progress = false
+	for {
+		members := []string{key}
+		if len(r.Members) > 0 {
+			members = q.byUse(r.Members) // lowest recent use first, and again after each grant (#17586)
+		}
+		var got *Entry
 		for _, m := range members {
 			mr := q.res[m]
 			if mr == nil || len(mr.Members) > 0 || q.held(m) >= mr.Slots {
 				continue
 			}
-			e := q.bestWaiter(m)
-			if e == nil {
-				continue
+			if e := q.bestWaiter(m); e != nil {
+				e.Granted = q.now()
+				if e.Resource != m { // a pool's entry: it holds this member
+					e.Member = m
+				}
+				e.Lease = e.Granted.Add(q.leaseOf(e, q.res[e.Resource]))
+				granted = append(granted, *e)
+				q.note("granted", e)
+				got = e
+				break
 			}
-			e.Granted = q.now()
-			if e.Resource != m { // a pool's entry: it holds this member
-				e.Member = m
-			}
-			e.Lease = e.Granted.Add(q.leaseOf(e, q.res[e.Resource]))
-			granted = append(granted, *e)
-			q.note("granted", e)
-			progress = true
+		}
+		if got == nil {
+			break
 		}
 	}
 	return granted

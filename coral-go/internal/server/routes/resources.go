@@ -38,6 +38,8 @@ type ResourcesHandler struct {
 	Hook  *resources.Hook    // the shell hook, swept with every call (#13645); may be nil
 	// ToolCalls are the tool_use ids of the calls the session has in flight (the one running coral-board resource claim is among them; tools run in parallel); none when not known: a claim then keeps its lease (#13718); nil: hand claims are not tied to a call.
 	ToolCalls func(sessionID string) []string
+	// Stats samples each resource's machine (#17560); nil shows no stats.
+	Stats *resources.StatsBoard
 	// AgentPID is the process of the agent itself (its session's), 0 when not known: a shell that IS the agent (a simple command a shell ran directly leaves the agent as the claim's parent) says nothing about the job, so such a claim follows its call alone (#13718).
 	AgentPID func(sessionName string) int
 }
@@ -65,16 +67,22 @@ type entryView struct {
 }
 
 type resourceView struct {
-	Name     string      `json:"name"`
-	Slots    int         `json:"slots"`
-	Machine  string      `json:"machine,omitempty"`
-	Where    string      `json:"where,omitempty"` // here or remote; empty says nothing (#14354)
-	MaxLease int         `json:"max_lease_seconds"`
-	Members  []string    `json:"members,omitempty"` // a pool: its members, in the order they are tried
-	Allowed  []string    `json:"allowed,omitempty"`
-	Match    []string    `json:"match,omitempty"`
-	Holders  []entryView `json:"holders"`
-	Queue    []entryView `json:"queue"`
+	Name     string   `json:"name"`
+	Slots    int      `json:"slots"`
+	Machine  string   `json:"machine,omitempty"`
+	Where    string   `json:"where,omitempty"` // here or remote; empty says nothing (#14354)
+	MaxLease int      `json:"max_lease_seconds"`
+	Members  []string `json:"members,omitempty"` // a pool: its members, in the order they are tried
+	Allowed  []string `json:"allowed,omitempty"`
+	Match    []string `json:"match,omitempty"`
+	// Description is the resource's own how-to (#17560); Stats the machine as it is now (a minute old at most). Plain text: the page and the CLI escape it.
+	Description string            `json:"description,omitempty"`
+	Facts       map[string]string `json:"facts,omitempty"` // #17586: what the box can run (os, go, cores ...), its weight when work is spread, and what a pool's commands need of a member
+	Weight      int               `json:"weight,omitempty"`
+	Needs       []string          `json:"needs,omitempty"`
+	Stats       *resources.Stats  `json:"stats,omitempty"`
+	Holders     []entryView       `json:"holders"`
+	Queue       []entryView       `json:"queue"`
 }
 
 func viewEntry(e resourcequeue.Entry, place int) entryView {
@@ -91,7 +99,7 @@ func viewStatus(st resourcequeue.Status) resourceView {
 	if lease <= 0 {
 		lease = resourcequeue.DefaultLease
 	}
-	v := resourceView{Name: st.Resource.Key, Slots: st.Resource.Slots, Machine: st.Resource.Machine, Where: st.Resource.Where, MaxLease: int(lease / time.Second), Members: st.Resource.Members, Allowed: st.Resource.Allowed, Match: st.Resource.Match, Holders: []entryView{}, Queue: []entryView{}}
+	v := resourceView{Name: st.Resource.Key, Slots: st.Resource.Slots, Machine: st.Resource.Machine, Where: st.Resource.Where, MaxLease: int(lease / time.Second), Members: st.Resource.Members, Allowed: st.Resource.Allowed, Match: st.Resource.Match, Description: st.Resource.Description, Facts: st.Resource.Facts, Weight: st.Resource.Weight, Needs: st.Resource.Needs, Holders: []entryView{}, Queue: []entryView{}}
 	for _, e := range st.Holders {
 		v.Holders = append(v.Holders, viewEntry(e, 0))
 	}
@@ -113,8 +121,10 @@ func (h *ResourcesHandler) fail(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "not_holder", err.Error())
 	case errors.Is(err, resourcequeue.ErrInPool):
 		writeError(w, http.StatusConflict, "in_pool", err.Error())
-	case errors.Is(err, resourcequeue.ErrBadResource), errors.Is(err, resourcequeue.ErrBadMatch):
+	case errors.Is(err, resourcequeue.ErrBadResource), errors.Is(err, resourcequeue.ErrBadMatch), errors.Is(err, resourcequeue.ErrBadFacts), errors.Is(err, resourcequeue.ErrBadNeeds), errors.Is(err, resourcequeue.ErrBadWeight):
 		errBadRequest(w, err.Error())
+	case errors.Is(err, resourcequeue.ErrNoCapable):
+		writeError(w, http.StatusConflict, "no_capable_member", err.Error())
 	default:
 		errInternalServer(w, err.Error())
 	}
@@ -139,6 +149,7 @@ func (h *ResourcesHandler) List(w http.ResponseWriter, r *http.Request) {
 	h.addGoals(r.Context(), out)
 	h.addStuck(out)
 	h.addMachines(out)
+	h.addStats(out)
 	if cloud.Tunneled(r) {
 		redactNotes(out) // an agent's note is free text: through the Hub it leaves only after the secret rules, and without the note when they cannot run
 	}
@@ -237,6 +248,7 @@ func (h *ResourcesHandler) Get(w http.ResponseWriter, r *http.Request) {
 	one := []resourceView{viewStatus(st)}
 	h.addStuck(one)
 	h.addMachines(one) // a pool's holds say which machine they are on here too (#13751)
+	h.addStats(one)
 	writeJSON(w, http.StatusOK, one[0])
 }
 
@@ -379,6 +391,14 @@ func (h *ResourcesHandler) Define(w http.ResponseWriter, r *http.Request) {
 	if !h.manager(w, r) {
 		return
 	}
+	if r.URL.Query().Get("check") == "1" { // may this caller define? Answers yes and defines nothing (resource setup asks before it reads a box, #17894)
+		if !resourceNameRe.MatchString(chi.URLParam(r, "name")) { // the same name check a definition gets, so setup stops before any box is read (#18222)
+			errBadRequest(w, "name: letters, digits, dot, dash and underscore, up to 64")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "may_define": true})
+		return
+	}
 	var body struct {
 		Slots     int      `json:"slots"`
 		Machine   string   `json:"machine"`
@@ -387,6 +407,11 @@ func (h *ResourcesHandler) Define(w http.ResponseWriter, r *http.Request) {
 		Allowed   []string `json:"allowed"`
 		Match     []string `json:"match"`
 		Members   []string `json:"members"` // a pool (#13719)
+		// Description is the how-to (#17560): required for a resource that is new, and kept when a redefine leaves it out.
+		Description string            `json:"description"`
+		Facts       map[string]string `json:"facts"`  // #17586
+		Weight      int               `json:"weight"` // its share when work is spread (0: 1)
+		Needs       []string          `json:"needs"`  // a pool: what a command it claims needs of the member that runs it
 	}
 	if err := decodeJSONMax(w, r, &body, 8192); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -407,7 +432,12 @@ func (h *ResourcesHandler) Define(w http.ResponseWriter, r *http.Request) {
 			allowed = append(allowed, a)
 		}
 	}
-	if err := h.M.Queue().Define(resourcequeue.Resource{Key: name, Slots: body.Slots, Members: cleanMembers(body.Members), Machine: cleanText(body.Machine, 128), Where: body.Where, MaxLease: time.Duration(body.MaxLeaseS) * time.Second, Allowed: allowed, Match: body.Match}); err != nil {
+	desc := cleanDescription(body.Description)
+	if _, missing := h.M.Queue().Status(name); missing != nil && desc == "" {
+		errBadRequest(w, "description: a new resource needs one: what it runs, how to reach it (such as ssh epoch) and its rules, in a few lines of plain text (--description)")
+		return
+	}
+	if err := h.M.Queue().Define(resourcequeue.Resource{Description: desc, Key: name, Slots: body.Slots, Members: cleanMembers(body.Members), Machine: cleanText(body.Machine, 128), Where: body.Where, MaxLease: time.Duration(body.MaxLeaseS) * time.Second, Allowed: allowed, Match: body.Match, Facts: body.Facts, Weight: body.Weight, Needs: body.Needs}); err != nil {
 		h.fail(w, err)
 		return
 	}
@@ -499,6 +529,37 @@ func (h *ResourcesHandler) addMachines(views []resourceView) {
 			if e := &views[i].Holders[j]; e.Member != "" {
 				e.Machine = machine[e.Member]
 			}
+		}
+	}
+}
+
+// cleanDescription keeps a resource's how-to as plain text: control characters dropped (a line break stays), at most 6 lines and 600 characters.
+func cleanDescription(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\r", "\n") {
+		if r == '\n' || (!unicode.IsControl(r) && r != '\u2028' && r != '\u2029') {
+			b.WriteRune(r)
+		}
+	}
+	lines := strings.Split(strings.TrimSpace(b.String()), "\n")
+	if len(lines) > 6 {
+		lines = lines[:6]
+	}
+	out := strings.TrimSpace(strings.Join(lines, "\n"))
+	if rs := []rune(out); len(rs) > 600 {
+		out = string(rs[:600])
+	}
+	return out
+}
+
+// addStats gives each plain resource the stats of its machine (a pool has none of its own: its members do).
+func (h *ResourcesHandler) addStats(views []resourceView) {
+	if h.Stats == nil {
+		return
+	}
+	for i := range views {
+		if len(views[i].Members) == 0 {
+			views[i].Stats = h.Stats.Get(views[i].Machine, views[i].Where)
 		}
 	}
 }
