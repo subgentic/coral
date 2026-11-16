@@ -241,7 +241,7 @@ function _mountMemberSkills() {
 
 /** The approved skills, offered in New agent and New team for this computer's own launch only (#12104). */
 function _mountSkills() {
-    importOnce('./launch_skills.js').then(m => { const local = normServer(launch.server) === LOCAL_SERVER; m.mountLaunchSkills('launch-skills', local, launch.welcomePrompt?.kind === 'agent' ? 'getting-started-agent' : ''); m.mountLaunchSkills('team-skills', local, launch.welcomePrompt?.kind === 'team' ? 'getting-started-team' : ''); }).catch(() => {});
+    importOnce('./launch_skills.js').then(m => { const local = normServer(launch.server) === LOCAL_SERVER; m.mountLaunchSkills('launch-skills', local, launch.welcomePrompt?.kind === 'agent' ? 'getting-started-agent' : ''); m.mountLaunchSkills('team-skills', local, ''); /* the tour's guide is the Orchestrator's own skill (team_dialogs.js), not every member's (#18808) */ }).catch(() => {});
 }
 
 // ── Server picker (hub mode) ─────────────────────────────────────────────

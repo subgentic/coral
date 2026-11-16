@@ -24,7 +24,8 @@ const shots=process.env.CORAL_GUIDE_SHOTS; if(shots)fs.mkdirSync(shots,{recursiv
  else assert.ok((await ev(`document.querySelector('${selector}').value`)).trim().length>20,`${width}: Inbox ${kind} guide supplies instructions`);
  if(!before){
  if(kind==='agent')assert.equal(await ev(`document.getElementById('launch-persona-select').value`),'Getting started','Inbox agent selects Getting started persona');
- await waitFor(`!!document.querySelector('#${kind==='agent'?'launch-skills':'team-skills'}-host input[type=checkbox]:checked')`,'Getting started skill selected');
+ if(kind==='agent')await waitFor(`!!document.querySelector('#launch-skills-host input[type=checkbox]:checked')`,'Getting started skill selected');
+ else await waitFor(`[...document.querySelectorAll('#team-agents-list .team-agent-row')].some(r=>/Orchestrator/.test(r.querySelector('.team-agent-role-name').textContent)&&!!r.dataset.skills)`,'Getting started skill is the Orchestrator\'s own (#18808), not every member\'s');
  }
  if(shots){
  await ev(kind==='agent'?`window._launchStage('persona');true`:`import((window.__coralStatic||'/static/')+'team_steps.js').then(m=>{m.showTeamStep('start');return true})`);
@@ -39,7 +40,8 @@ const shots=process.env.CORAL_GUIDE_SHOTS; if(shots)fs.mkdirSync(shots,{recursiv
  await ev(`Promise.resolve(window.${kind==='agent'?'launchSession':'launchTeam'}()).then(()=>true)`);
  await waitFor(`!!window.__guideLaunch`,'cleared prompt reaches intercepted launch request');
  const request=await ev(`window.__guideLaunch`);
- assert.equal(request.body.skills?.length,1,'selected Getting started skill reaches launch request');
+ if(kind==='agent')assert.equal(request.body.skills?.length,1,'selected Getting started skill reaches launch request');
+ else{assert.equal(request.body.skills,undefined,'no skill for every member (#18808)');const own=(request.body.agents||[]).filter(a=>a.skills&&a.skills.length);assert.equal(own.length,1,'only one member carries a skill: '+JSON.stringify(own.map(a=>a.name)));assert.match(own[0].name,/Orchestrator/,'and it is the Orchestrator');}
  if(kind==='agent')assert.equal(request.body.prompt||'','','cleared prompt is empty in real launch request');
  else assert.ok(!JSON.stringify(request.body).includes('getting-started-team'),'cleared team guide is absent from launch request');
  }

@@ -18,6 +18,11 @@ function newestOnly(list) {
     return [...best.values()];
 }
 
+/** The id of the approved skill with this name (its newest version), '' when there is none or the list cannot be read: the tour gives the Orchestrator its guide by name (#18808). */
+export async function skillIdByName(name) {
+    try { const list = newestOnly((await requestJson('GET', '/api/skills?status=approved')).skills || []); return list.find(s => s.name === name)?.id || ''; } catch { return ''; }
+}
+
 /** The ids ticked in the row ('launch-skills' or 'team-skills'), none when the row is hidden. */
 export function launchSkillIds(rowId) {
     const row = document.getElementById(`${rowId}-row`);

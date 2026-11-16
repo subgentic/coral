@@ -296,6 +296,12 @@ function cancelTeamMember() {
 window.cancelTeamMember = cancelTeamMember;
 
 /** A member row's own skill ids (#18657): kept on the row, since the member's form has no field for them; none for a row made before they existed. */
+/** Try a team (#18808, the Operator: "should this go for every member?"): getting-started-team is how an Orchestrator guides a new person, so it is the Orchestrator's own skill, not ticked for every member. */
+async function giveOrchestratorTheTour() {
+    const mod = await importOnce('./launch_skills.js').catch(() => null), id = mod ? await mod.skillIdByName('getting-started-team') : '';
+    const row = id && teamRows().find(r => isOrchestrator(rowRole(r)));
+    if (row) { setRowSkills(row, [...new Set([...rowSkills(row), id])]); _updateTeamAgentSummary(row); }
+}
 function rowSkills(row) {
     try { const v = JSON.parse(row?.dataset.skills || '[]'); return Array.isArray(v) ? v.filter(id => typeof id === 'string') : []; } catch { return []; }
 }
@@ -546,7 +552,7 @@ async function _initTeamForm() {
     // The default team is in Members when the dialog opens (#9877, the Operator): the Orchestrator, the Lead and the Reviewer, each removable; a template still replaces them.
     // A team the AI generated fills the list itself (launch.skipDefaultTeamAgents). #5989 opened it empty after four agents nobody picked were launched; three a person can see and remove are not that.
     const defaultsOnOpen = !launch.skipDefaultTeamAgents;
-    if (defaultsOnOpen) { _addDefaultMembers(launch.welcomePrompt?.members); resetTeamTemplatePicker(); markTeamTemplate(DEFAULT_TEAM_KEY); } // marked now, not after the board names load: a pick made meanwhile must not be overwritten
+    if (defaultsOnOpen) { _addDefaultMembers(launch.welcomePrompt?.members); resetTeamTemplatePicker(); markTeamTemplate(DEFAULT_TEAM_KEY); if (launch.welcomePrompt?.kind === 'team' && launch.welcomePrompt.members) giveOrchestratorTheTour(); } // marked now, not after the board names load: a pick made meanwhile must not be overwritten
 
     // Fetch existing boards for uniqueness validation
     await _loadExistingTeamBoards();
