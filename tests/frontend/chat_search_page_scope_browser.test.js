@@ -12,7 +12,7 @@ const BASE = require('./test_base').BASE;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
             await ev(`(() => { window.__asked = []; const R = window.fetch.bind(window); const json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'content-type': 'application/json' } }));
-                const all = Array.from({ length: 6 }, (_, i) => ({ session_id: 'chat-' + i, type: 'agent', title: i === 2 ? 'The build failed' : 'Other chat ' + i, summary: i === 2 ? 'the build failed twice' : 'nothing', snippet: i === 2 ? 'The **build failed** twice in `compile`.' : '', agent_name: 'Backend Dev', display_name: 'Backend Dev', last_timestamp: new Date(Date.now() - i * 3600000).toISOString(), duration_sec: 60, source_type: 'claude', starred: false, archived: false, active: false, tags: [] }));
+                const all = Array.from({ length: 6 }, (_, i) => ({ session_id: 'chat-' + i, type: 'agent', title: i === 2 ? 'The build failed' : 'Other chat ' + i, summary: i === 2 ? 'the build failed twice' : 'nothing', snippet: i === 2 ? 'The **build failed** twice in \`compile\`.' : '', agent_name: 'Backend Dev', display_name: 'Backend Dev', last_timestamp: new Date(Date.now() - i * 3600000).toISOString(), duration_sec: 60, source_type: 'claude', starred: false, archived: false, active: false, tags: [] }));
                 window.fetch = (u, o = {}) => { const url = new URL(String(u && u.url || u), location.origin);
                     if (url.pathname === '/api/sessions/history/counts') return json({ all: 6, group: 0, notes: 0, active: 0, starred: 0, archived: 0, by_agent_type: { claude: 6 }, tags: [] });
                     if (url.pathname === '/api/sessions/history') { window.__asked.push(Object.fromEntries(url.searchParams)); const q = (url.searchParams.get('q') || '').toLowerCase(); const list = q ? all.filter(s => (s.title + ' ' + s.summary).toLowerCase().includes(q)) : all; const pg = Number(url.searchParams.get('page') || 1), n = Number(url.searchParams.get('page_size') || 50); return json({ sessions: list.slice((pg - 1) * n, pg * n), total: list.length, page: pg, page_size: n }); }
@@ -36,6 +36,10 @@ const BASE = require('./test_base').BASE;
             const snippet = await ev(`(()=>{const root=document.getElementById('group-table-view');return {text:root.innerText,marks:[...root.querySelectorAll('mark')].map(x=>x.textContent)}})()`);
             assert.ok(!snippet.text.includes('**') && !snippet.text.includes('`'), `${w}: snippet strips Markdown: ${JSON.stringify(snippet)}`);
             assert.ok(snippet.marks.some(t=>t.toLowerCase()==='build failed'), `${w}: snippet highlights query: ${JSON.stringify(snippet)}`);
+            const cue = await ev(`document.querySelector('.chat-search-filter')?.textContent || ''`);
+            assert.ok(cue.includes('build failed') && cue.includes('Sidebar counts include all chats'), `${w}: the filter and sidebar count scope are visible`);
+            await ev(`document.querySelector('.chat-search-filter button').click();true`);
+            await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length===6 && !document.querySelector('.chat-search-filter')`, 'Clear restores all chats', {timeout:10000});
             console.log(`ok ${w}`);
         }
         console.log('PASS ordinary page navigation does not carry the sidebar query');
