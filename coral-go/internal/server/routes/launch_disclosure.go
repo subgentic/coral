@@ -15,9 +15,9 @@ import (
 // dialog uses that default. The text and its id live here; the acknowledgement is an operator-only record of the id and when (never a browser flag, never set by an agent route or by any launch).
 const (
 	// LaunchDisclosureID versions the words: a change of the text is a new id, and an old acknowledgement then no longer counts.
-	LaunchDisclosureID = "full-permissions-4"
-	// LaunchDisclosureText names the default and points to the controls for choosing a different mode.
-	LaunchDisclosureText = "Agents default to auto mode. Choose a different permission mode when you launch an agent or set a default in Settings."
+	LaunchDisclosureID = "full-permissions-5"
+	// LaunchDisclosureText says what auto mode is and where the default is changed (#18765: the Operator found "agents default to auto mode" confusing).
+	LaunchDisclosureText = "In auto mode, an agent works without stopping to ask you: it runs commands and edits files on its own. Each CLI has its own safety checks. To use a different mode, change the default in Settings > Defaults."
 	// PermissionLoweringText is where to lower it, carried in every launch answer.
 	PermissionLoweringText = "To lower it: pass a lower permission mode when you launch (a CLI permission flag, or permission_mode default), or set a default permission mode in Settings."
 	// launchDisclosureAckSetting holds {"id","at"}. Its opaque Coral setting is hidden from GET /api/settings and cannot be written through PUT /api/settings.

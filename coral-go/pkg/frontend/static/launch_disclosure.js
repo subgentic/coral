@@ -2,7 +2,7 @@
  * may acknowledge it; a dialog refusal starts nothing until that write succeeds. */
 import { serverFetch, normServer, isCloud, sessionServer } from './server_base.js';
 import { showToast } from './utils.js';
-import { showConfirmModal } from './confirm_dialog.js';
+import { showConfirmModal, hideConfirmModal } from './confirm_dialog.js';
 import { announceNotice } from './notifications.js';
 import { browserLocal } from './safe_storage.js';
 import { isPhoneLayout } from './phone_layout.js';
@@ -20,7 +20,7 @@ const hint = {
     clear() { browserLocal.remove(HINT_KEY); },
     release() { document.getElementById('launch-notice-room')?.remove(); document.documentElement.removeAttribute('data-launch-notice'); }, // the notice fills the room, or there is none to fill
 };
-const headline = 'Agents default to auto mode: they can act without asking you; protections vary by agent.';
+const headline = 'Agents launch in auto mode: they work without stopping to ask you; each CLI has its own safety checks.';
 function disclosureSection(id, title, disclosure) {
     const section = document.createElement('details'); section.className = 'disclosure';
     const summary = document.createElement('summary');
@@ -46,7 +46,14 @@ export async function confirmLaunchDisclosure(server, disclosure, payload = null
     const { launchModeNotice } = await importOnce('./launch_disclosure_modes.js');
     const customs = hasOwn ? await importOnce('./custom_modes.js') : null;
     const { title, note } = launchModeNotice(payload, value => value === 'default' ? 'Default' : (customs?.customModeById(value)?.name || 'its own mode'));
-    const accepted = await new Promise(resolve => showConfirmModal(title, note ? `${disclosure.text} ${note}` : disclosure.text, () => resolve(true), () => resolve(false), { danger: false, label: 'Continue launch', cancelLabel: 'Cancel' }));
+    let link = null; // where the default is changed, as a link in the dialog (#18765): it closes the question as a Cancel (nothing launches) and opens Settings on Defaults
+    const accepted = await new Promise(resolve => {
+        showConfirmModal(title, note ? `${disclosure.text} ${note}` : disclosure.text, () => resolve(true), () => resolve(false), { danger: false, label: 'Continue launch', cancelLabel: 'Cancel' });
+        link = document.createElement('a'); link.id = 'confirm-modal-link'; link.href = '#'; link.textContent = 'Open Settings > Defaults';
+        link.addEventListener('click', event => { event.preventDefault(); hideConfirmModal(); window.showSettingsModal?.('agents'); });
+        document.getElementById('confirm-modal-message')?.after(link);
+    });
+    link?.remove();
     if (!accepted) return false;
     try { await acknowledge(server, disclosure); return true; }
     catch (error) { showToast(error.message, true); return false; }
