@@ -6,7 +6,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
 (async () => {
-    const { client, Page, ev, waitFor, PRELOAD, install } = await connect();
+    const { client, Page, ev, waitFor, PRELOAD, install, select } = await connect();
     const rows = () => ev(`T.state.liveSessions.filter(s => s.board_project === 'recipe').map(s => ({ n: s.name, a: !!s.archived, z: !!s.sleeping }))`);
     const confirmYes = async () => { await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the question'); await ev(`[...document.querySelectorAll('#confirm-modal button')].find(b => /archive team/i.test(b.textContent)).click(); true`); };
     try {
@@ -20,12 +20,16 @@ const BASE = require('./test_base').BASE;
         // 1. the team's sidebar menu offers Archive team, and says what it does before it does it
         const labels = await ev(`(() => { const g = [...document.querySelectorAll('li.session-team-group')].find(l => /recipe/i.test(l.textContent)); return [...g.querySelectorAll('.group-kebab .overflow-menu-item')].map(b => b.textContent.replace(/\s+/g, ' ').trim()); })()`);
         assert.ok(labels.includes('Archive team'), 'the sidebar team menu offers Archive team: ' + JSON.stringify(labels));
+        assert.ok(await ev(`!!([...document.querySelectorAll('li.session-team-group')].find(l => /recipe/i.test(l.textContent)).querySelector('[data-mode="archive"] svg'))`), 'the Archive team item has an icon, as its neighbours do (#17647)');
+        await select('r-dev'); // a chat of the team is open while it is archived
+        assert.ok(!(await ev(`document.getElementById('command-pane').classList.contains('agent-sleeping')`)), 'the open chat is awake before');
         await ev(`[...document.querySelectorAll('li.session-team-group')].find(l => /recipe/i.test(l.textContent)).querySelector('[data-mode="archive"]').click(); true`);
         await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the question');
         const ask = await ev(`document.getElementById('confirm-modal-message').textContent`);
         assert.ok(/3 agents stop/.test(ask) && /goals, tasks, files and chats stay/i.test(ask) && /Restore team/.test(ask), 'it says what stops, what stays and the way back: ' + ask);
         await ev(`[...document.querySelectorAll('#confirm-modal button')].find(b => /archive team/i.test(b.textContent)).click(); true`);
         await waitFor(`T.state.liveSessions.filter(s => s.board_project === 'recipe').every(s => s.archived)`, 'every member archived', 8000);
+        await waitFor(`document.getElementById('command-pane').classList.contains('agent-sleeping')`, 'the open chat shows its agent asleep at once, as Archive agent does, not on the next feed tick (#17647)', 1000);
         // 2. the team leaves the list; the Archived line names it; its caption has Restore team
         const after = await ev(`({ summary: (document.querySelector('.archived-summary-row') || {}).textContent.trim().replace(/\s+/g, ' '), groups: [...document.querySelectorAll('li.session-team-group')].map(l => l.textContent.trim().slice(0, 30)), restore: [...document.querySelectorAll('.archived-team-caption button')].map(b => b.textContent.trim()) })`);
         assert.match(after.summary, /^Archived \(3\) · recipe$/, 'the Archived line names the team: ' + JSON.stringify(after));
