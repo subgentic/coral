@@ -34,14 +34,18 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.showLaunchModal(); window._selectLaunchType('team'); window._addTeamAgent('Scribe', 'Write the notes.'); true`);
             await waitFor(`!!document.querySelector('#team-agents-list .team-agent-row')`, `${tag}: the member row`);
             const rowsNow = () => ev(`[...document.querySelectorAll('#team-agents-list .team-agent-role-name')].map(e => e.textContent)`), before = await rowsNow();
-            assert.ok(before.includes('Scribe'), `${tag}: the added member is a row: ` + before);
-            const edit = () => ev(`[...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === 'Scribe').querySelector('.team-agent-edit-btn').click(); true`);
+            for (const who of ['Scribe', 'Orchestrator']) { // walk 80 most likely edited the Orchestrator row, so it goes through the same three steps (#17970)
+            assert.ok(before.includes(who), `${tag}: ${who} is a row: ` + before);
+            const edit = who => ev(`[...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === ${JSON.stringify(who)}).querySelector('.team-agent-edit-btn').click(); true`);
             // Back from the settings: the role and the prompt are the member's own
-            await edit(); await waitFor(`document.getElementById('launch-modal').dataset.member === 'edit' && document.getElementById('launch-step-agent').dataset.stage === 'agent'`, `${tag}: Edit member`);
+            await edit(who); await waitFor(`document.getElementById('launch-modal').dataset.member === 'edit' && document.getElementById('launch-step-agent').dataset.stage === 'agent'`, `${tag}: Edit member`);
+            const shown = await state(); // what the editor shows for this member: Back must show the same, whatever the persona text is
+            assert.ok(shown.prompt && shown.prompt.trim(), `${tag} ${who}: the editor shows a persona to compare: ` + JSON.stringify(shown));
+            if (who === 'Scribe') assert.equal(shown.prompt, 'Write the notes.', `${tag}: the added member's own prompt: ` + JSON.stringify(shown));
             await click('launch-agent-back'); await waitFor(`document.getElementById('launch-step-agent').dataset.stage === 'persona'`, `${tag}: Back opens the role`);
             let s = await state();
-            assert.equal(s.role, 'Scribe', `${tag}: Back shows the member's own Role, not an empty required field: ` + JSON.stringify(s));
-            assert.equal(s.prompt, 'Write the notes.', `${tag}: and its prompt: ` + JSON.stringify(s));
+            assert.equal(s.role, who, `${tag} ${who}: Back shows the member's own Role, not an empty required field: ` + JSON.stringify(s));
+            assert.equal(s.prompt, shown.prompt, `${tag} ${who}: and its prompt, the text the editor showed: ` + JSON.stringify(s) + ' vs ' + JSON.stringify(shown));
             // Cancel closes the member editor only
             await click('launch-agent-cancel');
             await waitFor(`document.getElementById('launch-modal').dataset.member !== 'edit'`, `${tag}: the member editor closes`);
@@ -49,11 +53,12 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(s.modal && s.teamShown, `${tag}: Cancel leaves the New team wizard open on its form: ` + JSON.stringify(s));
             assert.deepEqual(s.rows, before, `${tag}: and the typed team is kept: ` + JSON.stringify(s));
             // the header arrow does the same
-            await edit(); await waitFor(`document.getElementById('launch-modal').dataset.member === 'edit'`, `${tag}: Edit member again`);
+            await edit(who); await waitFor(`document.getElementById('launch-modal').dataset.member === 'edit'`, `${tag}: Edit member again`);
             await ev(`window._selectLaunchType('back'); true`);
             await waitFor(`document.getElementById('launch-modal').dataset.member !== 'edit'`, `${tag}: the arrow closes the member editor`);
             s = await state();
             assert.ok(s.modal && s.teamShown && s.rows.length === before.length, `${tag}: the arrow leaves the wizard and the team: ` + JSON.stringify(s));
+            }
             await ev(`window.hideLaunchModal(); true`);
         }
         console.log('PASS Edit member: Back keeps the member\'s role, Cancel closes only the member editor');
