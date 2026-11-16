@@ -795,7 +795,7 @@ function inboxGoalsToolbar() {
         filters: goalFilters,
         options: { team: { values: teams, labels: Object.fromEntries(teams.map(t => [t, goalTeam({ board_id: t })])) }, driver: { values: drivers } },
         pills: { label: 'Show goals that are', current: goalFilters.state || 'all',
-            items: [{ key: 'all', label: 'All', count: rows.filter(g => String(g.state || '').toLowerCase() !== 'done').length }, ...GF.STATES.map((key, i) => ({ key, label: GF.STATE_LABEL[key], count: GF.CLOSED.includes(key) && !closedKnown[key] ? undefined : counts[i] }))],
+            items: [{ key: 'all', label: 'Open', count: rows.filter(g => !GF.CLOSED.includes(String(g.state || '').toLowerCase())).length }, /* the open goals (active, blocked, proposed): the list this pill shows and the Goals folder's own number count them; Done and Dropped are the pills beside it (#16863, walk 36 C6) */ ...GF.STATES.map((key, i) => ({ key, label: GF.STATE_LABEL[key], count: GF.CLOSED.includes(key) && !closedKnown[key] ? undefined : counts[i] }))],
             onPick: key => { const was = goalFilters.state; goalFilters = { ...goalFilters, state: key === 'all' ? '' : key }; GF.saveFilters(goalFilters); renderInboxNav(true); if (was !== goalFilters.state && (GF.CLOSED.includes(was) || GF.CLOSED.includes(goalFilters.state))) refreshGoals(); /* the Done and Dropped pills read their own goals again (one read each) */ } },
         action: newGoalAction(),
     });
