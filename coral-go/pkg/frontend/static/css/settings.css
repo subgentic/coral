@@ -80,5 +80,5 @@
 /* Reset lives with its label; it wraps before a phone row can grow wider. */
 .settings-reset { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .settings-reset[hidden] { display: none; }
-.settings-default-dot { color: var(--accent); }
+.settings-default-dot { color: var(--link-text, var(--accent)); } /* the accent is 4.4:1 on the light panel (#18819) */
 .settings-reset .btn { min-height: 44px; }

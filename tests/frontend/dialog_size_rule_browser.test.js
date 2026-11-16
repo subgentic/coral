@@ -39,7 +39,8 @@ const SIZES = [[1280, 800, false], [1440, 900, false], [1920, 1080, false], [256
         assert.ok(m.h <= (screenSheet ? m.vh : 0.9 * m.vh) + 1.5, `${label}: height ${m.h} is at most ${screenSheet ? 'the whole of' : '90% of'} ${m.vh}`);
         // The terminal form (a small form) scrolls its step by the 24px its sticky header and footer overhang; that is padding, not content.
         if (small) m.scrollers = m.scrollers.filter(x => x.total - x.visible > 30);
-        if (m.scrollers.length) assert.ok(m.h >= 0.9 * m.vh - 3, `${label}: it scrolls, so it must first use its room: ${m.h} of ${m.vh} (${JSON.stringify(m.scrollers)})`);
+        // Settings is 960 x 720 on a desktop on every tab by design (settings.css: the pane is the one place that scrolls), so its size does not follow the window's height; the other dialogs use their room first.
+        if (m.scrollers.length && !(wide && /^Settings/.test(label) && Math.abs(m.h - Math.min(720, 0.9 * m.vh)) <= 2)) assert.ok(m.h >= 0.9 * m.vh - 3, `${label}: it scrolls, so it must first use its room: ${m.h} of ${m.vh} (${JSON.stringify(m.scrollers)})`);
         assert.ok(m.scrollers.length <= 1, `${label}: ONE scroll area, found ${JSON.stringify(m.scrollers)}`);
         if (m.footer) assert.ok((m.footer.inBox || small) && m.footer.inView, `${label}: the footer stays in view ${JSON.stringify(m.footer)}`);
         assert.ok(m.pageX <= 1, `${label}: no page-wide horizontal scroll`);

@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
+const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_notice');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -14,7 +15,7 @@ const { coralReady } = require('./helpers/wait');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
+        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, process.env.CORAL_TEST_URL + '/'); /* the unseen first-launch notice ("Agents launch in auto mode...") is announced in the same live region: this suite is about the question's own announcement (#18819) */ await install();
         await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`localStorage.setItem('coral-alerts-offered', '1'); /* the alerts offer (#15120) announces itself in the same live region; this suite is about the question's own announcement */ localStorage.setItem('coral-live-view-mode', 'chat'); localStorage.removeItem('coral-agent-keys'); window.__m.add('coral-go', 'm', 3, { sleeping: false, session_id: 'o1' }); true`);
         await new Promise(r => setTimeout(r, 800)); // sleep-ok: the list renders from several answers
@@ -45,7 +46,7 @@ const { coralReady } = require('./helpers/wait');
         await ask('o2', false); await new Promise(r => setTimeout(r, 900)); // sleep-ok: the status regions are written a frame later
         s = await said();
         check(/needs your answer|Pick a color/.test(s.notice), `another agent's question, whose card is not on screen: the toast announces it: ${JSON.stringify(s)}`);
-    } finally { await client.close(); }
+    } finally { try { await restoreLaunchNotice(ev); } catch (e) {} await client.close(); }
     assert.deepEqual(problems, [], 'a question announced once:\n  ' + problems.join('\n  '));
     console.log('PASS a question is announced once');
 })().catch(e => { console.error(e); process.exit(1); });
