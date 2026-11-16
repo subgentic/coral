@@ -8,7 +8,7 @@ const PROVIDERS = [['claude', 'Claude Code'], ['codex', 'Codex'], ['agy', 'Antig
 const FRESH_MS = 20000;
 let _last = null, _at = 0;
 
-async function found(server, type) {
+async function cliFound(server, type) {
     try {
         const r = await serverFetch(server, `/api/system/cli-check?type=${encodeURIComponent(type)}`, { cache: 'no-store' });
         if (!r.ok) return null;
@@ -20,14 +20,12 @@ async function found(server, type) {
 /** { claude, codex, agy }: true found, false not found, null when the server could not say. Kept for 20 s; `force` asks again. */
 export async function readyProviders(force = false, server = currentServer()) {
     if (!force && _last && Date.now() - _at < FRESH_MS) return _last;
-    const got = await Promise.all(PROVIDERS.map(([type]) => found(server, type)));
+    const got = await Promise.all(PROVIDERS.map(([type]) => cliFound(server, type)));
     _last = Object.fromEntries(PROVIDERS.map(([type], i) => [type, got[i]])); _at = Date.now();
     return _last;
 }
 /** True only when the server said every one of the three is missing: a probe that failed or timed out never blocks anyone. */
 export const noneReady = async force => Object.values(await readyProviders(force)).every(v => v === false);
-/** The cached answer, no wait: true when the last probe found none; false when unknown or one is ready. */
-export const noneReadyNow = () => !!_last && Date.now() - _at < FRESH_MS && Object.values(_last).every(v => v === false);
 
 /** The agent type a new agent or team starts on: when the person has none chosen, or the one they chose is not installed, it becomes the one that is ready (Try a team and New agent then open on it). */
 export function adoptDefault(pick) {
@@ -43,7 +41,7 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 export async function openSetupDialog({ onReady, onSkip } = {}) {
     const { CLI_INSTALL_INSTRUCTIONS } = await importOnce('./cli_check.js');
     document.getElementById('setup-agent-modal')?.remove();
-    const modal = el('div', 'modal'); modal.id = 'setup-agent-modal'; modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true'); modal.setAttribute('aria-labelledby', 'setup-agent-title'); modal.style.display = 'flex';
+    const modal = el('div', 'modal'); modal.id = 'setup-agent-modal'; modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true'); modal.setAttribute('aria-labelledby', 'setup-agent-title'); modal.style.display = 'flex'; // display-ok: a dialog built here, shown at once
     const box = el('div', 'modal-content dlg-confirm'), head = el('div', 'modal-header'), body = el('div', 'modal-body'), actions = el('div', 'modal-actions modal-footer');
     const title = el('h3', null, 'Get an agent ready'); title.id = 'setup-agent-title'; head.append(title);
     body.append(el('p', 'text-secondary-sm', 'Coral runs agents through one of these. Set one up, then check again.'));
@@ -51,12 +49,12 @@ export async function openSetupDialog({ onReady, onSkip } = {}) {
     const rows = {};
     for (const [type, label] of PROVIDERS) {
         const info = CLI_INSTALL_INSTRUCTIONS[type] || {}, cmd = (win && info.winCmd) || info.cmd || '';
-        const row = el('div', 'setup-agent-row'), top = el('div', 'setup-agent-top'), status = el('span', 'setup-agent-status', 'Checking…'), more = el('button', 'btn btn-secondary', 'Show steps');
-        more.type = 'button'; top.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 0'; row.style.cssText = 'border-top:1px solid var(--border-color, rgba(128,128,128,.3))';
-        const name = el('b', null, label); name.style.minWidth = '110px'; status.style.cssText = 'flex:1;font-size:13px;opacity:.8';
+        const row = el('div', 'setup-agent-row'), top = el('div', 'setup-agent-top'), status = el('span', 'setup-agent-status', 'Checking…'), more = el('button', 'btn', 'Show steps');
+        more.type = 'button'; top.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 0'; row.style.cssText = 'border-top:1px solid var(--border)';
+        const name = el('b', null, label); name.style.minWidth = '7rem'; status.style.cssText = 'flex:1;font-size:var(--fs-md);opacity:.8';
         more.type = 'button'; top.append(name, status, more);
-        const steps = el('div', 'setup-agent-steps'); steps.hidden = true; steps.style.cssText = 'padding:0 0 10px 4px;font-size:13px;line-height:1.6;overflow-wrap:anywhere';
-        const line = el('p'), code = el('code', null, cmd), copy = el('button', 'btn btn-secondary', 'Copy'); copy.type = 'button';
+        const steps = el('div', 'setup-agent-steps'); steps.hidden = true; steps.style.cssText = 'padding:0 0 10px 4px;font-size:var(--fs-md);line-height:var(--lh-body);overflow-wrap:anywhere';
+        const line = el('p'), code = el('code', null, cmd), copy = el('button', 'btn', 'Copy'); copy.type = 'button';
         copy.onclick = () => { navigator.clipboard?.writeText(cmd).then(() => { copy.textContent = 'Copied'; }).catch(() => {}); };
         line.append('1. Run this in a terminal: ', code, ' ', copy);
         const signin = el('p', null, `2. Run ${info.name || type} once and sign in.`), help = el('p');
@@ -66,7 +64,7 @@ export async function openSetupDialog({ onReady, onSkip } = {}) {
         row.append(top, steps); body.append(row); rows[type] = { status, label };
     }
     const result = el('p', 'setup-agent-result'); result.style.minHeight = '1.4em'; result.setAttribute('role', 'status'); body.append(result);
-    const check = el('button', 'btn btn-secondary', 'Check again'), go = el('button', 'btn btn-primary', 'Continue'), close = el('button', 'btn btn-secondary', 'Not now');
+    const check = el('button', 'btn', 'Check again'), go = el('button', 'btn btn-primary', 'Continue'), close = el('button', 'btn', 'Not now');
     for (const b of [check, go, close]) b.type = 'button';
     go.hidden = true; actions.append(close, check, go);
     box.append(head, body, actions); modal.append(box); document.body.append(modal);
