@@ -15,7 +15,8 @@ const HOLD = `(() => { const f = window.fetch; window.fetch = (u, o) => /\\/api\
     const problems = [];
     const check = (ok, msg) => { if (!ok) problems.push(msg); };
     // the tracker runs from the start of every document: the element right under the sign-in banner (or the top bar), its top at every frame, and when the notice is on screen
-    const TRACK = `(() => { const t = window.__jump = { tops: [], noticeAt: -1, frames: 0 };
+    const TRACK = `(() => { const t = window.__jump = { tops: [], noticeAt: -1, frames: 0, reserved: false };
+        new MutationObserver(ms => { if (ms.some(m => m.attributeName === 'data-launch-notice' && (m.oldValue !== null || document.documentElement.hasAttribute('data-launch-notice')))) t.reserved = true; }).observe(document, {subtree:true, attributes:true, attributeOldValue:true, attributeFilter:['data-launch-notice']});
         const content = () => [...document.body.children].find(e => e.tagName === 'DIV' && !e.id && e.getBoundingClientRect().height > 100);
         const tick = () => { t.frames++; const n = document.getElementById('launch-disclosure-banner'), c = content();
             // the room the notice takes (or has reserved): the content's top under the top bar, less the sign-in banner's own height (that banner arrives late too, and is not this test's subject)
@@ -24,7 +25,7 @@ const HOLD = `(() => { const f = window.fetch; window.fetch = (u, o) => /\\/api\
             if (t.noticeAt < 0 || t.tops.length < t.noticeAt + 3) requestAnimationFrame(tick); /* raf-ok: the tracker samples every frame itself, in the page, from the first one */ };
         requestAnimationFrame(tick); /* raf-ok: as above */ })();`;
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD + require('./helpers/launch_notice_agent').PRELOAD });
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -34,7 +35,7 @@ const HOLD = `(() => { const f = window.fetch; window.fetch = (u, o) => /\\/api\
             await ev(`try { localStorage.removeItem('coral-launch-notice'); } catch (e) {} true`);
             const ids = [(await Page.addScriptToEvaluateOnNewDocument({ source: HOLD })).identifier, (await Page.addScriptToEvaluateOnNewDocument({ source: TRACK })).identifier];
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            check(await ev(`document.documentElement.hasAttribute('data-launch-notice')`), `${at}the room is reserved before first paint on a cold load (the server said the notice is unseen)`);
+            check(await ev(`window.__jump.reserved`), `${at}the room is reserved before first paint on a cold load (the server said the notice is unseen)`);
             await waitFor(`!!document.getElementById('launch-disclosure-banner') && window.__jump.noticeAt >= 0 && window.__jump.tops.length >= window.__jump.noticeAt + 3`, `${at}the notice on a cold load`, 15000);
             const j = await ev(`window.__jump`);
             const spread = Math.max(...j.tops) - Math.min(...j.tops);

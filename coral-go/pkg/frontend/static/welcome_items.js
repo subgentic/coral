@@ -8,7 +8,7 @@ import { importOnce } from './import_once.js';
 import { registerActions } from './actions.js';
 import { browserSession } from './safe_storage.js';
 
-export const WELCOME_IDS = ['welcome', 'agent', 'team', 'connect', 'asks', 'guide'];
+export const WELCOME_IDS = ['agent', 'welcome', 'team', 'connect', 'asks', 'guide'];
 const GUIDE_URL = '/static/guide/getting-started.md';
 export const WELCOME = {
     welcome: { title: 'Welcome to Coral', text: 'This is your Inbox. Anything an agent needs from you shows up here, so you never have to watch a terminal.', go: 'Got it', dismiss: false },

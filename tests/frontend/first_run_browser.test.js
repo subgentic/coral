@@ -218,9 +218,9 @@ async function freshServer(standIn) {
                 let raw = await ev(`fetch('/api/sessions/launch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ working_dir: ${JSON.stringify(s.dirs.work)}, agent_type: 'claude' }) }).then(async r => ({ status: r.status, body: await r.text() }))`);
                 assert.equal(raw.status,409,'even a missing CLI launch first requires disclosure acknowledgement');
                 assert.equal(JSON.parse(raw.body).code,'launch_disclosure_required');
-                await ev(`document.querySelector('#launch-disclosure-banner summary').click();true`);
-                await waitFor(`document.querySelector('#launch-disclosure-banner summary').getAttribute('aria-expanded')==='true'`, 'read the permissions notice');
-                await ev(`document.querySelector('#launch-disclosure-banner button').click();true`);
+                await ev(`fetch('/api/launch-disclosure').then(r=>r.json()).then(async d=>{const m=await import((window.__coralStatic||'/static/')+'launch_disclosure.js');window.__launchDisclosureAnswer=m.confirmLaunchDisclosure('local',d)}).then(()=>true)`);
+                await waitFor(`document.getElementById('confirm-modal-yes')?.getClientRects().length>0`, 'launch-time permissions notice');
+                await ev(`document.getElementById('confirm-modal-yes').click();true`);
                 await waitFor(`fetch('/api/launch-disclosure',{cache:'no-store'}).then(r=>r.json()).then(d=>d.seen===true)`, 'notice acknowledged before CLI error check');
                 raw = await ev(`fetch('/api/sessions/launch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ working_dir: ${JSON.stringify(s.dirs.work)}, agent_type: 'claude' }) }).then(async r => ({ status: r.status, body: await r.text() }))`);
                 assert.ok(raw.status >= 400, `the launch of a missing CLI is an error (got ${raw.status})`);

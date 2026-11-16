@@ -14,7 +14,7 @@ const { coralReady } = require('./helpers/wait');
     const check = (ok, msg) => { if (!ok) found.push(msg); };
     const S = `(window.__coralStatic || '/static/')`;
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-    const TITLES = ['Welcome to Coral', 'Start your first agent', 'Make a team so agents can work together', 'Connect a second computer or the Hub', 'How agents ask you for things', 'Read the Coral guide'];
+    const TITLES = ['Start your first agent', 'Welcome to Coral', 'Make a team so agents can work together', 'Connect a second computer or the Hub', 'How agents ask you for things', 'Read the Coral guide'];
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
@@ -36,7 +36,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 6`, `${tag}: six welcome items`, 8000);
             check(JSON.stringify(await titles()) === JSON.stringify(TITLES), `${tag}: the six items in order: ` + JSON.stringify(await titles()));
             const acts = await ev(`[...document.querySelectorAll('#group-table-view .inbox-review-actions')].map(b => [...b.querySelectorAll('button:not(.menu-item):not(.inbox-row-more-toggle)')].map(x => x.textContent))`);
-            const want = mobile ? [['Got it'], ['New agent'], ['New team'], ['Connect'], ['Read it'], ['Open guide']] : [['Got it'], ['New agent', 'Dismiss'], ['New team', 'Dismiss'], ['Connect', 'Dismiss'], ['Read it', 'Dismiss'], ['Open guide', 'Dismiss']]; // a phone row has no Dismiss button: it is in the three-dot menu, or a swipe (#11642)
+            const want = mobile ? [['New agent'], ['Got it'], ['New team'], ['Connect'], ['Read it'], ['Open guide']] : [['New agent', 'Dismiss'], ['Got it'], ['New team', 'Dismiss'], ['Connect', 'Dismiss'], ['Read it', 'Dismiss'], ['Open guide', 'Dismiss']]; // a phone row has no Dismiss button: it is in the three-dot menu, or a swipe (#11642)
             check(JSON.stringify(acts) === JSON.stringify(want), `${tag}: each item's action, and Dismiss on all but the welcome (in the menu on a phone): ` + JSON.stringify(acts));
             check(await ev(`/optional/.test([...document.querySelectorAll('#group-table-view .inbox-welcome-name')][3].textContent)`), `${tag}: Connect is marked optional`);
             check(await ev(`!!document.querySelector('button[aria-label="Dismiss Getting started"]')`), `${tag}: the separate block is dismissible`);

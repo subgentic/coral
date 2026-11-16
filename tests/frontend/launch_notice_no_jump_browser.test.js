@@ -22,7 +22,7 @@ const { guardSettings } = require('./helpers/settings_guard');
             if (t.noticeAt < 0 || t.tops.length < t.noticeAt + 3) requestAnimationFrame(tick); /* raf-ok: the tracker samples every frame itself, in the page, from the first one */ };
         requestAnimationFrame(tick); /* raf-ok: as above */ })();`;
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD + require('./helpers/launch_notice_agent').PRELOAD });
         let trackId = null;
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             const at = `${w} px: `;
