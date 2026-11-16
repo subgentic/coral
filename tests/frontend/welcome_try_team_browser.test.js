@@ -20,7 +20,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(names.length, 3, 'three members: ' + JSON.stringify(names));
         for (const n of ['Orchestrator', 'Lead Dev', 'QA']) assert.ok(names.includes(n), `${n} is a member: ${JSON.stringify(names)}`);
         const models = await ev(`import((window.__coralStatic || '/static/') + 'agent_config_form.js').then(m => [...document.querySelectorAll('#team-agents-list .team-agent-row')].map(r => m.getAgentConfig(r.dataset.acfId).model || ''))`);
-        assert.deepEqual(models, ['opus', 'opus', 'opus'], 'all three members run on the opus alias the model chip offers, not Default: ' + JSON.stringify(models));
+        assert.deepEqual(models, ['opus', 'sonnet', 'sonnet'], 'the Orchestrator runs on the opus alias, Lead Dev and QA on the sonnet alias, none on Default: ' + JSON.stringify(models));
         const task = await ev(`document.getElementById('team-goal').value`);
         assert.match(task, /teaching me how to use Coral and how to work with an agent team/, task);
         assert.match(task, /Load the Getting started skill first/, task);
