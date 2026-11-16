@@ -44,7 +44,7 @@ function ensureTab() {
     if (btn && panel) return { btn, panel };
     const tasks = document.getElementById('agentic-tab-tasks'), tasksPanel = document.getElementById('agentic-panel-tasks');
     if (!tasks || !tasksPanel) return null;
-    btn = el('button', 'tab agentic-tab'); btn.id = TAB; btn.type = 'button'; btn.title = 'Sub-agents: the agents this agent launched';
+    btn = el('button', 'tab agentic-tab'); btn.id = TAB; btn.dataset.tab = 'subagents'; btn.type = 'button'; btn.title = 'Sub-agents: the agents this agent launched';
     btn.addEventListener('click', () => window.switchAgenticTab?.('subagents', 'top'));
     const icon = el('span', 'material-icons', 'account_tree'); icon.setAttribute('aria-hidden', 'true');
     const count = el('span', 'tab-count agentic-tab-count'); count.id = 'subagents-count';
