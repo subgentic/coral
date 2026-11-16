@@ -1,0 +1,6 @@
+
+/* A visible jump button gets its own lane, clear of message text (#16739). */
+.capture-wrapper.chat-mode:has(.chat-jump-latest-btn:not([hidden])) .live-history-center { margin-bottom: 56px; }
+.chat-team-instructions { text-align: left; }
+.chat-team-instructions summary { cursor: pointer; }
+.chat-team-instructions pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
