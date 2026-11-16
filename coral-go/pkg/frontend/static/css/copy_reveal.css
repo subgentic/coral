@@ -1,0 +1,7 @@
+/* #17573: when the phone copy button is revealed, pad the bubble so text does not sit under it */
+@media (max-width: 767px) and (pointer: coarse) {
+    .chat-prose.chat-messages .chat-bubble.assistant.copy-revealed,
+    .chat-prose.chat-messages .chat-bubble.assistant:focus-within {
+        padding-right: 36px;
+    }
+}
