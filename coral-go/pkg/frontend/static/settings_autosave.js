@@ -2,6 +2,7 @@
 import { importOnce } from './import_once.js';
 import { browserLocal } from './safe_storage.js';
 const { readSettingsForm } = await importOnce('./settings_form.js');
+const { wireSettingsResets, refreshSettingsResets } = await importOnce('./settings_reset.js');
 const { saveSettingsRow } = await importOnce('./settings_save.js');
 
 const values = new WeakMap(), timers = new WeakMap();
@@ -62,12 +63,19 @@ async function persist(e) {
         say(row,error?.userMessage ? `Not saved. ${error.userMessage} Try again.` : 'Not saved. Try again.',true);
         if (e.id === 'settings-theme') (await importOnce('./settings_core.js')).restoreSavedTheme().catch(() => {});
         if (e.classList.contains('settings-model-text')) (await importOnce('./settings_model_pick.js')).syncModelPicks(); // a failed save puts the dropdown back on the saved model too, not only its box (#16772)
-    } finally { group.forEach(i => { i.disabled = false; }); delete e.dataset.saving; }
+    } finally { group.forEach(i => { i.disabled = false; }); delete e.dataset.saving; refreshSettingsResets(e.closest('#settings-modal')); }
 }
 export function wireSettingsAutosave(modal) {
     for (const e of modal.querySelectorAll('input,select,textarea')) if (eligible(e)) { remember(e); status(e.closest('.sv-row')); }
+    wireSettingsResets(modal, async (e, value) => {
+        if (e.type === 'checkbox') e.checked = value; else e.value = value;
+        e.dispatchEvent(new Event('input', { bubbles: true }));
+        e.dispatchEvent(new Event('change', { bubbles: true }));
+        if (textField(e)) await persist(e);
+    });
     if (modal.dataset.autosave) return;
     modal.dataset.autosave = '1';
+    for (const type of ['input', 'change', 'focusin']) modal.addEventListener(type, () => refreshSettingsResets(modal));
     // Focus/pointer snapshots include controls loaded asynchronously after the dialog opens.
     for (const type of ['focusin','pointerdown']) modal.addEventListener(type,e => { if (eligible(e.target) && e.target.dataset.saving !== '1' && (type !== 'pointerdown' || e.target !== document.activeElement)) remember(e.target); });
     // A model dropdown only sets the text box the form reads; the box is the control that saves (the dropdown itself has no value of its own in the payload, so saving it found nothing changed: Haiku went back to the CLI's default, #16667)

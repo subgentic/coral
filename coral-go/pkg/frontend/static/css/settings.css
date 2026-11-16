@@ -76,3 +76,9 @@
 }
 
 #settings-modal .settings-section-link { white-space: normal; height: auto; max-width: 100%; }
+
+/* Reset lives with its label; it wraps before a phone row can grow wider. */
+.settings-reset { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.settings-reset[hidden] { display: none; }
+.settings-default-dot { color: var(--accent); }
+.settings-reset .btn { min-height: 44px; }
