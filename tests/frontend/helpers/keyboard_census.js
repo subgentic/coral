@@ -9,6 +9,7 @@
 // ALLOW_KEYBOARD below is the reviewed list of exceptions: [scene pattern, control pattern, kind, why]. Empty: a control a keyboard cannot reach or see is fixed, not listed.
 const ALLOW_KEYBOARD = [
     ['^launch: team', 'team-template-opt', 'unreachable', 'the options of the template combobox are chosen with the arrow keys and Enter from its search box (aria-activedescendant), not with Tab: launch_team_steps_browser pins that (#6411)'],
+    ['^phone: (hub: )?board', 'team-tabs-next', '^unreachable', 'the Show more tabs arrow is in the walk\'s list while tabs wait past the strip\'s end; Tab through the tabs scrolls the strip to its end and the arrow is then display:none, which is not a stop, and every tab it points to is one (#18972)'],
 ];
 const allowedKb = (scene, kind, c) => ALLOW_KEYBOARD.some(([s, p, k]) => new RegExp(s).test(scene) && new RegExp(p).test(c) && new RegExp(k).test(kind));
 
