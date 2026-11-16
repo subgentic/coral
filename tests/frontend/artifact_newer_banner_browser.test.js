@@ -34,9 +34,9 @@ const { coralReady } = require('./helpers/wait');
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await ev(`import(${S} + 'artifact_viewer.js').then(m => m.openArtifactViewer(${JSON.stringify(hex2)}, { board: ${JSON.stringify(B)}, filename: ${JSON.stringify(name)} })).then(() => true)`);
             await waitFor(`!!document.querySelector('#artifact-viewer:not([hidden]) .artifact-review-approve:not([hidden])')`, at + 'the viewer has Approve on v2', 15000);
-            const c = await api('POST', `/api/artifacts/${hex2}/comments?board=${B}`, { body: 'Please add a section.' });
+            const c = await api('POST', `/api/artifacts/${hex2}/comments?board=${B}`, { body: 'Please add a section.', whole: true });
             check(c.status < 300, at + 'a comment was sent on v2: ' + c.status + ' ' + JSON.stringify(c.body).slice(0, 120));
-            const banner = () => ev(`(() => { const v = document.querySelector('#artifact-viewer'), b = v.querySelector('.artifact-newer-banner'); if (!b || b.hidden) return null; const r = b.getBoundingClientRect(), main = v.querySelector('.artifact-viewer-body').getBoundingClientRect(), btn = b.querySelector('.artifact-review-newest'); return { text: b.textContent.replace(/\\s+/g, ' ').trim(), w: Math.round(r.width), above: r.bottom <= main.top + 1, role: b.getAttribute('role'), primary: !!btn && /btn-primary/.test(btn.className) && !btn.hidden, btn: btn ? btn.textContent : '', color: getComputedStyle(b).backgroundColor, pill: (v.querySelector('.artifact-review-state') || {}).textContent || '' }; })()`);
+            const banner = () => ev(`(() => { const v = document.querySelector('#artifact-viewer'), b = v.querySelector('.artifact-newer-banner'); if (!b || b.hidden) return null; const r = b.getBoundingClientRect(), main = v.querySelector('.artifact-viewer-body').getBoundingClientRect(), dlg = Math.round(v.querySelector('.artifact-viewer-content').getBoundingClientRect().width), btn = b.querySelector('.artifact-review-newest'); return { text: b.textContent.replace(/\\s+/g, ' ').trim(), w: Math.round(r.width), dlg, above: r.bottom <= main.top + 1, role: b.getAttribute('role'), primary: !!btn && /btn-primary/.test(btn.className) && !btn.hidden, btn: btn ? btn.textContent : '', color: getComputedStyle(b).backgroundColor, pill: (v.querySelector('.artifact-review-state') || {}).textContent || '' }; })()`);
             check(await banner() === null, at + 'no banner while v2 is the newest');
             const up3 = await api('POST', `/api/agent/artifacts?session_id=${sid}${q}`, `plan v3 ${Date.now()}`, { ...hdr, 'X-Artifact-New-Version-Of': hex2 }), hex3 = hexOf(up3);
             check(up3.status < 300 && hex3, at + 'uploaded v3');
@@ -47,7 +47,7 @@ const { coralReady } = require('./helpers/wait');
             if (b) {
                 check(b.primary, at + 'Open v3 is the primary button in the banner');
                 check(b.above, at + 'the banner is above the content');
-                check(b.w >= w - 40, at + 'the banner is full width: ' + b.w + ' of ' + w);
+                check(b.w >= b.dlg - 4, at + 'the banner is the full width of the viewer: ' + b.w + ' of ' + b.dlg);
                 check(!/^An older version/.test(b.pill), at + 'the header pill does not say it twice: ' + JSON.stringify(b.pill));
                 const [r, g, bl] = (b.color.match(/\d+(\.\d+)?/g) || []).map(Number); check(r > g && r >= bl || r > 150 && g > 100 && bl < 140, at + 'the banner is in the warning colour, not grey: ' + b.color);
             }
