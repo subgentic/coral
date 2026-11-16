@@ -500,7 +500,7 @@ func (h *SessionsHandler) sendNoTeamComment(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	res := sendResult{Agent: names[0]}
-	d := h.deliverNoTeamComment(r, caller, t, id)
+	d := h.typeNoTeamComment(r, t, id) // the press was counted by the handler: one ask of the hour, not two (#18175)
 	switch d.Reason {
 	case "":
 		res.State = "sent"
