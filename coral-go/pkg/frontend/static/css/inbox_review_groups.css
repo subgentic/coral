@@ -18,7 +18,7 @@
 
 /* A tablet's Needs you (#15259, walk 13): the chips wrap onto their own line under the title and search instead of running off the right edge cut mid-chip. */
 /* A wider window has the robot on this row too (#18802): the search keeps its 200 px and the chips wrap inside their own box before the search gives way. */
-@media (min-width: 1000px) { .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .list-bar-search-wrap { min-width: 200px; } .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .team-tb-pills { flex: 0 1 auto; min-width: 0; flex-wrap: wrap; } }
+@media (min-width: 1000px) { .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .agent-copy) { column-gap: 4px; } .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .agent-copy) > .list-bar-search-wrap { min-width: 200px; } .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .agent-copy) > .team-tb-pills { flex: 0 1 auto; min-width: 0; flex-wrap: wrap; } }
 @media (min-width: 768px) and (max-width: 999px) {
     .inbox-folder-toolbar .list-bar-search-row.gt-toolbar { flex-wrap: wrap; }
     .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .team-tb-pills { flex: 0 1 auto; min-width: 0; flex-wrap: wrap; overflow: visible; } /* the chips go to their own line only when they do not fit beside the search (#15366: at 900 px a row that fits stays one line) */
@@ -54,7 +54,7 @@
 }
 /* The Operator's Needs you (#15540): title, search and filters stay while rows are selected, and the actions are ONE line below them, the count first; the line is where the list's count stood, so ticking a row moves nothing (#15339). The checkbox, the kind icon and the star are one line at the top of every row, whatever its height. */
 #group-table-view .gt-toolbar.tb-low { flex-wrap: wrap; }
-#group-table-view .gt-toolbar.tb-low > .team-tb-selection { order: 10; flex: 1 1 100%; min-height: var(--tb-bar-h); flex-wrap: nowrap; overflow-x: auto; }
+#group-table-view .gt-toolbar.tb-low > .team-tb-selection { order: 100; flex: 1 1 100%; min-height: var(--tb-bar-h); flex-wrap: nowrap; overflow-x: auto; }
 #group-table-view .gt-toolbar.tb-low > .list-bar-count { display: none; }
 @media (min-width: 768px) { #group-table-view .inbox-folder-toolbar:not(:has(.team-toolbar-selecting)) { padding-bottom: calc(var(--tb-bar-h) + 10px); } } /* the actions line (--tb-bar-h, the row's 8 px gap and 2 px from the toggle's box: 50 px at the 40 px bar, #16792) is kept while nothing is selected, so ticking a row moves no row (#15339, #16792, #16967) */
 /* #15540: icon and star share a line at the row's top on a computer; a phone card keeps its star at the end of the button row (#15658) */

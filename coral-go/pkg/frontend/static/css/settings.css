@@ -84,3 +84,4 @@
 .settings-default-dot::before { content: '•'; }
 .settings-reset .btn { position: absolute; left: 1rem; bottom: -.3em; line-height: var(--lh-label); min-height: 0; height: auto; padding: 0 6px; }
 .settings-reset .btn::after { content: ''; position: absolute; left: -4px; right: -4px; top: 50%; height: 44px; transform: translateY(-50%); }
+#settings-cloud .cloud-advanced { align-self: stretch; } /* the commands' Advanced fold (#16717) is as wide as the card, so the command row in it is a full-width box with Copy at its end (#7626) */

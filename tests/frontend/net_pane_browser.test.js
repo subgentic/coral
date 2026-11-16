@@ -143,6 +143,7 @@ const { coralReady } = require('./helpers/wait');
             // 7. a Coral with no hub says what to run: the command is a full-width box with Copy at its end (#7626)
             await ev(`(async () => { window.__st = { configured: false, state: 'off' }; await window.__cc.loadCloudStatus(); return true; })()`);
             await waitFor(`!!document.querySelector('#settings-cloud [data-cloud=command-row]:not([hidden])')`, 'the command row', 8000);
+            assert.equal(await ev(`(() => { const d = document.querySelector('#settings-cloud details.cloud-advanced'); if (!d) return 'no fold'; const had = d.open; d.open = true; return had ? 'open' : 'closed'; })()`), 'closed', at + 'the commands are in a closed Advanced fold (#16717); the box below is measured with it open');
             const cmd = await ev(`(() => { const row = document.querySelector('#settings-cloud [data-cloud=command-row]'); const body = document.getElementById('settings-cloud').getBoundingClientRect(); const r = row.getBoundingClientRect(), c = row.querySelector('code').getBoundingClientRect(), b = row.querySelector('button').getBoundingClientRect(); return { rowW: r.width, bodyW: body.width, codeW: c.width, copyRight: b.right, bodyRight: body.right, copyTop: b.top, rowTop: r.top }; })()`);
             assert.ok(cmd.rowW >= cmd.bodyW - 2, at + `the command row is as wide as its card (${cmd.rowW} of ${cmd.bodyW})`);
             assert.ok(cmd.bodyRight - cmd.copyRight < 4, at + 'Copy is at the end of the row ' + JSON.stringify(cmd));
