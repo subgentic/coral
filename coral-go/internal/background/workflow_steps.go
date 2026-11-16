@@ -3,6 +3,7 @@ package background
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -13,7 +14,6 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/agentprio"
-	"github.com/subgentic/coral/internal/safego"
 
 	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/agentenv"
@@ -461,14 +461,14 @@ func (wr *WorkflowRunner) executeAgentInteractive(ctx context.Context, runID int
 	wr.activeChildren[runID] = &activeChild{stepType: "agent", sessionName: launchResult.SessionName}
 	wr.mu.Unlock()
 
-	// Send prompt after initialization delay
-	go func() {
-		defer safego.Recover("background/workflow_runner:779")
-		wr.launcher.SendPrompt(ctx, launchResult.SessionID, launchResult.SessionName, agentCfg.AgentType, prompt)
-	}()
+	// Send prompt after initialization delay. A prompt Coral could not type is reported (#16796): the step fails with that reason, as a job's run does, instead of waiting on an agent
+	// that has nothing to do (#16957).
+	watchCtx, stopWatch := context.WithCancel(ctx)
+	defer stopWatch()
+	done, outcome := wr.launcher.startPromptDeliveryResult(ctx, launchResult.SessionID, launchResult.SessionName, agentCfg.AgentType, prompt)
 
 	// Poll for session completion — 5s interval for workflow steps
-	err = wr.watchSessionFast(ctx, launchResult.SessionName)
+	err = awaitStepAgent(done, outcome, func() error { return wr.watchSessionFast(watchCtx, launchResult.SessionName) })
 
 	wr.mu.Lock()
 	delete(wr.activeChildren, runID)
@@ -478,6 +478,24 @@ func (wr *WorkflowRunner) executeAgentInteractive(ctx context.Context, runID int
 		return fmt.Errorf("agent session: %w", err)
 	}
 	return nil
+}
+
+// awaitStepAgent waits for a workflow step's agent to finish (watch) and fails the step early when its prompt could not be typed (done closed with ErrPromptNotTyped): the step then fails with
+// that reason. A delivery that ended any other way leaves the step to the watch, as before.
+func awaitStepAgent(done <-chan struct{}, outcome func() error, watch func() error) error {
+	watched := make(chan error, 1)
+	go func() { watched <- watch() }()
+	for {
+		select {
+		case err := <-watched:
+			return err
+		case <-done:
+			if err := outcome(); errors.Is(err, ErrPromptNotTyped) {
+				return err
+			}
+			done = nil
+		}
+	}
 }
 
 // watchSessionFast polls for session existence every 5 seconds (faster than default 30s).

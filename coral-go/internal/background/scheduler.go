@@ -116,6 +116,7 @@ type JobScheduler struct {
 	store          *store.ScheduleStore
 	sessionStore   *store.SessionStore
 	lastEventType  func(ctx context.Context, sessionID string) (last string, stopFailed bool) // the type of the agent's last event (stop, tool_use...), "" for none, and whether a stop was a failed turn (an API error); nil: not known (#6898)
+	resultOf       func(sessionID, workingDir, agentType string) string                       // the text of what a run's agent said last, redacted, or "" (#16958)
 	agentWaiting   func(ctx context.Context, sessionID string) bool                           // whether the agent is waiting at a prompt of its own (permission, question, plan) right now: a run that runs out of time then says it stopped waiting for an answer (#14772)
 	hasEvents      func(ctx context.Context, sessionID string) bool                           // whether the agent's CLI reported anything (its hook events); nil: a run is never judged by it (#6842)
 	runtime        AgentRuntime
@@ -600,6 +601,10 @@ func (s *JobScheduler) launchAndWatch(runID int64, job store.ScheduledJob, rc ru
 		exitReason = agentNeverStartedCode // the code in exit_reason, the sentence in error_msg, on every path (the startup settle's shape, #7016)
 		s.store.UpdateScheduledRun(ctx, runID, map[string]interface{}{"error_msg": agentNeverStartedMsg, "error_code": agentNeverStartedCode})
 	}
+	if status == "failed" && errors.Is(launchErr, ErrPromptNotTyped) { // its own sentence and code: the person sees why the run never began (#16796)
+		exitReason = promptNotTypedCode
+		s.store.UpdateScheduledRun(ctx, runID, map[string]interface{}{"error_msg": ErrPromptNotTyped.Error(), "error_code": promptNotTypedCode})
+	}
 	if status == "failed" && errors.Is(launchErr, ptymanager.ErrStartCommand) { // one plain sentence and a fixed code, not "spawn agent failed: ..." (#6978)
 		exitReason = startCommandFailedCode
 		s.store.UpdateScheduledRun(ctx, runID, map[string]interface{}{"error_msg": ptymanager.ErrStartCommand.Error(), "error_code": startCommandFailedCode})
@@ -612,6 +617,33 @@ func (s *JobScheduler) launchAndWatch(runID int64, job store.ScheduledJob, rc ru
 	// Cleanup worktree if configured
 	if rc.cleanupWorktree && wt.worktreeDir != "" {
 		s.cleanupWorktree(rc.repoPath, wt.worktreeDir, wt.runBranch, wt.baseBranch)
+	}
+}
+
+// SetResultReader tells the scheduler how to read what a run's agent said last, so a run keeps it when it ends (the startup passes the transcript reader).
+func (s *JobScheduler) SetResultReader(fn func(sessionID, workingDir, agentType string) string) {
+	s.resultOf = fn
+}
+
+// keepResult stores what the run's agent said last on the run record (#16958), so See result has something to show when the chat is not kept. A run with no session or no message keeps nothing.
+func (s *JobScheduler) keepResult(ctx context.Context, runID int64, job store.ScheduledJob) {
+	if s.resultOf == nil {
+		return
+	}
+	run, err := s.store.GetScheduledRun(ctx, runID)
+	if err != nil || run == nil || run.SessionID == nil || *run.SessionID == "" {
+		return
+	}
+	dir := job.RepoPath
+	if run.WorktreePath != nil && *run.WorktreePath != "" {
+		dir = *run.WorktreePath
+	}
+	agentType := job.AgentType
+	if run.AgentType != nil && *run.AgentType != "" {
+		agentType = *run.AgentType
+	}
+	if text := s.resultOf(*run.SessionID, dir, agentType); text != "" {
+		s.store.SetScheduledRunResult(ctx, runID, text)
 	}
 }
 
@@ -642,6 +674,9 @@ func (s *JobScheduler) SetLastEventType(fn func(ctx context.Context, sessionID s
 func reportsEvents(agentType string) bool {
 	return agentType == "claude" || agentType == "codex" || agentType == ""
 }
+
+// promptNotTypedCode is the run's fixed error_code when the job's prompt could not be typed into its agent (#16796).
+const promptNotTypedCode = "prompt_not_delivered"
 
 // startCommandFailedCode is the run's fixed error_code when Coral could not hand the agent its start command (#6978).
 const startCommandFailedCode = "start_command_failed"
@@ -811,7 +846,9 @@ func (s *JobScheduler) finishRun(ctx context.Context, runID int64, job store.Sch
 	}
 	if !userKilled {
 		// Only while the run is still active: a turn end, a kill or the deadline that settled it first is not overwritten (#7090).
-		s.store.FinishScheduledRunIfActive(ctx, runID, status, exitReason, "", "", now)
+		if won, _ := s.store.FinishScheduledRunIfActive(ctx, runID, status, exitReason, "", "", now); won {
+			s.keepResult(ctx, runID, job)
+		}
 	}
 }
 
