@@ -32,8 +32,8 @@ const PLAN = 'Plan for the Reading List app (task #1) — OK to proceed? 1) Scop
             await ev(`window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.updateInboxTab()); true`);
             await ev(`(() => { const at = n => new Date(Date.now() - n * 60000).toISOString(); window.__asks = [
                 { board: 'reading', board_label: 'Reading List', kind: 'ask', id: 51, asker: 'Orchestrator', text: '@Operator ' + ${JSON.stringify(PLAN)}, at: at(4) },
-                { board: 'reading', board_label: 'Reading List', kind: 'ask', id: 52, asker: 'Designer', text: '@Operator ' + ${JSON.stringify(PLAN.repeat(2))}, at: at(6) },
-                { board: 'reading', board_label: 'Reading List', kind: 'ask', id: 54, asker: 'Tester', text: '@Operator ' + ${JSON.stringify(PLAN.repeat(2))}, at: at(8) },
+                /* exact duplicate questions are one row now (ef1b310926), so the second long question differs in its last words */ { board: 'reading', board_label: 'Reading List', kind: 'ask', id: 52, asker: 'Designer', text: '@Operator ' + ${JSON.stringify(PLAN.repeat(2))}, at: at(6) },
+                { board: 'reading', board_label: 'Reading List', kind: 'ask', id: 54, asker: 'Tester', text: '@Operator ' + ${JSON.stringify(PLAN.repeat(2) + ' (a different question from the Designer\'s, in the same words at the start)')}, at: at(8) },
                 { board: 'reading', board_label: 'Reading List', kind: 'ask', id: 53, asker: 'Dev', text: '@Operator May I delete the old books table and start again?', at: at(9) }];
                 const orig = window.fetch.bind(window); window.fetch = (u, o) => String(u) === '/api/operator-asks' ? Promise.resolve(new Response(JSON.stringify(window.__asks), { status: 200, headers: { 'Content-Type': 'application/json' } })) : orig(u, o); return true; })()`);
             await ev(`import((window.__coralStatic || '/static/') + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => true)`);
