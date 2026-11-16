@@ -329,7 +329,7 @@ const needsKinds = NF.KINDS.filter(k => k !== 'welcome');
 const GROUP_REVIEW_KEY = 'coral-inbox-group-review-goal';
 const GROUP_MODE_KEY = 'coral-inbox-group-mode';
 const GROUP_MODES = ['none', 'goal', 'task'], GROUP_MODE_LABEL = { none: 'None', goal: 'Goal', task: 'Goal and task' };
-// Group by (#14729, the Operator: an option in the Filters panel to experiment): None (the default, the list as it was), Goal (one heading per goal, a task's items plain rows in it), Goal and task (a heading per task inside its goal, what the checkbox did when it was on). Kept in this browser; the old checkbox's 'on' is Goal and task.
+// Group by (#14729): None (default), Goal, Goal and task. Kept in this browser; old checkbox 'on' maps to Goal and task.
 let groupMode = GROUP_MODES.includes(browserLocal.get(GROUP_MODE_KEY)) ? browserLocal.get(GROUP_MODE_KEY) : (browserLocal.get(GROUP_REVIEW_KEY) === 'true' ? 'task' : 'none');
 let groupReviews = groupMode !== 'none', byTask = groupMode === 'task';
 const setGroupMode = mode => { groupMode = GROUP_MODES.includes(mode) ? mode : 'none'; groupReviews = groupMode !== 'none'; byTask = groupMode === 'task'; browserLocal.set(GROUP_MODE_KEY, groupMode); browserLocal.set(GROUP_REVIEW_KEY, String(groupReviews)); needsState.shown = null; renderInboxNav(true); };
@@ -437,10 +437,9 @@ function keepPlace(button) {
 /** Four words, the item's name, the task link and the goal need about 1360 px of window (the sidebar takes 320 of it): narrower, and on a phone, the other rows' second action is in the row's menu. */
 const compactActions = () => isPhoneLayout() || !matchMedia('(min-width: 1360px)').matches;
 let moreMenus = 0;
-/** The bookmark of Save for later, drawn like the Saved folder's (the icon font has no glyph for it). */
-/** Request changes, drawn as a speech bubble (the icon font has no glyph for it either). */
-function changesIcon() { const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg'), path = document.createElementNS(NS, 'path'); for (const [k, v] of Object.entries({ viewBox: '0 0 16 16', width: '16', height: '16', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(k, v); path.setAttribute('d', 'M2.5 3h11v7.5H7L4 13.5v-3H2.5z'); svg.append(path); return svg; }
-function bookmarkIcon() { const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg'), path = document.createElementNS(NS, 'path'); for (const [k, v] of Object.entries({ viewBox: '0 0 16 16', width: '16', height: '16', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(k, v); path.setAttribute('d', 'M4 2.5h8v11L8 10.5l-4 3z'); svg.append(path); return svg; }
+function svgIcon(d, extra) { const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg'), p = document.createElementNS(NS, 'path'); for (const [k, v] of Object.entries({ viewBox: '0 0 16 16', width: '16', height: '16', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linejoin': 'round', 'aria-hidden': 'true', ...extra })) svg.setAttribute(k, v); p.setAttribute('d', d); svg.append(p); return svg; }
+function changesIcon() { return svgIcon('M2.5 3h11v7.5H7L4 13.5v-3H2.5z'); }
+function bookmarkIcon() { return svgIcon('M4 2.5h8v11L8 10.5l-4 3z', { 'stroke-linecap': 'round' }); }
 
 /** A row's less used actions in one menu behind a three-dot button (menu_button.js: arrow keys, Escape back to the button, Tab or a tap elsewhere closes). items: [{ label, title, run(button) }]. */
 function moreMenu(items, label) {
@@ -603,12 +602,21 @@ function openGoalDone(g, close = false, rowKey = '') {
     go({ ...folderRoute, id: g.board_id, item: g.id });
 }
 /** A "Goal looks done" item's actions (#11825): Close goal (the goal's Close dialog, set to Done), Not yet (hidden until a task is added) and Dismiss (hidden for good, Undo in the notice); on a phone Dismiss is in the menu. */
-/** A skill waiting for approval has one action: Review opens it in the Skills tab, where the files are read before anything is approved. */
+/** A skill's Needs you actions: Review opens the Skills tab; a no-scripts skill also has Approve with a file-count confirm (#17403). */
 function skillActions(r) {
-    if (r.hub) { const note = DT.el('div', 'inbox-review-actions'); return note; } // through a Hub there is nothing to press: approve at the computer (#13841)
-    const box = DT.el('div', 'inbox-review-actions'), b = DT.el('button', 'btn btn-small', 'Review'); b.type = 'button'; b.setAttribute('aria-label', `Review the skill ${skillName(r)}`);
-    b.addEventListener('click', e => { e.stopPropagation(); openSkill(r); });
-    box.append(b); return box;
+    if (r.hub) return DT.el('div', 'inbox-review-actions');
+    const box = DT.el('div', 'inbox-review-actions'), name = skillName(r);
+    const btn = (cls, text, fn) => { const b = DT.el('button', `btn btn-small ${cls}`.trim(), text); b.type = 'button'; b.setAttribute('aria-label', `${text} the skill ${name}`); b.addEventListener('click', e => { e.stopPropagation(); fn(b); }); return b; };
+    box.append(btn('', 'Review', () => openSkill(r)));
+    if (!r.has_scripts && !r.not_reviewable) {
+        const n = r.file_count || 0, pl = n === 1 ? '' : 's';
+        box.append(btn('btn-primary', 'Approve', a => {
+            showConfirmModal(`Approve ${n} file${pl} without opening?`, `${name} has ${n} file${pl} you have not read. Approve it anyway?`,
+                () => { a.disabled = true; importOnce('./request_json.js').then(({ requestJson }) => requestJson('POST', `/api/skills/${encodeURIComponent(r.id)}/approve`, { digest: r.digest, scripts_acked: false })).then(() => { showToast(`Approved ${name}.`); loadPendingSkills().then(() => refreshGroupTable('hub-inbox')); }).catch(err => { a.disabled = false; showToast(err.message || 'Could not approve.', true); }); },
+                () => openSkill(r), { label: 'Approve', cancelLabel: 'Open it first', danger: false });
+        }));
+    }
+    return box;
 }
 
 function goalDoneActions(g) {
