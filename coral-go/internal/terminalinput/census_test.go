@@ -322,7 +322,6 @@ var reviewedOrigins = map[string]bool{
 	"internal/background/runtime_tmux.go	TmuxRuntime.SendInput	SendKeys	o":                                           true,
 	"internal/background/runtime_tmux.go	TmuxRuntime.SendPrompt	SendPrompt	o":                                        true,
 	"internal/background/runtime_tmux.go	TmuxRuntime.SpawnAgent	SendKeysToTarget	Internal":                           true,
-	"internal/background/workflow_steps.go	WorkflowRunner.executeAgentInteractive	SendPrompt	?":                      true, // AgentLauncher.SendPrompt, a method of its own that hands the prompt to the automated-input gate (Coral's text)
 	"internal/ptymanager/automated_input_deliver.go	inputGate.typeNow	SendPrompt	Coral":                              true,
 	"internal/server/routes/sessions_waiting.go	SessionsHandler.SendWaitingNow	SendInput	Coral":                      true, // the Operator's Send now (#7727): Coral's nudge text, a person's choice
 	"internal/ptymanager/notice_pause.go	typeSummary	SendInput	Coral":                                                true, // the one line that stands for held notices (#11387): Coral's own, typed through DeliverAutomated

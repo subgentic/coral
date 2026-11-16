@@ -326,6 +326,7 @@ var queryIdentityReads = map[string]string{
 	"sessions_waiting.go session_id":       queryLookup, // GET live/{name}/waiting?session_id=: names the exact session to list (validateExactLiveTarget); an Operator-only route (#7554)
 	"shared_images.go session_id":          queryLookup, // DELETE /api/shared-images/{id}?session_id=: the agent whose pasted image it is; the Operator calls it (#5284)
 	"operator_artifacts.go session_id":     queryLookup, // POST /api/board/{project}/operator-artifacts?session_id=: names the agent the Operator's file is for; checked against the board's own subscribers, an Operator-only route, never an agent token or a Hub grantee (#11376)
+	"chat_search.go session_id":            queryLookup, // GET /api/sessions/history/search?session_id=: narrows the search to one indexed chat (a filter key, #17912); without it the same route searches every indexed chat, so it widens nothing and says nothing about who is calling
 	"board_subscribers.go subscriber_id":   queryBoard,
 	"board_task_create.go subscriber_id":   queryBoard,
 	"board_waits.go subscriber_id":         queryBoard,

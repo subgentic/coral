@@ -21,6 +21,7 @@ import (
 	"github.com/subgentic/coral/internal/agentsignin"
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/executil"
+	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -490,7 +491,7 @@ func (wr *WorkflowRunner) executeAgentInteractive(ctx context.Context, runID int
 // reason, in words (#16957). A delivery that ended any other way never reaches gaveUp and leaves the step to the watch, as before.
 func awaitStepAgent(gaveUp <-chan error, watch func() error) error {
 	watched := make(chan error, 1)
-	go func() { watched <- watch() }()
+	safego.Go("workflow step watch", func() { watched <- watch() })
 	select {
 	case err := <-watched:
 		return err

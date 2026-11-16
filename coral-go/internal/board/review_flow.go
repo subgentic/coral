@@ -353,6 +353,13 @@ func (s *Store) DelegateReview(ctx context.Context, project string, id int64, ac
 		}
 		round.Dropped = kept
 	}
+	// A closed goal is not reopened by a review of one of its old tasks (#18160 reopens a goal when work is linked to it): that review is made without the goal. A goal that is not there is still an error, from the create.
+	reviewGoal := task.GoalID
+	if reviewGoal != nil {
+		if g, gerr := s.GetGoal(ctx, project, *reviewGoal); gerr == nil && g.Closed() {
+			reviewGoal = nil
+		}
+	}
 	var created []*Task
 	for _, r := range clean {
 		if prev, ok := have[r]; ok {
@@ -361,11 +368,7 @@ func (s *Store) DelegateReview(ctx context.Context, project string, id int64, ac
 		}
 		title, body := fmt.Sprintf("Review #%d: %s", id, task.Title), reviewTaskBody(id, task.Title, w.OriginalAuthor, round.Round)
 		rt, err := s.CreateTaskWithOpts(ctx, project, title, body, task.Priority, actor,
-			&CreateTaskOpts{Workflow: TaskWorkflow{ReviewOf: id, ReviewRound: round.Round}, reviewTask: true, GoalID: task.GoalID}, r) // a review serves the goal of the task it reviews (#17612)
-		if errors.Is(err, ErrGoalClosed) && task.GoalID != nil { // the goal closed since: the review is made without one rather than not at all (any other refusal is still an error)
-			rt, err = s.CreateTaskWithOpts(ctx, project, title, body, task.Priority, actor,
-				&CreateTaskOpts{Workflow: TaskWorkflow{ReviewOf: id, ReviewRound: round.Round}, reviewTask: true}, r)
-		}
+			&CreateTaskOpts{Workflow: TaskWorkflow{ReviewOf: id, ReviewRound: round.Round}, reviewTask: true, GoalID: reviewGoal}, r) // a review serves the goal of the task it reviews (#17612)
 		if err != nil {
 			return nil, nil, err
 		}

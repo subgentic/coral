@@ -554,7 +554,7 @@
     },
     {
       "name": "board_ask_subjects",
-      "sql": "CREATE TABLE board_ask_subjects (\n\t\t\tmessage_id INTEGER PRIMARY KEY,\n\t\t\tproject    TEXT NOT NULL,\n\t\t\tgoal_id    INTEGER NOT NULL DEFAULT 0,\n\t\t\ttask_id    INTEGER NOT NULL DEFAULT 0\n\t\t)",
+      "sql": "CREATE TABLE board_ask_subjects (\n\t\t\tmessage_id INTEGER PRIMARY KEY,\n\t\t\tproject    TEXT NOT NULL,\n\t\t\tgoal_id    INTEGER NOT NULL DEFAULT 0,\n\t\t\ttask_id    INTEGER NOT NULL DEFAULT 0,\n\t\t\texplicit   INTEGER NOT NULL DEFAULT 0\n\t\t)",
       "tbl_name": "board_ask_subjects",
       "type": "table"
     },
@@ -2056,6 +2056,15 @@
           "dflt_value": "0",
           "hidden": 0,
           "name": "task_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 4,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "explicit",
           "notnull": 1,
           "pk": 0,
           "type": "INTEGER"

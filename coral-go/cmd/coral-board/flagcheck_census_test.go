@@ -27,7 +27,8 @@ var optionShape = regexp.MustCompile(`^--?[a-zA-Z][a-zA-Z0-9-]*$`)
 
 // notChecked: options that appear in a command's code but are not options of the command as flagcheck sees them, each with why. Keyed by command, then option.
 var notChecked = map[string]map[string]string{
-	"unlink": {"--no-files": "cmdLink is shared with link; unlink answers --no-files itself, with its own message ('--no-files is for link: unlink removes the link whole')"},
+	"resource": {"-local": "a suffix trimmed from a host name (strings.TrimSuffix in resource_setup.go), not an option"},
+	"unlink":   {"--no-files": "cmdLink is shared with link; unlink answers --no-files itself, with its own message ('--no-files is for link: unlink removes the link whole')"},
 }
 
 // notRead: table entries the command's own code does not spell out as a literal, each with why.

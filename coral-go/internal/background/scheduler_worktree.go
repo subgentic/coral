@@ -102,13 +102,13 @@ func closeRunFolder(dir string, logger *slog.Logger) {
 	}
 	root, err := os.OpenRoot(dir)
 	if err != nil {
-		logger.Warn("scheduled run: its folder could not be opened to close it to group and other write", "folder", dir, "error", err.Error())
+		logger.Warn("scheduled run: its folder could not be opened to close it to group and other write", "folder", logsafe.Dir(dir), "error", err.Error())
 		return
 	}
 	defer root.Close()
 	werr := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			logger.Warn("scheduled run: a path in its folder could not be read to close it to group and other write", "path", path, "error", err.Error())
+			logger.Warn("scheduled run: a path in its folder could not be read to close it to group and other write", "path", logsafe.Dir(path), "error", err.Error())
 			return nil
 		}
 		if d.Type()&fs.ModeSymlink != 0 {
@@ -120,18 +120,18 @@ func closeRunFolder(dir string, logger *slog.Logger) {
 		}
 		fi, lerr := root.Lstat(rel)
 		if lerr != nil {
-			logger.Warn("scheduled run: a path in its folder could not be examined", "path", path, "error", lerr.Error())
+			logger.Warn("scheduled run: a path in its folder could not be examined", "path", logsafe.Dir(path), "error", lerr.Error())
 			return nil
 		}
 		if fi.Mode()&fs.ModeSymlink == 0 && fi.Mode().Perm()&0o022 != 0 {
 			if cerr := root.Chmod(rel, fi.Mode().Perm()&^0o022); cerr != nil {
-				logger.Warn("scheduled run: a path in its folder could not be closed to group and other write", "path", path, "error", cerr.Error())
+				logger.Warn("scheduled run: a path in its folder could not be closed to group and other write", "path", logsafe.Dir(path), "error", cerr.Error())
 			}
 		}
 		return nil
 	})
 	if werr != nil {
-		logger.Warn("scheduled run: its folder could not be walked to close it to group and other write", "folder", dir, "error", werr.Error())
+		logger.Warn("scheduled run: its folder could not be walked to close it to group and other write", "folder", logsafe.Dir(dir), "error", werr.Error())
 	}
 }
 

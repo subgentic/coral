@@ -148,7 +148,7 @@ func TestABoundedCallerSeesNoAgentsOfOtherWorktrees(t *testing.T) {
 	r.src.dirs = map[string]int{"/work/feature": 1}
 	_, body := r.get("dev-a", "aaaaaaaa-0423-4000-8000-000000000001", asBranchesDashboard)
 	raw, _ := json.Marshal(body)
-	assert.Contains(t, string(raw), `"name":"dev-a2"`, "the local dashboard sees who works where")
+	assert.Contains(t, string(raw), `"name":"Alice"`, "the local dashboard sees who works where")
 	assert.Contains(t, string(raw), `"display_name":"Alice"`, "the agent's display name is served")
 	_, body = r.get("dev-a", "aaaaaaaa-0423-4000-8000-000000000001", nil) // not the local dashboard: bounded (the Hub, another page)
 	raw, _ = json.Marshal(body)
@@ -202,7 +202,7 @@ func TestTheTeamViewShowsItsAgentsRepositoriesAndOnlyItsOwnTeam(t *testing.T) {
 	require.Len(t, repos, 1, "both agents work in the same repository: one section")
 	raw, _ := json.Marshal(body)
 	assert.Contains(t, string(raw), `"name":"dev-a"`)
-	assert.Contains(t, string(raw), `"name":"dev-a2"`)
+	assert.Contains(t, string(raw), `"name":"Alice"`)
 	assert.Contains(t, string(raw), `"display_name":"Alice"`, "the team view serves the agent's display name")
 	assert.NotContains(t, string(raw), "dev-b", "another team's agent")
 	assert.NotContains(t, string(raw), "/work/", "no folder path")
