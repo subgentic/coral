@@ -379,9 +379,13 @@ func (s *Store) reviewVerdictBefore4599(ctx context.Context, project string, id 
 	_ = tx.GetContext(ctx, &orchAssignee, "SELECT COALESCE(assigned_to,'') FROM board_tasks WHERE id=?", id)
 	v.Orchestrator = orchAssignee
 	if !approve {
-		// The round ends; the other reviewers stay on the task (#3787): their review tasks stay
-		// open and reopen for the next round when the author resubmits.
+		// The round ends; the other reviewers stay on the task (#3787): their open review tasks are
+		// skipped (#17948, a newer rule the old implementation lacks) and reopen for the next round
+		// when the author resubmits.
 		round.Result = "rejected"
+		if err := skipOtherReviewTasks(ctx, tx, project, id, round, me.ReviewTaskID, actor); err != nil {
+			return nil, err
+		}
 		// Back to its author, pending, with a fresh candidate to come.
 		if _, err := tx.ExecContext(ctx, "UPDATE board_tasks SET status='pending', assigned_to=?, "+keepWorkBeforeSQL+", claimed_at=NULL WHERE id=? AND board_id=?", append(append([]any{ptr.NullIfEmpty(w.OriginalAuthor)}, keepWorkArgs(submittedAtOf(w.CompletionReview))...), id, project)...); err != nil {
 			return nil, err

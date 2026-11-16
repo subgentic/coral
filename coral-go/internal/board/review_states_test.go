@@ -64,8 +64,8 @@ func TestListReviewStatesAgreesWithTheHydratedRead(t *testing.T) {
 			want[tk.ID] = tk
 		}
 	}
-	// The one expected difference (#9779, Security Reviewer's probe): after one reviewer rejects, the parent is back with its author, no longer in review, and the other reviewer's review task
-	// is still open. The hydrated read lists that stale review; ListReviewStates does not, as it finds review tasks through the tasks in review.
+	// The one difference (#9779, Security Reviewer's probe) was a stale review: after one reviewer rejected, the parent was back with its author and the other reviewer's review task still open, which the
+	// hydrated read listed and ListReviewStates did not. A rejection now skips that task (#17948), so none is left to differ.
 	stale := 0
 	for id, tk := range want {
 		if tk.Workflow.ReviewOf > 0 {
@@ -75,7 +75,7 @@ func TestListReviewStatesAgreesWithTheHydratedRead(t *testing.T) {
 			}
 		}
 	}
-	require.Equal(t, 1, stale, "the split-verdict review task is the stale one")
+	require.Equal(t, 0, stale, "a rejection closes the other reviewer's review task, so no stale one is left")
 	require.GreaterOrEqual(t, len(want), 3, "a review_pending task and two review tasks")
 	got, err := s.ListReviewStates(ctx, team)
 	require.NoError(t, err)
