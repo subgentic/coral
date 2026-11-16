@@ -44,8 +44,9 @@ const { safePaused } = require('./helpers/paused');
         // the strip loads late (its module, then the team's record): the table must not move when it arrives (#15618, the table sat 70 px lower after it, and team_bulk's long press missed)
         await waitFor(`!!document.querySelector('#team-panel-artifacts .team-files-strip-host')`, 'the strip holds its place', 8000);
         const rowTop = () => ev(`Math.round(document.querySelector('#team-panel-artifacts [data-artifact-id]').getBoundingClientRect().top)`);
-        const before = await rowTop(), held = await ev(`(() => { const h = document.querySelector('#team-panel-artifacts .team-files-strip-host'); return { real: !!h.querySelector('.team-files-strip'), height: Math.round(h.getBoundingClientRect().height), hidden: getComputedStyle(h).visibility, aria: h.getAttribute('aria-hidden') }; })()`);
+        const before = await rowTop(), held = await ev(`(() => { const h = document.querySelector('#team-panel-artifacts .team-files-strip-host'); return { real: !!h.querySelector('.team-files-strip'), ghost: [...h.querySelectorAll('.team-files-strip-ghost button')].map(b => b.textContent), height: Math.round(h.getBoundingClientRect().height), hidden: getComputedStyle(h).visibility, aria: h.getAttribute('aria-hidden') }; })()`);
         assert.ok(!held.real && held.height >= 30 && held.hidden === 'hidden' && held.aria === 'true', 'before the answer the strip is a held, unseen, silent space: ' + JSON.stringify(held));
+        assert.ok(!held.real && held.ghost.length === 2 && held.ghost.every(x => !/\d/.test(x)), 'the held space carries no count that the real strip could contradict (#17473): ' + JSON.stringify(held.ghost));
         await waitFor(`!!document.querySelector('#team-panel-artifacts .team-files-strip')`, 'the folder strip', 8000);
         const after = await rowTop();
         assert.ok(Math.abs(after - before) <= 1, `the first row does not move when the strip arrives (${before} -> ${after})`);
