@@ -40,7 +40,7 @@ try {
   assert.match(h.stderr, /1 of 3 checks FAILED[\s\S]*node hang\.js/);
   assert.match(h.stderr, /timed out/i, 'the summary says it timed out: ' + h.stderr);
 } finally {
-  fs.rmSync(tmp, { recursive: true, force: true });
+  fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }); // Windows holds a folder a moment after its process ends
 }
 
 // The real list: nothing twice, every line a short single command, and package.json's script is just the runner.
