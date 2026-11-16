@@ -9,7 +9,7 @@ const KINDS = { team: 'team', goals: 'goal', tasks: 'task', artifacts: 'file', a
 const LISTS = { goal: 'Goals', task: 'Tasks', file: 'Artifacts', message: 'Board', team: 'Agents', agent: 'Agents', page: 'Agents' };
 
 /** Show it. what: 'goal' | 'task' | 'file' | 'agent' | 'team' | 'message' | 'page'; id: what the address named (shown as text, never as markup); back: the route of the list to go back to. */
-export async function showNotFound({ what = 'page', id = '', back = { view: 'agents' }, backLabel = '' }) {
+export async function showNotFound({ what = 'page', id = '', back = { view: 'agents' }, backLabel = '', unread = null }) {
     await loadStyles('not_found.css');
     let view = document.getElementById('not-found-view');
     if (!view) {
@@ -17,18 +17,28 @@ export async function showNotFound({ what = 'page', id = '', back = { view: 'age
         const title = document.createElement('h2'); title.id = 'not-found-title'; title.className = 'not-found-title';
         const detail = document.createElement('p'); detail.className = 'not-found-detail'; detail.setAttribute('role', 'status');
         const button = document.createElement('button'); button.type = 'button'; button.className = 'btn not-found-back';
-        view.append(title, detail, button);
+        const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'btn not-found-retry'; retry.textContent = 'Retry';
+        view.append(title, detail, retry, button);
         (document.getElementById('team-page-view') || document.querySelector('.layout')).parentNode.append(view);
         onViewShown(() => { view.hidden = true; });
     }
     const n = String(id || '').slice(0, 60), label = what === 'page' ? 'That page' : `That ${what}`;
-    view.querySelector('.not-found-title').textContent = n && what !== 'page' ? `${label} was not found: ${n}` : `${label} was not found`;
-    view.querySelector('.not-found-detail').textContent = 'The address may be mistyped, or it was removed. Nothing was opened.';
+    const retry = view.querySelector('.not-found-retry');
+    // A read that failed (a server fault or the network) is not "not found" (#16418): it says so and offers the read again.
+    if (unread) {
+        view.querySelector('.not-found-title').textContent = n && what !== 'page' ? `Could not load ${what} ${n}` : `Could not load ${what}`;
+        view.querySelector('.not-found-detail').textContent = 'It could not be read just now. It may still be there. Nothing was opened.';
+        retry.hidden = false; retry.onclick = () => { view.hidden = true; unread(); };
+    } else {
+        view.querySelector('.not-found-title').textContent = n && what !== 'page' ? `${label} was not found: ${n}` : `${label} was not found`;
+        view.querySelector('.not-found-detail').textContent = 'The address may be mistyped, or it was removed. Nothing was opened.';
+        retry.hidden = true; retry.onclick = null;
+    }
     const button = view.querySelector('.not-found-back'), text = backLabel || `Back to ${LISTS[what] || 'Agents'}`;
     button.textContent = text;
     button.onclick = () => { view.hidden = true; go(back); };
     showView('');
-    view.hidden = false; button.focus();
+    view.hidden = false; (unread ? retry : button).focus();
 }
 
 /** What the address named, as text: percent-decoded, or as written when it is not valid (a lone % must not stop the view, Security's SHOULD on #15295). */

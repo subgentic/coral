@@ -1,4 +1,4 @@
-// A task link whose task cannot be READ (the request fails; it is not a 404) opens the not-found view, never a blank route (#16403, Windows gate 5: task_link_missing_browser sat on /tasks/77 with nothing on screen, nf:null for 15 s on a first try and passed on the retry).
+// A task link whose task cannot be READ (the request fails; it is not a 404) opens a view that says it could not be read, with Retry (#16418), never a blank route or 'not found' (#16403, Windows gate 5: task_link_missing_browser sat on /tasks/77 with nothing on screen, nf:null for 15 s on a first try and passed on the retry).
 // The read is tried once more when it throws; when both tries fail the view says the task could not be shown. The task's request is refused here, as a dropped one is: first only (once), then every time (always). Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -37,6 +37,22 @@ const MODES = (process.env.UNREAD_MODES || 'once,always').split(',');
             await waitFor(`location.pathname === ${JSON.stringify(`/team/${board}/tasks/${GONE}`)}`, 'the task route', 10000);
             await waitFor(`(() => { const v = document.getElementById('not-found-view'); return !!v && !v.hidden && /${GONE}/.test(v.textContent); })()`, `${m}: the not-found view naming the missing task after a failed read`, 15000,
                 `({ tab: location.pathname, refused: ${refused}, nf: !!document.getElementById('not-found-view') })`);
+            // #16418: a read that failed says it could not be read (not "not found") and offers Try again
+            if (m === 'once') {
+                // the second try is answered (a 404 for this id): that is truly "not found", with no Retry
+                assert.match(await ev(`document.querySelector('#not-found-view .not-found-title').textContent`), /was not found/, 'once: the retry was answered 404, said as not found');
+            } else {
+                const said = await ev(`({ title: document.querySelector('#not-found-view .not-found-title').textContent, retry: (() => { const b = document.querySelector('#not-found-view .not-found-retry'); return !!b && !b.hidden && b.textContent; })() })`);
+                assert.match(said.title, /^Could not load task /, `always: says it could not be read, got ${said.title}`);
+                assert.doesNotMatch(said.title, /not found/i, 'always: a failed read is not "not found"');
+                assert.equal(said.retry, 'Retry', 'always: a Retry button');
+            }
+            if (m === 'always') {
+                // the server answers again: Retry reads the task; this id is a number no task has, so now it is truly not found
+                armed = false;
+                await ev(`document.querySelector('#not-found-view .not-found-retry').click(); true`);
+                await waitFor(`(() => { const v = document.getElementById('not-found-view'); return !!v && !v.hidden && /was not found/.test(v.querySelector('.not-found-title').textContent) && document.querySelector('#not-found-view .not-found-retry').hidden; })()`, 'Retry reads it: the answer is a 404, said as not found, with no Retry');
+            }
             assert.ok(refused >= 1, `${m}: the task's request was refused at least once`);
             if (m === 'always') assert.ok(refused >= 2, `${m}: a throwing read is tried twice before it is given up (${refused} requests refused)`);
             console.log(`${m}: refused ${refused}, the view shows`);
