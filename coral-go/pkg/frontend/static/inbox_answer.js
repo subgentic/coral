@@ -156,6 +156,7 @@ async function answer(s, o, ask, cell, step = '', trustFolder = '', rateLimitMod
             const why = await resp.json().catch(() => ({}));
             if (why.code === 'trust_changed') { read.delete(askKey(s)); fill(s, cell).then(keep); showToast('The folder to trust changed or cannot be trusted from here. Open the agent to answer it.', true); return; } // the server refused the Yes: nothing was sent
             if (why.code === 'rate_limit_changed') { read.delete(askKey(s)); fill(s, cell).then(keep); showToast('The rate-limit notice changed or cannot be answered from here. Open the agent to answer it.', true); return; } // the server refused: nothing was sent
+            if (why.code === 'browser_choice') { read.delete(askKey(s)); fill(s, cell).then(keep); showToast('Only Not now can be answered from here. Open the agent to answer the rest.', true); return; } // the server takes only Not now for this prompt: nothing was sent
             if (why.code === 'ask_changed') { read.delete(askKey(s)); fill(s, cell).then(keep); showToast('That question changed; look at it again.', true); return; } // the server saw another ask than the one drawn
             if (why.code === 'answer_sent_prompt_open') { // the key went and the prompt had not cleared: the agent may still be waiting, so the row stays in Needs you (the feed removes it when the agent stops waiting) and says so
                 read.delete(askKey(s));
