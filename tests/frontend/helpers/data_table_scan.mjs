@@ -45,4 +45,7 @@ export const EXEMPT = {
 // rules in a stylesheet that has real tables too, exempt by selector with a reason (none now: the session tooltip is a .facts list, facts.js)
 export const EXEMPT_SELECTORS = [];
 // rules of the component's own dt-* classes that sit outside data_table.css, each EXACT selector with its reason ({ sel, why }): none now. #13144's five Inbox-only rules were here while the start CSS had no room; they are back in data_table.css since the Operator raised the start-CSS ceiling (#13487). The census fails an entry that stops matching.
-export const EXEMPT_OWN = [];
+export const EXEMPT_OWN = [
+    { sel: '.queue-tab-table .dt-box.dt-mail-on .dt-group th', why: 'the Queue tab (#18732): its lazy sheet pins a phone group line to the top because the table header is gone there; data_table.css is start CSS and has no room for one tab, so the rule stays in the tab\'s own lazy file' },
+    { sel: '.dt-one-line .team-artifact-badge.team-artifact-badge-news', why: 'the team artifact badge (#17454): its lazy sheet keeps the short fixed words New comments and Superseded by vN whole inside a one-line table; the rule styles the badge, not the table, and data_table.css is start CSS' },
+];

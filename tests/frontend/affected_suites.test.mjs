@@ -1,5 +1,5 @@
 // The affected-suites finder (#17652): a diff that rewords text lists the suites that still assert the old words, and leaves out the ones that do not; a changed helper lists its importers.
-import { spawnSync } from 'node:child_process';
+import { spawnSync } from './helpers/child_process.js';
 import assert from 'node:assert/strict';
 import { removedTokens, affected, tokensOf, revArg, escapeRe } from './affected_suites.mjs';
 

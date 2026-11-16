@@ -126,6 +126,8 @@ radio_button_unchecked
 rate_review
 refresh
 replay
+reply
+restore
 route
 save
 schedule
@@ -144,6 +146,7 @@ swap_vert
 system_update
 tab
 task
+task_alt
 terminal
 timeline
 title

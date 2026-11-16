@@ -49,7 +49,7 @@ function drawNav(rows) {
     else { sideNav = VL.build({ id: 'queue-views', label: 'Queue views', ...spec, onPick: () => {} }); list.replaceChildren(sideNav); }
     importOnce('./sidebar_folder_rail.js').then(m => m.drawFolderRail('queue', 'Queue', spec.sections[0].items, spec.current, () => {})).catch(() => {}); // the collapsed rail's icons
 }
-const emptyState = (line, hint) => { const box = el('div', 'queue-tab-empty'); box.setAttribute('role', 'status'); box.append(el('p', 'queue-tab-empty-title', line)); if (hint) box.append(el('p', 'queue-tab-empty-hint', hint)); return box; };
+const emptyState = (line, hint) => { const box = el('div', 'empty-state'); box.setAttribute('role', 'status'); box.append(el('p', 'empty-state-line', line)); if (hint) box.append(el('p', 'empty-state-hint', hint)); return box; };
 const NOTHING = ['Nothing is waiting for a computer', 'When an agent needs a shared computer, it lines up here: who holds it, who waits, and for how long. An Orchestrator defines a resource with coral-board resource.'];
 
 export function drawQueueTab() {

@@ -5,7 +5,7 @@
 // words between tags. Every suite under tests/frontend that contains one of those, verbatim, is listed with the token that matched. Suites that import a changed test helper (helpers/*,
 // *_harness.js) are listed too. It prints the command to run them. Too short or too common a token is skipped; a longer reword is what makes the list useful, so it can over-list a
 // little but it does not read code: a suite it does not list is not proof (run the area's suites too).
-import { execFileSync } from 'node:child_process';
+import { execFileSync } from './helpers/child_process.js';
 import { readdirSync, readFileSync } from 'node:fs';
 import { basename, join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';

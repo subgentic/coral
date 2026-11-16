@@ -26,6 +26,7 @@ export const NOT_A_TAB_STRIP = {
     'tab-customize': 'the dock\'s Customize panel: a popover that holds checkboxes',
     'history-tab-content': 'the panel under the history tabs: it is the content, not a tab',
     'servers-tab-title': 'the heading inside the Servers page',
+    'team-tabs-next': 'the scroll cue at the end of a phone\'s team tab strip (#17816): a tappable arrow that shows more tabs, not a tab',
 };
 const LOOK = /(^|[;\s])(background|border|padding|font-size|font-weight|color|min-height|height|border-radius)\s*:/g;
 
