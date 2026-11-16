@@ -91,7 +91,6 @@
 1	changed_files.js	adds
 1	changed_files.js	agentOnlyCls
 1	changed_files.js	agentsHtml
-2	changed_files.js	cls
 1	changed_files.js	compareNote
 2	changed_files.js	copyBtn
 1	changed_files.js	dels
@@ -99,12 +98,15 @@
 2	changed_files.js	editBtn
 1	changed_files.js	expandAll
 1	changed_files.js	expandBtn
+1	changed_files.js	extra
 1	changed_files.js	f.additions
 1	changed_files.js	f.deletions
 1	changed_files.js	fileIconHtml(name)
+1	changed_files.js	icon
 1	changed_files.js	modeSelect
 1	changed_files.js	moreButton(f.filepath, rowName)
 1	changed_files.js	moreButton(filepath, name)
+1	changed_files.js	on
 1	changed_files.js	options
 2	changed_files.js	previewBtn
 1	changed_files.js	rowsHtml
@@ -267,6 +269,7 @@
 1	model_picker.js	by.get(base).map(variantHtml).join('')
 1	model_picker.js	mine.map(optionHtml).join('')
 1	model_picker.js	models.filter(m => m.group === name).map(optionHtml).join('')
+1	model_picker.js	older.map(optionHtml).join('')
 1	needs_input_card.js	apart.map(o => optionButtonHtml(o, "", fullLabels[o.label])).join("")
 1	needs_input_card.js	controls.foot
 1	needs_input_card.js	hint
@@ -289,7 +292,7 @@
 1	preview_pane.js	_fileIcon(tab)
 1	preview_pane.js	active
 1	preview_pane.js	buttons
-1	preview_pane.js	icon
+2	preview_pane.js	icon
 1	preview_pane.js	link
 1	preview_pane.js	preview
 1	preview_pane.js	renderMarkdownStrict(content)

@@ -26,7 +26,7 @@ let _actionsOpenFor = ''; // the path whose row has its Copy, Preview and Edit o
 // A phone's row has one "More" button in place of the three icon buttons, so the name keeps the row (#7652); it opens them on a line under the row.
 const moreButton = (path, name) => { const label = `More for ${name}`; return `<button type="button" class="btn btn-quiet btn-icon btn-xs file-more-btn ic-more" data-on-click="file-more" data-path="${escapeAttr(path)}" aria-expanded="${escapeAttr(String(_actionsOpenFor === path))}" aria-label="${escapeAttr(label)}" title="More"></button>`; }; // the three dots are drawn in CSS (.ic-more): no icon font name to subset
 /** A file row's Share as artifact button (#10269): it names its file, as the row's other buttons do. */
-const iconButton = (on, icon, title, label, path, extra = '') => `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" ${on} data-path="${escapeAttr(path)}" ${extra} title="${title}" aria-label="${escapeAttr(label)}"><span class="material-icons" aria-hidden="true">${icon}</span></button>`;
+const iconButton = (on, icon, title, label, path, extra = '') => `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" ${on} data-path="${escapeAttr(path)}" ${extra} title="${escapeAttr(title)}" aria-label="${escapeAttr(label)}"><span class="material-icons" aria-hidden="true">${icon}</span></button>`;
 const shareButton = (path, name) => iconButton('data-on-click="file-share"', 'link', 'Share as artifact', `Share ${name} as an artifact`, path);
 const downloadButton = (path, name) => iconButton('data-on-click="file-download"', 'download', 'Download', `Download ${name}`, path); // #17632
 /* ── Starred files (persisted in localStorage per session) ── */
@@ -646,7 +646,6 @@ document.addEventListener('keydown', e => {
 // The changed and starred files' markup (#3645): data-on-* names, never code. The path is the file's
 // own (data-path, never re-escaped into a script); data-diff opens its diff.
 const pathOf = el => textOf(el.dataset.path, 4096);
-const viaFile = (mod, fn) => async (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) (await importOnce(mod))[fn](p); }; // a Files button whose work is a lazy module's (#17632)
 const diffOpts = el => (el.dataset.diff === '1' ? [0, { diff: true }] : []);
 registerActions({
     'file-expand': (el, event) => { event.stopPropagation(); toggleFileExpanded(pathOf(el)); },
