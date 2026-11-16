@@ -12,9 +12,10 @@ import (
 var pendingStarts = struct {
 	sync.Mutex
 	until map[string]time.Time
-}{until: map[string]time.Time{}}
+	typed map[string]time.Time // when a start was last typed (or gave up): the exit grace runs from here, not from when it was scheduled
+}{until: map[string]time.Time{}, typed: map[string]time.Time{}}
 
-// pendingStartSlack is how long past MaxStartWait a mark stands before it is dropped as lost.
+// pendingStartSlack is how long past the start's own delay a mark stands before it is dropped as lost.
 const pendingStartSlack = 30 * time.Second
 
 // pendingKey is the session a start target names: a pane id ("<session>.0") is the session's.
@@ -27,10 +28,17 @@ func pendingKey(target string) string {
 	return strings.ToLower(target)
 }
 
-// MarkStartPending records that a start for target (a session name, or its pane) will be typed later, and returns the function that clears it once it has been typed (or has failed).
-func MarkStartPending(target string) (done func()) {
+// typedKeep is how long a typed time is remembered: well past any exit grace.
+const typedKeep = 10 * time.Minute
+
+// MarkStartPending records that a start for target (a session name, or its pane) will be typed in d (the delay it was given, which the Codex first-start gap can make longer than MaxStartWait), and
+// returns the function that clears it once it has been typed (or has failed) and notes the time.
+func MarkStartPending(target string, d time.Duration) (done func()) {
 	key := pendingKey(target)
-	deadline := time.Now().Add(MaxStartWait + pendingStartSlack)
+	if d < MaxStartWait {
+		d = MaxStartWait
+	}
+	deadline := time.Now().Add(d + pendingStartSlack)
 	pendingStarts.Lock()
 	pendingStarts.until[key] = deadline
 	pendingStarts.Unlock()
@@ -39,8 +47,23 @@ func MarkStartPending(target string) (done func()) {
 		defer pendingStarts.Unlock()
 		if pendingStarts.until[key].Equal(deadline) { // a newer mark for the same session is not this one's to clear
 			delete(pendingStarts.until, key)
+			now := time.Now()
+			for k, t := range pendingStarts.typed {
+				if now.Sub(t) > typedKeep {
+					delete(pendingStarts.typed, k)
+				}
+			}
+			pendingStarts.typed[key] = now
 		}
 	}
+}
+
+// StartTypedAt is when the session's last scheduled start was typed, if this process typed one lately: the launch is that old, whatever its row says (a spaced start is stamped when scheduled).
+func StartTypedAt(session string) (time.Time, bool) {
+	pendingStarts.Lock()
+	defer pendingStarts.Unlock()
+	t, ok := pendingStarts.typed[pendingKey(session)]
+	return t, ok
 }
 
 // StartPending reports whether a start for the session is scheduled and not yet typed.

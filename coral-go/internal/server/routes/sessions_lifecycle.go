@@ -193,7 +193,7 @@ func (h *SessionsHandler) startAgentCLI(ctx context.Context, team, agentType, ta
 		return err
 	}
 	log.Printf("[launch] %s: its start is typed in %s (the team's starts are spaced)", target, d.Round(100*time.Millisecond))
-	typed := ptymanager.MarkStartPending(target) // until the line is typed the pane is at its shell, and the reconciler must not take that for an exit (#18988)
+	typed := ptymanager.MarkStartPending(target, d) // until the line is typed the pane is at its shell, and the reconciler must not take that for an exit (#18988)
 	h.teamSlot(d, func() {
 		defer typed()
 		bg, cancel := context.WithTimeout(context.Background(), 30*time.Second)
