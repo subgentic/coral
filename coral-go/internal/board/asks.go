@@ -710,6 +710,20 @@ func (s *Store) CloseAsk(ctx context.Context, project string, messageID int64, b
 	return err
 }
 
+// CloseAsksOfFinishedTasks closes every open question whose task has finished (completed, skipped or cancelled), for all teams at once: it leaves Needs you instead of waiting there with "May no longer apply" (#18714).
+// It returns how many it closed. The closing is the same row CloseAsk writes, by Coral and with a fixed note, so Undo and the history read it as they read the Operator's own.
+func (s *Store) CloseAsksOfFinishedTasks(ctx context.Context) (int64, error) {
+	res, err := s.db.ExecContext(ctx, `INSERT OR IGNORE INTO board_ask_closed (message_id, project, closed_by, note, closed_at)
+		SELECT a.message_id, a.project, 'Coral', 'Its task finished', ? FROM board_ask_subjects a
+		JOIN board_tasks t ON t.board_id = a.project AND t.id = a.task_id
+		WHERE a.task_id > 0 AND t.status IN ('completed','skipped','cancelled')
+		AND a.message_id NOT IN (SELECT message_id FROM board_ask_closed)`, nowUTC())
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // ReopenAsk undoes CloseAsk (#11552): the Operator's Ignore of a question has an Undo. It reports whether a closing was removed; an open question is left as it is. It does not touch an answer: a question the
 // Operator replied to stays answered.
 func (s *Store) ReopenAsk(ctx context.Context, project string, messageID int64) (bool, error) {

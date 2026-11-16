@@ -114,6 +114,7 @@ func (m *BoardHealthMonitor) scan(ctx context.Context) {
 	for _, a := range agents {
 		bySession[naming.SessionName(a.AgentType, a.SessionID)] = a
 	}
+	_, _ = m.store.CloseAsksOfFinishedTasks(ctx) // questions about a finished task leave Needs you (#18714)
 	for _, p := range projects {
 		m.checkProject(ctx, p.Project, bySession, tick)
 		m.sweepProject(ctx, p.Project, bySession, tick) // the stale-task sweep, on its own period (#14863)
