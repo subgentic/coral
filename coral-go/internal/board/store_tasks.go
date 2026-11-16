@@ -711,6 +711,11 @@ func (s *Store) ClaimTask(ctx context.Context, project, subscriberID string, req
 			return nil, err
 		}
 	}
+	if !reviewsOnly && !named && s.InReviewerPool(ctx, project, subscriberID) { // #17612: a bare claim by a member of the team's reviewer pool is offered review tasks only; a task named by number is still its to take
+		if candidateIDs, err = s.reviewsOnlyCandidates(ctx, candidateIDs, false); err != nil {
+			return nil, err
+		}
+	}
 	for _, taskID := range candidateIDs {
 		claimed, err := s.claimOne(ctx, project, subscriberID, taskID, now)
 		if err != nil {

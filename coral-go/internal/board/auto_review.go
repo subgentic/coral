@@ -127,6 +127,16 @@ func (s *Store) AutoReviewers(ctx context.Context, project string, task *Task, o
 			}
 		}
 	}
+	if pool := s.GetHealthSettings(ctx, project).ReviewerPool; len(pool) > 0 && source != ReviewersNamedInTask { // #17612: the team's pool adds one reviewer, the least busy
+		skip := append(append([]string(nil), excluded...), names...)
+		if pick, why := s.pickFromReviewerPool(ctx, project, pool, skip, subs); pick != "" {
+			names = append(names, pick)
+			if source == "" {
+				source = ReviewersTeamDefault
+			}
+			source = strings.Replace(source, ReviewersTeamDefault, "the team's default reviewers", 1) + "; " + pick + " picked from the pool: " + why
+		}
+	}
 	if len(names) == 0 {
 		return nil, "", identityDiffers, nil
 	}

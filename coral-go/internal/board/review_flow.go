@@ -344,8 +344,13 @@ func (s *Store) DelegateReview(ctx context.Context, project string, id int64, ac
 			round.Reviewers = append(round.Reviewers, prev) // kept, with any verdict given
 			continue
 		}
-		rt, err := s.CreateTaskWithOpts(ctx, project, fmt.Sprintf("Review #%d: %s", id, task.Title), reviewTaskBody(id, task.Title, w.OriginalAuthor, round.Round), task.Priority, actor,
-			&CreateTaskOpts{Workflow: TaskWorkflow{ReviewOf: id, ReviewRound: round.Round}, reviewTask: true}, r)
+		title, body := fmt.Sprintf("Review #%d: %s", id, task.Title), reviewTaskBody(id, task.Title, w.OriginalAuthor, round.Round)
+		rt, err := s.CreateTaskWithOpts(ctx, project, title, body, task.Priority, actor,
+			&CreateTaskOpts{Workflow: TaskWorkflow{ReviewOf: id, ReviewRound: round.Round}, reviewTask: true, GoalID: task.GoalID}, r) // a review serves the goal of the task it reviews (#17612)
+		if err != nil && task.GoalID != nil { // the goal may have closed since: the review is made without one rather than not at all
+			rt, err = s.CreateTaskWithOpts(ctx, project, title, body, task.Priority, actor,
+				&CreateTaskOpts{Workflow: TaskWorkflow{ReviewOf: id, ReviewRound: round.Round}, reviewTask: true}, r)
+		}
 		if err != nil {
 			return nil, nil, err
 		}
