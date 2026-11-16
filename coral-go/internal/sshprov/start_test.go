@@ -253,10 +253,15 @@ func TestStopAndConfirmReturnsOnlyOnAConfirmedStop(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "noproc"), nil, 0o600); err != nil { // cannot tell
 		t.Fatal(err)
 	}
-	stopWait = 5 * time.Second // a check that cannot tell does not wait this out
-	start := time.Now()
-	if err := r.StopAndConfirm(ctx, tg); !errors.Is(err, ErrNotStopped) || time.Since(start) > 3*time.Second {
-		t.Errorf("a check that cannot tell must refuse at once: %v after %v", err, time.Since(start))
+	// A check that cannot tell does not wait the grace period out. The event for that is not a wall time (each far command is a process spawn: ~2 s apiece on a loaded Windows box, 5.98 s against
+	// 3 s, #18935) but what it found and whether the wait was over: the grace period is an hour and the context 30 s, so a refusal that polled would end on the context, not on CannotTell.
+	stopWait = time.Hour
+	wctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	err := r.StopAndConfirm(wctx, tg)
+	var ns *NotStoppedError
+	if !errors.Is(err, ErrNotStopped) || !errors.As(err, &ns) || ns.Found != CannotTell || wctx.Err() != nil {
+		t.Errorf("a check that cannot tell must refuse at once: %v (context: %v)", err, wctx.Err())
 	}
 }
 
