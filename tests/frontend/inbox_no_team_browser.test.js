@@ -43,9 +43,17 @@ const BASE = require('./test_base').BASE;
                 await inbox.openInboxGroup('needs');
             })()`);
             await waitFor(`document.querySelector('#group-table-view')?.textContent.includes('Solo report.txt')`, 'solo review row');
-            assert.ok(await ev(`document.querySelector('#group-table-view').textContent.includes('Not on a team')`));
+            assert.ok(await ev(`document.querySelector('#group-table-view').textContent.includes('Solo writer')`), 'the Needs you row names the agent');
             assert.ok(await ev(`document.querySelector('#group-table-view').textContent.includes('Is this ready to ship?')`));
             assert.equal(await ev(`document.querySelectorAll('#group-table-view .inbox-main-action, #group-table-view .inbox-changes').length`), 2, 'approved no-team API supports decisions');
+            // #18157: in the Files list a single agent's file names the agent in the Team column, not "Not on a team" (noise for one agent); the filter bar still offers that choice, so read the row
+            await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.openInboxGroup('artifacts')).then(() => true)`);
+            await waitFor(`!!document.querySelector('#group-table-view tbody tr')`, 'the Files row');
+            const fileRow = await ev(`document.querySelector('#group-table-view tbody tr').textContent`);
+            assert.ok(fileRow.includes('Solo report.txt') && !fileRow.includes('Not on a team'), 'a single agent\'s file row does not say "Not on a team": ' + JSON.stringify(fileRow));
+            assert.ok(fileRow.includes('Solo writer'), 'the row names the agent: ' + JSON.stringify(fileRow));
+            await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.openInboxGroup('needs')).then(() => true)`);
+            await waitFor(`!!document.querySelector('#group-table-view .inbox-review-name')`, 'back on the Needs you row');
             await ev(`document.querySelector('#group-table-view .inbox-review-name').click(); true`);
             await waitFor(`!document.getElementById('artifact-viewer')?.hidden`, 'solo file opens');
             await waitFor(`window.__soloWrites.some(tags=>tags.includes('read'))`, 'opening marks read');
