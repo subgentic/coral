@@ -142,9 +142,11 @@ function _renderTabs() {
 
 /* ── Toolbar ───────────────────────────────────────────────── */
 
-const _btn = (cls, action, mode, icon, title, label) => `<button class="${cls}" data-action="${escapeAttr(action)}"${mode ? ` data-mode="${escapeAttr(mode)}"` : ''} title="${escapeAttr(title)}" aria-label="${escapeAttr(label)}"><span class="material-icons" aria-hidden="true">${icon}</span></button>`;
-const _modeBtn = (mode, icon, title, tab) => _btn('inline-preview-mode-btn' + (tab.mode === mode ? ' active' : ''), 'mode', mode, icon, title, title);
-const _fileBtn = (action, icon, title, label) => _btn('btn btn-quiet btn-icon btn-xs inline-preview-mode-btn', action, '', icon, title, label);
+function _modeBtn(mode, icon, title, tab) {
+    return `<button class="inline-preview-mode-btn${tab.mode === mode ? ' active' : ''}" data-action="mode" data-mode="${escapeAttr(mode)}" title="${escapeAttr(title)}" aria-label="${escapeAttr(title)}"><span class="material-icons" aria-hidden="true">${icon}</span></button>`;
+}
+
+const _fileBtn = (action, icon, title, label) => `<button class="btn btn-quiet btn-icon btn-xs inline-preview-mode-btn" data-action="${escapeAttr(action)}" title="${escapeAttr(title)}" aria-label="${escapeAttr(label)}"><span class="material-icons" aria-hidden="true">${icon}</span></button>`;
 
 function _renderToolbar(tab) {
     const bar = document.getElementById('preview-toolbar');
