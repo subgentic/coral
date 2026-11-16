@@ -7,9 +7,9 @@ import (
 
 func TestWalk34SHOULDs(t *testing.T) {
 	t.Run("quick-reply padding on touch", func(t *testing.T) {
-		src := frontendSource(t, "board_quick_reply.js")
+		src := frontendSource(t, "css/board_quick_reply.css") // the Reply button's rules are a lazy stylesheet (the Hub's CSP refuses an injected <style>, #18816)
 		if !strings.Contains(src, "@media(hover:none)") {
-			t.Fatal("the Reply button's inline CSS must add padding on hover:none (touch) so it does not overlap the row's tags and time")
+			t.Fatal("the Reply button's CSS must add padding on hover:none (touch) so it does not overlap the row's tags and time")
 		}
 		if !strings.Contains(src, "padding-inline-end") {
 			t.Fatal("the touch rule must add padding-inline-end to the message row")
