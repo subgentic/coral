@@ -448,8 +448,6 @@ node menu_dialog_motion_lint.test.mjs
 node signout_destination.test.mjs
 node signout_hub_destination.test.mjs
 node affected_suites.test.mjs
-node settings_inbox_off_line.test.mjs
-node menu_dialog_motion_lint.test.mjs
 node team_health_all_clear_line.test.mjs
 node walk65_batch_pins.test.mjs
 node launch_disclosure_modes.test.mjs

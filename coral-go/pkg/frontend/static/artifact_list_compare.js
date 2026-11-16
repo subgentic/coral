@@ -6,7 +6,6 @@ import { markHidden } from './visible_marks.js';
 import { lockFrame, sandboxedDoc } from './sandbox_frame.js';
 import { loadStyles } from './lazy_styles.js';
 const { diffLines } = await importOnce('./artifact_versions.js');
-import { renderArtifact } from './artifact_preview.js'; // the existing startup stub; no new startup namespace registration
 const LIMIT = 2 * 1024 * 1024;
 await loadStyles('artifact_viewer_header.css'); // the viewer's own .av-add / .av-del tints, shared, not copied
 const node = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
@@ -77,7 +76,7 @@ export async function showComparison(dialog, opts, before, after) {
             if (data.text !== null && (/html/i.test(data.type) || /\.x?html?$/i.test(opts.name || ''))) {
                 const frame = node('iframe'); frame.setAttribute('aria-label', `Rendered v${v.n}`); lockFrame(frame); frame.srcdoc = sandboxedDoc(data.text); preview.append(frame); return;
             }
-            await renderArtifact(preview, `coral://artifacts/${v.hex}`, { server: opts.server, board: opts.board, filename: opts.name, mediaType: data.type }, { signal, isStale: () => stale() || token !== mode, renderContent: (el, text, path) => { if (/\.(md|markdown|mdown)$/i.test(path || '')) { const prose = node('div', 'prose'); prose.innerHTML = renderMarkdownStrict(text); el.replaceChildren(prose); } else el.replaceChildren(node('pre', '', text)); }, setMeta() {}, openEntry() {} });
+            await (await importOnce('./artifact_preview.js')).renderArtifact(preview, `coral://artifacts/${v.hex}`, { server: opts.server, board: opts.board, filename: opts.name, mediaType: data.type }, { signal, isStale: () => stale() || token !== mode, renderContent: (el, text, path) => { if (/\.(md|markdown|mdown)$/i.test(path || '')) { const prose = node('div', 'prose'); prose.innerHTML = renderMarkdownStrict(text); el.replaceChildren(prose); } else el.replaceChildren(node('pre', '', text)); }, setMeta() {}, openEntry() {} });
         }));
         if (token === mode) markBlocks(grid, status);
     };

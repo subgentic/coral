@@ -102,8 +102,7 @@
    "radius: 999px": 1
   },
   "coral-go/pkg/frontend/static/css/inbox_review_groups.css": {
-   "height: .inbox-group-review-toggle input { height: 18px }": 1,
-   "radius: 999px": 2
+   "height: .inbox-group-review-toggle input { height: 18px }": 1
   },
   "coral-go/pkg/frontend/static/css/layout.css": {
    "radius: 11px": 2,
@@ -119,7 +118,7 @@
    "radius: 0 16px 16px 0": 1,
    "radius: 14px": 1,
    "radius: 16px": 2,
-   "radius: 18px": 2,
+   "radius: 18px": 1,
    "radius: 20px": 1,
    "radius: 24px": 1,
    "radius: 26px": 1
@@ -147,9 +146,6 @@
   },
   "coral-go/pkg/frontend/static/css/short_screen.css": {
    "height: .alerts-offer-banner .btn { min-height: 28px }": 1
-  },
-  "coral-go/pkg/frontend/static/css/skill_mention.css": {
-   "radius: 999px": 1
   },
   "coral-go/pkg/frontend/static/css/skills.css": {
    "height: .skills-pick-label input[type=checkbox] { height: 20px }": 1
@@ -181,7 +177,7 @@
    "btn-primary written in a dialog module": 2
   },
   "coral-go/pkg/frontend/static/goal_view.js": {
-   "btn-primary written in a dialog module": 3
+   "btn-primary written in a dialog module": 4
   },
   "coral-go/pkg/frontend/static/platform/native.js": {
    "radius: inline 3px": 1

@@ -94,10 +94,12 @@ const { JSDOM } = require('jsdom');
     const src = fs.readFileSync(path.join(dir, 'desktop_notify.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
     assert.ok(!/serviceWorker|pushManager|PushManager|showNotification|fetch\(|XMLHttpRequest|sendBeacon/.test(src));
 
-    // the wiring: the alert is raised from the rising edge in websocket.js only, summaries are not passed
+    // the wiring: the reply alert is raised from websocket.js (noteHidden calls noteAttention once, #17898) and the needs-input alert from needs_input_alert.js (lazy, #17733), each only on the rising edge, summaries are not passed
     const ws = fs.readFileSync(path.join(dir, 'websocket.js'), 'utf8');
-    const calls = ws.match(/noteHidden\(m => m\.KIND_[A-Z_]+, s, id, /g) || []; // the two alert functions share noteHidden, which calls noteAttention once (#17898)
-    assert.strictEqual(calls.length, 2, 'the needs-input alert and the reply alert are raised from websocket.js');
-    for (const call of calls) assert.ok(!/summary|detail/.test(call), call);
+    const reply = ws.match(/noteHidden\(m => m\.KIND_REPLY, s, id, /g) || [];
+    assert.strictEqual(reply.length, 1, 'the reply alert is raised from websocket.js');
+    const needs = fs.readFileSync(path.join(dir, 'needs_input_alert.js'), 'utf8').match(/noteRow\(m\.KIND_NEEDS_INPUT, s, id, /g) || [];
+    assert.strictEqual(needs.length, 1, 'the needs-input alert is raised from needs_input_alert.js');
+    for (const call of [...reply, ...needs]) assert.ok(!/summary|detail/.test(call), call);
     console.log('desktop_notify: ok');
 })().catch(e => { console.error(e); process.exit(1); });
