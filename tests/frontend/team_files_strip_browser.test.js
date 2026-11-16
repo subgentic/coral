@@ -25,7 +25,9 @@ const { safePaused } = require('./helpers/paused');
         const launch = await api('POST', '/api/sessions/launch', { working_dir: os.tmpdir(), agent_type: 'terminal', display_name: 'Files QA' });
         sid = launch.body.session_id; sname = launch.body.session_name || launch.body.name; assert.ok(sid, JSON.stringify(launch));
         assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'Files QA', job_title: 'Backend Dev', session_name: sname })).status < 300);
-        const up = async (name, text, type) => { const r = await api('POST', `/api/agent/artifacts?session_id=${sid}`, text, { 'X-Artifact-Name': name, 'X-Artifact-Media-Type': type }); assert.equal(r.status, 201, JSON.stringify(r)); return /[a-f0-9]{64}/.exec(r.body.uri)[0]; };
+        const up = async (name, text, type, as = sid) => { const r = await api('POST', `/api/agent/artifacts?session_id=${as}`, text, { 'X-Artifact-Name': name, 'X-Artifact-Media-Type': type }); assert.equal(r.status, 201, JSON.stringify(r)); return /[a-f0-9]{64}/.exec(r.body.uri)[0]; };
+        // a team lists its members' files: a team that is to hold only some files gets its own agent, as the one agent above is on every team of this suite
+        const newMember = async (board, name) => { const l = await api('POST', '/api/sessions/launch', { working_dir: os.tmpdir(), agent_type: 'terminal', display_name: name }); const s2 = l.body.session_id, n2 = l.body.session_name || l.body.name; assert.ok(s2, JSON.stringify(l)); assert.ok((await api('POST', `/api/board/${board}/subscribe`, { subscriber_id: name, job_title: 'Backend Dev', session_name: n2 })).status < 300); return s2; };
         const hIndex = await up('index.html', '<h1>Flashcards</h1><script src="app.js"></script>', 'text/html');
         await up('app.js', 'console.log("flashcards " + Date.now());', 'text/javascript');
         await up('README.md', '# Flashcards\nOpen index.html', 'text/markdown');
@@ -95,30 +97,30 @@ const { safePaused } = require('./helpers/paused');
         await ev(`window.__detailDelay = 0; window.openTeamPage(${JSON.stringify(B2)}, { tab: 'artifacts' }); true`);
         await waitFor(`!!document.querySelector('#team-panel-artifacts .team-files-strip')`, 'the folder strip (B2)', 15000);
         const strip2 = await ev(`document.querySelector('#team-panel-artifacts .team-files-strip')?.textContent || ''`);
-        assert.ok(/Open index\.html in that folder/.test(strip2), 'index.html is preferred over report.html: ' + strip2);
+        assert.ok(/[Oo]pen index\.html in that folder/.test(strip2), 'index.html is preferred over report.html: ' + strip2);
         assert.ok(!/report\.html/.test(strip2), 'report.html is not named when index.html exists: ' + strip2);
 
         // #17814 SHOULD d: a team with only app.html (no index.html)
         console.log('app.html without index.html');
         B3 = 'tf3-' + Date.now().toString(36);
-        assert.ok((await api('POST', `/api/board/${B3}/subscribe`, { subscriber_id: 'Files QA', job_title: 'Backend Dev', session_name: sname })).status < 300);
-        await up('app.html', '<h1>Newsletter</h1>', 'text/html');
-        await up('data.json', '{}', 'application/json');
+        const s3 = await newMember(B3, 'Files QA 3');
+        await up('app.html', '<h1>Newsletter</h1>', 'text/html', s3);
+        await up('data.json', '{}', 'application/json', s3);
         await ev(`window.openTeamPage(${JSON.stringify(B3)}, { tab: 'artifacts' }); true`);
         await waitFor(`!!document.querySelector('#team-panel-artifacts .team-files-strip')`, 'the folder strip (B3)', 15000);
         const strip3 = await ev(`document.querySelector('#team-panel-artifacts .team-files-strip')?.textContent || ''`);
-        assert.ok(/Open app\.html in that folder/.test(strip3), 'app.html is named when it is the only .html file: ' + strip3);
+        assert.ok(/[Oo]pen app\.html in that folder/.test(strip3), 'app.html is named when it is the only .html file: ' + strip3);
 
         // #17814 SHOULD d: a team with no HTML file
         console.log('no HTML file');
         B4 = 'tf4-' + Date.now().toString(36);
-        assert.ok((await api('POST', `/api/board/${B4}/subscribe`, { subscriber_id: 'Files QA', job_title: 'Backend Dev', session_name: sname })).status < 300);
-        await up('main.py', 'print("hello")', 'text/x-python');
-        await up('README.md', '# Hello', 'text/markdown');
+        const s4 = await newMember(B4, 'Files QA 4');
+        await up('main.py', 'print("hello")', 'text/x-python', s4);
+        await up('README.md', '# Hello', 'text/markdown', s4);
         await ev(`window.openTeamPage(${JSON.stringify(B4)}, { tab: 'artifacts' }); true`);
         await waitFor(`!!document.querySelector('#team-panel-artifacts .team-files-strip')`, 'the folder strip (B4)', 15000);
         const strip4 = await ev(`document.querySelector('#team-panel-artifacts .team-files-strip')?.textContent || ''`);
-        assert.ok(!/Open .* in that folder/.test(strip4), 'no HTML file: no "Open" hint: ' + strip4);
+        assert.ok(!/[Oo]pen .* in that folder/.test(strip4), 'no HTML file: no "Open" hint: ' + strip4);
         assert.ok(/The team works in the folder/.test(strip4), 'still shows the folder path: ' + strip4);
 
         // #17814 MUST: a second load (the finally branch) must not throw when hooks.stripHint is called
@@ -132,7 +134,7 @@ const { safePaused } = require('./helpers/paused');
         await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length >= 4`, 'at least four files after adding dashboard.html', 15000);
         await waitFor(`!!document.querySelector('#team-panel-artifacts .team-files-strip')`, 'the strip after the late .html', 15000);
         const stripAfterLate = await ev(`document.querySelector('#team-panel-artifacts .team-files-strip')?.textContent || ''`);
-        assert.ok(/Open index\.html in that folder/.test(stripAfterLate), 'index.html still preferred after adding dashboard.html: ' + stripAfterLate);
+        assert.ok(/[Oo]pen index\.html in that folder/.test(stripAfterLate), 'index.html still preferred after adding dashboard.html: ' + stripAfterLate);
         const typeErrors = exceptions.filter(e => /TypeError/.test(e));
         assert.equal(typeErrors.length, 0, 'no TypeError on second load (hooks.stripHint must be a function, not a Promise): ' + typeErrors.join('; '));
         console.log('PASS second load no throw, late .html file appears');
