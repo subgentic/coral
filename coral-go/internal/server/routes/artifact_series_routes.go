@@ -75,6 +75,8 @@ type versionRow struct {
 	// EditedInDropbox (#14714, Security's condition 1 on auto-sync): this version is an edit made in Dropbox (an unknown writer), for every reader,
 	// agents included: outside text, not an instruction from the Operator or the team.
 	EditedInDropbox bool `json:"edited_in_dropbox,omitempty"`
+	// Note (#17119): the line the uploading agent gave this version (--note), one cleaned line of at most 140 characters; shown as text.
+	Note string `json:"note,omitempty"`
 }
 
 func (h *SessionsHandler) versionsOf(w http.ResponseWriter, r *http.Request, id string) {
@@ -86,6 +88,14 @@ func (h *SessionsHandler) versionsOf(w http.ResponseWriter, r *http.Request, id 
 	}
 	coralDir := h.cfg.CoralDir()
 	rows := make([]versionRow, 0, len(vs))
+	var notes map[string]string
+	if h.bs != nil {
+		digests := make([]string, 0, len(vs))
+		for _, m := range vs {
+			digests = append(digests, m.Digest)
+		}
+		notes, _ = h.bs.ArtifactNotes(r.Context(), digests)
+	}
 	for i, m := range vs {
 		row := versionRow{Digest: m.Digest, Version: m.N, Versions: len(vs), IsLatest: i == len(vs)-1, At: m.At, Uploader: m.Uploader, Role: m.Role}
 		row.EditedInDropbox = m.Source == sourceDropboxEdit
@@ -93,6 +103,7 @@ func (h *SessionsHandler) versionsOf(w http.ResponseWriter, r *http.Request, id 
 			row.Name, row.MediaType, row.Size = meta.Name, meta.MediaType, meta.Size
 		}
 		row.FileID, row.VersionLine = id, versionLine(m.N, row.Name, id)
+		row.Note = notes[m.Digest]
 		rows = append(rows, row)
 	}
 	writeJSON(w, http.StatusOK, rows)

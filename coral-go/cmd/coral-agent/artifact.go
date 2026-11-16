@@ -20,13 +20,13 @@ import (
 	"github.com/subgentic/coral/internal/mediatype"
 )
 
-const artifactUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <file id>[@version]] [--rename] [--task N | --no-task] [--tag WORD]... [--question TEXT] [--kind done|release|decided]
+const artifactUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <file id>[@version]] [--rename] [--task N | --no-task] [--tag WORD]... [--question TEXT] [--kind done|release|decided] [--note TEXT]
        coral-agent artifact download <coral://artifacts/digest | file id | file id@version> [--output FILE] [--force]
        coral-agent artifact reply <coral://artifacts/digest | coral://goals/team/number | coral://diffs/team/session/hash> <comment-id> <text | ->
        coral-agent artifact comments <coral://artifacts/digest | coral://goals/team/number | coral://diffs/team/session/hash>
 Run coral-agent artifact upload --help, artifact download --help, artifact reply --help or artifact comments --help for one of them.`
 
-const artifactUploadUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <file id>[@version]] [--rename] [--task N | --no-task] [--tag WORD]... [--question TEXT] [--kind done|release|decided]
+const artifactUploadUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <file id>[@version]] [--rename] [--task N | --no-task] [--tag WORD]... [--question TEXT] [--kind done|release|decided] [--note TEXT]
 
 An upload is linked to the task you have in progress (the reply says task_id, and this prints
 "Attached to task #N <title>"); the task's page and the team's Artifacts tab then list it. --task N links it to
@@ -136,7 +136,7 @@ func cmdArtifact(args []string) {
 		fmt.Fprintln(os.Stderr, artifactUsageText)
 		clierr.Exit1()
 	}
-	opts, err := splitOptions(args[1:], []string{"name", "media-type", "new-version-of", "task", "tag", "question", "kind"}, []string{"no-task", "rename"})
+	opts, err := splitOptions(args[1:], []string{"name", "media-type", "new-version-of", "task", "tag", "question", "kind", "note"}, []string{"no-task", "rename"})
 	if err != nil || len(opts.Positional) != 1 {
 		if err == nil {
 			err = fmt.Errorf("upload needs exactly one file")
@@ -165,7 +165,7 @@ func cmdArtifact(args []string) {
 	}
 	name = mediatype.EnsureExtension(name, file)
 	mediaType := mediatype.Resolve(opts.Values["media-type"], file, name)
-	if err := uploadArtifactFull(serverURL, file, name, mediaType, resolveSessionID(), opts.Values["new-version-of"], task, opts.All["tag"], opts.Values["question"], opts.Values["kind"], opts.Bools["rename"], os.Stdout, os.Stderr); err != nil {
+	if err := uploadArtifactFull(serverURL, file, name, mediaType, resolveSessionID(), opts.Values["new-version-of"], task, opts.All["tag"], opts.Values["question"], opts.Values["kind"], opts.Values["note"], opts.Bools["rename"], os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		clierr.Exit1()
 	}
@@ -186,12 +186,12 @@ func uploadArtifactTags(serverURL, file, name, mediaType, sid, newVersionOf, tas
 
 // uploadArtifactKind is uploadArtifactTags with the kind of a file for review (#12144), sent as the kind parameter; the server checks the fact for it.
 func uploadArtifactKind(serverURL, file, name, mediaType, sid, newVersionOf, task string, tags []string, question, kind string, stdout, stderr io.Writer) error {
-	return uploadArtifactFull(serverURL, file, name, mediaType, sid, newVersionOf, task, tags, question, kind, false, stdout, stderr)
+	return uploadArtifactFull(serverURL, file, name, mediaType, sid, newVersionOf, task, tags, question, kind, "", false, stdout, stderr)
 }
 
 // uploadArtifactFull is uploadArtifactKind with rename (#14145): the upload may give a new version of a file another name.
-func uploadArtifactFull(serverURL, file, name, mediaType, sid, newVersionOf, task string, tags []string, question, kind string, rename bool, stdout, stderr io.Writer) error {
-	if err := refuseSignInLinkIn("an artifact name, tag or question", append([]string{name, question}, tags...)...); err != nil {
+func uploadArtifactFull(serverURL, file, name, mediaType, sid, newVersionOf, task string, tags []string, question, kind, note string, rename bool, stdout, stderr io.Writer) error {
+	if err := refuseSignInLinkIn("an artifact name, tag or question", append([]string{name, question, note}, tags...)...); err != nil {
 		return err
 	}
 	// Its contents: a warning only, and the upload goes ahead.
@@ -201,7 +201,7 @@ func uploadArtifactFull(serverURL, file, name, mediaType, sid, newVersionOf, tas
 		return err
 	}
 	defer f.Close()
-	req, err := http.NewRequest(http.MethodPost, serverURL+"/api/agent/artifacts?session_id="+url.QueryEscape(sid)+tagQuery(tags)+questionQuery(question)+kindQuery(kind), f)
+	req, err := http.NewRequest(http.MethodPost, serverURL+"/api/agent/artifacts?session_id="+url.QueryEscape(sid)+tagQuery(tags)+questionQuery(question)+kindQuery(kind)+noteQuery(note), f)
 	if err != nil {
 		return err
 	}
@@ -367,6 +367,14 @@ func questionQuery(q string) string {
 }
 
 // kindQuery is the kind parameter of an upload for review (#12144): "&kind=<word>", or nothing.
+// noteQuery is the --note text for the upload's query: what this version changed, one line the server cleans and cuts at 140 characters (#17119).
+func noteQuery(n string) string {
+	if strings.TrimSpace(n) == "" {
+		return ""
+	}
+	return "&note=" + url.QueryEscape(strings.TrimSpace(n))
+}
+
 func kindQuery(k string) string {
 	if strings.TrimSpace(k) == "" {
 		return ""
