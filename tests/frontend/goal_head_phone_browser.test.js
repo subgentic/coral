@@ -3,7 +3,6 @@
 // title is two lines at most; every target is 44 px; keyboard: the toggle opens the menu on Enter, ArrowDown moves, Escape closes it and gives the focus back. 390 px (100% and 200% text, both themes) and landscape
 // 844x390. At 1280 nothing changed: the four buttons are in the header and Copy for an agent is in the line. Real boards on the isolated dev server.
 const assert = require('node:assert/strict');
-if (process.platform === 'win32') { console.log('goal_head_phone_browser: SKIPPED on Windows for now (#14876); Linux and Mac keep running it'); process.exit(0); }
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
