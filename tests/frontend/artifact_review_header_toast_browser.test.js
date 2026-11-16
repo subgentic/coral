@@ -25,6 +25,8 @@ const { coralReady } = require('./helpers/wait');
                 return orig(u, o); }; return true; })()`);
             await ev(`import(${S} + 'artifact_viewer.js').then(v => v.openArtifactViewer('${H3}', { goal: 'Ship it', goalId: 3, goalTeam: 'team-a', task: 'A task', filename: 'plan.md', board: 'team-a', from: 'Developer · sample-project' })).then(() => true)`);
             await waitFor(`!!document.querySelector('.artifact-review-approve:not([hidden])') && !!document.querySelector('.av-current')`, `${w}: the viewer shows its review and versions`, 12000);
+            // the squeezed line moves below the header from a ResizeObserver callback (#18778): on a slow Windows run it is measured before that runs (13 px), so wait for it to settle; a stub that never settles still fails
+            await waitFor(`(() => { const e = document.querySelector('.artifact-viewer-from'); return !e || !e.getClientRects().length || e.getBoundingClientRect().width >= 100; })()`, `${w}: the sender line is readable, not a clipped stub`, 3000).catch(() => {});
             const from = await ev(`(() => { const e = document.querySelector('.artifact-viewer-from'), r = e.getBoundingClientRect(); return { w: Math.round(r.width), shown: !!e.getClientRects().length, clipped: e.scrollWidth > e.clientWidth }; })()`);
             assert.ok(!from.shown || from.w >= 100, `${w}: the sender line is readable, not a clipped stub (it is ${from.w} px wide)`);
             await ev(`document.querySelector('.artifact-review-approve').click(); true`);
