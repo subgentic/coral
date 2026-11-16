@@ -136,7 +136,9 @@ const spec = (i) => {
                 const c = await cur();
                 assert.ok(c && c.open && c.expanded === 'true' && c.marks === 1 && c.inView, `match ${i + 1} is open and marked: ${JSON.stringify(c)}`);
                 seen.push(c.id);
-                if (i < 2) { await ev(`document.querySelector('.mb-search-step[data-step=older]').click(); true`); await waitFor(`document.querySelector('#mb-tools .mb-search-results').textContent.startsWith('${i + 2} of ')`, `match ${i + 2}`, { timeout: 8000 }); await waitFor(`Number((document.querySelector('#mb-messages > .mb-message.mb-message-current') || { dataset: {} }).dataset.messageId) === ${needleIds[i + 1]}`, `the row of match ${i + 2}, its pages loaded`, { timeout: 20000 }); await settle(400); }
+                // A distant hit loads and renders many 50-row pages. Windows can need
+                // more than 20s; use the same 60s bound as full-board loading below.
+                if (i < 2) { await ev(`document.querySelector('.mb-search-step[data-step=older]').click(); true`); await waitFor(`document.querySelector('#mb-tools .mb-search-results').textContent.startsWith('${i + 2} of ')`, `match ${i + 2}`, { timeout: 8000 }); await waitFor(`Number((document.querySelector('#mb-messages > .mb-message.mb-message-current') || { dataset: {} }).dataset.messageId) === ${needleIds[i + 1]}`, `the row of match ${i + 2}, its pages loaded`, { timeout: 60000 }); await settle(400); }
             }
             assert.deepEqual(seen, needleIds, 'the matches are stepped newest to oldest, across the pages between');
             assert.equal(await ev(`${box}.querySelectorAll(':scope > .mb-message.mb-open').length`) >= 1, true);
