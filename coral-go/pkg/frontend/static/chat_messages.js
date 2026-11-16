@@ -60,7 +60,17 @@ function renderOneMessage(msg, container, agentType) {
     } else if (msg.type === "user" && msg.local_command === true) {
         // A slash command the CLI ran by itself ("/model sonnet"): a small note of what was typed, not a bubble (#5488). Seeing it here is how the message the person sent is known to be taken.
         appendContent(container, makeBubble("chat-note chat-local-command", escapeHtml(markHidden(msg.content || ""))));
-	} else if (msg.type === "user" && isCoralDelivery(msg)) {
+	} else if (msg.type === "user" && msg.coral_notice !== false &&
+        /You were automatically joined to message board "[^"\n]+"/.test(String(msg.content || "")) &&
+        String(msg.content).includes('Use the coral-board CLI to communicate with your teammates:') &&
+        String(msg.content).includes('Do NOT run coral-board join')) {
+        // Preserve the full generated launch source, including literal CLI placeholders.
+        const bubble = makeBubble("chat-note", "");
+        const details = document.createElement("details"); details.className = "chat-team-instructions";
+        const summary = document.createElement("summary"); summary.textContent = "Team instructions";
+        const source = document.createElement("pre"); source.textContent = unwrapPastedContent(msg.content);
+        details.append(summary, source); bubble.append(details); appendContent(container, bubble);
+    } else if (msg.type === "user" && isCoralDelivery(msg)) {
 		const text = unwrapPastedContent(msg.content);
 		appendCoralNotice(container, normalizeNudgeText(text), isCoralHealthNudge(text));
     } else if (msg.type === "user") {
