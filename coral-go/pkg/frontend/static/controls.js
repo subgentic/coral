@@ -469,27 +469,27 @@ export function renderQuickActions() {
         <div class="toolbar-group toolbar-group-nav">
             ${navButtons}
             <div class="toolbar-send-split">
-                <button class="btn btn-primary btn-small btn-nav btn-send" data-coral-hook="send-button" data-on-click="cmd-send" data-tooltip="Sends the text from the input box below to the terminal" aria-label="Send command">${SVGO.o3}<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+                <button class="btn btn-primary btn-small btn-nav btn-send" data-coral-hook="send-button" data-on-click="cmd-send" data-tooltip="Sends your message to the agent" aria-label="Send command">${SVGO.o3}<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
                 <button class="btn btn-primary btn-icon btn-small btn-nav btn-send-dropdown" data-on-click="cmd-send-menu" aria-label="Send options" title="Send options" aria-haspopup="menu" aria-expanded="false">
                     <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4z"/></svg>
                 </button>
                 <div class="menu send-btn-menu" role="menu" aria-label="Send options" style="display:none">
                     <button class="menu-item send-menu-item" role="menuitem" data-on-click="send-menu-send">
                         ${SVGO.o3}<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                        Send
+                        <span class="send-menu-text">Send<span class="send-menu-note">Sends your message to the agent</span></span>
                         <span class="send-menu-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></span>
                     </button>
                     <button class="menu-item send-menu-item" role="menuitem" data-on-click="send-menu-team">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M17 11a4 4 0 0 1 4 4v2"/></svg>
-                        Send + Team Reminder
+                        <span class="send-menu-text">Send + Team Reminder<span class="send-menu-note">Adds a reminder to use the team board, then sends</span></span>
                     </button>
                     <button class="menu-item send-menu-item" role="menuitem" data-on-click="send-menu-resend">
                         ${SVGO.o3}<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-                        Resend Prompt
+                        <span class="send-menu-text">Resend Prompt<span class="send-menu-note">Sends the team's starting instructions again</span></span>
                     </button>
                     <button class="menu-item send-menu-item" role="menuitem" data-on-click="send-menu-protocol">
                         ${SVGO.o3}<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
-                        Send Board Protocol
+                        <span class="send-menu-text">Send Board Protocol<span class="send-menu-note">Adds how to use the message board, then sends</span></span>
                     </button>
                 </div>
             </div>

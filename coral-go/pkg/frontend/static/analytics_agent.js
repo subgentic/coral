@@ -79,7 +79,7 @@ function draw() {
     const tiles = el('div', 'viz-tiles');
     const hit = series.cacheHit(row.input_tokens, row.cache_read_tokens);
     tiles.append(tile('Cost', money(row.cost_usd || 0), `${compactCount(row.requests || 0)} requests`), tile('Tokens', compactCount((row.input_tokens || 0) + (row.output_tokens || 0)), `${compactCount(row.input_tokens || 0)} in, ${compactCount(row.output_tokens || 0)} out`),
-        tile('Cache read', compactCount(row.cache_read_tokens || 0), hit == null ? '' : `${pct(hit)} of the input`), tile('Cache write', compactCount(row.cache_write_tokens || 0)));
+        tile('Cache read', compactCount(row.cache_read_tokens || 0), hit == null ? 'read back from the cache, billed lower' : `${pct(hit)} of the input, read from the cache`), tile('Cache write', compactCount(row.cache_write_tokens || 0), 'saved to the cache for later turns'));
     h.append(tiles);
 
     // 1. cost over the session, turn by turn

@@ -766,6 +766,7 @@ function _renderSpendChart(buckets) {
     _spendBuckets = buckets;
     _watchSpendChart(container);
 
+    if (buckets.length >= 2 && !buckets.some(b => (b.cumulative_cost || 0) > 0)) { emptyState(container, noDataWords(_period(), 'Nothing was spent in this range, so there is no line to draw.'), 'empty-state'); return; } // intervals but no spend: a flat line on an empty frame read as a broken chart (walk 51, #17152)
     if (buckets.length < 2) {
         const spent = _costTotal > 0 || (buckets[0]?.cumulative_cost || 0) > 0; // money was spent: it is all in one interval, so there is no line to draw, which is not "not enough data" (#10740)
         emptyState(container, spent ? 'All the spend so far is in one interval, so there is no line to draw yet. The total above is complete.' : noDataWords(_period(), 'Not enough data yet.'), 'empty-state'); // says what makes it appear (Beta Tester, #9955)
