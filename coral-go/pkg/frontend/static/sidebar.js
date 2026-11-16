@@ -320,12 +320,13 @@ export function toggleAgenticPanel(forceState) {
  * every tab (#11629), kept in this browser. */
 const SIDEBAR_PANES = {
     agents: { search: 'Search agents', action: { name: 'launch-show', label: 'New agent' } },
-    history: { search: 'Search chats', action: null },
-    automations: { search: 'Search jobs', action: null }, // Workflows and Jobs as one screen (Goal #74): its folders' toolbars carry the create action
-    'hub-inbox': { search: 'Search the Inbox', action: null },
-    tokens: { search: 'Search views', action: null }, // Analytics: the tab's name is tokens
-    skills: { search: 'Search skills', action: null }, // the Skills Store: its folders (All, Imported, Agent created, Coral skills) and a search of the table (#12997)
-    docs: { search: 'Search docs', action: null },
+    history: { search: 'Search chats' },
+    automations: { search: 'Search jobs' }, // Workflows and Jobs as one screen (Goal #74): its folders' toolbars carry the create action
+    'hub-inbox': { search: 'Search the Inbox' },
+    tokens: { search: 'Search views' }, // Analytics: the tab's name is tokens
+    skills: { search: 'Search skills' }, // the Skills Store: its folders (All, Imported, Agent created, Coral skills) and a search of the table (#12997)
+    queue: { search: 'Search the queue' }, // the resource queue (#18719): its views and a search of the table
+    docs: { search: 'Search docs' },
 };
 
 const RAIL_KEY = 'coral-sidebar-collapsed-rail'; // the Agents tab's (its name from before the other tabs had one)

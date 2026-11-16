@@ -1,7 +1,7 @@
 /* The phone's mirrored search row, loaded only on a phone (#15859).
  * Input and Enter still go to the view's original search handler. */
 import { isPhoneBar } from './phone_layout.js';
-const SEARCH_OF = { 'hub-inbox': 'inbox-search', history: 'history-search', automations: 'automations-search', tokens: 'analytics-search', docs: 'docs-search', skills: 'skills-search' };
+const SEARCH_OF = { 'hub-inbox': 'inbox-search', history: 'history-search', automations: 'automations-search', tokens: 'analytics-search', docs: 'docs-search', skills: 'skills-search', queue: 'queue-search' };
 /** The open Inbox page's own search box (Needs you, Tasks, Goals, Saved, Chats, Files: the page's toolbar draws it in #group-table-view): on a phone the pill is that field and the box is not drawn (#13591). */
 const pageSearch = () => { const v = document.getElementById('group-table-view'); if (!v || !/^hub-inbox/.test(v.dataset.group || '') || v.style.display === 'none' || !v.getClientRects().length) return null; const q = [...v.querySelectorAll('.list-bar-search')].find(e => e.closest('.list-bar-search-wrap')); return q || null; };
 const searchTarget = () => { const arg = document.querySelector('.top-nav-tab.active')?.dataset.arg || ''; if (arg === 'hub-inbox') { const q = pageSearch(); if (q) return q; } const id = SEARCH_OF[arg], e = id ? document.getElementById(id) : null; return e && !e.closest('[hidden]') ? e : null; }; // a search box the view hides (the page has its own) is not one the bar mirrors (#11859)

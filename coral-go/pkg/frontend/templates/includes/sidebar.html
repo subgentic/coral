@@ -83,6 +83,14 @@
                     </div>
                 </section>
             </div>
+            <div class="sidebar-pane sidebar-pane-fixed" data-pane="queue" hidden>
+                {{ template "includes/sidebar_header" "queue" }}
+                <section class="sidebar-section" data-section="queue">
+                    <div class="sidebar-section-body">
+                        <div id="queue-nav-list"></div><!-- the queue's views (queue_tab.js): Resources now, more kinds of queue later -->
+                    </div>
+                </section>
+            </div>
             <div class="sidebar-pane" data-pane="docs" hidden>
                 {{ template "includes/sidebar_header" "docs" }}
                 <section class="sidebar-section" data-section="docs">
@@ -107,13 +115,14 @@
                         {{ else if eq . "automations" }}<input type="search" id="automations-search" class="field field-search sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search jobs" data-on-input="automations-search-filter">
                         {{ else if eq . "tokens" }}<input type="search" id="analytics-search" class="field field-search sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search views" data-on-input="analytics-search-filter">
                         {{ else if eq . "skills" }}<input type="search" id="skills-search" class="field field-search sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search skills" data-on-input="skills-search-filter">
+                        {{ else if eq . "queue" }}<input type="search" id="queue-search" class="field field-search sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search the queue">
                         {{ else if eq . "hub-inbox" }}<input type="search" id="inbox-search" class="field field-search sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search the Inbox" data-on-input="inbox-search-filter">
                         {{ else }}<input type="search" id="docs-search" class="field field-search sidebar-search-input" placeholder="Search" autocomplete="off" aria-label="Search docs" data-on-input="docs-search-filter">{{ end }}
                     </div>
-                    {{ if ne . "automations" }}{{ if ne . "docs" }}{{ if ne . "tokens" }}{{ if ne . "skills" }}<!-- Display options (#3085): the button opens a panel in place with the tab's filters and what a row shows; absent on a tab that has none -->
+                    {{ if ne . "automations" }}{{ if ne . "docs" }}{{ if ne . "tokens" }}{{ if ne . "skills" }}{{ if ne . "queue" }}<!-- Display options (#3085): the button opens a panel in place with the tab's filters and what a row shows; absent on a tab that has none -->
                     <button class="btn btn-quiet btn-icon sidebar-collapse-btn" {{ if eq . "agents" }}id="sidebar-summary-btn" {{ end }}type="button" data-display-button data-on-click="display-panel-toggle" aria-expanded="false" aria-controls="{{ if eq . "agents" }}display-panel{{ else }}display-panel-{{ . }}{{ end }}" title="Display options" aria-label="Display options">
                         <span class="material-icons" style="font-size:var(--icon-size)" aria-hidden="true">notes</span><span class="display-dot" {{ if eq . "history" }}id="hf-active-count"{{ else }}data-display-badge{{ end }} hidden></span>
-                    </button>{{ end }}{{ end }}{{ end }}{{ end }}
+                    </button>{{ end }}{{ end }}{{ end }}{{ end }}{{ end }}
                     <button class="btn btn-quiet btn-icon sidebar-collapse-btn group-toggle-btn" type="button" data-group-toggle data-next="collapse" data-on-click="groups-toggle-all" title="Collapse all groups" aria-label="Collapse all groups" hidden>
                         <svg class="group-toggle-collapse" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9l5-5 5 5M7 15l5 5 5-5"/></svg>
                         <svg class="group-toggle-expand" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l5 5 5-5M7 20l5-5 5 5"/></svg>

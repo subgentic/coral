@@ -49,7 +49,7 @@ export function switchNavTab(tab, opts = {}) {
     }
 
     // Toggle sidebar visibility — full-width views hide the sidebar
-    const fullWidthTabs = new Set(['servers', 'artifacts', 'skills', 'queue', ...(isCloud() ? ['hub-inbox'] : [])]); // Workflows, Analytics and the Inbox have their sidebars (#7471, #7473, #7472), except where the hub serves the Inbox as a frame
+    const fullWidthTabs = new Set(['servers', 'artifacts', 'skills', ...(isCloud() ? ['hub-inbox'] : [])]); // Workflows, Analytics and the Inbox have their sidebars (#7471, #7473, #7472), except where the hub serves the Inbox as a frame
     const layout = document.querySelector('.layout');
     if (layout) layout.classList.toggle('sidebar-hidden', fullWidthTabs.has(tab));
 
