@@ -61,7 +61,7 @@ var allowedSenders = map[string]sender{
 	"internal/ptymanager/notice_pause.go\ttypeSummary\tSendInput":                            {guardGate, "gate: the one line for held notices is the Send of a DeliverAutomated call (#11387)", ""},
 	"internal/server/routes/agent_ui_request.go\tSessionsHandler.agentUIRequest\tSendPrompt": {guardGate, "gate (its send closure)", ""},
 	// AgentLauncher.SendPrompt, which goes through the gate itself.
-	"internal/background/launcher.go\tAgentLauncher.startPromptDelivery\tSendPrompt":            {guardGate, "gated launcher prompt", ""},
+	"internal/background/launcher.go\tAgentLauncher.startPromptDeliveryReporting\tSendPrompt":            {guardGate, "gated launcher prompt", ""},
 	"internal/background/workflow_steps.go\tWorkflowRunner.executeAgentInteractive\tSendPrompt": {guardGate, "gated launcher prompt", ""},
 	// #7727: the gate's own sends: one look at the screen, then the text and its Enter at once; nothing into an open prompt or over a draft.
 	"internal/ptymanager/automated_input_deliver.go\tinputGate.typeNow\tSendPrompt":            {guardGate, "gate (the paste with its Enter: the screen is looked at once before, and again just before the Enter)", ""},
@@ -79,6 +79,7 @@ var allowedSenders = map[string]sender{
 	"internal/server/routes/websocket.go\tterminalStream.handleFrame\tSendInput":           {guardHuman, "human: terminal typing", ""},
 	"internal/server/routes/model_switch_ask.go\tswitchAsker.answer\tSendRawInput":         {guardScreen, "Coral answers the one dialog a model switch implies (#15410): the digit goes only if the screen still shows the same dialog, under the agent's lock", "TestAnyOtherSwitchDialogIsAskedInTheChatAndTheWaitDoesNotRunOut"},
 	"internal/server/routes/prompt_answer.go\tSessionsHandler.AnswerPrompt\tSendInput":     {guardScreen, "human: picks an option", "TestAnswerPrompt_ClaudeStillOpen"},
+	"internal/server/routes/orchestrator_agents.go\tSessionsHandler.OrchestratorStop\tSendRawInput": {guardGate, "orchestrator stop (#17348): Escape (C-c for Hermes) to an agent in a turn; asks automatedInputBlocked first", ""},
 	"internal/server/routes/prompt_answer.go\tSessionsHandler.AnswerPrompt\tSendRawInput":  {guardScreen, "human: picks an option", "TestAnswerPromptSendsNoKeyOverADraft"},
 	"internal/server/routes/prompt_answer.go\tSessionsHandler.selectUnnumbered\tSendArrow": {guardScreen, "human: picks an option (a menu without numbers, #4543)", "TestAnswerPrompt_AgyNavigatesWithArrows"},
 	"internal/server/routes/prompt_answer.go\tSessionsHandler.selectUnnumbered\tSendEnter": {guardScreen, "human: picks an option (once the arrows have selected it)", "TestAnswerPrompt_AgyNavigatesWithArrows"},

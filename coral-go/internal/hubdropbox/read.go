@@ -10,7 +10,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/subgentic/coral/pkg/redact"
+	"github.com/subgentic/coral/internal/secrets"
 )
 
 // MaxFile is the artifact cap (maxAgentArtifactSize): a bigger file is refused, never cut.
@@ -85,9 +85,9 @@ func ReadOnce(r io.Reader) (*File, error) {
 	}, nil
 }
 
-// Scan is the secret scanner: the text it returns differs from its input when it would change something. The default knows token formats only; the server sets it to Coral's full redactor (keyword rules too),
+// Scan is the secret scanner: the text it returns differs from its input when it would change something. The default is Coral's own redactor (internal/secrets); the server sets the same one (keyword rules too),
 // the one Share via Dropbox already uses, so both paths flag the same files. An error counts as flagged.
-var Scan = func(b []byte) ([]byte, error) { return redact.Tokens(b), nil }
+var Scan = func(b []byte) ([]byte, error) { return secrets.Redactor().Text(b) }
 
 // flagged runs the redactor over the bytes. Any panic or doubt is "flagged": a scan that did not finish is never "clean".
 func flagged(data []byte) (f bool) {

@@ -9,6 +9,8 @@ import (
 	"sync"
 	"unicode/utf8"
 
+	"github.com/subgentic/coral/internal/fsreplace"
+	"github.com/subgentic/coral/internal/logsafe"
 	"github.com/subgentic/coral/internal/secfile"
 )
 
@@ -138,11 +140,11 @@ func keepLegacyAgentFilesAgentFiles(dir string) {
 		}
 		to := filepath.Join(dir, stem+"_.md")
 		if _, err := os.Lstat(to); err == nil {
-			slog.Warn("knowledge: an agent's file named like a note was left as it is: its new name is taken", "file", n)
+			slog.Warn("knowledge: an agent's file named like a note was left as it is: its new name is taken", "file", logsafe.Path(n))
 			continue
 		}
-		if err := os.Rename(filepath.Join(dir, n), to); err != nil {
-			slog.Warn("knowledge: an agent's file named like a note was not renamed", "file", n, "error", err)
+		if err := fsreplace.Rename(filepath.Join(dir, n), to); err != nil {
+			slog.Warn("knowledge: an agent's file named like a note was not renamed", "file", logsafe.Path(n), "error", err)
 		}
 	}
 }

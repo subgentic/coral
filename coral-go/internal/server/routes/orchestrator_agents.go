@@ -401,12 +401,17 @@ func (h *SessionsHandler) OrchestratorStop(w http.ResponseWriter, r *http.Reques
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "stopped": false, "name": who, "note": who + " is not working; nothing to stop"})
 		return
 	}
+	pane := naming.SessionName(target.AgentType, target.SessionID)
+	// The Escape is Coral's own key, not a person's: it asks the automated-input gate first, as every automated key does (a CLI that has exited is a shell, a person typing or a draft in the box would take the key), and before the hourly cap is spent on it.
+	if automatedInputBlocked(r.Context(), h.terminal, pane, target.AgentType, target.SessionID, "orchestrator stop") {
+		orchRefusal(w, http.StatusConflict, "input_held", "that agent's terminal is not taking automated keys right now (its CLI has exited, or a person is typing or has a draft there): nothing was sent")
+		return
+	}
 	id, err := h.reserveForBoard(r.Context(), project, board.LifecycleStop, actor, who, g)
 	if err != nil {
 		h.refuseCap(w, err, g)
 		return
 	}
-	pane := naming.SessionName(target.AgentType, target.SessionID)
 	keys := []string{"Escape"}
 	if target.AgentType == at.Hermes {
 		keys = []string{"C-c"}
