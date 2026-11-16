@@ -283,6 +283,12 @@
       "type": "index"
     },
     {
+      "name": "sqlite_autoindex_artifact_notes_1",
+      "sql": null,
+      "tbl_name": "artifact_notes",
+      "type": "index"
+    },
+    {
       "name": "sqlite_autoindex_artifact_private_1",
       "sql": null,
       "tbl_name": "artifact_private",
@@ -466,6 +472,12 @@
       "name": "artifact_kinds",
       "sql": "CREATE TABLE artifact_kinds (\n\t\tboard_id   TEXT NOT NULL,\n\t\thex        TEXT NOT NULL,\n\t\tkind       TEXT NOT NULL,\n\t\tsession_id TEXT NOT NULL,\n\t\tset_at     TEXT NOT NULL,\n\t\tPRIMARY KEY (board_id, hex)\n\t)",
       "tbl_name": "artifact_kinds",
+      "type": "table"
+    },
+    {
+      "name": "artifact_notes",
+      "sql": "CREATE TABLE artifact_notes (\n\t\thex        TEXT NOT NULL PRIMARY KEY,\n\t\tnote       TEXT NOT NULL,\n\t\tsession_id TEXT NOT NULL,\n\t\tnoted_at   TEXT NOT NULL\n\t)",
+      "tbl_name": "artifact_notes",
       "type": "table"
     },
     {
@@ -1063,6 +1075,73 @@
             }
           ],
           "name": "sqlite_autoindex_artifact_kinds_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "artifact_notes": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "hex",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "note",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "session_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "noted_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "hex",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "sqlite_autoindex_artifact_notes_1",
           "origin": "pk",
           "partial": 0,
           "seq": 0,
