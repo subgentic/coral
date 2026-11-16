@@ -1,5 +1,5 @@
 // Codex's Auto says what it is (Security's ask on #7483, UI/UX's wording): in New agent's Permissions tab the line under the Mode is "Workspace sandbox, with the network on so it can reach Coral." when Codex and Auto are chosen,
-// the mode's own line for any other mode, and Claude's Auto keeps "Everything, with safety checks."; the dialog's size does not change. Isolated dev server; models stubbed.
+// the mode's own line for any other mode, and Claude's Auto keeps "Everything; safety checks on Claude only."; the dialog's size does not change. Isolated dev server; models stubbed.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installNA, N, openNewAgent, scenarios, stubModels } = require('./helpers/new_agent');
@@ -47,7 +47,7 @@ const BASE = require('./test_base').BASE;
         await S.run('Claude with Auto keeps its own line', async () => {
             await tab('Agent'); await radio(N.provider, /^Claude$/i);
             await tab('Permissions'); await radio(N.mode, /^Auto$/i);
-            assert.equal(await line(), 'Everything, with safety checks.');
+            assert.equal(await line(), 'Everything; safety checks on Claude only.');
         });
         S.finish();
     } finally { await client.close(); }
