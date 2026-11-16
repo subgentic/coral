@@ -79,11 +79,12 @@ const BASE = require('./test_base').BASE;
         await ev(`document.getElementById('sec-signout').focus(); true`);
         assert.equal(await ev(`document.activeElement.id`), 'sec-signout', 'the button takes keyboard focus');
         const before = navigations.length;
+        const returnTo = await ev(`location.pathname + location.search + location.hash`);
         await Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
         await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
         const until = Date.now() + 8000;
-        while (!navigations.slice(before).includes('/signin') && Date.now() < until) await new Promise(r => setTimeout(r, 20));
-        assert.ok(navigations.slice(before).includes('/signin'), `the sign-in page shows (${JSON.stringify(navigations.slice(before))})`);
+        while (!navigations.slice(before).includes('/auth') && Date.now() < until) await new Promise(r => setTimeout(r, 20));
+        assert.ok(navigations.slice(before).includes('/auth'), `the sign-in page shows (${JSON.stringify(navigations.slice(before))})`);
         // After the navigation this is the sign-in page of the same origin: its storage is the one we seeded.
         const after = await ev(`({ stored: Object.keys(localStorage).filter(k => /^coral-(input-drafts|pending-messages|recent-dirs|starred-files-)/.test(k)),
             panel: Object.keys(sessionStorage).filter(k => k.startsWith('coral-panel-request:')), kept: localStorage.getItem('coral-group-by-server'), other: sessionStorage.getItem('some-other-key'), logout: JSON.parse(sessionStorage.getItem('zz-logout') || 'null'), path: location.pathname })`);
@@ -92,8 +93,9 @@ const BASE = require('./test_base').BASE;
         assert.equal(after.kept, 'true', 'a display preference stays (the tab layout)');
         assert.equal(after.other, 'kept', 'nothing else in the session storage is touched');
         assert.deepEqual(after.logout, { method: 'POST', status: 200, storedAtCall: 0 }, 'POST /auth/logout, answered ok, after the content was cleared');
-        assert.equal(after.path, '/signin');
-        console.log('   ✓ cleared, /auth/logout POSTed, /signin shown, display preference kept');
+        assert.equal(after.path, '/auth');
+        assert.equal(await ev(`new URLSearchParams(location.search).get('return_to')`), returnTo, 'local sign-in returns to the view where Sign out was pressed');
+        console.log('   ✓ cleared, /auth/logout POSTed, /auth shown with return_to, display preference kept');
 
         console.log('\nAll Sign out checks passed');
     } finally {

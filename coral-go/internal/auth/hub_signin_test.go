@@ -769,3 +769,14 @@ func TestHubSensitiveReadIsNamedFromTheRoutedPath(t *testing.T) {
 	guard.ServeHTTP(w, g.req("GET", "/api/auth%2Fsessions", "", "10.0.0.5", hub))
 	assert.Equal(t, http.StatusForbidden, w.Code, "the deny list reads the decoded path: a superset, so an encoded spelling cannot slip past it")
 }
+
+// With --cloud-url off there is no destination for linking this computer.
+type noPageHubBackend struct{ HubBackend }
+
+func (noPageHubBackend) HubPage() string { return "" }
+func TestHubSigninNoConfiguredHubHasNoOffer(t *testing.T) {
+	g := newHubRig(t)
+	g.hub.linked = false
+	g.hs.hub = noPageHubBackend{g.hub}
+	assert.Empty(t, g.hs.PageState(g.req("GET", "/auth", "", "10.0.0.5", nil)))
+}
