@@ -26,7 +26,7 @@ const BASE = require('./test_base').BASE;
                 const real = window.fetch;
                 window.fetch = (u, opts) => {
                     const p = new URL(String(u), location.origin).pathname;
-                    if (p.startsWith('/api/artifacts/') && p.endsWith('/versions')) return Promise.resolve(new Response('{}', { status: 404 }));
+                    if (p.startsWith('/api/artifacts/') && p.endsWith('/versions')) return Promise.resolve(new Response(JSON.stringify([{ version: 1, digest: 'a'.repeat(64), at: '2026-11-14T21:10:00Z', role: 'Orchestrator' }, { version: 2, digest: 'b'.repeat(64), at: '2026-11-14T21:40:00Z', role: 'operator' }]), { status: 200, headers: { 'content-type': 'application/json' } })); // a real series: a same-name guess offers no Compare (#18644)
                     if (p.startsWith('/api/artifacts/')) return Promise.resolve(new Response(p.includes('bbbb') ? '# Notes\\n\\nSame paragraph.\\n\\nNext meeting: Friday\\n' : '# Notes\\n\\nSame paragraph.\\n\\nOld line to drop\\n', { headers: { 'content-type': 'text/markdown' } }));
                     return real(u, opts);
                 }; return true;
