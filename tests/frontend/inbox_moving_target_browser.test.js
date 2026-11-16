@@ -11,7 +11,7 @@ const BASE=require('./test_base').BASE;
  await ev(`window.switchNavTab('hub-inbox');true`);
  await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(()=>true)`);
  await waitFor(`document.body.dataset.navTab==='hub-inbox' && !!document.getElementById('group-table-view')`,'Inbox navigation and list');
- await ev(`(()=>{const host=document.getElementById('group-table-view');host.replaceChildren();const b=document.createElement('button');b.id='moving-card-action';b.textContent='Open agent';b.style.cssText='transition:none!important;position:fixed;left:40px;top:160px;width:240px;height:70px;z-index:99999';window.__opened=0;window.__pressTrace=[];for(const type of ['pointerdown','click'])document.addEventListener(type,e=>window.__pressTrace.push({type,button:e.button,primary:e.isPrimary,detail:e.detail,at:e.timeStamp,nav:document.body.dataset.navTab,target:e.target.id,y:e.target.getBoundingClientRect().y}),true);b.addEventListener('click',()=>window.__opened++);host.append(b);return true})()`);
+ await ev(`(()=>{const host=document.createElement('div');host.className='team-needs-body';document.body.append(host);const b=document.createElement('button');b.id='moving-card-action';b.textContent='Open agent';b.style.cssText='transition:none!important;position:fixed;left:40px;top:160px;width:240px;height:70px;z-index:99999';window.__opened=0;window.__pressTrace=[];for(const type of ['pointerdown','click'])document.addEventListener(type,e=>window.__pressTrace.push({type,button:e.button,primary:e.isPrimary,detail:e.detail,at:e.timeStamp,nav:document.body.dataset.navTab,target:e.target.id,y:e.target.getBoundingClientRect().y}),true);b.addEventListener('click',()=>window.__opened++);host.append(b);return true})()`);
  const mouse=client.Input;
  await mouse.dispatchMouseEvent({type:'mousePressed',x:120,y:190,button:'left',clickCount:1});
  await ev(`document.getElementById('moving-card-action').style.setProperty('top','180px','important');true`);
@@ -20,7 +20,7 @@ const BASE=require('./test_base').BASE;
  assert.equal(await ev(`window.__opened`),0,`${width}: moving Inbox target must not activate: ${JSON.stringify(await ev('window.__pressTrace'))}`);
  await mouse.dispatchMouseEvent({type:'mousePressed',x:120,y:210,button:'left',clickCount:1});
  await mouse.dispatchMouseEvent({type:'mouseReleased',x:120,y:210,button:'left',clickCount:1});
- assert.equal(await ev(`window.__opened`),1,'deliberate stable click works: '+JSON.stringify(await ev('window.__pressTrace.slice(-3)')));
+ assert.equal(await ev(`window.__opened`),1,'deliberate stable click works: '+JSON.stringify(await ev('window.__pressTrace.slice(-3)'))+' '+JSON.stringify(await ev(`(()=>{const c=document.getElementById(\'moving-card-action\'),p=document.elementFromPoint(120,210);return {card:c&&c.getBoundingClientRect().toJSON(),conn:c&&c.isConnected,at:p&&(p.tagName+\'#\'+p.id+\'.\'+p.className)}})()`)));
  // #18397: a live redraw REPLACES the pressed control with a new node (not a move); an identical one at the same spot keeps the click, anything else does not
  const replace=(label,dy=0)=>ev(`(()=>{const old=document.getElementById('moving-card-action');const n=document.createElement('button');n.id='moving-card-action';n.textContent=${JSON.stringify(label)};n.style.cssText=old.style.cssText.replace(/top:[^;]+/,'top:'+(old.getBoundingClientRect().top+${dy})+'px');n.addEventListener('click',()=>window.__opened++);old.replaceWith(n);return true})()`);
  let before=await ev(`window.__opened`);

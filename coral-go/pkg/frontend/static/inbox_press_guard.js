@@ -17,7 +17,7 @@ document.addEventListener('pointerdown', e => {
     const node = control(e.target);
     if (node && node.closest('#group-table-view, .team-needs-body')) {
         const box = node.getBoundingClientRect();
-        press = { node, x: box.x, y: box.y, at: e.timeStamp, sig: signature(node) };
+        press = { node, x: box.x, y: box.y, at: e.timeStamp, sig: signature(node), px: e.clientX, py: e.clientY };
     }
 }, true);
 let redelivery = 0;
@@ -25,8 +25,9 @@ let redelivery = 0;
 document.addEventListener('pointerup', e => {
     const held = press;
     if (!held || held.node.isConnected || e.button !== 0 || e.timeStamp - held.at > 1500) return;
+    if (Math.hypot(e.clientX - held.px, e.clientY - held.py) > 4) return; // a drag is not a tap
     const target = control(e.target);
-    if (!target || !same(target, held)) return;
+    if (!target || target.closest('[data-group-control]') || !same(target, held)) return; // a group heading's tap is taken on the lift by data_table.js
     redelivery = setTimeout(() => { redelivery = 0; if (press === held) { press = null; target.click(); } }, 0);
 }, true);
 document.addEventListener('pointercancel', () => { press = null; }, true);
