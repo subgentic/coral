@@ -6,6 +6,7 @@ import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
 import { foldWayBack } from './way_back.js';
 import { state } from './state.js';
+import { modelName } from './model_labels.js'; // the Model column's words (#16671); the start bundle holds it, so no await in this lazy module (#18160)
 import { boardFetch, inTeam, keyLabel, isCloud, splitKey, sessionServer } from './server_base.js';
 import { pollEvery } from './overload.js';
 import { OPERATOR_ID } from './utils.js';
@@ -18,7 +19,6 @@ const { rowFocusTarget, el } = await importOnce('./team_table.js'); // lazy modu
 
 const DT = await importOnce('./data_table.js');
 const { statusMark } = await importOnce('./status_mark.js'); // lazy like this page: a lazy module is loaded through importOnce (import_hygiene)
-const { modelName } = await importOnce('./model_labels.js'); // the Model column's words (#16671)
 const { mountAgentReviewSettings } = await importOnce('./agent_review_settings.js');
 let agentsTableState = DT.tableState();
 
@@ -57,7 +57,8 @@ export function onTaskWords(a, now = Date.now()) {
     const d = Math.floor(h / 24), hh = h % 24;
     return hh ? `${d} d ${hh} h` : `${d} d`;
 }
-const modelOf = (a) => { const s = (state.liveSessions || []).find(x => inTeam(x, model.team) && ((a.session_id && x.session_id === a.session_id) || x.name === a.name)); return s ? modelName(s.agent_type, s.model, sessionServer(s)) : ''; }; // from the agent's live session; an ended agent has none (#16671)
+let modelMemo = new WeakMap(); // each agent's model, worked out once per drawing: a sort asks for it on every compare (#18160)
+const modelOf = (a) => { let m = modelMemo.get(a); if (m === undefined) { const s = (state.liveSessions || []).find(x => inTeam(x, model.team) && ((a.session_id && x.session_id === a.session_id) || x.name === a.name)); m = s ? modelName(s.agent_type, s.model, sessionServer(s)) : ''; modelMemo.set(a, m); } return m; }; // from the agent's live session; an ended agent has none (#16671)
 const providerOf = (a) => PROVIDER[a.agent_type] || (a.agent_type ? a.agent_type.charAt(0).toUpperCase() + a.agent_type.slice(1) : 'Claude');
 const canRemind = (a) => a.availability !== 'offline' && (a.agent_type !== 'terminal' || a.reminder); // a reminder to an ended agent does nothing (#8271) // a terminal is not an agent: a reminder to it does nothing (UI audit #5589)
 // A task nobody has picked up says what it waits on (#10200): the agent it is for, not just "pending".
@@ -198,6 +199,7 @@ function drawChips(host) {
 }
 
 function draw() {
+    modelMemo = new WeakMap(); // the sessions may have changed since the last drawing (#18160)
     const body = root && root.querySelector('.team-agents-body'); if (!body) return;
     const a = document.activeElement;
     const held = a && body.contains(a) ? (a.closest('tr[data-key]')?.dataset.key && a.classList.contains('dt-primary') ? `row:${a.closest('tr').dataset.key}` : a.dataset.filter ? `chip:${a.dataset.filter}` : '') : '';

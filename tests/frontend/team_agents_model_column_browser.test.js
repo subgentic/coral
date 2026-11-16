@@ -40,6 +40,11 @@ const TEAM = `qa-model-${Date.now() % 100000}`;
                 const clickHead = () => ev(`(() => { const th = [...document.querySelectorAll('th')].filter(h => h.getClientRects().length).find(h => h.textContent.trim().startsWith('Model')); (th.querySelector('button, .dt-sort, a') || th).click(); return true; })()`);
                 await clickHead(); await settle(300); const o1 = await names(); await clickHead(); await settle(300); const o2 = await names();
                 check(JSON.stringify(o1) !== JSON.stringify(o2), `${at}Model sorts both ways: ${JSON.stringify([o1, o2])}`);
+                // #18160 (QA5 INFO on #16671): a sort works out each agent's model once per drawing, not on every compare. Reads of a live session's model during one more click on the header
+                await ev(`(async () => { const st = (await import((window.__coralStatic || '/static/') + 'state.js')).state; window.__modelReads = 0; for (const s of st.liveSessions) { const v = s.model; Object.defineProperty(s, 'model', { get() { window.__modelReads++; return v; }, configurable: true }); } return true; })()`);
+                await clickHead(); await settle(300);
+                const reads = await ev(`window.__modelReads`);
+                check(reads <= 4, `${at}one sort reads each session's model about once, not on every compare: ${reads} reads`);
             } else {
                 check(!grid.wide, `${at}nothing is wider than the screen with the column: ${JSON.stringify(grid)}`);
             }
