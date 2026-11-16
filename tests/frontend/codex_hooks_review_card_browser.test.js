@@ -17,10 +17,15 @@ const DIALOG = ['  Hooks need review', '  2 hooks are new or changed.', '  Hooks
 // The scripted codex: answers the version and sign-in probes like the CLI, and otherwise draws the dialog and waits.
 function writeCodex(dir) {
     if (process.platform === 'win32') {
-        const cli = path.join(dir, 'codex.cmd');
-        const esc = l => (l === '' ? 'echo.' : 'echo ' + l.replace(/([&|<>^()])/g, '^$1').replace(/%/g, '%%'));
-        fs.writeFileSync(cli, ['@echo off', 'if "%~1"=="--version" (echo codex-cli 0.161.0& exit /b 0)', 'if "%~1"=="login" (echo Logged in using ChatGPT& exit /b 0)',
-            ...DIALOG.map(esc), 'ping -n 600 127.0.0.1 >nul', ''].join('\r\n'));
+        // A real Codex on Windows is npm's .cmd shim that runs node on a script. Coral unwraps that to node.exe and the script, so its -c hook arguments (a " and an &) never meet cmd.exe; a plain scripted .cmd is refused for them (#16224).
+        const cli = path.join(dir, 'codex.cmd'), js = path.join(dir, 'codex.js');
+        fs.writeFileSync(js, ['const a = process.argv[2];',
+            "if (a === '--version') { console.log('codex-cli 0.161.0'); process.exit(0); }",
+            "if (a === 'login') { console.log('Logged in using ChatGPT'); process.exit(0); }",
+            `console.log(${JSON.stringify(DIALOG.join('\n'))});`, 'setInterval(() => {}, 1000000);', ''].join('\n'));
+        fs.writeFileSync(cli, ['@ECHO off', 'GOTO start', ':find_dp0', 'SET dp0=%~dp0', 'EXIT /b', ':start', 'SETLOCAL', 'CALL :find_dp0', '',
+            'IF EXIST "%dp0%\\node.exe" (', '  SET "_prog=%dp0%\\node.exe"', ') ELSE (', '  SET "_prog=node"', '  SET PATHEXT=%PATHEXT:;.JS;=;%', ')', '',
+            'endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\codex.js" %*', ''].join('\r\n'));
         return cli;
     }
     const cli = path.join(dir, 'codex');

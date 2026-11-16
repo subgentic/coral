@@ -45,7 +45,9 @@ async function runAt(width, Page, Emulation, ev, install) {
     assert.equal(atRest.overlap, false, `${width}px at rest: no overlap with next row: ${JSON.stringify(atRest)}`);
 
     // tap the reply bubble: the copy button appears
-    await ev(`(() => { document.getElementById('zz-reply').click(); })()`);
+    // the tap's handler and its stylesheet are lazy (copy_reveal.js): wait for the reveal, which a slow disk (Windows CI) delivers a moment after the click
+    const tapAndSettle = id => ev(`new Promise(res => { const b = document.getElementById(${JSON.stringify(id)}), t0 = Date.now(); b.click(); (function p() { const btn = b.querySelector('.chat-copy-btn'); if ((b.classList.contains('copy-revealed') && parseFloat(getComputedStyle(btn).opacity) >= 0.9) || Date.now() - t0 > 5000) res(true); else setTimeout(p, 25); })(); })`, true);
+    await tapAndSettle('zz-reply');
     const afterTap = await ev(`(() => {
         const btn = document.querySelector('#zz-reply .chat-copy-btn');
         const reply = document.getElementById('zz-reply');
@@ -77,7 +79,7 @@ async function runAt(width, Page, Emulation, ev, install) {
     assert.equal(textOverlap.overlap, false, `${width}px after tap: button does not overlap the reply text: ${JSON.stringify(textOverlap)}`);
 
     // a short one-line reply: the button must not cover its last words (#17573)
-    await ev(`(() => { document.getElementById('zz-short').click(); })()`);
+    await tapAndSettle('zz-short');
     const shortOverlap = await ev(`(() => {
         const bubble = document.getElementById('zz-short');
         const txt = bubble.querySelector('.message-text');

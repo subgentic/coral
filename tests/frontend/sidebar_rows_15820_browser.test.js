@@ -67,7 +67,7 @@ const ROWS = `(() => { const pane = [...document.querySelectorAll('.sidebar-pane
             for (const [tab, name] of TABS.filter(t => t[0] !== 'hub-inbox')) {
                 await ev(`window.switchNavTab('${tab}'); true`);
                 if (tab === 'tokens') { await waitFor(`!!document.querySelector('.cost-phone-back') || [...document.querySelectorAll('#cost-nav-list .row-btn')].some(b => b.getClientRects().length)`, `390 ${theme} ${name}: Overview or the list`, 15000); await ev(`(() => { const b = document.querySelector('.cost-phone-back'); if (b && b.getClientRects().length) b.click(); return true; })()`); } // on a phone Analytics opens a view: the way back shows the list
-                await waitFor(`[...document.querySelectorAll('.view-list-item, #cost-nav-list .row-btn')].filter(b => b.getClientRects().length).length >= 3`, `390 ${theme} ${name}: the list`, 15000);
+                await waitFor(`(() => { const b = document.querySelector('.cost-phone-back'); if (b && b.getClientRects().length) b.click(); return [...document.querySelectorAll('.view-list-item, #cost-nav-list .row-btn')].filter(b => b.getClientRects().length).length >= 3; })()`, `390 ${theme} ${name}: the list`, 25000); // Analytics may open its first view after the list shows (slower on Windows CI): the way back is pressed again while it waits
                 await new Promise(r => setTimeout(r, 400)); // sleep-ok: the glyph font and the counts settle
                 check(await ev(`document.documentElement.scrollWidth <= window.innerWidth`), `390 ${theme} ${name}: the page does not scroll sideways`);
                 await shot(`sidebar-rows-${name.toLowerCase()}-390-${theme}`);

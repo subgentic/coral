@@ -24,11 +24,11 @@ const BOARD = 'more-keys-' + Date.now().toString(36);
         await new Promise(r => setTimeout(r, 600)); // sleep-ok: the header fills
         await ev(`document.getElementById('team-page-more').focus(); document.getElementById('team-page-more').click(); true`);
         await waitFor(`!document.getElementById('team-page-more-menu').hidden`, 'the menu opens', 5000);
-        let s = await at(); check(s.idx === -1 && s.n >= 4, `open, with the focus still on the button: ${JSON.stringify(s)}`);
+        let s = await at(); check(s.idx === 0 && s.n >= 4, `open, the focus is on the first shown item (#16432, 6f4a3bba6d): ${JSON.stringify(s)}`);
         const n = s.n;
-        await press('ArrowDown'); s = await at(); check(s.idx === 0, `Down from the button is the first item: ${JSON.stringify(s)}`);
-        await press('ArrowDown'); s = await at(); check(s.idx === 1, `Down again is the second: ${JSON.stringify(s)}`);
-        await press('ArrowUp'); s = await at(); check(s.idx === 0, `Up goes back: ${JSON.stringify(s)}`);
+        await press('ArrowDown'); s = await at(); check(s.idx === 1, `Down from the first item is the second: ${JSON.stringify(s)}`);
+        await press('ArrowDown'); s = await at(); check(s.idx === 2, `Down again is the third: ${JSON.stringify(s)}`);
+        await press('ArrowUp'); s = await at(); check(s.idx === 1, `Up goes back: ${JSON.stringify(s)}`);
         await press('End'); s = await at(); check(s.idx === n - 1, `End is the last item: ${JSON.stringify(s)}`);
         await press('Home'); s = await at(); check(s.idx === 0, `Home is the first: ${JSON.stringify(s)}`);
         await press('ArrowUp'); s = await at(); check(s.idx === n - 1, `Up from the first wraps to the last: ${JSON.stringify(s)}`);
@@ -46,7 +46,7 @@ const BOARD = 'more-keys-' + Date.now().toString(36);
         await waitFor(`document.getElementById('confirm-modal').style.display !== 'flex'`, 'the confirmation is cancelled', 5000);
         await ev(`document.getElementById('team-page-more').focus(); document.getElementById('team-page-more').click(); true`);
         await waitFor(`!document.getElementById('team-page-more-menu').hidden`, 'the menu opens after Stop agents', 5000);
-        await press('ArrowDown'); s = await at(); check(s.idx === 0, `after Stop agents, Down is the first item: ${JSON.stringify(s)}`);
+        await press('ArrowDown'); s = await at(); check(s.idx === 1, `after Stop agents, the menu opens on the first item and Down is the second: ${JSON.stringify(s)}`);
         await press('End'); s = await at(); check(s.idx === s.n - 1, `after Stop agents, End is the last item: ${JSON.stringify(s)}`);
         await press('Tab'); s = await at(); check(!s.open, `after Stop agents, Tab closes the menu: ${JSON.stringify(s)}`);
     } finally { await removeBoards(ev, [BOARD]).catch(() => {}); await client.close(); }
