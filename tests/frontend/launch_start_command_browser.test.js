@@ -42,6 +42,7 @@ const { install: installNA, stubModels, stubCliChecks } = require('./helpers/new
             { // the recap is one line with an arrow at every width (#18568); its details (the command with Copy) open upward
                 const c = await ev(`(() => { const t = document.getElementById('launch-recap-toggle'), r = document.getElementById('launch-recap'); return { shown: t.getClientRects().length > 0, closed: !r.hasAttribute('data-open'), cmdShown: !!document.querySelector('#launch-recap .launch-recap-command')?.getClientRects().length, expanded: t.getAttribute('aria-expanded') }; })()`);
                 if (!c.shown || !c.closed || c.cmdShown || c.expanded !== 'false') problems.push(label + ': the recap is not one line with its toggle closed: ' + JSON.stringify(c));
+                await shot(`recap-closed-${label}`); // the one line with its arrow (#18568)
                 await ev(`document.getElementById('launch-recap-toggle').click(); true`);
                 if ((await ev(`document.getElementById('launch-recap-toggle').getAttribute('aria-expanded')`)) !== 'true') problems.push(label + ': the toggle does not open the details');
             }
