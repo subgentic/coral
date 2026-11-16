@@ -1,6 +1,6 @@
 // Keep the original dependency evaluation order (#8372).
 import { rawKeyOk, rawKeySeq } from './raw_keys.js';
-import './import_once.js';
+import { importOnce } from './import_once.js';
 import './session_overlay.js';
 import { dashboardPromptRequested } from './dashboard_analytics.js';
 import { mountSettingsView } from './settings_view.js';
@@ -181,6 +181,8 @@ export async function sendCommand({ nudge = false } = {}) {
             // The typed text only: the attachments stay attached until a send of them succeeds.
             if (!input.value && state.currentSession && state.currentSession.session_id === sentSessionId) { input.value = textPart; const k = sessionKey(targetSession); if (k) saveSessionDraft(k, textPart); }
         };
+        const arrived = async () => { try { return await (await importOnce('./send_arrived.js')).typedAnyway(sentSessionId, sessionServer(targetSession), command); } catch { return false; } }; // an answer that never came back usable: was it typed anyway (#18592)
+        const typedNow = () => { confirmPendingMessage(sentSessionId, sentAt); clearAttachments(targetSession); clearComposerError(); const k = sessionKey(targetSession); if (k) saveSessionDraft(k, ""); toastSent(command); };
         try {
             const post = (name, type) => serverFetch(sessionServer(targetSession), `/api/sessions/live/${encodeURIComponent(name)}/send`, {
                 method: "POST",
@@ -203,6 +205,7 @@ export async function sendCommand({ nudge = false } = {}) {
                     reportSendError(targetSession, text, code, exited);
                     return;
                 }
+                if ((resp.status >= 500 || !body) && await arrived()) { typedNow(); return; } // a gateway's answer, not the agent's refusal, and Coral typed it (#18592)
                 notSent();
                 // Plain text naming the server; never the raw response (#3151). The draft stays.
                 // Said under the composer (#3218); a gone terminal also marks the agent and offers Restart.
@@ -236,6 +239,7 @@ export async function sendCommand({ nudge = false } = {}) {
                 _getXtermModule().then(m => m.focusTerminal());
             }
         } catch (e) {
+            if (await arrived()) { typedNow(); return; } // the connection dropped or timed out after Coral typed it (#18592)
             notSent();
             if (!showComposerError("The message was not sent. Check the connection and try again.")) announceNotSent(sentSessionId);
             console.error("Send exception:", e);
