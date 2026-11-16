@@ -322,3 +322,10 @@ export function chatsSpec(key, ctx) {
             return wrap;
         } };
 }
+
+/** A confirmed stop changes Active now immediately, including its unread badge, without waiting for the Inbox poll. */
+export function chatsStopped(redraw) {
+    lastRecount = 0;
+    resetChatLists('chats-active');
+    return loadChatCounts(redraw);
+}
