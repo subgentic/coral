@@ -40,7 +40,7 @@ export function adoptDefault(pick) {
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; };
 
 /** The dialog. `onReady` runs when the person continues with a provider that is ready (the launch they clicked, or nothing from the Inbox). */
-export async function openSetupDialog({ onReady } = {}) {
+export async function openSetupDialog({ onReady, onSkip } = {}) {
     const { CLI_INSTALL_INSTRUCTIONS } = await importOnce('./cli_check.js');
     document.getElementById('setup-agent-modal')?.remove();
     const modal = el('div', 'modal'); modal.id = 'setup-agent-modal'; modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true'); modal.setAttribute('aria-labelledby', 'setup-agent-title'); modal.style.display = 'flex';
@@ -80,8 +80,9 @@ export async function openSetupDialog({ onReady } = {}) {
         check.disabled = false; (pick ? go : check).focus();
     };
     const shut = () => { modal.remove(); document.removeEventListener('keydown', onKey); };
-    const onKey = e => { if (e.key === 'Escape') shut(); };
+    const skip = () => { shut(); if (onSkip) onSkip(); }; // "Not now" and Escape: what was clicked goes on without an agent set up (someone with only Pi, Hermes or their own CLI path is never stopped)
+    const onKey = e => { if (e.key === 'Escape') skip(); };
     document.addEventListener('keydown', onKey);
-    close.onclick = shut; check.onclick = () => run(true); go.onclick = () => { shut(); adoptDefault(pick); if (onReady) onReady(pick); };
+    close.onclick = skip; check.onclick = () => run(true); go.onclick = () => { shut(); adoptDefault(pick); if (onReady) onReady(pick); };
     await run(false);
 }

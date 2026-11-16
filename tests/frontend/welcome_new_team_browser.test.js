@@ -20,7 +20,7 @@ const BASE = require('./test_base').BASE;
             await ev(`document.getElementById('set-password-new').value = 'Local test password 29!'; document.getElementById('set-password-confirm').value = 'Local test password 29!'; document.getElementById('set-password-form').requestSubmit(); true`);
             await waitFor(`!document.getElementById('set-password-modal')`, 'password setup closed', 8000);
             await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            const button = `[...document.querySelectorAll('.inbox-getting-started button')].find(b => b.textContent === 'New team')`;
+            const button = `[...document.querySelectorAll('#group-table-view .inbox-welcome-actions button')].find(b => b.textContent === 'New team')`;
             await waitFor(`!!(${button})`, 'Getting started New team', 8000);
             await ev(`${button}.click(); true`);
             const teamOpen = `document.getElementById('launch-modal')?.getClientRects().length > 0 && document.getElementById('launch-step-team')?.getClientRects().length > 0`;

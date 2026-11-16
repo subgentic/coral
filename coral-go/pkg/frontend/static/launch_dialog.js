@@ -102,7 +102,7 @@ function _selectLaunchType(type) {
     if (_needsComputerStep(type)) { launch.pendingType = type; _showComputerStep(type); return; } // on a Hub the computer is the first step (#15014)
     if ((type === 'agent' || type === 'team') && !launch.member && !launch.addTo && !launch.setupChecked) { // #18752: with none of Claude, Codex or Antigravity installed, the set-up step comes first (once per dialog)
         launch.setupChecked = true; const wp = launch.welcomePrompt;
-        importOnce('./setup_agent.js').then(m => m.noneReady().then(none => { if (none) { window.hideLaunchModal?.(); m.openSetupDialog({ onReady: () => { showLaunchModal(undefined, false, wp); launch.setupChecked = true; _selectLaunchType(type); } }); } })).catch(() => {});
+        importOnce('./setup_agent.js').then(m => m.noneReady().then(none => { if (none) { window.hideLaunchModal?.(); const resume = () => { showLaunchModal(undefined, false, wp); launch.setupChecked = true; _selectLaunchType(type); }; m.openSetupDialog({ onReady: resume, onSkip: resume }); } })).catch(() => {});
     }
     launch.mode = type;
     if (type === "agent") setLaunchMore(false); // New Agent always opens on step 1, the folder (#7391)

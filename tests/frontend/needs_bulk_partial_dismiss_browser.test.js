@@ -36,14 +36,12 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(framesJs(4));
             await ev(`(() => { const st = document.createElement('style'); st.textContent = '*, *::before, *::after { transition: none !important; }'; document.head.append(st); return true; })()`);
             await ev(`(() => { const real = window.fetch.bind(window); window.fetch = (u, o) => String(u).includes('/api/settings') && o && o.method === 'PUT' ? Promise.resolve(new Response('{"ok":true}', { status: 200, headers: { 'Content-Type': 'application/json' } })) : real(u, o); return true; })()`);
-            await ev(`import(${S} + 'state.js').then(m => { m.state.settings = { ...m.state.settings, inbox_welcome: 'on', inbox_welcome_done: '' }; return true; })`);
+            await ev(`import(${S} + 'state.js').then(m => { m.state.settings = { ...m.state.settings, inbox_welcome: 'off', inbox_welcome_done: '' }; return true; })`); // #18764: Getting started items are ordinary rows now; this suite is about the review files and the question
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`!!document.querySelector('${T} .inbox-getting-started li')`, at + 'Getting started block', 15000);
-            check(await ev(`document.querySelectorAll('${T} .inbox-getting-started input[type=checkbox]').length === 0`), at + 'onboarding cannot enter the Needs bulk selection');
+            await waitFor(`!!document.querySelector('${T} tbody tr.dt-row')`, at + 'the Needs rows', 15000);
             await ev(`[...document.querySelectorAll('${T} tbody tr.dt-row .dt-check input')].forEach(i => { if (!i.checked) i.click(); }); true`); await ev(framesJs(4));
             const selection = await ev(`({ ticked: document.querySelectorAll('${T} tbody .dt-check input:checked').length, count: document.querySelector('.dt-bar-count')?.textContent || '' })`);
             check(selection.ticked === 4 && /4/.test(selection.count), at + 'bulk selection counts only the three review files and question: ' + JSON.stringify(selection));
-            check(await ev(`!document.querySelector('${T} tbody .inbox-welcome-name')`), at + 'Welcome cannot become a skipped bulk row');
         }
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
     if (failures.length) { console.error('FAIL\n  ' + failures.join('\n  ')); process.exit(1); }

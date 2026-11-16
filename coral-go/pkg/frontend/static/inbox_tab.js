@@ -36,8 +36,10 @@ export function waitingCount() {
 }
 
 /** The ONE number of things that need the person: the tab's badge, the sidebar's Needs you count and the page header all read it, so they cannot disagree (#15380 D). Only what is live is counted: rows kept from a computer that is offline are shown, not counted (#15380 C). */
+let _welcomeN = 0; // the Getting started items still open (welcome_items.js says; it loads after the start): each is a Needs you item and counts (#18764)
+export function setWelcomeCount(n) { if (n === _welcomeN) return; _welcomeN = n; document.dispatchEvent(new CustomEvent('coral:welcome-changed')); }
 export function needsCount(reviews = reviewAttentionCount().value) {
-    return waitingCount() + reviews + failedUnread().length + pendingProposals().length + operatorAsks().length + goalDoneCount() + closedByAgentCount() + skillCount();
+    return _welcomeN + waitingCount() + reviews + failedUnread().length + pendingProposals().length + operatorAsks().length + goalDoneCount() + closedByAgentCount() + skillCount();
 }
 
 /** Something has waited for the person 5 minutes with alerts still off: the offer comes back once (alerts_offer.js decides whether this browser may be offered again). */

@@ -1,5 +1,4 @@
-// #16862: Welcome is now a separate Getting started list, outside swipeable Needs rows.
-// Its dismiss button persists the setting and tells no agent; review swipes remain covered by needs_phone_rows.
+// #18764: the Getting started items are ordinary Needs rows; one Dismiss removes one and tells no agent (review swipes: needs_phone_rows).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
@@ -17,13 +16,15 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
         };T.state.settings={...T.state.settings,inbox_welcome:'on',inbox_welcome_done:''};T.state.liveSessions=[];T.state.servers=[];true`);
         await installGuard(ev);
         await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>{m.updateInboxTab();return m.selectInboxTab('needs');}).then(()=>true)`);
-        await waitFor(`document.querySelectorAll('.inbox-getting-started li').length===5`,'five Getting started items',8000);
-        assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr.dt-row').length`),0,'onboarding is outside swipeable Needs rows');
-        assert.equal(await ev(`document.querySelectorAll('.inbox-getting-started [data-welcome-id], .inbox-getting-started input[type=checkbox]').length`),0,'onboarding does not declare swipe or bulk-selection targets');
-        await ev(`document.querySelector('button[aria-label="Dismiss Getting started"]').click();true`);
-        await waitFor(`!document.querySelector('.inbox-getting-started')`,'block dismissed',8000);
-        assert.equal(await ev(`window.__puts.some(x=>x.inbox_welcome==='off')`),true,'dismissal persists the existing setting');
+        await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length===5`,'five Getting started rows',8000);
+        assert.equal(await ev(`!document.querySelector('.inbox-getting-started') && !document.querySelector('button[aria-label="Dismiss Getting started"]')`),true,'no separate block and no Dismiss all');
+        assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr[data-welcome-id]').length`),4,'each row with a Dismiss declares its id, so a swipe dismisses it like its Dismiss (the welcome row has none)');
+        // Dismiss on one row: that item is remembered done, the other four stay, and the count follows. Nothing is sent to an agent.
+        await ev(`document.querySelector('#group-table-view tbody tr[data-welcome-id="asks"] .inbox-row-more-toggle, #group-table-view tbody tr[data-welcome-id="asks"] button[aria-label^="More"]')?.click();true`);
+        await ev(`(document.querySelector('#group-table-view tbody tr[data-welcome-id="asks"] [aria-label^="Dismiss"]') || [...document.querySelectorAll('.menu-item')].find(b=>b.textContent==='Dismiss')).click();true`);
+        await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length===4`,'one row dismissed',8000);
+        assert.equal(await ev(`window.__puts.some(x=>/asks/.test(x.inbox_welcome_done||''))`),true,'the dismissal is remembered in the settings');
         assert.deepEqual(await reached(ev),[],'dismissal sends nothing to an agent');
-        console.log('PASS Getting started stays outside Needs swipe and bulk selection');
+        console.log('PASS Getting started rows dismiss one at a time');
     } finally { await client.close(); }
 })().catch(e=>{console.error(e);process.exit(1);});
