@@ -16,6 +16,8 @@ var coralSessionIDPattern = regexp.MustCompile(`^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[
 
 // LaunchParams holds all parameters for building a launch command.
 type LaunchParams struct {
+	// RestartNote: what a restarted agent is told after the board's action text, which asks it to introduce itself (#17411): its name, its tasks, and not to introduce itself again.
+	RestartNote  string
 	SessionID    string
 	SessionName  string // tmux session name (e.g. "claude-<uuid>"), used for CORAL_SESSION_NAME
 	ProtocolPath string

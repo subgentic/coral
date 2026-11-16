@@ -44,7 +44,7 @@ func TestARestartsInstructionsTurnIsFlaggedAsCoralsOwn(t *testing.T) {
 	}
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&result))
 
-	first := agent.BuildBoardActionPrompt(handler.boardLabel("restart-instructions-board"), naming.SubscriberID("UI", "claude"), prompt, nil, "")
+	first := agent.BuildBoardActionPrompt(handler.boardLabel("restart-instructions-board"), naming.SubscriberID("UI", "claude"), prompt, nil, "") + restartNoteText("UI", "UI", nil) // the restart's message ends with its note (#17411)
 	require.NotEmpty(t, first)
 	require.True(t, ptymanager.HasDeliveredTexts(result.SessionName), "the restart recorded what it started the CLI with")
 	msgs := []map[string]any{
