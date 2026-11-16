@@ -19,7 +19,7 @@ const detail2 = t => t;
             localStorage.removeItem('coral-inbox-activity-filters'); window.switchNavTab('hub-inbox'); return import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.openInboxGroup('activity')).then(() => true); })()`);
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr.activity-card').length === 3`, 'the cards', 15000);
         const detail = await ev(`[...document.querySelectorAll('.activity-folder tr.activity-card')].map(d => d.textContent).join(' | ')`); // the cards show the words whole: there is no expanded row
-        assert.ok(!detail.includes('​'), 'no raw zero-width space in the cards: ' + JSON.stringify(detail));
+        assert.ok(!detail.includes('\u200b'), 'no raw zero-width space in the cards: ' + JSON.stringify(detail));
         assert.ok(detail.includes('Orch<U+200B>estrator'), 'the card writes the hidden character out of the asker: ' + JSON.stringify(detail));
         assert.ok(detail.includes('Dev<U+200B>eloper'), 'and out of the agent name an ON line is built from (a permission row): ' + JSON.stringify(detail));
         // every other cell an agent's words reach, in the table (#18275, Security's INFO on #18244): the ON line and the detail of a waiting card (its title), the recorded note (an answer's text), the team

@@ -33,6 +33,12 @@ type joinEntry struct {
 
 // joinSites is "file<TAB>function" -> its joins, by file relative to coral-go.
 var joinSites = map[string]joinEntry{
+	"cmd/coral-agent/artifact_download.go\tsweepAttachments": {1, joinFixed, "names from the temp folder's own listing, kept only when they start with coral-artifact- and are regular files, removed after the keep time"},
+	"internal/agent/hermes.go\tHermesAgent.LaunchCommand": {1, joinOwn, "the preview's would-be Hermes home (#15951): the data folder plus the constant hermes-homes and the placeholder <team>, then the session id; it only names the folder in the line a person reads and writes nothing (a real launch builds the folder through PrepareHermesHome)"},
+	"internal/background/knowledge_note.go\tAddKnowledgeNote": {1, joinOwn, "the file name is note- plus a slug of the title that noteSlug makes (slugifyBase's word characters, never a separator, never empty) plus .md, in the team's knowledge folder from knowledgeTeamDir (#17485)"},
+	"internal/background/knowledge_note.go\tkeepLegacyAgentFilesAgentFiles": {3, joinFixed, "names from the knowledge folder's own listing (a plain file, never a folder), the new name that name's stem plus _.md; the target is Lstat-checked free first and nothing is replaced (#17485)"},
+	"internal/gitutil/gitutil.go\tnoRepoScan": {1, joinFixed, "names from the folder's own listing, each a directory, joined with the constant .git and only Lstat'd to see whether it is a repository"},
+	"internal/server/routes/hub_dropbox.go\tHubDropbox.isArtifact": {1, joinID, "the digest is checked as 64 lower-case hex (lowerHex64) in SharedHint before setShared asks; the file is only Lstat'd, to be a regular file, and no byte is read (#16109)"},
 	"internal/server/routes/team_file_holders.go\tteamHoldersPath":                           {1, joinFixed, "the file is named by 32 hex characters of a SHA-256 of the team's name, so no name can reach a path (#15356)"},
 	"internal/server/routes/dropbox_autosync.go\tDropboxBackup.undoEdit":                     {2, joinID, "the digest is checked first (objectNameRe: 64 lower-case hex) and the uploads folder comes from uploadsDir with the session of the series' own member (#14714 Undo this edit)"},
 	"internal/server/routes/dropbox_backup.go\tDropboxBackup.Pass":                           {1, joinID, "the outbox row's digest is checked (objectNameRe) before it names the object (#14655)"},

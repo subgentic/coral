@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/skills"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -178,6 +179,14 @@ func TestApproveRefusesAnOversizedBodyAndLeavesTheSkillPending(t *testing.T) {
 	assert.Equal(t, 200, code, "a body under the cap still approves")
 }
 
+// starterCount is how many example skills Coral ships: the folders under skills/starter, so a new one does not turn these tests red (#18676).
+func starterCount(t *testing.T) int {
+	t.Helper()
+	zips, err := skills.StarterZips()
+	require.NoError(t, err)
+	return len(zips)
+}
+
 // The example skills Coral ships (#12463): on every start they are in the store as approved, published by Coral; a second start adds nothing; a changed text is a new version; a skill of the same name that a
 // person published is left alone; and none of them can be removed (the route and the store both refuse), while a person's skill still can.
 func TestTheStarterSkillsAreSeededOnceAreRefreshedAndCannotBeRemoved(t *testing.T) {
@@ -186,7 +195,7 @@ func TestTheStarterSkillsAreSeededOnceAreRefreshedAndCannotBeRemoved(t *testing.
 	e.h.SeedStarterSkills(ctx)
 	rows, err := e.ss.ListSkills(ctx, "")
 	require.NoError(t, err)
-	require.Len(t, rows, 5)
+	require.Len(t, rows, starterCount(t))
 	for _, r := range rows {
 		assert.Equal(t, store.SkillApproved, r.Status, r.Name)
 		assert.Equal(t, store.PublisherCoral, r.PublisherKind, r.Name)
@@ -202,7 +211,7 @@ func TestTheStarterSkillsAreSeededOnceAreRefreshedAndCannotBeRemoved(t *testing.
 	e.h.SeedStarterSkills(ctx) // the next start
 	rows2, err := e.ss.ListSkills(ctx, "")
 	require.NoError(t, err)
-	assert.Len(t, rows2, 5, "a second start adds nothing")
+	assert.Len(t, rows2, starterCount(t), "a second start adds nothing")
 
 	// Removing one is refused, by the route and by the store; it is still there and still approved.
 	code, out := e.call("DELETE", "/api/skills/"+rows[0].ID, "", "operator")
@@ -258,7 +267,7 @@ func TestAnExampleSkillsFrameSaysItShipsWithCoral(t *testing.T) {
 	e.h.SeedStarterSkills(context.Background())
 	rows, err := e.ss.ListSkills(context.Background(), "")
 	require.NoError(t, err)
-	require.Len(t, rows, 5)
+	require.Len(t, rows, starterCount(t))
 	code, out := e.get("/api/agent/skills/"+rows[0].ID, "agent")
 	require.Equal(t, 200, code)
 	assert.Contains(t, out["frame"], "An example skill that ships with Coral")

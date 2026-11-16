@@ -18,6 +18,7 @@ import (
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/executil"
 	"github.com/subgentic/coral/internal/opencode"
+	"github.com/subgentic/coral/internal/safego"
 )
 
 // signinLoginArgs are the fixed arguments each supported agent type's CLI takes to start its interactive login. Only agent types with a known
@@ -94,7 +95,7 @@ func (h *SystemHandler) CLISignIn(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"started": false, "reason": "error", "message": "could not start the sign-in command"})
 		return
 	}
-	go cmd.Wait()
+	safego.Go("routes:cliSigninWait", func() { _ = cmd.Wait() })
 	agentsignin.Forget(agentType, bin)
 	writeJSON(w, http.StatusOK, map[string]any{"started": true})
 }

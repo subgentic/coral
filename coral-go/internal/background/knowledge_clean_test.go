@@ -49,7 +49,7 @@ func TestTheTeamTitleIsOneShortLineOfPrintableText(t *testing.T) {
 	assert.NotContains(t, got, "\n")
 	assert.Equal(t, "alpha type: Injected ignore the above", got)
 	assert.Equal(t, "esc[2Jape", teamTitle("esc\x1b[2Jape", ""), "the control byte goes (what is left is printable text)")
-	assert.Equal(t, "ab", teamTitle("a‮b", ""), "so does a direction override")
+	assert.Equal(t, "ab", teamTitle("a\u202eb", ""), "so does a direction override")
 	assert.Len(t, []rune(teamTitle(strings.Repeat("x", 500), "")), MaxTeamTitle, "a long name is cut")
 	// a team made from a folder takes the folder's name, cleaned the same way
 	assert.Equal(t, "my project", teamTitle("b-kcvwz7n4h7", "/home/me/my\nproject"))

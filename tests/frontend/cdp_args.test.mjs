@@ -24,7 +24,7 @@ assert.deepEqual([...read].sort(), [...FLAGS, ...VALUE_FLAGS].sort(), 'cdp_args.
 assert.match(src, /badArgs\(process\.argv\.slice\(2\)\)/, 'the runner checks its arguments before it starts anything');
 
 // the runner itself: exits 2 and starts nothing (no server, no Chrome; it answers at once)
-const run = (...a) => spawnSync(process.execPath, [fileURLToPath(new URL('./run_cdp_suites.mjs', import.meta.url)), ...a], { encoding: 'utf8', timeout: 20000, env: { ...process.env, CDP_NETNS: '0' } });
+const run = (...a) => spawnSync(process.execPath, [fileURLToPath(new URL('./run_cdp_suites.mjs', import.meta.url)), ...a], { encoding: 'utf8', timeout: 20000, env: { ...process.env, CDP_NETNS: '0', CORAL_TELEMETRY_DISABLED: '1' } });
 const bare = run('inbox_group_tap');
 assert.equal(bare.status, 2, 'a bare name exits 2: ' + bare.stdout + bare.stderr);
 assert.match(bare.stderr, /did you mean --only inbox_group_tap\?/);
