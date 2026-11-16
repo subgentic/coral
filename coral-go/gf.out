@@ -1,6 +1,0 @@
-internal/dataowner/launch_census_test.go
-internal/httputil/limit_census_test.go
-internal/ptymanager/automated_input_census_test.go
-internal/safefs/join_census_test.go
-internal/server/routes/file_open_lint_test.go
-internal/terminalinput/census_test.go
