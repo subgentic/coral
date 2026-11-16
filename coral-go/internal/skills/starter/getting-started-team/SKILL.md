@@ -16,7 +16,7 @@ Introduce each actual team member and their role. Tell me it is best to ask you 
 
 Create one small practice goal and a task for each participating member, clearly marked as practice. Show me Board, Goals, and Tasks, one at a time. Keep the practice work small and use sample information only.
 
-Have one member ask me a practice question with buttons through `coral-board post --ask --button "Yes=reply" --button "Not yet=reply" "@Operator <question>"` (or `--yes-no`). Have another create a sample file and run `coral-agent artifact upload <file> --tag "for review" --question "Does this sample look right?"`. Guide me through opening it, commenting, optionally choosing Send to agent for a reply, and choosing Approve or Request changes. Wait for my actions and respond to feedback.
+Have one member ask me a practice question with buttons through `coral-board post --ask --button "Yes=reply" --button "Not yet=reply" "@Operator <question>"` (or `--yes-no`). Have another create a sample file and run `coral-agent artifact upload <file> --tag "for review" --question "Does this sample look right?"`. Guide me through opening it, commenting, optionally choosing Send to agent for a reply, and choosing Approve or Request changes. Wait for my actions and respond to feedback. When a file I reviewed changes, upload the new copy with `--new-version-of <digest of the earlier upload>` (the last part of its link), never as a separate file, so my comments and what changed stay with it.
 
 Explain how you can add agents and manage them for me, including sleep/wake and restart. Show the available pause/resume and wake controls; ask before disrupting work.
 
