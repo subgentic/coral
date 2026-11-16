@@ -63,7 +63,8 @@ const canRemind = (a) => a.availability !== 'offline' && (a.agent_type !== 'term
 const waitsOn = (t) => [...(Array.isArray(t.waiting_on) ? t.waiting_on : []).map(n => `#${Number(n)}`), ...(Array.isArray(t.waiting_on_elsewhere) ? t.waiting_on_elsewhere : []).map(b => `${keyLabel(String(b.board_id || ''))} #${Number(b.id)}`)].join(', ');
 const taskLine = (t, a) => `#${Number(t.id)} ${(t.status === 'pending' || t.status === 'blocked') && waitsOn(t) ? `waiting on ${waitsOn(t)}` : t.status === 'pending' && a && a.name ? `waiting for ${a.name} to pick it up` : String(t.status || '').replaceAll('_', ' ')}: ${t.title}`;
 /** What the agent is doing: its first task as one line, else the reason its status gives. */
-const doingOf = (a) => (a.tasks && a.tasks.length ? taskLine(a.tasks[0], a) + (a.tasks.length > 1 ? ` (+${a.tasks.length - 1} more)` : '') : (a.reason || ''));
+const joinedWords = (a) => (a.join_notice === 'told' ? 'Team told' : a.join_notice === 'not_told' ? 'Team not told yet' : ''); // an agent added to the team with no task yet: whether its Orchestrator was told (#17343)
+const doingOf = (a) => (a.tasks && a.tasks.length ? taskLine(a.tasks[0], a) + (a.tasks.length > 1 ? ` (+${a.tasks.length - 1} more)` : '') : [a.reason || '', joinedWords(a)].filter(Boolean).join(' · '));
 
 /** The statuses with at least one agent, in the order of the chips, with their counts. */
 function chipCounts(agents) {

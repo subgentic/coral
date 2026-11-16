@@ -50,6 +50,8 @@ type availableAgent struct {
 	Reminder                bool                  `json:"reminder,omitempty"`
 	ReminderIntervalSeconds int                   `json:"reminder_interval_seconds,omitempty"`
 	Activity                string                `json:"activity,omitempty"`
+	// JoinNotice is whether the team was told of an agent added to it that has no task yet (#17343): "told" (the Orchestrator has read the notice) or "not_told" (none sent, or not read yet). Omitted once it has work.
+	JoinNotice string `json:"join_notice,omitempty"`
 	// EndedSession is the session a Resume of an ended agent starts from (#15294): only on an offline row whose agent was ended here and not started again.
 	EndedSession *endedSessionRef `json:"ended_session,omitempty"`
 }
@@ -164,6 +166,14 @@ func (h *SessionsHandler) teamAvailabilityUncached(w http.ResponseWriter, r *htt
 				}
 			}
 			agents = append(agents, a)
+		}
+	}
+	orch, _ := h.bs.TeamOrchestrator(ctx, name)
+	if states, err := h.bs.JoinNoticeStates(ctx, name, orch); err == nil && len(states) > 0 {
+		for i := range agents {
+			if st := states[agents[i].SubscriberID]; st != "" && agents[i].OpenTasks == 0 {
+				agents[i].JoinNotice = st
+			}
 		}
 	}
 	sort.Slice(agents, func(i, j int) bool {
