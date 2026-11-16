@@ -32,7 +32,7 @@ import { serverFetch, sessionServer, normServer, boardTeamKey, keyLabel, identit
 import { teamLabel, serverLabel } from './server_status.js';
 import { showView, showToast, OPERATOR_ID, versionLineOf } from './utils.js';
 import { registerActions, textOf } from './actions.js';
-import { tableMarkup, registerGroupSource, refreshGroupTable, openGroupTable, foldWayBack } from './sidebar_groups.js';
+import { hooks, tableMarkup, registerGroupSource, refreshGroupTable, openGroupTable, foldWayBack } from './sidebar_groups.js';
 import { isPhoneLayout, PHONE_QUERY } from './phone_layout.js';
 import { showConfirmModal } from './confirm_dialog.js';
 import { markReady } from './ready.js';
@@ -1269,6 +1269,8 @@ async function openChat(c) {
 /** A Hub page in the centre (Needs you, Tasks, Saved for later): one iframe, its address a constant from HUB_FRAMES, never built from a URL, a hash or a message; nothing is posted to it or read from it, so the
  *  folder has no count of ours. The frame is made the first time the folder is shown and the same element is handed back on a redraw of that folder; picking another folder takes it out, and its page loads again. */
 const hubFrames = new Map();
+// A folder's redraw wipes the page's table view; a loaded Hub page stays attached and hidden, and loses its class while hidden so the phone's edge-to-edge rules (:has(.inbox-frame)) see only the shown one (an iframe taken out and put back loads its page again, #17584)
+hooks.wipe = (host, html) => { host.querySelectorAll(':scope > iframe').forEach(f => { f.hidden = true; f.className = ''; }); host.querySelectorAll(':scope > :not(iframe)').forEach(c => c.remove()); host.insertAdjacentHTML('afterbegin', html); };
 function hubFrameTable(key) {
     const meta = GROUPS.find(g => g.key === key);
     return { title: meta.label, count: null, noun: ['item', 'items'], rows: [{}], signature: `hub-frame:${key}`, node: () => {
@@ -1280,7 +1282,9 @@ function hubFrameTable(key) {
             f.setAttribute('src', HUB_FRAMES[key]);
             hubFrames.set(key, f);
         }
-        return hubFrames.get(key);
+        const frame = hubFrames.get(key); frame.hidden = false; frame.className = 'inbox-frame'; if (frame.getAttribute('src') !== HUB_FRAMES[key]) frame.src = HUB_FRAMES[key];
+        if (!frame.isConnected) return frame;
+        const here = document.createElement('div'); here.hidden = true; return here; // already on the page (kept, hidden by the last draw): shown where it is, never moved, for a moved iframe loads its page again
     } };
 }
 

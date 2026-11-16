@@ -21,6 +21,7 @@ const LAZY_SOURCES = { 'hub-inbox': './inbox_sidebar.js' }; // the module that r
 const LANDING = '*'; // the key of the page that lists every group (a source with landing: true)
 const KEY = kind => `coral-sidebar-groups-${kind}`;
 
+export const hooks = { wipe: (h, s) => { h.innerHTML = s; } }; // inbox_sidebar swaps in a wipe that keeps a loaded Hub page attached (#17584)
 export function registerGroupSource(kind, source) { sources.set(kind, source); }
 
 export { foldWayBack } from './way_back.js';
@@ -167,9 +168,9 @@ function drawTable() {
     if (!host || !tables.length) return false;
     // a phone's way back to the list is in the table's own title row, not a row of its own above it (#7722)
     // A source with a `lead` (the Inbox: its view list as one select, #7785) puts that on top of the table on a phone instead: the select is the way to the other views, so there is no way back to a list.
-    const lead0 = isPhoneLayout() && src.lead ? src.lead() : null, lead = lead0 && !lead0.none ? lead0 : null; // lead.none (the Inbox, #13596): no strip and no way back either, the ☰ drawer lists the folders
+    const lead0 = isPhoneLayout() && src.lead?.(), lead = lead0 && !lead0.none ? lead0 : null; // lead.none (the Inbox, #13596): no strip and no way back either, the ☰ drawer lists the folders
     const back = isPhoneLayout() && !lead0 ? `<button type="button" class="back-link group-table-back" data-on-click="sgroup-list" data-kind="${escapeAttr(open.kind)}">\u2190 ${escapeHtml(TAB_NAME[open.kind] || 'List')}</button>` : '';
-    const bar = src.toolbar ? src.toolbar(open.key) : null;
+    const bar = src.toolbar?.(open.key);
     const html = (bar && !bar.node ? toolbarHtml(bar, tables[0]) : '') + tables.map((x, i) => tableHtml(x, i, i ? '' : back, !!bar)).join('');
     const scrollPlaces = [];
     if (host.dataset.group === open.kind + ':' + open.key) {
@@ -178,33 +179,34 @@ function drawTable() {
         if (page?.scrollTop > 0 && !scrollPlaces.some(([e]) => e === page)) scrollPlaces.push([page, page.scrollTop]);
     }
     host.dataset.group = open.kind + ':' + open.key; // which table is on screen (saved.js asks for the Inbox's Saved)
-    const a = document.activeElement, typing = a && host.contains(a) && a.id === 'gt-search' ? { start: a.selectionStart, end: a.selectionEnd } : null;
+    const a = document.activeElement, typing = host.contains(a) && a.id === 'gt-search' ? { start: a.selectionStart, end: a.selectionEnd } : null;
     // A component toolbar keeps its own listeners, open panel, search, and focus across table redraws.
     const toolbarFocus = bar?.node?.contains(a) ? a : null;
-    const toolbarCaret = toolbarFocus && typeof toolbarFocus.selectionStart === 'number' ? [toolbarFocus.selectionStart, toolbarFocus.selectionEnd] : null;
-    const folderPage = bar?.node && tables[0] && tables[0].noun ? tables[0] : null;
+    const toolbarCaret = typeof toolbarFocus?.selectionStart === 'number' ? [toolbarFocus.selectionStart, toolbarFocus.selectionEnd] : null;
+    const folderPage = bar?.node && tables[0].noun ? tables[0] : null;
     // The count in a toolbar page's head (folderHead) and the status line under it are written in place (below), not part of what decides a redraw (#14877): a count that lands late (the review pages' total from null to 0, a completeness flag) changes only those words,
     // and drawing the table again for it replaced a link the person might be clicking.
     const compare = html.replace(/(class="item-meta group-table-status" role="status">)[^<]*/g, '$1');
     const drawn = compare + (src.signature?.() || '') + (folderPage ? `|head:${folderPage.title}` : '') + (bar?.signature || '') + tables.map(x => (x.node ? `|${x.signature || ''}` : '')).join('') + (lead ? `|${lead.signature}` : ''); // a table with its own rows says what they are (signature): the same rows are not drawn again
     // A row the keyboard is on keeps it across a redraw (the Inbox's "waiting 4 min" moves on every 30 seconds while the table is the only list, #7004): it is found again by its class and data attributes
     const focusTargets = '.group-chip, .dt-primary, .dt-quiet, .inbox-answer, a.inbox-ask-subject-link';
-    const held = host.contains(a) && a.matches(focusTargets) ? { cls: a.className, data: JSON.stringify(a.dataset), href: a.getAttribute('href'), row: a.closest('tbody tr') ? [...a.closest('tbody').children].indexOf(a.closest('tr')) : -1 } : null;
+    const held = host.contains(a) && a.matches(focusTargets) ? { cls: a.className, data: JSON.stringify(a.dataset), href: a.getAttribute('href'), row: [...(a.closest('tbody')?.children || [])].indexOf(a.closest('tr')) } : null;
     if (host.dataset.drawn !== drawn) {
-        host.innerHTML = html; host.dataset.drawn = drawn;
+        hooks.wipe(host, html);
+        host.dataset.drawn = drawn;
         if (bar?.node) host.prepend(bar.node);
         if (folderPage) folderHead(bar.node, folderPage);
         if (lead) { // a phone: the strip is a tab list and everything under it is its panel (#11281); the panel adds no box (display: contents)
             const strip = lead.node(), panel = document.createElement('div'); panel.className = 'vl-panel'; panel.id = `${strip.dataset.viewList}-panel`; panel.setAttribute('role', 'tabpanel');
-            const tab = strip.querySelector('[role="tab"][aria-selected="true"]'); if (tab) panel.setAttribute('aria-labelledby', tab.id);
-            panel.append(...host.childNodes); host.replaceChildren(strip, panel);
+            const tab = strip.querySelector('[role="tab"][aria-selected="true"]'); tab && panel.setAttribute('aria-labelledby', tab.id);
+            panel.append(...host.querySelectorAll(':scope > :not(iframe)')); host.prepend(strip, panel);
         }
         const slots = host.querySelectorAll('.group-table-node'); // one per table that draws its own rows (and has some), in order
         let k = 0;
         for (const x of tables) if (x.node && (x.rows.length || !x.empty)) slots[k++]?.replaceWith(x.node());
         for (const x of tables) { const supplement = x.supplement?.(); if (supplement) (host.querySelector('.vl-panel') || host).append(supplement); }
         for (const x of tables) { const b = x.banner?.(); if (b) host.querySelector('.gt-toolbar')?.after(b); }
-        for (const x of tables) { const f = x.foot && x.foot(); if (f) host.querySelector('.vl-panel') ? host.querySelector('.vl-panel').append(f) : host.append(f); } // a line under the page that is not part of the table (Needs you's alerts offer, #11837); a phone's panel holds the page
+        for (const x of tables) { const f = x.foot?.(); if (f) (host.querySelector('.vl-panel') || host).append(f); } // a line under the page that is not part of the table (Needs you's alerts offer, #11837); a phone's panel holds the page
     }
     if (host.dataset.drawn === drawn) { // nothing to draw again: the head's count and the status line follow in place
         if (folderPage && bar?.node && host.contains(bar.node)) { // the head's count span only: drawing the head again would replace the h2 the keyboard may be on
@@ -216,12 +218,12 @@ function drawTable() {
                 head.dataset.words = `${folderPage.title}|${n}`;
             }
         }
-        host.querySelectorAll('.group-table-status').forEach((p, i) => { const t = tables[i]; if (t && t.status && p.textContent !== t.status) p.textContent = t.status; });
+        host.querySelectorAll('.group-table-status').forEach((p, i) => { const t = tables[i]?.status; if (t && p.textContent !== t) p.textContent = t; });
     }
     // Replacing rows temporarily empties the scroller and clamps its position.
     // Keep the current folder's place through every refresh, including count-only updates.
     for (const [element, top] of scrollPlaces) element.scrollTop = top;
-    if (toolbarFocus && toolbarFocus.isConnected && document.activeElement !== toolbarFocus) {
+    if (toolbarFocus?.isConnected && document.activeElement !== toolbarFocus) {
         toolbarFocus.focus({ preventScroll: true });
         if (toolbarCaret) toolbarFocus.setSelectionRange(...toolbarCaret);
     }

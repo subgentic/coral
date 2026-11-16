@@ -22,7 +22,7 @@ const {coralReady}=require('./helpers/wait');
     for(const [folder,enabled]of [['tasks',account.tasks_native===true],['saved',account.saved_native===true]]){
      await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.openInboxGroup('${folder}'))`);
      await waitFor(`document.querySelector('#group-table-view')?.getClientRects().length>0`,'folder mounted');
-     assert.equal(await ev(`!!document.querySelector('#group-table-view iframe')`),!enabled,width+' '+folder+' frame fallback matches its gate');
+     assert.equal(await ev(`!!document.querySelector('#group-table-view iframe:not([hidden])')`),!enabled,width+' '+folder+' frame fallback matches its gate');
     }
     assert.equal(await ev(`window.__nativeAccountReads`),1,'shared account reader is not duplicated per folder');
     await Page.removeScriptToEvaluateOnNewDocument({identifier});
