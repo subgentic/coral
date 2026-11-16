@@ -37,6 +37,20 @@ const BASE = require('./test_base').BASE;
    const notices=await ev(`[...document.querySelectorAll('#toast-host .toast-message')].map(n=>n.textContent)`);
    if(notices.some(t=>/^Restarting\b/.test(t)))problems.push(width+': stale pending toast beside completion: '+JSON.stringify(notices));
   }
+  // Overlapping restarts retain progress for the other request; error notices survive cleanup.
+  await ev(`(()=>{const m=window.__m;for(const [id,name] of [['batch-a','Worker A'],['batch-b','Worker B']])m.add(id,'B',1,{sleeping:false,session_id:id,display_name:name});T.state.liveSessions=Object.values(m.agents).map(a=>m.entry(a));T.render.renderLiveSessions(T.state.liveSessions);for(const b of document.querySelectorAll('#toast-host .toast-close'))b.click();window.__pendingRestart={};const real=window.fetch;window.fetch=(url,opts={})=>{if(/\\/api\\/sessions\\/live\\/[^/?]+\\/restart$/.test(String(url))&&opts.method==='POST'){const id=JSON.parse(opts.body).session_id;return new Promise(resolve=>{window.__pendingRestart[id]=()=>resolve(Response.json({error:'Cannot restart '+id}))})}return real(url,opts)};return true})()`);
+  for(const [id,key] of [['batch-a','__runA'],['batch-b','__runB']]){
+   await ev(`window.selectLiveSession('${id}','claude','${id}','local')`);
+   await ev(`import(${S}+'restart_flow.js').then(m=>{window.${key}=m.restartSameSettings();return true})`);
+   await waitFor(`typeof window.__pendingRestart['${id}']==='function'`,'restart held in flight');
+  }
+  assert.deepEqual(await ev(`[...document.querySelectorAll('#toast-host .toast[data-group="restarting"] .toast-message')].map(n=>n.textContent)`),['Restarting 2 agents'],'overlapping requests share one progress card');
+  await ev(`(async()=>{window.__pendingRestart['batch-a']();await window.__runA;return true})()`);
+  assert.deepEqual(await ev(`[...document.querySelectorAll('#toast-host .toast[data-group="restarting"] .toast-message')].map(n=>n.textContent)`),['Restarting Worker B'],'finishing one request preserves only the other progress');
+  await ev(`(async()=>{window.__pendingRestart['batch-b']();await window.__runB;return true})()`);
+  assert.equal(await ev(`document.querySelectorAll('#toast-host .toast[data-group="restarting"]').length`),0,'no progress remains after both requests finish');
+  const errors=await ev(`[...document.querySelectorAll('#toast-host .toast.error .toast-message')].map(n=>n.textContent)`);
+  assert.ok(errors.includes('Cannot restart batch-a')&&errors.includes('Cannot restart batch-b'),'progress cleanup retains both failure notices');
   assert.deepEqual(problems,[]);console.log('PASS viewer More/Download pointer access and nonconflicting restart feedback at 1280/390');
  }finally{await client.close();}
 })().catch(e=>{console.error(e);process.exit(1)});

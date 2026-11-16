@@ -157,14 +157,28 @@ export async function restartSameSettings() {
     return runRestart({});
 }
 
+// One progress card tracks the requests still in flight; completion removes its own entry (#17021).
+const pendingRestarts = new Map();
+let restartProgress = null;
+function restartNotice(token, who) {
+    if (who === undefined) { if (!pendingRestarts.delete(token)) return; }
+    else pendingRestarts.set(token, who);
+    restartProgress?.querySelector('.toast-close')?.click();
+    restartProgress = null;
+    if (!pendingRestarts.size) return;
+    const names = [...pendingRestarts.values()];
+    restartProgress = showToast(names.length === 1 ? `Restarting ${names[0]}` : `Restarting ${names.length} agents`, false, undefined, { group: { key: 'restarting', text: n => `Restarting ${n} agents` } });
+}
+
 async function runRestart(config) {
+    const notice = {};
     const restartId = state.currentSession && state.currentSession.session_id;
     try {
         // Show restarting overlay instead of session-ended
         const xtermMod = await _getXtermModule();
         xtermMod.setRestarting?.(true, restartId);
         const replaced = state.currentSession, who = replaced.display_name || replaced.name;
-        showToast(`Restarting ${who}`, false, undefined, { group: { key: 'restarting', text: n => `Restarting ${n} agents` } });
+        restartNotice(notice, who || 'Agent');
         const payload = { agent_type: config.agentType || state.currentSession.agent_type, session_id: state.currentSession.session_id };
         if (config.flags) payload.extra_flags = config.flags;
         if (config.prompt) payload.prompt = config.prompt;
@@ -231,5 +245,7 @@ async function runRestart(config) {
         if (restartId) _getXtermModule().then((m) => m.setRestarting(false, restartId)).catch(() => {});
         showToast("Failed to restart session", true);
         console.error("confirmRestart exception:", e);
+    } finally {
+        restartNotice(notice);
     }
 }
