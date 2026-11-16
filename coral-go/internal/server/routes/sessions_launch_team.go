@@ -801,7 +801,7 @@ func (h *SessionsHandler) launchTeamMember(ctx context.Context, body launchTeamR
 	skillRows = h.withTeamBuilderSkill(ctx, skillRows, def.Name)                   // the Orchestrator seat also gets the team-builder skill (#13894)
 	result, err := h.launchSession(ctx, launchSpec{
 		WorkDir: workingDir, AgentType: agentType, DisplayName: def.Name, Flags: agentFlags,
-		Prompt:    withSkillNote(InjectKnowledgeIntoPrompt(h.cfg.CoralDir(), body.BoardName, def.Name, def.Prompt), launchSkillNote(skillRows)),
+		Prompt:    withSkillNote(withRosterNote(InjectKnowledgeIntoPrompt(h.cfg.CoralDir(), body.BoardName, def.Name, def.Prompt), seat, body.Agents, def.Name), launchSkillNote(skillRows)),
 		BoardName: body.BoardName, BoardServer: body.BoardServer, Backend: body.Backend, BoardType: body.BoardType,
 		Model: effectiveModel, Thinking: effectiveThinking, Capabilities: def.Capabilities, Tools: def.Tools, Hooks: def.Hooks,
 		// The member's flags carry the mode as the expanded flags of its type (--sandbox workspace-write -a never for Codex's auto), which PermissionModeFromFlags does not read
@@ -922,4 +922,19 @@ func memberLaunchMode(def launchTeamAgent, fromTeamFlags string, memberFlags []s
 func modeNamed(m string) bool {
 	_, custom := custommodes.IDOf(m)
 	return m == "default" || custom
+}
+
+// withRosterNote adds the team's roster to the Orchestrator seat's prompt (#17168); every other member's prompt is as it was.
+func withRosterNote(prompt string, seat bool, members []launchTeamAgent, self string) string {
+	if !seat {
+		return prompt
+	}
+	note := teamRosterNote(members, self)
+	if note == "" {
+		return prompt
+	}
+	if strings.TrimSpace(prompt) == "" {
+		return note
+	}
+	return prompt + "\n\n" + note
 }
