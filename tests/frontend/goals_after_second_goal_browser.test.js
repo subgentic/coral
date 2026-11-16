@@ -32,7 +32,9 @@ const { coralReady } = require('./helpers/wait');
         await api('POST', `/api/board/${B}/tasks`, { title: 'Add reminders', created_by: 'orch', goal_id: g2 });
         await api('POST', `/api/board/${B}/tasks`, { title: 'Polish the habit page', created_by: 'orch', goal_id: g1 }); // made after goal 2's task: the groups still go goal 1, goal 2 (#15364)
         await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: 'Idea for later', state: 'proposed' }); // a goal the default list does not show: the badge is not the count of all goals
-        await open(`/team/${B}/goals`, `document.querySelectorAll('#team-panel-goals tbody tr:not(.dt-group)').length === 1`);
+        await open(`/team/${B}/goals`, `document.querySelectorAll('#team-panel-goals tbody tr:not(.dt-group)').length >= 1`);
+        await ev(`document.querySelector('#team-panel-goals [data-filter="active"]').click(); true`); // the All the person chose above is remembered in this browser: Active is chosen again here (#17625)
+        await waitFor(`document.querySelectorAll('#team-panel-goals tbody tr:not(.dt-group)').length === 1`, 'Active lists only the active goal');
         await ev(`document.querySelector('#team-panel-goals [data-filter="all"]').click(); true`);
         await waitFor(`document.querySelectorAll('#team-panel-goals tbody tr:not(.dt-group)').length === 3`, 'All includes all three goals');
         r = await rows();
