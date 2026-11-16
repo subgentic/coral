@@ -28,7 +28,7 @@ const TASKS = [{ id: 86091, title: 'Named agent task', status: 'completed', assi
     { id: 86092, title: 'Unassigned task', status: 'completed', assigned_to: null, priority: 'low', cost_usd: 0.5 }];
 const VIEWS = ['Overview', 'Tokens per commit', 'Task time', 'Tool and API calls']; // one entry per metric (#9236): the views that use the header's Time range. Usage, Operator interaction and Team communication (#11222) carry their own Period (analytics_tabs_browser)
 const LISTED = ['Overview', 'Usage', 'Operator interaction', 'Inbox vs chat', 'Resource queue', 'Team communication', 'Tokens per commit', 'Task time', 'Advanced']; // Tool and API calls is under Advanced (#10521)
-const GROUP_OF = { 'By provider': 'Provider', 'By model': 'Model', 'By thinking level': 'Thinking level', 'By team': 'Team', 'By agent': 'Agent', 'By branch': 'Branch', 'By task': 'Task' }; // the groupings are Overview's Group by (#9236), not sidebar entries
+const GROUP_OF = { 'By provider': 'Provider', 'By model': 'Model', 'By thinking level': 'Thinking level', 'By team': 'Team', 'By agent': 'Agent', 'By branch': 'Branch', 'By task': 'Task', 'By goal': 'Goal' }; // the groupings are Overview's Group by (#9236), not sidebar entries
 const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
     window.fetch = (u, o) => { const url = String(u && u.url || u); window.__costReq = (window.__costReq || []).concat(url);
         if (new URL(url, location.origin).pathname === '/api/board/tasks') return json({ tasks: ${JSON.stringify(TASKS)} });
@@ -161,9 +161,9 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
                 if (mobile) assert.ok(r.h >= 44, at + `${label}: a 44 px target on a phone: ` + r.h);
             }
             await choose('By task');
-            await waitFor(`document.querySelectorAll('#cost-by-task tbody tr').length === 2`, at + 'the seeded task rows', 5000);
+            await waitFor(`document.querySelectorAll('#cost-by-task tbody tr').length === 3`, at + 'the seeded task rows and the cost no task carries', 5000);
             const people = await ev(`[...document.querySelectorAll('#cost-by-task tbody tr')].map(r => r.querySelector('[data-key="assigned_to"]').textContent.trim())`);
-            assert.deepEqual(people, ['BBackend Dev', '—'], at + 'By task shows the named agent beside its circle; only an unassigned task has a dash');
+            assert.deepEqual(people, ['', 'BBackend Dev', '—'], at + 'By task (the first row, the largest cost, is the cost no task carries, #17693) shows the named agent beside its circle; only an unassigned task has a dash');
             await choose('Overview');
             await ev(`(() => { const s = document.getElementById('cost-time-range'); s.value = 'week'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await waitFor(`document.getElementById('cost-range-text').textContent === 'Last 7 days'`, at + 'the page says the range', 5000);
