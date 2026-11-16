@@ -1,6 +1,6 @@
 // Keep the original dependency evaluation order (#8372).
 import { rawKeyOk, rawKeySeq } from './raw_keys.js';
-import './import_once.js';
+import { importOnce } from './import_once.js';
 import './session_overlay.js';
 import { dashboardPromptRequested } from './dashboard_analytics.js';
 import { mountSettingsView } from './settings_view.js';
@@ -19,7 +19,6 @@ import { resolveSessionIdentity } from './session_state.js';
 import { agentWords, whatStaysKill } from './agent_words.js';
 import './sleeping_view.js';
 import { hubBlocked } from './hub_access.js';
-import { loadLiveSessions } from './api.js';
 
 import './image_attach.js';
 import { attachmentsLead, sentToastText } from './shared_images.js';
@@ -41,22 +40,6 @@ import { SVGO } from './svg_open.js';
 /** What the composer says when the server still refuses the target after the list was read again: the page's view of this agent is out of date (#10813). */
 const TARGET_CHANGED_MESSAGE = 'This agent was restarted or renamed, so your message was not sent. Reload the page, then send it again.';
 
-/** True when a send was refused because the name or type sent is not the session's stored one (the server's code session_target_mismatch). */
-async function _isTargetMismatch(resp) {
-    if (resp.status !== 400) return false;
-    try { const b = await resp.clone().json(); return !!b && b.code === 'session_target_mismatch'; } catch { return false; }
-}
-
-/** The session's row in a fresh list that differs from the name and type just sent, or null when the list cannot be read, no longer has it, or still says the same.
- *  A read already under way when the refusal came may be older than the restart, so the list is read a second time before giving up. */
-async function _refetchedTarget(sessionId, server, sentName, sentType) {
-    for (let i = 0; i < 2; i++) {
-        try { await loadLiveSessions(); } catch { return null; }
-        const row = (state.liveSessions || []).find(s => s && s.session_id === sessionId && sessionServer(s) === server);
-        if (row && (row.name !== sentName || row.agent_type !== sentType)) return row;
-    }
-    return null;
-}
 export { getPendingAttachments, initImageDrop, uploadAndInsertImage, renderAttachments, removeAttachment } from './image_composer.js';
 export { restartSession, restartStage, hideRestartModal, confirmRestart } from './restart_flow.js';
 /* Quick actions, command sending, mode toggling, and session controls */
@@ -176,11 +159,13 @@ export async function sendCommand({ nudge = false } = {}) {
         addPendingMessage(sentSessionId, command, sentAt, { sending: true });
         input.value = "";
         clearSentDraft(targetSession);
+        const draft = t => { const k = sessionKey(targetSession); if (k) saveSessionDraft(k, t); };
         const notSent = () => {
             removePendingMessage(sentSessionId, sentAt, { announce: false }); // each refusal below shows the error under the composer, which says why, or says it was not sent when there is no box (#352)
             // The typed text only: the attachments stay attached until a send of them succeeds.
-            if (!input.value && state.currentSession && state.currentSession.session_id === sentSessionId) { input.value = textPart; const k = sessionKey(targetSession); if (k) saveSessionDraft(k, textPart); }
+            if (!input.value && state.currentSession && state.currentSession.session_id === sentSessionId) { input.value = textPart; draft(textPart); }
         };
+        const late = () => importOnce('./send_arrived.js').then(m => m.settleTyped(sentSessionId, sentAt, targetSession, command, toastSent), () => false);
         try {
             const post = (name, type) => serverFetch(sessionServer(targetSession), `/api/sessions/live/${encodeURIComponent(name)}/send`, {
                 method: "POST",
@@ -189,8 +174,8 @@ export async function sendCommand({ nudge = false } = {}) {
             });
             let resp = await post(targetSessionName, targetAgentType);
             // The name or type this page holds is no longer the stored one (the agent was restarted or renamed since the list was read): read the list again and send once more with what it now says (#10813).
-            if (!resp.ok && await _isTargetMismatch(resp)) {
-                const fresh = await _refetchedTarget(sentSessionId, sessionServer(targetSession), targetSessionName, targetAgentType);
+            if (!resp.ok && resp.status === 400) {
+                const fresh = await (await importOnce('./send_arrived.js')).changedTarget(resp, sentSessionId, sessionServer(targetSession), targetSessionName, targetAgentType);
                 if (fresh) resp = await post(fresh.name, fresh.agent_type);
             }
             if (!resp.ok) {
@@ -203,6 +188,7 @@ export async function sendCommand({ nudge = false } = {}) {
                     reportSendError(targetSession, text, code, exited);
                     return;
                 }
+                if ((resp.status >= 500 || !body) && await late()) return;
                 notSent();
                 // Plain text naming the server; never the raw response (#3151). The draft stays.
                 // Said under the composer (#3218); a gone terminal also marks the agent and offers Restart.
@@ -218,8 +204,7 @@ export async function sendCommand({ nudge = false } = {}) {
                 // The agent waits on a question for the person (#6610): the server holds the message and types it once none is left. It shows in the chat then; no "Sent" now.
                 removePendingMessage(sentSessionId, sentAt, { announce: false }); // held, not refused: the toast below says so, and the box stays empty (it was announced as not sent, #352)
                 clearAttachments(targetSession);
-                const heldKey = sessionKey(targetSession);
-                if (heldKey) saveSessionDraft(heldKey, "");
+                draft("");
                 if (result.held_id !== undefined && result.held_id !== null) noteHeld(sentSessionId, undefined, command, result.held_id); // the line under the box, with Cancel
                 showToast(result.note || "Held until the agent's question is answered.");
             } else if (result.error) {
@@ -230,12 +215,12 @@ export async function sendCommand({ nudge = false } = {}) {
                 clearComposerError();
                 confirmPendingMessage(sentSessionId, sentAt);
                 clearAttachments(targetSession);
-                const key = sessionKey(targetSession);
-                if (key) saveSessionDraft(key, "");
+                draft("");
                 toastSent(command);
                 _getXtermModule().then(m => m.focusTerminal());
             }
         } catch (e) {
+            if (await late()) return;
             notSent();
             if (!showComposerError("The message was not sent. Check the connection and try again.")) announceNotSent(sentSessionId);
             console.error("Send exception:", e);
