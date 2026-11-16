@@ -1,4 +1,5 @@
 import { openTask } from './task_navigation.js';
+import { menuMove } from './menu_keys.js';
 /* The team page (#7453, UI/UX's one team page): the page a team's row opens. Its header (the team's name and ONE status, Add agent and More) and its tab strip (Goals, Messages, Tasks, Agents, Artifacts, Knowledge, Settings) never move; under them
  * is the tab's table or an item's page (a goal's, a task's) with a link back that returns the focus to the row; documents open in the detail pane on the right (detail_pane.js). The address follows: /team/<name>/<tab>[/<n>].
  * This module is the shell: each tab's own panel is built the first time the tab is opened by its own module (goals_view.js, team_tasks_page.js, team_artifacts_page.js); Messages is the board's own column moved in (message_board.js),
@@ -180,6 +181,14 @@ function buildMore() {
     menu.addEventListener('click', (e) => { if (e.target.closest('button')) set(false); });
     document.addEventListener('keydown', (e) => { if (moreOpen && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); set(false, { focus: true }); } }, true);
     document.addEventListener('click', (e) => { if (moreOpen && !menu.contains(e.target) && !b.contains(e.target)) set(false); });
+    // The menu keyboard (menu_keys.js, #16432): Up, Down, Home and End move between the items that are shown, from the button or from an item; Tab closes the menu and goes on from its button, as every other menu does.
+    host.addEventListener('keydown', (e) => { // on the host: the focus is on the button, not in the menu, when the menu opens (QA2 on #16432)
+        if (!moreOpen) return;
+        if (e.key === 'Tab') { set(false, { focus: true }); return; }
+        const list = [...menu.querySelectorAll('button:not([hidden]):not([disabled])')].filter(i => i.getClientRects().length > 0);
+        const to = menuMove(e.key, list.length, list.indexOf(document.activeElement));
+        if (to >= 0) { e.preventDefault(); list[to].focus(); }
+    });
 }
 const BOARD_ACTIONS = ['mb-export-btn', 'mb-pause-btn', 'mb-select-btn', 'mb-delete-btn'];
 function adoptBoardActions() {
