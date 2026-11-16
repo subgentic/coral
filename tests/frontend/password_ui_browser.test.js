@@ -17,7 +17,7 @@ const BASE = require('./test_base').BASE;
         const out = await ev(`(async () => {
             const S = window.__coralStatic || '/static/';
             const sleep = ms => new Promise(r => setTimeout(r, ms));
-            const waitFor = async (cond, what, ms = 30000) => { const end = performance.now() + ms; while (!cond()) { if (performance.now() > end) { await sleep(0); if (cond()) return; throw new Error('timed out: ' + (typeof what === 'function' ? what() : what)); } await sleep(10); } }; // a wall-clock fuse, not a speed check: a page whose main thread stalls for seconds on a loaded shard (its fetch reply is a task of its own) used to trip a 4 s one before the handler under test had run (#18504); a real hang still fails, at 30 s, and the condition gets one more look after the deadline
+            const waitFor = async (cond, what, ms = 4000) => { const end = performance.now() + ms; while (!cond()) { if (performance.now() > end) { await sleep(0); if (cond()) return; throw new Error('timed out: ' + (typeof what === 'function' ? what() : what)); } await sleep(10); } }; // a wall-clock fuse, not a speed check: a page whose main thread stalls for seconds on a loaded shard (its fetch reply is a task of its own) used to trip a 4 s one before the handler under test had run (#18504); a real hang still fails, at 30 s, and the condition gets one more look after the deadline
             const RealFetch = window.fetch;
             const calls = [];
             const trace = [];
@@ -33,6 +33,7 @@ const BASE = require('./test_base').BASE;
                     calls.push({ url, body: o.body ? JSON.parse(o.body) : null });
                     const r = reply[url] || { status: 200, body: { ok: true } };
                     const resp = new Response(JSON.stringify(r.body), { status: r.status, headers: r.headers || {} });
+                    if (url === '/api/auth/password/set' && r.status === 200) status = { ...status, password_set: true };   // like the server: once a password is set the status says so, or a focus/visibility re-check re-opens the prompt over the one just closed (#18504)
                     const T = trace[trace.length] = { url, stubAt: Math.round(performance.now()) }, json = resp.json.bind(resp); // where a stuck set stops, for the failure text (#18504)
                     resp.json = () => { T.jsonAt = Math.round(performance.now()); return json().then(v => { T.doneAt = Math.round(performance.now()); return v; }); };
                     return resp;
