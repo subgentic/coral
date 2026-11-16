@@ -8,7 +8,8 @@ const { connect } = require('./agent_view_harness');
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const BASE_ROW = { session_id: 'l1', name: 'coral-go', display_name: 'Worker', agent_type: 'claude', summary: 'Ship the release plan', model: 'claude-opus-5-5', working_directory: '/work/coral', repo_name: 'coral' };
     const CASES = [
-        ['a level the newest turn ran at', { thinking_actual: 'high' }, 'Opus 5.5 · High'],
+        ['a level the newest turn ran at, none asked for: the CLI default is named, 'Default · High', as the chat bar's chip does (#17925)', { thinking_actual: 'high' }, 'Opus 5.5 · Default · High'],
+        ['a level asked for and run', { thinking: 'high', thinking_actual: 'high' }, 'Opus 5.5 · High'],
         ['only the level it was started with', { thinking: 'xhigh' }, 'Opus 5.5 · Extra high'],
         ['both: what it ran at wins', { thinking: 'low', thinking_actual: 'max' }, 'Opus 5.5 · Max'],
         ['no level on record', {}, 'Opus 5.5'],

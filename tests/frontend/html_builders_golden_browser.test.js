@@ -124,7 +124,7 @@ const HEX = c => c.repeat(64);
             ['a worktree on its own branch', { branch: 'fix/login', git_state: { is_worktree: true, base_branch: 'main' } }], // Show branches is off, as it starts (#5117): no worktree line
             ['a worktree on its own branch, with Show branches on', { branch: 'fix/login', git_state: { is_worktree: true, base_branch: 'main' } }, 'coral-show-branches'],
             ['a model on a claude agent', { model: 'claude-opus-4-1' }],
-            ['a model and a thinking level on a claude agent', { model: 'claude-opus-4-1', thinking_actual: 'high' }],
+            ['a model and a thinking level on a claude agent', { model: 'claude-opus-4-1', thinking: 'high', thinking_actual: 'high' }],
             ['a thinking level only, with the model option off', { model: 'claude-opus-4-1', thinking: 'medium' }, 'coral-show-model=false'],
             ['an agent with a prompt only (no summary)', { first_prompt: 'Please fix the login bug', summary: '' }],
             ['an agent on a stale server', { server: 'gone-box', stale: true }],
