@@ -77,6 +77,6 @@ export async function mountLaunchSkills(rowId, local, opts = {}) {
     more.append(summary, search, ul, note);
     host.append(more);
     sync();
-    if (chosen.size || rows.some(r => team.has(r.s.id))) more.open = true; // a member that has skills, or gets the team's, shows them (#18657)
+    // Closed on open (#18794, the Operator: "too much info"): the summary line already says what is chosen ("1 chosen", ", 2 from the team"), as #18657 wanted.
     row.hidden = false;
 }
