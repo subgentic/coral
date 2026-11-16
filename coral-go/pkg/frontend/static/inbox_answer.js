@@ -259,7 +259,7 @@ function fill(s, cell, withDismiss = true) {
             cell.append(block);
             if (targetNote) { const nt = document.createElement('span'); nt.className = 'inbox-cmd-note'; nt.textContent = targetNote; cell.append(nt); }
             const yes = document.createElement('span'); yes.className = 'inbox-trust-note inbox-yes-note'; cell.append(yes);
-            const more = document.createElement('button'); more.type = 'button'; more.className = 'btn btn-quiet btn-small inbox-cmd-more'; more.textContent = 'Show all'; more.hidden = true; more.setAttribute('aria-label', 'Show all of the command'); cell.insertBefore(more, yes);
+            const more = document.createElement('button'); more.type = 'button'; more.className = 'btn btn-quiet btn-small inbox-cmd-more'; more.textContent = 'Show all to allow'; more.hidden = true; more.setAttribute('aria-label', 'Show all of the command'); cell.insertBefore(more, yes);
             let open = false, reached = false;
             const laidOut = () => block.getClientRects().length > 0;
             const clipped = () => !(laidOut() && block.scrollHeight <= block.clientHeight + 1); // not laid out is not shown: fail closed

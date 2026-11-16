@@ -177,6 +177,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 let s0 = await rowState();
                 check(s0 && s0.clipped && s0.yes === 0 && s0.no === 1 && /Read the whole command to allow it: press Show all/.test(s0.sentence), `${at}${what}: clipped, no Yes, 'Read the whole command to allow it': ` + JSON.stringify(s0));
                 check(await ev(`(() => { const m = document.querySelector('#group-table-view .inbox-cmd-more'); return !!m && !m.hidden && m.getClientRects().length > 0; })()`), `${at}${what}: a Show all button is on the row`);
+                check((await ev(`document.querySelector('#group-table-view .inbox-cmd-more')?.textContent`)) === 'Show all to allow', `${at}${what}: the button says what it is for: Yes needs the whole command (#17834)`);
                 // a Yes forced from outside while it is locked sends nothing
                 await ev(`document.querySelectorAll('#group-table-view .inbox-answers button').forEach(b => { if (b.textContent === 'Yes') b.click(); }); true`);
                 await new Promise(r => setTimeout(r, 400)); // sleep-ok: a refused click settles
