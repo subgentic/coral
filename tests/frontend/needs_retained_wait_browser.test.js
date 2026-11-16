@@ -29,11 +29,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
    await ev(`window.openTeamPage(${JSON.stringify(team)})`);
    await waitFor(`/^1 needs? attention$/.test(document.querySelector('#team-page-status')?.textContent.trim()||'')`,'the header says the retained wait the Needs you list counts',20000);
    assert.equal(await ev(`document.querySelector('#team-page-status').classList.contains('well')`),false,width+': a retained wait is not well');
-   await ev(`window.__failAvailability=true;window.openTeamPage(${JSON.stringify(team)})`);
+   await ev(`window.T.state.liveSessions=window.T.state.liveSessions.filter(row=>row!==window.__retained);window.__failAvailability=true;window.openTeamPage(${JSON.stringify(team)})`); // no live row of the team here, so the page has nothing to say but that the status is unavailable
    await waitFor(`window.__availabilityFailed && document.querySelector('#team-page-status')?.textContent.trim()==='Status unavailable'`,'failed availability ends at explicit unavailable status');
    assert.equal(await ev(`document.querySelector('#team-page-status').classList.contains('well')`),false,'failed availability remains neutral');
    await ev(`window.__failAvailability=false;true`);
-   await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.updateInboxTab()).then(()=>true)`);
+   await ev(`window.T.state.liveSessions.push(window.__retained);import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.updateInboxTab()).then(()=>true)`);
 
    await waitFor(`document.querySelector('#team-page-health')?.textContent.includes('1 needs attention')`,'team status counts the same retained wait');
    await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);

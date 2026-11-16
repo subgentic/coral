@@ -37,7 +37,7 @@ const PLAN = 'Plan for the Reading List app (task #1) — OK to proceed? 1) Scop
                 { board: 'reading', board_label: 'Reading List', kind: 'ask', id: 53, asker: 'Dev', text: '@Operator May I delete the old books table and start again?', at: at(9) }];
                 const orig = window.fetch.bind(window); window.fetch = (u, o) => String(u) === '/api/operator-asks' ? Promise.resolve(new Response(JSON.stringify(window.__asks), { status: 200, headers: { 'Content-Type': 'application/json' } })) : orig(u, o); return true; })()`);
             await ev(`import((window.__coralStatic || '/static/') + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => true)`);
-            await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '6'`, `${w}: waiting badge`, 8000);
+            try { await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '6'`, `${w}: waiting badge`, 8000); } catch (e) { throw new Error(e.message + ' (badge ' + await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`) + ', rows ' + await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.textContent.trim().slice(0, 40)).join(' | ')`) + ')'); }
             if (mobile) {
                 await ev(`document.getElementById('nav-select').click(); true`);
                 await waitFor(`!!document.querySelector('#nav-more-menu [data-arg="hub-inbox"]')`, '390: Inbox in the view dropdown', 5000);
