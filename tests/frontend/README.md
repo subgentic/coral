@@ -26,7 +26,7 @@ is no network inside. Where namespaces aren't allowed it prints a note and runs 
 the change's own base. Before submitting dashboard work, from your worktree:
 
 ```
-node tests/frontend/start_bytes_delta.mjs        # app.js base X head Y (+/-n), start CSS base X head Y (+/-n) (gz -9); exit 1 when either grew
+node tests/frontend/start_bytes_delta.mjs        # app.js base X head Y (+/-n), start CSS base X head Y (+/-n) (gz -9); the last line is "start bytes: OK (go1.x)" or "GREW: app.js +N gz / CSS +N gz (MUST) (go1.x)", exit 1 on growth; quote it with the Go version
 ```
 
 It builds the merge-base with origin/main in a temporary worktree and your tree with the same Go test the gate uses (`go` and `git` on the PATH). A growth is fixed by moving the code into a lazy module
