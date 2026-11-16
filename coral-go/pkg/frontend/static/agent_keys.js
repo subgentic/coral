@@ -182,6 +182,7 @@ async function stopAgent(silentFail) {
 }
 let stoppedNote = '';
 
+document.getElementById('keys-chip')?.setAttribute('data-on-click', 'agent-keys-toggle'); // the chip works once this module has loaded (it loads with the first agent header, #970488c2f3 made it lazy): a literal name the action census reads, set here so the page never holds a control whose action is not registered yet
 registerActions({
     'agent-continue': async (el, event) => {
         event.stopPropagation(); window.closeSidebarKebabs();
