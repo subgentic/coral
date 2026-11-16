@@ -5,9 +5,11 @@ package routes
 import (
 	"context"
 	"errors"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,6 +34,13 @@ func (h *SessionsHandler) GetFileContent(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if r.URL.Query().Get("download") == "1" { // the bytes of any file, saved by the person (#17655): the same folder checks, an attachment, a cap of its own
+		content, _, ok := h.readWorkFile(w, r, name, sessionID, fp, maxDownloadBytes, "File too large to download")
+		if ok {
+			writeFileDownload(w, fp, content)
+		}
+		return
+	}
 	content, workdir, ok := h.readWorkFile(w, r, name, sessionID, fp, maxFileBytes(), "File too large to preview")
 	if !ok {
 		return
@@ -169,6 +178,28 @@ func writeRawImage(w http.ResponseWriter, fp string, data []byte) {
 		return
 	}
 	writeRawPreview(w, ct, data, true)
+}
+
+// maxDownloadBytes is the most of one file a Download saves (#17655): the dashboard's own limit for a saved file, 25 MiB.
+const maxDownloadBytes = 25 << 20
+
+// writeFileDownload sends a file's bytes as they are, to be saved under its own name: an attachment of no type a page could run as, never sniffed, never cached.
+func writeFileDownload(w http.ResponseWriter, fp string, data []byte) {
+	base := strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f || r == '"' || r == '\\' || r == '/' {
+			return '_'
+		}
+		return r
+	}, filepath.Base(fp))
+	h := w.Header()
+	h.Set("Content-Type", "application/octet-stream")
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Content-Security-Policy", "default-src 'none'; sandbox")
+	h.Set("Cache-Control", "no-store")
+	h.Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": base}))
+	h.Set("Content-Length", strconv.Itoa(len(data)))
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
 }
 
 func writeRawPreview(w http.ResponseWriter, ct string, data []byte, image bool) {

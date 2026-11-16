@@ -7,7 +7,6 @@ import { worktreeMode, setWorktreeMode } from './agent_file_api.js';
 import { deriveSessionState } from './render.js';
 import { escapeHtml, escapeAttr, showToast, refusedTooLarge } from './utils.js';
 import { registerActions, textOf } from './actions.js';
-import { fetchFileList, fuzzyFilter } from './file_mention.js';
 import { initFilesSourcePicker, syncFilesSourceTeam } from './team_artifacts.js';
 import { fileIconHtml } from './file_explorer.js';
 import { openPreviewTab, openArtifactTab, setPreviewSession, refreshOpenFiles } from './preview_pane.js';
@@ -27,10 +26,9 @@ let _actionsOpenFor = ''; // the path whose row has its Copy, Preview and Edit o
 // A phone's row has one "More" button in place of the three icon buttons, so the name keeps the row (#7652); it opens them on a line under the row.
 const moreButton = (path, name) => { const label = `More for ${name}`; return `<button type="button" class="btn btn-quiet btn-icon btn-xs file-more-btn ic-more" data-on-click="file-more" data-path="${escapeAttr(path)}" aria-expanded="${escapeAttr(String(_actionsOpenFor === path))}" aria-label="${escapeAttr(label)}" title="More"></button>`; }; // the three dots are drawn in CSS (.ic-more): no icon font name to subset
 /** A file row's Share as artifact button (#10269): it names its file, as the row's other buttons do. */
-const shareButton = (path, name) => { const label = `Share ${name} as an artifact`; return `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-share" data-path="${escapeAttr(path)}" title="Share as artifact" aria-label="${escapeAttr(label)}"><span class="material-icons" aria-hidden="true">link</span></button>`; };
-let _searchTimeout = null;
-let _renderTimer = null;
-
+const iconButton = (on, icon, title, label, path, extra = '') => `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" ${on} data-path="${escapeAttr(path)}" ${extra} title="${title}" aria-label="${escapeAttr(label)}"><span class="material-icons" aria-hidden="true">${icon}</span></button>`;
+const shareButton = (path, name) => iconButton('data-on-click="file-share"', 'link', 'Share as artifact', `Share ${name} as an artifact`, path);
+const downloadButton = (path, name) => iconButton('data-on-click="file-download"', 'download', 'Download', `Download ${name}`, path); // #17632
 /* ── Starred files (persisted in localStorage per session) ── */
 
 // The signed-in account's (local_store.js, #3681), stored with when they were last changed, so an
@@ -93,10 +91,10 @@ function renderStarredFiles() {
             const { dir, name } = splitPath(filepath);
             const unstarLabel = `Unstar ${name}`, copyLabel = `Copy path of ${name}`, previewLabel = `Preview ${name}`, editLabel = `Edit ${name}`;
             const starBtn = `<button class="btn btn-quiet btn-icon btn-xs file-star-btn starred" data-filepath="${escapeAttr(filepath)}" data-on-click="file-star" data-path="${escapeAttr(filepath)}" title="Unstar" aria-label="${escapeAttr(unstarLabel)}">★</button>`; // each button names its file: a list of rows must not read as the same four buttons (#6152)
-            const copyBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-copy" data-path="${escapeAttr(filepath)}" title="Copy path" aria-label="${escapeAttr(copyLabel)}"><span class="material-icons" aria-hidden="true">content_copy</span></button>`;
-            const previewBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-preview" data-path="${escapeAttr(filepath)}" title="Preview" aria-label="${escapeAttr(previewLabel)}"><span class="material-icons" aria-hidden="true">visibility</span></button>`;
-            const editBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-edit" data-path="${escapeAttr(filepath)}" title="Edit" aria-label="${escapeAttr(editLabel)}"><span class="material-icons" aria-hidden="true">edit</span></button>`;
-            const shareBtn = shareButton(filepath, name);
+            const copyBtn = iconButton('data-on-click="file-copy"', 'content_copy', 'Copy path', copyLabel, filepath);
+            const previewBtn = iconButton('data-on-click="file-preview"', 'visibility', 'Preview', previewLabel, filepath);
+            const editBtn = iconButton('data-on-click="file-edit"', 'edit', 'Edit', editLabel, filepath);
+            const shareBtn = downloadButton(filepath, name) + shareButton(filepath, name);
             return `<div class="file-item file-starred${escapeAttr(_actionsOpenFor === filepath ? ' actions-open' : '')}" data-on-click="file-open" role="button" tabindex="0" data-key-click data-path="${escapeAttr(filepath)}">
                 ${starBtn}
                 <div class="file-path-wrap">
@@ -109,164 +107,17 @@ function renderStarredFiles() {
         }).join('');
 }
 
-/* ── File search ── */
-
-let _searchResults = [];      // current dropdown results
-let _searchSelectedIdx = 0;   // selected index in dropdown
-
-async function searchRepoFiles(query) {
-    if (!query || !state.currentSession || state.currentSession.type !== 'live') {
-        _hideSearchDropdown();
-        return;
-    }
-
-    const files = await fetchFileList();
-    const matches = fuzzyFilter(files, query);
-    clearTimeout(_renderTimer);
-    _renderTimer = setTimeout(() => _renderSearchDropdown(matches, query), 30);
-}
-
-function _renderSearchDropdown(files, query) {
-    const dropdown = document.getElementById('files-search-dropdown');
-    if (!dropdown) return;
-
-    const hasExactMatch = files.some(f => f === query);
-    const looksLikePath = query.includes('/') || query.includes('.');
-
-    let html = '';
-
-    // Build results list
-    _searchResults = [];
-    files.slice(0, 50).forEach((filepath, i) => {
-        const cls = i === _searchSelectedIdx ? 'file-mention-item selected' : 'file-mention-item';
-        _searchResults.push({ path: filepath, type: 'file' });
-        html += `<div class="${cls}" data-index="${Number(i)}">${escapeHtml(filepath)}</div>`;
-    });
-
-    // +create option at the end
-    if (query && looksLikePath && !hasExactMatch) {
-        const createIdx = _searchResults.length;
-        _searchResults.push({ path: query, type: 'create' });
-        const cls = createIdx === _searchSelectedIdx ? 'file-mention-item selected' : 'file-mention-item';
-        html += `<div class="${cls}" data-index="${Number(createIdx)}" style="color:var(--accent)">+ Create ${escapeHtml(query)}</div>`;
-    }
-
-    if (_searchResults.length === 0) {
-        _hideSearchDropdown();
-        return;
-    }
-
-    _searchSelectedIdx = Math.min(_searchSelectedIdx, _searchResults.length - 1);
-    dropdown.innerHTML = html;
-    dropdown.style.display = 'block';
-
-    // Click handlers
-    dropdown.querySelectorAll('.file-mention-item').forEach(el => {
-        el.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            _selectSearchItem(parseInt(el.dataset.index));
-        });
-    });
-}
-
-function _selectSearchItem(index) {
-    if (index < 0 || index >= _searchResults.length) return;
-    const item = _searchResults[index];
-
-    if (item.type === 'create') {
-        _hideSearchDropdown();
-        _createFile(item.path);
-    } else {
-        _hideSearchDropdown();
-        openFilePreview(item.path);
-    }
-}
-
-function _hideSearchDropdown() {
-    const dropdown = document.getElementById('files-search-dropdown');
-    if (dropdown) dropdown.style.display = 'none';
-    _searchResults = [];
-    _searchSelectedIdx = 0;
-    // Also hide the old inline results container
-    const el = document.getElementById('files-search-results');
-    if (el) el.style.display = 'none';
-}
+/* ── File search (a lazy module, file_search.js, #17632) ── */
 
 export function initFileSearch() {
     initFilesSourcePicker(openFilePreview);
     const input = document.getElementById('files-search-input');
     if (!input || input.dataset.searchBound) return;
     input.dataset.searchBound = '1';
-
     input.placeholder = 'Search files...';
-
-    function onSearchInput() {
-        clearTimeout(_searchTimeout);
-        const q = input.value.trim();
-        if (!q) {
-            _hideSearchDropdown();
-            return;
-        }
-        _searchTimeout = setTimeout(() => searchRepoFiles(q), 200);
-    }
-
-    input.addEventListener('input', onSearchInput);
-    input.addEventListener('keyup', onSearchInput);
-    input.addEventListener('keydown', (e) => {
-        const dropdown = document.getElementById('files-search-dropdown');
-        const isVisible = dropdown && dropdown.style.display !== 'none';
-
-        if (e.key === 'Escape') {
-            if (isVisible) {
-                e.preventDefault();
-                _hideSearchDropdown();
-            } else {
-                input.value = '';
-            }
-            return;
-        }
-
-        if (!isVisible || _searchResults.length === 0) return;
-
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            _searchSelectedIdx = Math.min(_searchSelectedIdx + 1, _searchResults.length - 1);
-            _updateSearchSelection();
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            _searchSelectedIdx = Math.max(_searchSelectedIdx - 1, 0);
-            _updateSearchSelection();
-        } else if (e.key === 'Tab' || e.key === 'Enter') {
-            e.preventDefault();
-            _selectSearchItem(_searchSelectedIdx);
-        }
-    });
-
-    input.addEventListener('focus', async () => {
-        if (!input.value.trim()) {
-            // Show the file listing on focus
-            if (!state.currentSession || state.currentSession.type !== 'live') return;
-            const files = await fetchFileList();
-            if (files && files.length > 0) {
-                _renderSearchDropdown(files.slice(0, 50), '');
-            }
-        }
-    });
-
-    input.addEventListener('blur', () => {
-        setTimeout(_hideSearchDropdown, 200);
-    });
+    importOnce('./file_search.js').then(m => m.bindFileSearch(input));
 }
 
-function _updateSearchSelection() {
-    const dropdown = document.getElementById('files-search-dropdown');
-    if (!dropdown) return;
-    dropdown.querySelectorAll('.file-mention-item').forEach((el, i) => {
-        el.classList.toggle('selected', i === _searchSelectedIdx);
-    });
-    const selected = dropdown.querySelector('.file-mention-item.selected');
-    if (selected) selected.scrollIntoView({ block: 'nearest' });
-}
 
 // The list was refused as too large to check through Coral Hub (#3718): it says so, not "No changed files".
 let _filesRefused = false;
@@ -311,16 +162,13 @@ export async function loadChangedFiles(agentName, sessionId, quiet = false) { //
     refreshOpenFiles().catch(() => {}); // an open preview follows its file (#10334)
 }
 
-// The Files list follows the agent (#10268): it was read when the tab opened and on Refresh, so a reply that changed files left a stale "+2" until the button was pressed. The session feed
-// carries each agent's changed-file count and its state: the list is read again when the open agent's count moves or its turn ends (working to anything else), once for a burst of rows.
+// The Files list follows the agent (#10268): the session feed carries each agent's changed-file count and state; the list is read again when the open agent's count moves or its turn ends, once for a burst of rows.
 let _followed = { id: '', count: null, working: false };
 let _followTimer = null;
 let _filesStale = false; // the agent changed files while the Files panel was not showing: the next look reads the list
 const filesPanelShowing = () => { const p = document.getElementById('agentic-panel-files'); return !!p && p.classList.contains('active') && p.getClientRects().length > 0; };
 const FOLLOW_DELAY_MS = 300;
-// The follow's read: the route's refresh, not its cached list (the server keeps a list for 30 s or more, and the change that moved the count may be inside it). The refresh computes the diff, so it is
-// one at a time with at least about 2 s between two (a reply and its edits come as a burst), and a request that comes while one runs is one more after it, not one each. A view-only viewer on a Hub
-// has no refresh to call: it reads the list (#10268). Each read of the owner's watch is that refresh, so a few git commands about every 4 s while the panel shows (#10485).
+// The follow's read is the route's refresh, not its cached list (the change that moved the count may be inside it): one at a time, at least about 2 s apart, a request during one is one more after it. A view-only Hub viewer has no refresh: it reads the list (#10268, #10485).
 const MIN_REFRESH_GAP_MS = 2000;
 let _refreshBusy = false, _refreshQueued = false, _queuedQuiet = true, _refreshAt = 0;
 // A folder git is too slow for is paused by the server (#13079): live updates stop, the list is the last one, and Refresh asks for one pass. The page makes no automatic request for it meanwhile.
@@ -455,34 +303,6 @@ export function openFileEdit(filepath, line, opts) {
 
 /** Create a new file via the API and open it in the editor. */
 // Exposed on window for onclick in rendered search results.
-async function _createFile(filePath) {
-    if (!filePath) return;
-    const s = state.currentSession;
-    if (!s || s.type !== 'live') return;
-
-    try {
-        const qs = new URLSearchParams({ filepath: filePath, session_id: s.session_id || '' });
-        const resp = await serverFetch(sessionServer(s), `/api/sessions/live/${encodeURIComponent(s.name)}/file-content?${qs}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content: '' }),
-        });
-        const data = await resp.json();
-        if (data.error) {
-            showToast(data.error, true);
-            return;
-        }
-        // Clear search, open the new file in editor, refresh file list
-        const searchInput = document.getElementById('files-search-input');
-        if (searchInput) searchInput.value = '';
-        const searchResults = document.getElementById('files-search-results');
-        if (searchResults) searchResults.style.display = 'none';
-        openFileEdit(filePath);
-        refreshChangedFiles();
-    } catch (e) {
-        showToast('Failed to create file', true);
-    }
-};
 
 /* ── Refresh & Render ──────────────────────────────────────── */
 
@@ -498,30 +318,17 @@ let _cloudDiffMode = '';
 
 async function setGitDiffMode(mode) {
     if (!_diffModes.includes(mode)) return;
-    if (isCloud()) {
-        try {
-            const resp = await serverFetch(currentServer(), '/api/settings/git-diff-mode', {
-                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }),
-            });
+    const json = { method: 'PUT', headers: { 'Content-Type': 'application/json' } };
+    try {
+        if (isCloud()) {
+            const resp = await serverFetch(currentServer(), '/api/settings/git-diff-mode', { ...json, body: JSON.stringify({ mode }) });
             if (!resp.ok) { renderChangedFiles(); return; } // refused (view-only server): the wrapper has explained it; show the real mode again
             _cloudDiffMode = mode;
-        } catch (e) { renderChangedFiles(); return; }
-        refreshChangedFiles();
-        return;
-    }
-
-    try {
-        await fetch('/api/settings', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ git_diff_mode: mode }),
-        });
-        state.settings = { ...state.settings, git_diff_mode: mode };
-    } catch (e) {
-        console.error('Failed to save git diff mode:', e);
-        return;
-    }
-
+        } else {
+            await fetch('/api/settings', { ...json, body: JSON.stringify({ git_diff_mode: mode }) });
+            state.settings = { ...state.settings, git_diff_mode: mode };
+        }
+    } catch (e) { if (isCloud()) renderChangedFiles(); else console.error('Failed to save git diff mode:', e); return; }
     refreshChangedFiles();
 }
 
@@ -791,10 +598,10 @@ document.addEventListener('keydown', e => {
         const rowTitle = plain ? f.filepath : `${f.filepath} (${statusLabel})`;
         const starLabel = `${isStarred ? 'Unstar' : 'Star'} ${rowName}`, copyLabel = `Copy path of ${rowName}`, previewLabel = `Preview ${rowName}`, editLabel = `Edit ${rowName}`;
         const starBtn = `<button class="btn btn-quiet btn-icon btn-xs file-star-btn ${escapeAttr(isStarred ? 'starred' : '')}" data-filepath="${escapeAttr(f.filepath)}" data-on-click="file-star" data-path="${escapeAttr(f.filepath)}" title="${escapeAttr(isStarred ? 'Unstar' : 'Star')}" aria-label="${escapeAttr(starLabel)}">${isStarred ? '★' : '☆'}</button>`;
-        const copyBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-copy" data-path="${escapeAttr(f.filepath)}" title="Copy path" aria-label="${escapeAttr(copyLabel)}"><span class="material-icons" aria-hidden="true">content_copy</span></button>`;
-        const previewBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-preview" data-path="${escapeAttr(f.filepath)}" ${plain ? '' : 'data-diff="1"'} title="Preview" aria-label="${escapeAttr(previewLabel)}"><span class="material-icons" aria-hidden="true">visibility</span></button>`;
-        const editBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-edit" data-path="${escapeAttr(f.filepath)}" ${plain ? '' : 'data-diff="1"'} title="Edit" aria-label="${escapeAttr(editLabel)}"><span class="material-icons" aria-hidden="true">edit</span></button>`;
-        const shareBtn = shareButton(f.filepath, rowName);
+        const copyBtn = iconButton('data-on-click="file-copy"', 'content_copy', 'Copy path', copyLabel, f.filepath);
+        const previewBtn = iconButton('data-on-click="file-preview"', 'visibility', 'Preview', previewLabel, f.filepath, plain ? '' : 'data-diff="1"');
+        const editBtn = iconButton('data-on-click="file-edit"', 'edit', 'Edit', editLabel, f.filepath, plain ? '' : 'data-diff="1"');
+        const shareBtn = downloadButton(f.filepath, rowName) + shareButton(f.filepath, rowName);
         const open = !plain && _expandedFiles.has(f.filepath);
         const expandTitle = `${open ? 'Hide' : 'Show'} the changes`, expandLabel = `${expandTitle} in ${rowName}`;
         const expandBtn = plain ? '' : `<button type="button" class="btn btn-quiet btn-icon btn-xs file-expand-btn" data-on-click="file-expand" data-path="${escapeAttr(f.filepath)}" aria-expanded="${escapeAttr(String(open))}" aria-controls="file-diff-${Number(i)}" title="${escapeAttr(expandTitle)}" aria-label="${escapeAttr(expandLabel)}"><span class="material-icons" aria-hidden="true">${open ? 'keyboard_arrow_up' : 'keyboard_arrow_down'}</span></button>`;
@@ -839,6 +646,7 @@ document.addEventListener('keydown', e => {
 // The changed and starred files' markup (#3645): data-on-* names, never code. The path is the file's
 // own (data-path, never re-escaped into a script); data-diff opens its diff.
 const pathOf = el => textOf(el.dataset.path, 4096);
+const viaFile = (mod, fn) => async (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) (await importOnce(mod))[fn](p); }; // a Files button whose work is a lazy module's (#17632)
 const diffOpts = el => (el.dataset.diff === '1' ? [0, { diff: true }] : []);
 registerActions({
     'file-expand': (el, event) => { event.stopPropagation(); toggleFileExpanded(pathOf(el)); },
@@ -850,6 +658,7 @@ registerActions({
     'file-more': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (!p) return; _actionsOpenFor = _actionsOpenFor === p ? '' : p; const row = el.closest('.file-item'); if (row) row.classList.toggle('actions-open', _actionsOpenFor === p); el.setAttribute('aria-expanded', String(_actionsOpenFor === p)); },
     'file-copy': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) copyFilePath(p); },
     'file-preview': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) openFilePreview(p, ...diffOpts(el)); },
+    'file-download': async (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) (await importOnce('./file_download.js')).downloadFile(p); },
     'file-share': async (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) (await importOnce('./share_file.js')).shareFileAsArtifact(p); },
     'file-edit': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) openFileEdit(p, ...diffOpts(el)); },
     // On mousedown, as before: the @-mention list closes on the input's blur, which a click comes after.

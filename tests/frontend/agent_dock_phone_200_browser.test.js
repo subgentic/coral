@@ -58,7 +58,7 @@ const ROOT = '/work/demo/projects/queue-service';
             await ev(`document.querySelector('#changed-files-list .file-more-btn').click(); true`);
             await shot(`files-more-${zoom}`);
             const opened = await ev(`(() => { const r = document.querySelector('#changed-files-list .file-item'); const b = r.querySelector('.file-more-btn'), a = r.querySelector('.file-action-btns'), n = r.querySelector('.file-path-wrap').getBoundingClientRect(), ar = a.getBoundingClientRect(); return { expanded: b.getAttribute('aria-expanded'), shown: getComputedStyle(a).display !== 'none' && ar.height > 0, under: ar.top >= n.bottom - 1, buttons: a.querySelectorAll('button').length, inside: ar.right <= innerWidth + 1 }; })()`);
-            assert.deepEqual(opened, { expanded: 'true', shown: true, under: true, buttons: 4, inside: true }, at + 'More opens the four (Copy, Preview, Edit, Share as artifact: #10357) on a line under the name');
+            assert.deepEqual(opened, { expanded: 'true', shown: true, under: true, buttons: 5, inside: true }, at + 'More opens the five (Copy, Preview, Edit, Download #17632, Share as artifact: #10357) on a line under the name');
             await ev(`document.querySelector('#changed-files-list .file-more-btn').click(); true`);
             assert.equal(await ev(`document.querySelector('#changed-files-list .file-more-btn').getAttribute('aria-expanded')`), 'false', at + 'and closes them');
 
