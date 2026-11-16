@@ -418,7 +418,8 @@ export function appendNewMessages(count) {
         start = lastIdx + 1; // a message row: kept, and the new rows group with it
         prev = { kind: 'msg', m: bs._allMessages[lastIdx] };
     }
-    const items = groupTaskQueueRuns(bs._allMessages.slice(start), collapse);
+    const shown = new Set([...container.querySelectorAll('[data-message-id]')].filter(e => !replace?.contains(e)).map(e => Number(e.dataset.messageId))); // a reply is drawn under its message, away from its place in time (#17644): a message that has a row is not drawn again
+    const items = groupTaskQueueRuns(bs._allMessages.slice(start).filter(m => !shown.has(Number(m.id))), collapse);
     const tmp = document.createElement('template');
     tmp.innerHTML = items.map((item, i) => renderBoardItem(item, i > 0 ? items[i - 1] : prev)).join('');
     const added = [...tmp.content.children];
