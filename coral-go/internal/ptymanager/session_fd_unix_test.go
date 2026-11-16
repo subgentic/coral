@@ -118,7 +118,9 @@ func TestTheSessionsOwnTerminalIsWatchedNotTheProcessDescriptorCount(t *testing.
 	for _, f := range others {
 		f.Close()
 	}
-	assert.LessOrEqual(t, openFDs(t), counted, "other descriptors went while the session came: a whole-process count does not show the session's terminal held")
+	// The whole-process count is reported, not asserted: it is what the other tests' goroutines in this package move (21 against 17 under -race, #18944), so no bound on it holds. The assertion that does is the
+	// session's own terminal below, which is open while the count says nothing about it.
+	t.Logf("whole-process descriptors: %d before the session, %d with it and the six others gone", counted, openFDs(t))
 	terminal := ownTerminal(t, backend, "fd-own")
 	assert.True(t, isOpen(terminal), "yet the session's own terminal is open while it runs")
 	require.NoError(t, os.WriteFile(release, []byte("go"), 0o644))
