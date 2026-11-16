@@ -161,7 +161,7 @@ func (h *SessionsHandler) flushExits(ctx context.Context, team string) {
 				a.plan = fmt.Sprintf("Coral resumes it in about %d min (attempt %d of %d)", int(d.Round(time.Minute)/time.Minute), n+1, len(autoResumeDelays))
 				h.exits.after(d, func() { h.autoResume(context.Background(), sid, n+1) })
 			} else {
-				a.plan = fmt.Sprintf("Coral tried %d times and has stopped; Wake resumes it", n)
+				a.plan = fmt.Sprintf("Coral tried %d times and has stopped; "+strings.ToLower(exitRapidPlan[:1])+exitRapidPlan[1:], n) // waking starts what failed n times the same way: the cause comes first, whether or not the agent stops right after each start (#16640)
 			}
 		}
 		agents = append(agents, a)
