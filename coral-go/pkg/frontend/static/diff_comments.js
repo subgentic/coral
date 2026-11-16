@@ -100,11 +100,11 @@ const rowOf = slot => { const r = slot.previousElementSibling; return r && r.cla
 export function placeDiffCommentIcon(slot) { mounted.get(slot)?.place(); }
 
 /** Put the comments of `file` under its diff in `slot`. view is the editor of the diff, texts its two texts. Does nothing through Coral Hub or when the agent has no team. */
-export async function attachDiffComments(slot, file, view, texts, base = '', fields = []) {
+export async function attachDiffComments(slot, file, view, texts, base = '', fields = [], context = null) {
     const drawing = slot.dataset.drawing;
     const current = () => !!drawing && slot.dataset.drawing === drawing && !slot.hidden && slot.contains(view.dom);
     if (!current()) return; // the lazy import may have finished after this editor closed
-    const s = state.currentSession, team = s && s.board_project, sid = s && s.session_id;
+    const s = context ? context.session : state.currentSession, team = s && s.board_project, sid = s && s.session_id;
     if (!s || s.type !== 'live' || !sid) return;
     if (isCloud() || !team) { // a line that says why there is no Comment button (#12570): comments go to an agent on a team's board, on the computer itself
         if (!slot.querySelector('.diff-comments-note')) slot.append(el('p', 'diff-comments-note', isCloud() ? 'Comments on a diff are made on the computer itself.' : 'Comments need a team: this agent is not on one, so there is no board to send a comment to.'));
@@ -131,7 +131,7 @@ export async function attachDiffComments(slot, file, view, texts, base = '', fie
     const placeIcon = () => { const row = rowOf(slot) || slot.closest('#preview-pane')?.querySelector('#preview-toolbar'); if (!row || row.contains(icon)) return; const acts = row.querySelector('.file-action-btns'); if (acts) acts.before(icon); else row.append(icon); };
     const comments = attachComments(box, body, box, { toggleHost: true, compact: true, sheet: () => false, shown: () => true, words: { quote: '' }, wholeAnchor: () => fileAnchor(texts, file, base), outdated: c => !stillThere(c.anchor, texts),
         onState: now => { count = now.count; if (opened && !now.composing && !now.count) { opened = false; box.hidden = true; } paint(); } }); // a cancelled composer on a file with no comments leaves nothing open
-    comments.open(key, contextServer(), team);
+    comments.open(key, context ? context.server : contextServer(), team);
     comments.docWhole();
     comments.setSheet(true);
     let anchor = null;
@@ -156,8 +156,23 @@ export async function attachDiffComments(slot, file, view, texts, base = '', fie
         if (!comments.isComposing()) comments.composeOn(fileAnchor(texts, file, base)); // false when this person cannot comment (locked): the thread opens and says why
         else box.querySelector('.ac-input')?.focus();
     });
+    // A visible action works with a cursor or a touch-selected line; a text selection still offers the range comment above.
+    const lineButton = el('button', 'btn btn-small diff-line-comment', 'Comment on line');
+    lineButton.type = 'button';
+    lineButton.title = 'Place the cursor on a line, then comment on that line';
+    lineButton.addEventListener('mousedown', e => e.preventDefault());
+    lineButton.addEventListener('click', () => {
+        const selected = selectionAnchor(slot, view, texts, file, base, fields);
+        if (selected?.tooLong) return;
+        const line = view.state.doc.lineAt(view.state.selection.main.head);
+        const anchor = selected || { path: file.filepath, side: 'new', start_line: line.number, end_line: line.number,
+            quote: line.text, prefix: view.state.doc.sliceString(view.state.doc.line(Math.max(1, line.number - CONTEXT_LINES)).from, line.from).replace(/\n$/, ''),
+            suffix: line.number < view.state.doc.lines ? view.state.doc.sliceString(view.state.doc.line(line.number + 1).from, view.state.doc.line(Math.min(view.state.doc.lines, line.number + CONTEXT_LINES)).to) : '', base };
+        show(true); comments.composeOn(anchor);
+    });
+    slot.prepend(lineButton);
     paint(); placeIcon();
-    const handle = { place: placeIcon, destroy() { clearTimeout(timer); slot.removeEventListener('mouseup', soon); slot.removeEventListener('keyup', soon); slot.removeEventListener('touchend', soon); comments.close(); box.remove(); btn.remove(); icon.remove(); mounted.delete(slot); } };
+    const handle = { place: placeIcon, destroy() { clearTimeout(timer); slot.removeEventListener('mouseup', soon); slot.removeEventListener('keyup', soon); slot.removeEventListener('touchend', soon); comments.close(); lineButton.remove(); box.remove(); btn.remove(); icon.remove(); mounted.delete(slot); } };
     mounted.set(slot, handle);
 }
 

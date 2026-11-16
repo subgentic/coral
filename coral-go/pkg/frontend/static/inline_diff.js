@@ -14,7 +14,10 @@ export const BIG_LINES = 4000;
 const reads = new Map(); // `${path}|${signature}` -> the two texts, so a redraw of the list does not read them again
 const views = new WeakMap(); // slot -> the editor mounted in it
 
-const url = (endpoint, filepath) => serverUrl(`/api/sessions/live/${encodeURIComponent(agentName())}/${endpoint}?${apiQs(filepath)}`, currentServer());
+const url = (endpoint, filepath, context) => {
+    const qs = context ? new URLSearchParams({ filepath, session_id: context.session.session_id, worktree: 'follow' }) : apiQs(filepath);
+    return serverUrl(`/api/sessions/live/${encodeURIComponent(context ? context.session.name : agentName())}/${endpoint}?${qs}`, context ? context.server : currentServer());
+};
 const lines = text => (text ? text.split('\n').length : 0);
 
 function note(slot, text, tone) {
@@ -25,10 +28,10 @@ function note(slot, text, tone) {
     return p;
 }
 
-async function readTexts(file) {
-    const key = `${file.filepath}|${file.status}|${file.additions || 0}|${file.deletions || 0}`;
+async function readTexts(file, context) {
+    const key = `${context?.mode || ''}|${context?.server || currentServer()}|${context?.session.session_id || apiQs('')}|${file.filepath}|${file.status}|${file.additions || 0}|${file.deletions || 0}`;
     if (reads.has(key)) return reads.get(key);
-    const get = async endpoint => { const resp = await retryOnce(() => fetch(url(endpoint, file.filepath))); const data = await resp.json(); return data.error ? '' : (data.content || ''); };
+    const get = async endpoint => { const resp = await retryOnce(() => fetch(url(endpoint, file.filepath, context))); const data = await resp.json(); return data.error ? '' : (data.content || ''); };
     const [original, content] = await Promise.all([get('file-original'), get('file-content')]);
     if (reads.size > 200) reads.clear();
     const both = { original, content };
@@ -42,7 +45,7 @@ function drop(slot) {
     if (view) { try { view.destroy(); } catch { /* already gone */ } views.delete(slot); }
 }
 
-async function mount(slot, file, { original, content }, drawing) {
+async function mount(slot, file, { original, content }, drawing, context) {
     const current = () => slot.dataset.drawing === drawing && !slot.hidden;
     if (!window.CoralCM) await loadCodeMirror();
     if (!current()) return; // closed or replaced while the editor loaded
@@ -65,14 +68,14 @@ async function mount(slot, file, { original, content }, drawing) {
     const view = new cm.EditorView({ state: cm.EditorState.create({ doc: content, extensions }), parent: host });
     views.set(slot, view);
     plainWholeLineMarks(view);
-    importOnce('./diff_comments.js').then(m => { if (current() && views.get(slot) === view) return m.attachDiffComments(slot, file, view, { original, content }, compareBase(file), m.mergeFields(mergeExt)); }).catch(() => {}); // comments on these lines (#12536); the diff reads fine without them
+    importOnce('./diff_comments.js').then(m => { if (current() && views.get(slot) === view) return m.attachDiffComments(slot, file, view, { original, content }, compareBase(file), m.mergeFields(mergeExt), context); }).catch(() => {}); // comments on these lines (#12536); the diff reads fine without them
 }
 
 /** The state the diff was made on, for a comment's anchor: the file's status and counts. */
 const compareBase = file => `${file.status || 'changed'} +${file.additions || 0} -${file.deletions || 0}`;
 
 /** Draws the file's diff into its slot (a block under its row), or what stands in for it. force: a long file's diff the person asked for. */
-export async function showFileDiff(slot, file, force = false) {
+export async function showFileDiff(slot, file, force = false, context = null) {
     if (!slot || !file) return;
     slot.hidden = false;
     if (slot.dataset.shown === `${file.filepath}|${file.status}|${file.additions || 0}|${file.deletions || 0}|${force ? 1 : 0}` && (views.has(slot) || slot.querySelector('.file-diff-note'))) return; // drawn already, and the file has not moved
@@ -82,16 +85,16 @@ export async function showFileDiff(slot, file, force = false) {
     const drawing = String(Date.now() + Math.random()); // a slot hidden, or redrawn for another file, while the texts are read is not written to
     slot.dataset.drawing = drawing;
     try {
-        const texts = await readTexts(file);
+        const texts = await readTexts(file, context);
         if (slot.dataset.drawing !== drawing || slot.hidden) return;
         if (texts.original === texts.content) { note(slot, 'No changes to show.'); }
         else if (!force && Math.max(lines(texts.original), lines(texts.content)) > BIG_LINES) {
             const p = note(slot, `A long file (${Math.max(lines(texts.original), lines(texts.content)).toLocaleString()} lines): its diff is not drawn until you ask. `);
             const b = document.createElement('button');
             b.type = 'button'; b.className = 'btn btn-small file-diff-more'; b.textContent = 'Show the diff';
-            b.addEventListener('click', () => showFileDiff(slot, file, true));
+            b.addEventListener('click', () => showFileDiff(slot, file, true, context));
             p.append(b);
-        } else await mount(slot, file, texts, drawing);
+        } else await mount(slot, file, texts, drawing, context);
         if (slot.dataset.drawing !== drawing || slot.hidden) return;
         slot.dataset.shown = `${file.filepath}|${file.status}|${file.additions || 0}|${file.deletions || 0}|${force ? 1 : 0}`;
     } catch {
