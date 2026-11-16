@@ -176,8 +176,15 @@ func TestIsGitAnswersTheCurrentBranch(t *testing.T) {
 		return dir
 	}
 	assert.Equal(t, map[string]any{"is_git": true, "branch": "trunk"}, get(mk("committed", true)))
-	assert.Equal(t, map[string]any{"is_git": true, "branch": ""}, get(mk("empty", false)))
+	assert.Equal(t, map[string]any{"is_git": true, "branch": "", "files": float64(0)}, get(mk("empty", false)), "a repository with no commit says how many files its folder holds (#17150)")
 	plain := filepath.Join(e.home, "projects", "plain")
 	require.NoError(t, os.MkdirAll(plain, 0o755))
-	assert.Equal(t, map[string]any{"is_git": false}, get(plain))
+	assert.Equal(t, map[string]any{"is_git": false, "files": float64(0)}, get(plain))
+	require.NoError(t, os.WriteFile(filepath.Join(plain, "index.html"), []byte("<p>hi</p>"), 0o644))
+	require.NoError(t, os.MkdirAll(filepath.Join(plain, "img"), 0o755))
+	assert.Equal(t, map[string]any{"is_git": false, "files": float64(1)}, get(plain), "the files in it (an empty folder is no file), so the job form can say what the first commit leaves out (#17150, #17211)")
+	for _, n := range []string{"a", "b", "c"} {
+		require.NoError(t, os.WriteFile(filepath.Join(plain, "img", n+".png"), []byte("x"), 0o644))
+	}
+	assert.Equal(t, map[string]any{"is_git": false, "files": float64(4)}, get(plain), "a folder holding one subfolder of files counts the files, not '1' (#17211)")
 }

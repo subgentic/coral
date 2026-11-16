@@ -5,6 +5,7 @@ package routes
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -59,7 +60,8 @@ func homeOrRootRefusal(dir string) string {
 // POST /api/scheduled/jobs/init-repo {"repo_path": "..."}
 func (h *ScheduleHandler) InitJobRepo(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		RepoPath string `json:"repo_path"`
+		RepoPath     string `json:"repo_path"`
+		IncludeFiles bool   `json:"include_files"` // the first commit holds the files that are in the folder now (git add -A, so .gitignore is honoured); else it is empty (#17150)
 	}
 	if err := decodeJSON(r, &body); err != nil || strings.TrimSpace(body.RepoPath) == "" {
 		errBadRequest(w, "repo_path is required")
@@ -96,12 +98,36 @@ func (h *ScheduleHandler) InitJobRepo(w http.ResponseWriter, r *http.Request) {
 			args = append(args, "-c", key+"="+fallback)
 		}
 	}
+	var left []string
+	var snap indexSnapshot // files a first commit leaves out for their names (#17211)
+	if body.IncludeFiles {
+		if n, capped := countFolderFiles(ctx, dir, maxFirstCommitFiles); capped {
+			errBadRequest(w, fmt.Sprintf("This folder holds more than %d files, too many for a first commit. Pick a smaller project folder, or make the first commit empty.", maxFirstCommitFiles))
+			return
+		} else if n == 0 {
+			body.IncludeFiles = false
+		}
+	}
+	if body.IncludeFiles {
+		var serr error
+		var sout string
+		if left, snap, serr, sout = stageFirstCommit(ctx, dir); serr != nil {
+			if ctx.Err() != nil {
+				sout = "it took too long"
+			}
+			errBadRequest(w, "adding the folder's files failed: "+sout+". Nothing was committed and the folder's index is as it was.")
+			return
+		}
+	}
 	args = append(args, "-c", "commit.gpgsign=false", "commit", "--allow-empty", "--no-verify", "-m", "Initial commit") // never a signing prompt or a failed signature on Coral's own placeholder commit (#10534)
 	if out, err := gitutil.Command(ctx, dir, args...).CombinedOutput(); err != nil {
+		if body.IncludeFiles {
+			snap.undo(dir)
+		}
 		errBadRequest(w, "the first commit failed: "+strings.TrimSpace(string(out)))
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "repo_path": dir, "created": true})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "repo_path": dir, "created": true, "left_out": left})
 }
 
 // sameDir reports whether two directories are the same, links resolved.

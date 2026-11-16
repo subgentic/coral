@@ -596,6 +596,8 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 /* A confirmation is asked from other dialogs (Settings' Prune, Start automatic cleanup, Delete received files, Delete terminal logs) and comes earlier in the page than
    they do, so at the same layer they were painted over it: the dimmed page, and no question to answer. It is above the dialog that asked. */
 #confirm-modal { z-index: 110; }
+.modal-content label.confirm-modal-ack { display: flex; flex-direction: row; align-items: flex-start; gap: 8px; margin: 12px 0 0; text-align: left; cursor: pointer; font-size: var(--fs-sm); } /* a tick box and its sentence in one row, like any checkbox row (#17211: the box sat centred above its label in a wide bar) */
+.modal-content label.confirm-modal-ack input[type="checkbox"] { flex: none; width: auto; margin: .2em 0 0; }
 
 .modal-content {
     background: var(--bg-secondary);
