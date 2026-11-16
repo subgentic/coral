@@ -1,6 +1,5 @@
 import { publishArtifactsRev } from './artifacts_feed.js';
 import { needsInputAttention } from './display_activity_hint.js';
-import { dialogDue, DIALOG_WORDS } from './at_dialog.js';
 import { refreshNeedsInputCard } from './needs_input_card.js';
 /* WebSocket connection for real-time coral updates */
 
@@ -10,15 +9,16 @@ import { agentIsStarting, syncSendStarting } from './agent_starting.js';
 import { updateModelChip } from './model_chip.js';
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
+import './team_names.js'; // shared startup dependency of attention and chat renderers
 import { goToSignIn } from './cloud.js';
 import { feedRetryDelay, isStalenessDrift, DRIFT_RENDER_MAX_AGE_MS } from './feed_pacing.js';
 import { scheduleLiveSessionsRender, updateSessionStatus, updateSessionSummary, updateSessionBranch, updateSessionFolder, updateSessionModel, updateWaitingIndicator, resolveSessionIdentity, commandPlaceholder, startingPlaceholder, applyTerminalDot } from './render.js';
 import { renderLiveJobs } from './live_jobs.js';
 import { updateChangedFileCount, followChangedFiles } from './changed_files.js';
-import { showNotificationToast, showWorkflowNotification, showAlertNotification, escapeHtml, dbg } from './utils.js';
+import { showWorkflowNotification, showAlertNotification, dbg } from './utils.js';
 import { serverWsBase, identityKey, sessionServer, isCloud } from './server_base.js';
 import { updateHeaderContext } from './header_context.js';
-import { deriveSessionState, askWords } from './session_state.js';
+import { deriveSessionState } from './session_state.js';
 import { isPopout, popoutAllowsToastFor, popoutUpdateFromSession, popoutHandleSessionsTick, formatTerminalLabel } from './popout.js';
 import { applySleepingView } from './sleeping_view.js';
 import { updateServersTabVisibility } from './servers_tab.js';
@@ -32,7 +32,6 @@ import { publishGoalsBrief } from './goals_feed.js';
 import { syncAutoAcceptHeader, noteAutoAcceptPauses } from './auto_accept.js';
 import { pruneTerminalGone, syncTerminalGoneHeader } from './terminal_gone.js';
 import { setText } from './dom_write.js';
-import { withTeam } from './team_names.js';
 import { isPhoneLayout } from './phone_layout.js';
 
 // Reconnect pacing for the live feed. A fixed 5 s retry made every open dashboard reconnect in the same second after
@@ -259,15 +258,7 @@ const openLive = s => importOnce('./sessions.js').then(m => m.selectLiveSession(
 
 /** The needs-input toast, and the opt-in desktop alert, for row s. */
 function _raiseNeedsInputAlert(s, id) {
-    const label = escapeHtml(withTeam(resolveSessionIdentity(s), s)); // the role or the name the row shows (the row's own words), not the folder twice; two teams: "Orchestrator (team-a)" (#10134)
-    const detail = s.waiting_summary ? escapeHtml(askWords(s.waiting_summary)) : dialogDue(s) ? escapeHtml(DIALOG_WORDS) : null; // an agent at a dialog says it needs one click (#11430)
-    const openSession = () => openLive(s).then(() => window.showChatView?.()); // the chat card is where the answer is (#10141)
-    // The question is announced once: with its card on screen in this agent's chat (a role=alert that says it) the toast is there to see and use but does not say it again (#10374).
-    const cardShown = state.currentSession?.session_id === s.session_id && [...document.querySelectorAll('#live-history-messages > .chat-needs-input')].some(e => e.getClientRects().length > 0);
-    // Phone, Needs you open: the row is the notice, a toast would cover it (#17733)
-    const t = document.getElementById('group-table-view');
-    if (!(isPhoneLayout() && t?.dataset.group === 'hub-inbox:needs' && t.getClientRects().length)) showNotificationToast(label, detail, openSession, { silent: cardShown });
-    noteHidden(m => m.KIND_NEEDS_INPUT, s, id, openSession);
+    importOnce('./needs_input_alert.js').then(m => m.raiseNeedsInputAlert(s, id)).catch(() => {});
 }
 
 /** The opt-in desktop alert while this tab is in the background; names only. attention.js is read when the first alert is due, not at start (the start weight is guarded): the count it keeps is only ever needed from then on.

@@ -151,5 +151,5 @@ func waitingSince(s sessionstate.State) any {
 	if !s.NeedsInput || s.WaitingSince.IsZero() {
 		return nil
 	}
-	return s.WaitingSince.UTC().Format(time.RFC3339)
+	return s.WaitingSince.UTC().Format(time.RFC3339Nano)
 }
