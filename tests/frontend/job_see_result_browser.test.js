@@ -23,7 +23,8 @@ const S = `(window.__coralStatic || '/static/')`;
                 if (/^\\/api\\/scheduled\\/jobs\\/8\\/runs/.test(u)) return json({ runs: [
                     { id: 21, job_id: 8, status: 'completed', started_at: new Date().toISOString(), finished_at: new Date().toISOString(), session_id: '3f2a9c1e-1111-4222-8333-444455556666' },
                     { id: 22, job_id: 8, status: 'running', started_at: new Date().toISOString(), session_id: '3f2a9c1e-2222-4222-8333-444455556666' },
-                    { id: 23, job_id: 8, status: 'failed', started_at: new Date().toISOString(), finished_at: new Date().toISOString(), error_msg: 'Coral could not type the job\\'s prompt into the agent, so the run never began', session_id: '3f2a9c1e-3333-4222-8333-444455556666' }], total: 3 });
+                    { id: 23, job_id: 8, status: 'failed', started_at: new Date().toISOString(), finished_at: new Date().toISOString(), error_msg: 'Coral could not type the job\\'s prompt into the agent, so the run never began', session_id: '3f2a9c1e-3333-4222-8333-444455556666' },
+                    { id: 24, job_id: 8, status: 'completed', started_at: new Date().toISOString(), finished_at: new Date().toISOString(), session_id: '3f2a9c1e-4444-4222-8333-444455556666', result_text: 'Summary: 3 files changed <b>not markup</b>, tests pass.' }], total: 4 });
                 if (/^\\/api\\/scheduled\\/jobs\\/\\d+\\/runs/.test(u)) return json({ runs: [], total: 0 });
                 return real(input, init);
             };
@@ -32,7 +33,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await Page.navigate({ url: BASE + '/automations/jobs' }); await Page.loadEventFired(); await install(); await require('./helpers/wait').coralReady(ev);
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'the two jobs', 10000);
         await ev(`[...document.querySelectorAll('#group-table-view tbody tr .dt-primary')].find(b => /weekday-summary/.test(b.textContent)).click(); true`);
-        await waitFor(`document.querySelectorAll('#scheduler-detail [data-on-click="job-run-session"]').length === 3`, 'See result on each run', 8000);
+        await waitFor(`document.querySelectorAll('#scheduler-detail [data-on-click="job-run-session"]').length === 4`, 'See result on each run', 8000);
         const WORDS = { 21: /this run finished, but its chat was not kept/, 22: /this run is still going and has no chat yet/, 23: /this run failed before it had a chat to show: Coral could not type the job's prompt/ };
         for (const [id, want] of Object.entries(WORDS)) {
             await ev(`document.querySelectorAll('.toast-message').forEach(t => t.remove()); true`);
@@ -44,6 +45,11 @@ const S = `(window.__coralStatic || '/static/')`;
             assert.ok(!/If it is still running/.test(await ev(`document.body.textContent`)), `run ${id}: no 'if it is still running' for a run whose status is known`);
             assert.ok(!/Loading chat/.test(await ev(`document.getElementById('history-session-view')?.offsetParent ? document.getElementById('history-session-view').textContent : ''`)), `run ${id}: not left on Loading chat`);
         }
+        // #16958: a finished run with a result_text on its record shows what its agent said last, as plain text, when its chat is gone
+        await ev(`document.querySelector('#scheduler-detail [data-on-click="job-run-session"][data-session-id^="3f2a9c1e-4444"]').click(); true`);
+        await waitFor(`!!document.querySelector('#run-result-dialog[open] #run-result-text')`, 'the run result dialog', 6000);
+        assert.equal(await ev(`document.querySelector('#run-result-text').textContent`), 'Summary: 3 files changed <b>not markup</b>, tests pass.', 'the text is shown as written');
+        assert.equal(await ev(`document.querySelectorAll('#run-result-text b').length`), 0, 'and never as markup');
         console.log('\nPASS See result with no chat goes back to the job and says why');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
