@@ -25,6 +25,7 @@ const TEAM = `qa-hdr-${Date.now() % 100000}`;
             await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await ev(`window.switchNavTab('agents'); window.openTeamPage(${JSON.stringify(TEAM)}, { tab: 'agents' }); true`);
             await waitFor(`(document.getElementById('team-page-title') || {}).textContent === ${JSON.stringify(TEAM)}`, 'the team page opened on its Agents tab', 10000); await settle(1500);
+            await waitFor(`/agents have not sent a first message yet/.test((document.getElementById('team-page-status') || {}).textContent || '')`, 'the status has settled (it reads "Checking attention status" until the read answers or its deadline passes)', 20000);
             const originalStatus = await ev(`document.getElementById('team-page-status').textContent`);
             for (const theme of ['dark', 'light']) for (const size of [16, 32]) {
                 await ev(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}; document.documentElement.style.fontSize = '${size}px'; true`);
