@@ -109,7 +109,15 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 		errBadRequest(w, fmt.Sprintf("offset must be an integer between 0 and %d", maxTeamArtifactOffset))
 		return
 	}
-	artifactsRev := h.bs.ArtifactsRevision("")
+	artifactsRev := h.bs.ArtifactsRevision("") // read BEFORE the data: a write during the build leaves the kept answer older than the next token
+	countKey, countable := countKeyFor(r, artifactsRev, vals.Encode(), limit, offset, vals.Get("cursor") != "")
+	builtAt := h.itemsCache.clock()
+	if countable {
+		if resp, ok := h.countCache.get(countKey, builtAt); ok {
+			writeJSON(w, http.StatusOK, resp)
+			return
+		}
+	}
 	projects, err := h.bs.ListProjects(r.Context())
 	if err != nil {
 		errInternalServer(w, "could not list artifacts")
@@ -207,6 +215,9 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 	}
 	if sel.facets != nil {
 		resp["facets"] = sel.facets
+	}
+	if countable {
+		h.countCache.put(countKey, builtAt, resp)
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
