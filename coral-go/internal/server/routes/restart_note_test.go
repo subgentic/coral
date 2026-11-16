@@ -55,3 +55,12 @@ func TestTheRestartNoteListsBlockedAndReviewTasksWithCleanTitles(t *testing.T) {
 	assert.NotContains(t, note, "@all", "an @ cannot mention anyone")
 	assert.NotContains(t, note, "`", "a backtick cannot close a frame")
 }
+
+// A restarted agent holding a task in progress is told to run task current first, not to claim it again (#18150).
+func TestTheRestartNoteSendsAnAgentWithATaskInProgressToTaskCurrent(t *testing.T) {
+	inProgress := restartNoteText("Dev", "Dev", []board.Task{{ID: 7, Title: "work", Status: "in_progress"}})
+	assert.Contains(t, inProgress, "coral-board task current")
+	assert.NotContains(t, inProgress, "task claim")
+	waiting := restartNoteText("Dev", "Dev", []board.Task{{ID: 8, Title: "later", Status: "pending"}})
+	assert.NotContains(t, waiting, "task current", "a task not yet claimed has no current task to show")
+}

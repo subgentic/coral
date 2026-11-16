@@ -1925,3 +1925,15 @@ func TestOrchestratorPromptSaysToReportUncommittedWork(t *testing.T) {
 		}
 	}
 }
+
+// The system prompts' sentences start with a capital (#18150): "...do not introduce yourself again. then discuss..." read as a typo.
+func TestTheSystemPromptsStartTheirSecondSentenceWithACapital(t *testing.T) {
+	for name, p := range map[string]string{"orchestrator": DefaultOrchestratorSystemPrompt, "worker": DefaultWorkerSystemPrompt} {
+		if !strings.Contains(p, "do not introduce yourself again. Then ") && !strings.Contains(p, "do not introduce yourself again. ") {
+			t.Fatalf("%s prompt lost the sentence: %q", name, p)
+		}
+		if strings.Contains(p, "again. then") {
+			t.Errorf("%s prompt has a lowercase 'then' after a full stop", name)
+		}
+	}
+}
