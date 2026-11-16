@@ -234,4 +234,35 @@ func TestCloseOvertakenAsks_GoalOnlyWithAutoFilledTask(t *testing.T) {
 	closed, err := s.AskIsClosed(ctx, "alpha", q.ID)
 	require.NoError(t, err)
 	assert.False(t, closed, "ask stays open because the task link was not explicit")
+
+// #18714: every open question about a finished task leaves Needs you at once (several on one team, not only one); a question about a task still going stays; a second sweep closes nothing more.
+func TestQuestionsAboutFinishedTasksAreClosedTogether(t *testing.T) {
+	s, ctx := askBoard(t)
+	mk := func(title string) (*Task, *Message) {
+		task, err := s.CreateTask(ctx, "alpha", title, "", "medium", "Lead", "Dev A")
+		require.NoError(t, err)
+		q := askPost(t, s, ctx, "Lead", "@Operator about "+title+"?", true, 0)
+		require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 0, task.ID))
+		return task, q
+	}
+	t1, q1 := mk("one")
+	t2, q2 := mk("two")
+	_, q3 := mk("three, still going")
+	for _, task := range []*Task{t1, t2} {
+		_, err := s.ClaimTask(ctx, "alpha", "Dev A", task.ID)
+		require.NoError(t, err)
+		_, err = s.CompleteTask(ctx, "alpha", task.ID, "Dev A", nil)
+		require.NoError(t, err)
+	}
+	n, err := s.CloseAsksOfFinishedTasks(ctx)
+	require.NoError(t, err)
+	assert.EqualValues(t, 2, n)
+	for q, want := range map[int64]bool{q1.ID: true, q2.ID: true, q3.ID: false} {
+		closed, err := s.AskIsClosed(ctx, "alpha", q)
+		require.NoError(t, err)
+		assert.Equal(t, want, closed, "question %d", q)
+	}
+	n, err = s.CloseAsksOfFinishedTasks(ctx)
+	require.NoError(t, err)
+	assert.Zero(t, n)
 }

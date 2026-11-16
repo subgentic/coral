@@ -243,8 +243,38 @@ func TestDismissingASingleAgentsQuestionTellsTheAgentAndAnExitedAgentsQuestionDr
 	assert.Len(t, typed, 1, "and tells the agent nothing more")
 
 	require.NoError(t, ss.UnregisterLiveSession(context.Background(), o.SessionID))
-	assert.Empty(t, list(), "its agent has exited: the question drops off by itself")
 	open, err := ss.OpenAgentAsk(context.Background(), id)
 	require.NoError(t, err)
-	assert.Nil(t, open, "and is closed")
+	assert.Nil(t, open, "its agent has exited: the question is closed by the exit itself, not by a read of the list (#18714)")
+	assert.Empty(t, list(), "and is not listed")
+	assert.Equal(t, http.StatusConflict, dismiss(id, `{"undo":true}`).Code, "Undo does not bring back a question closed by an exit")
+}
+
+// #18714: Undo brings back only a dismissed question: an answered one stays answered, so the agent is not answered twice.
+func TestUndoDoesNotReopenAnAnsweredAgentQuestion(t *testing.T) {
+	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "a.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	ss := store.NewSessionStore(db)
+	h := NewAgentAsksHandler(ss, nil)
+	h.deliver = func(context.Context, ptymanager.SessionTerminal, string, string, string, string, string) error { return nil }
+	o := owner("0001")
+	registerAsker(t, ss, o)
+	id, err := ss.CreateAgentAsk(context.Background(), o.SessionID, o.SessionName, "Which?", nil, time.Now())
+	require.NoError(t, err)
+	post := func(path, body string, fn http.HandlerFunc) int {
+		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+		req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+		rec := httptest.NewRecorder()
+		rr := chi.NewRouter()
+		rr.Post("/api/agent-asks/{id}/answer", h.Answer)
+		rr.Post("/api/agent-asks/{id}/dismiss", h.Dismiss)
+		rr.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	assert.Equal(t, http.StatusOK, post("/api/agent-asks/"+askIDText(id)+"/answer", `{"answer":"A"}`, nil))
+	assert.Equal(t, http.StatusConflict, post("/api/agent-asks/"+askIDText(id)+"/dismiss", `{"undo":true}`, nil), "an answered question is not brought back")
+	open, err := ss.OpenAgentAsk(context.Background(), id)
+	require.NoError(t, err)
+	assert.Nil(t, open)
 }
