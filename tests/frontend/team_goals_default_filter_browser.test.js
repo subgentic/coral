@@ -59,17 +59,17 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
                 assert.equal((await rows()).length, 4, 'the four goals are listed: ' + JSON.stringify(await rows()));
                 await shot(`goals-default-no-active-${label}`);
             });
-            await S.run(`${label}: a team with only finished goals stays on the default filter and its Done group shows (#18168)`, async () => {
+            await S.run(`${label}: a team with only finished goals stays on the default filter and says there is no active goal, with Done kept in its pill (#18168, #17625)`, async () => {
                 await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'liveListLoaded', 'settings'); await installTP(ev); // a fresh page: no filter kept from the teams above
                 await seed(ev, TEAM3); if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
                 await ev(GOALS_STUB);
                 await ev(`window.__goals = window.__goals.filter(g => g.state === 'done' || g.state === 'dropped'); true`); await openTeam(ev, waitFor, TEAM3).catch(() => {});
-                await goTab(ev, settle, 'Goals'); await waitFor(`document.querySelectorAll('${panel} tbody tr').length >= 1`, 'the goals', 10000); await settle(300);
+                await goTab(ev, settle, 'Goals'); await waitFor(`/No active goals/.test(document.querySelector('${panel}')?.textContent || '')`, 'the empty Active list', 10000); await settle(300);
                 const p = await pills();
                 assert.deepEqual(p.filter(x => x[1]).map(x => x[0].replace(/\s*\d+$/, '').replace(/\s*\(\d+\)$/, '')), ['Active'], 'the default filter is kept, not All: ' + JSON.stringify(p));
+                assert.ok(p.some(x => /^Done\s*1$/.test(x[0].replace(/[^A-Za-z0-9]+/g, ' ').trim())), 'the Done pill still counts the finished goal: ' + JSON.stringify(p));
                 const r = await rows();
-                assert.ok(r.some(x => /^Done \(1\)$/.test(x)), 'the Done group shows: ' + JSON.stringify(r));
-                assert.ok(r.some(x => /Old cleanup/.test(x)), 'with the finished goal under it: ' + JSON.stringify(r));
+                assert.equal(r.length, 0, 'Active lists no finished goal under it (#17625): ' + JSON.stringify(r));
             });
         }
     } finally { await removeBoards(ev, [TEAM, TEAM2, TEAM3]).catch(() => {}); await client.close(); }

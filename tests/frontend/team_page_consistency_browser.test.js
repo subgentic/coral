@@ -26,7 +26,9 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
-        await seed(ev, TEAM); await stub(); await liveWaiting(ev, true); await openTeam(ev, waitFor, TEAM); // the status says Backend Dev needs input: its live row agrees, or the header says "Checking attention status" (42b847cc3, #14437) await settle(700);
+        await seed(ev, TEAM); await stub(); await liveWaiting(ev, true); await openTeam(ev, waitFor, TEAM);
+        // the status says Backend Dev needs input: its live row agrees, or the header says "Checking attention status" (42b847cc3, #14437). The header now reads the Needs you tab's own count (#17625), which is certified after a read, so wait for the words rather than a fixed pause.
+        await waitFor(`document.getElementById('team-page-status').textContent.trim() === '1 needs attention'`, 'the status counts the waiting agent', 8000);
         await S.run('a waiting agent is "needs attention", not "All well"', async () => {
             assert.equal(await status(), '1 needs attention', `got ${JSON.stringify(await status())}`);
         });
