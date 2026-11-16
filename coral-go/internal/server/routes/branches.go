@@ -23,7 +23,7 @@ type BranchesSource interface {
 	Holds(repo branches.Repo, i int, dir string) bool
 	Detail(ctx context.Context, repo branches.Repo, head string) (branches.Detail, bool, error) // a branch's commits and files over the base (#17543): read when a row is opened
 	Same(a, b branches.Repo) bool                                                               // the same repository (the team view groups by it)
-	ReadState(dir string) (state string, notGit bool) // pending until the folder is read, done after; notGit when it holds no repository (#17058, #17600)
+	ReadState(dir string) (state string, notGit bool)                                           // pending until the folder is read, done after; notGit when it holds no repository (#17058, #17600)
 }
 
 // SetBranches wires the snapshot in.
