@@ -15,5 +15,5 @@ export function revealInStrip(strip, tab) {
     }
     const max = strip.scrollWidth - view;
     if (target > max) strip.style.paddingInlineEnd = `${padR + target - max}px`;
-    strip.scrollLeft = target;
+    strip.scrollLeft = target; strip._revealedTo = strip.scrollLeft; strip._moved = false;
 }
