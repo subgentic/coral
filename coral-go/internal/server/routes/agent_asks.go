@@ -264,7 +264,7 @@ func (h *AgentAsksHandler) Rows(r *http.Request) []operatorAskRow {
 		} else if dn, err := h.ss.GetDisplayName(r.Context(), a.SessionID); err == nil && dn != nil && strings.TrimSpace(*dn) != "" {
 			asker = *dn
 		}
-		row := operatorAskRow{Kind: "agent", ID: a.ID, Asker: clitext.CleanName(asker), Text: text, Cut: cut, At: a.CreatedAt, Options: a.Options}
+		row := operatorAskRow{SessionID: a.SessionID, Kind: "agent", ID: a.ID, Asker: clitext.CleanName(asker), Text: text, Cut: cut, At: a.CreatedAt, Options: a.Options}
 		rows = append(rows, row)
 	}
 	return rows
