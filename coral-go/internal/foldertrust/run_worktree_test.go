@@ -171,7 +171,7 @@ func TestSweepWritesEachSettingsFileOnceAndSkipsAMissingRoot(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		p := filepath.Join(root, fmt.Sprintf("job-run-%d-gone", 100+i))
 		cj.WriteString(fmt.Sprintf(`, %q: {"hasTrustDialogAccepted": true}`, p))
-		tb.WriteString(fmt.Sprintf("[projects.%q]\ntrust_level = \"trusted\"\n\n", p))
+		tb.WriteString(fmt.Sprintf("[projects.%s]\ntrust_level = \"trusted\"\n\n", tomlKey(t, p)))
 	}
 	cj.WriteString("}}")
 	require.NoError(t, os.WriteFile(cfg, []byte(cj.String()), 0o600))

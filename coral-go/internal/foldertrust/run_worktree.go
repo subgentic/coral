@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
+
+	"github.com/subgentic/coral/internal/coralnames"
 )
 
 // A scheduled job whose person ticked "Trust this folder" trusts exactly the worktree each of its runs made for itself (#16421, Security's conditions on the job's tick). That folder sits under Coral's own data
@@ -186,7 +188,7 @@ func SweepGoneRunFolders(claudeCfg, codexCfg, worktreesRoot string) (int, error)
 		roots = append(roots, filepath.Clean(r))
 	}
 	gone := func(key string) bool {
-		if !filepath.IsAbs(key) || !strings.HasPrefix(filepath.Base(key), "job-run-") {
+		if !filepath.IsAbs(key) || !coralnames.IsJobRunName(filepath.Base(key)) {
 			return false
 		}
 		inside := false
