@@ -47,7 +47,7 @@ const { coralReady } = require('./helpers/wait');
                 const row = await seen('settings-dropbox-hubshare-on');
                 check(`${tag}: the switch is shown with Dropbox not connected, and nothing covers it`, row.ok, JSON.stringify(row));
                 check(`${tag}: it is off by default`, !(await ev(`document.getElementById('settings-dropbox-hubshare-on').checked`)));
-                check(`${tag}: the sentence says private files are never sent and only on press Share`, await ev(`/Private and secret-looking files are never sent/.test(document.getElementById('settings-dropbox-hubshare-desc').textContent) && /Only when you press Share/.test(document.getElementById('settings-dropbox-hubshare-desc').textContent)`));
+                check(`${tag}: the sentence says private files are never sent and only on press Share`, await ev(`/Private files are never sent; a secret-looking one waits for your OK/.test(document.getElementById('settings-dropbox-hubshare-desc').textContent) && /Only when you press Share/.test(document.getElementById('settings-dropbox-hubshare-desc').textContent)`));
                 check(`${tag}: no sideways scroll`, await ev(`document.documentElement.scrollWidth <= innerWidth + 1`));
                 await shot(`hubshare-settings-after-${w}-${theme}`);
 
