@@ -9,7 +9,7 @@ import { announceNotice } from './notifications.js';
 import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
 import { registerActions } from './actions.js';
-import { isCloud, serverFetch } from './server_base.js';
+import { isCloud, serverFetch, boardTeamKey, keyLabel } from './server_base.js';
 const HUB_WORDS = 'The queue is kept by each computer: open this computer\'s own Coral to see it, and move or remove an entry there.';
 const DT = await importOnce('./data_table.js');
 const { agentLink } = await importOnce('./agent_link.js');
@@ -192,6 +192,16 @@ const stateWord = row => (row.state === 'holding' ? holdWord(row) : row.state ==
 const openTaskPage = (r, from) => importOnce('./task_navigation.js').then(m => m.openTask(r.project, r.task, from, { from: '' }));
 const openGoalPage = r => importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(r.project, r.goal_id));
 const goalWords = r => `#${r.goal_id} ${r.goal_title}`;
+// A queue is shared across boards. Keep the board from this entry, including the chosen remote computer.
+const teamLink = r => {
+    if (r.state === 'free') return '';
+    if (!r.project) return DT.el('span', 'dt-time queue-team', '—');
+    const team = boardTeamKey(machine, r.project);
+    const b = DT.link(keyLabel(team), () => importOnce('./team_page.js').then(m => m.openTeamPage(team)));
+    b.classList.add('queue-team', 'btn', 'btn-quiet', 'btn-small');
+    b.setAttribute('aria-label', `Open team ${keyLabel(team)}`);
+    return b;
+};
 /** The links of one row (#13704): the agent opens its chat, the task its page, the goal its page on the team's. A row with no task has no task or goal link; a task with no goal has no goal link. */
 const taskLink = r => (queueReadOnly() ? (r.task ? DT.el('span', '', `#${r.task}`) : '') : r.task && r.project ? DT.link(`#${r.task}`, ev => openTaskPage(r, ev && ev.currentTarget)) : r.task ? DT.el('span', '', `#${r.task}`) : '');
 const goalLink = r => { if (queueReadOnly()) return r.goal_id ? DT.el('span', 'queue-goal', goalWords(r)) : ''; if (!(r.goal_id && r.project)) return ''; const b = DT.link(goalWords(r), () => openGoalPage(r)); b.classList.add('queue-goal'); b.title = goalWords(r); b.setAttribute('aria-label', `Open goal ${goalWords(r)}`); return b; };
@@ -216,10 +226,12 @@ export function queueTable(rows, narrowed) {
                 { key: 'why', label: 'Note', width: '12rem', dropAt: 62, tone: 'tertiary', cell: r => r.note || '' },
                 { key: 'task', label: 'Task', width: '5rem', dropAt: 52, cell: taskLink },
                 { key: 'goal', label: 'Goal', width: '9rem', dropAt: 52, cell: goalLink },
+                { key: 'team', label: 'Team', width: '9rem', cell: teamLink },
                 { key: 'time', label: 'Lease left / waited', width: '9rem', dropAt: 52, tone: 'tertiary', cell: r => (r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : '') },
                 ...(denied || queueReadOnly() ? [] : [{ key: 'actions', label: 'Move or kick', width: '14rem', cell: actionsCell }]),
             ],
             mail: r => ({ lead: { icon: r.state === 'holding' ? 'lock' : r.state === 'waiting' ? 'hourglass_empty' : 'check_circle', square: true, name: stateWord(r) }, title: r.state === 'free' ? `${r.resource}: all slots free` : r.agent,
+                extra: teamLink(r),
                 snippet: r.state === 'free' ? '' : `${r.resource}${r.note ? ' · ' + r.note : ''}`, state: stateWord(r), time: r.state === 'holding' ? `${holdWord(r)} \u00b7 ${leaseWords(r)}` : r.state === 'waiting' ? `Place ${r.place} \u00b7 ${waitWords(r)}` : '',
                 actions: [...linkActions(r), ...rowActions(r)].map(a => ({ label: a.label, title: a.title, off: a.off, ...(a.kick ? { confirm: 'Confirm kick', onArm: () => announceNotice(`Press Confirm kick to remove ${r.agent} from ${r.resource}.`) } : {}), run: () => { noteFocus(a.kick ? neighbour(r)[0] : r.id, a.label); a.run(); } })) }),
         }).el };
