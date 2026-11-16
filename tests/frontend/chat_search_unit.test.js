@@ -23,4 +23,10 @@ assert.match(html, /afé/);
 const safe = highlightExcerpt('alpha beta', [[0, 5], [3, 8], [-2, 99]]);
 assert.match(safe, /<mark>alpha<\/mark>/);
 assert.match(safe, /beta/);
+// The excerpt is shown as the words it says (walk 78, #17801): markdown marks (** __ ~~ backticks, a heading's #) are dropped and the match offsets, which count the raw text, follow the words.
+const md = highlightExcerpt('Use **bold** and `code` here', [[6, 10], [18, 22]]);
+assert.equal(md, 'Use <mark>bold</mark> and <mark>code</mark> here', md);
+assert.equal(highlightExcerpt('## Plan\nthe **plan** holds', [[3, 7]]), '<mark>Plan</mark>\nthe plan holds');
+assert.equal(highlightExcerpt('a **b', [[0, 1]]), '<mark>a</mark> b', 'a mark with no partner is dropped too');
+assert.equal(highlightExcerpt('2 ** 3 = 8', [[9, 10]]), '2  3 = <mark>8</mark>', 'a stray pair is a mark: dropped (the words around it are intact)');
 console.log('chat_search_unit: ok');

@@ -33,6 +33,7 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
             await ev(`try { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-inbox-chats-filters')) localStorage.removeItem(k); } catch {} true`);
             await ev(`(() => { const R = window.fetch; window.__hist = [];
                 window.fetch = (u, o) => { const url = new URL(String(u), location.href), json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } }));
+                    if (url.pathname === '/api/sessions/history/search') { window.__searchAsked = (window.__searchAsked || 0) + 1; return json({ status: 'complete', results: [{ type: 'agent', session_id: 'sess-1', hits: [{ role: 'user', excerpt: 'x', match_offsets: [], locator: { session_id: 'sess-1', message_index: 42 } }] }] }); }
                     if (url.pathname === '/api/sessions/history/counts') return json(${JSON.stringify(COUNTS)});
                     if (url.pathname === '/api/sessions/history') { const q = url.searchParams.get('q') || url.searchParams.get('search') || ''; window.__hist.push(Object.fromEntries(url.searchParams));
                         if (q === 'BROKEN') return json({ error: 'search_failed', detail: 'Search failed: try other words' }, 400);
@@ -47,6 +48,11 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
             check(`${label}: a search for PLUM-4471 shows the hit line of the chat`, /ticket PLUM-4471 is about the billing deploy/.test(await body()), (await body()).slice(0, 200));
             const hitBox = await ev(`(() => { const e = document.querySelector('.dt-title-snippet'); if (!e) return null; const r = e.getBoundingClientRect(), t = e.closest('.dt-title-cell').querySelector('.dt-primary').getBoundingClientRect(), row = e.closest('tr, .dt-row, li, [role=row]'), rr = row ? row.getBoundingClientRect() : null; return { w: Math.round(r.width), h: Math.round(r.height), under: r.top >= t.bottom - 1, inRow: !rr || r.bottom <= rr.bottom + 1 }; })()`);
             if (!mobile) check(`${label}: the hit line has a size and sits under the title, inside its row (#10262)`, hitBox && hitBox.w > 80 && hitBox.h > 8 && hitBox.under && hitBox.inRow, JSON.stringify(hitBox));
+            // opening the found chat lands at the matching message (the locator of the search's first hit), not at the newest (#17801)
+            await ev(`window.__opened = null; window.selectHistorySession = (id, locator) => { window.__opened = { id, locator }; return true; }; document.querySelector('button.dt-primary').click(); true`);
+            await waitFor(`!!window.__opened`, 'the chat opening', 8000);
+            check(`${label}: a found chat opens at its matching message`, (await ev(`JSON.stringify(window.__opened)`)) === '{"id":"sess-1","locator":{"session_id":"sess-1","message_index":42}}', await ev(`JSON.stringify(window.__opened)`));
+            await ev(`window.switchNavTab('hub-inbox'); true`); await openFolder('chats', mobile, 'All chats');
             await search('BROKEN');
             check(`${label}: a search the server refuses says "Search failed", not "Loading chats"`, /Search failed/.test(await body()) && !/Loading chats/.test(await body()), (await body()).slice(0, 200));
             await search('PLUM-4471');

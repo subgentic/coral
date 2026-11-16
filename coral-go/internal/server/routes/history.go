@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -250,6 +251,11 @@ func historyFiltered(params store.SessionListParams) bool {
 		params.AgentName != "" || params.Starred || params.Archived || params.Active || params.WithNotes
 }
 
+// snippetMarks are the markdown marks of a chat's text (bold, strike, code, a heading's #): the search's hit line is the chat's words, not its markup (#17801, walk 78).
+var snippetMarks = regexp.MustCompile("(?m)\\*\\*|__|~~|`+|^#{1,6}[ \\t]+")
+
+func plainSnippet(s string) string { return snippetMarks.ReplaceAllString(s, "") }
+
 // agentHistoryRows are the agent sessions' rows.
 func agentHistoryRows(sessions []store.SessionListItem) []map[string]any {
 	rows := make([]map[string]any, 0, len(sessions))
@@ -279,7 +285,7 @@ func agentHistoryRows(sessions []store.SessionListItem) []map[string]any {
 			row["board_name"] = s.BoardName // the team of a live agent's chat (#10592)
 		}
 		if s.Snippet != "" { // a search's hit: one line of the chat's text around the matched words (#10137)
-			row["snippet"] = s.Snippet
+			row["snippet"] = plainSnippet(s.Snippet)
 		}
 		rows = append(rows, row)
 	}

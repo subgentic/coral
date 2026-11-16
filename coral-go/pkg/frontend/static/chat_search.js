@@ -25,8 +25,20 @@ function utf16Slice(text, start, end) {
     return out;
 }
 
-export function highlightExcerpt(text, offsets = []) {
-    const source = String(text || '');
+// An excerpt is raw transcript text: its markdown marks (** __ ~~ backticks, a heading's #) are dropped and the offsets, which count the raw text, are moved onto the words that stay (#17801).
+const MD_MARKS = /\*\*|__|~~|`+|^#{1,6}[ \t]+/gm;
+function plainWords(raw, offsets) {
+    let out = '', last = 0;
+    const at = new Array(raw.length + 1);
+    const keep = to => { for (; last < to; last++) { at[last] = out.length; out += raw[last]; } };
+    for (const m of raw.matchAll(MD_MARKS)) { keep(m.index); for (; last < m.index + m[0].length; last++) at[last] = out.length; }
+    keep(raw.length); at[raw.length] = out.length;
+    const to = n => at[Math.min(Math.max(0, n), raw.length)];
+    return { text: out, offsets: offsets.map(r => Array.isArray(r) && r.length >= 2 ? [to(Number(r[0]) || 0), to(Number(r[1]) || 0)] : r) };
+}
+
+export function highlightExcerpt(text, rawOffsets = []) {
+    const { text: source, offsets } = plainWords(String(text || ''), rawOffsets);
     const ranges = offsets.filter(r => Array.isArray(r) && r.length >= 2)
         .map(r => [Math.max(0, Number(r[0]) || 0), Math.max(0, Number(r[1]) || 0)])
         .filter(([a, b]) => b > a).sort((a, b) => a[0] - b[0]);
@@ -86,6 +98,16 @@ async function openSearchHit(result, hit) {
     if (locator.session_id && window.selectHistorySession) {
         await window.selectHistorySession(locator.session_id, locator);
     }
+}
+
+/** Opens a chat a search found at the message that matches (the locator of its first hit), or at the newest when the search names none (#17801). */
+export async function openAtMatch(query, chat) {
+    let at = null;
+    try {
+        const response = await historyFetch(`/api/sessions/history/search?${new URLSearchParams({ q: String(query || '').trim(), page: '1', page_size: '20', type: 'all' })}`);
+        if (response.ok) at = (await response.json()).results?.find(r => r.session_id === chat.session_id)?.hits?.[0]?.locator || null;
+    } catch { /* the chat still opens, at the newest */ }
+    return window.selectHistorySession?.(chat.session_id, at, chat);
 }
 
 // What a screen reader hears: one short line (the results list is not a live region, so a list is not read out whole on every keystroke).
