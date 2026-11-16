@@ -15,7 +15,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
 const STUB = `
   (function(){ const Real = window.WebSocket; function Dead(u){ this.url=String(u); this.readyState=0; } Dead.prototype.send=function(){}; Dead.prototype.close=function(){}; Dead.prototype.addEventListener=function(){}; Dead.prototype.removeEventListener=function(){};
     function W(u,p){ if (/\\/ws\\//.test(String(u))) return new Dead(u); return p===undefined? new Real(u): new Real(u,p); } W.prototype=Real.prototype; W.CONNECTING=0; W.OPEN=1; W.CLOSING=2; W.CLOSED=3; window.WebSocket=W; })();
-  window.__origFetch = window.fetch.bind(window); window.__answers = []; window.__uploads = 0;
+  window.__origFetch = window.fetch.bind(window); window.__answers = []; window.__uploads = 0; window.__sessions = []; // the live list the app reads before the test sets its agent is an empty one, never an empty body (JSON.stringify(undefined) answered 'Unexpected end of JSON input' on a slow start, #18937)
   window.fetch = (url, opts) => { const u=String(url); const rel=u.replace(/^https?:\\/\\/[^/]+/,''); const path=rel.split('?')[0]; const m=((opts&&opts.method)||'GET').toUpperCase();
     const json=(b)=>Promise.resolve(new Response(JSON.stringify(b),{status:200,headers:{'Content-Type':'application/json'}}));
     if (m==='POST' && /\\/answer-prompt$/.test(path)) { window.__answers.push(JSON.parse(opts.body)); return json({ ok: true }); }
@@ -45,6 +45,8 @@ const STUB = `
                 window.__promptScreen = { question: 'Which layout?', options: [{ n: 1, label: 'Compact', selected: true, action: 'select' }, { n: 2, label: 'Roomy', action: 'select' }, { n: 3, label: 'Type something.', action: 'text' }, { n: 4, label: 'Chat about this', action: 'chat' }] }; window.__answers = []; window.__uploads = 0; true`);
             await waitFor(`!!document.querySelector('#live-history-messages .cni-text-form[data-n="3"]')`, `${at}: the question card with its answer box`, 15000);
             const F = `document.querySelector('#live-history-messages .cni-text-form[data-n="3"]')`;
+            // the card's image code loads with the first card drawn (needs_input_card.js, #11403) and listens for the paste when it has: a paste that comes first is not heard, which is what a slow start did (#18937). Wait for the module, as a person's copy and paste takes longer than its load.
+            await ev(`import((window.__coralStatic || '/static/') + 'card_attach.js').then(() => true)`);
             // pasting a picture into the answer box: one upload, a chip in the card, nothing in the message box's strip
             await ev(`(() => { const dt = new DataTransfer(); dt.items.add(new File([Uint8Array.from(atob(${JSON.stringify(PNG)}), c => c.charCodeAt(0))], 'shot.png', { type: 'image/png' })); const i = ${F}.querySelector('.cni-text-input'); i.focus(); i.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); return true; })()`);
             await waitFor(`${F}.querySelectorAll('.cni-attach .image-attachment').length === 1`, `${at}: the pasted image's chip in the card`, 8000);
