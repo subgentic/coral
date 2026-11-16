@@ -54,7 +54,7 @@ const { coralReady } = require('./helpers/wait');
             // On: accent, full strength, named on.
             await render(true);
             const on = await icon();
-            assert.equal(on.label, `Health monitor settings for ${TEAM}`); assert.equal(on.title, `Health monitor settings for ${TEAM}`); assert.equal(on.on, true);
+            assert.equal(on.label, `Health check settings for ${TEAM}`); assert.equal(on.title, `Health check settings for ${TEAM}`); assert.equal(on.on, true);
             assert.ok(on.w >= 24 && on.h >= 24, 'health settings has a 24px target');
             assert.ok(on.beside, `${dev}: it sits beside the team's info button ${JSON.stringify(on)}`);
             const accent = await ev(`getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()`);
@@ -104,7 +104,7 @@ const { coralReady } = require('./helpers/wait');
             // Coral Hub: the list carries no state, so no icon.
             await render(undefined, 'hub-' + TEAM);
             assert.equal(await icon(), null, `${dev}: no icon where the list gives no state`);
-            assert.deepEqual(await ev(`import(${MOD} + 'list_card_parts.js').then(m => { const host = document.createElement('div'); host.innerHTML = m.teamHealthBtn('@remote/${TEAM}', [{ team_health_on: true }]); const icon = host.firstElementChild; return { tag: icon.tagName, role: icon.getAttribute('role'), label: icon.getAttribute('aria-label'), action: icon.hasAttribute('data-on-click'), focusable: icon.tabIndex >= 0 }; })`), { tag: 'SPAN', role: 'img', label: 'Health monitor is on', action: false, focusable: false }, 'remote Hub keeps the on signal without an unavailable settings action');
+            assert.deepEqual(await ev(`import(${MOD} + 'list_card_parts.js').then(m => { const host = document.createElement('div'); host.innerHTML = m.teamHealthBtn('@remote/${TEAM}', [{ team_health_on: true }]); const icon = host.firstElementChild; return { tag: icon.tagName, role: icon.getAttribute('role'), label: icon.getAttribute('aria-label'), action: icon.hasAttribute('data-on-click'), focusable: icon.tabIndex >= 0 }; })`), { tag: 'SPAN', role: 'img', label: 'Health check is on', action: false, focusable: false }, 'remote Hub keeps the on signal without an unavailable settings action');
         }
 
         // A click opens the team's settings on the Health check tab, which (real server) shows a new team's check on and what it costs.

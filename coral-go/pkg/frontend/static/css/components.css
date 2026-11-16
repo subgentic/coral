@@ -1145,7 +1145,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     align-items: center;
     justify-content: center;
     z-index: 10000;
-    animation: fadeIn 0.2s ease;
+    animation: fadeIn .15s ease;
 }
 
 .alert-notification {
@@ -1157,7 +1157,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     width: 90%;
     text-align: center;
     box-shadow: 0 8px 32px rgba(var(--black-rgb), 0.4);
-    animation: scaleIn 0.2s ease;
+    animation: scaleIn .15s ease;
 }
 
 .alert-notification-icon {
