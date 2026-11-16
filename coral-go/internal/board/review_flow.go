@@ -523,6 +523,9 @@ func checkOpenReview(id int64, status string, w TaskWorkflow) error {
 // second verdict in the round.
 func roundReviewer(id int64, round *ReviewRound, actor string, reviewed int) (*ReviewerState, error) {
 	if reviewed != 0 && reviewed != round.Round {
+		if reviewed > round.Round { // a number ahead of the task, a typo, not a resubmission (#18203)
+			return nil, fmt.Errorf("you reviewed round %d of task #%d, but the task is only at round %d: give your verdict with --round %d (or leave --round out; coral-board task detail %d shows the round)", reviewed, id, round.Round, round.Round, id)
+		}
 		return nil, fmt.Errorf("you reviewed round %d of task #%d, but it was resubmitted and is at round %d: read it again (coral-board task detail %d) and give your verdict with --round %d", reviewed, id, round.Round, id, round.Round)
 	}
 	var me *ReviewerState
