@@ -208,7 +208,7 @@ func TestDocsMetaIntroductionsHaveExplicitSummaries(t *testing.T) {
 
 // #10093 v2 (Desktop #10087): the pages a newcomer reads first carry no source paths and no agent CLI flags (they are for developers, and a newcomer cannot use them). The example files of the quickstart's demo (stringutil.go) are not source paths.
 func TestNewcomerPagesHaveNoSourcePathsOrAgentFlags(t *testing.T) {
-	pages := []string{"how-do-i", "quickstart", "using-the-dashboard", "worked-demos", "workflow-quickstart", "troubleshooting"}
+	pages := []string{"how-do-i", "quickstart", "key-concepts", "using-the-dashboard", "worked-demos", "workflow-quickstart", "troubleshooting"}
 	path := regexp.MustCompile("`(?:internal|pkg|cmd|tests)/[^`]*`|`[A-Za-z0-9_./-]*\\.(?:go|js):?[0-9]*`|\\((?:`[A-Za-z]+` in )?`(?:internal|pkg|cmd)/[^`]*`\\)")
 	flag := regexp.MustCompile("--(?:permission-mode|dangerously-skip-permissions|effort)\\b|model_reasoning_effort")
 	for _, p := range pages {
@@ -369,4 +369,22 @@ func TestHowDoIStopsAReplyAndEndsWithWhereToGo(t *testing.T) {
 	forum := regexp.MustCompile(`\[Forum\]\((https://[^)]+)\)`).FindStringSubmatch(tail)
 	require.Len(t, forum, 2)
 	assert.Contains(t, welcome, `href="`+forum[1]+`"`, "the Forum link is the one the dashboard's welcome page has")
+}
+
+// #17508 (walk 73 H2): a user page defines goal, task, Done when and Operator for a newcomer who searches "what is a goal";
+// Settings steps no longer say "Save settings" (settings auto-save).
+func TestKeyConceptsPageDefinesGoalTaskDoneWhen(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "..", "..", "agent_docs", "key-concepts.md"))
+	require.NoError(t, err)
+	text := strings.ReplaceAll(string(b), "\r\n", "\n")
+	for _, heading := range []string{"## Goal", "## Task", "## Done when", "## Operator", "## Team"} {
+		assert.Contains(t, text, heading, "the page defines "+heading)
+	}
+}
+
+func TestHowDoIDoesNotSaySaveSettings(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "..", "..", "agent_docs", "how-do-i.md"))
+	require.NoError(t, err)
+	text := strings.ReplaceAll(string(b), "\r\n", "\n")
+	assert.NotContains(t, text, "Save settings", "settings auto-save; the docs must not say Save settings")
 }
