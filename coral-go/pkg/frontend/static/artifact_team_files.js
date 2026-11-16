@@ -3,6 +3,7 @@
 import { MAX_DOWNLOAD_BYTES, sanitizeDownloadName } from './artifact_download.js';
 import { teamFetch } from './server_base.js';
 import { copyText, showToast } from './utils.js';
+import { isPhoneLayout } from './phone_layout.js';
 
 const folders = new Map(); // team -> its folder ('' when it has none), read once per page life
 /** The team's own folder from its record ('' when it has none or the computer cannot say). */
@@ -82,12 +83,13 @@ export async function fillStrip(host, { project, files, hasMore }) {
     const row = document.createElement('div'); row.className = 'team-files-strip';
     if (dir) {
         const note = document.createElement('p'); note.className = 'goals-note'; note.append('The team works in the folder ');
-        const code = document.createElement('code'); code.textContent = dir; note.append(code, '. The app runs from there: open index.html in that folder.');
+        // a phone cannot open a folder of the computer Coral runs on: it is told so, and how the page reaches it (#17458, walk 69 H1)
+        const code = document.createElement('code'); code.textContent = dir; note.append(code, isPhoneLayout() ? ', on the computer that runs Coral. A phone cannot open that folder: ask an agent to share the finished page as a file, and it is listed here.' : '. The app runs from there: open index.html in that folder.');
         const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'btn btn-small'; copy.textContent = 'Copy path'; copy.setAttribute('aria-label', 'Copy the team folder path');
         copy.addEventListener('click', async () => { showToast((await copyText(dir)) === false ? 'Could not copy. Select the path and copy it.' : 'Folder path copied', false); });
         row.append(note, copy);
     }
-    const all = document.createElement('button'); all.type = 'button'; all.className = 'btn btn-small'; all.textContent = 'Download all (zip)'; all.setAttribute('aria-label', 'Download the files shown as one zip');
+    const all = document.createElement('button'); all.type = 'button'; all.className = 'btn btn-small'; const listed = files().length; all.textContent = `Download the ${listed} file${listed === 1 ? '' : 's'} listed (zip)`; all.setAttribute('aria-label', `Download the ${listed} file${listed === 1 ? '' : 's'} listed as one zip. Files that are not listed here, such as a page in the team folder, are not in it.`);
     all.addEventListener('click', async () => {
         if (all.disabled) return; const list = files(); if (!list.length) { showToast('No file here can be downloaded.', true); return; } all.disabled = true; // never a silent button
         try { const n = await downloadAllAsZip(list, `${project}-files`); showToast(`Saved ${n} file${n === 1 ? '' : 's'} as a zip${hasMore() ? '. Only the files shown are in it: load more first for the rest.' : ''}`, false); }

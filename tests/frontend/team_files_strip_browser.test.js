@@ -51,11 +51,11 @@ const { safePaused } = require('./helpers/paused');
         assert.ok(Math.abs(after - before) <= 1, `the first row does not move when the strip arrives (${before} -> ${after})`);
         const strip = await ev(`(() => { const s = document.querySelector('#team-panel-artifacts .team-files-strip'); return { text: s.textContent, buttons: [...s.querySelectorAll('button')].map(b => b.textContent) }; })()`);
         assert.ok(strip.text.includes(`/Users/me/Coral/${B}`) && /index\.html/.test(strip.text), 'the strip names the team folder and says what to open: ' + JSON.stringify(strip));
-        assert.deepEqual(strip.buttons, ['Copy path', 'Download all (zip)']);
+        assert.deepEqual(strip.buttons, ['Copy path', 'Download the 3 files listed (zip)'], 'the zip button names what it holds (#17458)');
         await ev(`[...document.querySelectorAll('#team-panel-artifacts .team-files-strip button')].find(b => b.textContent === 'Copy path').click(); true`);
         await waitFor(`window.__copied.length === 1`, 'the path is copied', 5000);
         assert.equal(await ev('window.__copied[0]'), `/Users/me/Coral/${B}`);
-        await ev(`[...document.querySelectorAll('#team-panel-artifacts .team-files-strip button')].find(b => b.textContent.startsWith('Download all')).click(); true`);
+        await ev(`[...document.querySelectorAll('#team-panel-artifacts .team-files-strip button')].find(b => b.textContent.startsWith('Download the')).click(); true`);
         await waitFor(`window.__saved.length === 1`, 'the zip is saved', 10000);
         const saved = await ev('window.__saved[0]');
         assert.equal(saved.name, `${B}-files.zip`);
@@ -64,6 +64,17 @@ const { safePaused } = require('./helpers/paused');
         fs.rmSync(zip, { force: true });
         assert.deepEqual(Object.keys(listing).sort(), ['README.md', 'app.js', 'index.html'], 'the zip holds the three files');
         assert.equal(listing['index.html'], '<h1>Flashcards</h1><script src="app.js"></script>', 'whole and unchanged');
+
+        // a phone cannot open a folder of the computer Coral runs on (#17458, walk 69 H1): the strip says so and does not send it to "open index.html in that folder"
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+        await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`);
+        await waitFor(`!!document.querySelector('#team-panel-artifacts .team-files-strip')`, 'the strip on a phone', 10000);
+        const phone = await ev(`(() => { const s = document.querySelector('#team-panel-artifacts .team-files-strip'); return { text: s.querySelector('p').textContent, buttons: [...s.querySelectorAll('button')].map(b => b.textContent), over: document.documentElement.scrollWidth > innerWidth }; })()`);
+        assert.ok(!/open index\.html in that folder/.test(phone.text), 'a phone is not sent to a folder it cannot open: ' + JSON.stringify(phone));
+        assert.ok(/phone/i.test(phone.text) && /share/i.test(phone.text), 'it says why and how to get the page: ' + JSON.stringify(phone));
+        assert.deepEqual(phone.buttons, ['Copy path', 'Download the 3 files listed (zip)']);
+        assert.ok(!phone.over, 'no sideways scroll at 390');
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
 
         console.log('superseded says what it means');
         assert.equal((await api('PUT', `/api/board/${B}/artifacts/${hIndex}/tags`, { tags: ['superseded'] })).status, 200);
