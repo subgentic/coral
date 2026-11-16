@@ -487,7 +487,7 @@ async function _initTeamForm() {
     const list = document.getElementById("team-agents-list");
     list.innerHTML = "";
     _clearTeamUndo();
-    mountTeamLaunchSettings(launch.welcomePrompt?.kind === 'team' ? launch.welcomePrompt.text : ''); // step 3's tabs, with a new team's own settings
+    mountTeamLaunchSettings(launch.welcomePrompt?.kind === 'team' ? launch.welcomePrompt.text : '', !launch.welcomePrompt?.members); // step 3's tabs, with a new team's own settings
     showTeamStep('team');
     _applyTeamDefaultMode();
 
@@ -536,7 +536,7 @@ async function _initTeamForm() {
     // The default team is in Members when the dialog opens (#9877, the Operator): the Orchestrator, the Lead and the Reviewer, each removable; a template still replaces them.
     // A team the AI generated fills the list itself (launch.skipDefaultTeamAgents). #5989 opened it empty after four agents nobody picked were launched; three a person can see and remove are not that.
     const defaultsOnOpen = !launch.skipDefaultTeamAgents;
-    if (defaultsOnOpen) { _addDefaultMembers(); resetTeamTemplatePicker(); markTeamTemplate(DEFAULT_TEAM_KEY); } // marked now, not after the board names load: a pick made meanwhile must not be overwritten
+    if (defaultsOnOpen) { _addDefaultMembers(launch.welcomePrompt?.members); resetTeamTemplatePicker(); markTeamTemplate(DEFAULT_TEAM_KEY); } // marked now, not after the board names load: a pick made meanwhile must not be overwritten
 
     // Fetch existing boards for uniqueness validation
     await _loadExistingTeamBoards();
@@ -553,8 +553,8 @@ async function _initTeamForm() {
 
 
 /** The default team's members: generic roles that work for any goal (#9877, #17817). */
-function _addDefaultMembers() {
-    for (const a of DEFAULT_TEAM_MEMBERS) _addTeamAgent(a.name, a.prompt, a.capabilities, a.agent_type, a.model, a.flags);
+function _addDefaultMembers(members = DEFAULT_TEAM_MEMBERS) {
+    for (const a of members) _addTeamAgent(a.name, a.prompt, a.capabilities, a.agent_type, a.model, a.flags);
 }
 
 function _loadTeamTemplate(name) {

@@ -67,7 +67,7 @@ function syncMenuStates() {
 }
 
 /** Draw the step with a new team's own values (every time the team dialog opens: nothing from the last team stays). */
-export function mountTeamLaunchSettings(firstTask = '') {
+export function mountTeamLaunchSettings(firstTask = '', saveGoal = true) {
     const host = document.getElementById('team-start-host');
     if (!host) return;
     if (_view) _view.destroy();
@@ -78,7 +78,7 @@ export function mountTeamLaunchSettings(firstTask = '') {
     host.replaceChildren();
     _view = mountSettingsView(host, {
         mode: 'settings', saveBar: false, group: 'start', label: 'Team settings sections', groupLabel: 'Team settings section', groupPickText: 'Jump to a section',
-        load: async () => ({ ...startValues(), first_task: firstTask }),
+        load: async () => ({ ...startValues(), first_task: firstTask, save_goal: saveGoal }),
         groups: [
             { id: 'start', label: 'Start', icon: 'play_arrow', fields: [
                 { key: 'first_task', type: 'textarea', id: 'team-goal', label: 'What should the team work on?', help: 'Optional. It goes to the Orchestrator as the first task.', wide: true, rows: 4, placeholder: 'For example: build a small invoice calculator', attrs: { maxlength: '2000' } },
