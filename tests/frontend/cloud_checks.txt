@@ -438,3 +438,4 @@ node pending_kept_receipts.test.mjs
 node cdp_args.test.mjs
 node top_nav_actions.test.mjs
 node cpu_load.test.js
+node patch_leftovers.test.mjs
