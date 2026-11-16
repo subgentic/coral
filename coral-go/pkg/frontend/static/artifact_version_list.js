@@ -89,12 +89,12 @@ export async function openVersionList(opts) {
 
 // the review bar's lazy half (#15285, #15329): the newer version of a file, and the file view's own Approve
 /** A newer version of this file than this one (#15285, #15329): one in Needs you, else the newest of the file's series, so an older file says so whether or not the newest is still waiting. { n, hex } or null. */
-export async function newerOf(team, hex) {
+export async function newerOf(team, hex, { fresh = false } = {}) { // fresh: the series is read again, not the copy read when the viewer opened (#17460)
     const m = await importOnce('./inbox_reviews.js'), top = m.reviewItems().find(a => a.team === team && a.hex !== hex && (a.earlier || []).some(e => e.hex === hex));
     if (top) return { n: Number(top.version) > 1 ? Number(top.version) : (top.earlier || []).length + 1, hex: top.hex };
     try {
         const k = splitKey(team);
-        const { response, dropped } = await readVersions(k.server, hex, k.name, { reuse: true });
+        const { response, dropped } = await readVersions(k.server, hex, k.name, { reuse: !fresh });
         if (!dropped.length && response.ok) {
             const list = await response.json();
             if (Array.isArray(list) && list.length > 1) { const last = list.reduce((a, b) => (b.version > a.version ? b : a)); if (last.digest !== hex) return { n: last.version, hex: last.digest }; }

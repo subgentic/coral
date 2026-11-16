@@ -78,7 +78,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
         });
     };
     /** The words after "Sent to A": a first ask says nothing more; one that was asked before says so plainly, not "(already asked)" (#15119). */
-    const sentWords = words => { const w = String(words || '').replace(/^./, c => c.toLowerCase()); return !w ? '' : w.startsWith('already asked') ? ` (asked about this thread before${w.slice('already asked'.length)})` : ` (${w})`; };
+    const sentWords = words => { const w = String(words || '').replace(/^./, c => c.toLowerCase()); return !w ? '' : w.startsWith('already asked') ? `, who was already asked about this thread${w.slice('already asked'.length)}` : ` (${w})`; };
     const statusWords = id => { const p = document.createElement('p'); fillStatus(p, id); return p.textContent; };
     const redrawStatus = id => { const p = panel.querySelector(`.ac-card[data-id="${id}"] .ac-ask-status`); if (p) fillStatus(p, id); };
     function askBlock() {

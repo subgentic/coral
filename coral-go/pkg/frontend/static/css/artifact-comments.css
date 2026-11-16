@@ -94,7 +94,7 @@
     .artifact-viewer-header .artifact-viewer-newtab:not([hidden]) + .artifact-viewer-download { margin-left: 0; } /* the two buttons sit together at the right */
     .ac-toggle { display: inline-flex; align-items: center; min-height: 44px; }
     .ac-toggle[hidden] { display: none; }
-    .ac-panel { position: absolute; left: 0; right: 0; bottom: 0; width: auto; flex: none; max-height: 70%; border-left: 0; border-top: 1px solid var(--border); border-radius: 12px 12px 0 0; transform: translateY(105%); transition: transform 0.2s ease; z-index: 110; padding-bottom: calc(var(--space-md) + env(safe-area-inset-bottom, 0px)); }
+    .ac-panel { position: absolute; left: 0; right: 0; bottom: 0; width: auto; flex: none; max-height: 50%; border-left: 0; border-top: 1px solid var(--border); border-radius: 12px 12px 0 0; transform: translateY(105%); transition: transform 0.2s ease; z-index: 110; padding-bottom: calc(var(--space-md) + env(safe-area-inset-bottom, 0px)); }
     .ac-panel.ac-sheet-open { transform: none; }
     .ac-sheet-close { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; order: 2; }
     .ac-head { flex-wrap: wrap; }
@@ -130,7 +130,7 @@
     .preview-main > .ac-panel:not(.ac-sheet-open) { display: none; }
 }
 @container pv (max-width: 719px) {
-    .preview-main > .ac-panel { position: absolute; left: 0; right: 0; bottom: 0; width: auto; flex: none; max-height: 70%; border-left: 0; border-top: 1px solid var(--border); border-radius: 12px 12px 0 0; transform: translateY(105%); z-index: 5; box-shadow: 0 -4px 16px rgba(var(--black-rgb), 0.25); }
+    .preview-main > .ac-panel { position: absolute; left: 0; right: 0; bottom: 0; width: auto; flex: none; max-height: 50%; border-left: 0; border-top: 1px solid var(--border); border-radius: 12px 12px 0 0; transform: translateY(105%); z-index: 5; box-shadow: 0 -4px 16px rgba(var(--black-rgb), 0.25); }
     .preview-main > .ac-panel.ac-sheet-open { transform: none; }
     .preview-main > .ac-panel .ac-sheet-close { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; order: 2; }
     .preview-main > .ac-panel .ac-head { flex-wrap: wrap; }
