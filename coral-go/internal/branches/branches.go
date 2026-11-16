@@ -83,7 +83,8 @@ type Repo struct {
 	PRNote string `json:"pr_note,omitempty"`
 	key    string // the collector's key for this repository
 	// Unreadable: git would not read the repository (not a repository any more, or one it calls of dubious ownership, which Coral never overrides).
-	Unreadable bool `json:"unreadable,omitempty"`
+	Unreadable bool   `json:"unreadable,omitempty"`
+	baseTip    string // the full commit id of the base, for a branch's detail (#17543)
 }
 
 // counts are a branch's numbers against the base, kept while neither tip moves.
@@ -130,6 +131,9 @@ var readCommands = map[string][]string{
 	"for-each-ref": {refsFormat},
 	"config":       {"--get"},
 	"merge-base":   {"--is-ancestor", "--end-of-options"},
+	// A branch's detail (#17543): its commits over the base, and the files they change. Commit ids only, as a range, after --end-of-options.
+	"log":  {"--max-count=51", "--format=%H%x1f%an%x1f%aI%x1f%s", "--no-color", "--no-show-signature", "--end-of-options"},
+	"diff": {"--numstat", "--no-renames", "--no-ext-diff", "--no-color", "--end-of-options"},
 }
 
 // readOperands pins the operands of the commands that take a fixed one: for-each-ref reads only refs/heads, config reads only the origin's URL.
@@ -168,6 +172,9 @@ func readAllowed(args []string) bool {
 			}
 			if args[0] == "merge-base" && (!ended || !validSHA(a)) {
 				return false // commit ids only, after --end-of-options
+			}
+			if (args[0] == "log" || args[0] == "diff") && (!ended || !rangeRe.MatchString(a)) {
+				return false // one range of two commit ids, after --end-of-options
 			}
 			continue
 		}
@@ -348,6 +355,7 @@ func (c *Collector) read(ctx context.Context, root string) *Repo {
 	}
 	baseName, baseTip := c.base(ctx, root)
 	repo.Base = baseName
+	repo.baseTip = baseTip
 	if out, err := c.run(ctx, root, "config", "--get", "remote.origin.url"); err == nil {
 		if r, ok := parseRemote(string(out)); ok {
 			repo.Remote = &r
@@ -522,6 +530,7 @@ func parseWorktrees(out []byte) []Worktree {
 	return trees
 }
 
+var rangeRe = regexp.MustCompile(`^[0-9a-f]{40}([0-9a-f]{24})?\.\.\.?[0-9a-f]{40}([0-9a-f]{24})?$`)
 var shaRe = regexp.MustCompile(`^[0-9a-f]{40}([0-9a-f]{24})?$`)
 
 // validSHA says s is a full commit id: the only thing about a branch this package gives git.
