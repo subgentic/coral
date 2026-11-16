@@ -6,6 +6,7 @@ import { browserLocal } from './safe_storage.js';
 import { ensureBuilt, onBuilt } from './lazy_dom.js';
 import { importOnce } from './import_once.js';
 
+
 // ── Sidebar kebab menu helpers ───────────────────────────────────────────
 // With restoreFocus (Escape) the focus goes back to the button of the menu that was open, when it was inside it (#4621).
 export function closeSidebarKebabs({ restoreFocus = false } = {}) {
@@ -18,6 +19,8 @@ export function closeSidebarKebabs({ restoreFocus = false } = {}) {
         }
     }
 }
+
+const menuItemRoles = menu => { for (const it of menu.querySelectorAll('.overflow-menu-item')) if (!it.hasAttribute('role')) it.setAttribute('role', 'menuitem'); };
 
 export function toggleSidebarKebab(btn, event) {
     const menu = btn.nextElementSibling;
@@ -34,6 +37,7 @@ export function toggleSidebarKebab(btn, event) {
         // Measured hidden; the tablet drawer (#15258) transforms and clips, so its box is the window
         menu.style.visibility = 'hidden';
         menu.style.display = 'block';
+        window.menuHelp?.(menu); // menu_help.js (fetched by kebab_keys.js) sets it: lines drawn before the menu is measured (#17492)
         const r = btn.getBoundingClientRect(), sb = menu.closest('.tablet-open');
         const x = sb ? sb.getBoundingClientRect() : new DOMRect(0, 0, innerWidth, innerHeight);
         // A menu longer than the screen scrolls inside it and never runs past its edge: a phone's row menu is 16 items (#17333), and Stop at the foot must be reachable.
@@ -44,7 +48,7 @@ export function toggleSidebarKebab(btn, event) {
         menu.style.left = Math.min(r.left - x.left, x.width - w - 8) + 'px';
         menu.style.visibility = '';
         // Every item is a menu item for a screen reader (the row menus are marked as they are drawn).
-        for (const it of menu.querySelectorAll('.overflow-menu-item')) if (!it.hasAttribute('role')) it.setAttribute('role', 'menuitem');
+        menuItemRoles(menu);
         // Opened from the keyboard (Enter or Space is a click with no pointer): the focus goes to the first item.
         if (event?.detail === 0) menu.querySelector('.overflow-menu-item')?.focus({ preventScroll: true });
         // Hide any visible tooltips so they don't cover the menu
@@ -58,7 +62,7 @@ export function toggleTopBarSettings(event) {
     if (!menu) return;
     const isOpen = menu.style.display !== 'none';
     menu.style.display = isOpen ? 'none' : '';
-    for (const it of menu.querySelectorAll('.overflow-menu-item')) if (!it.hasAttribute('role')) it.setAttribute('role', 'menuitem'); // the items are menu items to a screen reader (#10374)
+    menuItemRoles(menu); // the items are menu items to a screen reader (#10374)
     document.querySelector('[aria-controls="top-bar-settings-menu"]')?.setAttribute('aria-expanded', String(!isOpen));
     if (!isOpen && event && event.detail === 0) [...menu.querySelectorAll('.overflow-menu-item')].find(i => i.getClientRects().length)?.focus({ preventScroll: true }); // opened from the keyboard (a click with no pointer), the focus goes into the menu (#6038)
     // Sync group-by-team checkmark
