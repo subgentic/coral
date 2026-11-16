@@ -5,6 +5,7 @@ import { serverFetch, serverForSession, sessionServer, inTeam, keyLabel } from '
 import { showToast } from './utils.js';
 import { redrawLiveList } from './list_hooks.js';
 import { showConfirmModal } from './confirm_dialog.js';
+import { applySleepingView } from './sleeping_view.js';
 
 const members = (board, archived) => (state.liveSessions || []).filter(s => inTeam(s, board) && !!s.archived === archived);
 
@@ -22,6 +23,9 @@ async function each(board, action, list) {
         } catch { /* counted below: the toast says how many of the team were moved */ }
     }
     redrawLiveList();
+    const cur = state.currentSession, row = cur && cur.type === 'live' && state.liveSessions.find(x => x.session_id === cur.session_id && sessionServer(x) === sessionServer(cur));
+    if (row && list.includes(row) && !!cur.sleeping !== !!row.sleeping) window.selectLiveSession(cur.name, cur.agent_type, cur.session_id, sessionServer(cur)); // the chat on screen follows now, not on the next feed tick, as Archive agent's does
+    else if (row && list.includes(row) && row.sleeping) applySleepingView(true, { archived: !!row.archived, manageInput: !document.body.classList.contains('popout-mode') });
     return done;
 }
 
@@ -41,3 +45,4 @@ export async function restoreTeam(board) {
     showToast(n === list.length ? `Team "${name}" is back, asleep. Wake Team starts it.` : `Restored ${n} of ${list.length} agents of "${name}"`, n !== list.length);
     return n > 0;
 }
+export { archiveTeam as archive, restoreTeam as restore }; // team_actions.js calls them by the menu's own word

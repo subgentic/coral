@@ -35,7 +35,7 @@ function _archivedTeamLabel(s) {
 export function _renderArchivedSection(archived) {
     if (!archived.length) return '';
     const expanded = _isArchivedExpanded();
-    const names = [...new Set(archived.filter(s => s.board_project).map(_archivedTeamLabel))].sort((a, b) => a.localeCompare(b)); // the line names its teams, so an archived team is not a nameless count (#17491)
+    const names = [...new Set(archived.filter(s => s.board_project).map(_archivedTeamLabel))]; // the line names its teams, so an archived team is not a nameless count (#17491)
     const named = names.length ? ' · ' + names.slice(0, 2).join(', ') + (names.length > 2 ? ` +${names.length - 2}` : '') : '';
     let html = `<li class="sleeping-summary-row archived-summary-row" data-on-click="archived-toggle"><button type="button" class="row-btn" aria-expanded="${escapeAttr(expanded)}">
         ${SVGO.o4}<rect x="2" y="3" width="12" height="3" rx="0.5"/><path d="M3 6v7h10V6"/><path d="M6.5 9h3"/></svg>
