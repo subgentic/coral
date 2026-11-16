@@ -53,7 +53,7 @@ export function setLaunchStage(stage) {
     if (rm) { rm.hidden = !launch.member?.row || stage !== 'agent'; rm.style.visibility = String(launch.member?.value?.name || '').trim().toLowerCase() === 'orchestrator' ? 'hidden' : ''; } // Edit member only; the Orchestrator is not removed (#10836), but its slot stays (hidden, out of the Tab order) so Save member never changes places with Remove from team (walk 10 H4)
     const mvBox = document.getElementById('launch-member-move'); if (mvBox) mvBox.hidden = !launch.member?.row || stage !== 'agent'; // a single-pointer way to reorder besides dragging and Alt+Arrow, for touch (#10868): in the dialog's header, not its footer (#16361)
     const recap = document.getElementById("launch-recap");
-    if (recap) recap.hidden = stage === 'folder' || !!launch.member;
+    if (recap) recap.hidden = stage !== 'agent' || !!launch.member; // the start command is for the model step only (#18082 item 3, #18568)
     const live = document.getElementById("launch-stage-live");
     if (live) live.textContent = '';
     return sub;
