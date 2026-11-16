@@ -35,7 +35,8 @@ const (
 	// v2.0.65 candidate (lead-v2065): the ~375 picks (the review series and versions, Needs you cards, team files, Dropbox, the getting-started guide) put the tree at 6,653,071 bytes, 57,487 over the previous budget; plus 64 KiB, rounded up to a whole KiB, is 6,719,488 (the Operator's standing approval; the start-JS and start-CSS ceilings are unchanged).
 	// v2.0.69 trial (final head ed3f2ff50, standing OK for approved work, not the start-CSS cap nor the app.js ceiling): the ~300 picks put the tree at 6,823,707 bytes, 31,515 over the previous budget; plus 64 KiB, as the test prints.
 	// v2.0.69 rc4 head b366165fb6 (standing OK for approved work, not the start-CSS cap nor the app.js ceiling): the roll-in picks put the tree at 6,954,861 bytes, 65,389 over the previous budget; plus 64 KiB, as the test prints (#18676).
-	staticBudget = 7_020_544
+	// #18825: the Technical Writer's Getting started guide (v7, approved by the Operator; guide/getting-started.md, 1,244,326 bytes with its nine screenshots inline, up from 395,954) is the first Inbox item of a new install and ships inside the binary: the tree is 7,813,278 bytes; plus 64 KiB, as the test prints. The Operator's standing OK for approved work (not the start-CSS cap).
+	staticBudget = 7_879_680
 	// fileBudget is the most one embedded file may hold (the CodeMirror bundle, the largest, is ~1 MB).
 	fileBudget = 1536 << 10
 	// budgetWarnRoom is the room under which the test warns, and budgetPolicyRoom the room a raise leaves.
@@ -361,7 +362,7 @@ var nonWebAllowed = map[string]string{
 	"vendor/fonts/README.md":            "the fonts' licences and sources: the notice that goes with the font files",
 	"vendor/xterm/addon-canvas.LICENSE": "the licence text of a vendored library",
 	".gitkeep":                          "12 bytes: keeps static/ a directory the embed can name in a fresh checkout",
-	"guide/getting-started.md":          "the Getting Started guide (#14744): the welcome list's 'Read the Coral guide' row fetches it from /static/guide/ when it is opened, never at start; it has its screenshots inline, so it is not agent_docs",
+	"guide/getting-started.md":          "the Getting Started guide (#14744): the welcome list's first item, 'Read the Coral guide' (#18825), reads it from the embedded /static/guide/ when it is opened, never at start; it has its screenshots inline, so it is not agent_docs",
 }
 
 // webExt are the extensions of what a browser loads from the static tree.

@@ -13,11 +13,11 @@ const BASE=require('./test_base').BASE;
    await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>{m.updateInboxTab();return m.selectInboxTab('needs')}).then(()=>true)`);
    await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-actions').length===5`,'five Welcome actions');
    const got=await ev(`[...document.querySelectorAll('#group-table-view .inbox-welcome-actions')].map(e=>({text:e.querySelector('.inbox-main-action').textContent,primary:e.querySelector('.inbox-main-action').classList.contains('btn-primary')}))`);
-   assert.equal(got[0].text,'New agent','Start your first agent is first');assert.deepEqual(got.filter(a=>a.primary).map(a=>a.text),['New agent'],'one primary action');
+   assert.equal(got[0].text,'Open guide','the guide is first (#18825)');assert.equal(got[1].text,'New agent','Start your first agent follows it');assert.deepEqual(got.filter(a=>a.primary).map(a=>a.text),['New agent'],'one primary action');
    await ev(`import((window.__coralStatic||'/static/')+'launch_disclosure.js').then(m=>m.refreshLaunchDisclosure()).then(()=>true)`);
    assert.equal(await ev(`!!document.getElementById('launch-disclosure-banner')`),false,'no auto-mode banner without any agents');
    // Open the first action before a live agent makes that completed Welcome item disappear.
-   await ev(`document.querySelector('#group-table-view .inbox-welcome-actions .inbox-main-action').click();true`);
+   await ev(`[...document.querySelectorAll('#group-table-view .inbox-welcome-actions .inbox-main-action')].find(b=>b.textContent==='New agent').click();true`);
    await waitFor(`document.getElementById('launch-modal')?.getClientRects().length>0`,'New agent opens launch');await ev(`window.hideLaunchModal();true`);
    await ev(`window.T.state.liveSessions=[{session_id:'qa-agent',name:'First agent',server:'local'}];window.dispatchEvent(new Event('coral:live-list-rendered'));true`);
    await waitFor(`!!document.getElementById('launch-disclosure-banner')`,'notice available after first agent');

@@ -1,10 +1,14 @@
-// The Getting started guide says its screenshots show the dark theme (#15175, walk 7 L17; the Orchestrator's decision: keep them dark and say so), once, near the top, before the first screenshot.
+// The Getting started guide (#18825, the Technical Writer's v7, approved by the Operator) shows Coral in pictures: it has screenshots, every one is inline in the file (shipped with the binary, nothing fetched) and
+// has words for a screen reader. (It said once that its screenshots were the dark theme, #15175; the new text has no such line and its pictures are the guide's own.)
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const md = readFileSync(new URL('../../coral-go/pkg/frontend/static/guide/getting-started.md', import.meta.url), 'utf8');
-const caption = md.indexOf('Screenshots show the dark theme.'), firstShot = md.indexOf('![');
-assert.ok(firstShot > 0, 'the guide has screenshots');
-assert.ok(caption > 0 && caption < firstShot, 'the caption comes before the first screenshot');
-assert.equal(md.split('Screenshots show the dark theme.').length - 1, 1, 'said once');
+const shots = [...md.matchAll(/!\[([^\]]*)\]\(([^)]*)\)/g)];
+assert.ok(shots.length >= 5, 'the guide has screenshots: ' + shots.length);
+for (const [, alt, src] of shots) {
+    assert.ok(alt.trim().length > 8, 'a screenshot has words for a screen reader: "' + alt + '"');
+    assert.match(src, /^data:image\//, 'a screenshot is inline, not fetched: ' + src.slice(0, 40));
+}
+assert.match(md, /^# Getting started with Coral/m, 'the guide opens with its title');
 console.log('guide_theme_caption: ok');
