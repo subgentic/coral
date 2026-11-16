@@ -167,6 +167,7 @@ function _syncTeamGate() {
     }
     if (go && !go.disabled) go.removeAttribute('aria-disabled');
     if (!recap) return;
+    importOnce('./launch_footer.js').then(m => m.fitFooter('launch-step-team')).catch(() => {}); // desktop: the line sits at the left of the buttons (#18795)
     recap.classList.toggle('launch-recap-warn', !!reason && step !== 'team' && step !== 'members');
     recap.classList.toggle('launch-recap-error', !!reason && (step === 'team' || step === 'members')); // steps 1 and 2: one red line naming the first thing wrong (step 1: the field errors are under the fields)
     const line = document.createDocumentFragment(); // built apart: a polite live region that is rewritten with the same words is said again, so an unchanged line is left alone (#10693)
