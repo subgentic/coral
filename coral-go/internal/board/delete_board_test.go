@@ -64,7 +64,7 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	require.NoError(t, err)
 	require.NoError(t, s.RecordAsk(ctx, project, linked, []string{"Dev"}))
 	require.NoError(t, s.LinkAsk(ctx, project, linked.ID, hello.ID))
-	require.NoError(t, s.RecordAskSubject(ctx, project, hello.ID, 1, 2, true))                                                                                          // what a question is about goes with its board (#12164)
+	require.NoError(t, s.RecordAskSubject(ctx, project, hello.ID, 1, 2, true))                                                                                    // what a question is about goes with its board (#12164)
 	require.NoError(t, s.SetOrchGrant(ctx, OrchGrant{Project: project, Enabled: true, SeatSession: "seat-1", MaxPerHour: 5, MaxLive: 4, IdleMin: 5}, "Operator")) // #11432
 	_, err = s.ReserveLifecycle(ctx, project, LifecycleWake, "Orchestrator", "Dev", nil)
 	require.NoError(t, err)
