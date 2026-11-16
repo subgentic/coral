@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -106,8 +107,20 @@ func TestListReviewStatesCostOnABigBoard(t *testing.T) {
 		_, err := s.CreateTask(ctx, team, fmt.Sprintf("open %d", i), body, "medium", "lead", "Dev")
 		require.NoError(t, err)
 	}
-	states := bestOf(7, func() { _, _ = s.ListOpenTaskStates(ctx, team) })
-	reviews := bestOf(7, func() { _, _ = s.ListReviewStates(ctx, team) })
-	t.Logf("1,500 open tasks plus the review tasks: ListOpenTaskStates %v, ListReviewStates %v", states, reviews)
+	// A coarse clock (Windows reads 0s for a fast call, #18567) cannot tell short reads apart: each read is timed
+	// as a batch of k calls, with k grown until the batch takes 20 ms, and compared as the time of one call.
+	perCall := func(call func()) (per time.Duration, k int) {
+		batch := func() {
+			for i := 0; i < k; i++ {
+				call()
+			}
+		}
+		for k = 1; k < 1<<16 && bestOf(3, batch) < 20*time.Millisecond; k *= 2 {
+		}
+		return bestOf(7, batch) / time.Duration(k), k
+	}
+	states, ks := perCall(func() { _, _ = s.ListOpenTaskStates(ctx, team) })
+	reviews, kr := perCall(func() { _, _ = s.ListReviewStates(ctx, team) })
+	t.Logf("1,500 open tasks plus the review tasks, per call: ListOpenTaskStates %v (batches of %d), ListReviewStates %v (batches of %d)", states, ks, reviews, kr)
 	assert.Less(t, reviews, states, "the review read costs less than the open-task read it sits beside")
 }
