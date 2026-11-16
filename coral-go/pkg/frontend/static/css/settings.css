@@ -55,7 +55,8 @@
 }
 /* Per-row persistence feedback stays beside the setting, including at larger text sizes. */
 .settings-save-status { display: block; font-size: var(--sv-help-size); color: var(--text-muted); }
-.settings-save-status:not([data-error]) { position: absolute; right: 0; bottom: 1px; pointer-events: none; } /* "Saved" sits in the row's own padding and takes no room, so the switch does not move when it appears (Beta Tester, walk 16414); an error still takes its line */
+.settings-save-status:not([data-error]) { position: absolute; right: 0; bottom: -6px; pointer-events: none; } /* "Saved" sits in the row's own padding and takes no room, so the switch does not move when it appears (Beta Tester, walk 16414); an error still takes its line */
+.sv-row-toggle .settings-save-status:not([data-error]) { right: 3.5rem; bottom: auto; top: 50%; transform: translateY(-50%); } /* a switch row has no padding to spare: the note sits level with the switch, to its left (#17628) */
 .settings-save-status[data-error] { color: var(--danger); }
 
 /* Password recovery is help text; retain its public link and phone target. */
