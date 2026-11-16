@@ -33,12 +33,11 @@ const NAME = 'claude-' + SID;
         await waitFor(`document.querySelectorAll('#files-search-dropdown .file-mention-item').length === 3`, 'two matches and + Create in the dropdown', 5000, `({ n: document.querySelectorAll('#files-search-dropdown .file-mention-item').length, d: (document.getElementById('files-search-dropdown')||{}).style && document.getElementById('files-search-dropdown').style.display, errs: window.__errors, mod: performance.getEntriesByType('resource').some(e => /file_search/.test(e.name)) })`);
         const sel = () => ev(`[...document.querySelectorAll('#files-search-dropdown .file-mention-item')].findIndex(e => e.classList.contains('selected'))`);
         check(await sel() === 0, 'the first match is highlighted: ' + await sel());
-                await press('ArrowDown'); check(await sel() === 1, 'Down moves the highlight: ' + await sel());
+        await press('ArrowDown'); check(await sel() === 1, 'Down moves the highlight: ' + await sel());
         await press('ArrowUp'); check(await sel() === 0, 'Up moves it back: ' + await sel());
         check((await ev(`window.__errors`)).length === 0, 'the arrow keys threw: ' + JSON.stringify(await ev(`window.__errors`)));
         await press('ArrowDown'); check(await sel() === 1, 'Down again: ' + await sel()); await press('Enter');
         try { await waitFor(`(document.querySelector('#preview-toolbar .preview-toolbar-path') || {}).textContent === 'src/alpine.js'`, 'the file open in the preview', 3000); } catch (e) { problems.push(e.message.slice(0, 200)); }
-        check(true, '');
         await ev(`(() => { const i = document.getElementById('files-search-input'); i.focus(); i.value = 'src/new.js'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
         await waitFor(`[...document.querySelectorAll('#files-search-dropdown .file-mention-item')].some(e => /^\\+ Create src\\/new\\.js$/.test(e.textContent))`, 'the + Create row', 5000);
     } finally { await client.close(); }
