@@ -141,7 +141,7 @@ const MENU = (extra = {}) => ({ question: 'Quick safety check: Is this a project
                 }
                 check(!got.some(l => /trust/i.test(l)) && (expect === 0 ? JSON.stringify(got) === JSON.stringify(['Open agent']) : got.length === expect), `${at}${name}: no Yes on the row (${expect ? expect + ' choice' : 'only Open agent'}): ` + JSON.stringify(got));
                 if (name === 'no offer' || name === 'no folder' || name === 'a hidden character in the folder') check(JSON.stringify(got) === JSON.stringify(['No, exit']) && /open the agent/i.test(await ev(`document.querySelector('#group-table-view .inbox-answers').textContent`)), `${at}${name}: No only, the rest is left to Open: ` + JSON.stringify(got));
-                if (name === 'no offer, with the reason (#14572)') check((await ev(`document.querySelector('#group-table-view .inbox-only-reject')?.textContent || ''`)).includes(`No Yes here: ${WHY} Open the agent to answer.`), `${at}${name}: the row says why there is no Yes`);
+                if (name === 'no offer, with the reason (#14572)') check((await ev(`document.querySelector('#group-table-view .inbox-only-reject')?.textContent || ''`)).includes(`Folder trust is unavailable here. ${WHY} Open the agent to review it.`), `${at}${name}: the row says why there is no Yes`);
             }
 
             // 5) the server refuses the Yes (the folder changed): told, nothing claimed, the choices drawn again

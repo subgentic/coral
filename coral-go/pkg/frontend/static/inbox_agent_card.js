@@ -66,7 +66,8 @@ export function openAgentCard(s) {
         if (card.onlyReject) body.append(el('p', 'inbox-only-reject', 'It can only be rejected here: what it wants to run is cut or hidden, or too long to read in full.'));
         const list = el('div', 'inbox-ask-offers-list');
         for (const o of card.options) {
-            const b = el('button', 'btn', String(o.label)); b.type = 'button'; b.dataset.n = String(Number(o.n));
+            const primaryTrust = card.options.length === 2 && card.options.some(p => p.label === 'No, exit') && o.label === 'Yes, I trust this folder';
+            const b = el('button', primaryTrust ? 'btn btn-primary' : 'btn', String(o.label)); b.type = 'button'; b.dataset.n = String(Number(o.n));
             b.addEventListener('click', () => choose(card, o, list));
             list.append(b);
         }

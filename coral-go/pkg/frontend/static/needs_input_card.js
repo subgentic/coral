@@ -516,15 +516,7 @@ export function syncNeedsInputCard(container, session) {
         container.appendChild(el);
     }
     watchCardInView(el);
-    if (isNew) takeKeyboard(el);
-}
-
-// A new question takes the keyboard on its first answer (#10410, Beta #10401: it went to the hidden terminal box and the answers were 53 Tab stops away), unless the person is in the middle of a message in the box or somewhere else that holds words.
-function takeKeyboard(card) {
-    const now = document.activeElement;
-    const free = !now || now === document.body || (now.id === "command-input" && !now.value);
-    const first = free && card.querySelector(".cni-answer:not(:disabled)");
-    if (first) first.focus({ preventScroll: true });
+    if (isNew) importOnce('./needs_input_focus.js').then(m => m.takeKeyboard(el));
 }
 
 // The numbers a question's answers are labelled with pick them (1 Red, 2 Blue), from the keyboard in the card (#10410).

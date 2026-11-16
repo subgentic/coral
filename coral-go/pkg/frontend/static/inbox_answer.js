@@ -123,6 +123,13 @@ export async function readWholeQuestion(s) {
     return q.length > 4096 ? `${q.slice(0, 4096)}\u2026` : q;
 }
 
+/** Fresh server-authorized Claude folder menu; the group also pins the recorded folder. */
+export async function readTrustAsk(s) {
+    if (sessionServer(s) !== 'local' || blockedReason('local', 'interact')) return null;
+    const r = await readAsk(s);
+    return r.ask && (r.trust || typeof r.trustWhy === 'string') ? r : null;
+}
+
 const askKey = s => `${sessionServer(s)}:${s.session_id}:${s.waiting_since || ''}`;
 
 async function answer(s, o, ask, cell, step = '', trustFolder = '', rateLimitModel = '') { // step: the whole review text the row was drawn for ('' for a step with no review)
@@ -292,7 +299,7 @@ function fill(s, cell, withDismiss = true) {
             cell.append(b);
         }
         gate?.apply();
-        if (held) { const more = document.createElement('span'); more.className = 'inbox-only-reject'; more.textContent = trustWhy ? `No Yes here: ${trustWhy} Open the agent to answer.` : 'More choices: open the agent.'; cell.append(more);
+        if (held) { const more = document.createElement('span'); more.className = 'inbox-only-reject'; more.textContent = trustWhy ? `Folder trust is unavailable here. ${trustWhy} Open the agent to review it.` : 'More choices: open the agent.'; cell.append(more);
             if (typeof trustWhy === 'string') { const r = document.createElement('button'); r.type = 'button'; r.className = 'btn btn-small inbox-review-trust'; r.textContent = 'Review and trust'; r.setAttribute('aria-label', `Review and trust the folder of ${resolveSessionIdentity(s)}`); // the full card in a dialog over the Inbox, with Yes, I trust this folder (#15090; the row keeps #14110's rule)
                 r.addEventListener('click', e => { e.stopPropagation(); importOnce('./inbox_agent_card.js').then(m => (m.canOpenCard(s) ? m.openAgentCard(s) : openAgent(s))); });
                 r.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }); cell.append(r); } } // some of the question's choices are left to Open: said, so these do not read as all of them
