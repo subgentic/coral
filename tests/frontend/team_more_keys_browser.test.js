@@ -37,6 +37,18 @@ const BOARD = 'more-keys-' + Date.now().toString(36);
         await ev(`document.getElementById('team-page-more').focus(); if (document.getElementById('team-page-more-menu').hidden) document.getElementById('team-page-more').click(); true`);
         await waitFor(`!document.getElementById('team-page-more-menu').hidden`, 'the menu opens again', 5000);
         await press('Tab'); s = await at(); check(!s.open, `Tab from the button closes the menu: ${JSON.stringify(s)}`);
+        // after Stop agents (Kill all) is chosen and its confirmation is cancelled, the menu takes the keys and Tab closes it just the same (#16432 item 2, #17417)
+        await ev(`document.getElementById('team-page-more').focus(); if (document.getElementById('team-page-more-menu').hidden) document.getElementById('team-page-more').click(); true`);
+        await waitFor(`!document.getElementById('team-page-more-menu').hidden`, 'the menu opens for Stop agents', 5000);
+        await ev(`document.querySelector('#team-page-more-menu [data-stop="kill"]').click(); true`);
+        await waitFor(`document.getElementById('confirm-modal').style.display === 'flex'`, 'the Stop agents confirmation', 8000);
+        await ev(`document.querySelector('#confirm-modal .modal-footer button:not(#confirm-modal-yes), #confirm-modal [data-on-click="confirm-no"], #confirm-modal .modal-close').click(); true`);
+        await waitFor(`document.getElementById('confirm-modal').style.display !== 'flex'`, 'the confirmation is cancelled', 5000);
+        await ev(`document.getElementById('team-page-more').focus(); document.getElementById('team-page-more').click(); true`);
+        await waitFor(`!document.getElementById('team-page-more-menu').hidden`, 'the menu opens after Stop agents', 5000);
+        await press('ArrowDown'); s = await at(); check(s.idx === 0, `after Stop agents, Down is the first item: ${JSON.stringify(s)}`);
+        await press('End'); s = await at(); check(s.idx === s.n - 1, `after Stop agents, End is the last item: ${JSON.stringify(s)}`);
+        await press('Tab'); s = await at(); check(!s.open, `after Stop agents, Tab closes the menu: ${JSON.stringify(s)}`);
     } finally { await removeBoards(ev, [BOARD]).catch(() => {}); await client.close(); }
     assert.deepEqual(problems, [], 'the More menu keys:\n  ' + problems.join('\n  '));
     console.log('PASS the team More menu: Down, Up, Home, End move from the button and Tab closes it (real keys)');
