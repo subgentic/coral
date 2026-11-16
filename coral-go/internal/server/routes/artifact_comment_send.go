@@ -519,3 +519,12 @@ func (h *SessionsHandler) sendNoTeamComment(w http.ResponseWriter, r *http.Reque
 	}
 	writeJSON(w, status, map[string]any{"ok": res.State == "sent", "results": []sendResult{res}})
 }
+
+// newVersionLine is the line that tells an agent how to answer a comment on a file with a fix (#17361, walk 67): upload the next version of this file under its own name (a new file would be a
+// second row for one document), and say everything that changed in the reply, not only the main edit. Only a file has versions: a comment on changes or a goal gets none.
+func newVersionLine(kind sendKind) string {
+	if kind != sendOnArtifact {
+		return ""
+	}
+	return "If your answer changes the file, upload the next version of this same file under the same name: coral-agent artifact upload <file> --new-version-of <the link on the Version line>. Do not upload it as a new file. In your reply say everything you changed, not only the main edit.\n"
+}
