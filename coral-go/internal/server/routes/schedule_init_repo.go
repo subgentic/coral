@@ -98,9 +98,10 @@ func (h *ScheduleHandler) InitJobRepo(w http.ResponseWriter, r *http.Request) {
 			args = append(args, "-c", key+"="+fallback)
 		}
 	}
-	var left []string // files a first commit leaves out for their names (#17211)
+	var left []string
+	var snap indexSnapshot // files a first commit leaves out for their names (#17211)
 	if body.IncludeFiles {
-		if n, capped := countFolderFiles(dir, maxFirstCommitFiles); capped {
+		if n, capped := countFolderFiles(ctx, dir, maxFirstCommitFiles); capped {
 			errBadRequest(w, fmt.Sprintf("This folder holds more than %d files, too many for a first commit. Pick a smaller project folder, or make the first commit empty.", maxFirstCommitFiles))
 			return
 		} else if n == 0 {
@@ -110,7 +111,7 @@ func (h *ScheduleHandler) InitJobRepo(w http.ResponseWriter, r *http.Request) {
 	if body.IncludeFiles {
 		var serr error
 		var sout string
-		if left, serr, sout = stageFirstCommit(ctx, dir); serr != nil {
+		if left, snap, serr, sout = stageFirstCommit(ctx, dir); serr != nil {
 			if ctx.Err() != nil {
 				sout = "it took too long"
 			}
@@ -120,7 +121,9 @@ func (h *ScheduleHandler) InitJobRepo(w http.ResponseWriter, r *http.Request) {
 	}
 	args = append(args, "-c", "commit.gpgsign=false", "commit", "--allow-empty", "--no-verify", "-m", "Initial commit") // never a signing prompt or a failed signature on Coral's own placeholder commit (#10534)
 	if out, err := gitutil.Command(ctx, dir, args...).CombinedOutput(); err != nil {
-		unstage(dir)
+		if body.IncludeFiles {
+			snap.undo(dir)
+		}
 		errBadRequest(w, "the first commit failed: "+strings.TrimSpace(string(out)))
 		return
 	}

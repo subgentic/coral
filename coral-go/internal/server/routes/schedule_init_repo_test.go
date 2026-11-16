@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"os/exec"
@@ -163,13 +164,13 @@ func TestInitJobRepoCountsFilesAndRefusesAHugeFolder(t *testing.T) {
 	for i := 0; i < 7; i++ {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "big", "deep", "f"+strconv.Itoa(i)), []byte("x"), 0o644))
 	}
-	n, capped := countFolderFiles(dir, 100)
+	n, capped := countFolderFiles(context.Background(), dir, 100)
 	assert.Equal(t, 7, n, "one folder holding seven files is seven files, not one")
 	assert.False(t, capped)
 	old := maxFirstCommitFiles
 	maxFirstCommitFiles = 5
 	t.Cleanup(func() { maxFirstCommitFiles = old })
-	n, capped = countFolderFiles(dir, 5)
+	n, capped = countFolderFiles(context.Background(), dir, 5)
 	assert.True(t, capped, "past the limit it says so, and stops counting")
 	code, body := sendJSON(t, http.MethodPost, srv.URL+"/api/scheduled/jobs/init-repo", map[string]any{"repo_path": dir, "include_files": true})
 	assert.Equal(t, http.StatusBadRequest, code)
@@ -186,8 +187,9 @@ func TestAFailedFirstCommitLeavesNothingStaged(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, consoletest.HiddenCommand("git", "init", "-q", dir).Run())
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a"), 0o644))
+	snap := takeIndexSnapshot(dir)
 	require.NoError(t, consoletest.HiddenCommand("git", "-C", dir, "add", "-A").Run()) // half-staged, as after a timeout
-	unstage(dir)
+	snap.undo(dir)
 	out, err := consoletest.HiddenCommand("git", "-C", dir, "diff", "--cached", "--name-only").Output()
 	require.NoError(t, err)
 	assert.Empty(t, strings.TrimSpace(string(out)), "the index is empty again")
