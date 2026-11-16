@@ -237,6 +237,7 @@ func (h *SessionsHandler) resumeCommand(ctx context.Context, p *restartPlan, age
 		BoardName:       p.board,
 		BoardLabel:      h.boardLabel(p.board),
 		Role:            naming.SubscriberID(p.displayName, p.agentType),
+		PostedBefore:    h.postedBefore(ctx, p.board, naming.SubscriberID(p.displayName, p.agentType)),
 		Prompt:          p.prompt,
 		PromptOverrides: promptOverrides(userSettings),
 		BoardType:       p.boardType,

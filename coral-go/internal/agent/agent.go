@@ -34,6 +34,7 @@ type LaunchParams struct {
 	// NoStartPrompt: this launch resumes a conversation that already has its first prompt, and what woke it says what to do: the CLI is started without the first message (auto-wake, #12358). The role
 	// still reaches a Claude agent through its system prompt, and every agent through its board protocol.
 	NoStartPrompt     bool
+	PostedBefore      bool              // the member has posted on this board before (a restart or a new session): its first message does not ask it to introduce itself again (#17641)
 	OneShot           bool              // run once and exit: Pi's --print --no-session with Prompt as its argument (a scheduled job, #11293); other CLIs ignore it
 	PromptOverrides   map[string]string // user overrides for orchestrator/worker prompts
 	BoardType         string

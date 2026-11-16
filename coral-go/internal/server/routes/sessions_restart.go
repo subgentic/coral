@@ -487,8 +487,9 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 		BoardName:       p.board,
 		BoardLabel:      h.boardLabel(p.board),
 		Role:            naming.SubscriberID(p.displayName, p.agentType),
-		Prompt:          withRestartBrief(p.prompt, h.restartBrief(ctx, p)), // the task it held, for this launch only (#16893)
-		RestartNote:     h.restartNote(ctx, p),                              // the restart tells the agent its name and tasks, and not to introduce itself again (#17411)
+		PostedBefore:    h.postedBefore(ctx, p.board, naming.SubscriberID(p.displayName, p.agentType)), // a member that has posted is not asked to introduce itself again (#17641)
+		Prompt:          withRestartBrief(p.prompt, h.restartBrief(ctx, p)),                            // the task it held, for this launch only (#16893)
+		RestartNote:     h.restartNote(ctx, p),                                                         // the restart tells the agent its name and tasks, and not to introduce itself again (#17411)
 		PromptOverrides: promptOverrides(userSettings),
 		BoardType:       p.boardType,
 		Capabilities:    p.caps,
@@ -757,4 +758,9 @@ func modelOfFlags(flags []string) string {
 		return ""
 	}
 	return model
+}
+
+// postedBefore: the member has posted on the board already, so the start message of its new session does not ask it to introduce itself again (#17641).
+func (h *SessionsHandler) postedBefore(ctx context.Context, board, member string) bool {
+	return h.bs != nil && board != "" && member != "" && h.bs.HasPosted(ctx, board, member)
 }
