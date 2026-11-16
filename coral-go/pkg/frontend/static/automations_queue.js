@@ -197,6 +197,7 @@ const teamLink = r => {
     if (r.state === 'free') return '';
     if (!r.project) return DT.el('span', 'dt-time queue-team', '—');
     const team = boardTeamKey(machine, r.project);
+    if (queueReadOnly()) return DT.el('span', 'queue-team', keyLabel(team)); // another computer's queue is read only: its team is words here, like its task and goal (#18546)
     const b = DT.link(keyLabel(team), () => importOnce('./team_page.js').then(m => m.openTeamPage(team)));
     b.classList.add('queue-team', 'btn', 'btn-quiet', 'btn-small');
     b.setAttribute('aria-label', `Open team ${keyLabel(team)}`);
