@@ -48,9 +48,7 @@ async function fetchJobs() {
         scheduledJobs = data.jobs || [];
         for (const f of jobsListeners) f();
         announceFailedRuns(before);
-    } catch (e) {
-        console.error('Failed to fetch scheduled jobs:', e);
-    }
+    } catch (e) { console.error(e); }
 }
 
 const RUNS_PAGE = 20; // runs read at a time: the page opens with the newest and the footer reads the older ones (#8089: it showed the newest 20 and said nothing of the rest)
@@ -62,7 +60,7 @@ async function fetchJobRuns(jobId) {
         const data = await resp.json();
         return { runs: data.runs || [], total: data.total };
     } catch (e) {
-        console.error('Failed to fetch runs:', e);
+        console.error(e);
         return { runs: [], total: 0, failed: true };
     }
 }
@@ -87,7 +85,7 @@ async function loadWorkflowsById() {
     return workflowsById;
 }
 
-/** The job page's runs and its detail, read again and drawn (a run that was pending or running is read again every 3 s until it has ended, so the page does not keep saying "Waiting to start" for a run the sidebar already lists as Failed, #9958). */
+/** The job page's runs and detail, drawn; a pending or running run is read every 3 s until it ends (#9958). */
 async function reloadJobDetail(job, { refresh = false } = {}) {
     const jobId = job.id;
     // A watch read takes the jobs again too: the job's own last result (its page's "waiting to start", the sidebar's Failed count) comes from the list, and read once it would stay as it was when the run began (#10104).
@@ -100,7 +98,7 @@ async function reloadJobDetail(job, { refresh = false } = {}) {
     watchJobRuns(job, jobRuns.runs);
 }
 let _runsWatch = null;
-// A run that stays pending or running is read every 3 s for two minutes, then every 30 s, and the page says it is still waiting, with a Refresh that reads now and starts the fast pace again (#10120): a run that never ends is not polled at 3 s for ever.
+// A pending or running run is read every 3 s for two minutes, then every 30 s, with a Refresh that starts the fast pace again (#10120).
 const WATCH_FAST_MS = 3000, WATCH_SLOW_MS = 30000, WATCH_BACKOFF_AFTER_MS = 120000;
 let _watchedJobId = null, _watchSince = 0;
 function paintStillWaiting(job, slow, running = false) {
@@ -305,7 +303,7 @@ async function readOlderRuns(page) {
         page.rows = page.rows.concat((data.runs || []).filter(r => !have.has(r.id)));
         if (Number.isFinite(data.total)) page.total = data.total;
         if (!(data.runs || []).length) page.total = page.rows.length; // nothing older came: stop offering more
-    } catch { showToast('The older runs could not be read', true); }
+    } catch { showToast('Older runs could not be read', true); }
     page.busy = false; redrawRuns(page);
 }
 
@@ -322,28 +320,26 @@ async function toggleScheduledJob(jobId) {
         await fetch(`/api/scheduled/jobs/${jobId}/toggle`, { method: 'POST' });
         await fetchJobs();
         if (selectedJobId === jobId) selectScheduledJob(jobId);
-    } catch (e) {
-        showToast('Failed to toggle job', true);
+    } catch {
+        showToast('Failed to toggle', true);
     }
 }
 
 /** Run now: the job's workflow or prompt runs once, recorded as the job's run (#9293); the page shows the new run under the job. */
 async function runScheduledJobNow(jobId, btn) {
     if (btn) btn.disabled = true;
+    let bad;
     try {
         const resp = await fetch(`/api/scheduled/jobs/${jobId}/run`, { method: 'POST' });
-        if (!resp.ok) {
-            const err = await resp.json().catch(() => ({}));
-            showToast(resp.status === 409 ? 'This job is already running' : (err.error || err.message || 'Could not start the run'), true);
-            if (btn) btn.disabled = false;
-            return;
+        if (resp.ok) {
+            document.querySelector('.sched-saved')?.remove(); // #17354
+            await fetchJobs();
+            return selectedJobId === jobId && selectScheduledJob(jobId);
         }
-        await fetchJobs();
-        if (selectedJobId === jobId) selectScheduledJob(jobId);
-    } catch (e) {
-        showToast('Could not start the run', true);
-        if (btn) btn.disabled = false;
-    }
+        bad = resp.status === 409 ? 'This job is already running' : (await resp.json().catch(() => ({}))).error;
+    } catch {}
+    showToast(bad || 'Could not start it', true);
+    if (btn) btn.disabled = false;
 }
 
 function deleteScheduledJob(jobId) {
@@ -358,8 +354,8 @@ function deleteScheduledJob(jobId) {
             const A = await importOnce('./automations.js');
             A.noteJobDeleted(gone); // no toast: the page it returns to says it, in words, under its title (#9298)
             A.backToFolder('jobs');
-        } catch (e) {
-            showToast('Failed to delete job', true);
+        } catch {
+            showToast('Failed to delete', true);
         }
     }, undefined, { label: 'Delete job', danger: true }); // the button says what it does, not Yes
 }

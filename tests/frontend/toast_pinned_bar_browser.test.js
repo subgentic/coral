@@ -41,6 +41,11 @@ const BASE = require('./test_base').BASE;
             const over = await ev(`(() => { const t = document.querySelector('#toast-host .toast'), b = document.querySelector('#scheduler-detail .sched-actions'); if (!t) return 'no toast'; const a = t.getBoundingClientRect(); return [...b.querySelectorAll('button')].filter(x => x.getClientRects().length).filter(x => { const c = x.getBoundingClientRect(); return a.right > c.left && a.left < c.right && a.bottom > c.top && a.top < c.bottom; }).map(x => x.textContent.trim()); })()`);
             assert.ok(over === 'no toast' || over.length === 0, `${label}: the toast is not over the job page's actions: ${JSON.stringify(over)}`);
             await shot(`job-created-${label}`);
+            // Run now starts a run: 'Created. Next run …' goes (#17354, walk 66 F2)
+            await ev(`window.__runStub = true; const real3 = window.fetch; window.fetch = (u, o) => /\\/api\\/scheduled\\/jobs\\/7\\/run$/.test(String(u && u.url || u)) && o && o.method === 'POST' ? Promise.resolve(new Response(JSON.stringify({ ok: true }), { headers: { 'Content-Type': 'application/json' } })) : real3(u, o); true`);
+            await ev(`document.querySelector('#scheduler-detail [data-on-click="job-run-now"]').click(); true`);
+            await settle(500);
+            assert.equal(await ev(`!!document.querySelector('#scheduler-detail .sched-saved')`), false, `${label}: Run now clears the Created line`);
             // it is said once: opening the job again does not repeat it
             await ev(`import((window.__coralStatic || '/static/') + 'scheduler.js').then(m => m.selectScheduledJob(7)); true`);
             await settle(300);
