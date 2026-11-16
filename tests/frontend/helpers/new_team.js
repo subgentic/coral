@@ -23,7 +23,7 @@ const N = {
     teamName: /^Team name/i, folder: /^Folder/i, recents: /^Recent folders$/i, machine: /^Computer$/i, address: /^Another computer's address$/i,
     template: /template/i, bulk: /^Everyone's provider/i, section: /section$/i,
     cancel: /^Cancel$/i, back: /^Back$/i, next: /^Next$/i, launch: /^Launch team$/i, save: /^Save member$/i, addMember: /^\+?\s*Add member$/i, addOrch: /^Add Orchestrator$/i,
-    tabs: ['Start', 'Workflow', 'Health check', 'Messaging'], memberTabs: ['Agent', 'Permissions', 'Advanced'], // the sections of a member's settings page; its role and prompt are the persona page before it (#7861)
+    tabs: ['Start', 'Workflow', 'Health check', 'Messaging'], memberTabs: ['Agent', 'Permissions', 'Skills', 'Advanced'], // the sections of a member's settings page; its role and prompt are the persona page before it (#7861)
 };
 const stepLine = ev => ev(`(() => { const d = window.__nt.dlg(${N.team}); if (!d) return ''; const hits = [...d.querySelectorAll('*')].filter(window.__na.vis).map(e => window.__na.text(e)).filter(t => /^Step \\d of 3: /.test(t)); hits.sort((a, b) => a.length - b.length); return hits[0] || ''; })()`);
 // Open New team as a person does: the Launch dialog, then the Team choice.
