@@ -1,5 +1,6 @@
 /* Activity rows use recorded fields only; old rows without sender/choice details stay explicit about what is known. A row is a verb (YOU DID), an object (ON) and a detail on its own line (#14423). */
 import { importOnce } from './import_once.js';
+import { markHidden } from './visible_marks.js';
 const { ACTION_LABEL } = await importOnce('./operator_activity_filters.js');
 /** New job-run records carry the parent job and run id; older bare ids have no safe parent. */
 export function jobRunParts(value) {
@@ -27,7 +28,7 @@ export function activityParts(row, itemWords) {
     const mk = (did, on, detail = '') => ({ did, on, detail: detail === FIXED_DISMISS_NOTE ? '' : detail });
     if (row.action === 'answer' && row.item_kind === 'question') { // a NEW row: the title is the ask's line and `asker` is who asked; an older row keeps the asker in the title
         const answer = note ? `Your answer: ${cleanAnswer(note, row.asker || row.title)}` : '';
-        if (row.asker) return mk('Answered', String(row.title || '').replace(/^@Operator\b[\s,:]*/i, '').trim() || 'a question', [`from ${row.asker}`, answer].filter(Boolean).join(' · '));
+        if (row.asker) return mk('Answered', String(row.title || '').replace(/^@Operator\b[\s,:]*/i, '').trim() || 'a question', [`from ${markHidden(row.asker, { strict: true })}`, answer].filter(Boolean).join(' · '));
         return mk('Answered', row.title ? `${row.title}’s question` : 'a question', answer);
     }
     if (row.action === 'prompt_allow') return mk('Allowed', `${who}’s permission request`, note);
