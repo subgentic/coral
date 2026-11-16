@@ -48,6 +48,9 @@ type ReviewRound struct {
 	SupersededBy string `json:"superseded_by,omitempty"`
 	// SentBackDigests: the patches that were approved and sent back, kept for the history (the queue never reads it).
 	SentBackDigests []string `json:"sent_back_digests,omitempty"`
+	// Dropped: reviewers an Orchestrator took off this open round (their review task is skipped) before they gave a verdict (#17613). One of them who then gives a verdict is put back on the round with their review task
+	// reopened, rather than refused: they may have read the work already.
+	Dropped []ReviewerState `json:"dropped,omitempty"`
 }
 
 type TaskTextApproval struct {
@@ -331,12 +334,24 @@ func (s *Store) DelegateReview(ctx context.Context, project string, id int64, ac
 		round.Reviewers = nil
 		for _, r := range have {
 			if !seen[r.Reviewer] { // dropped: their review ends
+				if r.State == "pending" || r.State == "stale" {
+					round.Dropped = append(round.Dropped, r) // kept so a verdict from them is heard (#17613)
+				}
 				if _, err := s.db.ExecContext(ctx, "UPDATE board_tasks SET status='skipped', completed_by=?, completion_message=?, completed_at=? WHERE id=? AND board_id=? AND status IN ('pending','in_progress')",
 					actor, fmt.Sprintf("%s took %s off the review of #%d", actor, r.Reviewer, id), nowUTC(), r.ReviewTaskID, project); err != nil {
 					return nil, nil, err
 				}
 			}
 		}
+	}
+	if open { // a reviewer named again is on the round, not dropped from it
+		kept := round.Dropped[:0]
+		for _, d := range round.Dropped {
+			if !seen[d.Reviewer] {
+				kept = append(kept, d)
+			}
+		}
+		round.Dropped = kept
 	}
 	var created []*Task
 	for _, r := range clean {
@@ -438,6 +453,10 @@ func (s *Store) reviewVerdictAt(ctx context.Context, project string, id int64, a
 		return nil, err
 	}
 	round := &w.ReviewRounds[len(w.ReviewRounds)-1]
+	reopened, err := reopenDroppedReviewer(ctx, tx, project, id, round, actor, reviewed)
+	if err != nil {
+		return nil, err
+	}
 	me, err := roundReviewer(id, round, actor, reviewed)
 	if err != nil {
 		return nil, err
@@ -497,6 +516,9 @@ func (s *Store) reviewVerdictAt(ctx context.Context, project string, id int64, a
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
+	}
+	if reopened { // the verdict is stored: the board says why their review task was open again (#17613)
+		s.PostSystemMessage(ctx, project, "Coral", fmt.Sprintf("[Coral] %s was taken off the review of #%d and gave a verdict anyway: their review task is open again and the verdict counts.", actor, id), nil)
 	}
 	s.NoteArtifactsChanged(project) // a rejection clears the completion review the list shows, an approval completes the task (its time is the files' time) (#13566)
 	if v.Task, err = s.GetTask(ctx, project, id); err != nil {
@@ -645,4 +667,30 @@ func (s *Store) RejectReviewTextVersion(ctx context.Context, project string, id 
 		return nil, fmt.Errorf("say why: a rejection needs --note")
 	}
 	return s.reviewVerdictAt(ctx, project, id, actor, note, false, round, NoRevisionStated, taskVersion)
+}
+
+// reopenDroppedReviewer puts actor back on the open round when an Orchestrator took them off it (round.Dropped) and they give a verdict now (#17613): their review task, skipped by the drop, is open again in their queue and
+// they are a reviewer of the round once more. A verdict on an earlier round is not reopened, and neither is anyone who was never on the round. It says whether it reopened.
+func reopenDroppedReviewer(ctx context.Context, tx *sqlx.Tx, project string, id int64, round *ReviewRound, actor string, reviewed int) (bool, error) {
+	if reviewed != 0 && reviewed != round.Round {
+		return false, nil
+	}
+	for _, r := range round.Reviewers {
+		if r.Reviewer == actor {
+			return false, nil
+		}
+	}
+	for i, d := range round.Dropped {
+		if d.Reviewer != actor {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE board_tasks SET status='pending', completed_by=NULL, completion_message=NULL, completed_at=NULL, claimed_at=NULL WHERE id=? AND board_id=? AND status='skipped' AND assigned_to=?`, d.ReviewTaskID, project, actor); err != nil {
+			return false, err
+		}
+		d.State = "pending"
+		round.Reviewers = append(round.Reviewers, d)
+		round.Dropped = append(round.Dropped[:i], round.Dropped[i+1:]...)
+		return true, nil
+	}
+	return false, nil
 }
