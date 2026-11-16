@@ -15,7 +15,7 @@ import (
 var boardOwnedRows = []struct{ table, col string }{
 	{"board_ask_task_snapshots", "project"}, {"board_goal_task_moves", "board_id"},
 	{"board_message_sessions", "project"}, {"chief_check_messages", "project"},
-	{"board_subscribers", "project"}, {"board_messages", "project"}, {"board_reminders", "project"}, {"board_groups", "project"},
+	{"board_subscribers", "project"}, {"board_messages", "project"}, {"board_reminders", "project"}, {"board_join_notices", "project"}, {"board_groups", "project"},
 	{"board_tasks", "board_id"}, {"board_settings", "project"}, {"board_waits", "project"}, {"board_working_modes", "board_id"},
 	{"board_workflow_presets", "board_id"}, {"health_counters", "project"}, {"health_items", "project"}, {"health_offbooks", "project"}, {"health_goal_size", "project"}, {"boards", "id"},
 	{"board_proposals", "board_id"}, {"board_goals", "board_id"}, {"board_goal_meta", "board_id"}, {"board_goal_images", "board_id"}, {"board_goal_events", "board_id"}, {"board_settings_log", "board_id"}, // the goals tables were missing from this census until #7355
@@ -85,6 +85,7 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 		args []any
 	}{
 		{`INSERT INTO board_reminders (project, subscriber_id, message, interval_seconds) VALUES (?, 'Dev', 'remind', 60)`, []any{project}},
+		{`INSERT INTO board_join_notices (project, subscriber_id, message_id, created_at) VALUES (?, 'Dev', 1, '2026-10-19T00:00:00Z')`, []any{project}}, // #17343: whether the Orchestrator was told of an agent added mid-run
 		{`INSERT INTO board_groups (project, group_id, session_id) VALUES (?, 'g1', 'claude-x')`, []any{project}},
 		{`INSERT INTO board_settings_log (board_id, at, kind, actor, field, old_value, new_value) VALUES (?, '2026-10-19T00:00:00Z', 'change', 'Boss', 'x', 'a', 'b')`, []any{project}},
 		{`INSERT INTO health_actions (project, rule, target, at) VALUES (?, 'claim', 'Dev', '2026-10-19T00:00:00Z')`, []any{project}},
