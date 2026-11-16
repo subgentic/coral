@@ -170,7 +170,10 @@ const spec = (i) => {
             const openId = await ev(`(() => { const o = ${box}.querySelector(':scope > .mb-message.mb-open'); return o ? Number(o.dataset.messageId) : null; })()`);
             assert.ok(openId, 'a row at the bottom is open');
             const newIds = []; for (let k = 0; k < 3; k++) newIds.push(await ev(`fetch('/api/board/${B}/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'orchestrator', content: 'A live message ${k} while a row is open.' }) }).then(r => r.json()).then(j => j.id || j.message.id)`));
-            await waitFor(`${box}.querySelector(':scope > .mb-message[data-message-id="${newIds[2]}"]')`, 'the live messages', { timeout: 25000 });
+            // The board polls every 10 s, but a page's timers are not ours to count on: on frontier's headless Chrome the phone page's 10 s timer ticked once at 24 s and never again for 95 s (#18959: nothing cleared it, the
+            // state was healthy, and a poll called by hand fetched the new rows at once). The suite asks for the poll itself (the hook a test has for it) until the rows are there; what is checked is that a poll shows live messages
+            // with a row open, not when the browser runs a timer.
+            await waitFor(`window.__coral.pollBoardNow().then(() => !!${box}.querySelector(':scope > .mb-message[data-message-id="${newIds[2]}"]'))`, 'the live messages', { timeout: 25000 });
             const live = await ev(`(() => ({ open: ${box}.querySelector(':scope > .mb-message[data-message-id="${openId}"]')?.classList.contains('mb-open'), newOpen: ${box}.querySelectorAll(':scope > .mb-message[data-message-id="${newIds[0]}"].mb-open, :scope > .mb-message[data-message-id="${newIds[2]}"].mb-open').length, last: Number(${box}.querySelector(':scope > .mb-message:last-of-type')?.dataset.messageId) }))()`);
             assert.ok(live.open && live.newOpen === 0 && live.last === newIds[2], `the open row stayed open and the new ones are closed rows at the bottom: ${JSON.stringify(live)} (last was ${lastBefore})`);
             await orderOk('after live messages');
