@@ -290,6 +290,7 @@ func (h *SessionsHandler) SleepSession(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Failed to kill tmux for session %s during sleep: %v", sessionID[:8], err)
 	}
 
+	noteActivity(r, board.ActAgentSleep, "agent", sess.AgentName, "", "", "") // only a sleep that happened is a row: the failures above answer 200 too (#16972)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "sleeping": true})
 }
 
@@ -370,6 +371,7 @@ func (h *SessionsHandler) WakeSession(w http.ResponseWriter, r *http.Request) {
 		h.resetAutoResume(sess.SessionID)
 	}
 	h.touch(r, sess.SessionID, board.TouchWake)
+	noteActivity(r, board.ActAgentWake, "agent", sess.AgentName, "", "", "") // after the wake worked: every failure above answers 200 too (#16972)
 	// One the Operator chose to wake from the over-the-cap list (#3636) gets Coral's notice.
 	if h.takePendingAutoWake(sess.SessionID) {
 		h.sendAutoWakeNotice(ctx, *sess)

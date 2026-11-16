@@ -105,7 +105,10 @@ const (
 	ActGoalMove       = "goal_move"
 	ActGoalRequestAdd = "goal_request_accept"
 	ActGoalRequestNo  = "goal_request_decline"
-	ActInboxHide      = "inbox_hide" // Dismiss or Not yet on a goal-looks-done row, a welcome item's Dismiss: kept in settings
+	ActInboxHide      = "inbox_hide"     // Dismiss or Not yet on a goal-looks-done row, a welcome item's Dismiss: kept in settings
+	ActAgentSleep     = "agent_sleep"    // the Operator put one agent to sleep (#16972); the item is the agent
+	ActAgentWake      = "agent_wake"     // the Operator woke one agent (#16972)
+	ActSettingChange  = "setting_change" // the Operator saved settings (#16972); the note names the settings, never their values
 )
 
 // ActivityMeta is what a handler knows about the action, set on the context so the store's own transaction can write the row: the actor and source come from the verified request, never the body.
