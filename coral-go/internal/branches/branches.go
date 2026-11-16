@@ -83,7 +83,8 @@ type Repo struct {
 	PRNote string `json:"pr_note,omitempty"`
 	key    string // the collector's key for this repository
 	// Unreadable: git would not read the repository (not a repository any more, or one it calls of dubious ownership, which Coral never overrides).
-	Unreadable bool `json:"unreadable,omitempty"`
+	Unreadable bool   `json:"unreadable,omitempty"`
+	baseTip    string // the full commit id of the base, for a branch's detail (#17543)
 }
 
 // counts are a branch's numbers against the base, kept while neither tip moves.
@@ -100,6 +101,7 @@ type Collector struct {
 	counts   map[string]counts // by base tip + branch tip
 	paused   map[string]time.Time
 	asked    map[string]time.Time // canonical agent folders whose tab was read, and when
+	notRepo  map[string]bool      // canonical roots that are not git repositories (rev-parse failed); pruned each Observe pass
 	prs      map[string]*prState  // PR state by repository key (gh.go)
 	gh       func(ctx context.Context, path string, args ...string) ([]byte, string, error)
 	ghLooked time.Time
@@ -114,7 +116,7 @@ type Collector struct {
 
 // New is an empty collector that runs git through gitutil.
 func New() *Collector {
-	return &Collector{repos: map[string]*Repo{}, rootKey: map[string]string{}, counts: map[string]counts{}, paused: map[string]time.Time{}, asked: map[string]time.Time{}, prs: map[string]*prState{}, kick: make(chan struct{}, 1), now: time.Now, run: readGit, gh: runGh}
+	return &Collector{repos: map[string]*Repo{}, rootKey: map[string]string{}, counts: map[string]counts{}, paused: map[string]time.Time{}, asked: map[string]time.Time{}, notRepo: map[string]bool{}, prs: map[string]*prState{}, kick: make(chan struct{}, 1), now: time.Now, run: readGit, gh: runGh}
 }
 
 // errNotRead is a git call this package does not make.
@@ -129,6 +131,9 @@ var readCommands = map[string][]string{
 	"for-each-ref": {refsFormat},
 	"config":       {"--get"},
 	"merge-base":   {"--is-ancestor", "--end-of-options"},
+	// A branch's detail (#17543): its commits over the base, and the files they change. Commit ids only, as a range, after --end-of-options.
+	"log":  {"--max-count=51", "--format=%H%x1f%an%x1f%aI%x1f%s", "--no-color", "--no-show-signature", "--end-of-options"},
+	"diff": {"--numstat", "--no-renames", "--no-ext-diff", "--no-color", "--end-of-options"},
 }
 
 // readOperands pins the operands of the commands that take a fixed one: for-each-ref reads only refs/heads, config reads only the origin's URL.
@@ -168,6 +173,9 @@ func readAllowed(args []string) bool {
 			if args[0] == "merge-base" && (!ended || !validSHA(a)) {
 				return false // commit ids only, after --end-of-options
 			}
+			if (args[0] == "log" || args[0] == "diff") && (!ended || !rangeRe.MatchString(a)) {
+				return false // one range of two commit ids, after --end-of-options
+			}
 			continue
 		}
 		known := false
@@ -199,7 +207,7 @@ func scrubGitEnv(env []string) []string {
 	return out
 }
 
-// Observe reads the repositories of roots (the agents' working folders' git roots), each at most every refreshEvery, within passBudget for all of them.
+// Observe reads the repositories of roots (the agents' working folders, which may include non-git directories), each at most every refreshEvery, within passBudget for all of them.
 func (c *Collector) Observe(ctx context.Context, roots []string) {
 	ctx, cancel := context.WithTimeout(ctx, passBudget)
 	defer cancel()
@@ -214,7 +222,20 @@ func (c *Collector) Observe(ctx context.Context, roots []string) {
 			continue // nobody has the tab open for this repository: no git runs for it
 		}
 		key := c.repoKey(ctx, root)
-		if key == "" || seen[key] {
+		if key == "" {
+			if cr := canonical(root); cr != "" {
+				c.mu.Lock()
+				c.notRepo[cr] = true
+				c.mu.Unlock()
+			}
+			continue
+		}
+		if cr := canonical(root); cr != "" {
+			c.mu.Lock()
+			delete(c.notRepo, cr)
+			c.mu.Unlock()
+		}
+		if seen[key] {
 			continue
 		}
 		seen[key] = true
@@ -241,6 +262,18 @@ func (c *Collector) Observe(ctx context.Context, roots []string) {
 		if !seen[key] {
 			delete(c.repos, key)
 			delete(c.prs, key)
+		}
+	}
+	for cr := range c.notRepo { // a non-git folder no agent works in any more is forgotten too
+		still := false
+		for _, root := range roots {
+			if rc := canonical(root); rc == cr {
+				still = true
+				break
+			}
+		}
+		if !still {
+			delete(c.notRepo, cr)
 		}
 	}
 	type ask struct {
@@ -322,6 +355,7 @@ func (c *Collector) read(ctx context.Context, root string) *Repo {
 	}
 	baseName, baseTip := c.base(ctx, root)
 	repo.Base = baseName
+	repo.baseTip = baseTip
 	if out, err := c.run(ctx, root, "config", "--get", "remote.origin.url"); err == nil {
 		if r, ok := parseRemote(string(out)); ok {
 			repo.Remote = &r
@@ -496,6 +530,7 @@ func parseWorktrees(out []byte) []Worktree {
 	return trees
 }
 
+var rangeRe = regexp.MustCompile(`^[0-9a-f]{40}([0-9a-f]{24})?\.\.\.?[0-9a-f]{40}([0-9a-f]{24})?$`)
 var shaRe = regexp.MustCompile(`^[0-9a-f]{40}([0-9a-f]{24})?$`)
 
 // validSHA says s is a full commit id: the only thing about a branch this package gives git.
@@ -562,6 +597,34 @@ func (c *Collector) For(dir string) (Repo, int, bool) {
 	cp := *bestRepo
 	cp.Worktrees = append([]Worktree(nil), bestRepo.Worktrees...)
 	return withPRs(cp, c.prs[cp.key], c.ghNote), best, true
+}
+
+// ReadState tells the caller whether the collector has read a working directory's area (#17058):
+// state is "pending" when Observe has not processed this directory yet, "done" when it has.
+// notGit is true only when done and no git repository was found.
+func (c *Collector) ReadState(dir string) (state string, notGit bool) {
+	d := canonical(dir)
+	if d == "" {
+		return "pending", false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, r := range c.repos {
+		for _, w := range r.Worktrees {
+			if w.path != "" && within(d, w.path) {
+				return "done", false
+			}
+		}
+	}
+	if c.notRepo[d] {
+		return "done", true
+	}
+	for root := range c.notRepo {
+		if within(d, root) {
+			return "done", true
+		}
+	}
+	return "pending", false
 }
 
 // Kicks fires when a tab asked for a folder the collector has no picture of: the git poller runs a Branches pass then (only Observe reads, and only what is wanted), so the

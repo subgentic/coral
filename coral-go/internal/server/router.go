@@ -367,6 +367,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/sessions/live/{name}/search-files", sessHandler.SearchFiles)
 	r.Get("/api/sessions/live/{name}/git", sessHandler.Git)
 	r.Get("/api/sessions/live/{name}/branches", sessHandler.Branches)
+	r.Get("/api/sessions/live/{name}/branches/detail", sessHandler.BranchDetail) // one branch: its commits and changed files over the base (#17543)
 	r.With(hubTarget).Post("/api/sessions/live/{name}/send", sessHandler.Send)
 	r.Delete("/api/sessions/live/{name}/held/{id}", sessHandler.CancelHeld)
 	r.With(routes.RefuseSignInLink, hubTarget).Post("/api/sessions/live/{name}/goal", sessHandler.RequestGoal)

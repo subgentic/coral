@@ -133,8 +133,11 @@
 @media (pointer: fine) { #team-panel-messages .list-bar-filter-btn { min-height: var(--toolbar-control-h); } } /* a fine pointer only: a touch screen's 44 px (touch.css) is not undone by this id's rule (#8157: the search's previous and next were 32 px on a phone) */ /* Filters, Jump to first and Jump to latest are the page's buttons: 13/500 on the tertiary fill, as Add agent and More (UI/UX #7588 item 4) */
 #team-panel-messages .list-bar-filter-btn:hover { background: var(--bg-hover); }
 
+#team-panel-branches { padding: 16px 24px; } /* the Branches tab's text and repositories were flush to the sidebar (#17483) */
+
 @media (max-width: 760px) {
     #team-panel-messages { padding: 12px 16px 0; }
+    #team-panel-branches { padding: 12px 16px; }
     .team-page-head, .team-tabs { padding-left: 16px; padding-right: 16px; }
     .team-page-head { flex-wrap: nowrap; padding-top: 8px; min-height: 0; gap: 2px 8px; display: grid; grid-template-columns: minmax(0, 1fr) auto; }
     .team-page-title { font-size: var(--fs-2xl); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: var(--fw-title); } /* 17/700, one line: at 200% text the header and the tabs stay near a quarter of the screen */

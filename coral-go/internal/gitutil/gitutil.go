@@ -80,6 +80,39 @@ func ResolveGitRoot(ctx context.Context, workdir string) string {
 	return workdir
 }
 
+// NoRepoMarkerFor says, from the file system alone (no git runs, so it answers at once), that a folder is not in a git repository: neither it nor any parent has a .git (a folder, or the
+// gitfile of a worktree), and none of its direct subfolders does (ResolveGitRoot looks one level down). A repository that git itself refuses is not caught here: that is the rare case, and
+// it keeps the slow answer. An unreadable folder is not said to be non-git.
+func NoRepoMarkerFor(dir string) bool {
+	dir = filepath.Clean(dir)
+	if dir == "" || dir == "." || !filepath.IsAbs(dir) {
+		return false
+	}
+	if _, err := os.Stat(dir); err != nil {
+		return false
+	}
+	for d := dir; ; d = filepath.Dir(d) {
+		if _, err := os.Lstat(filepath.Join(d, ".git")); err == nil {
+			return false
+		}
+		if filepath.Dir(d) == d {
+			break
+		}
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			if _, err := os.Lstat(filepath.Join(dir, e.Name(), ".git")); err == nil {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // nativePath turns a path git printed into this system's form: on Windows git prints
 // C:/Users/x/repo, which compared or joined with Windows paths (C:\Users\x\repo) never
 // matches (#3631).
