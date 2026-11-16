@@ -243,7 +243,7 @@ func TestQuestionsAboutFinishedTasksAreClosedTogether(t *testing.T) {
 		task, err := s.CreateTask(ctx, "alpha", title, "", "medium", "Lead", "Dev A")
 		require.NoError(t, err)
 		q := askPost(t, s, ctx, "Lead", "@Operator about "+title+"?", true, 0)
-		require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 0, task.ID))
+		require.NoError(t, s.RecordAskSubject(ctx, "alpha", q.ID, 0, task.ID, true))
 		return task, q
 	}
 	t1, q1 := mk("one")
