@@ -13,6 +13,7 @@ import { loadStyles } from './lazy_styles.js';
 import { note, go } from './nav.js';
 import { keyRoute, parse, TEAM_TABS } from './routes.js';
 import { importOnce } from './import_once.js';
+import { scrollBehavior } from './motion.js';
 import { refreshTeamAvailability } from './team_availability.js';
 import { pollEvery } from './overload.js';
 import { onViewShown } from './view_switch.js';
@@ -104,7 +105,7 @@ function buildTabsMore(tabs) {
     }
     row.append(b, menu);
     const next = el('button', 'team-tabs-next'); next.type = 'button'; next.id = 'team-tabs-next'; next.setAttribute('aria-label', 'Show more tabs'); // a tappable cue at the strip's end while tabs wait past it (css, off the strip's data-more); it replaces the end chevron then (#17816)
-    next.addEventListener('click', () => tabs.scrollBy({ left: tabs.clientWidth * 0.7, behavior: 'smooth' }));
+    next.addEventListener('click', () => tabs.scrollBy({ left: tabs.clientWidth * 0.7, behavior: scrollBehavior() }));
     tabs.append(next);
     for (const [side, glyph] of [['start', '‹'], ['end', '›']]) {
         const cue = el('span', `team-strip-edge team-strip-edge-${side}`, glyph);

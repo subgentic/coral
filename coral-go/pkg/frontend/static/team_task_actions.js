@@ -6,6 +6,7 @@
  *   editForm(task, ctx)  -> Promise<{ node, save() }>      completeForm(task, ctx) -> { node, submit() }
  *   ctx: { project, redraw(task, mode), reload(message), back() } */
 import { importOnce } from './import_once.js';
+import { scrollBehavior } from './motion.js';
 import { state } from './state.js';
 import { boardFetch, pathId, splitKey } from './server_base.js';
 import { showToast } from './utils.js';
@@ -126,7 +127,7 @@ export async function editForm(task, ctx) {
     }
     const mount = (host) => { if (showDeps) _renderDepPicker('task-edit-deps', (task.blocked_by || []).map(d => d.task_id), task.id); return host; };
 
-    const say = (text) => { error.textContent = text; error.hidden = !text; if (text) error.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
+    const say = (text) => { error.textContent = text; error.hidden = !text; if (text) error.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() }); };
     async function save() {
         const value = (id) => { const e = document.getElementById(id); return e ? e.value : ''; };
         const title = value('task-edit-title').trim();
