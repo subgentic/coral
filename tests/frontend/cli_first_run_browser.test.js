@@ -18,7 +18,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`(() => { window.__found = false; window.__launches = []; window.__checks = [];
             const real = window.fetch; const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href), m = o.method || 'GET';
-                if (p.pathname === '/api/system/cli-check') { window.__checks.push(p.search); return window.__found ? json({ found: true, version: '1', status: 'available' }) : json({ found: false, status: 'missing', install_command: 'npm install -g @anthropic-ai/claude-code', install_url: 'https://code.claude.com/docs/en/overview' }); }
+                if (p.pathname === '/api/system/cli-check') { window.__checks.push(p.search); if (p.searchParams.get('type') !== 'claude') return json({ status: 'unknown' }); /* #18752: another agent that cannot be told is neither ready nor missing, so the set-up step stays out of the way and the default stays Claude */ return window.__found ? json({ found: true, version: '1', status: 'available' }) : json({ found: false, status: 'missing', install_command: 'npm install -g @anthropic-ai/claude-code', install_url: 'https://code.claude.com/docs/en/overview' }); }
                 if (p.pathname === '/api/sessions/launch' && m === 'POST') { window.__launches.push(1); return window.__found ? json({ session_name: 'first', session_id: 'sid-first' }) : json({ error: 'claude CLI not found. Install it: npm install -g @anthropic-ai/claude-code' }, 500); }
                 if (p.pathname === '/api/board/projects') return json([]);
                 return real(u, o); };
