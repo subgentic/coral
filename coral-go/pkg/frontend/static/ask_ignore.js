@@ -2,7 +2,7 @@
  * (POST .../asks/<id>/close) with a fixed note, which is shown with the ask; Undo is the same route with undo:true (the Operator's alone: the asker and every other token are refused). A `wait --operator` has no ask row
  * and no close route, so only an ask is ignorable. Lazy: the Inbox loads it on the first Dismiss. */
 import { showToast, announceNotice } from './notifications.js';
-import { refreshOperatorAsks } from './operator_asks.js';
+import { refreshOperatorAsks, forgetAsk } from './operator_asks.js';
 import { markHidden } from './visible_marks.js';
 import { serverFetch } from './server_base.js';
 
@@ -38,3 +38,12 @@ export { refreshOperatorAsks };
 
 /** Retire an exact duplicate after its source question was answered successfully. */
 export const closeAnsweredAsk = (a, id) => close(a, { note: `Same question answered on message #${id}` });
+
+/** Server-linked asks are already answered together. Exact-text fallback sources still need explicit retirement. */
+export async function finishAnsweredDuplicates(a) {
+    for (const other of a.duplicates || []) {
+        if (a.key && a.key === other.key) { forgetAsk(other); continue; }
+        try { await closeAnsweredAsk(other, a.id); forgetAsk(other); }
+        catch { showToast('Reply sent. A duplicate question could not be closed; it remains in Needs you.', true); }
+    }
+}
