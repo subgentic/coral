@@ -11,3 +11,12 @@ export const TOUR_TEAM_MEMBERS = [
     { name: 'Lead Dev', model: 'sonnet', prompt: "You are the lead developer. Do the main work the Orchestrator assigns, and show the operator what you are doing as you go. Coordinate with the team via the message board. Wait for instructions from the Orchestrator before starting." },
     { name: 'QA', model: 'sonnet', prompt: "You are QA. Check the team's work for quality and correctness, and say what you checked. Coordinate with the team via the message board. Wait for instructions from the Orchestrator before starting." },
 ].map(m => ({ ...m, capabilities: { allow: [...SHIPPED_CAPABILITIES], deny: [] } }));
+/** The tour team on the provider the person set as their default (#18747): the Orchestrator on its top model, Lead Dev and QA on its everyday one. Ids are the ones Coral reads from each CLI's own list; a provider with no pair here gets the Claude pair, as before. */
+const TOUR_MODELS = { claude: ['opus', 'sonnet'], codex: ['gpt-6-astra', 'gpt-6-sol'], agy: ['gemini-3.1-pro-high', 'gemini-3.8-flash-high'] };
+export function tourTeamMembers(provider) {
+    const type = provider === 'antigravity' || provider === 'gemini' ? 'agy' : (provider || 'claude');
+    if (type === 'claude') return TOUR_TEAM_MEMBERS;
+    if (!TOUR_MODELS[type]) return TOUR_TEAM_MEMBERS.map(m => ({ ...m, agent_type: 'claude' })); // no pair for this provider (pi, opencode...): the tour runs on Claude, the models its pair names
+    const [top, everyday] = TOUR_MODELS[type];
+    return TOUR_TEAM_MEMBERS.map((m, i) => ({ ...m, agent_type: type, model: i === 0 ? top : everyday }));
+}
