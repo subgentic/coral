@@ -8,7 +8,7 @@ const { JSDOM } = require('jsdom');
 
 (async () => {
     const dir = path.resolve(__dirname, '../../coral-go/pkg/frontend/static');
-    const dom = new JSDOM('<!doctype html><body></body>', { url: 'https://hub.example/' });
+    const dom = new JSDOM('<!doctype html><body></body>', { url: 'https://hub.example/', pretendToBeVisual: true });
     for (const k of ['window', 'document', 'localStorage']) Object.defineProperty(globalThis, k, { value: dom.window[k], configurable: true, writable: true });
     for (const k of ['MutationObserver', 'HTMLElement', 'Node', 'getComputedStyle']) if (dom.window[k]) Object.defineProperty(globalThis, k, { value: dom.window[k], configurable: true, writable: true });
     let perm = 'default', asked = 0, answer = 'granted';
@@ -28,11 +28,13 @@ const { JSDOM } = require('jsdom');
     assert.strictEqual(offers().length, 0);
     assert.strictEqual(dom.window.localStorage.getItem(m.ALERTS_OFFERED_KEY), null, 'the one offer is not spent');
     pw.remove(); document.dispatchEvent(new dom.window.Event('coral:password-prompt-closed'));
+    await new Promise(r => setTimeout(r, 1500)); // sleep-ok: the strip waits for a still pointer, 1 s (#16841)
     assert.strictEqual(offers().length, 1, 'the offer comes once the prompt has closed');
     document.querySelectorAll('#alerts-offer-banner').forEach(t => t.remove()); dom.window.localStorage.clear();
 
     // first agent, nothing asked yet: one toast, with one button, and no permission box (a browser ignores one that is not from a click)
     assert.strictEqual(m.offerAlertsAfterLaunch(), true);
+    await new Promise(r => setTimeout(r, 1500)); // sleep-ok: the strip waits for a still pointer, 1 s (#16841)
     assert.strictEqual(offers().length, 1);
     assert.match(offers()[0], /alert when an agent needs you or finishes a reply/);
     assert.strictEqual(toasts().length, 0, 'the offer is not a toast over the page');
@@ -55,6 +57,7 @@ const { JSDOM } = require('jsdom');
     dom.window.localStorage.clear(); perm = 'default'; answer = 'denied'; asked = 0;
     document.querySelectorAll('.toast, #alerts-offer-banner').forEach(t => t.remove());
     m.offerAlertsAfterLaunch();
+    await new Promise(r => setTimeout(r, 1500)); // sleep-ok: the strip waits for a still pointer, 1 s (#16841)
     turnOn();
     await new Promise(r => setTimeout(r, 20));
     assert.ok(toasts().some(t => /Alerts stay off: your browser did not allow them/.test(t)), JSON.stringify(toasts()));
