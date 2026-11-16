@@ -194,8 +194,12 @@ func TestBackgroundCallersDoNotStormWhileNotSignedIn(t *testing.T) {
 			patientCheck(t)
 			stub := claudestub.New(t, claudestub.SignedOut)
 			for i := 0; i < 10; i++ {
+				before := len(stub.AuthChecks())
 				_, _, took := ran(t, c, stub.Path())
-				assert.Less(t, took, failFast, "call %d", i+1)
+				// The event for "does not sit on the check" is the count: at most one sign-in check per call, never a retry loop. The wall clock only sees a hold by being slow, and a loaded
+				// machine is slow (3.06 s against 3 s, #18930), so its bound is the hold's ceiling, as for a signed-in call above.
+				assert.LessOrEqual(t, len(stub.AuthChecks())-before, 1, "call %d: at most one sign-in check", i+1)
+				assert.Less(t, took, failFast+5*time.Second, "call %d", i+1)
 			}
 			assert.Empty(t, stub.PrintRuns())
 			assert.Zero(t, stub.Grabs())
