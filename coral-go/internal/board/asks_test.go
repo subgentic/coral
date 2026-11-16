@@ -226,3 +226,88 @@ func TestAReplyToOneQuestionClosesOnlyThatQuestion(t *testing.T) {
 	assert.Empty(t, askOf(t, s, ctx, q1.ID).Open)
 	assert.Empty(t, askOf(t, s, ctx, q3.ID).Open)
 }
+
+// #16617 (walk 26 L2): a question posted on a task stops waiting for an answer when the task is completed after it, or when its asker posts on that task again; a question on no task is closed only by an answer, and
+// one the Operator reopened stays open.
+func TestAnAskOnATaskClosesWhenTheTaskIsDecidedOrTheAskerPostsAgain(t *testing.T) {
+	s, ctx := askBoard(t)
+	post := func(who, text string, ask bool, task *Task) *Message {
+		var asked []string
+		if ask {
+			var err error
+			asked, err = s.AskTargets(ctx, "alpha", who, text)
+			require.NoError(t, err)
+		}
+		var tid *int64
+		if task != nil {
+			tid = &task.ID
+		}
+		m, err := s.PostMessageForTask(ctx, "alpha", who, text, nil, "", tid)
+		require.NoError(t, err)
+		if ask {
+			require.NoError(t, s.RecordAsk(ctx, "alpha", m, asked))
+		}
+		return m
+	}
+	task := func(title string) *Task {
+		tk, err := s.CreateTask(ctx, "alpha", title, "", "medium", "Lead", "Dev A")
+		require.NoError(t, err)
+		return tk
+	}
+	t1, t2, t3 := task("one"), task("two"), task("three")
+	q1 := post("Lead", "@Dev A is v2 right?", true, t1)
+	q2 := post("Lead", "@Dev A open the terminal", true, t2)
+	q3 := post("Lead", "@Dev A a question on no task", true, nil)
+	_ = t3
+	for _, id := range []int64{q1.ID, q2.ID, q3.ID} {
+		assert.Equal(t, []string{"Dev A"}, askOf(t, s, ctx, id).Open, "all three wait")
+	}
+	time.Sleep(1100 * time.Millisecond) // the task is completed after the question (RFC3339 seconds)
+	_, err := s.CompleteTask(ctx, "alpha", t1.ID, "Dev A", nil)
+	require.NoError(t, err)
+	info := askOf(t, s, ctx, q1.ID)
+	assert.Empty(t, info.Open, "the task was decided")
+	assert.True(t, info.Answered)
+	assert.True(t, info.Closed)
+	assert.Equal(t, "Coral", info.ClosedBy)
+	post("Lead", "all fine now", false, t2)
+	info = askOf(t, s, ctx, q2.ID)
+	assert.Empty(t, info.Open, "the asker posted on the task again")
+	assert.True(t, info.Closed)
+	assert.Equal(t, []string{"Dev A"}, askOf(t, s, ctx, q3.ID).Open, "a question on no task is closed only by an answer")
+	post("Dev A", "someone else posting on the task", false, t3)
+	q4 := post("Lead", "@Dev A question on t3", true, t3)
+	post("Dev A", "not the asker", false, t3)
+	assert.Equal(t, []string{"Dev A"}, askOf(t, s, ctx, q4.ID).Open, "only the asker's own later post closes it")
+}
+
+// #16641 (Security INFO on #16617): askClosedBy compares completed_at > created_at as TEXT, so the two columns must be written in one layout (nowUTC: RFC3339, whole seconds). A task completed in the same
+// second as the question cannot be ordered after it, so the question stays open (the next second's completion closes it, as the test above shows); and a layout that differed (microseconds, +00:00) would
+// compare wrongly, so the layouts are pinned here.
+func TestAnAskAndACompletionInTheSameSecondShareOneLayoutAndTheAskStaysOpen(t *testing.T) {
+	s, ctx := askBoard(t)
+	tk, err := s.CreateTask(ctx, "alpha", "same second", "", "medium", "Lead", "Dev A")
+	require.NoError(t, err)
+	asked, err := s.AskTargets(ctx, "alpha", "Lead", "@Dev A same second?")
+	require.NoError(t, err)
+	tid := tk.ID
+	q, err := s.PostMessageForTask(ctx, "alpha", "Lead", "@Dev A same second?", nil, "", &tid)
+	require.NoError(t, err)
+	require.NoError(t, s.RecordAsk(ctx, "alpha", q, asked))
+	_, err = s.CompleteTask(ctx, "alpha", tk.ID, "Dev A", nil)
+	require.NoError(t, err)
+
+	var askAt, doneAt string
+	require.NoError(t, s.db.GetContext(ctx, &askAt, `SELECT created_at FROM board_asks WHERE message_id = ?`, q.ID))
+	require.NoError(t, s.db.GetContext(ctx, &doneAt, `SELECT completed_at FROM board_tasks WHERE id = ?`, tk.ID))
+	_, err = time.Parse(time.RFC3339, askAt)
+	require.NoError(t, err, "the ask's created_at is RFC3339: %q", askAt)
+	_, err = time.Parse(time.RFC3339, doneAt)
+	require.NoError(t, err, "the task's completed_at is RFC3339: %q", doneAt)
+	assert.Equal(t, len(askAt), len(doneAt), "one layout, so the text compares as a time: %q vs %q", askAt, doneAt)
+	if askAt == doneAt { // the same second (the usual case here): not ordered after the question
+		assert.Equal(t, []string{"Dev A"}, askOf(t, s, ctx, q.ID).Open, "a completion in the question's own second does not close it")
+	} else { // the second turned between the two calls: then it is after, and closes
+		assert.Empty(t, askOf(t, s, ctx, q.ID).Open)
+	}
+}
