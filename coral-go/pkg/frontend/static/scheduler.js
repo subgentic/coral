@@ -391,12 +391,8 @@ export function initScheduler() {
 
 // The scheduled jobs' markup (#3645): data-on-* names, never code.
 // Ids are checked (idOf, uuidOf) before use: a bad one does nothing. Deleting still asks first.
-/** Why a run has no chat to open, by its status. */
-function noChatWords(status, error) {
-    if (status === 'running' || status === 'pending') return 'this run is still going and has no chat yet. Its result appears here when it ends.';
-    if (status === 'failed' || status === 'killed') return `this run ${status === 'killed' ? 'was stopped' : 'failed'} before it had a chat to show${error ? `: ${error.replace(/[.\s]+$/, '')}` : ''}.`;
-    return 'this run finished, but its chat was not kept, so there is nothing to open.';
-}
+/** Why a run has no chat to open, by its status (a run still going has no See result: #17520). */
+const noChatWords = (status, error) => status === 'failed' || status === 'killed' ? `this run ${status === 'killed' ? 'was stopped' : 'failed'} before it had a chat${error ? `: ${error.replace(/[.\s]+$/, '')}` : ''}.` : 'this run finished, but its chat was not kept.';
 
 registerActions({
     'job-new': () => importOnce('./job_form.js', 'the job form').then(m => m.showJobModal()).catch(() => {}), // the form loads when it is first opened (#10218)

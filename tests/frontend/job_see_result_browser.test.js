@@ -34,7 +34,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await ev(`[...document.querySelectorAll('#group-table-view tbody tr .dt-primary')].find(b => /weekday-summary/.test(b.textContent)).click(); true`);
         await waitFor(`document.querySelectorAll('#scheduler-detail [data-on-click="job-run-session"]').length === 2`, 'See result on the two runs that ended', 8000);
         assert.equal(await ev(`!!document.querySelector('#scheduler-detail [data-on-click="job-run-session"][data-session-id^="3f2a9c1e-2222"]')`), false, 'a run still going offers no See result');
-        const WORDS = { 21: /this run finished, but its chat was not kept/, 23: /this run failed before it had a chat to show: The job's prompt was never typed/ };
+        const WORDS = { 21: /this run finished, but its chat was not kept\./, 23: /this run failed before it had a chat: The job's prompt was never typed/ };
         for (const [id, want] of Object.entries(WORDS)) {
             await ev(`document.querySelectorAll('.toast-message').forEach(t => t.remove()); true`);
             const sid = { 21: '3f2a9c1e-1111', 23: '3f2a9c1e-3333' }[id];
