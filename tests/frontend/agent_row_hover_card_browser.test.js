@@ -10,7 +10,12 @@ const { connect } = require('./agent_view_harness');
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     const base = o => Object.assign({ name: 'coral-go', display_name: '', agent_type: 'claude', summary: '', status: '', model: 'claude-opus-5-5', branch: '', repo_name: 'coral', working_directory: '/work/first-agent', server: 'local', board_project: 'beta-team', board_job_title: 'Orchestrator', context_pct: null }, o);
     const labels = () => ev(`(() => { const t = [...document.querySelectorAll('#live-sessions-list .session-tooltip')].find(e => getComputedStyle(e).display === 'block'); return t ? [...t.querySelectorAll('dt')].map(d => d.textContent) : null; })()`);
-    const hover = async id => { const r = await ev(`(() => { const b = document.querySelector('#live-sessions-list .session-group-item[data-session-id="${id}"]').getBoundingClientRect(); return { x: Math.round(b.left + 40), y: Math.round(b.top + b.height / 2) }; })()`); await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 900, y: 700 }); await sleep(100); await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: r.x, y: r.y }); }; // sleep-ok: the pointer leaves the row first
+    const hover = async id => { // the pointer leaves the row, then reaches it; under load the list can lay out again between the measuring and the move, so it is moved again until the row really is under it (:hover)
+        const at = () => ev(`(() => { const b = document.querySelector('#live-sessions-list .session-group-item[data-session-id="${id}"]').getBoundingClientRect(); return { x: Math.round(b.left + 40), y: Math.round(b.top + b.height / 2) }; })()`);
+        const under = () => ev(`document.querySelector('#live-sessions-list .session-group-item[data-session-id="${id}"]').matches(':hover')`);
+        await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 900, y: 700 }); await sleep(100); // sleep-ok: the pointer leaves the row first
+        for (let i = 0; i < 20; i++) { const r = await at(); await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: r.x, y: r.y }); if (await under()) return; await sleep(100); } // sleep-ok: the layout settles
+    };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
@@ -19,12 +24,13 @@ const { connect } = require('./agent_view_harness');
         await waitFor(`document.querySelectorAll('#live-sessions-list .session-group-item').length >= 2`, 'the rows', 6000);
         await hover('h1'); await sleep(300); // sleep-ok: part of the 800 ms the card waits
         check((await labels()) === null, 'the card is not open 300 ms after the pointer reaches a row: ' + JSON.stringify(await labels()));
-        await sleep(800); // sleep-ok: the card's own delay
+        await waitFor(`[...document.querySelectorAll('#live-sessions-list .session-tooltip')].some(e => getComputedStyle(e).display === 'block')`, 'the card opens once the pointer has rested (its own 800 ms delay, longer under load)', 8000);
         const quiet = await labels();
         { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/hover-card-quiet.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
         check(Array.isArray(quiet) && quiet.includes('State') && quiet.includes('Agent'), 'it opens once the pointer has rested: ' + JSON.stringify(quiet));
         check(Array.isArray(quiet) && !quiet.some(l => ['Goal', 'Status', 'Branch', 'Context', 'Board', 'Role', 'Name'].includes(l)), 'an agent with no goal, status or branch, an unknown context, a team heading above it and a role that is its name shows none of those rows: ' + JSON.stringify(quiet));
-        await hover('h2'); await sleep(1100); // sleep-ok: the card's own delay
+        await hover('h2');
+        for (let i = 0; i < 80; i++) { const l = await labels(); if (Array.isArray(l) && l.includes('Goal')) break; await sleep(100); } // sleep-ok: poll until the second card (its own 800 ms delay, longer under load) shows its rows; the checks below read the result
         const full = await labels();
         { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/hover-card-full.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
         check(Array.isArray(full) && ['Goal', 'Status', 'Branch', 'Role'].every(l => full.includes(l)), 'an agent that has them shows its goal, status, branch and role: ' + JSON.stringify(full));
