@@ -214,6 +214,18 @@ export function exportTeamTemplate(name) {
 function _initAgentPresets() {
     _renderPresetButtons("agent-preset-selector", "agent", { blankFirst: true, selectId: 'launch-persona-select' });
     _syncPersonaButtons();
+    _wirePersonaMore();
+}
+
+/** The More menu (a bare <details>) shuts on a press outside it, on Escape (the focus back on More; the dialog stays) and after an action in it is used (#18716). */
+function _wirePersonaMore() {
+    const d = document.querySelector('#launch-persona-top details.persona-files');
+    if (!d || d.dataset.closes) return;
+    d.dataset.closes = '1';
+    const shut = () => { d.open = false; };
+    document.addEventListener('pointerdown', e => { if (d.open && !d.contains(e.target)) shut(); }, true);
+    d.addEventListener('keydown', e => { if (e.key !== 'Escape' || !d.open) return; e.preventDefault(); e.stopPropagation(); shut(); d.querySelector('summary').focus(); });
+    d.addEventListener('click', e => { if (e.target.closest('.persona-files-row button')) shut(); });
 }
 
 function _selectAgentPreset(name) {
