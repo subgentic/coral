@@ -44,8 +44,7 @@ const { guardSettings } = require('./helpers/settings_guard');
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
         await ev(`import(${S} + 'automation_runs.js').then(m => m.refreshRuns(true)).then(() => true)`);
-        await waitFor(`['permission','question','ask','review','proposal','goal_done','skill_review','run'].every(k=>document.querySelector('${T} .inbox-kind-icon[data-kind="'+k+'"]')) && document.querySelectorAll('${T} [data-review-artifact]').length===2`, 'the rows of every kind', 20000);
-        check(await ev(`!!document.querySelector('.inbox-getting-started') && !document.querySelector('${T} tbody .inbox-welcome-name')`), 'Getting started is separate from counted Needs rows');
+        await waitFor(`['permission','question','ask','review','proposal','goal_done','skill_review','run','welcome'].every(k=>document.querySelector('${T} .inbox-kind-icon[data-kind="'+k+'"]')) && document.querySelectorAll('${T} [data-review-artifact]').length===2`, 'the rows of every kind', 20000);
         const table = [];
         for (const [w, h] of [[390, 1500], [320, 1500]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: true });

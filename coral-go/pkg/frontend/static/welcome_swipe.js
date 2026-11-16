@@ -3,8 +3,7 @@
  * horizontal ones. The visible Dismiss button stays the real control (keyboard, screen reader): a swipe is a shortcut to the same dismissWelcome, and only a swipe offers Undo (in the toast, which stays 30 seconds: the notices' rule for a toast with an action). Lazy: the Inbox loads
  * it for a touch screen when a row has a Dismiss (inbox_sidebar.js), nothing at start. With reduced motion the row neither slides nor springs. */
 import { state } from './state.js';
-import { importOnce } from './import_once.js';
-const { dismissWelcome, save } = await importOnce('./welcome_items.js');
+import { dismissWelcome, save } from './welcome_items.js';
 import { showToast, announceNotice } from './notifications.js';
 
 const START_PX = 10, COMMIT = 0.4, FLICK = 0.5, FLICK_MIN_PX = 40; // FLICK: px per ms

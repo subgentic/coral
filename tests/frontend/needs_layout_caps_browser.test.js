@@ -46,9 +46,10 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`window.__needsItems.length = 0; (() => { const real = window.fetch.bind(window); window.fetch = (u, o) => String(u) === '/api/operator-asks' ? Promise.resolve(new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } })) : String(u).includes('/api/settings') && o && o.method === 'PUT' ? Promise.resolve(new Response('{"ok":true}', { status: 200, headers: { 'Content-Type': 'application/json' } })) : real(u, o); })(); true`);
             await ev(`import(${S} + 'state.js').then(m => { m.state.settings = { ...m.state.settings, inbox_welcome: 'on', inbox_welcome_done: '' }; return true; })`);
             await ev(`import(${S} + 'inbox_reviews.js').then(async m => { m.reviewsChangedOnServer(); await m.refreshReviews(true); await import(${S} + 'ask_ignore.js').then(a => a.refreshOperatorAsks(true)); return import(${S} + 'inbox_tab.js'); }).then(m => m.selectInboxTab('needs')).then(() => true)`); await ev(framesJs(6));
-            await waitFor(`!!document.querySelector('.inbox-getting-started li') && !document.querySelector('${T} tbody tr.dt-row')`, at + 'Getting started without Needs rows', 15000);
-            await waitFor(`(() => { const el = document.querySelector('.inbox-getting-started'); if (!el) return false; const r = el.getBoundingClientRect(), p = el.parentElement.getBoundingClientRect(); return r.left >= p.left - 1 && r.right <= p.right + 1; })()`, at + 'Getting started fits its panel', 15000);
-            check(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), at + 'the empty Needs panel and Getting started do not scroll sideways');
+            await waitFor(`document.querySelectorAll('${T} tbody tr[data-key*=":welcome:"]').length > 0 && !document.querySelector('${T} tbody tr:not([data-key*=":welcome:"]):not(.dt-group)')`, at + 'only Welcome items (' + await ev(`JSON.stringify([...document.querySelectorAll('${T} tbody tr')].map(r => r.dataset.key || r.className))`) + ')', 15000);
+            const heads = await ev(`[...document.querySelectorAll('${T} th[data-key]')].map(h => h.dataset.key)`);
+            check(heads.includes('team'), at + 'the Team column is still there with only Welcome items (walk 23 L17): ' + JSON.stringify(heads) + await ev(`document.querySelector('${T} table, ${T} [role=table], ${T} [role=grid]')?.outerHTML.slice(0, 600)`));
+            check(await wrapW() <= 1281, at + 'and the table is no wider than 1280 px: ' + await wrapW());
         }
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
     if (failures.length) { console.error('FAIL\n  ' + failures.join('\n  ')); process.exit(1); }

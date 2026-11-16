@@ -1,5 +1,4 @@
-// #16862: Getting started is excluded from Needs you bulk selection; replaces the obsolete Welcome partial-dismiss scenario.
-// Previously: Needs you bulk Dismiss that skips a row names it (#15339, walk 23 H4): selecting the Welcome items (all six; the first is read with its own Got it button, the others can be dismissed) and pressing Dismiss dismisses what can be dismissed and the notice says
+// Needs you bulk Dismiss that skips a row names it (#15339, walk 23 H4): selecting the Welcome items (all six; the first is read with its own Got it button, the others can be dismissed) and pressing Dismiss dismisses what can be dismissed and the notice says
 // which row was skipped and what to press instead ('Welcome to Coral: use Got it'), (Undo of a dismissed review file or question is in needs_bulk_dismiss_undo.) The settings save is answered in the page, so the server's setting is never touched. 1280 px, mouse.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -38,12 +37,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`(() => { const real = window.fetch.bind(window); window.fetch = (u, o) => String(u).includes('/api/settings') && o && o.method === 'PUT' ? Promise.resolve(new Response('{"ok":true}', { status: 200, headers: { 'Content-Type': 'application/json' } })) : real(u, o); return true; })()`);
             await ev(`import(${S} + 'state.js').then(m => { m.state.settings = { ...m.state.settings, inbox_welcome: 'on', inbox_welcome_done: '' }; return true; })`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`!!document.querySelector('${T} .inbox-getting-started li')`, at + 'Getting started block', 15000);
-            check(await ev(`document.querySelectorAll('${T} .inbox-getting-started input[type=checkbox]').length === 0`), at + 'onboarding cannot enter the Needs bulk selection');
-            await ev(`[...document.querySelectorAll('${T} tbody tr.dt-row .dt-check input')].forEach(i => { if (!i.checked) i.click(); }); true`); await ev(framesJs(4));
-            const selection = await ev(`({ ticked: document.querySelectorAll('${T} tbody .dt-check input:checked').length, count: document.querySelector('.dt-bar-count')?.textContent || '' })`);
-            check(selection.ticked === 4 && /4/.test(selection.count), at + 'bulk selection counts only the three review files and question: ' + JSON.stringify(selection));
-            check(await ev(`!document.querySelector('${T} tbody .inbox-welcome-name')`), at + 'Welcome cannot become a skipped bulk row');
+            await waitFor(`!!document.querySelector('${T} tbody tr[data-welcome-id], ${T} tbody tr[data-key^="welcome"]')`, at + 'the Welcome row', 15000);
+            await ev(`[...document.querySelectorAll('${T} tbody tr[data-key*=":welcome:"] .dt-check input')].forEach(i => { if (!i.checked) i.click(); }); true`); await ev(framesJs(4));
+            await ev(`[...document.querySelectorAll('.dt-bar button')].find(b => /^Dismiss/.test(b.getAttribute('aria-label') || b.textContent.trim()))?.click(); true`); await ev(framesJs(3));
+            await ev(`[...document.querySelectorAll('.dt-bar button')].find(b => /^(Dismiss|Yes)/.test(b.textContent.trim()) && b !== document.activeElement)?.click(); true`).catch(() => {});
+            await waitFor(`/Dismissed \\d+ of \\d+/.test(document.body.innerText)`, at + 'the partial notice (' + await ev(`JSON.stringify({ ticked: document.querySelectorAll('${T} .dt-check input:checked').length, bar: (document.querySelector('.dt-bar') || {}).innerText, said: (document.body.innerText.match(/Dismissed[^\\n]*/) || [''])[0] })`) + ')', 10000);
+            const toast = await ev(`(document.body.innerText.match(/Dismissed \\d+ of \\d+[^\\n]*/) || [''])[0]`);
+            check(/Welcome to Coral: use Got it/.test(toast), at + 'the notice names the skipped row and what to press: ' + JSON.stringify(toast));
         }
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
     if (failures.length) { console.error('FAIL\n  ' + failures.join('\n  ')); process.exit(1); }

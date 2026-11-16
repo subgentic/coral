@@ -38,7 +38,7 @@ const { coralReady } = require('./helpers/wait');
                 return true; })()`);
             await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.settings = { ...m.state.settings, inbox_welcome: 'on', inbox_welcome_done: '' }; return true; })`);
             await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr.dt-row').length === 6 && document.querySelectorAll('${T} .inbox-getting-started li').length > 0`, at + 'six counted review/question rows and separate Getting started', 15000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 8`, at + 'welcome, review and question rows', 15000);
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: the table settles after its first draw
 
             assert.equal(await ev(`(document.querySelector('#group-table-view .view-list-nav')?.getClientRects().length || 0)`), 0, at + 'row actions remain usable without the Inbox strip');
@@ -75,7 +75,8 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await ev(`window.__calls.filter(c => c.review === '${(5).toString(16).padStart(64, '0')}' && c.decision === 'ignore').length`), 1, at + 'after the folder switches one drag is one ignore request');
             assert.equal(await ev(`[...document.querySelectorAll('.toast')].filter(t => /Dismissed: Phone review 5/.test(t.textContent)).length`), 1, at + 'and one toast');
             assert.ok(await ev(`!${rowOf('Phone review 5.txt')}`), at + 'and its row is gone');
-            assert.equal(await ev(`document.querySelectorAll('.inbox-getting-started input[type=checkbox]').length`), 0, at + 'Getting started is outside bulk selection');
+            await drag('Connect a second computer or the Hub');
+            await waitFor(`(window.__puts || []).some(b => /connect/.test(String(b.inbox_welcome_done || '')))`, at + 'a drag from 350 to 40 px ignores a welcome item (its id is saved as done)', 6000);
             await ev('window.__calls = []; true');
             // a long press selects a review file; a tap adds the question; the bar shows what fits
             await press('Phone review 1.txt');
@@ -91,7 +92,7 @@ const { coralReady } = require('./helpers/wait');
             const stay = await ev(`(() => { const bar = document.querySelector('.dt-bar'), sc = document.getElementById('group-table-view'); sc.scrollTop = sc.scrollTop + 500; const r = bar.getBoundingClientRect(), t = sc.getBoundingClientRect(); return { top: Math.round(r.top - t.top), shown: r.height > 0 }; })()`);
             assert.ok(stay.shown && stay.top >= -1 && stay.top <= 40, at + 'after the list scrolls the bar is still at the top of the screen (within 40 px of the list top): ' + JSON.stringify(stay));
             // the empty area under the list at its end is the same with rows selected as without (the Hide-all-welcome button and the bottom bar's room, 173 px here): a selection adds none (#11765)
-            const end = await ev(`(() => { const sc = document.getElementById('group-table-view'); sc.scrollTop = sc.scrollHeight; const rows = [...document.querySelectorAll('${T} tbody tr')], last = { bottom: Math.max(rows[rows.length - 1].getBoundingClientRect().bottom, document.querySelector('${T} .inbox-getting-started')?.getBoundingClientRect().bottom || 0) }, s = sc.getBoundingClientRect(); const note = document.querySelector('${T} .inbox-alerts-link'), cs = note && getComputedStyle(note); return Math.round(s.bottom - last.bottom - (note ? note.getBoundingClientRect().height + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom) : 0)); })()`); // the "Turn on alerts" line (#11837, 11d) is under the list on purpose: it is not empty room
+            const end = await ev(`(() => { const sc = document.getElementById('group-table-view'); sc.scrollTop = sc.scrollHeight; const rows = [...document.querySelectorAll('${T} tbody tr')], last = rows[rows.length - 1].getBoundingClientRect(), s = sc.getBoundingClientRect(); const note = document.querySelector('${T} .inbox-alerts-link'), cs = note && getComputedStyle(note); return Math.round(s.bottom - last.bottom - (note ? note.getBoundingClientRect().height + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom) : 0)); })()`); // the "Turn on alerts" line (#11837, 11d) is under the list on purpose: it is not empty room
             assert.ok(end <= 240, at + 'under the last row there is only the page\'s own room (the bar, and the room the + New button needs: at most 240 px, #12634), not a selection\'s empty area: ' + end);
             assert.ok(!b.actions.find(a => a.label === 'Approve').off && !b.actions.find(a => a.label === 'Changes').off, at + 'a file can be approved or sent back');
             // the three dots hold Changes, Mark read and Mark unread, and open on a tap

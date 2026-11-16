@@ -2,6 +2,7 @@ import './board_fetch.js'; // shared retry-safe route helpers used statically by
 import './inbox_servers.js'; // source helpers shared by lazy Inbox filters and lists
 import { needsYou, askedRow } from './asked_before_restart.js';
 import { unrecordedItem } from './waiting.js';
+import { syncWelcome } from './welcome_items.js';
 /* Inbox tab (#4718, #4811, #7472): on every Coral. Where the hub serves the dashboard it is the Coral Hub's /inbox page (what needs the Operator, what was saved) inside the dashboard, in a
  * frame whose address is the constant below: never built from a URL, a hash or a message, and nothing is posted to or read from the frame. On every other Coral the dashboard builds its own
  * Inbox on the shared sidebar: three groups, Needs you (the agents waiting for input, from the live list the dashboard already holds, each opening that agent), Tasks and Saved for later, whose names
@@ -78,7 +79,7 @@ export function updateInboxTab() {
     refreshReviews();
     scheduleReviewCounts();
     if (!isCloud() || nativeNeeds()) refreshOperatorAsks(); // Coral's own Needs you table on the Hub reads them from each online computer too (#13450); the questions asked of the Operator are read from this Coral too (#11417)
-    if (state.settings?.inbox_welcome === 'on') importOnce('./welcome_items.js').then(m => m.syncWelcome()).catch(() => {}); // onboarding completion stays off the startup graph; read current state when loaded
+    syncWelcome(); // a welcome step seen is remembered (#11443); the items are not in the badge
     refreshProposals(); // after the Inbox was first opened, and at most once in 20 seconds (proposals_state.js)
     if (!isCloud()) refreshRuns(); // the runs are read from this Coral only, and only once the Inbox or Automations has been shown
     const reviewCount = reviewAttentionCount();
