@@ -14,7 +14,7 @@ export const ACTION_LABEL = {
     message: 'Sent a message', task_create: 'Created a task', task_complete: 'Completed a task', task_cancel: 'Cancelled a task', task_publish: 'Published a task', task_edit: 'Changed a task', task_remind: 'Reminded about a task',
     task_park: 'Parked or released a task', task_reply: 'Replied on a task', prompt_answer: "Answered an agent's prompt", prompt_allow: 'Allowed what an agent asked', prompt_reject: 'Refused what an agent asked', wait_dismiss: 'Dismissed a waiting agent', wait_send: 'Sent held words to an agent',
     mark_unread: 'Marked unread', file_tags: 'Changed the tags of a file', file_star: 'Starred a file', file_unstar: 'Unstarred a file', file_keep: 'Kept a file', file_release: 'Released a file', file_delete: 'Deleted a file', file_share: 'Shared a file with an agent', file_edit: 'Saved a new version of a file', file_edit_send: 'Sent an edit of a file to agents',
-    saved_add: 'Saved a message', saved_update: 'Changed a saved message', saved_remove: 'Removed a saved message', chat_flag: 'Starred or archived a chat', chat_send: 'Sent words to an agent', run_seen: 'Opened or dismissed a failed run',
+    saved_add: 'Saved a message', saved_update: 'Changed a saved message', saved_remove: 'Removed a saved message', chat_flag: 'Starred or archived a chat', run_seen: 'Opened or dismissed a failed run',
     agents_record: 'Recorded for all agents', keep_full_access: 'Changed Full access on restart', goal_create: 'Created a goal', goal_edit: 'Changed a goal', goal_driver: 'Changed the driver of a goal', goal_move: 'Moved a goal to another team', goal_request_accept: 'Accepted a goal request',
     goal_request_decline: 'Declined a goal request', inbox_hide: 'Dismissed a row in Needs you', preview_trust: 'Trusted a file to run scripts in its preview', preview_untrust: 'Turned scripts off in a file preview',
     hub_update_check: 'Coral Hub checked for an update', hub_update_relaunch: 'Coral Hub relaunched into an update',
@@ -32,8 +32,8 @@ const KIND_TEST = {
     decisions: r => !!DECISION_LABEL[decisionOf(r)] || ['goal_close', 'task_complete', 'task_cancel', 'goal_review'].includes(r.action), // Answered, Allowed, Denied, Approved, Closed, Completed and the like
     answers: r => r.action === 'answer' || r.action === 'proposal' || r.action === 'prompt_answer', // an agent's question answered (#16088)
     permissions: r => r.action === 'prompt_allow' || r.action === 'prompt_reject' || isTrustAnswer(r), // a request to use a tool, allowed or refused (#16088); a trust dialog's answer is a permission decision too, so it is in both lists (#16116)
-    files: r => ['file', 'task', 'goal'].includes(r.item_kind) && r.action !== 'chat_send',
-    words: r => ['message', 'chat_send', 'task_reply'].includes(r.action),
+    files: r => ['file', 'task', 'goal'].includes(r.item_kind),
+    words: r => ['message', 'task_reply'].includes(r.action),
 };
 export const inKind = (r, k) => !k || !!(KIND_TEST[k] && KIND_TEST[k](r));
 

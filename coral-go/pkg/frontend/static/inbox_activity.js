@@ -131,15 +131,16 @@ export function forget() { rows = []; check = null; loaded = false; more = false
 document.addEventListener('coral:signed-out', forget); // a signed-out page keeps no computer's actions (#15404)
 
 /** Team ids that appear in the record, with the names the page shows them by. */
-export const teams = () => [...new Set(rows.map(r => r.team))].sort((a, b) => teamLabel(a).localeCompare(teamLabel(b)));
+const shown = () => rows.filter(r => r.action !== 'chat_send'); // 'Sent words to an agent' stays in the record (the server still writes it) but is not a row here (the Operator, 2026-11-15, #18466); the paging still goes by every row read
+export const teams = () => [...new Set(shown().map(r => r.team))].sort((a, b) => teamLabel(a).localeCompare(teamLabel(b)));
 /** The agents and the goals the record names, for the Filters panel's lists (#14445): the agents by name, the goals by title with No goal last when any row has none. */
-export const agents = () => [...new Set(rows.map(AF.agentOf).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-export const goals = () => { const all = [...new Set(rows.map(AF.goalOf))]; return [...all.filter(g => g !== AF.NO_GOAL).sort((a, b) => a.localeCompare(b)), ...all.filter(g => g === AF.NO_GOAL)]; };
+export const agents = () => [...new Set(shown().map(AF.agentOf).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+export const goals = () => { const all = [...new Set(shown().map(AF.goalOf))]; return [...all.filter(g => g !== AF.NO_GOAL).sort((a, b) => a.localeCompare(b)), ...all.filter(g => g === AF.NO_GOAL)]; };
 export const teamOf = r => teamLabel(r.team);
-export const filtered = f => AF.ordered(rows.filter(r => AF.matches(r, f, teamOf)), f);
-export const total = () => rows.length;
+export const filtered = f => AF.ordered(shown().filter(r => AF.matches(r, f, teamOf)), f);
+export const total = () => shown().length;
 /** How many of the rows read are of a kind (the chips' counts); '' is all of them. */
-export const countKind = k => rows.filter(r => AF.inKind(r, k)).length;
+export const countKind = k => shown().filter(r => AF.inKind(r, k)).length;
 
 /** The page's table spec for the sidebar's group table. `open` has { file(row), goal(row), question(row) }: how a row's item opens (the sidebar knows the routes). */
 export function spec(f, open, { grouped = false, byTask = true, tasks, taskSignature = '' } = {}) {
