@@ -76,7 +76,7 @@ registerActions({
     'mb-select-mode': () => boardPage()?.toggleSelectMode(),
     'mb-export': () => boardPage()?.showExportBoardModal(),
     'mb-pause': () => importOnce('./board_controls.js').then(m => m.toggleBoardPause()), // from any tab (#15331): the Board's own toggle did nothing until the Board tab had been opened (it had no team yet), so a first click was lost
-    'mb-delete-board': () => boardPage()?.deleteMessageBoardProject(),
+    'mb-delete-board': () => importOnce('./message_board.js').then(m => m.deleteMessageBoardProject()), // loads the board's code if it is not in yet: a click before it was in did nothing (#18903)
     'team-delete': el => { const b = el.dataset.board; if (b) importOnce('./message_board.js', 'the board').then(mod => mod.deleteTeam(b)).catch(() => {}); }, // the sidebar's team menu (#10318): the board's code loads here, the board's page may not be open; a failed load says so with importOnce's toast (the label), not silently
     'mb-post': () => boardPage()?.postBoardMessage(),
     // Enter sends, Shift+Enter is a new line.

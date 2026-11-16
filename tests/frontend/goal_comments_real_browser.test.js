@@ -74,6 +74,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
         await ev(`document.querySelector('#team-panel-goals .goal-comments .ac-resolve').click(); true`);
         await waitFor(`(document.querySelector('#team-panel-goals #goal-tab-comments .goal-tab-count').textContent || '').trim() === '1'`, 'reopened: the count is 1', 8000);
         await load(`/team/${B}/goals/${G}`);
+        await waitFor(`!!document.querySelector('#team-panel-goals #goal-tab-comments')`, 'the goal page\'s Comments tab after the reload (a slow runner clicked before it was drawn: null.click, #18903)', 15000);
         await ev(`document.querySelector('#team-panel-goals #goal-tab-comments').click(); true`);
         await waitFor(`document.querySelectorAll('#team-panel-goals .goal-comments .ac-card').length === 1`, 'the thread after a reload', 15000);
         // #12262: nothing remembered (the Comments choice is stored only by a toggle, and a goal's panel has none), a goal with an open comment opens its panel on a computer: the goal page keeps its own default, not the file viewer's closed one
