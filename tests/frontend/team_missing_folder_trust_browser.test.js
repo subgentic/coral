@@ -25,7 +25,7 @@ const BASE = require('./test_base').BASE;
    await ev(`(() => {const n=document.getElementById('team-board-name');n.value='folder-check';n.dispatchEvent(new Event('input',{bubbles:true}));return true;})()`);
    await setDir('/home/test/Coral/folder-check',true);
    let v=await inspect();
-   if(v.toggle||!v.line||v.text!=='Coral creates this folder and trusts it for the team. A Claude agent may still ask once.') failures.push(`${width}: suggested missing folder: ${JSON.stringify(v)}`);
+   if(v.toggle||!v.line||v.text!=='Coral will start these agents in this folder and try to record trust in their existing settings. Agents may still ask; you can answer together in Needs you.') failures.push(`${width}: suggested missing folder: ${JSON.stringify(v)}`);
    await ev(`import((window.__coralStatic||'/static/')+'team_dialogs.js').then(m=>m.teamStepMove(-1))`);
    await setDir('/work/new-team',false);
    v=await inspect();
