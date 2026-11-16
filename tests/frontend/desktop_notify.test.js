@@ -96,7 +96,7 @@ const { JSDOM } = require('jsdom');
 
     // the wiring: the alert is raised from the rising edge in websocket.js only, summaries are not passed
     const ws = fs.readFileSync(path.join(dir, 'websocket.js'), 'utf8');
-    const calls = ws.match(/noteRow\(m\.KIND_[A-Z_]+, [^)]*\)/g) || [];
+    const calls = ws.match(/noteHidden\(m => m\.KIND_[A-Z_]+, s, id, /g) || []; // the two alert functions share noteHidden, which calls noteAttention once (#17898)
     assert.strictEqual(calls.length, 2, 'the needs-input alert and the reply alert are raised from websocket.js');
     for (const call of calls) assert.ok(!/summary|detail/.test(call), call);
     console.log('desktop_notify: ok');

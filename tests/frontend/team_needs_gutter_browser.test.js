@@ -12,7 +12,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.addScriptToEvaluateOnNewDocument({source:"localStorage.setItem('coral-inbox-needs-filters',JSON.stringify({agent:'Inbox person'}));"});
-        for (const width of [960]) {
+        for (const width of [960, 390]) {
             await Emulation.setDeviceMetricsOverride({ width, height: 844, deviceScaleFactor: 1, mobile: width === 390 });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installTeam(ev);
             await seed(ev, team);
@@ -24,7 +24,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.querySelector('#team-panel-needs:not([hidden])')`, 'needs panel');
             await waitFor(`document.querySelector('#team-panel-needs')?.textContent.includes('Team waiting agent')`, 'row');
             const m = await ev(`(() => { const p = document.querySelector('#team-panel-needs'), t = p.querySelector('.dt-box, .dt-table, table'), b = t.getBoundingClientRect(), pr = p.getBoundingClientRect(); const page = p.querySelector('.goals-table-page'); const cs = page && getComputedStyle(page); return { vw: innerWidth, panelL: Math.round(pr.left), panelR: Math.round(pr.right), tblL: Math.round(b.left), tblR: Math.round(b.right), pagePad: cs && cs.paddingLeft + ' ' + cs.paddingRight, cls: t.className, pageCls: page && page.className }; })()`);
-            assert.ok(m.tblL >= 16 && m.tblR <= m.vw - 16, 'the Needs you table keeps a gutter at 960 px (#15324, walk 21 M3): ' + JSON.stringify(m));
+            assert.ok(m.tblL >= 16 && m.tblR <= m.vw - 16, 'the Needs you table keeps a gutter at ' + width + ' px (#15324, walk 21 M3; #17243, walk 57 F6 at 390): ' + JSON.stringify(m));
         }
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

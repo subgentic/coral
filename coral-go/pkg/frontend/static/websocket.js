@@ -254,34 +254,31 @@ function _mergeFeedDiff(data) {
  * that is still open after this long is shown; one the turn has moved past by then (the tool ran, the turn stopped) never is. */
 export const CODEX_REVIEW_HOLD_MS = 6000;
 
+/** Opens row s's chat in the Agents view. */
+const openLive = s => importOnce('./sessions.js').then(m => m.selectLiveSession(s.name, s.agent_type, s.session_id, sessionServer(s)));
+
 /** The needs-input toast, and the opt-in desktop alert, for row s. */
 function _raiseNeedsInputAlert(s, id) {
     const label = escapeHtml(withTeam(resolveSessionIdentity(s), s)); // the role or the name the row shows (the row's own words), not the folder twice; two teams: "Orchestrator (team-a)" (#10134)
     const detail = s.waiting_summary ? escapeHtml(askWords(s.waiting_summary)) : dialogDue(s) ? escapeHtml(DIALOG_WORDS) : null; // an agent at a dialog says it needs one click (#11430)
-    const sessionName = s.name;
-    const agentType = s.agent_type;
-    const sessionId = s.session_id;
-    const sessionSrv = sessionServer(s);
-    const openSession = () => importOnce('./sessions.js').then(m => m.selectLiveSession(sessionName, agentType, sessionId, sessionSrv)).then(() => window.showChatView?.()); // the chat card is where the answer is (#10141)
+    const openSession = () => openLive(s).then(() => window.showChatView?.()); // the chat card is where the answer is (#10141)
     // The question is announced once: with its card on screen in this agent's chat (a role=alert that says it) the toast is there to see and use but does not say it again (#10374).
-    const cardShown = state.currentSession?.session_id === sessionId && [...document.querySelectorAll('#live-history-messages > .chat-needs-input')].some(e => e.getClientRects().length > 0);
+    const cardShown = state.currentSession?.session_id === s.session_id && [...document.querySelectorAll('#live-history-messages > .chat-needs-input')].some(e => e.getClientRects().length > 0);
     // Phone, Needs you open: the row is the notice, a toast would cover it (#17733)
     const t = document.getElementById('group-table-view');
     if (!(isPhoneLayout() && t?.dataset.group === 'hub-inbox:needs' && t.getClientRects().length)) showNotificationToast(label, detail, openSession, { silent: cardShown });
-    // Opt-in desktop alert while this tab is in the background; names only.
-    // attention.js is read when the first alert is due, not at start (the start weight is guarded): the count it keeps is only ever needed from then on
-    // Whether the tab is in the background is decided now, when the alert is raised: attention.js answers after it has loaded, and a tab that was visible at the reply and hidden by then must not count it (#10396)
-    if (document.hidden) importOnce('./attention.js').then(m => m.noteRow(m.KIND_NEEDS_INPUT, s, id, openSession)).catch(() => {});
+    noteHidden(m => m.KIND_NEEDS_INPUT, s, id, openSession);
+}
+
+/** The opt-in desktop alert while this tab is in the background; names only. attention.js is read when the first alert is due, not at start (the start weight is guarded): the count it keeps is only ever needed from then on.
+ *  Whether the tab is in the background is decided now, when the alert is raised: attention.js answers after it has loaded, and a tab that was visible at the reply and hidden by then must not count it (#10396). */
+function noteHidden(kindOf, s, id, onClick) {
+    if (document.hidden) importOnce('./attention.js').then(m => m.noteRow(kindOf(m), s, id, onClick)).catch(() => {});
 }
 
 /** An agent's turn just ended and it awaits its person: a count in the tab title and, when this browser wants them, a desktop alert; only while this tab is in the background (#10068). Names only. */
 function _raiseReplyAlert(s, id) {
-    const sessionName = s.name;
-    const agentType = s.agent_type;
-    const sessionId = s.session_id;
-    const sessionSrv = sessionServer(s);
-    const openSession = () => importOnce('./sessions.js').then(m => m.selectLiveSession(sessionName, agentType, sessionId, sessionSrv));
-    if (document.hidden) importOnce('./attention.js').then(m => m.noteRow(m.KIND_REPLY, s, id, openSession)).catch(() => {});
+    noteHidden(m => m.KIND_REPLY, s, id, () => openLive(s));
 }
 
 /** A Codex row whose request is the agent's own approval request (its PermissionRequest hook), which Codex's reviewer may settle by itself. */
@@ -464,8 +461,7 @@ function _syncViewedSession(data) {
             // history takes over. The popout follows its own lifecycle.
             if (!isPopout()) {
                 if (!!s.sleeping !== !!state.currentSession.sleeping) {
-                    const cur = state.currentSession;
-                    window.selectLiveSession(cur.name, cur.agent_type, cur.session_id, sessionServer(cur));
+                    if (!isPhoneLayout() || document.body.classList.contains('live-session-active')) openLive(state.currentSession); // a phone re-selects only while the chat is the screen shown: a team Wake from its list does not open it (#17243)
                 } else if (s.sleeping) {
                     // The placeholder above was the awake one; archived may have changed.
                     applySleepingView(true, { archived: !!s.archived });
