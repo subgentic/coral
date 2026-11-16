@@ -243,3 +243,21 @@ func TestSendToAgentOnANoTeamFileTypesTheCommentIntoTheUploader(t *testing.T) {
 	sh.sendNoTeamComment(rec, req, caller, c, id, []string{"a", "b"})
 	assert.Equal(t, http.StatusBadRequest, rec.Code, "one agent, never two")
 }
+
+// A Send to agent on a no-team file costs one ask of the owner's hour, not two (#18175, Security's INFO on #18105): the send handler counts the press once, before it does anything, and the delivery
+// it calls does not count it again. sendNoTeamComment is what the handler calls after its own count, so a call here must leave the whole hour's allowance untouched.
+func TestSendToAgentOnANoTeamFileCountsTheOwnersLimitOnce(t *testing.T) {
+	bh, _, _, id, _ := noTeamNoticeRig(t)
+	_, sh, _, _ := setupSessionsTestServer(t)
+	sh.SetBoardHandler(bh)
+	req := httptest.NewRequest(http.MethodPost, "/api/artifacts/"+id+"/comments/1/send", nil)
+	caller := commentCaller{Kind: commentCallerOwner, Issuer: "local", Subject: "owner"}
+	rec := httptest.NewRecorder()
+	sh.sendNoTeamComment(rec, req, caller, store.ArtifactComment{Body: "Please add the Q4 table."}, id, []string{"The agent that uploaded this file"})
+	require.Equal(t, http.StatusOK, rec.Code, "%s", rec.Body.String())
+	key := caller.Issuer + "|" + caller.Subject
+	for i := 0; i < sendLimitPerHour; i++ {
+		require.True(t, sh.sendLimit.allow(key, time.Now()), "ask %d of %d is still allowed: the delivery counted nothing of its own", i+1, sendLimitPerHour)
+	}
+	assert.False(t, sh.sendLimit.allow(key, time.Now()), "and the limit itself still holds")
+}

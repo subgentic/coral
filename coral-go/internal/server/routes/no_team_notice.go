@@ -51,12 +51,24 @@ func (h *SessionsHandler) deliverNoTeamComment(r *http.Request, caller commentCa
 	if h.boardHandler == nil {
 		return autoDelivery{Reason: "no_uploader"}
 	}
-	item, ok := h.boardHandler.noTeamManagedArtifact(r.Context(), id)
-	if !ok {
+	if _, ok := h.boardHandler.noTeamManagedArtifact(r.Context(), id); !ok {
 		return autoDelivery{Reason: "no_uploader"}
 	}
 	if !h.sendLimit.allow(caller.Issuer+"|"+caller.Subject, time.Now()) {
 		return autoDelivery{Reason: "rate_limited"}
+	}
+	return h.typeNoTeamComment(r, c, id)
+}
+
+// typeNoTeamComment is the typing of deliverNoTeamComment with no count of the owner's hourly limit: an automatic delivery counts it first (above), and Send to agent has already counted its press in
+// the send handler, so counting here too took two asks of the hour for one press (#18175, Security's INFO on #18105).
+func (h *SessionsHandler) typeNoTeamComment(r *http.Request, c store.ArtifactComment, id string) autoDelivery {
+	if h.boardHandler == nil {
+		return autoDelivery{Reason: "no_uploader"}
+	}
+	item, ok := h.boardHandler.noTeamManagedArtifact(r.Context(), id)
+	if !ok {
+		return autoDelivery{Reason: "no_uploader"}
 	}
 	text, ok := sendQuote(c.Body, 2*sendCommentCap)
 	if !ok {
