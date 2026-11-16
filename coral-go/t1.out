@@ -1,0 +1,5 @@
+--- FAIL: TestEveryTypedSenderIsInTheCensus (0.14s)
+    typed_notices_test.go:63: agent_asks.go:232 types text into an agent's terminal and is not in the census's list of call sites: build its text with a typed builder, add the builder to TestTypedNoticeCensus, and list the call here: _ = h.deliver(r.Context(), h.term, ask.SessionName, agentType, sessionID, text, "operator dismissed") // best effort: the agent may be gone, and the question is closed either way
+FAIL
+FAIL	github.com/subgentic/coral/internal/server/routes	1.073s
+FAIL
