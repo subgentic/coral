@@ -10,3 +10,4 @@
 .queue-tab-empty { max-width: 60ch; padding: 24px 0; }
 .queue-tab-empty-title { margin: 0 0 4px; font-size: var(--fs-lg); font-weight: 600; color: var(--text-primary); }
 .queue-tab-empty-hint { margin: 0; font-size: var(--fs-base); color: var(--text-secondary); }
+.queue-tab-table .dt-box.dt-mail-on .dt-group th { top: 0; } /* the table's header is gone on a phone, so a group line sticks at the top, not 33px down on the first row (#18732) */
