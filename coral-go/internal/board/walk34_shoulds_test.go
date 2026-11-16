@@ -23,18 +23,14 @@ func TestWalk34SHOULDs(t *testing.T) {
 		}
 	})
 
-	t.Run("pw-strength-idle uses display:none", func(t *testing.T) {
-		src := frontendSource(t, "css/components.css")
-		idx := strings.Index(src, ".pw-strength-idle")
-		if idx < 0 {
-			t.Fatal(".pw-strength-idle rule must exist")
+	t.Run("pw-strength-idle hidden via JS attribute", func(t *testing.T) {
+		css := frontendSource(t, "css/components.css")
+		if strings.Contains(css, ".pw-strength-idle") {
+			t.Fatal(".pw-strength-idle must not be in the start CSS (hiding is via the hidden attribute in password_ui.js)")
 		}
-		block := src[idx : idx+120]
-		if !strings.Contains(block, "display: none") && !strings.Contains(block, "display:none") {
-			t.Fatal(".pw-strength-idle must use display:none (not visibility:hidden) so the idle strength bar takes no space")
-		}
-		if strings.Contains(block, "visibility") {
-			t.Fatal(".pw-strength-idle must not use visibility:hidden (it leaves a gap)")
+		js := frontendSource(t, "password_ui.js")
+		if !strings.Contains(js, "root.hidden") {
+			t.Fatal("password_ui.js must set root.hidden to hide the idle strength meter")
 		}
 	})
 }
