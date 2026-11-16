@@ -161,7 +161,7 @@ func runUpdateTaskOracle(t *testing.T, seed int64, counts map[string]int) {
 	}
 
 	actors := []string{"Orch", "Orch", "Dev", "QA", "Operator", "", "Ghost", "Arch"}
-	targets := []string{"Dev", "QA", "Arch", "Orch", "Ghost", "", "Idle", "Dev"}
+	targets := []string{"Dev", "QA", "Arch", "Orch", "Arch", "", "Idle", "Dev"} // every target is on the board: a name that is not is refused (#18294)
 	for step := 0; step < 80; step++ {
 		enforced := rng.Intn(6) == 0
 		caller := []Actor{{Kind: ActorClaimed}, {Kind: ActorOperator, Name: "Operator"}, {Kind: ActorToken, Name: "Dev"}}[rng.Intn(3)]

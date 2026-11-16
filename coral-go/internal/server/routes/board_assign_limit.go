@@ -3,6 +3,7 @@ package routes
 import (
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/subgentic/coral/internal/board"
@@ -95,4 +96,63 @@ func (h *BoardHandler) noteForcedAssignment(r *http.Request, project string, tas
 		return
 	}
 	h.postNotice(r.Context(), project, fmt.Sprintf("[Task #%d assigned to %s past the limit (%d waiting) by %s with --force]", taskID, h.noticeText(r.Context(), project, assignee), waiting, h.noticeText(r.Context(), project, by)))
+}
+
+// refuseUnknownAssignee answers 409 assignee_unknown when assignee is no one on the board (a git author's name, a typo): no agent would ever see that task, and the load check above passes a name it has never heard of with 0 waiting (#18294).
+// The refusal names the closest board members. The Operator and a task's own creator are never refused.
+func (h *BoardHandler) refuseUnknownAssignee(w http.ResponseWriter, r *http.Request, project, assignee, createdBy string) bool {
+	assignee = strings.TrimSpace(assignee)
+	if assignee == "" || strings.EqualFold(assignee, board.OperatorName) || board.SameIdentity(assignee, createdBy) {
+		return false
+	}
+	subs, err := h.bs.ListSubscribers(r.Context(), project)
+	if err != nil {
+		return false // a list that cannot be read never blocks an assignment
+	}
+	var names []string
+	for _, s := range subs {
+		if board.SameIdentity(s.SubscriberID, assignee) {
+			return false
+		}
+		if s.IsActive != 0 && strings.TrimSpace(s.SessionName) != "" && !strings.EqualFold(s.SubscriberID, board.OperatorName) {
+			names = append(names, s.SubscriberID)
+		}
+	}
+	low := strings.ToLower(assignee)
+	sort.SliceStable(names, func(i, j int) bool {
+		return nameDistance(low, strings.ToLower(names[i])) < nameDistance(low, strings.ToLower(names[j]))
+	})
+	if len(names) > 3 {
+		names = names[:3]
+	}
+	msg := fmt.Sprintf("%s is not on this board, so no agent would see the task.", assignee)
+	if len(names) > 0 {
+		msg += " Closest: " + strings.Join(names, ", ") + "."
+	}
+	writeError(w, http.StatusConflict, "assignee_unknown", msg)
+	return true
+}
+
+// nameDistance is the edit distance of two names, less 1 for each when one holds the other ("qa" is closer to "QA Engineer 2" than to "Lead").
+func nameDistance(a, b string) int {
+	if strings.Contains(b, a) || strings.Contains(a, b) {
+		return 0
+	}
+	prev := make([]int, len(b)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(a); i++ {
+		cur := make([]int, len(b)+1)
+		cur[0] = i
+		for j := 1; j <= len(b); j++ {
+			cost := 1
+			if a[i-1] == b[j-1] {
+				cost = 0
+			}
+			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
+		}
+		prev = cur
+	}
+	return prev[len(b)]
 }

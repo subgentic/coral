@@ -75,6 +75,10 @@ func TestBoardTaskPlanningOperatorAndOrchestrator(t *testing.T) {
 		t.Run(actor, func(t *testing.T) {
 			server, h := setupBoardTestServer(t)
 			registerTaskPlanner(t, h, "team", "coordinator")
+			for _, n := range []string{"worker", "next"} {
+				_, err := h.bs.Subscribe(context.Background(), "team", n, "Developer", n, nil, "all", false)
+				require.NoError(t, err)
+			}
 			base := server.URL + "/api/board/team/tasks"
 			r := postJSON(t, base, map[string]string{"created_by": actor, "title": "Allowed"})
 			require.Equal(t, http.StatusCreated, r.StatusCode)
