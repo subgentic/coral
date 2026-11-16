@@ -14,6 +14,7 @@ import (
 	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/load"
 	"github.com/shirou/gopsutil/v4/mem"
+	"github.com/subgentic/coral/internal/safego"
 )
 
 // Stats is what one resource's machine looks like now (#17560): the numbers an agent needs to pick a box (is it up, how loaded, how much memory and disk is free). They come from the machine itself: gopsutil here,
@@ -170,7 +171,7 @@ func (b *StatsBoard) Get(machine, where string) *Stats {
 	if have {
 		if !b.flight[key] {
 			b.flight[key] = true
-			go b.refresh(machine, where, key)
+			safego.Go("resources:refresh", func() { b.refresh(machine, where, key) })
 		}
 		b.mu.Unlock()
 		return &st
@@ -178,7 +179,7 @@ func (b *StatsBoard) Get(machine, where string) *Stats {
 	if where == "remote" {
 		if !b.flight[key] {
 			b.flight[key] = true
-			go b.refresh(machine, where, key)
+			safego.Go("resources:refresh", func() { b.refresh(machine, where, key) })
 		}
 		b.mu.Unlock()
 		return &Stats{State: "checking"}

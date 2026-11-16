@@ -120,9 +120,12 @@ func TestHubDropboxPrepare_BadNamesAreRefusedNotRepaired(t *testing.T) {
 	}
 }
 
+// hdTokenBody is a token the redactor recognises: a run of one letter is not one (internal/secrets skips a low-entropy body).
+const hdTokenBody = "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8"
+
 const hdCanary = "Authorization: Bearer ghp_"
 
-func canaryText() string { return "notes\n" + hdCanary + strings.Repeat("a", 36) + "\n" }
+func canaryText() string { return "notes\n" + hdCanary + hdTokenBody + "\n" }
 
 func TestHubDropbox_FlaggedIsHeldUntilTheOwnerClickAndTheClickIsUsedOnce(t *testing.T) {
 	e := newHDEnv(t)
@@ -160,7 +163,7 @@ func TestHubDropbox_ASecretSplitAcrossAChunkEdgeStillHoldsTheFile(t *testing.T) 
 	e := newHDEnv(t)
 	// the token starts 10 bytes before the 64 KiB read boundary and ends after it
 	pad := strings.Repeat("x ", (64<<10-10)/2)
-	d := e.put(t, pad+"Authorization: Bearer ghp_"+strings.Repeat("b", 36)+"\n")
+	d := e.put(t, pad+hdCanary+hdTokenBody+"\n")
 	_, got := e.call(e.d.Push, `{"digest":"`+d+`","link":"`+hdLink+`"}`)
 	assert.JSONEq(t, `{"word":"held"}`, got)
 	assert.Empty(t, e.stub.got)

@@ -48,6 +48,7 @@ var pinnedSites = map[string]string{
 	// the scheduler and the workflow runner
 	"scheduler.go JobScheduler.killRunSession":                 background + ": only reached from JobScheduler.Run's ticks and the run handlers",
 	"scheduler_turn.go JobScheduler.endRunSession":             background + ": only reached from JobScheduler.Run's ticks",
+	"launcher.go AgentLauncher.BuildSchedulerLaunchFn":         background + ": a scheduled job's launch, from the scheduler's ticks and the run handlers; it ends the agent only when the job's prompt could not be typed, so the run is failed with the reason and not left Running (#17520)",
 	"workflow_runner.go WorkflowRunner.KillRun":                person + ": the workflow run's kill handler",
 	"workflow_steps.go WorkflowRunner.executeAgentInteractive": background + ": the workflow agent step, reached from the workflow runner",
 	"chief_checks.go ChiefChecksHandler.wake":                  background + ": only from Chief check delivery (the person-only Run now handler, scheduled delivery or Poll); delivery requires the Operator-saved trigger snapshot AND current wake consent, pinned live board membership, non-paused board and receive mode; wake also reserves ordinary live/hourly grant caps, paces, and uses the existing wake permissions",
@@ -189,15 +190,16 @@ var guardedHelpers = []string{"startOnBackend", "startOnTmux", "restartTerminal"
 
 // pinnedCallers are the callers of the guarded helpers that are neither handlers nor pinned above: each is reached only from the handler or background entry named.
 var pinnedCallers = map[string]string{
-	"orchestrator_restart.go SessionsHandler.restartAsSeat":    "the Orchestrator restart handler (a signed agent call under its grant and caps, #15112) and queueRestart, started from that handler",
-	"scheduler.go JobScheduler.KillRun":                        "the run-kill handler (tasks.go) and the workflow run handlers",
-	"scheduler.go JobScheduler.finishRun":                      "only reached from the scheduler's ticks and watchers or a run a person started",
-	"scheduler_reap.go JobScheduler.reapStaleRuns":             "only reached from JobScheduler.Run",
-	"scheduler_turn.go JobScheduler.settleOnTurn":              "only reached from the scheduler's turn watchers (started by Run or by a run a person started)",
-	"sessions_launch_session.go SessionsHandler.launchSession": "the launch, team launch, team lifecycle and team reset handlers",
-	"sessions_launch_team.go SessionsHandler.launchTeamMember": "the team launch handlers",
-	"sessions_wake.go SessionsHandler.wakeExistingSession":     "the wake handlers; its two background callers are autoResume and autoWakeOne",
-	"sessions_wake.go SessionsHandler.wakeSession":             "wakeExistingSession (the wake handlers and their background callers) and WakeIdleFor, a background entry",
+	"orchestrator_restart.go SessionsHandler.restartAsSeat":           "the Orchestrator restart handler (a signed agent call under its grant and caps, #15112) and queueRestart, started from that handler",
+	"scheduler.go JobScheduler.KillRun":                               "the run-kill handler (tasks.go) and the workflow run handlers",
+	"scheduler.go JobScheduler.finishRun":                             "only reached from the scheduler's ticks and watchers or a run a person started",
+	"scheduler_reap.go JobScheduler.reapStaleRuns":                    "only reached from JobScheduler.Run",
+	"scheduler_turn.go JobScheduler.settleOnTurn":                     "only reached from the scheduler's turn watchers (started by Run or by a run a person started)",
+	"sessions_launch_session.go SessionsHandler.launchSession":        "the launch, team launch, team lifecycle and team reset handlers",
+	"sessions_launch_session.go SessionsHandler.LaunchSigninTerminal": "the OpenCode sign-in route (SetSigninTerminal, router.go): a person's Sign in click, with a command built from a fixed shape (#16716)",
+	"sessions_launch_team.go SessionsHandler.launchTeamMember":        "the team launch handlers",
+	"sessions_wake.go SessionsHandler.wakeExistingSession":            "the wake handlers; its two background callers are autoResume and autoWakeOne",
+	"sessions_wake.go SessionsHandler.wakeSession":                    "wakeExistingSession (the wake handlers and their background callers) and WakeIdleFor, a background entry",
 }
 
 func TestEveryCallerOfAPersonTriggeredFunctionIsAHandlerListedOrGated(t *testing.T) {

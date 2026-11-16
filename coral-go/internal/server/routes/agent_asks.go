@@ -228,7 +228,7 @@ func (h *AgentAsksHandler) Dismiss(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	agentType, sessionID := logparse.ParseSessionName(ask.SessionName)
-	text := "[Coral] The Operator dismissed your question " + board.TypedText(clipRunes(ask.Text, 80)) + " without answering it. Do not wait for an answer: carry on, or ask again if you still need one."
+	text := typedAgentAskDismissed(ask.Text)
 	_ = h.deliver(r.Context(), h.term, ask.SessionName, agentType, sessionID, text, "operator dismissed") // best effort: the agent may be gone, and the question is closed either way
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
@@ -276,6 +276,12 @@ func clipRunes(s string, n int) string {
 		return s
 	}
 	return string(r[:n-1]) + "…"
+}
+
+// typedAgentAskDismissed is the line typed into the agent when the Operator dismisses its question: the question is the agent's own
+// words, so it goes through board.TypedText and is cut at 80 characters (goal #7: listed in TestTypedNoticeCensus).
+func typedAgentAskDismissed(question string) string {
+	return "[Coral] The Operator dismissed your question " + board.TypedText(clipRunes(question, 80)) + " without answering it. Do not wait for an answer: carry on, or ask again if you still need one."
 }
 
 // typedAgentAskAnswer is the line typed into the agent for the Operator's answer: the question and the answer are other people's words, so

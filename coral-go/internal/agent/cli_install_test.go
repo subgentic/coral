@@ -199,9 +199,9 @@ func TestNotFoundModalShowsTheOfficialPageAndNote(t *testing.T) {
 	js := string(b)
 	i := strings.Index(js, "function _showCLINotFoundModal")
 	require.Greater(t, i, 0)
-	body := js[i : i+3000]
+	body := js[i : i+5000]
 	assert.Contains(t, body, "info.url")
-	assert.Contains(t, body, "official install page")
+	assert.Contains(t, body, "Install it from")
 	assert.Contains(t, body, "info.note")
 	assert.Contains(t, body, `rel="noopener noreferrer"`)
 	assert.Contains(t, body, "escapeHtml(info.note)")

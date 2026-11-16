@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/subgentic/coral/internal/secfile"
 )
 
 // PinToolsPath makes the agent's own shell find THIS build's coral-agent and coral-board first, whatever order its PATH has been put in (#18643): the launch line and the settings
@@ -26,7 +28,7 @@ func PinToolsPath(envFile, dir string) error {
 	if old, err := os.ReadFile(envFile); err == nil && strings.Contains(string(old), line) {
 		return nil
 	}
-	f, err := os.OpenFile(envFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600)
+	f, err := secfile.OpenNoFollow(envFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600)
 	if err != nil {
 		return err
 	}

@@ -312,7 +312,7 @@ var reviewedOrigins = map[string]bool{
 	"cmd/launch-coral/main.go	launchAgentSessions	SendKeysToTarget	Internal":                                         true,
 	"internal/background/agent_exited.go	deliverAutomatedIfWanted	SendInput	Coral":                                   true,
 	"internal/background/context_compact.go	deliverCommand	SendInput	Coral":                                          true, // the CLI's own /compact or /clear and the cleared agent's fixed line, through DeliverAutomated (#14849)
-	"internal/background/launcher.go	AgentLauncher.startPromptDelivery	SendPrompt	?":                                 true, // AgentLauncher.SendPrompt, a method of its own that hands the prompt to the automated-input gate (Coral's text)
+	"internal/background/launcher.go	AgentLauncher.startPromptDeliveryReporting	SendPrompt	?":                        true, // AgentLauncher.SendPrompt, a method of its own that hands the prompt to the automated-input gate (Coral's text)
 	"internal/background/runtime_pty.go	PTYRuntime.SendEnter	SendInput	Internal":                                     true,
 	"internal/background/runtime_pty.go	PTYRuntime.SendInput	SendText	o":                                             true,
 	"internal/background/runtime_pty.go	PTYRuntime.SendPrompt	SendPrompt	o":                                          true,
@@ -322,7 +322,6 @@ var reviewedOrigins = map[string]bool{
 	"internal/background/runtime_tmux.go	TmuxRuntime.SendInput	SendKeys	o":                                           true,
 	"internal/background/runtime_tmux.go	TmuxRuntime.SendPrompt	SendPrompt	o":                                        true,
 	"internal/background/runtime_tmux.go	TmuxRuntime.SpawnAgent	SendKeysToTarget	Internal":                           true,
-	"internal/background/workflow_steps.go	WorkflowRunner.executeAgentInteractive	SendPrompt	?":                      true, // AgentLauncher.SendPrompt, a method of its own that hands the prompt to the automated-input gate (Coral's text)
 	"internal/ptymanager/automated_input_deliver.go	inputGate.typeNow	SendPrompt	Coral":                              true,
 	"internal/server/routes/sessions_waiting.go	SessionsHandler.SendWaitingNow	SendInput	Coral":                      true, // the Operator's Send now (#7727): Coral's nudge text, a person's choice
 	"internal/ptymanager/notice_pause.go	typeSummary	SendInput	Coral":                                                true, // the one line that stands for held notices (#11387): Coral's own, typed through DeliverAutomated
@@ -350,6 +349,7 @@ var reviewedOrigins = map[string]bool{
 	"internal/ptymanager/tmux_backend.go	TmuxBackend.Spawn	SendKeysToTarget	Internal":                                true,
 	"internal/server/routes/agent_exited.go	deliverAutomatedOutcome	SendInput	Coral":                                 true,
 	"internal/server/routes/agent_ui_request.go	SessionsHandler.agentUIRequest	SendPrompt	Coral":                     true,
+	"internal/server/routes/orchestrator_agents.go	SessionsHandler.OrchestratorStop	SendRawInput	Internal":           true, // the stop key (#17348), after automatedInputBlocked
 	"internal/server/routes/auto_accept.go	AutoAcceptor.check	SendRawInput	Internal":                                 true,
 	"internal/server/routes/dialog_timeout.go	SessionsHandler.dialogTimeout	SendRawInput	Internal":                   true,
 	"internal/server/routes/auto_recommend.go	AutoRecommender.pick	SendRawInput	Internal":                            true, // the operator's opt-in answer to a question with its Recommended option (inside AutoAcceptSend)

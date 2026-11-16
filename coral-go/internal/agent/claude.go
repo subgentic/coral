@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/subgentic/coral/internal/secfile"
 	"github.com/subgentic/coral/internal/transcriptlink"
 )
 
@@ -335,7 +336,7 @@ func (a *ClaudeAgent) PrintArgs(params LaunchParams) (args []string, settingsFil
 func PrintSystemFile(settingsFile string) string { return settingsFile + ".sys.md" }
 
 func writeNewFile(path string, b []byte) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	f, err := secfile.OpenNoFollow(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600) // a new file only: a planted link at the path is refused, never written through
 	if err != nil {
 		return err
 	}

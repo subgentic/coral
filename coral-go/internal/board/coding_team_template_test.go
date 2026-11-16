@@ -64,7 +64,7 @@ func TestDefaultTeamMembersAreGenericNotCodingSpecific(t *testing.T) {
 
 	// team_dialogs.js uses DEFAULT_TEAM_MEMBERS, not the Coding Team slice
 	dialogs := frontendSource(t, "team_dialogs.js")
-	require.Contains(t, dialogs, "for (const a of DEFAULT_TEAM_MEMBERS)", "_addDefaultMembers uses the generic array")
+	require.Contains(t, dialogs, "function _addDefaultMembers(members = DEFAULT_TEAM_MEMBERS)", "_addDefaultMembers uses the generic array")
 	require.Contains(t, dialogs, "DEFAULT_TEAM_MEMBERS,", "the import includes it")
 }
 
@@ -76,6 +76,6 @@ func TestChoosingATemplateSetsTheLaunchFormsWorkingMode(t *testing.T) {
 	settings := frontendSource(t, "team_launch_settings.js")
 	require.Contains(t, settings, "export function setTeamLaunchMode(mode, wm)")
 	require.Contains(t, settings, "mode: _defaultMode,", "a step that is still loading starts with the template's mode")
-	require.Contains(t, settings, "if (_view) _view.destroy();\n    _defaultMode = 'none';", "and mounting the step for a new dialog starts every team at None again")
+	require.Contains(t, settings, "const on = { signal: _listening.signal };\n    _defaultMode = 'none'; _defaultExtra = {};", "and mounting the step for a new dialog starts every team at None again")
 	require.Contains(t, settings, "{ value: 'task_queue', label: 'Task queue' }", "the Working mode select offers it")
 }

@@ -34,7 +34,8 @@ const (
 	// #14944, Share via Dropbox (approved by the Operator on #197874): the dialog module (dropbox_share.js, loaded only on the press), the viewer's item and Settings' shared list bring the tree to 6,529,154 bytes; plus 64 KiB, rounded up. The Operator's standing OK for approved work (not the start-CSS cap).
 	// v2.0.65 candidate (lead-v2065): the ~375 picks (the review series and versions, Needs you cards, team files, Dropbox, the getting-started guide) put the tree at 6,653,071 bytes, 57,487 over the previous budget; plus 64 KiB, rounded up to a whole KiB, is 6,719,488 (the Operator's standing approval; the start-JS and start-CSS ceilings are unchanged).
 	// v2.0.69 trial (final head ed3f2ff50, standing OK for approved work, not the start-CSS cap nor the app.js ceiling): the ~300 picks put the tree at 6,823,707 bytes, 31,515 over the previous budget; plus 64 KiB, as the test prints.
-	staticBudget = 6_889_472
+	// v2.0.69 rc4 head b366165fb6 (standing OK for approved work, not the start-CSS cap nor the app.js ceiling): the roll-in picks put the tree at 6,954,861 bytes, 65,389 over the previous budget; plus 64 KiB, as the test prints (#18676).
+	staticBudget = 7_020_544
 	// fileBudget is the most one embedded file may hold (the CodeMirror bundle, the largest, is ~1 MB).
 	fileBudget = 1536 << 10
 	// budgetWarnRoom is the room under which the test warns, and budgetPolicyRoom the room a raise leaves.

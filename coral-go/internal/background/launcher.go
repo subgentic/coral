@@ -397,7 +397,7 @@ func (l *AgentLauncher) BuildSchedulerLaunchFn(schedStore *store.ScheduleStore) 
 		wctx, stop := context.WithCancel(ctx)
 		defer stop()
 		watched := make(chan error, 1)
-		go func() { watched <- l.watchSession(wctx, result.SessionName) }()
+		safego.Go("background/launcher:watchSession", func() { watched <- l.watchSession(wctx, result.SessionName) })
 		select {
 		case err := <-watched:
 			return err
