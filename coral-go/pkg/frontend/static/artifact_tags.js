@@ -17,6 +17,10 @@ async function putTags(project, hex, tags) {
     return Array.isArray(d.tags) ? d.tags : tags;
 }
 
+const READ_WAITING = 'Read, waiting for your decision'; // opened, not decided: the badge no longer counts it (#9277), the words must not say it is unseen (#16670)
+/** True for the two ways a file is waiting for the Operator's decision. */
+export const isWaitingWords = w => w === 'Waiting for your review' || w === READ_WAITING;
+
 /** What a file's review says, in words, from its tags and its recorded decision ({state, at}): "Approved Oct 30, 10:42", "Changes requested", "Waiting for your review", "Reviewed"; "" for a file that is not for review (#136584). */
 export function reviewWords(tags, review, agent) {
     const has = t => Array.isArray(tags) && tags.includes(t);
@@ -24,7 +28,7 @@ export function reviewWords(tags, review, agent) {
         const t = review && review.at ? Date.parse(review.at) : NaN;
         return Number.isNaN(t) ? 'Approved' : `Approved ${new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`;
     }
-    if (has('for review')) return has('changes requested') ? (agent ? `Changes requested, waiting for ${agent}` : 'Changes requested') : 'Waiting for your review'; // the file is the agent's turn (#11985)
+    if (has('for review')) return has('changes requested') ? (agent ? `Changes requested, waiting for ${agent}` : 'Changes requested') : has('read') ? READ_WAITING : 'Waiting for your review'; // the file is the agent's turn (#11985)
     return has('reviewed') ? 'Reviewed' : '';
 }
 

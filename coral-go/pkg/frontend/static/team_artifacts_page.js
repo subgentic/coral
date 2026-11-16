@@ -602,7 +602,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                     : { label: 'Send for review', menu: 1, description: 'Puts it in Needs you to approve or ask for changes', title: 'Put it in Needs you to approve or ask for changes', run: () => changeReview(reviewFiles([item]), false, name).then(r => { if (r) showToast(r.failed ? `Could not send it for review: ${r.why}` : 'Sent for review: it is in Needs you', !!r.failed); }) });
             }
             // while the file waits for review the header already has Approve beside Request changes (#15120): the bar keeps one only for 'Approve anyway' after changes were asked, or where the header has none (#15627)
-            const headerApproves = Tags.reviewWords(item.tags, item.review, item.produced_by) === 'Waiting for your review' && local();
+            const headerApproves = Tags.isWaitingWords(Tags.reviewWords(item.tags, item.review, item.produced_by)) && local();
             if (hex && !isUnverified(item) && (item.tags || []).includes(REVIEW) && !headerApproves) { // the panel says 'Waiting for your review': the decision is here too, not only in the viewer and Needs you (#15338, walk 23)
                 const asked = (item.tags || []).includes('changes requested');
                 actions.push({ label: asked ? 'Approve anyway' : 'Approve', primary: true, title: asked ? 'Approve this version as it is' : 'Approve it: it leaves Needs you and the agent is told', run: () => approveHere().catch(e => showToast(e.message, true)) });
@@ -621,7 +621,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             head = document.createElement('div'); head.className = 'artifact-sheet-head';
             const line = document.createElement('span'); line.className = 'artifact-review-line'; line.setAttribute('role', 'status'); line.textContent = reviewText;
             head.append(line, editor);
-            if (reviewText === 'Waiting for your review' && local()) { // review from the list, in two clicks (walk 3 N4): Approve here; Request changes opens the viewer's form
+            if (Tags.isWaitingWords(reviewText) && local()) { // review from the list, in two clicks (walk 3 N4): Approve here; Request changes opens the viewer's form
                 const team = inbox ? item.board_id : model.project, row = { ...item, id: hex, hex, team, name }, acts = document.createElement('div'); acts.className = 'artifact-sheet-review'; acts.setAttribute('role', 'group'); acts.setAttribute('aria-label', 'Review this file');
                 const approve = document.createElement('button'); approve.type = 'button'; approve.className = 'btn btn-primary'; approve.textContent = 'Approve';
                 approve.addEventListener('click', async () => { approve.disabled = true; try { await approveHere(); } catch (e) { showToast(e.message, true); approve.disabled = false; } });
