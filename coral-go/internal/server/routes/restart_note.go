@@ -44,7 +44,14 @@ func restartNoteText(name, subscriber string, tasks []board.Task) string {
 		b.WriteString(" You hold no task now: read the board with coral-board read and wait for instructions there.")
 		return b.String()
 	}
-	b.WriteString(" You still hold these tasks; carry on with them (coral-board task show <id> has the details):")
+	b.WriteString(" You still hold these tasks; carry on with them (coral-board task show <id> has the details).")
+	for _, t := range tasks {
+		if t.Status == "in_progress" { // already claimed: the prompt's "task claim" would be refused for it (#18150)
+			b.WriteString(" Run coral-board task current first: it shows the task you have in progress, which you do not claim again.")
+			break
+		}
+	}
+	b.WriteString(" Your tasks:")
 	for i, t := range tasks {
 		if i == 5 {
 			fmt.Fprintf(&b, "\n- and %d more (coral-board task list)", len(tasks)-5)
