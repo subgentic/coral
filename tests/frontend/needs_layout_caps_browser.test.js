@@ -1,4 +1,4 @@
-// Needs you at 1920 px (#15339, walk 23 M11, L17): the Filters panel's selects are not the panel's whole width (770 px), and the table is not as wide as the screen (Time sat 1400 px from the title); with only Welcome items the
+// Needs you at 1920 px (#15339, walk 23 M11, L17): the Filters panel's selects are not the panel's whole width (770 px) (the table's own width cap is gone since #18358: needs_full_width_browser); with only Welcome items the
 // Team column is still there, so the layout does not jump when the last review goes. Stubbed review rows and a stubbed settings save. 1920 px, mouse.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -34,14 +34,13 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 3 && !!document.querySelector('${T} tbody tr .inbox-answers, ${T} tbody tr [data-on-click*="ask"], ${T} tbody tr button')`, at + 'the review rows and the question', 15000);
             await ev(framesJs(4));
             await ev(`(() => { const st = document.createElement('style'); st.textContent = '*, *::before, *::after { transition: none !important; }'; document.head.append(st); return true; })()`);
-            const wrapW = () => ev(`Math.round(document.querySelector('${T} .inbox-needs-results').getBoundingClientRect().width)`);
             await ev(`(() => { const b = document.querySelector('[aria-controls=inbox-needs-menu]'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); return true; })()`); await ev(framesJs(4));
             await new Promise(r => setTimeout(r, 400)); // sleep-ok: the panel opens
             const sel = await ev(`[...document.querySelectorAll('#inbox-needs-menu select')].map(e => Math.round(e.getBoundingClientRect().width))`);
             await Promise.resolve();
             check(sel.length > 0 && sel.every(x => x <= 420), at + 'the Filters selects are not the width of the panel (walk 23 M11): ' + JSON.stringify(sel) + ' ' + await ev(`JSON.stringify([...document.querySelectorAll('button')].filter(b => /Filter/.test(b.textContent + b.className)).map(b => b.className + '|' + b.textContent.trim().slice(0, 20) + '|' + b.getAttribute('aria-expanded')).concat([...document.querySelectorAll('select')].map(e => e.className + '@' + (e.closest('[class*=menu],[class*=panel]') || {}).className)))`));
             await ev(`(() => { const b = document.querySelector('[aria-controls=inbox-needs-menu]'); if (b && b.getAttribute('aria-expanded') === 'true') b.click(); return true; })()`);
-            check(await wrapW() <= 1281, at + 'the table is no wider than 1280 px on a 1920 screen (walk 23 L17): ' + await wrapW());
+            // the 1280 px cap on the table is gone (#18358, the Operator: data tables fill their area); needs_full_width_browser holds the width at 1280 and 1920
             // only Welcome items: no review rows, no questions
             await ev(`window.__needsItems.length = 0; (() => { const real = window.fetch.bind(window); window.fetch = (u, o) => String(u) === '/api/operator-asks' ? Promise.resolve(new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } })) : String(u).includes('/api/settings') && o && o.method === 'PUT' ? Promise.resolve(new Response('{"ok":true}', { status: 200, headers: { 'Content-Type': 'application/json' } })) : real(u, o); })(); true`);
             await ev(`import(${S} + 'state.js').then(m => { m.state.settings = { ...m.state.settings, inbox_welcome: 'on', inbox_welcome_done: '' }; return true; })`);
@@ -49,7 +48,6 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await waitFor(`document.querySelectorAll('${T} tbody tr[data-key*=":welcome:"]').length > 0 && !document.querySelector('${T} tbody tr:not([data-key*=":welcome:"]):not(.dt-group)')`, at + 'only Welcome items (' + await ev(`JSON.stringify([...document.querySelectorAll('${T} tbody tr')].map(r => r.dataset.key || r.className))`) + ')', 15000);
             const heads = await ev(`[...document.querySelectorAll('${T} th[data-key]')].map(h => h.dataset.key)`);
             check(heads.includes('team'), at + 'the Team column is still there with only Welcome items (walk 23 L17): ' + JSON.stringify(heads) + await ev(`document.querySelector('${T} table, ${T} [role=table], ${T} [role=grid]')?.outerHTML.slice(0, 600)`));
-            check(await wrapW() <= 1281, at + 'and the table is no wider than 1280 px: ' + await wrapW());
         }
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
     if (failures.length) { console.error('FAIL\n  ' + failures.join('\n  ')); process.exit(1); }
