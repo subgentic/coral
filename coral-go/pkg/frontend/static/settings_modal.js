@@ -9,7 +9,7 @@ ensureBuilt('settings-modal');
 const settingsDialog = await importOnce('./settings_dialog.js');
 export const { showSettingsModal, hideSettingsModal, applySettings } = settingsDialog;
 
-// The robot on each section's heading (#15152): the section's name, and where in the docs to read (Notifications and Network and Hub have a topic of their own).
+// The robot on each section's heading (#15152): the section's name, and where in the docs to read (Notifications and Coral Hub and remote access have a topic of their own).
 const { agentCopyBeside, agentCopyLabelled } = await importOnce('./agent_copy_button.js');
 const PANE_DOCS = { notifications: 'notifications', network: 'hub' };
 // General has no More menu: its copy is a labelled Quiet button in the heading's row, not a lone robot and not a row of its own that makes the dialog scroll (#15993, #17591).

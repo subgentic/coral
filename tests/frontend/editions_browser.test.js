@@ -12,7 +12,7 @@
 //     explainer (no command). A build with no hub configured never opens it.
 //   - From another computer (the cloud routes answer 403) it says to connect on the
 //     computer running Coral.
-//   - Settings > Network and Hub reopens it without changing the stored answer.
+//   - Settings > Coral Hub and remote access reopens it without changing the stored answer.
 //   - The home section sits under the launch cards, opens the screen or the explainer,
 //     and its X hides it for good (server setting).
 // The /api/cloud/* routes are stubbed in the page (a scripted hub), so no hub is needed.
@@ -331,7 +331,7 @@ async function run() {
             await load({ state: 'off', configured: false });
             check(`${label}: a build with no hub configured does not open it`, !(await open()) && (await settings()).welcome_pending === 'True');
             const offText = await ev(`(async () => (await import((window.__coralStatic||'/static/')+'cloud_connect.js')).describe({ state: 'off' }))()`);
-            check(`${label}: not configured: says to open Settings (#16717)`, /^Coral Hub isn't configured on this computer\. Open Settings .* Network and Hub for setup steps\.$/.test(offText), offText);
+            check(`${label}: not configured: says to open Settings (#16717)`, /^Coral Hub isn't configured on this computer\. Open Settings .* Coral Hub and remote access for setup steps\.$/.test(offText), offText);
             await put({ welcome_pending: 'False' });
             await load({}, true);
             await ev(`(async () => (await import((window.__coralStatic||'/static/')+'editions.js')).showHubSetup())()`);
@@ -348,13 +348,13 @@ async function run() {
             check(`${label}: from another computer (#3285 server): the elsewhere text, no command`, !!s && s.status === own.error && !s.command, JSON.stringify(s));
             await click('#editions-modal [data-editions="skip"]');
 
-            // ── Settings > Network and Hub reopens it; closing keeps the stored answer ──
+            // ── Settings > Coral Hub and remote access reopens it; closing keeps the stored answer ──
             await load();
             await ev(`window.showSettingsModal(); true`);
             await until(`!!document.querySelector('#about-section [data-editions="open"]') && document.querySelector('#about-section [data-editions="open"]').offsetParent !== null`, 'About > Connect to Coral Hub');
             await click('#about-section [data-editions="open"]');
             s = await screen();
-            check(`${label}: Settings > Network and Hub reopens it (settings closed)`, !!s && s.title === 'Connect to Coral Hub' && (await ev(`getComputedStyle(document.getElementById('settings-modal')).display === 'none'`)), JSON.stringify(s));
+            check(`${label}: Settings > Coral Hub and remote access reopens it (settings closed)`, !!s && s.title === 'Connect to Coral Hub' && (await ev(`getComputedStyle(document.getElementById('settings-modal')).display === 'none'`)), JSON.stringify(s));
             await escape();
             await until(`document.getElementById('editions-modal').style.display === 'none'`, 'closed');
             check(`${label}: closing a reopened screen keeps the stored answer`, (await settings()).welcome_choice === 'own-hub');

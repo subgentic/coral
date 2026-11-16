@@ -46,7 +46,7 @@ export function effectiveMode(s) {
 /** The most this computer allows, as words for a note: "This computer allows up to Interact; change it in Coral on that computer." Fixed words, never machine text; '' when it allows Launch. */
 export function launchNote(s) {
     const local = rank(s.local_mode) >= 0 ? s.local_mode : null;
-    if (local && rank(local) < rank('launch')) return `This computer allows up to ${MODE_INFO[local].label}; change it in Coral on that computer (Settings > Network and Hub).`;
+    if (local && rank(local) < rank('launch')) return `This computer allows up to ${MODE_INFO[local].label}; change it in Coral on that computer (Settings > Coral Hub and remote access).`;
     return '';
 }
 

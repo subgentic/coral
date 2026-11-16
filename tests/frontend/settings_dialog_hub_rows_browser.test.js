@@ -42,7 +42,7 @@ const MACHINE = ['settings-working-dir', 'settings-accounts-check', 'settings-cl
             const tabs = await ev(`[...document.querySelectorAll('#settings-tabs [role=tab]')].map(t => [t.id.replace('settings-tab-', ''), t.hidden])`);
             // Security and privacy is not asserted: its password row is loaded by security_settings.js, which does not run on the hub, and here (not the hub) it is loaded and is not a hub row
             const left = tabs.filter(([, h]) => h).map(([g]) => g);
-            assert.ok(left.includes('cleanup') && left.includes('network'), 'Storage and cleanup and Network and Hub have only machine rows and leave the list: ' + JSON.stringify(tabs));
+            assert.ok(left.includes('cleanup') && left.includes('network'), 'Storage and cleanup and Coral Hub and remote access have only machine rows and leave the list: ' + JSON.stringify(tabs));
             for (const g of ['general', 'agents', 'terminal', 'notifications', 'files']) assert.ok(!left.includes(g), `${g} keeps a per-user row and stays in the list: ${JSON.stringify(tabs)}`);
             assert.equal(await ev(`(() => { const p = [...document.querySelectorAll('#settings-modal .settings-pane')].find(x => !x.hidden); return !!p && !p.dataset.empty && !document.getElementById('settings-tab-' + p.dataset.group).hidden; })()`), true, 'the pane shown is a group that is in the list');
         });

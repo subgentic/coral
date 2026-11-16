@@ -1,4 +1,4 @@
-// Confirm owner in Settings > Network and Hub (#6108): a computer linked before it recorded who owns it shows a row. The last owner the Hub showed (and how long ago) is looked up again every time Settings
+// Confirm owner in Settings > Coral Hub and remote access (#6108): a computer linked before it recorded who owns it shows a row. The last owner the Hub showed (and how long ago) is looked up again every time Settings
 // opens (the panel outlives the dialog). Pressing Confirm owner posts {} to the arm route and counts down a minute while the person opens an owner-only page through Coral Hub; when the label is recorded the
 // row goes and "Owner confirmed <time>" says so; when the minute ends first it says "Time is up". The server's answers are stubbed in the page; drives Chrome over CDP through agent_view_harness.js.
 // (Adapted from QA's refresh check for the earlier record-an-account design.)

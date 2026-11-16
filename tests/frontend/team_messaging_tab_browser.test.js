@@ -97,7 +97,7 @@ const SID = '0b7c2e4a-5d1f-4c8e-9a36-2f4d8e1b7c90';
             // 2. the server's states: its words as text, the dot and the button from the state
             const base = { enforced: false, allowed: [], max_entries: 200, was_open: false, suggestions: [] };
             for (const [state, text, dot, prim, act, href] of [['waiting', 'No team on another Coral is linked to this team yet.', 'warm', 'Link a team on another Coral', '', HUB_LINKS], ['ready', '2 teams on other Corals can message this team.', 'ok', 'Link a team on another Coral', '', HUB_LINKS],
-                ['off', 'Cross-team messaging is off on <b>this</b> team. Turn it on in Team settings > Messaging.', '', 'Turn on cross-team messaging', 'turn-on', null], ['stale', 'Waiting for Coral Hub: messages from other teams are refused until this computer reconnects. Last heard from Coral Hub today 14:02. Check the connection in Settings > Network and Hub.', 'bad', 'Check the Coral Hub connection', 'check-hub', null],
+                ['off', 'Cross-team messaging is off on <b>this</b> team. Turn it on in Team settings > Messaging.', '', 'Turn on cross-team messaging', 'turn-on', null], ['stale', 'Waiting for Coral Hub: messages from other teams are refused until this computer reconnects. Last heard from Coral Hub today 14:02. Check the connection in Settings > Coral Hub and remote access.', 'bad', 'Check the Coral Hub connection', 'check-hub', null],
                 ['old', 'This team was made before Coral Hub links existed, so it cannot use the relay.', 'bad', 'Create a new team', 'new-team', null]]) {
                 await setState({ ...base, status: { state, text }, links: state === 'old' ? links(1) : state === 'ready' ? links(2) : [] });
                 await open();
@@ -108,7 +108,7 @@ const SID = '0b7c2e4a-5d1f-4c8e-9a36-2f4d8e1b7c90';
                     await shot(`messaging-ready-${view.name}-${view.theme}`);
                 }
                 if (state === 'old') check(`${tag}: an old team shows no linked teams`, p.teams.length === 0);
-                if (state === 'stale') { await click(`${P} .xt-primary`); check(`${tag}: stale: the button opens Settings > Network and Hub`, (await ev(`window.__xt.calls.includes('settings:network')`))); }
+                if (state === 'stale') { await click(`${P} .xt-primary`); check(`${tag}: stale: the button opens Settings > Coral Hub and remote access`, (await ev(`window.__xt.calls.includes('settings:network')`))); }
                 if (state === 'old') { await ev(`window.__xt.calls.length = 0; true`); await click(`${P} .xt-primary`); check(`${tag}: old: the button opens the launch dialog on Agent Team`, JSON.stringify(await ev(`window.__xt.calls`)) === JSON.stringify(['launch', 'type:team'])); }
             }
             // stale keeps the last known rows but says they are not active: the heading must not claim they can message this team

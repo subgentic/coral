@@ -1,4 +1,4 @@
-/* The words of Settings > Network and Hub > Coral Hub that are decisions, not layout (#6555, #6579): a pure module, node-tested.
+/* The words of Settings > Coral Hub and remote access > Coral Hub that are decisions, not layout (#6555, #6579): a pure module, node-tested.
  *   morePermsWords: the summary of the closed "More Coral Hub permissions": which permissive switches are ON (named), and a warning when the protective one is OFF.
  *   operatorLine:   where the Operator switch's state is said outside the closed disclosure (the most consequential of them, Security's #6559).
  *   spellCode:      a one-time code as a screen reader should say it ("W X Y Z, 1 2 3 4"): a code read as a word is useless.
@@ -34,7 +34,7 @@ export function spellCode(code) {
 // ── the status sentences and the confirm texts of the connect panel (moved from cloud_connect.js, #8386)
 
 // Said when this server has no hub (a dev build, or --cloud-url off); the CLI says the same (#3285).
-export const OFF_TEXT = "Coral Hub isn't configured on this computer. Open Settings › Network and Hub for setup steps.";
+export const OFF_TEXT = "Coral Hub isn't configured on this computer. Open Settings › Coral Hub and remote access for setup steps.";
 
 // What the Hub may do at each level, as the sentence after "may now:" said once a change is saved.
 export const LEVEL_NOW = { view: 'look only', interact: 'send and answer', launch: 'start agents' };

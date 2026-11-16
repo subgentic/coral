@@ -139,7 +139,7 @@ async function renderAccess(status, gen, signal) {
     renderSetupCode(gen, signal); // after the details are up: the QR and the address first, the code when it arrives
 }
 
-/** "Use Coral Hub instead": the dialog closes and Settings opens on Network and Hub, where the Hub link is made. It changes nothing by itself. */
+/** "Use Coral Hub instead": the dialog closes and Settings opens on Coral Hub and remote access, where the Hub link is made. It changes nothing by itself. */
 function useCoralHub() {
     hideMobileConnectModal();
     window.showSettingsModal?.('network');

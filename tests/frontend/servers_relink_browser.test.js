@@ -12,7 +12,7 @@ const SERVERS = [
     { id: 'r3', label: 'Old Hub Answer', online: false, access_mode: 'follow', local_mode: 'launch', last_seen: '2026-10-12T00:00:00Z' },
 ];
 const LIVE = SERVERS.map(s => ({ id: s.id, label: s.label, status: s.online ? 'online' : 'offline', coral_version: '1.4.157', agents: 2, update: 'current' }));
-const HELP = "Needs Link can't confirm its owner yet. On that computer, open Settings > Network and Hub and choose Confirm owner.";
+const HELP = "Needs Link can't confirm its owner yet. On that computer, open Settings > Coral Hub and remote access and choose Confirm owner.";
 
 const CLOUD_PRELOAD = `(() => {
     window.__qaServers = ${JSON.stringify(SERVERS)};

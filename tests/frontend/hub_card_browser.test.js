@@ -1,4 +1,4 @@
-// The Coral Hub card of Settings > Network and Hub (#6555 audit, #6579 build; Security's #6559 and UI Accessibility's #6558):
+// The Coral Hub card of Settings > Coral Hub and remote access (#6555 audit, #6579 build; Security's #6559 and UI Accessibility's #6558):
 //   not connected: the question first (View selected, what the Hub may do at each level said in words), Connect under it, no switch that does nothing yet; waiting: the link, the code (said letter by letter),
 //   Cancel, nothing else, and focus lands on Cancel; connected: the status and Disconnect on one row, the Operator's state said outside the closed "More Coral Hub permissions", whose summary names the
 //   permissive switches that are on and marks the protective one when it is off; the Operator switch is "Let Coral Hub act as the Operator" and its stored opt-out ("disabled") maps both ways; a change says

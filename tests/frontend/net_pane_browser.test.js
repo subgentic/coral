@@ -1,4 +1,4 @@
-// Settings > Network and Hub, the groups (#6579 part 2; Security's #6559, UI Accessibility's #6558, the Orchestrator's fold of #6629 LOW 4):
+// Settings > Coral Hub and remote access, the groups (#6579 part 2; Security's #6559, UI Accessibility's #6558, the Orchestrator's fold of #6629 LOW 4):
 //   the groups are sections with an h5 under the pane's h4 (#7282) (the headings list reads Use from other devices, Remote access, [Setup code], Coral Hub, Manage other computers), Coral Hub first on a phone;
 //   Remote access turning on is an explicit act (it waits for Save and says what it then lets in); the setup code is there only while Remote access is on or a Coral Hub link is being made, is not on the screen
 //   until "Show setup code" (a button that says whether it is open), is spelled for a screen reader, is copied with "Copy setup code", and hides itself after a minute; "Manage other computers from this one" says
