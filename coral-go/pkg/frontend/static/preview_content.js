@@ -23,12 +23,12 @@ export function _renderContentView(body, content, filepath, line, interpretHtml)
         const safe = sanitizeHtml(marked.parse(content), DOMPURIFY_CONFIG, { links: 'file', headings: 2 });
         body.innerHTML = `<div class="prose preview-pane-markdown">${safe}</div>`;
         keepFragmentsInside(body);
-        importOnce('./md_front.js').then(m => m.show(body, content)); // the front matter as a key/value header (#16651); a failed load leaves the preview as drawn
+        importOnce('./md_front.js').then(m => m.show(body, content), () => {}); // the front matter as a key/value header (#16651); a failed load leaves the preview as drawn
     } else {
         body.innerHTML = `<pre class="preview-pane-code"><code class="language-${lang}">${escapeHtml(content)}</code></pre>`;
         // Plain first; coloured once highlight.js has loaded (plain if it cannot).
         const block = body.querySelector('pre code');
-        if (block) loadHighlight().then(h => { if (block.isConnected) h.highlightElement(block); }, () => {});
+        if (block) loadHighlight().then(h => block.isConnected && h.highlightElement(block), () => {});
     }
     if (line > 0) _scrollToLine(body, content, line);
 }
