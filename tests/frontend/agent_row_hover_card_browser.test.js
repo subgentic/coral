@@ -29,7 +29,8 @@ const { connect } = require('./agent_view_harness');
         { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/hover-card-quiet.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
         check(Array.isArray(quiet) && quiet.includes('State') && quiet.includes('Agent'), 'it opens once the pointer has rested: ' + JSON.stringify(quiet));
         check(Array.isArray(quiet) && !quiet.some(l => ['Goal', 'Status', 'Branch', 'Context', 'Board', 'Role', 'Name'].includes(l)), 'an agent with no goal, status or branch, an unknown context, a team heading above it and a role that is its name shows none of those rows: ' + JSON.stringify(quiet));
-        await hover('h2'); await sleep(1100); // sleep-ok: the card's own delay
+        await hover('h2');
+        for (let i = 0; i < 80; i++) { const l = await labels(); if (Array.isArray(l) && l.includes('Goal')) break; await sleep(100); } // sleep-ok: poll until the second card (its own 800 ms delay, longer under load) shows its rows; the checks below read the result
         const full = await labels();
         { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/hover-card-full.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
         check(Array.isArray(full) && ['Goal', 'Status', 'Branch', 'Role'].every(l => full.includes(l)), 'an agent that has them shows its goal, status, branch and role: ' + JSON.stringify(full));
