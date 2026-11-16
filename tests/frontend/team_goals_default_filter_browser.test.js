@@ -8,7 +8,7 @@ const { install: installTP, seed, openTeam, goTab, scenarios } = require('./help
 const { GOALS_STUB } = require('./helpers/goals_stub');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
-const TEAM = `qa-goals-default-${Date.now() % 100000}`;
+const TEAM = `qa-goals-default-${Date.now() % 100000}`, TEAM2 = TEAM + '-b', TEAM3 = TEAM + '-c';
 const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
 
 (async () => {
@@ -44,7 +44,28 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
                 const p = await pills(); assert.deepEqual(p.filter(x => x[1]).map(x => x[0].replace(/\s*\d+$/, '').replace(/\s*\(\d+\)$/, '')), ['All'], 'All is still the one selected: ' + JSON.stringify(p));
                 assert.ok((await rows()).length >= 5, 'and all the goals are listed');
             });
+            await S.run(`${label}: a team with no Active goal opens on All, not on 'No active goals' (#16692)`, async () => {
+                await ev(`window.__goals = window.__goals.filter(g => g.state !== 'active'); true`);
+                await seed(ev, TEAM2); await openTeam(ev, waitFor, TEAM2).catch(() => {});
+                await goTab(ev, settle, 'Goals'); await waitFor(`document.querySelectorAll('${panel} tbody tr').length >= 1`, 'the goals', 10000); await settle(300);
+                const p = await pills();
+                assert.deepEqual(p.filter(x => x[1]).map(x => x[0].replace(/\s*\d+$/, '').replace(/\s*\(\d+\)$/, '')), ['All'], 'All is selected: ' + JSON.stringify(p));
+                assert.equal((await rows()).length, 4, 'the four goals are listed: ' + JSON.stringify(await rows()));
+                await shot(`goals-default-no-active-${label}`);
+            });
+            await S.run(`${label}: a team with only finished goals stays on the default filter and its Done group shows (#18168)`, async () => {
+                await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'liveListLoaded', 'settings'); await installTP(ev); // a fresh page: no filter kept from the teams above
+                await seed(ev, TEAM3); if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
+                await ev(GOALS_STUB);
+                await ev(`window.__goals = window.__goals.filter(g => g.state === 'done' || g.state === 'dropped'); true`); await openTeam(ev, waitFor, TEAM3).catch(() => {});
+                await goTab(ev, settle, 'Goals'); await waitFor(`document.querySelectorAll('${panel} tbody tr').length >= 1`, 'the goals', 10000); await settle(300);
+                const p = await pills();
+                assert.deepEqual(p.filter(x => x[1]).map(x => x[0].replace(/\s*\d+$/, '').replace(/\s*\(\d+\)$/, '')), ['Active'], 'the default filter is kept, not All: ' + JSON.stringify(p));
+                const r = await rows();
+                assert.ok(r.some(x => /^Done \(1\)$/.test(x)), 'the Done group shows: ' + JSON.stringify(r));
+                assert.ok(r.some(x => /Old cleanup/.test(x)), 'with the finished goal under it: ' + JSON.stringify(r));
+            });
         }
-    } finally { await removeBoards(ev, [TEAM]).catch(() => {}); await client.close(); }
+    } finally { await removeBoards(ev, [TEAM, TEAM2, TEAM3]).catch(() => {}); await client.close(); }
     S.finish();
 })().catch(e => { console.error(e); process.exit(1); });
