@@ -966,6 +966,7 @@ const results = []; // one entry per suite per run
 const leakReport = []; // the suites that left the shared server state changed (#4830)
 // Settings rows a suite may add and leave (named rows only, never a whole suite): a PUT cannot delete a row, so a suite that really saves a setting for the first time leaves its row, and the runner puts the value back. --fail-on-leak does not count these; they are still reported. A row that is changed (not added) is never allowed.
 const ALLOWED_SETTING_ROWS = {
+  'artifact_newer_banner_browser.test.js': ['artifact_comments_owner_id'], // the comment sent on v2 is the first on this computer (#18767)
   'goal_comments_real_browser.test.js': ['artifact_comments_owner_id'], // the install's comment identity, made by the first comment anyone writes on this computer
   'goal_new_comments_browser.test.js': ['goal_done_hidden', 'goal_done_read'], // the Operator's read and hidden lists of finished goals, saved for the first time by this suite and put back to empty at its end (#12073)
   'theme_configurator_light_browser.test.js': ['custom_theme'], // it saves a theme and applies it: the setting row is first written there
