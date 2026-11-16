@@ -32,7 +32,8 @@ const (
 )
 
 type operatorAskRow struct {
-	Board string `json:"board"`
+	SessionID string `json:"session_id,omitempty"` // The asking single agent, independent of its display name (#18771).
+	Board     string `json:"board"`
 	// BoardLabel is the team's name for a person to read (#11860: the panel said the internal board id); "" when the board has none, and the page then says the id.
 	BoardLabel string `json:"board_label,omitempty"`
 	Kind       string `json:"kind"`

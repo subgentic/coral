@@ -28,7 +28,15 @@ export function openAskDialog(a, onDone, runners = {}) {
     const sub = document.createElement('p'); sub.className = 'inbox-ask-sub';
     const who = markHidden(a.asker, { strict: true }); // the title and its link use the same visible name
     sub.textContent = whenText(a.at) + (a.kind === 'wait' ? ', waiting for your reply' : '');
-    importOnce('./agent_link.js').then(m => { if (title.isConnected) title.replaceChildren(m.agentLink(who, { board: boardTeamKey(a.server, a.board) }), ...(a.kind === 'agent' ? [] : [` · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`])); }); // the asker still opens their chat
+    importOnce('./agent_link.js').then(m => {
+        if (!title.isConnected || missingCloudSource) return;
+        const identity = { board: a.board ? boardTeamKey(a.server, a.board) : '', session: a.session_id || '' };
+        title.replaceChildren(m.agentLink(who, identity), ...(a.kind === 'agent' ? [] : [` · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`]));
+        const live = m.liveAgentOf(a.asker, identity);
+        if (!live || normServer(live.server) !== normServer(a.server)) return;
+        const go = m.agentLink(a.asker, { ...identity, text: 'Open agent', label: `Open agent: ${who}`, cls: 'btn' });
+        sub.append(' · ', go); // the shared agent link keeps the unsent-reply confirmation and closes the question before navigation
+    });
     const subjects = askSubjects(a), links = document.createElement('p'); links.className = 'inbox-ask-subjects'; links.hidden = !subjects.length; if (subjects.length) loadStyles('pictures.css'); // its links are drawn by the lazy picture rules // the goal and task it is about, each a link that opens it in the Inbox
     if (subjects.length) links.append(document.createTextNode('About ')); // the asker names them: the line says so (Security's INFO on #12164)
     subjects.forEach((x, i) => {
