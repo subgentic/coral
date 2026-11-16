@@ -18,6 +18,8 @@ const { framesJs } = require('./helpers/wait');
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
+            // This is about the box (#15372, #15401). The jump-to-latest button's lane (a 56 px margin under the chat while the button shows, #16739) comes and goes with the scroll position and shrinks the chat by 56 px without moving its text (chat_reading_position, chat_team_instructions pin that), so here it is off: it is not the box, and its timing against the box's would make the distance from the bottom a different number each time.
+            await ev(`(() => { const st = document.createElement('style'); st.textContent = '#live-history-messages { margin-bottom: 0 !important; }'; document.head.append(st); return true; })()`);
             await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('jl', 'jl', 150, { sleeping: false }); true`);
             await ev(`window.selectLiveSession('jl', 'claude', 'jl-id', 'local'); true`);
             await waitFor(`${C}.scrollHeight > ${C}.clientHeight * 3 && ${C}.scrollHeight - ${C}.scrollTop - ${C}.clientHeight < 50`, at + 'the chat at the bottom', 8000);
