@@ -135,6 +135,7 @@ func (h *BoardHandler) refuseUnknownAssignee(w http.ResponseWriter, r *http.Requ
 
 // nameDistance is the edit distance of two names, less 1 for each when one holds the other ("qa" is closer to "QA Engineer 2" than to "Lead").
 func nameDistance(a, b string) int {
+	a, b = cutName(a), cutName(b) // a long name must not cost quadratic time (#18347)
 	if strings.Contains(b, a) || strings.Contains(a, b) {
 		return 0
 	}
@@ -155,4 +156,17 @@ func nameDistance(a, b string) int {
 		prev = cur
 	}
 	return prev[len(b)]
+}
+
+// maxNameCompared is how many characters of a name the closest-member search compares: a board member's name is short, and the candidate comes from a request.
+const maxNameCompared = 64
+
+func cutName(s string) string {
+	if len(s) <= maxNameCompared {
+		return s
+	}
+	if r := []rune(s); len(r) > maxNameCompared {
+		return string(r[:maxNameCompared])
+	}
+	return s
 }

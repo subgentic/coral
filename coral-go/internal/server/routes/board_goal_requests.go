@@ -262,7 +262,7 @@ func (h *BoardHandler) AcceptGoalRequest(w http.ResponseWriter, r *http.Request)
 	if body.Priority == "" {
 		body.Priority = "medium"
 	}
-	if h.refuseArchivedAssignee(w, r.Context(), project, body.AssignedTo) {
+	if h.refuseArchivedAssignee(w, r.Context(), project, body.AssignedTo) || h.refuseUnknownAssignee(w, r, project, body.AssignedTo, actor) {
 		return
 	}
 	task, in, err := h.bs.AcceptGoalRequest(r.Context(), project, id, body.Title, body.Body, body.Priority, actor, body.AssignedTo)

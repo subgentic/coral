@@ -386,3 +386,25 @@ func TestGoalRequestSendRefusalWording(t *testing.T) {
 	code, _ = call("POST", "/api/board/beta/goal-requests/1/decline", map[string]any{"subscriber_id": "Worker"})
 	assert.Equal(t, 403, code)
 }
+
+// Accepting a goal request names a member to do the work: a name that is no one on the board is refused like a task's (#18347, Security's SHOULD on #18294); a member is accepted.
+func TestAcceptingAGoalRequestRefusesAnUnknownAssignee(t *testing.T) {
+	call, h, goal := goalRequestEnv(t)
+	ctx := context.Background()
+	code, out := sendRequest(call, goal, "Please build the importer")
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	rows, err := h.bs.ListGoalRequestsIn(ctx, "beta", board.GoalRequestPending, 10)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	id := itoa(rows[0].ID)
+	_, err = h.bs.Subscribe(ctx, "beta", "Worker", "Developer", "tmux-w", nil, "mentions", false)
+	require.NoError(t, err)
+	code, out = call("POST", "/api/board/beta/goal-requests/"+id+"/accept", map[string]any{"subscriber_id": "Orchestrator B", "title": "Build the importer", "assigned_to": "Some Git Author"})
+	require.Equal(t, http.StatusConflict, code, "%v", out)
+	assert.Equal(t, "assignee_unknown", out["code"])
+	rows, err = h.bs.ListGoalRequestsIn(ctx, "beta", board.GoalRequestPending, 10)
+	require.NoError(t, err)
+	assert.Len(t, rows, 1, "the refused accept leaves the request waiting")
+	code, out = call("POST", "/api/board/beta/goal-requests/"+id+"/accept", map[string]any{"subscriber_id": "Orchestrator B", "title": "Build the importer", "assigned_to": "Worker"})
+	assert.Equal(t, http.StatusCreated, code, "a member on the board is accepted: %v", out)
+}
