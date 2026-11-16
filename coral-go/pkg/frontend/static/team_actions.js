@@ -192,7 +192,7 @@ export function teamWakeFailureWords(team, failed) {
 }
 
 export function toggleTeamSleep(boardName, action) {
-    if (action === 'archive' || action === 'restore') return importOnce('./team_archive.js').then(m => m[action === 'archive' ? 'archiveTeam' : 'restoreTeam'](boardName)); // #17491
+    if (action === 'archive' || action === 'restore') return importOnce('./team_archive.js').then(m => m[action](boardName)); // #17491
     document.dispatchEvent(new CustomEvent('coral:team-action', { detail: { team: boardName } }));
     const doIt = async () => {
         try {
