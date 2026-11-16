@@ -155,6 +155,8 @@ const spec = (i) => {
             const big = await metrics();
             log('   expand all: ' + shown + ' rows in ' + took + ' ms, +' + (big.nodes - before.nodes) + ' nodes, heap ' + before.heap.toFixed(1) + ' -> ' + big.heap.toFixed(1) + ' MB');
             assert.ok(took < 6000, `Expand all on ${shown} rows took ${took} ms`);
+            const replies = await ev(`(() => { const all = [...${rows}], counts = {}; for (const row of all) if (row.dataset.replyTo) counts[row.dataset.replyTo] = (counts[row.dataset.replyTo] || 0) + 1; return all.map(row => ({ id: row.dataset.messageId, expected: counts[row.dataset.messageId] || 0, actual: row.querySelectorAll(':scope > .mb-row-replies > .mb-row-reply').length })).filter(x => x.expected !== x.actual); })()`);
+            assert.deepEqual(replies, [], 'Expand all keeps each message’s replies under its own row');
             assert.ok(big.nodes - before.nodes < 120000, `Expand all adds ${big.nodes - before.nodes} nodes for ${shown} rows`);
             await ev(`${box}.scrollTop = ${box}.scrollHeight; true`); await settle(300); await shot(`seeded-${tag}-expanded`);
             await ev(`document.querySelector('#mb-tools .list-bar-more-btn').click(); true`); await settle(150);

@@ -213,10 +213,10 @@ export function refreshAsk(row, m) {
 }
 
 /** The replies to an open message, as buttons that go to each one: built from the rows now in the list (a reply is a row of its own, in order, indented). */
-function fillReplies(row) {
+function fillReplies(row, replies) {
     const holder = row.querySelector(':scope > .mb-row-replies');
     if (!holder) return;
-    const kids = row.parentElement ? [...row.parentElement.querySelectorAll(`:scope > .mb-message[data-reply-to="${CSS.escape(row.dataset.messageId)}"]`)] : [];
+    const kids = replies ?? (row.parentElement ? [...row.parentElement.querySelectorAll(`:scope > .mb-message[data-reply-to="${CSS.escape(row.dataset.messageId)}"]`)] : []);
     holder.replaceChildren();
     holder.hidden = !kids.length;
     if (!kids.length) return;
@@ -263,18 +263,27 @@ function fillReplies(row) {
 }
 
 /** Open or close one row (force true or false, else the other way). The open ones are remembered by message id. */
-export function toggleRow(row, force) {
+export function toggleRow(row, force, replies) {
     const want = typeof force === 'boolean' ? force : !row.classList.contains('mb-open');
     row.classList.toggle('mb-open', want);
     const head = row.querySelector(':scope > .mb-row-toggle');
     if (head) head.setAttribute('aria-expanded', String(want));
     const id = row.dataset.messageId;
-    if (want) { opened.add(String(id)); ensureOpenParts(row); fillReplies(row); } else opened.delete(String(id));
+    if (want) { opened.add(String(id)); ensureOpenParts(row); fillReplies(row, replies); } else opened.delete(String(id));
 }
 
 /** Expand all or Collapse all: every row on screen (and, for Collapse, every one remembered). */
 export function setAllRows(container, on) {
-    for (const row of container.querySelectorAll(':scope > .mb-message[data-message-id]')) toggleRow(row, on);
+    const rows = container.querySelectorAll(':scope > .mb-message[data-message-id]');
+    // Find replies once for the batch, rather than scanning the whole board for each open row.
+    const replies = new Map();
+    if (on) for (const row of rows) {
+        const parent = row.dataset.replyTo;
+        if (!parent) continue;
+        if (!replies.has(parent)) replies.set(parent, []);
+        replies.get(parent).push(row);
+    }
+    for (const row of rows) toggleRow(row, on, replies.get(row.dataset.messageId) || []);
     if (!on) opened.clear();
 }
 
