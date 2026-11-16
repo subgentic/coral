@@ -72,7 +72,10 @@ const folderUnread = key => (unread && unread[key]) || undefined;
 
 /** The view list's sections for the chat folders: the number beside a folder is its unread chats, its total is the tooltip (a folder with none unread shows no number). */
 export function chatSections(c = counts) {
-    const item = (key, label) => ({ key, label, count: folderUnread(key), total: shownCount(key, c), unread: true });
+    const item = (key, label) => {
+      const total = shownCount(key, c);
+      return { key, label, count: folderUnread(key), total, unread: true, ...(key === 'chats-active' && total != null ? { words: `${total} running` } : {}) };
+    };
     const out = [{ title: 'Chats', items: FOLDERS.map(f => item(f.key, f.label)) },
         { title: 'By CLI', items: CLIS.map(([t, label]) => item(`chats-cli-${t}`, label)) }];
     const tags = (c && c.tags) || [];
