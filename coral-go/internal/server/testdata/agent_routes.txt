@@ -153,6 +153,7 @@ c GET /api/health
 b GET /api/launch-disclosure
 b GET /api/operator-asks
 b GET /api/history-import
+b GET /api/away
 b GET /api/needs-you
 c GET /api/pinned-folders
 b GET /api/saved

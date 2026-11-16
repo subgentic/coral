@@ -39,7 +39,17 @@ func (e *reviewEnv) activityServer(t *testing.T, person bool) *httptest.Server {
 
 func getActivity(t *testing.T, base, query string, hdr map[string]string) (int, map[string]any) {
 	t.Helper()
-	req, err := http.NewRequest("GET", base+"/api/activity"+query, nil)
+	return getActivityHdr(t, base, "/api/activity", query, hdr)
+}
+
+func getActivityPath(t *testing.T, base, path, query string) (int, map[string]any) {
+	t.Helper()
+	return getActivityHdr(t, base, path, query, nil)
+}
+
+func getActivityHdr(t *testing.T, base, path, query string, hdr map[string]string) (int, map[string]any) {
+	t.Helper()
+	req, err := http.NewRequest("GET", base+path+query, nil)
 	require.NoError(t, err)
 	for k, v := range hdr {
 		req.Header.Set(k, v)
