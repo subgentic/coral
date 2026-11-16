@@ -32,7 +32,7 @@ const { coralReady } = require('./helpers/wait');
         await openV(h1, '');
         await waitFor(`!!document.querySelector('.artifact-review-approve') && !document.querySelector('.artifact-review-approve').hidden && /older version|newer/.test(document.querySelector('.artifact-review-approve').textContent)`, 'Approve names the version and the newer one', 12000).catch(async e => { throw new Error(e.message + ' | ' + await ev(`JSON.stringify({ a: (document.querySelector('.artifact-review-approve') || {}).textContent, hid: (document.querySelector('.artifact-review-approve') || {}).hidden, shown: document.querySelector('#artifact-viewer')?.dataset.shownVersion, newer: document.querySelector('#artifact-viewer')?.dataset.newerVersion, title: document.querySelector('.artifact-viewer-title')?.textContent, bar: !!document.querySelector('.av-current'), state: (document.querySelector('.artifact-review-state') || {}).textContent, tags: window.__tagsDbg })`)); });
         assert.equal(await ev(`document.querySelector('.artifact-review-approve').textContent`), 'Approve this older version'); // #15329: the button says it is the older one, the line beside it names the newer
-        assert.match(await ev(`document.querySelector('#artifact-viewer .artifact-review-state, .artifact-review-state')?.textContent || ''`), /v2 is newer/);
+        assert.match(await ev(`document.querySelector('#artifact-viewer .artifact-newer-banner')?.textContent || ''`), /v2 is the newest/); // #18767: said in the banner
         await close();
 
         // the newest version's content arrives late (a slow disk or link, as on the Windows runner, #15629): the title already says version 2 while the body is still the old one or empty
