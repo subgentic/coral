@@ -365,3 +365,35 @@ func TestTheFileOfAnAgentWithoutATeamNamesItsAgent(t *testing.T) {
 	require.NotNil(t, got.Artifacts[0].ProducedBy, "the row names its agent")
 	assert.Equal(t, "first-agent", *got.Artifacts[0].ProducedBy)
 }
+
+// #18623: the count-only read of the cross-team list (limit=1, what the dashboard asks on its first load and each tick) is kept per artifacts revision: the second ask walks no team, a write that moves the revision is
+// answered fresh, and a page of rows is never kept.
+func TestAllTeamArtifactsCountOnlyReadIsKeptPerRevision(t *testing.T) {
+	srv, h := allTeamArtifactsServer(t)
+	twoTeamsFourResults(t, h)
+	builds := 0
+	old := teamItemsBuildHook
+	teamItemsBuildHook = func() { builds++ }
+	t.Cleanup(func() { teamItemsBuildHook = old })
+	drop := func() { h.itemsCache.mu.Lock(); h.itemsCache.entries = nil; h.itemsCache.mu.Unlock() } // so a walk of the teams would show as builds
+
+	first := getAllTeamArtifacts(t, srv, "?limit=1", http.StatusOK)
+	require.Equal(t, 4, first.Total)
+	walked := builds
+	require.Positive(t, walked, "the first ask walks the teams")
+	drop()
+	second := getAllTeamArtifacts(t, srv, "?limit=1", http.StatusOK)
+	assert.Equal(t, walked, builds, "the second ask is kept: no team is walked")
+	assert.Equal(t, first.Total, second.Total)
+	assert.Equal(t, first.Rev, second.Rev)
+
+	drop()
+	getAllTeamArtifacts(t, srv, "?limit=2", http.StatusOK)
+	assert.Greater(t, builds, walked, "a page of two rows is not a count-only read: it is built")
+
+	completeWithArtifacts(t, h, "alpha", "A three", []board.TaskArtifact{{Name: "alpha-3.md", Content: "text of alpha-3.md"}}) // moves the revision
+	drop()
+	third := getAllTeamArtifacts(t, srv, "?limit=1", http.StatusOK)
+	assert.Equal(t, 5, third.Total, "a write that moves the revision is counted at once")
+	assert.NotEqual(t, first.Rev, third.Rev)
+}
