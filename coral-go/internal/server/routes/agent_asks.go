@@ -160,13 +160,24 @@ func (h *AgentAsksHandler) Answer(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "not_open", "message": "That question is already answered or was replaced."})
 		return
 	}
+	// The question is claimed BEFORE the text is typed (#18667): two answers at once (a double click, a button and Send, a second tab) used to both see it open and type the answer into the agent twice. Whoever closes it
+	// first types; the other is told it is answered. A delivery that fails gives the question back, so the Operator can answer again.
+	claimed, err := h.ss.CloseAgentAsk(r.Context(), id, time.Now())
+	if err != nil {
+		errInternalServer(w, "could not record the answer")
+		return
+	}
+	if !claimed {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "not_open", "message": "That question is already answered or was replaced."})
+		return
+	}
 	agentType, sessionID := logparse.ParseSessionName(ask.SessionName)
 	text := typedAgentAskAnswer(ask.Text, answer)
 	if err := h.deliver(r.Context(), h.term, ask.SessionName, agentType, sessionID, text, "operator answer"); err != nil {
+		_ = h.ss.ReopenAgentAsk(context.WithoutCancel(r.Context()), id)
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "not_delivered", "message": "The agent is not running, so the answer was not sent. Wake it, then answer again."})
 		return
 	}
-	_, _ = h.ss.CloseAgentAsk(r.Context(), id, time.Now())
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 

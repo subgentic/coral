@@ -146,3 +146,46 @@ func TestAPictureForASingleAgentsQuestionIsStoredWithThatAgent(t *testing.T) {
 	assert.GreaterOrEqual(t, up(id, []byte("not a picture"), false).Code, 400, "its own bytes decide")
 	assert.Equal(t, http.StatusConflict, up(id+99, png, false).Code, "a question that is not open takes no picture")
 }
+
+// #18667: an answer reaches the agent exactly once, even when a second answer arrives while the first is being typed; a delivery that fails leaves the question open to answer again.
+func TestAnAnswerToASingleAgentIsTypedOnce(t *testing.T) {
+	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "a.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	ss := store.NewSessionStore(db)
+	h := NewAgentAsksHandler(ss, nil)
+	o := owner("0001")
+	id, err := ss.CreateAgentAsk(context.Background(), o.SessionID, o.SessionName, "Which?", nil, time.Now())
+	require.NoError(t, err)
+	answer := func(text string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/agent-asks/"+askIDText(id)+"/answer", strings.NewReader(`{"answer":"`+text+`"}`))
+		req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+		rec := httptest.NewRecorder()
+		rr := chi.NewRouter()
+		rr.Post("/api/agent-asks/{id}/answer", h.Answer)
+		rr.ServeHTTP(rec, req)
+		return rec
+	}
+	var typed []string
+	var second *httptest.ResponseRecorder
+	h.deliver = func(_ context.Context, _ ptymanager.SessionTerminal, _, _, _, text, _ string) error {
+		typed = append(typed, text)
+		if len(typed) == 1 {
+			second = answer("again") // typing takes a while: the Operator's second answer arrives meanwhile
+		}
+		return nil
+	}
+	assert.Equal(t, http.StatusOK, answer("first").Code)
+	require.NotNil(t, second)
+	assert.Equal(t, http.StatusConflict, second.Code)
+	assert.Len(t, typed, 1, "the agent was told once")
+
+	id2, err := ss.CreateAgentAsk(context.Background(), o.SessionID, o.SessionName, "Which port?", nil, time.Now())
+	require.NoError(t, err)
+	id = id2
+	h.deliver = func(context.Context, ptymanager.SessionTerminal, string, string, string, string, string) error { return assert.AnError }
+	assert.Equal(t, http.StatusBadGateway, answer("x").Code)
+	open, err := ss.OpenAgentAsk(context.Background(), id)
+	require.NoError(t, err)
+	assert.NotNil(t, open, "a failed delivery gives the question back")
+}

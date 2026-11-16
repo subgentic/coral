@@ -75,6 +75,12 @@ func (s *SessionStore) OpenAgentAsk(ctx context.Context, id int64) (*AgentAsk, e
 	return &list[0], nil
 }
 
+// ReopenAgentAsk puts back a question that was claimed for an answer which then could not be delivered (#18667): it is the Operator's again.
+func (s *SessionStore) ReopenAgentAsk(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE agent_asks SET answered_at = NULL WHERE id = ?`, id)
+	return err
+}
+
 // CloseAgentAsk marks a question answered; false when it was not open (another answer got there first).
 func (s *SessionStore) CloseAgentAsk(ctx context.Context, id int64, now time.Time) (bool, error) {
 	res, err := s.db.ExecContext(ctx, `UPDATE agent_asks SET answered_at = ? WHERE id = ? AND answered_at IS NULL`, now.UTC().Format(ISOFormat), id)
