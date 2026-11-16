@@ -44,8 +44,8 @@ const GOLD = n => fs.readFileSync(path.join(__dirname, '../../coral-go/internal/
             check(`${at}the reason is said once`, (text.match(/keeps other people/g) || []).length === 1, JSON.stringify((text.match(/keeps other people/g) || []).length));
             check(`${at}one primary button is shown`, (await vis('#panel-create .btn-primary')) === 1, String(await vis('#panel-create .btn-primary')));
             check(`${at}Open Coral on this computer, the Hub link and the API key are folded under Other ways in`, (await vis('#local-open')) === 0 && (await vis('#show-key')) === 0 && /Other ways in/.test(text), await ev(`document.getElementById('other-ways').open`));
-            const help = await ev(`(() => { const a = [...document.querySelectorAll('#panel-create a')].find(e => /Forgot password/.test(e.textContent)); return a && { href: a.getAttribute('href'), shown: a.checkVisibility() }; })()`);
-            check(`${at}recovery Docs and the password manager line stay`, help?.href === '/static/password-reset.html' && help.shown && /password manager can save it/.test(text), JSON.stringify(help));
+            const help = await ev(`[...document.querySelectorAll('#panel-create a')].some(e => /Forgot password/.test(e.textContent))`);
+            check(`${at}no "Forgot password" before a password exists (walk 53, #17169); the password manager line stays`, help === false && /password manager can save it/.test(text), JSON.stringify(help));
             check(`${at}commands live in Docs`, await ev(`!/coral (?:reset-password|open|setup-code)/.test(document.getElementById('panel-create').textContent)`));
             const gap = (await top('confirm')) - (await ev(`Math.round(document.getElementById('password').getBoundingClientRect().bottom)`));
             const before = await top('confirm');

@@ -347,6 +347,7 @@ export function _fillTerminalAndBrowserPrefs(s) {
     const kinds = [["settings-alert-needs-input", "needsInput"], ["settings-alert-reply", "finished"], ["settings-alert-sound", "sound"]];
     const paintAlertKinds = () => {
         const on = desktopNotifyEnabled(), prefs = alertPrefs();
+        const tb = document.getElementById("settings-desktop-test"); if (tb) tb.hidden = !on;
         for (const [id, name] of kinds) {
             const box = document.getElementById(id);
             if (!box) continue;
@@ -359,6 +360,14 @@ export function _fillTerminalAndBrowserPrefs(s) {
         }
     };
     const say = text => { if (why) { why.textContent = text; why.hidden = !text; } };
+    const testBtn = document.getElementById("settings-desktop-test"); // "Send a test alert": there while the switch is on (walk 53, #17169)
+    if (testBtn && !testBtn.dataset.bound) {
+        testBtn.dataset.bound = "1";
+        testBtn.addEventListener("click", async () => {
+            const sent = (await importOnce("./desktop_alert_test.js")).sendTestAlert();
+            say(sent ? "Test alert sent. If you did not see it, check your computer's notification settings." : "Could not send a test alert: turn Desktop alerts on and allow notifications for this site.");
+        });
+    }
     const blockedText = () => desktopNotifyBlocked()
         ? `Your browser blocks alerts from Coral. Allow notifications for this site in ${isPhoneLayout() ? "your browser's site settings" : "the browser's address bar or site settings"}, then turn this on again.` // a phone has no address bar to look at (#10266)
         : "";
@@ -372,7 +381,7 @@ export function _fillTerminalAndBrowserPrefs(s) {
             desktopCheck.addEventListener("change", async () => {
                 if (desktopCheck.checked) {
                     desktopCheck.checked = await enableDesktopNotify();
-                    say(desktopCheck.checked ? "" : (blockedText() || "Alerts need your permission: choose Allow when the browser asks, then turn this on again."));
+                    say(desktopCheck.checked ? "Alerts are on. Send a test alert to see one." : (blockedText() || "Alerts need your permission: choose Allow when the browser asks, then turn this on again."));
                 } else {
                     disableDesktopNotify();
                     say("");

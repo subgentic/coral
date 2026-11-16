@@ -205,7 +205,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
       <label class="check"><input type="checkbox" id="keep"><span>Keep me signed in on this browser<small>For 30 days. Leave it off on a shared computer.</small></span></label>
       <div class="btnrow"><button type="submit" disabled data-needs-script id="submit" class="btn btn-primary wide">Create password and open Coral</button></div>
     </form>
-    <p class="note">{{if not .Local}}A password keeps other people and other devices out of Coral when it is opened in a web browser. {{end}}Your password manager can save it. <a class="link" href="/static/password-reset.html" target="_blank" rel="noopener">Forgot password?</a></p>
+    <p class="note">{{if not .Local}}A password keeps other people and other devices out of Coral when it is opened in a web browser. {{end}}Your password manager can save it.</p>
     <details class="otherways" id="other-ways">
       <summary>Other ways in</summary>
 {{if or .Locked (not .Local)}}

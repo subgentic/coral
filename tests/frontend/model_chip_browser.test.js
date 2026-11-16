@@ -252,7 +252,7 @@ const { coralReady } = require('./helpers/wait');
             await openMenu('model');
             await pick('[data-model="claude-sonnet-5-5"]');
             await waitFor(`window.__posts.length === 2 && window.__posts[1].model === 'claude-sonnet-5-5'`, 'the model request', 4000);
-            await feed('ch-a-id', { agent_type: 'claude', model: SONNET.value, thinking_actual: 'high', model_switch: null });
+            await feed('ch-a-id', { agent_type: 'claude', model: SONNET.value, thinking_actual: 'high', model_switch: { state: 'done', model: SONNET.value } }); // the server keeps how the switch went on the row
             await waitFor(`document.getElementById('model-chip-text').textContent === 'Claude · Sonnet 5.5' && document.getElementById('thinking-chip-text').textContent === 'High'`, 'Sonnet', 4000);
             await openMenu('thinking');
             m = await menu('thinking');
