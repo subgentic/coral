@@ -126,7 +126,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     };
     const foot = document.createElement('div'); foot.className = 'inbox-ask-foot'; foot.append(row);
     if (!dismiss.hidden) { // the two exits say how they differ (walk 47, #17032)
-        const how = document.createElement('p'); how.className = 'inbox-ask-sub inbox-ask-exits'; how.textContent = 'Close keeps this question in Needs you. Dismiss takes it out and tells nobody.';
+        const how = document.createElement('p'); how.className = 'inbox-ask-sub inbox-ask-exits'; how.textContent = 'Close keeps this question in Needs you. Dismiss takes it out and tells nobody, so an agent waiting on it stays blocked.';
         close.title = 'Close this; the question stays in Needs you'; foot.append(how);
     }
     // Reply attachments belong with the reply box; the footer holds its final actions
