@@ -969,6 +969,14 @@ func seedNewInstallInboxWelcome(db *store.DB, hasBoards bool) {
 	if db == nil || hasBoards {
 		return
 	}
+	// The set-up row (#18752) is seeded first, under the same test: the inbox_welcome row below would make that test fail.
+	if _, err := db.Exec(`INSERT INTO user_settings (key, value)
+		SELECT 'inbox_welcome_setup', 'on'
+		WHERE NOT EXISTS (SELECT 1 FROM user_settings WHERE key IN ('demo_workflows_seeded', 'welcome_pending', 'welcome_choice', 'git_diff_mode', 'inbox_welcome'))
+		AND NOT EXISTS (SELECT 1 FROM live_sessions) AND NOT EXISTS (SELECT 1 FROM session_index)
+		ON CONFLICT(key) DO NOTHING`); err != nil {
+		log.Printf("inbox welcome set-up row: %v", err)
+	}
 	if _, err := db.Exec(`INSERT INTO user_settings (key, value)
 		SELECT 'inbox_welcome', 'on'
 		WHERE NOT EXISTS (SELECT 1 FROM user_settings WHERE key IN ('demo_workflows_seeded', 'welcome_pending', 'welcome_choice', 'git_diff_mode', 'inbox_welcome'))

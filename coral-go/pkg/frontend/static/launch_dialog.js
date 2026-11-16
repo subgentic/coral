@@ -100,6 +100,10 @@ function _selectLaunchType(type) {
         return;
     }
     if (_needsComputerStep(type)) { launch.pendingType = type; _showComputerStep(type); return; } // on a Hub the computer is the first step (#15014)
+    if ((type === 'agent' || type === 'team') && !launch.member && !launch.addTo && !launch.setupChecked) { // #18752: with none of Claude, Codex or Antigravity installed, the set-up step comes first (once per dialog)
+        launch.setupChecked = true; const wp = launch.welcomePrompt;
+        importOnce('./setup_agent.js').then(m => m.noneReady().then(none => { if (none) { window.hideLaunchModal?.(); m.openSetupDialog({ onReady: () => { showLaunchModal(undefined, false, wp); launch.setupChecked = true; _selectLaunchType(type); } }); } })).catch(() => {});
+    }
     launch.mode = type;
     if (type === "agent") setLaunchMore(false); // New Agent always opens on step 1, the folder (#7391)
     wireEnterAdvances(document.getElementById('launch-step-agent')); wireEnterAdvances(document.getElementById('launch-step-team')); // Enter in a single-line field is Next, and Launch on the last step (#11289)
@@ -174,7 +178,7 @@ window._selectLaunchType = _selectLaunchType;
  * context). Default is the hub itself with a free choice.
  */
 export function showLaunchModal(server, lock = false, welcomePrompt = null) {
-    launch.welcomePrompt = welcomePrompt;
+    launch.welcomePrompt = welcomePrompt; launch.setupChecked = false;
     reportLaunchDialogOpened();
     launch.mode = null;
     launch.addTo = null; // a New Agent dialog is not an Add agent one (#7778)

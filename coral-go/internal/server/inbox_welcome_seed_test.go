@@ -58,6 +58,11 @@ func TestInboxWelcomeIsSeededForANewInstallOnly(t *testing.T) {
 		seedNewInstallInboxWelcome(db2, false)
 		require.NoError(t, db2.GetContext(context.Background(), &n, `SELECT COUNT(*) FROM user_settings WHERE key = 'inbox_welcome'`))
 		assert.Equal(t, 1, n, "nothing at all: new")
+		require.NoError(t, db2.GetContext(context.Background(), &n, `SELECT COUNT(*) FROM user_settings WHERE key = 'inbox_welcome_setup' AND value = 'on'`))
+		assert.Equal(t, 1, n, "a new install also gets the set-up row (#18752)")
+		seedNewInstallInboxWelcome(db, false)
+		require.NoError(t, db.GetContext(context.Background(), &n, `SELECT COUNT(*) FROM user_settings WHERE key = 'inbox_welcome_setup'`))
+		assert.Zero(t, n, "an install that has run never gets the set-up row")
 	}
 	_, ok = value(t, nil, "1")
 	assert.False(t, ok, "a test server never asks")
