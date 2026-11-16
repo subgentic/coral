@@ -335,6 +335,7 @@ func (wr *WorkflowRunner) executeAgentPrint(ctx context.Context, runID int64, st
 			}
 			// The step's settings temp file goes once the step has run (Security's review).
 			defer os.Remove(settingsFile)
+			defer os.Remove(agent.PrintSystemFile(settingsFile))
 		} else {
 			args = append([]string{"--print", "--no-session-persistence"}, agentCfg.Flags...)
 		}

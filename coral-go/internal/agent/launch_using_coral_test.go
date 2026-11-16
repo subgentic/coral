@@ -3,6 +3,7 @@ package agent
 import (
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -112,4 +113,49 @@ func TestClaudeLaunchCarriesTheSystemPromptInAFileFlag(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(b), "CORAL_SESSION_ID: 11111111-2222-3333-4444-555555555556")
 	assert.Contains(t, string(b), "coral-board")
+}
+
+// #18151: a print-mode run (a workflow step) names Coral's text with --append-system-prompt-file too, through the real argument path; with no text there is no flag and no file.
+func TestPrintArgsCarryTheSystemTextInAFileFlag(t *testing.T) {
+	setTestHome(t, t.TempDir())
+	sid := "11111111-2222-3333-4444-555555555557"
+	args, settings, err := (&ClaudeAgent{}).PrintArgs(LaunchParams{SessionID: sid, WorkingDir: t.TempDir(), EmbeddedProtocol: true, BoardName: "team-x", Role: "Developer"})
+	require.NoError(t, err)
+	t.Cleanup(func() { os.Remove(settings); os.Remove(PrintSystemFile(settings)) })
+	i := slices.Index(args, "--append-system-prompt-file")
+	require.GreaterOrEqual(t, i, 0, "%v", args)
+	require.Equal(t, PrintSystemFile(settings), args[i+1])
+	b, err := os.ReadFile(args[i+1])
+	require.NoError(t, err)
+	assert.Contains(t, string(b), "CORAL_SESSION_ID: "+sid)
+	assert.Contains(t, string(b), "coral-board")
+	assert.NotContains(t, args, "--append-system-prompt", "the text is not on the command line")
+	// what a workflow step gives: no board, no session, no text
+	args, settings, err = (&ClaudeAgent{}).PrintArgs(LaunchParams{WorkingDir: t.TempDir()})
+	require.NoError(t, err)
+	t.Cleanup(func() { os.Remove(settings) })
+	assert.NotContains(t, args, "--append-system-prompt-file")
+	_, statErr := os.Stat(PrintSystemFile(settings))
+	assert.True(t, os.IsNotExist(statErr))
+}
+
+// #18151 (QA SHOULD): a resume, a wake and a restart launch line carry the text file too (they are LaunchCommand with ResumeSessionID, the text named by the resumed id).
+func TestResumeWakeAndRestartLinesCarryTheSystemTextFile(t *testing.T) {
+	sid, old := "11111111-2222-3333-4444-555555555558", "99999999-2222-3333-4444-555555555559"
+	for name, p := range map[string]LaunchParams{
+		"resume":  {SessionID: sid, ResumeSessionID: old},
+		"wake":    {SessionID: sid, ResumeSessionID: old, Prompt: "wake up"},
+		"restart": {SessionID: sid, ResumeSessionID: old, Flags: []string{"--model", "sonnet"}},
+	} {
+		p.CoralDir, p.WorkingDir, p.SessionName = t.TempDir(), t.TempDir(), "claude-"+sid
+		p.EmbeddedProtocol, p.BoardName, p.Role = true, "team-x", "Developer"
+		cmd, err := GetAgent("claude").LaunchCommand(p)
+		require.NoError(t, err, name)
+		assert.Contains(t, cmd, "--resume "+old, name)
+		m := regexp.MustCompile(`--append-system-prompt-file '?([^' ]+)`).FindStringSubmatch(cmd)
+		require.Len(t, m, 2, "%s: %s", name, cmd)
+		b, err := os.ReadFile(m[1])
+		require.NoError(t, err, name)
+		assert.Contains(t, string(b), "CORAL_SESSION_ID: "+sid, name)
+	}
 }
