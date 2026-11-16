@@ -401,13 +401,23 @@ func TestAResourceViewCarriesItsMachinesStats(t *testing.T) {
 	g.do("operator", "PUT", "/api/resources/epoch-go", map[string]any{"slots": 2, "machine": "epoch", "where": "remote"})
 	g.do("operator", "PUT", "/api/resources/gone", map[string]any{"slots": 1, "machine": "down", "where": "remote"})
 	g.do("operator", "PUT", "/api/resources/nowhere", map[string]any{"slots": 1, "machine": "somewhere"})
-	_, out := g.do("operator", "GET", "/api/resources/epoch-go", nil)
+	// a first look at a remote box answers "checking" and reads it in the background (#17656): look again until it has answered
+	settled := func(name string) map[string]any {
+		var out map[string]any
+		require.Eventually(t, func() bool {
+			_, out = g.do("operator", "GET", "/api/resources/"+name, nil)
+			st, _ := out["stats"].(map[string]any)
+			return st != nil && st["state"] != "checking"
+		}, 5*time.Second, 5*time.Millisecond, "%s: the background read answered", name)
+		return out
+	}
+	out := settled("epoch-go")
 	st, _ := out["stats"].(map[string]any)
 	require.NotNil(t, st, "%v", out)
 	assert.Equal(t, "ok", st["state"])
 	assert.EqualValues(t, 8, st["cpu_count"])
 	assert.EqualValues(t, 24000, st["mem_available_mb"])
-	_, out = g.do("operator", "GET", "/api/resources/gone", nil)
+	out = settled("gone")
 	assert.Equal(t, "unreachable", out["stats"].(map[string]any)["state"])
 	_, out = g.do("operator", "GET", "/api/resources/nowhere", nil)
 	assert.Nil(t, out["stats"], "no where, no stats")
