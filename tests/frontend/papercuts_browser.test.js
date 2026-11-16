@@ -134,8 +134,8 @@ const BASE = require('./test_base').BASE;
         // No sign-in: the server answers 401; the field says how to see the key (text, controls off), not "Not configured".
         await ev(`window.__keyAnswer = 401; showSettingsModal(); true`);
         await waitFor(`/Sign in/.test(document.getElementById('settings-api-key').value)`, 'the sign-in text', { timeout: 8000 });
-        const refused = await ev(`(() => { const i = document.getElementById('settings-api-key'); return { value: i.value, type: i.type, showHidden: document.getElementById('settings-api-key-show').hidden, copyDisabled: document.getElementById('settings-api-key-copy').disabled }; })()`);
-        assert.deepEqual(refused, { value: 'Sign in to see the API key (run: coral open)', type: 'text', showHidden: true, copyDisabled: true });
+        const refused = await ev(`(() => { const i = document.getElementById('settings-api-key'); return { value: i.value, type: i.type, showHidden: document.getElementById('settings-api-key-show').hidden, copyDisabled: document.getElementById('settings-api-key-copy').disabled, signinVisible: !document.getElementById('settings-api-key-signin').hidden }; })()`);
+        assert.deepEqual(refused, { value: 'Sign in to see the API key', type: 'text', showHidden: true, copyDisabled: true, signinVisible: true });
         await ev(`hideSettingsModal(); window.fetch = window.__realFetch; true`);
         console.log('PASS (12) API key: masked full width, Show/Hide, Copy enabled; a 401 says to sign in');
 

@@ -13,7 +13,7 @@ const { coralReady } = require('./helpers/wait');
 // Keep the old section budgets plus the words in those authored lines (HELP_LINES /
 // HINTS); long explanations remain in Docs and never inflate the dialog.
 // Notifications includes the existing Inbox block; retain an allowance of 180 words for its labels/help and team notice.
-const BEFORE = { 'Coral Hub and remote access':186, Defaults:269, 'Storage and backup':151, Updates:20, 'Teams and Chief':80, Appearance:80, Notifications:72+180, 'Files and Git':40, 'Security and privacy':59 };
+const BEFORE = { 'Coral Hub and remote access':186, Defaults:269, 'Storage and backup':151, Updates:20, 'Teams and Chief':80, Appearance:80, Notifications:72+180, 'Files and Git':40, 'Security and privacy':61 };
 // #17538: Storage and backup +22 (Local backup heading, the data-folder path, Copy path button, and the one-line backup note)
 const HELP_WORDS = { 'Coral Hub and remote access':80, Defaults:73, 'Storage and backup':21+18+22, Updates:6, 'Teams and Chief':12, Appearance:22, 'Files and Git':8, 'Security and privacy':17 };
 const BUDGET = Object.fromEntries(Object.entries(BEFORE).map(([k,v])=>[k,v+(HELP_WORDS[k]||0)]));
