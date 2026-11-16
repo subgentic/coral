@@ -177,3 +177,40 @@ func TestTheOperatorsOwnCommentOnAnUploadWaitsForABusyUploader(t *testing.T) {
 	assert.Contains(t, msgs[0].Content, "The Operator commented on an artifact", "still the Operator's own request (#14855)")
 	assert.True(t, msgs[0].IsSystem, "posted as Coral's notice, as the on-write delivery always was")
 }
+
+// #16850: a comment on an agent's changes or on a goal waits for a busy agent as an artifact comment does.
+func TestADiffCommentForABusyAgentWaitsUntilItsTurnEnds(t *testing.T) {
+	rig := newCmtRig(t)
+	sid := rig.diffRig(1, "Dev", "pkg/a.go")
+	rig.turn(1, "Dev", "prompt_submit")
+	key := diffSubject("team-a", sid, "pkg/a.go")
+	code, out := rig.do("POST", cp(key), cmtAsOwner, map[string]any{"body": "Why not wrap this error?", "anchor": diffAnchor("pkg/a.go", nil)})
+	require.Equal(t, http.StatusCreated, code, fmt.Sprint(out))
+	assert.Equal(t, "Dev", out["queued_for"], fmt.Sprint(out))
+	assert.Empty(t, rig.operatorMessages(), "nothing is typed while the agent is mid-turn")
+
+	rig.turn(1, "Dev", "stop")
+	rig.h.flushHeldComments(context.Background(), time.Now())
+	msgs := rig.operatorMessages()
+	require.Len(t, msgs, 1, "delivered when the agent is free")
+	assert.Contains(t, msgs[0].Content, "Why not wrap this error?")
+	assert.Contains(t, msgs[0].Content, "pkg/a.go, lines 3-4")
+}
+
+func TestAGoalCommentForABusyDriverWaitsUntilItsTurnEnds(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.agent(2, "Orchestrator", false)
+	path, _ := rig.goal("Dev")
+	rig.turn(1, "Dev", "prompt_submit")
+	code, out := rig.do("POST", path, cmtAsOwner, goalComment(nil))
+	require.Equal(t, http.StatusCreated, code, fmt.Sprint(out))
+	assert.Equal(t, "Dev", out["queued_for"], fmt.Sprint(out))
+	assert.Empty(t, rig.operatorMessages(), "nothing is typed while the driver is mid-turn")
+
+	rig.turn(1, "Dev", "stop")
+	rig.h.flushHeldComments(context.Background(), time.Now())
+	msgs := rig.operatorMessages()
+	require.Len(t, msgs, 1, "delivered when the driver is free")
+	assert.Contains(t, msgs[0].Content, "Please also cover the retries.")
+}

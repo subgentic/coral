@@ -326,18 +326,18 @@ func (s *SessionStore) HoldAskMessage(ctx context.Context, commentID int64, agen
 
 // HeldAsks are the asks holding a message at now, oldest hold first, whose agent is live, awake and not archived (an agent that sleeps or is gone is looked at again when it wakes). Expired and closed asks are
 // not held any more (DropHeldAsks).
-func (s *SessionStore) HeldAsks(ctx context.Context, now time.Time, limit int) ([]ArtifactAsk, error) {
+func (s *SessionStore) HeldAsks(ctx context.Context, limit int) ([]ArtifactAsk, error) {
 	var out []ArtifactAsk
-	err := s.reader().SelectContext(ctx, &out, "SELECT "+artifactAskCols+` FROM artifact_comment_asks WHERE queued_at IS NOT NULL AND closed_at IS NULL AND expires_at > ?
-		AND agent_session IN (SELECT session_id FROM live_sessions WHERE COALESCE(is_archived, 0) = 0 AND COALESCE(is_sleeping, 0) = 0 AND agent_type != 'terminal') ORDER BY queued_at, id LIMIT ?`, now.UTC().Format(ISOFormat), limit)
+	err := s.reader().SelectContext(ctx, &out, "SELECT "+artifactAskCols+` FROM artifact_comment_asks WHERE queued_at IS NOT NULL AND closed_at IS NULL
+		AND agent_session IN (SELECT session_id FROM live_sessions WHERE COALESCE(is_archived, 0) = 0 AND COALESCE(is_sleeping, 0) = 0 AND agent_type != 'terminal') ORDER BY queued_at, id LIMIT ?`, limit)
 	return out, err
 }
 
 // ReleaseHeldAsks clears the hold of the given asks once their message is posted; it reports how many were released.
-func (s *SessionStore) ReleaseHeldAsks(ctx context.Context, ids []int64) (int, error) {
+func (s *SessionStore) ReleaseHeldAsks(ctx context.Context, ids []int64, now time.Time) (int, error) {
 	n := 0
 	for _, id := range ids {
-		res, err := s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET queued_at = NULL, queued_msg = '', queued_now = 0, queued_system = 0 WHERE id = ? AND queued_at IS NOT NULL`, id)
+		res, err := s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET queued_at = NULL, queued_msg = '', queued_now = 0, queued_system = 0, expires_at = ? WHERE id = ? AND queued_at IS NOT NULL`, now.Add(AskTTL).UTC().Format(ISOFormat), id)
 		if err != nil {
 			return n, err
 		}

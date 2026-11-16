@@ -174,7 +174,18 @@ func (h *SessionsHandler) deliverGoalComment(r *http.Request, caller commentCall
 		context += ". " + note
 	}
 	msg := sendMessageOf(sendOnGoal, title, sendAuthorOperator, context, sendReplyCommand(id, rootID), text, snippet, names, commentPictureLinks(c.ImagesJSON)...)
-	posted, err := h.postCommentMessage(ctx, team, msg)
+	ls, _ := h.ss.GetLiveSession(ctx, sessionID)
+	var posted *board.Message
+	var held bool
+	if ls != nil { // a busy goal owner gets the comment when it is free (#14860, #16850)
+		posted, held, err = h.holdOrPost(ctx, ls, &owner, team, rootID, msg, false, true)
+	} else {
+		posted, err = h.postCommentMessage(ctx, team, msg)
+	}
+	if held {
+		slog.Info("[goal comments] the Operator's comment held for a busy agent", "board", team, "goal", gid, "comment", c.ID, "agent", title)
+		return autoDelivery{Queued: title}
+	}
 	if err != nil {
 		slog.Warn("[goal comments] message not posted", "board", team, "error", err)
 		_ = h.ss.CloseArtifactAsk(ctx, rootID, sessionID, time.Now())
