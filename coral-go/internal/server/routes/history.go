@@ -256,10 +256,31 @@ func historyFiltered(params store.SessionListParams) bool {
 		params.AgentName != "" || params.Starred || params.Archived || params.Active || params.WithNotes
 }
 
-// snippetMarks are the markdown marks of a chat's text (bold, strike, code, a heading's #): the search's hit line is the chat's words, not its markup (#17801, walk 78).
-var snippetMarks = regexp.MustCompile("(?m)\\*\\*|__|~~|`+|^#{1,6}[ \\t]+")
+// snippetMarks are the markdown marks of a chat's text (bold, strike, code, a heading's #): the search's hit line is the chat's words, not its markup (#17801, walk 78). A double underscore is
+// emphasis only around words: "__two words__" loses its marks, snake_case and __init__ keep theirs (#17912).
+var snippetMarks = regexp.MustCompile("(?m)\\*\\*|~~|`+|^#{1,6}[ \\t]+")
+var underEmphasis = regexp.MustCompile(`__([^\s_](?:(?:[^_\n]|_[^_\n])*?[^\s_])?)__`)
 
-func plainSnippet(s string) string { return snippetMarks.ReplaceAllString(s, "") }
+func isWordByte(c byte) bool {
+	return c == '_' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= 0x80
+}
+
+func plainSnippet(s string) string {
+	s = snippetMarks.ReplaceAllString(s, "")
+	var out strings.Builder
+	last := 0
+	for _, m := range underEmphasis.FindAllStringSubmatchIndex(s, -1) {
+		start, end := m[0], m[1]
+		if start > 0 && isWordByte(s[start-1]) || end < len(s) && isWordByte(s[end]) || !strings.ContainsAny(s[m[2]:m[3]], " \t") {
+			continue // snake__case, __init__, or one word: not emphasis around words
+		}
+		out.WriteString(s[last:start])
+		out.WriteString(s[m[2]:m[3]])
+		last = end
+	}
+	out.WriteString(s[last:])
+	return out.String()
+}
 
 // agentHistoryRows are the agent sessions' rows.
 func agentHistoryRows(sessions []store.SessionListItem) []map[string]any {

@@ -12,6 +12,10 @@ func TestPlainSnippetDropsMarkdownMarks(t *testing.T) {
 		"ticket **PLUM-4471** is about the `billing` deploy": "ticket PLUM-4471 is about the billing deploy",
 		"## Plan\nthe ~~old~~ plan":                          "Plan\nthe old plan",
 		"snake_case and a * b stay":                          "snake_case and a * b stay",
+		"__init__ and snake__case_name stay":                 "__init__ and snake__case_name stay",
+		"a __two words__ b":                                  "a two words b",
+		"__bold words__":                                     "bold words",
+		"__x__ and __y z__":                                  "__x__ and y z",
 		"":                                                   "",
 	} {
 		if got := plainSnippet(in); got != want {

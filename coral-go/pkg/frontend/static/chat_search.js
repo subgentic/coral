@@ -25,13 +25,17 @@ function utf16Slice(text, start, end) {
     return out;
 }
 
-// An excerpt is raw transcript text: its markdown marks (** __ ~~ backticks, a heading's #) are dropped and the offsets, which count the raw text, are moved onto the words that stay (#17801).
-const MD_MARKS = /\*\*|__|~~|`+|^#{1,6}[ \t]+/gm;
+// An excerpt is raw transcript text: its markdown marks (** ~~ backticks, a heading's #, and __ around words) are dropped and the offsets, which count the raw text, are moved onto the words that stay (#17801).
+// A double underscore is emphasis only around words: snake__case and __init__ keep theirs (#17912).
+const MD_MARKS = /\*\*|~~|`+|^#{1,6}[ \t]+/gm, UNDER = /(?<!\w)__(?=[^\s_])((?:[^_\n]|_(?!_))*?[^\s_])__(?!\w)/g;
 function plainWords(raw, offsets) {
+    const marks = [...raw.matchAll(MD_MARKS)].map(m => [m.index, m.index + m[0].length]);
+    for (const m of raw.matchAll(UNDER)) if (/\s/.test(m[1])) marks.push([m.index, m.index + 2], [m.index + m[0].length - 2, m.index + m[0].length]);
+    marks.sort((a, b) => a[0] - b[0]);
     let out = '', last = 0;
     const at = new Array(raw.length + 1);
     const keep = to => { for (; last < to; last++) { at[last] = out.length; out += raw[last]; } };
-    for (const m of raw.matchAll(MD_MARKS)) { keep(m.index); for (; last < m.index + m[0].length; last++) at[last] = out.length; }
+    for (const [from, to] of marks) { keep(from); for (; last < to; last++) at[last] = out.length; }
     keep(raw.length); at[raw.length] = out.length;
     const to = n => at[Math.min(Math.max(0, n), raw.length)];
     return { text: out, offsets: offsets.map(r => Array.isArray(r) && r.length >= 2 ? [to(Number(r[0]) || 0), to(Number(r[1]) || 0)] : r) };
@@ -104,7 +108,7 @@ async function openSearchHit(result, hit) {
 export async function openAtMatch(query, chat) {
     let at = null;
     try {
-        const response = await historyFetch(`/api/sessions/history/search?${new URLSearchParams({ q: String(query || '').trim(), page: '1', page_size: '20', type: 'all' })}`);
+        const response = await historyFetch(`/api/sessions/history/search?${new URLSearchParams({ q: String(query || '').trim(), page: '1', page_size: '20', type: 'all', session_id: chat.session_id })}`);
         if (response.ok) at = (await response.json()).results?.find(r => r.session_id === chat.session_id)?.hits?.[0]?.locator || null;
     } catch { /* the chat still opens, at the newest */ }
     return window.selectHistorySession?.(chat.session_id, at, chat);
