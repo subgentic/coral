@@ -38,7 +38,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
     function _maxColumnWidth() {
         const body = document.querySelector('.live-body');
         const room = body ? body.getBoundingClientRect().width : window.innerWidth;
-        return Math.max(COLUMN_MIN, Math.floor(room - CHAT_MIN - HANDLE_W));
+        return Math.max(COLUMN_MIN, Math.floor(room - (_taskExpanded ? 240 : CHAT_MIN) - HANDLE_W));
     }
     function _clampColumnWidth(w) {
         w = Number(w);
