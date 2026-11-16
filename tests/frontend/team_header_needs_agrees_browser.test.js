@@ -24,11 +24,13 @@ const TEAM = 'needs-agree-' + Date.now().toString(36);
         await waitFor(`/attention/.test((document.getElementById('team-page-status') || {}).textContent || '')`, 'the header says how many need attention', 10000);
         const header = await ev(`document.getElementById('team-page-status').textContent`);
         assert.equal(header, '1 needs attention', 'the header says what the Needs you tab says (1), not the two agents the board counts: ' + header);
-        // The sum (#17794, QA5 on #17067's d79c249b6e): an ended agent that holds a task is not on the tab, so it adds to the tab's count: the tab's 1 plus the ended agent's 1 reads 2, not 1 (and not 3).
+        // One number (#17625 item 3, the Orchestrator's decision on #18820): an ended agent that holds a task is not a Needs you item, so the header no longer adds it (#17794 had it read 2): it still equals the tab's 1.
         await ev(`window.__endedHolder = true; true`);
         await openTeam(ev, waitFor, TEAM);
-        await waitFor(`(document.getElementById('team-page-status') || {}).textContent === '2 need attention'`, 'the header adds the ended agent that holds a task to the tab count', 10000);
-        assert.equal(await ev(`(document.querySelector('#team-tab-needs .team-tab-count') || {}).textContent`), '1', 'the tab itself still says 1');
+        await waitFor(`(document.querySelector('#team-tab-needs .team-tab-count') || {}).textContent === '1' && /attention/.test((document.getElementById('team-page-status') || {}).textContent || '')`, 'the tab and the header after an ended agent holding a task is added', 10000);
+        const withHolder = await ev(`({ header: document.getElementById('team-page-status').textContent, tab: document.querySelector('#team-tab-needs .team-tab-count').textContent })`);
+        assert.equal(withHolder.header, '1 needs attention', 'the header does not add the ended agent: ' + JSON.stringify(withHolder));
+        assert.equal(withHolder.tab, '1', 'and equals the tab: ' + JSON.stringify(withHolder));
     } finally { await removeBoards(ev, [TEAM]).catch(() => {}); await client.close(); }
     console.log('PASS the team header and the Needs you tab count the same');
 })().catch(e => { console.error(e); process.exit(1); });

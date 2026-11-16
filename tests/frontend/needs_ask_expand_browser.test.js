@@ -21,7 +21,7 @@ const PLAN = 'Plan for the Reading List app (task #1) — OK to proceed? 1) Scop
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await quietLaunchNotice(Page, ev, BASE + '/'); /* the unseen first-run notice sits in the phone Inbox pane now (#16460) and shifts what these measure: acked on the test server */ await install();
             await coralReady(ev);
-            await ev(`localStorage.removeItem('coral.inbox.tab'); window.__answers = []; window.__multi = false;
+            await ev(`localStorage.removeItem('coral.inbox.tab'); window.__answers = []; window.__multi = false; /* Getting started items count like any row now (#18764), so this suite, which counts questions, switches them off */ window.T && (window.T.state.settings = { ...window.T.state.settings, inbox_welcome: 'off', inbox_welcome_done: '' });
                 const real = window.fetch; window.fetch = (u, o = {}) => { const url = String(u), m = (o.method || 'GET').toUpperCase();
                     if (m === 'POST' && /\\/answer-prompt$/.test(url)) { window.__answers.push(JSON.parse(o.body)); return Promise.resolve(new Response(JSON.stringify({ ok: true }), { headers: { 'content-type': 'application/json' } })); }
                     if (m === 'GET' && /\\/api\\/sessions\\/live\\/[^/]+\\/chat\\?/.test(url)) return Promise.resolve(new Response(JSON.stringify({ messages: [], total: 0, prompt_options: { question: ${JSON.stringify(PLAN)}, ask_id: 'ask-1', multi: window.__multi, options: [{ n: 1, label: 'Yes', action: 'select' }, { n: 2, label: 'No', action: 'select' }] } }), { headers: { 'content-type': 'application/json' } }));
@@ -32,12 +32,12 @@ const PLAN = 'Plan for the Reading List app (task #1) — OK to proceed? 1) Scop
             await ev(`window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.updateInboxTab()); true`);
             await ev(`(() => { const at = n => new Date(Date.now() - n * 60000).toISOString(); window.__asks = [
                 { board: 'reading', board_label: 'Reading List', kind: 'ask', id: 51, asker: 'Orchestrator', text: '@Operator ' + ${JSON.stringify(PLAN)}, at: at(4) },
-                { board: 'reading', board_label: 'Reading List', kind: 'ask', id: 52, asker: 'Designer', text: '@Operator ' + ${JSON.stringify(PLAN.repeat(2))}, at: at(6) },
-                { board: 'reading', board_label: 'Reading List', kind: 'ask', id: 54, asker: 'Tester', text: '@Operator ' + ${JSON.stringify(PLAN.repeat(2))}, at: at(8) },
+                /* exact duplicate questions are one row now (ef1b310926), so the second long question differs in its last words */ { board: 'reading', board_label: 'Reading List', kind: 'ask', id: 52, asker: 'Designer', text: '@Operator ' + ${JSON.stringify(PLAN.repeat(2))}, at: at(6) },
+                { board: 'reading', board_label: 'Reading List', kind: 'ask', id: 54, asker: 'Tester', text: '@Operator ' + ${JSON.stringify(PLAN.repeat(2) + ' (a different question from the Designer\'s, in the same words at the start)')}, at: at(8) },
                 { board: 'reading', board_label: 'Reading List', kind: 'ask', id: 53, asker: 'Dev', text: '@Operator May I delete the old books table and start again?', at: at(9) }];
                 const orig = window.fetch.bind(window); window.fetch = (u, o) => String(u) === '/api/operator-asks' ? Promise.resolve(new Response(JSON.stringify(window.__asks), { status: 200, headers: { 'Content-Type': 'application/json' } })) : orig(u, o); return true; })()`);
             await ev(`import((window.__coralStatic || '/static/') + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => true)`);
-            await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '6'`, `${w}: waiting badge`, 8000);
+            try { await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '6'`, `${w}: waiting badge`, 8000); } catch (e) { throw new Error(e.message + ' (badge ' + await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`) + ', rows ' + await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.textContent.trim().slice(0, 40)).join(' | ')`) + ')'); }
             if (mobile) {
                 await ev(`document.getElementById('nav-select').click(); true`);
                 await waitFor(`!!document.querySelector('#nav-more-menu [data-arg="hub-inbox"]')`, '390: Inbox in the view dropdown', 5000);
