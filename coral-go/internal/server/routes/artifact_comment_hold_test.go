@@ -244,3 +244,26 @@ func TestAHoldForAnAgentThatNeverComesFreeEndsWithANoticeInTheThread(t *testing.
 	assert.Len(t, rig.stored(), before+1, "said once")
 	assert.Empty(t, rig.operatorMessages(), "the agent was never typed anything")
 }
+
+// #18624 (Security and QA on #17549): a hold whose comment no longer exists was skipped for good, and StaleHeldAsks lists oldest first, so enough of them would fill every batch and keep the real stale holds behind them from
+// ever being told. Now it is dropped with no notice (there is no thread to tell).
+func TestAStaleHoldWhoseCommentIsGoneIsDroppedWithNoNotice(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.turn(1, "Dev", "prompt_submit") // mid-turn, and the turn never ends
+	gone := rig.ownerComment("This comment will be removed.")
+	code, out := rig.send(gone, "Dev")
+	require.Equal(t, http.StatusOK, code, fmt.Sprint(out))
+	require.True(t, rig.askQueued(gone, 1))
+	_, err := rig.ss.DB().ExecContext(context.Background(), "DELETE FROM artifact_comments WHERE id = ?", gone)
+	require.NoError(t, err)
+	before := len(rig.stored())
+
+	late := time.Now().Add(store.HeldAskMaxAge + time.Hour)
+	rig.h.flushHeldComments(context.Background(), late)
+	assert.False(t, rig.askQueued(gone, 1), "the hold of a comment that is gone ended")
+	assert.Len(t, rig.stored(), before, "with no notice: there is no thread to put one in")
+	stale, err := rig.ss.StaleHeldAsks(context.Background(), late, 10)
+	require.NoError(t, err)
+	assert.Empty(t, stale, "and it no longer takes a place in the stale batch")
+}

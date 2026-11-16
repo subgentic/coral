@@ -91,7 +91,14 @@ func (h *SessionsHandler) surfaceStaleHolds(ctx context.Context, now time.Time) 
 	}
 	for _, a := range stale {
 		root, ok, err := h.ss.GetArtifactComment(ctx, a.ArtifactID, a.CommentID)
-		if err != nil || !ok {
+		if err != nil {
+			continue // not read: the hold stays and the next pass tries again
+		}
+		if !ok {
+			// The comment is gone (its artifact was deleted), so there is no thread to tell and nothing left to deliver: drop the hold with no notice, or it sits first in the oldest-first batch for good.
+			if _, err := h.ss.DropHeldAsk(ctx, a.ID, now); err != nil {
+				slog.Warn("[artifact comments] a hold whose comment is gone was not dropped", "ask", a.ID, "error", err)
+			}
 			continue
 		}
 		parent := root.ID
