@@ -83,6 +83,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             await sleep(300); // sleep-ok: the viewer closes over a frame
             await open('ask-team');
             check(`${tag}: an open thread of the owner shows "Send to agent"; a reply and a resolved thread do not`, (await ev(`!!${sendBtn(1)}`)) && !(await ev(`!!${sendBtn(3)}`)) && !(await ev(`!!document.querySelector('.ac-card[data-id="1"] .ac-reply .ac-ask-open')`)));
+            check(`${tag}: optional invitation explains Send to agent at rest`, await ev(`(() => {const h=document.querySelector('.ac-card[data-id="1"] .ac-send-help');return !!h&&h.getClientRects().length>0&&h.textContent.includes('invites the agent')&&h.textContent.includes('optional')})()`));
             // does the agent have it? said beside the link (#11861): nothing sent yet says so; an agent that has replied is said to have replied, not 'Sent to' (#14129: Sent, then Read, then replied)
             check(`${tag}: a comment an agent was asked into says who has it, beside Send to agent (#11861)`, (await ev(`document.querySelector('.ac-card[data-id="1"] .ac-ask-status')?.textContent || ''`)) === 'Reviewer replied (2 times), reminded', await ev(`document.querySelector('.ac-card[data-id="1"] .ac-ask-status')?.textContent || ''`));
             // an agent's name is as written and opens its chat (#12168, the operator): the reply author and its circle for a running agent; a gone agent is plain text with a tooltip

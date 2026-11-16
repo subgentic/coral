@@ -337,7 +337,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (!c.deleted && c.images && c.images.length && !editing(c)) main.append(pictures(c));
         if (top && c.fromVersion != null && c.carried !== 'found') main.append(el('p', 'ac-from ac-from-note', groupOf(c) === 'look' ? `From v${c.fromVersion}. The quote is in this version more than once, so it is not pinned to either.` : `On v${c.fromVersion}. Its text is not in this version.`));
         main.append(actions(c, top));
-        if (top && canAsk(c)) { const sp = el('p', 'ac-note ac-ask-status'); fillStatus(sp, c.id); main.append(sp); } // does the agent have it? said at rest, under the comment: the actions row is hidden until hover
+        if (top && canAsk(c)) { const sp = el('p', 'ac-note ac-ask-status'); fillStatus(sp, c.id); main.append(sp, el('p', 'ac-note ac-send-help', 'Send to agent invites the agent to respond here. It is optional when posting a comment or reply.')); } // does the agent have it? said at rest, under the comment: the actions row is hidden until hover
         e.append(main);
         return e;
     }
