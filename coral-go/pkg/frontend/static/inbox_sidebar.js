@@ -44,7 +44,7 @@ import { setHidden } from './dom_write.js';
 import { loadStyles } from './lazy_styles.js';
 import { syncDisplayPanels } from './display_panel.js';
 import { onViewShown } from './view_switch.js';
-import { importOnce, loadedModule } from './import_once.js';
+import { importOnce } from './import_once.js';
 const { fileContext } = await importOnce('./artifact_file_context.js');
 import { claudeSignedIn, onSigninChange } from './signin_line.js';
 import { markHidden } from './visible_marks.js';
@@ -969,17 +969,7 @@ async function refreshBoards() {
     renderInboxNav(true);
 }
 const BOARD_ITEM = 'board:';
-const BOARDS_MORE = BOARD_ITEM + '\u0000more'; // the row under the boards (Show all teams): not a board
-/** The Boards group lists the active teams (#17457, #15744's rule: active first, newest message first, the idle ones behind a row; the open board and a search always listed; up to four all listed). */
-function boardSection() {
-    if (!isPhoneLayout() || !boardList.length) return [];
-    const open = page?.kind === BOARDS_SUB ? page.project : state.selectedTeam, AT = loadedModule('./active_teams.js');
-    if (!AT && boardList.length > 4) importOnce('./active_teams.js').then(() => renderInboxNav(true));
-    const by = new Map(boardList.map(b => [b.key, b])), r = AT ? AT.pickBoards(boardList.map(b => [b.key, (state.liveSessions || []).filter(s => String(s.board_project) === b.key)]), open) : { shown: boardList.map(b => [b.key]), idle: 0 };
-    const items = r.shown.map(([key]) => ({ key: BOARD_ITEM + key, label: by.get(key).label }));
-    if (r.idle) items.push({ key: BOARDS_MORE, label: r.hide ? `Show all teams (${r.idle} idle)` : 'Show active teams only' });
-    return [{ title: 'Boards', items }];
-}
+const boardSection = () => (isPhoneLayout() && boardList.length ? [{ title: 'Boards', items: boardList.map(b => ({ key: BOARD_ITEM + b.key, label: b.label })) }] : []);
 /** What the folder list shows as current: on a phone an open board is its own entry of the Boards group (the folder it belongs to elsewhere is Board history). */
 const navCurrent = () => (isPhoneLayout() && page?.kind === BOARDS_SUB ? BOARD_ITEM + page.project : pageGroup());
 const FOLDER_TIPS = { needs: 'Agents waiting for you: a question, a permission or a review', tasks: 'Tasks assigned to you, not the ones your agents work on (those are on each team\u2019s page and goal)', goals: 'The open goals of your teams', saved: 'Messages you saved for later', artifacts: 'Files agents shared', activity: 'What you did in Needs you' }; // one line each (#10074)
@@ -1011,7 +1001,6 @@ const liveGoals = () => { if (isCloud() && group === 'needs' && !needsBootCounts
 state.inboxFolderRows = () => ({ sections: folderSections().filter(sec => !sec.items.some(it => String(it.key).startsWith(BOARD_ITEM))), current: navCurrent(), pick: pickFolder });
 /** A folder was picked: a page that is open gives way, and the folder's table opens with the keyboard at its heading. */
 function pickFolder(key) {
-    if (key === BOARDS_MORE) { importOnce('./active_teams.js').then(m => { m.toggleAll(); renderInboxNav(true); }); return; }
     if (key.startsWith(BOARD_ITEM)) { openItemRoute(BOARDS_SUB, key.slice(BOARD_ITEM.length), null, key); return; } // a board of the phone drawer's Boards group: its messages, in the Inbox
     if (page) closePage(false);
     setGroup(key);
