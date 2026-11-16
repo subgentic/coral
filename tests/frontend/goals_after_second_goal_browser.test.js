@@ -34,13 +34,13 @@ const { coralReady } = require('./helpers/wait');
         await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: 'Idea for later', state: 'proposed' }); // a goal the default list does not show: the badge is not the count of all goals
         await open(`/team/${B}/goals`, `document.querySelectorAll('#team-panel-goals tbody tr:not(.dt-group)').length >= 1`);
         await ev(`document.querySelector('#team-panel-goals [data-filter="active"]').click(); true`); // the All the person chose above is remembered in this browser: Active is chosen again here (#17625)
-        await waitFor(`document.querySelectorAll('#team-panel-goals tbody tr:not(.dt-group)').length === 1`, 'Active lists only the active goal');
+        await waitFor(`document.querySelectorAll('#team-panel-goals tbody tr:not(.dt-group)').length === 2`, 'Active lists the two active goals: a task added to the closed goal reopens it (c8b19f6bc6)');
         await ev(`document.querySelector('#team-panel-goals [data-filter="all"]').click(); true`);
         await waitFor(`document.querySelectorAll('#team-panel-goals tbody tr:not(.dt-group)').length === 3`, 'All includes all three goals');
         r = await rows();
-        assert.ok(r.some(x => !x.group && /Habit tracker with reminders/.test(x.text)) && r.some(x => !x.group && /Habit tracker/.test(x.text) && !/reminders/.test(x.text)), 'All retains active and finished goals: ' + JSON.stringify(r));
+        assert.ok(r.some(x => !x.group && /Habit tracker with reminders/.test(x.text)) && r.some(x => !x.group && /Habit tracker/.test(x.text) && !/reminders/.test(x.text)), 'All retains every goal: ' + JSON.stringify(r));
         const badge = await ev(`(document.querySelector('#team-tab-goals .team-tab-count') || {}).textContent`);
-        assert.equal(badge, '2', 'the badge counts open goals (active and proposed): ' + badge);
+        assert.equal(badge, '3', 'the badge counts open goals (the two active ones, the reopened goal 1 among them, and the proposed one): ' + badge);
         // All searches include a finished goal when its title matches.
         const search = async text => { await ev(`(() => { const i = document.querySelector('#team-panel-goals input[type=search], #team-panel-goals input[placeholder="Search goals"]'); i.value = ${JSON.stringify(text)}; i.dispatchEvent(new Event('input', { bubbles: true })); })()`); };
         await search('reminders');
