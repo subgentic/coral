@@ -14,6 +14,9 @@ await loadStyles('operator_ask_dialog.css');
 
 const isReply = action => /^reply$/.test(action);
 
+// The person's own Yes, No, reply or Ignore leaves the row at once: the table redraws once, not held under the pointer that rests on the list (#17501, walk 72 M6); the same event pair the other actions use (sidebar_groups.js).
+const ownAction = () => { const b = { table: null }; document.dispatchEvent(new CustomEvent('coral:action-start', { detail: b })); return () => document.dispatchEvent(new CustomEvent('coral:action-result', { detail: b })); };
+
 export function openAskDialog(a, onDone, runners = {}) {
     const missingCloudSource = isCloud() && !a.server;
     a = { ...a, server: a.server || LOCAL_SERVER }; // freeze the question's computer across navigation
@@ -77,11 +80,12 @@ export function openAskDialog(a, onDone, runners = {}) {
                 btn.addEventListener('click', async () => {
                     if (sending || (binary && picturesBlocked())) return;
                     sending = true; err.textContent = ''; sync();
+                    const left = ownAction();
                     try {
                         const draft = replyText();
-                        if (binary && draft) { await replyToAsk(a, `${b.label}\n\n${draft}`); finish(); showToast(`Sent: ${b.label} with your reply`); return; }
+                        if (binary && draft) { await replyToAsk(a, `${b.label}\n\n${draft}`); finish(); left(); showToast(`Sent: ${b.label} with your reply`); return; }
                         const got = await claimButton(a, b); // the stored action, whatever the label says
-                        if (isReply(got.action)) { forgetAsk(a); refreshOperatorAsks(true); finish(); showToast(`Sent: ${markHidden(got.label, { strict: true })}`); return; }
+                        if (isReply(got.action)) { forgetAsk(a); refreshOperatorAsks(true); finish(); left(); showToast(`Sent: ${markHidden(got.label, { strict: true })}`); return; }
                         const navigates = ['open:new-agent', 'open:task', 'open:artifact'].includes(got.action);
                         finish(); // the dialog is modal: it goes before the page it opens
                         try {
@@ -116,7 +120,7 @@ export function openAskDialog(a, onDone, runners = {}) {
                 await refreshOperatorAsks(true); // the task may have left review since the list was read: asked again now, and the two buttons go if it has (#15111)
                 const now = operatorAsks().find(x => askKey(x) === askKey(a));
                 if (now && now.task_in_review !== true) { a.task_in_review = false; sending = false; drawOffers(); sync(); err.textContent = 'That task is no longer waiting for review, so Approve and Request changes are off. You can still reply.'; return; }
-                try { await replyToAsk(a, text ? (draft ? `${text}\n\n${draft}` : text) : `Changes requested:\n\n${draft}`); finish(); showToast(`Sent: ${word}`); }
+                const left = ownAction(); try { await replyToAsk(a, text ? (draft ? `${text}\n\n${draft}` : text) : `Changes requested:\n\n${draft}`); finish(); left(); showToast(`Sent: ${word}`); }
                 catch (e) { err.textContent = e.message || 'Not sent.'; sending = false; sync(); }
             }); choices.push(b); return b; };
             review.append(answer('Approve', 'Approved.'), answer('Request changes', ''));
@@ -150,7 +154,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     dismiss.addEventListener('click', async () => {
         if (sending) return;
         sending = true; err.textContent = ''; dismiss.disabled = true; sync();
-        try { const m = await importOnce('./ask_ignore.js'); await m.ignoreAsk(a, markHidden(a.asker, { strict: true })); forgetAsk(a); finish(); }
+        const left = ownAction(); try { const m = await importOnce('./ask_ignore.js'); await m.ignoreAsk(a, markHidden(a.asker, { strict: true })); forgetAsk(a); finish(); left(); }
         catch (e) { if (e && e.code === 'owner_only') { dismiss.hidden = true; err.textContent = 'Only this computer\u2019s owner can dismiss it.'; } else err.textContent = e.message || 'Could not dismiss it.'; dismiss.disabled = false; sending = false; sync(); }
     });
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
@@ -158,7 +162,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     send.addEventListener('click', async () => {
         if (sending || picturesBlocked()) return;
         sending = true; err.textContent = ''; sync();
-        try { await replyToAsk(a, replyText()); finish(); showToast(`Reply sent to ${markHidden(a.asker, { strict: true })}`); } // the dialog closes: say it went (#15078)
+        const left = ownAction(); try { await replyToAsk(a, replyText()); finish(); left(); showToast(`Reply sent to ${markHidden(a.asker, { strict: true })}`); } // the dialog closes: say it went (#15078)
         catch (e) { err.textContent = e.message || 'Not sent.'; sending = false; sync(); box.focus(); } // the text stays
     });
     document.body.append(dlg);
