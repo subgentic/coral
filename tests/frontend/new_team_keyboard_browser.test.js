@@ -78,11 +78,11 @@ const BASE = require('./test_base').BASE;
             assert.ok(await ev(`!!window.__nt.dlg(${N.team})`), 'New team is still open');
             assert.match((await insideTop()).name, new RegExp('^Edit ' + role.replace(/[^\w]/g, '.') + '$'), 'focus is back on the row that opened it');
         });
-        await S.run('Edit member: the tabs Agent, Permissions, Advanced of the settings are real tabs with the arrow keys, the persona page before them is named; every control of each tab is named; Mode is a radiogroup with arrow keys; Tab stays inside it', async () => {
+        await S.run('Edit member: the tabs Agent, Permissions, Skills, Advanced of the settings are real tabs with the arrow keys, the persona page before them is named; every control of each tab is named; Mode is a radiogroup with arrow keys; Tab stays inside it', async () => {
             const role = (await ev(`window.__nt.roles(window.__nt.dlg(${N.team}))`))[1];
             await focusRow(role); await key('Enter'); await waitFor(`!!window.__nt.dlg(${N.member})`, 'Edit member', 4000);
             const tl = await ev(`(() => { const tl = window.__nt.tablist(window.__nt.dlg(${N.member})); return tl ? [...tl.querySelectorAll('[role=tab]')].filter(window.__na.vis).map(x => window.__na.name(x)) : null; })()`);
-            assert.deepEqual(tl, N.memberTabs, 'a tablist with the three tabs');
+            assert.deepEqual(tl, N.memberTabs, 'a tablist with the four tabs');
             const vertical = await ev(`window.__nt.tablist(window.__nt.dlg(${N.member})).getAttribute('aria-orientation') === 'vertical'`); const next = vertical ? 'ArrowDown' : 'ArrowRight';
             await ev(`[...window.__nt.dlg(${N.member}).querySelectorAll('[role=tab]')].find(x => x.getAttribute('aria-selected') === 'true').focus(); true`); await key(next);
             assert.equal(await ev(`window.__na.name([...window.__nt.dlg(${N.member}).querySelectorAll('[role=tab]')].find(x => x.getAttribute('aria-selected') === 'true'))`), 'Permissions', 'the arrow selects the next tab (Edit member opens on Agent)');

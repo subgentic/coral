@@ -263,7 +263,7 @@ function showTeamAgentModal(row = null, { role = '' } = {}) {
     if (row && row.dataset.permissionExplicit !== '1' && !/--permission-mode|--mode|--sandbox|--full-auto|--dangerously/.test(acfValue.flags || '')) acfValue.flags = [acfValue.flags, _teamModeFlags(acfValue.agentType)].filter(Boolean).join(' ');
     const dialog = document.getElementById('launch-modal');
     if (dialog && getComputedStyle(dialog).display === 'none') { dialog.style.display = 'flex'; launch.mode = 'team'; _showLaunchStep('team'); } // display-ok: the member is a step of the Launch dialog, which is open when a person is in the team form; opened as it is when something else asks (the team form is kept, not reset)
-    launch.member = { row, returnTo: currentTeamStep(), value: acfValue };
+    launch.member = { row, returnTo: currentTeamStep(), value: acfValue, skills: rowSkills(row) }; // the member's own skills (#18657)
     window._selectLaunchType('agent');
     _syncMemberMoveButtons();
 }
@@ -294,6 +294,12 @@ function cancelTeamMember() {
 }
 window.cancelTeamMember = cancelTeamMember;
 
+/** A member row's own skill ids (#18657): kept on the row, since the member's form has no field for them; none for a row made before they existed. */
+function rowSkills(row) {
+    try { const v = JSON.parse(row?.dataset.skills || '[]'); return Array.isArray(v) ? v.filter(id => typeof id === 'string') : []; } catch { return []; }
+}
+function setRowSkills(row, ids) { if (!row) return; if (ids.length) row.dataset.skills = JSON.stringify(ids); else delete row.dataset.skills; }
+
 function saveTeamAgentFromModal() {
     const m = launch.member;
     if (!m) return;
@@ -310,16 +316,19 @@ function saveTeamAgentFromModal() {
     if (modalMode && modalMode === (document.getElementById('team-permission-mode')?.value || 'default')) config.flags = _normalizePermFlagsForAgent(config.flags, config.agentType, 'default');
     const followsType = config.agentType === document.getElementById('team-agent-type')?.value; // a provider left at the default keeps following it
     const opener = m.row;
+    const skillIds = m.skillsNow ? m.skillsNow() : m.skills || []; // what the Skills section says now (#18657), else what the member had
     if (opener?.dataset.acfId) {
         opener.dataset.followsTeamType = followsType ? '1' : '';
         opener.dataset.modelHand = (config.model || '') !== _everyone.model ? '1' : ''; // set by hand only when it differs from Everyone runs as
         opener.dataset.thinkingHand = (config.thinking || '') !== _everyone.thinking ? '1' : '';
         setAgentConfig(opener.dataset.acfId, config);
+        setRowSkills(opener, skillIds);
         opener.dataset.permissionExplicit = modalMode === 'default' || modalMode !== document.getElementById('team-permission-mode')?.value ? '1' : '';
         if (!opener.dataset.permissionExplicit) delete document.getElementById(opener.dataset.acfId)?.querySelector('.acf-permission-mode')?.dataset.pickedByPerson;
     } else {
         const added = _addTeamAgent(config.name, config.prompt, config.capabilities, followsType ? '' : config.agentType, config.model, config.flags, { reveal: true, thinking: config.thinking });
         setAgentConfig(added.dataset.acfId, config);
+        setRowSkills(added, skillIds);
         added.dataset.permissionExplicit = modalMode === 'default' || modalMode !== document.getElementById('team-permission-mode')?.value ? '1' : '';
     }
     _leaveMember();
@@ -931,6 +940,8 @@ async function launchTeam() {
             const pick = own || team, m = pick && customModeById(pick), type = config.agentType || agentType;
             if (m && String(m.agent_type).replace(/^(antigravity|gemini)$/, 'agy') === String(type).replace(/^(antigravity|gemini)$/, 'agy')) agent.permission_mode = pick;
         }
+        const own = rowSkills(row);
+        if (own.length) agent.skills = own; // this member's own skills, besides the team's (#18657; the server unions them)
         agents.push(agent);
     }
 

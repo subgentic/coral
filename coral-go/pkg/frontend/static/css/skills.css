@@ -30,7 +30,7 @@
 .skills-pick-desc { color: var(--text-secondary); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .skills-pick-more, [id$='-skills-host'] { min-width: 0; max-width: 100%; } /* the nowrap descriptions must not size the row: it was 543 px in a 390 px dialog (#12515) */
 .skills-pick-flag { grid-column: 2 / -1; font-size: var(--fs-sm, 12px); color: var(--text-secondary); }
-#launch-modal[data-member] #launch-skills-row { display: none; } /* a team member's own dialog carries no skills yet: the team's row (and a launch's) do */
+.skills-from-team { font-style: italic; }
 @media (max-width: 600px) { /* a phone: the name above its description, the search the row's width, a tick a finger can hit (#12515) */
     .skills-pick-more .skills-pick-list .skills-pick > .skills-pick-label { grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; align-items: start; padding: 10px 4px; }
     .skills-pick-label input[type=checkbox] { width: 20px; height: 20px; grid-area: 1 / 1 / span 2 / 1; }

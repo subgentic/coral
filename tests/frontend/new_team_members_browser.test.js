@@ -114,7 +114,7 @@ const BASE = require('./test_base').BASE;
             if (handModel === '1') { assert.match(await ev(`${'document.querySelectorAll("#team-agents-list .team-agent-row")[1].textContent'}`), /Set by hand: model/, 'a member whose model was set by hand says that it differs'); }
             assert.match(handBefore, /\S/, 'the hand-set member still has its summary');
         });
-        await S.run('Edit member is a dialog named "Edit member": it opens on the member\'s settings (the sections Agent, Permissions, Advanced), the persona page (Role) is one Back away; Cancel is leftmost and Save member the rightmost; it is the same size as New team', async () => {
+        await S.run('Edit member is a dialog named "Edit member": it opens on the member\'s settings (the sections Agent, Permissions, Skills, Advanced), the persona page (Role) is one Back away; Cancel is leftmost and Save member the rightmost; it is the same size as New team', async () => {
             const roles0 = await roles(); const tt = await t.rect(); await openRow(roles0[1]);
             assert.match(await ev(`window.__na.name(window.__nt.dlg(${N.member}))`), /^Edit member/, 'the dialog is named Edit member');
             assert.ok(!(await mem.onPersona()), 'it opens on the settings page');
