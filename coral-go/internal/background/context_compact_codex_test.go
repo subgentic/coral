@@ -3,6 +3,7 @@ package background
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -66,4 +67,28 @@ func TestTheCompactedRecordIsReadFromTheSessionFile(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 	assert.True(t, read(), "a compacted record after it was typed does")
+}
+
+// A real compacted record carries the replacement history and runs to megabytes (200 KB to 4 MB seen): a tail cut inside it must not lose it (#17562 review).
+func TestALargeCompactedRecordLastInTheFileIsStillRead(t *testing.T) {
+	typed := time.Date(2026, 11, 16, 10, 0, 0, 0, time.UTC)
+	path := filepath.Join(t.TempDir(), "rollout.jsonl")
+	big := `{"timestamp":"2026-11-16T10:00:20.500Z","type":"compacted","payload":{"replacement_history":"` + strings.Repeat("x", 3<<20) + `"}}` + "\n"
+	pad := strings.Repeat(`{"timestamp":"2026-11-16T09:00:00Z","type":"event_msg","payload":{"text":"older"}}`+"\n", 200000)
+	require.NoError(t, os.WriteFile(path, []byte(pad+big), 0o600))
+	f, err := os.Open(path)
+	require.NoError(t, err)
+	defer f.Close()
+	assert.True(t, compactedRecordSince(f, typed), "a 3 MB compacted line at the end of a large file confirms")
+}
+
+func TestOnlyARegularSessionFileIsOpened(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CODEX_HOME", dir)
+	sid := "0199aaaa-bbbb-7ccc-8ddd-eeeeffff0001"
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "sessions", "2026", "11", "16"), 0o700))
+	target := filepath.Join(dir, "real.jsonl")
+	require.NoError(t, os.WriteFile(target, []byte(`{"timestamp":"2026-11-16T10:00:20Z","type":"compacted"}`+"\n"), 0o600))
+	require.NoError(t, os.Symlink(target, filepath.Join(dir, "sessions", "2026", "11", "16", "rollout-2026-11-16T10-00-00-"+sid+".jsonl")))
+	assert.False(t, codexCompactedSince(sid, time.Date(2026, 11, 16, 10, 0, 0, 0, time.UTC)), "a link at the session path is not followed")
 }

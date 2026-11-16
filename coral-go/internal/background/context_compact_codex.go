@@ -11,13 +11,20 @@ import (
 	"github.com/subgentic/coral/internal/jsonl"
 )
 
-// codexCompactTail is how much of the end of a Codex session file is read to look for a "compacted" record: a compaction that has just happened is among the last lines.
-const codexCompactTail = 1 << 20
+// codexCompactLineMax is the longest line the scan reads. A "compacted" record carries the replacement history, so real ones run from 200 KB to over 4 MB.
+const codexCompactLineMax = 8 << 20
+
+// codexCompactTail is how much of the end of a Codex session file is read to look for a "compacted" record: a compaction that has just happened is among the last lines. It is more than the longest line read, so a line the scan can read always starts inside the window (a seek that lands mid-line only drops that one cut line).
+const codexCompactTail = codexCompactLineMax + 1<<20
 
 // codexCompactedSince is whether the Codex session file of sessionID has a "compacted" record written at or after since (#17562): Codex's /compact starts no turn, and this record is what it leaves.
 func codexCompactedSince(sessionID string, since time.Time) bool {
 	path := jsonl.CodexTranscriptPath(sessionID)
 	if path == "" {
+		return false
+	}
+	// Only a regular file: a named pipe or a link planted at the path must not stall the compaction pass.
+	if fi, err := os.Lstat(path); err != nil || !fi.Mode().IsRegular() {
 		return false
 	}
 	f, err := os.Open(path)
@@ -40,7 +47,7 @@ func compactedRecordSince(f *os.File, since time.Time) bool {
 		}
 	}
 	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64*1024), 8<<20)
+	sc.Buffer(make([]byte, 0, 64*1024), codexCompactLineMax)
 	for sc.Scan() {
 		line := sc.Bytes()
 		if !bytes.Contains(line, []byte(`"compacted"`)) {
