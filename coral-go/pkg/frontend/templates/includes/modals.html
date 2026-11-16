@@ -554,7 +554,7 @@
                         <div class="settings-tabs" id="settings-tabs" role="tablist" aria-orientation="vertical" aria-label="Settings sections" aria-describedby="settings-tabs-hint"></div>
                     </nav>
                     <div class="settings-panes">
-                    <section class="settings-pane" id="settings-pane-general" data-group="general" data-icon="tune" data-title="Appearance" data-nav-group="You" data-hint="Theme and display" role="tabpanel" aria-labelledby="settings-tab-general" tabindex="-1">
+                    <section class="settings-pane" id="settings-pane-general" data-autosaves data-group="general" data-icon="tune" data-title="Appearance" data-nav-group="You" data-hint="Theme and display" role="tabpanel" aria-labelledby="settings-tab-general" tabindex="-1">
                         <h4 class="settings-pane-title">Appearance</h4>
                         <div id="settings-general-rows"></div>
                         <div id="settings-terminal-live" hidden>
@@ -584,15 +584,15 @@
 
 
                     </section>
-                    <section class="settings-pane" id="settings-pane-notifications" data-group="notifications" data-icon="notifications" data-title="Notifications" data-nav-group="You" data-hint="Alerts and Needs you" role="tabpanel" aria-labelledby="settings-tab-notifications" tabindex="-1" hidden>
+                    <section class="settings-pane" id="settings-pane-notifications" data-autosaves data-group="notifications" data-icon="notifications" data-title="Notifications" data-nav-group="You" data-hint="Alerts and Needs you" role="tabpanel" aria-labelledby="settings-tab-notifications" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Notifications</h4>
                         <div id="settings-notifications-rows"></div>
-                    <section class="settings-inbox-block" id="settings-pane-needs-you" aria-labelledby="settings-inbox-block-title">
+                    <section class="settings-inbox-block" id="settings-pane-needs-you" data-autosaves aria-labelledby="settings-inbox-block-title">
                         <h5 id="settings-inbox-block-title">What reaches Needs you</h5>
                         <div id="settings-inbox-rows"></div>
                     </section>
                     </section>
-                    <section class="settings-pane" id="settings-pane-agents" data-group="agents" data-icon="smart_toy" data-title="Defaults" data-nav-group="Agents" data-hint="How agents start and behave" role="tabpanel" aria-labelledby="settings-tab-agents" tabindex="-1" hidden>
+                    <section class="settings-pane" id="settings-pane-agents" data-autosaves data-group="agents" data-icon="smart_toy" data-title="Defaults" data-nav-group="Agents" data-hint="How agents start and behave" role="tabpanel" aria-labelledby="settings-tab-agents" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Defaults</h4>
                         <div id="settings-agents-rows" data-coral-root="{{ .CoralRoot }}"></div>
                         <!-- the live parts of this group (filled by settings_dialog.js, shown or hidden by it) sit here until the rows are drawn, then settings_fields.js moves each into place -->
@@ -608,22 +608,22 @@
                         </div>
                         </div>
                     </section>
-                    <section class="settings-pane" id="settings-pane-providers" data-group="providers" data-icon="psychology" data-title="Providers" data-nav-group="Agents" data-hint="Models and CLI paths" role="tabpanel" aria-labelledby="settings-tab-providers" tabindex="-1" hidden>
+                    <section class="settings-pane" id="settings-pane-providers" data-autosaves data-group="providers" data-icon="psychology" data-title="Providers" data-nav-group="Agents" data-hint="Models and CLI paths" role="tabpanel" aria-labelledby="settings-tab-providers" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Providers</h4>
                         <div id="settings-providers-rows"></div>
                     </section>
                     <section class="settings-pane" id="settings-pane-chief" data-group="chief" data-icon="chat" data-title="Teams and Chief" data-nav-group="Agents" data-hint="Chief and team controls" role="tabpanel" aria-labelledby="settings-tab-chief" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Teams and Chief</h4>
                         <!-- Filled by chief_setup.js (#11796); not on the hub: Chief is this computer's. -->
-                        <div id="settings-team-rows"></div>
+                        <div id="settings-team-rows" data-autosaves></div>
                         <div id="settings-chief-host"></div>
                     </section>
-                    <section class="settings-pane" id="settings-pane-updates" data-group="updates" data-icon="system_update" data-title="Updates" data-nav-group="This computer" data-hint="Versions and relaunch" role="tabpanel" aria-labelledby="settings-tab-updates" tabindex="-1" hidden>
+                    <section class="settings-pane" id="settings-pane-updates" data-autosaves data-group="updates" data-icon="system_update" data-title="Updates" data-nav-group="This computer" data-hint="Versions and relaunch" role="tabpanel" aria-labelledby="settings-tab-updates" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Updates</h4>
                         <div id="settings-updates-rows"></div>
                         <div id="update-pane-body" data-flag="updates"></div>
                     </section>
-                    <section class="settings-pane" id="settings-pane-cleanup" data-group="cleanup" data-icon="inventory_2" data-title="Storage and backup" data-nav-group="This computer" data-hint="Limits, clean-up and backup" role="tabpanel" aria-labelledby="settings-tab-cleanup" tabindex="-1" hidden>
+                    <section class="settings-pane" id="settings-pane-cleanup" data-autosaves data-group="cleanup" data-icon="inventory_2" data-title="Storage and backup" data-nav-group="This computer" data-hint="Limits, clean-up and backup" role="tabpanel" aria-labelledby="settings-tab-cleanup" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Storage and backup</h4>
                         <div id="settings-cleanup-rows"></div>
                         <div id="settings-cleanup-live" hidden>
@@ -724,13 +724,13 @@
                             </div>
                         </div>
                     </section>
-                    <section class="settings-pane" id="settings-pane-files" data-group="files" data-icon="account_tree" data-title="Files and Git" data-nav-group="This computer" data-hint="File search and Git" role="tabpanel" aria-labelledby="settings-tab-files" tabindex="-1" hidden>
+                    <section class="settings-pane" id="settings-pane-files" data-autosaves data-group="files" data-icon="account_tree" data-title="Files and Git" data-nav-group="This computer" data-hint="File search and Git" role="tabpanel" aria-labelledby="settings-tab-files" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Files and Git</h4>
                         <div id="settings-files-rows"></div>
                     </section>
                     <section class="settings-pane" id="settings-pane-security" data-group="security" data-icon="lock" data-title="Security and privacy" data-nav-group="Access" data-hint="Sign-in and privacy" role="tabpanel" aria-labelledby="settings-tab-security" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Security and privacy</h4>
-                        <div id="settings-security-rows"></div>
+                        <div id="settings-security-rows" data-autosaves></div>
                         <div id="settings-security-live" hidden>
                             <!-- Settings > Browser sign-in (#3948): filled by security_settings.js; never shown through Coral Hub. -->
                             <div class="sec-row" id="settings-security" role="group" hidden></div>
@@ -745,7 +745,7 @@
                             <button class="btn btn-small" type="button" id="settings-debug-input-log-delete" hidden>Delete the log</button>
                         </div>
                     </section>
-                    <section class="settings-pane" id="settings-pane-network" data-group="network" data-icon="hub" data-title="Coral Hub and remote access" data-nav-group="Access" data-hint="Hub and other devices" role="tabpanel" aria-labelledby="settings-tab-network" tabindex="-1" hidden>
+                    <section class="settings-pane" id="settings-pane-network" data-autosaves data-group="network" data-icon="hub" data-title="Coral Hub and remote access" data-nav-group="Access" data-hint="Hub and other devices" role="tabpanel" aria-labelledby="settings-tab-network" tabindex="-1" hidden>
                         <h4 class="settings-pane-title">Coral Hub and remote access</h4>
                         <div id="settings-network-rows"></div>
                         <div id="settings-network-live" hidden>
