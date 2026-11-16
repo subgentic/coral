@@ -32,13 +32,13 @@ func TestLaunchPermissionArgsRouteAnswersFromTheLaunchBuilders(t *testing.T) {
 	}
 	code, out := ask(`{"agent_type":"codex","permission_mode":"bypassPermissions"}`)
 	require.Equal(t, http.StatusOK, code, out)
-	assert.JSONEq(t, `{"args":["--dangerously-bypass-approvals-and-sandbox"],"text":"--dangerously-bypass-approvals-and-sandbox","note":""}`, out)
+	assert.JSONEq(t, `{"args":["--dangerously-bypass-approvals-and-sandbox"],"text":"--dangerously-bypass-approvals-and-sandbox","note":"","skips_prompts":true}`, out)
 	_, out = ask(`{"agent_type":"codex","permission_mode":"plan"}`)
-	assert.JSONEq(t, `{"args":["--sandbox","read-only","-a","on-request"],"text":"--sandbox read-only -a on-request","note":""}`, out)
+	assert.JSONEq(t, `{"args":["--sandbox","read-only","-a","on-request"],"text":"--sandbox read-only -a on-request","note":"","skips_prompts":false}`, out)
 	_, out = ask(`{"agent_type":"codex","permission_mode":"plan","keep_full_access":true}`)
 	assert.Contains(t, out, `"--dangerously-bypass-approvals-and-sandbox"`)
 	_, out = ask(`{"agent_type":"codex","permission_mode":"default"}`)
-	assert.JSONEq(t, `{"args":[],"text":"","note":"No permission flags are added, so Codex's own settings (its config file) decide."}`, out)
+	assert.JSONEq(t, `{"args":[],"text":"","note":"No permission flags are added, so Codex's own settings (its config file) decide.","skips_prompts":false}`, out)
 	code, _ = ask(`not json`)
 	assert.Equal(t, http.StatusBadRequest, code)
 	// Security's #15726: the body and each flag are capped.
@@ -156,4 +156,23 @@ func trimLaunchWrappers(cmd string) string {
 		return cmd[i:]
 	}
 	return cmd
+}
+
+// #18286: the answer says whether the choice could act without asking (the Hub gate's allowlist), so the recap can say so for a mode it has no sentence for.
+func TestLaunchPermissionArgsRouteSaysWhetherTheChoiceSkipsPrompts(t *testing.T) {
+	h := &SessionsHandler{}
+	skips := func(body string) any {
+		w := httptest.NewRecorder()
+		h.PostLaunchPermissionArgs(w, httptest.NewRequest(http.MethodPost, "/api/launch/permission-args", strings.NewReader(body)))
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var m map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &m))
+		return m["skips_prompts"]
+	}
+	assert.Equal(t, false, skips(`{"agent_type":"claude","permission_mode":"default"}`), "Default asks")
+	assert.Equal(t, true, skips(`{"agent_type":"claude","permission_mode":"plan"}`), "Claude's Plan runs classifier-approved commands without asking (#5894), as the Hub gate counts it")
+	assert.Equal(t, false, skips(`{"agent_type":"codex","permission_mode":"plan"}`), "Codex's Plan asks")
+	assert.Equal(t, true, skips(`{"agent_type":"claude","permission_mode":"bypassPermissions"}`), "Bypass does not")
+	assert.Equal(t, true, skips(`{"agent_type":"claude","permission_mode":"acceptEdits"}`), "accepting edits is acting without asking")
+	assert.Equal(t, true, skips(`{"agent_type":"pi","permission_mode":"default"}`), "Pi has no mode that asks")
 }

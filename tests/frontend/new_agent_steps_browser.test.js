@@ -165,6 +165,10 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
                 for (const x of b) assert.ok(x.h >= 44, `phone step ${n}: ${x.name} is ${x.h}px tall`);
                 const cancel = b.find(x => /^Cancel$/i.test(x.name)), prim = b.find(x => /^(Next|Choose model|Launch)$/i.test(x.name)); const pl = await ev(`window.__na.box(window.__na.panel())`); assert.ok(cancel && prim && cancel.x < prim.x && Math.abs(cancel.y - prim.y) < 4 && cancel.x >= pl.x, `phone step ${n}: Cancel sits left of ${prim && prim.name} with it, on one row, inside the dialog (#16361): ${JSON.stringify({ cancel: [cancel.x, cancel.y], prim: prim && [prim.x, prim.y], dialogLeft: pl.x })}`);
                 assert.ok(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), `phone step ${n}: no sideways scroll`);
+                if (n === 3) {
+                    assert.ok(await ev(`(() => { const r = document.getElementById('launch-recap'), t = document.getElementById('launch-recap-toggle'), n = r.querySelector('.launch-recap-note'); return !r.hasAttribute('data-open') && t.getClientRects().length > 0 && t.getAttribute('aria-expanded') === 'false' && (!n || n.getClientRects().length === 0) && r.getBoundingClientRect().height < 60; })()`), 'phone step 3: the recap is one line with its toggle closed, so the options keep the room');
+                    await ev(`document.getElementById('launch-recap-toggle').click(); true`); await shotIf('new-agent-recap-closed-390');
+                }
                 if (n === 3) { assert.ok(await ev(`(() => { const d = window.__na.dialog(), n = d.querySelector('.launch-recap-note'), r = n && n.closest('.launch-recap'); if (!n || !r) return false; const a = n.getBoundingClientRect(), b = r.getBoundingClientRect(); return a.height > 0 && a.bottom <= b.bottom + 1 && r.scrollHeight <= r.clientHeight + 1; })()`), 'phone step 3: the mode note is whole inside the recap, not cut off by its line clamp'); await shotIf('new-agent-mode-note-390'); }
             }
         });

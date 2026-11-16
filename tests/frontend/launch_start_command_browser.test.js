@@ -37,6 +37,12 @@ const { install: installNA, stubModels, stubCliChecks } = require('./helpers/new
             await expectCmd('codex', 'plan', '--sandbox read-only');
             await expectCmd('codex', 'bypassPermissions', '--dangerously-bypass-approvals-and-sandbox', ['--sandbox read-only']);
             await expectCmd('claude', 'plan', '--permission-mode plan');
+            if (mobile) { // the recap is one line with a toggle; its details (the command with Copy) open upward
+                const c = await ev(`(() => { const t = document.getElementById('launch-recap-toggle'), r = document.getElementById('launch-recap'); return { shown: t.getClientRects().length > 0, closed: !r.hasAttribute('data-open'), cmdShown: !!document.querySelector('#launch-recap .launch-recap-command')?.getClientRects().length, expanded: t.getAttribute('aria-expanded') }; })()`);
+                if (!c.shown || !c.closed || c.cmdShown || c.expanded !== 'false') problems.push('390: the recap is not one line with its toggle closed: ' + JSON.stringify(c));
+                await ev(`document.getElementById('launch-recap-toggle').click(); true`);
+                if ((await ev(`document.getElementById('launch-recap-toggle').getAttribute('aria-expanded')`)) !== 'true') problems.push('390: the toggle does not open the details');
+            }
             // read-only and labelled
             const g = await ev(`(() => { const r = document.querySelector('#launch-recap .launch-recap-command'); if (!r) return null; const b = [...r.querySelectorAll('button')].map(x => ({ t: x.textContent.trim(), shown: x.getClientRects().length > 0 })); return { label: r.querySelector('.lrc-label').textContent, buttons: b, editable: !!r.querySelector('input,textarea,[contenteditable]') }; })()`);
             if (!g) problems.push(label + ': no start command row'); else {

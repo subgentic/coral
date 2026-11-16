@@ -2,6 +2,8 @@
  * fields (the fields stay the one place that sets anything), so it can never say one thing and the launch another. */
 import { modelName } from './model_labels.js';
 import { importOnce } from './import_once.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('launch_recap_phone.css'); // the phone's one-line recap and its toggle: not at start (#18082)
 const { TYPE, fetchFlags, flagsNodes } = await importOnce('./permission_flags_line.js'); // the flags line is shared with Restart and Resume (#15761)
 const { permissionDescription, PI_NO_PERMISSIONS } = await importOnce('./permission_flags.js'); // lazy like launch_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 
@@ -49,7 +51,9 @@ function paintFlags(answer, type) {
     const el = document.getElementById('launch-recap');
     if (!el) return;
     el.querySelectorAll('.launch-recap-flags').forEach(n => n.remove());
-    el.append(...flagsNodes(answer, type)); // why what is added is not what the pick stands for (#15735): a role's rule, kept Full access, or Codex's own settings; the server says it
+    const nodes = flagsNodes(answer, type), at = nodes.findIndex(n => n.classList.contains('launch-recap-command'));
+    if (answer?.skips_prompts && type !== 'pi' && !el.textContent.includes('\u26a0')) nodes.splice(at < 0 ? nodes.length : at, 0, Object.assign(document.createElement('span'), { className: 'launch-recap-note launch-recap-flags launch-recap-risk', textContent: '\u26a0 Acts without asking first: this mode skips permission prompts.' })); // a mode that skips them says so, a custom one too (#18286); Bypass's own warning and Pi's sentence stand alone
+    el.append(...nodes); // why what is added is not what the pick stands for (#15735): a role's rule, kept Full access, or Codex's own settings; the server says it
 }
 function syncFlags() {
     const body = flagsBody();
@@ -92,6 +96,7 @@ export function wireRecap() {
     const acf = container();
     if (!acf || acf.dataset.recapWired) return;
     acf.dataset.recapWired = '1';
+    const tg = document.getElementById('launch-recap-toggle'); if (tg) tg.onclick = () => tg.setAttribute('aria-expanded', document.getElementById('launch-recap').toggleAttribute('data-open')); // phone: the recap is one line, and its details open upward
     if (!phoneWidthWired) { phoneWidthWired = true; window.matchMedia?.('(max-width: 599px)').addEventListener?.('change', () => syncRecap()); } // a rotation or a resized window: the folder is cut or whole again at once, not at the next change in the form (#11791); one listener for the page, however many dialogs open (#11794)
     for (const t of ['input', 'change', 'acf-synced']) acf.addEventListener(t, () => syncRecap());
     for (const id of ['launch-dir', 'launch-agent-name-input']) { const e = document.getElementById(id); if (e) for (const t of ['input', 'change']) e.addEventListener(t, () => syncRecap()); }
