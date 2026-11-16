@@ -180,3 +180,14 @@ func (s *Store) GetAllSubscriptions(ctx context.Context) (map[string]*Subscriber
 	}
 	return result, nil
 }
+
+// FormerMemberNames is every id and job title a project's members have had, active or departed (a left member's row stays, and so do the messages it sent): names a rename must not take, since an @mention
+// meant for the member of the past would reach the new holder (#17720).
+func (s *Store) FormerMemberNames(ctx context.Context, project string) ([]string, error) {
+	var names []string
+	err := s.reader().SelectContext(ctx, &names,
+		`SELECT subscriber_id FROM board_subscribers WHERE project = ? AND subscriber_id IS NOT NULL
+		 UNION SELECT job_title FROM board_subscribers WHERE project = ? AND job_title IS NOT NULL
+		 UNION SELECT subscriber_id FROM board_messages WHERE project = ? AND subscriber_id IS NOT NULL`, project, project, project)
+	return names, err
+}
