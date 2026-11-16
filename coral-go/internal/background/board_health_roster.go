@@ -41,7 +41,7 @@ func resolveWait(w board.RegisteredWait, subs []board.Subscriber, tasks map[int6
 		return waitTarget{label: "the Operator"}
 	case "message":
 		if w.TargetID == "" {
-			return waitTarget{label: "any board message"}
+			return waitTarget{label: "a message for it"}
 		}
 		if s := member(w.TargetID); s != nil {
 			return waitTarget{sub: s}
@@ -61,7 +61,7 @@ func resolveWait(w board.RegisteredWait, subs []board.Subscriber, tasks map[int6
 	case "commit":
 		return waitTarget{label: "a commit"}
 	}
-	return waitTarget{label: "any board update"}
+	return waitTarget{label: "a message for it"}
 }
 
 // rosterInputs is what buildRoster reads.

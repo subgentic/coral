@@ -139,7 +139,10 @@ one on the board.
   --block     do not return: wait in this process until it resolves
   --reason    a short note shown with the wait
 Choose one target at most: --from, --task, --commit or --operator; with none,
-any board message ends the wait.`
+the wait ends on a message that reaches you: one that names you, your role or
+everyone (@notify-all), including a post on a task you own. A member that
+receives all messages (an orchestrator) keeps any message that is not meant for
+someone else.`
 
 // postFlags and sendFlags are the options of post and of send. They are read in any case (--TO is --to) and anywhere before or among the words of the message.
 var (

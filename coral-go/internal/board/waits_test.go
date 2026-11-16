@@ -260,3 +260,36 @@ func TestAnExplicitMentionEndsATaskOrCommitWait(t *testing.T) {
 	require.Len(t, matched, 1)
 	assert.Equal(t, "commit", matched[0].WaitType)
 }
+
+// #17561 (QA INFO at the approval of #17503): `post --to Name msg` reaches the server as the content "@Name msg" (the CLI prefixes it), so a target-less wait of a member in mentions mode ends on it, and
+// the wait of another member does not. The contents here are exactly what --to builds, one name and two.
+func TestAToPostEndsTheTargetlessMentionsWaitOfTheNamedMemberOnly(t *testing.T) {
+	s, err := NewStoreWithKey(filepath.Join(t.TempDir(), "board.db"), "")
+	require.NoError(t, err)
+	defer s.Close()
+	ctx := context.Background()
+	for _, who := range []string{"Dev A", "Dev B", "Dev C"} {
+		_, err = s.Subscribe(ctx, "proj", who, who, "sess-"+who, nil, "mentions")
+		require.NoError(t, err)
+		_, err = s.RegisterWait(ctx, "proj", who, "sess-"+who, "message", "", "waiting for a message", time.Hour)
+		require.NoError(t, err)
+	}
+	names := func(ws []RegisteredWait) []string {
+		var out []string
+		for _, w := range ws {
+			out = append(out, w.SubscriberID)
+		}
+		return out
+	}
+	matched, err := s.ResolveMatchingMessageWaits(ctx, "proj", "Lead", "@Dev A the result is ready") // --to "Dev A"
+	require.NoError(t, err)
+	assert.Equal(t, []string{"Dev A"}, names(matched), "the named member's wait ends")
+	for _, other := range []string{"Dev B", "Dev C"} {
+		w, err := s.GetActiveWait(ctx, "proj", other)
+		require.NoError(t, err)
+		assert.NotNil(t, w, "%s was not named: its wait goes on", other)
+	}
+	matched, err = s.ResolveMatchingMessageWaits(ctx, "proj", "Lead", "@Dev B @Dev C all done") // --to "Dev B,Dev C"
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"Dev B", "Dev C"}, names(matched), "each named member's wait ends")
+}

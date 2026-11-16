@@ -335,12 +335,15 @@ func (s *Store) ResolveMatchingMessageWaits(ctx context.Context, project, sender
 			}
 			continue
 		}
-		var jobTitle string
+		var jobTitle, receiveMode string
+		var canPeek int
 		var sub struct {
-			JobTitle string `db:"job_title"`
+			JobTitle    string `db:"job_title"`
+			ReceiveMode string `db:"receive_mode"`
+			CanPeek     int    `db:"can_peek"`
 		}
-		if err := s.reader().GetContext(ctx, &sub, "SELECT job_title FROM board_subscribers WHERE project = ? AND subscriber_id = ?", project, w.SubscriberID); err == nil {
-			jobTitle = sub.JobTitle
+		if err := s.reader().GetContext(ctx, &sub, "SELECT job_title, receive_mode, can_peek FROM board_subscribers WHERE project = ? AND subscriber_id = ?", project, w.SubscriberID); err == nil {
+			jobTitle, receiveMode, canPeek = sub.JobTitle, sub.ReceiveMode, sub.CanPeek
 		}
 		numbered := s.numberedNamesCached(ctx, project)
 		explicitlyForWaiter := containsExplicitTag(content, w.SubscriberID, jobTitle, numbered)
@@ -369,7 +372,14 @@ func (s *Store) ResolveMatchingMessageWaits(ctx context.Context, project, sender
 			}
 		}
 		if target == "" || target == "*" {
-			matches = !explicitlyForSomeoneElse
+			// A wait with no target ends on what reaches the waiter under its receive mode (#17503): a member in mentions mode (the default)
+			// on a message that names it, its role or everyone (a post on a task it owns names it too); only an orchestrator, or a member
+			// that receives all, keeps any message that is not meant for someone else.
+			if receiveMode == "all" || isOrchestrator(w.SubscriberID, jobTitle, canPeek) {
+				matches = !explicitlyForSomeoneElse
+			} else {
+				matches = explicitlyForWaiter
+			}
 		} else if strings.EqualFold(target, senderID) {
 			matches = !explicitlyForSomeoneElse || explicitlyForWaiter
 		} else if jobTitle != "" && strings.EqualFold(target, jobTitle) {
