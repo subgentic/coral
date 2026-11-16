@@ -21,11 +21,13 @@ const { coralReady } = require('./helpers/wait');
         assert.equal((await api('POST', `/api/board/${B}/tasks/${t1.id}/complete`, { subscriber_id: 'orch', message: 'built' })).status, 200); // finished: the board lists it after the open tasks, so goal 1's two tasks are not side by side unless the page groups them (#15364)
         assert.equal((await api('POST', `/api/board/${B}/goals/${g1}/close`, { subscriber_id: 'Operator', reason: 'shipped' })).status, 200);
         const rows = () => ev(`[...document.querySelectorAll('#team-panel-goals tbody tr')].map(r => ({ group: r.classList.contains('dt-group'), text: r.textContent.replace(/\\s+/g, ' ').trim() }))`);
-        // only a finished goal: it is listed, in the Done group, not "No active goals"
+        // Active 0 contains no finished goals; All still offers the finished work (#17625).
         await open(`/team/${B}/goals`, `document.querySelectorAll('#team-panel-goals tbody tr').length > 0 || /No active goals/.test(document.body.innerText)`);
         let r = await rows();
-        assert.ok(r.some(x => !x.group && /Habit tracker/.test(x.text)) && r.some(x => x.group && /Done \(1\)/.test(x.text)), 'the finished goal is listed under Done: ' + JSON.stringify(r));
-        assert.ok(!/No active goals/.test(await ev(`document.body.innerText`)), 'no "No active goals"');
+        assert.equal(r.filter(x => !x.group).length, 0, 'Active 0 has no completed goal rows');
+        assert.ok(/No active goals/.test(await ev(`document.body.innerText`)));
+        await ev(`document.querySelector('#team-panel-goals [data-filter="all"]').click(); true`);
+        await waitFor(`/Habit tracker/.test(document.getElementById('team-panel-goals').textContent)`, 'All retains the finished goal');
         // a second goal with a new task
         const g2 = (await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: 'Habit tracker with reminders', outcome: 'Second app', done_when: 'It reminds', state: 'active' })).body.id;
         await api('POST', `/api/board/${B}/tasks`, { title: 'Add reminders', created_by: 'orch', goal_id: g2 });
@@ -33,16 +35,15 @@ const { coralReady } = require('./helpers/wait');
         await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: 'Idea for later', state: 'proposed' }); // a goal the default list does not show: the badge is not the count of all goals
         await open(`/team/${B}/goals`, `document.querySelectorAll('#team-panel-goals tbody tr:not(.dt-group)').length >= 2`);
         r = await rows();
-        const order = r.map(x => x.group ? 'G:' + x.text.replace(/\s*\(.*$/, '') : (/reminders/.test(x.text) ? 'second' : 'first'));
-        assert.deepEqual(order.filter(x => x !== 'G:Active'), ['second', 'G:Done', 'first'], 'the active goal, then the Done group with the first: ' + JSON.stringify(r));
+        assert.ok(r.some(x => !x.group && /Habit tracker with reminders/.test(x.text)) && r.some(x => !x.group && /Habit tracker/.test(x.text) && !/reminders/.test(x.text)), 'All retains active and finished goals: ' + JSON.stringify(r));
         const badge = await ev(`(document.querySelector('#team-tab-goals .team-tab-count') || {}).textContent`);
-        assert.equal(badge, '2', 'the badge says what the list shows (two goals): ' + badge);
+        assert.equal(badge, '2', 'the badge counts open goals (active and proposed): ' + badge);
         // the Done group follows the search box: it hides when nothing finished matches, and shows when one does (#15364)
         const search = async text => { await ev(`(() => { const i = document.querySelector('#team-panel-goals input[type=search], #team-panel-goals input[placeholder="Search goals"]'); i.value = ${JSON.stringify(text)}; i.dispatchEvent(new Event('input', { bubbles: true })); })()`); };
         await search('reminders');
         await waitFor(`![...document.querySelectorAll('#team-panel-goals tbody tr.dt-group')].some(r => /Done/.test(r.textContent))`, 'the Done group hidden by a search that matches no finished goal', 4000);
         await search('Habit tracker');
-        await waitFor(`[...document.querySelectorAll('#team-panel-goals tbody tr.dt-group')].some(r => /Done \\(1\\)/.test(r.textContent))`, 'the Done group back when the search matches the finished goal', 4000);
+        await waitFor(`[...document.querySelectorAll('#team-panel-goals tbody tr:not(.dt-group)')].some(r => /Habit tracker/.test(r.textContent) && !/reminders/.test(r.textContent))`, 'All search includes the matching finished goal', 4000);
         await search('');
         // tasks: one group per goal
         await open(`/team/${B}/tasks`, `document.querySelectorAll('#team-panel-tasks tbody tr').length >= 2`);
