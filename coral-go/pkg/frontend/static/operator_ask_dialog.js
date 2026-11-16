@@ -11,6 +11,7 @@ import { importOnce } from './import_once.js';
 import { askParts, askSubjects, fromAnotherComputer, buttonsOffered, noteButtonsOwnerOnly, yesNoButtons, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, operatorAsks, askKey, replyToAsk as replyOnBoard, closeAnsweredDuplicates, forgetAsk, questionContextNote } from './operator_asks.js';
 const replyToAsk = (a, text) => a.kind === 'agent' ? importOnce('./agent_ask_answer.js').then(m => m.answerAgentAsk(a, text)) : replyOnBoard(a, text); // a single agent's question (#18106) is answered in its conversation, not on a board
 await loadStyles('operator_ask_dialog.css');
+const { askPageLabel, openAskPage } = await importOnce('./ask_open_page.js'); // loaded with the dialog, never at startup (#18768)
 
 const isReply = action => /^reply$/.test(action);
 
@@ -44,6 +45,13 @@ export function openAskDialog(a, onDone, runners = {}) {
     importOnce('./artifact_refs.js').then(m => { if (whole.isConnected) m.linkArtifactRefsIn(whole, { asWritten: true, server: normServer(a.server) }); }).catch(() => {}); // a file named in the question opens in the viewer, the words as written (#12361); plain text until the helper is there
     if (!fromAnotherComputer(a)) importOnce('./message_refs.js').then(m => { if (whole.isConnected) m.linkMessageRefsIn(whole, (id, b) => openWithQuestionReturn(b, async () => { const nav = await importOnce('./nav.js'); await nav.go({ view: 'team', id: boardTeamKey(a.server, a.board), sub: 'messages', item: id }); }).catch(e => { err.textContent = e.message || 'The message could not be opened.'; }), { who }); }).catch(() => {}); // "#8" in the question opens message 8 of the asker's team, and Back returns to the question (#14153)
     whole.hidden = !parts.body && !a.cut; // an empty question has no body
+    const picture = a.kind === 'agent' && /^[0-9a-f]{64}\.(png|jpg|jpeg|svg)$/.test(a.image || '') ? a.image : ''; // the picture the asker put on the card, above the buttons (#18768)
+    let pictureBox = null;
+    if (picture) {
+        pictureBox = document.createElement('figure'); pictureBox.className = 'inbox-ask-picture'; pictureBox.hidden = true;
+        const img = document.createElement('img'); img.alt = `Picture from ${markHidden(a.asker || 'the agent', { strict: true })}`; img.className = 'inbox-ask-picture-img'; pictureBox.append(img);
+        importOnce('./image_source.js').then(m => m.fetchImageSrc(`/api/artifacts/${picture.slice(0, 64)}`, { name: 'picture' + picture.slice(64) })).then(r => { img.src = r.src; pictureBox.hidden = false; }).catch(() => { /* no picture: the question reads without it */ }); // the page's own safe path: an SVG is only ever a data: URL in an <img>
+    }
     const label = document.createElement('label'); label.className = 'inbox-ask-label'; label.textContent = 'Your reply';
     const box = document.createElement('textarea'); box.className = 'field inbox-ask-box'; box.rows = 6; box.placeholder = 'Write a reply…'; box.maxLength = 8000; box.readOnly = missingCloudSource; label.append(box);
     const pics = document.createElement('div'); pics.className = 'inbox-ask-pics'; // pictures for the reply (#12173): the comment composer's tray, loaded with the dialog
@@ -67,10 +75,18 @@ export function openAskDialog(a, onDone, runners = {}) {
         offered?.remove(); offered = null; review?.remove(); review = null; choices.length = 0;
         binary = yesNoButtons(a);
         const offers = buttonsOffered(a);
-        if (offers.length) { // what the asker offered: one tap per choice, each with what it does
+        const pageLabel = a.kind === 'agent' ? askPageLabel(a.open_page) : ''; // a page of Coral the asker offered a button for (#18768)
+        send.classList.toggle('btn-primary', !pageLabel); // one primary button to a dialog: with an Open button, that is the primary and Send reply is the plain one
+        if (offers.length || pageLabel) { // what the asker offered: one tap per choice, each with what it does
             offered = document.createElement('section'); offered.className = 'inbox-ask-offers'; offered.setAttribute('aria-label', `Buttons ${markHidden(a.asker, { strict: true })} offered`);
             const head = document.createElement('p'); head.className = 'inbox-ask-offers-head'; head.textContent = offers.every(b => isReply(b.action)) ? 'Choose a reply, or write your own.' : 'Choose an action, or write a reply.';
             const list = document.createElement('div'); list.className = 'inbox-ask-offers-list';
+            if (pageLabel) { // the primary button: it goes to the page and answers nothing, so Done / Skip / Stop still work after it (#18768)
+                const item = document.createElement('div'); item.className = 'inbox-ask-offer';
+                const open = document.createElement('button'); open.type = 'button'; open.className = 'btn btn-primary inbox-ask-open-page'; open.textContent = pageLabel; open.dataset.openPage = a.open_page;
+                open.addEventListener('click', () => { finish(); try { openAskPage(a.open_page); } catch (e) { showToast(e.message || 'That did not open.', true); } }); // the dialog is modal: it goes before the page; the question stays open in Needs you
+                item.append(open); list.append(item);
+            }
             for (const b of offers) {
                 const item = document.createElement('div'); item.className = 'inbox-ask-offer';
                 const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn'; const label = binary ? (b.label === 'Yes' ? 'Approve' : 'Deny') : markHidden(b.label, { strict: true }); btn.textContent = label; btn.dataset.buttonId = String(b.id);
@@ -133,6 +149,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const foot = document.createElement('div'); foot.className = 'inbox-ask-foot'; foot.append(row); // Reply attachments belong with the reply box; the footer holds its final actions
     const reading = document.createElement('div'); reading.className = 'inbox-ask-reading'; reading.tabIndex = -1;
     if (!whole.hidden) reading.append(whole);
+    if (pictureBox) reading.append(pictureBox);
     const compose = document.createElement('div'); compose.className = 'inbox-ask-compose';
     const addSlot = document.createElement('div'); addSlot.className = 'inbox-ask-attach'; pics.append(addSlot);
     const sendRow = document.createElement('div'); sendRow.className = 'inbox-ask-sendrow'; const pickSlot = document.createElement('span'); pickSlot.className = 'inbox-ask-pick'; sendRow.append(pickSlot, send); addSlot.append(sendRow); // Add image on the left, Send reply on the right, the pictures note under them (#13148)

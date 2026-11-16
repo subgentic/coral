@@ -40,9 +40,13 @@ type operatorAskRow struct {
 	Asker      string `json:"asker"`
 	// Options: on a single agent's question (kind "agent", #18106), the answers it offered (up to 3); the Operator may still write their own.
 	Options []string `json:"options,omitempty"`
-	Text    string   `json:"text"`
-	Cut     bool     `json:"cut,omitempty"`
-	At      string   `json:"at"`
+	// OpenPage: a page of Coral the card offers an Open button for (kind "agent", #18768); one of internal/askpage, "" for none.
+	OpenPage string `json:"open_page,omitempty"`
+	// Image: the id of the picture the card shows above its buttons (kind "agent", #18768).
+	Image string `json:"image,omitempty"`
+	Text  string `json:"text"`
+	Cut   bool   `json:"cut,omitempty"`
+	At    string `json:"at"`
 	// Buttons the asker declared on a question (#11643), in order, with their state (pending, used); the Operator's click claims one through the claim route.
 	Buttons []board.AskButton `json:"buttons,omitempty"`
 	// GoalID and TaskID are the goal and the task the question is about (#12164), checked to be of its team when it was posted, with their titles cleaned and cut; absent for none.

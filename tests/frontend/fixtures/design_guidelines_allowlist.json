@@ -179,6 +179,9 @@
   "coral-go/pkg/frontend/static/goal_view.js": {
    "btn-primary written in a dialog module": 4
   },
+  "coral-go/pkg/frontend/static/operator_ask_dialog.js": {
+   "btn-primary written in a dialog module": 3
+  },
   "coral-go/pkg/frontend/static/platform/native.js": {
    "radius: inline 3px": 1
   }

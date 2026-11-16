@@ -67,3 +67,7 @@
     dialog.inbox-ask-dialog .inbox-ask-sendrow { position: sticky; bottom: calc(-1 * var(--space-2xl)); z-index: 2; padding: 8px 0; background: var(--bg-secondary); }
     dialog.inbox-ask-dialog .inbox-ask-foot { position: static; }
 }
+
+/* The picture an agent put on its question (coral-agent ask --image, #18768): shown whole above the buttons, never wider than the card. */
+.inbox-ask-dialog .inbox-ask-picture { margin: 8px 0 0; }
+.inbox-ask-dialog .inbox-ask-picture-img { display: block; max-width: 100%; max-height: 40vh; object-fit: contain; border: 1px solid var(--border); border-radius: 8px; }

@@ -4,12 +4,14 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/askpage"
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/httputil"
@@ -89,6 +91,9 @@ func (h *AgentAsksHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, reply)
 }
 
+// askImageRE is the one shape a card's picture has: the 64-hex id of the agent's upload, a dot and the kind of picture. Never a path or a link.
+var askImageRE = regexp.MustCompile(`^[0-9a-f]{64}\.(png|jpg|jpeg|svg)$`)
+
 // Create files a question.
 func (h *AgentAsksHandler) Create(w http.ResponseWriter, r *http.Request) {
 	owner, ok := VerifiedSession(r.Context())
@@ -99,6 +104,8 @@ func (h *AgentAsksHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Text    string   `json:"text"`
 		Options []string `json:"options"`
+		Image   string   `json:"image"` // <artifact id>.<png|jpg|jpeg|svg> of this agent's own upload (coral-agent ask --image), "" for none (#18768)
+		Open    string   `json:"open"`  // a page of Coral from the fixed list (internal/askpage), "" for none (#18768)
 	}
 	if err := decodeJSONMax(w, r, &body, 64<<10); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -122,7 +129,15 @@ func (h *AgentAsksHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 		opts = append(opts, o)
 	}
-	id, err := h.ss.CreateAgentAsk(r.Context(), owner.SessionID, owner.SessionName, text, opts, time.Now())
+	if body.Image != "" && !askImageRE.MatchString(body.Image) {
+		errBadRequest(w, "the picture is an artifact id and its extension (png, jpg, jpeg or svg)")
+		return
+	}
+	if body.Open != "" && askpage.Label(body.Open) == "" {
+		errBadRequest(w, "--open names one of: "+askpage.Names())
+		return
+	}
+	id, err := h.ss.CreateAgentAskWithPage(r.Context(), owner.SessionID, owner.SessionName, text, opts, body.Open, body.Image, time.Now())
 	if err != nil {
 		errInternalServer(w, "could not record the question")
 		return
@@ -264,7 +279,7 @@ func (h *AgentAsksHandler) Rows(r *http.Request) []operatorAskRow {
 		} else if dn, err := h.ss.GetDisplayName(r.Context(), a.SessionID); err == nil && dn != nil && strings.TrimSpace(*dn) != "" {
 			asker = *dn
 		}
-		row := operatorAskRow{Kind: "agent", ID: a.ID, Asker: clitext.CleanName(asker), Text: text, Cut: cut, At: a.CreatedAt, Options: a.Options}
+		row := operatorAskRow{Kind: "agent", ID: a.ID, Asker: clitext.CleanName(asker), Text: text, Cut: cut, At: a.CreatedAt, Options: a.Options, OpenPage: a.OpenPage, Image: a.Image}
 		rows = append(rows, row)
 	}
 	return rows

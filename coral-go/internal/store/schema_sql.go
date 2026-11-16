@@ -227,6 +227,8 @@ CREATE TABLE IF NOT EXISTS agent_asks (
 	session_name TEXT NOT NULL,
 	text         TEXT NOT NULL,
 	options      TEXT NOT NULL DEFAULT '[]',
+	open_page    TEXT NOT NULL DEFAULT '',
+	image        TEXT NOT NULL DEFAULT '',
 	created_at   TEXT NOT NULL,
 	answered_at  TEXT
 );

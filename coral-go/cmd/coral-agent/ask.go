@@ -10,30 +10,58 @@ import (
 	"strings"
 	"time"
 
+	"github.com/subgentic/coral/internal/askpage"
 	"github.com/subgentic/coral/internal/clierr"
 	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/hooks"
 )
 
-const askUsageText = `Usage: coral-agent ask "<question>" [--option LABEL]... (up to 3)
+var askUsageText = `Usage: coral-agent ask "<question>" [--option LABEL]... (up to 3) [--open PAGE] [--image FILE]
 
 Asks the Operator a question from an agent that is not on a team. It appears in their
 Needs you, and their answer is typed into this conversation. Ask one question at a time;
-a new one replaces your older open one. On a team, use coral-board post --ask instead.`
+a new one replaces your older open one. On a team, use coral-board post --ask instead.
+
+--open PAGE puts a button on the card that opens that page of Coral without answering
+(Open Analytics, Open Settings). PAGE is one of: ` + askpage.Names() + `. Never a link.
+--image FILE shows one small picture (PNG, JPEG or SVG, in your working folder, up to 2 MB) in the
+card above the buttons.`
 
 // cmdAsk files a question for the Operator (POST /api/agent-asks, #18106).
 func cmdAsk(args []string, out io.Writer) error {
-	o, err := splitOptions(args, []string{"option"}, nil)
+	o, err := splitOptions(args, []string{"option", "open", "image"}, nil)
 	if err != nil || len(o.Positional) != 1 || strings.TrimSpace(o.Positional[0]) == "" {
 		return errors.New(askUsageText)
 	}
 	if len(o.All["option"]) > 3 {
 		return errors.New("at most 3 --option\n" + askUsageText)
 	}
+	page := ""
+	if p := o.All["open"]; len(p) > 1 {
+		return errors.New("--open takes one page\n" + askUsageText)
+	} else if len(p) == 1 {
+		if page = strings.ToLower(strings.TrimSpace(p[0])); askpage.Label(page) == "" {
+			return fmt.Errorf("--open %q is not a Coral page: use one of %s", p[0], askpage.Names())
+		}
+	}
+	imageFile := ""
+	if p := o.All["image"]; len(p) > 1 {
+		return errors.New("--image takes one picture\n" + askUsageText)
+	} else if len(p) == 1 {
+		if imageFile, err = askImageFile(p[0]); err != nil {
+			return err
+		}
+	}
 	if err := refuseSignInLinkIn("a question", o.Positional[0]); err != nil {
 		return err
 	}
-	data, _ := json.Marshal(map[string]any{"text": o.Positional[0], "options": o.All["option"]})
+	image := ""
+	if imageFile != "" { // after every check: a refused question uploads nothing
+		if image, err = uploadAskImage(imageFile); err != nil {
+			return err
+		}
+	}
+	data, _ := json.Marshal(map[string]any{"text": o.Positional[0], "options": o.All["option"], "open": page, "image": image})
 	req, err := http.NewRequest(http.MethodPost, serverURL+"/api/agent-asks", bytes.NewReader(data))
 	if err != nil {
 		return err

@@ -53,6 +53,8 @@ New agents use it unless you choose a model when you launch them.
 
 Agents put what needs you (a decision, an approval, a file to look at) in your **Inbox**, under **Needs you**. An agent asks with `coral-board post --ask "@Operator <question>"`, or uploads the file tagged **for review**, and only for what you must see, decide or approve (logs, patches, notes and screenshots meant for other agents are not tagged, so Needs you does not fill up): one item per decision, with its recommendation. Your comments on a **for review** file reach the agent that uploaded it whether you make them at this computer's dashboard or through Coral Hub; on a team machine they are not delivered (several people share one issuer). It does not publish the team's work outside Coral without your OK. Every team's agents are told this by default; you do not need to add it to the team's instructions.
 
+An agent that is not on a team asks with `coral-agent ask "<question>" --option LABEL` (up to 3 buttons); `--open analytics`, `--open settings` or `--open inbox` adds a button that opens that page of Coral without answering the question (never a link); `--image FILE` shows one small picture (PNG, JPEG or SVG from its working folder, up to 2 MB) in the card above the buttons.
+
 ## Give an agent a file
 
 - **A file in its folder:** in the message box, type **@** and the start of the file's name. A list of the files in the agent's folder opens; pick one and its path is put in your message, so the agent knows which file you mean. In a folder with many files, keep typing to narrow the list.
