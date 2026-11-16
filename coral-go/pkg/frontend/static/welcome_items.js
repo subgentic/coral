@@ -8,7 +8,7 @@ import { importOnce } from './import_once.js';
 import { browserSession } from './safe_storage.js';
 import { setWelcomeCount } from './inbox_tab.js';
 
-export const WELCOME_IDS = ['agent', 'welcome', 'team', 'asks', 'guide'];
+export const WELCOME_IDS = ['guide', 'agent', 'welcome', 'team', 'asks']; // the guide is the first thing a new person sees (#18825, the Operator: "This can be the first item we show users")
 const GUIDE_URL = '/static/guide/getting-started.md';
 export const WELCOME = {
     welcome: { title: 'Welcome to Coral', text: 'This is your Inbox. Anything an agent needs from you shows up here, so you never have to watch a terminal.', go: 'Got it', dismiss: false },
@@ -16,7 +16,7 @@ export const WELCOME = {
     team: { title: 'Make a team so agents can work together', text: 'A team gives agents a shared board to talk and hand off work.', go: 'New team', dismiss: true },
     asks: { title: 'How agents ask you for things', text: 'Approvals, dialogs and review artifacts all land here. A short read, then it clears.', go: 'Read it', dismiss: true },
     setup: { title: 'Get set up with Claude, Codex or Antigravity', text: 'Coral runs agents through one of these. Set one up and the rest of this guide works.', go: 'Set up an agent', dismiss: false }, // #18752: shown first while none is ready, and clears itself
-    guide: { title: 'Read the Coral guide', text: 'How to set Coral up, and a tour of what it can do.', go: 'Open guide', dismiss: true },
+    guide: { title: 'Read the Coral guide', text: 'A short tour of the Inbox, launching your first agent, and teams and goals.', go: 'Open guide', dismiss: true },
 };
 
 export const welcomeOn = () => (state.settings || {}).inbox_welcome === 'on';
@@ -92,7 +92,7 @@ export async function runWelcome(id) {
     if (id === 'welcome') { mark('welcome'); return; }
     if (id === 'setup') { importOnce('./setup_agent.js').then(m => m.openSetupDialog({ onReady: () => { _setupNone = false; save({ inbox_welcome_setup: 'off' }); setWelcomeCount(welcomeRows().length); document.dispatchEvent(new CustomEvent('coral:welcome-changed')); } })); return; }
     if (id === 'agent' || id === 'team') { return importOnce('./welcome_launch.js').then(m => m.openWelcomeLaunch(id)); }
-    if (id === 'guide') { importOnce('./artifact_viewer.js').then(m => m.openBundledDocument({ title: 'Getting started with Coral', name: 'getting-started.md', url: GUIDE_URL, onOpened: () => mark('guide') })); return; } // the guide (about 400 KB with its pictures) is fetched when the row is opened, never at start (page_weight)
+    if (id === 'guide') { importOnce('./artifact_viewer.js').then(m => m.openBundledDocument({ title: 'Getting started with Coral', name: 'getting-started.md', url: GUIDE_URL, onOpened: () => mark('guide') })); return; } // the guide (about 1.2 MB with its pictures, inside the binary: served from the embedded files, never from the network) is read when the row is opened, never at start (page_weight)
     if (id === 'asks') importOnce('./welcome_asks.js').then(m => m.readAsks(WELCOME.asks.title, () => mark('asks'))); // the long read arrives when it is opened, not at start (page_weight)
 }
 

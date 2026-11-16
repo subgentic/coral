@@ -14,7 +14,7 @@ const { coralReady } = require('./helpers/wait');
     const check = (ok, msg) => { if (!ok) found.push(msg); };
     const S = `(window.__coralStatic || '/static/')`;
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-    const TITLES = ['Start your first agent', 'Welcome to Coral', 'Make a team so agents can work together', 'How agents ask you for things', 'Read the Coral guide'];
+    const TITLES = ['Read the Coral guide', 'Start your first agent', 'Welcome to Coral', 'Make a team so agents can work together', 'How agents ask you for things']; // the guide is the first item (#18825)
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
@@ -36,7 +36,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 5`, `${tag}: five welcome items`, 8000);
             check(JSON.stringify(await titles()) === JSON.stringify(TITLES), `${tag}: the five items in order: ` + JSON.stringify(await titles()));
             const acts = await ev(`[...document.querySelectorAll('#group-table-view .inbox-review-actions')].map(b => [...b.querySelectorAll('button:not(.menu-item):not(.inbox-row-more-toggle)')].map(x => x.textContent))`);
-            const want = mobile ? [['New agent'], ['Got it'], ['New team'], ['Read it'], ['Open guide']] : [['New agent', 'Dismiss'], ['Got it'], ['New team', 'Dismiss'], ['Read it', 'Dismiss'], ['Open guide', 'Dismiss']]; // a phone row has no Dismiss button: it is in the three-dot menu, or a swipe (#11642)
+            const want = mobile ? [['Open guide'], ['New agent'], ['Got it'], ['New team'], ['Read it']] : [['Open guide', 'Dismiss'], ['New agent', 'Dismiss'], ['Got it'], ['New team', 'Dismiss'], ['Read it', 'Dismiss']]; // a phone row has no Dismiss button: it is in the three-dot menu, or a swipe (#11642)
             check(JSON.stringify(acts) === JSON.stringify(want), `${tag}: each item's action, and Dismiss on all but the welcome (in the menu on a phone): ` + JSON.stringify(acts));
             check(await ev(`!document.querySelector('.inbox-getting-started') && !document.querySelector('button[aria-label="Dismiss Getting started"]')`), `${tag}: no separate block and no Dismiss all: the items are ordinary rows (#18764)`);
             check(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '5'`), `${tag}: the five items are counted in the Inbox badge`);
@@ -65,6 +65,7 @@ const { coralReady } = require('./helpers/wait');
             await press('Open guide');
             await waitFor(`(() => { const d = document.getElementById('artifact-viewer'); return !!d && !d.hidden && /Getting started with Coral/.test(d.querySelector('.artifact-viewer-title').textContent) && !!d.querySelector('.artifact-viewer-body h1, .artifact-viewer-body .md-h1, .artifact-viewer-body h2'); })()`, `${tag}: the guide opens in the viewer, drawn as a document`, 10000);
             check(await ev(`document.querySelectorAll('#artifact-viewer .artifact-viewer-body img').length > 0 && [...document.querySelectorAll('#artifact-viewer .artifact-viewer-body img')].every(i => i.naturalWidth > 0 || !i.complete)`), `${tag}: the guide's pictures are drawn`);
+            check(await ev(`/Your Inbox and .Needs you./.test(document.querySelector('#artifact-viewer .artifact-viewer-body').textContent) && /What to try first/.test(document.querySelector('#artifact-viewer .artifact-viewer-body').textContent)`), `${tag}: it is the approved guide text (v7: Inbox and Needs you ... What to try first)`);
             await shot(`welcome-guide-${w}`);
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
             await waitFor(`!/Read the Coral guide/.test(document.getElementById('group-table-view').textContent)`, `${tag}: opening the guide clears its row`, 6000);
