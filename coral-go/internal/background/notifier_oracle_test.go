@@ -411,10 +411,6 @@ func (n *BoardNotifier) runPassWithBefore4599(ctx context.Context, boards map[st
 		}
 
 		// Send nudge via tmux session name (routing identity, not board identity)
-		plural := "s"
-		if unread == 1 {
-			plural = ""
-		}
 		health, healthErr := n.boardStore.HasUnreadHealthMessage(ctx, sub.Project, subscriberID)
 		if healthErr != nil {
 			n.logger.Warn("health message classification failed", "subscriber_id", subscriberID, "error", healthErr)
@@ -432,9 +428,9 @@ func (n *BoardNotifier) runPassWithBefore4599(ctx context.Context, boards map[st
 				continue
 			}
 		}
-		nudge := fmt.Sprintf("You have %d unread message%s on the message board. Run 'coral-board read' to see them.", unread, plural)
+		nudge := "You have unread messages on the message board. Run 'coral-board read' to see them."
 		if health {
-			nudge = fmt.Sprintf("[Coral health check] Team health check for %s: %d unread message%s include a health-monitor summary. Review team status, assignments, progress, and blockers, then run 'coral-board read' to see the authoritative full content.", sub.Project, unread, plural)
+			nudge = fmt.Sprintf("[Coral health check] Team health check for %s: the unread messages include a health-monitor summary. Review team status, assignments, progress, and blockers, then run 'coral-board read' to see the authoritative full content.", sub.Project)
 		}
 		// A nudge about a message that tags the agent is a mention: typed in mid-turn when the
 		// gate follows the signals; a routine one waits for the turn to end (#3578). Decided

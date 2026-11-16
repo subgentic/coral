@@ -26,7 +26,7 @@ func TestBoardNudge8031SkippedDialogRetriesOnceWithoutNewMessage(t *testing.T) {
 			rt.setScreen("working on the approved command\n")
 			require.NoError(t, n.RunOnce(ctx))
 			require.Len(t, rt.typed(), 1)
-			require.Contains(t, rt.typed()[0], "1 unread message")
+			require.Contains(t, rt.typed()[0], "You have unread messages")
 			require.NoError(t, n.RunOnce(ctx))
 			require.Len(t, rt.typed(), 1, "successful delivery is recorded and deduplicated")
 			unread, err := bs.CheckUnread(ctx, "board-X", "Worker")

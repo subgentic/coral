@@ -21,8 +21,8 @@ func TestTypedNoticeCensus(t *testing.T) {
 	at := time.Date(2026, 10, 29, 9, 0, 0, 0, time.UTC)
 	composed := "Since 08:00: 2 tasks completed. Waiting: Backend Dev on #12 (said \"" + h + "\")."
 	cases := []typedcensus.Case{
-		typedcensus.C("board nudge", nudgeText("b-team", 2, false), nudgeText(h, 2, false)),
-		typedcensus.C("board nudge, health", nudgeText("b-team", 2, true), nudgeText(h, 2, true)),
+		typedcensus.C("board nudge", nudgeText("b-team", false), nudgeText(h, false)),
+		typedcensus.C("board nudge, health", nudgeText("b-team", true), nudgeText(h, true)),
 		typedcensus.C("mention re-nudge", mentionRenudgeText("Lead Developer", 1, at), mentionRenudgeText(h, 1, at)),
 		typedcensus.C("mention re-nudge, several", mentionRenudgeText("Lead Developer", 3, at), mentionRenudgeText(h, 3, at)),
 		typedcensus.C("question reminder", askReminderText("Lead Developer", 20, 31), askReminderText(h, 20, 31)),

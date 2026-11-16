@@ -12,7 +12,7 @@ var (
 	agyMetadataRE    = regexp.MustCompile(`(?s)<(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|system-reminder|environment_context)>.*?</(?:ADDITIONAL_METADATA|USER_SETTINGS_CHANGE|CONTEXT_SUMMARY|system-reminder|environment_context)>`)
 	coralMetaBlockRE = regexp.MustCompile(`(?s)Coral session metadata:.*?This metadata is for Coral bookkeeping only\. Do not mention it to the user\.\s*`)
 	coralMarkerRE    = regexp.MustCompile(`\[CORAL_SESSION_ID:[^\]]+\]\s*`)
-	agySlashNudgeRE  = regexp.MustCompile(`(?i)^(?:/[a-zA-Z0-9_-]+\s+)+(?:@[^@\n\r]+?\s+)?(You have \d+ unread message|You have tasks available|You have a new task in Coral|\[Task #\d+|\[Wait resolved\]|\[Coral\b)`)
+	agySlashNudgeRE  = regexp.MustCompile(`(?i)^(?:/[a-zA-Z0-9_-]+\s+)+(?:@[^@\n\r]+?\s+)?(You have (?:\d+ )?unread message|You have tasks available|You have a new task in Coral|\[Task #\d+|\[Wait resolved\]|\[Coral\b)`)
 	agySlashCmdRE    = regexp.MustCompile(`^(?:/[a-zA-Z0-9_-]+\s+)+`)
 )
 

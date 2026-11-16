@@ -2,6 +2,7 @@ package background
 
 import (
 	"context"
+	"github.com/subgentic/coral/internal/board"
 	"log/slog"
 	"testing"
 	"time"
@@ -44,5 +45,5 @@ func TestANudgeIsHeldWhileACompactionIsOverdueAndGoesWhenTheHoldEnds(t *testing.
 	holding = false
 	pass()
 	require.Len(t, typed, 1, "the nudge goes once the hold ends: nothing is lost")
-	assert.Contains(t, typed[0], "1 unread")
+	assert.Equal(t, board.NudgeText(), typed[0])
 }

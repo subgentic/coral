@@ -35,7 +35,7 @@ func TestTypedNoticeCensus(t *testing.T) {
 		typedcensus.C("artifact reminder", claudeArtifactNudgeText, claudeArtifactNudgeText),
 		typedcensus.C("agent UI action", uiActionPrompt(7, "panel-1", 3), uiActionPrompt(7, "panel-1", 3)),
 		typedcensus.C("review pool", reviewPoolNudge, reviewPoolNudge),
-		typedcensus.C("send now", board.NudgeText(3), board.NudgeText(1)),
+		typedcensus.C("send now", board.NudgeText(), board.NudgeText()),
 		typedcensus.C("no-team approval", typedNoTeamApproved("report.md", strings.Repeat("a", 64), ""), typedNoTeamApproved(h, strings.Repeat("a", 64), "")),
 		typedcensus.C("no-team approval with a note", typedNoTeamApproved("report.md", strings.Repeat("a", 64), "Tidy the title."), typedNoTeamApproved(h, strings.Repeat("a", 64), h)),
 		typedcensus.C("no-team denial", typedNoTeamDenied("report.md", strings.Repeat("a", 64), "Wrong template."), typedNoTeamDenied(h, strings.Repeat("a", 64), h)),

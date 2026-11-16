@@ -2,6 +2,7 @@ package background
 
 import (
 	"context"
+	"github.com/subgentic/coral/internal/board"
 	"log/slog"
 	"testing"
 	"time"
@@ -64,7 +65,7 @@ func TestASummaryThatToldAHeldNudgeReplacesTheNextNudge(t *testing.T) {
 	post("@Dev three") // newer
 	pass()
 	require.Len(t, typed, 1, "a message after the summary is nudged as always")
-	assert.Contains(t, typed[0], "3 unread")
+	assert.Equal(t, board.NudgeText(), typed[0])
 }
 
 // ... and without a summary, a held nudge is still sent when the hold ends (nothing was told).

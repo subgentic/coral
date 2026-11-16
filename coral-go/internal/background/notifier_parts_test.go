@@ -45,7 +45,7 @@ func TestNudgeDue(t *testing.T) {
 }
 
 func TestNudgeText(t *testing.T) {
-	assert.Equal(t, "You have 1 unread message on the message board. Run 'coral-board read' to see them.", nudgeText("t", 1, false))
-	assert.Equal(t, "You have 3 unread messages on the message board. Run 'coral-board read' to see them.", nudgeText("t", 3, false))
-	assert.Equal(t, "[Coral health check] Team health check for team-a: 2 unread messages include a health-monitor summary. Review team status, assignments, progress, and blockers, then run 'coral-board read' to see the authoritative full content.", nudgeText("team-a", 2, true))
+	// no number: a plain read can return more or other messages than the count that decides a nudge (#18753)
+	assert.Equal(t, "You have unread messages on the message board. Run 'coral-board read' to see them.", nudgeText("t", false))
+	assert.Equal(t, "[Coral health check] Team health check for team-a: the unread messages include a health-monitor summary. Review team status, assignments, progress, and blockers, then run 'coral-board read' to see the authoritative full content.", nudgeText("team-a", true))
 }

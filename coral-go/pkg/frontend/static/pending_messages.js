@@ -105,7 +105,7 @@ export const INTERRUPT_RE = /^\[Request interrupted by user[^\]]*\]$/;
 // Not anchored at the end: two nudges typed at the same moment arrive as one
 // message ("...to start.You have 1 unread message...").
 const CORAL_NUDGE_RES = [
-    /^You have \d+ unread messages? on the message board/i,
+    /^You have (?:\d+ )?unread messages? on the message board/i,
     /^You have tasks available/i,
     /^You have a new task in Coral \(#\d+:/i,
     /^\[Task #\d+[^\]]*\]/i,

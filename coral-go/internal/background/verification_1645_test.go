@@ -38,7 +38,7 @@ func TestTask1645_ComprehensiveNotifierVerification(t *testing.T) {
 
 		require.NoError(t, notifier.RunOnce(ctx))
 		require.Len(t, rt.sent, 1, "nudge 1 sent for message A")
-		require.Contains(t, rt.sent[0].text, "1 unread message")
+		require.Contains(t, rt.sent[0].text, "You have unread messages")
 
 		// Message A is LEFT UNREAD. Message B arrives!
 		_, err = bs.PostMessage(ctx, "proj", "Worker", "message B", nil)
@@ -46,7 +46,7 @@ func TestTask1645_ComprehensiveNotifierVerification(t *testing.T) {
 
 		require.NoError(t, notifier.RunOnce(ctx))
 		require.Len(t, rt.sent, 2, "nudge 2 sent for message B when A left unread for receive_mode=all")
-		require.Contains(t, rt.sent[1].text, "2 unread messages")
+		require.Contains(t, rt.sent[1].text, "You have unread messages")
 	})
 
 	t.Run("2_OriginalHypothesis_WorkerMentions_UnreadA_ThenB_Behavior", func(t *testing.T) {
@@ -161,7 +161,7 @@ func TestTask1645_ComprehensiveNotifierVerification(t *testing.T) {
 
 		require.NoError(t, notifier.RunOnce(ctx))
 		require.Len(t, rt.sent, 1, "burst must coalesce into single nudge")
-		require.Contains(t, rt.sent[0].text, "5 unread messages")
+		require.Contains(t, rt.sent[0].text, "You have unread messages")
 	})
 
 	t.Run("6_FailedDelivery_RetriesOnNextPass", func(t *testing.T) {
