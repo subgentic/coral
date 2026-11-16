@@ -12,4 +12,11 @@ export function closedByLine(g) {
     const why = String((g && g.closedReason) || '').trim();
     return `Closed as ${word}${who}.${why ? ` Reason: ${why}` : ''}`;
 }
+/** How long after a goal is closed its page still asks about work left uncommitted (#17608): an old closed goal that kept asking could be pointing at work that is someone else's by now. */
+export const UNCOMMITTED_ASK_DAYS = 7;
+/** Whether a closed goal was closed (last changed) within UNCOMMITTED_ASK_DAYS; a goal with no readable time counts as recent, so a missing date never hides the line. */
+export function closedRecently(g, now = Date.now()) {
+    const at = Date.parse(g && g.updatedAt);
+    return !at || now - at < UNCOMMITTED_ASK_DAYS * 86400000;
+}
 /** What Not yet does on a goal that looks done, in a line beside its buttons (a phone shows no tooltip). */
