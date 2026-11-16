@@ -157,6 +157,9 @@ func downloadArtifactOpts(base, ref, output string, force bool) (string, error) 
 			return "", fmt.Errorf("the folder %s does not exist; create it or choose another --output", dir)
 		}
 	}
+	if output == "" {
+		dir = agentAttachmentsDir() // an agent's own folder, so reading the file is never a request for a path outside it (#17332)
+	}
 	f, err := os.CreateTemp(dir, "coral-artifact-*"+ext)
 	if err != nil {
 		// A read-only sandbox lets the agent read the stored file but not write a copy: after the same SHA-256 proof, the stored file's own path is the answer (it has no extension).
@@ -288,4 +291,53 @@ func verifyObject(path, id string) error {
 		return fmt.Errorf("artifact SHA-256 mismatch")
 	}
 	return nil
+}
+
+// agentAttachmentsDir is where a Coral agent's download with no --output goes: .coral-attachments in the folder it works in, which ignores itself (a .gitignore of "*"), so the agent's CLI
+// reads the file inside its own folder and a commit never picks it up. Empty (the system temp folder, as before) outside an agent session or when the folder cannot be made (#17332, walk 63 F1).
+func agentAttachmentsDir() string {
+	if os.Getenv("CORAL_SESSION_NAME") == "" {
+		return ""
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	dir := filepath.Join(wd, ".coral-attachments")
+	// Never through a link (a repo can ship either as one): the folder and its .gitignore must be what this function makes, a real directory and a real file (#17407).
+	if fi, err := os.Lstat(dir); err == nil && !fi.IsDir() || err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		return ""
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return ""
+	}
+	ignore := filepath.Join(dir, ".gitignore")
+	if fi, err := os.Lstat(ignore); err != nil {
+		if err := os.WriteFile(ignore, []byte("*\n"), 0o644); err != nil {
+			return ""
+		}
+	} else if !fi.Mode().IsRegular() {
+		return ""
+	}
+	sweepAttachments(dir, time.Now())
+	return dir
+}
+
+// attachmentKeep is how long a downloaded attachment stays in .coral-attachments: a week, then the next download there removes it (#17407: the folder is the agent's own, so Coral keeps it tidy).
+const attachmentKeep = 7 * 24 * time.Hour
+
+// sweepAttachments removes the files this command made (coral-artifact-*) that are older than attachmentKeep. Only regular files with that name; nothing else in the folder is touched.
+func sweepAttachments(dir string, now time.Time) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if !strings.HasPrefix(e.Name(), "coral-artifact-") || !e.Type().IsRegular() {
+			continue
+		}
+		if fi, err := e.Info(); err == nil && now.Sub(fi.ModTime()) > attachmentKeep {
+			os.Remove(filepath.Join(dir, e.Name()))
+		}
+	}
 }
