@@ -114,7 +114,7 @@ export function startNav() {
     if (started) return current;
     started = true;
     setServedAddress(location.pathname + location.search + location.hash); // what the person opened, for a sign-in that must bring them back to it (#12406)
-    let route = startRoute(), restored = false;
+    let route = startRoute(), start = {};
     const bare = /^\/?$/.test(location.pathname) && !location.search && !location.hash.slice(1);
     const kept = lastPlace();
     write(route, true);
@@ -136,14 +136,13 @@ export function startNav() {
     });
     (async () => {
         if (bare) {
-            const start = await (await importOnce('./startup_attention.js')).startupRoute(kept);
+            start = await (await importOnce('./startup_attention.js')).choose(kept);
             if (current !== route) return;
-            ({ route, restored } = start);
+            route = start.route;
             write(route, true, '', start.keep);
             if (kept && isHome(route)) lastPlace(kept);
-            markStartTab(route);
         }
-        await show(route, { fromHistory: true, startup: true, restored });
+        await show(route, { ...start, fromHistory: true, startup: true });
         if (route.bad) (await importOnce('./np.js')).lost(route.bad);
     })().catch(console.error);
     return route;

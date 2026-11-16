@@ -4,7 +4,7 @@ import { isPhoneLayout } from './phone_layout.js';
 import { isCloud } from './server_base.js';
 import { parse } from './routes.js';
 import { importOnce } from './import_once.js';
-export async function startupRoute(lastPlace) {
+export async function choose(lastPlace) {
     await liveListReady;
     let attention = 0;
     try { attention = await (await importOnce('./inbox_sidebar.js')).startupNeedsCount(); }
