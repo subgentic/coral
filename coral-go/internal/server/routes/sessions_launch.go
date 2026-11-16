@@ -301,6 +301,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	if body.BoardName != "" {
 		h.setupBoardAndPrompt(result["session_id"].(string), result["session_name"].(string),
 			body.AgentType, body.BoardName, launchedName(result, body.DisplayName))
+		h.tellOrchestratorOfNewAgent(r.Context(), body.BoardName, launchedName(result, body.DisplayName), body.AgentType, body.Prompt) // an agent added to a running team: its Orchestrator is told (#17305)
 	}
 
 	if sid, _ := result["session_id"].(string); sid != "" { // pinned to the versions approved now; a newer one is an update to offer, never swapped in; using-coral is attached to every agent (#13523)
