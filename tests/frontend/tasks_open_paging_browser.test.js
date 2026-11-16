@@ -27,10 +27,19 @@ const B = 'open-paging-' + Date.now().toString(36);
         // the bytes of every open task, read as the old default list read them
         const whole = await ev(`(async () => { let cursor = '', bytes = 0, n = 0; for (let i = 0; i < 10; i++) { const r = await fetch('/api/board/${B}/tasks?status=open&limit=200' + (cursor ? '&cursor=' + encodeURIComponent(cursor) : '')); const t = await r.text(); bytes += t.length; const j = JSON.parse(t); n += j.tasks.length; cursor = j.next_cursor; if (!cursor) break; } return { bytes, n }; })()`);
         assert.equal(whole.n, 360);
-        await ev(`window.__tasksReads = []; { const w = window.fetch; window.fetch = (u, o) => { const p = w(u, o); if (/\\/api\\/board\\/${B}\\/tasks\\?/.test(String(u)) && !/status=/.test(String(u))) p.then(r => r.clone().text()).then(t => window.__tasksReads.push({ url: String(u), bytes: t.length, rows: JSON.parse(t).tasks.length })).catch(() => {}); return p; }; } true`);
+        // Count at request start, not when a cloned response body happens to finish.
+        // The fixture's limit=1 probe must already belong to the pre-refresh baseline.
+        await ev(`window.__tasksReads = []; window.__tasksReadBodies = []; { const w = window.fetch; window.fetch = (u, o) => {
+            const p = w(u, o), url = String(u);
+            if (/\\/api\\/board\\/${B}\\/tasks\\?/.test(url) && !/[?&](status|counts)=/.test(url)) {
+                const read = { url }; window.__tasksReads.push(read);
+                window.__tasksReadBodies.push(p.then(r => r.clone().text()).then(t => Object.assign(read, { bytes: t.length, rows: JSON.parse(t).tasks.length })).catch(() => {}));
+            }
+            return p;
+        }; } true`);
         await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks' }); true`);
         await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr[data-key], #team-panel-tasks tbody tr.dt-row').length > 0`, 'the tasks', 20000);
-        await waitFor(`window.__tasksReads.some(r => /limit=50(&|$)/.test(r.url))`, 'the first read', 10000);
+        await waitFor(`window.__tasksReads.some(r => /limit=50(&|$)/.test(r.url) && Number.isFinite(r.bytes))`, 'the first read', 10000);
         const first = await ev(`window.__tasksReads.find(r => /limit=50(&|$)/.test(r.url))`);
         assert.equal(first.rows, 50, 'the first read is one page of open tasks: ' + JSON.stringify(first));
         assert.ok(first.bytes * 4 < whole.bytes, `the first read is a small part of the open set's bytes (${first.bytes} of ${whole.bytes})`);
@@ -51,12 +60,12 @@ const B = 'open-paging-' + Date.now().toString(36);
         const reads = (await ev(`window.__tasksReads.length`));
         await ev(`import((window.__coralStatic || '/static/') + 'team_tasks_page.js').then(m => m.loadTasks()).then(() => true)`);
         await waitFor(`window.__tasksReads.length > ${reads}`, 'the refresh', 10000);
-        await ev(`new Promise(r => setTimeout(r, 1500))`); // sleep-ok: the refresh's pages arrive one after another; the count of reads after it has no event
+        await ev(`Promise.all(window.__tasksReadBodies).then(() => true)`);
         const refreshReads = (await ev(`window.__tasksReads.length`)) - reads;
         assert.ok(refreshReads <= 6, `a refresh makes the first read and at most five more (${refreshReads})`);
-        const openRows = () => ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr.dt-row')].filter(r => /Open task/.test(r.textContent)).map(r => r.textContent)`);
+        const openRows = () => ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr.dt-row')].filter(r => /Open task/.test(r.textContent)).map(r => r.dataset.key)`);
         const afterRefresh = await openRows();
-        assert.ok(!afterRefresh.some(t => t.includes(finished.title)), `the task that finished (${finished.title}) is not open on screen after the refresh`);
+        assert.ok(!afterRefresh.some(t => t === 't' + finished.id), `the task that finished (${finished.title}) is not open on screen after the refresh`);
         assert.equal(afterRefresh.length, 300, 'the first page and the five re-read pages stay, the two beyond are dropped');
         assert.equal(await ev(`/Load more open tasks/.test(document.getElementById('team-panel-tasks').textContent)`), true, 'and Load more open tasks offers them again');
         for (let i = 0; i < 4 && await ev(`/Load more open tasks/.test(document.getElementById('team-panel-tasks').textContent)`); i++) {
@@ -65,7 +74,7 @@ const B = 'open-paging-' + Date.now().toString(36);
             await waitFor(`[...document.querySelectorAll('#team-panel-tasks tbody tr.dt-row')].filter(r => /Open task/.test(r.textContent)).length > ${n}`, 'the next page again', 10000);
         }
         // the task that finished is a task finished today: the Open view keeps it too (#10604), as Done; it is not one of the open ones
-        assert.equal((await openRows()).filter(t => !t.includes(finished.title)).length, 359, 'Load more fetched the rest: every open task but the finished one');
+        assert.equal((await openRows()).filter(t => t !== 't' + finished.id).length, 359, 'Load more fetched the rest: every open task but the finished one');
         console.log('PASS open set paging: 50 rows and ' + first.bytes + ' bytes for the first read instead of the whole ' + whole.bytes + '; Load more open tasks follows the cursor; a refresh read ' + refreshReads + ' pages of the 8 loaded and dropped the rest');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
