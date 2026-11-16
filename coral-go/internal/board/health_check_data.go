@@ -147,6 +147,7 @@ type ReviewWait struct {
 	With    []string
 	Since   time.Time
 	Started bool // a round of review has begun
+	Pooled  bool // the review waits in the board's pool (its own line of the check)
 }
 
 // ReviewWaits lists the board's tasks in review, oldest first.
@@ -168,6 +169,7 @@ func (s *Store) ReviewWaits(ctx context.Context, project string) ([]ReviewWait, 
 		var w struct {
 			CompletionReview *CompletionReview `json:"completion_review"`
 			ReviewRounds     []ReviewRound     `json:"review_rounds"`
+			ReviewInPool     bool              `json:"review_in_pool"`
 		}
 		if r.Data != nil {
 			_ = json.Unmarshal([]byte(*r.Data), &w)
@@ -184,6 +186,7 @@ func (s *Store) ReviewWaits(ctx context.Context, project string) ([]ReviewWait, 
 			stamp = r.CreatedAt
 		}
 		rw.Since, _ = time.Parse(time.RFC3339, stamp)
+		rw.Pooled = w.ReviewInPool
 		if n := len(w.ReviewRounds); n > 0 && w.ReviewRounds[n-1].Result == "" {
 			rw.Started = true
 			for _, rs := range w.ReviewRounds[n-1].Reviewers {
