@@ -226,7 +226,7 @@ func TestAutoResumeIsBoundedAndOnlyTheOperatorResetsIt(t *testing.T) {
 	// After the third: no more attempts, and the notice says so.
 	assert.Empty(t, burst(a), "Coral stops trying for good")
 	notes := r.notices()
-	assert.Contains(t, notes[len(notes)-1], "Backend Dev: rate limited. Coral tried 3 times and has stopped; Wake resumes it.")
+	assert.Contains(t, notes[len(notes)-1], "Backend Dev: rate limited. Coral tried 3 times and has stopped; check its terminal for the error, then Wake it once that is fixed.")
 	// A stale timer does nothing.
 	last.f()
 	sleeping, _ := r.asleep(a)
