@@ -32,6 +32,7 @@ import { publishGoalsBrief } from './goals_feed.js';
 import { syncAutoAcceptHeader, noteAutoAcceptPauses } from './auto_accept.js';
 import { pruneTerminalGone, syncTerminalGoneHeader } from './terminal_gone.js';
 import { setText } from './dom_write.js';
+import { isPhoneLayout } from './phone_layout.js';
 
 // Reconnect pacing for the live feed. A fixed 5 s retry made every open dashboard reconnect in the same second after
 // a hub restart or deploy, and kept retrying forever after the sign-in ended. Retries now back off exponentially
@@ -264,7 +265,6 @@ function _raiseNeedsInputAlert(s, id) {
  *  Whether the tab is in the background is decided now, when the alert is raised: attention.js answers after it has loaded, and a tab that was visible at the reply and hidden by then must not count it (#10396). */
 function noteHidden(kindOf, s, id, onClick) {
     if (document.hidden) importOnce('./attention.js').then(m => m.noteRow(kindOf(m), s, id, onClick)).catch(() => {});
-
 }
 
 /** An agent's turn just ended and it awaits its person: a count in the tab title and, when this browser wants them, a desktop alert; only while this tab is in the background (#10068). Names only. */
