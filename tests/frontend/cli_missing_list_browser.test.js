@@ -8,7 +8,7 @@ const BASE = require('./test_base').BASE;
 const { install: installNA, stubModels, stubCliChecks } = require('./helpers/new_agent');
 const FIXTURE = require('./fixtures/cli_refusal_sentences.json').cases; // the server's sentences, one copy shared with the Go test (#12364)
 
-const NOTE = (bin, type) => `Found but not used: ~/.local/bin/${bin} is in an agent's working folder: the agent "Security Reviewer" works in ~. Archive that agent (an asleep one counts too) or restart it in a project folder, then check again, so a launch refuses it. Install it somewhere else, or set its path in Settings > CLI paths (the setting cli_path_${type}).`;
+const NOTE = (bin, type) => `Found but not used: ~/.local/bin/${bin} is in an agent's working folder: the agent "Security Reviewer" works in ~. Archive that agent (an asleep one counts too) or restart it in a project folder, then check again, so a launch refuses it. Install it somewhere else, or set its path in Settings > Providers (the setting cli_path_${type}).`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();

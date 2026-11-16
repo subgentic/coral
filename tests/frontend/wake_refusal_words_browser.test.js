@@ -22,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
             const m = await import(${S} + 'operator_asks.js');
             try { await m.wakeMember({ board: 'wake-team', asker: 'Orchestrator' }, 'Security Reviewer'); return 'no error'; } catch (e) { return e.message; } finally { window.fetch = original; }
         })()`);
-        const sentence = 'failed to start: the Antigravity CLI was not found. Set Settings > CLI paths > Antigravity to its agy.';
+        const sentence = 'failed to start: the Antigravity CLI was not found. Set Settings > Providers > Antigravity to its agy.';
         const got = await run(422, { error: sentence, code: 'cli_not_found' });
         if (!got.includes(sentence) || /HTTP 422/.test(got)) failures.push('a refusal with a sentence shows the sentence, not the status: ' + got);
         if (!got.startsWith('Could not wake')) failures.push('and says which wake failed: ' + got);
