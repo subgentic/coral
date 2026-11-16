@@ -106,7 +106,7 @@ async function loadUnread() {
 }
 
 /** The folders a chat row is in, for the unread numbers. */
-const foldersOf = s => [isGroup(s) ? 'chats-group' : 'chats', ...(s.starred ? ['chats-starred'] : []), ...(s.active ? ['chats-active'] : []), ...(s.archived ? ['chats-archived'] : []),
+const foldersOf = s => [isGroup(s) ? 'chats-group' : 'chats', ...(s.starred ? ['chats-starred'] : []), ...(s.active && !isGroup(s) ? ['chats-active'] : []), ...(s.archived && !isGroup(s) ? ['chats-archived'] : []),
     ...(isGroup(s) ? [] : CLIS.filter(([t]) => (t === 'agy' ? ['agy', 'antigravity', 'gemini'] : [t]).includes(s.source_type)).map(([t]) => `chats-cli-${t}`))];
 const bump = (keys, by) => { if (unread) for (const k of keys) unread[k] = Math.max(0, (unread[k] || 0) + by); };
 /** A chat was opened from the Inbox: marked read, and the numbers of the folders it is in go down by one, in memory, with no request (#9703). */
