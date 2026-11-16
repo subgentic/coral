@@ -139,6 +139,22 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             check(`${tag}: with no record nobody is ticked, though the versions list and the team's list name QA Engineer`, (await ticked()).length === 0, JSON.stringify(await ticked()));
             check(`${tag}: neither the team's artifact list nor the versions list is read when the picker opens`, (await ev(`window.__listReads || 0`)) === 0 && (await ev(`window.__versionReads || 0`)) === 0, JSON.stringify(await ev(`[window.__listReads, window.__versionReads]`)));
             await closeViewer();
+            // 8) #17734: a queued ask (sent, not yet read or replied) hides 'Send to agent'; a read or replied ask brings it back
+            for (const [what, asks, visible] of [
+                ['queued (sent, not read)', [{ agent: 'QA Engineer', open: true, replies: 0, seen: false, nudged: false }], false],
+                ['read (seen)', [{ agent: 'QA Engineer', open: true, replies: 0, seen: true, nudged: false }], true],
+                ['replied', [{ agent: 'QA Engineer', open: true, replies: 1, seen: false, nudged: false }], true],
+            ]) {
+                await ev(STUB); await ev(`window.__cs[0].asks = ${JSON.stringify(asks)}; true`);
+                await ev(`import(${S} + 'state.js').then(m => { m.state.liveSessions = [{ session_id: 'sess-qa', name: 'qa-agent', agent_type: 'claude', board_subscriber_id: 'QA Engineer', board_project: 'ask-team' }]; return true; })`);
+                await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md', board: 'ask-team', uploader: ${JSON.stringify({ role: 'QA Engineer', hex: HEX, server: 'local', board: 'ask-team' })} }); return true; })()`);
+                await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`, 'the document', 8000);
+                await waitFor(`document.querySelectorAll('.ac-card').length >= 1`, 'the threads', 8000);
+                await ev(`(() => { const t = document.querySelector('.ac-toggle'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click(); return true; })()`);
+                await sleep(300); // sleep-ok: the panel opens over a frame or two
+                check(`${tag}: ${what} ${visible ? 'shows' : 'hides'} Send to agent`, visible === !!await ev(sendBtn(1)), `button ${visible ? 'should' : 'should not'} exist`);
+                await closeViewer();
+            }
         }
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
