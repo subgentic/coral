@@ -81,14 +81,23 @@ func (h *HistoryHandler) SearchChats(w http.ResponseWriter, r *http.Request) {
 	if chatType == "all" || chatType == "agent" {
 		// Read at most 200 indexed sessions per request. FTS remains the
 		// shortlist; message parsing is performed only for those sessions.
-		listed, err := h.ss.ListSessionsPaged(r.Context(), store.SessionListParams{Page: 1, PageSize: 200, Search: q, FTSMode: "or"})
+		var shortlist []store.SessionListItem
+		var err error
+		if onlySession != "" { // one chat asked for by id: it is read itself, not looked for among the shortlist's 200 rows (#17982)
+			var one *store.SessionIndex
+			if one, err = h.ss.GetIndexedSession(r.Context(), onlySession); err == nil && one != nil {
+				shortlist = []store.SessionListItem{{SessionID: one.SessionID, SourceType: one.SourceType, SourceFile: one.SourceFile, LastTimestamp: one.LastTimestamp}}
+			}
+		} else {
+			var listed *store.SessionListResult
+			if listed, err = h.ss.ListSessionsPaged(r.Context(), store.SessionListParams{Page: 1, PageSize: 200, Search: q, FTSMode: "or"}); err == nil {
+				shortlist = listed.Sessions
+			}
+		}
 		if err != nil {
 			status = "unavailable"
 		} else {
-			for _, idx := range listed.Sessions {
-				if onlySession != "" && idx.SessionID != onlySession {
-					continue
-				}
+			for _, idx := range shortlist {
 				if idx.SourceFile == "" || agent.IsLabelSource(idx.SourceFile) || !fileExists(idx.SourceFile) { // a label (opencode) is not a file
 					unavailable++
 					continue

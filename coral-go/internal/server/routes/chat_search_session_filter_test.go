@@ -56,4 +56,12 @@ func TestChatSearchCanBeAskedForOneChat(t *testing.T) {
 	require.Greater(t, len(search("")), 1, "without the filter the search lists many chats")
 	require.Equal(t, []string{"sess-29"}, search("&session_id=sess-29"), "asked for one chat, it answers that chat only, wherever it ranks")
 	require.Empty(t, search("&session_id=nosuch"))
+
+	// #17982: asked for one chat, the search reads that chat itself: one the FTS shortlist (its first 200 rows) does not hold is found too.
+	transcript := filepath.Join(dir, "outside.jsonl")
+	writeClaudeJSONLTranscript(t, transcript, []map[string]any{{"type": "user", "message": map[string]any{"content": "start"}}, {"type": "user", "message": map[string]any{"content": query + " in a chat the index does not rank"}}})
+	require.NoError(t, ss.UpsertSessionIndex(ctx, &store.SessionIndex{SessionID: "outside", SourceType: "claude", SourceFile: transcript, DisplaySummary: "unrelated"}))
+	require.NoError(t, ss.UpsertFTS(ctx, "outside", "nothing like the words"))
+	require.NotContains(t, search(""), "outside", "the shortlist does not hold it")
+	require.Equal(t, []string{"outside"}, search("&session_id=outside"), "asked for by id, it is read and found")
 }
