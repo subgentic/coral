@@ -1,5 +1,5 @@
 // Skills in New agent and New team (#12104, goal #191): the approved skills are listed in both dialogs (a skill with scripts says so), ticking some adds `skills` (ids) to the launch request and ticking none
-// leaves the request as it was, the team's row is for every member, another computer's launch has no row, and a team member's own dialog has none. The routes are stood in. 1440 px, isolated dev server.
+// leaves the request as it was, the team's row is for every member, another computer's launch has no row, and a team member's own dialog has them in a Skills section of its own (#18657, member_skills_browser). The routes are stood in. 1440 px, isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -66,7 +66,7 @@ const SKILLS = [
         await fill('team-agent-type', 'codex'); await fill('team-permission-mode', 'plan'); await fill('team-board-server', 'http://remote:8420'); // as the other dialog suite sets them (a remote board: the launch does not wait on this computer's tmux)
         await ev(`window.showTeamAgentModal(); true`);
         await waitFor(`document.getElementById('launch-modal').hasAttribute('data-member') && getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none' && !!document.getElementById('launch-agent-name-input')`, 'the member dialog', 8000);
-        assert.equal(await ev(`getComputedStyle(document.getElementById('launch-skills-row')).display`), 'none', 'a team member\'s own dialog has no skills row');
+        assert.ok(await ev(`!!document.querySelector('#launch-agent-acf [data-section="skills"] #launch-skills-row')`), 'a team member\'s dialog has the row, in a Skills section of its own (#18657)');
         await fill('launch-agent-name-input', 'Orchestrator');
         await ev(`(() => { const e = document.querySelector('#launch-agent-acf .acf-prompt'); e.value = 'Write the code.'; e.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
         await click('#launch-step-agent #launch-agent-save');

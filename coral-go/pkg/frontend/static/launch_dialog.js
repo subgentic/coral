@@ -123,14 +123,15 @@ function _selectLaunchType(type) {
             showName: false,
             cliSlot: 'launch-cli-slot', // a missing CLI is said under the provider, in the reserved note slot (#5835, #7391)
             sections: true, // step 3 is a sectioned dialog (#4950): Agent, Permissions, Advanced
+            skillsPane: !!launch.member, // Edit member and Add member have a Skills section too (#18657): the member's own skills
             wizard: true, // the persona page for step 2 and three panes for step 3 (#7391)
             adopt: { persona: 'launch-persona-top', agent: 'launch-agent-provider', advanced: 'launch-advanced-extra' },
             adoptEnd: { agent: 'launch-note-slot' }, // the provider's notes have their room at the END of the Agent pane, under Thinking: nothing above it moves when a note appears (#8528)
             value: launch.member ? launch.member.value : { prompt: launch.welcomePrompt?.kind === 'agent' ? launch.welcomePrompt.text : '', agentType: _settingsFor(_effectiveServer(launch.server)).default_agent_type || 'claude' }, // a member's own values (#7861)
         });
         { // the skills are the agent's own choice: they sit at the end of the Agent section (step 3's first), not behind the Advanced entry of the section list, which a phone shows as a dropdown nobody opens (#12569)
-            const pane = document.querySelector('#launch-agent-acf [data-section="agent"]'), skills = document.getElementById('launch-skills-row'), slot = document.getElementById('launch-note-slot');
-            if (pane && skills) pane.insertBefore(skills, slot && slot.parentNode === pane ? slot : null);
+            const pane = document.querySelector(`#launch-agent-acf [data-section="${launch.member ? 'skills' : 'agent'}"]`), skills = document.getElementById('launch-skills-row'), slot = document.getElementById('launch-note-slot');
+            if (pane && skills) pane.insertBefore(skills, !launch.member && slot && slot.parentNode === pane ? slot : null);
         }
         if (launch.welcomePrompt?.kind === 'agent') { const picker = document.getElementById('launch-persona-select'); if (picker) picker.value = 'Getting started'; _selectAgentPreset('Getting started'); }
         importOnce('./launch_signin_notice.js').then(m => m.mountLaunchSigninNotice({ slot: document.getElementById('launch-cli-slot'), before: document.getElementById('launch-agent-pick-label')?.parentElement, form: document.getElementById('launch-agent-acf'), server: _effectiveServer(launch.server) })).catch(e => console.error('sign-in notice', e)); // Claude not signed in is said here, with how (#11336)
@@ -141,6 +142,7 @@ function _selectLaunchType(type) {
         if (!launch.member && !launch.addTo && !_settingsFor(_effectiveServer(launch.server)).default_working_dir) offerSuggestion(document.getElementById('launch-dir'), document.getElementById('launch-dir-suggest'), 'first-agent'); // a first agent has a folder to say yes to (#11258)
         wireRecap(); syncRecap(); _syncLaunchBlock();
         _checkTmuxHere(); // tmux missing: said once, Launch off (#6046)
+        if (launch.member) _mountMemberSkills();
         if (launch.member) _applyMember(); else if (launch.addTo) _applyAddTo(); else document.getElementById('launch-dir')?.focus(); // the one thing most launches need: the folder
     } else if (type === "team") {
         launch.teamAddress = false;
@@ -225,6 +227,12 @@ export function showLaunchModal(server, lock = false, welcomePrompt = null) {
     _syncLaunchAccess();
     _mountSkills();
     if (launch.server !== LOCAL_SERVER) _onLaunchServerChange(launch.server, { force: true });
+}
+
+/** Edit member / Add member (#18657): the Skills section is the same pick list, ticked with the member's own skills, the team's shown beside them as "from the team". */
+function _mountMemberSkills() {
+    const m = launch.member, local = normServer(launch.server) === LOCAL_SERVER;
+    importOnce('./launch_skills.js').then(mod => { m.skillsNow = () => mod.memberSkillIds(); return mod.mountLaunchSkills('launch-skills', local, { initial: m.skills || [], fromTeam: mod.launchSkillIds('team-skills') }); }).catch(() => {});
 }
 
 /** The approved skills, offered in New agent and New team for this computer's own launch only (#12104). */
