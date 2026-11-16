@@ -20,9 +20,9 @@
     "viewing a live agent: its header follows the feed": "e53319abc1e8717ced3b64f80e39f28393773b4ec2c92282ce8919a954ae8c2c",
     "viewing an agent that was renamed": "a8d0a89ad1029f79a1451463a6fb64445f660a40d314481715d39cd67c7d720b",
     "viewing an agent matched by name only adopts the new id": "462b5c47b42526ee31381870c170eb2282db4eb6a0c2b9acb1785ac46504adf1",
-    "the viewed agent falls asleep": "ccea511b7790abd9b73cccfe7a150a125de53fc94b2f6c8cc808d3a4b135ce81",
-    "the viewed agent stays asleep and is archived": "ac13ce8d994d374fc87092d8f1e9f7f57595df2573070389a838f6a2a69c33ff",
-    "the viewed agent is gone from the feed": "46ce43236991b2bd2c8d8b031a16f2d3cd2ac6a40fb0be6c2a44352785da165b"
+    "the viewed agent falls asleep": "fff666c3d1297cfa9f5e68ca71f3d07d2c2a3f227a4317480f281762eaf23a6f",
+    "the viewed agent stays asleep and is archived": "0e4f2c015d689abb8ffcc4c3e056eedf310bc01a5cb0e7811f80ab3bf81acefd",
+    "the viewed agent is gone from the feed": "a74cb368a163db1c55590beed0f121b6e4b0b63a72137e8ea7f515f7c215a5eb"
   },
   "lines": {
     "full update of two agents": "a1/a1-id/local/Working/false/sum a1//false/5/main/opus/[\"/x\"]/false ; a2/a2-id/local/Idle/false/sum a2//false/5/main/opus/[\"/x\"]/false | servers [] | header  |  | Type a command or paste an image... | current null | toasts  | calls  | sched>0 true",
@@ -44,8 +44,8 @@
     "viewing a live agent: its header follows the feed": "a1/a1-id/local/Needs input/false/new goal/Ada/false/5/feat/opus/[\"/x\"]/false ; a2/a2-id/local/Working/false/sum a2//false/5/main/opus/[\"/x\"]/false | servers [] | header Ada | Ada | Message Ada, @ to mention a file, or paste an image | current a1/a1-id//Ada/new goal | toasts  | calls  | sched>0 true",
     "viewing an agent that was renamed": "a1-renamed/a1-id/local/Working/false/sum a1-renamed//false/5/main/opus/[\"/x\"]/false ; a2/a2-id/local/Working/false/sum a2//false/5/main/opus/[\"/x\"]/false | servers [] | header a1-renamed | a1-renamed | Message a1-renamed, @ to mention a file, or paste an image | current a1-renamed/a1-id/tmx-1//sum a1-renamed | toasts  | calls  | sched>0 true",
     "viewing an agent matched by name only adopts the new id": "b1/b1-new/local/Working/false/sum b1//false/5/main/opus/[\"/x\"]/false ; a2/a2-id/local/Working/false/sum a2//false/5/main/opus/[\"/x\"]/false | servers [] | header b1 | b1 | Message b1, @ to mention a file, or paste an image | current b1/b1-new///sum b1 | toasts  | calls  | sched>0 true",
-    "the viewed agent falls asleep": "b1/b1-new/local/Working/false/sum b1//true/5/main/opus/[\"/x\"]/false ; a2/a2-id/local/Working/false/sum a2//false/5/main/opus/[\"/x\"]/false | servers [] | header b1 | b1 | Message b1, @ to mention a file, or paste an image | current b1/b1-new///sum b1 | toasts  | calls select [\"b1\",\"claude\",\"b1-new\",\"local\"] | sched>0 true",
-    "the viewed agent stays asleep and is archived": "b1/b1-new/local/Working/false/sum b1//true/5/main/opus/[\"/x\"]/true ; a2/a2-id/local/Working/false/sum a2//false/5/main/opus/[\"/x\"]/false | servers [] | header b1 | b1 |  | current b1/b1-new///sum b1 | toasts  | calls  | sched>0 true",
-    "the viewed agent is gone from the feed": "a2/a2-id/local/Working/false/sum a2//false/5/main/opus/[\"/x\"]/false | servers [] | header b1 | b1 |  | current b1/b1-new///sum b1 | toasts  | calls  | sched>0 true"
+    "the viewed agent falls asleep": "b1/b1-new/local/Working/false/sum b1//true/5/main/opus/[\"/x\"]/false ; a2/a2-id/local/Working/false/sum a2//false/5/main/opus/[\"/x\"]/false | servers [] | header b1 | b1 |  | current b1/b1-new/b1// | toasts  | calls  | sched>0 true",
+    "the viewed agent stays asleep and is archived": "b1/b1-new/local/Working/false/sum b1//true/5/main/opus/[\"/x\"]/true ; a2/a2-id/local/Working/false/sum a2//false/5/main/opus/[\"/x\"]/false | servers [] | header b1 | b1 |  | current b1/b1-new/b1//sum b1 | toasts  | calls  | sched>0 true",
+    "the viewed agent is gone from the feed": "a2/a2-id/local/Working/false/sum a2//false/5/main/opus/[\"/x\"]/false | servers [] | header b1 | b1 |  | current b1/b1-new/b1//sum b1 | toasts  | calls  | sched>0 true"
   }
 }

@@ -205,7 +205,7 @@ async function connect(opts = {}) {
         window.T = { state, liveChat, ws, render };
         window.__qaState = state;
         // Count re-selects from every caller (Wake, the feed, the test itself).
-        { const orig = window.selectLiveSession; window.__selCalls = 0; window.selectLiveSession = (...a) => { window.__selCalls++; return orig(...a); }; }
+        { window.__selCalls = 0; document.addEventListener('coral:agent-selected', () => { window.__selCalls++; }); } // the page's callers reach selectLiveSession through the sessions.js module (openLive), not window, so the event it dispatches is the count (#17243)
         // The real feed would replace the mocked agents with the test server's (empty) list:
         // detach it and drive sleeping/awake changes through handleCoralMessage instead.
         ws.feedHooks.schedule = () => {};
