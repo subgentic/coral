@@ -12,6 +12,7 @@ import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
 const { fileContext } = await importOnce('./artifact_file_context.js');
 import { nameSpan } from './agent_live.js';
+import { markHidden } from './visible_marks.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('team_artifact_badge.css'); // the badges' rules load with the page, not at start (#17746)
 await loadStyles('phone_lists.css');
@@ -20,7 +21,7 @@ import { browserLocal } from './safe_storage.js';
 const { renderArtifact } = await importOnce('./artifact_preview.js');
 import { showToast, fileIdOf, versionLineOf, copyFileId } from './utils.js';
 /** An agent's file with no team says whose it is where the Team column would say "No team" (#10797): the name comes from the live list, and "No team" stays when the agent is not in it. */
-const soloName = item => { if (item.team !== 'No team' && item.team !== 'Not on a team') return ''; const a = item.session_id && (state.liveSessions || []).find(s => s.session_id === item.session_id); return a ? (a.display_name || a.name) : item.produced_by || ''; }; // a single agent's file names the agent (its live name, else who sent it), not 'Not on a team' (#18157)
+const soloName = item => { if (item.team !== 'No team' && item.team !== 'Not on a team') return ''; const a = item.session_id && (state.liveSessions || []).find(s => s.session_id === item.session_id); return markHidden(String(a ? (a.display_name || a.name) : item.produced_by || ''), { strict: true }).trim(); }; // a single agent's file names the agent (its live name, else who sent it), not 'Not on a team' (#18157); an agent-chosen name has what hides or reorders it written out (markHidden strict), as the Producer fact's does
 const placeOf = item => soloName(item) || teamLabel(item.board_id, item.team);
 const DT = await importOnce('./data_table.js');
 const { artifactTable, serverArtifactSort, tableSortOf } = await importOnce('./artifact_table.js');
