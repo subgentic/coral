@@ -25,17 +25,15 @@ const { removeBoards } = require('./helpers/board_cleanup');
     await waitFor(`!!document.querySelector('#group-table-view tr[data-key="local:retained-agent-id"].dt-mailed')`,'retained row uses phone layout');
     assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tr[data-key="local:retained-agent-id"] [role="menuitem"]')].map(item=>item.textContent.trim()).filter(text=>text==='Dismiss')`),[],'phone row menu cannot dismiss an already still-waiting request again');
    }
-   await ev(`globalThis.__coralAttentionGraceMs=4000;window.T.state.liveSessions=window.T.state.liveSessions.filter(row=>row!==window.__retained);window.openTeamPage(${JSON.stringify(team)})`);
-   await waitFor(`document.querySelector('#team-page-status')?.textContent.trim()==='Checking attention status'`,'explicit checking status after availability arrives before local live snapshot');
-   assert.notEqual(await ev(`document.querySelector('#team-page-status').textContent.trim()`),'All well',width+': missing live row cannot certify zero attention');
-   assert.equal(await ev(`document.querySelector('#team-page-status').classList.contains('well')`),false,'mismatch has neutral status');
-   // #15151 (walk 4 F13, seen again on walks 6 and 7): 'Checking attention status' is for a moment. When the board still says an agent waits and no live row agrees after the grace, the board's word counts: the header settles.
-   await waitFor(`/^1 needs? attention$/.test(document.querySelector('#team-page-status')?.textContent.trim()||'')`,'the header settles on the board\'s word and never stays on Checking',20000);
+   // #17625 item 3 (the Orchestrator's decision on #18820): the team header shows the Needs you number, so the retained wait the Inbox counts is the one the header counts, with no grace period and no 'Checking' stretch.
+   await ev(`window.openTeamPage(${JSON.stringify(team)})`);
+   await waitFor(`/^1 needs? attention$/.test(document.querySelector('#team-page-status')?.textContent.trim()||'')`,'the header says the retained wait the Needs you list counts',20000);
+   assert.equal(await ev(`document.querySelector('#team-page-status').classList.contains('well')`),false,width+': a retained wait is not well');
    await ev(`window.__failAvailability=true;window.openTeamPage(${JSON.stringify(team)})`);
    await waitFor(`window.__availabilityFailed && document.querySelector('#team-page-status')?.textContent.trim()==='Status unavailable'`,'failed availability ends at explicit unavailable status');
    assert.equal(await ev(`document.querySelector('#team-page-status').classList.contains('well')`),false,'failed availability remains neutral');
    await ev(`window.__failAvailability=false;true`);
-   await ev(`window.T.state.liveSessions.push(window.__retained);import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.updateInboxTab()).then(()=>true)`);
+   await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.updateInboxTab()).then(()=>true)`);
 
    await waitFor(`document.querySelector('#team-page-health')?.textContent.includes('1 needs attention')`,'team status counts the same retained wait');
    await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
