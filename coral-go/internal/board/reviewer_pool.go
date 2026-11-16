@@ -3,6 +3,7 @@ package board
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 )
 
@@ -31,7 +32,12 @@ func (s *Store) pickFromReviewerPool(ctx context.Context, project string, pool, 
 		WHERE t.board_id = ? AND t.assigned_to IS NOT NULL AND COALESCE(json_extract(w.data, '$.review_of'), 0) > 0 GROUP BY t.assigned_to`, project)
 	given := map[string]time.Time{}
 	for _, l := range last {
-		given[l.Assignee] = parseStamp(l.At)
+		at := parseStamp(l.At)
+		if at.IsZero() {
+			// The stamp ranks this member as given a review longest ago; say so instead of doing it silently (#17807).
+			slog.Warn("[reviewer pool] a review task's created_at cannot be read; the member ranks as given a review longest ago", "member", l.Assignee, "created_at", l.At)
+		}
+		given[l.Assignee] = at
 	}
 	best, bestOpen, bestAt := "", 0, time.Time{}
 	for _, c := range pool {
