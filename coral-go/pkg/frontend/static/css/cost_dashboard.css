@@ -117,13 +117,14 @@
 .cost-header-actions {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: stretch; /* the range select and Refresh are one height at any text size (#15842) */
     gap: 8px;
     min-width: 0;
     max-width: 100%;
 }
 
 .cost-time-select { cursor: pointer; }
+.cost-header-actions .btn { padding-block: 0; } /* the range select and Refresh are both one control height (36 px): the button's own padding made it 37 (#15842) */
 
 /* Summary Cards */
 .cost-summary-cards {
@@ -273,7 +274,7 @@
 .spend-label {
     font-size: var(--fs-sm);
     fill: var(--text-muted);
-    font-family: var(--font-mono, monospace);
+    font-variant-numeric: tabular-nums; /* the sans font of the page, figures that line up (#15842): the other charts' axes already are */
 }
 
 /* ── Team Share Bar ─────────────────────────────────────── */
