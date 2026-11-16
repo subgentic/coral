@@ -109,6 +109,7 @@ function buildTabsMore(tabs) {
     const next = el('button', 'team-tabs-next'); next.type = 'button'; next.id = 'team-tabs-next'; next.setAttribute('aria-label', 'Show more tabs'); // a tappable cue at the strip's end while tabs wait past it (css, off the strip's data-more); it replaces the end chevron then (#17816)
     next.addEventListener('click', () => { tabs._moved = true; /* a person's scroll, even before its first scroll event: the strip is not put back by a width change (#18963) */ tabs.scrollBy({ left: tabs.clientWidth * 0.7, behavior: scrollBehavior() }); });
     b.before(next); // beside the scrolling strip, before More: a tab never lies under it (#18867)
+    new MutationObserver(() => { if (document.activeElement === next && !next.getClientRects().length) b.focus(); }).observe(tabs, { attributes: true, attributeFilter: ['data-more'] }); // the arrow hides when the strip reaches its end: focus on it goes to More, the next stop, not to a button that is no longer there (#18972)
     for (const [side, glyph] of [['start', '‹'], ['end', '›']]) {
         const cue = el('span', `team-strip-edge team-strip-edge-${side}`, glyph);
         cue.setAttribute('aria-hidden', 'true'); row.append(cue);
