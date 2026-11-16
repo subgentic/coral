@@ -85,6 +85,9 @@ export function drawerTop() {
         if (ctx === 'agents') out.push(row('smart_toy', 'All agents', (state.liveSessions || []).length, () => window.switchNavTab?.('agents')));
         out.push(row('checklist', 'Tasks', inboxCountsNow().tasks, inboxPage('tasks', 'Tasks')), row('chat_bubble_outline', 'Chats', 0, inboxPage('chats', 'Chats'))); // the bar has no Tasks or Chats: every other drawer has them first
     }
+    if ((state.liveSessions || []).length) {
+        out.push(row('timeline', 'Activity', 0, () => { const s = state.currentSession || (state.liveSessions || [])[0]; if (!s) return; window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => { window.switchAgenticTab?.('activity', 'top'); window.toggleAgenticPanel?.(); }); }));
+    }
     if (ctx === 'hub-inbox' || ctx === 'history' || ctx === 'agents') { // teams belong with agents and with the Inbox; an Automations, Analytics or Docs drawer is its places only
         const host = el('div', 'nav-drawer-teams'); drawTeams(host); out.push(host);
         readTeamKeys().then(() => { if (host.isConnected) drawTeams(host); });
