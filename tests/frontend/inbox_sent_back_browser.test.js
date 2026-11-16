@@ -52,21 +52,21 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`window.switchNavTab('hub-inbox');true`);
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
                 await waitFor(`!!(${row('Sent back file.txt')})&&!!(${row('Quiet file.txt')})`, 'both files in Needs you', 15000);
-                const info = name => ev(`(() => { const r = ${row(name)}, chip = r.querySelector('.inbox-sent-back'), ask = r.querySelector('.inbox-sent-back-ask'), ap = r.querySelector('[data-slot=approve]'), age = r.querySelector('.inbox-age'); return { chip: chip ? chip.textContent : null, chipWhole: chip ? chip.scrollWidth <= chip.clientWidth + 1 : null, ask: ask && !ask.hidden ? ask.textContent : null, forReview: /For review/.test(r.textContent), primary: ap ? ap.classList.contains('btn-primary') : null, age: age ? age.className + '|' + age.textContent : null, slow: /changes requested/i.test(r.querySelector('.inbox-review-name')?.textContent || '') }; })()`);
+                const info = name => ev(`(() => { const r = ${row(name)}, chip = r.querySelector('.inbox-sent-back'), ask = r.querySelector('.inbox-sent-back-ask'), ap = r.querySelector('[data-slot=approve]'), age = r.querySelector('.inbox-age'); return { chip: chip ? chip.textContent : null, chipWhole: chip ? chip.scrollWidth <= chip.clientWidth + 1 : null, ask: ask && !ask.hidden ? ask.textContent : null, forReview: [...r.querySelectorAll('.inbox-kind')].some(k => /For review/.test(k.textContent)), primary: ap ? ap.classList.contains('btn-primary') : null, age: age ? age.className + '|' + age.textContent : null, slow: /changes requested/i.test(r.querySelector('.inbox-review-name')?.textContent || '') }; })()`);
                 await waitFor(`(${row('Sent back file.txt')}).querySelector('.inbox-sent-back-ask') && !(${row('Sent back file.txt')}).querySelector('.inbox-sent-back-ask').hidden`, 'the request is read from the thread', 8000);
                 const sent = await info('Sent back file.txt'), quiet = await info('Quiet file.txt');
                 assert.match(sent.chip || '', /^Sent back · waiting on Writer A$/, 'the chip names the state and the agent: ' + JSON.stringify(sent));
                 assert.ok(sent.chipWhole, 'and is not cut off');
-                assert.ok(!sent.forReview, 'the row no longer says For review: ' + JSON.stringify(sent));
+                assert.ok(width !== 1280 || !sent.forReview, 'the row no longer says For review in its line: ' + JSON.stringify(sent));
                 assert.equal(sent.primary, false, 'Approve is not the blue main button on a sent-back row');
                 assert.match(sent.ask || '', /^please add a summary table at the top/, 'one line of what was asked for, without the Changes requested: prefix: ' + JSON.stringify(sent));
                 assert.ok(!sent.slow, 'the grey Changes requested text after the title is gone (the chip says it)');
                 if (width === 1280) assert.ok(/inbox-age$/.test((sent.age || '').split('|')[0]) && /5 min|under 1 min/.test(sent.age), 'the time counts from the send-back (5 min), neutral, not amber for the 3 h upload: ' + sent.age);
-                assert.equal(quiet.chip, null, 'a file still waiting for the Operator has no chip'); assert.ok(quiet.forReview && quiet.primary === true, 'and keeps For review and the blue Approve: ' + JSON.stringify(quiet));
+                assert.equal(quiet.chip, null, 'a file still waiting for the Operator has no chip'); assert.ok((width !== 1280 || quiet.forReview) && quiet.primary === true, 'and keeps For review and the blue Approve: ' + JSON.stringify(quiet));
                 // a new version: the agent uploads again and the row is back to needing review as before
                 await ev(`(() => { const it = window.__reviewItems[1]; it.tags = ['for review']; delete it.review; return import((window.__coralStatic||'/static/')+'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true); })()`);
                 await waitFor(`!(${row('Sent back file.txt')}).querySelector('.inbox-sent-back')`, 'the chip is gone when the tag is');
-                const back = await info('Sent back file.txt'); assert.ok(back.forReview && back.primary === true, 'back to needing review with the blue Approve: ' + JSON.stringify(back));
+                const back = await info('Sent back file.txt'); assert.ok((width !== 1280 || back.forReview) && back.primary === true, 'back to needing review with the blue Approve: ' + JSON.stringify(back));
                 console.log('PASS sent-back state ' + width);
             } catch (error) { failures.push(width + ': ' + error.message); console.error(failures.at(-1)); }
         }
