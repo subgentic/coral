@@ -11,7 +11,9 @@ const { coralReady } = require('./helpers/wait');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'settings');
-        const shared = (await ev(`navigator.platform`)).startsWith('Mac') ? '/private/tmp' : '/tmp';
+        const platform = await ev(`navigator.platform`);
+        // Windows has no /tmp: a path with no drive is not absolute there. A new folder two levels under a drive's root is the shallow case the server refuses the same way.
+        const shared = platform.startsWith('Mac') ? '/private/tmp' : platform.startsWith('Win') ? 'C:' : '/tmp';
         const fresh = shared + '/coral-newfolder-' + Date.now().toString(36) + '/wordgame';
         await ev(`window.showLaunchModal(); window._selectLaunchType('team'); true`);
         await waitFor(`!!document.getElementById('launch-step-team') && getComputedStyle(document.getElementById('launch-step-team')).display !== 'none' && document.querySelectorAll('#team-template-select option').length > 1`, 'the team step');

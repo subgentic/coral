@@ -52,6 +52,8 @@ const { coralReady } = require('./helpers/wait');
             await next();
             await waitFor(`!!document.getElementById('launch-dir').dataset.createNew || document.getElementById('launch-step-agent').dataset.stage !== 'folder'`, 'the check', 8000);
             await ev(`window._launchStage('folder'); true`);
+            // createNew is still set from the case before, so wait for this folder's own line: the check's answer arrives later on a slower disk (Windows CI)
+            await waitFor(`/beta24-c does not exist yet/.test(document.getElementById('launch-dir-new')?.textContent || '')`, 'the line names this folder', 8000);
             const s = await state();
             assert.ok(/beta24-c does not exist yet\. Coral creates it inside .* when you launch\./.test(s.lineText), 'the words: ' + JSON.stringify(s));
         });

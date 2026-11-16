@@ -24,6 +24,7 @@ const TEAM = `qa-ended-${Date.now() % 100000}`;
                     return Promise.resolve(new Response(JSON.stringify({ agents, summary: { total: 5, available: 1, needs_input: 1, offline: 2, queued: 1 } }), { status: 200, headers: { 'content-type': 'application/json' } })); }
                 return R(u, o); }; return true; })()`);
             await openTeam(ev, waitFor, TEAM); await settle(600);
+            await waitFor(`!!(document.getElementById('team-page-status') || {}).textContent && !/^Checking/.test(document.getElementById('team-page-status').textContent)`, 'the attention status has answered', 15000); // the status read is async: a slower disk (Windows CI) answers after the fixed settle
             const head = await ev(`(document.getElementById('team-page-status') || {}).textContent`);
             assert.match(head, /^1 needs attention$/, `${tag}: the two ended agents and the queued one are not counted: ` + head);
             await ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === 'Agents'); t.click(); return true; })()`);

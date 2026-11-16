@@ -50,7 +50,7 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'a Lead question opens', 4000);
                 lead.push(await btns()); await closeDlg();
             }
-            const olderAt = lead.findIndex(x => x && /Older: Lead asked again/.test(x.note)), older = lead[olderAt];
+            const olderAt = lead.findIndex(x => x && /Older: Lead has asked something newer/.test(x.note)), older = lead[olderAt];
             check(at + 'exactly one Lead question says it is older', olderAt >= 0 && lead.filter(x => /Older:/.test(x.note)).length === 1, JSON.stringify(lead));
             if (older) {
                 check(at + 'the older question: Dismiss comes first in the footer', older.footer[0] === 'Dismiss, no reply', JSON.stringify(older));
