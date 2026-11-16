@@ -26,7 +26,7 @@ func TestSingleAgentAskReachesNeedsYouAndTheAnswerReachesTheAgent(t *testing.T) 
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
 	h := NewAgentAsksHandler(store.NewSessionStore(db), nil)
-	liveAgent(t, store.NewSessionStore(db), owner("0001"))
+	registerAsker(t, store.NewSessionStore(db), owner("0001"))
 	var typed []string
 	h.deliver = func(_ context.Context, _ ptymanager.SessionTerminal, name, _, _, text, _ string) error {
 		typed = append(typed, name+"|"+text)
@@ -77,8 +77,8 @@ func TestSingleAgentAskReachesNeedsYouAndTheAnswerReachesTheAgent(t *testing.T) 
 	assert.Equal(t, http.StatusConflict, post("/api/agent-asks/1/answer", `{"answer":"x"}`, false).Code, "an answered or replaced question is not answered twice")
 }
 
-// liveAgent registers the asking agent's session: a question whose agent is gone leaves Needs you by itself (#18668).
-func liveAgent(t *testing.T, ss *store.SessionStore, o *store.SessionTokenOwner) {
+// registerAsker registers the asking agent's session: a question whose agent is gone leaves Needs you by itself (#18668).
+func registerAsker(t *testing.T, ss *store.SessionStore, o *store.SessionTokenOwner) {
 	t.Helper()
 	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: o.SessionID, AgentType: "claude", AgentName: "claude"}))
 }
@@ -129,7 +129,7 @@ func TestAPictureForASingleAgentsQuestionIsStoredWithThatAgent(t *testing.T) {
 	h := NewAgentAsksHandler(ss, nil)
 	h.SetCoralDir(t.TempDir())
 	o := owner("0001")
-	liveAgent(t, ss, o)
+	registerAsker(t, ss, o)
 	id, err := ss.CreateAgentAsk(context.Background(), o.SessionID, o.SessionName, "Which logo?", nil, time.Now())
 	require.NoError(t, err)
 	up := func(id int64, body []byte, agent bool) *httptest.ResponseRecorder {
@@ -163,7 +163,7 @@ func TestAnAnswerToASingleAgentIsTypedOnce(t *testing.T) {
 	ss := store.NewSessionStore(db)
 	h := NewAgentAsksHandler(ss, nil)
 	o := owner("0001")
-	liveAgent(t, ss, o)
+	registerAsker(t, ss, o)
 	id, err := ss.CreateAgentAsk(context.Background(), o.SessionID, o.SessionName, "Which?", nil, time.Now())
 	require.NoError(t, err)
 	answer := func(text string) *httptest.ResponseRecorder {
@@ -192,7 +192,9 @@ func TestAnAnswerToASingleAgentIsTypedOnce(t *testing.T) {
 	id2, err := ss.CreateAgentAsk(context.Background(), o.SessionID, o.SessionName, "Which port?", nil, time.Now())
 	require.NoError(t, err)
 	id = id2
-	h.deliver = func(context.Context, ptymanager.SessionTerminal, string, string, string, string, string) error { return assert.AnError }
+	h.deliver = func(context.Context, ptymanager.SessionTerminal, string, string, string, string, string) error {
+		return assert.AnError
+	}
 	assert.Equal(t, http.StatusBadGateway, answer("x").Code)
 	open, err := ss.OpenAgentAsk(context.Background(), id)
 	require.NoError(t, err)
@@ -207,7 +209,7 @@ func TestDismissingASingleAgentsQuestionTellsTheAgentAndAnExitedAgentsQuestionDr
 	ss := store.NewSessionStore(db)
 	h := NewAgentAsksHandler(ss, nil)
 	o := owner("0001")
-	liveAgent(t, ss, o)
+	registerAsker(t, ss, o)
 	var typed []string
 	h.deliver = func(_ context.Context, _ ptymanager.SessionTerminal, _, _, _, text, _ string) error {
 		typed = append(typed, text)
