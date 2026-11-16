@@ -30,7 +30,7 @@ const BASE = require('./test_base').BASE;
                 if (count !== expected) failures.push(`${width}: ${label} lists ${count}, expected ${expected}`);
             };
             const block = await ev(`(() => { const b=document.querySelector('#group-table-view section[aria-label="Getting started"]'); return {exists:!!b, tips:b?.querySelectorAll('li').length||0, inRows:!!b?.closest('tbody'), chip:[...document.querySelectorAll('#group-table-view button.goals-chip')].some(x=>/^Welcome/.test(x.textContent))}; })()`);
-            if (!block.exists || block.tips!==4 || block.inRows || block.chip) failures.push(`${width}: Getting started must be separate: ${JSON.stringify(block)}`);
+            if (!block.exists || block.tips!==3 || block.inRows || block.chip) failures.push(`${width}: Getting started must be separate: ${JSON.stringify(block)}`);
             await pick('All', 1); await pick('Question', 1); await pick('Needs input', 0); await pick('All', 1);
             if (block.exists) {
                 await ev(`document.querySelector('#group-table-view button[aria-label="Dismiss Getting started"]').click(); true`); await ev(framesJs(6));

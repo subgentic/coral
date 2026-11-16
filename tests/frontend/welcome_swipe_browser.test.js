@@ -17,7 +17,7 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
         };T.state.settings={...T.state.settings,inbox_welcome:'on',inbox_welcome_done:''};T.state.liveSessions=[];T.state.servers=[];true`);
         await installGuard(ev);
         await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>{m.updateInboxTab();return m.selectInboxTab('needs');}).then(()=>true)`);
-        await waitFor(`document.querySelectorAll('.inbox-getting-started li').length===6`,'six Getting started items',8000);
+        await waitFor(`document.querySelectorAll('.inbox-getting-started li').length===5`,'five Getting started items',8000);
         assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr.dt-row').length`),0,'onboarding is outside swipeable Needs rows');
         assert.equal(await ev(`document.querySelectorAll('.inbox-getting-started [data-welcome-id], .inbox-getting-started input[type=checkbox]').length`),0,'onboarding does not declare swipe or bulk-selection targets');
         await ev(`document.querySelector('button[aria-label="Dismiss Getting started"]').click();true`);

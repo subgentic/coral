@@ -15,7 +15,7 @@ const shots=process.env.CORAL_GUIDE_SHOTS; if(shots)fs.mkdirSync(shots,{recursiv
  await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev);await installTeam(ev);await stubModels(ev);await setTheme(ev,theme);
  await ev(`(()=>{const real=window.fetch;window.fetch=(u,o={})=>{const p=new URL(String(u),location.href).pathname;if(p==='/api/sessions/launch'||p==='/api/sessions/launch-team'){window.__guideLaunch={path:p,body:JSON.parse(o.body)};return Promise.resolve(Response.json({error:'Test intercepted launch; no agent started'},{status:400}));}if(p==='/api/board/projects')return Promise.resolve(Response.json([]));if(p==='/api/settings'&&o.method==='PUT')return Promise.resolve(Response.json({ok:true}));return real(u,o)};window.T.state.settings={...window.T.state.settings,inbox_welcome:'on',inbox_welcome_done:''};window.T.state.liveSessions=[];window.T.state.servers=[];window.switchNavTab('hub-inbox');return true})()`);
  await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>{m.updateInboxTab();return m.selectInboxTab('needs')}).then(()=>true)`);
- await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-actions').length===6`,'guide actions');
+ await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-actions').length===5`,'guide actions');
  for(const kind of ['agent','team']){
  await ev(`Array.from(document.querySelectorAll('#group-table-view .inbox-welcome-actions button')).find(b=>b.textContent==='New ${kind}').click();true`);
  const selector=kind==='agent'?'#launch-agent-acf .acf-prompt':'#team-goal';
