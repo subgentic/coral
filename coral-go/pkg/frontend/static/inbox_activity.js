@@ -64,11 +64,18 @@ function combineChecks(map) {
 
 const atOf = r => { const t = Date.parse(r.at); return Number.isFinite(t) ? t : -Infinity; };
 
+let emptyPages = 0;
+/** More is offered but the pages read show nothing new (every row on them is hidden): read the next page, up to 20 in a row, so Load more never lands on a blank. */
+function keepReading(need) {
+    if (more && !failed && shown().length <= need && ++emptyPages < 20) refresh(null, { next: true });
+    else emptyPages = 0;
+}
 /** Read the first page (and the record's check), or the page after the last row. Tells the sidebar when it is done. On a Hub with linked computers every online one is read on its own (one failing does not fail the folder),
  *  each action carries its computer, and the folder is the actions of all of them, newest first. */
 export function refresh(done, { next = false } = {}) {
     if (done) onChange = done;
     if (loading) return loading;
+    const need = next ? shown().length : 0; // a page that adds no visible row (all hidden 'Sent words' rows) reads on (#18545)
     const sources = sourcesNow();
     if (sources) { // a computer that left the list takes what was read from it along (#15404)
         const live = new Set(sources), gone = id => !live.has(id);
@@ -89,7 +96,7 @@ export function refresh(done, { next = false } = {}) {
                 failed = false; denied = false;
             } catch (e) { failed = true; denied = e && e.status === 403; } // 403: through Coral Hub the record is the owner's alone
             loaded = true;
-        })().finally(() => { loading = null; onChange(); });
+        })().finally(() => { loading = null; onChange(); keepReading(need); });
         return loading;
     }
     const targets = next ? sources.filter(id => moreBy[id]) : sources;
@@ -122,7 +129,7 @@ export function refresh(done, { next = false } = {}) {
         failed = answered.length === 0 && !deniedAll && settled.some(x => x.status === 'rejected');
         denied = deniedAll;
         loaded = true;
-    })().finally(() => { loading = null; onChange(); });
+    })().finally(() => { loading = null; onChange(); keepReading(need); });
     return loading;
 }
 
