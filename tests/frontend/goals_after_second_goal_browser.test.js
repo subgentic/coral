@@ -1,5 +1,4 @@
-// After a second goal (walk 18 M7, M8, #15305): the finished first goal stays on the Goals tab under the active one in its own "Done" group (it used to vanish into "No active goals / Show all 1"), the tab's badge says what
-// the list shows, and the Tasks tab groups the tasks by goal (goal 1's finished tasks are not mixed with goal 2's new one). Real server, a made-up board (removed again). 1280 and 390.
+// After a second goal: Active excludes finished goals; All retains them. The Tasks All view groups finished and queued tasks by goal. Real server, an isolated board removed afterward.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -33,12 +32,14 @@ const { coralReady } = require('./helpers/wait');
         await api('POST', `/api/board/${B}/tasks`, { title: 'Add reminders', created_by: 'orch', goal_id: g2 });
         await api('POST', `/api/board/${B}/tasks`, { title: 'Polish the habit page', created_by: 'orch', goal_id: g1 }); // made after goal 2's task: the groups still go goal 1, goal 2 (#15364)
         await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: 'Idea for later', state: 'proposed' }); // a goal the default list does not show: the badge is not the count of all goals
-        await open(`/team/${B}/goals`, `document.querySelectorAll('#team-panel-goals tbody tr:not(.dt-group)').length >= 2`);
+        await open(`/team/${B}/goals`, `document.querySelectorAll('#team-panel-goals tbody tr:not(.dt-group)').length === 1`);
+        await ev(`document.querySelector('#team-panel-goals [data-filter="all"]').click(); true`);
+        await waitFor(`document.querySelectorAll('#team-panel-goals tbody tr:not(.dt-group)').length === 3`, 'All includes all three goals');
         r = await rows();
         assert.ok(r.some(x => !x.group && /Habit tracker with reminders/.test(x.text)) && r.some(x => !x.group && /Habit tracker/.test(x.text) && !/reminders/.test(x.text)), 'All retains active and finished goals: ' + JSON.stringify(r));
         const badge = await ev(`(document.querySelector('#team-tab-goals .team-tab-count') || {}).textContent`);
         assert.equal(badge, '2', 'the badge counts open goals (active and proposed): ' + badge);
-        // the Done group follows the search box: it hides when nothing finished matches, and shows when one does (#15364)
+        // All searches include a finished goal when its title matches.
         const search = async text => { await ev(`(() => { const i = document.querySelector('#team-panel-goals input[type=search], #team-panel-goals input[placeholder="Search goals"]'); i.value = ${JSON.stringify(text)}; i.dispatchEvent(new Event('input', { bubbles: true })); })()`); };
         await search('reminders');
         await waitFor(`![...document.querySelectorAll('#team-panel-goals tbody tr.dt-group')].some(r => /Done/.test(r.textContent))`, 'the Done group hidden by a search that matches no finished goal', 4000);
@@ -46,11 +47,13 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`[...document.querySelectorAll('#team-panel-goals tbody tr:not(.dt-group)')].some(r => /Habit tracker/.test(r.textContent) && !/reminders/.test(r.textContent))`, 'All search includes the matching finished goal', 4000);
         await search('');
         // tasks: one group per goal
-        await open(`/team/${B}/tasks`, `document.querySelectorAll('#team-panel-tasks tbody tr').length >= 2`);
+        await open(`/team/${B}/tasks`, `!!document.querySelector('#team-panel-tasks [data-filter="all"]') && !/Loading tasks/.test(document.getElementById('team-panel-tasks').textContent)`);
+        await ev(`document.querySelector('#team-panel-tasks [data-filter="all"]').click(); true`);
+        await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr.dt-group').length === 2`, 'All tasks grouped by both goals');
         const heads = await ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr.dt-group')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
         assert.ok(heads.length === 2 && /Habit tracker/.test(heads[0]) && /reminders/.test(heads[1]), 'the tasks are grouped by goal: ' + JSON.stringify(heads));
         const goalCells = await ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr:not(.dt-group) [data-goal-link]')].map(a => a.textContent.trim())`);
         assert.ok(goalCells.length >= 2 && goalCells.every(c => /^#\d+ /.test(c)) && new Set(goalCells.map(c => c.slice(0, 4))).size === 2, 'the Goal column leads with the number, so near-identical names differ at the start: ' + JSON.stringify(goalCells));
-        console.log('PASS after a second goal: the finished goal stays under Done, the badge is the list, tasks are grouped by goal');
+        console.log('PASS after a second goal: All retains finished goals and tasks grouped by goal');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
