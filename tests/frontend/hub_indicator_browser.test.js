@@ -95,12 +95,15 @@ const STATES = {
         const offer = await ev(homeHub);
         await show('moved'); l = await look();
         check('enrolled with the old host (hub_moved): amber, saying where it moved and what to run', !l.hidden && l.state === 'disconnected' && l.color === rgb(l.warning)
-            && l.aria === 'Connect to Coral Hub (Coral Hub moved to app.coralhub.dev: run coral cloud connect --force)', JSON.stringify(l));
+            && l.aria === 'Connect to Coral Hub (Coral Hub moved to app.coralhub.dev: connect this computer again)', JSON.stringify(l));
         const movedHome = await ev(homeHub);
-        check('the home section says to connect again, not the never-enrolled offer', /^Coral Hub moved Connect this computer again at app\.coralhub\.dev: run coral cloud connect --force/.test(movedHome) && movedHome !== offer, movedHome);
+        check('the home section says to connect again, not the never-enrolled offer', /^Coral Hub moved Connect this computer again at app\.coralhub\.dev\. Reconnect$/.test(movedHome) && !/coral cloud|--force|run /.test(movedHome) && movedHome !== offer, movedHome);
+        await ev(`document.querySelector('#editions-home [data-editions="home-hub"] button[data-editions="home-hub"]').click(); true`);
+        await waitFor(`!!document.getElementById('editions-modal') && getComputedStyle(document.getElementById('editions-modal')).display !== 'none' && /Connect to Coral Hub/.test(document.getElementById('editions-modal').textContent)`, 'Reconnect opens the Connect flow');
+        await ev(`document.getElementById('editions-modal').style.display = 'none'; true`);
         await show('movedFailed'); l = await look();
         check('after a failed attempt to enroll again (its own code): still amber, still "connect again"', !l.hidden && l.state === 'disconnected'
-            && l.aria === 'Connect to Coral Hub (Coral Hub moved to app.coralhub.dev: run coral cloud connect --force)' && (await ev(homeHub)) === movedHome, JSON.stringify(l));
+            && l.aria === 'Connect to Coral Hub (Coral Hub moved to app.coralhub.dev: connect this computer again)' && (await ev(homeHub)) === movedHome, JSON.stringify(l));
         await show('connected');
         check('and the offer comes back with any other status', (await ev(homeHub)) === offer, await ev(homeHub));
         for (const name of ['idle', 'enrolling', 'off']) {

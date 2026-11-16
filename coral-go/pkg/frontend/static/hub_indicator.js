@@ -61,8 +61,8 @@ export function indicatorLabel(st, state, now = new Date(), locale) {
         return st && st.state === 'retrying' ? `Coral Hub: reconnecting${at}` : `Coral Hub: connecting${at}`;
     }
     if (st && (st.hub_moved || st.last_error_code === 'hub_moved')) {
-        // A fixed message with the new host only (Security): what to run, nothing else.
-        return `Coral Hub moved to ${host || 'a new host'}: run coral cloud connect --force`;
+        // A fixed message with the new host only (Security): no command; the click opens the Connect flow (#16718).
+        return `Coral Hub moved to ${host || 'a new host'}: connect this computer again`;
     }
     const why = { revoked: 'the hub no longer accepts this Coral', key_unreadable: "the stored connection can't be read", upgrade_required: 'this Coral needs an update' }[st && st.state] || 'not connected';
     return `Coral Hub: disconnected${host ? ` from ${host}` : ''} (${why})`;
