@@ -59,6 +59,7 @@ await loadStyles('needs_actions.css'); // the actions cell's fixed slots (moved 
 await loadStyles('inbox_review_groups.css');
 await loadStyles('needs_rows_compact.css'); // a computer's Needs you rows, compact: the grid and the labelled buttons (#15722); every rule is under the folded card list, so a phone is unchanged
 await loadStyles('needs_phone.css'); // a phone's Needs you rows: not in the start's stylesheet (page_weight), loaded with the Inbox before a row is drawn
+await loadStyles('data_table_goals.css'); // the shared goal-card rules: loaded before the first goals row is drawn, so the old card never shows for a frame (#16663)
 const { el } = DT;
 const TF = await importOnce('./task_filters.js');
 const TV = await importOnce('./tasks_view.js'); // the one Tasks view
@@ -1530,7 +1531,7 @@ registerGroupSource('hub-inbox', {
             const emptyLine = narrowed ? 'No goal matches the search and filters.' : goalFilters.state === 'done' ? 'No finished goals.' : hasDone ? 'All goals are done.' : 'No open goals.';
             return { title: 'Goals', noun: ['goal', 'goals'], rows, ...(waitingNote ? { note: waitingNote } : {}), empty: { line: emptyLine, hint: waitingNote || (narrowed ? undefined : goalFilters.state === 'done' || hasDone ? undefined : "Press New goal to create one, or an Orchestrator can propose one too.") },
                 signature: JSON.stringify(rows.map(g => [g.board_id, g.id, g.title, g.outcome, g.state, g.updated_at, g.rollup])),
-                node: () => { loadStyles('data_table_goals.css'); const phone = isPhoneLayout(), mountBar = () => { const bar = document.querySelector('#group-table-view .gt-toolbar'); if (bar) { Toolbar.mountSelection(bar, goalsState.selected.size ? table.bar : null); if (phone) bar.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); } }; const table = DT.dataTable({ label: `Goals, ${rows.length}`, rows, rowKey: goalKey, state: goalsState, rowName: g => g.title,
+                node: () => { const phone = isPhoneLayout(), mountBar = () => { const bar = document.querySelector('#group-table-view .gt-toolbar'); if (bar) { Toolbar.mountSelection(bar, goalsState.selected.size ? table.bar : null); if (phone) bar.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); } }; const table = DT.dataTable({ label: `Goals, ${rows.length}`, rows, rowKey: goalKey, state: goalsState, rowName: g => g.title,
                     selectable: { contextKey: 'inbox-goals', canSelect: g => ['proposed', 'active', 'blocked'].includes(String(g.state || '').toLowerCase()), actions: closeGoalsActions(), onChange: () => mountBar(), ...(phone ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) }, // the tick column of the team page's Goals too (#16371); a phone: a long press selects, as in Needs you (#12230)
                     open: g => {
                         quietFocus($('inbox-view')); // same pointer-only heading focus rule as the team page
