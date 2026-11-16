@@ -1,4 +1,4 @@
-// #18771: the opened question has an explicit way to its asking agent.
+// #18809: the opened question offers an open icon beside its asking agent.
 // Mock-agent harness; solo display name and same-named members of different teams, desktop/phone.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -30,7 +30,7 @@ const BASE = require('./test_base').BASE;
                     await m.openAskDialog({ kind: '${kind}', asker: '${asker}', board: '${board}', session_id: '${kind === 'agent' ? session : ''}', id: 71, at: new Date().toISOString(), text: 'Open Settings and look around.' });
                     return true;
                 })()`);
-                const button = `document.querySelector('dialog.inbox-ask-dialog .inbox-ask-sub [data-agent-link]')`;
+                const button = `document.querySelector('dialog.inbox-ask-dialog h2 .inbox-ask-open-agent')`;
                 await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog')`, `${width}: question opens`, 8000);
                 let missing;
                 try { await waitFor(`!!${button}`, `${width} ${kind}: Open agent is offered`, 6000); } catch (e) { missing = e; }
@@ -39,7 +39,9 @@ const BASE = require('./test_base').BASE;
                     fs.writeFileSync(path.join(process.env.CORAL_SCREENSHOT_DIR, `question-agent-${width}-${kind}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
                 }
                 if (missing) throw missing;
-                assert.equal(await ev(`${button}.textContent`), 'Open agent');
+                assert.equal(await ev(`${button}.getAttribute('aria-label')`), `Open ${asker}`);
+                assert.equal(await ev(`${button}.querySelector('[aria-hidden="true"]').textContent`), 'open_in_new');
+                assert.equal(await ev(`!!document.querySelector('dialog.inbox-ask-dialog .inbox-ask-sub [data-agent-link]')`), false, 'the separate button is removed');
                 assert.equal(await ev(`${button}.dataset.agentLink`), session, 'the question identifies its own agent');
                 const reachable = await ev(`(() => { const b = ${button}; b.scrollIntoView({ block: 'nearest' }); const r = b.getBoundingClientRect(); const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return hit === b || b.contains(hit); })()`);
                 assert.equal(reachable, true, `${width}: action can be clicked`);

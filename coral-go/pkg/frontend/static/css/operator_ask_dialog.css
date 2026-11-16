@@ -67,3 +67,5 @@
     dialog.inbox-ask-dialog .inbox-ask-sendrow { position: sticky; bottom: calc(-1 * var(--space-2xl)); z-index: 2; padding: 8px 0; background: var(--bg-secondary); }
     dialog.inbox-ask-dialog .inbox-ask-foot { position: static; }
 }
+
+.inbox-ask-dialog h2 .inbox-ask-open-agent { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; vertical-align: middle; }

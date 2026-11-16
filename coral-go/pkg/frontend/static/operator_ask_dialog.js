@@ -35,8 +35,10 @@ export function openAskDialog(a, onDone, runners = {}) {
         title.replaceChildren(m.agentLink(who, identity), ...(a.kind === 'agent' ? [] : [` · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`]));
         const live = m.liveAgentOf(a.asker, identity);
         if (!live || normServer(live.server) !== normServer(a.server)) return;
-        const go = m.agentLink(a.asker, { ...identity, text: 'Open agent', label: `Open agent: ${who}`, cls: 'btn' });
-        sub.append(' · ', go); // the shared agent link keeps the unsent-reply confirmation and closes the question before navigation
+        const go = m.agentLink(a.asker, { ...identity, label: `Open ${who}`, cls: 'inbox-ask-open-agent' });
+        const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = 'open_in_new';
+        go.replaceChildren(icon);
+        title.append(' ', go); // shared chat navigation keeps the unsent-reply confirmation
     });
     const subjects = askSubjects(a), links = document.createElement('p'); links.className = 'inbox-ask-subjects'; links.hidden = !subjects.length; if (subjects.length) loadStyles('pictures.css'); // its links are drawn by the lazy picture rules // the goal and task it is about, each a link that opens it in the Inbox
     if (subjects.length) links.append(document.createTextNode('About ')); // the asker names them: the line says so (Security's INFO on #12164)
