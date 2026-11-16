@@ -62,6 +62,10 @@ func TestSingleAgentAskReachesNeedsYouAndTheAnswerReachesTheAgent(t *testing.T) 
 	require.NoError(t, store.NewSessionStore(db).SetDisplayName(context.Background(), o.SessionID, "Notes builder"))
 	rows = h.Rows(httptest.NewRequest(http.MethodGet, "/", nil))
 	assert.Equal(t, "Notes builder", rows[0].Asker, "the name the sidebar shows, not the session's prefix (#18668)")
+	dn := "Getting Started Agent"
+	require.NoError(t, store.NewSessionStore(db).RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: o.SessionID, AgentType: "claude", AgentName: "claude", DisplayName: &dn}))
+	rows = h.Rows(httptest.NewRequest(http.MethodGet, "/", nil))
+	assert.Equal(t, "Getting Started Agent", rows[0].Asker, "a named single agent shows its live display name, not \"claude\" (#18668)")
 
 	require.Equal(t, http.StatusOK, post("/api/agent-asks", `{"text":"Which port?"}`, true).Code)
 	rows = h.Rows(httptest.NewRequest(http.MethodGet, "/", nil))

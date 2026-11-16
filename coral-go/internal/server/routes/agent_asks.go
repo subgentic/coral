@@ -234,17 +234,18 @@ func (h *AgentAsksHandler) Rows(r *http.Request) []operatorAskRow {
 	if err != nil {
 		return nil
 	}
-	live := map[string]bool{}
+	live := map[string]*store.LiveSession{}
 	if sessions, err := h.ss.GetAllLiveSessions(r.Context()); err == nil {
-		for _, s := range sessions {
-			live[s.SessionID] = true // asleep counts: it is answered once woken
+		for i := range sessions {
+			live[sessions[i].SessionID] = &sessions[i] // asleep counts: it is answered once woken
 		}
 	} else {
 		live = nil // cannot tell: nothing is dropped
 	}
 	rows := make([]operatorAskRow, 0, len(list))
 	for _, a := range list {
-		if live != nil && !live[a.SessionID] { // its agent has exited: nobody is left to read an answer, so the question leaves Needs you by itself (#18668)
+		ls := live[a.SessionID]
+		if live != nil && ls == nil { // its agent has exited: nobody is left to read an answer, so the question leaves Needs you by itself (#18668)
 			_, _ = h.ss.CloseAgentAsk(r.Context(), a.ID, time.Now())
 			continue
 		}
@@ -253,8 +254,11 @@ func (h *AgentAsksHandler) Rows(r *http.Request) []operatorAskRow {
 		if _, sid := logparse.ParseSessionName(a.SessionName); sid != "" {
 			asker = strings.TrimSuffix(strings.TrimSuffix(a.SessionName, sid), "-")
 		}
-		if dn, err := h.ss.GetDisplayName(r.Context(), a.SessionID); err == nil && dn != nil && strings.TrimSpace(*dn) != "" {
-			asker = *dn // the name the sidebar shows, not the session's prefix
+		// the name the sidebar shows (the live row's display name, else the one kept for the session), never the agent type "claude" (#18668)
+		if ls != nil && ls.DisplayName != nil && strings.TrimSpace(*ls.DisplayName) != "" {
+			asker = *ls.DisplayName
+		} else if dn, err := h.ss.GetDisplayName(r.Context(), a.SessionID); err == nil && dn != nil && strings.TrimSpace(*dn) != "" {
+			asker = *dn
 		}
 		row := operatorAskRow{Kind: "agent", ID: a.ID, Asker: clitext.CleanName(asker), Text: text, Cut: cut, At: a.CreatedAt, Options: a.Options}
 		rows = append(rows, row)
