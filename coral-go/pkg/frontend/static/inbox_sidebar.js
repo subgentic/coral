@@ -1494,7 +1494,7 @@ registerGroupSource('hub-inbox', {
                 } };
         }
         if (CH.CHAT_KEY.test(key)) {
-            return CH.chatsSpec(key, { selection: bar => Toolbar.mountSelection($('group-table-view')?.querySelector('.gt-toolbar'), bar), query: chatFiltersOf(key).q, params: CF.toParams(key, chatFiltersOf(key)), server: chatFiltersOf(key).server, redraw: () => refreshGroupTable('hub-inbox'), nav: () => renderInboxNav(true), open: openChat,
+            return CH.chatsSpec(key, { clearSearch: () => { chatFilters.set(key, { ...chatFiltersOf(key), q: '' }); queries[key] = ''; const input = $('inbox-search'); if (input && group === key) input.value = ''; if (nativeInbox()) CH.resetChatLists(key); renderInboxNav(true); }, selection: bar => Toolbar.mountSelection($('group-table-view')?.querySelector('.gt-toolbar'), bar), query: chatFiltersOf(key).q, params: CF.toParams(key, chatFiltersOf(key)), server: chatFiltersOf(key).server, redraw: () => refreshGroupTable('hub-inbox'), nav: () => renderInboxNav(true), open: openChat,
                 after: () => { CH.loadChatCounts(() => renderInboxNav(true)); refreshGroupTable('hub-inbox'); } });
         }
         if (key === 'goals') {
