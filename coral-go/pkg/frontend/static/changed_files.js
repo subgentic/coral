@@ -646,7 +646,6 @@ document.addEventListener('keydown', e => {
 // The changed and starred files' markup (#3645): data-on-* names, never code. The path is the file's
 // own (data-path, never re-escaped into a script); data-diff opens its diff.
 const pathOf = el => textOf(el.dataset.path, 4096);
-const viaFile = (mod, fn) => async (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) (await importOnce(mod))[fn](p); }; // a Files button whose work is a lazy module's (#17632)
 const diffOpts = el => (el.dataset.diff === '1' ? [0, { diff: true }] : []);
 registerActions({
     'file-expand': (el, event) => { event.stopPropagation(); toggleFileExpanded(pathOf(el)); },
