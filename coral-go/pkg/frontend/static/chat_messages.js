@@ -1,3 +1,4 @@
+import { importOnce } from './import_once.js';
 /* Drawing a chat's messages (moved out of live_chat.js, #5065; no behaviour change; the copy button's click listener stays in live_chat.js, which registers it after its own earlier ones). */
 import { markHidden } from './visible_marks.js';
 import { appendContent, appendTurnFinal, appendWork, htmlToElement } from './chat_content.js';
@@ -6,13 +7,10 @@ import { unwrapPastedContent } from './pasted_content.js';
 import { isCoralNudge, INTERRUPT_RE, appendCoralNotice, isCoralHealthNudge, normalizeNudgeText } from './pending_messages.js';
 import { escapeHtml, escapeAttr, renderMarkdown } from './utils.js';
 import { CHAT_MARKDOWN } from './markdown.js';
-import { thumbHtml, wireThumbs, sharedImageChips } from './chat_thumbs.js';
-import { splitSharedImages } from './shared_images.js';
 import { chatAgentAdapter } from './chat_agents.js';
 import { SAVE_BUTTON } from './saved_marks.js';
 import { messageTimeHtml } from './message_time.js';
 import { getToolIcon, renderToolCard, renderQuestionCard } from './chat_tool_cards.js';
-import { visibleName } from './artifact_names.js';
 
 // Agent replies carry a copy button that copies the reply's markdown as the
 // agent wrote it (not the rendered text).
@@ -47,11 +45,6 @@ function isCoralDelivery(msg) {
 // A pasted image in a user turn (Codex records it as a name like "[Image #1]" and the saved file's base name): a chip with
 // the name, and the file name when there is one. The chip is not a link; the image is shown as a thumbnail from its reference in the session's transcript, or
 // from an upload by the file's name (chat_thumbs.js, #5028, #5032).
-function attachmentChips(attachments) {
-    const chips = (Array.isArray(attachments) ? attachments : []).filter(a => a && a.name).map(a =>
-        `<span class="chip chip-tag chat-attachment-chip">${escapeHtml(visibleName(a.name))}${a.file ? ` <span class="chat-attachment-file">${escapeHtml(a.file)}</span>` : ""}</span>${thumbHtml(a)}`);
-    return chips.length ? `<div class="chat-attachments">${chips.join("")}</div>` : "";
-}
 
 function renderOneMessage(msg, container, agentType) {
     const adapter = chatAgentAdapter(agentType);
@@ -60,27 +53,13 @@ function renderOneMessage(msg, container, agentType) {
     } else if (msg.type === "user" && msg.local_command === true) {
         // A slash command the CLI ran by itself ("/model sonnet"): a small note of what was typed, not a bubble (#5488). Seeing it here is how the message the person sent is known to be taken.
         appendContent(container, makeBubble("chat-note chat-local-command", escapeHtml(markHidden(msg.content || ""))));
-	} else if (msg.type === "user" && msg.coral_notice !== false &&
-        /You were automatically joined to message board "[^"\n]+"/.test(String(msg.content || "")) &&
-        String(msg.content).includes('Use the coral-board CLI to communicate with your teammates:') &&
-        String(msg.content).includes('Do NOT run coral-board join')) {
-        // Preserve the full generated launch source, including literal CLI placeholders.
-        const bubble = makeBubble("chat-note", "");
-        const details = document.createElement("details"); details.className = "chat-team-instructions";
-        const summary = document.createElement("summary"); summary.textContent = "Team instructions";
-        const source = document.createElement("pre"); source.textContent = unwrapPastedContent(msg.content);
-        details.append(summary, source); bubble.append(details); appendContent(container, bubble);
-    } else if (msg.type === "user" && isCoralDelivery(msg)) {
+	} else if (msg.type === "user" && isCoralDelivery(msg)) {
 		const text = unwrapPastedContent(msg.content);
 		appendCoralNotice(container, normalizeNudgeText(text), isCoralHealthNudge(text));
     } else if (msg.type === "user") {
-        // Images pasted in the dashboard lead the turn as "<path> coral://artifacts/<hex>" pairs (#5284): shown as artifact thumbnails, not as the text of a path and a link.
-        const lead = splitSharedImages(unwrapPastedContent(msg.content));
-        const bubble = makeBubble("chat-bubble human",
-            `<div class="role-label">You</div><div class="message-text prose">${renderMarkdown(markHidden(lead.rest), CHAT_MARKDOWN, 'chat')}</div>${attachmentChips(msg.attachments)}${sharedImageChips(lead.images)}${messageMenuButton(lead.rest)}${msg.key ? SAVE_BUTTON : ""}${messageTimeHtml(msg.timestamp)}`);
-        if (msg.key) { bubble.dataset.msgKey = msg.key; bubble.dataset.said = msg.timestamp || ""; } // Save for Later finds the message again by this (#4510)
-        wireThumbs(bubble);
+        const bubble = makeBubble("chat-bubble human", "");
         appendContent(container, bubble);
+        importOnce('./chat_user_message.js').then(m => m.fillUserMessage(bubble, msg, messageMenuButton));
     } else if (msg.type === "assistant") {
         if (msg.text) {
             const bubble = makeBubble(`chat-bubble assistant${msg.phase === "commentary" ? " commentary" : ""}`,
