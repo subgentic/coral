@@ -428,7 +428,7 @@ const _tables = {};
 const _numCol = (key, label, get, show, extra) => ({ key, label, numeric: true, sort: 'number', firstDir: 'desc', sortValue: get, cell: r => show(get(r)), ...extra });
 const _tokCol = (key, label, extra) => _numCol(key, label, r => r[key] || 0, compactFigure, extra);
 const _cacheCols = () => [_tokCol('cache_read_tokens', 'Cache read', { narrowHide: true }), _tokCol('cache_write_tokens', 'Cache write', { narrowHide: true })]; // the two that wait when the table's box is narrow
-const _costCol = (rows = []) => { const digits = costDigits(rows.map(r => r.cost_usd || 0)); return _numCol('cost_usd', 'Cost', r => r.cost_usd || 0, c => formatCost(c, { zeroAsTwo: true, digits }), { foldFirst: true }); }; // digits: two rows that round to the same cents show more (#10740); // the figure the page is opened for: on a phone it follows the name (#5056)
+const _costCol = (rows = []) => { const digits = costDigits(rows.map(r => r.cost_usd || 0)); return _numCol('cost_usd', 'Cost', r => r.cost_usd || 0, c => c < 0 ? '-' + formatCost(-c, { zeroAsTwo: true, digits }) : formatCost(c, { zeroAsTwo: true, digits }), { foldFirst: true }); }; // digits: two rows that round to the same cents show more (#10740); // the figure the page is opened for: on a phone it follows the name (#5056)
 const _shareCol = () => _numCol('cost_pct', 'Share', r => r.cost_pct || 0, v => `${Math.round(v * 100)}%`, { foldFirst: true });
 // Team's and branch's Share: the share of the whole table (not of the filtered rows), drawn as a bar with its figure.
 const _shareBarCol = total => _numCol('cost_pct', 'Share', r => r.cost_usd || 0, () => '', { foldFirst: true, cell: r => {
@@ -677,6 +677,8 @@ const _listFull = tasks => tasks.length >= 100;
 /** The cost no task carries (an agent between tasks, chats, the Operator's own sessions): the page's total less what the tasks add up to, as a row of its own so the table's rows agree with Total cost (walk 80). */
 function _untaskedRow(costTasks, full) {
     const left = _costTotal - costTasks.reduce((n, t) => n + (t.cost_usd || 0), 0);
+    // Over: a task that began before the range counts in full (its cost is not split by day), so the tasks can add up to more than the range's Total. A negative row says so and keeps the rows adding up to the Total, instead of hiding the rest (#17827).
+    if (left <= -0.005) return { id: 0, untasked: true, title: 'Earlier spend of tasks begun before this range', cost_usd: left };
     return left >= 0.005 ? { id: 0, untasked: true, title: full ? 'Other cost in this range' : 'Not on a task', cost_usd: left } : null; // a full list may leave tasks out: then the rest is not only what no task carries
 }
 
