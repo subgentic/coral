@@ -530,7 +530,7 @@ function factsOf(task, ctx) {
     if (task.completed_at) fact(dl, 'Finished', whenText(task.completed_at));
     if (task.completed_by) fact(dl, task.status === 'skipped' ? 'Cancelled by' : 'Finished by', task.completed_by);
     if (task.workflow && task.workflow.outcome === 'failed') fact(dl, 'Outcome', 'Failed'); // the dialog's "Result: Failed"
-    if (task.completion_message) fact(dl, 'Result', linkedText(task.completion_message, { server: ctx && ctx.project ? splitKey(ctx.project).server : undefined }));
+    if (task.completion_message) { const r = el('span', null); r.append(linkedText(task.completion_message, { server: ctx && ctx.project ? splitKey(ctx.project).server : undefined })); fact(dl, 'Result', r); if (jump && jump.kind === 'agent' && jump.state === 'running') importOnce('./task_result_files.js').then(m => m.linkPaths(r, jump.session)).catch(Object); } // a path in it opens (#18200)
     else if (task.workflow && task.workflow.outcome === 'failed') fact(dl, 'Result details', 'No failure reason was provided.');
     return dl;
 }
