@@ -1,3 +1,4 @@
+import { importOnce } from './import_once.js';
 /* Live history controller: polling, page cursors, cancellation, kept pages and reset. Moved from live_chat.js (#8353). */
 
 import { state } from './state.js';
@@ -57,6 +58,7 @@ function noteHistoryReceipts(sessionId, messages) {
 async function _showKeptPage(session, container, kept) {
     // Built off screen in slices; a poll that comes while it builds returns at once (keptRenderGeneration).
     const generation = historyGeneration;
+
     keptRenderGeneration = generation;
     const built = document.createElement("div");
     let rebuilt = false;
@@ -219,6 +221,7 @@ export async function refreshLiveHistory() {
         let data;
         try {
             data = await resp.json();
+            await importOnce('./chat_team_instructions.js');
         } catch (err) {
             // A reply that isn't JSON says so, rather than only a parser's position (#3694).
             throw new Error(`the reply from the server could not be read: ${err.message}`);

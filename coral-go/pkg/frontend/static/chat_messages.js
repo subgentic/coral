@@ -1,3 +1,4 @@
+import { loadedModule } from './import_once.js';
 /* Drawing a chat's messages (moved out of live_chat.js, #5065; no behaviour change; the copy button's click listener stays in live_chat.js, which registers it after its own earlier ones). */
 import { loadStyles } from './lazy_styles.js';
 import { markHidden } from './visible_marks.js';
@@ -19,7 +20,7 @@ import { visibleName } from './artifact_names.js';
 // agent wrote it (not the rendered text).
 // The button of a message the person sent: its menu (message_menu.js) loads when it is first opened, not at start (page weight).
 // Each button names its message, so a list of them is not a list of the same name (#10451): "Message actions: first words of the message".
-const messageMenuButton = text => { const words = markHidden(text || '').trim().split(/\s+/).filter(Boolean).slice(0, 6).join(' '); const label = words ? `Message actions: ${words}` : 'Message actions'; return `<button type="button" class="btn btn-quiet btn-icon btn-xs chat-msg-menu-btn" title="Message actions" aria-label="${escapeAttr(label)}" aria-haspopup="menu" aria-expanded="false" aria-controls="chat-msg-menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="13" cy="8" r="1.4"/></svg></button>`; };
+const messageMenuButton = text => { const words = markHidden(text || '').trim().split(/\s+/).filter(Boolean).slice(0, 6).join(' '); const label = words ? `Message actions: ${words}` : 'Message actions'; return `<button type="button" class="btn btn-quiet btn-icon btn-xs chat-msg-menu-btn ic-more" title="Message actions" aria-label="${escapeAttr(label)}" aria-haspopup="menu" aria-expanded="false" aria-controls="chat-msg-menu"></button>`; };
 const COPY_BUTTON = `<button type="button" class="btn btn-quiet btn-icon btn-xs chat-copy-btn" title="Copy" aria-label="Copy message"><span class="material-icons" aria-hidden="true">content_copy</span></button>`;
 
 export const bubbleSource = new WeakMap();
@@ -28,7 +29,7 @@ export const bubbleSource = new WeakMap();
 // in its place, and the messages around it are drawn as usual.
 export function renderMessage(msg, container, agentType = "claude") {
     try {
-        renderOneMessage(msg, container, agentType);
+        if (!loadedModule('./chat_team_instructions.js')?.appendInstructions(msg, container)) renderOneMessage(msg, container, agentType);
     } catch (e) {
         console.warn("[coral] a chat message could not be shown", e);
         appendContent(container, makeBubble("chat-note chat-message-unrendered", "This message could not be shown."));
@@ -39,15 +40,17 @@ export function renderMessage(msg, container, agentType = "claude") {
 // Operator sent from the dashboard (#5482: a person's own "[Coral ...]", "[Task #4]" or "Stop hook feedback:" is theirs, whatever its words). Only a turn with no recorded origin (older history, anything sent
 // before the server started, keys typed in the terminal view) is read by its text. A long notice reaches the agent as a paste, which Claude Code records wrapped in pasted_content tags, so the text is
 // unwrapped before it is read.
+
+
+// A pasted image in a user turn (Codex records it as a name like "[Image #1]" and the saved file's base name): a chip with
+// the name, and the file name when there is one. The chip is not a link; the image is shown as a thumbnail from its reference in the session's transcript, or
+// from an upload by the file's name (chat_thumbs.js, #5028, #5032).
 function isCoralDelivery(msg) {
     if (msg.coral_notice === true) return true;
     if (msg.coral_notice === false) return false;
     return isCoralNudge(unwrapPastedContent(msg.content));
 }
 
-// A pasted image in a user turn (Codex records it as a name like "[Image #1]" and the saved file's base name): a chip with
-// the name, and the file name when there is one. The chip is not a link; the image is shown as a thumbnail from its reference in the session's transcript, or
-// from an upload by the file's name (chat_thumbs.js, #5028, #5032).
 function attachmentChips(attachments) {
     const chips = (Array.isArray(attachments) ? attachments : []).filter(a => a && a.name).map(a =>
         `<span class="chip chip-tag chat-attachment-chip">${escapeHtml(visibleName(a.name))}${a.file ? ` <span class="chat-attachment-file">${escapeHtml(a.file)}</span>` : ""}</span>${thumbHtml(a)}`);
