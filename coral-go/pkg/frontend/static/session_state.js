@@ -62,8 +62,8 @@ export function startingPlaceholder(identity) {
 
 /** What an agent waits for, in words a person reads: the tool's name is not one ("Wants to use AskUserQuestion" is a question for the person; the sentence with the question in it, "Wants to know: Pick a color", is kept as it is). Display text only (#10195). */
 export function askWords(summary) {
-    const t = String(summary || '').replace(/\s+/g, ' ').trim();
-    return /^(Notification: )?Wants to use AskUserQuestion$/i.test(t) ? 'Has a question for you' : t;
+    const t = String(summary || '').replace(/\s+/g, ' ').trim().replace(/^Notification:\s*/, ''); // the event's own prefix is not what the agent asks (#16658)
+    return /^Wants to use AskUserQuestion$/i.test(t) ? 'Has a question for you' : t;
 }
 
 /** Shared identity resolver used by row label, avatar, header, terminal label and placeholder. */
