@@ -101,8 +101,9 @@ const BUNDLE = { exists: true, index: '# Team alpha\\n\\nWhat the team knows.', 
 
         // ── Start, leave, come back ──
         await openKnowledge();
-        await until(`/No knowledge yet/.test((document.getElementById('team-panel-knowledge') || {}).textContent || '')`, 'the empty knowledge view');
-        check('no knowledge yet: the empty view with Distill', /No knowledge yet/.test(await panelText()));
+        // One read says it: the page redraws the tab once more after its first paint (Loading knowledge… again, on a slow machine), so a second read after the wait could land on that redraw (#18975)
+        const empty = await until(`(() => { const p = document.getElementById('team-panel-knowledge'); return !!p && /No knowledge yet/.test(p.textContent) && !/Loading knowledge/.test(p.textContent) && !!p.querySelector('.team-distill'); })()`, 'the empty knowledge view with Distill');
+        check('no knowledge yet: the empty view with Distill', empty === true);
         await ev(`document.querySelector('#team-panel-knowledge .team-distill').click(); true`);
         await until(`window.__posts === 1 && /Distilling…/.test(document.getElementById('team-panel-knowledge').textContent)`, 'the run started');
         check('Distill starts one run and the button says Distilling…, off', (await ev('window.__posts')) === 1 && /Distilling…/.test(await panelText()) && (await ev(`document.querySelector('#team-panel-knowledge .team-distill').disabled`)));
