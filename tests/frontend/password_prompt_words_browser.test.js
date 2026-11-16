@@ -18,7 +18,7 @@ const { coralReady } = require('./helpers/wait');
                 return { title: m.querySelector('h3').textContent.trim(), lead: m.querySelector('.pw-lead').textContent.trim(), note: (m.querySelector('.pw-not-now') || {}).textContent || '', text: m.innerText.replace(/\\s+/g, ' '),
                     primary: [...m.querySelectorAll('button.btn-primary')].filter(vis).map(b => b.textContent.trim()), buttons: [...m.querySelectorAll('.modal-footer button')].filter(vis).map(b => ({ t: b.textContent.trim(), h: Math.round(b.getBoundingClientRect().height) })) }; })()`);
             assert.equal(d.title, 'Protect Coral with a password', `${w}: the title says what it is`);
-            assert.equal(d.lead, 'A password keeps other people and other devices out of Coral when it is opened in a web browser.', `${w}: it says what the password protects`);
+            assert.equal(d.lead, 'A password keeps others out of Coral in a web browser. You can change it in Settings, Security.', `${w}: it says what the password protects and where to change it later (#17695)`);
             assert.match(d.text, /Coral needs a password before it opens\./, `${w}: a prompt with no way past it says so in one line (#16594): ${d.text}`);
             assert.equal(d.note, '', `${w}: no line about skipping (#11892: a password is always created)`);
             assert.doesNotMatch(d.text, /skip|without a password|Only you use this computer|Not now/i, `${w}: nothing reads as a way around it: ${d.text}`);

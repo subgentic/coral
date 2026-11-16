@@ -166,7 +166,7 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(out.fields.username, { ac: 'username', hidden: true }, 'a username field for the password manager');
         assert.equal(out.fields.type, 'password'); assert.equal(out.fields.focused, 'set-password-new', 'focus moves to the password');
         assert.equal(out.shown, 'text'); assert.equal(out.hiddenAgain, 'password', 'Show then Hide');
-        assert.equal(out.lead1, 'A password keeps other people and other devices out of Coral when it is opened in a web browser.', 'the dialog says what the password is for, not a change notice');
+        assert.equal(out.lead1, 'A password keeps others out of Coral in a web browser. You can change it in Settings, Security.', 'the dialog says what the password is for, not a change notice');
         assert.equal(out.lead2, out.lead1, 'the same words on a later visit, and no "nothing changed" notice');
         assert.doesNotMatch(out.lead1 + out.lead2, /nothing changed|now asks browsers/);
         assert.deepEqual(out.weak, { level: 'weak', disabled: false }, 'the meter advises and never blocks');

@@ -118,8 +118,8 @@ export function showSetPasswordModal({ required = false } = {}) {
     const content = el('div', 'modal-content dlg-confirm');
     const head = el('div', 'modal-header'); const title = el('h3', '', 'Protect Coral with a password'); title.id = 'set-password-title'; head.append(title);
     const body = el('div', 'modal-body');
-    // One wording for everyone (a new install and an upgrade alike): what the password is for. The server has no first-run marker, and nobody needs "nothing changed here" (#6010).
-    body.append(el('p', 'pw-lead', 'A password keeps other people and other devices out of Coral when it is opened in a web browser.'));
+    // One wording for everyone (a new install and an upgrade alike): what the password is for and where to change it (#17695; the web sign-in page, auth_page.go, keeps its own words: a browser there cannot reach Settings). The server has no first-run marker, and nobody needs "nothing changed here" (#6010).
+    body.append(el('p', 'pw-lead', 'A password keeps others out of Coral in a web browser. You can change it in Settings, Security.'));
     if (required) body.append(el('p', 'pw-lead pw-required', 'Coral needs a password before it opens.')); // no Cancel here, so the dialog says why (#16594)
     const form = el('form', 'pw-form'); form.autocomplete = 'on'; form.id = 'set-password-form';
     const pw = passwordField({ id: 'set-password-new', label: 'Password', autocomplete: 'new-password', name: 'new-password' });
