@@ -116,7 +116,7 @@ body.panel-dragging .agentic-state {
 /* ── Tabs ──────────────────────────────────────────────────── */
 
 .agentic-state-tabs { flex-shrink: 0; }
-.agentic-state-tabs > .agentic-tab { align-self: flex-start; } /* a tab is 36 px, not stretched to the strip's overlap (#15821) */ /* the strip is the one tab strip's (.tabs .tabs-icons, components.css): the tabs share its width and wrap at large text (#4344) */
+.agentic-state-tabs > .agentic-tab { align-self: flex-start; min-width: 44px; } /* 36 px high, not stretched (#15821); 44 px wide, not 2em: fits at 200% text (#17417) */ /* one strip with .tabs-icons: the tabs share its width, wrap at large text (#4344) */
 
 .agentic-tab .material-icons {
     font-size: var(--icon-size);
@@ -132,7 +132,7 @@ body.panel-dragging .agentic-state {
 
 /* A tab the user hid; !important so it wins over the scope rules that show tabs. */
 .agentic-tab.tab-hidden { display: none !important; }
-.agentic-tab-customize { flex: 0 0 auto; min-width: 40px; }
+.agentic-tab-customize { flex: 0 0 auto; } /* its 44 px floor is the strip's (#17417) */
 
 /* The tabs' words (UI/UX's 170 list, #7621): shown beside the icon when dock_tabs.js measured that all of them fit the row on one line at 1280 px and up (data-words); the name is the title and the
    aria-label either way. The rarely used tabs are drawn out of the row (.tab-more: still real buttons, out of the tab order) and open from the More menu. */
@@ -2034,4 +2034,3 @@ body.panel-dragging .agentic-state {
 .inline-preview-cm .cm-merge-b .cm-changedLine,
 .inline-preview-cm .cm-deletedChunk { color: var(--diff-line-text, inherit); }
 .inline-preview-cm .cm-merge-b .cm-line:not(.cm-changedLine) span { filter: var(--diff-context-filter, none); } /* the lines around a change: a comment was 3.9:1 on the dark editor */
-.agentic-state-tabs > .agentic-tab { min-width: 44px; } /* 44 px is the target, not 2em: at 200% text 2em is 64 px a tab and the row (Board, Files with its count, Artifacts, Tasks, More) no longer fits, so the open tab lost its word and the row was cut off (#17417) */
