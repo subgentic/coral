@@ -494,7 +494,7 @@
     },
     {
       "name": "artifact_review_sent",
-      "sql": "CREATE TABLE artifact_review_sent (\n\t\tboard_id TEXT NOT NULL,\n\t\thex      TEXT NOT NULL,\n\t\tat       TEXT NOT NULL,\n\t\tPRIMARY KEY (board_id, hex)\n\t)",
+      "sql": "CREATE TABLE artifact_review_sent (\n\t\tboard_id TEXT NOT NULL,\n\t\thex      TEXT NOT NULL,\n\t\tat       TEXT NOT NULL, sent_by TEXT NOT NULL DEFAULT '',\n\t\tPRIMARY KEY (board_id, hex)\n\t)",
       "tbl_name": "artifact_review_sent",
       "type": "table"
     },
@@ -1316,6 +1316,15 @@
           "dflt_value": null,
           "hidden": 0,
           "name": "at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "sent_by",
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"

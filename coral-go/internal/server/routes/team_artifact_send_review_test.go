@@ -323,3 +323,22 @@ func TestSendingForReviewIsRecordedStampedAndAnApprovedFileStartsANewRound(t *te
 	}
 	assert.True(t, found, "the re-send says it follows an approval: %v", got)
 }
+
+// The row of a file the person sent for review says so (#17819): the store records who started the review, and the list carries it, so Needs you does not name whoever produced the file (the Orchestrator, in the walk).
+func TestAFileThePersonSentForReviewSaysSoOnItsRow(t *testing.T) {
+	e := newTagEnv(t)
+	ctx := context.Background()
+	mine, theirs := e.ids["report.md"], e.ids["scratch.log"]
+	require.NotEmpty(t, mine)
+	require.NotEmpty(t, theirs)
+	_, _, err := e.h.bs.StartArtifactReview(ctx, "tag-team", mine, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, e.h.bs.SetArtifactTags(ctx, "tag-team", theirs, []string{"for review"})) // an agent's own upload with the tag
+	rows := []teamArtifact{{managed: mine}, {managed: theirs}}
+	e.h.attachArtifactTags(ctx, "tag-team", rows)
+	assert.Equal(t, "operator", rows[0].ReviewSentBy, "the person's own send")
+	assert.Empty(t, rows[1].ReviewSentBy, "an agent's file for review is not marked")
+	b, err := json.Marshal(rows[0])
+	require.NoError(t, err)
+	assert.Contains(t, string(b), `"review_sent_by":"operator"`)
+}
