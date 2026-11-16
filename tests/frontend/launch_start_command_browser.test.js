@@ -22,6 +22,8 @@ const { install: installNA, stubModels, stubCliChecks } = require('./helpers/new
             await waitFor(`!!document.getElementById('launch-dir') && document.getElementById('launch-dir').getClientRects().length > 0`, 'the folder step', 8000);
             await ev(`(() => { const i = document.getElementById('launch-dir'); if (!i.value) { i.value = '/tmp'; i.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('launch-agent-next').click(); return true; })()`);
             await waitFor(`document.getElementById('launch-agent-pick') && document.getElementById('launch-agent-pick').dataset.probed === '1'`, 'the cards', 10000);
+            await ev(`(() => { for (let i = 0; i < 2; i++) { if (document.getElementById('launch-modal').getAttribute('data-agent-stage') !== 'agent') document.getElementById('launch-agent-next').click(); } return true; })()`); // to the model step: the recap is on that one only (#18568)
+            await waitFor(`document.getElementById('launch-modal').getAttribute('data-agent-stage') === 'agent'`, 'the model step', 6000);
             const pick = (type, mode) => ev(`(() => { const t = document.querySelector('#launch-agent-acf .acf-agent-type'); t.value = ${JSON.stringify(type)}; t.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`)
                 .then(() => ev(`(() => { const m = document.querySelector('#launch-agent-acf .acf-permission-mode'); m.value = ${JSON.stringify(mode)}; m.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`));
             const cmd = () => ev(`document.querySelector('#launch-recap .launch-recap-command .lrc-text')?.textContent || ''`);
