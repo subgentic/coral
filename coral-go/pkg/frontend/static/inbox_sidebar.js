@@ -413,7 +413,7 @@ function inboxNeedsToolbar() {
     node.querySelectorAll('.skip-link, .inbox-filter-note').forEach(e => e.remove()); /* the bar is kept between draws: what was added to it last time goes first */
     const skip = DT.el('a', 'skip-link', 'Skip to the list'); skip.href = '#'; skip.addEventListener('click', e => { e.preventDefault(); document.querySelector('#group-table-view tbody tr:not(.dt-group) button, #group-table-view tbody tr:not(.dt-group) a')?.focus(); }); node.prepend(skip); // a keyboard user passes the search and filters (walk 7 M3)
     if (needsFilters.team && !activeNeedsTeam) { const n = DT.el('p', 'goals-note inbox-filter-note', `Filtered by team: ${needsFilters.team} `), c = DT.el('button', 'btn', 'Clear'); c.type = 'button'; c.setAttribute('aria-label', `Clear the team filter: ${needsFilters.team}`); c.addEventListener('click', () => { needsFilters = { ...needsFilters, team: '', server: '' }; persistNeedsFilters(); renderInboxNav(true); }); n.append(c); node.append(n); } /* a team filter kept from last time says so above the list (walk 15 M2, #15259) */
-    if (!node.querySelector('.agent-copy')) node.append(agentCopyButton('needs_you', 'Coral\u2019s Needs you list: what agents and the board wait on the Operator for.', { className: 'agent-copy-words' }));
+    if (!node.querySelector('.agent-copy')) (node.querySelector(':scope > .list-bar-search-row') || node).append(agentCopyButton('needs_you', 'Coral\u2019s Needs you list: what agents and the board wait on the Operator for.')); // the robot is on the header row at its far right, with the filters, not alone on a row of its own under it (#18802)
     return { node, signature: JSON.stringify([groupMode, needsFilters, teams, names, goalNames, counts, rows.length, rows.filter(needsUnread).length]) };
 }
 
@@ -927,7 +927,7 @@ function inboxSavedToolbar() {
     const v = saved.savedView(), filters = saved.savedFiltersNow(), options = saved.savedPageOptions();
     const node = savedBar.draw({ filters, options,
         pills: { label: 'Show', current: v.tab, items: [{ key: 'open', label: 'Open', count: `${countSavedReviews().complete && savedKnown() ? '' : 'at least '}${v.totals.open + countSavedReviews().value}` }, { key: 'done', label: 'Done', count: v.totals.done }], onPick: key => saved.setSavedTab(key) } });
-    if (!node.querySelector('.agent-copy')) node.append(agentCopyButton('saved_messages', 'The Operator\u2019s Saved list (Inbox, Saved): messages kept for later.', { className: 'agent-copy-words' }));
+    if (!node.querySelector('.agent-copy')) (node.querySelector(':scope > .list-bar-search-row') || node).append(agentCopyButton('saved_messages', 'The Operator\u2019s Saved list (Inbox, Saved): messages kept for later.')); // on the header row, like Needs you (#18802)
     return { node, signature: JSON.stringify([filters, v.tab, v.totals, options, countSavedReviews()]) };
 }
 const savedCounts = () => saved.savedView().totals;

@@ -21,3 +21,6 @@
 
 /* A robot that stands alone above a list (Needs you, Saved) says what it is on a phone, where a title never shows (walk 49). */
 @media (max-width: 600px) { .agent-copy-words { width: auto; gap: 8px; padding-inline: 12px; } .agent-copy-words::after { content: 'Copy for an agent'; font-size: var(--fs-md); } }
+
+/* The robot of a list bar (Needs you, Saved) is the last thing on the header row, at its far right, after the filters and Select (#18802). */
+.list-bar-search-row > .agent-copy { order: 99; }
