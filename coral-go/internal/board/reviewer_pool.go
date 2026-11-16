@@ -3,6 +3,7 @@ package board
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 // The reviewer pool (#17612): reviews spread themselves. A team lists a group to "pick one from"; a task entering review goes to the group member with the fewest open review tasks, ties to the one
@@ -28,11 +29,11 @@ func (s *Store) pickFromReviewerPool(ctx context.Context, project string, pool, 
 	}
 	_ = s.reader().SelectContext(ctx, &last, `SELECT t.assigned_to, MAX(t.created_at) AS at FROM board_tasks t JOIN task_workflows w ON w.task_id = t.id
 		WHERE t.board_id = ? AND t.assigned_to IS NOT NULL AND COALESCE(json_extract(w.data, '$.review_of'), 0) > 0 GROUP BY t.assigned_to`, project)
-	given := map[string]string{}
+	given := map[string]time.Time{}
 	for _, l := range last {
-		given[l.Assignee] = l.At
+		given[l.Assignee] = parseStamp(l.At)
 	}
-	best, bestOpen, bestAt := "", 0, ""
+	best, bestOpen, bestAt := "", 0, time.Time{}
 	for _, c := range pool {
 		id := ""
 		for _, sub := range subs {
@@ -55,7 +56,7 @@ func (s *Store) pickFromReviewerPool(ctx context.Context, project string, pool, 
 			continue
 		}
 		n, at := len(open[id]), given[id]
-		if best == "" || n < bestOpen || (n == bestOpen && at < bestAt) {
+		if best == "" || n < bestOpen || (n == bestOpen && at.Before(bestAt)) {
 			best, bestOpen, bestAt = id, n, at
 		}
 	}
@@ -63,4 +64,14 @@ func (s *Store) pickFromReviewerPool(ctx context.Context, project string, pool, 
 		return "", ""
 	}
 	return best, fmt.Sprintf("least open reviews: %d", bestOpen)
+}
+
+// parseStamp reads a stored created_at as a time (RFC 3339 or SQLite's "2006-01-02 15:04:05", with or without fractions); a stamp that is neither is the zero time, which sorts first: given longest ago (#17749, as a string "9" sorted after "10").
+func parseStamp(v string) time.Time {
+	for _, layout := range []string{time.RFC3339Nano, "2006-01-02 15:04:05.999999999", "2006-01-02T15:04:05.999999999", "2006-01-02 15:04:05"} {
+		if t, err := time.Parse(layout, v); err == nil {
+			return t
+		}
+	}
+	return time.Time{}
 }
