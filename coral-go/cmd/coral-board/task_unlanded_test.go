@@ -21,14 +21,36 @@ func gitIn(t *testing.T, dir string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
+// shortHead is HEAD's 10-digit name, re-made (amended) until it holds a letter and a digit: headSHAFromText refuses a word of only digits or only letters, so a test that names a head must not depend on luck.
+func shortHead(t *testing.T, dir string) string {
+	t.Helper()
+	for i := 0; i < 50; i++ {
+		if s := gitIn(t, dir, "rev-parse", "--short=10", "HEAD"); hasLetterAndDigit(s) {
+			return s
+		}
+		gitIn(t, dir, "commit", "-q", "--amend", "--allow-empty", "-m", fmt.Sprintf("%s (retry %d)", gitIn(t, dir, "log", "-1", "--format=%s"), i))
+	}
+	t.Fatal("no head name with a letter and a digit in 50 tries")
+	return ""
+}
+
 func TestHeadSHAIsTheOneAfterHeadElseTheFirstRealHexWord(t *testing.T) {
 	assert.Equal(t, "593c17b672", headSHAFromText("", "Head 593c17b672 on qa-x (base 7ca240b821)"), "the base named after the head is not the head")
 	assert.Equal(t, "74da127ae8", headSHAFromText("Model column (head 74da127ae8, branch qa on 7ca240b821)"))
-	assert.Equal(t, "2010aa1b98", headSHAFromText("Download; 2010aa1b98, stacked on 5d2ffdd95f"), "no 'head': the first commit-looking word")
+	assert.Equal(t, "2010aa1b98", headSHAFromText("Download; at 2010aa1b98, stacked on 5d2ffdd95f"), "no 'head': the first commit-looking word after at, commit or sha")
+	assert.Equal(t, "2010aa1b98", headSHAFromText("fixed in commit 2010aa1b98"))
+	assert.Equal(t, "2010aa1b98", headSHAFromText("done, sha: 2010aa1b98"))
 	assert.Equal(t, "", headSHAFromText("it effaced a deadbeef-less word, 1234567 digits only", "review pending"), "a word with no letter, or no digit, is not a commit")
 	assert.Equal(t, "abc1234", headSHAFromText("", "Head: ABC1234."), "case and punctuation")
 	// a base is never taken for the head (#18255): it would show the task as landed
-	assert.Equal(t, "", headSHAFromText("ready on main 7ca240b821, fix at abc1234def"), "the first word is main's")
+	assert.Equal(t, "abc1234def", headSHAFromText("ready on main 7ca240b821, fix at abc1234def"), "main's word follows 'main', not an allow word")
+	// an allow list, not a block list (#18302): a word before the commit that is not at, commit or sha takes none
+	assert.Equal(t, "", headSHAFromText("rebased 7ca240b821"))
+	assert.Equal(t, "", headSHAFromText("branched at 7ca240b821"), "the base, even after 'at'")
+	assert.Equal(t, "", headSHAFromText("based at 7ca240b821; rebased at 5d2ffdd95f"))
+	assert.Equal(t, "2010aa1b98", headSHAFromText("branched at 7ca240b821, fixed at 2010aa1b98"))
+	assert.Equal(t, "", headSHAFromText("branched at-ish 7ca240b821, then 2010aa1b98"))
+	assert.Equal(t, "", headSHAFromText("2010aa1b98 ready"), "a commit with no allow word before it")
 	assert.Equal(t, "", headSHAFromText("fixed (base 7ca240b821)"))
 	assert.Equal(t, "", headSHAFromText("", "based on 7ca240b821"))
 	assert.Equal(t, "", headSHAFromText("stacked on 5d2ffdd95f"))
@@ -40,25 +62,25 @@ func TestUnlandedListsApprovedTasksWhoseHeadIsNotOnTheRef(t *testing.T) {
 	repo := t.TempDir()
 	gitIn(t, repo, "init", "-q", "-b", "main")
 	gitIn(t, repo, "commit", "-q", "--allow-empty", "-m", "first")
-	onMain := gitIn(t, repo, "rev-parse", "--short=10", "HEAD")
+	onMain := shortHead(t, repo)
 	gitIn(t, repo, "checkout", "-q", "-b", "topic")
 	gitIn(t, repo, "commit", "-q", "--allow-empty", "-m", "topic work")
-	offMain := gitIn(t, repo, "rev-parse", "--short=10", "HEAD")
+	offMain := shortHead(t, repo)
 	gitIn(t, repo, "checkout", "-q", "main")
 	before := gitIn(t, repo, "rev-parse", "HEAD")
 	now := time.Now().UTC()
 	day := func(n int) string { return now.Add(-time.Duration(n) * 24 * time.Hour).Format(time.RFC3339) }
 	tasks := []map[string]any{
-		{"id": 1.0, "status": "completed", "outcome": "success", "completed_at": day(1), "title": "landed"},
-		{"id": 2.0, "status": "completed", "outcome": "success", "completed_at": day(1), "title": "approved, not on main"},
-		{"id": 3.0, "status": "completed", "outcome": "success", "completed_at": day(1), "title": "no sha in its text"},
+		{"id": 1.0, "status": "completed", "outcome": "success", "reviewers": []any{"Security Reviewer"}, "completed_at": day(1), "title": "landed"},
+		{"id": 2.0, "status": "completed", "outcome": "success", "reviewers": []any{"Security Reviewer"}, "completed_at": day(1), "title": "approved, not on main"},
+		{"id": 3.0, "status": "completed", "outcome": "success", "reviewers": []any{"Security Reviewer"}, "completed_at": day(1), "title": "no sha in its text"},
 		{"id": 4.0, "status": "completed", "outcome": "failed", "completed_at": day(1), "title": "failed"},
-		{"id": 5.0, "status": "completed", "outcome": "success", "completed_at": day(30), "title": "too old"},
+		{"id": 5.0, "status": "completed", "outcome": "success", "reviewers": []any{"Security Reviewer"}, "completed_at": day(30), "title": "too old"},
 		{"id": 6.0, "status": "in_progress", "title": "open"},
-		{"id": 7.0, "status": "completed", "outcome": "success", "completed_at": day(2), "title": "a commit this clone lacks"},
-		{"id": 8.0, "status": "completed", "outcome": "success", "completed_at": day(1), "title": "Review #2: approved, not on main"},
-		{"id": 9.0, "status": "completed", "outcome": "success", "completed_at": day(1), "title": "a review task by another name"},
-		{"id": 10.0, "status": "completed", "outcome": "success", "completed_at": day(1), "title": "names only its base, which is on main"},
+		{"id": 7.0, "status": "completed", "outcome": "success", "reviewers": []any{"Security Reviewer"}, "completed_at": day(2), "title": "a commit this clone lacks"},
+		{"id": 8.0, "status": "completed", "outcome": "success", "reviewers": []any{"Security Reviewer"}, "completed_at": day(1), "title": "Review #2: approved, not on main"},
+		{"id": 9.0, "status": "completed", "outcome": "success", "reviewers": []any{"Security Reviewer"}, "completed_at": day(1), "title": "a review task by another name"},
+		{"id": 10.0, "status": "completed", "outcome": "success", "reviewers": []any{"Security Reviewer"}, "completed_at": day(1), "title": "names only its base, which is on main"},
 	}
 	text := map[int64]string{1: "Head " + onMain, 2: "Head " + offMain, 3: "all done", 7: "Head 0123abc4567", 10: "ready, base " + onMain}
 	detail := func(id int64) (map[string]any, error) {
@@ -67,7 +89,7 @@ func TestUnlandedListsApprovedTasksWhoseHeadIsNotOnTheRef(t *testing.T) {
 		}
 		return map[string]any{"workflow": map[string]any{"completion_review": map[string]any{"message": text[id], "reason": "review pending"}}}, nil
 	}
-	got, err := findUnlanded(tasks, now.Add(-7*24*time.Hour), "main", detail, gitLanded(repo, "main"))
+	got, err := findUnlanded(tasks, now.Add(-7*24*time.Hour), "main", detail, gitChecks(repo, "main"))
 	require.NoError(t, err)
 	var ids []string
 	for _, r := range got {
@@ -79,7 +101,7 @@ func TestUnlandedListsApprovedTasksWhoseHeadIsNotOnTheRef(t *testing.T) {
 	assert.Empty(t, gitIn(t, repo, "status", "--porcelain"))
 	// the same work counts as landed once its branch is merged
 	gitIn(t, repo, "merge", "-q", "--no-ff", "-m", "merge topic", "topic")
-	got, err = findUnlanded(tasks, now.Add(-7*24*time.Hour), "main", detail, gitLanded(repo, "main"))
+	got, err = findUnlanded(tasks, now.Add(-7*24*time.Hour), "main", detail, gitChecks(repo, "main"))
 	require.NoError(t, err)
 	for _, r := range got {
 		assert.NotEqual(t, int64(2), r.ID, "a merged head is landed")
@@ -98,4 +120,174 @@ func TestUnlandedWindowAndRefAreChecked(t *testing.T) {
 		_, err := parseSince(bad)
 		assert.Error(t, err, bad)
 	}
+}
+
+// A pick lands under another SHA (#18373): the ref has the same patch, or its log names the task. A real repository: a cherry-pick, a rebase, a trial merge with the task in its subject, and a branch whose patch is not on the ref.
+func TestUnlandedCountsAPickAndATaskNamedOnTheRefAsLanded(t *testing.T) {
+	repo := t.TempDir()
+	gitIn(t, repo, "init", "-q", "-b", "main")
+	write := func(name, body string) { require.NoError(t, os.WriteFile(repo+"/"+name, []byte(body), 0o644)) }
+	write("base.txt", "base\n")
+	gitIn(t, repo, "add", "-A")
+	gitIn(t, repo, "commit", "-q", "-m", "base")
+	branch := func(name, file string) string {
+		gitIn(t, repo, "checkout", "-q", "-b", name, "main")
+		write(file, name+"\n")
+		gitIn(t, repo, "add", "-A")
+		gitIn(t, repo, "commit", "-q", "-m", name+" work")
+		sha := shortHead(t, repo)
+		gitIn(t, repo, "checkout", "-q", "main")
+		return sha
+	}
+	picked, named, unsent := branch("picked", "p.txt"), branch("named", "n.txt"), branch("unsent", "u.txt")
+	write("other.txt", "main moved\n")
+	gitIn(t, repo, "add", "-A")
+	gitIn(t, repo, "commit", "-q", "-m", "main moves on")
+	gitIn(t, repo, "cherry-pick", "picked") // on a moved main: a new SHA, the same patch
+	require.NotEqual(t, picked, shortHead(t, repo))
+	gitIn(t, repo, "merge", "-q", "--no-ff", "--no-commit", "named")
+	gitIn(t, repo, "commit", "-q", "-m", "Merge a head into the trial (#302)")
+	now := time.Now().UTC()
+	day := now.Add(-24 * time.Hour).Format(time.RFC3339)
+	tasks := []map[string]any{
+		{"id": 301.0, "status": "completed", "outcome": "success", "reviewers": []any{"Security Reviewer"}, "completed_at": day, "title": "cherry-picked"},
+		{"id": 302.0, "status": "completed", "outcome": "success", "reviewers": []any{"Security Reviewer"}, "completed_at": day, "title": "named in a merge subject"},
+		{"id": 303.0, "status": "completed", "outcome": "success", "reviewers": []any{"Security Reviewer"}, "completed_at": day, "title": "not on the ref"},
+		{"id": 304.0, "status": "completed", "outcome": "success", "reviewers": []any{"Security Reviewer"}, "completed_at": day, "title": "its commit is unknown here, the log names it"},
+	}
+	heads := map[int64]string{301: picked, 302: named, 303: unsent, 304: "0123abc4567"}
+	gitIn(t, repo, "commit", "-q", "--allow-empty", "-m", "Merge 0123abc4567 into the trial (#304)")
+	detail := func(id int64) (map[string]any, error) {
+		return map[string]any{"workflow": map[string]any{"completion_review": map[string]any{"message": "Head " + heads[id]}}}, nil
+	}
+	got, err := findUnlanded(tasks, now.Add(-7*24*time.Hour), "main", detail, gitChecks(repo, "main"))
+	require.NoError(t, err)
+	require.Len(t, got, 1, "%v", got)
+	assert.Equal(t, int64(303), got[0].ID, "only the branch whose patch and number are not on main is unlanded")
+	assert.Equal(t, "not on main", got[0].Why)
+}
+
+// The commit an approval names is the head that must land, not the first one a submit named (#18373): #18082 and #18092 showed '-', #18255 an early head.
+func TestUnlandedUsesTheApprovedHeadBeforeTheSubmittedOne(t *testing.T) {
+	repo := t.TempDir()
+	gitIn(t, repo, "init", "-q", "-b", "main")
+	gitIn(t, repo, "commit", "-q", "--allow-empty", "-m", "first")
+	onMain := shortHead(t, repo)
+	gitIn(t, repo, "checkout", "-q", "-b", "topic")
+	gitIn(t, repo, "commit", "-q", "--allow-empty", "-m", "topic work")
+	off := shortHead(t, repo)
+	gitIn(t, repo, "checkout", "-q", "main")
+	now := time.Now().UTC()
+	day := now.Add(-24 * time.Hour).Format(time.RFC3339)
+	tasks := []map[string]any{
+		{"id": 1.0, "status": "completed", "outcome": "success", "reviewers": []any{"Security Reviewer"}, "completed_at": day, "title": "early head landed, approved head not"},
+		{"id": 2.0, "status": "completed", "outcome": "success", "reviewers": []any{"Security Reviewer"}, "completed_at": day, "title": "no head in the submit, the approval has it"},
+		{"id": 3.0, "status": "completed", "outcome": "success", "reviewers": []any{"Security Reviewer"}, "completed_at": day, "title": "approved head is on main"},
+	}
+	round := func(res, note string) map[string]any {
+		return map[string]any{"workflow": nil, "result": res, "reviewers": []any{map[string]any{"state": res, "note": note}}}
+	}
+	detail := func(id int64) (map[string]any, error) {
+		rounds := map[int64][]any{
+			1: {round("rejected", "Rejected "+onMain), round("approved", "Approved "+off+", code read")},
+			2: {round("approved", "Approved "+off)},
+			3: {round("approved", "Approved "+onMain)},
+		}[id]
+		submit := map[int64]string{1: "Head " + onMain, 2: "ready for review", 3: "Head " + off}[id]
+		return map[string]any{"workflow": map[string]any{"completion_review": map[string]any{"message": submit}, "review_rounds": rounds}}, nil
+	}
+	got, err := findUnlanded(tasks, now.Add(-7*24*time.Hour), "main", detail, gitChecks(repo, "main"))
+	require.NoError(t, err)
+	var ids []string
+	for _, r := range got {
+		ids = append(ids, fmt.Sprintf("%d:%s:%s", r.ID, r.SHA, r.Why))
+	}
+	assert.Equal(t, []string{"1:" + off + ":not on main", "2:" + off + ":not on main"}, ids, "the approved head decides; a rejected round's SHA never does")
+}
+
+// #18191: only a code submit that went through review is a candidate (a task with no reviewers has no commit to find, and 536 of them buried the real ones), a task the board records as landed (mark-landed)
+// is not listed whatever the ref holds, and a title is printed as one clean line in the text and the JSON.
+func TestUnlandedListsOnlyReviewedSubmitsSkipsMarkedLandedAndCleansTitles(t *testing.T) {
+	repo := t.TempDir()
+	gitIn(t, repo, "init", "-q", "-b", "main")
+	gitIn(t, repo, "commit", "-q", "--allow-empty", "-m", "first")
+	gitIn(t, repo, "checkout", "-q", "-b", "topic")
+	gitIn(t, repo, "commit", "-q", "--allow-empty", "-m", "never landed")
+	off := shortHead(t, repo)
+	gitIn(t, repo, "checkout", "-q", "main")
+	now := time.Now().UTC()
+	day := now.Add(-24 * time.Hour).Format(time.RFC3339)
+	reviewers := []any{"Security Reviewer"}
+	tasks := []map[string]any{
+		{"id": 1.0, "status": "completed", "outcome": "success", "completed_at": day, "title": "reviewed, not on main", "reviewers": reviewers},
+		{"id": 2.0, "status": "completed", "outcome": "success", "completed_at": day, "title": "no reviewers: a plain task done with a message"},
+		{"id": 3.0, "status": "completed", "outcome": "success", "completed_at": day, "title": "marked landed on the board", "reviewers": reviewers},
+		{"id": 4.0, "status": "completed", "outcome": "success", "completed_at": day, "title": "evil \x1b]0;pwned\x07title\nsecond line", "reviewers": reviewers},
+	}
+	read := []int64{}
+	detail := func(id int64) (map[string]any, error) {
+		read = append(read, id)
+		wf := map[string]any{"completion_review": map[string]any{"message": "Head " + off, "reason": "review pending"}}
+		if id == 3 {
+			wf["artifacts"] = []any{map[string]any{"kind": "landed-commit", "landed_at": day}}
+		}
+		return map[string]any{"workflow": wf}, nil
+	}
+	got, err := findUnlanded(tasks, now.Add(-7*24*time.Hour), "main", detail, gitChecks(repo, "main"))
+	require.NoError(t, err)
+	var ids []int64
+	for _, r := range got {
+		ids = append(ids, r.ID)
+	}
+	assert.Equal(t, []int64{1, 4}, ids, "the unreviewed task and the one marked landed are not listed")
+	assert.NotContains(t, read, int64(2), "an unreviewed task is not even read")
+	assert.Equal(t, "evil title second line", got[1].Title, "a title is one clean line")
+}
+
+// #18191 (the Orchestrator's fold-in from #18373): only "(#N)" at the end of a subject names a task, a Revert never does, and the counts say what the list leaves out.
+func TestUnlandedNamesATaskOnlyByAnEndingNumberAndCountsWhatItSkips(t *testing.T) {
+	for line, want := range map[string]int64{
+		"Merge 0123abc4567 into the trial (#304)": 304,
+		"Fix the thing (#17452)":                  17452,
+		"Fix the thing (#17452)  ":                17452,
+		"follows #17452 in spirit":                0,
+		"Fix the thing (#17452) and more":         0,
+		"Revert \"Fix the thing (#17452)\"":       0,
+		"revert: Fix the thing (#17452)":          0,
+		"no number":                               0,
+	} {
+		n, ok := namedInSubject(line)
+		assert.Equal(t, want != 0, ok, line)
+		assert.Equal(t, want, n, line)
+	}
+
+	repo := t.TempDir()
+	gitIn(t, repo, "init", "-q", "-b", "main")
+	gitIn(t, repo, "commit", "-q", "--allow-empty", "-m", "first")
+	gitIn(t, repo, "checkout", "-q", "-b", "topic")
+	gitIn(t, repo, "commit", "-q", "--allow-empty", "-m", "never landed")
+	off := shortHead(t, repo)
+	gitIn(t, repo, "checkout", "-q", "main")
+	gitIn(t, repo, "commit", "-q", "--allow-empty", "-m", "Merge a head into the trial (#402)")
+	gitIn(t, repo, "commit", "-q", "--allow-empty", "-m", "Revert \"Merge a head into the trial (#403)\"")
+	now := time.Now().UTC()
+	day := now.Add(-24 * time.Hour).Format(time.RFC3339)
+	rv := []any{"Security Reviewer"}
+	tasks := []map[string]any{
+		{"id": 401.0, "status": "completed", "outcome": "success", "reviewers": rv, "completed_at": day, "title": "marked landed"},
+		{"id": 402.0, "status": "completed", "outcome": "success", "reviewers": rv, "completed_at": day, "title": "named on the ref"},
+		{"id": 403.0, "status": "completed", "outcome": "success", "reviewers": rv, "completed_at": day, "title": "its only mention on the ref is a revert"},
+	}
+	detail := func(id int64) (map[string]any, error) {
+		wf := map[string]any{"completion_review": map[string]any{"message": "Head " + off, "reason": "review pending"}}
+		if id == 401 {
+			wf["artifacts"] = []any{map[string]any{"landed_at": day}}
+		}
+		return map[string]any{"workflow": wf}, nil
+	}
+	got, counts, err := findUnlandedCounted(tasks, now.Add(-7*24*time.Hour), "main", detail, gitChecks(repo, "main"))
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, int64(403), got[0].ID, "a revert does not land it")
+	assert.Equal(t, unlandCounts{Checked: 3, MarkedLanded: 1, Named: 1}, counts)
 }
