@@ -56,6 +56,9 @@ let _editor = null;
 let _editAbort = null;
 let _editCapability = null, _editOpening = false;
 let _sendCapability = null, _editSend = null, _sendOpening = false;
+let _trail = [];         // the documents this one was reached from, newest last: { hex, opts, name, scroll } (#18208)
+let _trailOverlay = 0;   // the trail's entry in overlay_history.js
+let _restore = null;     // the scroll the document we came Back to had, put back once it is drawn
 let _overlay = 0;        // its entry in overlay_history.js while it is open on a phone (#5219)
 
 // Layout preferences are scoped by kind, not by artifact ID; browserLocal catches
@@ -78,12 +81,40 @@ function setFullScreen(d, on, remember = false) {
     button.textContent = on ? '⤡' : '⤢';
     if (remember && _layoutType) browserLocal.set('coral-artifact-fullscreen:' + _layoutType, String(on));
 }
+/* A link inside the document opens the linked file as a step in this viewer (#18208): the document is kept on _trail with its scroll, 'Back to <name>' (and Escape, and the browser's Back) returns to it. */
+const bodyScroller = d => d.querySelector('.artifact-viewer-body');
+function showTrail(d) {
+    const row = d.querySelector('.artifact-viewer-trail'), last = _trail[_trail.length - 1];
+    row.hidden = !last;
+    if (last) { const b = row.querySelector('.artifact-viewer-back'); b.textContent = `Back to ${last.name || 'the document'}`; b.setAttribute('aria-label', `Back to ${last.name || 'the document'}`); }
+}
+function backInViewer() {
+    const last = _trail[_trail.length - 1];
+    if (!last) return;
+    openArtifactViewer(last.hex, { ...last.opts, trailBack: true, restoreScroll: last.scroll });
+}
+function leaveTrail() { _trail.length = 0; if (_trailOverlay) { const id = _trailOverlay; _trailOverlay = 0; popOverlay(id); } }
+/* The history (overlay_history): the viewer has one entry (a phone's from the start, a computer's from its first step) and the trail one more above it, however many steps it holds. The browser's Back takes the trail's entry: it steps back and,
+ * while the trail is not empty, takes a new one; the router never sees a Back that lands on its own page until the viewer itself closes. */
+function trailPopped() {
+    _trailOverlay = 0;
+    if (!_trail.length) return;
+    backInViewer();
+    if (_trail.length && !_trailOverlay) _trailOverlay = pushOverlay(trailPopped);
+}
+function viewerPopped() { _overlay = 0; closeArtifactViewer({ popped: true }); }
+function followLink(d, hex, opts) {
+    const name = d.querySelector('.artifact-viewer-title-name')?.textContent || '';
+    const entry = { hex: _hex, opts: _lastOpts, name, scroll: bodyScroller(d).scrollTop };
+    openArtifactViewer(hex, { ...opts, keepTrail: true, trailFrom: entry });
+}
 function escapeViewer(d) {
     if (_editor) { _editor.cancel(); return; }
     if (d.classList.contains('av-fullscreen') && !isPhoneLayout()) {
         setFullScreen(d, false, true);
         d.querySelector('.artifact-viewer-fullscreen').focus();
-    } else closeArtifactViewer();
+    } else if (_trail.length) backInViewer();
+    else closeArtifactViewer();
 }
 
 /** Render an artifact's text: Markdown through the strict renderer, anything else as plain text. */
@@ -128,6 +159,7 @@ function _build() {
                 </div>
             </span>
         </div>
+        <div class="artifact-viewer-trail" hidden><button type="button" class="btn artifact-viewer-back"></button></div>
         <p class="artifact-viewer-versionline" hidden></p>
         <p class="artifact-viewer-source" role="note" hidden></p>
         <div class="artifact-viewer-readers" hidden></div>
@@ -177,6 +209,7 @@ function _build() {
     d.querySelectorAll('.artifact-viewer-edit,.artifact-viewer-edit-item').forEach(b => b.addEventListener('click', () => startMarkdownEdit(d)));
     d.querySelector('.artifact-edit-send-action').addEventListener('click', () => startEditSend(d));
     d.querySelector('.artifact-viewer-markup').addEventListener('click', markUp); d.querySelector('.artifact-viewer-markup-item').addEventListener('click', markUp);
+    d.querySelector('.artifact-viewer-back').addEventListener('click', backInViewer);
     d.addEventListener('click', (e) => { if (e.target === d) closeArtifactViewer(); });
     d.querySelector('.artifact-viewer-close').addEventListener('click', closeArtifactViewer);
     // A Coral artifact linked inside the shown file opens here too (the strict renderer keeps
@@ -190,7 +223,7 @@ function _build() {
         e.preventDefault();
         // The file cannot choose another computer through a data attribute. The sanitized
         // document's own artifact links inherit the frozen source and attribution.
-        openArtifactViewer(hex.toLowerCase(), { server: _lastOpts.server, board: _lastOpts.board, sourceNamed: _lastOpts.sourceNamed, onClose: _lastOpts.onClose, filename: a.textContent.trim() });
+        followLink(d, hex.toLowerCase(), { server: _lastOpts.server, board: _lastOpts.board, sourceNamed: _lastOpts.sourceNamed, onClose: _lastOpts.onClose, filename: a.textContent.trim() });
     });
     setDialogHide(d, () => escapeViewer(d)); // modal_chrome's Escape (with the focus anywhere on the page) closes it through its own close, not by display:none, which left it open and every later open a no-op (#12290)
     d.addEventListener('keydown', (e) => {
@@ -401,6 +434,15 @@ export function openArtifactViewer(hex, opts = {}) {
     _abort?.abort();
     _abort = new AbortController();
     const gen = ++_gen;
+    if (opts.trailFrom) { // a step into a linked file: the document stays on the trail, and the browser's Back is the way back on a computer too
+        const e = opts.trailFrom; _trail.push(e);
+        if (!_overlay) _overlay = pushOverlay(viewerPopped); // a computer's viewer has no history entry of its own: the browser's Back must land on one of ours, not on the router's page
+        if (!_trailOverlay) _trailOverlay = pushOverlay(trailPopped);
+    } else if (opts.trailBack) { _trail.pop(); if (!_trail.length && _trailOverlay) { const id = _trailOverlay; _trailOverlay = 0; popOverlay(id); } }
+    else if (!opts.keepTrail) leaveTrail();
+    _restore = opts.trailBack ? opts.restoreScroll : null;
+    opts = { ...opts, trailFrom: undefined, trailBack: undefined, restoreScroll: undefined, keepTrail: _trail.length > 0 || undefined };
+    showTrail(d);
     opts = { ...opts, lineHex: opts.lineHex || hex }; // the hex a caller's file id and line were given for: a version switch or a save spreads these opts onto ANOTHER hex, and the line must stay with its own (#14178)
     _hex = hex; _lastOpts = opts;
     _barLine = null; // before the bar is opened below: it may draw at once and tell the version it shows, and that line must survive the rest of this open
@@ -443,7 +485,7 @@ export function openArtifactViewer(hex, opts = {}) {
     d.hidden = false;
     syncTitleExpand(d);
     if (!wasOpen && isPhoneLayout()) document.querySelectorAll('#toast-host > .toast:not(.error):not(.has-action)').forEach(t => t.remove()); // a plain toast was announced and sat over the viewer's header and versions at the top of a phone (#11621)
-    if (!wasOpen && isPhoneLayout() && !_overlay) _overlay = pushOverlay(() => closeArtifactViewer({ popped: true })); // Back closes it, above the preview's full screen, under its comments sheet
+    if (!wasOpen && isPhoneLayout() && !_overlay) _overlay = pushOverlay(viewerPopped); // Back closes it, above the preview's full screen, under its comments sheet
     _comments.open(hex, opts.server, opts.board, true); // true: the comments of earlier versions of a series too (the server answers the plain list for an artifact in none)
     _versions.open(hex, opts.server, { switched: !!opts.switched, board: opts.board || '' });
     _review.open(hex, opts);
@@ -475,6 +517,7 @@ export function openArtifactViewer(hex, opts = {}) {
     paintLine(d);
     readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { _details.add(readersBlock(hex, opts.server, _details)); if (opts.sourceNamed) _details.add(privateBlock(hex, opts.server, _details)); _details.add(dropboxBlock(hex, opts.server, _details)); } }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
+    const scrollBack = _restore; _restore = null; // the scroll of the document we came Back to
     let textShown = false; // the strict text view drew it: comments can point into it. Anything else (a frame, a picture, a PDF, a table, a video, a download) takes whole-document comments (#11444).
     Promise.resolve(renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, board: opts.board, sourceNamed: opts.sourceNamed, filename: opts.filename, mediaType: opts.mediaType, scripts: true }, {
         signal: _abort.signal,
@@ -489,7 +532,7 @@ export function openArtifactViewer(hex, opts = {}) {
         renderContent: (el, content, path, server) => { textShown = true; renderArtifactText(el, content, path, server); _comments.docRendered(content, true); if (/\.(?:md|markdown|mdown)$/i.test(path || '')) { offerMarkdownEdit(d, hex, opts, gen); offerEditSend(d, hex, opts, gen); } },
         openEntry: (entry) => {
             const m = /^coral:\/\/artifacts\/([a-f0-9]{64})$/i.exec(entry.uri || '');
-            if (m) openArtifactViewer(m[1], { server: opts.server, board: opts.board, sourceNamed: opts.sourceNamed, onClose: opts.onClose, filename: entry.name, mediaType: entry.media_type });
+            if (m && _dialog) followLink(_dialog, m[1], { server: opts.server, board: opts.board, sourceNamed: opts.sourceNamed, onClose: opts.onClose, filename: entry.name, mediaType: entry.media_type });
         },
         setMeta: ({ title: t, filename }) => {
             if (gen !== _gen) return;
@@ -506,7 +549,7 @@ export function openArtifactViewer(hex, opts = {}) {
             dl.href = target.url; dl.setAttribute('download', target.name);
             dl.onclick = isCloud() ? (e) => { e.preventDefault(); if (dl.getAttribute('aria-disabled') === 'true') return; downloadArtifact(target.url, sanitizeDownloadName(target.name)).catch(err => { title.textContent = err.message; }); } : null;
         },
-    })).then(() => { if (gen !== _gen) return; syncSandbox(d, body); syncScripts(d, body); d.classList.toggle('is-image', !!body.querySelector('.image-panes')); d._markUp.picture(!!body.querySelector('.image-panes')); if (!textShown) _comments.docWhole(); setContentPending(d, false); }, () => { if (gen === _gen) setContentPending(d, false); }); // the content is on screen (or could not be drawn): Approve and the opened count go on (#15636) // a picture opens taller (css), not as a strip of its own height
+    })).then(() => { if (gen !== _gen) return; syncSandbox(d, body); syncScripts(d, body); d.classList.toggle('is-image', !!body.querySelector('.image-panes')); d._markUp.picture(!!body.querySelector('.image-panes')); if (!textShown) _comments.docWhole(); if (scrollBack != null) bodyScroller(d).scrollTop = scrollBack; setContentPending(d, false); }, () => { if (gen === _gen) setContentPending(d, false); }); // the content is on screen (or could not be drawn): Approve and the opened count go on (#15636) // a picture opens taller (css), not as a strip of its own height
     return true;
 }
 
@@ -523,6 +566,7 @@ export async function openBundledDocument({ title, url, name, onOpened }) {
     _abort?.abort(); _abort = new AbortController();
     const gen = ++_gen, signal = _abort.signal;
     _hex = ''; _lastOpts = {}; _line = null; _barLine = null; _layoutType = null;
+    leaveTrail(); showTrail(d);
     _versions?.close(); _review?.close(); _comments?.close(); _details.clear();
     for (const sel of ['.artifact-edit-send-action', '.artifact-viewer-edit', '.artifact-viewer-edit-item', '.artifact-viewer-markup', '.artifact-viewer-markup-item', '.artifact-viewer-newtab', '.artifact-viewer-dropbox-share', '.artifact-viewer-source', '.artifact-viewer-from']) { const el = d.querySelector(sel); if (el) el.hidden = true; }
     d.querySelector('.artifact-edit-send-note').hidden = true;
@@ -571,6 +615,7 @@ export async function openBundledDocument({ title, url, name, onOpened }) {
         }
     }
     stopEditSend(); stopMarkdownEdit();
+    leaveTrail(); showTrail(_dialog);
     _versions?.close();
     _review?.close();
     _comments?.close(); // the sheet (above it) goes first, so Back's order and ours agree
