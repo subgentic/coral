@@ -39,19 +39,19 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, theme] of [[1440, 'dark'], [1440, 'light'], [1100, 'dark'], [900, 'light'], [768, 'dark'], [390, 'dark'], [390, 'light']]) {
             const tag = `${w}-${theme}`, wide = await (async () => { await open(w, theme, false); return await ev(`!!document.querySelector('.team-tb-pills')?.getClientRects().length`); })();
-            assert.equal(await rowsNow(), 7, `${tag}: Everything shows all seven`);
+            assert.equal(await rowsNow(), 6, `${tag}: Everything shows all six (a send to an agent is in the record but not a row, #18466)`);
             const counts = await ev(`[...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.replace(/\\s+/g, ' ').trim())`);
             if (wide) {
                 await pick('words'); await pick('permissions');
                 assert.deepEqual(await pressed(), ['permissions', 'words'], `${tag}: two kinds are on together`);
-                assert.equal(await rowsNow(), 3, `${tag}: the two kinds' rows (two permissions, one word)`);
+                assert.equal(await rowsNow(), 2, `${tag}: the two kinds' rows (two permissions; the word has no row, #18466)`);
                 assert.deepEqual(await ev(`[...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.replace(/\\s+/g, ' ').trim())`), counts, `${tag}: the counts do not move with the choice`);
                 assert.equal(await ev(`[...document.querySelectorAll('.list-bar-chip, .team-tb-chip')].filter(e => e.getClientRects().length).map(e => e.textContent).join('|')`), '', `${tag}: no filter chip repeats the kinds over the strip`);
                 assert.equal(await ev(`!!document.querySelector('.inbox-folder-toolbar .list-bar-toggle .display-badge:not([hidden])')`), false, `${tag}: and no badge counts them`);
                 assert.deepEqual(await clipped(), [], `${tag}: nothing in the strip is cut`);
                 await shot(`kinds-two-${tag}`);
                 await pick('words'); assert.deepEqual(await pressed(), ['permissions'], `${tag}: pressing a kind again takes it off`);
-                await pick('words'); await pick('all'); assert.deepEqual(await pressed(), ['all'], `${tag}: Everything clears the others`); assert.equal(await rowsNow(), 7);
+                await pick('words'); await pick('all'); assert.deepEqual(await pressed(), ['all'], `${tag}: Everything clears the others`); assert.equal(await rowsNow(), 6);
                 await pick('files'); await pick('decisions'); // the choice is kept: a reload brings the same chips back
                 const kept = await ev(`JSON.parse(localStorage.getItem('coral-inbox-activity-filters') || '{}')`);
                 assert.deepEqual([...(kept.kind || [])].sort(), ['decisions', 'files'], `${tag}: kept in the browser: ${JSON.stringify(kept)}`);
@@ -66,11 +66,11 @@ const BASE = require('./test_base').BASE;
                 await tick(5); await ev(framesJs(4)); await tick(3); await ev(framesJs(4));
                 const checks = await panelChecks();
                 assert.deepEqual(checks, [false, false, false, true, false, true], `${tag}: two kinds ticked together: ${JSON.stringify(checks)}`);
-                assert.equal(await rowsNow(), 3, `${tag}: their rows`);
+                assert.equal(await rowsNow(), 2, `${tag}: their rows`);
                 await shot(`kinds-two-${tag}`);
                 await ev(`document.querySelector('.inbox-pill-field .team-tb-checks input').click(); true`); await ev(framesJs(4));
                 assert.deepEqual(await panelChecks(), [true, false, false, false, false, false], `${tag}: Everything clears the others`);
-                assert.equal(await rowsNow(), 7);
+                assert.equal(await rowsNow(), 6);
             }
         }
     } finally { await client.close(); }

@@ -19,7 +19,7 @@ const TRACK = `(() => { const t = window.__jump = { tops: [], noticeAt: -1 };
     const guard = await guardSettings();
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD + require('./helpers/launch_notice_agent').PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 700, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
         await ev(`fetch('/api/launch-disclosure/ack', { method: 'DELETE' }).then(r => r.ok)`);

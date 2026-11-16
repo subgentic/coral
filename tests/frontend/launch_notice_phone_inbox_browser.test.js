@@ -9,6 +9,7 @@ const { guardSettings } = require('./helpers/settings_guard');
 
 const HOLD = `(() => { const f = window.fetch; window.fetch = (u, o) => /\\/api\\/launch-disclosure(\\?|$)/.test(String((u && u.url) || u)) && (!o || !o.method || o.method === 'GET') ? new Promise(r => setTimeout(r, 700)).then(() => f(u, o)) : f(u, o); })()`; // sleep-ok: the notice's read is held on purpose, so it lands after first paint
 // the first thing under the pane's heading that is not the notice: its top at every frame, and when the notice is on screen
+const RESERVED = `(() => { window.__reserved = false; new MutationObserver(ms => { if (ms.some(m => m.attributeName === 'data-launch-notice' && (m.oldValue !== null || document.documentElement.hasAttribute('data-launch-notice')))) window.__reserved = true; }).observe(document, { subtree: true, attributes: true, attributeOldValue: true, attributeFilter: ['data-launch-notice'] }); })()`; // the attribute is set before first paint and may be gone when the notice has drawn (#18822: as launch_notice_cold_no_jump)
 const TRACK = `(() => { const t = window.__jump = { tops: [], noticeAt: -1 };
     const tick = () => { const v = document.getElementById('group-table-view'), n = document.getElementById('launch-disclosure-banner'), bar = v && v.querySelector(':scope > .inbox-folder-toolbar');
         const below = bar && [...v.children].find(e => e !== bar && e !== n && e.getBoundingClientRect().height > 0 && !e.classList.contains('skip-link'));
@@ -23,7 +24,7 @@ const TRACK = `(() => { const t = window.__jump = { tops: [], noticeAt: -1 };
     const check = (ok, msg) => { if (!ok) problems.push(msg); };
     const where = () => ev(`(() => { const n = document.getElementById('launch-disclosure-banner'); if (!n) return { none: true }; const p = n.parentElement, prev = n.previousElementSibling; return { inPane: p && p.id === 'group-table-view', underHeading: !!prev && prev.classList.contains('inbox-folder-toolbar'), underBar: !!prev && (prev.id === 'local-auth-banner' || prev.matches('header.top-bar')), count: document.querySelectorAll('#launch-disclosure-banner').length }; })()`);
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD + require('./helpers/launch_notice_agent').PRELOAD });
         for (const [w, h, mobile] of [[390, 844, true], [1280, 800, false]]) {
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -33,11 +34,11 @@ const TRACK = `(() => { const t = window.__jump = { tops: [], noticeAt: -1 };
             // 1. a cold load of /inbox/needs with the notice unseen and its read held. A phone loads it twice (#17289): the first time the browser has no hint and a typical height (57 px) is reserved, the second time the notice's own height, kept as the hint, is: the notice is taller than 57 on a renderer whose fonts wrap its headline to a third line (93 px on Windows), so only the second load can stay put within 3 px everywhere
             let p;
             for (const pass of mobile ? [1, 2] : [1]) {
-            const ids = [(await Page.addScriptToEvaluateOnNewDocument({ source: HOLD })).identifier];
+            const ids = [(await Page.addScriptToEvaluateOnNewDocument({ source: HOLD })).identifier, (await Page.addScriptToEvaluateOnNewDocument({ source: RESERVED })).identifier];
             if (mobile) ids.push((await Page.addScriptToEvaluateOnNewDocument({ source: TRACK })).identifier);
             await Page.navigate({ url: BASE + '/inbox/needs' }); await Page.loadEventFired(); await install();
             if (pass === 2) check(/^p\|\d+$/.test(await ev(`localStorage.getItem('coral-launch-notice') || ''`)), `${at}the notice's height is kept as the hint after the first load`);
-            check(await ev(`document.documentElement.hasAttribute('data-launch-notice')`), `${at}the room is reserved before first paint on a cold load of /inbox/needs`);
+            check(await ev(`window.__reserved`), `${at}the room is reserved before first paint on a cold load of /inbox/needs`);
             await waitFor(`!!document.getElementById('launch-disclosure-banner') && (window.__jump ? window.__jump.noticeAt >= 0 && window.__jump.tops.length >= window.__jump.noticeAt + 3 : true)`, `${at}the notice on a cold load of /inbox/needs`, 15000);
             await waitFor(`document.body.getAttribute('data-nav-tab') === 'hub-inbox' && !!document.querySelector('#group-table-view > .inbox-folder-toolbar')`, `${at}the Inbox's heading`, 10000);
             if (mobile && process.env.CORAL_SCREENSHOT_DIR) for (const theme of ['dark', 'light']) { // the shots: the phone's Inbox with the notice, both themes

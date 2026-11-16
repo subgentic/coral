@@ -28,7 +28,7 @@ const { coralReady } = require('./helpers/wait');
             check(shown.hintHidden === false && hidden.hintHidden === true, 'the hint was shown, then hidden');
             check(shown.send === hidden.send, `the Comment button stays where it was when the hint goes (${shown.send} px, then ${hidden.send} px)`);
             check(/^\d+ \/ \d+$/.test(shown.count), `the count is only the count: ${JSON.stringify(shown.count)}`);
-            check(/^Enter starts a new line\. Press (Ctrl\+Enter|⌘ Return) to send\.$/.test(shown.how), `one sentence says how to send: ${JSON.stringify(shown.how)}`);
+            check(/^(Enter starts a new line\. Press (Ctrl\+Enter|⌘ Return) to send|Return starts a new line\. Tap the button to send)\.$/.test(shown.how), `one sentence says how to send: ${JSON.stringify(shown.how)}`);
             check(!/Return sends|⌘ Enter|on a Mac/.test(shown.text), `the shortcut is not said a second time, in another spelling: ${JSON.stringify(shown.text)}`);
         }
     } finally { await client.close(); }

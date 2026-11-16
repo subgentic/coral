@@ -44,7 +44,7 @@ const { coralReady } = require('./helpers/wait');
                 await still();
                 const d = await read();
                 ok(JSON.stringify(d.texts) === JSON.stringify(['Add task', 'Mark done', 'More']), `${tag}: the buttons are Add task, Mark done and More`, d.texts);
-                ok(JSON.stringify(d.blue) === JSON.stringify(['Mark done']), `${tag}: Mark done is the one blue button`, d.blue);
+                ok(JSON.stringify(d.blue) === JSON.stringify(['Add task']), `${tag}: Add task is the one blue button while no task is done (#16636)`, d.blue);
                 ok(!d.teamLinkOutside, `${tag}: the team link is not a loose link in the header`);
                 ok(d.inside && !d.sideways, `${tag}: nothing is off screen or scrolls sideways`, d);
                 if (rowCheck) ok(d.tops === 1, `${tag}: the buttons are one row`, d.tops);
