@@ -198,7 +198,8 @@ const SLEEPING_PLACEHOLDER = '';
         await quiet();
         await settled();
         r = await reqs();
-        assert.equal(await ev('window.__selCalls'), 1, `wake + feed flip together: one re-select (got ${await ev('window.__selCalls')})`);
+        // The feed's flip re-selects only while the agent's chat is the screen shown (#17243), so here the Wake button's own re-select is the one: counted once, never twice.
+        assert.equal(await ev('window.__selCalls'), 1, `wake + feed flip together: still one re-select (got ${await ev('window.__selCalls')})`);
         assert.equal(r.filter(x => x.first).length, 0, `wake + feed flip together: no first-page /chat, the kept page is shown (got ${r.filter(x => x.first).length})`);
         const ids = await ev('window.__rendered()');
         assert.equal(new Set(ids).size, ids.length, 'history not duplicated');
