@@ -28,3 +28,43 @@ func TestTheGettingStartedSkillsAskEveryQuestionWithChoicesWithButtons(t *testin
 	assert.NotRegexp(t, regexp.MustCompile(`coral-board post --ask "@Operator What would you like to make`), team, "no bare question with choices left")
 	assert.NotRegexp(t, regexp.MustCompile(`coral-agent ask "What would you like to make\?"\.`), agent, "no bare question with choices left")
 }
+
+// The Operator (rc4c preview): the agent used buttons for the first question only; every later step ended in plain chat ("Tell me when you've finished"). Every step that waits on the person ends with
+// buttons (Done / Skip this step / Stop the tour), and the file review step says where Approve and Request changes are.
+func TestEveryStepOfTheGettingStartedSkillsThatWaitsEndsWithButtons(t *testing.T) {
+	read := func(name string) string {
+		b, err := starterFS.ReadFile("starter/" + name + "/SKILL.md")
+		require.NoError(t, err)
+		return string(b)
+	}
+	agent, team := read("getting-started-agent"), read("getting-started-team")
+	assert.Regexp(t, `Every step that waits on me ends with buttons too, never plain chat.*`+"`"+`coral-agent ask "[^"]+"( --option "(Done|Skip this step|Stop the tour)"){3}`+"`", agent, "the agent's general wait rule names the button command with all three buttons")
+	assert.Regexp(t, `Every step that waits on me ends with buttons too, never plain chat.*`+"`"+`coral-board post --ask( --button "(Done|Skip this step|Stop the tour)=reply"){3} "@Operator [^"]+"`+"`", team, "the team's general wait rule names the button command with all three buttons")
+	assert.Contains(t, agent, "Approve and Request changes buttons are on the file itself", "the agent says where the review buttons are")
+	assert.Contains(t, team, "those buttons are on the file itself", "the team's Orchestrator says where the review buttons are")
+	// every step that waits has the three buttons named in it, not just in the general line
+	assert.Contains(t, agent, "after each, ask with the Done / Skip this step / Stop the tour buttons", "the Analytics and Settings steps wait with buttons")
+	for _, step := range []string{"one at a time, ending each with the Done / Skip this step / Stop the tour buttons", "end the step with the Done / Skip this step / Stop the tour buttons"} {
+		assert.Contains(t, team, step, "a waiting team step ends with the buttons")
+	}
+	assert.NotRegexp(t, `(?i)tell me when you('ve| have) finished`, agent+team, "no plain-chat wait left")
+}
+
+// The Operator (rc4c preview): as the tour does each thing, the guide says in one line how to get any agent to do it again.
+func TestTheGettingStartedSkillsSayHowToGetAnyAgentToDoItAgain(t *testing.T) {
+	read := func(name string) string {
+		b, err := starterFS.ReadFile("starter/" + name + "/SKILL.md")
+		require.NoError(t, err)
+		return string(b)
+	}
+	agent, team := read("getting-started-agent"), read("getting-started-team")
+	assert.Contains(t, agent, "ask it to ask me with buttons, and it will use `coral-agent ask --option`", "agent: buttons")
+	assert.Contains(t, team, "ask any agent to ask me with buttons, and it will use `coral-board post --ask --button`", "team: buttons")
+	for name, md := range map[string]string{"agent": agent, "team": team} {
+		assert.Contains(t, md, "put a file in Needs you for review", name+": Needs you")
+		assert.Contains(t, md, "`coral-agent artifact upload <file> --tag \"for review\"`", name+": the upload command")
+		assert.Contains(t, md, "read my comments", name+": a comment")
+		assert.Contains(t, md, "answer Send to agent", name+": Send to agent")
+		assert.Contains(t, md, "upload it as a new version", name+": --new-version-of")
+	}
+}
