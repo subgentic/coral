@@ -24,7 +24,7 @@ const MENU = (extra = {}) => ({ question: 'Claude wants to use your browser This
             await coralReady(ev);
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.__answers = []; window.__status = 200; window.__po = ${JSON.stringify(MENU())}; window.__ws = 1; window.__waiting = true;
                 const real = window.fetch; window.fetch = (u, o = {}) => { const url = String(u), m = (o.method || 'GET').toUpperCase();
-                    if (m === 'POST' && /\\/answer-prompt$/.test(url)) { window.__answers.push(JSON.parse(o.body)); return Promise.resolve(new Response(JSON.stringify(window.__status === 200 ? { ok: true } : { code: 'trust_changed', error: 'The folder to trust changed.' }), { status: window.__status, headers: { 'content-type': 'application/json' } })); }
+                    if (m === 'POST' && /\\/answer-prompt$/.test(url)) { window.__answers.push(JSON.parse(o.body)); return Promise.resolve(new Response(JSON.stringify(window.__status === 200 ? { ok: true } : { code: window.__code || 'trust_changed', error: window.__code === 'browser_choice' ? 'Only Not now can be answered from here. Answer the rest in the agent\\'s own chat.' : 'The folder to trust changed.' }), { status: window.__status, headers: { 'content-type': 'application/json' } })); }
                     if (m === 'GET' && /\\/api\\/sessions\\/live\\/[^/]+\\/chat\\?/.test(url)) return Promise.resolve(new Response(JSON.stringify({ messages: [], total: 0, prompt_options: window.__po }), { headers: { 'content-type': 'application/json' } }));
                     return real(u, o); };
                 const entry = window.__m.entry.bind(window.__m); window.__m.entry = a => ({ ...entry(a), board_job_title: 'QA Engineer', waiting_for_input: window.__waiting, waiting_kind: 'permission', waiting_summary: 'Notification: Claude wants to use your browser', waiting_since: 'w' + window.__ws });
@@ -69,6 +69,16 @@ const MENU = (extra = {}) => ({ question: 'Claude wants to use your browser This
             check(geo.bs.every(b => b.left >= 0 && b.right <= geo.vw && b.w > 0) && geo.noteLeft >= 0 && geo.noteRight <= geo.vw && !geo.wide, `${at}the button and the sentence are on the screen, nothing sideways: ` + JSON.stringify(geo));
             if (mobile) check(geo.bs.every(b => b.h >= 44 && b.w >= 44), `${at}Not now is a 44 px target: ` + JSON.stringify(geo));
             await shot(`browser-row-${w}`);
+
+            // 1b) the server refuses with 409 browser_choice (the row sent an answer the route does not take): the toast says it in the row's own words and sends the person to the agent, like the other refusals, not the generic "Could not send"
+            await ev(`window.__status = 409; window.__code = 'browser_choice'; window.__answers = []; true`);
+            await click('Not now');
+            await waitFor(`window.__answers.length === 1`, `${at}the refused answer is sent`, 5000);
+            await waitFor(`!!document.querySelector('#toast-host .toast')`, `${at}the refusal is toasted`, 5000);
+            const refused = await ev(`[...document.querySelectorAll('#toast-host .toast')].map(t => t.textContent).join(' | ')`);
+            check(/Only Not now can be answered from here/.test(refused) && /Open the agent/.test(refused) && !/Could not send the answer/.test(refused), `${at}the 409 browser_choice toast uses its own wording, like the other refusals: ` + JSON.stringify(refused));
+            check(JSON.stringify(await rowButtons()) === JSON.stringify(['Not now']), `${at}the row keeps its Not now button after the refusal: ` + JSON.stringify(await rowButtons()));
+            await ev(`window.__status = 200; window.__code = ''; window.__answers = []; document.querySelectorAll('#toast-host .toast').forEach(t => t.remove()); true`);
 
             // 2) one real click sends Not now (n 2) through the chat's route with the ask, and nothing else
             const p = await click('Not now');
