@@ -16,10 +16,13 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             const setList = n => ev(`window.__m.add('proj1', 'A', 2, { sleeping: false, session_id: 'w-sid', display_name: 'Writer', board_project: 'team-x' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); true`.replace("'Writer'", `'Writer${n}'`));
             await setList('');
-            await waitFor(`!!document.querySelector('.session-group-item .sidebar-kebab-btn')`, 'the agent row', 10000);
+            const BTN = '.session-group-item[data-session-id="w-sid"] .sidebar-kebab-btn'; // this agent's row: the team's card draws after the agent list and has a menu button of its own, ahead of it on a phone
+            await waitFor(`!!document.querySelector('${BTN}')`, 'the agent row', 10000);
             const centre = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); const r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
             const click = async p => { await Input.dispatchMouseEvent({ type: 'mouseMoved', x: p.x, y: p.y }); await Input.dispatchMouseEvent({ type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 }); await Input.dispatchMouseEvent({ type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 }); };
-            await click(await centre('.session-group-item .sidebar-kebab-btn'));
+            await ev(`document.querySelector('${BTN}').scrollIntoView({ block: 'center' }); true`);
+            for (let j = 0, prev = ''; j < 40; j++) { const now = JSON.stringify(await centre(BTN)); if (now === prev) break; prev = now; await new Promise(r => setTimeout(r, 100)); } // sleep-ok: waits for the button to stop moving (the team's card draws after the list and shifts it)
+            await click(await centre(BTN));
             await waitFor(`[...document.querySelectorAll('.sidebar-kebab-menu')].some(m => getComputedStyle(m).display !== 'none')`, `${w} px, ${variant}: the menu opens`, 4000);
             if (variant === 'after 100 ms') await ev(framesJs(6));
             if (variant === 'after another agent appears') { await ev(`window.__m.add('proj2', 'A', 2, { sleeping: false, session_id: 'x-sid', display_name: 'Other', board_project: 'team-x' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); true`); await ev(framesJs(4)); }
