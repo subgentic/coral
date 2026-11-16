@@ -5,7 +5,7 @@ import { importOnce } from './import_once.js';
 import { killLiveTeam, dropKilledRows } from './kill_live.js';
 import { keyLabel, splitKey, hasBoardLabel, boardFetch, noteBoardLabel, inTeam } from './server_base.js';
 import { loadStyles } from './lazy_styles.js';
-import { agentWords, deleteTeamWords } from './agent_words.js';
+import { agentWords } from './agent_words.js';
 import { state } from './state.js';
 import { initGrowingTextarea } from './growing_textarea.js';
 import { mountBoardSearch, resetBoardSearch, highlightBoard } from './board_search.js';
@@ -253,14 +253,16 @@ function runningAgentsOn(project) {
 export function deleteMessageBoardProject() { deleteTeam(state.selectedTeam || bs.currentProject); } // the team on the page, not the last board the Messages tab loaded (#15277: on any other tab that was none, or another team)
 
 /** Remove team: the in-page dialog (what goes, what stays, which agents run), then the DELETE; with agents running its button is "Stop agents and remove", which stops them and then removes the team. A toast says it is done. From the team page's More menu and from the sidebar's team menu (#10318, #15277). */
-export function deleteTeam(project) {
+export async function deleteTeam(project) {
     document.dispatchEvent(new CustomEvent('coral:team-action', { detail: { team: project } }));
     const blocked = project ? launchBlockedReason(splitKey(project).server) : '';
     if (blocked) { showToast(blocked, true); return; }
     if (!project) return;
     const running = runningAgentsOn(project);
     const label = keyLabel(project);
-    window.showConfirmModal('Remove team', deleteTeamWords(label, running), async () => {
+    const { deleteTeamWords } = await importOnce('./delete_team_words.js'); // the words are read when the dialog is asked for, not at start (#16895)
+    const words = deleteTeamWords(label, running);
+    window.showConfirmModal('Remove team', words, async () => {
         try {
             if (running.length) { // a board with agents running is not deleted (#5043): they are stopped first, here, so the team is not left half there
                 const { ok, answer } = await killLiveTeam(project);
@@ -273,6 +275,7 @@ export function deleteTeam(project) {
                 showToast(out.error || 'The team was not removed.', true);
                 return;
             }
+            document.dispatchEvent(new CustomEvent('coral:team-removed', { detail: { team: project } })); // the Inbox drops the team's "Goal closed" rows now, not at its next read (#16895)
             showToast(`Removed team "${label}". Its agents' chats stay in History and its folder is untouched.`);
             if (document.getElementById('team-page-view')?.getClientRects().length) { window.exitTeamPage?.({ force: true }); window.switchNavTab?.('agents'); } // removed from its team page: back to Agents, not the board list
             else if (document.getElementById('messageboard-view')?.getClientRects().length) showMessageBoardProjects();
@@ -282,6 +285,7 @@ export function deleteTeam(project) {
             showToast('Could not reach Coral to remove the team.', true);
         }
     }, undefined, { label: running.length ? 'Stop agents and remove' : 'Remove team', danger: true });
+    { const m = document.getElementById('confirm-modal-message'); if (m) m.replaceChildren(...words.split('\n').flatMap((l, i) => (i ? [document.createElement('br'), l] : [l]))); } // the words are short lines, one under another, not one paragraph (#16895)
 }
 
 // ── Polling ──────────────────────────────────────────────────────────────

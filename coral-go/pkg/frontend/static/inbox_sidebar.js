@@ -843,6 +843,11 @@ function refreshGoals(force = true) {
     _goalsReading = readGoals().then(ok => { _goalsFails = ok ? 0 : Math.min(_goalsFails + 1, 8); }, () => { _goalsFails = Math.min(_goalsFails + 1, 8); }).finally(() => { _goalsReading = null; });
     return _goalsReading;
 }
+document.addEventListener('coral:team-removed', e => { // Remove team: its closed-goal rows and goals leave the Inbox now, not at the next read, which would list a Reopen for a team that is gone (#16895)
+    const k = splitKey((e.detail && e.detail.team) || ''), id = k.name ? identityKey(k.server, k.name) : ''; if (!id) return;
+    closedGoals = closedGoals.filter(g => goalTeamHere(g) !== id); goals = goals.filter(g => goalTeamHere(g) !== id); closedReadAt = 0;
+    syncGoalDoneCount(); renderInboxNav(true);
+});
 let _goalsSeqTimer = 0;
 onGoalsSeq(() => { clearTimeout(_goalsSeqTimer); _goalsSeqTimer = setTimeout(() => { if (!document.hidden && !isPaused()) refreshGoals(true); }, 300); }); // a goal write anywhere moves the change counter: the Goals count and list read again at once, not on the next poll (#15229)
 async function readGoals() {
