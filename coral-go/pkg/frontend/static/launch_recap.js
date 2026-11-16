@@ -37,6 +37,7 @@ const shortPath = p => (typeof window !== 'undefined' && window.matchMedia && wi
 export function syncRecap() {
     paintRecap();
     syncFlags();
+    importOnce('./launch_footer.js').then(m => m.fitFooter('launch-step-agent')).catch(() => {}); // desktop: the recap sits at the left of the buttons (#18795)
 }
 
 // The exact flags Coral adds for the chosen permissions (#15719), as the server's launch builders give them (POST /api/launch/permission-args: one source of truth, never a second copy here), in the recap's last line.
@@ -96,7 +97,7 @@ export function wireRecap() {
     const acf = container();
     if (!acf || acf.dataset.recapWired) return;
     acf.dataset.recapWired = '1';
-    const tg = document.getElementById('launch-recap-toggle'); if (tg) tg.onclick = () => tg.setAttribute('aria-expanded', document.getElementById('launch-recap').toggleAttribute('data-open')); // phone: the recap is one line, and its details open upward
+    const tg = document.getElementById('launch-recap-toggle'); if (tg) tg.onclick = () => { tg.setAttribute('aria-expanded', document.getElementById('launch-recap').toggleAttribute('data-open')); importOnce('./launch_footer.js').then(m => m.fitFooter('launch-step-agent')).catch(() => {}); }; // phone: the recap is one line, and its details open upward
     if (!phoneWidthWired) { phoneWidthWired = true; window.matchMedia?.('(max-width: 599px)').addEventListener?.('change', () => syncRecap()); } // a rotation or a resized window: the folder is cut or whole again at once, not at the next change in the form (#11791); one listener for the page, however many dialogs open (#11794)
     for (const t of ['input', 'change', 'acf-synced']) acf.addEventListener(t, () => syncRecap());
     for (const id of ['launch-dir', 'launch-agent-name-input']) { const e = document.getElementById(id); if (e) for (const t of ['input', 'change']) e.addEventListener(t, () => syncRecap()); }

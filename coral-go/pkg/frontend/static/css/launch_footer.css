@@ -1,0 +1,14 @@
+/* The launch dialog's footer on a desktop (#18795): the recap or the reason at the left of the buttons' own row, and New agent's "More ▴" at the end of its text. Lazy (launch_footer.js). Phone: untouched. */
+@media (min-width: 768px) {
+    #launch-step-agent, #launch-step-team { position: relative; }
+    #launch-step-agent .launch-recap-wrap { position: absolute; left: 0; bottom: 0; right: var(--lf-right, 22rem); height: var(--lf-h, 72px); z-index: 1; display: flex; align-items: center; gap: 4px; padding-left: 24px; }
+    #launch-step-agent .launch-recap-wrap #launch-recap:not([hidden]) { flex: 0 1 auto; min-width: 0; padding: 0; border: 0; -webkit-line-clamp: 1; }
+    #launch-step-agent .launch-recap-wrap .launch-recap-toggle { position: static; flex: none; min-width: 0; min-height: 0; padding: 2px 6px; font-size: var(--fs-md); color: var(--accent, var(--text-primary)); text-decoration: underline; }
+    #launch-step-agent .launch-recap-wrap .launch-recap-toggle::before { content: 'More \25B4'; transform: none; }
+    #launch-step-agent .launch-recap-wrap #launch-recap[data-open] + .launch-recap-toggle::before { content: 'Less \25BE'; transform: none; }
+    /* open: the detail is a panel above the footer row, the whole width, with its link under the text */
+    #launch-step-agent .launch-recap-wrap:has(#launch-recap[data-open]) { right: 0; bottom: var(--lf-h, 72px); height: auto; max-height: 45dvh; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 24px; background: var(--bg-secondary); border-top: 1px solid var(--border); }
+    #launch-step-agent .launch-recap-wrap #launch-recap[data-open] { max-height: 36dvh; padding: 0; border: 0; }
+    #launch-step-team > #team-recap { position: absolute; left: 0; right: var(--lf-right, 22rem); bottom: calc(var(--lf-h, 72px) / 2); transform: translateY(50%); z-index: 1; padding: 0 0 0 24px; border: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+    #launch-step-team > #team-recap:empty { display: none; }
+}
