@@ -112,8 +112,10 @@ const SLEEPING_PLACEHOLDER = '';
         console.log('   ✓ search filters the archived section');
 
         console.log('2. Kebab menus');
+        const rowWake = await ev(`[...document.querySelectorAll('#live-sessions-list li')].filter(l => l.textContent.includes('arch-a')).flatMap(l => [...l.querySelectorAll('button')].map(b => (b.getAttribute('aria-label') || b.textContent).trim())).filter(t => /^Wake/i.test(t))`);
+        assert.deepEqual(rowWake, [], 'an archived row shows no Wake: Unarchive is the way back (#17420)');
         const archivedMenu = await menuItems('t1-arch-a-id');
-        assert.ok(archivedMenu.some(t => /^Unarchive$/.test(t)) && archivedMenu.some(t => /^Wake/.test(t)), `archived menu has Unarchive and Wake (${JSON.stringify(archivedMenu)})`);
+        assert.ok(archivedMenu.some(t => /^Unarchive$/.test(t)) && !archivedMenu.some(t => /^Wake/.test(t)), `archived menu has Unarchive and no Wake (#17420) (${JSON.stringify(archivedMenu)})`);
         assert.ok(!archivedMenu.some(t => /Restart|Rename|Move|^Archive$/.test(t)), `archived menu has no Restart/Rename/Move/Archive (${JSON.stringify(archivedMenu)})`);
         await ev(`(() => { const e = document.querySelector('#live-sessions-list .sleeping-summary-row:not(.archived-summary-row)'); if (e) e.click(); })()`);
         for (const sid of ['t1-lead-id', 't1-sleeper-id']) {
