@@ -395,6 +395,7 @@ function inboxNeedsToolbar() {
             const input = $('inbox-search'); if (input && group === 'needs') input.value = next.q; // the sidebar's box shows the same words
             renderInboxNav(true);
         });
+        needsBar.bar.node.classList.add('inbox-needs-toolbar');
         needsBar.bar.node.addEventListener('click', e => {
             if (e.target.closest('.list-bar-clear-all, .list-bar-clear-q, .list-bar-chip-all')) needsBar.bar.closeMenu(false);
         }, true);

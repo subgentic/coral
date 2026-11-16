@@ -28,7 +28,10 @@ const BASE = require('./test_base').BASE;
                 check(names.some(t=>t.startsWith(team+' · Orchestrator')), `${w}: agent identity leads with ${team}: ${JSON.stringify(names)}`);
                 check(names.some(t=>t.startsWith(team+' · Goal #'+(7101+i))), `${w}: closed goal names ${team}: ${JSON.stringify(names)}`);
             }
+            await ev(`(()=>{for(const b of document.querySelectorAll('.notification-toast-close'))b.click();document.querySelector('.launch-disclosure-dismiss')?.click();return true})()`);
             await settle(200); await shot('list-'+w);
+            if(mobile){await ev(`document.querySelector('[data-welcome-id*="7101"]')?.scrollIntoView({block:'start'});true`);await settle(150);await shot('goals-'+w);await ev(`document.querySelector('#group-table-view .inbox-needs-results')?.scrollIntoView({block:'start'});true`);}
+
             await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills button')].find(b=>/^Permission/.test(b.textContent.trim())).click();true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length===1`, 'permission-only row', 5000);
             const only = await ev(`[...document.querySelectorAll('#group-table-view .dt-primary, #group-table-view .dt-mail-title, #group-table-view .inbox-review-from')].map(n=>n.textContent.trim())`);
