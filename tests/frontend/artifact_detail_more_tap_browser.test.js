@@ -15,12 +15,13 @@ const os = require('node:os');
     const open = () => ev(`document.querySelector(${JSON.stringify(MORE)}).getAttribute('aria-expanded') === 'true'`);
     const center = () => ev(`(() => { const r = document.querySelector(${JSON.stringify(MORE)}).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
     const reset = async () => { await ev(`document.querySelector(${JSON.stringify(MORE)}).getAttribute('aria-expanded') === 'true' && document.querySelector(${JSON.stringify(MORE)}).click(); true`); await waitFor(`document.querySelector(${JSON.stringify(MORE)}).getAttribute('aria-expanded') === 'false'`, 'the menu is closed again', 4000); };
+    let sname = '', sid = '';
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         const launch = await api('POST', '/api/sessions/launch', { working_dir: os.tmpdir(), agent_type: 'terminal', display_name: 'More Tap' });
-        const sid = launch.body.session_id, sname = launch.body.session_name || launch.body.name;
+        sid = launch.body.session_id; sname = launch.body.session_name || launch.body.name;
         if (!sid) throw new Error('no session: ' + JSON.stringify(launch));
         await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'More Tap', job_title: 'Writer', session_name: sname });
         await api('POST', `/api/agent/artifacts?session_id=${sid}`, Array.from({ length: 80 }, (_, i) => `Line ${i + 1} of a file long enough to scroll the open view.`).join('\n\n'), { 'X-Artifact-Name': 'tap.txt', 'X-Artifact-Media-Type': 'text/plain' });
@@ -54,7 +55,10 @@ const os = require('node:os');
                 if (await open()) await reset();
             }
         }
-    } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
+    } finally {
+        if (sname) await api('POST', `/api/sessions/live/${encodeURIComponent(sname)}/kill`, { session_id: sid, agent_type: 'terminal' }).catch(() => {}); // the terminal it launched (#17804)
+        await removeBoards(ev, [B]).catch(() => {}); await client.close();
+    }
     if (failures.length) { console.error('FAIL\n  ' + failures.join('\n  ')); process.exit(1); }
     console.log('artifact_detail_more_tap_browser: ok');
 })().catch(e => { console.error(e); process.exit(1); });
