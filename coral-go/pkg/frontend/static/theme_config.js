@@ -7,6 +7,7 @@ import { registerActions } from './actions.js';
 import { updateTerminalTheme } from './xterm_renderer.js';
 import { isCloud } from './server_base.js';
 import { applyTheme, applyThemeData, clearCustomThemeVars } from './settings_core.js';
+const { withAccent } = await importOnce('./theme_accent.js');
 import { browserLocal } from './safe_storage.js';
 import { importOnce } from './import_once.js';
 const { moreMenu } = await importOnce('./more_menu.js'); // Import, Export, Reset and Preview live in a More menu (#15845, guidelines 4.8)
@@ -43,7 +44,7 @@ export async function showThemeConfigurator() {
     savedThemes = themesResp.themes || [];
 
     // Seed currentEdits from the current computed CSS values
-    currentEdits = {};
+    currentEdits = {}; dimEdited = false;
     const styles = getComputedStyle(document.documentElement);
     for (const vars of Object.values(variableGroups)) {
         for (const cssVar of Object.keys(vars)) {
@@ -158,10 +159,20 @@ function renderModal() {
 
 // ── Color picker handlers (exposed globally) ────────────────────────────
 
+/** Picking the accent moves the accent dim with it (switches, primary buttons and progress bars use the dim, #17345), unless the person set the dim themselves. */
+function followAccent(cssVar, value) {
+    if (cssVar === '--accent-dim') dimEdited = true;
+    if (cssVar !== '--accent' || dimEdited || !/^#[0-9a-f]{6}$/i.test(value)) return;
+    const dim = '#' + [1, 3, 5].map(i => Math.round(parseInt(value.slice(i, i + 2), 16) * 0.72).toString(16).padStart(2, '0')).join('');
+    currentEdits['--accent-dim'] = dim;
+    for (const e of document.querySelectorAll('[data-var="--accent-dim"]')) e.value = dim;
+}
+let dimEdited = false;
+
 (window.__coral ||= {}).updateThemeVar = function(picker) {
     const cssVar = picker.dataset.var;
     const value = picker.value;
-    currentEdits[cssVar] = value;
+    currentEdits[cssVar] = value; followAccent(cssVar, value);
     // Sync the text input
     const textInput = picker.parentElement.querySelector('.theme-color-text');
     if (textInput) textInput.value = value;
@@ -170,7 +181,7 @@ function renderModal() {
 (window.__coral ||= {}).updateThemeVarText = function(input) {
     const cssVar = input.dataset.var;
     const value = input.value.trim();
-    currentEdits[cssVar] = value;
+    currentEdits[cssVar] = value; followAccent(cssVar, value);
     // Sync the color picker if it's a valid hex
     const hex = toHex(value);
     if (hex !== '#000000' || value.toLowerCase().startsWith('#000')) {
@@ -327,6 +338,7 @@ function deleteSelectedTheme() {
     const name = select.value;
     if (!name) return;
     if (name.startsWith('base:')) { showToast('Dark and Light are built in and cannot be deleted', true); return; }
+    if (['Dark', 'GhostV3', 'Obsidian'].includes(name)) { showToast(`${name} ships with Coral and comes back when it starts: it cannot be deleted`, true); return; } // the bundled themes are seeded at every start (SeedBundledThemes), so a delete only looked like it worked (#17345)
     window.showConfirmModal('Delete theme', `Delete theme "${name}"?`, async () => { try {
         await fetch(`/api/themes/${encodeURIComponent(name)}`, { method: 'DELETE' });
         // If active theme is being deleted, clear the setting
@@ -487,7 +499,7 @@ function importThemeFile() {
 // ── Utilities ────────────────────────────────────────────────────────────
 
 function applyVariablesToDom(variables) {
-    for (const [cssVar, value] of Object.entries(variables)) {
+    for (const [cssVar, value] of Object.entries(withAccent(variables))) {
         if (value) {
             document.documentElement.style.setProperty(cssVar, value);
         }

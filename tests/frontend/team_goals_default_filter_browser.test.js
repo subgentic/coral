@@ -37,6 +37,12 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
                 const r = await rows(); assert.equal(r.length, 1, 'Active contains only the active goal (#17625): ' + JSON.stringify(r)); assert.match(r[0], /Ship the new installer/);
                 await shot(`goals-default-${label}`);
             });
+            await S.run(`${label}: Active with no active goal to show lists no Done group under it (#17345, walk 65 F6)`, async () => {
+                await ev(`(() => { const i = document.querySelector('${panel} input[type=search], ${panel} input#goals-search'); i.value = 'Old cleanup'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+                await settle(400);
+                const r = await rows(); assert.ok(!r.some(t => /Done \(\d+\)|Old cleanup/.test(t)), 'the search matches only the finished goal, so Active lists nothing and no Done group: ' + JSON.stringify(r));
+                await ev(`(() => { const i = document.querySelector('${panel} input[type=search], ${panel} input#goals-search'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`); await settle(300);
+            });
             await S.run(`${label}: a choice the person makes is remembered: All stays All through Tasks and back`, async () => {
                 await ev(`(() => { const p = document.querySelector('${panel}'); const sel = [...p.querySelectorAll('select')].find(s => /Show goals that are/i.test(s.getAttribute('aria-label') || '')); if (sel) { const o = [...sel.options].find(x => /^All/.test(x.textContent.trim())); sel.value = o.value; sel.dispatchEvent(new Event('change', { bubbles: true })); return true; } const b = [...p.querySelectorAll('[role=group] button')].find(x => /^All\\b/.test(x.textContent.trim())); b.click(); return true; })()`);
                 await waitFor(`document.querySelectorAll('${panel} tbody tr').length >= 5`, 'all five goals', 8000);

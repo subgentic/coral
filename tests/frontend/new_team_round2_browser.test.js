@@ -29,7 +29,7 @@ const BASE = require('./test_base').BASE;
                 return { info: [...p.querySelectorAll('.settings-info-btn')].filter(vis).length, onHelp: help('on'), clearHelp: help('all_clear'), everyOff: row('interval_min').hasAttribute('data-disabled'), clearOff: row('all_clear').hasAttribute('data-disabled'), recipient: !!row('recipient') }; })()`);
             const off0 = await probe(); const off = off0;
             assert.equal(off.info, 0, 'no (i) icon'); assert.deepEqual(off.onHelp, [true, 'Checks on stuck or idle agents. Uses tokens each time.'], 'the first switch has its line on the page');
-            assert.deepEqual(off.clearHelp, [true, 'The one-line check at each heartbeat, so a quiet team is not mistaken for a stopped check.'], 'Post when all is well has its own line');
+            assert.deepEqual(off.clearHelp, [true, 'The one-line check every set number of minutes above (never with 0), so a quiet team is not mistaken for a stopped check.'], 'Post when all is well has its own line');
             assert.equal(off.everyOff, false, 'Look every is on while Send health check is on, as a new team starts (#14091)'); assert.equal(off.clearOff, false, 'and so is Post when all is well'); assert.equal(off.recipient, false, 'who gets the check is not asked: it goes to the Orchestrator');
             await ev(`(() => { const d = window.__nt.dlg(${N.team}); const i = [...d.querySelectorAll('input[type=checkbox]')].find(x => x.name === 'on'); i.click(); return true; })()`); await settle(250);
             const on = await probe();

@@ -1,7 +1,7 @@
 /* The team's files as a person runs them (#15154, walk 5): where the team's folder is (with Copy path), and Download all, one zip of the files the list shows. Lazy: the Artifacts tab loads it when its list is drawn.
  * The zip is built here from the same routes the list already reads, one stored (uncompressed) entry per file, so no new server route is needed; the bytes are held in memory under the same 25 MiB limit as one download. */
 import { MAX_DOWNLOAD_BYTES, sanitizeDownloadName } from './artifact_download.js';
-import { teamFetch } from './server_base.js';
+import { teamFetch, keyLabel } from './server_base.js';
 import { copyText, showToast } from './utils.js';
 import { isPhoneLayout } from './phone_layout.js';
 
@@ -92,7 +92,7 @@ export async function fillStrip(host, { project, files, hasMore }) {
     const all = document.createElement('button'); all.type = 'button'; all.className = 'btn btn-small'; const listed = files().length; all.textContent = `Download the ${listed} file${listed === 1 ? '' : 's'} listed (zip)`; all.setAttribute('aria-label', `Download the ${listed} file${listed === 1 ? '' : 's'} listed as one zip. Files that are not listed here, such as a page in the team folder, are not in it.`);
     all.addEventListener('click', async () => {
         if (all.disabled) return; const list = files(); if (!list.length) { showToast('No file here can be downloaded.', true); return; } all.disabled = true; // never a silent button
-        try { const n = await downloadAllAsZip(list, `${project}-files`); showToast(`Saved ${n} file${n === 1 ? '' : 's'} as a zip${hasMore() ? '. Only the files shown are in it: load more first for the rest.' : ''}`, false); }
+        try { const n = await downloadAllAsZip(list, `${keyLabel(project)}-files`); showToast(`Saved ${n} file${n === 1 ? '' : 's'} as a zip${hasMore() ? '. Only the files shown are in it: load more first for the rest.' : ''}`, false); }
         catch (e) { showToast(e && e.message ? e.message : 'The zip could not be made.', true); }
         finally { all.disabled = false; }
     });
