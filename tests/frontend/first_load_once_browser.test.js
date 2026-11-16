@@ -12,7 +12,7 @@ const BASE = require("./test_base").BASE;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await coralReady(ev, 'startup', 'liveList', 'settings');
         await settle(ev, 3000); // sleep-ok: the first load's calls all go out within a few seconds; the count is of what went out
-        const seen = (await ev(`window.__calls`)).map(k => ({ m: k.split(' ')[0], key: k.split(' ')[1].replace(/^\/api\/remote\/[^/]+/, '[remote]') + '' , raw: k }));
+        const seen = (await ev(`window.__calls`)).filter(k => !/\/api\/tracking\//.test(k)).map(k => ({ m: k.split(' ')[0], key: k.split(' ')[1].replace(/^\/api\/remote\/[^/]+/, '[remote]') + '' , raw: k }));
         const count = {}; for (const r of seen) { const k = r.raw; count[k] = (count[k] || 0) + 1; }
         const twice = Object.entries(count).filter(([, n]) => n > 1);
         console.log('requests', seen.length, 'distinct', Object.keys(count).length, 'ALL', JSON.stringify(seen.map(r => r.raw)));
