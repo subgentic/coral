@@ -13,7 +13,7 @@ const { coralReady } = require('./helpers/wait');
     const api = (method, path, body, headers) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: ${JSON.stringify(headers || { 'Content-Type': 'application/json' })}, body: ${body === undefined ? 'undefined' : typeof body === 'string' ? JSON.stringify(body) : JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
     const S = `(window.__coralStatic || '/static/')`;
     const hexOf = up => String((up.body && (up.body.digest || up.body.id || up.body.hex)) || '').replace(/^sha256:/, '').replace(/^coral:\/\/artifacts\//, '');
-    let sid = null;
+    let sid = null, sname = null;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1440, 900, false], [390, 844, true]]) {
@@ -22,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             if (!sid) {
                 const launch = await api('POST', '/api/sessions/launch', { working_dir: os.tmpdir(), agent_type: 'terminal', display_name: 'Banner Writer' });
-                sid = launch.body.session_id; const sname = launch.body.session_name || launch.body.name;
+                sid = launch.body.session_id; sname = launch.body.session_name || launch.body.name;
                 if (!sid) throw new Error('no session: ' + JSON.stringify(launch));
                 check((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'Banner Writer', job_title: 'Writer', session_name: sname })).status < 300, 'subscribed');
             }
@@ -57,7 +57,10 @@ const { coralReady } = require('./helpers/wait');
             check(sw, at + 'Open v3 switched to v3 and the banner went');
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close')?.click(); true`);
         }
-    } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
+    } finally {
+        if (sname) await api('POST', `/api/sessions/live/${encodeURIComponent(sname)}/kill`, { session_id: sid, agent_type: 'terminal' }).catch(() => {}); // the terminal it launched: a board with a running agent is not deleted (board_has_running_agents)
+        await removeBoards(ev, [B]).catch(() => {}); await client.close();
+    }
     if (failures.length) { console.error('FAIL\n  ' + failures.join('\n  ')); process.exit(1); }
     console.log('artifact_newer_banner_browser: ok');
 })().catch(e => { console.error(e); process.exit(1); });
