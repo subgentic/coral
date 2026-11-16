@@ -50,6 +50,7 @@ var ownerBoardPosts = map[string]ownerPost{
 	"POST /api/board/{}/artifacts/{}/edit/send":     {"", "Send to agent with the diff: person-gated, no name read"},
 	"POST /api/board/{}/operator-artifacts":         {"", "a file the Operator shares with an agent: no name read"},
 	"POST /api/board/{}/operator-artifacts/message": {"", "the message that tells the agent: no name read"},
+	"POST /api/agent-asks/{}/images":                {"", "a picture for the answer to an agent: no name read"},
 	"POST /api/board/{}/goal-images":                {"", "a picture for a goal's description: no name read"},
 	"POST /api/board/{}/cross-team/enable":          {"", "the four Hub switch routes do their own owner check and record (#5572)"},
 	"POST /api/board/{}/cross-team/disable":         {"", "the four Hub switch routes do their own owner check and record (#5572)"},

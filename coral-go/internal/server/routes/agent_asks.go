@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/logparse"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
@@ -21,6 +23,7 @@ import (
 //
 //	POST /api/agent-asks             the agent's own token: {text, options?: up to 3 labels} -> {id}
 //	POST /api/agent-asks/{id}/answer the Operator: {answer} -> typed into the agent, the question closed
+//	POST /api/agent-asks/{id}/images the Operator: one picture for the reply -> stored as that agent's artifact ({hex, uri, name, content_type, size}); the reply names it as coral://artifacts/<hex>
 
 const agentAskOptionsMax = 3
 
@@ -28,6 +31,8 @@ const agentAskOptionsMax = 3
 type AgentAsksHandler struct {
 	ss   *store.SessionStore
 	term ptymanager.SessionTerminal
+	// coralDir is the data folder the pictures are stored in ("" refuses them).
+	coralDir string
 	// deliver types text into a session (tests replace it).
 	deliver func(ctx context.Context, term ptymanager.SessionTerminal, name, agentType, sessionID, text, what string) error
 }
@@ -35,6 +40,52 @@ type AgentAsksHandler struct {
 // NewAgentAsksHandler is the handler for the sessions in ss, typing answers through term.
 func NewAgentAsksHandler(ss *store.SessionStore, term ptymanager.SessionTerminal) *AgentAsksHandler {
 	return &AgentAsksHandler{ss: ss, term: term, deliver: deliverAutomated}
+}
+
+// SetCoralDir tells the handler where a reply's pictures are stored.
+func (h *AgentAsksHandler) SetCoralDir(dir string) { h.coralDir = dir }
+
+const sourceAgentAskImage = "agent-ask-image"
+
+// UploadImage stores one picture for the Operator's answer to an open question, as an artifact of the agent that asked (so that agent can read it): checked as a comment's picture is (its own bytes decide the type,
+// metadata is removed, 25 MB). The Operator's alone.
+func (h *AgentAsksHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
+	if !operatorOnly(w, r) {
+		return
+	}
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || id <= 0 {
+		errBadRequest(w, "invalid id")
+		return
+	}
+	if h.coralDir == "" {
+		errInternalServer(w, "no data folder")
+		return
+	}
+	ask, err := h.ss.OpenAgentAsk(r.Context(), id)
+	if err != nil {
+		errInternalServer(w, "could not read the question")
+		return
+	}
+	if ask == nil || !sessionIDLike.MatchString(ask.SessionID) {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "not_open", "message": "That question is already answered or was replaced."})
+		return
+	}
+	scope := "agent-ask:" + strconv.FormatInt(id, 10)
+	if !commentImageLimit.allow(scope, commentImageLimitPerMinute, time.Now()) {
+		httputil.WriteActionLimit(w, 60, "rate_limited", "too many pictures in a minute; try again shortly")
+		return
+	}
+	pic, ok := receivePicture(w, r, h.coralDir)
+	if !ok {
+		return
+	}
+	defer os.Remove(pic.tmpPath) // a no-op once it is in the store
+	reply, ok := storeReceivedPicture(w, h.coralDir, ask.SessionID, pic, nil, sourceAgentAskImage)
+	if !ok {
+		return
+	}
+	writeJSON(w, http.StatusCreated, reply)
 }
 
 // Create files a question.
@@ -127,14 +178,13 @@ func (h *AgentAsksHandler) Rows(r *http.Request) []operatorAskRow {
 	}
 	rows := make([]operatorAskRow, 0, len(list))
 	for _, a := range list {
-		full := a.Text
-		if len(a.Options) > 0 { // the row has no buttons for these: the choices are in the question, and the Operator types one
-			full += "\n\nChoices:\n- " + strings.Join(a.Options, "\n- ")
-		}
-		text, cut := operatorAskText(full)
+		text, cut := operatorAskText(a.Text) // the choices are buttons now (Options), not text in the question
 		asker := a.SessionName
 		if _, sid := logparse.ParseSessionName(a.SessionName); sid != "" {
 			asker = strings.TrimSuffix(strings.TrimSuffix(a.SessionName, sid), "-")
+		}
+		if dn, err := h.ss.GetDisplayName(r.Context(), a.SessionID); err == nil && dn != nil && strings.TrimSpace(*dn) != "" {
+			asker = *dn // the name the sidebar shows, not the session's prefix
 		}
 		row := operatorAskRow{Kind: "agent", ID: a.ID, Asker: clitext.CleanName(asker), Text: text, Cut: cut, At: a.CreatedAt, Options: a.Options}
 		rows = append(rows, row)

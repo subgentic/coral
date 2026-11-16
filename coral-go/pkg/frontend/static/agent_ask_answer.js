@@ -14,3 +14,12 @@ export async function answerAgentAsk(a, text) {
     }
     refreshOperatorAsks(true);
 }
+
+/** One picture for the reply, stored as the asking agent's own file; resolves like uploadCommentImage ({hex, name, contentType, size}). */
+export async function uploadAgentAskImage(a, blob) {
+    const resp = await serverFetch(a.server, `/api/agent-asks/${encodeURIComponent(a.id)}/images`, { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob });
+    let d = {};
+    try { d = await resp.json(); } catch { /* an answer that is not JSON has no reason */ }
+    if (!resp.ok || !/^[0-9a-f]{64}$/.test(String(d.hex || ''))) { const e = new Error((d && (d.message || d.error)) || `The picture was not stored (HTTP ${resp.status}).`); e.status = resp.status; throw e; }
+    return { hex: d.hex, name: String(d.name || ''), contentType: String(d.content_type || blob.type), size: Number(d.size) || blob.size };
+}

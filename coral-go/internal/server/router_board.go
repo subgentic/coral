@@ -19,9 +19,11 @@ func (s *Server) registerBoard(r *chi.Mux, h *routeHandlers) {
 	s.registerBoardRemotes(r)
 	boardHandler, notifHandler := s.configureBoardHandlers(h)
 	agentAsks := routes.NewAgentAsksHandler(store.NewSessionStore(s.db), s.terminal) // a single agent's question to the Operator (#18106)
+	agentAsks.SetCoralDir(s.cfg.CoralDir())
 	boardHandler.SetAgentAsks(agentAsks.Rows)
 	r.With(routes.RefuseSignInLink).Post("/api/agent-asks", agentAsks.Create) // text and options the Operator reads: no sign-in link (#232, the server side)
 	r.With(routes.RefuseSignInLink).Post("/api/agent-asks/{id}/answer", agentAsks.Answer)
+	r.Post("/api/agent-asks/{id}/images", agentAsks.UploadImage) // the Operator's picture for the answer, kept as the asking agent's artifact
 	r.With(routes.RefuseSignInLink).Post("/api/notifications", notifHandler.Create) // text people read: no sign-in link (#232, the server side)
 	s.registerBoardAPI(r, boardHandler, h.sess)
 	s.registerOneShotTasks(r)

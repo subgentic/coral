@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -8,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -54,7 +56,11 @@ func TestSingleAgentAskReachesNeedsYouAndTheAnswerReachesTheAgent(t *testing.T) 
 	assert.Equal(t, "agent", rows[0].Kind)
 	assert.Equal(t, "", rows[0].Board)
 	assert.Contains(t, rows[0].Text, "Which database?")
-	assert.Contains(t, rows[0].Text, "- Postgres")
+	assert.NotContains(t, rows[0].Text, "Choices", "the choices are buttons (Options), not text in the question (#18668)")
+	assert.Equal(t, []string{"Postgres", "SQLite"}, rows[0].Options)
+	require.NoError(t, store.NewSessionStore(db).SetDisplayName(context.Background(), o.SessionID, "Notes builder"))
+	rows = h.Rows(httptest.NewRequest(http.MethodGet, "/", nil))
+	assert.Equal(t, "Notes builder", rows[0].Asker, "the name the sidebar shows, not the session's prefix (#18668)")
 
 	require.Equal(t, http.StatusOK, post("/api/agent-asks", `{"text":"Which port?"}`, true).Code)
 	rows = h.Rows(httptest.NewRequest(http.MethodGet, "/", nil))
@@ -105,4 +111,38 @@ func TestAnAskWithASignInLinkIsRefused(t *testing.T) {
 		assert.Contains(t, rec.Body.String(), "sign_in_link", body)
 	}
 	assert.Empty(t, h.Rows(httptest.NewRequest(http.MethodGet, "/", nil)), "nothing was stored")
+}
+
+// #18668: a picture for the answer to a single agent's question is stored as that agent's file; a question that is not open takes none.
+func TestAPictureForASingleAgentsQuestionIsStoredWithThatAgent(t *testing.T) {
+	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "a.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	ss := store.NewSessionStore(db)
+	h := NewAgentAsksHandler(ss, nil)
+	h.SetCoralDir(t.TempDir())
+	o := owner("0001")
+	id, err := ss.CreateAgentAsk(context.Background(), o.SessionID, o.SessionName, "Which logo?", nil, time.Now())
+	require.NoError(t, err)
+	up := func(id int64, body []byte, agent bool) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/agent-asks/"+askIDText(id)+"/images", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "image/png")
+		if agent {
+			req = req.WithContext(context.WithValue(req.Context(), verifiedSessionKey{}, o))
+		} else {
+			req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+		}
+		rec := httptest.NewRecorder()
+		rr := chi.NewRouter()
+		rr.Post("/api/agent-asks/{id}/images", h.UploadImage)
+		rr.ServeHTTP(rec, req)
+		return rec
+	}
+	png := pngBytes(t, 8, 8)
+	assert.GreaterOrEqual(t, up(id, png, true).Code, 400, "an agent cannot put a picture in the Operator's reply")
+	rec := up(id, png, false)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	assert.Regexp(t, `"hex":"[0-9a-f]{64}"`, rec.Body.String())
+	assert.GreaterOrEqual(t, up(id, []byte("not a picture"), false).Code, 400, "its own bytes decide")
+	assert.Equal(t, http.StatusConflict, up(id+99, png, false).Code, "a question that is not open takes no picture")
 }

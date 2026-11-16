@@ -138,7 +138,7 @@ export const noteButtonsOwnerOnly = server => { refusedByOwner.add(normServer(se
 export const buttonsOffered = a => (fromAnotherComputer(a) && (decisionNeedsPerson(a.server) || ownerOnlyAt(normServer(a.server)) || refusedByOwner.has(normServer(a.server)))) ? [] : buttonsOf(a);
 
 /** The buttons of a question that can still be used: only a question (not a wait) has them, and a used one is gone. */
-export const buttonsOf = a => (a && a.kind === 'ask' && Array.isArray(a.buttons) ? a.buttons.filter(b => b && b.state === 'pending' && Number.isFinite(Number(b.id)) && typeof b.label === 'string' && typeof b.action === 'string') : []);
+export const buttonsOf = a => (a && a.kind === 'agent' ? (Array.isArray(a.options) ? a.options.filter(o => typeof o === 'string' && o.trim()).slice(0, 3).map((label, i) => ({ id: i + 1, label, action: 'reply', state: 'pending' })) : []) : a && a.kind === 'ask' && Array.isArray(a.buttons) ? a.buttons.filter(b => b && b.state === 'pending' && Number.isFinite(Number(b.id)) && typeof b.label === 'string' && typeof b.action === 'string') : []);
 
 /** Only an explicit, complete Yes/No reply declaration gets Approve/Deny (#13735).
  * No inspection of question prose, synonyms, punctuation, hidden text or extra actions. */
@@ -222,7 +222,7 @@ async function resumeEndedMember(server, a, name, who, sessionName) {
 
 /** The dialog names the asker and team; the complete question is shown once in its body (#12722). */
 export function askParts(a) {
-    return { title: `${markHidden(a.asker || 'Agent', { strict: true })} · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`,
+    return { title: a && a.kind === 'agent' ? markHidden(a.asker || 'Agent', { strict: true }) : `${markHidden(a.asker || 'Agent', { strict: true })} · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`, // a single agent has no team
         body: listsOf(askWhole(a).replace(/^\s*@Operator\b[:,]?\s*/i, '').trim()) };
 }
 
