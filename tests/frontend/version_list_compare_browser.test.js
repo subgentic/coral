@@ -26,7 +26,7 @@ const BASE = require('./test_base').BASE;
             const real = window.fetch; window.__pwned = 0;
             window.fetch = (u, opts) => {
                 const p = new URL(String(u), location.origin).pathname;
-                if (p.startsWith('/api/artifacts/') && p.endsWith('/versions')) return Promise.resolve(new Response('{}', { status: 404 }));
+                if (p.startsWith('/api/artifacts/') && p.endsWith('/versions')) return Promise.resolve(new Response(JSON.stringify([...Array.from({ length: 5 }, (_, i) => ({ version: i + 1, digest: 'a'.repeat(64), at: '2026-11-14T21:' + (10 + i) + ':00Z', uploader: 'Orchestrator' })), { version: 6, digest: 'b'.repeat(64), at: '2026-11-14T21:40:00Z', role: 'operator' }]), { status: 200, headers: { 'content-type': 'application/json' } })); // a real series (#18644: without one the list is only uploads of the same name, with no Compare)
                 if (p.startsWith('/api/artifacts/')) return Promise.resolve(new Response('<h1>' + (p.includes('bbbb') ? 'New tip' : 'Old tip') + '</h1>\\n<script>parent.__pwned = 1</script>', { headers: { 'content-type': 'text/html' } }));
                 return real(u, opts);
             }; return true;

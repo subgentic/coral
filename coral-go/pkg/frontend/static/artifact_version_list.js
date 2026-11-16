@@ -11,7 +11,7 @@ const when = iso => { const t = new Date(iso); return Number.isNaN(t.getTime()) 
 
 const madeByYou = v => v.role === 'operator' || v.source === 'edit'; // the person's own: an upload as the Operator or an edit in the dashboard (#15329, #15369); one test for the series and the fallback list
 
-/** The versions of the file the row stands for, oldest first: [{ n, hex, at, who, note, current }]. The server's series when it has one, else the older uploads of the same file the row already holds (`earlier`) and itself. */
+/** The versions of the file the row stands for, oldest first: [{ n, hex, at, who, note, current }]. The server's series when it has one, else the older uploads of the same name the row already holds (`earlier`) and itself, each marked `guess`: they are not a series (#18644). */
 export async function versionsOf({ hex, server, board, current, earlier }) {
     try {
         const { response: r, dropped } = await readVersions(server, hex, board, { reuse: true });
@@ -24,7 +24,7 @@ export async function versionsOf({ hex, server, board, current, earlier }) {
         }
     } catch { /* no series: the row's own older uploads below */ }
     const all = [...(earlier || []), current].filter(Boolean).sort((a, b) => String(a.created_at || a.at || '').localeCompare(String(b.created_at || b.at || '')));
-    return all.map((v, i) => ({ n: i + 1, hex: v.hex, at: v.created_at || v.at || '', who: v.produced_by || v.role || '', you: madeByYou(v), current: i === all.length - 1 }));
+    return all.map((v, i) => ({ n: i + 1, hex: v.hex, at: v.created_at || v.at || '', who: v.produced_by || v.role || '', you: madeByYou(v), current: i === all.length - 1, guess: true }));
 }
 
 /** Open the list. opts: { hex, server, board, name, current, earlier, open(version), restore?(version) } where restore resolves when the uploader was asked. */
@@ -33,8 +33,11 @@ export async function openVersionList(opts) {
     const versions = await versionsOf(opts);
     const dlg = document.createElement('dialog');
     dlg.className = 'modal-content dlg-form version-list-dialog'; dlg.setAttribute('aria-labelledby', 'version-list-title');
-    const title = document.createElement('h2'); title.id = 'version-list-title'; title.tabIndex = -1; title.textContent = `Versions of ${shown(opts.name)}`;
+    const title = document.createElement('h2'); title.id = 'version-list-title'; title.tabIndex = -1; const guess = versions.some(v => v.guess); // no series: uploads of the same name, not versions (#18644)
+    title.textContent = `${guess ? 'Uploads named' : 'Versions of'} ${shown(opts.name)}`;
     const list = document.createElement('ul'); list.className = 'version-list';
+    const aside = document.createElement('p'); aside.className = 'version-list-guess'; aside.hidden = !guess;
+    if (guess) aside.textContent = 'Other uploads with the same name. They are not versions of one file, so there is no Restore or Compare here. To make a series, upload the next one with --new-version-of.';
     const status = document.createElement('p'); status.className = 'inbox-ask-error'; status.setAttribute('role', 'status');
     const finish = () => { dlg.close(); dlg.remove(); };
     const confirmRestore = (v, li) => {
@@ -51,14 +54,14 @@ export async function openVersionList(opts) {
         sure.append(q, yes, no); li.append(sure); yes.focus();
     };
     for (const [i, v] of versions.entries()) {
-        const li = document.createElement('li'); li.className = 'version-list-entry'; li.dataset.version = String(v.n); if (v.current) li.setAttribute('aria-current', 'true');
-        const name = document.createElement('span'); name.className = 'version-list-name'; name.textContent = `v${v.n}${v.current ? ' (newest)' : ''}`;
+        const li = document.createElement('li'); li.className = 'version-list-entry'; if (!v.guess) li.dataset.version = String(v.n); if (v.current) li.setAttribute('aria-current', 'true');
+        const name = document.createElement('span'); name.className = 'version-list-name'; name.textContent = `${v.guess ? 'Upload' : 'v' + v.n}${v.current ? ' (newest)' : ''}`;
         const who = document.createElement('span'); who.className = 'version-list-who'; who.textContent = [when(v.at), v.you ? 'You' : shown(v.who) ? `${shown(v.who)}, an agent` : ''].filter(Boolean).join(' · '); // who made it: you (an edit in the dashboard) or an agent (#15329)
         const actions = document.createElement('span'); actions.className = 'version-list-actions';
-        const open = document.createElement('button'); open.type = 'button'; open.className = 'btn btn-small version-list-open'; open.textContent = 'Open'; open.setAttribute('aria-label', `Open v${v.n}`);
+        const open = document.createElement('button'); open.type = 'button'; open.className = 'btn btn-small version-list-open'; open.textContent = 'Open'; open.setAttribute('aria-label', v.guess ? `Open the upload of ${when(v.at)}` : `Open v${v.n}`);
         open.addEventListener('click', () => { finish(); opts.open(v); });
         actions.append(open);
-        if (i > 0) {
+        if (i > 0 && !v.guess) {
             const compare = document.createElement('button'); compare.type = 'button'; compare.className = 'btn btn-small version-list-compare';
             compare.textContent = `Compare with v${versions[i - 1].n}`;
             compare.addEventListener('click', async () => {
@@ -70,7 +73,7 @@ export async function openVersionList(opts) {
             });
             actions.append(compare);
         }
-        if (!v.current && opts.restore) {
+        if (!v.current && !v.guess && opts.restore) {
             const rb = document.createElement('button'); rb.type = 'button'; rb.className = 'btn btn-small version-list-restore'; rb.textContent = 'Restore'; rb.setAttribute('aria-label', `Restore v${v.n}`);
             rb.addEventListener('click', () => confirmRestore(v, li)); actions.append(rb);
         }
@@ -82,7 +85,7 @@ export async function openVersionList(opts) {
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close'; close.addEventListener('click', finish);
     buttons.append(close);
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
-    dlg.append(title, list, status, buttons);
+    dlg.append(title, aside, list, status, buttons);
     document.body.append(dlg); dlg.showModal(); title.focus();
     return dlg;
 }
