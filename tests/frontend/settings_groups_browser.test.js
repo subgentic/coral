@@ -14,7 +14,7 @@ const GROUPS = {
     notifications: ['settings-notify-needs-input', 'settings-desktop-notify', 'settings-alert-needs-input', 'settings-alert-reply', 'settings-alert-sound'],
     files: ['settings-file-search-mode', 'settings-file-search-limit', 'settings-git-diff-mode', 'settings-git-poll-interval'],
     cleanup: ['settings-artifact-store-max', 'settings-received-max', 'settings-prune-days', 'settings-retention-enabled', 'settings-terminal-logs-delete'],
-    network: ['settings-remote-access-enabled', 'settings-cloud', 'settings-hub-mode-enabled', 'machine-health-local'],
+    network: ['settings-remote-access-enabled', 'settings-cloud', 'settings-hub-mode-enabled'],
     chief: ['settings-chief-host', 'settings-board-auto-attach', 'settings-board-health-monitor'],
     updates: ['settings-check-updates'],
     security: ['settings-api-key', 'settings-security', 'settings-database-encryption', 'settings-telemetry-enabled', 'settings-debug-input-log'],

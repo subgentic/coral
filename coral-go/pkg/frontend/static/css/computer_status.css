@@ -1,0 +1,5 @@
+.computer-status-dialog { width: min(640px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 0; color: var(--text-primary); background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; }
+.computer-status-dialog::backdrop { background: rgba(0,0,0,.5); }
+.computer-status-dialog .modal-body { max-height: 65dvh; overflow: auto; overflow-wrap: anywhere; min-width: 0; }
+.computer-status-dialog .btn { min-height: 44px; }
+.computer-status-dialog li { margin-bottom: 12px; }

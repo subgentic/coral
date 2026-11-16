@@ -767,9 +767,6 @@
                 <!-- Status: the version (Coral has no paid licence, #3221) and this machine's health from the feed (#3446); a hub-served page has no machine of its own, so it hides the group (UI audit #5589, finding 19) -->
                 <div class="net-body">
                     <div id="peer-check-line" class="settings-hint sv-help" role="status" hidden></div>
-                    <div class="settings-machine-health" data-local-only>
-                        <div id="machine-health-local"></div>
-                    </div>
                     <button type="button" class="btn btn-small settings-editions-btn" data-editions="open">Connect to Coral Hub…</button>
                 </div>
                 </section>
@@ -831,11 +828,8 @@
                         <div class="settings-cloud-hub-operator settings-cloud-switch-row" id="settings-cloud-hub-operator-row" data-cloud="hub-operator-row" hidden>
                             <div class="settings-cloud-switch-text">
                                 <label for="settings-cloud-hub-operator" class="settings-cloud-switch-label">Let Coral Hub act as the Operator</label>
-                            <div id="settings-cloud-hub-operator-desc" class="settings-hint sv-help">At Interact or Launch a hub user can create, assign and complete tasks and post as the Operator here. Each action shows which hub user did it ("Operator via Coral Hub · hub-user-…"), agents are told it came through Coral Hub, and it is recorded below. Board settings can never be changed through Coral Hub. Turn this off to keep the Operator on this computer only.</div>
-                            <details class="settings-cloud-hub-operator-actions" data-cloud="hub-operator-actions" hidden>
-                                <summary>Coral Hub actions</summary>
-                                <ol data-cloud="hub-operator-actions-list"></ol>
-                            </details>
+                            <div id="settings-cloud-hub-operator-desc" class="settings-hint sv-help">At Interact or Launch a hub user can create, assign and complete tasks and post as the Operator here. Each action shows which hub user did it ("Operator via Coral Hub · hub-user-…"), agents are told it came through Coral Hub, and it is recorded in the actions list. Board settings can never be changed through Coral Hub. Turn this off to keep the Operator on this computer only.</div>
+                            <button type="button" class="btn btn-quiet btn-small" data-cloud="hub-operator-actions" hidden>See what Coral Hub did</button>
                             <div id="settings-cloud-hub-operator-msg" data-cloud="hub-operator-msg" class="settings-hint settings-error sv-help" role="alert" hidden></div>
                             </div>
                             <label class="check-hit"><input type="checkbox" class="switch" id="settings-cloud-hub-operator" data-cloud="hub-operator" aria-describedby="settings-cloud-hub-operator-desc"></label>
