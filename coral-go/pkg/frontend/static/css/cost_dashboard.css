@@ -395,7 +395,8 @@
 .viz-legend-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .viz-legend-value { font-variant-numeric: tabular-nums; color: var(--text-muted); }
 @media (forced-colors: active) { .viz-fill { stroke: Canvas; } }
-#cost-summary-cards .cost-card { grid-row: span 4; } /* label, figure, the change against the period before (#7930), sparkline */
+#cost-summary-cards .cost-card { grid-row: span 5; } /* label, figure, a hint, the change against the period before (#7930), sparkline: a tile with a hint put its change on the line's row (#15841) */
+#cost-summary-cards .cost-card-sparkline { grid-row: 5; }
 /* the agent drill-down (analytics_agent.js, #7930) */
 .viz-back { display: inline-flex; align-items: center; margin: 0 0 8px; }
 @media (pointer: coarse) { .viz-back { min-height: var(--control-touch-height, 44px); } }

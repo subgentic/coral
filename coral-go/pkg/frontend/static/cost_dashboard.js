@@ -826,8 +826,8 @@ function _cssVar(name) {
 
 function _renderSparklines(buckets) {
     if (buckets.length < 2) return;
-    // each tile's line is its metric's colour in the charts (the same tokens: input blue, output orange, cache read aqua, cache write yellow)
-    const c = field => _cssVar(`--viz-${(series.METRIC_SLOT[field] ?? 0) + 1}`);
+    // one colour for the tile lines (--viz-1): a tile line is one metric alone, and a colour of its own would read as a status (#15841, the design guidelines); the charts keep each metric's colour
+    const c = () => _cssVar('--viz-1');
     _renderMiniSparkline('cost-spark-input', buckets.map(b => b.input_tokens), c('input_tokens'));
     _renderMiniSparkline('cost-spark-output', buckets.map(b => b.output_tokens), c('output_tokens'));
     _renderMiniSparkline('cost-spark-cache-read', buckets.map(b => b.cache_read_tokens), c('cache_read_tokens'));
