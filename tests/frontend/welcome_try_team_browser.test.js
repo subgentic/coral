@@ -37,13 +37,15 @@ const BASE = require('./test_base').BASE;
         // #18747: the tour team runs on the provider the person set as their default: Orchestrator on its top model, Lead Dev and QA on its everyday one.
         const cfgs = () => ev(`import((window.__coralStatic || '/static/') + 'agent_config_form.js').then(m => [...document.querySelectorAll('#team-agents-list .team-agent-row')].map(r => { const c = m.getAgentConfig(r.dataset.acfId); return [c.agentType, c.model || '']; }))`);
         const tour = async type => {
-            await ev(`window.hideLaunchModal(); window.T.state.settings = { ...window.T.state.settings, default_agent_type: '${type}' }; true`);
-            await ev(`import((window.__coralStatic || '/static/') + 'welcome_launch.js').then(m => m.openWelcomeLaunch('team')).then(() => true)`);
+            await ev(`window.hideLaunchModal(); true`);
+            await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.settings = { ...(m.state.settings || {}), default_agent_type: '${type}' }; return true; })`); // the module the page itself reads (window.T exists only in this harness)
+            await ev(`(() => { window.__T = window.T; window.T = undefined; return import((window.__coralStatic || '/static/') + 'welcome_launch.js').then(m => m.openWelcomeLaunch('team')).then(() => { window.T = window.__T; return true; }); })()`); // window.T is a harness-only handle: a real dashboard has none, so the default provider must come from state.js
             await waitFor(`document.querySelectorAll('#team-agents-list .team-agent-row').length === 3`, 'the tour wizard opens on ' + type);
             return cfgs();
         };
         assert.deepEqual(await tour('codex'), [['codex', 'gpt-6-astra'], ['codex', 'gpt-6-sol'], ['codex', 'gpt-6-sol']], 'Codex default: the team runs on Codex');
         assert.deepEqual(await tour('agy'), [['agy', 'gemini-3.1-pro-high'], ['agy', 'gemini-3.8-flash-high'], ['agy', 'gemini-3.8-flash-high']], 'Antigravity default: the team runs on Antigravity');
+        assert.deepEqual(await tour('pi'), [['claude', 'opus'], ['claude', 'sonnet'], ['claude', 'sonnet']], 'a provider with no model pair (Pi) gets the Claude pair, not empty models');
         assert.deepEqual(await tour('claude'), [['claude', 'opus'], ['claude', 'sonnet'], ['claude', 'sonnet']], 'Claude default: Opus and Sonnet as before');
         console.log('PASS Try a team opens the wizard for the tour; plain New team is unchanged');
     } finally { await client.close(); }
