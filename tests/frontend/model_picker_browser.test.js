@@ -169,7 +169,7 @@ const { coralReady } = require('./helpers/wait');
             (() => { const old = document.getElementById('acf-t'); if (old) old.remove(); const host = document.createElement('div'); host.id = 'acf-t'; document.body.appendChild(host); window.__acf.renderAgentConfigForm('acf-t', {}); })(); true`);
         await waitFor(`!!document.querySelector('#acf-t .acf-model-select option[value="global-opus-5-5"]')`, 'the custom model in the list', 4000);
         b = await box();
-        assert.deepEqual(b.options, ['Default', 'Opus 4.1', 'Global Opus 5.5 (custom)', '<img src=x onerror="window.__pwn=1"> (custom)', 'Other…', 'Add a model…'], 'a custom model says so in the list, and a name with markup is text');
+        assert.deepEqual(b.options, ['Default', 'Global Opus 5.5 (custom)', '<img src=x onerror="window.__pwn=1"> (custom)', 'Opus 4.1', 'Other…', 'Add a model…'], 'a custom model says so in the list (the picker orders the list since #17196), and a name with markup is text');
         assert.equal(await ev(`document.querySelectorAll('#acf-t img').length + (window.__pwn ? 1 : 0)`), 0, 'a custom model\'s name never becomes markup');
         await ev(`{ const s = document.querySelector('#acf-t .acf-model-select'); s.value = 'global-opus-5-5'; s.dispatchEvent(new Event('change', { bubbles: true })); true }`);
         assert.equal(await formModel(), 'global-opus-5-5', 'the form returns the custom id like any other');
