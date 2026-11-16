@@ -1,3 +1,5 @@
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('board_message_actions.css');
 /* The board's windowed message list: loading a page, loading the earlier ones, rendering, prepending, trimming and the header (moved out of message_board.js, #8399; no behaviour change). */
 import { importOnce, loadedModule } from './import_once.js';
 import { fetchMessages, PAGE_SIZE, mergeMessages } from './board_fetch.js';
@@ -197,7 +199,9 @@ export function openMessageActions(opener) {
     const messageId = row.dataset.messageId;
     const save = row.querySelector('.mb-save-btn'), del = row.querySelector('.mb-delete-msg-btn');
     const dlg = document.createElement('dialog'); dlg.className = 'mb-actions-sheet'; dlg.setAttribute('aria-labelledby', 'mb-actions-title');
-    const title = document.createElement('h3'); title.id = 'mb-actions-title'; title.textContent = (opener.getAttribute('aria-label') || 'Message actions').replace(/^Actions for the m/, 'M').replace(/: .*$/, ''); // the snippet starts at ": "; the time's own colon (2:57 PM) is kept (it was cut to "Message from Operator, 2", #10730)
+    const message = bs._allMessages.find(m => String(m.id) === String(messageId));
+    const title = document.createElement('h3'); title.id = 'mb-actions-title';
+    title.textContent = message ? `Message from ${boardSenderName(message)}, ${formatTime(message.created_at)}` : 'Message actions';
     dlg.append(title);
     const item = (cls, text, target) => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = text; b.addEventListener('click', () => { dlg.close(); target.click(); }); return b; };
     if (save) dlg.append(item('btn mb-actions-item', save.getAttribute('aria-pressed') === 'true' ? 'Remove from saved' : 'Save for later', save));
