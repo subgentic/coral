@@ -166,7 +166,7 @@ func (a *AutoKnowledge) Run(ctx context.Context, teamName string) AutoResult {
 		chars += len(prompt) + len(content) + len(out)
 		return out, err
 	}
-	bundle := &KnowledgeBundle{TeamName: teamName, CreatedAt: a.now().Format(time.RFC3339), Agents: make(map[string]*AgentConcept)}
+	bundle := &KnowledgeBundle{TeamName: teamName, TeamTitle: knowledgeTeamTitle(ctx, a.TS, teamName), CreatedAt: a.now().Format(time.RFC3339), Agents: make(map[string]*AgentConcept)}
 	var lastCallErr error
 	callKeep := func(prompt, content string) (string, error) {
 		out, err := call(prompt, content)
