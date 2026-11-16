@@ -253,7 +253,7 @@ func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession
 	launchParams.NoStartPrompt = noStartPrompt && launchParams.ResumeSessionID != ""
 	// A person's wake of a conversation that is resumed types a short note, not the original starting prompt: an agent that remembers an old plan took that prompt as a reason to restart it (#17324, #17318).
 	if !launchParams.NoStartPrompt && launchParams.ResumeSessionID != "" {
-		launchParams.Prompt = wakeNote()
+		launchParams.Prompt = wakeNote(boardName != "")
 	}
 	return &wakePlan{agentImpl: agentImpl, params: launchParams, backend: backend, sessionName: sessionName, logFile: logFile, boardName: boardName, displayName: displayName, freshStart: freshStart}, nil
 }
@@ -400,9 +400,13 @@ func regularFile(path string) bool {
 	return path != "" && err == nil && fi.Mode().IsRegular()
 }
 
-// wakeNote is what a woken agent that resumed its conversation is told (#17324): it was asleep, what it was told before the time given is handled, and it reads the board and the task list before it acts on
-// anything it remembers. A question for the Operator goes through post --ask: text in the chat never reaches their Needs you.
-func wakeNote() string {
-	return "You were asleep and are awake again. Run coral-board read and coral-board task list before acting on anything you remember: messages may have arrived while you slept. " +
+// wakeNote is what a woken agent that resumed its conversation is told (#17324): it was asleep, messages may have arrived while it slept (it has no way to tell which it read before, so it reads what is unread), and it
+// checks the board and the task list before it acts on anything it remembers. No time is given: Coral's clock says nothing about which messages this agent read (#17607). A question for the Operator goes through
+// post --ask: text in the chat never reaches their Needs you. An agent on no board is not pointed at board commands it has no board for.
+func wakeNote(onBoard bool) string {
+	if !onBoard {
+		return "You were asleep and are awake again. Check what you remember before acting on it: things may have changed while you slept."
+	}
+	return "You were asleep and are awake again. Run coral-board read (it shows only the messages you have not read) and coral-board task list before acting on anything you remember: messages may have arrived while you slept, and an unread one may change what you do. " +
 		"If you need an answer from the Operator, ask with coral-board post --ask \"@Operator <question>\": text in the chat never reaches their Needs you."
 }

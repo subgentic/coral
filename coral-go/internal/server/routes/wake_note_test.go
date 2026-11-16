@@ -49,3 +49,16 @@ func TestAWakeOfAResumedConversationTypesAWakeNoteNotTheOriginalPrompt(t *testin
 		assert.True(t, strings.Contains(plan2.params.Prompt, "ORIGINAL-START-PROMPT"), "a new conversation gets the original prompt")
 	}
 }
+
+// #17607: the note tells an agent that did read some messages before sleeping to read the unread ones (not that anything is handled, and no time of Coral's own), and an agent on no board is not pointed at board commands.
+func TestWakeNoteSaysReadTheUnreadAndNamesNoBoardCommandsOffABoard(t *testing.T) {
+	on, off := wakeNote(true), wakeNote(false)
+	assert.Contains(t, on, "only the messages you have not read")
+	assert.Contains(t, on, "coral-board read")
+	for _, s := range []string{on, off} {
+		assert.NotContains(t, s, "handled")
+		assert.NotRegexp(t, `\d\d:\d\d`, s, "no clock time: it would need a zone and says nothing of what this agent read")
+	}
+	assert.NotContains(t, off, "coral-board", "an agent on no board has no board commands to run")
+	assert.NotContains(t, off, "--ask")
+}
