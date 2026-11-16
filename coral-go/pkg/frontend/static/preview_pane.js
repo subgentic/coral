@@ -9,7 +9,7 @@ import { loadCodeMirror, showVendorLoading, showVendorLoadError } from './vendor
 import './draggable.js';
 import './xterm_renderer.js';
 import { toggleStarFile, isFileStarred } from './changed_files.js';
-import { renderArtifact, resolveArtifactSource, manifestDownload } from './artifact_preview.js';
+import { resolveArtifactSource, manifestDownload } from './artifact_address.js'; // the renderer, artifact_preview.js, loads when the first artifact is drawn (#17351)
 import { serverUrl, currentServer, isCloud } from './server_base.js';
 import { fetchImageSrc } from './image_source.js';
 import { wireDownloads } from './artifact_download.js';
@@ -448,6 +448,8 @@ async function _render(tab) {
             try { const { tagEditor, reviewWords } = await importOnce('./artifact_tags.js'); if (current()) { const bar = document.getElementById('preview-toolbar'); const words = reviewWords(tab.options.tagging.tags, tab.options.tagging.review); if (words && bar) { const line = document.createElement('span'); line.className = 'artifact-review-line'; line.dataset.tabId = String(tab.id); line.setAttribute('role', 'status'); line.textContent = words; bar.append(line); } const editor = tagEditor({ ...tab.options.tagging, hex }); editor.dataset.tabId = String(tab.id); bar?.append(editor); } } catch (e) { console.error('[coral] tags', e); }
         }
         const { linkArtifactRefsIn } = await importOnce('./artifact_refs.js'); // a coral://artifacts/<hex> in a Markdown file is a link that opens that file, on the file's own computer (#12386, as the viewer's: #12361, #12373)
+        const { renderArtifact } = await importOnce('./artifact_preview.js');
+        if (!current()) return;
         await renderArtifact(body, tab.filepath, tab.options, {
             signal: tab.abort.signal,
             isStale: () => !current(),

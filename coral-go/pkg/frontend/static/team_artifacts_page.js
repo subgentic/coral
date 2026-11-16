@@ -17,7 +17,7 @@ await loadStyles('team_artifact_badge.css'); // the badges' rules load with the 
 await loadStyles('phone_lists.css');
 await loadStyles('team_artifact_layout.css'); // the phone form of a team list (#12230); not at start (page_weight)
 import { browserLocal } from './safe_storage.js';
-import { renderArtifact } from './artifact_preview.js';
+const { renderArtifact } = await importOnce('./artifact_preview.js');
 import { showToast, fileIdOf, versionLineOf, copyFileId } from './utils.js';
 /** An agent's file with no team says whose it is where the Team column would say "No team" (#10797): the name comes from the live list, and "No team" stays when the agent is not in it. */
 const placeOf = item => { const a = (item.team === 'No team' || item.team === 'Not on a team') && item.session_id && (state.liveSessions || []).find(s => s.session_id === item.session_id); return a ? (a.display_name || a.name) : teamLabel(item.board_id, item.team); };

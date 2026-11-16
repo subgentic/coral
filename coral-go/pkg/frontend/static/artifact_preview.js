@@ -2,20 +2,20 @@
 
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
+import { CORAL_ARTIFACT_URI_RE, resolveArtifactSource, manifestDownload } from './artifact_address.js'; // the two the preview pane needs at once live there (start); the renderer below loads on first use (#17351)
+export { resolveArtifactSource, manifestDownload };
 import { escapeHtml, escapeAttr, renderImagePanes } from './utils.js';
-import { renderJSONReport } from './artifact_report.js';
-import { splitKey, serverUrl, contextServer, isCloud, artifactPath, boardTeamKey } from './server_base.js';
-import { inlineArtifactPath } from './artifact_paths.js';
+const { renderJSONReport } = await importOnce('./artifact_report.js'); // lazy, retried if it fails to load
+import { serverUrl, isCloud, artifactPath, boardTeamKey } from './server_base.js';
 import { isSvg, svgDataUrl } from './image_source.js';
 import { wireDownloads } from './artifact_download.js';
 import { lockFrame, sandboxedDoc } from './sandbox_frame.js';
 import { visibleName } from './artifact_names.js';
-import { responseFilename as contentDispositionName } from './content_disposition.js'; // Content-Disposition describes the stored file; the artifact label may be extensionless or entirely different. Keep it independent of the UI title.
+const { responseFilename: contentDispositionName } = await importOnce('./content_disposition.js'); // Content-Disposition describes the stored file; the artifact label may be extensionless or entirely different. Keep it independent of the UI title.
 
 const MAX_ARTIFACT_PREVIEW_BYTES = 2 * 1024 * 1024;
 const MAX_ARTIFACT_MANIFEST_ENTRIES = 200;
- const CORAL_ARTIFACT_URI_RE = /^coral:\/\/artifacts\/([a-f0-9]{64})$/i;
-
+ 
 function _sizeLabel(bytes) {
     if (!Number.isFinite(bytes) || bytes < 0) return 'unknown size';
     if (bytes < 1024) return `${bytes} bytes`;
@@ -80,13 +80,6 @@ function _parseManifest(content) {
     return { entries, raw: content };
 }
 
-/** What a Download should save for an artifact that is a manifest (#9925): the manifest is a JSON list of files, so its Download saved a .json where the person wanted the file. One entry: that file, by its own name.
- *  Several: none (each row has its own Download, and the toolbar's Download JSON is the manifest itself), so null. */
-export function manifestDownload(entries, server = contextServer()) {
-    if (!Array.isArray(entries) || entries.length !== 1) return null;
-    const m = CORAL_ARTIFACT_URI_RE.exec(entries[0].uri || '');
-    return m ? { url: serverUrl(artifactPath(m[1]), server), name: entries[0].name } : null;
-}
 
 function _entryType(entry) {
     if (entry.media_type) return entry.media_type;
@@ -201,20 +194,6 @@ async function _scriptsFor(body, { hex, content, name, server, board, ctx }) {
     } catch { /* the plain preview stays */ }
 }
 
-/** Resolve where an artifact's bytes come from; null when the source is unusable. */
-export function resolveArtifactSource(uri, options = {}) {
-    const match = CORAL_ARTIFACT_URI_RE.exec(uri);
-    const board = options.board || (state.selectedTeam ? splitKey(state.selectedTeam).name : (state.currentSession?.board_project || '')); // options.board: a screen that names its own team (the Inbox's goal, #8914)
-    const inlineURL = inlineArtifactPath(options.contentURL, board); // exactly the shape this route has, for this board (a registered server's value must name no other route)
-    let externalURL = null;
-    try {
-        const parsed = new URL(options.externalURL);
-        if (parsed.protocol === 'https:' || parsed.protocol === 'http:') externalURL = parsed.href;
-    } catch { /* Only explicit HTTP(S) links can be embedded. */ }
-    if (!match && !inlineURL && !externalURL) return null;
-    // A board post's artifact lives on the board's server (#3540), which the caller names.
-    return { url: externalURL || inlineURL || artifactPath(match[1]), externalURL, server: options.server || contextServer() };
-}
 
 /**
  * Render an artifact into `body`.
