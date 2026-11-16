@@ -38,7 +38,9 @@ const { coralReady } = require('./helpers/wait');
 
         // 2. A Codex login or startup prompt, or an elicitation, is alerted at once too.
         for (const kind of ['login', 'startup', 'elicitation']) {
-            await feed({ cx: { kind, since: 't2' } });
+            // Each own request gets a new event timestamp, including within one second.
+            const since = { login: '2026-11-16T04:00:00.001Z', startup: '2026-11-16T04:00:00.002Z', elicitation: '2026-11-16T04:00:00.003Z' }[kind];
+            await feed({ cx: { kind, since } });
             await waitFor(`document.querySelectorAll('.notification-toast').length === 1`, `a Codex ${kind} request toasts at once`, { timeout: 2000 });
             await feed({}); await clear();
         }
