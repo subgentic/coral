@@ -218,7 +218,7 @@ export function resolveArtifactSource(uri, options = {}) {
 
 /**
  * Render an artifact into `body`.
- * ctx: { signal, isStale(), renderContent(body, content, path, server), openEntry({name, uri, media_type}, server),
+ * ctx: { signal, isStale(), renderContent(body, content, path, server), resetContent?(), openEntry({name, uri, media_type}, server),
  *        setMeta({ title, filename }), typeResolved?({ mediaType, filename }), typeKnown?(entries|null) }  (typeKnown: once, when the kind is known: the files of a manifest, so a Download can name the file and not the manifest (#9925), or null for any other artifact; a host with a Download offers none before it, #9941)
  */
 export async function renderArtifact(body, uri, options, ctx) {
@@ -298,6 +298,7 @@ async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
                 rendered = true;
                 // Scripts: only in the single-artifact viewer (it passes options.scripts), for a stored file, on a computer that is not the Hub (#14730: its host header is not live there yet).
                 if (options.scripts && opened && !isCloud() && !ctx.isStale()) await _scriptsFor(body, { hex: opened[1], content, name: filename, server: source.server, board: options.board || '', ctx });
+                if (!ctx.isStale() && ctx.renderContent) importOnce('./artifact_html_source.js').then(m => m.addToggle(body, { content, filename, path: artifactPath, source, ctx, options, opened, render: _renderSandboxed, scripts: _scriptsFor, isCloud })).catch(() => {});
                 return;
             }
             const delimited = [type, declaredType].some(v => v === 'text/tab-separated-values') || filenameHints.some(n => /\.tsv$/i.test(n)) ? 'tsv'
