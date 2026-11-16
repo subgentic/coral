@@ -19,7 +19,7 @@ const { pathToFileURL } = require('node:url');
     globalThis.MutationObserver = class { observe() {} disconnect() {} }; globalThis.ResizeObserver = globalThis.MutationObserver; globalThis.IntersectionObserver = globalThis.MutationObserver; // what websocket.js touches when it is imported
     globalThis.matchMedia = () => ({ matches: false, addEventListener() {}, addListener() {} });
     globalThis.CustomEvent = class { constructor(t, o) { this.type = t; this.detail = o && o.detail; } };
-    globalThis.document = { addEventListener() {}, getElementById: id => (id === 'coral-boot' ? boot : null), querySelector() { return null; }, body, createElement: () => ({ style: {}, classList: { add() {} }, setAttribute() {}, append() {}, addEventListener() {}, dataset: {} }), createTextNode: t => ({ nodeType: 3, t }) };
+    globalThis.document = { head: body, addEventListener() {}, getElementById: id => (id === 'coral-boot' ? boot : null), querySelector() { return null; }, body, createElement: () => ({ style: {}, classList: { add() {} }, setAttribute() {}, append() {}, addEventListener() {}, dataset: {} }), createTextNode: t => ({ nodeType: 3, t }) };
     globalThis.localStorage = { getItem() { return null; }, setItem() {}, removeItem() {} };
     let sessionAnswer = null;
     globalThis.fetch = () => sessionAnswer; // /auth/session: the test decides when and what

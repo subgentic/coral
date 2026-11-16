@@ -9,7 +9,7 @@ const { JSDOM } = require('jsdom');
 (async () => {
     const dir = path.resolve(__dirname, '../../coral-go/pkg/frontend/static');
     const dom = new JSDOM('<!doctype html><title>Coral</title><body></body>', { url: 'https://hub.example/' });
-    for (const k of ['window', 'document', 'localStorage']) Object.defineProperty(globalThis, k, { value: dom.window[k], configurable: true, writable: true });
+    for (const k of ['window', 'document', 'localStorage', 'location']) Object.defineProperty(globalThis, k, { value: dom.window[k], configurable: true, writable: true });
     const shown = [];
     let perm = 'granted', hidden = true;
     class FakeNotification {
