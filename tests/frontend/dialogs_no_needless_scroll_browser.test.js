@@ -10,7 +10,7 @@ const { coralReady } = require('./helpers/wait');
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const found = [];
     const probe = (id) => ev(`(() => { const m = document.getElementById(${JSON.stringify(id)}), c = m.querySelector('.modal-content'); if (!m || m.style.display === 'none' || !c.getClientRects().length) return null;
-        const bad = [c, ...c.querySelectorAll('*')].filter(e => e.getClientRects().length && ['auto', 'scroll'].includes(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1).map(e => (e.id || String(e.className)).slice(0, 40) + ' ' + e.scrollHeight + '/' + e.clientHeight);
+        const bad = [c, ...c.querySelectorAll('*')].filter(e => e.getClientRects().length && !(e.closest('details:not([open])') && !e.closest('summary')) /* the browser lays out a closed details' content as skipped: not on screen, so no scrolling part (#18819) */ && ['auto', 'scroll'].includes(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1).map(e => (e.id || String(e.className)).slice(0, 40) + ' ' + e.scrollHeight + '/' + e.clientHeight);
         return { dialogH: Math.round(c.getBoundingClientRect().height), windowH: innerHeight, bad }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
