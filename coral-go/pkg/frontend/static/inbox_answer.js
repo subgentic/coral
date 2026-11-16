@@ -16,6 +16,7 @@ import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('inbox_answer.css'); // the step line's rules (#11981) are a sheet of their own: not in the start's stylesheet, and here before any step is drawn
 const { canDismissWait, dismissButton, dismissWait, canRemoveWait, removeWait, REMOVE_WAIT_LINE } = await importOnce('./dismiss_wait.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
+importOnce('./inbox_row_keys.js'); // the arrow keys between the rows of Needs you (#17226)
 
 const MAX_CHOICES = 4;
 // Choices that last past this one answer, or change how the agent runs: never a button on a list row (each CLI's own words: Claude's "Yes, and don't ask again for ..." and "Yes, allow all edits during this session", Codex's "Yes, and don't ask again", Antigravity's "always allow").

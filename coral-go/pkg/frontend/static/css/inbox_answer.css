@@ -28,3 +28,4 @@
 .inbox-trust-group { min-width: 0; max-width: 100%; white-space: normal; }
 .inbox-trust-group .inbox-trust-go { min-height: 44px; white-space: normal; }
 .inbox-trust-group .inbox-trust-note { display: block; }
+.inbox-answers .inbox-dismiss:focus-visible { outline-offset: -3px; } /* the cell clips what is drawn outside it: the whole ring sits inside the button (#17226) */
