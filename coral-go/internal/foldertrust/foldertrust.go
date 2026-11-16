@@ -83,6 +83,38 @@ func Check(path, home string, basis Basis) (string, error) {
 	if fi, err := os.Stat(realPath); err != nil || !fi.IsDir() {
 		return "", refuse(plainFind, "the folder is not an existing folder")
 	}
+	return checkResolved(realPath, home, basis)
+}
+
+// CheckPlanned says whether a folder that does not exist yet (the launch will make it) could be trusted: the nearest folder that exists is resolved, the rest of the name is put back on it, and the same rules as
+// Check's apply to the result on the Made basis. The page asks it before launch so a new folder in /tmp is warned about at the toggle (#17422).
+func CheckPlanned(path, home string) error {
+	clean := filepath.Clean(path)
+	if path == "" || !filepath.IsAbs(clean) || strings.ContainsAny(path, "\x00\n\r") {
+		return refuse(plainFind, "the folder is not a plain absolute path")
+	}
+	anc, rest := clean, []string{}
+	for {
+		if _, err := os.Lstat(anc); err == nil {
+			break
+		}
+		parent := filepath.Dir(anc)
+		if parent == anc {
+			return refuse(plainFind, "no part of the folder exists")
+		}
+		rest = append([]string{filepath.Base(anc)}, rest...)
+		anc = parent
+	}
+	real, err := filepath.EvalSymlinks(anc)
+	if err != nil {
+		return refuse(plainFind, fmt.Sprintf("the folder cannot be resolved: %v", err))
+	}
+	_, err = checkResolved(filepath.Join(append([]string{real}, rest...)...), home, Made)
+	return err
+}
+
+// checkResolved is Check's rules for a folder already resolved.
+func checkResolved(realPath, home string, basis Basis) (string, error) {
 	if realPath == filepath.Dir(realPath) {
 		return "", refuse(plainHome, "a filesystem root is never trusted")
 	}

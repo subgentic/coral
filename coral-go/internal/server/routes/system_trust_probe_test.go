@@ -130,3 +130,27 @@ func TestProjectTrustProbeSaysWhyAFolderIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// #17422 (walk 68): a NEW folder typed under /private/tmp showed the Trust switch with no warning (the probe skipped a folder that does not exist yet) and only the launch said no. The probe now checks where the folder
+// would be made: a new folder in a shared place is refused up front, one under the home folder is not.
+func TestProjectTrustProbeWarnsAboutANewFolderInASharedPlace(t *testing.T) {
+	home := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(home, "Code"), 0700))
+	shared := "/tmp"
+	if runtime.GOOS == "darwin" {
+		shared = "/private/tmp"
+	}
+	if fi, err := os.Lstat(shared); runtime.GOOS == "windows" || err != nil || !fi.IsDir() {
+		t.Skip("no shared temp folder here")
+	}
+	fresh := filepath.Join(shared, "coral-trustprobe-new-"+filepath.Base(home), "wordgame")
+	out := probeProjectTrust(fresh, home)
+	reason, _ := out["refused"].(string)
+	require.Contains(t, reason, "shared", "a new folder in a shared place is refused before launch: %v", out)
+	require.NotContains(t, reason, "coral-trustprobe-new", "the sentence names no path")
+	_, err := os.Lstat(fresh)
+	require.True(t, os.IsNotExist(err), "the probe makes nothing")
+	for name, dir := range map[string]string{"a new project under home": filepath.Join(home, "Code", "new", "deeper"), "a new direct child of home, which a launch may make": filepath.Join(home, "newproj")} {
+		require.NotContains(t, probeProjectTrust(dir, home), "refused", name)
+	}
+}
