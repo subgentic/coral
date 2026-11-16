@@ -24,6 +24,7 @@ const { framesJs, coralReady } = require('./helpers/wait');
             const st = window.__coralStatic || '/static/';
             const ws = await import(st + 'websocket.js');
             const render = await import(st + 'render.js');
+            const { state } = await import(st + 'state.js');
             const frames = n => ${framesJs('n')};
             const mk = i => ({ name: 'batch-' + i, session_id: 'batch-' + i, agent_type: 'claude', server: 'local', status: 'working', summary: 's' + i, display_name: 'B' + i });
             ws.handleCoralMessage({ type: 'coral_update', sessions: Array.from({ length: 20 }, (_, i) => mk(i)) });
@@ -41,7 +42,9 @@ const { framesJs, coralReady } = require('./helpers/wait');
             // 2. A synchronous render drops the pending scheduled one.
             before = window.__renders;
             ws.handleCoralMessage({ type: 'coral_diff', changed: [{ name: 'batch-2', session_id: 'batch-2', server: 'local', display_name: 'sync wins' }] });
-            render.renderLiveSessions((await import(st + 'state.js')).state.liveSessions);
+            // Keep the cancellation in the same task: even a cached import() yields
+            // and can let the scheduled animation frame render before the user action.
+            render.renderLiveSessions(state.liveSessions);
             await frames(2);
             out.syncRenders = window.__renders - before;
 
