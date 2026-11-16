@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, nextFrame } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -20,7 +20,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await api('POST', `/api/board/${B}/subscribe`, { subscriber_id:'access',job_title:'Accessibility Checker',session_name:'access-s'}),200);
         assert.equal(await api('POST', `/api/board/${B}/messages`, {subscriber_id:'access',content:'Second-specific accessibility message'}),200);
         await Page.navigate({ url: `${BASE}/team/${B}/messages` }); await Page.loadEventFired(); await install(); await coralReady(ev);
-        await waitFor(`document.querySelectorAll('#mb-messages .mb-msg-more').length >= 1`, 'the message and its More button', 15000);
+        await waitFor(`[...document.querySelectorAll('#mb-messages .mb-msg-more')].some(b=>b.closest('.mb-message').textContent.includes('Second-specific'))`, 'the second message and its More button', 15000);
         await ev(`window.__boardOpener=[...document.querySelectorAll('#mb-messages .mb-msg-more')].find(b=>b.closest('.mb-message').textContent.includes('Second-specific'));true`);
         const label = await ev(`window.__boardOpener.getAttribute('aria-label')`);
         await ev(`window.__boardOpener.setAttribute('aria-label','Actions for the message from Coral, 11:28 PM: stale label');true`);
@@ -29,7 +29,9 @@ const { coralReady } = require('./helpers/wait');
         const identity = await ev(`(()=>{const row=window.__boardOpener.closest('.mb-message');const save=row.querySelector('.mb-save-btn'),del=row.querySelector('.mb-delete-msg-btn');window.__target=null;for(const b of [save,del])if(b)b.addEventListener('click',e=>{window.__target={id:row.dataset.messageId,kind:b===del?'delete':'save'};e.preventDefault();e.stopImmediatePropagation()},true);return{id:row.dataset.messageId,saveVisible:!!save&&save.getClientRects().length>0}})()`);
         await ev(`(()=>{const b=[...document.querySelectorAll('.mb-actions-sheet button')].find(b=>b.textContent==='Delete message');b.click();return true})()`);
         assert.deepEqual(await ev('window.__target'),{id:identity.id,kind:'delete'},'Delete acts on the opened row');
+        await waitFor(`!document.querySelector('dialog.mb-actions-sheet')`, 'Delete sheet removed before reopening', 5000);
         await ev(`window.__boardOpener.click();true`);
+        await waitFor(`!!document.querySelector('dialog.mb-actions-sheet[open]') && document.querySelector('dialog.mb-actions-sheet[open] .mb-actions-item')?.textContent === 'Save for later'`, 'the reopened sheet and its Save action', 5000);
         const title = await ev(`document.getElementById('mb-actions-title').textContent`);
         const m = /^Actions for the (message from .+?, \d{1,2}:\d{2}(?:\s?[AP]M)?)(?::|$)/.exec(label);
         if (!m) problems.push(`the More button's name is "Actions for the message from <sender>, <time>: <words>" (it is "${label}")`);
@@ -37,8 +39,8 @@ const { coralReady } = require('./helpers/wait');
         if(process.env.CORAL_BOARD_SHOTS){const fs=require('node:fs');fs.mkdirSync(process.env.CORAL_BOARD_SHOTS,{recursive:true});fs.writeFileSync(process.env.CORAL_BOARD_SHOTS+'/actions.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
         await ev(`(()=>{[...document.querySelectorAll('.mb-actions-sheet button')].find(b=>b.textContent==='Save for later').click();return true})()`);
         assert.deepEqual(await ev('window.__target'),{id:identity.id,kind:'save'},'Save acts on the opened second message');
-        await waitFor(`!document.querySelector('.mb-actions-sheet[open]')`,'actions sheet closes');
-        await ev(`new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(true))))`);
+        await waitFor(`!document.querySelector('dialog.mb-actions-sheet')`,'actions sheet closes');
+        await nextFrame(ev);
         for(const width of [390,1280]){
             await Emulation.setDeviceMetricsOverride({width,height:764,deviceScaleFactor:1,mobile:width===390});
             await ev(`window.__boardOpener.closest('.mb-message').scrollIntoView({block:'end'});true`);

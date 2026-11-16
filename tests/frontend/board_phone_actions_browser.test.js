@@ -1,5 +1,5 @@
-// The team page's Board tab, as the chat, on a phone (#7183, UI/UX's #7180 findings 4 and 6; on the team page since the board page went, #8157): the search and its buttons are one "Search" row that opens on a tap (a wider window shows the bar as before); each message's actions are one
-// "..." that opens a sheet with Save for later and, set apart from it, Delete (Delete is never beside Save); the two jumps are items of the search bar's More menu: "Jump to first message" and "Jump to latest message". 390 px with touch, and 1280 px.
+// The team page's Board tab, as the chat, on a phone (#7183, UI/UX's #7180 findings 4 and 6; on the team page since the board page went, #8157): the search and its buttons are one "Search" row that opens on a tap (a wider window shows the bar as before); each message has a
+// visible bookmark plus "..." that opens a sheet with Save for later and, set apart from it, Delete (#16823); the two jumps are items of the search bar's More menu: "Jump to first message" and "Jump to latest message". 390 px with touch, and 1280 px.
 // Real isolated server, a board made through the API (and removed again). Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -33,7 +33,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`) <= 0, true, 'nothing scrolls sideways');
         assert.deepEqual(await ev(`[...document.querySelectorAll('#mb-tools .list-bar-more-menu [role=menuitem]')].filter(b => !b.hidden).map(b => b.textContent)`), ['Jump to first message', 'Jump to latest message'], 'the jumps are menu items of the More icon and say what they do (#7686)');
         assert.equal(await ev(`[...document.querySelectorAll('.mb-message-header .mb-delete-msg-btn')].filter(b => b.getClientRects().length).length`), 0, 'no Delete cross beside the time');
-        assert.equal(await ev(`[...document.querySelectorAll('.mb-message-header .mb-save-btn')].filter(b => b.getClientRects().length).length`), 0, 'no Save bookmark drawn on an unsaved message');
+        assert.equal(await ev(`[...document.querySelectorAll('.mb-message-header .mb-save-btn')].filter(b => b.getClientRects().length).length`), 2, 'each unsaved message has a visible Save bookmark (#16823)');
         const more = await ev(`[...document.querySelectorAll('.mb-message-header .mb-msg-more')].map(b => ({ shown: b.getClientRects().length > 0, h: Math.round(b.getBoundingClientRect().height), w: Math.round(b.getBoundingClientRect().width), name: b.getAttribute('aria-label') }))`);
         assert.ok(more.length >= 2 && more.every(m => m.shown && m.h >= 44 && m.w >= 44 && /^Actions for the message from QA/.test(m.name)), 'one 44 px "..." per message, named for its message: ' + JSON.stringify(more));
         assert.equal(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), true, 'nothing scrolls sideways');
