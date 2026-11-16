@@ -7,9 +7,6 @@
   "coral-go/pkg/frontend/static/board_export_render.js": {
    "radius: inline 10px": 1
   },
-  "coral-go/pkg/frontend/static/css/acf_sizes.css": {
-   "height: .perm-chip { min-height: 24px }": 1
-  },
   "coral-go/pkg/frontend/static/css/agentic.css": {
    "height: .activity-chart-mode button { min-height: 24px }": 1,
    "height: .task-completion-form textarea { min-height: 72px }": 1,
@@ -134,9 +131,6 @@
    "height: .artifact-review-form textarea { min-height: 4.5em }": 1,
    "height: .inbox-ask-subjects .btn { min-height: 28px }": 1
   },
-  "coral-go/pkg/frontend/static/css/provider_cards.css": {
-   "height: .provider-strip .provider-card-head input { height: 1px }": 1
-  },
   "coral-go/pkg/frontend/static/css/session.css": {
    "height: .hub-readonly-chip:empty { height: 1px }": 1,
    "radius: 11px": 1,
@@ -179,9 +173,6 @@
   "coral-go/pkg/frontend/static/css/variables.css": {
    "radius: --radius-ml = 10px": 1,
    "radius: --radius-xs = 3px": 1
-  },
-  "coral-go/pkg/frontend/static/dropbox_share.js": {
-   "btn-primary written in a dialog module": 6
   },
   "coral-go/pkg/frontend/static/editions.js": {
    "btn-primary written in a dialog module": 3

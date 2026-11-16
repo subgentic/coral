@@ -7,7 +7,7 @@
 .provider-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: 0; width: 100%; margin: 0 0 8px; overflow: hidden; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-secondary); }
 .provider-strip .provider-card-head { margin: 0 !important; position: relative; justify-content: center; min-height: var(--control-height, 36px); padding: 0 var(--space-lg, 12px); border: 0; border-radius: 0; background: var(--bg-secondary); box-shadow: 1px 0 0 var(--control-border), 0 1px 0 var(--control-border); color: var(--text-secondary); font-weight: var(--fw-medium); white-space: nowrap; } /* the dividers are each segment's right and bottom line: the strip's own edge clips the last ones, and an odd last row leaves no grey cell */
 .provider-strip .provider-card-head:hover { background: var(--bg-hover); color: var(--text-primary); }
-.provider-strip .provider-card-head input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+.provider-strip .provider-card-head input { position: absolute; opacity: 0; width: 1px; margin: 0; } /* the radio is invisible and out of flow; no height needed (#17850) */
 .provider-strip .provider-mark, .provider-strip .provider-status { display: none; } /* the status is the panel's first line */
 .provider-strip .provider-name { color: inherit; font-weight: inherit; }
 .provider-strip .provider-card-head.is-open { background: var(--accent-dim); color: var(--text-on-accent); font-weight: var(--fw-strong); }
