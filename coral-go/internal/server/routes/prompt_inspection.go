@@ -46,6 +46,13 @@ func (h *SystemHandler) GetPromptInspection(w http.ResponseWriter, r *http.Reque
 		"worker":       role("Worker", "default_prompt_worker", agent.DefaultWorkerSystemPrompt, agent.DefaultWorkerActionPrompt),
 		"task":         map[string]any{"default_instructions": board.DefaultTaskWorkflowInstructions, "scope": "Shipped task default; read-only here", "applicability": "Stored when a task is created, followed by any per-task additional instructions. Team workflow guidance is appended on first claim. Historical task instructions are not rewritten."},
 	}
+	// The Orchestrator's prompt also carries a section built from its team's settings (#17622); the preview shows it for both settings of the launch switch, with the team's own values as placeholders (#17662).
+	{
+		a := teamAbilities{BoardID: project, Dir: "<team folder>", AgentType: "<type>", Model: "<model>"}
+		off := canDoSection(orchestratorCanDo(a))
+		a.MayLaunch = true
+		out["orchestrator_team_section"] = map[string]string{"launch_allowed": canDoSection(orchestratorCanDo(a)), "launch_not_allowed": off, "applicability": "Added to an Orchestrator's system prompt at every launch, restart and wake, from the team's Orchestrator access setting as it is then."}
+	}
 	if cloud.Tunneled(r) {
 		// A size cap on what leaves through the tunnel: read only, bounded.
 		if b, err := json.Marshal(out); err != nil || len(b) > promptInspectionHubMax {

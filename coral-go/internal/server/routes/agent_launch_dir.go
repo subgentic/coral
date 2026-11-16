@@ -71,3 +71,30 @@ func (h *SessionsHandler) callersBoardWithGrant(r *http.Request) string {
 	}
 	return *sess.BoardName
 }
+
+// refuseAgentLaunchWhileAccessOff answers 403 orchestrator_access_off, and reports true, when an agent starts agents while the Operator has switched Orchestrator access OFF for its team (#17661): the prompt tells the Orchestrator it
+// may not, and this is what backs that up. It is the caller's own team (the board its session is seated on) and the board the launch names, whichever has a grant the Operator turned off. A board the Operator never decided for (no
+// grant row) is as it was, the Operator's and the dashboard's launches are never held, and a team with the access on is held to its caps and folders as before.
+func (h *SessionsHandler) refuseAgentLaunchWhileAccessOff(w http.ResponseWriter, r *http.Request, named string) bool {
+	owner, ok := VerifiedSession(r.Context())
+	if !ok || h.ss == nil || h.bs == nil {
+		return false
+	}
+	boards := []string{named}
+	if sess, err := h.ss.GetLiveSession(r.Context(), owner.SessionID); err == nil && sess != nil && sess.BoardName != nil {
+		boards = append(boards, *sess.BoardName)
+	}
+	for _, b := range boards {
+		if b == "" {
+			continue
+		}
+		g, err := h.bs.GetOrchGrant(r.Context(), b)
+		if err != nil || g.Enabled || g.SetAt == "" { // unreadable: as before; never decided: as before
+			continue
+		}
+		msg := "the Operator has not allowed agents to start agents on this team: ask the Operator to turn on Orchestrator access in the team's settings"
+		writeError(w, http.StatusForbidden, "orchestrator_access_off", msg)
+		return true
+	}
+	return false
+}

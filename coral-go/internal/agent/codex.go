@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/logsafe"
 	"log/slog"
 	"os"
@@ -411,7 +412,7 @@ func codexInstructions(files *launchFiles, params LaunchParams) string {
 	if proto := protocolText(params); proto != "" {
 		sysParts = append(sysParts, proto)
 	}
-	if boardSysPrompt := BuildBoardSystemPrompt(params.BoardName, params.Role, "", params.PromptOverrides, params.BoardType); boardSysPrompt != "" {
+	if boardSysPrompt := withBoardAbilities(BuildBoardSystemPrompt(params.BoardName, params.Role, "", params.PromptOverrides, params.BoardType), params, at.Codex); boardSysPrompt != "" {
 		sysParts = append(sysParts, boardSysPrompt)
 	}
 	sysParts = appendCoralSessionMarker(sysParts, params.SessionID)

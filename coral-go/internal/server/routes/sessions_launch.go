@@ -112,6 +112,10 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		}
 		body.BoardName = key
 	}
+	if h.refuseAgentLaunchWhileAccessOff(w, r, body.BoardName) {
+		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+		return
+	}
 	// An agent on a team whose grant is on starts agents in that team's folders, wherever the agent is placed (#13891, #13903).
 	if h.refuseAgentLaunchOutsideTeam(w, r, body.WorkingDir) {
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
@@ -219,6 +223,9 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	}
 	// Resolve model: request wins, else per-type default from settings.
 	takesSeat := h.launchTakesTheSeat(r.Context(), r, body.DisplayName, body.AgentType, body.BoardName, body.BoardServer)
+	if body.ResumeSessionID == "" && strings.TrimSpace(body.Model) == "" && modelInFlags(body.Flags) == "" {
+		body.Model = h.callersTeamModel(r, body.AgentType, body.BoardName, body.BoardServer) // #17545: the team's model, not the Settings default
+	}
 	effectiveModel := h.resolveModelFor(r.Context(), body.AgentType, body.Model, takesSeat)
 	if effectiveModel != "" && !agentmodels.ValidModelValue(effectiveModel) {
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)

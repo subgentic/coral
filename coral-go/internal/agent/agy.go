@@ -286,7 +286,7 @@ func (a *AgyAgent) LaunchCommand(params LaunchParams) (string, error) {
 	if proto := protocolText(params); proto != "" {
 		sysParts = append(sysParts, proto)
 	}
-	boardSysPrompt := BuildBoardSystemPrompt(params.BoardName, params.Role, "", params.PromptOverrides, params.BoardType)
+	boardSysPrompt := withBoardAbilities(BuildBoardSystemPrompt(params.BoardName, params.Role, "", params.PromptOverrides, params.BoardType), params, at.Agy)
 	if boardSysPrompt != "" {
 		sysParts = append(sysParts, boardSysPrompt)
 	}
