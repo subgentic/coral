@@ -22,7 +22,7 @@ const { framesJs, coralReady } = require('./helpers/wait');
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'settings');
         // The Files list is read once for each agent switch, and a read that answers late redraws #changed-files-list (#15057): the reads in flight are counted so the feed window below can open after the last one has answered.
-        await ev(`(() => { window.__filesReads = 0; const f = window.fetch; window.fetch = function (u) { const files = /\\/api\\/sessions\\/live\\/[^/]+\\/files/.test(String((u && u.url) || u)); const p = f.apply(this, arguments); if (!files) return p; window.__filesReads++; const done = () => { window.__filesReads--; }; p.then(done, done); return p; }; return true; })()`);
+        await ev(`(() => { window.__filesReads = 0; const f = window.fetch; window.fetch = function (u) { const files = /\\/api\\/sessions\\/live\\/[^/]+\\/files/.test(String((u && u.url) || u)); if (files && window.__holdFiles) return new Promise(() => {}); /* step 7: a Files read that starts now is held, so none answers inside the counted window */ const p = f.apply(this, arguments); if (!files) return p; window.__filesReads++; const done = () => { window.__filesReads--; }; p.then(done, done); return p; }; return true; })()`);
         // a chat with a few hundred messages on screen, so the page has something to walk
         await ev(`(() => { const a = window.__m.add('perf-a', 'P', 0, { sleeping: false, session_id: 'perf-a-id' }); const m = []; for (let i = 0; i < 400; i++) { m.push({ type: 'user', content: 'question ' + i, key: 'u' + i }); m.push({ type: 'assistant', text: 'answer ' + i + ' with **bold** and \`code\`', key: 'a' + i }); } a.msgs = m;
             window.selectLiveSession('perf-a', 'claude', 'perf-a-id', 'local'); return true; })()`);
@@ -122,8 +122,10 @@ const { framesJs, coralReady } = require('./helpers/wait');
             T.ws.handleCoralMessage({ type: 'coral_diff', changed: [e], removed: [] }); await ${framesJs(3)}; seen.push(...mo.takeRecords().map(r => ({ type: r.type, inList: false, target: 'late' }))); mo.disconnect(); return seen; })()`);
         await feed({ summary: 'budget settled' }); // the first message may still be settling what the last one changed
         // and the page's own late work (the switched-to agent's changed-files list answering a moment after the switch: 1 run in 25 at CPU x4 saw it inside the next count) is waited out: nothing writes anywhere for 400 ms
+        // The page's Files follow can start a read after a quiet gap longer than any we wait (the queued read waits MIN_REFRESH_GAP_MS = 2 s on a timer, which nothing here can see), and its answer redraws #changed-files-list inside the window below (CI fail-fast on fc3e701210). So from here a new Files read is held, and the reads already in flight are waited out.
+        await ev(`window.__holdFiles = true`);
         await ev(`window.__writes = 0; new MutationObserver(rs => { window.__writes += rs.length; }).observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true }); true`);
-        await require('./helpers/wait').waitStable(ev, 'window.__writes', 'the page has stopped writing before a quiet message is counted', 400, { timeout: 10000 });
+        await require('./helpers/wait').waitStable(ev, `window.__writes + ':' + window.__filesReads`, 'the page has stopped writing and has no Files read in flight before a quiet message is counted', 400, { timeout: 15000, accept: v => v.endsWith(':0') }); // a read that answers after a quiet gap redrew #changed-files-list inside the counted window (fail-fast on fc3e701210): the quiet gap only counts with no read in flight
         const quiet = await feed({ staleness_seconds: 7 });
         assert.deepEqual(quiet, [], 'a message that changes nothing drawn writes nothing to the page: ' + JSON.stringify(quiet));
         const one = await feed({ summary: 'budget step ' + Math.random() });
