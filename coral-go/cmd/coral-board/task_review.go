@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -53,6 +54,7 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 	candidateRevision := fs.String("candidate-revision", "", "Exact source/build revision represented by candidate evidence")
 	areas := fs.String("areas", "", "The review's areas, comma-separated (submit-review): who may take it from the review pool")
 	reviewers := fs.Int("reviewers", 0, "How many reviewers the review wants, 1 or 2 (submit-review)")
+	head := fs.String("head", "", "The commit you submit (submit-review; default: HEAD of the repository you run it in). A resubmit of the commit a reviewer rejected is refused")
 	clihelp.ParseFlags(fs, args[1:], func() string { return commandUsage(os.Args[1], os.Args[2:]) })
 	*message = flagText(*message, "completion message")
 	if strings.TrimSpace(*reason) == "" {
@@ -75,6 +77,21 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 	}
 	if *reviewers != 0 {
 		body["reviewers"] = *reviewers
+	}
+	if action == "submit-review" {
+		h := strings.TrimSpace(*head)
+		if h == "" {
+			h = worktreeHead()
+			if h != "" {
+				announceHead(os.Stderr, "", h)
+			}
+		}
+		if h != "" {
+			body["head"] = h
+		}
+	} else if *head != "" {
+		fmt.Fprintln(os.Stderr, "--head belongs to submit-review")
+		os.Exit(2) // usage
 	}
 	if *candidateRevision != "" {
 		body["candidate_revision"] = *candidateRevision
@@ -344,4 +361,37 @@ func warnUnpushedCommit(reason, dir string) {
 // or none was recorded. An approval names it; the server refuses one that names an older revision.
 func lastSeenRevision(project string, id int64) int {
 	return loadSeenRounds()[fmt.Sprintf("%s/%d#revision", project, id)]
+}
+
+// worktreeHead is the commit checked out where the command runs, or "" outside a repository (#18135).
+func worktreeHead() string {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	out, err := gitutil.Command(ctx, "", "rev-parse", "HEAD").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// announceHead says on stderr which commit, from which folder, goes to the review, and warns when that folder is not a task worktree: the shared
+// checkout (it has no linked-worktree .git file) or a branch named main. A head taken from the wrong folder is stored and a later unchanged resubmit
+// is refused for it (#18457; the task's own branch is not known here, so the check is on the folder).
+func announceHead(w io.Writer, dir, h string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	git := func(args ...string) string {
+		out, err := gitutil.Command(ctx, dir, args...).Output()
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(string(out))
+	}
+	top := git("rev-parse", "--show-toplevel")
+	fmt.Fprintf(w, "submitting %s from %s\n", h, top)
+	branch := git("rev-parse", "--abbrev-ref", "HEAD")
+	shared := git("rev-parse", "--git-dir") == git("rev-parse", "--git-common-dir")
+	if shared || branch == "main" || branch == "master" {
+		fmt.Fprintf(w, "warning: this is %s (branch %q), not a worktree of the task's branch: if %s is not the commit you mean, resubmit with --head <sha>\n", map[bool]string{true: "the shared checkout", false: "a worktree"}[shared], branch, h[:min(len(h), 10)])
+	}
 }

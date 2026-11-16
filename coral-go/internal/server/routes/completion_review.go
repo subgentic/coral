@@ -28,6 +28,7 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 		CandidateRevision string               `json:"candidate_revision,omitempty"`
 		Areas             []string             `json:"areas,omitempty"`     // the review's areas (#8957); absent: from paths when they are listed
 		Reviewers         int                  `json:"reviewers,omitempty"` // 1 (the default) or 2
+		Head              string               `json:"head,omitempty"`      // the commit submitted; a resubmit of the rejected one is refused (#18135)
 		Paths             []string             `json:"paths,omitempty"`     // the files the change touches, when the caller knows them
 	}
 	derr := decodeJSON(r, &body)
@@ -63,7 +64,7 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 		return
 	}
 	vetted := h.vetTaskArtifacts(r, project, body.Artifacts)
-	task, err := h.bs.SubmitCompletionReviewAtRevisionAndCandidate(r.Context(), project, id, body.SubscriberID, body.Message, body.Outcome, body.Reason, body.Artifacts, body.ExpectedRevision, body.CandidateRevision)
+	task, err := h.bs.SubmitCompletionReviewAtHead(r.Context(), project, id, body.SubscriberID, body.Message, body.Outcome, body.Reason, body.Artifacts, body.ExpectedRevision, body.CandidateRevision, body.Head)
 	if err != nil {
 		if strings.Contains(err.Error(), "revision") {
 			errConflict(w, err.Error())

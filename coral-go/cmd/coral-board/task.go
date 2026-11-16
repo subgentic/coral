@@ -22,7 +22,7 @@ Subcommands:
   add "title" [--body "details"] [--priority P]
   list [--json]
   claim
-  submit-review <id> --reason "review pending" [--revision N] [--candidate-revision REVISION] [--message "note"] [--outcome success|failed] [--artifacts manifest.json] [--areas ui,go] [--reviewers 1|2]
+  submit-review <id> --reason "review pending" [--revision N] [--candidate-revision REVISION] [--head SHA] [--message "note"] [--outcome success|failed] [--artifacts manifest.json] [--areas ui,go] [--reviewers 1|2]
   release-review <id> --reason "slot released pending review" (orchestrator only)
   review <id> --to "Security Reviewer,QA Engineer"   (orchestrator: delegate a task in review)
   approve <id> [--round N] [--note "..."] / reject <id> [--round N] --note "why"   (a delegated reviewer)

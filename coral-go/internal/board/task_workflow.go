@@ -81,6 +81,7 @@ type TaskWorkflow struct {
 	CompletionGates              []CompletionGate       `json:"completion_gates,omitempty"`
 	GateResults                  []CompletionGateResult `json:"gate_results,omitempty"`
 	CandidateRevision            string                 `json:"candidate_revision,omitempty"`
+	SubmittedHead                string                 `json:"submitted_head,omitempty"` // the commit the author last submitted for review (#18135)
 	// The review pool (#8957, Goal #80): a review that waits on the board for reviewers instead of with the orchestrator. ReviewInPool is true from submit-review until the wanted number of
 	// reviewers have taken it (or a reviewer was named, or a verdict ended it); ReviewAreas are the areas that decide who may take it; ReviewersWanted is 2 when the author asked for two.
 	ReviewAreas     []string `json:"review_areas,omitempty"`
