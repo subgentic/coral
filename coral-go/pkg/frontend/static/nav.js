@@ -5,10 +5,8 @@
    Paths come from routes.js (parse/build); old hash links are read once at startup and replaced. */
 
 import { setServedAddress } from './served_address.js';
-import { isPhoneLayout } from './phone_layout.js';
 import { browserLocal } from './safe_storage.js';
 import { parse, build, fromLegacyHash, normalize, chatsQuery } from './routes.js';
-import { isCloud } from './server_base.js';
 import { importOnce } from './import_once.js';
 
 const handlers = new Map();
@@ -116,15 +114,11 @@ export function startNav() {
     if (started) return current;
     started = true;
     setServedAddress(location.pathname + location.search + location.hash); // what the person opened, for a sign-in that must bring them back to it (#12406)
-    let route = startRoute(), restored = false, keep = false;
-    // The bare start (the address "/", no query; /agents typed on purpose is the list) reopens the place the person left (#10057); a link, a phone (its Home is the Agents list) or a place that is gone is shown as it is.
-    if (isHome(route) && (location.pathname === '/' || location.pathname === '') && !location.search && (!location.hash || location.hash === '#') && !isPhoneLayout()) {
-        const back = parse(lastPlace() || '', '');
-        if (isPlace(back)) { route = back; restored = true; } else { route = { view: 'inbox-folder', folder: 'needs' }; keep = isCloud(); } // no place to reopen: a computer starts on the Inbox, the first tab (#11594)
-    }
+    let route = startRoute(), restored = false;
+    const bare = /^\/?$/.test(location.pathname) && !location.search && !location.hash.slice(1);
     const kept = lastPlace();
-    write(route, true, '', keep);
-    markStartTab(route);
+    write(route, true);
+    if (!bare) markStartTab(route);
     if (kept && isHome(route)) lastPlace(kept); // the start itself is not the person choosing Home: a phone's Home start (or a link's) leaves the place for the next wide start
     window.addEventListener('popstate', () => {
         setServedAddress('');
@@ -140,6 +134,17 @@ export function startNav() {
         current = r;
         show(r, { fromHistory: true }).finally(routeChanged);
     });
-    show(route, { fromHistory: true, startup: true, restored }).then(() => route.bad && importOnce('./np.js').then(m => m.lost(route.bad)));
+    (async () => {
+        if (bare) {
+            const start = await (await importOnce('./startup_attention.js')).startupRoute(kept);
+            if (current !== route) return;
+            ({ route, restored } = start);
+            write(route, true, '', start.keep);
+            if (kept && isHome(route)) lastPlace(kept);
+            markStartTab(route);
+        }
+        await show(route, { fromHistory: true, startup: true, restored });
+        if (route.bad) (await importOnce('./np.js')).lost(route.bad);
+    })().catch(console.error);
     return route;
 }
