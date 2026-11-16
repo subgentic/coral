@@ -83,7 +83,7 @@ export async function loadGoals() {
 
 const goalById = (id) => model.goals.find(g => g.id === id);
 /** The default view (Active) keeps the goals that finished under the active ones, as their own group, so a finished goal does not vanish when the next one starts (#15305). */
-const doneBelow = () => model.filter !== DEFAULT_FILTER ? [] : model.goals.filter(g => g.state === 'done' && (!model.goalSearch.trim() || String(g.title || '').toLowerCase().includes(model.goalSearch.trim().toLowerCase())));
+const doneBelow = () => model.filter !== DEFAULT_FILTER || !visible().length ? [] : model.goals.filter(g => g.state === 'done' && (!model.goalSearch.trim() || String(g.title || '').toLowerCase().includes(model.goalSearch.trim().toLowerCase())));
 const visible = () => model.goals.filter(g => W.keepsGoal(model.filter, g) && (!model.goalSearch.trim() || String(g.title || '').toLowerCase().includes(model.goalSearch.trim().toLowerCase())));
 
 // ── drawing ──────────────────────────────────────────────────────────────

@@ -90,12 +90,12 @@ export function healthFields(ctx) {
         { key: 'hb_check', type: 'heading', level: 1, label: 'The health check', help: 'When it goes out, and to whom.' },
         { key: 'on', type: 'toggle', label: 'Send health check', help: 'Checks on stuck or idle agents. Uses tokens each time.' },
         { key: 'interval_min', type: 'number', label: 'Look every', unit: 'minutes', min: LO, max: HI, integer: true, compact: true, under: 'on', disabledWhen: v => !v.on },
-        { key: 'heartbeat_min', type: 'number', label: 'Say all is well at least every', unit: 'minutes', min: 0, max: HI, integer: true, compact: true, help: '0 = never (the default): the check goes out only when something changed.', under: 'on', disabledWhen: v => !v.on },
+        { key: 'heartbeat_min', type: 'number', label: 'Say all is well at least every', unit: 'minutes', min: 0, max: HI, integer: true, compact: true, help: '0 = never (the default): no all-well post, even with Post when all is well on.', under: 'on', disabledWhen: v => !v.on },
         { key: 'recipient', type: 'select', label: 'Send it to', under: 'on', disabledWhen: v => !v.on, options: async () => {
             const members = await ctx.members();
             return [{ value: '', label: 'The orchestrator (default)' }, ...members.map(m => ({ value: m.subscriber_id, label: `${m.subscriber_id}${m.job_title ? ` (${m.job_title})` : ''}` }))];
         } },
-        { key: 'all_clear', type: 'toggle', label: 'Post when all is well', help: 'The one-line check at each heartbeat, so a quiet team is not mistaken for a stopped check.', under: 'on', disabledWhen: v => !v.on },
+        { key: 'all_clear', type: 'toggle', label: 'Post when all is well', help: 'The one-line check every set number of minutes above (never with 0), so a quiet team is not mistaken for a stopped check.', under: 'on', disabledWhen: v => !v.on },
         { key: 'health_reviews', type: 'heading', level: 1, label: 'Reviews and assignment' },
         { key: 'auto_delegate_on', type: 'toggle', label: 'Hand reviews to the default reviewers', help: 'When a task is submitted for review and nobody is assigned, Coral delegates it to the default reviewers; with none named, reviews wait for the orchestrator. Works whether or not the health check is on.' },
         { key: 'default_reviewers', type: 'text', label: 'Default reviewers', wide: true, help: `Names of agents on this team, up to ${HEALTH_LIMITS.reviewers}, separated by commas.`, placeholder: `Agent names (up to ${HEALTH_LIMITS.reviewers})`,

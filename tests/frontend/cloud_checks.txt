@@ -436,3 +436,5 @@ node open_link.test.mjs
 node pending_kept_receipts.test.mjs
 node cdp_args.test.mjs
 node top_nav_actions.test.mjs
+node team_health_all_clear_line.test.mjs
+node walk65_batch_pins.test.mjs
