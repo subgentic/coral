@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -337,5 +338,57 @@ func (h *BoardHandler) nudgeNextTask(ctx context.Context, project, subscriberID 
 	}
 	if err := h.sendTaskNudge(ctx, project, subscriberID, text); err != nil {
 		slog.Warn("next task nudge failed", "project", project, "subscriber", subscriberID, "task_id", next.ID, "error", err)
+	}
+}
+
+var headSHARe = regexp.MustCompile(`\b[0-9a-f]{7,40}\b`)
+
+// headSHAOf is the commit the task was submitted at: the last hex word of 7 to 40 digits (with a letter in it) in the submit reason or note, or "". Only that word is ever sent on.
+func headSHAOf(task *board.Task) string {
+	cr := task.Workflow.CompletionReview
+	if cr == nil {
+		return ""
+	}
+	sha := ""
+	for _, text := range []string{cr.Message, cr.Reason} {
+		for _, w := range headSHARe.FindAllString(strings.ToLower(text), -1) {
+			if strings.Trim(w, "0123456789") != "" {
+				sha = w
+			}
+		}
+		if sha != "" {
+			break
+		}
+	}
+	return sha
+}
+
+// notifyNamedOfCompletion tells the members a task names (task add --notify, #17739) what the creator is told when it completes or is approved: the fixed notice and the head SHA, never the author's free text.
+func (h *BoardHandler) notifyNamedOfCompletion(ctx context.Context, project, completer string, task *board.Task, by string) {
+	if h.terminal == nil || task == nil || len(task.Workflow.Notify) == 0 {
+		return
+	}
+	subs, err := h.bs.ListSubscribers(ctx, project)
+	if err != nil {
+		slog.Warn("list subscribers for named completion notice failed", "project", project, "task_id", task.ID, "error", err)
+		return
+	}
+	notification := typedCompletedNotice(task.ID, by, task.Workflow.Outcome)
+	if sha := headSHAOf(task); sha != "" {
+		notification += " Head: " + sha + "."
+	}
+	for i := range subs {
+		sub := &subs[i]
+		if sub.SubscriberID == completer || sub.SessionName == "" {
+			continue
+		}
+		for _, name := range task.Workflow.Notify {
+			if board.SameIdentity(sub.SubscriberID, name) {
+				if err := h.sendAutomated(ctx, project, sub.SessionName, notification); err != nil {
+					slog.Warn("failed to notify a named member of a completed task", "member", sub.SubscriberID, "task_id", task.ID, "error", err)
+				}
+				break
+			}
+		}
 	}
 }

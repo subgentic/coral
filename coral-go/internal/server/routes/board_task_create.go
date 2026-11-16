@@ -188,6 +188,7 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 
 	// How the creator's name is backed: the server's to say, whatever the request sent (#4175).
 	clearReviewFields(&body.Workflow)
+	body.Workflow.Notify = board.CleanNotify(body.Workflow.Notify)
 	body.Workflow.CreatedIdentity = h.claimIdentity(r, project, createdBy)
 	body.Workflow.AmendIdentity = nil
 	opts := &board.CreateTaskOpts{Draft: body.Draft, Workflow: body.Workflow, GoalID: body.GoalID}

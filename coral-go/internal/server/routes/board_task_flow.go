@@ -178,6 +178,7 @@ func (h *BoardHandler) afterTaskCompleted(project, subscriberID string, complete
 		notification := fmt.Sprintf("[Task #%d completed by %s] Outcome: %s; %d artifacts. %s", completedTask.ID, h.noticeText(ctx, project, by), h.noticeText(ctx, project, completedTask.Workflow.Outcome), len(completedTask.Workflow.Artifacts), h.noticeText(ctx, project, msg)) // the completion message is whatever the worker wrote
 		h.postNotice(ctx, project, notification)
 		h.notifyOrchestratorsTaskCompleted(ctx, project, subscriberID, completedTask, by)
+		h.notifyNamedOfCompletion(ctx, project, subscriberID, completedTask, by)
 
 		// Resolve downstream blocked tasks
 		h.notifyUnblockedTasks(ctx, project, completedTask.ID)

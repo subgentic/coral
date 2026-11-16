@@ -743,6 +743,7 @@ Workflow options for add:
   --workflow "name" --stage "Build" --outputs "build,test_report"
   --blocked-by '[{"task_id":1,"condition":"success","required_artifacts":["build"]}]'
   --workflow-instructions "project-specific guidance" --parent <id> --retry-of <id>
+  --notify "DevOps,QA Engineer"   (they are told when it completes or is approved, with the head SHA)
   --completion-gates '[{"type":"report","artifact":"report"}]'  (EXPERIMENTAL, disabled by default: the server rejects new gate declarations unless it enables the feature; existing gates are inactive)
 Conditions: success (default), failure, termination. Completed results are immutable.
 --- stderr
@@ -816,6 +817,7 @@ Workflow options for add:
   --workflow "name" --stage "Build" --outputs "build,test_report"
   --blocked-by '[{"task_id":1,"condition":"success","required_artifacts":["build"]}]'
   --workflow-instructions "project-specific guidance" --parent <id> --retry-of <id>
+  --notify "DevOps,QA Engineer"   (they are told when it completes or is approved, with the head SHA)
   --completion-gates '[{"type":"report","artifact":"report"}]'  (EXPERIMENTAL, disabled by default: the server rejects new gate declarations unless it enables the feature; existing gates are inactive)
 Conditions: success (default), failure, termination. Completed results are immutable.
 --- stderr
