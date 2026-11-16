@@ -18,6 +18,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await ev(`import((window.__coralStatic || '/static/') + 'menu_help.js').then(() => true)`); // the help lines module is in, as it is a moment after the page loads
             await setList();
             await waitFor(`!!document.querySelector('.session-group-item .sidebar-kebab-btn')`, 'the agent row', 10000);
+            await ev(framesJs(40)); // rc4's sidebar finishes its first builds and redraws a moment after the row appears: the click comes after, as a person's would
             const click = async p => { await Input.dispatchMouseEvent({ type: 'mouseMoved', x: p.x, y: p.y }); await Input.dispatchMouseEvent({ type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 }); await Input.dispatchMouseEvent({ type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 }); };
             const kebab = await ev(`(() => { const r = document.querySelector('.session-group-item .sidebar-kebab-btn').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
             await click(kebab);
