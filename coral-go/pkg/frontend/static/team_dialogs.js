@@ -469,7 +469,7 @@ async function _initTeamForm() {
     const list = document.getElementById("team-agents-list");
     list.innerHTML = "";
     _clearTeamUndo();
-    mountTeamLaunchSettings(); // step 3's tabs, with a new team's own settings
+    mountTeamLaunchSettings(launch.welcomePrompt?.kind === 'team' ? launch.welcomePrompt.text : ''); // step 3's tabs, with a new team's own settings
     showTeamStep('team');
     _applyTeamDefaultMode();
 
@@ -479,8 +479,6 @@ async function _initTeamForm() {
     const dirInput = document.getElementById("launch-team-dir");
     // No folder is chosen for the person (#5989): the Settings default if they set one, else empty and required, never the home folder.
     if (dirInput) dirInput.value = '';
-    const goalEl = document.getElementById("team-goal");
-    if (goalEl) goalEl.value = "";
     if (launch.server !== LOCAL_SERVER) _resetDirInputs(['launch-team-dir'], launch.server, s, { switching: true });
     else if (s.default_working_dir && dirInput) dirInput.value = s.default_working_dir;
     else if (dirInput) { delete dirInput.dataset.suggested; offerSuggestion(dirInput, document.getElementById('launch-team-dir-suggest'), 'first-team', { afterCoralMade: true }); } // a first team has a folder to say yes to (#11258), and so does one after the first agent: its own new folder beside the one Coral made (#11336)
