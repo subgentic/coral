@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -54,6 +56,11 @@ func TestTheUnsyncedDocsEstimateMatchesTheSyncedGzip(t *testing.T) {
 	}
 	if _, err := Static.Open("static/agent_docs"); err != nil {
 		t.Skip("docs not synced here: nothing to compare")
+	}
+	// A tree synced before agent_docs/ last changed (a checkout copied to another machine, a sync left by an earlier build) is a stale sync, not a wrong estimate: say so, as the server package's test does (#18354: epoch showed
+	// "synced 6744831, estimate 6756678", 11.8 KB apart, which read as a bug in the estimate).
+	if stale := staleEmbeddedDocs(t, Static, filepath.Join("..", "..", "agent_docs")); len(stale) > 0 {
+		t.Fatalf("the embedded agent docs are stale: run tools/sync-agent-docs.sh and rebuild:\n  %s", strings.Join(stale, "\n  "))
 	}
 	// the same tree without its docs, plus the estimate from the sources
 	files, _, _ := shippedStaticFiles(Static, filepath.Join("..", "..", "agent_docs"))
@@ -136,5 +143,73 @@ func TestTheBaselineFileRoundTrips(t *testing.T) {
 	}
 	if readBaseline(filepath.Join(t.TempDir(), "none.txt")) != nil {
 		t.Error("no baseline file: nil")
+	}
+}
+
+// staleEmbeddedDocs names each agent_docs/*.md whose embedded .gz copy is missing or unzips to other bytes, and each embedded copy of a doc that is gone from agent_docs/.
+func staleEmbeddedDocs(t *testing.T, embedded fs.FS, src string) []string {
+	t.Helper()
+	var stale []string
+	have := map[string]bool{}
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		t.Skip("no agent_docs folder beside this module")
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
+			continue
+		}
+		have[e.Name()+".gz"] = true
+		want, err := os.ReadFile(filepath.Join(src, e.Name()))
+		if err != nil {
+			continue
+		}
+		zipped, err := fs.ReadFile(embedded, "static/agent_docs/"+e.Name()+".gz")
+		if err != nil {
+			stale = append(stale, e.Name()+" (missing from the embedded copy)")
+			continue
+		}
+		zr, err := gzip.NewReader(bytes.NewReader(zipped))
+		if err != nil {
+			stale = append(stale, e.Name()+" (embedded copy is not gzip)")
+			continue
+		}
+		got, _ := io.ReadAll(zr)
+		if !bytes.Equal(got, want) {
+			stale = append(stale, e.Name()+" (differs from agent_docs/)")
+		}
+	}
+	if entries, err := fs.ReadDir(embedded, "static/agent_docs"); err == nil {
+		for _, e := range entries {
+			if strings.HasSuffix(e.Name(), ".md.gz") && !have[e.Name()] {
+				stale = append(stale, strings.TrimSuffix(e.Name(), ".gz")+" (no longer in agent_docs/)")
+			}
+		}
+	}
+	return stale
+}
+
+// #18354: a doc edited after the sync, one added since and one removed since are each named as stale; a fresh sync names nothing.
+func TestAnEditedAddedOrRemovedDocIsNamedAsStaleInTheEmbeddedCopy(t *testing.T) {
+	src := t.TempDir()
+	for name, body := range map[string]string{"a.md": "alpha", "b.md": "bravo", "c.md": "charlie"} {
+		if err := os.WriteFile(filepath.Join(src, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	zip := func(s string) *fstest.MapFile { return &fstest.MapFile{Data: gzipBytes(t, []byte(s))} }
+	fresh := fstest.MapFS{"static/agent_docs/a.md.gz": zip("alpha"), "static/agent_docs/b.md.gz": zip("bravo"), "static/agent_docs/c.md.gz": zip("charlie")}
+	if got := staleEmbeddedDocs(t, fresh, src); len(got) != 0 {
+		t.Errorf("a fresh sync names nothing: %v", got)
+	}
+	old := fstest.MapFS{"static/agent_docs/a.md.gz": zip("alpha OLD"), "static/agent_docs/b.md.gz": zip("bravo"), "static/agent_docs/gone.md.gz": zip("x")}
+	got := strings.Join(staleEmbeddedDocs(t, old, src), "|")
+	for _, want := range []string{"a.md (differs from agent_docs/)", "c.md (missing from the embedded copy)", "gone.md (no longer in agent_docs/)"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("want %q in the stale list: %s", want, got)
+		}
+	}
+	if strings.Contains(got, "b.md") {
+		t.Errorf("b.md is current: %s", got)
 	}
 }

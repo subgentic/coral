@@ -30,9 +30,9 @@ const (
 	goalNeedsYouWalkMs   = 4000
 	goalNeedsYouWalkCIMs = 8000
 	// The CPU the walk may use on a developer's machine (#16035). The wall clock is the machine's as much as the code's: a box with four pinned cores or other agents' go tests took 5.6 and 6.1 s for a walk that
-	// takes 1.6 s alone (epoch), and the best of three was no help. The walk's CPU time moves little with load (3.05 s alone, 3.55 s beside eight busy loops on the Mac). 7 s is twice what the walk uses
-	// and the cache-less code (every page builds the list: 14 s on the fastest machine) is far over it.
-	goalNeedsYouWalkCPUMs = 7000
+	// takes 1.6 s alone (epoch), and the best of three was no help. The walk's CPU time moves little with load (3.05 s alone, 3.55 s beside eight busy loops on the Mac). The measure is the lesser of CPU and wall (walkTime, #18354).
+	// epoch (36 cores, slow) reads 6.2 to 6.7 s of wall for it, so 9 s leaves 2.3 s of room there, like CI's 8 s, and the cache-less code (every page builds the list: 14 s on the fastest machine) is still over it.
+	goalNeedsYouWalkCPUMs = 9000
 )
 
 // needsYouWalkCeilingMs is the ceiling for this machine: the CI one when CI is set.
@@ -76,6 +76,19 @@ func fastestWithin(n int, budget time.Duration, measure func(attempt int) time.D
 		}
 	}
 	return best
+}
+
+// walkTime is the time the goal is read from: the lesser of the walk's wall clock and its process CPU time (#18354). A loaded machine stretches the wall clock but not the CPU; a many-core one does the opposite, because
+// the Go collector runs a worker per core and the process CPU time counts every one of them (epoch, 36 cores: 6.2 s wall, 9.1 s CPU for the same walk that is 6 s on a Mac). A walk that is really slow is slow by both.
+func walkTime(wall, cpu time.Duration) time.Duration {
+	return min(wall, cpu)
+}
+
+// #18354: a many-core machine's CPU time over the wall clock, and a loaded machine's wall clock over the CPU time, are neither a slow walk; a walk slow by both is.
+func TestTheWalkIsReadFromTheLesserOfWallAndCPUTime(t *testing.T) {
+	require.Equal(t, 6*time.Second, walkTime(6*time.Second, 9*time.Second), "many cores: the collector's workers add CPU time, not walk time")
+	require.Equal(t, 5*time.Second, walkTime(20*time.Second, 5*time.Second), "a loaded box: the wall clock is stretched")
+	require.Equal(t, 9*time.Second, walkTime(9*time.Second, 9*time.Second), "slow by both is slow")
 }
 
 // walkForReview reads every page of the for-review list the way the dashboard does (a page of 200, the cursor of the page before) and returns how many files and pages it read.
@@ -125,7 +138,7 @@ func TestNeedsYouWalkOfABigBoardIsUnderTheGoal(t *testing.T) {
 	// The fastest of up to three cold walks (each on a fresh rig, so none is warmed by the one before): one wall-clock sample that a loaded machine stalls is not a slow walk, three over the goal are (#15480).
 	var files, pages int
 	var allocMB float64
-	// On a developer's machine the goal is read from the walk's CPU time (a loaded box stretches the wall clock, not the CPU); where the platform does not say (Windows) or on CI (its own wall ceiling, above), the wall clock.
+	// On a developer's machine the goal is read from the lesser of the walk's CPU time and its wall clock (a loaded box stretches the wall clock, not the CPU; a many-core one inflates the CPU, #18354); where the platform does not say (Windows) or on CI (its own wall ceiling, above), the wall clock.
 	_, haveCPU := processCPU()
 	byCPU := haveCPU && os.Getenv("CI") == ""
 	if byCPU {
@@ -142,7 +155,7 @@ func TestNeedsYouWalkOfABigBoardIsUnderTheGoal(t *testing.T) {
 		d := time.Since(t0)
 		if cpu1, ok := processCPU(); ok && byCPU {
 			t.Logf("PERF walk %d: %s wall, %s CPU", attempt+1, d.Round(time.Millisecond), (cpu1 - cpu0).Round(time.Millisecond))
-			d = cpu1 - cpu0
+			d = walkTime(d, cpu1-cpu0)
 		}
 		runtime.ReadMemStats(&m1)
 		if a := float64(m1.TotalAlloc-m0.TotalAlloc) / (1 << 20); attempt == 0 || a > allocMB {
