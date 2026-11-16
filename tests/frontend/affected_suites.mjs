@@ -10,6 +10,11 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { basename, join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+/** A revision argument goes to git as a revision, never as an option: one that starts with '-' is refused (--output=FILE would write a file). */
+export function revArg(x) { if (typeof x === 'string' && x.startsWith('-')) throw new Error(`refusing "${x}": a revision does not start with "-"`); return x; }
+/** A file name as a literal inside a RegExp. */
+export const escapeRe = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const MIN = 6;                                              // shorter tokens are common words and fragments
 const SKIP = new Set(['button', 'dialog', 'hidden', 'true', 'false', 'object', 'string', 'number', 'function', 'return', 'default', 'change', 'click', 'submit', 'status', 'content', 'display', 'center']);
 
@@ -48,7 +53,7 @@ export function affected({ tokens, helpers }, suites) {
     for (const [path, full] of suites) {
         const why = [], text = full.toLowerCase(); // a suite often says the words inside a longer sentence, in another case
         for (const [t, from] of tokens) if (text.includes(t.toLowerCase().replace(/[.:]$/, ''))) { why.push(`"${t.length > 60 ? t.slice(0, 57) + '...' : t}" (removed from ${basename(from)})`); if (why.length >= 3) break; }
-        for (const h of helpers) { const name = basename(h).replace(/\.[cm]?js$/, ''); if (new RegExp(`require\\(['"]\\./(?:helpers/)?${name}(?:\\.js)?['"]\\)|from ['"]\\./(?:helpers/)?${name}(?:\\.[cm]?js)?['"]`).test(full)) why.push(`imports ${h}`); }
+        for (const h of helpers) { const name = escapeRe(basename(h).replace(/\.[cm]?js$/, '')); if (new RegExp(`require\\(['"]\\./(?:helpers/)?${name}(?:\\.js)?['"]\\)|from ['"]\\./(?:helpers/)?${name}(?:\\.[cm]?js)?['"]`).test(full)) why.push(`imports ${h}`); }
         if (why.length) out.set(path, why);
     }
     return out;
@@ -56,9 +61,10 @@ export function affected({ tokens, helpers }, suites) {
 
 function main() {
     const [base, head] = process.argv.slice(2);
+    try { revArg(base); revArg(head); } catch (e) { console.error(e.message); process.exit(2); }
     if (!base) { console.error('usage: node tests/frontend/affected_suites.mjs <base> [<head>]'); process.exit(2); }
     const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-    const diff = execFileSync('git', ['diff', '-U0', '--no-color', base, ...(head ? [head] : [])], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 28 });
+    const diff = execFileSync('git', ['diff', '-U0', '--no-color', base, ...(head ? [head] : []), '--'], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 28 });
     const dir = join(root, 'tests/frontend');
     const suites = new Map(readdirSync(dir).filter(f => /\.test\.(js|mjs)$/.test(f)).map(f => ['tests/frontend/' + f, readFileSync(join(dir, f), 'utf8')]));
     const hit = affected(removedTokens(diff), suites);
