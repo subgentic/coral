@@ -46,7 +46,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
     /** The line under a comment that says where an agent has it (#14129): Sent to A, then Read by A (with the time the server saw its own read call return the comment), then A replied; at rest, and again as soon as a send answers (#12112: it kept saying "Not sent to an agent yet" beside "Asked just now"). Each name as written, a button to the agent's chat (#12168). */
     const fillStatus = (p, id) => {
         const rows = [...statusNow(id)]; p.replaceChildren();
-        if (!rows.length && st.noTeamSent?.has(id)) { p.textContent = 'Sent to the agent that uploaded this file'; return; } // typed into its session when the comment was written (#18105): the thread agrees with the toast
+        if (!rows.length && (st.noTeamSent?.has(id) || (c => !!c && c.mine && c.parentId == null && c.body.startsWith('Changes requested: '))(st.data?.comments.find(x => x.id === id)))) { p.textContent = 'Sent to the agent that uploaded this file'; return; } // typed into its session when the comment was written (#18105): the thread agrees with the toast; so does a Request changes comment (#18701), which the decision itself delivered: it has no ask of its own to read
         if (rows.length === 1 && rows[0][0] === askUi.NO_TEAM_AGENT) { p.textContent = 'Sent to the agent that uploaded this file'; return; } // asked from the sheet: no board, so no ask to read or reply to
         if (!rows.length) { p.textContent = st.undelivered && st.undelivered.get(id) ? `Not delivered: ${st.undelivered.get(id)}` : 'Not sent to an agent yet'; return; } // why it went nowhere (#15034)
         const all = (st.data && st.data.comments) || [], top = all.find(x => x.id === id);
