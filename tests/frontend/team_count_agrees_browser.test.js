@@ -1,5 +1,5 @@
-// The team header's count says how many agents are awake: the rows above the "N sleeping agents" line (#10892 item 4, the phone pass: the header said 4 while 3 rows showed above the sleeping line). A team of
-// three awake agents and four asleep (up to three asleep stay rows, #10062, so four are what folds into the sleeping line): the header says 3 and the sleeping line says 4 sleeping agents. 1280 and 390 px; mocked list on the isolated dev server.
+// The team header's count is the team's members, awake or asleep (#17536 round 2, pinned in team_half_asleep_browser; it was the awake rows only, #10892 item 4). A team of three awake agents and four asleep
+// (up to three asleep stay rows, #10062, so four are what folds into the sleeping line): the header says 7 and the sleeping line says 4 sleeping agents, so the sleeping line is what accounts for the rows that are not shown. 1280 and 390 px; mocked list on the isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -16,7 +16,7 @@ const { coralReady } = require('./helpers/wait');
             if (mobile) await ev(`import((window.__coralStatic || '/static/') + 'mobile.js').then(m => { m.syncMobileAgentList(); return true; })`);
             await waitFor(`!!document.querySelector('${list} .session-group-count') && !!document.querySelector('${list} .sleeping-summary-row')`, `${w}: the team and its sleeping line`, 8000);
             const r = await ev(`({ count: document.querySelector('${list} .session-board-card .session-group-count').textContent.trim(), rows: document.querySelectorAll('${list} .session-board-card .session-group-item:not(.sleeping)').length, sleeping: document.querySelector('${list} .sleeping-summary-label').textContent.trim() })`);
-            assert.equal(r.count, '3', `${w}: the header counts the awake agents: ` + JSON.stringify(r));
+            assert.equal(r.count, '7', `${w}: the header counts the team's members, awake and asleep: ` + JSON.stringify(r));
             assert.equal(r.sleeping, '4 sleeping agents', `${w}: and the sleeping line the rest: ` + JSON.stringify(r));
         }
         console.log('PASS');

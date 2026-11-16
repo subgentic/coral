@@ -56,6 +56,9 @@ function fill(slot) {
 /** The Needs you list's banner: the line, then the signed-out notice when Claude is signed out (that notice's module is loaded from here so the start code holds one import for both). */
 export function mountAway(slot, signedOut) {
     const aw = el('div'), sg = el('div'); slot.append(aw, sg);
+    // An empty banner is no row of the list: it was a 24 px gap above the table (the rows moved when the list drew again) when neither the line nor the sign-in notice is there.
+    const sync = () => { slot.hidden = !(aw.firstChild || sg.firstChild); }; sync();
+    new MutationObserver(sync).observe(slot, { childList: true, subtree: true });
     if (signedOut) importOnce('./inbox_signin_notice.js').then(m => m.mountInboxSigninNotice(sg)).catch(() => {});
     fill(aw);
 }

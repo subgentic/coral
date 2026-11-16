@@ -1,5 +1,5 @@
-// An ended agent that holds an open task stops the team being "All well" (#15293, walk 17 H1): nothing else said the task waited for an agent that was gone. An ended agent with no task still is not one that needs
-// a person (#8269, team_agents_ended_browser). The board's /status answer is stubbed: one free agent, one ended agent, with and without an open task. 1280 px.
+// The team header shows the Needs you number and nothing else (#17625 item 3, the Orchestrator's decision on #18820): an ended agent that holds an open task is not a Needs you item, so the header does not add
+// it any more (#15293 had it count). An ended agent with no task is not one that needs a person either (#8269, team_agents_ended_browser). The board's /status answer is stubbed: one free agent, one ended agent, with and without an open task. 1280 px.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam } = require('./helpers/team_page');
@@ -23,9 +23,8 @@ const TEAM = `qa-endtask-${Date.now() % 100000}`;
                 return R(u, o); }; return true; })()`);
             await openTeam(ev, waitFor, TEAM); await settle(800);
             const head = await ev(`(document.getElementById('team-page-status') || {}).textContent`);
-            if (open) assert.match(head, /^1 needs attention$/, 'an ended agent that holds a task counts: ' + head);
-            else assert.doesNotMatch(head, /need/, 'an ended agent with no task is not one that needs a person: ' + head);
+            assert.doesNotMatch(head, /need/, (open ? 'an ended agent holding a task is not a Needs you item, so the header does not count it: ' : 'an ended agent with no task is not one that needs a person: ') + head);
         }
-        console.log('PASS an ended agent holding a task makes the team header say "1 needs attention"; one with no task does not');
+        console.log('PASS the team header does not count an ended agent, with a task or without');
     } finally { await removeBoards(ev, [TEAM]).catch(() => { }); await client.close(); }
 })().catch(e => { console.error('FAIL', e); process.exit(1); });
