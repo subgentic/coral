@@ -146,7 +146,7 @@ function _modeBtn(mode, icon, title, tab) {
     return `<button class="inline-preview-mode-btn${tab.mode === mode ? ' active' : ''}" data-action="mode" data-mode="${escapeAttr(mode)}" title="${escapeAttr(title)}" aria-label="${escapeAttr(title)}"><span class="material-icons" aria-hidden="true">${icon}</span></button>`;
 }
 
-const _fileBtn = (action, icon, title, label) => `<button class="btn btn-quiet btn-icon btn-xs inline-preview-mode-btn" data-action="${escapeAttr(action)}" title="${escapeAttr(title)}" aria-label="${escapeAttr(label)}"><span class="material-icons" aria-hidden="true">${icon}</span></button>`;
+const _fileBtn = (action, icon, label) => `<button class="btn btn-quiet btn-icon btn-xs inline-preview-mode-btn" data-action="${escapeAttr(action)}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"><span class="material-icons" aria-hidden="true">${icon}</span></button>`;
 
 function _renderToolbar(tab) {
     const bar = document.getElementById('preview-toolbar');
@@ -187,8 +187,8 @@ function _renderToolbar(tab) {
         _modeBtn('preview', 'visibility', 'Preview', tab),
         binary ? '' : _modeBtn('edit', 'edit', 'Edit', tab),
         !binary && tab.mode === 'edit' ? `<button class="inline-preview-save" data-action="save">Save</button>` : '',
-        _fileBtn('download-file', 'download', 'Download', `Download ${_fileName(tab.filepath)}`), // #17632
-        _fileBtn('share-file', 'link', 'Share as artifact', `Share ${_fileName(tab.filepath)} as an artifact`), // #10269
+        _fileBtn('download-file', 'download', `Download ${_fileName(tab.filepath)}`), // #17632
+        _fileBtn('share-file', 'link', `Share ${_fileName(tab.filepath)} as an artifact`), // #10269
     ].join('');
     bar.innerHTML = `<span class="preview-toolbar-path" title="${escapeAttr(tab.filepath)}">${escapeHtml(tab.filepath)}</span>
         <div class="inline-preview-actions">${buttons}</div>`;
