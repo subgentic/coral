@@ -174,10 +174,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
     const why = reasonWords(last);
     const when = last && (last.finished_at || last.started_at) ? ` ${whenWords(last.finished_at || last.started_at)}` : '';
     const failBanner = noSignIn
-        ? `<div class="notice notice-error sched-fail-banner" role="status"><div class="sched-fail-text">
-             <strong>The last run did not start: ${escapeHtml(noSignIn.text)}.</strong>
-             ${escapeHtml(noSignIn.hint)} This job keeps its schedule and ${escapeHtml(noSignIn.again)}.
-           </div></div>`
+        ? '<div class="sched-fail-slot"></div>'
         : fails >= 1
         ? `<div class="notice notice-error sched-fail-banner" role="status"><div class="sched-fail-text">
              <strong>${fails === 1 ? 'The last run failed' : `The last ${fails} runs failed`}</strong>${escapeHtml(when)}${why ? `: ${escapeHtml(why)}` : ''}. ${!job.enabled ? (job.paused_reason ? 'It is paused. Fix the cause, then press Enable.' : 'It is paused. Press Enable to run it again.') : 'It is still scheduled.'}
@@ -252,6 +249,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
                 : `<button class="btn btn-small" data-on-click="job-run-now" data-job-id="${Number(job.id)}">Run now</button>`}
         </div>
     `;
+    if (noSignIn) importOnce('./run_signin.js').then(m => m.signedOutNotice(container.querySelector('.sched-fail-slot'), last, job.id)).catch(() => {});
     container.querySelector('#sched-run-history').append(renderRunsTable(runsPage));
     foldWayBack(container, '.sched-back', '.sched-header');
 }

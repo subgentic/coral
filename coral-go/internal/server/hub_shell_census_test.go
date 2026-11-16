@@ -69,6 +69,7 @@ var shellNeverRoutes = map[string]shellNever{
 	"needs_skills.js GET /api/skills":                           {bExplains, `approve at the computer`, "through a Hub the skills come from one read of GET /api/needs-you?kind=skill, drawn as plain rows that say to approve at the computer, with no buttons; this read is the computer's own list (#13841)", 0},
 	"launch_provider_cards.js POST /api/system/cli-signin":       {bHidden, `isLocalServer\(server\) && !isCloud\(\) && signinCommandIsSafe`, "the OpenCode card's Sign in button is drawn only for this computer's own Coral, outside a Hub and with the exact command shape; through a Hub the card says to sign in on the computer (#16716)", 0},
 	"settings_fields.js POST /api/system/cli-signin":             {bHidden, `signIn\.hidden = cloud`, "the Sign in button is hidden through a Hub (cloud || !canSignIn); the POST is never sent and the text says to sign in on the computer (#16714)", 0},
+	"run_signin.js POST /api/system/cli-signin":                  {bExplains, `Sign in on the computer that runs Coral`, "through a Hub the POST is never sent: the notice says to sign in on the computer that runs Coral, then press Retry (#16715)", 0},
 }
 
 // shellNeverFiles: every other never call of a script that nobody has read yet for what it does through a Hub. This is the starting list of #13860 ("what is true today"): it is a worklist, and

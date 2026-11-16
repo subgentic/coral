@@ -1,0 +1,2 @@
+.run-signin-actions { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } /* Sign in and Retry under a run that did not start for want of a sign-in (#16715) */
+.run-signin-retry[hidden] { display: none; }
