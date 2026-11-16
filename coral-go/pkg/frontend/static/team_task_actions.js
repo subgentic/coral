@@ -102,18 +102,18 @@ export async function editForm(task, ctx) {
     const error = el('div', 'modal-error'); error.id = 'task-edit-error'; error.hidden = true; error.setAttribute('role', 'alert');
     const rev = el('div', 'task-edit-revision'); rev.append('Editing revision ', Object.assign(el('strong'), { textContent: String(revision) }), '. Changes to description or instructions require a reason.');
     const priority = el('select'); priority.id = 'task-edit-priority';
-    for (const p of ['critical', 'high', 'medium', 'low']) priority.append(option(p, p, p === task.priority));
+    for (const p of ['critical', 'high', 'medium', 'low']) priority.append(option(p, p[0].toUpperCase() + p.slice(1), p === task.priority));
     const goal = el('select'); goal.id = 'task-edit-goal';
     const goalLabel = labelled('Goal', goal, 'task-edit-goal'); goalLabel.id = 'task-edit-goal-row';
     if (!(goalRead.goals.length || goalRead.requireGoal || task.goal_id)) goalLabel.hidden = true;
     const goalError = el('p', 'task-goal-error modal-error'); goalError.id = 'task-edit-goal-error'; goalError.hidden = true; goalError.setAttribute('role', 'alert');
     form.append(error, rev,
         labelled('Title', input('task-edit-title', task.title), 'task-edit-title'),
+        labelled('Assigned To', assignee, 'task-edit-assignee'),
+        labelled('Priority', priority, 'task-edit-priority'),
         labelled('Description', area('task-edit-body', task.body || ''), 'task-edit-body'),
         labelled('Workflow instructions', area('task-edit-instructions', instructions), 'task-edit-instructions'),
         labelled('Amendment reason', Object.assign(input('task-edit-reason'), { placeholder: 'Why should this instruction change?' }), 'task-edit-reason'),
-        labelled('Priority', priority, 'task-edit-priority'),
-        labelled('Assigned To', assignee, 'task-edit-assignee'),
         goalLabel, goalError);
     fillGoalSelect(goal, { goals: goalRead.goals, requireGoal: goalRead.requireGoal, selectedId: task.goal_id, current: currentGoal });
     const showDeps = task.status === 'blocked' || task.status === 'pending' || task.status === 'draft';
@@ -124,7 +124,7 @@ export async function editForm(task, ctx) {
     }
     const mount = (host) => { if (showDeps) _renderDepPicker('task-edit-deps', (task.blocked_by || []).map(d => d.task_id), task.id); return host; };
 
-    const say = (text) => { error.textContent = text; error.hidden = !text; };
+    const say = (text) => { error.textContent = text; error.hidden = !text; if (text) error.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
     async function save() {
         const value = (id) => { const e = document.getElementById(id); return e ? e.value : ''; };
         const title = value('task-edit-title').trim();
