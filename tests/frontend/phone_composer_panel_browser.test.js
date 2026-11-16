@@ -27,7 +27,7 @@ const S = `(window.__coralStatic || '/static/')`;
         console.log('2. the team reminder (and Model and thinking) are behind Send options');
         assert.equal(await ev(`!document.querySelector('.mobile-send-team-btn')`), true, 'no second round button beside Send');
         assert.equal(await shown('.mobile-send-options-btn'), true);
-        assert.equal(await ev(`document.querySelector('.mobile-send-options-btn').getAttribute('aria-label')`), 'Send options');
+        assert.equal(await ev(`document.querySelector('.mobile-send-options-btn').getAttribute('aria-label')`), 'Model, thinking and send options');
         assert.equal(await shown('.mobile-send-menu'), false, 'closed');
         await ev(`document.querySelector('.mobile-send-options-btn').click(); true`);
         await waitFor(`getComputedStyle(document.querySelector('.mobile-send-menu')).display !== 'none'`, 'the menu', 3000);
