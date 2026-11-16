@@ -2,7 +2,7 @@
 
 ## v2.0.69 — An updated Getting started guide, Needs you and Inbox that behave, files you can download and compare, a resource queue, and phone and iPad touch fixes
 
-Task numbers in brackets. Built on v2.0.68 and gated on ci/v2069 1bdb1a99ce plus three test-only fixes (189d01a68c); it carries the whole v2.0.70 queue. A prerelease until the Operator promotes it.
+Task numbers in brackets. Built on v2.0.68 and gated on ci/v2069 261dd9d56f; it carries the whole v2.0.70 queue. A prerelease until the Operator promotes it.
 
 ### Changes
 
@@ -28,6 +28,7 @@ Task numbers in brackets. Built on v2.0.68 and gated on ci/v2069 1bdb1a99ce plus
 - The team page shows whether the Orchestrator was told about an added agent (#17343).
 - A warning when a task is assigned to a sleeping member (#17657).
 - A restarted agent remembers the task it had claimed (#17411).
+- Agents no longer show as sleeping while they wake (#18988).
 - Waking a resumed conversation types a short wake note, not the original starting prompt (#17324).
 - A Codex agent's row keeps its model line after Restart with the same settings (#16434).
 - Restarting to the CLI default no longer carries the old model (#17551).
@@ -156,7 +157,7 @@ Task numbers in brackets. Built on v2.0.68 and gated on ci/v2069 1bdb1a99ce plus
 
 - When the launch notice arrives, the content under the banners can move (73 px over 15 frames in the launch_notice_no_jump test, #18964). Waived for this release; fixed in the next.
 - On a phone, the board table's Expand All can run over its time budget and the phone live-message wait can time out (the board_table_seeded test, #18959). Waived for this release; fixed in the next.
-- On a phone, keyboard focus on the team tab strip's Show more tabs button can leave it off the screen (the keyboard_census_hub test, #18972); the fix (#18984, #18985) comes in the next release.
+- On a phone, keyboard focus on the team tab strip's Show more tabs button can leave it off the screen (the keyboard_census_hub test, #18972); the fix (#18984) comes in the next release.
 
 ## v2.0.68 — Custom permission modes, Settings that save as you go, Codex trusting Coral's hooks by default, a computer set up over SSH that starts again, and one look across the dialogs and phone
 
