@@ -378,7 +378,7 @@ func (h *BoardHandler) needsYouItems(r *http.Request) (items []NeedsYouItem, unr
 // shell reading ?kind=skill threw them away after the scans (0.1 to 0.6 s of the first dashboard load).
 func (h *BoardHandler) needsYouItemsOf(r *http.Request, onlySkills bool) (items []NeedsYouItem, unread []string, muted map[string]int, err error) {
 	ctx := r.Context()
-	muted = map[string]int{} // the files the Operator's settings mute, by kind: counted here and nowhere else (#12144)
+	muted = map[string]int{}               // the files the Operator's settings mute, by kind: counted here and nowhere else (#12144)
 	if h.agentAsks != nil && !onlySkills { // a single agent's question (#18106): kind question, no team
 		for _, a := range h.agentAsks(r) {
 			items = append(items, NeedsYouItem{Kind: "question", From: needsYouLine(a.Asker), Line: needsYouLine(a.Text), ID: "agent-ask:" + strconv.FormatInt(a.ID, 10), At: needsYouTime(a.At)})
