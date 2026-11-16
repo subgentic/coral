@@ -38,7 +38,7 @@ export async function loadBranches() {
     const overdue = notYet && Date.now() - waiting.since > FIRST_READ_LIMIT_MS;
     if (!data || data.available === false) emptyState(el, 'Branches are not available from this computer.');
     else if (notGit) emptyState(el, NOT_GIT_AGENT);
-    else if (!data.found) emptyState(el, waitingText(overdue));
+    else if (!data.found) emptyState(el, waitingText(overdue, waiting.since));
     else el.replaceChildren(drawRepo(data, s.session_id, { name: s.name, session_id: s.session_id, agent_type: s.agent_type || '' }));
     // past the limit the folder is likely not a repository: ask once a minute, so an open tab on it does not start a pass every 15 s (Security's INFO on #531)
     timer = setTimeout(loadBranches, notYet && !overdue ? FIRST_READ_STEPS[Math.min(waiting.tries++, FIRST_READ_STEPS.length - 1)] : REFRESH_MS);
@@ -68,7 +68,7 @@ export async function showTeamBranches(host, team) {
     else if (notGit) emptyState(host, NOT_GIT_TEAM);
     else if (none) emptyState(host, overdue
         ? "Coral has not read a repository for this team's agents. Their folders may not be in git repositories, or a slow read is paused for a few minutes."
-        : "Reading the repositories this team's agents work in. The first read can take up to a minute on a large repository.");
+        : `Reading the repositories this team's agents work in${Math.round((Date.now() - teamWaiting.since) / 1000) >= 5 ? `, ${Math.round((Date.now() - teamWaiting.since) / 1000)} s so far` : ''}: the first read takes a few seconds, and a large repository can take a minute.`);
     else host.replaceChildren(...data.repos.map(r => drawRepo(r, '', r.ask)));
     // past the limit, ask once a minute like the agent's tab, so a page left open on folders that are not repositories does not start a pass every 15 s (Security's INFO on #531)
     teamTimer = setTimeout(() => { if (host.isConnected && host.offsetParent !== null) showTeamBranches(host, team); }, none && !overdue ? FIRST_READ_MS : REFRESH_MS);
@@ -92,15 +92,17 @@ function changes(w) {
 /** The numbers of one worktree, as words. */
 function numbers(w, base) {
     if (!base) return changes(w);
+    if (w.is_base) return `the base branch · ${changes(w)}`;
     const where = (w.ahead || w.behind) ? `${w.ahead} ahead, ${w.behind} behind` : 'even with the base';
     return `${where} · ${changes(w)}`;
 }
 
 /** What the tab says while its repository has not been read: the first read takes seconds (the tab's ask starts a pass on the server); past a minute it says it has not read one. */
-function waitingText(overdue) {
+function waitingText(overdue, since = 0) {
+    const secs = since ? Math.round((Date.now() - since) / 1000) : 0; // the cause and the time so far, not a silent 'reading' (#17433)
     return overdue
         ? "Coral has not read a repository for this agent's folder. Its folder may not be in a git repository, or git took too long and the read is paused for a few minutes."
-        : "Reading this agent's repository. The first read can take up to a minute on a large repository.";
+        : `Reading this agent's repository${secs >= 5 ? `, ${secs} s so far` : ''}: the first read takes a few seconds, and a large repository can take a minute.`;
 }
 
 const PR_STATE = { open: 'open', merged: 'merged', closed: 'closed' };
@@ -181,7 +183,7 @@ function drawRepo(data, currentSid, ask) {
         if (w.quiet) marks.push('no commit in 14 days');
         if (marks.length) row.append(text('div', 'branches-mark', marks.join(' · ')));
         if (w.pr) row.append(text('div', 'branches-meta', prLine(w.pr)));
-        const agents = (w.agents || []).filter(a => !currentSid || a.session_id !== currentSid).map(a => a.name);
+        const agents = (w.agents || []).filter(a => !currentSid || a.session_id !== currentSid).map(a => a.display_name || a.name);
         if (agents.length) row.append(text('div', 'branches-meta', `${currentSid ? 'Agents here' : 'Agents'}: ${agents.join(', ')}`));
         if (w.current && w.changed) row.append(text('div', 'branches-meta', 'The Files tab lists the changes.'));
         if (ask && data.base && w.head && !w.not_local && !w.unreadable) row.append(detailToggle(ask, w, data.base));
