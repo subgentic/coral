@@ -224,12 +224,17 @@ function drawStatus(data) {
     syncStop();
     S.statusData = data;
     const live = (state.liveSessions || []).filter(row => inTeam(row, S.team));
-    const n = live.filter(needsYou).length + (data?.agents || []).filter(a => a.availability === 'offline' && a.open_tasks).length; // an ended agent that holds a task is not "All well" (#15293)
+    const ended = (data?.agents || []).filter(a => a.availability === 'offline' && a.open_tasks).length; // an ended agent that holds a task is not "All well" (#15293)
+    const agentsN = live.filter(needsYou).length + ended;
+    // One definition of "needs you" for the header, the Needs you tab and the sidebar (#17067, #16548): when the tab has something to show, its number is the header's (plus an ended agent that holds a task, which the tab does not list). Counting agents here said
+    // "2 need attention" with 1 on the tab and 0 in the sidebar. A tab at 0 or not yet known leaves the agents counted as before, so a wait only the board knows about (#14152, #15151) still reads as one.
+    const tabCount = S.counts.needs, byTab = typeof tabCount === 'number' && tabCount > 0;
+    const n = byTab ? tabCount + ended : agentsN;
     if (live.length && (!data || !data.agents?.length)) data = { agents: live.map(row => ({ availability: row.sleeping ? 'sleeping' : 'unknown' })) };
     if (!data || !Array.isArray(data.agents)) { s.textContent = 'Status unavailable'; s.className = 'team-page-status unknown'; const health = $('team-page-health'); if (health) health.hidden = true; return; } // kept in the page and empty: a live region that is shown and filled in one turn is not announced
     // a team with no agent has nothing to be well: a name no board has (a mistyped /team/<name>) said All well in green (#8839 c); say nothing
     if (!data.agents.length) { s.textContent = ''; s.className = 'team-page-status'; const hb = $('team-page-health'); if (hb) hb.hidden = true; return; }
-    const owed = Math.max(0, data.agents.filter(agent => ['needs_input', 'waiting'].includes(agent.availability) && !live.some(row => row.session_id === agent.session_id && row.wait_removed)).length - n); // agents the board says wait, that no live row here agrees with
+    const owed = byTab ? 0 : Math.max(0, data.agents.filter(agent => ['needs_input', 'waiting'].includes(agent.availability) && !live.some(row => row.session_id === agent.session_id && row.wait_removed)).length - n); // agents the board says wait, that no live row here agrees with
     if (!owed) S.disagreeSince = 0; else if (!S.disagreeSince) S.disagreeSince = Date.now();
     const settled = owed > 0 && Date.now() - S.disagreeSince > (Number(globalThis.__coralAttentionGraceMs) >= 0 ? Number(globalThis.__coralAttentionGraceMs) : 30000); // #15151: 'Checking attention status' is for a moment (the rows catch up); when the two still disagree after 30 s the board's word counts, it never stays
     const uncertainAttention = owed > 0 && !settled;
@@ -295,7 +300,7 @@ async function readCounts() {
     S.counts.needs ??= '…';
     importOnce('./inbox_sidebar.js').then(m => m.refreshTeamNeedsCount(team)).then(count => {
         if (seq !== S.countSeq || team !== S.team) return;
-        S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts();
+        S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts(); if (S.statusData) drawStatus(S.statusData);
     }).catch(() => { if (seq === S.countSeq && team === S.team) { S.counts.needs = '…'; drawCounts(); } });
     const knowledge = S.knowledgeFor === team ? null : (S.knowledgeFor = team, teamFetch(team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge`).then(async r => { const data = await r.json(); return r.ok ? data : null; }).catch(() => null)); // the Knowledge tab's count once per team, with the others (the notes are read again when the tab opens)
     importOnce('./team_pause.js').then(m => m.readTeamPause(team)); // the pause is read on every poll, so a pause made elsewhere (another tab, a restart) shows here too
@@ -325,7 +330,7 @@ window.addEventListener('kill', () => { if (currentTeamPage()) readCounts(); });
 function syncNeedsCount() {
     if (!S.team || !currentTeamPage()) return;
     const team = S.team;
-    importOnce('./inbox_sidebar.js').then(m => { if (S.team !== team) return; const count = m.teamNeedsCount(team); S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts(); });
+    importOnce('./inbox_sidebar.js').then(m => { if (S.team !== team) return; const count = m.teamNeedsCount(team); S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts(); if (S.statusData) drawStatus(S.statusData); });
 }
 document.addEventListener('coral:needs-updated', () => { if (S.team && currentTeamPage()) drawStatus(S.statusData); syncNeedsCount(); });
 document.addEventListener('coral:team-needs-count', e => { if (e.detail?.team === S.team) syncNeedsCount(); });
