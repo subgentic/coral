@@ -44,6 +44,20 @@ func agedFile(t *testing.T, dir, name string) string {
 
 func present(p string) bool { _, err := os.Lstat(p); return err == nil }
 
+// asTheFilesOwner makes the token user, for this test, the owner Windows gave the file: on an elevated token (the ssh session on the frontier box, an Administrator's shell) that owner is the
+// Administrators group, and the sweep keeps such a file by design (see TestWindowsSweepKeepsALockedFileAndTakesItOnceItIsFree), which is not what a test of something else is checking.
+func asTheFilesOwner(t *testing.T, path string) {
+	t.Helper()
+	h, err := openNoFollow(path, windows.READ_CONTROL)
+	require.NoError(t, err)
+	owner, err := fileOwnerSID(h)
+	windows.CloseHandle(h)
+	require.NoError(t, err)
+	prev := currentUserSID
+	t.Cleanup(func() { currentUserSID = prev })
+	currentUserSID = func() (*windows.SID, error) { return owner, nil }
+}
+
 // The real case: a file this test creates, old enough, not live, named like a launch file, is removed. The file's owner is whatever Windows gave it; a process whose new files are owned by
 // Administrators (an elevated token) owns nothing by the SID rule, and then the file is kept: the rule is "the owner equals the token user", and the test says which of the two it saw.
 func TestWindowsSweepRemovesAnOldFileOfTheCurrentUser(t *testing.T) {
@@ -187,6 +201,7 @@ func TestWindowsSweepKeepsAJunctionWithACoralName(t *testing.T) {
 func TestWindowsSweepStopsWhenItsContextEnds(t *testing.T) {
 	dir := t.TempDir()
 	p := agedFile(t, dir, "coral_prompt_"+winDeadSID+"_123.txt")
+	asTheFilesOwner(t, p) // an elevated token's new files are owned by Administrators and kept by the owner rule; this test is about the context, so the file is made ours (#18365)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	opt := sweepOpts()
