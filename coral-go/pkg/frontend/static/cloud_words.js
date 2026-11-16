@@ -34,7 +34,7 @@ export function spellCode(code) {
 // ── the status sentences and the confirm texts of the connect panel (moved from cloud_connect.js, #8386)
 
 // Said when this server has no hub (a dev build, or --cloud-url off); the CLI says the same (#3285).
-export const OFF_TEXT = "Coral Hub isn't configured on this computer. Start Coral with --cloud-url https://app.coralhub.dev (or CORAL_CLOUD_URL=https://app.coralhub.dev), then run: coral cloud connect";
+export const OFF_TEXT = "Coral Hub isn't configured on this computer. Open Settings › Network and Hub for setup steps.";
 
 // What the Hub may do at each level, as the sentence after "may now:" said once a change is saved.
 export const LEVEL_NOW = { view: 'look only', interact: 'send and answer', launch: 'start agents' };

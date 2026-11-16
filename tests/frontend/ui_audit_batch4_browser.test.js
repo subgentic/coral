@@ -22,12 +22,13 @@ const { coralReady } = require('./helpers/wait');
             await coralReady(ev, 'startup', 'liveList', 'settings');
             const open = async group => { await ev(`(async () => { await window.showSettingsModal(${JSON.stringify(group)}); return true; })()`); await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'Settings'); };
 
-            console.log(`1. (${w}) No hub: the sentence once, the whole sequence in the row, Copy takes it`);
+            console.log(`1. (${w}) No hub: a short sentence, commands in an Advanced fold (#16717)`);
             await open('network');
-            await waitFor(`/start Coral with the Hub address/.test(document.getElementById('settings-cloud-status').textContent)`, 'the no-hub status', 10000);
-            const hub = await ev(`(() => { const r = document.querySelector('#settings-cloud [data-cloud=command-row]'); return { sentence: document.getElementById('settings-cloud-status').textContent, flag: /--cloud-url|CORAL_CLOUD_URL/.test(document.getElementById('settings-cloud-status').textContent), lines: r.querySelector('code').textContent.split('\\n'), shown: !r.hidden }; })()`);
-            assert.ok(hub.shown && !hub.flag, 'the flag is in the row, not repeated in the sentence: ' + JSON.stringify(hub));
-            assert.match(hub.sentence, /^Only needed to use Coral Hub\. Skip it otherwise\. To use it, start Coral with the Hub address, then connect:$/, 'the sentence says first that the commands are only for the Hub, then what order (the two commands are in the row): ' + hub.sentence);
+            await waitFor(`/Only needed to use Coral Hub/.test(document.getElementById('settings-cloud-status').textContent)`, 'the no-hub status', 10000);
+            const hub = await ev(`(() => { const d = document.querySelector('#settings-cloud .cloud-advanced'); const r = document.querySelector('#settings-cloud [data-cloud=command-row]'); return { sentence: document.getElementById('settings-cloud-status').textContent, fold: !!d, summary: d ? d.querySelector('summary').textContent : '', lines: r.querySelector('code').textContent.split('\\n') }; })()`);
+            assert.ok(hub.fold, 'the commands are in an Advanced fold: ' + JSON.stringify(hub));
+            assert.match(hub.summary, /Advanced/, 'the fold summary says Advanced');
+            assert.match(hub.sentence, /^Only needed to use Coral Hub\. Skip it otherwise\.$/, 'the sentence is short, no commands: ' + hub.sentence);
             assert.deepEqual(hub.lines, ['coral --cloud-url https://app.coralhub.dev', 'coral cloud connect']);
             await ev(`window.__copied = []; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: t => { window.__copied.push(t); return Promise.resolve(); } } }); document.querySelector('#settings-cloud [data-cloud=command-row] button').click(); true`);
             await waitFor(`window.__copied.length === 1`, 'the copy');
