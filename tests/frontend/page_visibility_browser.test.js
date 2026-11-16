@@ -41,7 +41,9 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
             // visibilityState turns 'hidden' a moment after the key; look until it has had time to.
             await new Promise(r => setTimeout(r, 150)); // sleep-ok: visibilityState flips a moment after the key, and there is no event for a state that must stay unchanged
             const after = await state();
-            const frames = await framesRan();
+            // A hidden page runs no frames at all, ever; a loaded machine can starve a single 300 ms window down to 1 or 2 (seen: 2 and 1 under 8 busy loops, #18531). Look in up to 10 windows for one that drew, and report the best.
+            let frames = await framesRan();
+            for (let i = 0; i < 9 && frames < 3; i++) frames = Math.max(frames, await framesRan());
             check(`after ${name} the page is still visible, focused and drawing frames`, after.visible === 'visible' && after.focus && frames >= 3, JSON.stringify({ ...after, frames }));
         }
     } catch (e) {
