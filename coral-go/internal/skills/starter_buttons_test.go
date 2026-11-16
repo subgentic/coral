@@ -68,3 +68,27 @@ func TestTheGettingStartedSkillsSayHowToGetAnyAgentToDoItAgain(t *testing.T) {
 		assert.Contains(t, md, "upload it as a new version", name+": --new-version-of")
 	}
 }
+
+// The Operator (#18766): the first sample file the tour sends has a picture in it, in the one form the preview draws (a data: image, which Coral's Markdown keeps), and each stop of the single-agent
+// tour says in plain words where the place is, what it is for, what the person will see and what to try.
+func TestTheGettingStartedSkillsSendASampleFileWithAnImageAndExplainEachStop(t *testing.T) {
+	read := func(name string) string {
+		b, err := starterFS.ReadFile("starter/" + name + "/SKILL.md")
+		require.NoError(t, err)
+		return string(b)
+	}
+	agent, team := read("getting-started-agent"), read("getting-started-team")
+	for name, md := range map[string]string{"agent": agent, "team": team} {
+		assert.Contains(t, md, "![A small chart](data:image/svg+xml;base64,<the base64 text>)", name+": the form of the embedded image")
+		assert.Contains(t, md, "nothing downloaded", name+": the image is made for the sample")
+	}
+	assert.Contains(t, agent, "the first file you send must include at least one image", "the first file has an image")
+	assert.Contains(t, agent, "ask any agent to put an image in the file it sends me", "how to get any agent to do it again")
+	for _, where := range []string{"the Inbox tab at the top left", "the Analytics tab in the row of tabs along the top", "the gear icon at the top right"} {
+		assert.Contains(t, agent, where, "the agent says where the page is")
+	}
+	assert.Contains(t, agent, "what it is for", "the agent explains what a place is for")
+	assert.Contains(t, agent, "what I will see", "the agent says what the person will see")
+	assert.Contains(t, agent, "what to try", "the agent says what to try")
+	assert.Contains(t, team, "the Inbox tab at the top left", "the team's Orchestrator says where Needs you is")
+}
