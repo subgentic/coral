@@ -12,10 +12,12 @@ const { coralReady } = require('./helpers/wait');
 // #16109 adds 18 visible words: Share through Coral Hub (4), its short rule (12), Sharing details (2).
 // Keep the old section budgets plus the words in those authored lines (HELP_LINES /
 // HINTS); long explanations remain in Docs and never inflate the dialog.
-// Notifications includes the existing Inbox block; retain an allowance of 180 words for its labels/help and team notice.
-const BEFORE = { 'Coral Hub and remote access':186, Defaults:269, 'Storage and backup':151, Updates:20, 'Teams and Chief':80, Appearance:80, Notifications:72+180, 'Files and Git':40, 'Security and privacy':61 };
+// Notifications includes the existing Inbox block; retain an allowance of 220 words for its labels/help and team notice (180 until #17022 and #17169 added the "Needs Desktop alerts on." lines and the test-alert row; #18814).
+const BEFORE = { 'Coral Hub and remote access':186, Defaults:269, 'Storage and backup':151, Updates:20, 'Teams and Chief':80, Appearance:80, Notifications:72+220, 'Files and Git':40, 'Security and privacy':61 };
+// #18814: Files and Git +1 (the Reset word beside a setting that is not at its default)
+// #18814: Storage and backup +4 (the Hub share row's rule and its Sharing details link, shown since #16599's Dropbox rows)
 // #17538: Storage and backup +22 (Local backup heading, the data-folder path, Copy path button, and the one-line backup note)
-const HELP_WORDS = { 'Coral Hub and remote access':80, Defaults:73, 'Storage and backup':21+18+22, Updates:6, 'Teams and Chief':12, Appearance:22, 'Files and Git':8, 'Security and privacy':17 };
+const HELP_WORDS = { 'Coral Hub and remote access':80, Defaults:73, 'Storage and backup':21+18+22+4, Updates:6, 'Teams and Chief':12, Appearance:22, 'Files and Git':8+1, 'Security and privacy':17 };
 const BUDGET = Object.fromEntries(Object.entries(BEFORE).map(([k,v])=>[k,v+(HELP_WORDS[k]||0)]));
 
 (async () => {
