@@ -66,6 +66,7 @@ const { coralReady } = require('./helpers/wait');
         await click('Edit');
         await waitFor(`!!document.getElementById('task-edit-title')`, 'the form');
         check('the form has title, description, instructions, reason, priority, assignee', ['task-edit-title', 'task-edit-body', 'task-edit-instructions', 'task-edit-reason', 'task-edit-priority', 'task-edit-assignee'].length === 6 && await ev(`['task-edit-title','task-edit-body','task-edit-instructions','task-edit-reason','task-edit-priority','task-edit-assignee'].every(i => !!document.getElementById(i))`));
+        check('the agent\'s workflow instructions are behind Advanced, shut', await ev(`(() => { const d = document.getElementById('task-edit-advanced'); const t = document.getElementById('task-edit-instructions'); return !!d && !d.open && d.contains(t) && !t.checkVisibility() && /^Advanced/.test(d.querySelector('summary').textContent); })()`) , 'walk 52 F10 (#17160)');
         await shot('task-page-edit');
         check('the bar holds Cancel and Save', JSON.stringify(await barButtons()) === JSON.stringify(['Cancel', 'Save']), JSON.stringify(await barButtons()));
         check('the title field has the focus', await ev(`document.activeElement && document.activeElement.id === 'task-edit-title'`));
