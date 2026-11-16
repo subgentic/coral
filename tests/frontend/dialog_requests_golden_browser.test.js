@@ -24,6 +24,7 @@ const GOLDEN = path.join(__dirname, 'fixtures', 'dialog_requests_golden.json');
             window.__reqs = [];
             const real = window.fetch; const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href), m = o.method || 'GET';
+                if (m === 'GET' && p.pathname === '/api/system/terminal-backend') return json({ running: 'tmux', saved: 'tmux', next: 'tmux', forced: false, choice: true }); // the Backend select starts on the backend the server runs (#16409): pinned, so the recorded bodies do not follow the machine this runs on
                 if (m === 'POST' && /^\\/api\\/sessions\\/(launch|launch-team|live\\/[^/]+\\/restart)$/.test(p.pathname)) {
                     window.__reqs.push({ path: p.pathname, body: JSON.parse(o.body) });
                     if (p.pathname === '/api/sessions/launch-team') return json({ agents: [{ name: 'A', session_id: 's' }] });

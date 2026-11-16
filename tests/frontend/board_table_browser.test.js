@@ -37,7 +37,7 @@ const BASE = require('./test_base').BASE;
         const rid = await post('Backend Dev', 'Agreed with the second; the count already follows the read.', { reply_to: qid });
         await post('Orchestrator', 'Fine. @Operator please look at the plan when you can: ' + 'a long line that goes on and on to be cut by the row and shown whole when open, '.repeat(4) + '#7809');
         await post('Backend Dev', 'Summary posted. #7809');
-        await post('Lead Developer', '@Backend Dev @QA Engineer @Orchestrator six marks in one message #7790', { ask: true, reply_to: firstId }); // a reply, three mentions, a task and a question: six marks
+        await post('Lead Developer', '@Backend Dev @QA Engineer @Orchestrator six marks in one note, task #7790', { ask: true, reply_to: firstId }); // a reply, three mentions, a task and a question: six marks
         const longReplyText = 'A detailed reply should remain available to read in the conversation. '.repeat(4);
         const longReply = await post('Orchestrator', `${longReplyText}[Reference link](https://example.com/reply)`, { reply_to: qid });
 

@@ -1,10 +1,5 @@
-document.head.append(Object.assign(document.createElement('style'), { textContent:
-    '.mb-qr{position:absolute;right:.875rem;top:50%;transform:translateY(-50%);z-index:1;margin:0;transition:opacity .1s}' +
-    '@media(hover:hover){.mb-qr{opacity:0;pointer-events:none}' +
-    '.mb-message:not(.mb-open):hover>.mb-qr,.mb-message:not(.mb-open):focus-within>.mb-qr{opacity:1;pointer-events:auto}}' +
-    '@media(hover:none){.mb-table .mb-message:not(.mb-open){padding-inline-end:5rem}}' +
-    '.mb-open>.mb-qr{display:none}'
-}));
+import { loadStyles } from './lazy_styles.js';
+loadStyles('board_quick_reply.css'); // a stylesheet, not an injected <style>: the Hub's CSP (style-src 'self') refuses an inline one (hub_board_link: style-src-elem)
 
 function add(msg) {
     if (msg.querySelector('.mb-qr') || !msg.dataset.messageId) return;

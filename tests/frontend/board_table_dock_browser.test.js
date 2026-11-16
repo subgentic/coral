@@ -37,7 +37,7 @@ const BASE = require('./test_base').BASE;
         await post('Backend Dev', 'Agreed with the second; the count already follows the read.', { reply_to: qid });
         await post('Orchestrator', 'Fine. @Operator please look at the plan: ' + 'a long line that goes on and on, '.repeat(6) + '#7809');
         await post('Backend Dev', 'Summary posted. #7809');
-        await post('Lead Developer', '@Backend Dev @QA Engineer @Orchestrator six marks in one message #7790', { ask: true, reply_to: firstId }); // a reply, three mentions, a task and a question: six marks
+        await post('Lead Developer', '@Backend Dev @QA Engineer @Orchestrator six marks in one note, task #7790', { ask: true, reply_to: firstId }); // a reply, three mentions, a task and a question: six marks
 
         for (const [label, w, h, mobile, dock] of [['default dock width', 1280, 800, false, 420], ['narrowest dock', 1280, 800, false, 280], ['phone', 390, 844, true, 390]]) {
             console.log(`${label}: the dock's Board tab is the table, folded`);
