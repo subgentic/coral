@@ -12,7 +12,8 @@ import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
 import { nameSpan } from './agent_live.js';
 import { loadStyles } from './lazy_styles.js';
-await loadStyles('phone_lists.css'); // the phone form of a team list (#12230); not at start (page_weight)
+await loadStyles('phone_lists.css');
+await loadStyles('team_artifact_layout.css'); // the phone form of a team list (#12230); not at start (page_weight)
 import { browserLocal } from './safe_storage.js';
 import { renderArtifact } from './artifact_preview.js';
 import { showToast, fileIdOf, versionLineOf, copyFileId } from './utils.js';
@@ -451,6 +452,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                     if (isUnverified(item)) note.classList.add('dt-warning'); return note;
                 },
                 ...(inbox || phoneTeam ? { mail: item => ({ data: { artifactId: itemKey(item) }, lead: { node: artifactThumbnail({ ...item, name: readableName(item) }, { size: 32, url: thumbnailPath(item) ? serverUrl(thumbnailPath(item), inbox ? serverOf(item) : server()) : '' }), square: true, name: String(readableName(item)).split('.').pop() }, title: readableName(item), ask: uploaderText(item) || '—', askTag: isOperatorUpload(item), starred: !!item.starred, snippet: [placeOf(item), taskText(item), versionLineOf(item)].filter(Boolean).join(' · '), time: DT.timeCell(item.updated_at || item.created_at).textContent, tip: [`Uploaded by: ${uploaderText(item) || '—'}`, multipleServers() ? `${item.team || keyLabel(item.board_id)} \u00b7 ${serverLabel(serverOf(item))}` : placeOf(item), taskText(item)].filter(Boolean).join(' \u00b7 ') }) } : {}), // a phone's row (#9583): its hover names the team and the computer, as the dropped columns did: a file glyph, the name, its team and task, when it changed
+                tagsWidth: !inbox && !model.scope ? '10rem' : '',
                 updatedWidth: model.scope ? '' : '9rem', // the lists with a Goal column keep "yesterday 3:00 AM" whole (the narrow lists drop nothing here and keep 7.5 rem)
                 tagsDropAt: inbox ? 62 : 0, // the Inbox list is crowded (a team, a task): its Tags go first, before Team and Task
                 afterName: [...(inbox ? (model.filters.team
@@ -464,11 +466,13 @@ export function createArtifactsList({ inbox = false } = {}) {
                 footer: { auto: !model.truncated && !model.error, text: `Showing ${model.items.length} of ${model.counts?.matched ?? model.items.length}${model.truncated ? '+' : ''}`,
                     more: model.hasMore ? { label: 'Load more', busy: !!model.controller, run: () => { if (!model.loadingMore) loadArtifacts({ append: true }); } } : null },
             });
+            if (!inbox && !model.scope && toolbarRow) { const columns = table.el.querySelector('.cols-hidden-bar'); if (columns) { toolbarRow.querySelector('.cols-hidden-bar')?.remove(); toolbarRow.append(columns); } }
             if (selectionBar !== table.bar) { heldFiles.end(); selectionBar = table.bar; wireHeld(table.bar); } // a new table is a new selection bar: the confirmation of the old one is over
             // This table never folds: optional columns disappear as its container narrows.
             if (phoneTeam) { const bleed = document.createElement('div'); bleed.className = 'goals-bleed'; bleed.append(table.el); body.append(bleed); } else body.append(table.el); Toolbar.mountSelection(toolbarRow, artifactState.selected.size ? table.bar : null);
             if (!model.scope && !phoneTeam && matchMedia('(max-width: 760px)').matches) toolbarRow?.append(table.selectButton); // a team's list on a phone selects by long press, with no Select button
         }
+        root._share?.attach();
         if (model.truncated) body.append(el('p', 'goals-note', 'Some older artifacts are not included in this list.'));
         if (!model.scope) {
             const names = Object.entries(model.tagCounts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([t]) => t);
@@ -673,6 +677,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             if (!external) bar = null;
         }
         root = host.firstChild;
+        root.classList.toggle('team-artifacts-layout', !scope && !external && !inbox);
         if (scope && !scope.standalone && project && !external && !inbox) { // an agent with a team: files can be dropped on its list to share them with it (#11376)
             importOnce('./operator_share.js').then(m => m.mountOperatorShare(root, { project, session: scope.session, server: scope.server, name: scope.name, reload: () => loadArtifacts({ keep: true }) })).catch(() => {});
         } else if (!scope && project && !external && !inbox) { // the team's own Artifacts tab (#15317): a visible Add files button shares files with the whole team
