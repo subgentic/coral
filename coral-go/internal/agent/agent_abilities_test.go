@@ -33,7 +33,8 @@ func TestAnOrchestratorsSystemPromptCarriesTheAbilitiesSection(t *testing.T) {
 	assert.Equal(t, base, withBoardAbilities(base, p, "claude"), "a hook with nothing to say adds nothing")
 }
 
-var quotedPath = regexp.MustCompile(`(/[^\s'"]+\.(?:json|md|txt))`)
+// a Unix path, or a Windows one (C:\Users\...\x.md): the command quotes it either way
+var quotedPath = regexp.MustCompile(`((?:[A-Za-z]:)?[\\/][^\s'"]+\.(?:json|md|txt))`)
 
 // commandAndFiles is a launch command with the contents of the prompt files it reads (`cat '<file>'`, or a `--settings <file>`), which is where each agent's system prompt is.
 func commandAndFiles(cmd string) string {
@@ -71,4 +72,12 @@ func TestHermesFirstMessageCarriesTheSectionForAnOrchestratorOnly(t *testing.T) 
 	SetBoardAbilities(func(LaunchParams, string) string { return "ABILITIES-SECTION-17622" })
 	assert.Contains(t, hermesFirstMessage(LaunchParams{BoardName: "team", Role: "Orchestrator"}), "ABILITIES-SECTION-17622")
 	assert.NotContains(t, hermesFirstMessage(LaunchParams{BoardName: "team", Role: "Developer"}), "ABILITIES-SECTION-17622")
+}
+
+// The helper finds a prompt file in a Windows command too (#18871: it matched only a path starting with "/", so on Windows no file was read and the section looked missing).
+func TestQuotedPathFindsAWindowsPromptFile(t *testing.T) {
+	m := quotedPath.FindStringSubmatch(`Remove-Item Env:CORAL_SESSION_ID; claude --append-system-prompt-file 'C:\Users\runneradmin\AppData\Local\Temp\TestX\001\claude_sys.md' --x`)
+	assert.Equal(t, []string{`C:\Users\runneradmin\AppData\Local\Temp\TestX\001\claude_sys.md`, `C:\Users\runneradmin\AppData\Local\Temp\TestX\001\claude_sys.md`}, m)
+	m = quotedPath.FindStringSubmatch(`cat '/tmp/x/y.md' | claude`)
+	assert.Equal(t, "/tmp/x/y.md", m[1])
 }
