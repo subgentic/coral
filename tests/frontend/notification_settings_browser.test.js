@@ -35,6 +35,7 @@ const BASE = require('./test_base').BASE;
         assert.match(s.note, /blocks alerts from Coral/, 'the reason is there before the person even tries');
         assert.match(s.note, /site settings/, 'and where to change it');
         assert.deepEqual(s.kindsDisabled, [true, true, true], 'the kinds wait for alerts to be on');
+        assert.deepEqual([s.needs, s.reply, s.sound], [false, false, false], 'with Desktop alerts off the kinds show OFF too, the page does not claim an alert will fire (#17022, walk 46): ' + JSON.stringify(s));
         // a phone has no address bar to look at: its browser's site settings are where the permission is (#10266)
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await open(); await ev(STUB('denied', 'denied')); await show();
@@ -84,6 +85,14 @@ const BASE = require('./test_base').BASE;
         assert.equal(s.desktop, true);
         await ev(`document.getElementById('settings-desktop-notify').click(); true`);
         await waitFor(`document.getElementById('settings-alert-reply').disabled === true`, 'the kinds wait again when alerts are turned off');
+        s = await state();
+        assert.deepEqual([s.needs, s.reply, s.sound], [false, false, false], 'turned off: the kinds show off, whatever the person chose before (#17022): ' + JSON.stringify(s));
+        await ev(`document.getElementById('settings-desktop-notify').click(); true`);
+        await waitFor(`document.getElementById('settings-alert-reply').disabled === false`, 'the kinds are back when alerts are turned on again');
+        s = await state();
+        assert.deepEqual([s.needs, s.reply, s.sound], [true, false, true], 'and show what the person chose again (nothing was forgotten): ' + JSON.stringify(s));
+        await ev(`document.getElementById('settings-desktop-notify').click(); true`);
+        await waitFor(`document.getElementById('settings-alert-reply').disabled === true`, 'off again for the next step');
 
         console.log('4. Every switch says what it does');
         s = await state();
