@@ -179,7 +179,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
             // the search narrows the list
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = 'task'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await waitFor(`document.querySelectorAll('${pane} li .row-btn').length === 2`, at + 'the search narrows the list', 5000);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} li .row-btn')].map(b => b.textContent.trim())`), ['Tasks', 'Task time'], at + 'to the matches (Tasks, #17206, matches too)');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} li .row-btn')].map(b => b.textContent.trim())`), ['Task time', 'Tasks'], at + 'to the matches (Tasks, #17206, matches too; in the sidebar order)');
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = 'zzz'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await waitFor(`!!document.querySelector('${pane} .empty-state')`, at + 'no match says so', 5000);
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);

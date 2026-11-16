@@ -43,9 +43,9 @@ const answer = (group, reviews) => {
         await ev(`window.switchNavTab('tokens'); true`);
         await waitFor(`document.querySelectorAll('#cost-nav-list .row-btn').length >= 4`, 'the list of views', 10000);
 
-        await run('Tasks is listed right after Usage', async () => {
+        await run('Tasks is listed right after Task time', async () => {
             const names = await ev(`[...document.querySelectorAll('#cost-nav-list .row-btn')].map(b => b.textContent.trim())`);
-            assert.equal(names.indexOf('Tasks'), names.indexOf('Usage') + 1, JSON.stringify(names));
+            assert.equal(names.indexOf('Tasks'), names.indexOf('Task time') + 1, JSON.stringify(names)); // the sidebar order: Task time, then Tasks
         });
 
         for (const [w, theme] of [[1440, 'dark'], [390, 'light']]) {

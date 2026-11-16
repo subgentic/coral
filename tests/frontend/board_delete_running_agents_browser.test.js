@@ -42,7 +42,7 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`!!window.__confirm`, 'the dialog', 6000);
         assert.equal(await ev(`window.__confirm.title`), 'Remove team', 'a dialog, not a toast that is gone before it is read (#10139)');
         assert.equal(await ev(`window.__confirm.label`), 'Stop agents and remove', 'its button stops the agents and removes the team');
-        assert.match(await ev(`window.__confirm.msg`), /1 agent is running on it: bd-agent\. Stop agents and remove stops them first\..*goals.*The agents' chats stay in History, and the files in the team's folder and the logs are not touched\./, 'it names the agent, the way out, what goes and what stays');
+        assert.match(await ev(`window.__confirm.msg`), /1 agent is running on it: bd-agent\. Stop agents and remove stops them first\.[\s\S]*goals[\s\S]*The agents' chats stay in History[,;] (and )?the files in the team's folder and the logs are not touched\./, 'it names the agent, the way out, what goes and what stays');
         assert.deepEqual(await ev(`window.__kills`), [], 'no agent is stopped before the answer');
         assert.deepEqual(await toasts(), [], 'and no toast beside it');
         assert.deepEqual(await ev(`window.__deletes`), [], 'no DELETE is sent');

@@ -44,7 +44,8 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`document.getElementById('notices').style.visibility === 'hidden'`, 'the banners step aside while the menu is open');
             const items = await rects('.menu:not([hidden]) .menu-item');
             assert.ok(items.length > 0, `${at}: the menu has entries`);
-            for (const it of items) {
+            const vh = await ev(`innerHeight`);
+            for (const it of items.filter(x => x.b <= vh)) { // an entry below the screen's edge is reached by scrolling the drawer: elementFromPoint cannot see it (#18822: the phone's menu is taller than 844 px since the More entry)
                 const covered = await ev(`(() => { const e = document.elementFromPoint(${it.l + (it.r - it.l) / 2}, ${it.t + (it.b - it.t) / 2}); return !(e && e.closest('.menu')); })()`);
                 assert.ok(!covered, `${at}: a banner covers a menu entry ${JSON.stringify(it)}`);
             }
