@@ -1,7 +1,13 @@
 // Loaded only by the Inbox Getting started launch actions. The guides ship as starter skills.
 import { importOnce } from './import_once.js';
-const { AGENT_PRESETS } = await importOnce('./agent_presets.js');
+const { AGENT_PRESETS, SHIPPED_CAPABILITIES } = await importOnce('./agent_presets.js');
 export const GETTING_STARTED_PROMPTS = {
     "agent": AGENT_PRESETS.find(p => p.name === 'Getting started').prompt,
-    "team": "Use the getting-started-team skill to guide me through working with a Coral team, one step at a time."
+    "team": "You are teaching me how to use Coral and how to work with an agent team. Load the Getting started skill first (getting-started-team), then walk me through it step by step with your team: the inbox, comments, replies, new versions, questions with buttons, and how to get an agent to repeat each step."
 };
+/** The tour team (#18717): Inbox Try a team opens New team with these three members; the person can still change them. */
+export const TOUR_TEAM_MEMBERS = [
+    { name: 'Orchestrator', prompt: "You are the orchestrator. Your team is teaching the operator how to use Coral and work with agent teams, so go one step at a time and let them act at each step. Break down the goal, assign work to the team via the message board, and track progress. Delegate to the other agents; do not do the work yourself. Discuss your plan with the operator before posting assignments." },
+    { name: 'Lead Dev', prompt: "You are the lead developer. Do the main work the Orchestrator assigns, and show the operator what you are doing as you go. Coordinate with the team via the message board. Wait for instructions from the Orchestrator before starting." },
+    { name: 'QA', prompt: "You are QA. Check the team's work for quality and correctness, and say what you checked. Coordinate with the team via the message board. Wait for instructions from the Orchestrator before starting." },
+].map(m => ({ ...m, capabilities: { allow: [...SHIPPED_CAPABILITIES], deny: [] } }));
