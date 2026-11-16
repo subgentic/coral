@@ -45,4 +45,22 @@ async function removeTeams(ev, names) {
     }
 }
 
-module.exports = { removeBoards, removeTeams, AGAIN_MS };
+/** The live agents now, as {id, name, type}, through the page. A suite that can start agents it did not launch by name (a crawl that clicks, a team that adds members) takes this before it starts and kills the new ones in its finally. Never throws. */
+async function liveSessions(ev) {
+    try {
+        const l = await ev(`fetch('/api/sessions/live').then(r => r.json())`);
+        return (Array.isArray(l) ? l : (l && l.sessions) || []).map(x => ({ id: x.session_id, name: x.name || x.session_name || '', type: x.agent_type || 'terminal' }));
+    } catch { return []; }
+}
+
+/** Kill each agent ({id, name, type}) through the page, so the board it is subscribed to can then be removed without the agent keeping a subscriber on it (#18904: a live agent left `board ... added (1 subscriber)` and a live_sessions row in the end-check). Never throws. */
+async function killSessions(ev, sessions) {
+    for (const s of sessions) {
+        if (!s || !s.id) continue;
+        try {
+            await ev(`fetch('/api/sessions/live/' + encodeURIComponent(${JSON.stringify(String(s.name || ''))}) + '/kill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_type: ${JSON.stringify(s.type || 'terminal')}, session_id: ${JSON.stringify(s.id)} }) }).then(() => true)`);
+        } catch { /* the end-check reports what is left */ }
+    }
+}
+
+module.exports = { removeBoards, removeTeams, liveSessions, killSessions, AGAIN_MS };

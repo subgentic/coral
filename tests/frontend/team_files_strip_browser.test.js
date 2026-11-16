@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('./helpers/child_process');
 const { connect } = require('./agent_view_harness');
-const { removeBoards } = require('./helpers/board_cleanup');
+const { removeBoards, killSessions } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 const { safePaused } = require('./helpers/paused');
@@ -17,6 +17,7 @@ const { safePaused } = require('./helpers/paused');
     const B = 'tf-' + Date.now().toString(36);
     const api = (method, p, body, headers) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(method)}, headers: ${JSON.stringify(headers || { 'Content-Type': 'application/json' })}, body: ${body === undefined ? 'undefined' : typeof body === 'string' ? JSON.stringify(body) : JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
     let sid = null, sname = null, B2 = null, B3 = null, B4 = null;
+    const members = []; // the agents newMember launches: each is killed in the finally, before its board is removed (#18904)
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -27,7 +28,7 @@ const { safePaused } = require('./helpers/paused');
         assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'Files QA', job_title: 'Backend Dev', session_name: sname })).status < 300);
         const up = async (name, text, type, as = sid) => { const r = await api('POST', `/api/agent/artifacts?session_id=${as}`, text, { 'X-Artifact-Name': name, 'X-Artifact-Media-Type': type }); assert.equal(r.status, 201, JSON.stringify(r)); return /[a-f0-9]{64}/.exec(r.body.uri)[0]; };
         // a team lists its members' files: a team that is to hold only some files gets its own agent, as the one agent above is on every team of this suite
-        const newMember = async (board, name) => { const l = await api('POST', '/api/sessions/launch', { working_dir: os.tmpdir(), agent_type: 'terminal', display_name: name }); const s2 = l.body.session_id, n2 = l.body.session_name || l.body.name; assert.ok(s2, JSON.stringify(l)); assert.ok((await api('POST', `/api/board/${board}/subscribe`, { subscriber_id: name, job_title: 'Backend Dev', session_name: n2 })).status < 300); return s2; };
+        const newMember = async (board, name) => { const l = await api('POST', '/api/sessions/launch', { working_dir: os.tmpdir(), agent_type: 'terminal', display_name: name }); const s2 = l.body.session_id, n2 = l.body.session_name || l.body.name; members.push({ id: s2, name: n2, type: 'terminal' }); assert.ok(s2, JSON.stringify(l)); assert.ok((await api('POST', `/api/board/${board}/subscribe`, { subscriber_id: name, job_title: 'Backend Dev', session_name: n2 })).status < 300); return s2; };
         const hIndex = await up('index.html', '<h1>Flashcards</h1><script src="app.js"></script>', 'text/html');
         await up('app.js', 'console.log("flashcards " + Date.now());', 'text/javascript');
         await up('README.md', '# Flashcards\nOpen index.html', 'text/markdown');
@@ -155,6 +156,7 @@ const { safePaused } = require('./helpers/paused');
         console.log('PASS prefer index.html, app.html fallback, no HTML, and ghost at 390');
     } finally {
         if (sid) await ev(`fetch('/api/sessions/live/${encodeURIComponent(sname || '')}/kill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_type: 'terminal', session_id: ${JSON.stringify(sid)} }) }).then(() => true)`).catch(() => {});
+        await killSessions(ev, members);
         await removeBoards(ev, [B, B2, B3, B4].filter(Boolean)).catch(() => {}); await client.close();
     }
 })().catch(e => { console.error(e); process.exitCode = 1; });

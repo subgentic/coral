@@ -15,7 +15,7 @@
 const CDP = require('chrome-remote-interface');
 const BASE = require('./test_base').BASE;
 const { launchStandIn } = require('./helpers/stand_in_agent');
-const { removeBoards } = require('./helpers/board_cleanup');
+const { removeBoards, liveSessions, killSessions } = require('./helpers/board_cleanup');
 
 const results = [];
 const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' — ' + detail : ''}`); };
@@ -95,7 +95,7 @@ const HOOK = `(() => {
         (r.status >= 200 && r.status < 300 ? planted : refused).push(`${field} (${r.status}${r.status >= 300 ? ' ' + JSON.stringify(r.data).slice(0, 160) : ''})`);
         return r;
     };
-    let standIn = null;
+    let standIn = null, before = null;
     const BOARD = 'pwn-' + Date.now().toString(36);
     const fs = require('fs'), path = require('path'), os = require('os'), cp = require('./helpers/child_process.js');
     // A working folder an agent could have made: a file, a folder and a branch named with markup (a name may hold < > " ' and =, not a slash or a
@@ -117,6 +117,7 @@ const HOOK = `(() => {
     fs.writeFileSync(path.join(repo, 'tracked' + T('file-name-tracked') + '.txt'), 'two\n');          // modified
     fs.writeFileSync(path.join(repo, 'untracked' + T('file-name-untracked') + '.txt'), 'new\n');       // untracked
     try {
+        before = new Set((await liveSessions(ev)).map(x => x.id));
         standIn = await launchStandIn(httpJson, { displayName: 'Injection QA', workingDir: repo });
         if (!standIn.sid) throw new Error('no stand-in agent: ' + standIn.diag);
         const sid = standIn.sid, name = standIn.name, tok = { 'X-Coral-Session-Token': standIn.token };
@@ -259,6 +260,8 @@ const HOOK = `(() => {
         check('the suite ran', false, e.message);
     } finally {
         if (standIn) await standIn.stop().catch(() => {});
+        // the crawl clicks controls that can start agents of their own: the ones that were not there before are killed, and named, so a cause shows (#18904)
+        if (before) { const extra = (await liveSessions(ev)).filter(x => !before.has(x.id)); if (extra.length) console.log('agents left by the crawl, killed: ' + JSON.stringify(extra)); await killSessions(ev, extra); }
         for (const u of made) await ev(`fetch(${JSON.stringify(u)}, { method: 'DELETE' }).then(r => r.status)`).catch(() => {});
         try { if (/\/pwn-repo-/.test(repo)) fs.rmSync(repo, { recursive: true, force: true }); } catch { /* best effort */ }
         await removeBoards(ev, [BOARD]);
