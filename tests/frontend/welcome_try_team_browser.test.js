@@ -10,7 +10,6 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installTeam(ev); await stubModels(ev);
-        await ev(`(() => { const R = window.fetch; window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); if (url.pathname.startsWith('/api/agents/models')) return Promise.resolve(new Response(JSON.stringify({ agent_type: 'claude', fetched_at: '2026-10-25T00:00:00Z', refreshing: false, source: 'account', models: [{ value: 'default', display_name: 'Default (recommended)', efforts: ['low','medium','high'] }, { value: 'opus', display_name: 'Opus 5.5', efforts: ['low','medium','high'] }, { value: 'claude-sonnet-5-5', display_name: 'Sonnet 5.5', efforts: ['low','medium','high'] }], thinking: ['low','medium','high'] }), { status: 200, headers: { 'content-type': 'application/json' } })); return R(u, o); }; return true; })()`); // the claude list offers the opus alias, as the real one does
         await ev(`(() => { const real = window.fetch; window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href).pathname; if (p === '/api/board/projects') return Promise.resolve(Response.json([])); if (p === '/api/settings' && o.method === 'PUT') return Promise.resolve(Response.json({ ok: true })); return real(u, o); }; window.T.state.settings = { ...window.T.state.settings, inbox_welcome: 'on', inbox_welcome_done: '' }; window.T.state.liveSessions = []; window.T.state.servers = []; window.switchNavTab('hub-inbox'); return true; })()`);
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
         await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-actions').length === 5`, 'guide actions');
@@ -22,9 +21,6 @@ const BASE = require('./test_base').BASE;
         for (const n of ['Orchestrator', 'Lead Dev', 'QA']) assert.ok(names.includes(n), `${n} is a member: ${JSON.stringify(names)}`);
         const models = await ev(`import((window.__coralStatic || '/static/') + 'agent_config_form.js').then(m => [...document.querySelectorAll('#team-agents-list .team-agent-row')].map(r => m.getAgentConfig(r.dataset.acfId).model || ''))`);
         assert.deepEqual(models, ['opus', 'opus', 'opus'], 'all three members run on the opus alias the model chip offers, not Default: ' + JSON.stringify(models));
-        await waitFor(`document.getElementById('team-set-all-model')?.value === 'opus'`, 'Everyone runs as shows Opus');
-        const byHand = await ev(`[...document.querySelectorAll('#team-agents-list .team-agent-row')].filter(r => /Set by hand/.test(r.textContent)).length`);
-        assert.equal(byHand, 0, 'no member reads as set by hand: Everyone runs as holds the same model');
         const task = await ev(`document.getElementById('team-goal').value`);
         assert.match(task, /teaching me how to use Coral and how to work with an agent team/, task);
         assert.match(task, /Load the Getting started skill first/, task);

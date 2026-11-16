@@ -545,7 +545,7 @@ async function _initTeamForm() {
     // The default team is in Members when the dialog opens (#9877, the Operator): the Orchestrator, the Lead and the Reviewer, each removable; a template still replaces them.
     // A team the AI generated fills the list itself (launch.skipDefaultTeamAgents). #5989 opened it empty after four agents nobody picked were launched; three a person can see and remove are not that.
     const defaultsOnOpen = !launch.skipDefaultTeamAgents;
-    if (defaultsOnOpen) { if (launch.welcomePrompt?.members) _everyone.model = launch.welcomePrompt.members.find(m => m.name !== 'Orchestrator')?.model || ''; /* Try a team (#18741): Everyone runs as shows Opus too, so no member reads as set by hand */ _addDefaultMembers(launch.welcomePrompt?.members); resetTeamTemplatePicker(); markTeamTemplate(DEFAULT_TEAM_KEY); } // marked now, not after the board names load: a pick made meanwhile must not be overwritten
+    if (defaultsOnOpen) { _addDefaultMembers(launch.welcomePrompt?.members); resetTeamTemplatePicker(); markTeamTemplate(DEFAULT_TEAM_KEY); } // marked now, not after the board names load: a pick made meanwhile must not be overwritten
 
     // Fetch existing boards for uniqueness validation
     await _loadExistingTeamBoards();
