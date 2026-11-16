@@ -1,0 +1,6 @@
+/* Visible board bookmarks; the table reserves their own space beside the row toggle (#16823). */
+.mb-message .mb-message-header .mb-save-btn { display: inline-flex; opacity: 1; }
+.mb-table .mb-message-header { right: 0; padding-right: 0.875rem; }
+.mb-table .mb-message-header .mb-save-btn { pointer-events: auto; margin-left: auto; }
+.mb-table .mb-row-toggle { padding-right: 3.5rem; }
+.mb-messages-scroll, .board-chat-messages { scroll-padding-bottom: 3.5rem; padding-bottom: 3.5rem; }
