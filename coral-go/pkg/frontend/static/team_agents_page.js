@@ -6,7 +6,7 @@ import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
 import { foldWayBack } from './way_back.js';
 import { state } from './state.js';
-import { boardFetch, inTeam, keyLabel, isCloud, splitKey } from './server_base.js';
+import { boardFetch, inTeam, keyLabel, isCloud, splitKey, sessionServer } from './server_base.js';
 import { pollEvery } from './overload.js';
 import { OPERATOR_ID } from './utils.js';
 import { refreshTeamAvailability, remindAgent, stopAgentReminder } from './team_availability.js';
@@ -18,6 +18,7 @@ const { rowFocusTarget, el } = await importOnce('./team_table.js'); // lazy modu
 
 const DT = await importOnce('./data_table.js');
 const { statusMark } = await importOnce('./status_mark.js'); // lazy like this page: a lazy module is loaded through importOnce (import_hygiene)
+const { modelName } = await importOnce('./model_labels.js'); // the Model column's words (#16671)
 const { mountAgentReviewSettings } = await importOnce('./agent_review_settings.js');
 let agentsTableState = DT.tableState();
 
@@ -56,6 +57,7 @@ export function onTaskWords(a, now = Date.now()) {
     const d = Math.floor(h / 24), hh = h % 24;
     return hh ? `${d} d ${hh} h` : `${d} d`;
 }
+const modelOf = (a) => { const s = (state.liveSessions || []).find(x => inTeam(x, model.team) && ((a.session_id && x.session_id === a.session_id) || x.name === a.name)); return s ? modelName(s.agent_type, s.model, sessionServer(s)) : ''; }; // from the agent's live session; an ended agent has none (#16671)
 const providerOf = (a) => PROVIDER[a.agent_type] || (a.agent_type ? a.agent_type.charAt(0).toUpperCase() + a.agent_type.slice(1) : 'Claude');
 const canRemind = (a) => a.availability !== 'offline' && (a.agent_type !== 'terminal' || a.reminder); // a reminder to an ended agent does nothing (#8271) // a terminal is not an agent: a reminder to it does nothing (UI audit #5589)
 // A task nobody has picked up says what it waits on (#10200): the agent it is for, not just "pending".
@@ -222,6 +224,7 @@ function draw() {
             { key: 'open', label: 'Open tasks', line: 2, width: '6rem', dropAt: 36, sort: true, align: 'end', sortValue: openTasksOf, cell: ag => { const n = openTasksOf(ag); if (!n) return '0'; const link = DT.link(String(n), () => importOnce('./nav.js').then(nav => importOnce('./routes.js').then(r => nav.go(r.keyRoute('team', model.team, 'tasks', null, new URLSearchParams({ agent: ag.name }).toString()))))); link.setAttribute('aria-label', `${n} open ${n === 1 ? 'task' : 'tasks'}: ${ag.name}`); return link; } },
             { key: 'onTask', label: 'Time on task', line: 2, width: '6.75rem', dropAt: 36, sort: true, align: 'end', sortValue: ag => claimedAt(ag) === null ? 0 : Date.now() - claimedAt(ag), blankLast: ag => claimedAt(ag) === null, cell: ag => { const w = onTaskWords(ag); if (w) return w; const none = el('span', null, '\u2014'); none.setAttribute('role', 'img'); none.setAttribute('aria-label', 'none'); return none; } }, // a row with no task is last under either order; its dash is named "none" for a screen reader
             { key: 'provider', label: 'Provider', line: 2, width: '6rem', dropAt: 36, tone: 'tertiary', sort: true, sortValue: providerOf, cell: providerOf },
+            { key: 'model', label: 'Model', line: 2, width: '7rem', dropAt: 36, tone: 'tertiary', sort: true, sortValue: modelOf, blankLast: ag => !modelOf(ag), cell: ag => modelOf(ag) || '\u2014' },
             ...(searchShown ? [{ key: 'search', label: 'Search', line: 2, width: '12rem', dropAt: 52, tone: 'tertiary', cell: ag => searchChip((model.levels.get(ag.name) || {}).level) || '' }] : []), // a column only while some member is above "own": an empty one was drawn, clipped at the right edge of a phone's table as a stray "…" (#11128)
         ], oneLine: true, resize: true, sortBar: false,
     }).el);
