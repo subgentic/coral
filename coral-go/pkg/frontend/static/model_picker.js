@@ -71,9 +71,20 @@ function effortGroups(models) {
 
 const optionHtml = m => `<option value="${escapeAttr(m.value)}">${escapeHtml((m.display_name || m.value) + (m.custom === true ? ' (custom)' : ''))}</option>`;
 
+/** The newest of each family first, older versions under "Older models" (#17196 item 2, walk 51: Sonnet 5.5 / Sonnet 5, Opus 5.5 / Opus 5 / 4.8 with no hint which to take). The CLI's own list is kept whole; Coral only orders it,
+ * and labels nothing "current". A model whose name has no family and version stays where it was. */
+const FAMILY_VERSION = /\b(opus|sonnet|haiku)\s+(\d+(?:\.\d+)?)/i;
+export function splitOlder(models) {
+    const top = new Map(), at = m => { const hit = FAMILY_VERSION.exec(m.display_name || ''); return hit ? { fam: hit[1].toLowerCase(), v: parseFloat(hit[2]) } : null; };
+    for (const m of models) { const x = at(m); if (x && !(top.get(x.fam) >= x.v)) top.set(x.fam, x.v); }
+    const older = models.filter(m => { const x = at(m); return x && x.v < top.get(x.fam); });
+    return older.length ? { newest: models.filter(m => !older.includes(m)), older } : { newest: models, older: [] };
+}
+const flatOptions = models => effortGroups(models) ?? models.map(optionHtml).join('');
+
 /** The model options: a list whose models name a provider (Pi's) is one group of choices per provider, the ones the CLI is signed in to first (the server's `groups` order); any other list is flat (#11338). */
 function modelOptions(models, groups) {
-    if (!models.some(m => m.group)) return effortGroups(models) ?? models.map(optionHtml).join('');
+    if (!models.some(m => m.group)) { const { newest, older } = splitOlder(models); return flatOptions(newest) + (older.length ? `<optgroup label="Older models">${older.map(optionHtml).join('')}</optgroup>` : ''); }
     const order = (Array.isArray(groups) ? groups : []).map(g => g && g.name).filter(Boolean);
     for (const m of models) if (m.group && !order.includes(m.group)) order.push(m.group);
     const signed = new Set((Array.isArray(groups) ? groups : []).filter(g => g && g.signed_in).map(g => g.name));
