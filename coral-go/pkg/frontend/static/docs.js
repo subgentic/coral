@@ -97,7 +97,7 @@ function hitSentence(name) {
     if (!line) return '';
     let best = '', bestN = 0;
     for (const part of line.text.split(/(?<=[.!?])\s+/)) {
-        const text = part.replace(/^[#>*\-\d.\s]+/, '').replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[`*_|]+/g, '').replace(/\s+/g, ' ').trim(), low = text.toLowerCase();
+        const text = part.replace(/^[#>*\-\d.\s]+/, '').replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[`*_|]+/g, '').replace(/#\d{3,}/g, '').replace(/\s+/g, ' ').trim(), low = text.toLowerCase();
         const n = words.filter(w => low.includes(w)).length;
         if (n > bestN) { bestN = n; best = text; }
     }
