@@ -36,9 +36,11 @@ function _archivedTeamLabel(s) {
 export function _renderArchivedSection(archived) {
     if (!archived.length) return '';
     const expanded = _isArchivedExpanded();
+    const names = [...new Set(archived.filter(s => s.board_project).map(_archivedTeamLabel))].sort((a, b) => a.localeCompare(b)); // the line names its teams, so an archived team is not a nameless count (#17491)
+    const named = names.length ? ' · ' + names.slice(0, 2).join(', ') + (names.length > 2 ? ` +${names.length - 2}` : '') : '';
     let html = `<li class="sleeping-summary-row archived-summary-row" data-on-click="archived-toggle"><button type="button" class="row-btn" aria-expanded="${escapeAttr(expanded)}">
         ${SVGO.o4}<rect x="2" y="3" width="12" height="3" rx="0.5"/><path d="M3 6v7h10V6"/><path d="M6.5 9h3"/></svg>
-        <span class="sleeping-summary-label">Archived (${archived.length})</span>
+        <span class="sleeping-summary-label">Archived (${archived.length})${escapeHtml(named)}</span>
     </button></li>`;
     if (!expanded) return html;
     const byTeam = new Map();
@@ -50,7 +52,7 @@ export function _renderArchivedSection(archived) {
     // Agents with no team come first with no heading of their own (a heading "No team" was noise, #10086); each team's agents follow under its name.
     for (const s of byTeam.get('No team') || []) html += _renderSessionItem(s, '__archived__', true, false, '');
     for (const label of [...byTeam.keys()].filter(l => l !== 'No team').sort((a, b) => a.localeCompare(b))) {
-        html += `<li class="archived-team-caption">${escapeHtml(label)}</li>`;
+        html += `<li class="archived-team-caption">${escapeHtml(label)} <button type="button" class="btn btn-quiet btn-xs" data-on-click="team-sleep" data-board="${escapeAttr(sessionTeamKey(byTeam.get(label)[0]))}" data-mode="restore">Restore team</button></li>`; // brings the whole team back, asleep (#17491)
         for (const s of byTeam.get(label)) html += _renderSessionItem(s, '__archived__', true, false, '');
     }
     return html;
