@@ -18,6 +18,7 @@ const HEX = 'ab'.repeat(32);
             await ev(`window.__posts = []; window.__pics = []; (() => { const R = window.fetch; window.fetch = (u, o = {}) => { const url = String(u); const ok = b => Promise.resolve(new Response(JSON.stringify(b), { status: b.hex ? 201 : 200, headers: { 'Content-Type': 'application/json' } }));
                 if ((o.method || 'GET') === 'POST' && /\\/api\\/agent-asks\\/[^/]+\\/answer$/.test(url)) { window.__posts.push({ url, body: JSON.parse(o.body) }); return ok({ ok: true }); }
                 if ((o.method || 'GET') === 'POST' && /\\/api\\/agent-asks\\/[^/]+\\/images$/.test(url)) { window.__pics.push(url); return ok({ hex: '${HEX}', uri: 'coral://artifacts/${HEX}', name: 'mock.png', content_type: 'image/png', size: 4 }); }
+                if ((o.method || 'GET') === 'POST' && /\\/api\\/agent-asks\\/[^/]+\\/dismiss$/.test(url)) { window.__dismissed = (window.__dismissed || []).concat(url); return ok({ ok: true }); }
                 if (/comment-images|goal-images/.test(url)) { window.__pics.push('TEAM ' + url); return Promise.resolve(new Response('{"error":"this team does not exist"}', { status: 404 })); }
                 return R(u, o); }; })(); true`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
@@ -48,7 +49,13 @@ const HEX = 'ab'.repeat(32);
             await ev(`document.querySelector('dialog.inbox-ask-dialog .inbox-ask-offers-list button').click(); true`);
             await waitFor(`window.__posts.length === 2`, `${width}: the second click answers`, 8000);
             assert.equal(await ev(`window.__posts[1].body.answer`), 'Postgres', `${width}: the label alone`);
+            // Dismiss: the question can be cleared (the agent is told by the server)
+            await open(9);
+            await waitFor(`!![...document.querySelectorAll('dialog.inbox-ask-dialog button')].find(b => /dismiss/i.test(b.textContent) && !b.hidden)`, `${width}: Dismiss is offered`, 8000);
+            await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog button')].find(b => /dismiss/i.test(b.textContent)).click(); true`);
+            await waitFor(`(window.__dismissed || []).length === 1`, `${width}: Dismiss posts`, 8000);
+            assert.match(await ev(`window.__dismissed[0]`), /\/api\/agent-asks\/9\/dismiss$/, `${width}: to the agent-ask dismiss route`);
         }
-        console.log('\nPASS a single agent question has buttons, the agent name and attachable pictures');
+        console.log('\nPASS a single agent question has buttons, the agent name and attachable pictures, and can be dismissed');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
