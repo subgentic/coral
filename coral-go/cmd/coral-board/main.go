@@ -207,6 +207,10 @@ Commands:
                                ask withdraw N). Asking the same question again
                                while it is open posts nothing: it answers
                                "Already asked as #N" (--again posts it anyway)
+  post --ask --same-as N "@Operator <question>"
+                               Another agent already asked this (open question
+                               N): link yours to it. The Operator sees one row
+                               and one answer closes both
   post --ask --button 'Label=action' "@Operator <question>"
                                Up to 3 buttons on a question to the Operator,
                                each one action: reply (the label is sent as

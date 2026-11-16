@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/jmoiron/sqlx"
 )
 
 // broadcastTagRE finds the tags that name everyone (@all and its spellings).
@@ -36,6 +38,8 @@ type AskInfo struct {
 	Closed     bool   `json:"closed,omitempty"`
 	ClosedBy   string `json:"closed_by,omitempty"`
 	ClosedNote string `json:"closed_note,omitempty"`
+	// AnsweredVia: the answer is the reply to (or the closing of) this linked ask of the same question (post --same-as, #17738).
+	AnsweredVia int64 `json:"answered_via,omitempty"`
 }
 
 func (s *Store) ensureAsksSchema(ctx context.Context) error {
@@ -93,6 +97,12 @@ func (s *Store) ensureAsksSchema(ctx context.Context) error {
 			reply_message_id INTEGER NOT NULL DEFAULT 0
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_board_ask_buttons_msg ON board_ask_buttons(project, message_id)`,
+		`CREATE TABLE IF NOT EXISTS board_ask_links (
+			message_id INTEGER PRIMARY KEY,
+			project    TEXT NOT NULL,
+			root       INTEGER NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_board_ask_links_root ON board_ask_links(project, root)`,
 	} {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
 			return err
@@ -413,7 +423,44 @@ func (s *Store) fillAsks(ctx context.Context, project string, msgs []Message) er
 	return nil
 }
 
+// askInfo is a question's state: its own, and for a linked one (#17738) answered or closed when any ask of its group is.
 func (s *Store) askInfo(ctx context.Context, project string, a askRow, subs map[string]Subscriber) (*AskInfo, error) {
+	info, err := s.ownAskInfo(ctx, project, a, subs)
+	if err != nil || info.Answered {
+		return info, err
+	}
+	group, err := s.AskGroupOf(ctx, project, a.MessageID)
+	if err != nil || len(group) == 0 {
+		return info, err
+	}
+	ids := make([]int64, len(group))
+	for i, g := range group {
+		ids[i] = g.ID
+	}
+	q, args, err := sqlx.In(`SELECT message_id, asker, asked, created_at FROM board_asks WHERE project = ? AND message_id IN (?) ORDER BY message_id`, project, ids) // one read for the group, not one per member
+	if err != nil {
+		return info, err
+	}
+	var rows []askRow
+	if err := s.reader().SelectContext(ctx, &rows, s.reader().Rebind(q), args...); err != nil {
+		return info, err
+	}
+	for _, row := range rows {
+		g := LinkedAsk{ID: row.MessageID}
+		other, err := s.ownAskInfo(ctx, project, row, subs)
+		if err != nil {
+			return nil, err
+		}
+		if other.Answered {
+			info.Answered, info.Open, info.AnsweredVia = true, []string{}, g.ID
+			info.Closed, info.ClosedBy, info.ClosedNote = other.Closed, other.ClosedBy, other.ClosedNote
+			return info, nil
+		}
+	}
+	return info, nil
+}
+
+func (s *Store) ownAskInfo(ctx context.Context, project string, a askRow, subs map[string]Subscriber) (*AskInfo, error) {
 	var to []string
 	_ = json.Unmarshal([]byte(a.Asked), &to)
 	info := &AskInfo{To: to, Open: []string{}}

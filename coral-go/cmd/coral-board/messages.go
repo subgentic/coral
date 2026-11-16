@@ -114,6 +114,7 @@ func cmdPost() {
 	var toNames, filePath, taskArg, assignArg, goalArg, titleArg, priorityArg, replyArg, guideArg string
 	var buttons []string // --button 'Label=action[:arg]', repeatable: the server checks each one (#11643)
 	ask, broadcast, yesNo, again := false, false, false, false
+	var sameAsArg string   // --same-as N: this question is the same as open question N (#17738)
 	var withdrawArg string // --withdraw N: take back my own unanswered question N (the same as ask withdraw N, #16135)
 	var msgParts []string
 	literal := false
@@ -139,6 +140,9 @@ func cmdPost() {
 			ask = true
 		} else if opt == "--again" {
 			again = true // post the question even if my identical one is still open (#16135)
+		} else if opt == "--same-as" && i+1 < len(os.Args) {
+			sameAsArg = os.Args[i+1]
+			i++
 		} else if opt == "--withdraw" && i+1 < len(os.Args) {
 			withdrawArg = os.Args[i+1]
 			i++
@@ -304,6 +308,14 @@ func cmdPost() {
 	}
 	if ask {
 		body["ask"] = true // a question to the members it @mentions, open until each has answered (#7794)
+	}
+	if sameAsArg != "" { // the same question as an earlier open one (#17738): one row for the Operator, one answer closes both
+		n, convErr := strconv.ParseInt(strings.TrimPrefix(sameAsArg, "#"), 10, 64)
+		if convErr != nil || n <= 0 || !ask {
+			fmt.Fprintln(os.Stderr, "Error: --same-as takes the message number of an earlier open question and goes with --ask: post --ask --same-as N \"@Operator ...\"")
+			os.Exit(2)
+		}
+		body["same_as"] = n
 	}
 	if again {
 		if !ask {

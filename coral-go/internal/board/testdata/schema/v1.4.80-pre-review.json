@@ -13,6 +13,12 @@
       "type": "index"
     },
     {
+      "name": "idx_board_ask_links_root",
+      "sql": "CREATE INDEX idx_board_ask_links_root ON board_ask_links(project, root)",
+      "tbl_name": "board_ask_links",
+      "type": "index"
+    },
+    {
       "name": "idx_board_asks_project",
       "sql": "CREATE INDEX idx_board_asks_project ON board_asks(project, message_id)",
       "tbl_name": "board_asks",
@@ -514,6 +520,12 @@
       "name": "board_ask_closed",
       "sql": "CREATE TABLE board_ask_closed (\n\t\t\tmessage_id INTEGER PRIMARY KEY,\n\t\t\tproject    TEXT NOT NULL,\n\t\t\tclosed_by  TEXT NOT NULL,\n\t\t\tnote       TEXT NOT NULL,\n\t\t\tclosed_at  TEXT NOT NULL\n\t\t)",
       "tbl_name": "board_ask_closed",
+      "type": "table"
+    },
+    {
+      "name": "board_ask_links",
+      "sql": "CREATE TABLE board_ask_links (\n\t\t\tmessage_id INTEGER PRIMARY KEY,\n\t\t\tproject    TEXT NOT NULL,\n\t\t\troot       INTEGER NOT NULL\n\t\t)",
+      "tbl_name": "board_ask_links",
       "type": "table"
     },
     {
@@ -1802,6 +1814,72 @@
         }
       ],
       "indexes": []
+    },
+    "board_ask_links": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "message_id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "root",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "root",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_board_ask_links_root",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
+        }
+      ]
     },
     "board_ask_reopened": {
       "columns": [
