@@ -17,7 +17,7 @@ const IR = await importOnce('./inbox_read.js'); // which chats and boards the pe
 const readKey = s => `${s.server}:${s.session_id}`, readKind = s => (isGroup(s) ? 'board' : 'chat');
 /** Whether a chat is unread (#11873): changed since the read marker began AND something Coral launched (an agent's chat, a row with an agent name) or a board's history. A transcript Coral did not launch (another Claude on the same computer) is in the list and the totals, never unread: it is not something waiting for the person. */
 const chatUnread = s => (isGroup(s) || !!s.agent_name) && IR.isUnread(readKind(s), readKey(s), stampOf(s));
-const { historyFetch } = await importOnce('./history_source.js');
+const { historyFetch, setHistorySource } = await importOnce('./history_source.js');
 const { historyLabel, hitWithoutTitle } = await importOnce('./history_label.js');
 const CI = await importOnce('./chat_import.js'); // the earlier chats of this computer, listed once the person imports them (#11970)
 const SA = await importOnce('./mailbox_starred_artifacts.js'); // the Starred folder's second part: starred artifacts (#10258)
@@ -109,6 +109,13 @@ async function loadUnread() {
 const foldersOf = s => [isGroup(s) ? 'chats-group' : 'chats', ...(s.starred ? ['chats-starred'] : []), ...(s.active && !isGroup(s) ? ['chats-active'] : []), ...(s.archived && !isGroup(s) ? ['chats-archived'] : []),
     ...(isGroup(s) ? [] : CLIS.filter(([t]) => (t === 'agy' ? ['agy', 'antigravity', 'gemini'] : [t]).includes(s.source_type)).map(([t]) => `chats-cli-${t}`))];
 const bump = (keys, by) => { if (unread) for (const k of keys) unread[k] = Math.max(0, (unread[k] || 0) + by); };
+/** A chat opened from the list, on its computer; a job run with no conversation yet opens to a page that says why (#17447): its agent has not written a line (Starting) or never started (Did not start). */
+export async function openHistory(c) {
+    if (!setHistorySource(c.server || 'local')) return;
+    if (await window.selectHistorySession?.(c.session_id, null, c) !== false || !c.run_state) return;
+    (await importOnce('./history_note.js')).noChat(() => openHistory(c));
+}
+
 /** A chat was opened from the Inbox: marked read, and the numbers of the folders it is in go down by one, in memory, with no request (#9703). */
 export function chatOpened(s) {
     if (chatUnread(s)) bump(foldersOf(s), -1);
@@ -278,7 +285,7 @@ function chatFolderSpec(key, ctx) {
             oneLine: true, resize: true, sortBar: false, // one line per chat, never folded (#8961, the shared one-row table of #8931): Server, then Agent drop as the box narrows; the role and the first message are in the chat that opens
             columns: [
                 { key: 'title', label: key === 'chats-group' ? 'Board' : 'Title', primary: true, width: 'grow', cell: s => { const group = isGroup(s), n = group ? (name(s) || 'Board') : historyLabel(s), who = group ? '' : agentLabel(s); const b = DT.primaryButton(n, group ? `Open the chat of the board ${n}` : `Open the chat ${n}${who ? ` of ${who}` : ''}`); b.dataset.sessionId = s.session_id; b.classList.add('dt-chat-name'); b.title = [n, who, multipleServers() ? serverLabel(serverOf(s)) : ''].filter(Boolean).join(' · '); /* what the row no longer draws is on the hover: the agent and, with several computers, which one (#9730) */ // the Server column goes first on a narrow row (#8961): the computer stays on the hover
-                    const marks = []; /* one chip a row at most (Goal #79, #9730): the first of Active now, Archived (an archived board stays in Board history, marked), Board; a folder that already says it (Archived, Board history) leaves its own word off */ const word = s.active ? 'Active now' : (s.archived && key !== 'chats-archived') ? 'Archived' : (group && key !== 'chats-group') ? 'Board' : ''; if (word) marks.push(DT.tag(word)); if (word && word !== 'Board') b.setAttribute('aria-label', `${b.getAttribute('aria-label')}, ${word.toLowerCase()}`); /* the chip beside the button is its state: the name ends with it, as the phone row's does (#9747; a board's own name already says Board) */
+                    const marks = []; /* one chip a row at most (Goal #79, #9730): the first of Active now, Archived (an archived board stays in Board history, marked), Board; a folder that already says it (Archived, Board history) leaves its own word off */ const word = s.run_state || (s.active ? 'Active now' : (s.archived && key !== 'chats-archived') ? 'Archived' : (group && key !== 'chats-group') ? 'Board' : ''); if (word) marks.push(DT.tag(word)); if (word && word !== 'Board') b.setAttribute('aria-label', `${b.getAttribute('aria-label')}, ${word.toLowerCase()}`); /* the chip beside the button is its state: the name ends with it, as the phone row's does (#9747; a board's own name already says Board) */
                     const shownHit = group ? '' : hitWithoutTitle(s); const hit = shownHit ? DT.el('span', 'dt-title-snippet') : null; if (hit) { hit.textContent = shownHit; DT.tipIf(hit, shownHit, () => hit.scrollWidth > hit.clientWidth); } /* a search's hit: one line of the chat around the matched words (#10137) */
                     if (!marks.length && !hit) return b; const w = DT.el('span', 'dt-title-cell'); w.append(b, ...marks, ...(hit ? [hit] : [])); return w; } },
                 ...(key === 'chats-group' ? [] : [{ key: 'agent', label: 'Agent', width: '12rem', dropAt: 36, cell: s => agentLabel(s) }]),
@@ -286,7 +293,7 @@ function chatFolderSpec(key, ctx) {
                 { key: 'when', label: 'When', tone: 'tertiary', align: 'end', width: '10rem', cell: s => DT.timeCell(stampOf(s)) },
                 ...serverColumns().map(c => ({ ...c, line: undefined, sort: false, width: '7rem', dropAt: 52 })),
                 { key: 'flags', label: 'Star, archive and continue', hideLabel: true, width: '8.5rem', dropAt: 36, /* the three icon buttons (star, archive, continue) are about 100 px and the cell has its padding: at 6.5 rem the third was cut by the cell's edge (#10523; at 5 rem the second was, #9458) */ cell: s => {
-                    if (isCloud() || (s.server && s.server !== 'local') || s.openAgent) return ''; // a row with no chat has nothing to star or archive here
+                    if (isCloud() || (s.server && s.server !== 'local') || s.openAgent || s.run_state) return ''; // a row with no chat has nothing to star or archive here
                     const w = DT.el('span', 'dt-chat-flags');
                     // icon buttons that show on the row's hover or focus (the star stays drawn when set); a phone has them in the opened chat
                     const flag = (key, on, icon, label, pressed) => { const b = DT.el('button', `dt-flag${key === 'starred' && on ? ' dt-flag-on' : ''}`); b.type = 'button'; b.title = label; b.dataset.sid = s.session_id; b.dataset.flag = key; b.setAttribute('aria-label', `${label}: ${name(s) || historyLabel(s)}`); if (pressed) b.setAttribute('aria-pressed', String(!!on)); const i = DT.el('span', 'material-icons', icon); i.setAttribute('aria-hidden', 'true'); b.append(i); b.addEventListener('click', (e) => { e.stopPropagation(); const who = name(s) || historyLabel(s); setFlag(s, key, !on, ctx.after, key === 'starred' ? (on ? `Star removed: ${who}` : `Starred: ${who}`) : (on ? `Unarchived: ${who}` : `Archived: ${who}`)); }); return b; };
