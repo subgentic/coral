@@ -1652,6 +1652,7 @@ let _autoFrom = ''; // the folder that was open before Needs you was opened for 
 function mountInbox() {
     if (_mounted) return;
     _mounted = true;
+    window.addEventListener('kill', () => CH.chatsStopped(() => { renderInboxNav(true); if (group === 'chats-active') refreshGroupTable('hub-inbox'); }));
     new MutationObserver(() => { if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') { _wasShown = false; needsOrder = null; needsState.shown = null; if (needsFilters.kind) { needsFilters = { ...needsFilters, kind: '' }; persistNeedsFilters(); } } }).observe(document.body, { attributes: true, attributeFilter: ['data-nav-tab'] });
     $('inbox-view').addEventListener('click', () => quietFocus($('inbox-view')), true);
     if (nativeInbox()) $('inbox-search')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (e.repeat) return; /* a held Enter is one search */ filterInbox(e.target.value); } }); // a chat search runs when it is asked for, not on each key (coral-hub's rate condition)

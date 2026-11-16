@@ -5,7 +5,6 @@ import { openTask } from './task_navigation.js';
  * and Agents, Knowledge and Settings are today's panels of the right dock moved in, until their own builds (stage 3 of #7453). Lazy: loaded by openTeamPage (lazy_panels.js). */
 import { state } from './state.js';
 import { showSidebarPane } from './sidebar.js';
-import { needsYou } from './asked_before_restart.js';
 import { keyLabel, splitKey, boardFetch, teamFetch, isCloud, teamWorkDir, inTeam, hasBoardLabel } from './server_base.js';
 const { wakingSince, stopWaking } = await importOnce('./team_waking.js'); // lazy like this file (the Wake action loads it too)
 import { showView } from './utils.js';
@@ -224,16 +223,14 @@ function drawStatus(data) {
     syncStop();
     S.statusData = data;
     const live = (state.liveSessions || []).filter(row => inTeam(row, S.team));
-    const n = live.filter(needsYou).length + (data?.agents || []).filter(a => a.availability === 'offline' && a.open_tasks).length; // an ended agent that holds a task is not "All well" (#15293)
+    const attention = S.attention;
+    const n = attention?.value || 0;
     if (live.length && (!data || !data.agents?.length)) data = { agents: live.map(row => ({ availability: row.sleeping ? 'sleeping' : 'unknown' })) };
     if (!data || !Array.isArray(data.agents)) { s.textContent = 'Status unavailable'; s.className = 'team-page-status unknown'; const health = $('team-page-health'); if (health) health.hidden = true; return; } // kept in the page and empty: a live region that is shown and filled in one turn is not announced
     // a team with no agent has nothing to be well: a name no board has (a mistyped /team/<name>) said All well in green (#8839 c); say nothing
-    if (!data.agents.length) { s.textContent = ''; s.className = 'team-page-status'; const hb = $('team-page-health'); if (hb) hb.hidden = true; return; }
-    const owed = Math.max(0, data.agents.filter(agent => ['needs_input', 'waiting'].includes(agent.availability) && !live.some(row => row.session_id === agent.session_id && row.wait_removed)).length - n); // agents the board says wait, that no live row here agrees with
-    if (!owed) S.disagreeSince = 0; else if (!S.disagreeSince) S.disagreeSince = Date.now();
-    const settled = owed > 0 && Date.now() - S.disagreeSince > (Number(globalThis.__coralAttentionGraceMs) >= 0 ? Number(globalThis.__coralAttentionGraceMs) : 30000); // #15151: 'Checking attention status' is for a moment (the rows catch up); when the two still disagree after 30 s the board's word counts, it never stays
-    const uncertainAttention = owed > 0 && !settled;
-    const shown = n + (settled ? owed : 0);
+    if (!data.agents.length && !n) { s.textContent = ''; s.className = 'team-page-status'; const hb = $('team-page-health'); if (hb) hb.hidden = true; return; }
+    const uncertainAttention = !attention?.complete || attention.ownerOnly;
+    const shown = n; // the exact source used by the team's Needs you tab (#17625)
     const waking = wakingSince(S.team) > 0;
     // no signal yet, or (right after Wake, while the read still says so) still asleep: nothing says they are well (#10006), and a just-woken team is counted as it reports (#10052, #10359)
     const notYet = a => a.availability === 'unknown' || (waking && a.availability === 'sleeping');
@@ -295,7 +292,7 @@ async function readCounts() {
     S.counts.needs ??= '…';
     importOnce('./inbox_sidebar.js').then(m => m.refreshTeamNeedsCount(team)).then(count => {
         if (seq !== S.countSeq || team !== S.team) return;
-        S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts();
+        S.attention = count; S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts(); drawStatus(S.statusData);
     }).catch(() => { if (seq === S.countSeq && team === S.team) { S.counts.needs = '…'; drawCounts(); } });
     const knowledge = S.knowledgeFor === team ? null : (S.knowledgeFor = team, teamFetch(team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge`).then(async r => { const data = await r.json(); return r.ok ? data : null; }).catch(() => null)); // the Knowledge tab's count once per team, with the others (the notes are read again when the tab opens)
     importOnce('./team_pause.js').then(m => m.readTeamPause(team)); // the pause is read on every poll, so a pause made elsewhere (another tab, a restart) shows here too
@@ -325,7 +322,7 @@ window.addEventListener('kill', () => { if (currentTeamPage()) readCounts(); });
 function syncNeedsCount() {
     if (!S.team || !currentTeamPage()) return;
     const team = S.team;
-    importOnce('./inbox_sidebar.js').then(m => { if (S.team !== team) return; const count = m.teamNeedsCount(team); S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts(); });
+    importOnce('./inbox_sidebar.js').then(m => { if (S.team !== team) return; const count = m.teamNeedsCount(team); S.attention = count; S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts(); drawStatus(S.statusData); });
 }
 document.addEventListener('coral:needs-updated', () => { if (S.team && currentTeamPage()) drawStatus(S.statusData); syncNeedsCount(); });
 document.addEventListener('coral:team-needs-count', e => { if (e.detail?.team === S.team) syncNeedsCount(); });
@@ -560,7 +557,7 @@ export async function openTeamPage(team, opts = {}) {
     showSidebarPane('agents'); // a team uses the agent list, never the pane of the page it was opened from (#17510)
     for (const b of document.querySelectorAll('.top-nav-tab')) { b.classList.remove('active'); b.removeAttribute('aria-current'); } // a team page is no page of the top bar: the Inbox's mark from the page before goes (#15449); the next tab chosen marks its own
     buildOnce();
-    if (changed) { // another team: the tables of the last one go, the moved-in panels and the board's column are drawn again for this one
+    if (changed) { S.attention = null; // another team: the tables of the last one go, the moved-in panels and the board's column are drawn again for this one
         for (const t of ['goals', 'tasks', 'artifacts', 'agents', 'knowledge']) { const p = panel(t); p.removeAttribute('data-built'); p.replaceChildren(); }
         drawCounts(); drawStatus(null);
         $('team-pause-bar')?.toggleAttribute('hidden', true); // the last team's pause line

@@ -67,7 +67,7 @@ export async function loadGoals() {
         if (project !== model.project) return;
         const sig = JSON.stringify([list.goals, list.requireGoal, list.noGoalOpen]);
         same = !model.failed && !!model.goals.length && sig === model.sig; // nothing changed: the page is left as it is (a redraw would take the keyboard's place)
-        if (layout === 'page') hooks.onCount?.(list.goals.filter(x => x.state === 'active' || x.state === 'done').length, list.goals.filter(x => W.isOpenGoal(x)).length); // the tab's number is what the default list shows: the active goals and the finished ones under them (#15305)
+        if (layout === 'page') hooks.onCount?.(list.goals.filter(x => x.state === 'active').length, list.goals.filter(x => W.isOpenGoal(x)).length); // the tab's number matches the default Active filter (#17625)
         model.sig = sig; model.goals = list.goals; model.requireGoal = list.requireGoal; model.noGoalOpen = list.noGoalOpen; model.failed = ''; model.asOf = clock();
         if (model.wantOpen) { const want = model.wantOpen; model.wantOpen = 0; if (model.goals.some(g => g.id === want)) { model.openId = want; same = false; focusOpened = true; } else hooks.onMissing?.(want); }
         if (model.openId && !model.goals.some(g => g.id === model.openId)) { model.openId = 0; same = false; }
@@ -82,8 +82,8 @@ export async function loadGoals() {
 }
 
 const goalById = (id) => model.goals.find(g => g.id === id);
-/** The default view (Active) keeps the goals that finished under the active ones, as their own group, so a finished goal does not vanish when the next one starts (#15305). */
-const doneBelow = () => model.filter !== DEFAULT_FILTER ? [] : model.goals.filter(g => g.state === 'done' && (!model.goalSearch.trim() || String(g.title || '').toLowerCase().includes(model.goalSearch.trim().toLowerCase())));
+/** Finished goals remain available through Done and All. */
+const doneBelow = () => []; // Active means active only (#17625); finished goals are in Done or All.
 const visible = () => model.goals.filter(g => W.keepsGoal(model.filter, g) && (!model.goalSearch.trim() || String(g.title || '').toLowerCase().includes(model.goalSearch.trim().toLowerCase())));
 
 // ── drawing ──────────────────────────────────────────────────────────────
