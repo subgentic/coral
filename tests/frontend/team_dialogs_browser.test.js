@@ -39,10 +39,10 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step');
         };
 
-        console.log('The team form starts with the default team (#9877: the Orchestrator, the Lead Developer, the QA Engineer), a hint for the name, and moves its agents');
+        console.log('The team form starts with the default team (#9877: the Orchestrator, the Lead, the Reviewer), a hint for the name, and moves its agents');
         await openTeam();
         await waitFor(`document.querySelectorAll('#team-template-select option').length > 1`, 'the template choice');
-        assert.deepEqual((await teamRows()).map(r => (Array.isArray(r) ? r[0] : r.role || r)), ['Orchestrator', 'Lead Developer', 'QA Engineer'], 'the default team, in Members on open (#9877)');
+        assert.deepEqual((await teamRows()).map(r => (Array.isArray(r) ? r[0] : r.role || r)), ['Orchestrator', 'Lead', 'Reviewer'], 'the default team, in Members on open (#9877)');
         // a blank team has none: the empty state says what to do
         await ev(`(() => { const s = document.getElementById('team-template-select'); s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
         await waitFor(`document.querySelectorAll('#team-agents-list > *').length === 0`, 'a blank team clears the members', 4000);
