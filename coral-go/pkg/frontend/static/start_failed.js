@@ -1,5 +1,5 @@
 /* An agent whose start was refused because its CLI is missing or can't be run (#353): the server records why in start_failure (a fixed code) apart from the sleep reason, and sends the one fixed
-   sentence for that code in start_failure_text ("failed to start: the Codex CLI was not found. Set Settings > CLI paths > Codex to its codex.exe."). The page picks nothing itself: it writes that
+   sentence for that code in start_failure_text ("failed to start: the Codex CLI was not found. Set Settings > Providers > Codex to its codex.exe."). The page picks nothing itself: it writes that
    sentence as text (textContent, never markup), after the agent's own name, so the server and the page cannot say different things. */
 
 const REASONS = new Set(['cli_missing', 'cli_untrusted_mount', 'cli_path_unusable', 'hermes_gateway_refused', 'hermes_setup_failed']);

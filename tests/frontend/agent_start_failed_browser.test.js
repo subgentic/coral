@@ -6,9 +6,9 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
 const WORDS = {
-    cli_missing: 'failed to start: the Codex CLI was not found. Set Settings > CLI paths > Codex to its codex.exe.',
-    cli_untrusted_mount: 'failed to start: Windows will not open the folder the Codex CLI is in. Set Settings > CLI paths > Codex to its codex.exe.',
-    cli_path_unusable: 'failed to start: the Codex CLI path in Settings > CLI paths can\'t be run. Set Settings > CLI paths > Codex to its codex.exe. Or clear it.',
+    cli_missing: 'failed to start: the Codex CLI was not found. Set Settings > Providers > Codex to its codex.exe.',
+    cli_untrusted_mount: 'failed to start: Windows will not open the folder the Codex CLI is in. Set Settings > Providers > Codex to its codex.exe.',
+    cli_path_unusable: 'failed to start: the Codex CLI path in Settings > Providers can\'t be run. Set Settings > Providers > Codex to its codex.exe. Or clear it.',
     hermes_setup_failed: 'failed to start: Hermes stopped during its first-use setup (it could not finish setting up its dependencies, often a network problem). Wake the agent to try again.', // #12213
     hermes_gateway_refused: "failed to start: Hermes could not start its gateway because another one held the host's lock. Wake the agent to try again.", // #12052: Hermes refused its own gateway start when two started together
 };

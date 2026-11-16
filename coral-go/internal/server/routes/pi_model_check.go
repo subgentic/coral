@@ -38,7 +38,7 @@ func (h *SystemHandler) PiModelProblem(ctx context.Context, model string) string
 			}
 		}
 	}
-	return "Pi has no model \"" + model + "\": the models it lists are in `pi --list-models` (Settings > Custom models adds one it does not list)"
+	return "Pi has no model \"" + model + "\": the models it lists are in `pi --list-models` (Settings > Providers > Custom models adds one it does not list)"
 }
 
 // SetPiModelCheck gives the sessions handler the check (it lives with the models service on the system handler).

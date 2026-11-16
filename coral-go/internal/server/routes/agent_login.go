@@ -175,7 +175,7 @@ var piExtraUsageRe = regexp.MustCompile(`(?i)third-?\s*party apps now draw from 
 const piLimitLines = 10
 
 // piExtraUsageNotice is what the person is told instead of Pi's raw JSON: why, and the three ways forward.
-const piExtraUsageNotice = "Pi can't use this Claude login: Anthropic bills third-party apps to extra usage, and none is added. Add some at claude.ai/settings/usage, use an Anthropic API key (ANTHROPIC_API_KEY, or /login in Pi), or pick another provider (--model provider/id, or Settings > Custom models)."
+const piExtraUsageNotice = "Pi can't use this Claude login: Anthropic bills third-party apps to extra usage, and none is added. Add some at claude.ai/settings/usage, use an Anthropic API key (ANTHROPIC_API_KEY, or /login in Pi), or pick another provider (--model provider/id, or Settings > Providers > Custom models)."
 
 // piLimitText is the notice for Pi's extra-usage refusal, or "": the exact error in the last lines of its terminal, never any text that merely mentions extra usage.
 func piLimitText(logInfo map[string]any) string {

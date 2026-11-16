@@ -13,7 +13,7 @@ The example output and timings in steps 4-5 are illustrative: they come from a t
 
 | Requirement | Notes |
 |---|---|
-| **tmux** | Not needed. Agents run in Coral's built-in terminal (pty) by default on every system. tmux is needed only if you choose it (Settings > Terminal, or `--backend tmux`) to keep agents running after Coral quits; the macOS app bundles tmux 3.7c, and elsewhere you install it first. See [Platform support](#platform-support). |
+| **tmux** | Not needed. Agents run in Coral's built-in terminal (pty) by default on every system. tmux is needed only if you choose it (Settings > Defaults, or `--backend tmux`) to keep agents running after Coral quits; the macOS app bundles tmux 3.7c, and elsewhere you install it first. See [Platform support](#platform-support). |
 | **git** | Worktree and branch features need a real repository. |
 | **An agent CLI** | At least one of `claude`, `codex`, `agy` (Antigravity), or `pi` — **installed and authenticated**. Coral drives these tools; it does not install, configure, or authenticate them. |
 
@@ -32,7 +32,7 @@ these official pages (and show the one-line command where the vendor has one).
 
 The Antigravity installer puts `agy` in `~/.local/bin`. Coral looks there itself, so it finds `agy`
 even when that folder is not on your `PATH`. To run `agy` in your own terminal, add
-`export PATH="$HOME/.local/bin:$PATH"` to `~/.zshrc` or `~/.bashrc` and open a new terminal. A custom executable can be set per agent type in **Settings > Agents > CLI paths** (a closed section; empty uses your `PATH`), which is the `cli_path_<type>`
+`export PATH="$HOME/.local/bin:$PATH"` to `~/.zshrc` or `~/.bashrc` and open a new terminal. A custom executable can be set per agent type in **Settings > Providers** (a closed section; empty uses your `PATH`), which is the `cli_path_<type>`
 setting. Coral launches only the agent CLIs listed above; adding another one needs a code change and a rebuild.
 
 > **If you ever ran `pip install agent-coral`, remove it first.**
@@ -187,7 +187,7 @@ Coral stops at startup and says so.
 Remote access on its own is **plain HTTP**: the API key, the login cookie and everything
 typed into agent terminals cross the network unencrypted, readable by anyone on it. The
 first-launch question, the startup log (`[startup] WARNING: remote access is on over plain
-HTTP …`) and **Settings > Network and Hub > Remote access** all say so. Pick one of:
+HTTP …`) and **Settings > Coral Hub and remote access > Remote access** all say so. Pick one of:
 
 - **Coral Hub** (recommended away from home): the server connects out to Coral Hub over
   TLS; nothing listens on the network. See [hub.md](hub.md#connecting-a-server-to-coral-hub).
@@ -229,7 +229,7 @@ terminal on the server. For a second instance, pass its `--home` and `--url` to
 `coral open` too.
 
 Coral Hub (app.coralhub.dev, invite-only beta) is optional. A fresh install stays local
-until you choose to connect from Home or **Settings > Network and Hub**, or run
+until you choose to connect from Home or **Settings > Coral Hub and remote access**, or run
 `coral cloud connect`. In the connect flow, approve the link/code and choose the
 hub's access (View, Interact or Launch). See [connecting to Coral Hub](hub.md#connecting-a-server-to-coral-hub).
 
@@ -346,7 +346,7 @@ by trusting the agent's summary.
 | `coral: command not found` after a DMG install | `install-cli.sh` was never run, or its link directory (`~/.local/bin` by default) is not on your `PATH`. |
 | `coral` starts something unfamiliar | The retired `agent-coral` pip package is shadowing it. Run `which -a coral`. |
 | Agents launch but never post to the board | Confirm the server's view with `/api/board/<project>/subscribers`. Agents are given `CORAL_URL` and `CORAL_DATA_DIR`; a custom wrapper that clears the environment can lose them. |
-| Agent launch fails with a tmux error | tmux was chosen (Settings > Terminal or `--backend tmux`) and is missing. The macOS app bundles it. Coral starts anyway and only fails at launch time; choose the built-in terminal (Settings > Terminal, or `--backend pty`) or install tmux. |
+| Agent launch fails with a tmux error | tmux was chosen (Settings > Defaults or `--backend tmux`) and is missing. The macOS app bundles it. Coral starts anyway and only fails at launch time; choose the built-in terminal (Settings > Defaults, or `--backend pty`) or install tmux. |
 
 ## Stop only what you started
 

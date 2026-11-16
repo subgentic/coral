@@ -46,7 +46,7 @@ func applyStartupSettings(ctx context.Context, db *store.DB, cfg *config.Config,
 		return len(names), known
 	})
 	cfg.TerminalBackend, cfg.TerminalBackendForced = opts.BackendType, backendForced
-	log.Printf("[STARTUP] terminal backend=%s (%s)", opts.BackendType, map[bool]string{true: "--backend", false: "Settings > Terminal backend, or the default"}[backendForced])
+	log.Printf("[STARTUP] terminal backend=%s (%s)", opts.BackendType, map[bool]string{true: "--backend", false: "Settings > Defaults, or the default"}[backendForced])
 	if keptForAgents {
 		log.Printf("[startup] Coral agents may still be running in Coral's tmux server, so this start keeps tmux to leave them reachable; the first start that finds none runs the built-in terminal")
 	}
@@ -98,7 +98,7 @@ func applyPrivacySettings(ctx context.Context, db *store.DB, cfg *config.Config,
 		}
 		settings[setreg.RemoteAccessEnabled] = value
 	} else if !configured && !forceRemote {
-		log.Printf("[startup] remote access is off: Coral didn't ask, as nobody is at a terminal to answer (it accepts connections from this computer only). To let other devices connect, turn it on in Settings > Network and Hub, or start Coral with --remote")
+		log.Printf("[startup] remote access is off: Coral didn't ask, as nobody is at a terminal to answer (it accepts connections from this computer only). To let other devices connect, turn it on in Settings > Coral Hub and remote access, or start Coral with --remote")
 	}
 	if !forceRemote && !setreg.Bool(settings, setreg.RemoteAccessEnabled) {
 		restrictToLoopback(cfg, "remote access is not enabled")
@@ -108,7 +108,7 @@ func applyPrivacySettings(ctx context.Context, db *store.DB, cfg *config.Config,
 	tracking.SetTelemetryEnabled(setreg.Bool(settings, setreg.TelemetryEnabled))
 }
 
-// applyHubModeSetting turns hub mode on when Settings > Run as a hub saved it
+// applyHubModeSetting turns hub mode on when Settings > Coral Hub and remote access > Run as a hub saved it
 // (hub_mode, #3460). --hub and CORAL_HUB=1 already did (and win); nothing here
 // turns it off. Unreadable settings leave it as the flags set it.
 func applyHubModeSetting(ctx context.Context, db *store.DB, cfg *config.Config) {
@@ -121,7 +121,7 @@ func applyHubModeSetting(ctx context.Context, db *store.DB, cfg *config.Config) 
 	}
 	if setreg.Bool(settings, routes.HubModeSetting) {
 		cfg.HubMode = true
-		log.Printf("[startup] hub mode is on (Settings > Run as a hub)")
+		log.Printf("[startup] hub mode is on (Settings > Coral Hub and remote access > Run as a hub)")
 	}
 }
 

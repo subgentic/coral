@@ -290,7 +290,7 @@ func storeReceivedPicture(w http.ResponseWriter, coralDir, session string, pic *
 		rec.UploadedBy, rec.Source = "owner", source
 	})
 	if errors.Is(err, errStoreFull) {
-		artifactRefusal(w, http.StatusRequestEntityTooLarge, "artifact_quota", "store", "the artifact store is full: delete old artifacts or raise the limit (Settings > Storage and cleanup)")
+		artifactRefusal(w, http.StatusRequestEntityTooLarge, "artifact_quota", "store", "the artifact store is full: delete old artifacts or raise the limit (Settings > Storage and backup)")
 		return nil, false
 	}
 	if err != nil {

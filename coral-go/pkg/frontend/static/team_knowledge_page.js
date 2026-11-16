@@ -6,6 +6,7 @@
 import { importOnce } from './import_once.js';
 import { teamFetch } from './server_base.js';
 import { refusedTooLarge } from './utils.js';
+import { loadStyles } from './lazy_styles.js';
 import { whenText } from './when_text.js';
 import { refreshDistill, startDistill, distillJob } from './knowledge_distill.js';
 const { splitFrontMatter, entryForLink } = await importOnce('./knowledge_text.js'); // the entry's front matter and its links (pure)
@@ -23,17 +24,23 @@ let root = null, hooks = {};
 const say = (t) => { const s = root && root.querySelector('.team-knowledge-status'); if (s) { s.textContent = ''; s.textContent = t; } };
 const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
-/** The table's entries: the team's index first, then each agent's notes by name. */
+/** The table's entries: the team's index first, then each agent's notes by name, and the notes a person wrote by hand (their title as the name, "Added by hand"). `file` is the file's own name, what a save is addressed to. */
 function entriesOf(data) {
     if (!data || !data.exists) return [];
     const out = [];
-    if (data.index) out.push({ key: 'index', name: 'Index', text: data.index, from: 'The whole team' });
-    for (const a of [...(data.agents || [])].sort((x, y) => String(x.name).localeCompare(String(y.name)))) out.push({ key: `agent:${a.name}`, name: a.name, text: a.content || '', from: `${a.name}'s sessions` });
+    if (data.index) out.push({ key: 'index', name: 'Index', file: 'index', text: data.index, from: 'The whole team' });
+    for (const a of [...(data.agents || [])].sort((x, y) => String(x.name).localeCompare(String(y.name)))) {
+        const text = a.content || '', note = /^note-.*[^_]$/.test(String(a.name)); // a note's file never ends in '_', an agent named note-... does (#17974)
+        const title = note ? (splitFrontMatter(text).facts || {}).title : '';
+        out.push({ key: `agent:${a.name}`, name: title || a.name, file: a.name, text, from: note ? 'Added by hand' : `${a.name}'s sessions` });
+    }
     return out;
 }
 
 async function load() {
     const team = model.team; if (!team) return;
+    await loadStyles('knowledge_note.css'); // the two actions' margins and the note form, not at start (page_weight)
+    if (team !== model.team) return;
     if (!model.data) { model.loading = true; draw(); }
     let refused = false;
     const data = await teamFetch(team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge`)
@@ -119,11 +126,11 @@ function openEntry(entry, opener, { focus = true } = {}) {
         save.addEventListener('click', async () => {
             save.disabled = true; cancel.disabled = true; say('Saving…');
             try {
-                const r = await teamFetch(model.team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge/${encodeURIComponent(entry.name)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: box.value }) });
+                const r = await teamFetch(model.team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge/${encodeURIComponent(entry.file || entry.name)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: box.value }) });
                 const b = await r.json().catch(() => ({}));
                 if (!r.ok || !b.ok) { say(`Could not save: ${(b && b.error) || `HTTP ${r.status}`}`); save.disabled = false; cancel.disabled = false; return; }
                 entry.text = box.value;
-                const a = model.data && model.data.agents.find(x => x.name === entry.name); if (a) a.content = box.value;
+                const a = model.data && model.data.agents.find(x => x.name === (entry.file || entry.name)); if (a) a.content = box.value;
                 toView(); say(b.redacted ? 'Saved. A secret in the text was replaced before it was saved.' : 'Saved.');
                 load(); // Updated and the table are read again
             } catch (e) { say(`Could not save: ${e && e.message ? e.message : 'no answer'}`); save.disabled = false; cancel.disabled = false; }
@@ -147,6 +154,13 @@ function openEntry(entry, opener, { focus = true } = {}) {
     root?.querySelectorAll('tr[data-key]').forEach(r => { if (r.dataset.key === entry.key) r.setAttribute('aria-current', 'true'); else r.removeAttribute('aria-current'); });
 }
 
+async function addNote(opener) {
+    try {
+        const [{ openNoteForm }, pane] = await Promise.all([importOnce('./team_knowledge_note.js'), importOnce('./detail_pane.js')]); // the form loads when it is asked for
+        openNoteForm({ team: model.team, pane, opener, onSaved: async (name) => { await load(); const e = entriesOf(model.data).find(x => x.key === `agent:${name}`); if (e) openEntry(e, null); else pane.closeDetailPane(); say('Note saved.'); } });
+    } catch (e) { say(`Could not open the note form: ${e && e.message ? e.message : 'it did not load'}`); }
+}
+
 async function distill() {
     const team = model.team;
     try { await startDistill(team); say('Distilling the team’s knowledge…'); } catch (e) { say(`Could not start: ${e && e.message ? e.message : 'no answer'}`); }
@@ -167,7 +181,11 @@ function draw() {
     const d = btn('btn btn-small team-distill', running ? 'Distilling…' : 'Distill knowledge', distill); d.disabled = running;
     if (running) d.setAttribute('aria-label', 'Distill knowledge, running');
     // The one toolbar line (#7717): the search field and Distill knowledge at the right (no count line: the table is the count).
-    body.append(Toolbar.build({ id: 'team-knowledge-search', label: 'Search knowledge', placeholder: 'Search knowledge', value: model.search, onSearch: text => { model.search = text; draw(); }, action: d }));
+    const bar = Toolbar.build({ id: 'team-knowledge-search', label: 'Search knowledge', placeholder: 'Search knowledge', value: model.search, onSearch: text => { model.search = text; draw(); }, action: d });
+    const add = btn('btn btn-small team-add-note', 'Add note', () => addNote(add)); add.classList.add('team-tb-action'); d.before(add); // Add note first, Distill knowledge at the far right (#17485)
+    body.append(bar);
+    // What Distill does and costs, before it is pressed (#17485): it is the one button here that spends model usage and rewrites files.
+    if (!running) body.append(el('p', 'goals-note team-distill-hint', 'Distill knowledge reads every agent’s conversations and asks Claude to write their notes: two model calls per agent and one for the team, a few minutes, on your Claude plan. It rewrites each agent’s notes, edits included. Notes you add are kept.'));
     // A run in progress says how long it has gone and what it is doing; a failed one keeps its error here (#15272).
     const job = distillJob(model.team), pr = job.progress || {};
     if (running) {
@@ -178,7 +196,7 @@ function draw() {
     if (model.failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, model.failed), btn('btn btn-small', 'Retry', () => load())); body.append(f); }
     if (model.loading) body.append(el('p', 'goals-note', 'Loading knowledge…'));
     else if (model.refused) body.append(emptyLine('This team’s knowledge is too large to show through Coral Hub; open it on the computer.'));
-    else if (!entries.length) { if (!model.failed) body.append(everything.length ? emptyLine('No entries match this search.') : emptyLine('No knowledge yet.', 'Distill knowledge reads the team’s work and writes what each agent learned. Run it when a goal is done.')); }
+    else if (!entries.length) { if (!model.failed) body.append(everything.length ? emptyLine('No entries match this search.') : emptyLine('No knowledge yet.', 'Add note writes one by hand. Distill knowledge reads the team’s work and writes what each agent learned. Run it when a goal is done.')); }
     else {
         body.append(DT.dataTable({
             label: `Knowledge, ${entries.length}`, rows: entries, rowKey: e => e.key, current: detailKey(), state: knowledgeTableState,

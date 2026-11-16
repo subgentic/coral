@@ -154,7 +154,7 @@ func settingWithItsOwnRoute(body map[string]any) string {
 	// The terminal backend is written only by its own route, which needs a person (#3634).
 	for k := range body {
 		if isTerminalBackendKey(k) {
-			return "terminal_backend is set with Settings > Terminal backend (PUT /api/system/terminal-backend)"
+			return "terminal_backend is set with Settings > Defaults (PUT /api/system/terminal-backend)"
 		}
 	}
 	// The Hub-as-Operator opt-out has its own route, which logs every change (#3377, #3404).
@@ -165,7 +165,7 @@ func settingWithItsOwnRoute(body map[string]any) string {
 		// Sign in with Coral Hub's settings have their own routes (#3966, Security condition 4):
 		// only a local Operator may change them, and turning it off ends Hub sessions.
 		if hubSigninSettingKey(k) {
-			return k + " is set in Settings > Browser sign-in (PUT /api/auth/hub-signin or /api/auth/hub-origins)"
+			return k + " is set in Settings > Security and privacy > Browser sign-in (PUT /api/auth/hub-signin or /api/auth/hub-origins)"
 		}
 		// The Coral Hub link's trust settings have their own routes, which a Coral Hub sign-in
 		// can't reach (#3966 round 1): never through the generic PUT, for any caller.
@@ -280,7 +280,7 @@ func (h *SystemHandler) normalizeSettingValues(ctx context.Context, body map[str
 	return applySettingRules(body, settingRulesAfterRetention)
 }
 
-// checkCLIPaths: cli_path_<type> (Settings > CLI paths) is the program Coral runs for that agent type: only a known
+// checkCLIPaths: cli_path_<type> (Settings > Providers) is the program Coral runs for that agent type: only a known
 // type, and only an absolute path to an executable file with no shell metacharacters (#3364). A value that is
 // unchanged is not re-checked, so a CLI that was uninstalled since doesn't block saving other settings.
 func (h *SystemHandler) checkCLIPaths(ctx context.Context, body map[string]any) string {

@@ -57,12 +57,12 @@ func TestUntrustedMountDirFindsTheFolderWindowsWillNotOpen(t *testing.T) {
 
 func TestTheUntrustedMountErrorNamesTheFolderAndTheFix(t *testing.T) {
 	e := &CLIUntrustedMountError{AgentType: "codex", Binary: "codex", Dir: `C:\Users\x\AppData\Local\Programs\OpenAI\Codex\bin`}
-	for _, want := range []string{"codex CLI not found", `C:\Users\x\AppData\Local\Programs\OpenAI\Codex\bin`, "untrusted mount point", "Settings > CLI paths", CLIPathSettingKey("codex"), "does not follow the junctions"} {
+	for _, want := range []string{"codex CLI not found", `C:\Users\x\AppData\Local\Programs\OpenAI\Codex\bin`, "untrusted mount point", "Settings > Providers", CLIPathSettingKey("codex"), "does not follow the junctions"} {
 		if !strings.Contains(e.Error(), want) {
 			t.Errorf("%q is missing %q", e.Error(), want)
 		}
 	}
-	if strings.Contains(e.HubText(), "Users") || !strings.Contains(e.HubText(), "Settings > CLI paths") {
+	if strings.Contains(e.HubText(), "Users") || !strings.Contains(e.HubText(), "Settings > Providers") {
 		t.Errorf("through Coral Hub no folder of this computer is named, the fix is: %q", e.HubText())
 	}
 }

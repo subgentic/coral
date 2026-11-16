@@ -31,7 +31,7 @@ func TestLaunchRefusesAnUntrustedMountPathWithTheFix(t *testing.T) {
 	answer(rec)
 	assert.Equal(t, http.StatusUnprocessableEntity, rec.Code)
 	assert.Contains(t, rec.Body.String(), "cli_untrusted_mount")
-	assert.Contains(t, rec.Body.String(), "CLI paths") // the ">" is JSON-escaped
+	assert.Contains(t, rec.Body.String(), "Providers") // the ">" is JSON-escaped
 	assert.Contains(t, rec.Body.String(), "Codex")
 
 	// An ordinary missing CLI keeps the install answer.
@@ -54,7 +54,7 @@ func TestCLICheckShowsAnUntrustedMountBeforeALaunch(t *testing.T) {
 	note, _ := out["install_note"].(string)
 	assert.Contains(t, note, "untrusted mount point")
 	assert.Contains(t, note, `C:\Codex\bin`)
-	assert.Contains(t, note, "Settings > CLI paths")
+	assert.Contains(t, note, "Settings > Providers")
 
 	agent.UntrustedMountDir = func(string) (string, bool) { return "", false }
 	out = cliCheck(t, h, "type=codex")

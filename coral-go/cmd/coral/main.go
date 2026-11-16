@@ -99,18 +99,18 @@ func defineServerFlags() *serverFlags {
 	// Parse --home early so config.Load() can use it
 	sf.homeDir = flag.String("home", "", "Data directory (default: ~/.coral)")
 	sf.adoptDataDir = flag.Bool("adopt-data-dir", false, "Make this data folder's database its own (a new id in the database and the folder) and exit; for a restored or copied database that Coral treats as foreign. Wakes nothing; Coral must be stopped")
-	sf.host = flag.String("host", "", "Address to listen on, or a comma list of them (e.g. 127.0.0.1,100.101.102.103). Default: this computer only. A network address (or 0.0.0.0) is used only when remote access is on (Settings > Network and Hub, or --remote); otherwise Coral listens on 127.0.0.1")
+	sf.host = flag.String("host", "", "Address to listen on, or a comma list of them (e.g. 127.0.0.1,100.101.102.103). Default: this computer only. A network address (or 0.0.0.0) is used only when remote access is on (Settings > Coral Hub and remote access, or --remote); otherwise Coral listens on 127.0.0.1")
 	sf.noAutoLoopback = flag.Bool("no-auto-loopback", config.Truthy(os.Getenv("CORAL_NO_AUTO_LOOPBACK")), "When --host names only network addresses, don't also listen on 127.0.0.1 (also CORAL_NO_AUTO_LOOPBACK=1)")
 	sf.port = flag.Int("port", 0, "Port to bind to")
 	sf.noBrowser = flag.Bool("no-browser", false, "Don't open the browser on startup")
-	// "" = not given: Settings > Terminal backend, else the built-in terminal, pty (#3634, #6064).
-	sf.backendFlag = flag.String("backend", "", "Terminal backend: pty or tmux (default: Settings > Terminal backend, else pty: agents stop when you quit Coral)")
+	// "" = not given: Settings > Defaults, else the built-in terminal, pty (#3634, #6064).
+	sf.backendFlag = flag.String("backend", "", "Terminal backend: pty or tmux (default: Settings > Defaults, else pty: agents stop when you quit Coral)")
 	sf.remoteAccess = flag.Bool("remote", false, "Allow remote (non-loopback) connections without requiring the saved setting")
 	sf.hubMode = flag.Bool("hub", false, "Run as a multi-server hub: manage and view remote Coral servers (also CORAL_HUB=1)")
 	sf.cloudURL = flag.String("cloud-url", "", "Coral Hub origin this server may connect to (also CORAL_CLOUD_URL). Release builds default to https://app.coralhub.dev; \"\" or off disables it. Nothing is sent until you connect")
 	sf.agentPriority = flag.String("agent-priority", "", "Priority of agent processes: low (default, nice +10 / below normal so the server stays responsive) or normal. Also CORAL_AGENT_PRIORITY or the Settings choice")
 	sf.debugInput = flag.Bool("debug-input", false, "Record every write Coral makes to agent terminals in <data dir>/input-debug.log (debug; may contain secrets). Also CORAL_DEBUG_INPUT=1 or the Settings toggle")
-	sf.cloudMaxMode = flag.String("cloud-max-mode", "", "Most Coral Hub may do on this computer: view, interact or launch (also CORAL_CLOUD_MAX_MODE). Sets the same cap as Settings > Network and Hub, at startup, for a machine nobody sits at (a container); an invalid value stops Coral from starting. Unset leaves the saved setting (view by default). Only whoever starts Coral can set it: the hub and the API cannot")
+	sf.cloudMaxMode = flag.String("cloud-max-mode", "", "Most Coral Hub may do on this computer: view, interact or launch (also CORAL_CLOUD_MAX_MODE). Sets the same cap as Settings > Coral Hub and remote access, at startup, for a machine nobody sits at (a container); an invalid value stops Coral from starting. Unset leaves the saved setting (view by default). Only whoever starts Coral can set it: the hub and the API cannot")
 	sf.allowHubUpdate = flag.Bool("allow-hub-update", false, "Turn on the switch that lets Coral Hub relaunch this Coral to install updates (also CORAL_ALLOW_HUB_UPDATE=1), for a computer nobody sits at. Applied at every start; it only turns the switch on. Settings shows it as on (set at launch)")
 	sf.bootstrapFile = flag.String("bootstrap-file", "", "One-time Coral Hub credential file to enroll this server with at startup (owned by you, mode 0600, removed after reading). On Linux /run/coral/bootstrap.d/credential is read without the flag")
 	sf.proofFile = flag.String("proof-file", "", "Optional proof file to send with the bootstrap credential (at most 16 KiB of JSON from a provider helper)")
@@ -197,7 +197,7 @@ func answeredBeforeStart(sf *serverFlags) bool {
 func loadServerConfig(sf *serverFlags) (*config.Config, string) {
 	cfg := config.Load(*sf.homeDir)
 	// --hub or CORAL_HUB=1 (read by config.Load) force hub mode on; otherwise the saved
-	// Settings > Run as a hub decides, at startup (#3460).
+	// Settings > Coral Hub and remote access > Run as a hub decides, at startup (#3460).
 	cfg.HubMode = *sf.hubMode || cfg.HubMode
 	cfg.HubModeForced = cfg.HubMode
 	// --cloud-url wins over CORAL_CLOUD_URL and the tier default, and --cloud-url "" turns it off.
@@ -568,12 +568,12 @@ func promptRemoteAccess(in io.Reader, out io.Writer, tlsOn bool) bool {
 	if scanner.Scan() {
 		answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
 		if answer == "y" || answer == "yes" {
-			fmt.Fprintln(out, "  Remote access enabled. You can change this later in Settings > Network and Hub.")
+			fmt.Fprintln(out, "  Remote access enabled. You can change this later in Settings > Coral Hub and remote access.")
 			fmt.Fprintln(out)
 			return true
 		}
 	}
-	fmt.Fprintln(out, "  Remote access disabled. You can change this later in Settings > Network and Hub.")
+	fmt.Fprintln(out, "  Remote access disabled. You can change this later in Settings > Coral Hub and remote access.")
 	fmt.Fprintln(out)
 	return false
 }

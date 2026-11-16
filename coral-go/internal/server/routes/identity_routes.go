@@ -127,7 +127,7 @@ var operatorOnlyRoutes = map[string]string{
 	"PUT /api/system/database-security":   "change the database security setting",
 	"DELETE /api/system/debug-input-log":  "delete the terminal input debug log",
 	"PUT /api/system/hub-operator":        "change the Coral Hub Operator setting",
-	// #3460: Settings > Run as a hub, and restarting Coral (Security's review).
+	// #3460: Settings > Coral Hub and remote access > Run as a hub, and restarting Coral (Security's review).
 	"PUT /api/system/hub-mode": "change whether Coral runs as a hub",
 	"POST /api/system/restart": "restart Coral",
 	// #5280: relaunching into a staged update (Coral Hub's owner), and what is staged.
@@ -379,6 +379,7 @@ var operatorOnlyRoutes = map[string]string{
 	"PUT /api/board/{project}/working-mode/presets/{presetID}":        "change a working-mode preset",
 	"POST /api/board/{project}/working-mode/presets/{presetID}/reset": "reset a working-mode preset",
 	"PUT /api/teams/detail/{name}/knowledge/{agentName}":              "change a team's knowledge",
+	"POST /api/teams/detail/{name}/knowledge":                         "add a note to a team's knowledge",
 	"PUT /api/teams/detail/{name}/daily-knowledge":                    "switch a team's daily knowledge on or off",
 	"PUT /api/teams/detail/{name}/daily-knowledge/auto-apply":         "change whether a team's daily knowledge is applied by itself",
 	"POST /api/teams/detail/{name}/daily-knowledge/accept":            "accept a team's new knowledge",

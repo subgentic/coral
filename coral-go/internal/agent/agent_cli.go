@@ -142,16 +142,16 @@ type CLIPathError struct {
 }
 
 func (e *CLIPathError) Error() string {
-	return fmt.Sprintf("%s CLI path \"%s\" (the setting %s, in Settings > CLI paths) can't be run (%v): fix it or clear it to use the one on PATH; Coral does not run another program in its place", e.AgentType, e.Path, CLIPathSettingKey(e.AgentType), e.Err)
+	return fmt.Sprintf("%s CLI path \"%s\" (the setting %s, in Settings > Providers) can't be run (%v): fix it or clear it to use the one on PATH; Coral does not run another program in its place", e.AgentType, e.Path, CLIPathSettingKey(e.AgentType), e.Err)
 }
 
 func (e *CLIPathError) Unwrap() error { return e.Err }
 
 func (e *CLIPathError) HubText() string {
-	return fmt.Sprintf("the %s CLI path set in Settings > CLI paths (%s) can't be run; Coral does not run another program in its place: fix it or clear it to use the one on PATH", e.AgentType, CLIPathSettingKey(e.AgentType))
+	return fmt.Sprintf("the %s CLI path set in Settings > Providers (%s) can't be run; Coral does not run another program in its place: fix it or clear it to use the one on PATH", e.AgentType, CLIPathSettingKey(e.AgentType))
 }
 
-// CLINotFoundError is an agent CLI found nowhere: not set in Settings > CLI paths, not on PATH, not in the common install places (#5838). A launch answers it with a 422 and the fixed
+// CLINotFoundError is an agent CLI found nowhere: not set in Settings > Providers, not on PATH, not in the common install places (#5838). A launch answers it with a 422 and the fixed
 // code cli_not_found, so a client says what to do (install it, or point Settings at it) instead of showing a server fault. Error keeps the sentence "<binary> CLI not found" (the
 // launch failure's analytics category and the dashboard read it) and adds the setting.
 type CLINotFoundError struct {
@@ -183,7 +183,7 @@ func (e *CLINotFoundError) Error() string {
 		msg += fmt.Sprintf(" (the vendor's page: %s)", e.InstallURL)
 	}
 	msg += fmt.Sprintf(". After installing, run %s once in a terminal to sign in; on a computer with no screen, use the Hub's Terminal for that", e.Binary)
-	msg += fmt.Sprintf(". Already installed? Set its path in Settings > CLI paths (the setting %s).", CLIPathSettingKey(e.AgentType))
+	msg += fmt.Sprintf(". Already installed? Set its path in Settings > Providers (the setting %s).", CLIPathSettingKey(e.AgentType))
 	if e.Refused != "" {
 		msg += fmt.Sprintf(" Coral found %s and did not use it: it is %s.", tildePath(e.RefusedPath), e.Refused)
 	}
@@ -246,7 +246,7 @@ func FindCLIForLaunch(settings map[string]string, agentType string) (string, err
 	if p := CommonPlaceCLI(bin, nil); p != "" {
 		return p, nil
 	}
-	return "", fmt.Errorf("%s CLI %q not found: install it or set its path in Settings > CLI paths", agentType, bin)
+	return "", fmt.Errorf("%s CLI %q not found: install it or set its path in Settings > Providers", agentType, bin)
 }
 
 // LaunchCLI is the program a restart, resume, wake or background launch runs for agentType (#115). A configured cli_path_<type> must be

@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
-const NOTE = bin => `Found but not used: ~/.local/bin/${bin} is in an agent's working folder: the agent "Security Reviewer" works in ~. Archive that agent (an asleep one counts too) or restart it in a project folder, then check again, so a launch refuses it. Install it somewhere else, or set its path in Settings > CLI paths.`;
+const NOTE = bin => `Found but not used: ~/.local/bin/${bin} is in an agent's working folder: the agent "Security Reviewer" works in ~. Archive that agent (an asleep one counts too) or restart it in a project folder, then check again, so a launch refuses it. Install it somewhere else, or set its path in Settings > Providers.`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();

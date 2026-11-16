@@ -118,7 +118,7 @@ func TestAStartAfterAnOpenDataFolderReplacesTheAPIKey(t *testing.T) {
 	assert.Contains(t, notice, "the API keys of the other Corals stored here (build box): make a new key on each of those computers")
 	b, err := store.NewRemoteServerStore(srv.db, dir).Get(context.Background(), "b")
 	require.NoError(t, err)
-	require.NotNil(t, b.KeyRenewSince, "the stored server is marked: Settings > Servers keeps saying it")
+	require.NotNil(t, b.KeyRenewSince, "the stored server is marked: the Computers tab keeps saying it")
 	assert.NotContains(t, notice, "Coral Hub", "no link is stored")
 	assert.NotContains(t, notice, "password", "no password is set")
 	assert.NotContains(t, notice, ".db_key", "no database key")
@@ -147,7 +147,7 @@ func TestOpenFolderWordsNameOnlyWhatApplies(t *testing.T) {
 	assert.Contains(t, all, " needs a restart. Only you can replace the rest: ")
 	for _, want := range []string{
 		"the API keys of the other Corals stored here (a, b): make a new key on each of those computers and enter it here again",
-		"the Coral Hub link: unlink and link again in Settings > Network and Hub",
+		"the Coral Hub link: unlink and link again in Settings > Coral Hub and remote access",
 		"the password: set a new one",
 		"the database key (.db_key): it can't be changed without re-encrypting the databases",
 	} {

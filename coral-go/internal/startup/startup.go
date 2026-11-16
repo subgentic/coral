@@ -37,7 +37,7 @@ type Options struct {
 	Instance *Instance
 
 	// Restart, when set, restarts this process (the desktop apps' tray, #3460):
-	// Settings > Run as a hub offers a Restart button then. It returns once the
+	// Settings > Coral Hub and remote access > Run as a hub offers a Restart button then. It returns once the
 	// restart is under way; the server shuts down shortly after.
 	Restart func() error
 

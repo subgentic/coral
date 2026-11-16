@@ -3,6 +3,8 @@ import { plural } from './format.js';
  * drawn from the status each time it is shown. The switches and channel save on change; the card's buttons act at once: "Update and relaunch" opens the
  * confirmation (a dialog over this one), "Check now" asks the updater to look. A Homebrew or unsupported install says so and why, with the command to run. */
 import { importOnce } from './import_once.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('update_check.css');
 import { isSignedOut } from './overload.js';
 import { copyText, showToast } from './utils.js';
 import { isCloud } from './server_base.js';
@@ -15,6 +17,26 @@ const { failureNotice, getUpdateStatus, refreshUpdateStatus, relaunchOffered } =
 
 let hubOn = null; // the hub switch as the server has it (GET /api/cloud/status), null when unknown
 const body = () => document.getElementById('update-pane-body');
+
+function versionCheckRow(slot, s) {
+    const ver = mk('span', 'update-version-value', `Coral ${s.installed || 'unknown'}`);
+    slot.append(ver);
+    if (!serverHas.check || isCloud()) return;
+    const btn = mk('button', 'btn btn-small update-check-inline', 'Check now'); btn.type = 'button';
+    const result = mk('span', 'update-check-result'); result.id = 'update-check-result'; result.setAttribute('role', 'status');
+    btn.addEventListener('click', async () => {
+        btn.disabled = true; result.textContent = 'Checking…';
+        const answer = await requestCheckNow();
+        await refreshUpdateStatus();
+        const fresh = getUpdateStatus();
+        if (answer.ok) { result.textContent = ''; btn.disabled = false; showUpdatesPane(); return; }
+        else if (answer.busy) { result.textContent = checkingWords(fresh || {}).sub.replace(' It is not finished yet.', ''); }
+        else if (answer.tooSoon) { result.textContent = 'Checked a moment ago. Try again in a minute.'; }
+        else { result.textContent = 'Could not check for updates.'; result.dataset.error = '1'; }
+        btn.disabled = false;
+    });
+    slot.append(' ', btn, ' ', result);
+}
 
 function stamp(iso) {
     const t = Date.parse(iso);
@@ -42,7 +64,7 @@ function card(s) {
         title.textContent = notice.lead; sub.textContent = notice.rest.trim(); dot.dataset.k = 'bad'; c.dataset.k = 'bad';
         if (serverHas.check) act = mk('button', 'btn update-act', 'Retry'); // no server route to check now, no button
         if (act) act.type = 'button';
-        if (act) act.addEventListener('click', async () => { act.disabled = true; await requestCheckNow(); await refreshUpdateStatus(); showUpdatesPane(); });
+        if (act) act.addEventListener('click', async () => { act.disabled = true; const answer = await requestCheckNow(); await refreshUpdateStatus(); showUpdatesPane(); const say = checkAnswerToast(answer, getUpdateStatus()); if (say) showToast(say.text, say.error, undefined, { group: { key: 'update-check', text: () => say.text } }); });
     } else if (relaunchOffered(s)) {
         const days = s.staged.days, tier = ageTier(days);
         title.textContent = `Coral ${s.staged.version} is ready`;
@@ -178,7 +200,8 @@ export async function showUpdatesPane() {
     host.replaceChildren();
     if (!s || !s.enabled) { host.append(mk('p', 'update-calm', 'Updates are not available in this Coral.')); return; }
     const unmanaged = isManaged(s);
-    const fields = [{ key: 'card', type: 'notice', render: slot => slot.append(unmanaged ? managed(s) : card(s)) }];
+    const fields = [{ key: 'version_check', type: 'custom', id: 'update-version-check', label: 'Version', render: slot => versionCheckRow(slot, s) },
+        { key: 'card', type: 'notice', render: slot => slot.append(unmanaged ? managed(s) : card(s)) }];
     if (s.hasChannel) fields.push(...channelFields(s));
     // Through Coral Hub the switch is not the hub's to change (the machine's owner sets it on that computer), so it is not drawn there
     const reason = unmanaged ? (s.installKind === 'homebrew' ? 'Homebrew manages updates.' : 'This install cannot update itself.') : '';
@@ -213,7 +236,6 @@ export async function showUpdatesPane() {
     const fact = (key, label, value) => fields.push({ key, type: 'custom', label, render: slot => { slot.classList.add('update-fact'); slot.textContent = value; } });
     if (s.checkedAt) fact('checked', 'Last checked', stamp(s.checkedAt));
     if (s.checkedAt && foundText(s)) fact('found', 'What it found', foundText(s));
-    fact('version', 'Version', s.installed || 'unknown');
     if (s.last && s.last.result === 'relaunched' && /^hub:/.test(s.last.by) && stamp(s.last.at)) fact('last', 'Last update', `Relaunched from Coral Hub at ${stamp(s.last.at)}`); // the time, never the hub user's name
     fields.push({ key: 'privacy', type: 'notice', render: slot => slot.append(mk('p', 'update-calm update-privacy', 'Coral contacts GitHub only, to read the release list and download the package.')) });
     mountSettingsView(host, { mode: 'settings', saveBar: false, fields });

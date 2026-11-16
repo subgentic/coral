@@ -11,7 +11,7 @@ import (
 	"github.com/subgentic/coral/internal/tmux"
 )
 
-// Settings > Terminal backend (#3634): tmux keeps agents running across Coral restarts but
+// Settings > Defaults (#3634): tmux keeps agents running across Coral restarts but
 // shares a socket any agent can use against another; pty isolates agents but they end when
 // Coral restarts. One Coral runs one backend, chosen at startup (--backend wins), so a change
 // applies at the next start. Writing it, and ending agents left in Coral's private tmux server

@@ -344,7 +344,7 @@ func TestRedactQueryCredentialNames(t *testing.T) {
 	}
 }
 
-// A marked server says so in Settings > Servers (its warning), with the day and what to do, until a different key is entered; it joins the
+// A marked server says so in the Computers tab (its warning), with the day and what to do, until a different key is entered; it joins the
 // URL's own warning, and a server never marked has none of it.
 func TestAMarkedServerSaysSoUntilItHasADifferentKey(t *testing.T) {
 	since := "2026-10-30T07:40:00.000000"

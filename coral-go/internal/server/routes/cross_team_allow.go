@@ -41,7 +41,7 @@ func (h *BoardHandler) SetChiefBoard(fn func(ctx context.Context) string) { h.ch
 // SetChiefFronts tells the handler how to read the team the Operator named as the one Chief fronts (chief_fronts, #12411).
 func (h *BoardHandler) SetChiefFronts(fn func(ctx context.Context) string) { h.chiefFronts = fn }
 
-// frontedByChief reports whether the team (a board's id) is the one the Operator named in Settings > Chief, written as its id or as its name (its label, exact, as the dashboard shows it).
+// frontedByChief reports whether the team (a board's id) is the one the Operator named in Settings > Teams and Chief, written as its id or as its name (its label, exact, as the dashboard shows it).
 func (h *BoardHandler) frontedByChief(ctx context.Context, team string) bool {
 	if h.chiefFronts == nil || h.bs == nil {
 		return false

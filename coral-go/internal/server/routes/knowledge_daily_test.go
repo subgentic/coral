@@ -314,3 +314,28 @@ func TestOnlyTheOwnerReadsTheWaitingCandidateAndItsDiff(t *testing.T) {
 		}
 	}
 }
+
+// The Add note route: a title and text become a note, a taken title is a 409, a bad one a 400 (#17485).
+func TestAddingANoteThroughTheRoute(t *testing.T) {
+	r := newDailyRig(t)
+	rt := chi.NewRouter()
+	rt.Post("/api/teams/detail/{name}/knowledge", r.h.AddKnowledgeNote)
+	post := func(body string) (int, map[string]any) {
+		w := httptest.NewRecorder()
+		rt.ServeHTTP(w, httptest.NewRequest("POST", "/api/teams/detail/alpha/knowledge", strings.NewReader(body)))
+		var out map[string]any
+		_ = json.Unmarshal(w.Body.Bytes(), &out)
+		return w.Code, out
+	}
+	code, out := post(`{"title":"Release rules","text":"Tag on green."}`)
+	require.Equal(t, http.StatusCreated, code, out)
+	assert.Equal(t, "note-release-rules", out["name"])
+	b, err := os.ReadFile(filepath.Join(r.dir, "agent_knowledge", "alpha", "note-release-rules.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(b), "Tag on green.")
+	code, out = post(`{"title":"release rules","text":"again"}`)
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Contains(t, out["error"], "already exists")
+	code, _ = post(`{"title":"","text":"x"}`)
+	assert.Equal(t, http.StatusBadRequest, code)
+}

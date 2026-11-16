@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Custom models (#5480): a model id the operator adds for a provider in Settings > Custom models, with the thinking levels it takes, so that it shows in every model picker. The
+// Custom models (#5480): a model id the operator adds for a provider in Settings > Providers > Custom models, with the thinking levels it takes, so that it shows in every model picker. The
 // id reaches a CLI as the one argument of --model, so it passes ValidModelValue (a letter or digit first, at most 128 characters, no space or control character: never
 // flag-shaped) when it is saved and again when it is read, and the levels are only ones the provider's CLI is given (FamilyLevels).
 
