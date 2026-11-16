@@ -22,6 +22,7 @@ import { browserLocal } from './safe_storage.js';
 import { syncDisplayPanels } from './display_panel.js';
 import { setChecked, setHidden } from './dom_write.js';
 import { SVGO } from './svg_open.js';
+import { wasStopped } from './stopped_agents.js';
 const _mk0 = "<path d=\"M3 3h10M3 6.5h10M3 10h6\"/><path d=\"M11.5 11.5l2 2\"/></svg>\n                Edit instructions\n            </button>";
 const _mk1 = "<line x1=\"4\" y1=\"4\" x2=\"12\" y2=\"12\"/><line x1=\"12\" y1=\"4\" x2=\"4\" y2=\"12\"/></svg>\n                Remove Agent\n            </button>";
 
@@ -175,6 +176,7 @@ ${_archiveItem}            <button class="menu-item overflow-menu-item" data-on-
             <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="agent-kill" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o1}${_mk1}`;
     const _awakeMenu = `
+            ${wasStopped(s) ? `<button class="menu-item overflow-menu-item" data-on-click="agent-continue" data-session-id="${escapeAttr(sid)}" data-server="${escapeAttr(sessionServer(s))}" title="Send continue to resume this conversation">Continue</button>` : ''}
             <button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="sleep">
                 ${SVGO.o0}<path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
                 Sleep

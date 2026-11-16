@@ -13,6 +13,11 @@ import { sendRawKeys } from './controls.js';
 import { browserLocal } from './safe_storage.js';
 import { setTerminalKeysOpen } from './terminal_statusbar.js';
 import { cancelHeldForStop, hasHeldForStop, forgetSendGrace } from './held_sends.js';
+import { showToast } from './utils.js';
+import { markStopped, wasStopped } from './stopped_agents.js';
+import { redrawLiveList } from './list_hooks.js';
+import { sessionServer } from './server_base.js';
+import { importOnce } from './import_once.js';
 
 const $ = id => document.getElementById(id);
 const STOP_AGAIN_MS = 3000;
@@ -83,6 +88,7 @@ function stopNowWanted({ working, text, pictures, viewOnly }) {
 let stopNow = false;
 let escHeldUntil = 0;
 let stoppingTimer = 0;
+let pendingStop = null;
 const STOPPING_MAX_MS = 15000;
 /** Stop was pressed (any of its three ways): the button greys and says "Stopping…" at once, and goes back when the agent is not working (said aloud: "The agent stopped"), or after a while if it still is (said too). */
 function markStopping() {
@@ -100,6 +106,12 @@ function endStopping(words) {
     pane.removeAttribute('data-stopping');
     const b = $('mobile-send-btn'); if (b && b.classList.contains('is-stop')) setAttr(b, 'aria-label', 'Stop the agent');
     if (words) say(words);
+    if (words && words.startsWith('The agent stopped')) {
+        if (pendingStop?.sent) { markStopped(pendingStop.row, true); redrawLiveList(); }
+        showToast('Stopped. The agent keeps its task; send a message or Continue to resume').classList.add('expanded');
+    }
+    else if (words) showToast(words, true);
+    pendingStop = null;
 }
 /** A desktop's chat has its Stop in the toolbar (the ■): it turns red and says Stop while stopNow, and Escape in the empty box presses it. */
 function paintStopNow(want) {
@@ -116,6 +128,7 @@ function paintStop(want) {
     btn.classList.toggle('is-stop', want);
     if (want) btn.setAttribute('data-on-click', 'cmd-stop'); else btn.setAttribute('data-on-click', 'cmd-send'); // literal names: the action census reads them
     setAttr(btn, 'aria-label', want ? 'Stop the agent' : 'Send');
+    setAttr(btn, 'title', want ? 'Stop the agent' : 'Send');
     if (!want) { btn.removeAttribute('aria-disabled'); stopHeldUntil = 0; }
     else if (document.activeElement === $('command-input')) say('Stop is shown'); // said to a person typing in the composer, not on every turn the agent takes (the button's name carries it otherwise)
 }
@@ -140,6 +153,7 @@ export function syncAgentKeys(row) {
     const viewOnly = pane.classList.contains('hub-view-only');
     if (viewOnly) { open = false; openedBy = null; paintStrip(); }
     const key = deriveSessionState(r);
+    if (key === 'working' && wasStopped(r)) { markStopped(r, false); redrawLiveList(); }
     const q = questionKey(r);
     if (!viewOnly) {
         if (q && !open && closedFor !== q && readPref() !== 'off') openStrip('byQuestion', questionCardShown() ? '' : 'Keys for the question are shown'); // the card in the chat has said the question: not a third time (#10374)
@@ -149,11 +163,12 @@ export function syncAgentKeys(row) {
     const { text, pictures } = inputState();
     paintStop(stopWanted({ working: key === 'working', text, pictures, viewOnly, phone: isPhoneLayout() }));
     paintStopNow(stopNowWanted({ working: key === 'working', text, pictures, viewOnly }));
-    if (key !== 'working') { const note = stoppedNote; stoppedNote = ''; endStopping(note ? `The agent stopped. ${note}` : 'The agent stopped'); }
+    if (key !== 'working' && pendingStop?.sent && r.session_id === pendingStop.row.session_id && sessionServer(r) === sessionServer(pendingStop.row)) { const note = stoppedNote; stoppedNote = ''; endStopping(note ? `The agent stopped. ${note}` : 'The agent stopped'); }
 }
 
 /** Stop: the held messages of this device are dropped first (their text back in the box), then the agent gets its Escape; what happened is said once it is known. Returns false when the Escape was not sent. */
 async function stopAgent(silentFail) {
+    const request = pendingStop = { row: last, sent: false };
     markStopping();
     const sid = last && last.session_id;
     const back = sid && hasHeldForStop(sid) ? await cancelHeldForStop(sid) : 0;
@@ -161,11 +176,18 @@ async function stopAgent(silentFail) {
     if (sent === false) { endStopping(silentFail); return false; }
     forgetSendGrace(sid); // the Escape went: a message just sent is no longer in flight for the Working row (#11052)
     stoppedNote = back ? `${back === 1 ? 'The message' : `${back} messages`} that waited ${back === 1 ? 'was' : 'were'} not sent: back in the box.` : '';
+    if (pendingStop === request) pendingStop.sent = true;
+    syncAgentKeys();
     return true;
 }
 let stoppedNote = '';
 
 registerActions({
+    'agent-continue': async (el, event) => {
+        event.stopPropagation(); window.closeSidebarKebabs();
+        const { continueAgent } = await importOnce('./continue_agent.js');
+        await continueAgent(el);
+    },
     'agent-keys-toggle': () => {
         if (open) { writePref('off'); closeStrip(undefined, { forQuestion: true }); }
         else { writePref('on'); open = false; openStrip('byChip'); }
