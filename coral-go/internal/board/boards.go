@@ -330,7 +330,7 @@ func (s *Store) BoardMembers(ctx context.Context, id string) int {
 
 // boardKeyColumns are every column in messageboard.db that holds a board's key.
 var boardKeyColumns = [][2]string{
-	{"board_subscribers", "project"}, {"board_messages", "project"}, {"board_reminders", "project"},
+	{"board_subscribers", "project"}, {"board_messages", "project"}, {"board_reminders", "project"}, {"board_join_notices", "project"},
 	{"board_groups", "project"}, {"board_tasks", "board_id"}, {"task_dependencies", "blocked_by_board_id"},
 	{"board_settings", "project"}, {"hub_operator_actions", "project"}, {"board_waits", "project"},
 	{"board_working_modes", "board_id"}, {"board_workflow_presets", "board_id"}, {"board_goals", "board_id"}, {"board_goal_meta", "board_id"}, {"board_goal_events", "board_id"}, {"board_settings_log", "board_id"}, {"cross_team_switch_log", "project"},

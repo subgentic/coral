@@ -262,6 +262,7 @@ func (s *Store) deleteProject(ctx context.Context, project string, onlyIfUnused 
 		{"DELETE FROM board_messages WHERE project = ?", 1},
 		{"DELETE FROM board_subscribers WHERE project = ?", 1},
 		{"DELETE FROM board_reminders WHERE project = ?", 1},
+		{"DELETE FROM board_join_notices WHERE project = ?", 1},
 		{"DELETE FROM board_workflow_presets WHERE board_id = ?", 1},
 		{"DELETE FROM board_working_modes WHERE board_id = ?", 1},
 		{"DELETE FROM board_groups WHERE project = ?", 1},

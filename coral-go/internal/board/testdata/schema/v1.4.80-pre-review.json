@@ -343,6 +343,12 @@
       "type": "index"
     },
     {
+      "name": "sqlite_autoindex_board_join_notices_1",
+      "sql": null,
+      "tbl_name": "board_join_notices",
+      "type": "index"
+    },
+    {
       "name": "sqlite_autoindex_board_orch_grant_1",
       "sql": null,
       "tbl_name": "board_orch_grant",
@@ -598,6 +604,12 @@
       "name": "board_groups",
       "sql": "CREATE TABLE board_groups (\n\t\t\tid         INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tproject    TEXT NOT NULL,\n\t\t\tgroup_id   TEXT NOT NULL,\n\t\t\tsession_id TEXT NOT NULL, subscriber_id TEXT,\n\t\t\tUNIQUE(project, group_id, session_id)\n\t\t)",
       "tbl_name": "board_groups",
+      "type": "table"
+    },
+    {
+      "name": "board_join_notices",
+      "sql": "CREATE TABLE board_join_notices (\n\t\t\tproject TEXT NOT NULL,\n\t\t\tsubscriber_id TEXT NOT NULL,\n\t\t\tmessage_id INTEGER NOT NULL DEFAULT 0,\n\t\t\tcreated_at TEXT NOT NULL,\n\t\t\tPRIMARY KEY(project, subscriber_id)\n\t\t)",
+      "tbl_name": "board_join_notices",
       "type": "table"
     },
     {
@@ -3302,6 +3314,81 @@
           "origin": "u",
           "partial": 0,
           "seq": 1,
+          "unique": 1
+        }
+      ]
+    },
+    "board_join_notices": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "subscriber_id",
+          "notnull": 1,
+          "pk": 2,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "message_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "subscriber_id",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_board_join_notices_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
           "unique": 1
         }
       ]
