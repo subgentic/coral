@@ -89,11 +89,11 @@ function renderStarredFiles() {
     container.innerHTML = `<div class="group-head starred-section-label">★ Starred</div>` +
         starred.map(filepath => {
             const { dir, name } = splitPath(filepath);
-            const unstarLabel = `Unstar ${name}`, copyLabel = `Copy path of ${name}`, previewLabel = `Preview ${name}`, editLabel = `Edit ${name}`;
+            const unstarLabel = `Unstar ${name}`;
             const starBtn = `<button class="btn btn-quiet btn-icon btn-xs file-star-btn starred" data-filepath="${escapeAttr(filepath)}" data-on-click="file-star" data-path="${escapeAttr(filepath)}" title="Unstar" aria-label="${escapeAttr(unstarLabel)}">★</button>`; // each button names its file: a list of rows must not read as the same four buttons (#6152)
-            const copyBtn = iconButton('data-on-click="file-copy"', 'content_copy', 'Copy path', copyLabel, filepath);
-            const previewBtn = iconButton('data-on-click="file-preview"', 'visibility', 'Preview', previewLabel, filepath);
-            const editBtn = iconButton('data-on-click="file-edit"', 'edit', 'Edit', editLabel, filepath);
+            const copyBtn = iconButton('data-on-click="file-copy"', 'content_copy', 'Copy path', `Copy path of ${name}`, filepath);
+            const previewBtn = iconButton('data-on-click="file-preview"', 'visibility', 'Preview', `Preview ${name}`, filepath);
+            const editBtn = iconButton('data-on-click="file-edit"', 'edit', 'Edit', `Edit ${name}`, filepath);
             const shareBtn = downloadButton(filepath, name) + shareButton(filepath, name);
             return `<div class="file-item file-starred${escapeAttr(_actionsOpenFor === filepath ? ' actions-open' : '')}" data-on-click="file-open" role="button" tabindex="0" data-key-click data-path="${escapeAttr(filepath)}">
                 ${starBtn}
@@ -596,11 +596,11 @@ document.addEventListener('keydown', e => {
             : '';
         const rowName = splitPath(f.filepath).name;
         const rowTitle = plain ? f.filepath : `${f.filepath} (${statusLabel})`;
-        const starLabel = `${isStarred ? 'Unstar' : 'Star'} ${rowName}`, copyLabel = `Copy path of ${rowName}`, previewLabel = `Preview ${rowName}`, editLabel = `Edit ${rowName}`;
+        const starLabel = `${isStarred ? 'Unstar' : 'Star'} ${rowName}`;
         const starBtn = `<button class="btn btn-quiet btn-icon btn-xs file-star-btn ${escapeAttr(isStarred ? 'starred' : '')}" data-filepath="${escapeAttr(f.filepath)}" data-on-click="file-star" data-path="${escapeAttr(f.filepath)}" title="${escapeAttr(isStarred ? 'Unstar' : 'Star')}" aria-label="${escapeAttr(starLabel)}">${isStarred ? '★' : '☆'}</button>`;
-        const copyBtn = iconButton('data-on-click="file-copy"', 'content_copy', 'Copy path', copyLabel, f.filepath);
-        const previewBtn = iconButton('data-on-click="file-preview"', 'visibility', 'Preview', previewLabel, f.filepath, plain ? '' : 'data-diff="1"');
-        const editBtn = iconButton('data-on-click="file-edit"', 'edit', 'Edit', editLabel, f.filepath, plain ? '' : 'data-diff="1"');
+        const copyBtn = iconButton('data-on-click="file-copy"', 'content_copy', 'Copy path', `Copy path of ${rowName}`, f.filepath);
+        const previewBtn = iconButton('data-on-click="file-preview"', 'visibility', 'Preview', `Preview ${rowName}`, f.filepath, plain ? '' : 'data-diff="1"');
+        const editBtn = iconButton('data-on-click="file-edit"', 'edit', 'Edit', `Edit ${rowName}`, f.filepath, plain ? '' : 'data-diff="1"');
         const shareBtn = downloadButton(f.filepath, rowName) + shareButton(f.filepath, rowName);
         const open = !plain && _expandedFiles.has(f.filepath);
         const expandTitle = `${open ? 'Hide' : 'Show'} the changes`, expandLabel = `${expandTitle} in ${rowName}`;
