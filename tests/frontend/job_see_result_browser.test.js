@@ -32,13 +32,14 @@ const S = `(window.__coralStatic || '/static/')`;
         await Page.navigate({ url: BASE + '/automations/jobs' }); await Page.loadEventFired(); await install(); await require('./helpers/wait').coralReady(ev);
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'the two jobs', 10000);
         await ev(`[...document.querySelectorAll('#group-table-view tbody tr .dt-primary')].find(b => /weekday-summary/.test(b.textContent)).click(); true`);
-        await waitFor(`document.querySelectorAll('#scheduler-detail [data-on-click="job-run-session"]').length === 3`, 'See result on each run', 8000);
-        const WORDS = { 21: /this run finished, but its chat was not kept/, 22: /this run is still going and has no chat yet/, 23: /this run failed before it had a chat to show: The job's prompt was never typed/ };
+        await waitFor(`document.querySelectorAll('#scheduler-detail [data-on-click="job-run-session"]').length === 2`, 'See result on the two runs that ended', 8000);
+        assert.equal(await ev(`!!document.querySelector('#scheduler-detail [data-on-click="job-run-session"][data-session-id^="3f2a9c1e-2222"]')`), false, 'a run still going offers no See result');
+        const WORDS = { 21: /this run finished, but its chat was not kept/, 23: /this run failed before it had a chat to show: The job's prompt was never typed/ };
         for (const [id, want] of Object.entries(WORDS)) {
             await ev(`document.querySelectorAll('.toast-message').forEach(t => t.remove()); true`);
-            const sid = { 21: '3f2a9c1e-1111', 22: '3f2a9c1e-2222', 23: '3f2a9c1e-3333' }[id];
+            const sid = { 21: '3f2a9c1e-1111', 23: '3f2a9c1e-3333' }[id];
             await ev(`document.querySelector('#scheduler-detail [data-on-click="job-run-session"][data-session-id^="${sid}"]').click(); true`);
-            await waitFor(`/this run (finished|is still going|failed)/.test(document.body.textContent)`, `run ${id}: the toast says why`, 6000);
+            await waitFor(`/this run (finished|failed)/.test(document.body.textContent)`, `run ${id}: the toast says why`, 6000);
             await waitFor(`/weekday-summary/.test(document.querySelector('#scheduler-detail h2')?.textContent || '') && !document.getElementById('history-session-view')?.offsetParent`, `run ${id}: back on the job page, the chat page gone`, 6000);
             assert.match(await ev(`document.body.textContent`), want, `run ${id}: worded by its status`);
             assert.ok(!/If it is still running/.test(await ev(`document.body.textContent`)), `run ${id}: no 'if it is still running' for a run whose status is known`);
