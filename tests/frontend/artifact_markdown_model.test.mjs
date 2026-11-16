@@ -160,7 +160,7 @@ test('a single ~ is text in the model too: such blocks map exactly', () => {
     marked.use(noTilde); // markdown.js does this when the page loads (marked is a script there; here it is set after the static imports ran)
     for (const source of ['export P=~/bin:~/go/bin\n', 'A ~one~ and ~/x\n', 'mount -o ro ~/a:~/b\n']) {
         const model = analyze(source, marked);
-        assert.equal(model.blocks[0].reason, undefined, source + ': ' + model.blocks[0].reason);
+        assert.ok(!model.blocks[0].reason, source + ': ' + model.blocks[0].reason);
         const runs = mapped(source);
         assert.ok(runs.length && runs.every(r => r.text.includes('~') || r.text.length), source);
         assert.equal(runs.map(r => r.text).join('').replace(/\s/g, ''), source.replace(/\s/g, ''), source + ': every character is in a run, none dropped as strike');
