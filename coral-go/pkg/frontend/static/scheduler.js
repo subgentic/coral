@@ -186,7 +186,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
         ['Time limit', escapeHtml(limitWords(job.max_duration_s) || `${job.max_duration_s} seconds`)],
         !isWorkflow && job.no_worktree === 1 ? ['Works in', 'The folder itself, no worktree'] : null,
         !isWorkflow && job.no_worktree !== 1 ? ['Cleanup worktree', job.cleanup_worktree ? 'Yes' : 'No'] : null,
-        !isWorkflow && job.trust_worktree === 1 ? ['Trusts its runs\' folders', 'Yes: each run trusts the worktree it made'] : null,
+        !isWorkflow && job.trust_worktree === 1 ? ['Trusts worktrees', 'Yes'] : null,
         job.flags ? ['Flags', `<code>${escapeHtml(job.flags)}</code>`] : null,
     ].filter(Boolean);
 
@@ -285,7 +285,7 @@ function renderRunsTable(page) {
                 if (!r.session_id) return '';
                 if (r.status === 'running' || r.status === 'pending') return DT.el('span', 'sched-run-live', (state.liveSessions || []).some(x => x && x.session_id === r.session_id && x.waiting_for_input) ? 'Needs you' : 'Running…'); // an agent stopped at a question (the folder-trust screen) says so, not 'Running…' for ever (#17520); no result to see yet: a link would open a chat that has none (#16733, walk 32 F2)
                 // short, so the Result keeps its room at 390 (Started 9.5 rem, See result 6.5 rem); it is where a newcomer looks for what the run said (#10378)
-                const b = DT.link('See result'); b.setAttribute('aria-label', 'See what this run did: open its conversation'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = r.session_id; b.dataset.runStatus = String(r.status || ''); b.dataset.runError = String(r.error_msg || '').slice(0, 200); return b;
+                const b = DT.link('See result'); b.setAttribute('aria-label', 'See what this run did: open its conversation'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = r.session_id; return b;
             } }] : []),
         ],
     });
@@ -391,9 +391,6 @@ export function initScheduler() {
 
 // The scheduled jobs' markup (#3645): data-on-* names, never code.
 // Ids are checked (idOf, uuidOf) before use: a bad one does nothing. Deleting still asks first.
-/** Why a run has no chat to open, by its status (a run still going has no See result: #17520). */
-const noChatWords = (status, error) => status === 'failed' || status === 'killed' ? `this run ${status === 'killed' ? 'was stopped' : 'failed'} before it had a chat${error ? `: ${error.replace(/[.\s]+$/, '')}` : ''}.` : 'this run finished, but its chat was not kept.';
-
 registerActions({
     'job-new': () => importOnce('./job_form.js', 'the job form').then(m => m.showJobModal()).catch(() => {}), // the form loads when it is first opened (#10218)
     'job-edit': el => withId(el.dataset.jobId, id => importOnce('./job_form.js', 'the job form').then(m => m.editScheduledJob(id)).catch(() => {})),
@@ -410,7 +407,7 @@ registerActions({
         const opened = await window.selectHistorySession(sid);
         if (opened === false) { // the run has no saved chat to open (a run still going, or one whose chat was not kept): the chat page is already up and would say 'Loading chat…' for good (#16770, walk 32 F1), so go back to the job and say why
             window.switchNavTab?.('automations'); if (jobId) selectScheduledJob(jobId);
-            showToast(`${job ? `${job.name}: ` : ''}${noChatWords(el.dataset.runStatus, el.dataset.runError)}`, true); // worded by the run's own status: 'if it is still running' read wrong for a run that had ended (#16796)
+            importOnce('./job_run_note.js', 'a note').then(m => showToast(m.noChatNote(job, runsPage, sid), true)).catch(() => {});
             return;
         }
         const back = document.getElementById('history-back'); // the way back is the job it came from, not All chats (#10378)
