@@ -17,7 +17,7 @@ func (h *BoardHandler) SetMemberNameLookup(fn func(ctx context.Context, project 
 	h.memberNames = fn
 }
 
-// MemberDisplayNames maps a member's board id to the display name the dashboard gave their agent, for the members renamed: one whose name is another member's id or job title is left
+// MemberDisplayNames maps a member's board id to the display name the dashboard gave their agent, for the members renamed: one whose name is another member's id or job title, now or in the past, is left
 // out (it would name the wrong one), and so is one that is no change, the Operator's or a broadcast word (@all).
 func MemberDisplayNames(bs *board.Store, ss *store.SessionStore) func(ctx context.Context, project string) map[string]string {
 	return func(ctx context.Context, project string) map[string]string {
@@ -29,6 +29,11 @@ func MemberDisplayNames(bs *board.Store, ss *store.SessionStore) func(ctx contex
 		for _, s := range subs {
 			known[strings.ToLower(strings.TrimSpace(s.SubscriberID))] = true
 			known[strings.ToLower(strings.TrimSpace(s.JobTitle))] = true
+		}
+		if former, err := bs.FormerMemberNames(ctx, project); err == nil { // and the names of members who left: a mention meant for one must not reach whoever takes the name (#17720)
+			for _, n := range former {
+				known[strings.ToLower(strings.TrimSpace(n))] = true
+			}
 		}
 		out := map[string]string{}
 		for _, s := range subs {

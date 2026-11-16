@@ -126,3 +126,26 @@ func TestARenameToTheOperatorOrAllIsNotACurrentName(t *testing.T) {
 	require.NoError(t, ss.SetDisplayName(ctx, "11111111-0000-0000-0000-000000000000", "Bug Hunter"))
 	assert.Equal(t, map[string]string{"QA Engineer": "Bug Hunter"}, h.memberNames(ctx, "team"), "an ordinary new name still counts")
 }
+
+// A rename cannot take the id or job title of a member who has left: an @mention meant for them would reach the new holder (Security, #17421; #17720).
+func TestARenameToAFormerMembersNameIsNotACurrentName(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	ctx := context.Background()
+	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "s.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	ss := store.NewSessionStore(db)
+	_, err = h.bs.Subscribe(ctx, "team", "QA Engineer", "QA Engineer", "claude-11111111-0000-0000-0000-000000000000", nil, "all")
+	require.NoError(t, err)
+	_, err = h.bs.Subscribe(ctx, "team", "Old Dev", "Retired Title", "claude-33333333-0000-0000-0000-000000000000", nil, "all")
+	require.NoError(t, err)
+	_, err = h.bs.Unsubscribe(ctx, "team", "Old Dev")
+	require.NoError(t, err)
+	h.SetMemberNameLookup(MemberDisplayNames(h.bs, ss))
+	for _, name := range []string{"Old Dev", "old dev", "Retired Title"} {
+		require.NoError(t, ss.SetDisplayName(ctx, "11111111-0000-0000-0000-000000000000", name))
+		assert.Empty(t, h.memberNames(ctx, "team"), "%q belonged to a member who left", name)
+	}
+	require.NoError(t, ss.SetDisplayName(ctx, "11111111-0000-0000-0000-000000000000", "Bug Hunter"))
+	assert.Equal(t, map[string]string{"QA Engineer": "Bug Hunter"}, h.memberNames(ctx, "team"))
+}
