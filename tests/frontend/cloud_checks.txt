@@ -447,3 +447,4 @@ node settings_inbox_off_line.test.mjs
 node menu_dialog_motion_lint.test.mjs
 node signout_destination.test.mjs
 node signout_hub_destination.test.mjs
+node affected_suites.test.mjs
