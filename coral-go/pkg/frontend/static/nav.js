@@ -114,12 +114,12 @@ export function startNav() {
     if (started) return current;
     started = true;
     setServedAddress(location.pathname + location.search + location.hash); // what the person opened, for a sign-in that must bring them back to it (#12406)
-    let route = startRoute(), start = {};
+    const route = startRoute();
     const bare = /^\/?$/.test(location.pathname) && !location.search && !location.hash.slice(1);
     const kept = lastPlace();
     write(route, true);
     if (!bare) markStartTab(route);
-    if (kept && isHome(route)) lastPlace(kept); // the start itself is not the person choosing Home: a phone's Home start (or a link's) leaves the place for the next wide start
+    if (kept && isHome(route)) lastPlace(kept);
     window.addEventListener('popstate', () => {
         setServedAddress('');
         // The URL is the truth: the route is parsed from the location every time, never taken
@@ -134,16 +134,7 @@ export function startNav() {
         current = r;
         show(r, { fromHistory: true }).finally(routeChanged);
     });
-    (async () => {
-        if (bare) {
-            start = await (await importOnce('./startup_attention.js')).choose(kept);
-            if (current !== route) return;
-            route = start.route;
-            write(route, true, '', start.keep);
-            if (kept && isHome(route)) lastPlace(kept);
-        }
-        await show(route, { ...start, fromHistory: true, startup: true });
-        if (route.bad) (await importOnce('./np.js')).lost(route.bad);
-    })().catch(console.error);
+    if (bare) importOnce('./startup_attention.js').then(m => m.start(kept, route, write, show, lastPlace)).catch(console.error);
+    else show(route, { fromHistory: true, startup: true }).then(() => route.bad && importOnce('./np.js').then(m => m.lost(route.bad)));
     return route;
 }
