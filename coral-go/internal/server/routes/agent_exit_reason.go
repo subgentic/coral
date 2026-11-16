@@ -65,6 +65,9 @@ func lastErrorLine(screen string) string {
 // exitNoErrorReason is the reason when nothing in the terminal looked like an error.
 const exitNoErrorReason = "its CLI ended and left its terminal at a shell, with no error shown"
 
+// exitTerminalLostReason is the reason when the agent's terminal is gone: Wake starts a new one, so the usual plan holds even for a rapid exit (#16664).
+const exitTerminalLostReason = "its terminal was lost"
+
 // exitRapidPlan is what a person can do about an agent that stops right after each start: waking it starts the same CLI the same way, so the cause comes first (#16596).
 const exitRapidPlan = "Check its terminal for the error, then Wake it once that is fixed"
 
@@ -91,7 +94,7 @@ func (h *SessionsHandler) exitReason(ctx context.Context, ls store.LiveSession) 
 		}
 	}
 	if ptr.Value(ls.SleepReason) == store.SleepReasonTerminalGone {
-		return "its terminal was lost"
+		return exitTerminalLostReason
 	}
 	return exitNoErrorReason
 }
