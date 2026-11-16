@@ -132,9 +132,9 @@ function rowsHTML(ctx) {
     const hidden = hiddenSet(ctx);
     return ids.map((id, i) => {
         const b = document.getElementById(`agentic-tab-${id}`);
-        const name = b.querySelector('.agentic-tab-word')?.textContent?.trim() || b.getAttribute('aria-label') || id;
+        const name = nameOf(id);
         const glyph = b.querySelector('.material-icons')?.textContent || '';
-        const svg = glyph ? null : b.querySelector('svg'); // Saved draws its bookmark as an inline SVG, not a font glyph
+        const svg = glyph ? null : b.querySelector('svg');
         const iconHtml = glyph ? `<span class="material-icons tc-icon" aria-hidden="true">${escapeHtml(glyph)}</span>` : svg ? `<span class="tc-icon tc-icon-svg" aria-hidden="true">${svg.outerHTML}</span>` : '';
         const on = !hidden.has(id);
         return `<li class="tc-row" draggable="true" data-tab="${escapeAttr(id)}">
@@ -166,7 +166,7 @@ function announce(text) {
     if (s) s.textContent = text;
 }
 
-const nameOf = id => { const b = document.getElementById(`agentic-tab-${id}`); return b?.querySelector('.agentic-tab-word')?.textContent?.trim() || b?.getAttribute('aria-label') || id; };
+const nameOf = id => document.getElementById(`agentic-tab-${id}`)?.children[1]?.textContent || id;
 
 function place(pop) {
     const btn = document.getElementById('agentic-tab-customize');
