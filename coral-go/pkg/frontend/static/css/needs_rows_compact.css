@@ -40,3 +40,12 @@
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td[data-key="agent"] > :not(.inbox-row-words):not(.inbox-kind-column) { grid-column: 3; } /* layout A, a file: the words are beside the name, and wrap inside their own column when long */
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td[data-key="agent"] > .inbox-row-words { grid-column: 4; order: 4; min-height: 2rem; display: flex; align-items: center; }
 }
+
+/* Onboarding is separate from the counted Needs you list. */
+.inbox-getting-started { margin: 24px 0 0; padding: 16px; border-top: 1px solid var(--border); }
+.inbox-start-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.inbox-getting-started h2 { margin: 0; font-size: var(--fs-lg); }
+.inbox-getting-started ul { list-style: none; padding: 0; margin: 0; }
+.inbox-getting-started li { padding: 12px 0; }
+.inbox-getting-started h3 { margin: 0; font-size: var(--fs-md); }
+.inbox-getting-started p { margin: 4px 0 8px; color: var(--text-secondary); }
