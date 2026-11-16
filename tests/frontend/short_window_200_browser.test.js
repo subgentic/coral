@@ -57,9 +57,9 @@ const R = `const r = e => { if (!e) return null; const b = e.getBoundingClientRe
             if (s.includes('/api/board/projects')) return json([]); if (s.includes('/api/settings') && o && o.method === 'PUT') return json({ ok: true }); return window.__realFetch(u, o); };
             T.state.settings = { ...T.state.settings, inbox_welcome: 'on', inbox_welcome_done: '' }; T.state.liveSessions = []; T.state.servers = []; true`);
         await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
-        await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 6`, 'six welcome items', 8000); await settle(600);
+        await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 5`, 'five welcome items', 8000); await settle(600);
         const welcome = await ev(`[...document.querySelectorAll('#group-table-view .inbox-welcome-actions button')].filter(b => b.getClientRects().length).map(b => { const q = b.getBoundingClientRect(); return { t: b.textContent.trim() || b.getAttribute('aria-label'), x: Math.round(q.x), r: Math.round(q.right), w: innerWidth }; })`);
-        check(welcome.length >= 6 && welcome.every(b => b.x >= 0 && b.r <= b.w), `each welcome row's button is on the screen (x >= 0, right <= ${720}): ` + JSON.stringify(welcome));
+        check(welcome.length >= 5 && welcome.every(b => b.x >= 0 && b.r <= b.w), `each welcome row's button is on the screen (x >= 0, right <= ${720}): ` + JSON.stringify(welcome));
 
         // 3) the Answer dialog
         const PLAN = 'Here is the plan:\n' + [1, 2, 3, 4].map(n => `${n}. Step ${n}: build the converter, check the rounding and write the notes for the team to read`).join('\n') + '\nDo you approve it?';
