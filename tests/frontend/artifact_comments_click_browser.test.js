@@ -26,7 +26,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await waitFor(`!!document.querySelector('.artifact-viewer:not([hidden])') && document.querySelector('.artifact-viewer-body').textContent.includes('Release plan')`, 'viewer', 8000);
             await waitFor(`(() => { const t = document.querySelector('.ac-toggle'); if (!t || t.hidden) return false; if (t.getAttribute('aria-expanded') !== 'true') t.click(); return t.getAttribute('aria-expanded') === 'true'; })()`, 'comments open', 6000);
             await frames(12);
-            await ev(`(() => { const b = [...document.querySelectorAll('.artifact-viewer button')].find(b => /^Reply/.test(b.textContent.trim())); b.click(); return true; })()`); await frames(10);
+            await ev(`(() => { const b = [...document.querySelector('.artifact-viewer .agent-link.ac-author').closest('.ac-card').querySelectorAll('button')].find(b => /^Reply/.test(b.textContent.trim())); b.click(); return true; })()`); await frames(10);
             await ev(`(() => { const t = [...document.querySelectorAll('.artifact-viewer textarea')].find(t => t.getClientRects().length && t.id !== 'artifact-review-text'); t.focus(); t.value = 'half a comment'; t.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             const press = async (scroll) => {
                 if (scroll) await ev(`document.querySelector('.artifact-viewer .agent-link.ac-author').scrollIntoView({ block: 'center' }); true`);

@@ -3,3 +3,5 @@
 @media (max-width: 760px) { .team-panel .team-tb-action + .team-tb-action { margin-left: auto; } } /* the row wraps: the second action may land alone on the next line, and it belongs at the right like every tab's action */
 .knowledge-note-form { display: flex; flex-direction: column; gap: 12px; }
 .knowledge-note-label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-md); color: var(--text-secondary); }
+
+.team-panel .team-knowledge-body .list-bar-search-row { flex-wrap: wrap; } /* at 200% text, search and both actions need two lines; keep the table page inside its gutter */
