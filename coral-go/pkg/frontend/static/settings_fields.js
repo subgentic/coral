@@ -1,5 +1,6 @@
 import { importOnce } from './import_once.js';
 import { isCloud } from './server_base.js';
+import { browserLocal } from './safe_storage.js';
 const { TERMINAL_BACKEND_IDS, backendHint } = await importOnce('./terminal_backend.js');
 export { TERMINAL_BACKEND_IDS, backendHint };
 /* The main Settings' rows as fields (#7744, #7838): each group of the Settings dialog is a list of fields drawn by settings_view (the same rows as the team Settings), into the pane's own host. The ids are the contract
@@ -212,6 +213,15 @@ const ACCOUNTS = [{ cli: 'claude', name: 'Claude', canSignIn: true }, { cli: 'pi
 const accountsLines = slot => {
     const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
     const cloud = isCloud();
+    const KEPT = 'coral-accounts-last-check'; // the last answer of Check, shown when Settings opens again (#17345, walk 65 F7): a line with no status read as unchecked
+    const kept = () => { try { return JSON.parse(browserLocal.get(KEPT) || '{}') || {}; } catch { return {}; } };
+    const remember = (cli, signedIn, provider) => browserLocal.set(KEPT, JSON.stringify({ ...kept(), [cli]: { signedIn, provider, at: Date.now() } }));
+    const paint = (a, signedIn, provider, at) => {
+        const to = provider ? ` to ${provider}` : '', when = at ? `, last checked ${new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : '';
+        if (signedIn === true) { a.status.textContent = `Signed in${to}${when}`; a.signIn.hidden = true; }
+        else if (signedIn === false) { a.status.textContent = (cloud ? `Not signed in${to} (sign in on the computer that runs Coral)` : a.canSignIn ? `Not signed in${to}` : `Not signed in${to}: ${a.notSignedIn}`) + when; a.signIn.hidden = cloud || !a.canSignIn; }
+        else { a.status.textContent = `Could not tell if ${a.name} is signed in`; }
+    };
     const lines = ACCOUNTS.map(a => {
         const line = mk('div', 'sv-ctl-line account-line'), status = mk('span', 'settings-hint');
         status.id = `settings-${a.cli}-account-status`; status.setAttribute('role', 'status');
@@ -229,6 +239,7 @@ const accountsLines = slot => {
         line.append(mk('span', 'account-name', a.name), status, signIn); slot.append(line);
         return { ...a, status, signIn };
     });
+    const last = kept(); for (const a of lines) { const k = last[a.cli]; if (k && typeof k.signedIn === 'boolean') paint(a, k.signedIn, k.provider || '', k.at || 0); }
     const row = mk('div', 'sv-ctl-line'), check = mk('button', 'btn btn-small', 'Check');
     check.type = 'button'; check.id = 'settings-accounts-check'; check.setAttribute('aria-label', 'Check Claude and Pi sign-in');
     let busy = false;
@@ -239,10 +250,8 @@ const accountsLines = slot => {
             a.status.textContent = 'Checking...';
             let signedIn, provider = '';
             try { const r = await fetch(`/api/system/cli-check?type=${a.cli}&signin=1&source=settings_check`, { cache: 'no-store' }); if (r.ok) { const d = await r.json(); signedIn = d.signed_in; provider = typeof d.provider === 'string' ? d.provider : ''; } } catch { /* said as could not tell */ }
-            const to = provider ? ` to ${provider}` : '';
-            if (signedIn === true) { a.status.textContent = `Signed in${to}`; a.signIn.hidden = true; }
-            else if (signedIn === false) { a.status.textContent = cloud ? `Not signed in${to} (sign in on the computer that runs Coral)` : a.canSignIn ? `Not signed in${to}` : `Not signed in${to}: ${a.notSignedIn}`; a.signIn.hidden = cloud || !a.canSignIn; }
-            else { a.status.textContent = `Could not tell if ${a.name} is signed in`; }
+            paint(a, signedIn, provider, 0);
+            if (typeof signedIn === 'boolean') remember(a.cli, signedIn, provider);
         }));
         busy = false; check.removeAttribute('aria-disabled');
     });

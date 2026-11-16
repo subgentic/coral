@@ -302,7 +302,7 @@ export function applyThemeData(theme, { remember = true } = {}) {
 
     // Overlay custom variables: custom properties with a real value only (an empty or blank one would empty the token the stylesheet defines, #6087)
     for (const [cssVar, value] of Object.entries(theme.variables)) {
-        if (typeof cssVar === "string" && cssVar.startsWith("--") && typeof value === "string" && value.trim()) document.documentElement.style.setProperty(cssVar, value.trim());
+        if (cssVar.startsWith("--") && typeof value === "string" && value.trim()) document.documentElement.style.setProperty(cssVar, value.trim());
     }
 
     // Refresh terminal colors
