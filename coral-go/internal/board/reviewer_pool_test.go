@@ -1,8 +1,10 @@
 package board
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"testing"
 	"time"
@@ -177,4 +179,44 @@ func TestThePoolSaysWhenNobodyIsFreeAndComparesStampsAsTime(t *testing.T) {
 	assert.True(t, a.Before(b), "%v %v", a, b)
 	assert.True(t, parseStamp("2026-11-15 08:30:00").Equal(time.Date(2026, 11, 15, 8, 30, 0, 0, time.UTC)))
 	assert.True(t, parseStamp("not a time").IsZero())
+}
+
+// A review task whose created_at cannot be read ranks its member as given a review longest ago; that is said in the log, not done silently (#17807).
+func TestAnUnreadableReviewStampIsLoggedNotSilentlyRankedOldest(t *testing.T) {
+	s, err := NewStoreWithKey(filepath.Join(t.TempDir(), "board.db"), "")
+	require.NoError(t, err)
+	defer s.Close()
+	ctx := context.Background()
+	for i, n := range []string{"Orchestrator", "Dev", "QA 1", "QA 2"} {
+		_, err := s.Subscribe(ctx, "p", n, n, fmt.Sprintf("claude-%d", i), nil, "all")
+		require.NoError(t, err)
+	}
+	h := s.GetHealthSettings(ctx, "p")
+	h.ReviewerPool = []string{"QA 1", "QA 2"}
+	require.NoError(t, s.SetHealthSettings(ctx, "p", h))
+	submit := func() []string {
+		task, err := s.CreateTaskWithOpts(ctx, "p", "T", "", "medium", "Orchestrator", nil, "Dev")
+		require.NoError(t, err)
+		_, err = s.db.ExecContext(ctx, "UPDATE board_tasks SET status='review_pending' WHERE id=?", task.ID)
+		require.NoError(t, err)
+		got, err := s.GetTask(ctx, "p", task.ID)
+		require.NoError(t, err)
+		names, _, _, err := s.AutoReviewers(ctx, "p", got, "Orchestrator", false)
+		require.NoError(t, err)
+		_, _, err = s.DelegateReview(ctx, "p", task.ID, "Orchestrator", names)
+		require.NoError(t, err)
+		return names
+	}
+	first := submit()
+	require.Len(t, first, 1)
+	_, err = s.db.ExecContext(ctx, "UPDATE board_tasks SET created_at='not a time' WHERE assigned_to=? AND id IN (SELECT task_id FROM task_workflows WHERE COALESCE(json_extract(data, '$.review_of'), 0) > 0)", first[0])
+	require.NoError(t, err)
+
+	var buf bytes.Buffer
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	defer slog.SetDefault(old)
+	submit()
+	assert.Contains(t, buf.String(), "created_at cannot be read", "the unreadable stamp is logged")
+	assert.Contains(t, buf.String(), first[0], "naming the member it ranked")
 }
