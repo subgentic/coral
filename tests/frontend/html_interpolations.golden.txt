@@ -202,7 +202,7 @@
 3	group_cards.js	CHEVRON_DECO
 2	group_cards.js	FOLDER_GROUP_ICON
 5	group_cards.js	MORE_DOTS_SVG
-25	group_cards.js	SVGO.o0
+27	group_cards.js	SVGO.o0
 8	group_cards.js	SVGO.o1
 2	group_cards.js	SVGO.o2
 2	group_cards.js	SVGO.o4
@@ -351,7 +351,7 @@
 1	session_header_updates.js	_whereBack
 2	session_rows.js	!instructionsOffered(s, isCloud()) ? '' : `<button class="menu-item overflow-menu-item" data-on-click="agent-i
 1	session_rows.js	MORE_DOTS_SVG
-20	session_rows.js	SVGO.o0
+19	session_rows.js	SVGO.o0
 8	session_rows.js	SVGO.o1
 4	session_rows.js	SVGO.o2
 2	session_rows.js	SVGO.o4
