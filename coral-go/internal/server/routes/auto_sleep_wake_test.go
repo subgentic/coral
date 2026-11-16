@@ -242,8 +242,8 @@ func promptFilesOf(t *testing.T, r *sleepRig) []string {
 	return out
 }
 
-// The operator's call (#12358): an auto-asleep agent woken by a delivery is started without its first message, because the delivery that woke it says what to do; a manual Wake sends it as it always did.
-func TestAutoWakeSendsNoStartingPromptAndAManualWakeDoes(t *testing.T) {
+// The operator's call (#12358): an auto-asleep agent woken by a delivery is started without its first message, because the delivery that woke it says what to do; a manual Wake of a resumed conversation types a short wake note, not that first message (#17324).
+func TestAutoWakeSendsNoStartingPromptAndAManualWakeSendsTheWakeNote(t *testing.T) {
 	const first = "UNIQUE-FIRST-PROMPT-TEXT"
 	t.Run("auto wake", func(t *testing.T) {
 		autoWakeSlots.Lock() // the board's hourly cap is process-wide: the other tests' wakes on this board are not this test's
@@ -275,7 +275,8 @@ func TestAutoWakeSendsNoStartingPromptAndAManualWakeDoes(t *testing.T) {
 		require.NoError(t, r.h.wakeExistingSession(r.ctx, ls))
 		files := promptFilesOf(t, r)
 		require.NotEmpty(t, files, "a manual wake passes its first message: %v", r.term.sent)
-		assert.Contains(t, strings.Join(files, "\n"), first, "the first prompt is sent as before")
+		assert.NotContains(t, strings.Join(files, "\n"), first, "a person's wake of a resumed conversation does not type the original prompt again (#17324)")
+		assert.Contains(t, strings.Join(files, "\n"), "You were asleep and are awake again", "it types the wake note instead")
 	})
 }
 
