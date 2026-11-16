@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 )
@@ -34,13 +35,15 @@ const (
 	LifecycleWake    = "wake"
 	LifecycleSleep   = "sleep"
 	LifecycleRestart = "restart" // counts toward the hour's cap like a wake (#15112)
+	LifecycleStop    = "stop"    // the orchestrator stopped an agent's current turn
 )
 
 // OrchGrant is a board's grant: off unless Enabled, and then only for SeatSession.
 type OrchGrant struct {
 	Project     string `json:"project"`
 	Enabled     bool   `json:"enabled"`
-	SeatSession string `json:"seat_session,omitempty"` // the session id of the orchestrator seat, named by the Operator
+	StopEnabled bool   `json:"stop_enabled"` // separate switch for stop, off by default (#17348)
+	SeatSession string `json:"seat_session,omitempty"`
 	MaxPerHour  int    `json:"max_per_hour"`
 	MaxLive     int    `json:"max_live"`
 	IdleMin     int    `json:"idle_minutes"`
@@ -101,6 +104,9 @@ func (s *Store) ensureOrchSchema(ctx context.Context) error {
 			return err
 		}
 	}
+	if _, err := s.db.ExecContext(ctx, `ALTER TABLE board_orch_grant ADD COLUMN stop_enabled INTEGER NOT NULL DEFAULT 0`); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+		log.Printf("board: ALTER board_orch_grant ADD stop_enabled: %v", err)
+	}
 	return nil
 }
 
@@ -109,6 +115,7 @@ func (s *Store) GetOrchGrant(ctx context.Context, project string) (OrchGrant, er
 	g := defaultOrchGrant(project)
 	var row struct {
 		Enabled     int    `db:"enabled"`
+		StopEnabled int    `db:"stop_enabled"`
 		SeatSession string `db:"seat_session"`
 		MaxPerHour  int    `db:"max_per_hour"`
 		MaxLive     int    `db:"max_live"`
@@ -116,14 +123,14 @@ func (s *Store) GetOrchGrant(ctx context.Context, project string) (OrchGrant, er
 		SetBy       string `db:"set_by"`
 		SetAt       string `db:"set_at"`
 	}
-	err := s.reader().GetContext(ctx, &row, `SELECT enabled, seat_session, max_per_hour, max_live, idle_min, set_by, set_at FROM board_orch_grant WHERE project = ?`, project)
+	err := s.reader().GetContext(ctx, &row, `SELECT enabled, stop_enabled, seat_session, max_per_hour, max_live, idle_min, set_by, set_at FROM board_orch_grant WHERE project = ?`, project)
 	if errors.Is(err, sql.ErrNoRows) {
 		return g, nil
 	}
 	if err != nil {
 		return g, err
 	}
-	g.Enabled, g.SeatSession, g.MaxPerHour, g.MaxLive, g.IdleMin, g.SetBy, g.SetAt = row.Enabled != 0, row.SeatSession, row.MaxPerHour, row.MaxLive, row.IdleMin, row.SetBy, row.SetAt
+	g.Enabled, g.StopEnabled, g.SeatSession, g.MaxPerHour, g.MaxLive, g.IdleMin, g.SetBy, g.SetAt = row.Enabled != 0, row.StopEnabled != 0, row.SeatSession, row.MaxPerHour, row.MaxLive, row.IdleMin, row.SetBy, row.SetAt
 	return g, nil
 }
 
@@ -140,9 +147,13 @@ func (s *Store) SetOrchGrant(ctx context.Context, g OrchGrant, by string) error 
 	if g.Enabled {
 		enabled = 1
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO board_orch_grant (project, enabled, seat_session, max_per_hour, max_live, idle_min, set_by, set_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(project) DO UPDATE SET enabled = excluded.enabled, seat_session = excluded.seat_session, max_per_hour = excluded.max_per_hour, max_live = excluded.max_live, idle_min = excluded.idle_min, set_by = excluded.set_by, set_at = excluded.set_at`,
-		g.Project, enabled, g.SeatSession, g.MaxPerHour, g.MaxLive, g.IdleMin, by, nowUTC())
+	stopEnabled := 0
+	if g.StopEnabled {
+		stopEnabled = 1
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO board_orch_grant (project, enabled, stop_enabled, seat_session, max_per_hour, max_live, idle_min, set_by, set_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(project) DO UPDATE SET enabled = excluded.enabled, stop_enabled = excluded.stop_enabled, seat_session = excluded.seat_session, max_per_hour = excluded.max_per_hour, max_live = excluded.max_live, idle_min = excluded.idle_min, set_by = excluded.set_by, set_at = excluded.set_at`,
+		g.Project, enabled, stopEnabled, g.SeatSession, g.MaxPerHour, g.MaxLive, g.IdleMin, by, nowUTC())
 	return err
 }
 
@@ -225,7 +236,7 @@ func (s *Store) ReserveLifecycle(ctx context.Context, project, kind, actor, targ
 	flightAgo := now.Add(-inFlightFor).Format(time.RFC3339)
 	res, err := s.db.ExecContext(ctx, `INSERT INTO board_lifecycle_log (project, kind, actor, target, status, at)
 		SELECT ?, ?, ?, ?, 'reserved', ?
-		WHERE (SELECT COUNT(*) FROM board_lifecycle_log WHERE project = ? AND kind IN ('launch', 'wake', 'restart') AND status != 'failed' AND at > ?) < ?
+		WHERE (SELECT COUNT(*) FROM board_lifecycle_log WHERE project = ? AND kind IN ('launch', 'wake', 'restart', 'stop') AND status != 'failed' AND at > ?) < ?
 		  AND ? + (SELECT COUNT(*) FROM board_lifecycle_log WHERE project = ? AND kind IN ('launch', 'wake') AND status = 'reserved' AND at > ?) < ?`,
 		project, kind, actor, target, now.Format(time.RFC3339),
 		project, hourAgo, caps.MaxPerHour,
@@ -235,7 +246,7 @@ func (s *Store) ReserveLifecycle(ctx context.Context, project, kind, actor, targ
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		var inHour int
-		_ = s.reader().GetContext(ctx, &inHour, `SELECT COUNT(*) FROM board_lifecycle_log WHERE project = ? AND kind IN ('launch', 'wake', 'restart') AND status != 'failed' AND at > ?`, project, hourAgo)
+		_ = s.reader().GetContext(ctx, &inHour, `SELECT COUNT(*) FROM board_lifecycle_log WHERE project = ? AND kind IN ('launch', 'wake', 'restart', 'stop') AND status != 'failed' AND at > ?`, project, hourAgo)
 		if inHour >= caps.MaxPerHour {
 			return 0, ErrLifecycleCapHour
 		}

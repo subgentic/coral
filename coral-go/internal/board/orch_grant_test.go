@@ -1,9 +1,13 @@
 package board
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log"
+	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -136,4 +140,22 @@ func TestTheLogSurvivesAReopenAndKeepsWhatItWasGiven(t *testing.T) {
 	}
 	_, err = s.ReserveLifecycle(ctx, "team", LifecycleWake, "Orchestrator", "Dev", &LifecycleCaps{MaxPerHour: 3, MaxLive: 100})
 	assert.True(t, errors.Is(err, ErrLifecycleCapHour), "the launch before the reopen counts")
+}
+
+func TestEnsureOrchSchemaLogsNonDuplicateAlterError(t *testing.T) {
+	s := orchStore(t)
+	ctx := context.Background()
+	// Replace the table with a view so the ALTER fails with something other than "duplicate column".
+	_, _ = s.db.ExecContext(ctx, `DROP TABLE IF EXISTS board_orch_grant`)
+	_, _ = s.db.ExecContext(ctx, `CREATE VIEW board_orch_grant AS SELECT '' AS project, 0 AS enabled, '' AS seat_session, 0 AS max_per_hour, 0 AS max_live, 0 AS idle_min, '' AS set_by, '' AS set_at`)
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stderr)
+	err := s.ensureOrchSchema(ctx)
+	if err != nil {
+		t.Fatalf("ensureOrchSchema must not return an error for an ALTER failure: %v", err)
+	}
+	if !strings.Contains(buf.String(), "ALTER board_orch_grant ADD stop_enabled") {
+		t.Fatalf("a non-duplicate ALTER error must be logged; got: %q", buf.String())
+	}
 }

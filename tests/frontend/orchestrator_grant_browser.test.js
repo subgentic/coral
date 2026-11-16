@@ -22,7 +22,7 @@ const SEAT = '0b7c2e4a-5d1f-4c8e-9a36-2f4d8e1b7c90';
         const json = (b, s) => Promise.resolve(new Response(JSON.stringify(b), { status: s || 200, headers: { 'content-type': 'application/json' } }));
         window.fetch = (u, o = {}) => { const p = new URL(String(u && u.url || u), location.origin).pathname; const m = (o.method || 'GET').toUpperCase();
             if (p === '/api/board/${TEAM}/orchestrator-grant' && m === 'GET') return json(window.__og.grant.body, window.__og.grant.status);
-            if (p === '/api/board/${TEAM}/orchestrator-grant' && m === 'PUT') { const b = JSON.parse(o.body); window.__og.puts.push(b); if (window.__og.putAnswer) return json(window.__og.putAnswer.body, window.__og.putAnswer.status); window.__og.grant.body = { ...window.__og.grant.body, enabled: b.enabled, seat_session: b.seat_session, max_per_hour: b.max_per_hour, max_live: b.max_live, idle_minutes: b.idle_minutes }; return json(window.__og.grant.body); }
+            if (p === '/api/board/${TEAM}/orchestrator-grant' && m === 'PUT') { const b = JSON.parse(o.body); window.__og.puts.push(b); if (window.__og.putAnswer) return json(window.__og.putAnswer.body, window.__og.putAnswer.status); window.__og.grant.body = { ...window.__og.grant.body, enabled: b.enabled, stop_enabled: b.stop_enabled, seat_session: b.seat_session, max_per_hour: b.max_per_hour, max_live: b.max_live, idle_minutes: b.idle_minutes }; return json(window.__og.grant.body); }
             if (p === '/api/board/${TEAM}/lifecycle-log' && m === 'GET') return json(window.__og.log);
             return R(u, o); }; return true; })()`);
     const open = async () => {
@@ -73,8 +73,15 @@ const SEAT = '0b7c2e4a-5d1f-4c8e-9a36-2f4d8e1b7c90';
             await setNum('og_max_live', 12);
             await ev(`document.querySelector('#team-settings-workspace .sv-save').click(); true`); await settle(400);
             const puts = await ev(`window.__og.puts`);
-            check(`${theme}: Save sends the whole grant and nothing else (no actor, no claim)`, puts.length === 1 && JSON.stringify(puts[0]) === JSON.stringify({ enabled: true, seat_session: SEAT, max_per_hour: 10, max_live: 12, idle_minutes: 5 }), JSON.stringify(puts));
+            check(`${theme}: Save sends the whole grant and nothing else (no actor, no claim)`, puts.length === 1 && JSON.stringify(puts[0]) === JSON.stringify({ enabled: true, stop_enabled: false, seat_session: SEAT, max_per_hour: 10, max_live: 12, idle_minutes: 5 }), JSON.stringify(puts));
             check(`${theme}: the form shows what the server kept and is clean`, (await ev(`${q('input[name=og_max_live]')}.value`)) === '12' && (await ev(`document.querySelector('#team-settings-workspace .sv-save').disabled`)));
+
+            // stop toggle: on (needs main switch), saves stop_enabled: true
+            await ev(`window.__og.puts.length = 0; true`);
+            await ev(`${q('input[name=og_stop_enabled]')}.click(); true`); await settle(100);
+            await ev(`document.querySelector('#team-settings-workspace .sv-save').click(); true`); await settle(400);
+            const stopPuts = await ev(`window.__og.puts`);
+            check(`${theme}: toggling stop on saves stop_enabled: true`, stopPuts.length === 1 && stopPuts[0].stop_enabled === true && stopPuts[0].enabled === true, JSON.stringify(stopPuts));
 
             // the server's refusal is said, the page stays dirty
             await ev(`window.__og.putAnswer = { status: 400, body: { error: 'seat_session must be a live agent seated on this board' } }; true`);

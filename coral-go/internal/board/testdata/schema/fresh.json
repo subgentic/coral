@@ -638,7 +638,7 @@
     },
     {
       "name": "board_orch_grant",
-      "sql": "CREATE TABLE board_orch_grant (\n\t\t\tproject      TEXT PRIMARY KEY,\n\t\t\tenabled      INTEGER NOT NULL DEFAULT 0,\n\t\t\tseat_session TEXT NOT NULL DEFAULT '',\n\t\t\tmax_per_hour INTEGER NOT NULL,\n\t\t\tmax_live     INTEGER NOT NULL,\n\t\t\tidle_min     INTEGER NOT NULL,\n\t\t\tset_by       TEXT NOT NULL DEFAULT '',\n\t\t\tset_at       TEXT NOT NULL DEFAULT ''\n\t\t)",
+      "sql": "CREATE TABLE board_orch_grant (\n\t\t\tproject      TEXT PRIMARY KEY,\n\t\t\tenabled      INTEGER NOT NULL DEFAULT 0,\n\t\t\tseat_session TEXT NOT NULL DEFAULT '',\n\t\t\tmax_per_hour INTEGER NOT NULL,\n\t\t\tmax_live     INTEGER NOT NULL,\n\t\t\tidle_min     INTEGER NOT NULL,\n\t\t\tset_by       TEXT NOT NULL DEFAULT '',\n\t\t\tset_at       TEXT NOT NULL DEFAULT ''\n\t\t, stop_enabled INTEGER NOT NULL DEFAULT 0)",
       "tbl_name": "board_orch_grant",
       "type": "table"
     },
@@ -3897,6 +3897,15 @@
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"
+        },
+        {
+          "cid": 8,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "stop_enabled",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
         }
       ],
       "indexes": [
