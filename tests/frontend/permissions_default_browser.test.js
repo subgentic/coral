@@ -94,11 +94,11 @@ const recordTiming=row=>{timings.push(row);if(process.env.CORAL_LAUNCH_TIMING_RE
    assert.equal(await ev(`!!document.getElementById('launch-disclosure-banner')`),false,'real acknowledgement survives full reload');
    await ev(`import((window.__coralStatic||'/static/')+'state.js').then(m=>{delete m.state.settings.default_permission_mode;return true})`);
    const presets=await ev(`import((window.__coralStatic||'/static/')+'agent_presets.js').then(m=>m.AGENT_PRESETS.map(p=>({name:p.name,allow:p.capabilities.allow.slice().sort(),deny:p.capabilities.deny||[]})))`);
-   assert.ok(presets.length>0);for(const p of presets){assert.deepEqual(p.allow,full,p.name+' shipped capabilities');assert.deepEqual(p.deny,[]);}
+   assert.ok(presets.length>0);for(const p of presets){assert.deepEqual(p.allow,p.name==='Getting started'?[]:full,p.name+' shipped capabilities'); /* the Getting started persona carries no capability flags (#18119) */ assert.deepEqual(p.deny,[]);}
    const templates=await ev(`import((window.__coralStatic||'/static/')+'team_templates_ui.js').then(m=>m.BUILTIN_TEAM_TEMPLATES.flatMap(t=>t.agents.map(a=>a.capabilities.allow.slice().sort())))`);
    for(const caps of templates)assert.deepEqual(caps,full,'built-in team member starts full');
-   assert.equal(presets.length,15,'exercise every shipped preset');
-   for(const role of presets.map(p=>p.name)){
+   assert.equal(presets.length,16,'exercise every shipped preset');
+   for(const role of presets.map(p=>p.name).filter(n=>n!=='Getting started')){ /* the Getting started persona has no role limits to apply (#18119) */
     await ev(`(async()=>{const S=window.__coralStatic||'/static/';const p=(await import(S+'agent_presets.js')).AGENT_PRESETS.find(p=>p.name===${JSON.stringify(role)});const f=await import(S+'agent_config_form.js');document.getElementById('role-default-probe')?.remove();const host=document.createElement('main');host.id='role-default-probe';host.style.cssText='position:fixed;inset:0;overflow:auto;z-index:10000;background:var(--bg-primary);padding:12px';document.body.append(host);f.renderAgentConfigForm(host.id,{showPreset:false,value:{...p,agentType:'claude'}});return true;})()`);
     const hint=await ev(`(()=>{const h=document.getElementById('role-default-probe'),b=[...h.querySelectorAll('button')].find(b=>b.textContent==="Apply the role's limits");return{words:h.textContent,visible:!!b&&!b.hidden&&b.getBoundingClientRect().height>0}})()`);
     assert.ok(hint.visible&&hint.words.includes('This role is a prompt, not a permission.'),role+' shows truthful role description and one-click limits');
