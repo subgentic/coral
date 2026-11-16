@@ -61,7 +61,7 @@ export const missingWords = list => list.length ? `Not in this list: ${list.map(
 export function checkWords(c) {
     if (!c) return '';
     if (!c.intact) return `${c.machine ? `On ${c.machine}: t` : 'T'}he record was changed outside Coral${c.reason === 'edited' ? ': a row was edited' : c.reason === 'removed' ? ': a row was removed' : c.reason === 'cut_off' ? ': rows were cut off' : ''}. ${c.note || ''}`.trim();
-    return `${c.rows === 1 ? '1 action' : `${c.rows} actions`} in the record, none changed outside Coral. ${c.note || ''}`.trim();
+    return ''; // an intact record says nothing: the count and the check's own caveat were not words anyone could use (#18620)
 }
 
 /** What the folder reads from: the online computers on a Hub-served dashboard (several, or one that is not this one), else this computer alone, which is read exactly as it always was. */
@@ -198,7 +198,7 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
                     node.append(DT.el('strong', '', p.on), DT.el('p', '', [p.did, p.detail].filter(Boolean).join(' · ')));
                     if (p.about) node.append(DT.el('p', 'activity-about', p.about));
                     for (const kind of ['goal', 'task']) if (Number(r[`${kind}_id`]) > 0 && !(r.item_kind === kind && String(r.item_id) === String(r[`${kind}_id`]))) { const link = DT.el('button', 'btn btn-small', `${kind === 'goal' ? 'Goal' : 'Task'} #${r[`${kind}_id`]}`); link.type = 'button'; link.onclick = () => open[kind]({ ...r, item_id: String(r[`${kind}_id`]) }); node.append(link); }
-                    node.append(DT.el('p', '', `${markHidden(AF.agentOf(r) || 'You', { strict: true })} · ${teamOf(r)} · ${fromCell(r)}`));
+                    node.append(DT.el('p', '', [markHidden(AF.agentOf(r) || 'You', { strict: true }), teamOf(r), fromCell(r)].filter(Boolean).join(' · ')));
                     if (opens(r)) { const b = DT.el('button', 'btn btn-small activity-open-item', 'Open item'); b.type = 'button'; b.onclick = () => openItem(r); node.append(b); }
                     return node;
                 } },

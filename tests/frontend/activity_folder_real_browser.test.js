@@ -57,9 +57,7 @@ const HEX = 'c'.repeat(64);
         // the action identity of this run's rows: two creates and two closes, and each goal has one of each
         const words = await ev(`${mine}.map(r => (((r.querySelector('td[data-key="action"]') || r).textContent.trim() === 'Closed') ? 'close' : ((r.querySelector('td[data-key="action"]') || r).textContent.trim() === 'Created') ? 'create' : '?') + ':' + (r.textContent.includes(${JSON.stringify(FIRST)}) ? 'first' : r.textContent.includes(${JSON.stringify(SECOND)}) ? 'second' : '?'))`);
         assert.deepEqual([...words].sort(), ['close:first', 'close:second', 'create:first', 'create:second'], `each goal has a created row and a closed row: ${JSON.stringify(words)}`); assert.match(t, /this computer/); assert.match(t, /not needed any more/);
-        const checkText = await ev(`document.querySelector('.activity-check').textContent`); // the record's whole count is the shard's, not this run's: only what the line says is checked, never the number
-        assert.match(checkText, /^\d+ actions in the record, none changed outside Coral\. Edits made outside Coral are shown unless the whole record was rewritten\.$/);
-        assert.equal(await ev(`document.querySelector('.activity-check').getAttribute('role')`), 'status');
+        assert.equal(await ev(`document.querySelector('.activity-check')`), null, 'an intact record says nothing above the table (#18620: the count and its caveat were not words anyone could use)');
         assert.match(await ev(`document.querySelector('#group-table-view tbody tr:not(.dt-detail)').textContent`), new RegExp(SECOND), 'newest first');
         console.log('   ✓');
 
