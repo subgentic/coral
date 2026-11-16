@@ -84,8 +84,9 @@ const STUB = `(() => {
 
         // 2. A failed send names the server in plain text, under the composer (#3218); no raw JSON, no 'Sent', draft kept.
         await ev(`(() => { const i = document.getElementById('command-input'); i.value = 'echo plain'; return true; })()`);
+        // the name is the computer's label when the hub's list is there and its id when the page's own agent poll has just emptied the list (this page's server is no hub, so its poll sends none): either names it
         await ev(`window.sendCommand()`);
-        await waitFor(`(() => { const b = document.getElementById('composer-error'); return !b.hidden && /box-b\\.lan is unreachable/.test(b.textContent); })()`, 'the plain unreachable error under the composer', 5000);
+        await waitFor(`(() => { const b = document.getElementById('composer-error'); return !b.hidden && /box-b(\\.lan)? is unreachable/.test(b.textContent); })()`, 'the plain unreachable error under the composer', 5000);
         const e2 = await ev(`document.querySelector('#composer-error .composer-error-text').textContent`);
         assert.ok(!/[{}]|Server error|502/.test(e2), 'no raw JSON or status code: ' + e2);
         assert.equal(await ev(`document.querySelector('#composer-error .composer-error-restart').hidden`), true, 'no Restart: the agent is fine, its server is not');
