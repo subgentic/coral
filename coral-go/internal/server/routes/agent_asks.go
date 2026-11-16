@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/askpage"
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/httputil"
@@ -99,6 +100,7 @@ func (h *AgentAsksHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Text    string   `json:"text"`
 		Options []string `json:"options"`
+		Open    string   `json:"open"` // a page of Coral from the fixed list (internal/askpage), "" for none (#18768)
 	}
 	if err := decodeJSONMax(w, r, &body, 64<<10); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -122,7 +124,11 @@ func (h *AgentAsksHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 		opts = append(opts, o)
 	}
-	id, err := h.ss.CreateAgentAsk(r.Context(), owner.SessionID, owner.SessionName, text, opts, time.Now())
+	if body.Open != "" && askpage.Label(body.Open) == "" {
+		errBadRequest(w, "--open names one of: "+askpage.Names())
+		return
+	}
+	id, err := h.ss.CreateAgentAskWithPage(r.Context(), owner.SessionID, owner.SessionName, text, opts, body.Open, time.Now())
 	if err != nil {
 		errInternalServer(w, "could not record the question")
 		return
@@ -264,7 +270,7 @@ func (h *AgentAsksHandler) Rows(r *http.Request) []operatorAskRow {
 		} else if dn, err := h.ss.GetDisplayName(r.Context(), a.SessionID); err == nil && dn != nil && strings.TrimSpace(*dn) != "" {
 			asker = *dn
 		}
-		row := operatorAskRow{SessionID: a.SessionID, Kind: "agent", ID: a.ID, Asker: clitext.CleanName(asker), Text: text, Cut: cut, At: a.CreatedAt, Options: a.Options}
+		row := operatorAskRow{SessionID: a.SessionID, Kind: "agent", ID: a.ID, Asker: clitext.CleanName(asker), Text: text, Cut: cut, At: a.CreatedAt, Options: a.Options, OpenPage: a.OpenPage}
 		rows = append(rows, row)
 	}
 	return rows

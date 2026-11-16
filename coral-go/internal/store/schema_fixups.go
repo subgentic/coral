@@ -15,7 +15,8 @@ import (
 var columnMigrations = []struct {
 	table, column, definition string
 }{
-	{"agent_asks", "dismissed_at", "TEXT"}, // set when the Operator dismissed it: only such a question can be brought back by Undo (#18714)
+	{"agent_asks", "open_page", "TEXT NOT NULL DEFAULT ''"}, // the page of Coral the card offers a button for (#18768)
+	{"agent_asks", "dismissed_at", "TEXT"},                  // set when the Operator dismissed it: only such a question can be brought back by Undo (#18714)
 	// Dropbox stage 4b, retention (#14703): a database made by a build of stages 3 and 4 has these tables without the columns.
 	{"dropbox_connection", "retention_days", "INTEGER NOT NULL DEFAULT 0"},
 	{"dropbox_connection", "retention_since", "TEXT"},
