@@ -20,7 +20,7 @@ const MANY = Array.from({ length: 100 }, (_, i) => task(100 + i, 0.001, 0)); // 
         await ev(`window.__tasks = ${JSON.stringify(TASKS)}; true`);
         await ev(`(() => { const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o) => { const url = String(u && u.url || u);
-                if (url.includes('/api/token-usage/summary')) return json({ totals: { input_tokens: 300, output_tokens: 30, cost_usd: 2.14, num_requests: 3 }, by_model: [], by_thinking: [], by_agent_type: [], by_agent: [] });
+                if (url.includes('/api/token-usage/summary')) return json({ totals: { input_tokens: 300, output_tokens: 30, cost_usd: window.__total === undefined ? 2.14 : window.__total, num_requests: 3 }, by_model: [], by_thinking: [], by_agent_type: [], by_agent: [] });
                 if (url.includes('/api/board/tasks')) return json({ tasks: window.__tasks });
                 if (url.includes('/api/call-metrics/summary')) return json({ rows: [] });
                 if (url.includes('/api/token-usage/by-team')) return json({ teams: [] });
@@ -51,6 +51,16 @@ const MANY = Array.from({ length: 100 }, (_, i) => task(100 + i, 0.001, 0)); // 
         await ev(`import((window.__coralStatic || '/static/') + 'analytics_views.js').then(m => m.selectView('task')).then(() => true)`);
         await waitFor(`[...document.querySelectorAll('#cost-by-task tbody tr')].some(r => r.textContent.includes('Other cost in this range'))`, 'a full list calls the rest "Other cost in this range"', 15000);
         assert.ok(![...await ev(`[...document.querySelectorAll('#cost-by-task tbody tr')].map(r => r.textContent)`)].some(x => x.includes('Not on a task')), 'and not "Not on a task"');
+        // a task that began before the range counts in full, so the tasks can add up to MORE than the Total: a negative row keeps the rows adding up instead of hiding the rest (#17827)
+        await ev(`window.__total = 0.5; window.__tasks = ${JSON.stringify(TASKS)}; import((window.__coralStatic || '/static/') + 'cost_dashboard.js').then(m => m._refreshCostDashboard({ force: true })).then(() => true)`);
+        await ev(`import((window.__coralStatic || '/static/') + 'analytics_views.js').then(m => m.selectView('task')).then(() => true)`);
+        await waitFor(`[...document.querySelectorAll('#cost-by-task tbody tr')].some(r => r.textContent.includes('Earlier spend'))`, 'tasks over the total get an "Earlier spend" row', 15000);
+        const over = await cells('#cost-by-task');
+        const oi = over.head.findIndex(h => /^Cost/.test(h));
+        const orow = over.rows.find(r => r[0].startsWith('Earlier spend'));
+        assert.ok(orow && orow[oi] === '-$0.12', `a negative row of -$0.12: ${JSON.stringify(over.rows)}`);
+        const osum = over.rows.reduce((n, r) => n + Number(r[oi].replace('$', '')), 0);
+        assert.ok(Math.abs(osum - 0.5) < 0.011, `with it the rows add up to the total: ${osum} ${JSON.stringify(over.rows)}`);
         console.log('PASS by task and by goal add up');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
