@@ -14,6 +14,7 @@ export const WELCOME = {
     agent: { title: 'Start your first agent', text: 'Pick a folder and a CLI, and Coral starts it for you.', go: 'New agent', dismiss: true },
     team: { title: 'Make a team so agents can work together', text: 'A team gives agents a shared board to talk and hand off work.', go: 'New team', dismiss: true },
     asks: { title: 'How agents ask you for things', text: 'Approvals, dialogs and review artifacts all land here. A short read, then it clears.', go: 'Read it', dismiss: true },
+    setup: { title: 'Get set up with Claude, Codex or Antigravity', text: 'Coral runs agents through one of these. Set one up and the rest of this guide works.', go: 'Set up an agent', dismiss: false }, // #18752: shown first while none is ready, and clears itself
     guide: { title: 'Read the Coral guide', text: 'How to set Coral up, and a tour of what it can do.', go: 'Open guide', dismiss: true },
 };
 
@@ -30,6 +31,16 @@ function readTeams() {
     }).catch(() => {});
 }
 
+let _setupNone = null, _probing = false; // #18752: whether none of the three agents is installed (null until the first answer)
+function probeSetup() {
+    if (_probing || (state.settings || {}).inbox_welcome_setup !== 'on' || _setupNone === false) return;
+    _probing = true;
+    importOnce('./setup_agent.js').then(m => m.noneReady()).then(none => {
+        const had = _setupNone; _setupNone = none; _probing = false;
+        if (!none) save({ inbox_welcome_setup: 'off' }, { auto: true }); // one is ready: the row never comes back
+        if (_setupNone !== had) document.dispatchEvent(new CustomEvent('coral:welcome-changed'));
+    }).catch(() => { _probing = false; });
+}
 /** Whether the step of one item has happened. */
 export function seen(id) {
     if (id === 'agent') return (state.liveSessions || []).length > 0;
@@ -44,8 +55,9 @@ export const finished = () => { const d = doneList(); for (const id of WELCOME_I
 export function welcomeRows() {
     if (!welcomeOn()) return [];
     if (!finished().has('team')) readTeams();
+    probeSetup();
     const d = finished();
-    return WELCOME_IDS.filter(id => !d.has(id)).map(id => ({ welcome: { id, ...WELCOME[id] }, session_id: `welcome:${id}`, display_name: WELCOME[id].title, board_project: '', server: '', waiting_kind: 'welcome', waiting_summary: WELCOME[id].text, waiting_since: '' }));
+    return [...(_setupNone && (state.settings || {}).inbox_welcome_setup === 'on' ? ['setup'] : []), ...WELCOME_IDS.filter(id => !d.has(id))].map(id => ({ welcome: { id, ...WELCOME[id] }, session_id: `welcome:${id}`, display_name: WELCOME[id].title, board_project: '', server: '', waiting_kind: 'welcome', waiting_summary: WELCOME[id].text, waiting_since: '' }));
 }
 
 let _saving = Promise.resolve();
@@ -82,6 +94,7 @@ export function dismissGettingStarted() {
 /** An item's own action. */
 export async function runWelcome(id) {
     if (id === 'welcome') { mark('welcome'); return; }
+    if (id === 'setup') { importOnce('./setup_agent.js').then(m => m.openSetupDialog({ onReady: () => { _setupNone = false; save({ inbox_welcome_setup: 'off' }); document.dispatchEvent(new CustomEvent('coral:welcome-changed')); } })); return; }
     if (id === 'agent' || id === 'team') { return importOnce('./welcome_launch.js').then(m => m.openWelcomeLaunch(id)); }
     if (id === 'guide') { importOnce('./artifact_viewer.js').then(m => m.openBundledDocument({ title: 'Getting started with Coral', name: 'getting-started.md', url: GUIDE_URL, onOpened: () => mark('guide') })); return; } // the guide (about 400 KB with its pictures) is fetched when the row is opened, never at start (page_weight)
     if (id === 'asks') importOnce('./welcome_asks.js').then(m => m.readAsks(WELCOME.asks.title, () => mark('asks'))); // the long read arrives when it is opened, not at start (page_weight)
