@@ -196,7 +196,9 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
 
     const moreId = `sched-more-${Number(job.id)}`;
     // One status line: the state and the last result. When it runs next is the Next fact below, not said twice (#9294, the Operator's audit).
-    const status = [job.enabled ? 'Active' : (job.paused_reason ? 'Paused: failing' : 'Turned off'), lastWords(job.last_run)].filter(Boolean).join(' \u00b7 ');
+    // a turned-off job whose last run is still going says so plainly: the run goes on, the job starts no new ones (#17572, walk 74 L17: 'Turned off · running now' read as a contradiction)
+    const goingOn = !job.enabled && job.last_run && (job.last_run.status === 'running' || job.last_run.status === 'pending');
+    const status = [job.enabled ? 'Active' : (job.paused_reason ? 'Paused: failing' : 'Turned off'), goingOn ? 'the last run is still going; no new runs will start' : lastWords(job.last_run)].filter(Boolean).join(' \u00b7 ');
     // A short prompt is shown; a long one is folded (it would push the runs off the page)
     const longPrompt = (job.prompt || '').length > 600 || (job.prompt || '').split('\n').length > 10;
     const promptHtml = !isWorkflow && job.prompt
@@ -280,7 +282,7 @@ function renderRunsTable(page) {
             { key: 'duration', label: 'Duration', width: '6rem', dropAt: 36, tone: 'tertiary', cell: tookOf },
             ...(!workflowHistory ? [{ key: 'conversation', label: 'Conversation', hideLabel: true, width: '6.5rem', when: r => !!r.session_id, cell: r => {
                 if (!r.session_id) return '';
-                if (r.status === 'running' || r.status === 'pending') return DT.el('span', 'sched-run-live', 'Running…'); // no result to see yet: a link would open a chat that has none (#16733, walk 32 F2)
+                if (r.status === 'running' || r.status === 'pending') return DT.el('span', 'sched-run-live', (state.liveSessions || []).some(x => x && x.session_id === r.session_id && x.waiting_for_input) ? 'Needs you' : 'Running…'); // an agent stopped at a question (the folder-trust screen) says so, not 'Running…' for ever (#17520); no result to see yet: a link would open a chat that has none (#16733, walk 32 F2)
                 // short, so the Result keeps its room at 390 (Started 9.5 rem, See result 6.5 rem); it is where a newcomer looks for what the run said (#10378)
                 const b = DT.link('See result'); b.setAttribute('aria-label', 'See what this run did: open its conversation'); b.setAttribute('data-on-click', 'job-run-session'); b.dataset.sessionId = r.session_id; return b;
             } }] : []),
