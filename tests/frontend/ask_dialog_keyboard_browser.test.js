@@ -1,6 +1,7 @@
 // #16754: on a phone with the keyboard open the ask dialog keeps Send reply in view. The footer (Close, Dismiss) was the sticky part, so with a long question Send scrolled out under it and the person saw only
 // Close and Dismiss (Operator, Android Chrome on the Hub). The keyboard is simulated as Chrome on Android does (it shrinks the layout viewport): 390 x 844 down to 390 x 360.
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady, nextFrame } = require('./helpers/wait');
@@ -31,6 +32,13 @@ const { coralReady, nextFrame } = require('./helpers/wait');
         // and it is the first action: it comes before Close and Dismiss
         const order = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog[open]'), n = [...d.querySelectorAll('button')]; const at = t => n.findIndex(b => b.textContent.trim() === t); return { send: n.findIndex(b => b.classList.contains('inbox-ask-send')), close: at('Close'), dismiss: at('Dismiss, no reply') }; })()`);
         assert.ok(order.send >= 0 && order.send < order.close && order.send < order.dismiss, 'Send reply comes before Close and Dismiss: ' + JSON.stringify(order));
+        // at the end of a long question (scrolled to the bottom above) a tap on Send cannot land on Dismiss: both are 44 px targets and at least 8 px apart (#16819, QA and Security on #16754)
+        const gap = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog[open]'), n = [...d.querySelectorAll('button')], s = d.querySelector('.inbox-ask-send').getBoundingClientRect(), x = n.find(b => b.textContent.trim() === 'Dismiss, no reply').getBoundingClientRect();
+            const gx = Math.max(0, x.left - s.right, s.left - x.right), gy = Math.max(0, x.top - s.bottom, s.top - x.bottom); return { gapX: Math.round(gx), gapY: Math.round(gy), sendH: Math.round(s.height), dismissH: Math.round(x.height), sameRow: x.top < s.bottom && s.top < x.bottom }; })()`);
+        assert.ok(gap.sendH >= 44 && gap.dismissH >= 44, 'Send reply and Dismiss are both 44 px targets: ' + JSON.stringify(gap));
+        assert.ok((gap.sameRow ? gap.gapX : gap.gapY) >= 8, 'Dismiss is at least 8 px from Send reply (a tap on Send cannot land on it): ' + JSON.stringify(gap));
+        const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+        for (const theme of ['dark', 'light']) { await ev(`document.documentElement.setAttribute('data-theme', '${theme}'); true`); await nextFrame(ev); await nextFrame(ev); await shot(`ask-390x360-keyboard-${theme}`); } // the shots #16754 owed: 390 x 360, keyboard open, scrolled to the end of the question
         await ev(`document.querySelector('dialog.inbox-ask-dialog[open] .inbox-ask-send').click(); true`);
         await waitFor(`window.__replies.length > 0`, 'a tap on Send reply sends the reply');
         // the keyboard goes down: the footer is back where it was (the sticky one), the rows have their normal layout
