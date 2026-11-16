@@ -15,5 +15,4 @@
 .version-compare-pane, .version-compare-preview { min-width: 0; }
 .version-compare-preview iframe { width: 100%; min-height: 20rem; border: 1px solid var(--border); }
 .version-compare-source { overflow: auto; max-height: 60dvh; white-space: pre-wrap; overflow-wrap: anywhere; }
-.version-compare-source ins, .version-compare-source del { display: block; }
 @media (max-width: 40rem) { .version-compare-panes { grid-template-columns: minmax(0, 1fr); } }
