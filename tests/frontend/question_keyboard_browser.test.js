@@ -16,18 +16,22 @@ const { coralReady } = require('./helpers/wait');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'settings');
-        await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('coral-go', 'm', 3, { sleeping: false, session_id: 'o1' }); window.__posts = []; { const R = window.fetch; window.fetch = (u, o = {}) => { if (/answer-prompt/.test(String(u))) { window.__posts.push(JSON.parse(o.body || '{}')); return Promise.resolve(new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })); } return R(u, o); }; } true`);
+        await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('coral-go', 'm', 3, { sleeping: false, session_id: 'o1' }); window.__posts = []; { const R = window.fetch; window.fetch = (u, o = {}) => { if (String(u).includes('/chat?') && window.__po) return R(u, o).then(async r => { const d = await r.json().catch(() => null); return d ? new Response(JSON.stringify({ ...d, prompt_options: window.__po }), { status: r.status, headers: { 'content-type': 'application/json' } }) : r; }); // the chat's own reads (every poll) carry the open prompt, as the server's do; without it each read clears the card's answers (_noteReplyState)
+             if (/answer-prompt/.test(String(u))) { window.__posts.push(JSON.parse(o.body || '{}')); return Promise.resolve(new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })); } return R(u, o); }; } true`);
         await new Promise(r => setTimeout(r, 800)); // sleep-ok: the list renders from several answers
         await ev(`window.selectLiveSession('coral-go', 'claude', 'o1', 'local'); true`);
         await waitFor(`!!document.getElementById('command-input') && document.getElementById('command-input').getClientRects().length > 0`, 'the chat', 10000);
         const draw = (draft) => ev(`(async () => { const NI = await import(${S} + 'needs_input_card.js'), st = (await import(${S} + 'state.js')).state; const base = window.__m.entry(window.__m.agents['o1']);
             const row = { ...base, waiting_for_input: true, waiting_kind: 'question', waiting_summary: 'Wants to know: Pick a color', needs_input: true };
+            const build = () => {
             document.querySelectorAll('#live-history-messages > .chat-needs-input').forEach(e => e.remove()); window.__posts.length = 0;
             const box = document.getElementById('command-input'); box.value = ${JSON.stringify(draft)}; box.focus();
             NI.pendingToolBySession.clear(); NI.promptOptionsBySession.clear(); NI.loginBySession.clear();
-            NI.promptOptionsBySession.set('o1', { question: 'Pick a color:', options: [{ n: 1, label: 'Red', action: 'select', selected: true }, { n: 2, label: 'Blue', action: 'select' }] });
+            window.__po = { question: 'Pick a color:', options: [{ n: 1, label: 'Red', action: 'select', selected: true }, { n: 2, label: 'Blue', action: 'select' }] }; NI.setPrompt('o1', window.__po);
             st.liveSessions = [row]; NI.syncNeedsInputCard(document.getElementById('live-history-messages'), row);
-            await new Promise(r => setTimeout(r, 150)); // sleep-ok: the card takes the keyboard on the next frame
+            };
+            build();
+            for (let i = 0; i < 60 && !(document.activeElement && /cni-answer/.test(String(document.activeElement.className))); i++) await new Promise(r => setTimeout(r, 50)); // sleep-ok: poll up to 3 s: the focus code loads when a new card first appears (#16658's deferral), so on a cold page the card takes the keyboard a moment later; a card that must not take it is still read after the same wait
             const a = document.activeElement; return { cls: a ? String(a.className) : '', n: a && a.dataset ? a.dataset.n : '', id: a ? a.id : '' }; })()`);
         // (1) a new question takes the keyboard on its first answer; typed words are not taken
         let f = await draw('');

@@ -516,7 +516,8 @@ export function syncNeedsInputCard(container, session) {
         container.appendChild(el);
     }
     watchCardInView(el);
-    if (isNew) importOnce('./needs_input_focus.js').then(m => m.takeKeyboard(el));
+    if (isNew) el._wantsKeyboard = true;
+    if (el._wantsKeyboard) importOnce('./needs_input_focus.js').then(m => { if (m.takeKeyboard(el)) el._wantsKeyboard = false; }); // until it has had its turn: a card lifted out for a moment while the chat draws, or drawn before its answers, asks again at its next draw (#18822)
 }
 
 // The numbers a question's answers are labelled with pick them (1 Red, 2 Blue), from the keyboard in the card (#10410).
