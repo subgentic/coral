@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -10,12 +11,15 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/subgentic/coral/internal/clierr"
 	"github.com/subgentic/coral/internal/clihelp"
 	"github.com/subgentic/coral/internal/fsreplace"
+	"github.com/subgentic/coral/internal/gitutil"
 )
 
 // taskReviewRequested: a list item says review_requested; a full task (an older
@@ -125,6 +129,7 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 			fmt.Printf("Task #%d: submit-review recorded.\n", id)
 		}
 		printUnverifiedArtifacts(data)
+		warnUnpushedCommit(*reason, "")
 		return
 	}
 	fmt.Printf("Task #%d: %s recorded. Completion has not been accepted.\n", id, action)
@@ -314,6 +319,25 @@ func noteSeenRound(project string, task map[string]any) {
 // the current round).
 func lastSeenRound(project string, id int64) int {
 	return loadSeenRounds()[fmt.Sprintf("%s/%d", project, id)]
+}
+
+var shaRe = regexp.MustCompile(`\b[0-9a-f]{7,40}\b`)
+
+// warnUnpushedCommit prints a warning to stderr when the reason text names a
+// commit SHA that no remote branch contains. Warn, never block (#17750).
+func warnUnpushedCommit(reason, dir string) {
+	shas := shaRe.FindAllString(reason, -1)
+	if len(shas) == 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	for _, sha := range shas {
+		out, err := gitutil.Command(ctx, dir, "branch", "-r", "--contains", sha).Output()
+		if err != nil || len(strings.TrimSpace(string(out))) == 0 {
+			fmt.Fprintf(os.Stderr, "warning: commit %s is not on origin — push before review\n", sha)
+		}
+	}
 }
 
 // lastSeenRevision is the revision of the round recorded for a task: how many patches joined it after it opened (#5689), 0 when none did
