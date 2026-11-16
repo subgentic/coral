@@ -80,6 +80,19 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             const t = await ev(`({ value: document.getElementById('launch-team-dir').value, line: document.getElementById('launch-team-dir-suggest').textContent, hidden: document.getElementById('launch-team-dir-suggest').hidden })`);
             assert.ok(/[\\/]Coral[\\/]build-an-app$/.test(t.value) && /Coral\/build-an-app|build-an-app/.test(t.line) && !/first-team/.test(t.line), 'the folder and its line name the typed team: ' + JSON.stringify(t));
         });
+        await S.run('New team: typing a path into the suggested Folder replaces it, never appends to it (#16652)', async () => {
+            await ev(`window.hideLaunchModal && window.hideLaunchModal(); true`);
+            await clearRecents();
+            await ev(`(async () => { await window.showLaunchModal(); window._selectLaunchType('team'); return true; })()`);
+            await waitFor(`!!document.getElementById('launch-team-dir') && document.getElementById('launch-team-dir').getClientRects().length > 0 && /Coral[\\\\/]first-team$/.test(document.getElementById('launch-team-dir').value)`, 'the suggested folder', 8000);
+            await ev(`(() => { const i = document.getElementById('launch-team-dir'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); return true; })()`); // a caret at the end, as a click leaves it
+            await client.Input.insertText({ text: '/tmp/mine' });
+            const v = await ev(`({ value: document.getElementById('launch-team-dir').value, line: document.getElementById('launch-team-dir-suggest').hidden })`);
+            assert.equal(v.value, '/tmp/mine', 'the typed path is the whole value, not added to the suggestion: ' + JSON.stringify(v));
+            assert.equal(v.line, true, 'and the suggestion line goes');
+            await client.Input.insertText({ text: '2' });
+            assert.equal(await ev(`document.getElementById('launch-team-dir').value`), '/tmp/mine2', 'further typing is ordinary typing');
+        });
         // #13510: on the Windows runner the note held "D:\\a\\_temp\\coral-cdp-...": a backslash path has no place to break, so at 390 px and 200% text it ran past the dialog and was cut
         // (phone_targets_census_b failed its first attempt on it). The note wraps anywhere in a long path. Checked with a path of that shape on any computer.
         await S.run('New team: a long Windows path in the note wraps inside the dialog (390 px, 200% text)', async () => {
