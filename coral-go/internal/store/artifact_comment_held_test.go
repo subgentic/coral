@@ -63,3 +63,35 @@ func TestAHeldCommentIsNotDroppedWhenTheAsksDayPasses(t *testing.T) {
 	assert.True(t, a.OpenAt(now.Add(time.Hour)), "delivered, the ask is open again: the agent has its day to answer from now")
 	assert.Nil(t, a.QueuedAt)
 }
+
+// #17549: a hold older than HeldAskMaxAge is listed as stale, and dropping it clears the words and closes the ask, once.
+func TestAStaleHoldIsListedAndDroppedOnce(t *testing.T) {
+	ctx := context.Background()
+	s := newCommentStore(t)
+	require.NoError(t, s.RegisterLiveSession(ctx, &LiveSession{SessionID: "sess-1", AgentType: "claude", AgentName: "dev", WorkingDir: "/tmp"}))
+	now := time.Now()
+	_, _, err := s.CreateArtifactAsk(ctx, 1, artA, "team-a", "sess-1", "Dev", now)
+	require.NoError(t, err)
+	ok, err := s.HoldAskMessage(ctx, 1, "sess-1", "the held words", false, false, now)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	stale, err := s.StaleHeldAsks(ctx, now.Add(HeldAskMaxAge-time.Hour).Add(-HeldAskMaxAge), 10)
+	require.NoError(t, err)
+	assert.Empty(t, stale, "a fresh hold is not stale")
+	stale, err = s.StaleHeldAsks(ctx, now.Add(time.Hour), 10)
+	require.NoError(t, err)
+	require.Len(t, stale, 1)
+	dropped, err := s.DropHeldAsk(ctx, stale[0].ID, now)
+	require.NoError(t, err)
+	assert.True(t, dropped)
+	dropped, err = s.DropHeldAsk(ctx, stale[0].ID, now)
+	require.NoError(t, err)
+	assert.False(t, dropped, "once")
+	a, found, err := s.GetArtifactAsk(ctx, 1, "sess-1")
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Nil(t, a.QueuedAt)
+	assert.Empty(t, a.QueuedMsg)
+	assert.NotNil(t, a.ClosedAt)
+}

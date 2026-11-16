@@ -214,3 +214,33 @@ func TestAGoalCommentForABusyDriverWaitsUntilItsTurnEnds(t *testing.T) {
 	require.Len(t, msgs, 1, "delivered when the driver is free")
 	assert.Contains(t, msgs[0].Content, "Please also cover the retries.")
 }
+
+// #17549: a comment held for an agent that never comes free is not held for ever, nor dropped silently: after store.HeldAskMaxAge the thread gets a reply saying it was never delivered, and the hold ends.
+func TestAHoldForAnAgentThatNeverComesFreeEndsWithANoticeInTheThread(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.turn(1, "Dev", "prompt_submit") // mid-turn, and the turn never ends
+	cid := rig.ownerComment("Try 5,000 rows per batch.")
+	code, out := rig.send(cid, "Dev")
+	require.Equal(t, http.StatusOK, code, fmt.Sprint(out))
+	require.True(t, rig.askQueued(cid, 1))
+	before := len(rig.stored())
+
+	rig.h.flushHeldComments(context.Background(), time.Now().Add(store.HeldAskMaxAge-time.Hour))
+	assert.True(t, rig.askQueued(cid, 1), "still held before the limit")
+	assert.Len(t, rig.stored(), before, "and nothing said")
+
+	rig.h.flushHeldComments(context.Background(), time.Now().Add(store.HeldAskMaxAge+time.Hour))
+	assert.False(t, rig.askQueued(cid, 1), "the hold ended")
+	all := rig.stored()
+	require.Len(t, all, before+1, "with a reply in the thread")
+	last := all[len(all)-1]
+	assert.Equal(t, "agent", last.AuthorKind, "an agent-kind reply is news in Needs you")
+	assert.Contains(t, last.Body, "Not delivered")
+	assert.Contains(t, last.Body, "Dev")
+	require.NotNil(t, last.ParentID)
+	assert.Equal(t, cid, *last.ParentID)
+	rig.h.flushHeldComments(context.Background(), time.Now().Add(store.HeldAskMaxAge+2*time.Hour))
+	assert.Len(t, rig.stored(), before+1, "said once")
+	assert.Empty(t, rig.operatorMessages(), "the agent was never typed anything")
+}

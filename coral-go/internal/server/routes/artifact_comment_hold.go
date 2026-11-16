@@ -7,6 +7,7 @@ package routes
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -72,8 +73,46 @@ func (h *SessionsHandler) RunCommentHolds(ctx context.Context) {
 	}
 }
 
-// flushHeldComments is one pass: for each agent holding comments that is free for them, one board message (the held ones joined in the order they were held) is posted and the holds end.
+// flushHeldComments is one pass: the held comments of free agents are delivered, then the ones held too long for an agent that never came back are told to the Operator (#17549).
 func (h *SessionsHandler) flushHeldComments(ctx context.Context, now time.Time) {
+	h.deliverHeldComments(ctx, now)
+	h.surfaceStaleHolds(ctx, now)
+}
+
+// surfaceStaleHolds ends the holds older than store.HeldAskMaxAge: a reply in the comment's thread says it was never delivered (an agent's reply is news in Needs you, so the Operator sees it), and only then
+// is the hold dropped, so a failure to write the notice leaves the hold to be tried again, never a silent drop.
+func (h *SessionsHandler) surfaceStaleHolds(ctx context.Context, now time.Time) {
+	if h.ss == nil {
+		return
+	}
+	stale, err := h.ss.StaleHeldAsks(ctx, now.Add(-store.HeldAskMaxAge), commentHoldBatch)
+	if err != nil {
+		return
+	}
+	for _, a := range stale {
+		root, ok, err := h.ss.GetArtifactComment(ctx, a.ArtifactID, a.CommentID)
+		if err != nil || !ok {
+			continue
+		}
+		parent := root.ID
+		if root.ParentID != nil {
+			parent = *root.ParentID
+		}
+		days := int(store.HeldAskMaxAge / (24 * time.Hour))
+		body := fmt.Sprintf("Not delivered: %s did not wake in %d days, so this comment was never sent to it. Send it again when the agent is back.", cleanCommentName(a.AgentName), days)
+		if _, err := h.ss.CreateArtifactComment(ctx, store.ArtifactComment{ArtifactID: a.ArtifactID, Board: a.Board, ParentID: &parent, Body: body,
+			AuthorIssuer: "coral", AuthorSubject: "coral-held-comment", AuthorName: "Coral", AuthorKind: commentCallerAgent}); err != nil {
+			slog.Warn("[artifact comments] the notice of a stale held comment was not written; it stays held", "ask", a.ID, "error", err)
+			continue
+		}
+		if _, err := h.ss.DropHeldAsk(ctx, a.ID, now); err != nil {
+			slog.Warn("[artifact comments] a stale hold was not dropped", "ask", a.ID, "error", err)
+		}
+	}
+}
+
+// deliverHeldComments is one delivery pass: for each agent holding comments that is free for them, one board message (the held ones joined in the order they were held) is posted and the holds end.
+func (h *SessionsHandler) deliverHeldComments(ctx context.Context, now time.Time) {
 	if h.ss == nil || h.bs == nil || h.ts == nil {
 		return
 	}
