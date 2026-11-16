@@ -431,7 +431,6 @@ var welcomeTitles = map[string]string{
 	"welcome": "Welcome to Coral",
 	"agent":   "Start your first agent",
 	"team":    "Make a team so agents can work together",
-	"connect": "Connect a second computer or the Hub",
 	"asks":    "How agents ask you for things",
 	"guide":   "Read the Coral guide",
 }
