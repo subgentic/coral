@@ -281,6 +281,8 @@ export function attachReview(d, { reload }) {
     document.addEventListener('coral:review-approved', e => { if (cur && cur.team === e.detail.team && cur.row.id === e.detail.id && cur.state !== 'approved') show({ ...cur, state: 'approved', at: e.detail.at }); });
     // The file may be settled while its viewer is open (a link opens from the rows the Inbox has, up to a scan old; #13128): when the Inbox's list is read again and no longer holds the pending file, the file's own state
     // is read once more and the viewer says what it is now (Approved, no Approve button), instead of leaving a decision that the server would only refuse.
+    // Cost (#17835): every reviews-changed with a pending or changes-requested viewer open does this fresh read, one request for the file's row and series, two when it is no longer waiting. The event fires when the
+    // Inbox's reviews change, not on a timer of this viewer's own, so a quiet Inbox costs nothing; a viewer in any other state returns first and reads nothing.
     document.addEventListener('coral:reviews-changed', async () => {
         const was = cur, g = gen;
         if (!was || (was.state !== 'pending' && was.state !== 'changes')) return;
