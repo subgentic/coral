@@ -75,10 +75,33 @@ func (s *SessionStore) OpenAgentAsk(ctx context.Context, id int64) (*AgentAsk, e
 	return &list[0], nil
 }
 
-// ReopenAgentAsk puts back a question that was claimed for an answer which then could not be delivered (#18667): it is the Operator's again.
+// ReopenAgentAsk puts back a question that was claimed for an answer which then could not be delivered (#18667): it is the Operator's again. Never one that was dismissed (that is Undo's, below).
 func (s *SessionStore) ReopenAgentAsk(ctx context.Context, id int64) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE agent_asks SET answered_at = NULL WHERE id = ?`, id)
+	_, err := s.db.ExecContext(ctx, `UPDATE agent_asks SET answered_at = NULL WHERE id = ? AND dismissed_at IS NULL`, id)
 	return err
+}
+
+// DismissAgentAsk closes a question as dismissed; false when it was not open.
+func (s *SessionStore) DismissAgentAsk(ctx context.Context, id int64, now time.Time) (bool, error) {
+	at := now.UTC().Format(ISOFormat)
+	res, err := s.db.ExecContext(ctx, `UPDATE agent_asks SET answered_at = ?, dismissed_at = ? WHERE id = ? AND answered_at IS NULL`, at, at, id)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return err == nil && n == 1, err
+}
+
+// UndoDismissAgentAsk puts back a question the Operator dismissed (#18714): an answered one, or one closed because its agent exited, stays closed (a second answer would be typed into the agent twice).
+// False when it was not dismissed, or the agent has asked something newer since.
+func (s *SessionStore) UndoDismissAgentAsk(ctx context.Context, id int64) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE agent_asks SET answered_at = NULL, dismissed_at = NULL WHERE id = ? AND dismissed_at IS NOT NULL
+		AND NOT EXISTS (SELECT 1 FROM agent_asks n WHERE n.session_id = agent_asks.session_id AND n.id > agent_asks.id AND n.answered_at IS NULL)`, id)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return err == nil && n == 1, err
 }
 
 // CloseAgentAsk marks a question answered; false when it was not open (another answer got there first).

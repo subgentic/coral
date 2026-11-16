@@ -202,8 +202,13 @@ func (h *AgentAsksHandler) Dismiss(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if body.Undo {
-		if err := h.ss.ReopenAgentAsk(r.Context(), id); err != nil {
+		back, err := h.ss.UndoDismissAgentAsk(r.Context(), id)
+		if err != nil {
 			errInternalServer(w, "could not bring the question back")
+			return
+		}
+		if !back {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "not_dismissed", "message": "That question was not dismissed, or the agent has asked something newer since."})
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
@@ -218,7 +223,7 @@ func (h *AgentAsksHandler) Dismiss(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "not_open", "message": "That question is already answered or was replaced."})
 		return
 	}
-	if claimed, err := h.ss.CloseAgentAsk(r.Context(), id, time.Now()); err != nil || !claimed {
+	if claimed, err := h.ss.DismissAgentAsk(r.Context(), id, time.Now()); err != nil || !claimed {
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "not_open", "message": "That question is already answered or was replaced."})
 		return
 	}
@@ -245,8 +250,7 @@ func (h *AgentAsksHandler) Rows(r *http.Request) []operatorAskRow {
 	rows := make([]operatorAskRow, 0, len(list))
 	for _, a := range list {
 		ls := live[a.SessionID]
-		if live != nil && ls == nil { // its agent has exited: nobody is left to read an answer, so the question leaves Needs you by itself (#18668)
-			_, _ = h.ss.CloseAgentAsk(r.Context(), a.ID, time.Now())
+		if live != nil && ls == nil { // its agent has exited: nobody is left to read an answer. The row is closed when the session ends (UnregisterLiveSession); a read never writes (#18714)
 			continue
 		}
 		text, cut := operatorAskText(a.Text) // the choices are buttons now (Options), not text in the question

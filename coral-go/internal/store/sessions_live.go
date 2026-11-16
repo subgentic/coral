@@ -170,6 +170,10 @@ func (s *SessionStore) UnregisterLiveSession(ctx context.Context, sessionID stri
 		if err := revokeSessionTokensTx(ctx, tx, sessionID); err != nil {
 			return err
 		}
+		// Nobody is left to read the answer to its open question: it leaves Needs you here, once, not on a read of the list (#18714).
+		if _, err := tx.ExecContext(ctx, "UPDATE agent_asks SET answered_at = ? WHERE session_id = ? AND answered_at IS NULL", nowUTC(), sessionID); err != nil {
+			return err
+		}
 		_, err := tx.ExecContext(ctx,
 			"UPDATE live_sessions SET status = 'inactive', stopped_at = ? WHERE session_id = ?",
 			nowUTC(), sessionID)
