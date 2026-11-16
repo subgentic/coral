@@ -11,6 +11,7 @@ import { importOnce } from './import_once.js';
 import { askParts, askSubjects, fromAnotherComputer, buttonsOffered, noteButtonsOwnerOnly, yesNoButtons, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, operatorAsks, askKey, replyToAsk as replyOnBoard, closeAnsweredDuplicates, forgetAsk, questionContextNote } from './operator_asks.js';
 const replyToAsk = (a, text) => a.kind === 'agent' ? importOnce('./agent_ask_answer.js').then(m => m.answerAgentAsk(a, text)) : replyOnBoard(a, text); // a single agent's question (#18106) is answered in its conversation, not on a board
 await loadStyles('operator_ask_dialog.css');
+const { askPageLabel, openAskPage } = await importOnce('./ask_open_page.js'); // loaded with the dialog, never at startup (#18768)
 
 const isReply = action => /^reply$/.test(action);
 
@@ -75,10 +76,18 @@ export function openAskDialog(a, onDone, runners = {}) {
         offered?.remove(); offered = null; review?.remove(); review = null; choices.length = 0;
         binary = yesNoButtons(a);
         const offers = buttonsOffered(a);
-        if (offers.length) { // what the asker offered: one tap per choice, each with what it does
+        const pageLabel = a.kind === 'agent' ? askPageLabel(a.open_page) : ''; // a page of Coral the asker offered a button for (#18768)
+        send.classList.toggle('btn-primary', !pageLabel); // one primary button to a dialog: with an Open button, that is the primary and Send reply is the plain one
+        if (offers.length || pageLabel) { // what the asker offered: one tap per choice, each with what it does
             offered = document.createElement('section'); offered.className = 'inbox-ask-offers'; offered.setAttribute('aria-label', `Buttons ${markHidden(a.asker, { strict: true })} offered`);
             const head = document.createElement('p'); head.className = 'inbox-ask-offers-head'; head.textContent = offers.every(b => isReply(b.action)) ? 'Choose a reply, or write your own.' : 'Choose an action, or write a reply.';
             const list = document.createElement('div'); list.className = 'inbox-ask-offers-list';
+            if (pageLabel) { // the primary button: it goes to the page and answers nothing, so Done / Skip / Stop still work after it (#18768)
+                const item = document.createElement('div'); item.className = 'inbox-ask-offer';
+                const open = document.createElement('button'); open.type = 'button'; open.className = 'btn btn-primary inbox-ask-open-page'; open.textContent = pageLabel; open.dataset.openPage = a.open_page;
+                open.addEventListener('click', () => { finish(); try { openAskPage(a.open_page); } catch (e) { showToast(e.message || 'That did not open.', true); } }); // the dialog is modal: it goes before the page; the question stays open in Needs you
+                item.append(open); list.append(item);
+            }
             for (const b of offers) {
                 const item = document.createElement('div'); item.className = 'inbox-ask-offer';
                 const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn'; const label = binary ? (b.label === 'Yes' ? 'Approve' : 'Deny') : markHidden(b.label, { strict: true }); btn.textContent = label; btn.dataset.buttonId = String(b.id);
