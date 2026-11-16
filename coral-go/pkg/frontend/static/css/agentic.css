@@ -2034,3 +2034,4 @@ body.panel-dragging .agentic-state {
 .inline-preview-cm .cm-merge-b .cm-changedLine,
 .inline-preview-cm .cm-deletedChunk { color: var(--diff-line-text, inherit); }
 .inline-preview-cm .cm-merge-b .cm-line:not(.cm-changedLine) span { filter: var(--diff-context-filter, none); } /* the lines around a change: a comment was 3.9:1 on the dark editor */
+.agentic-state-tabs > .agentic-tab { min-width: 44px; } /* 44 px is the target, not 2em: at 200% text 2em is 64 px a tab and the row (Board, Files with its count, Artifacts, Tasks, More) no longer fits, so the open tab lost its word and the row was cut off (#17417) */
