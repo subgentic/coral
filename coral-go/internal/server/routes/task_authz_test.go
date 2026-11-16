@@ -85,5 +85,5 @@ func TestTaskRoutesNeedAPlannerOrTheAssignee(t *testing.T) {
 	task, err := h.bs.GetTask(ctx, "team", id)
 	require.NoError(t, err)
 	assert.NotEqual(t, "skipped", task.Status, "not cancelled by the other worker")
-	assert.Equal(t, http.StatusOK, req("POST", p("/cancel"), map[string]any{"subscriber_id": "Dev1"}), "the assignee")
+	assert.Equal(t, http.StatusOK, req("POST", p("/cancel"), map[string]any{"subscriber_id": "Dev1", "message": "not needed"}), "the assignee")
 }

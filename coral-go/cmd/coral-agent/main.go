@@ -57,7 +57,7 @@ Commands:
   task edit <id> [options]       Edit unstarted task text/dependencies (task edit --help)
   task current [--json]          Show your current in-progress task
   task complete <id> [--message "note"]  Complete with outcome/evidence
-  task cancel <id> [--message "reason"]  Cancel a task
+  task cancel <id> --message "reason"  Cancel a task
   history search <query> [flags] Search conversation history (post-compaction)
   history context [sess] <idx>   Retrieve surrounding conversation context
   search <query> [flags]         Shortcut for 'history search'

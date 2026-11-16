@@ -172,7 +172,7 @@ func cmdTaskComplete(st *boardState, args []string) {
 
 func cmdTaskCancel(st *boardState, args []string) {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "Usage: coral-board task cancel <id> [--message \"reason\"]")
+		fmt.Fprintln(os.Stderr, "Usage: coral-board task cancel <id> --message \"reason\"")
 		clierr.Exit1()
 	}
 

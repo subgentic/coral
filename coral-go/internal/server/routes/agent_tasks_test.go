@@ -89,6 +89,9 @@ func TestAgentTasks_MirrorBoardTaskAPI(t *testing.T) {
 	assert.Equal(t, "Logged in battle_log.go", done["completion_message"])
 
 	// cancel -> skipped (board vocabulary); a cancelled task is never claimed
+	code, refused := post(fmt.Sprintf("/api/agent/tasks/%v/cancel", added["id"]), map[string]any{"session_id": "solo-1", "message": "  "})
+	assert.Equal(t, http.StatusBadRequest, code, "a skip with no reason is refused (#17614)")
+	assert.Equal(t, "reason_required", refused["code"])
 	code, cancelled := post(fmt.Sprintf("/api/agent/tasks/%v/cancel", added["id"]), map[string]any{"session_id": "solo-1", "message": "Not needed"})
 	require.Equal(t, http.StatusOK, code)
 	assert.Equal(t, "skipped", cancelled["status"])

@@ -310,6 +310,10 @@ func (h *SessionsHandler) finishAgentTask(w http.ResponseWriter, r *http.Request
 		errNotFound(w, "No such task for this agent. If this is a board task, use 'coral-board task complete' instead.")
 		return
 	}
+	if state == store.AgentTaskCancelled && strings.TrimSpace(body.Message) == "" && !humanInputCaller(r) {
+		writeError(w, http.StatusBadRequest, "reason_required", "say why this task is being skipped: add a message (the reason is kept on the task)") // #17614
+		return
+	}
 	if err := h.ts.FinishAgentTaskWithArtifactsAndCandidate(r.Context(), taskID, state, body.Message, body.Outcome, body.Artifacts, body.CandidateRevision); err != nil {
 		errBadRequest(w, err.Error())
 		return

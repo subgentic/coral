@@ -20,7 +20,7 @@ Commands:
   task edit <id> [options]       Edit unstarted task text/dependencies (task edit --help)
   task current [--json]          Show your current in-progress task
   task complete <id> [--message "note"]  Complete with outcome/evidence
-  task cancel <id> [--message "reason"]  Cancel a task
+  task cancel <id> --message "reason"  Cancel a task
   history search <query> [flags] Search conversation history (post-compaction)
   history context [sess] <idx>   Retrieve surrounding conversation context
   search <query> [flags]         Shortcut for 'history search'
@@ -73,7 +73,7 @@ Commands:
   task edit <id> [options]       Edit unstarted task text/dependencies (task edit --help)
   task current [--json]          Show your current in-progress task
   task complete <id> [--message "note"]  Complete with outcome/evidence
-  task cancel <id> [--message "reason"]  Cancel a task
+  task cancel <id> --message "reason"  Cancel a task
   history search <query> [flags] Search conversation history (post-compaction)
   history context [sess] <idx>   Retrieve surrounding conversation context
   search <query> [flags]         Shortcut for 'history search'
@@ -126,7 +126,7 @@ Commands:
   task edit <id> [options]       Edit unstarted task text/dependencies (task edit --help)
   task current [--json]          Show your current in-progress task
   task complete <id> [--message "note"]  Complete with outcome/evidence
-  task cancel <id> [--message "reason"]  Cancel a task
+  task cancel <id> --message "reason"  Cancel a task
   history search <query> [flags] Search conversation history (post-compaction)
   history context [sess] <idx>   Retrieve surrounding conversation context
   search <query> [flags]         Shortcut for 'history search'
@@ -281,7 +281,7 @@ Subcommands:
   complete <id> [--message "note"] [--outcome success|failed]
        [--artifacts manifest.json] [--candidate-revision REVISION]
                                  Complete with outcome/evidence
-  cancel <id> [--message "reason"]
+  cancel <id> --message "reason"
 
 Add options:
   --blocked-by '[{"task_id":1,"condition":"success","required_artifacts":["build"]}]'
@@ -329,7 +329,7 @@ Subcommands:
   complete <id> [--message "note"] [--outcome success|failed]
        [--artifacts manifest.json] [--candidate-revision REVISION]
                                  Complete with outcome/evidence
-  cancel <id> [--message "reason"]
+  cancel <id> --message "reason"
 
 Add options:
   --blocked-by '[{"task_id":1,"condition":"success","required_artifacts":["build"]}]'
@@ -360,7 +360,7 @@ Subcommands:
   complete <id> [--message "note"] [--outcome success|failed]
        [--artifacts manifest.json] [--candidate-revision REVISION]
                                  Complete with outcome/evidence
-  cancel <id> [--message "reason"]
+  cancel <id> --message "reason"
 
 Add options:
   --blocked-by '[{"task_id":1,"condition":"success","required_artifacts":["build"]}]'
@@ -390,7 +390,7 @@ Subcommands:
   complete <id> [--message "note"] [--outcome success|failed]
        [--artifacts manifest.json] [--candidate-revision REVISION]
                                  Complete with outcome/evidence
-  cancel <id> [--message "reason"]
+  cancel <id> --message "reason"
 
 Add options:
   --blocked-by '[{"task_id":1,"condition":"success","required_artifacts":["build"]}]'
@@ -420,7 +420,7 @@ Subcommands:
   complete <id> [--message "note"] [--outcome success|failed]
        [--artifacts manifest.json] [--candidate-revision REVISION]
                                  Complete with outcome/evidence
-  cancel <id> [--message "reason"]
+  cancel <id> --message "reason"
 
 Add options:
   --blocked-by '[{"task_id":1,"condition":"success","required_artifacts":["build"]}]'
@@ -450,7 +450,7 @@ Subcommands:
   complete <id> [--message "note"] [--outcome success|failed]
        [--artifacts manifest.json] [--candidate-revision REVISION]
                                  Complete with outcome/evidence
-  cancel <id> [--message "reason"]
+  cancel <id> --message "reason"
 
 Add options:
   --blocked-by '[{"task_id":1,"condition":"success","required_artifacts":["build"]}]'

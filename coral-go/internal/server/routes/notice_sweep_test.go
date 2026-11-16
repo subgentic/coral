@@ -91,7 +91,7 @@ func TestTaskLifecycleNoticesQuoteWhatWasWrittenWithoutTaggingAnyone(t *testing.
 	code, out = postCode(t, root+"/tasks", map[string]any{"title": "Docs Writer — cancel me", "created_by": "lead"})
 	require.Equal(t, http.StatusCreated, code, "%v", out)
 	cid := int64(out["id"].(float64))
-	code, out = postCode(t, base(cid, "cancel"), map[string]any{"subscriber_id": "lead"})
+	code, out = postCode(t, base(cid, "cancel"), map[string]any{"subscriber_id": "lead", "message": "not needed"})
 	require.Equal(t, http.StatusOK, code, "%v", out)
 	h.WaitBackground()
 	noOneTagged(t, h, "life", "a lifecycle notice tagged a bystander")
