@@ -109,6 +109,7 @@ func (h *SystemHandler) PutSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	values := settingStrings(body)
+	before, _ := h.ss.GetSettings(r.Context()) // read before the write: the Activity row for a welcome Dismiss names the item the write closed
 	// One request's settings are written together (one transaction): a later PUT can never
 	// land between two of its keys and be half overwritten by the rest (#3547: the dashboard
 	// saved welcome_choice and welcome_pending, and a PUT in between lost its welcome_pending).
@@ -125,7 +126,7 @@ func (h *SystemHandler) PutSettings(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if _, ok := values[key]; ok {
-			noteActivity(r, board.ActInboxHide, "setting", key, "", "", "")
+			noteActivity(r, board.ActInboxHide, "setting", key, "", welcomeDismissTitle(key, before, values), "")
 			break
 		}
 	}
@@ -429,4 +430,38 @@ func validBoolSetting(v any) (on bool, valid bool) {
 		}
 	}
 	return false, false
+}
+
+// welcomeTitles are the Getting started items' names as the Inbox says them (welcome_items.js WELCOME): an Activity row names what was dismissed (#18620).
+var welcomeTitles = map[string]string{
+	"welcome": "Welcome to Coral",
+	"agent":   "Start your first agent",
+	"team":    "Make a team so agents can work together",
+	"asks":    "How agents ask you for things",
+	"guide":   "Read the Coral guide",
+}
+
+// welcomeDismissTitle is what a welcome Dismiss in the settings dismissed: the items this write added to inbox_welcome_done, or the whole Getting started block when
+// inbox_welcome went off. Empty for anything else (a goal-looks-done row names itself elsewhere), so the row keeps the kind's words, as old rows do.
+func welcomeDismissTitle(key string, before, values map[string]string) string {
+	switch key {
+	case "inbox_welcome":
+		if setreg.Raw(values, "inbox_welcome") == "off" {
+			return "Getting started"
+		}
+	case "inbox_welcome_done":
+		had := map[string]bool{}
+		for _, id := range strings.Split(setreg.Raw(before, "inbox_welcome_done"), ",") {
+			had[strings.TrimSpace(id)] = true
+		}
+		var names []string
+		for _, id := range strings.Split(setreg.Raw(values, "inbox_welcome_done"), ",") {
+			if id = strings.TrimSpace(id); !had[id] && welcomeTitles[id] != "" {
+				names = append(names, welcomeTitles[id])
+				had[id] = true
+			}
+		}
+		return strings.Join(names, ", ")
+	}
+	return ""
 }
