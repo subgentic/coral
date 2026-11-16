@@ -2,6 +2,7 @@
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
+const { guardSettings } = require('./helpers/settings_guard');
 
 const WORLD = `(() => {
     const real = window.fetch; const at = m => new Date(Date.now() - m * 60000).toISOString();
@@ -16,6 +17,7 @@ const WORLD = `(() => {
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const failures = [];
+    const guard = await guardSettings(); // the suite acknowledges the launch notice on the server (launch_disclosure_ack): put back at the end (#17688)
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const S = `(window.__coralStatic || '/static/')`;
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
@@ -39,7 +41,7 @@ const WORLD = `(() => {
             await ev(`(async () => { const d = await (await fetch('/api/launch-disclosure')).json(); if (d && d.seen === false) { await fetch('/api/launch-disclosure/ack', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: d.id }) }); await import(${S} + 'launch_disclosure.js').then(m => m.refreshLaunchDisclosure()); } return true; })()`); // the launch notice (#16460) sits above the list in the phone Inbox and moves row 4 under the toast: this check is about the toast, so the notice is read first (isolated server)
             const low = await ev(`(() => { const t = document.getElementById('notices').getBoundingClientRect(), nav = document.getElementById('phone-nav'), n = nav && nav.getClientRects().length ? nav.getBoundingClientRect() : null, rows = [...document.querySelectorAll('#group-table-view tbody tr')].slice(0, 4).map(r => r.getBoundingClientRect()); return { top: Math.round(t.top), bottom: Math.round(t.bottom), navTop: n ? Math.round(n.top) : null, vh: innerHeight, overRows: rows.filter(r => r.height > 0 && t.top < r.bottom && t.bottom > r.top).length }; })()`);
             check(low.overRows === 0 && low.top > low.vh / 2 && (low.navTop === null || low.bottom <= low.navTop + 1), 'the toast is at the bottom, above the bottom bar, over none of the first four rows: ' + JSON.stringify(low));
-    } finally { await client.close(); }
+    } finally { await guard.restore(); await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
     console.log('phone_polish_browser: ok');
 })().catch(e => { console.error(e); process.exit(1); });
