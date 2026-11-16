@@ -18,6 +18,7 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`!!document.querySelector('.session-group-item .sidebar-kebab-btn')`, 'the agent row', 10000);
         await ev(`document.querySelector('.session-group-item .sidebar-kebab-btn').click(); true`);
         await waitFor(`[...document.querySelectorAll('.sidebar-kebab-menu')].some(m => getComputedStyle(m).display !== 'none')`, 'the menu opens', 4000);
+        await require('./helpers/scene_shots')(Page, 'agent-menu')('1280'); // evidence for the menu (a no-op unless CORAL_SCREENSHOT_DIR is set)
         const m = await ev(`(() => { const menu = [...document.querySelectorAll('.sidebar-kebab-menu')].find(x => getComputedStyle(x).display !== 'none'); const txt = e => e.textContent.replace(/\\s+/g, ' ').trim();
             const shown = [...menu.querySelectorAll('[role=menuitem], [role=menuitemcheckbox], .menu-item')].filter(e => !e.closest('[hidden]') && e.getClientRects().length).map(txt);
             const group = menu.querySelector('[role=group][hidden], .team-menu-more[hidden]'); const inGroup = group ? [...group.querySelectorAll('.menu-item')].map(txt) : null;
@@ -32,6 +33,8 @@ const { coralReady } = require('./helpers/wait');
         if (!m.more || !m.inGroup) problems.push('there is a More item with its group hidden under it');
         else for (const w of ['Set Icon', 'Session Info']) if (!m.inGroup.some(x => x.startsWith(w))) problems.push(`"${w}" is in the More group (${JSON.stringify(m.inGroup)})`);
         if (!m.switchDrawn) problems.push('Auto-accept is drawn as a switch (.menu-switch), not a tick');
+        // the card's menu is short (#17035, from #16688): Auto-sleep, Auto-accept and the instructions (and Full access where offered) are under More with Set Icon and Session Info, not in the first list
+        for (const re of [/auto-sleep/i, /auto-accept/i, /instructions/i]) { if (m.shown.some(x => re.test(x))) problems.push(`${re} is under More, not in the first list (${JSON.stringify(m.shown)})`); if (m.inGroup && !m.inGroup.some(x => re.test(x))) problems.push(`${re} is in the More group (${JSON.stringify(m.inGroup)})`); }
         await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
         await ev(`window.toggleAgentSleep('proj1', 'claude', 'w-sid', 'sleep'); true`);
         await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the Sleep dialog', 4000);
