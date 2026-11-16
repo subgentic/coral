@@ -99,14 +99,14 @@ async function loadUnread() {
         const replies = settled.filter(r => r.status === 'fulfilled').map(r => r.value); // a computer that does not answer must not blank the others' numbers
         if (!replies.length && settled.length) return;
         const rows = replies.flat().filter(s => chatUnread(s));
-        const next = { chats: rows.filter(s => !isGroup(s)).length, 'chats-group': rows.filter(isGroup).length, 'chats-starred': rows.filter(s => s.starred).length, 'chats-active': rows.filter(s => s.active).length, 'chats-archived': rows.filter(s => s.archived).length };
+        const next = { chats: rows.filter(s => !isGroup(s)).length, 'chats-group': rows.filter(isGroup).length, 'chats-starred': rows.filter(s => s.starred).length, 'chats-active': rows.filter(s => s.active && !isGroup(s)).length, 'chats-archived': rows.filter(s => s.archived && !isGroup(s)).length }; // Active now and Archived are the agents' folders, as the counts route has them: a team's board chat is in Board history, and a live team made it 'active' too (3 agents, Active now 4, #17482)
         for (const [t] of CLIS) { const types = t === 'agy' ? ['agy', 'antigravity', 'gemini'] : [t]; next[`chats-cli-${t}`] = rows.filter(s => !isGroup(s) && types.includes(s.source_type)).length; }
         unread = next;
     } catch { /* the folders keep their last numbers */ }
 }
 
 /** The folders a chat row is in, for the unread numbers. */
-const foldersOf = s => [isGroup(s) ? 'chats-group' : 'chats', ...(s.starred ? ['chats-starred'] : []), ...(s.active ? ['chats-active'] : []), ...(s.archived ? ['chats-archived'] : []),
+const foldersOf = s => [isGroup(s) ? 'chats-group' : 'chats', ...(s.starred ? ['chats-starred'] : []), ...(s.active && !isGroup(s) ? ['chats-active'] : []), ...(s.archived && !isGroup(s) ? ['chats-archived'] : []),
     ...(isGroup(s) ? [] : CLIS.filter(([t]) => (t === 'agy' ? ['agy', 'antigravity', 'gemini'] : [t]).includes(s.source_type)).map(([t]) => `chats-cli-${t}`))];
 const bump = (keys, by) => { if (unread) for (const k of keys) unread[k] = Math.max(0, (unread[k] || 0) + by); };
 /** A chat was opened from the Inbox: marked read, and the numbers of the folders it is in go down by one, in memory, with no request (#9703). */
