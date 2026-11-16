@@ -25,11 +25,18 @@ const { coralReady } = require('./helpers/wait');
             return seen;
         };
         const plain = await ask('plain', { agents: [{ name: 'Orchestrator' }, { name: 'QA Engineer' }] });
-        assert.equal(plain.title, 'Before starting: agents default to auto mode', 'members all in the default: the notice is as it was');
+        assert.equal(plain.title, 'Agents launch in auto mode', 'members all in the default: the notice is as it was');
         assert.equal(plain.message, 'Agents can act without asking you.', 'and its text is the server\'s alone');
         const mixed = await ask('mixed', { agents: [{ name: 'Orchestrator' }, { name: 'QA Engineer', permission_mode: 'custom:m1' }, { name: 'Dev' }] });
-        assert.equal(mixed.title, 'Before starting: most agents default to auto mode', 'one member has its own mode: not every agent defaults to auto');
+        assert.equal(mixed.title, 'Most agents launch in auto mode', 'one member has its own mode: not every agent defaults to auto');
         assert.ok(mixed.message.startsWith('Agents can act without asking you.') && mixed.message.endsWith('Not in auto mode: QA Engineer (Edits ok).'), 'the member and its mode are named: ' + mixed.message);
+        // #18765: the dialog names where the default is changed and the name is a link that opens it (Settings > Defaults), not a launch
+        await ev(`window.__asked = null; import(${S} + 'launch_disclosure.js').then(m => m.confirmLaunchDisclosure('local', { id: 'd1', text: 'Agents can act without asking you.', seen: false }, ${JSON.stringify({ agents: [{ name: 'Orchestrator' }] })})).then(v => { window.__asked = v; }); true`);
+        await waitFor(`document.getElementById('confirm-modal')?.getClientRects().length > 0 && !!document.getElementById('confirm-modal-link')`, 'the confirmation has a Settings > Defaults link', 8000);
+        assert.equal(await ev(`document.getElementById('confirm-modal-link').textContent.trim()`), 'Open Settings > Defaults', 'the link names the real place');
+        await ev(`document.getElementById('confirm-modal-link').click(); true`);
+        await waitFor(`window.__asked === false`, 'the link closes the question as a Cancel: nothing launches', 5000);
+        await waitFor(`(() => { const p = document.getElementById('settings-pane-agents'); return !!p && !p.hidden && p.getClientRects().length > 0; })()`, 'Settings opens on Defaults', 8000);
         console.log('launch_notice_modes: ok');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

@@ -86,8 +86,8 @@ func TestTheLaunchNoticeIsReadAndAcknowledgedOnlyByTheOwner(t *testing.T) {
 	assert.Equal(t, LaunchDisclosureID, v["id"])
 	assert.Equal(t, LaunchDisclosureText, v["text"])
 	assert.Equal(t, false, v["seen"])
-	assert.Contains(t, v["text"], "Agents default to auto mode.")
-	assert.Contains(t, v["text"], "when you launch an agent")
+	assert.Contains(t, v["text"], "In auto mode, an agent works without stopping to ask you")
+	assert.Contains(t, v["text"], "Settings > Defaults")
 	assert.NotContains(t, v["text"], "data folder", "no claim that Coral fences its data folder")
 
 	// an agent's token can neither read, acknowledge nor clear it; nothing is stored
@@ -217,10 +217,12 @@ func TestADialogLaunchThatWritesItsShippedModeAsFlagsStillWaitsForTheNotice(t *t
 
 // The Operator's chosen copy is short and points to where a different mode is chosen.
 func TestTheLaunchNoticeNamesAutoDefaultAndModeChoice(t *testing.T) {
-	assert.Contains(t, LaunchDisclosureText, "Agents default to auto mode.")
-	assert.Contains(t, LaunchDisclosureText, "when you launch an agent")
-	assert.Contains(t, LaunchDisclosureText, "set a default in Settings")
-	assert.Equal(t, "full-permissions-4", LaunchDisclosureID, "new words, new id: an older acknowledgement no longer counts")
+	assert.Contains(t, LaunchDisclosureText, "In auto mode, an agent works without stopping to ask you")
+	assert.Contains(t, LaunchDisclosureText, "runs commands and edits files on its own")
+	assert.Contains(t, LaunchDisclosureText, "Each CLI has its own safety checks")
+	assert.Contains(t, LaunchDisclosureText, "change the default in Settings > Defaults")
+	assert.NotContains(t, LaunchDisclosureText, "Agents default to auto mode")
+	assert.Equal(t, "full-permissions-5", LaunchDisclosureID, "new words, new id: an older acknowledgement no longer counts")
 }
 
 // Security's SHOULD on #14353: only "default" names a mode. Any other non-empty permission_mode is dropped by the launch, so it counts as none in each of the three places that decide the gate.
