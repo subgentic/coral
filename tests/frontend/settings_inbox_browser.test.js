@@ -112,7 +112,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`import(${S} + 'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true)`);
             await waitFor(`!!document.querySelector('.inbox-muted-line')`, 'the quiet Muted line', 8000);
             const line = await ev(`(() => { const p = document.querySelector('.inbox-muted-line'); return { text: p.textContent.replace(/\\s+/g, ' ').trim(), btn: !!p.querySelector('button') }; })()`);
-            check(`${tag}: a switched-off kind is never silent: one quiet line says what was muted, and a muted file more than a day old is named once`, /^Muted by your settings: 1 file for review, 1 release summary, 1 decision made for you\. 1 muted file is more than a day old: old-notes\.md\. Show them$/.test(line.text) && line.btn, JSON.stringify(line));
+            check(`${tag}: a switched-off kind is never silent: one quiet line says what was muted, and a muted file more than a day old is named once`, /^Muted by your settings: 1 file for review, 1 release summary, 1 decision made for you\. 1 muted file is more than a day old: old-notes\.md\. Show them Change in Settings$/.test(line.text) && line.btn, JSON.stringify(line));
             await shot(`needs-you-muted-line-${w}`);
             const count = await ev(`import(${S} + 'inbox_reviews.js').then(m => ({ unread: m.unreadReviewItems().length, muted: m.mutedReviewItems().length }))`);
             check(`${tag}: the muted files are not counted, and are kept`, count.unread === 1 && count.muted === 3, JSON.stringify(count));
@@ -145,7 +145,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`import(${S} + 'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true)`);
             await waitFor(`!!document.querySelector('.inbox-muted-line')`, 'the quiet line on the next visit', 8000);
             const again = await ev(`document.querySelector('.inbox-muted-line').textContent.replace(/\\s+/g, ' ').trim()`);
-            check(`${tag}: the day-old file is named once: the next visit says only what is muted`, /^Muted by your settings: 1 file for review\. Show them$/.test(again), again);
+            check(`${tag}: the day-old file is named once: the next visit says only what is muted`, /^Muted by your settings: 1 file for review\. Show them Change in Settings$/.test(again), again);
         }
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
