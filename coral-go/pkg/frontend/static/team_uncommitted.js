@@ -1,5 +1,7 @@
 /* The team page's line about work an agent left uncommitted (#17203): "Files changed in <folder>, not committed: N changed, M new" with Review changes (the list) and Commit (one local commit, never pushed). Lazy, loaded by the team page. */
 import { teamFetch, boardFetch, splitKey } from './server_base.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('team_uncommitted.css'); // the line's layout: not at start
 
 const $ = (id) => document.getElementById(id);
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
