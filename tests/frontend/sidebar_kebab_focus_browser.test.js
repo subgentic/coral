@@ -10,6 +10,9 @@ const { coralReady, framesJs } = require('./helpers/wait');
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { Input } = client;
     const key = (k, code, vk) => Input.dispatchKeyEvent({ type: 'rawKeyDown', key: k, code, windowsVirtualKeyCode: vk }).then(() => Input.dispatchKeyEvent({ type: 'keyUp', key: k, code, windowsVirtualKeyCode: vk }));
+    const label = () => ev(`(() => { const a = document.activeElement; return a ? (a.textContent || a.getAttribute('aria-label') || '').trim().replace(/\\s+/g, ' ').slice(0, 30) : ''; })()`);
+    // One real key press, then wait for the keyboard to move: the menu's keys are loaded before the first press (they load the first time a menu opens, so a press in the first milliseconds finds no handler: a deliberate trade for the start bytes), and no press is repeated
+    const pressMoves = async (k, code, vk) => { const was = await label(); await key(k, code, vk); await waitFor(`(() => { const a = document.activeElement; return ((a && (a.textContent || a.getAttribute('aria-label') || '')).trim().replace(/\\s+/g, ' ').slice(0, 30)) !== ${JSON.stringify(was)}; })()`, `${k} moves the keyboard off "${was}"`, 3000); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Emulation.setFocusEmulationEnabled({ enabled: true });
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
@@ -19,12 +22,16 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             const setList = () => ev(`window.__m.add('proj1', 'A', 2, { sleeping: false, session_id: 'w-sid', display_name: 'Writer', board_project: 'team-x' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); true`);
             await setList();
-            await waitFor(`!!document.querySelector('.session-group-item .sidebar-kebab-btn')`, at + 'the agent row', 10000);
-            const p = await ev(`(() => { const e = document.querySelector('.session-group-item .sidebar-kebab-btn'); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
-            await Input.dispatchMouseEvent({ type: 'mouseMoved', x: p.x, y: p.y }); await Input.dispatchMouseEvent({ type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 }); await Input.dispatchMouseEvent({ type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 });
-            await waitFor(`[...document.querySelectorAll('.sidebar-kebab-menu')].some(m => getComputedStyle(m).display !== 'none')`, at + 'the menu opens', 4000);
+            await waitFor(`!!document.querySelector('.session-group-item[data-session-id="w-sid"] .sidebar-kebab-btn')`, at + 'the agent row', 10000);
+            const clickIt = async () => { const q = await ev(`(() => { const e = document.querySelector('.session-group-item[data-session-id="w-sid"] .sidebar-kebab-btn'); const r = e.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`); await Input.dispatchMouseEvent({ type: 'mouseMoved', x: q.x, y: q.y }); await Input.dispatchMouseEvent({ type: 'mousePressed', x: q.x, y: q.y, button: 'left', clickCount: 1 }); await Input.dispatchMouseEvent({ type: 'mouseReleased', x: q.x, y: q.y, button: 'left', clickCount: 1 }); };
+            // The click is made where the row's button is once the list has stopped moving (the team's card draws after the agent list and shifts it: a click at a stale place opened the team's menu)
+            const rectOf = () => ev(`(() => { const e = document.querySelector('.session-group-item[data-session-id="w-sid"] .sidebar-kebab-btn'); const r = e && e.getBoundingClientRect(); return r ? [Math.round(r.left), Math.round(r.top)].join() : ''; })()`);
+            await ev(`document.querySelector('.session-group-item[data-session-id="w-sid"] .sidebar-kebab-btn').scrollIntoView({ block: 'center' }); true`);
+            for (let j = 0, prev = ''; j < 40; j++) { const now = await rectOf(); if (now && now === prev) break; prev = now; await new Promise(r => setTimeout(r, 100)); } // sleep-ok: waits for the button to stop moving
+            await clickIt();
+            await waitFor(`(() => { const m = document.querySelector('.session-group-item[data-session-id="w-sid"] .sidebar-kebab-menu'); return !!m && getComputedStyle(m).display !== 'none'; })()`, at + 'the menu opens', 4000);
             await ev(`import((window.__coralStatic || '/static/') + 'import_once.js').then(m => m.importOnce('./kebab_keys.js')).then(() => true)`); // the menu's keys load on its first opening: wait for them before pressing any
-            await key('Tab', 'Tab', 9); await key('ArrowDown', 'ArrowDown', 40); await key('ArrowDown', 'ArrowDown', 40); // Tab enters the first item (Sleep since #16371), Down twice goes to the third (Rename), after Open agent tab; Tab inside the menu closes it (#15445)
+            await pressMoves('Tab', 'Tab', 9); await pressMoves('ArrowDown', 'ArrowDown', 40); await pressMoves('ArrowDown', 'ArrowDown', 40); // Tab enters the first item (Sleep since #16371), Down twice goes to the third (Rename), after Open agent tab; Tab inside the menu closes it (#15445)
             const where = () => ev(`(() => { const a = document.activeElement, m = [...document.querySelectorAll('.sidebar-kebab-menu')].find(x => getComputedStyle(x).display !== 'none'); return { label: a ? (a.textContent || a.getAttribute('aria-label') || '').trim().replace(/\\s+/g, ' ').slice(0, 30) : '', inMenu: !!(m && a && m.contains(a)), open: !!m }; })()`);
             const before = await where();
             assert.deepEqual([before.label, before.inMenu, before.open], ['Rename', true, true], at + 'the keyboard is on Rename in the open menu: ' + JSON.stringify(before));
