@@ -17,14 +17,19 @@ const { coralReady } = require('./helpers/wait');
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: false });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev, 'startup', 'liveList', 'settings');
+            // the chat's own reads (every poll) carry the open prompt, as the server's do; without it each read clears the card's answers (_noteReplyState) and draws the card again without them
+            await ev(`window.__po = null; { const R = window.fetch; window.fetch = (u, o = {}) => String(u).includes('/chat?') && window.__po ? R(u, o).then(async r => { const d = await r.json().catch(() => null); return d ? new Response(JSON.stringify({ ...d, prompt_options: window.__po }), { status: r.status, headers: { 'content-type': 'application/json' } }) : r; }) : R(u, o); } true`);
             await ev(`T.state.liveSessions = ${JSON.stringify([base])}; T.render.renderLiveSessions(T.state.liveSessions); window.selectLiveSession('coral-go', 'claude', 'o1'); true`);
             await waitFor(`!!document.getElementById('command-input') && document.getElementById('command-input').getClientRects().length > 0 && !!document.getElementById('live-history-messages')`, `${w}: the chat with its message box`, 10000);
+            // the chat draws its history as it loads and lifts what it holds out and back: the cards are drawn once it has been still for a while
+            await ev(`new Promise(res => { const c = document.getElementById('live-history-messages'); let t; const done = () => { mo.disconnect(); res(true); }; const mo = new MutationObserver(() => { clearTimeout(t); t = setTimeout(done, 600); }); mo.observe(c, { childList: true, subtree: true }); t = setTimeout(done, 600); setTimeout(done, 6000); })`); // sleep-ok: waits for the history draw to go quiet (a mutation observer), capped at 6 s
             for (const [what, summary, options] of [['question', 'Wants to know: Pick a color', [['Red', 'select'], ['Blue', 'select']]], ['permission', 'Wants to run: rm -rf /tmp/x', [['Yes', 'select'], ['No', 'select']]]]) {
                 const check = (ok, msg) => { if (!ok) problems.push(`${w}, ${what}: ${msg}`); };
                 const draw = (sum, open) => ev(`(async () => { const NI = await import(${S} + 'needs_input_card.js'), st = (await import(${S} + 'state.js')).state;
                     const row = { ...${JSON.stringify(base)}, waiting_for_input: ${open}, waiting_summary: ${JSON.stringify(sum)} }; st.liveSessions = [row];
                     NI.pendingToolBySession.clear(); NI.promptOptionsBySession.clear(); NI.loginBySession.clear();
-                    if (${open}) NI.promptOptionsBySession.set('o1', { question: ${JSON.stringify(what === 'question' ? 'Pick a color:' : 'Do you want to proceed?')}, options: ${JSON.stringify(options.map(([label, action], i) => ({ n: i + 1, label, action, selected: i === 0 })))} });
+                    window.__po = ${open} ? { question: ${JSON.stringify(what === 'question' ? 'Pick a color:' : 'Do you want to proceed?')}, options: ${JSON.stringify(options.map(([label, action], i) => ({ n: i + 1, label, action, selected: i === 0 })))} } : null;
+                    if (${open}) NI.setPrompt('o1', { question: ${JSON.stringify(what === 'question' ? 'Pick a color:' : 'Do you want to proceed?')}, options: ${JSON.stringify(options.map(([label, action], i) => ({ n: i + 1, label, action, selected: i === 0 })))} });
                     NI.syncNeedsInputCard(document.getElementById('live-history-messages'), row); return true; })()`);
                 await draw(summary, true);
                 await waitFor(`document.querySelectorAll('#live-history-messages .chat-needs-input .cni-answer').length === 2`, `${w}: the ${what} card`, 5000);
