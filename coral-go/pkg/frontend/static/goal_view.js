@@ -177,7 +177,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         }
         if (W.isOpenGoal(g)) act.push({ key: 'close', cls: 'btn btn-primary goals-close', label: 'Mark done', aria: `Mark done: ${g.title}`, run: () => openClose(g) }); // named for its goal (#15166: the button says Mark done, as the task asks; its dialog is still the Close dialog)
         else if (W.isClosedGoal(g)) act.push({ key: 'reopen', cls: 'btn goals-reopen', label: 'Reopen', run: () => reopenGoal(g) });
-        if (!(g.rollup && g.rollup.done > 0) && !act.some(a => a.key === 'notyet')) { // nothing done and the goal does not look done: the commonest next step is Add task, not Mark done (#16636, walk 27 F8)
+        if (W.isOpenGoal(g) && !(g.rollup && g.rollup.done > 0) && !act.some(a => a.key === 'notyet')) { // nothing done and the goal does not look done: the commonest next step is Add task, not Mark done (#16636, walk 27 F8)
             for (const a of act) { if (a.key === 'close') a.cls = 'btn goals-close'; if (a.key === 'add') a.cls = 'btn btn-primary goals-add-task'; }
         }
         const makeBtn = a => { const b = btn(a.cls, a.label, a.run); if (a.aria) b.setAttribute('aria-label', a.aria); if (a.title) b.title = a.title; return b; };
