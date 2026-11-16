@@ -571,6 +571,15 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 			return
 		}
 		reply["series_id"], reply["version"], reply["versions"] = plan.id, plan.stamp.Version, versions
+		if h.ss != nil && plan.board != "" { // someone on the team answered by uploading the next version: the team's asks on the older versions are done (#17361)
+			old := make([]string, 0, len(plan.rows))
+			for _, m := range plan.rows {
+				old = append(old, m.Digest)
+			}
+			if aerr := h.ss.CloseOpenAsksOfVersions(r.Context(), old, plan.board, time.Now()); aerr != nil {
+				slog.Warn("[artifacts] the asks on the older versions could not be closed", "series", plan.id, "error", aerr)
+			}
+		}
 		fileID, fileVersion = plan.id, plan.stamp.Version
 		slog.Info("[artifacts] a new version", "series", plan.id, "version", plan.stamp.Version, "digest", hexID, "session", sid) // one audit line per version: who, which series, which digest, no content
 	}
