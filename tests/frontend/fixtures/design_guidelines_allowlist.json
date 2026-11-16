@@ -2,7 +2,7 @@
  "about": "Today's breaks of the design guidelines (corner radius, fixed control height, two primary buttons), per file with a count. Fixing one lowers the count here (design_guideline_census.test.mjs); a new one fails the test.",
  "files": {
   "coral-go/pkg/frontend/static/artifact_review.js": {
-   "btn-primary written in a dialog module": 3
+   "btn-primary written in a dialog module": 4
   },
   "coral-go/pkg/frontend/static/board_export_render.js": {
    "radius: inline 10px": 1

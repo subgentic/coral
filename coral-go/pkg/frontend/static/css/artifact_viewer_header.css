@@ -156,6 +156,6 @@
 .artifact-file-navigation .btn { min-width: 44px; min-height: 44px; }
 .artifact-file-position { color: var(--text-secondary); font-size: var(--fs-sm); }
 .artifact-file-help-text { margin: 0; padding: 4px 16px; font-size: var(--fs-sm); color: var(--text-secondary); }
-/* The older-version banner (#18767): across the top of the viewer, above the content, in the one notice's warning tone, with Open vN in it; it wraps on a phone */
-.artifact-newer-banner { flex: none; border-radius: 0; margin: 0; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
-.artifact-newer-banner-text { flex: 1 1 14rem; min-width: 0; font-weight: 600; }
+/* The older-version banner (#18767): across the top of the viewer, above the content: the one notice (warning tone, full-width bar) with Open vN in it; only where it sits is here */
+.artifact-newer-banner { flex: none; margin: 0; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+.artifact-newer-banner-text { flex: 1 1 14rem; min-width: 0; }
