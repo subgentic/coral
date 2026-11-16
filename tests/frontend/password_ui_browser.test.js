@@ -17,7 +17,7 @@ const BASE = require('./test_base').BASE;
         const out = await ev(`(async () => {
             const S = window.__coralStatic || '/static/';
             const sleep = ms => new Promise(r => setTimeout(r, ms));
-            const waitFor = async (cond, what, ms = 4000) => { const end = performance.now() + ms; while (!cond()) { if (performance.now() > end) throw new Error('timed out: ' + what); await sleep(10); } };
+            const waitFor = async (cond, what, ms = 30000) => { const end = performance.now() + ms; while (!cond()) { if (performance.now() > end) { await sleep(0); if (cond()) return; throw new Error('timed out: ' + what); } await sleep(10); } }; // a wall-clock fuse, not a speed check: a page whose main thread stalls for seconds on a loaded shard (its fetch reply is a task of its own) used to trip a 4 s one before the handler under test had run (#18504); a real hang still fails, at 30 s, and the condition gets one more look after the deadline
             const RealFetch = window.fetch;
             const calls = [];
             let status = { authenticated: true, method: 'session', password_set: false, local: true };
