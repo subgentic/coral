@@ -492,13 +492,18 @@ func (s *Store) SetTaskGoal(ctx context.Context, board string, taskID int64, goa
 	} else if on {
 		return ErrGoalRequired // a board that requires a goal never moves a task to none (#7116)
 	}
+	if goalID != nil {
+		if _, err := reopenTaskGoal(ctx, tx, board, *goalID); err != nil {
+			return err
+		}
+	}
 	if _, err := tx.ExecContext(ctx, `UPDATE board_tasks SET goal_id = ? WHERE id = ? AND board_id = ?`, goalID, taskID, board); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
-// checkGoalForTask is nil when a task of this board may be linked to goal id: it is on the board and not closed.
+// checkGoalForTask is nil when a task of this board may be linked to goal id: it is on the board. Closed goals reopen after the task link is validated.
 func (s *Store) checkGoalForTask(ctx context.Context, q goalQuerier, board string, id int64) error {
 	var state string
 	err := q.GetContext(ctx, &state, `SELECT state FROM board_goals WHERE id = ? AND board_id = ?`, id, board)
@@ -508,10 +513,19 @@ func (s *Store) checkGoalForTask(ctx context.Context, q goalQuerier, board strin
 	if err != nil {
 		return err
 	}
-	if state == GoalDone || state == GoalDropped {
-		return ErrGoalClosed
-	}
 	return nil
+}
+
+// reopenTaskGoal uses the same writer as the task link; a conditional update keeps an already open goal unchanged.
+func reopenTaskGoal(ctx context.Context, q interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}, board string, id int64) (bool, error) {
+	result, err := q.ExecContext(ctx, `UPDATE board_goals SET state = 'active', closed_at = NULL, closed_reason = '', closed_by = '', blocked_on = '', updated_at = ? WHERE id = ? AND board_id = ? AND state IN ('done', 'dropped')`, nowUTC(), id, board)
+	if err != nil {
+		return false, err
+	}
+	n, err := result.RowsAffected()
+	return n > 0, err
 }
 
 // inheritedGoal is the goal a retry of task retryOf continues under: the retried task's own, when it has one and that goal is still open.

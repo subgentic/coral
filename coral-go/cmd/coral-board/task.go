@@ -22,7 +22,7 @@ Subcommands:
   add "title" [--body "details"] [--priority P]
   list [--json]
   claim
-  submit-review <id> --reason "review pending" [--revision N] [--candidate-revision REVISION] [--head SHA] [--message "note"] [--outcome success|failed] [--artifacts manifest.json] [--areas ui,go] [--reviewers 1|2]
+  submit-review <id> --reason "review pending" [--no-tests "why"] [--revision N] [--candidate-revision REVISION] [--head SHA] [--message "note"] [--outcome success|failed] [--artifacts manifest.json] [--areas ui,go] [--reviewers 1|2]
   release-review <id> --reason "slot released pending review" (orchestrator only)
   review <id> --to "Security Reviewer,QA Engineer"   (orchestrator: delegate a task in review)
   approve <id> [--round N] [--note "..."] / reject <id> [--round N] --note "why"   (a delegated reviewer)
@@ -151,7 +151,7 @@ Subcommands:
                                    artifacts' coral:// links (--json: those fields as one JSON object)
   unlanded [--ref main] [--since 7d] [--repo DIR] [--json]
                                    Tasks approved in the window whose head commit (the 'Head <sha>' in the submit text) is not on the ref, or that name none; read-only, git runs in this folder
-  submit-review <id> --reason "review pending" [--revision N] [--message "note"] [--outcome success|failed] [--artifacts manifest.json] [--areas ui,go] [--reviewers 1|2]
+  submit-review <id> --reason "review pending" [--no-tests "why"] [--revision N] [--message "note"] [--outcome success|failed] [--artifacts manifest.json] [--areas ui,go] [--reviewers 1|2]
                                    Hands the task to the team's orchestrator (frees your slot); with no orchestrator, completes it
   review <id> --to "Security Reviewer,QA Engineer"  The orchestrator delegates a task in review: one review task each
   approve <id> [--task-version K] [--round N] [--revision N] [--note "..."]  A reviewer approves, any time the task is in review; the last approval completes it

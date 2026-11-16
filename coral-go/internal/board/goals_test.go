@@ -282,7 +282,10 @@ func TestSetTaskGoalLinksOnlyWithinTheBoardAndToAnOpenGoal(t *testing.T) {
 	_, _, err = s.CloseGoal(ctx, "alpha", g.ID, "done", "")
 	require.NoError(t, err)
 	other, _ := s.CreateTask(ctx, "alpha", "second", "", "medium", "Lead")
-	assert.ErrorIs(t, s.SetTaskGoal(ctx, "alpha", other.ID, &g.ID), ErrGoalClosed)
+	require.NoError(t, s.SetTaskGoal(ctx, "alpha", other.ID, &g.ID))
+	reopened, err := s.GetGoal(ctx, "alpha", g.ID)
+	require.NoError(t, err)
+	assert.Equal(t, GoalActive, reopened.State)
 	require.NoError(t, s.SetTaskGoal(ctx, "alpha", task.ID, nil), "unlinking is always allowed")
 	got, _ = s.GetTask(ctx, "alpha", task.ID)
 	assert.Nil(t, got.GoalID)
@@ -297,7 +300,7 @@ func TestCreateTaskWithAForeignOrClosedGoalStoresNothing(t *testing.T) {
 	_, _, err := s.CloseGoal(ctx, "alpha", closed.ID, "done", "")
 	require.NoError(t, err)
 	missing := int64(777)
-	for name, id := range map[string]int64{"another board's": foreign.ID, "closed": closed.ID, "unknown": missing} {
+	for name, id := range map[string]int64{"another board's": foreign.ID, "unknown": missing} {
 		_, err := s.CreateTaskWithOpts(ctx, "alpha", "refused", "", "medium", "Lead", &CreateTaskOpts{GoalID: &id})
 		require.Error(t, err, name)
 	}

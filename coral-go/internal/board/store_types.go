@@ -37,6 +37,7 @@ type GroupInfo struct {
 
 // Task represents a board task.
 type Task struct {
+	GoalReopened      bool     `db:"-" json:"goal_reopened,omitempty"` // create response only: adding work reopened its goal (#16046)
 	Version           int      `db:"version" json:"version,omitempty"`
 	ID                int64    `db:"id" json:"id"`
 	Revision          int      `db:"revision" json:"revision"`

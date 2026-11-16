@@ -36,9 +36,9 @@ async function readRequireGoal(project) {
     } catch { return false; }
 }
 
-/** The board's open goals (proposed, active, blocked) and whether it requires a goal. */
-export async function readOpenGoals(project) {
-    const [read, requireGoal] = await Promise.all([readGoals(project, OPEN_STATES), readRequireGoal(project)]);
+/** All goals offered when adding work; choosing a closed goal reopens it on save. */
+export async function readTaskGoalOptions(project) {
+    const [read, requireGoal] = await Promise.all([readGoals(project, ALL_STATES), readRequireGoal(project)]);
     return { ...read, requireGoal };
 }
 
@@ -63,7 +63,7 @@ export async function readGoal(project, id) {
 }
 
 /**
- * Fill a Goal select: the empty choice ("No goal", or "Choose a goal" when the board requires one), the open goals, and the task's current goal even
+ * Fill a Goal select: the empty choice ("No goal", or "Choose a goal" when the board requires one), all goals (closed ones marked), and the task's current goal even
  * when it is closed (so Save does not unlink it by accident). Returns the select.
  */
 export function fillGoalSelect(select, { goals, requireGoal, selectedId, current }) {
@@ -79,7 +79,7 @@ export function fillGoalSelect(select, { goals, requireGoal, selectedId, current
         o.value = String(g.id); o.textContent = g.title + (suffix || '');
         select.append(o);
     };
-    for (const g of goals) add(g);
+    for (const g of goals) add(g, ['done', 'dropped'].includes(g.state) ? ' (closed; adding a task reopens)' : '');
     if (current && current.id && !seen.has(current.id)) add(current, current.state ? ` (${current.state})` : '');
     select.value = selectedId && seen.has(Number(selectedId)) ? String(selectedId) : '';
     if (requireGoal) { select.required = true; select.setAttribute('aria-required', 'true'); } else { select.required = false; select.removeAttribute('aria-required'); } // a board that needs a goal says so to a screen reader (#7313)

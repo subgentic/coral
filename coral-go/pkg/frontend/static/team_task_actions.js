@@ -11,7 +11,7 @@ import { boardFetch, pathId, splitKey } from './server_base.js';
 import { showToast } from './utils.js';
 import { blockedReason } from './hub_access.js';
 const { el } = await importOnce('./team_table.js'); // lazy: its failure is retried
-const { readOpenGoals, readGoal, fillGoalSelect, showGoalInvalid, chooseGoalLabel } = await importOnce('./task_goals.js');
+const { readTaskGoalOptions, readGoal, fillGoalSelect, showGoalInvalid, chooseGoalLabel } = await importOnce('./task_goals.js');
 const { _renderDepPicker, _getSelectedDeps } = await importOnce('./task_dep_picker.js');
 const { _taskRequiredOutputs, nudgeBoardTask, remindBoardTask, stopBoardTaskReminder } = await importOnce('./task_reminders.js');
 const { loadBoardTasks } = await importOnce('./task_list.js');
@@ -92,7 +92,7 @@ export async function editForm(task, ctx) {
         const resp = await boardFetch(project, '/subscribers');
         if (resp.ok) for (const s of await resp.json().then(v => (Array.isArray(v) ? v : []))) { const name = s && (s.subscriber_id || s.name); if (typeof name === 'string' && name && !names.has(name)) { names.add(name); assignee.append(option(name, name, false)); } }
     } catch { /* the assignee stays */ }
-    const goalRead = await readOpenGoals(project);
+    const goalRead = await readTaskGoalOptions(project);
     const currentGoal = task.goal_id && !goalRead.goals.some(g => g.id === task.goal_id) ? await readGoal(project, task.goal_id) : null; // a closed goal the task has stays in the choice (#7253)
     if (!state.currentBoardTasks || !state.currentBoardTasks.length) await loadBoardTasks(project).catch(() => {}); // the dependency picker offers the board's tasks
 

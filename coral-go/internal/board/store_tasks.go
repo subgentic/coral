@@ -149,10 +149,24 @@ func (s *Store) CreateTaskWithOpts(ctx context.Context, project, title, body, pr
 	if err := s.addNewTaskDependencies(ctx, project, taskID, opts); err != nil {
 		return nil, err
 	}
-	if opts != nil && opts.Draft {
-		return s.getTaskByID(ctx, project, taskID)
+	// Dependency/workflow refusals above must never reopen a goal.
+	reopened := false
+	if goalID != nil {
+		reopened, err = reopenTaskGoal(ctx, s.db, project, *goalID)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return s.publishNewTask(ctx, project, taskID, w)
+	var task *Task
+	if opts != nil && opts.Draft {
+		task, err = s.getTaskByID(ctx, project, taskID)
+	} else {
+		task, err = s.publishNewTask(ctx, project, taskID, w)
+	}
+	if task != nil {
+		task.GoalReopened = reopened
+	}
+	return task, err
 }
 
 // addNewTaskDependencies stores the new task's blockers (a chain of three at most unless the caller allows more); a refused one takes the task and its workflow back out, so a refusal leaves no task behind.
@@ -187,7 +201,7 @@ func (s *Store) publishNewTask(ctx context.Context, project string, taskID int64
 	return s.getTaskByID(ctx, project, taskID)
 }
 
-// goalForNewTask is the goal a new task is linked to: the one asked for, else the retried task's own; it refuses a goal that is not the board's or is closed, and a task with none on a board that requires one. It stores nothing: a refusal leaves no task behind.
+// goalForNewTask is the goal a new task is linked to: the one asked for, else the retried task's own; it refuses a goal that is not the board's and a task with none on a board that requires one. It stores nothing: a refusal leaves no task behind.
 func (s *Store) goalForNewTask(ctx context.Context, project string, opts *CreateTaskOpts, w TaskWorkflow) (*int64, error) {
 	var goalID *int64
 	if opts != nil && opts.GoalID != nil {
