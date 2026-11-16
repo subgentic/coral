@@ -130,7 +130,8 @@ func (h *ScheduleHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		Enabled         *int   `json:"enabled"`
 		MaxDurationS    *int   `json:"max_duration_s"`
 		CleanupWorktree *int   `json:"cleanup_worktree"`
-		NoWorktree      *int   `json:"no_worktree"` // 1: the runs work in the folder itself, which need not be a git repository (#10276)
+		NoWorktree      *int   `json:"no_worktree"`    // 1: the runs work in the folder itself, which need not be a git repository (#10276)
+		TrustWorktree   *int   `json:"trust_worktree"` // 1: each run trusts its own worktree for the agent CLI; only the person's own dashboard may set it (#16421)
 		Flags           string `json:"flags"`
 		JobType         string `json:"job_type"`
 		WorkflowID      *int64 `json:"workflow_id"`
@@ -248,6 +249,18 @@ func (h *ScheduleHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 			writeBranchMissing(w, missing)
 			return
 		}
+	}
+
+	if tick := intPtrOr(body.TrustWorktree, 0); tick != 0 {
+		if tick != 1 {
+			errBadRequest(w, "'trust_worktree' must be 0 or 1")
+			return
+		}
+		if status, why := trustTickRefusal(r, job.JobType, job.AgentType, job.NoWorktree); status != 0 {
+			writeError(w, status, "", why)
+			return
+		}
+		job.TrustWorktree = 1
 	}
 
 	created, err := h.sched.CreateScheduledJob(r.Context(), &job)
@@ -391,6 +404,10 @@ func (h *ScheduleHandler) UpdateJob(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	existingJob, _ := h.sched.GetScheduledJob(r.Context(), jobID)
+	if !applyTrustTick(w, r, fields, existingJob) {
+		return
+	}
 	updated, err := h.sched.UpdateScheduledJob(r.Context(), jobID, fields)
 	if err != nil {
 		errInternalServer(w, err.Error())

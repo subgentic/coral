@@ -192,6 +192,7 @@ func (s *JobScheduler) Run(ctx context.Context) error {
 
 	// Reap stale runs from a previous crash
 	s.reapStaleRuns(ctx)
+	s.sweepRunTrust()
 
 	return runOnTicker(ctx, s.interval, func() {
 		if err := s.tick(ctx); err != nil {
@@ -554,6 +555,10 @@ func (s *JobScheduler) launchAndWatch(runID int64, job store.ScheduledJob, rc ru
 	wt, ok := s.prepareRunWorktree(ctx, watchCtx, runID, rc)
 	if !ok {
 		return
+	}
+
+	if wt.worktreeDir != "" { // the job's Trust box: the run's own folder only, never the repository (#16421)
+		s.trustRunFolder(runID, job, wt.worktreeDir)
 	}
 
 	// Update run with worktree path

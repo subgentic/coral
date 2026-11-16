@@ -186,6 +186,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
         ['Time limit', escapeHtml(limitWords(job.max_duration_s) || `${job.max_duration_s} seconds`)],
         !isWorkflow && job.no_worktree === 1 ? ['Works in', 'The folder itself, no worktree'] : null,
         !isWorkflow && job.no_worktree !== 1 ? ['Cleanup worktree', job.cleanup_worktree ? 'Yes' : 'No'] : null,
+        !isWorkflow && job.trust_worktree === 1 ? ['Trusts worktrees', 'Yes'] : null,
         job.flags ? ['Flags', `<code>${escapeHtml(job.flags)}</code>`] : null,
     ].filter(Boolean);
 
@@ -406,7 +407,7 @@ registerActions({
         const opened = await window.selectHistorySession(sid);
         if (opened === false) { // the run has no saved chat to open (a run still going, or one whose chat was not kept): the chat page is already up and would say 'Loading chat…' for good (#16770, walk 32 F1), so go back to the job and say why
             window.switchNavTab?.('automations'); if (jobId) selectScheduledJob(jobId);
-            showToast(`${job ? `${job.name}: ` : ''}this run has no chat to show${job ? '' : ' yet'}. If it is still running, its result appears here when it ends.`, true);
+            importOnce('./job_run_note.js', 'a note').then(m => showToast(m.noChatNote(job, runsPage, sid), true)).catch(() => {});
             return;
         }
         const back = document.getElementById('history-back'); // the way back is the job it came from, not All chats (#10378)

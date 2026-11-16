@@ -6,13 +6,18 @@ import (
 	"fmt"
 	"github.com/subgentic/coral/internal/coralnames"
 	"github.com/subgentic/coral/internal/logsafe"
+	"io/fs"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
+	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/foldertrust"
 	"github.com/subgentic/coral/internal/gitutil"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -44,6 +49,112 @@ func (s *JobScheduler) cleanupSettledWorktree(ctx context.Context, run store.Sch
 		base = "" // the run's branch is then kept: it cannot be compared with a base
 	}
 	s.cleanupWorktree(job.RepoPath, path, coralnames.JobRunBranch(run.ID), base)
+}
+
+// trustRunFolder trusts the worktree a run made for itself for its agent's CLI, when the job's Trust box is ticked (#16421): exactly that one folder (IsJobRunWorktree for this run id and repository, then
+// foldertrust.CheckRunWorktree: directly inside the worktrees root once resolved, not a link, not writable by others), for Claude and Codex only. Anything else leaves the CLI's card, and a run held at it ends
+// as failed with its reason when its prompt is never typed (promptNotTypedCode, #17520). The run's log says it was done, naming only the run's own folder.
+func (s *JobScheduler) trustRunFolder(runID int64, job store.ScheduledJob, dir string) {
+	if job.TrustWorktree != 1 || dir == "" || s.worktreeRoot == "" || (job.JobType != "" && job.JobType != "prompt") {
+		return
+	}
+	typ := job.AgentType
+	if typ == "" {
+		typ = at.Claude
+	}
+	if typ != at.Claude && typ != at.Codex {
+		return
+	}
+	if !coralnames.IsJobRunWorktree(s.worktreeRoot, job.RepoPath, runID, dir) {
+		s.logger.Warn("scheduled run: its folder is not the one made for it, so it is not trusted", "run_id", runID, "job", job.Name)
+		return
+	}
+	// A umask of 002 (the default for a user on most Linux distributions) makes git create the worktree group-writable, which CheckRunWorktree refuses; and every file and folder inside it is group-writable
+	// too, which a trusted run would then execute. The folder is ours, made for this run a moment ago: take group and other write away from everything in it (never following a link) before the check.
+	closeRunFolder(dir, s.logger)
+	resolved, err := foldertrust.CheckRunWorktree(dir, s.worktreeRoot)
+	if err != nil {
+		s.logger.Warn("scheduled run: its folder was not trusted", "run_id", runID, "job", job.Name, "why", err.Error())
+		return
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	var werr error
+	if typ == at.Codex {
+		_, werr = foldertrust.TrustCodex(foldertrust.CodexConfigPath(home), resolved)
+	} else {
+		_, werr = foldertrust.TrustClaude(foldertrust.ClaudeConfigPath(home), resolved)
+	}
+	if werr != nil {
+		s.logger.Warn("scheduled run: its folder was not trusted", "run_id", runID, "job", job.Name, "agent_type", typ, "why", werr.Error())
+		return
+	}
+	s.logger.Info("scheduled run trusted its own folder because the job's Trust box is ticked", "run_id", runID, "job", job.Name, "agent_type", typ, "folder", filepath.Base(resolved))
+}
+
+// closeRunFolder clears the group and other write bits of dir and of every file and folder inside it. A link is neither followed nor changed: WalkDir does not descend into one, and every Lstat and chmod goes through
+// an os.Root on dir, which refuses a path that leaves it (so a link swapped in between the walk and the chmod is never followed either). An error is logged with its path, never swallowed. Windows has no such bits.
+func closeRunFolder(dir string, logger *slog.Logger) {
+	if runtime.GOOS == "windows" {
+		return
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		logger.Warn("scheduled run: its folder could not be opened to close it to group and other write", "folder", dir, "error", err.Error())
+		return
+	}
+	defer root.Close()
+	werr := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			logger.Warn("scheduled run: a path in its folder could not be read to close it to group and other write", "path", path, "error", err.Error())
+			return nil
+		}
+		if d.Type()&fs.ModeSymlink != 0 {
+			return nil
+		}
+		rel, rerr := filepath.Rel(dir, path)
+		if rerr != nil {
+			return nil
+		}
+		fi, lerr := root.Lstat(rel)
+		if lerr != nil {
+			logger.Warn("scheduled run: a path in its folder could not be examined", "path", path, "error", lerr.Error())
+			return nil
+		}
+		if fi.Mode()&fs.ModeSymlink == 0 && fi.Mode().Perm()&0o022 != 0 {
+			if cerr := root.Chmod(rel, fi.Mode().Perm()&^0o022); cerr != nil {
+				logger.Warn("scheduled run: a path in its folder could not be closed to group and other write", "path", path, "error", cerr.Error())
+			}
+		}
+		return nil
+	})
+	if werr != nil {
+		logger.Warn("scheduled run: its folder could not be walked to close it to group and other write", "folder", dir, "error", werr.Error())
+	}
+}
+
+// untrustRunFolder removes the trust entries a run's worktree got, once the worktree is gone: only for a folder directly inside the worktrees root named for a run, so the settings files do not collect an
+// entry per run.
+func (s *JobScheduler) untrustRunFolder(resolved string) {
+	if resolved == "" || s.worktreeRoot == "" || !strings.HasPrefix(filepath.Base(resolved), "job-run-") {
+		return
+	}
+	root, err := filepath.EvalSymlinks(s.worktreeRoot)
+	if err != nil || filepath.Dir(resolved) != root {
+		return
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	if _, err := foldertrust.UntrustClaude(foldertrust.ClaudeConfigPath(home), resolved); err != nil {
+		s.logger.Warn("could not remove a finished run's trust entry from Claude's settings", "error", err.Error())
+	}
+	if _, err := foldertrust.UntrustCodex(foldertrust.CodexConfigPath(home), resolved); err != nil {
+		s.logger.Warn("could not remove a finished run's trust entry from Codex's settings", "error", err.Error())
+	}
 }
 
 // runWorktree is where a run's agent works: the repository, or a worktree made for the run on its own branch.
@@ -168,12 +279,14 @@ func (s *JobScheduler) cleanupWorktree(repoPath, worktreePath, runBranch, baseBr
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+	resolvedPath, _ := filepath.EvalSymlinks(worktreePath)                    // before it is gone: the trust entry was written under this name
 	err := runGitCmd(ctx, repoPath, "worktree", "remove", "--", worktreePath) // no --force: git keeps a worktree with unsaved work, and so does the branch (#6701)
 	if err != nil {
 		s.logger.Warn("kept the run's worktree: git would not remove it", "path", logsafe.Dir(worktreePath), "error", err)
 		return
 	}
 	s.logger.Info("cleaned up worktree", "path", logsafe.Dir(worktreePath))
+	s.untrustRunFolder(resolvedPath)
 
 	if runBranch == "" || baseBranch == "" {
 		return
@@ -205,4 +318,22 @@ func branchHasCommits(ctx context.Context, repoPath, base, branch string) bool {
 		return true
 	}
 	return n > 0
+}
+
+// sweepRunTrust removes the trust entries of run worktrees that are gone, once at startup (#17396): git keeps a worktree with unsaved work, so the entry its run got stayed with nothing to remove it later.
+func (s *JobScheduler) sweepRunTrust() {
+	if s.worktreeRoot == "" {
+		return
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	n, err := foldertrust.SweepGoneRunFolders(foldertrust.ClaudeConfigPath(home), foldertrust.CodexConfigPath(home), s.worktreeRoot)
+	if err != nil {
+		s.logger.Warn("could not remove the trust entries of run folders that are gone", "error", err.Error())
+	}
+	if n > 0 {
+		s.logger.Info("removed the trust entries of run folders that are gone", "count", n)
+	}
 }

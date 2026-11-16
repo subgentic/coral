@@ -53,10 +53,19 @@ func gitRepo(t *testing.T) string {
 
 func sendJSON(t *testing.T, method, url string, body any) (int, map[string]any) {
 	t.Helper()
+	return sendJSONHeader(t, method, url, body, nil)
+}
+
+// sendJSONHeader is sendJSON with extra request headers.
+func sendJSONHeader(t *testing.T, method, url string, body any, headers map[string]string) (int, map[string]any) {
+	t.Helper()
 	b, _ := json.Marshal(body)
 	req, err := http.NewRequest(method, url, strings.NewReader(string(b)))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()

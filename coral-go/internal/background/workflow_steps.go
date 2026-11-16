@@ -3,6 +3,7 @@ package background
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -13,7 +14,6 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/agentprio"
-	"github.com/subgentic/coral/internal/safego"
 
 	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/agentenv"
@@ -462,14 +462,19 @@ func (wr *WorkflowRunner) executeAgentInteractive(ctx context.Context, runID int
 	wr.activeChildren[runID] = &activeChild{stepType: "agent", sessionName: launchResult.SessionName}
 	wr.mu.Unlock()
 
-	// Send prompt after initialization delay
-	go func() {
-		defer safego.Recover("background/workflow_runner:779")
-		wr.launcher.SendPrompt(ctx, launchResult.SessionID, launchResult.SessionName, agentCfg.AgentType, prompt)
-	}()
+	// Send the prompt in the background, through the delivery a job's run uses (#17520): a prompt that could not be typed within promptGiveUp fails the step with that reason and stops the agent,
+	// instead of waiting on an agent that has nothing to do (#16957).
+	gaveUp := make(chan error, 1)
+	wr.launcher.startPromptDeliveryReporting(ctx, launchResult.SessionID, launchResult.SessionName, agentCfg.AgentType, prompt, func(err error) { gaveUp <- err })
 
 	// Poll for session completion — 5s interval for workflow steps
-	err = wr.watchSessionFast(ctx, launchResult.SessionName)
+	watchCtx, stopWatch := context.WithCancel(ctx)
+	defer stopWatch()
+	err = awaitStepAgent(gaveUp, func() error { return wr.watchSessionFast(watchCtx, launchResult.SessionName) })
+	if errors.Is(err, errPromptNotTyped) {
+		stopWatch()
+		_ = wr.launcher.runtime.KillAgent(context.Background(), launchResult.SessionName)
+	}
 
 	wr.mu.Lock()
 	delete(wr.activeChildren, runID)
@@ -479,6 +484,19 @@ func (wr *WorkflowRunner) executeAgentInteractive(ctx context.Context, runID int
 		return fmt.Errorf("agent session: %w", err)
 	}
 	return nil
+}
+
+// awaitStepAgent waits for a workflow step's agent to finish (watch) and ends the step early when its prompt could not be typed (gaveUp: errPromptNotTyped, #17520): the step then fails with that
+// reason, in words (#16957). A delivery that ended any other way never reaches gaveUp and leaves the step to the watch, as before.
+func awaitStepAgent(gaveUp <-chan error, watch func() error) error {
+	watched := make(chan error, 1)
+	go func() { watched <- watch() }()
+	select {
+	case err := <-watched:
+		return err
+	case err := <-gaveUp:
+		return fmt.Errorf("the step's prompt was never typed: the agent stayed on a question (such as trusting the folder) or was not ready for it: %w", err)
+	}
 }
 
 // watchSessionFast polls for session existence every 5 seconds (faster than default 30s).
