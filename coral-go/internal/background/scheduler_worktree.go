@@ -138,7 +138,7 @@ func closeRunFolder(dir string, logger *slog.Logger) {
 // untrustRunFolder removes the trust entries a run's worktree got, once the worktree is gone: only for a folder directly inside the worktrees root named for a run, so the settings files do not collect an
 // entry per run.
 func (s *JobScheduler) untrustRunFolder(resolved string) {
-	if resolved == "" || s.worktreeRoot == "" || !strings.HasPrefix(filepath.Base(resolved), "job-run-") {
+	if resolved == "" || s.worktreeRoot == "" || !coralnames.IsJobRunName(filepath.Base(resolved)) {
 		return
 	}
 	root, err := filepath.EvalSymlinks(s.worktreeRoot)

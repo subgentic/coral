@@ -2,6 +2,7 @@ package machineprobe
 
 import (
 	"os/exec"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,6 +42,9 @@ func TestAnAnswerThatIsCutShortOrNotAUnixBoxIsRefusedWithAReason(t *testing.T) {
 
 // The real script, run here, gives an answer Parse accepts, and reads nothing it should not: it only prints the eight keys.
 func TestTheScriptRunsHereAndParses(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the probe script is for Unix machines; a Windows box is defined by hand (resource define)")
+	}
 	if _, err := exec.LookPath("sh"); err != nil {
 		t.Skip("no sh")
 	}

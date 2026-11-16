@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -23,7 +24,7 @@ func trustRunFixture(t *testing.T, tick int) (cfg string, worktreeDuringLaunch *
 	}
 	repo = t.TempDir()
 	for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", "init"}} {
-		out, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput()
+		out, err := consoletest.HiddenCommand("git", append([]string{"-C", repo}, args...)...).CombinedOutput()
 		require.NoError(t, err, string(out))
 	}
 	cfgDir := t.TempDir()

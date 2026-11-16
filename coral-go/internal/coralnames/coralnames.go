@@ -106,3 +106,6 @@ func IsJobRunFolder(root string, runID int64, path string) bool {
 	base := filepath.Base(path)
 	return strings.HasPrefix(base, prefix) && len(base) > len(prefix)
 }
+
+// IsJobRunName reports whether a folder's name is one the scheduler gives a job run's worktree (job-run-<something>): the name only, not where the folder is (IsJobRunFolder checks the place and the run).
+func IsJobRunName(base string) bool { return strings.HasPrefix(base, "job-run-") }
