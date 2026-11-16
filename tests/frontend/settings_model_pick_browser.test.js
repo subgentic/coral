@@ -39,6 +39,8 @@ const { coralReady } = require('./helpers/wait');
             s = await state('claude');
             check(s.input === model && !s.inputShown, `a model sets the box's value and the box stays hidden: ${JSON.stringify(s)}`);
             check(await ev(`!document.getElementById('settings-save-btn')`), 'no footer Save is needed for the pick');
+            // a pick saves at once and holds its controls disabled until the save answers (settings_autosave.js); a person cannot choose Other in that time, and under load the save is still out here, where focus() on a disabled box does nothing
+            await waitFor(`!document.getElementById('settings-model-pick-claude').disabled && !document.getElementById('settings-default-model-claude').disabled && !document.getElementById('settings-default-model-claude').dataset.saving`, 'the pick has been saved and its controls are back', 10000);
             // Other shows the box
             await ev(`(() => { const e = document.getElementById('settings-model-pick-claude'); e.value = '__other__'; e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             s = await state('claude');
