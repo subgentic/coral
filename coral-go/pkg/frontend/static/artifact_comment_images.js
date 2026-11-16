@@ -12,7 +12,7 @@ const MAX_BYTES = 25 * 1024 * 1024; // a larger file is refused here with the re
 const typeOf = f => String((f && f.type) || '').toLowerCase();
 
 /** The tray of one comment being written. `upload(blob, versionOf)` stores (versionOf only on a marked-up copy) a picture and resolves its { hex, name, contentType, size }; `onChange()` is told whenever the pictures or their state change. */
-export function createImageTray({ upload, onChange = () => {} }) {
+export function createImageTray({ upload, onChange = () => {}, hintText = HINT }) {
     const node = el('div', 'ac-images'); node.hidden = true;
     const list = el('ul', 'ac-thumbs'); list.setAttribute('aria-label', 'Pictures to send with this comment');
     const note = el('p', 'ac-images-note'); note.setAttribute('role', 'status'); note.hidden = true;
@@ -90,7 +90,7 @@ export function createImageTray({ upload, onChange = () => {} }) {
         return wrap;
     }
     /** The one quiet line beside Add image (Security's INFO on #11650): what happens to a picture once it is sent. */
-    const hint = () => el('p', 'ac-images-hint', HINT);
+    const hint = () => el('p', 'ac-images-hint', hintText);
     /** Pasting a picture into the text, and dropping one on the form, add it; pasted text is left to the field. */
     function attach(form, field) {
         field.addEventListener('paste', e => {

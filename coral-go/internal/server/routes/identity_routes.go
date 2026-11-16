@@ -56,6 +56,8 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/sessions/live/{name}/memory/{id}":         "read one of an agent's instruction or memory files",
 	"GET /api/board/{project}/spend":                    "read a team's tokens, commits, tool calls and task times (it names every member and their work)",
 	"POST /api/agent-asks/{id}/answer":                  "answer a single agent's question: the text is typed into that agent (#18106)",
+	"POST /api/agent-asks/{id}/dismiss":                 "dismiss a single agent's question: the agent is told it was dismissed (#18668)",
+	"POST /api/agent-asks/{id}/images":                  "add a picture to the answer to a single agent's question, kept as that agent's file (#18668)",
 	"GET /api/operator-asks":                            "read the questions agents asked the Operator (their text)",
 	"GET /api/needs-you":                                "read what is waiting for the Operator (one cleaned line each)",
 	"GET /api/activity":                                 "read the Activity record of what the Operator did in Needs you (#12069)",

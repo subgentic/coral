@@ -299,6 +299,8 @@ a PATCH /api/sessions/live/{name}/notes/{noteID}
 a PATCH /api/sessions/live/{name}/tasks/{taskID}
 a POST /api/agent-asks
 b POST /api/agent-asks/{id}/answer
+b POST /api/agent-asks/{id}/dismiss
+b POST /api/agent-asks/{id}/images
 a POST /api/agent/artifacts
 a POST /api/agent/tasks
 a POST /api/agent/tasks/claim

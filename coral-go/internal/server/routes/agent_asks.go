@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/logparse"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
@@ -21,6 +23,8 @@ import (
 //
 //	POST /api/agent-asks             the agent's own token: {text, options?: up to 3 labels} -> {id}
 //	POST /api/agent-asks/{id}/answer the Operator: {answer} -> typed into the agent, the question closed
+//	POST /api/agent-asks/{id}/dismiss the Operator: {} -> the question leaves Needs you and the agent is told it was dismissed; {undo:true} puts it back
+//	POST /api/agent-asks/{id}/images the Operator: one picture for the reply -> stored as that agent's artifact ({hex, uri, name, content_type, size}); the reply names it as coral://artifacts/<hex>
 
 const agentAskOptionsMax = 3
 
@@ -28,6 +32,8 @@ const agentAskOptionsMax = 3
 type AgentAsksHandler struct {
 	ss   *store.SessionStore
 	term ptymanager.SessionTerminal
+	// coralDir is the data folder the pictures are stored in ("" refuses them).
+	coralDir string
 	// deliver types text into a session (tests replace it).
 	deliver func(ctx context.Context, term ptymanager.SessionTerminal, name, agentType, sessionID, text, what string) error
 }
@@ -35,6 +41,52 @@ type AgentAsksHandler struct {
 // NewAgentAsksHandler is the handler for the sessions in ss, typing answers through term.
 func NewAgentAsksHandler(ss *store.SessionStore, term ptymanager.SessionTerminal) *AgentAsksHandler {
 	return &AgentAsksHandler{ss: ss, term: term, deliver: deliverAutomated}
+}
+
+// SetCoralDir tells the handler where a reply's pictures are stored.
+func (h *AgentAsksHandler) SetCoralDir(dir string) { h.coralDir = dir }
+
+const sourceAgentAskImage = "agent-ask-image"
+
+// UploadImage stores one picture for the Operator's answer to an open question, as an artifact of the agent that asked (so that agent can read it): checked as a comment's picture is (its own bytes decide the type,
+// metadata is removed, 25 MB). The Operator's alone.
+func (h *AgentAsksHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
+	if !operatorOnly(w, r) {
+		return
+	}
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || id <= 0 {
+		errBadRequest(w, "invalid id")
+		return
+	}
+	if h.coralDir == "" {
+		errInternalServer(w, "no data folder")
+		return
+	}
+	ask, err := h.ss.OpenAgentAsk(r.Context(), id)
+	if err != nil {
+		errInternalServer(w, "could not read the question")
+		return
+	}
+	if ask == nil || !sessionIDLike.MatchString(ask.SessionID) {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "not_open", "message": "That question is already answered or was replaced."})
+		return
+	}
+	scope := "agent-ask:" + strconv.FormatInt(id, 10)
+	if !commentImageLimit.allow(scope, commentImageLimitPerMinute, time.Now()) {
+		httputil.WriteActionLimit(w, 60, "rate_limited", "too many pictures in a minute; try again shortly")
+		return
+	}
+	pic, ok := receivePicture(w, r, h.coralDir)
+	if !ok {
+		return
+	}
+	defer os.Remove(pic.tmpPath) // a no-op once it is in the store
+	reply, ok := storeReceivedPicture(w, h.coralDir, ask.SessionID, pic, nil, sourceAgentAskImage)
+	if !ok {
+		return
+	}
+	writeJSON(w, http.StatusCreated, reply)
 }
 
 // Create files a question.
@@ -109,13 +161,70 @@ func (h *AgentAsksHandler) Answer(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "not_open", "message": "That question is already answered or was replaced."})
 		return
 	}
+	// The question is claimed BEFORE the text is typed (#18667): two answers at once (a double click, a button and Send, a second tab) used to both see it open and type the answer into the agent twice. Whoever closes it
+	// first types; the other is told it is answered. A delivery that fails gives the question back, so the Operator can answer again.
+	claimed, err := h.ss.CloseAgentAsk(r.Context(), id, time.Now())
+	if err != nil {
+		errInternalServer(w, "could not record the answer")
+		return
+	}
+	if !claimed {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "not_open", "message": "That question is already answered or was replaced."})
+		return
+	}
 	agentType, sessionID := logparse.ParseSessionName(ask.SessionName)
 	text := typedAgentAskAnswer(ask.Text, answer)
 	if err := h.deliver(r.Context(), h.term, ask.SessionName, agentType, sessionID, text, "operator answer"); err != nil {
+		_ = h.ss.ReopenAgentAsk(context.WithoutCancel(r.Context()), id)
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "not_delivered", "message": "The agent is not running, so the answer was not sent. Wake it, then answer again."})
 		return
 	}
-	_, _ = h.ss.CloseAgentAsk(r.Context(), id, time.Now())
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// Dismiss closes a question with no answer and tells the agent so (it would wait for one forever, #18668); undo:true gives it back to the Operator (the agent was told once, and is not told again).
+func (h *AgentAsksHandler) Dismiss(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) || refuseUnlessPerson(w, r, "dismiss an agent's question") {
+		return
+	}
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || id <= 0 {
+		errBadRequest(w, "invalid id")
+		return
+	}
+	var body struct {
+		Undo bool `json:"undo"`
+	}
+	if r.ContentLength != 0 {
+		if err := decodeJSONMax(w, r, &body, 1<<10); err != nil {
+			errBadRequest(w, "invalid JSON")
+			return
+		}
+	}
+	if body.Undo {
+		if err := h.ss.ReopenAgentAsk(r.Context(), id); err != nil {
+			errInternalServer(w, "could not bring the question back")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		return
+	}
+	ask, err := h.ss.OpenAgentAsk(r.Context(), id)
+	if err != nil {
+		errInternalServer(w, "could not read the question")
+		return
+	}
+	if ask == nil {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "not_open", "message": "That question is already answered or was replaced."})
+		return
+	}
+	if claimed, err := h.ss.CloseAgentAsk(r.Context(), id, time.Now()); err != nil || !claimed {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "not_open", "message": "That question is already answered or was replaced."})
+		return
+	}
+	agentType, sessionID := logparse.ParseSessionName(ask.SessionName)
+	text := "[Coral] The Operator dismissed your question " + board.TypedText(clipRunes(ask.Text, 80)) + " without answering it. Do not wait for an answer: carry on, or ask again if you still need one."
+	_ = h.deliver(r.Context(), h.term, ask.SessionName, agentType, sessionID, text, "operator dismissed") // best effort: the agent may be gone, and the question is closed either way
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -125,16 +234,31 @@ func (h *AgentAsksHandler) Rows(r *http.Request) []operatorAskRow {
 	if err != nil {
 		return nil
 	}
+	live := map[string]*store.LiveSession{}
+	if sessions, err := h.ss.GetAllLiveSessions(r.Context()); err == nil {
+		for i := range sessions {
+			live[sessions[i].SessionID] = &sessions[i] // asleep counts: it is answered once woken
+		}
+	} else {
+		live = nil // cannot tell: nothing is dropped
+	}
 	rows := make([]operatorAskRow, 0, len(list))
 	for _, a := range list {
-		full := a.Text
-		if len(a.Options) > 0 { // the row has no buttons for these: the choices are in the question, and the Operator types one
-			full += "\n\nChoices:\n- " + strings.Join(a.Options, "\n- ")
+		ls := live[a.SessionID]
+		if live != nil && ls == nil { // its agent has exited: nobody is left to read an answer, so the question leaves Needs you by itself (#18668)
+			_, _ = h.ss.CloseAgentAsk(r.Context(), a.ID, time.Now())
+			continue
 		}
-		text, cut := operatorAskText(full)
+		text, cut := operatorAskText(a.Text) // the choices are buttons now (Options), not text in the question
 		asker := a.SessionName
 		if _, sid := logparse.ParseSessionName(a.SessionName); sid != "" {
 			asker = strings.TrimSuffix(strings.TrimSuffix(a.SessionName, sid), "-")
+		}
+		// the name the sidebar shows (the live row's display name, else the one kept for the session), never the agent type "claude" (#18668)
+		if ls != nil && ls.DisplayName != nil && strings.TrimSpace(*ls.DisplayName) != "" {
+			asker = *ls.DisplayName
+		} else if dn, err := h.ss.GetDisplayName(r.Context(), a.SessionID); err == nil && dn != nil && strings.TrimSpace(*dn) != "" {
+			asker = *dn
 		}
 		row := operatorAskRow{Kind: "agent", ID: a.ID, Asker: clitext.CleanName(asker), Text: text, Cut: cut, At: a.CreatedAt, Options: a.Options}
 		rows = append(rows, row)

@@ -28,7 +28,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const sub = document.createElement('p'); sub.className = 'inbox-ask-sub';
     const who = markHidden(a.asker, { strict: true }); // the title and its link use the same visible name
     sub.textContent = whenText(a.at) + (a.kind === 'wait' ? ', waiting for your reply' : '');
-    importOnce('./agent_link.js').then(m => { if (title.isConnected) title.replaceChildren(m.agentLink(who, { board: boardTeamKey(a.server, a.board) }), ` · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`); }); // the asker still opens their chat
+    importOnce('./agent_link.js').then(m => { if (title.isConnected) title.replaceChildren(m.agentLink(who, { board: boardTeamKey(a.server, a.board) }), ...(a.kind === 'agent' ? [] : [` · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`])); }); // the asker still opens their chat
     const subjects = askSubjects(a), links = document.createElement('p'); links.className = 'inbox-ask-subjects'; links.hidden = !subjects.length; if (subjects.length) loadStyles('pictures.css'); // its links are drawn by the lazy picture rules // the goal and task it is about, each a link that opens it in the Inbox
     if (subjects.length) links.append(document.createTextNode('About ')); // the asker names them: the line says so (Security's INFO on #12164)
     subjects.forEach((x, i) => {
@@ -52,7 +52,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const send = document.createElement('button'); send.type = 'button'; send.className = 'btn btn-primary inbox-ask-send'; send.textContent = 'Send reply'; send.disabled = missingCloudSource;
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close';
     // Dismiss closes a question with no answer and nothing said to the agent, as the row's own Dismiss does (#12599): the same route and the same toast with Undo. A wait has no ask row to close, so it has no Dismiss.
-    const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-quiet'; dismiss.textContent = 'Dismiss, no reply'; dismiss.title = 'Take it out of Needs you; nobody is told'; dismiss.hidden = missingCloudSource || a.kind !== 'ask' || (fromAnotherComputer(a) && decisionNeedsPerson(a.server)); // the close route is served for this computer's question and, through the Hub, for the computer's owner (coral-hub batch-125): a phone's rows have no Dismiss of their own (#14419), so the dialog must
+    const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-quiet'; dismiss.textContent = 'Dismiss, no reply'; dismiss.title = 'Take it out of Needs you; nobody is told'; dismiss.hidden = missingCloudSource || (a.kind !== 'ask' && a.kind !== 'agent') || (fromAnotherComputer(a) && decisionNeedsPerson(a.server)); // the close route is served for this computer's question and, through the Hub, for the computer's owner (coral-hub batch-125): a phone's rows have no Dismiss of their own (#14419), so the dialog must
     row.append(...(dismiss.hidden ? [close] : [dismiss, close])); // Dismiss alone at the far left (the quiet, different exit: nobody is told), Close at the right (#16371, #15816's footer; Send reply is on the row right under the reply box, #13148, the Operator: 'The send reply is too far away from text input')
     let tray = null;
     const opener = document.activeElement; // the button that opened this: the keyboard goes back to it, as the settings menu and the member editor do (walk 17 L20)
@@ -60,7 +60,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     let sending = false; const choices = [];
     const picturesBlocked = () => !!tray && (tray.busy() || tray.failed());
     const replyText = () => [box.value.trim(), tray ? tray.hexes().map(h => `coral://artifacts/${h}`).join('\n') : ''].filter(Boolean).join('\n\n');
-    const sync = () => { send.disabled = missingCloudSource || sending || picturesBlocked(); choices.forEach(c => { c.disabled = missingCloudSource || sending || (binary && picturesBlocked()); }); }; // Send waits for a picture going up, and for a failed one to be taken out
+    const sync = () => { send.disabled = missingCloudSource || sending || picturesBlocked(); choices.forEach(c => { c.disabled = missingCloudSource || sending || ((binary || a.kind === 'agent') && picturesBlocked()); }); }; // Send waits for a picture going up, and for a failed one to be taken out
     let binary = yesNoButtons(a), offered = null;
     let review = null;
     const drawOffers = () => {
@@ -83,6 +83,7 @@ export function openAskDialog(a, onDone, runners = {}) {
                     const left = ownAction();
                     try {
                         const draft = replyText();
+                        if (a.kind === 'agent') { await replyToAsk(a, draft ? `${b.label}\n\n${draft}` : b.label); finish(); left(); showToast(`Sent: ${markHidden(b.label, { strict: true })}`); return; } // a single agent's choice answers with its label, through the same Answer route as typing it (#18668)
                         if (binary && draft) { await replyToAsk(a, `${b.label}\n\n${draft}`); finish(); left(); showToast(`Sent: ${b.label} with your reply`); return; }
                         const got = await claimButton(a, b); // the stored action, whatever the label says
                         if (isReply(got.action)) { await closeAnsweredDuplicates(a); forgetAsk(a); refreshOperatorAsks(true); finish(); left(); showToast(`Sent: ${markHidden(got.label, { strict: true })}`); return; }
@@ -141,9 +142,11 @@ export function openAskDialog(a, onDone, runners = {}) {
     dlg.append(title, sub, ...(contextNote.hidden ? [] : [contextNote]), ...(links.hidden ? [] : [links]), reading, compose, foot);
     drawOffers();
     if (!missingCloudSource && !fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
-        Promise.all([importOnce('./artifact_comment_images.js'), importOnce('./artifact_comments_api.js')]).then(([m, api]) => {
+        Promise.all([importOnce('./artifact_comment_images.js'), importOnce('./artifact_comments_api.js'), a.kind === 'agent' ? importOnce('./agent_ask_answer.js') : null]).then(([m, api, agentApi]) => {
             if (!dlg.isConnected) return;
-            tray = m.createImageTray({ upload: (blob, versionOf) => api.uploadCommentImage(null, a.server, blob, versionOf, a.board) });
+            // a single agent's picture is kept as that agent's own file (POST /api/agent-asks/<id>/images): it has no team to keep it with (#18668)
+            tray = a.kind === 'agent' ? m.createImageTray({ upload: blob => agentApi.uploadAgentAskImage(a, blob), hintText: `Pictures are shared with ${who} as they are; nothing is hidden.` })
+                : m.createImageTray({ upload: (blob, versionOf) => api.uploadCommentImage(null, a.server, blob, versionOf, a.board) });
             tray.attach(dlg, box); tray.listen(sync);
             const picker = tray.picker(), add = picker.querySelector('button');
             add.textContent = ''; const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = 'image'; add.append(icon); add.title = 'Add image';

@@ -484,7 +484,7 @@ export function needsBulkActions() {
             const { ignoreRow, unignoreRow } = await importOnce('./artifact_review.js'), asks = await importOnce('./ask_ignore.js'), undo = [];
             const r = await each(rows, async s => {
                 if (s.review) { await ignoreRow(s.review.team, s.review); undo.push(() => unignoreRow(s.review.team, s.review)); }
-                else if (s.operatorAsk && s.operatorAsk.kind === 'ask') { await asks.closeAsk(s.operatorAsk); undo.push(() => asks.reopenAsk(s.operatorAsk)); }
+                else if (s.operatorAsk && (s.operatorAsk.kind === 'ask' || s.operatorAsk.kind === 'agent')) { await asks.closeAsk(s.operatorAsk); undo.push(() => asks.reopenAsk(s.operatorAsk)); }
                 else if (s.welcome && s.welcome.dismiss) (s.welcome.onDismiss ? s.welcome.onDismiss() : dismissWelcome(s.welcome.id));
                 else if (s.autorun) markSeen(s.autorun);
                 else if (s.goalDone) undo.push(await hideGoalDone(goalTeamHere(s.goalDone), s.goalDone, 'ignore'));
@@ -560,7 +560,7 @@ function askActions(a) {
     reply.classList.add('inbox-main-action'); // Answer, as the approved action set names it (#11552); the dialog it opens still has the reply box
     reply.setAttribute('aria-label', `Answer the question of ${who}`); reply.addEventListener('click', () => openAskDialog(a, () => $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true }), askRunners));
     box.append(reply);
-    if (a.kind === 'ask') { // a wait has no ask row to close: only a question is ignorable
+    if (a.kind === 'ask' || a.kind === 'agent') { // a wait has no ask row to close: only a question is ignorable
         const failed = DT.el('span', 'inbox-review-error'); failed.setAttribute('role', 'alert');
         const ignore = no => { no.disabled = true; failed.textContent = ''; const settle = keepPlace(no);
             return importOnce('./ask_ignore.js').then(async ({ ignoreAsk }) => { await ignoreAsk(a, who); sayLive(`Dismissed the question of ${who}.`); await settle(); }).catch(error => { no.disabled = false; failed.textContent = error.message; }); };
@@ -1472,7 +1472,7 @@ wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWor
                 for (const team of new Set(g.more.map(a => a.team))) p.append(DT.link(`Open ${keyLabel(team)} artifacts`, () => go(keyRoute('team', team, 'artifacts'))));
                 wrap.append(p);
             }
-            if (rows.some(r => (r.welcome && r.welcome.dismiss) || r.review || (r.operatorAsk && r.operatorAsk.kind === 'ask') || r.autorun) && (isPhoneLayout() || matchMedia('(pointer: coarse)').matches)) importOnce('./welcome_swipe.js').then(m => m.attachWelcomeSwipe(wrap)).catch(() => {}); // a touch screen, or a phone-sized window whatever its pointer says (#11765), swipes a row away (#11542); lazy
+            if (rows.some(r => (r.welcome && r.welcome.dismiss) || r.review || (r.operatorAsk && (r.operatorAsk.kind === 'ask' || r.operatorAsk.kind === 'agent')) || r.autorun) && (isPhoneLayout() || matchMedia('(pointer: coarse)').matches)) importOnce('./welcome_swipe.js').then(m => m.attachWelcomeSwipe(wrap)).catch(() => {}); // a touch screen, or a phone-sized window whatever its pointer says (#11765), swipes a row away (#11542); lazy
             return wrap; } };
 }
 
