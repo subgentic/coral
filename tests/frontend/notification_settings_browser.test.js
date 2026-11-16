@@ -69,7 +69,7 @@ const BASE = require('./test_base').BASE;
         await ev(`document.getElementById('settings-desktop-notify').click(); true`);
         await waitFor(`document.getElementById('settings-desktop-notify').checked === true`, 'alerts on');
         s = await state();
-        assert.equal(s.note, '');
+        assert.equal(s.note, 'Alerts are on. Send a test alert to see one.', 'turning it on says so (walk 53, #17169)');
         assert.deepEqual(s.kindsDisabled, [false, false, false]);
         assert.deepEqual([s.needs, s.reply, s.sound], [true, true, false], 'defaults: both kinds, no sound');
         await ev(`document.getElementById('settings-alert-reply').click(); document.getElementById('settings-alert-sound').click(); true`);
