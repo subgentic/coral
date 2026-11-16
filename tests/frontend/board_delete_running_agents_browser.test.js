@@ -6,7 +6,8 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, settle } = require('./helpers/wait');
+const { safePaused } = require('./helpers/paused');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -16,7 +17,7 @@ const { coralReady } = require('./helpers/wait');
         // The board's own code (message_board.js) loads lazily, and Remove team's click must wait for it, not be dropped (#18903: a slow Windows runner clicked before the file was in and nothing happened). It is held here, then let go.
         const { Fetch } = client; const held = [];
         await Fetch.enable({ patterns: [{ urlPattern: '*/message_board.js*', requestStage: 'Request' }] });
-        Fetch.requestPaused(e => { held.push(e.requestId); });
+        safePaused(client, e => { held.push(e.requestId); });
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.addScriptToEvaluateOnNewDocument({ source: `window.__qaSeed = [{ name: 'bd-agent', prefix: 'A', n: 2, sleeping: false, board_project: ${JSON.stringify(B)}, session_id: 'bd-agent-id' }];` });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -42,11 +43,10 @@ const { coralReady } = require('./helpers/wait');
         const boardListed = () => ev(`fetch('/api/board/projects').then(r => r.json()).then(p => (Array.isArray(p) ? p : p.projects || []).some(x => x.project === ${JSON.stringify(B)}))`);
 
         console.log('0. Remove team clicked while the board code is still loading is not lost: the dialog comes once it is in');
-        await waitFor(`true`, 'settle', 100);
-        for (let i = 0; i < 30 && !held.length; i++) await new Promise(r => setTimeout(r, 100));
+        for (let i = 0; i < 30 && !held.length; i++) await settle(ev, 100);
         assert.ok(held.length > 0, 'the board code was asked for and is held');
         await clickDelete();
-        await new Promise(r => setTimeout(r, 500));
+        await settle(ev, 500); // the click has had its frames: with the code held, nothing can answer it yet
         for (const requestId of held) await Fetch.continueRequest({ requestId }); await Fetch.disable();
         await waitFor(`!!window.__confirm`, 'the dialog after the held file arrives', 10000);
         await ev(`window.__confirm = null; true`);
