@@ -99,8 +99,9 @@ const { settle, coralReady } = require('./helpers/wait');
         await waitFor(`(() => { const rw = document.querySelector('${ROW}'); return rw.scrollWidth <= rw.clientWidth; })()`, 'the row has settled: the words on, or taken off, with nothing clipped', 4000);
         r = await row(); assert.ok(r.words && r.tops.length === 1 && !r.clipped && r.shown.filter(([t]) => ['files', 'artifacts', 'tasks'].includes(t)).every(([, w]) => w !== null), 'the words show at 1100: ' + JSON.stringify(r));
         await load(390, true);
-        await waitFor(`(() => { const rw = document.querySelector('${ROW}'); return rw.scrollWidth <= rw.clientWidth; })()`, 'the row has settled: the words on, or taken off, with nothing clipped', 4000);
-        r = await row(); assert.ok(r.more && r.tops.length === 1 && !r.clipped && (r.words ? r.shown.filter(([t]) => ['files', 'artifacts', 'tasks'].includes(t)).every(([, w]) => w !== null) : r.shown.filter(([, w]) => w !== null).length <= 1), 'the phone: all the words, or icons with the open tab word, never a clipped one, and More: ' + JSON.stringify(r));
+        // the phone's strip scrolls (#17242), so settled means the words are on or off, not that the row fits
+        await waitFor(`(() => { const rw = document.querySelector('${ROW}'); return rw.dataset.words !== undefined || rw.scrollWidth <= rw.clientWidth; })()`, 'the row has settled: the words on, or taken off, with nothing clipped', 4000);
+        r = await row(); assert.ok(r.more && r.tops.length === 1 && (r.words ? r.shown.filter(([t]) => ['files', 'artifacts', 'tasks'].includes(t)).every(([, w]) => w !== null) : r.shown.filter(([, w]) => w !== null).length <= 1), 'the phone: all the words, or icons with the open tab word, never a clipped one, and More: ' + JSON.stringify(r));
         await ev(`document.getElementById('agentic-tab-more').click(); true`);
         await waitFor(`!document.getElementById('agentic-more-menu').hidden`, 'More opens on the phone', 4000);
         const target = await ev(`Math.round(document.querySelector('#agentic-more-menu [role=menuitem]').getBoundingClientRect().height)`);
