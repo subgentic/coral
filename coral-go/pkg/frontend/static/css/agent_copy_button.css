@@ -18,3 +18,6 @@
 #settings-modal .agent-copy-hrow > .settings-pane-title { margin-bottom: 0; }
 /* At 200% text a pane stacks its rows (under 40rem wide) and its controls are 44 px; the robot follows (settings_groups). */
 @container settingspane (max-width: 40rem) { .agent-copy { width: 44px; height: 44px; } }
+
+/* A robot that stands alone above a list (Needs you, Saved) says what it is on a phone, where a title never shows (walk 49). */
+@media (max-width: 600px) { .agent-copy-words { width: auto; gap: 8px; padding-inline: 12px; } .agent-copy-words::after { content: 'Copy for an agent'; font-size: var(--fs-md); } }
