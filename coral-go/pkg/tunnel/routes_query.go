@@ -61,7 +61,7 @@ var routeQueries = map[string]string{
 	"GET /api/sessions/live/{}/diff":              "filepath*,session_id,worktree",
 	"GET /api/sessions/live/{}/events":            "cursor,limit,q,session_id,since,sort,type,until",
 	"GET /api/sessions/live/{}/events/counts":     "session_id",
-	"GET /api/sessions/live/{}/file-content":      "filepath*,raw,session_id,worktree",
+	"GET /api/sessions/live/{}/file-content":      "download,filepath*,raw,session_id,worktree",
 	"GET /api/sessions/live/{}/file-original":     "filepath*,raw,session_id,worktree",
 	"GET /api/sessions/live/{}/files":             "session_id,worktree",
 	"GET /api/sessions/live/{}/git":               "cursor,limit,session_id",

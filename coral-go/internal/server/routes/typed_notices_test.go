@@ -66,7 +66,7 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("agent_ui.go", `prompt, "agent UI action"`, 1, "uiActionPrompt (census)"),
 		typedcensus.S("agent_ui_request.go", `notification, ls.AgentType`, 1, "exception: the person's own request, typed as their own send is (the Orchestrator, goal #7)"),
 		typedcensus.S("auto_review.go", `taskClaimNudge(`, 1, "census: task available"),
-		typedcensus.S("board_notifications.go", `notification); err`, 1, "typedCompletedNotice (census)"),
+		typedcensus.S("board_notifications.go", `notification); err`, 2, "typedCompletedNotice (census): to the creator, and to the members task add --notify names (#17739: the fixed notice and the head SHA, never the author's text)"),
 		typedcensus.S("board_notifications.go", `typed); err`, 1, "typedStalledNotice (census)"),
 		typedcensus.S("board_notifications.go", `sub.SessionName, text); err`, 1, "sendTaskNudge: forwards the text of the callers listed here"),
 		typedcensus.S("board_notifications.go", `assignee, text); err`, 1, "typedTaskReminder (census)"),

@@ -38,13 +38,13 @@ type SystemHandler struct {
 	trustProbeMu sync.Mutex
 	trustProbeAt time.Time
 	// models lists each agent CLI's models (#4065).
-	models  *agentmodels.Service
+	models *agentmodels.Service
 	// signinTerminal opens a terminal session that runs a server-built sign-in command (#16716); set by the server wiring.
 	signinTerminal func(ctx context.Context, dir, command string) (map[string]any, error)
-	db      *store.DB
-	ss      *store.SessionStore
-	cfg     *config.Config
-	indexer Indexer
+	db             *store.DB
+	ss             *store.SessionStore
+	cfg            *config.Config
+	indexer        Indexer
 
 	// boardAuthor reads who wrote a board message, for the bookmarks saved before the author was kept (#4792); set by the server wiring.
 	boardAuthor func(ctx context.Context, project string, id int64) (string, bool, error)
