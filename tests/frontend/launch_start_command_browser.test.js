@@ -37,11 +37,11 @@ const { install: installNA, stubModels, stubCliChecks } = require('./helpers/new
             await expectCmd('codex', 'plan', '--sandbox read-only');
             await expectCmd('codex', 'bypassPermissions', '--dangerously-bypass-approvals-and-sandbox', ['--sandbox read-only']);
             await expectCmd('claude', 'plan', '--permission-mode plan');
-            if (mobile) { // the recap is one line with a toggle; its details (the command with Copy) open upward
+            { // the recap is one line with an arrow at every width (#18568); its details (the command with Copy) open upward
                 const c = await ev(`(() => { const t = document.getElementById('launch-recap-toggle'), r = document.getElementById('launch-recap'); return { shown: t.getClientRects().length > 0, closed: !r.hasAttribute('data-open'), cmdShown: !!document.querySelector('#launch-recap .launch-recap-command')?.getClientRects().length, expanded: t.getAttribute('aria-expanded') }; })()`);
-                if (!c.shown || !c.closed || c.cmdShown || c.expanded !== 'false') problems.push('390: the recap is not one line with its toggle closed: ' + JSON.stringify(c));
+                if (!c.shown || !c.closed || c.cmdShown || c.expanded !== 'false') problems.push(label + ': the recap is not one line with its toggle closed: ' + JSON.stringify(c));
                 await ev(`document.getElementById('launch-recap-toggle').click(); true`);
-                if ((await ev(`document.getElementById('launch-recap-toggle').getAttribute('aria-expanded')`)) !== 'true') problems.push('390: the toggle does not open the details');
+                if ((await ev(`document.getElementById('launch-recap-toggle').getAttribute('aria-expanded')`)) !== 'true') problems.push(label + ': the toggle does not open the details');
             }
             // read-only and labelled
             const g = await ev(`(() => { const r = document.querySelector('#launch-recap .launch-recap-command'); if (!r) return null; const b = [...r.querySelectorAll('button')].map(x => ({ t: x.textContent.trim(), shown: x.getClientRects().length > 0 })); return { label: r.querySelector('.lrc-label').textContent, buttons: b, editable: !!r.querySelector('input,textarea,[contenteditable]') }; })()`);
@@ -74,6 +74,15 @@ const { install: installNA, stubModels, stubCliChecks } = require('./helpers/new
                 if (open.expanded !== 'true' || open.label !== 'Show less' || !open.wraps || !open.fits) problems.push('390: Show full command does not open the whole line: ' + JSON.stringify(open));
                 await shot('start-command-390-open');
             }
+            // #18568 (the Operator, rc3): the recap and the start command belong to the model step only: going back, the persona and folder steps have none
+            const seen = {};
+            for (let i = 0; i < 3; i++) {
+                const st = await ev(`(() => ({ stage: document.getElementById('launch-modal').getAttribute('data-agent-stage'), shown: document.getElementById('launch-recap').getClientRects().length > 0 }))()`);
+                seen[st.stage] = st.shown;
+                if (st.stage === 'folder') break;
+                await ev(`document.getElementById('launch-agent-back').click(); true`);
+            }
+            if (seen.agent !== true || seen.persona !== false || seen.folder !== false) problems.push(label + ': the recap is not on the model step only: ' + JSON.stringify(seen));
             console.log(`   ${label} done`);
         }
         assert.deepEqual(problems, [], problems.join('\n'));
