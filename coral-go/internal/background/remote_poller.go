@@ -180,12 +180,7 @@ func (p *RemoteBoardPoller) RunOnce(ctx context.Context) error {
 		}
 
 		// Send nudge
-		plural := "s"
-		if data.Unread == 1 {
-			plural = ""
-		}
-		nudge := fmt.Sprintf("You have %d unread message%s on the message board. Run 'coral-board read' to see them.",
-			data.Unread, plural)
+		nudge := board.NudgeText()
 		sessionName := naming.SessionName(agent.AgentType, agent.SessionID)
 		// One line (#3376), through the automated-input gate (#3431). Whether a remote board's
 		// unread messages tag the agent isn't known here (only their count is), so it goes as a

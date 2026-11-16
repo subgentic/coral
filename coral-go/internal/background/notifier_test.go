@@ -233,7 +233,7 @@ func TestBoardNotifier_NormalAndMixedBatchesPreserveClassification(t *testing.T)
 	require.NoError(t, mixed.RunOnce(ctx))
 	require.Len(t, mixedRT.sent, 1)
 	assert.NotContains(t, mixedRT.sent[0].text, "Team health check")
-	assert.Contains(t, mixedRT.sent[0].text, "2 unread messages")
+	assert.Contains(t, mixedRT.sent[0].text, "You have unread messages")
 }
 
 func TestBoardNotifier_HealthClassificationIsolatedByRegisteredTeam(t *testing.T) {
@@ -309,7 +309,7 @@ func TestBoardNotifier_SuppressesHealthBacklogForMentionOnlyWorker(t *testing.T)
 	require.NoError(t, err)
 	require.NoError(t, n.RunOnce(ctx))
 	require.Len(t, rt.sent, 1)
-	assert.Contains(t, rt.sent[0].text, "1 unread message")
+	assert.Contains(t, rt.sent[0].text, "You have unread messages")
 	assert.NotContains(t, rt.sent[0].text, "Team health check")
 }
 
@@ -510,7 +510,7 @@ func TestBoardNotifier_MentionAfterReadBeforeNextPass(t *testing.T) {
 	mention("third")
 	require.NoError(t, notifier.RunOnce(ctx))
 	require.Len(t, rt.sent, 2, "a mention after the read is nudged at once, not after remindAfter")
-	assert.Contains(t, rt.sent[1].text, "1 unread message")
+	assert.Contains(t, rt.sent[1].text, "You have unread messages")
 
 	// And it is not repeated on the next passes.
 	clock = clock.Add(time.Minute)
@@ -560,7 +560,7 @@ func TestBoardNotifier_OneNudgePerBatch(t *testing.T) {
 	clock = clock.Add(defaultRemindAfter)
 	require.NoError(t, notifier.RunOnce(ctx))
 	require.Len(t, rt.sent, 2)
-	assert.Contains(t, rt.sent[1].text, "9 unread messages")
+	assert.Contains(t, rt.sent[1].text, "You have unread messages")
 	require.NoError(t, notifier.RunOnce(ctx))
 	assert.Len(t, rt.sent, 2, "the reminder is not repeated right away")
 
@@ -571,7 +571,7 @@ func TestBoardNotifier_OneNudgePerBatch(t *testing.T) {
 	post()
 	require.NoError(t, notifier.RunOnce(ctx))
 	require.Len(t, rt.sent, 3)
-	assert.Contains(t, rt.sent[2].text, "1 unread message")
+	assert.Contains(t, rt.sent[2].text, "You have unread messages")
 }
 
 // TestBoardNotifier_MultiSessionNoDuplicateNudge verifies that when multiple

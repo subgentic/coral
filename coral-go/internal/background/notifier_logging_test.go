@@ -91,18 +91,18 @@ func TestBoardNotifier_MentionsNudgesTrackUnreadCount(t *testing.T) {
 
 	first := post("Lead", "@Dev please look")
 	pass()
-	assert.Contains(t, lastNudge(), "You have 1 unread message on")
+	assert.Contains(t, lastNudge(), "You have unread messages on")
 
 	post("Lead", "Dev: and this too")
 	n.now = func() time.Time { return time.Now().Add(2 * defaultRemindAfter) }
 	pass()
-	assert.Contains(t, lastNudge(), "You have 2 unread messages")
+	assert.Contains(t, lastNudge(), "You have unread messages")
 
 	_, err = bs.DeleteMessage(ctx, "team", first)
 	require.NoError(t, err)
 	n.now = func() time.Time { return time.Now().Add(4 * defaultRemindAfter) }
 	pass()
-	assert.Contains(t, lastNudge(), "You have 1 unread message on")
+	assert.Contains(t, lastNudge(), "You have unread messages on")
 
 	_, err = bs.ReadMessages(ctx, "team", "Dev", 50)
 	require.NoError(t, err)

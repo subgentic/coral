@@ -89,5 +89,5 @@ func TestBoardNotifier_ANudgeReadBeforeItIsTypedIsDropped(t *testing.T) {
 	require.NoError(t, n.RunOnce(ctx))
 	typed := rt.typed()
 	require.Len(t, typed, 1)
-	assert.Contains(t, typed[0], "1 unread message on the message board")
+	assert.Contains(t, typed[0], "You have unread messages on the message board")
 }

@@ -537,7 +537,7 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 		}
 		return
 	}
-	nudge := nudgeText(sub.Project, unread, health)
+	nudge := nudgeText(sub.Project, health)
 	if !health && latestID > 0 { // the newest unread message is from another board: the nudge says how to answer it (#9054)
 		if m, merr := n.boardStore.GetMessageByID(ctx, sub.Project, latestID); merr == nil && m != nil && m.ReplyWith != "" {
 			// By reference: the reply line names the sender's board, which that board chose, so it is shown by coral-board read, never typed (goal #7).
@@ -681,15 +681,11 @@ func (n *BoardNotifier) nudgeKind(ctx context.Context, sub *board.Subscriber, su
 }
 
 // nudgeText is the nudge typed to the agent: the unread count, or the health check's for a health-only batch.
-func nudgeText(project string, unread int, health bool) string {
-	plural := "s"
-	if unread == 1 {
-		plural = ""
-	}
+func nudgeText(project string, health bool) string {
 	if health {
-		return fmt.Sprintf("[Coral health check] Team health check for %s: %d unread message%s include a health-monitor summary. Review team status, assignments, progress, and blockers, then run 'coral-board read' to see the authoritative full content.", board.TypedLabel(project), unread, plural)
+		return fmt.Sprintf("[Coral health check] Team health check for %s: the unread messages include a health-monitor summary. Review team status, assignments, progress, and blockers, then run 'coral-board read' to see the authoritative full content.", board.TypedLabel(project))
 	}
-	return board.NudgeText(unread)
+	return board.NudgeText()
 }
 
 // lacksSubscriber reports whether a session subscribed to the pass's boards is missing from

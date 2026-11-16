@@ -154,7 +154,7 @@ func (h *SessionsHandler) SendWaitingNow(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "sent": false, "nothing_waiting": true})
 		return
 	}
-	text := board.NudgeText(unread)
+	text := board.NudgeText()
 	delivery, err := ptymanager.DeliverNow(r.Context(), ptymanager.AutomatedInput{
 		Term: h.terminal, Name: name, AgentType: ls.AgentType, SessionID: ls.SessionID,
 		Text: text, What: "Send now", Paste: true,

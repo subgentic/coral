@@ -202,25 +202,25 @@ func TestHeldNoticesOlderThanTheKeepTimeAreDroppedWhenTheNextIsHeld(t *testing.T
 	assert.Equal(t, 1, waiting, "the five old ones are forgotten, only the fresh one waits")
 }
 
-// QA on #11387: the notifier's real nudge says how many messages are unread, and its sender is "board nudge": three of them held while paused read
-// "3 board messages" (the largest count they stated, not the number of nudges), and once the summary is typed the notifier is told once.
-func TestHeldBoardNudgesAreToldAsTheMessagesTheyStateAndTheNotifierIsToldOnce(t *testing.T) {
+// QA on #11387: the notifier's real nudge's sender is "board nudge": three of them held while paused are told as one (the nudge states no number since #18753, so it is one nudge however many were held), and
+// once the summary is typed the notifier is told once.
+func TestHeldBoardNudgesAreToldAsOneAndTheNotifierIsToldOnce(t *testing.T) {
 	const sid = "11111111-1387-4000-8000-000000000009"
 	a, in := noticeRig(t, sid)
 	PauseNotices(sid, time.Hour)
-	for _, n := range []int{1, 3, 2} {
-		d, err := DeliverAutomated(context.Background(), in("board nudge", board.NudgeText(n)))
+	for range 3 {
+		d, err := DeliverAutomated(context.Background(), in("board nudge", board.NudgeText()))
 		require.NoError(t, err)
 		require.Equal(t, Skipped, d)
 	}
 	_, _, waiting, _ := NoticeStatus(sid)
-	assert.Equal(t, 3, waiting, "the largest unread count the nudges stated")
+	assert.Equal(t, 1, waiting, "one nudge, however many were held")
 	assert.False(t, TakeBoardNudgeTold(sid), "nothing is told while it is held")
 
 	ResumeNotices(sid)
 	flushHeld(sid)
 	waitFlushed(t, sid)
-	assert.Equal(t, []string{"[Coral] While you were talking: 3 board messages. Run coral-board read."}, a.sent())
+	assert.Equal(t, []string{"[Coral] While you were talking: 1 board message. Run coral-board read."}, a.sent())
 	assert.True(t, TakeBoardNudgeTold(sid), "the summary stood for the nudge")
 	assert.False(t, TakeBoardNudgeTold(sid), "and says so once")
 }

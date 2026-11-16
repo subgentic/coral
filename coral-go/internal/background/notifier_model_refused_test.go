@@ -2,6 +2,7 @@ package background
 
 import (
 	"context"
+	"github.com/subgentic/coral/internal/board"
 	"log/slog"
 	"sync"
 	"testing"
@@ -71,7 +72,7 @@ func TestTheNotifierDoesNotNudgeACodexAgentWhoseModelIsRefusedAndResumesWhenItIs
 	rt.set("› Ask Codex to do anything\n\n  gpt-5.5 high · ~/work\n") // the model was changed: the refusal is off its screen
 	pass()
 	require.Len(t, typed, 1, "the nudge goes as soon as the refusal is gone")
-	assert.Contains(t, typed[0], "2 unread")
+	assert.Equal(t, board.NudgeText(), typed[0])
 
 	// the same screen on another agent type is no reason to hold its nudge
 	rt.set(refused)

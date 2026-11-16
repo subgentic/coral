@@ -23,7 +23,7 @@ func IsCoralDelivery(content string) bool {
 
 var (
 	coralDeliveryRes = []*regexp.Regexp{
-		regexp.MustCompile(`(?i)^You have \d+ unread messages? on the message board`),
+		regexp.MustCompile(`(?i)^You have (?:\d+ )?unread messages? on the message board`),
 		regexp.MustCompile(`(?i)^You have tasks available`),
 		regexp.MustCompile(`(?i)^You have a new task in Coral \(#\d+:`),
 		regexp.MustCompile(`(?i)^\[Task #\d+[^\]]*\]`),

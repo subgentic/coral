@@ -217,7 +217,7 @@ func scheduleFlushLocked(sessionID string, st *noticeState, d time.Duration) {
 // boardNudgeWhat is the sender of the notifier's "You have N unread messages" nudge.
 const boardNudgeWhat = "board nudge"
 
-var nudgeCountRe = regexp.MustCompile(`^You have (\d{1,9}) unread messages? on the message board`)
+var nudgeCountRe = regexp.MustCompile(`^You have (?:(\d{1,9}) )?unread messages? on the message board`)
 
 // nudgeCount is the unread count a board nudge states (ok false for any other notice).
 func nudgeCount(in AutomatedInput) (int, bool) {
@@ -227,6 +227,9 @@ func nudgeCount(in AutomatedInput) (int, bool) {
 	m := nudgeCountRe.FindStringSubmatch(in.Text)
 	if m == nil {
 		return 0, false
+	}
+	if m[1] == "" { // the nudge states no number (#18753): one nudge is held, however many messages wait
+		return 1, true
 	}
 	n, err := strconv.Atoi(m[1])
 	return n, err == nil && n > 0

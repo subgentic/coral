@@ -76,7 +76,7 @@ func TestTask1648_ComprehensiveStartupAndNotificationRetest(t *testing.T) {
 		// Pass: must notify because latestID > seeded latestID!
 		require.NoError(t, notifier.RunOnce(ctx))
 		require.Len(t, rt.sent, 1, "fresh same-count message arriving after startup must trigger notification")
-		require.Contains(t, rt.sent[0].text, "1 unread message")
+		require.Contains(t, rt.sent[0].text, "You have unread messages")
 	})
 
 	t.Run("3_StartupFollowedByNewArrivalWhileUnread_NotifiesImmediately", func(t *testing.T) {
@@ -104,7 +104,7 @@ func TestTask1648_ComprehensiveStartupAndNotificationRetest(t *testing.T) {
 
 		require.NoError(t, notifier.RunOnce(ctx))
 		require.Len(t, rt.sent, 1, "arrival while unread after startup must trigger nudge")
-		require.Contains(t, rt.sent[0].text, "2 unread messages")
+		require.Contains(t, rt.sent[0].text, "You have unread messages")
 	})
 
 	t.Run("4_EmptySeed_CleanStartupWithNoUnreads", func(t *testing.T) {

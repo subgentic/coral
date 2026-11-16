@@ -90,11 +90,7 @@ func unreadNotice(result map[string]any) string {
 	if int(count) <= 0 {
 		return ""
 	}
-	plural := "s"
-	if int(count) == 1 {
-		plural = ""
-	}
-	return fmt.Sprintf("\nYou have %d unread message%s on the message board. Run 'coral-board read' to see them.\n\n", int(count), plural)
+	return "\nYou have unread messages on the message board. Run 'coral-board read' to see them.\n\n" // board.NudgeText's words (a hook binary stays small: it does not import the board); a test keeps them equal (#18753)
 }
 
 func loadBoardState() map[string]any {
