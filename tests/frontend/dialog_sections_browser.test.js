@@ -169,7 +169,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window.showLaunchModal(); window._selectLaunchType('team'); window.showTeamAgentModal(); true`);
         await waitFor(`${vis('#launch-agent-name-input')} && !!document.querySelector('#launch-agent-acf .acf-agent-type')`, 'the member dialog on its role');
         const TA = '#launch-step-agent'; // the member is the agent step of the Launch dialog in a second mode (#7861): the role and prompt are its persona step, the tabs are Agent, Permissions, Advanced
-        assert.deepEqual(await names(TA), [['Agent', 'smart_toy'], ['Permissions', 'lock'], ['Advanced', 'tune']]);
+        assert.deepEqual(await names(TA), [['Agent', 'smart_toy'], ['Permissions', 'lock'], ['Skills', 'auto_awesome'], ['Advanced', 'tune']]);
         assert.equal(await ev(`document.getElementById('launch-step-agent').dataset.stage`), 'persona', 'a new member opens on its role');
         await ev(`window._launchStage('agent'); true`);
         // The agent form fills in after it opens (the models arrive and it is drawn again), which can replace the name field the problem was marked on: Save is pressed again until the empty name has the focus.
