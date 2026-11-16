@@ -34,8 +34,8 @@ var signinTerminalTypes = map[string]bool{"opencode": true}
 const signinStartGap = 10 * time.Second
 
 var (
-	signinStartMu sync.Mutex
-	signinStartAt = map[string]time.Time{}
+	signinStartMu  sync.Mutex
+	signinStartAt  = map[string]time.Time{}
 	signinStartNow = time.Now
 )
 
