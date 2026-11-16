@@ -4,6 +4,8 @@
 import { state } from './state.js';
 import { serverFetch, serverForSession, boardFetch } from './server_base.js';
 import { emptyState } from './dom_write.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('branches.css'); // the tab's rules load with it, not at start (#17746)
 
 const REFRESH_MS = 60000; // the snapshot is read again at most once a minute on the server
 const FIRST_READ_STEPS = [2000, 4000, 8000, 15000]; // a repository is first read when the tab asks (the server starts a pass then): look again soon, then less often
