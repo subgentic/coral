@@ -25,7 +25,13 @@ const BASE = require('./test_base').BASE;
         assert.match(task, /teaching me how to use Coral and how to work with an agent team/, task);
         assert.match(task, /Load the Getting started skill first/, task);
         assert.match(task, /questions with buttons/, task);
-        await waitFor(`!!document.querySelector('#team-skills-host input[type=checkbox]:checked')`, 'the Getting started skill is ticked for the members');
+        // #18808 (the Operator: "should this go for every member?"): the tour's guide is the Orchestrator's own skill; 'Skills for every member' starts with nothing chosen.
+        await waitFor(`document.querySelectorAll('#team-skills-host .skills-pick').length > 0`, 'the skills list is drawn');
+        assert.equal(await ev(`document.querySelectorAll('#team-skills-host input[type=checkbox]:checked').length`), 0, 'nothing is ticked under Skills for every member');
+        const guideId = await ev(`fetch('/api/skills?status=approved').then(r => r.json()).then(d => (d.skills || []).find(s => s.name === 'getting-started-team')?.id || '')`);
+        assert.ok(guideId, 'the getting-started-team skill is approved on this server');
+        await waitFor(`(() => { const r = [...document.querySelectorAll('#team-agents-list .team-agent-row')].find(x => /Orchestrator/.test(x.querySelector('.team-agent-role-name').textContent)); return !!r && (r.dataset.skills || '').includes(${JSON.stringify(guideId)}); })()`, 'the Orchestrator carries the guide as its own skill');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#team-agents-list .team-agent-row')].filter(r => !/Orchestrator/.test(r.querySelector('.team-agent-role-name').textContent)).map(r => r.dataset.skills || '')`), ['', ''], 'Lead Dev and QA carry no skill');
         assert.equal(await ev(`!!document.getElementById('team-save-goal')?.checked`), false, 'a tour is not a goal: the first task is not saved as one');
         await ev(`window.hideLaunchModal(); true`);
         await ev(`document.querySelector('.sidebar-new-btn-full[data-arg="team"]').click(); true`);
