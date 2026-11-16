@@ -26,7 +26,7 @@ const { coralReady } = require('./helpers/wait');
             const row = { ...${JSON.stringify(base)}, waiting_for_input: true, waiting_kind: 'permission', waiting_summary: 'Notification: Claude needs your permission to continue' }; st.liveSessions = [row];
             NI.pendingToolBySession.clear(); NI.promptOptionsBySession.clear(); NI.loginBySession.clear();
             NI.syncNeedsInputCard(document.getElementById('live-history-messages'), row); return true; })()`);
-        await waitFor(`!!document.querySelector('#live-history-messages .chat-needs-input .cni-hint')`, 'a card with no options', 6000);
+        await waitFor(`!!document.querySelector('#live-history-messages .chat-needs-input .cni-hint') && !!document.querySelector('#live-history-messages .chat-needs-input .cni-reread')`, 'a card with no options and its Check again (card_attach.js adds the button once it has loaded: a lazy module, #17826)', 6000);
         const card = () => ev(`(() => { const c = document.querySelector('#live-history-messages .chat-needs-input'); return c ? { hint: (c.querySelector('.cni-hint') || {}).textContent || '', again: !!c.querySelector('.cni-reread'), answers: [...c.querySelectorAll('.cni-answer')].map(b => b.textContent.trim().replace(/^\\d+\\s*/, '')) } : null; })()`);
         let c = await card();
         check(c && c.hint === 'Answer in the terminal' && c.again && c.answers.length === 0, 'a card with no options says so and has Check again: ' + JSON.stringify(c));
