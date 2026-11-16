@@ -105,7 +105,7 @@ const S = `(window.__coralStatic || '/static/')`;
             await ev(`document.querySelector('#scheduler-detail .sched-more-btn').click(); true`);
             assert.equal(await ev(vis('#scheduler-detail .sched-delete')), true);
             // #9293: an enabled job's primary is Run now and Turn off is beside it in the main row (#10475); More holds Delete
-            assert.equal(await ev(`document.querySelector('#scheduler-detail .sched-actions > .btn-primary')?.textContent.trim()`), 'Run now', `${at}: Run now is the primary`);
+            assert.equal(await ev(`document.querySelector('#scheduler-detail .sched-header > .btn-primary')?.textContent.trim()`), 'Run now', `${at}: Run now is the primary, beside the title (#16771)`);
             assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-actions > [data-on-click="job-toggle"]')].map(b => b.textContent.trim())`), ['Turn off'], `${at}: Turn off stays in the main row while the job is on (#10475)`);
             assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-more-menu .menu-item:not(.sched-menu-phone)')].map(b => b.textContent.trim())`), ['Delete'], `${at}: More holds only Delete (Edit and Turn off are in it too, on a phone only: .sched-menu-phone, phone_model_d)`);
             assert.equal(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-more-menu .menu-item')].every(b => { const r = b.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight; })`), true, `${at}: every item of More is on the screen (the menu opens above the pinned bar)`);
@@ -117,7 +117,7 @@ const S = `(window.__coralStatic || '/static/')`;
             assert.equal(await ev(vis('#scheduler-detail .sched-delete')), false, `${at}: a click elsewhere closes More`);
             assert.equal(await ev(`document.querySelector('#scheduler-detail .sched-more-btn').getAttribute('aria-expanded')`), 'false');
             await ev(`document.querySelector('#scheduler-detail .sched-more-btn').click(); document.querySelector('#scheduler-detail .sched-delete').focus(); true`);
-            for (const type of ['rawKeyDown', 'keyUp']) await client.Input.dispatchKeyEvent({ type, key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+            await ev(`document.querySelector('#scheduler-detail .sched-header > .btn').focus(); true`); // Delete is the page's last control now (Run now moved up beside the title, #16771): a Tab from it leaves the page, so the focus moves to another control the way a Tab does
             await waitFor(`!document.querySelector('#scheduler-detail .sched-more-menu') || document.querySelector('#scheduler-detail .sched-more-menu').hidden`, `${at}: Tab out of More closes it`, 3000);
             assert.equal(await ev(`document.querySelector('#scheduler-detail .sched-more-btn').getAttribute('aria-expanded')`), 'false');
             if (mobile) {
@@ -140,7 +140,8 @@ const S = `(window.__coralStatic || '/static/')`;
             // #9293: a paused job's primary is Enable; Run now is still there, and Pause is not
             await ev(`import(${S} + 'scheduler.js').then(m => m.selectScheduledJob(3)).then(() => true)`);
             await waitFor(`!!document.querySelector('#scheduler-detail .sched-actions')`, `${at}: the paused job's page`, 4000);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-actions > .btn')].map(b => b.textContent.trim() + (b.classList.contains('btn-primary') ? '*' : ''))`), ['Turn on*', 'Edit', 'Run now'], `${at}: paused: Turn on is the primary and Run now is last, where a workflow's Run is (#10476)`);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-actions > .btn')].map(b => b.textContent.trim() + (b.classList.contains('btn-primary') ? '*' : ''))`), ['Turn on*', 'Edit'], `${at}: paused: Turn on is the primary; Run now is beside the title (#16771), so Turn on has the footer's last spot to itself (#10476)`);
+            assert.equal(await ev(`document.querySelector('#scheduler-detail .sched-header > .btn')?.textContent.trim()`), 'Run now', `${at}: paused: Run now is beside the title`);
             assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-more-menu .menu-item:not(.sched-menu-phone)')].map(b => b.textContent.trim())`), ['Delete'], `${at}: a paused job's More holds only Delete`);
             await shot(`jobs-page-paused-${w}`);
         }

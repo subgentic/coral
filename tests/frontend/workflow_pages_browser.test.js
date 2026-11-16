@@ -51,7 +51,7 @@ const { coralReady } = require('./helpers/wait');
             const esc = await ev(`({ hidden: document.querySelector('.wf-more-menu').hidden, expanded: document.querySelector('.wf-more-btn').getAttribute('aria-expanded'), onMore: document.activeElement === document.querySelector('.wf-more-btn') })`);
             assert.deepEqual(esc, { hidden: true, expanded: 'false', onMore: true }, `${tag}: Escape closes the menu with the focus back on More: ` + JSON.stringify(esc));
             await ev(`document.querySelector('.wf-more-btn').click(); document.querySelector('.wf-more-menu button').focus(); true`);
-            await ev(`document.querySelector('.wf-detail-actions [data-on-click="wf-trigger"]').focus(); true`);
+            await ev(`document.querySelector('.sched-header [data-on-click="wf-trigger"]').focus(); true`);
             const left = await ev(`({ hidden: document.querySelector('.wf-more-menu').hidden, expanded: document.querySelector('.wf-more-btn').getAttribute('aria-expanded') })`);
             assert.deepEqual(left, { hidden: true, expanded: 'false' }, `${tag}: moving the focus out of More closes its menu: ` + JSON.stringify(left));
             await ev(`document.querySelector('.wf-runs-table .dt-primary').click(); true`);

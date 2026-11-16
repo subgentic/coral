@@ -52,10 +52,10 @@ const STUB = `(() => {
             await ev(`window.selectScheduledJob(5).then(() => true)`);
             await waitFor(`!!document.querySelector('#scheduler-view .sched-actions [data-on-click="job-toggle"]')`, `${tag}: the job's page with its bar`, 10000);
             const rect = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; })()`);
-            const turnOn = await rect('#scheduler-view .sched-actions [data-on-click="job-toggle"]'), runNow = await rect('#scheduler-view .sched-actions [data-on-click="job-run-now"]');
+            const turnOn = await rect('#scheduler-view .sched-actions [data-on-click="job-toggle"]'), runNow = await rect('#scheduler-view .sched-header [data-on-click="job-run-now"]');
             await ev(`window.selectWorkflow(7).then(() => true)`);
-            await waitFor(`!!document.querySelector('#wf-detail-container .wf-detail-actions [data-on-click="wf-trigger"]')`, `${tag}: the workflow's page with its bar`, 10000);
-            const runBtn = await rect('#wf-detail-container .wf-detail-actions [data-on-click="wf-trigger"]');
+            await waitFor(`!!document.querySelector('#wf-detail-container .sched-header [data-on-click="wf-trigger"]')`, `${tag}: the workflow's page with its bar`, 10000);
+            const runBtn = await rect('#wf-detail-container .sched-header [data-on-click="wf-trigger"]');
             const overlap = (a, b) => a && b && a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
             if (overlap(turnOn, runBtn)) problems.push(`${tag}: the workflow's Run sits where the job's Turn on does (${JSON.stringify([runBtn, turnOn])})`);
             if (!overlap(runNow, runBtn)) problems.push(`${tag}: the job's Run now sits where the workflow's Run does (${JSON.stringify([runNow, runBtn])})`);
