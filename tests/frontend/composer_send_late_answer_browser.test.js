@@ -69,9 +69,11 @@ const MOCK = `(() => {
         await fresh();
         console.log('2. the row lists the same words from 60 s before this send: an earlier message, so this one was not typed');
         await ev(`window.__mode = 'drop'; true`);
+        // The input can match before sending starts, and is restored before responseError() resolves.
+        // Wait for the send outcome before checking the error in these refusal cases.
         await typedIs('ok', 60000);
         await type('ok');
-        await ev(`window.sendCommand(); true`);
+        await ev(`window.sendCommand()`);
         await waitFor(`document.getElementById('command-input').value === 'ok'`, 'the text back in the box');
         assert.notEqual(await composerError(), '', 'the error shows');
 
@@ -80,7 +82,7 @@ const MOCK = `(() => {
         await ev(`window.__mode = '504'; true`);
         await typedIs('');
         await type('never arrived');
-        await ev(`window.sendCommand(); true`);
+        await ev(`window.sendCommand()`);
         await waitFor(`document.getElementById('command-input').value === 'never arrived'`, 'the text back in the box');
         assert.notEqual(await composerError(), '', 'the error shows');
         console.log('\nPASS composer send late answer: a send the agent got is Sent; one it did not is put back');
