@@ -92,6 +92,7 @@ func TestAgentTasks_MirrorBoardTaskAPI(t *testing.T) {
 	code, refused := post(fmt.Sprintf("/api/agent/tasks/%v/cancel", added["id"]), map[string]any{"session_id": "solo-1", "message": "  "})
 	assert.Equal(t, http.StatusBadRequest, code, "a skip with no reason is refused (#17614)")
 	assert.Equal(t, "reason_required", refused["code"])
+	assert.Contains(t, fmt.Sprint(refused["error"]), fmt.Sprintf("coral-agent task cancel %v --message", added["id"]), "the refusal names the full command (#17845)")
 	code, cancelled := post(fmt.Sprintf("/api/agent/tasks/%v/cancel", added["id"]), map[string]any{"session_id": "solo-1", "message": "Not needed"})
 	require.Equal(t, http.StatusOK, code)
 	assert.Equal(t, "skipped", cancelled["status"])
