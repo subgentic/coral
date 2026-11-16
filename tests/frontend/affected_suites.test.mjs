@@ -1,6 +1,7 @@
 // The affected-suites finder (#17652): a diff that rewords text lists the suites that still assert the old words, and leaves out the ones that do not; a changed helper lists its importers.
 import { spawnSync } from './helpers/child_process.js';
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
 import { removedTokens, affected, tokensOf, revArg, escapeRe } from './affected_suites.mjs';
 
 const diff = `diff --git a/coral-go/pkg/frontend/static/modes.js b/coral-go/pkg/frontend/static/modes.js
@@ -47,6 +48,6 @@ assert.equal(revArg(undefined), undefined);
 assert.equal(escapeRe('a.b(c)+[d]'), 'a\\.b\\(c\\)\\+\\[d\\]');
 const odd = affected({ tokens: new Map(), helpers: ['tests/frontend/helpers/wa(it.js'] }, new Map([['tests/frontend/x_browser.test.js', "require('./helpers/wa(it')"], ['tests/frontend/y_browser.test.js', "require('./helpers/wait')"]]));
 assert.deepEqual([...odd.keys()], ['tests/frontend/x_browser.test.js'], 'a helper name with a regexp character neither throws nor matches loosely');
-const bad = spawnSync(process.execPath, [new URL('./affected_suites.mjs', import.meta.url).pathname, '--output=/tmp/affected-should-not-exist'], { encoding: 'utf8' });
+const bad = spawnSync(process.execPath, [fileURLToPath(new URL('./affected_suites.mjs', import.meta.url)), '--output=/tmp/affected-should-not-exist'], { encoding: 'utf8' });
 assert.equal(bad.status, 2, 'the script exits 2 on an option-shaped revision'); assert.match(bad.stderr, /refusing/);
 console.log('PASS the affected-suites finder lists what a reworded string breaks');
