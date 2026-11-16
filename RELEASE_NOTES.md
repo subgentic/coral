@@ -1,5 +1,163 @@
 # Release Notes
 
+## v2.0.69 — An updated Getting started guide, Needs you and Inbox that behave, files you can download and compare, a resource queue, and phone and iPad touch fixes
+
+Task numbers in brackets. Built on v2.0.68 and on 5eeb154df2 (ci/v2069), tagged by the Operator's decision before its cdp-gate and Mac run had finished, so the Known issues below list every red they showed; it carries the whole v2.0.70 queue. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **Getting started is the first Inbox item of a new install** (#18825, #18764, #18666, #18766, #18808, #18945): the guide is an ordinary Needs you item that counts, stays in the Inbox until you press Dismiss and then shows in Activity; the tour's sample file has an image in its Markdown and each stop says where it is and what to try; Try a team runs the Orchestrator on the default model and the Lead Dev and QA on Sonnet.
+- **Inbox and Needs you that behave**: a single agent can ask you a question, a follow-up ask joins its earlier ask, solved board asks leave, Approve and Yes clear a row at once, and several rows can be cleared together on a phone (#18106, #17738, #16617, #17068, #17501, #17128).
+- **Files and artifacts**: download a file the team built, byte for byte; compare two versions of an artifact with changes in red and green; a file path in a task result opens the file (#17632, #17655, #17522, #18645, #18200).
+- **Resources and the queue**: a run asks for a kind of work and a free machine is chosen; resources are set up from a list of computers; the Queue tab has the app's left sidebar (#17586, #17588, #18719).
+- **A launch notice and a Launch dialog that say what happens**: 'Agents launch in auto mode', what it is and where to change it; the recap sits inline beside the buttons on a desktop (#18765, #18795).
+- **Full-width tables and one look on phones and tablets**: tables run full width on wide screens, and the phone and iPad touch-size checks pass (#18358, #18394, #18867, #18941).
+
+#### New agent and teams
+
+- New agent and New team offer a Getting started prompt as the first-run prompt (#18119).
+- New agent goes back to separate steps, with the Next button saying what comes next (#18082).
+- New agent: the start-command bar no longer fills the bottom of every step on desktop (#18568).
+- New agent recap warns again about a risky permission mode (bypass or custom no-prompts) (#18286).
+- A newsletter team no longer gets coding roles by default (#17817).
+- A half-asleep team can be woken from the team menu (#17536).
+- Waking an agent when the board is at its live limit offers to sleep the longest-idle one (#18114).
+- The Orchestrator is told when an agent is added to a running team (#17305).
+- The team page shows whether the Orchestrator was told about an added agent (#17343).
+- A warning when a task is assigned to a sleeping member (#17657).
+- A restarted agent remembers the task it had claimed (#17411).
+- Waking a resumed conversation types a short wake note, not the original starting prompt (#17324).
+- A Codex agent's row keeps its model line after Restart with the same settings (#16434).
+- Restarting to the CLI default no longer carries the old model (#17551).
+- The UI says Stop instead of Kill for agents and teams (#16456).
+- The agent card menu says Stop; Stop, Sleep and Pause wording matches the team menu (#16688).
+- The Orchestrator roster uses each member's role or title, not the start of its prompt (#17610).
+- coral-board stop lets the Orchestrator stop an agent's current turn (#16698).
+
+#### Inbox and Needs you
+
+- The Connect a second computer welcome item is removed (Getting started has 5 items) (#18115).
+- Needs you counts include the Welcome rows it shows (#16862).
+- The Getting started steps redraw when a step is done (#18588).
+- A single agent (no team) can ask you a question in Needs you (#18106).
+- An agent's follow-up ask links to its earlier open ask: one row, one answer closes both (#17738).
+- Inbox cards no longer reflow right after an action, so a click opens the right agent (#16616).
+- A live redraw no longer cancels a click on an identical control (#18397).
+- Solved board asks leave Needs you (#16617).
+- Approve on a review row clears it at once (#17068).
+- Yes on a plan clears the card and the count straight away (#17501).
+- One Orchestrator decision no longer arrives as two items (#17634).
+- Approving a newer version closes the older versions' review rows (#18166).
+- Needs you on a phone: select several rows and clear them together (#17128).
+- Removing a team removes its Goal closed cards; the Remove dialog is shorter (#16895).
+- An Orchestrator question stays out of a review card's text (#16963).
+- Tables run full width on wide screens, starting with Needs you (#18358).
+- Full width also on the Goals page and the artifact list (#18394).
+- The Who column (left out earlier) (#18299).
+- Team counts agree: Tasks tab, team header and Needs you show the same numbers (#17482).
+- Team header attention count matches the Needs you tab and sidebar (#17067).
+- A message with two ~ paths no longer strikes the text between them (#18435).
+- Goals lists match on both pages; Answer dialog has one footer; Sleep on sidebar hover (#16371).
+- Goals tab no longer opens on 'No done goals' (#16692).
+- Goals: All and sidebar counts match; the Done tab shows a number (#16863).
+- Goal 'Updated N min ago' follows newer agent work (#17887).
+
+#### Files, artifacts and chat
+
+- Files panel: download a file the team built (#17632).
+- Download any file byte-for-byte, including binaries (#17655).
+- Phone: a team's finished page can be opened (#17458).
+- Team Artifacts tab: Add files, Copy path and Download all sit in sensible places (#16666).
+- HTML artifacts: no line comments, one comment on the whole document (#16736).
+- Artifact view is one view, not two stacked ones with a second Approve row (#16737).
+- Artifact versions list opens in the right place and says what changed (#16824).
+- An upload note (what changed) shows under each artifact version (#17119).
+- Compare two artifact versions (#17522).
+- A file path in a task result becomes a link that opens the file (#18200).
+- A link inside a review document opens with a way back (#18208).
+- Line comments work on a single ~x~ in a markdown artifact (#18467).
+- An image sent in chat no longer makes the agent ask to read a temp file (#17332).
+- Chat opens at the latest message, not the whole startup prompt (#17461).
+- Chat after Stop: the Stopping and Working counters agree (#17530).
+- Phone chat: the Copy icon no longer overlaps the next row (#16701).
+- Activity no longer lists 'Sent words to an agent' rows (#18466).
+- Activity no longer shows an empty page with Load more (#18545).
+- Activity kind chips: picking a kind adds no extra filter chip (#16087).
+
+#### Settings, jobs and branches
+
+- Settings > Accounts: a Sign in button per provider (Claude, Pi) (#16714).
+- A signed-out run notice opens the account sign-in, then offers Retry (#16715).
+- Default models lists the same agents as New agent (#16599).
+- Picking Haiku as the Claude default now saves (#16667).
+- A failed default-model save repaints the saved value (#16772).
+- Per-kind Inbox switches are easy to find (#16973).
+- Desktop alerts off now shows the alert switch off (#17022).
+- Settings > Updates shows the version and a Check now button (#17538).
+- CLI text points at the current Settings sections (#17165).
+- Jobs: git-repo problems show before Create job; Make it a git repo is safe (#17150).
+- Jobs: secret files are left out and file counts are shown (#17211).
+- Jobs: Run now sits beside the job title (#16771).
+- A job run no longer stays Running after a folder-trust answer (#17520).
+- Job page: running now and recent runs agree (#17572).
+- Branches: a branch row opens its commits, diff and author (#17543).
+- Branches on a non-git folder answers at once and says what to do (#17483).
+- Branches API says 'not read yet' vs 'not a git folder' (#17058).
+- Knowledge: add a note by hand (#17485).
+- Knowledge after a goal fills in without a manual Distill (#17544).
+- Knowledge offers Distill when a goal closes (#18034).
+- Resources carry a how-to description shown in the queue (#17560).
+- Resource queue: a run asks for a kind of work and the free machine is chosen (#17586).
+- Resource setup from a list of computers (#17588).
+- Health check flags a High task waiting behind lower-priority work (#17648).
+- coral-board wait with no target no longer ends on any message (#17503).
+- Auto mode no longer raises permission cards for harmless Coral commands (#17547).
+- Adding or reassigning a task refuses an assignee that is not on the board (#18294).
+
+#### Design polish and other fixes
+
+- Design: Skills table shows full names and descriptions (#15839).
+- Design: Analytics tiles use one sparkline colour (#15841).
+- Design: Analytics axis labels use the normal font (#15842).
+- Design: Analytics tiles fit on a phone (#15843).
+- Design: the not-found page matches the app (#15852).
+- A task link that could not be read says so, not 'not found' (#16418).
+- Sidebar highlight follows the team page you opened (#16669).
+- Phone: Activity easier to find; pulse icon no longer opens Team settings (#17242).
+- Phone batch: team cards over error text, Board tab list, Inbox card titles (#17733).
+- Phone batch: Analytics detail keeps its tab bar, legend and back arrow (#17734).
+- Agent Tasks tab: the done/total badge is gone (#18429).
+- Customize tabs lists Sub-agents; Tasks has no count (#18430).
+- Rollback reasons are reported to the Hub correctly (#18201).
+- Windows: a stopped run kills the command's whole process tree (#17603).
+- Print-mode workflow runs and a pinned resume line for Coral text (#18151).
+
+#### More in this release
+
+- Activity is back to the card layout (agent, outcome chip, question and answer, team and time) (#18718).
+- Older version banner: Open vN is its primary button (#18767).
+- Review viewer: an approve with no recorded agent says 'The agent was told' (#18778).
+- Ask cards: coral-agent ask --open <page> (#18768).
+- An agent's shell finds this build's coral-agent first, whatever PATH became (#18643).
+- Skills picker stays closed on open in New agent, New team and a member's form (#18794).
+- A closed goal has no blue button: Add task is the primary only on an open goal with nothing done (#18822).
+- The idle password advice keeps its room again (#18789).
+- Comments panel: a card scrolled into view stops under the sticky header (#18900).
+- Team tab strip: Show more tabs and the strip's arrow keep their place when the width changes (#18906).
+
+#### For the team
+
+- Test and gate work: the start-bytes check, submit-review guards, census and golden updates, and many Windows, Linux and Mac flakes got their cause fixed (#18896, #18926, #18930, #18935, #18936, #18937, #18944, #18962, #18963, #18965, #18928, #18927, #18899, #18898, #18897, #18880, #18872, #18871, #18868, #18848, #17743, #17762, #18186).
+- windows-tests runs TestProbeFailureNamesTheCauseOfAWinsockError (#18896).
+
+### Known issues
+
+- When the launch notice arrives, the content under the banners can move (73 px over 15 frames in the launch_notice_no_jump test, #18964). Waived for this release; fixed in the next.
+- On a phone, the board table's Expand All can run over its time budget and the phone live-message wait can time out (the board_table_seeded test, #18959). Waived for this release; fixed in the next.
+- Three browser checks were red on the final head and are not fixed in this release: team_tabs_reveal (at 390 px with Board open the Artifacts tab is cut at the left edge of the team tab strip), review_approve_comment (opening the comment form moves the title and version controls by a pixel) and, on the Mac run only, teardown_stability (one more observer than its bound after 50 rounds). Fixes follow in the next release.
+
 ## v2.0.68 — Custom permission modes, Settings that save as you go, Codex trusting Coral's hooks by default, a computer set up over SSH that starts again, and one look across the dialogs and phone
 
 Task numbers in brackets. Built on v2.0.67 and gated on ci/v2068-gate8 4df09ccee. A prerelease until the Operator promotes it.
