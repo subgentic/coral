@@ -71,9 +71,9 @@ const GOAL = 'Explore goals with two teams';
                 assert.equal(await ev(`window.__tp.page().querySelectorAll('.goal-list .dt-primary').length`), 3, 'the goal\'s three tasks are rows of the list under the strip');
                 assert.ok(await ev(`!!window.__tp.find('button', /^Add task$/i)`), 'Add task');
                 assert.ok(await ev(`!!window.__tp.find('button', /^Mark done/i)`), 'Mark done'); // Add task and Mark done are the buttons at every width, the rest is in More (#15832)
-                const head = await ev(`(() => { const h = document.querySelector('.goal-back-row'), names = h ? [...h.querySelectorAll('.goal-head-actions .btn')].map(b => b.textContent.trim()) : []; return { names, primary: !!h && !!h.querySelector('.goal-head-actions .goals-close.btn-primary'), bar: !!document.querySelector('.goals-pinbar') }; })()`);
+                const head = await ev(`(() => { const h = document.querySelector('.goal-back-row'), names = h ? [...h.querySelectorAll('.goal-head-actions .btn')].map(b => b.textContent.trim()) : []; return { names, primary: !!h && !!h.querySelector('.goal-head-actions .goals-close.btn-primary'), addPrimary: !!h && !!h.querySelector('.goal-head-actions .goals-add-task.btn-primary'), bar: !!document.querySelector('.goals-pinbar') }; })()`);
                 assert.deepEqual(head.names.map(n => n.replace(/^(Mark done).*/, '$1')), ['Add task', 'Mark done', 'More'], "the goal's actions are in its header (#11823; Change driver and Move to another team are the Operator's own, #12693)");
-                assert.ok(head.primary && !head.bar, 'Mark done is the one blue button, and there is no bar at the bottom of the page');
+                assert.ok(!head.primary && head.addPrimary && !head.bar, 'a goal with no task done: Add task is the one blue button and Mark done is plain (#16636), and there is no bar at the bottom of the page');
             });
             await S.run(`${label}: Back returns to the list with the focus on the goal's row (not the page)`, async () => {
                 await click('button, a', /^(\u2190\s*)?Goals$/, 'back link');
