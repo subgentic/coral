@@ -83,6 +83,7 @@ const SKILLS = [
             assert.deepEqual(state[SKILLS[1].id], { checked: true, disabled: false }, 'Edit member shows the member\'s own skill ticked');
             assert.deepEqual(state[SKILLS[0].id], { checked: true, disabled: true }, 'and the team\'s as the team\'s');
             assert.match(await ev(`document.querySelector('#launch-skills-host .skills-pick-summary').textContent`), /1 chosen, 1 from the team/);
+            assert.equal(await ev(`document.querySelector('#launch-skills-host .skills-pick-more').open`), false, 'the skills list opens closed even with skills chosen (#18794, "too much info"): the summary says what is chosen');
             // Unticking and saving takes the member's skill off again, and the row carries none; ticking it again puts it back
             assert.equal(await tick('launch-skills-host', SKILLS[1].id), false, 'unticked');
             await saveMember();
