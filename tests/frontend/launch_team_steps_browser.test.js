@@ -59,8 +59,9 @@ const { coralReady } = require('./helpers/wait');
         // Explicit Default is distinct from the shipped Auto default (#14532).
         await ev(`{ const mode = document.getElementById('team-permission-mode'); mode.value = 'default'; mode.dispatchEvent(new Event('change', { bubbles: true })); } window.showTeamAgentModal(); true`);
         assert.equal(await ev(`document.querySelector('#launch-agent-acf .acf-permission-mode').value`), 'default', 'the new member starts at the default Mode');
+        assert.equal(await ev(`getComputedStyle(document.querySelector('#launch-step-agent .launch-back-btn')).display`), 'none', 'a member has no header arrow beside Back and Cancel: one way back (#16553)');
         await ev(`{ const n = document.getElementById('launch-agent-name-input'); n.value = 'Scribe'; n.dispatchEvent(new Event('input', { bubbles: true })); window.saveTeamAgentFromModal(); } true`);
-        assert.match(await summary('Scribe'), /default mode$/, 'and its row says so');
+        assert.match(await summary('Scribe'), /Default mode$/, 'and its row says so, capitalised like Plan mode (#16553)');
         await ev(`document.getElementById('team-permission-mode').value = 'plan'; document.getElementById('team-permission-mode').dispatchEvent(new Event('change', { bubbles: true })); window.showTeamAgentModal(); true`);
         assert.equal(await ev(`document.querySelector('#launch-agent-acf .acf-permission-mode').value`), 'plan', 'and follows a default Mode that was changed');
         await ev(`window.cancelTeamMember(); document.getElementById('team-permission-mode').value = 'default'; document.getElementById('team-permission-mode').dataset.pickedByPerson = ''; true`);
@@ -86,7 +87,7 @@ const { coralReady } = require('./helpers/wait');
             m._addTeamAgent('Open', 'p', { allow: ['file_read', 'file_write', 'shell', 'git_write'] }, 'codex', '', '');
             m._addTeamAgent('Careful', 'p', { allow: ['file_read'] }, 'codex', '', '');
             m._syncTeamMembers(); return true; })()`);
-        assert.equal(await modeOf('Plain'), 'default mode'); assert.equal(await modeOf('Planner'), 'Plan mode');
+        assert.equal(await modeOf('Plain'), 'Default mode'); assert.equal(await modeOf('Planner'), 'Plan mode');
         // the rule (#6425): an explicit Mode (the member's own, else the team's) is applied and capabilities only narrow it; with no Mode the capabilities decide
         assert.equal(await modeOf('Open'), 'Sandboxed: can change files in its folder and use the network', 'team Mode Default: the capabilities decide, and four chips are no longer an unsandboxed agent');
         assert.equal(await modeOf('Careful'), 'Read-only sandbox');
