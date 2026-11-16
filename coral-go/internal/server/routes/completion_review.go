@@ -58,6 +58,10 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 		errBadRequest(w, fmt.Sprintf("reviewers is 1 or %d", board.MaxReviewersWanted))
 		return
 	}
+	if h.bs.InReviewByAuthor(r.Context(), project, id, body.SubscriberID) { // the author's new revision while the task is in review (#18336): same review tasks, next round
+		h.submitNewRevisionInReview(w, r, project, id, body.SubscriberID, body.Message, body.Outcome, body.Reason, body.Artifacts, body.ExpectedRevision, body.CandidateRevision)
+		return
+	}
 	vetted := h.vetTaskArtifacts(r, project, body.Artifacts)
 	task, err := h.bs.SubmitCompletionReviewAtRevisionAndCandidate(r.Context(), project, id, body.SubscriberID, body.Message, body.Outcome, body.Reason, body.Artifacts, body.ExpectedRevision, body.CandidateRevision)
 	if err != nil {
@@ -321,4 +325,47 @@ func (h *BoardHandler) ReleaseCompletionReview(w http.ResponseWriter, r *http.Re
 		h.notifyFn(project)
 	}
 	writeJSON(w, http.StatusOK, task)
+}
+
+// submitNewRevisionInReview records the author's new revision of a task in review and tells the reviewers that the earlier one is superseded (#18336).
+func (h *BoardHandler) submitNewRevisionInReview(w http.ResponseWriter, r *http.Request, project string, id int64, author, message, outcome, reason string, artifacts []board.TaskArtifact, expectedRevision *int, candidateRevision string) {
+	ctx := r.Context()
+	vetted := h.vetTaskArtifacts(r, project, artifacts)
+	orch, reopened, err := h.bs.NewRevisionInReview(ctx, project, id, author, message, outcome, reason, artifacts, expectedRevision, candidateRevision)
+	if err != nil {
+		if strings.Contains(err.Error(), "revision") {
+			errConflict(w, err.Error())
+		} else {
+			errTaskStore(w, err)
+		}
+		return
+	}
+	task, _ := h.bs.GetTask(ctx, project, id)
+	title := ""
+	if task != nil {
+		title = task.Title
+	}
+	candidate := candidateRevision
+	if candidate == "" {
+		candidate = fmt.Sprintf("%d artifacts", len(artifacts))
+	}
+	if reopened != nil {
+		var mentions []string
+		for _, rv := range reopened.Reviewers {
+			if h.reviewerBusy(ctx, project, rv.Reviewer, rv.ReviewTaskID) {
+				mentions = append(mentions, rv.Reviewer+" (busy: offered when their task ends)")
+				continue
+			}
+			mentions = append(mentions, "@"+rv.Reviewer)
+		}
+		h.postNotice(ctx, project, fmt.Sprintf("%s [Task #%d has a new revision, round %d] %s sent %s while it was in review (candidate: %s; %s). The previous revision is superseded: read it again with coral-board task detail %d, then coral-board task approve %d --round %d, or reject %d --round %d --note \"why\". Your review task is the same one. @%s",
+			strings.Join(mentions, " "), id, reopened.Round, h.noticeText(ctx, project, author), quoteNotice(h.noticeText(ctx, project, title)), h.noticeText(ctx, project, candidate), h.noticeText(ctx, project, reason), id, id, reopened.Round, id, reopened.Round, orch))
+	} else {
+		h.postNotice(ctx, project, fmt.Sprintf("@%s [Task #%d has a new revision] %s sent %s while it was in review (candidate: %s; %s). The previous revision is superseded.",
+			orch, id, h.noticeText(ctx, project, author), quoteNotice(h.noticeText(ctx, project, title)), h.noticeText(ctx, project, candidate), h.noticeText(ctx, project, reason)))
+	}
+	if h.notifyFn != nil {
+		h.notifyFn(project)
+	}
+	writeTaskVetted(w, task, vetted)
 }
