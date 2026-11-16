@@ -51,8 +51,9 @@ type ScheduledRun struct {
 	FinishedAt        *string `db:"finished_at" json:"finished_at"`
 	ExitReason        *string `db:"exit_reason" json:"exit_reason"`
 	ErrorMsg          *string `db:"error_msg" json:"error_msg"`
-	ErrorCode         *string `db:"error_code" json:"error_code,omitempty"` // a fixed word for why the run failed ("not_signed_in", #5469)
-	AgentType         *string `db:"agent_type" json:"agent_type,omitempty"` // the agent CLI the error code is about
+	ErrorCode         *string `db:"error_code" json:"error_code,omitempty"`   // a fixed word for why the run failed ("not_signed_in", #5469)
+	AgentType         *string `db:"agent_type" json:"agent_type,omitempty"`   // the agent CLI the error code is about
+	ResultText        *string `db:"result_text" json:"result_text,omitempty"` // the agent's last message, redacted, kept at the run's end (#16958); NULL on older runs
 	TriggerType       *string `db:"trigger_type" json:"trigger_type"`
 	WebhookURL        *string `db:"webhook_url" json:"-"` // unused: webhooks were removed (#3646); kept for SELECT *, wiped at start
 	DisplayName       *string `db:"display_name" json:"display_name"`
@@ -234,6 +235,12 @@ func (s *ScheduleStore) FinishScheduledRunIfActive(ctx context.Context, runID in
 	}
 	n, err := res.RowsAffected()
 	return n == 1, err
+}
+
+// SetScheduledRunResult keeps the text of what a run's agent said last, once (a run that already has one keeps it).
+func (s *ScheduleStore) SetScheduledRunResult(ctx context.Context, runID int64, text string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE scheduled_runs SET result_text = ? WHERE id = ? AND result_text IS NULL`, text, runID)
+	return err
 }
 
 // GetRunsForJob returns recent runs for a specific job.

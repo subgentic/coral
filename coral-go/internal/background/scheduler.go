@@ -116,6 +116,7 @@ type JobScheduler struct {
 	store          *store.ScheduleStore
 	sessionStore   *store.SessionStore
 	lastEventType  func(ctx context.Context, sessionID string) (last string, stopFailed bool) // the type of the agent's last event (stop, tool_use...), "" for none, and whether a stop was a failed turn (an API error); nil: not known (#6898)
+	resultOf       func(sessionID, workingDir, agentType string) string                       // the text of what a run's agent said last, redacted, or "" (#16958)
 	agentWaiting   func(ctx context.Context, sessionID string) bool                           // whether the agent is waiting at a prompt of its own (permission, question, plan) right now: a run that runs out of time then says it stopped waiting for an answer (#14772)
 	hasEvents      func(ctx context.Context, sessionID string) bool                           // whether the agent's CLI reported anything (its hook events); nil: a run is never judged by it (#6842)
 	runtime        AgentRuntime
@@ -623,6 +624,33 @@ func (s *JobScheduler) launchAndWatch(runID int64, job store.ScheduledJob, rc ru
 	}
 }
 
+// SetResultReader tells the scheduler how to read what a run's agent said last, so a run keeps it when it ends (the startup passes the transcript reader).
+func (s *JobScheduler) SetResultReader(fn func(sessionID, workingDir, agentType string) string) {
+	s.resultOf = fn
+}
+
+// keepResult stores what the run's agent said last on the run record (#16958), so See result has something to show when the chat is not kept. A run with no session or no message keeps nothing.
+func (s *JobScheduler) keepResult(ctx context.Context, runID int64, job store.ScheduledJob) {
+	if s.resultOf == nil {
+		return
+	}
+	run, err := s.store.GetScheduledRun(ctx, runID)
+	if err != nil || run == nil || run.SessionID == nil || *run.SessionID == "" {
+		return
+	}
+	dir := job.RepoPath
+	if run.WorktreePath != nil && *run.WorktreePath != "" {
+		dir = *run.WorktreePath
+	}
+	agentType := job.AgentType
+	if run.AgentType != nil && *run.AgentType != "" {
+		agentType = *run.AgentType
+	}
+	if text := s.resultOf(*run.SessionID, dir, agentType); text != "" {
+		s.store.SetScheduledRunResult(ctx, runID, text)
+	}
+}
+
 // SetAgentWaiting tells the scheduler how to ask whether an agent is waiting at a prompt (the startup passes the hook-event state, AgentWaitingFromEvents).
 func (s *JobScheduler) SetAgentWaiting(fn func(ctx context.Context, sessionID string) bool) {
 	s.agentWaiting = fn
@@ -819,7 +847,9 @@ func (s *JobScheduler) finishRun(ctx context.Context, runID int64, job store.Sch
 	}
 	if !userKilled {
 		// Only while the run is still active: a turn end, a kill or the deadline that settled it first is not overwritten (#7090).
-		s.store.FinishScheduledRunIfActive(ctx, runID, status, exitReason, "", "", now)
+		if won, _ := s.store.FinishScheduledRunIfActive(ctx, runID, status, exitReason, "", "", now); won {
+			s.keepResult(ctx, runID, job)
+		}
 	}
 }
 

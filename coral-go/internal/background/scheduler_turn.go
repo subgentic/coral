@@ -74,6 +74,7 @@ func (s *JobScheduler) settleOnTurn(ctx context.Context, run store.ScheduledRun,
 	if err != nil || !won {
 		return false, false
 	}
+	s.keepResult(ctx, run.ID, job) // before its agent is ended: the transcript is read while it is there
 	s.logger.Info("a scheduled run finished on its agent's accepted turn end", "run_id", run.ID, "job", job.Name, "status", status)
 	agentGone = s.endRunSession(ctx, run, job)
 	// Recorded before the live watcher is released: the launch function returns on the cancel, and launchAndWatch must find the run already settled (and its agent already ended), not end it again.

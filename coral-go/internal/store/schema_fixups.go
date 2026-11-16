@@ -77,6 +77,8 @@ var columnMigrations = []struct {
 	{"workflow_runs", "agent_type", "TEXT"},
 	{"scheduled_runs", "error_code", "TEXT"},
 	{"scheduled_runs", "agent_type", "TEXT"},
+	// What the run's agent said last, kept when the run ends so a run whose chat was not kept still has a result to show (#16958). NULL on every older run and on one with no message.
+	{"scheduled_runs", "result_text", "TEXT"},
 	// Existing views have unknown provenance, so they migrate as "api": the dashboard asks once before running them.
 	{"custom_views", "created_via", "TEXT NOT NULL DEFAULT 'api'"},
 	// Where a bookmark belongs (#4792): its team (the board), and for a board message who wrote it (NULL: not looked up yet).
