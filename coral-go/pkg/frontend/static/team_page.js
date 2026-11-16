@@ -70,6 +70,8 @@ function buildOnce() {
     buildTabsMore(tabs);
     drawTabEdges = watchScrollCue(tabs);
     window.addEventListener('resize', () => { syncTabStop(); revealInStrip(tabs, $(`team-tab-${S.tab}`)); drawTabEdges(); });
+    let stripW = tabs.clientWidth; tabs.addEventListener('scroll', () => { if (tabs.clientWidth === stripW && Math.abs(tabs.scrollLeft - (tabs._revealedTo ?? tabs.scrollLeft)) > 1) tabs._moved = true; }, { passive: true });
+    new ResizeObserver(() => { const w = tabs.clientWidth; if (w === stripW || tabs._moved) { stripW = w; return; } stripW = w; revealInStrip(tabs, $(`team-tab-${S.tab}`)); }).observe(tabs); // the Show more tabs arrow takes room beside the strip once the cue draws: the strip rests on a tab's edge at its new width, unless a person has scrolled it since the last reveal (#18906)
     tabs.addEventListener('keydown', (e) => {
         const list = [...tabs.querySelectorAll('[role=tab]')].filter(b => b.getClientRects().length), i = list.indexOf(document.activeElement); // a phone's tabs behind More are not in the row
         if (i < 0) return;
