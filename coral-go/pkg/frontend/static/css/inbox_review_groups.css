@@ -77,3 +77,7 @@
 } /* a phone card: the pills are a line of their own under the title, so the title and the age keep their place (#16576) */
 .inbox-pill::after { content: ""; position: absolute; inset: -8px -6px -14px; } /* a small pill, with a 44 px target drawn around it (#16576) */
 .inbox-kind { color: var(--text-muted); } /* the kind label at the start of the meta line (#16678) */
+.inbox-sent-back { flex: 0 1 auto; max-width: 100%; white-space: normal; overflow-wrap: anywhere; } /* a file sent back to its agent (#18701): the chip says so in words, not cut off */
+.inbox-sent-back-ask { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: var(--fs-sm); } /* one line of what was asked for */
+.inbox-sent-back-ask[hidden] { display: none; }
+@media (max-width: 760px) { .inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-sent-back { grid-area: more; justify-self: start; } .inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-sent-back-ask { grid-column: 1 / -1; } } /* a phone row is a grid: the chip takes the line under the title, the ask the full width */
