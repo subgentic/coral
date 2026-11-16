@@ -61,7 +61,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`!/How agents ask you/.test(document.getElementById('group-table-view').textContent)`, `${tag}: reading it clears the item`, 6000);
             // Dismiss the optional one; the welcome is left, then hidden for good
             const before = await ev(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length`);
-            await press('Dismiss');
+            await press('Dismiss', '#group-table-view .inbox-getting-started li button'); // an item's own Dismiss, not the block's (its heading's Dismiss hides all of them)
             await waitFor(`!/Connect a second/.test(document.getElementById('group-table-view').textContent)`, `${tag}: Dismiss puts an item away`, 6000);
             check(await ev(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length`) === before - 1, `${tag}: dismissing one welcome item took away only that row (${before} before)`);
             await waitFor(`/Welcome to Coral/.test(document.getElementById('group-table-view').textContent)`, `${tag}: the welcome is still there`, 6000);
