@@ -40,7 +40,7 @@ module.exports = parts => (async () => {
         if (r.exceptionDetails) throw new Error(JSON.stringify(r.exceptionDetails).slice(0, 500));
         return r.result.value;
     };
-    const { coralReady } = require('./wait').bind(ev);
+    const { coralReady, waitFor } = require('./wait').bind(ev);
     const standIns = [];
     const guard = await require('./settings_guard').guardSettings(); // cli_path_claude and the rest are put back whatever path the suite ends on (#4849)
     // Pixels, not just the buffer: the canvas renderer can leave the screen blank while the buffer holds the text.
@@ -124,6 +124,11 @@ module.exports = parts => (async () => {
         const fast = () => Network.emulateNetworkConditions({ offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
         // xterm.js must come over the network on these pages: with the browser cache on, it would already be here from the earlier ones.
         await Network.setCacheDisabled({ cacheDisabled: true });
+        require('./paused').safePaused(client, async e => {
+            await sleep(1500); // sleep-ok: deliberately let the terminal stylesheet finish after its scripts
+            await client.Fetch.continueRequest({ requestId: e.requestId });
+        });
+        await client.Fetch.enable({ patterns: [{ urlPattern: '*/vendor/xterm/xterm.min.css*', requestStage: 'Response' }] });
         // idleMs is the Chat view's idle prefetch delay, set before the agent is selected (the timer starts then): short for the idle
         // scenario, out of reach for the others so only what they do themselves fetches xterm.js.
         const cold = async (label, ready, idleMs = 1e9) => {
@@ -140,11 +145,11 @@ module.exports = parts => (async () => {
         };
         const hovered = await cold('hover', async () => {
             await ev(`document.getElementById('live-view-btn-terminal').dispatchEvent(new PointerEvent('pointerover', { bubbles: true })); true`);
-            for (let k = 0; k < 400 && !(await ev(`typeof window.Terminal !== 'undefined' && typeof window.CanvasAddon !== 'undefined'`)); k++) await sleep(50);
+            await waitFor(`import(${MOD} + 'vendor_loader.js').then(m => m.xtermReady())`, 'the terminal scripts, addons and stylesheet are prefetched', { timeout: 20000 });
         });
         check(`slow link, the pointer was over the Terminal button: the first switch shows text within ${BUDGET_MS} ms`, hovered >= 0 && hovered <= BUDGET_MS, `${Math.round(hovered)} ms`);
         const idled = await cold('idle', async () => {
-            for (let k = 0; k < 400 && !(await ev(`typeof window.Terminal !== 'undefined' && typeof window.CanvasAddon !== 'undefined'`)); k++) await sleep(50);
+            await waitFor(`import(${MOD} + 'vendor_loader.js').then(m => m.xtermReady())`, 'the terminal scripts, addons and stylesheet are prefetched', { timeout: 20000 });
         }, 150);
         check(`slow link, Chat view showing for the idle delay: the first switch shows text within ${BUDGET_MS} ms`, idled >= 0 && idled <= BUDGET_MS, `${Math.round(idled)} ms`);
         const control = await cold('control', async () => { await sleep(300); }); // sleep-ok: the control waits a fixed time so nothing is fetched ahead, the thing it measures
@@ -160,7 +165,7 @@ module.exports = parts => (async () => {
         await ev(`window.setLiveViewMode('terminal'); true`);
         await sleep(200);   // sleep-ok: the Terminal view is left after a fixed 200 ms, the interval under test
         await ev(`window.setLiveViewMode('chat'); true`);
-        for (let k = 0; k < 400 && !(await ev(`typeof window.Terminal !== 'undefined' && typeof window.CanvasAddon !== 'undefined'`)); k++) await sleep(50);
+        await waitFor(`import(${MOD} + 'vendor_loader.js').then(m => m.xtermReady())`, 'the terminal scripts, addons and stylesheet are prefetched', { timeout: 20000 });
         await sleep(600);   // sleep-ok: the agent switch must happen with the Terminal view already settled; a window for nothing to change, not a condition
         const sockets = await ev(`window.__tws.map(s => s.readyState)`);
         check('Terminal then straight back to Chat while xterm.js downloads: no terminal socket opens in Chat view', sockets.length === 0, `${sockets.length} sockets (states ${sockets.join(',')})`);
