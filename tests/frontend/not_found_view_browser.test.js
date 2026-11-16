@@ -41,7 +41,7 @@ const TEAM = 'nf-' + Date.now().toString(36);
             // an address the server itself does not know gets its own page: themed, with the way around the dashboard
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady('startup');
             const bare = await ev(`fetch('/nowhere/at/all', { headers: { Accept: 'text/html' } }).then(r => r.text().then(t => ({ status: r.status, t })))`);
-            assert.ok(bare.status === 404 && /prefers-color-scheme:dark/.test(bare.t) && /<nav /.test(bare.t) && /href="\/inbox"/.test(bare.t) && /Back to Agents/.test(bare.t) && !/nowhere/.test(bare.t), at + 'the bare page is themed, has a nav, and names nothing of the request');
+            assert.ok(bare.status === 404 && /prefers-color-scheme:dark/.test(bare.t) && !/<nav /.test(bare.t) && /href="\/agents"/.test(bare.t) && /Back to Agents/.test(bare.t) && !/nowhere/.test(bare.t), at + 'the bare page is themed, has no menu of its own (#15852), the way back to Agents, and names nothing of the request');
             // a goal that is there still opens, with no not-found view
             await Page.navigate({ url: BASE + `/team/${TEAM}/goals/${gid}` }); await Page.loadEventFired(); await install();
             await waitFor(`/The one goal/.test(document.body.innerText)`, at + 'the real goal opens', 15000);
