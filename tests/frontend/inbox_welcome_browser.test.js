@@ -60,7 +60,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`!/How agents ask you/.test(document.getElementById('group-table-view').textContent)`, `${tag}: reading it clears the item`, 6000);
             // (Dismiss on one row is pinned in welcome_swipe_browser; the welcome is left)
             await waitFor(`/Welcome to Coral/.test(document.getElementById('group-table-view').textContent)`, `${tag}: the welcome is still there`, 6000);
-            // the guide row opens getting-started.md in the same viewer as any review file, and is done once it is on screen (#14744); it was not fetched before this
+            // the guide row opens getting-started.md in the same viewer as any review file, and stays until explicitly dismissed (#18945); it was not fetched before this
             check(await ev(`!performance.getEntriesByType('resource').some(e => /guide\\/getting-started/.test(e.name))`), `${tag}: the guide is not fetched until its row is opened`);
             await press('Open guide');
             await waitFor(`(() => { const d = document.getElementById('artifact-viewer'); return !!d && !d.hidden && /Getting started with Coral/.test(d.querySelector('.artifact-viewer-title').textContent) && !!d.querySelector('.artifact-viewer-body h1, .artifact-viewer-body .md-h1, .artifact-viewer-body h2'); })()`, `${tag}: the guide opens in the viewer, drawn as a document`, 10000);
@@ -68,7 +68,9 @@ const { coralReady } = require('./helpers/wait');
             check(await ev(`/Your Inbox and .Needs you./.test(document.querySelector('#artifact-viewer .artifact-viewer-body').textContent) && /What to try first/.test(document.querySelector('#artifact-viewer .artifact-viewer-body').textContent)`), `${tag}: it is the approved guide text (v7: Inbox and Needs you ... What to try first)`);
             await shot(`welcome-guide-${w}`);
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
-            await waitFor(`!/Read the Coral guide/.test(document.getElementById('group-table-view').textContent)`, `${tag}: opening the guide clears its row`, 6000);
+            await waitFor(`!!document.querySelector('#group-table-view tr[data-welcome-id="guide"]')`, `${tag}: closing the guide keeps its row`, 6000);
+            await ev(`import(${S} + 'welcome_items.js').then(m => m.dismissWelcome('guide'))`); // explicit dismissal is covered through its real desktop button and phone menu in welcome_guide_dismiss_browser
+            await waitFor(`!document.querySelector('#group-table-view tr[data-welcome-id="guide"]')`, `${tag}: explicitly dismissing the guide clears its row`, 6000);
             await press('Got it'); // the last one: the welcome's own button
             await waitFor(`/You are all caught up(?!r)/.test(document.getElementById('group-table-view').textContent)`, `${tag}: the empty Needs you says You are all caught up`, 6000);
             check(await ev(`window.__puts.some(p => String(p.inbox_welcome_done || '').split(',').length === 5)`), `${tag}: with every item done or dismissed, all five are remembered in the settings`);
