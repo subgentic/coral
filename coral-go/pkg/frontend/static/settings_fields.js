@@ -134,7 +134,7 @@ const providerCard = (type, name) => [
 const PROVIDERS_FIELDS = [
     { key: 'default_models_notice', type: 'notice', render: slot => { slot.innerHTML = '<span id="settings-default-models-notice" class="settings-hint" role="status"></span>'; } },
     ...PROVIDER_CARDS.flatMap(([type, name]) => providerCard(type, name)),
-    { key: 'providers_no_default', type: 'notice', render: slot => { const n = document.createElement('span'); n.id = 'settings-providers-no-default'; n.className = 'settings-hint'; n.textContent = 'OpenCode and Hermes have no default model here: each uses the model set in its own configuration.'; slot.append(n); } }, // New agent offers six providers; a default model is kept for four (#16599, walk 25 D10)
+    { key: 'providers_no_default', type: 'notice', render: slot => { const n = document.createElement('span'); n.id = 'settings-providers-no-default'; n.className = 'sv-help'; n.textContent = 'OpenCode and Hermes have no default model here: each uses the model set in its own configuration.'; slot.append(n); } }, // New agent offers six providers; a default model is kept for four (#16599, walk 25 D10)
     { key: 'providers_tools', type: 'heading', id: 'settings-providers-tools', label: 'Custom models' },
     { key: 'custom_models', type: 'custom', id: 'settings-custom-models', wide: true, label: 'Custom models', help: moreOnly('Model ids are passed to the CLI as they are written here.', "They appear in every model picker, including the one that switches a running agent's model."), // the list and its form: custom_models.js draws them and shows the row once the server has the route
         render: slot => slot.classList.add('settings-custom-models') },

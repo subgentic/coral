@@ -77,8 +77,12 @@
 
 #settings-modal .settings-section-link { white-space: normal; height: auto; max-width: 100%; }
 
-/* Reset lives with its label; it wraps before a phone row can grow wider. */
-.settings-reset { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+/* Reset sits on the label's line and takes no height when it appears (#18814): a zero-height box on the baseline, its dot and button drawn from it. Its 44 px tap area is drawn outside the box, not in the layout. */
+.settings-reset { display: inline-block; position: relative; width: 5.5rem; height: 0; margin-left: 6px; vertical-align: baseline; white-space: nowrap; }
 .settings-reset[hidden] { display: none; }
+.settings-default-dot, .settings-reset .btn { position: absolute; bottom: -.3em; line-height: 1.2; }
+.settings-default-dot { left: 0; }
 .settings-default-dot { color: var(--link-text, var(--accent)); } /* the accent is 4.4:1 on the light panel (#18819) */
-.settings-reset .btn { min-height: 44px; }
+.settings-default-dot::before { content: '•'; }
+.settings-reset .btn { left: 1rem; min-height: 0; height: auto; padding: 0 6px; }
+.settings-reset .btn::after { content: ''; position: absolute; left: -4px; right: -4px; top: 50%; height: 44px; transform: translateY(-50%); }

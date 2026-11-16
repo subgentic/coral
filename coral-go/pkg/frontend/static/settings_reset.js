@@ -46,12 +46,11 @@ export function wireSettingsResets(modal, reset) {
         const e = document.getElementById(id), row = e?.closest('.sv-row');
         if (!row || !e.closest('[data-autosaves]') || row.querySelector('[data-reset-setting]')) continue;
         const box = document.createElement('span'); box.className = 'settings-reset';
-        const dot = document.createElement('span'); dot.className = 'settings-default-dot'; dot.setAttribute('aria-hidden', 'true'); dot.textContent = '•';
+        const dot = document.createElement('span'); dot.className = 'settings-default-dot'; dot.setAttribute('aria-hidden', 'true'); // the dot is drawn by CSS: no text of its own to count or read
         const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-quiet btn-small'; button.textContent = 'Reset'; button.dataset.resetSetting = id;
         const label = row.querySelector('.sv-label')?.textContent || e.getAttribute('aria-label') || 'setting';
-        button.setAttribute('aria-label', `Reset ${label} to default`); box.title = 'Changed from default';
-        const words = document.createElement('span'); words.className = 'sr-only'; words.textContent = 'Changed from default. ';
-        box.append(dot, words, button); (row.querySelector('.sv-text') || row).append(box);
+        button.setAttribute('aria-label', `Reset ${label} to default. Changed from default.`); box.title = 'Changed from default';
+        box.append(dot, button); const at = row.querySelector('.sv-label'); if (at) at.after(box); else (row.querySelector('.sv-text') || row).append(box); // beside the label, on its own line: a Reset that appears adds no height
         button.addEventListener('click', async () => {
             if (e.disabled || e.readOnly || e.dataset.saving === '1') return;
             // Keep focus on the setting after its Reset disappears. The regular saver
