@@ -128,7 +128,7 @@ export async function attachDiffComments(slot, file, view, texts, base = '', fie
         badge.textContent = count > 99 ? '99+' : String(count); badge.hidden = !count;
     };
     const show = on => { opened = on; box.hidden = !on; paint(); };
-    const placeIcon = () => { const row = rowOf(slot); if (!row || row.contains(icon)) return; const acts = row.querySelector('.file-action-btns'); if (acts) acts.before(icon); else row.append(icon); };
+    const placeIcon = () => { const row = rowOf(slot) || slot.closest('#preview-pane')?.querySelector('#preview-toolbar'); if (!row || row.contains(icon)) return; const acts = row.querySelector('.file-action-btns'); if (acts) acts.before(icon); else row.append(icon); };
     const comments = attachComments(box, body, box, { toggleHost: true, compact: true, sheet: () => false, shown: () => true, words: { quote: '' }, wholeAnchor: () => fileAnchor(texts, file, base), outdated: c => !stillThere(c.anchor, texts),
         onState: now => { count = now.count; if (opened && !now.composing && !now.count) { opened = false; box.hidden = true; } paint(); } }); // a cancelled composer on a file with no comments leaves nothing open
     comments.open(key, contextServer(), team);
@@ -142,7 +142,7 @@ export async function attachDiffComments(slot, file, view, texts, base = '', fie
         if (!a) return;
         btn.textContent = a.tooLong ? (a.why || 'Too many lines') : 'Comment'; btn.disabled = !!a.tooLong; // a selection over the cap says so, and offers nothing
         const r = window.getSelection().getRangeAt(0).getBoundingClientRect(), at = slot.getBoundingClientRect();
-        btn.style.top = `${Math.max(0, r.bottom - at.top + 4)}px`; btn.style.left = `${Math.min(Math.max(0, r.left - at.left), Math.max(0, at.width - 96))}px`;
+        btn.style.top = `${Math.max(0, r.bottom - at.top + slot.scrollTop + 4)}px`; btn.style.left = `${Math.min(Math.max(0, r.left - at.left), Math.max(0, at.width - 96))}px`;
     };
     let timer = 0;
     const soon = () => { clearTimeout(timer); timer = setTimeout(place, 60); };

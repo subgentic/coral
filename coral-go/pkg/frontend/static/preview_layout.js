@@ -34,11 +34,11 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
 
     // The column's width (#4931). What is saved is the person's wish; what is shown is that wish held to what the window has room for, every time it is placed, so a width saved in a big window, a
     // corrupted value or a narrow window can never leave a pane that cannot be seen or dragged: at least COLUMN_MIN wide, and Chat keeps at least CHAT_MIN. (The side panel is outside .live-body.)
-    const COLUMN_MIN = 240, COLUMN_DEFAULT = 480, CHAT_MIN = 240, HANDLE_W = 1;
+    const COLUMN_MIN = 240, COLUMN_DEFAULT = 480, CHAT_MIN = 420, HANDLE_W = 1;
     function _maxColumnWidth() {
         const body = document.querySelector('.live-body');
         const room = body ? body.getBoundingClientRect().width : window.innerWidth;
-        return Math.max(COLUMN_MIN, Math.floor(room - CHAT_MIN - HANDLE_W));
+        return Math.max(COLUMN_MIN, Math.floor(room - (_taskExpanded ? 240 : CHAT_MIN) - HANDLE_W));
     }
     function _clampColumnWidth(w) {
         w = Number(w);
@@ -59,7 +59,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
         if (_isMobile()) return 'bottom';
         const room = document.querySelector('.live-body')?.getBoundingClientRect().width || window.innerWidth;
         // Keep the chosen column preference, but a task must leave a readable chat beside it (#8905), unless the person expanded it into the column themselves (#9076).
-        if (_dock === 'column' && !_maximised && !_taskExpanded && isTaskPreview() && room - _clampColumnWidth(_paneWidth) - HANDLE_W < 420) return 'bottom';
+        if (_dock === 'column' && !_maximised && !_taskExpanded && room - _clampColumnWidth(_paneWidth) - HANDLE_W < 420) return 'bottom';
         return _dock;
     };
 
@@ -134,7 +134,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
                 fitTerminal();
             });
             // The room changes with the window, the side panel opening or shutting, and the sidebar's width: the width shown is held to it again each time.
-            if (typeof ResizeObserver === 'function') new ResizeObserver(() => { if (getTabs().length && !_maximised) { if (isTaskPreview()) _placePane(); else if (_effectiveDock() === 'column') _applyColumnWidth(); } }).observe(liveBody);
+            if (typeof ResizeObserver === 'function') new ResizeObserver(() => { if (getTabs().length && !_maximised) { _placePane(); } }).observe(liveBody);
         }
 
         // A task's expand button, in the sidebar, does what a file's dock button does (#9076, the Operator): the preview goes to the full-height column beside the chat, with the column's handle and its width kept; one more press maximises it as for a file.
