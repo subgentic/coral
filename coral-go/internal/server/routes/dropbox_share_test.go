@@ -124,6 +124,10 @@ func (f *fakeDropbox) sharing(w http.ResponseWriter, r *http.Request) {
 		refuse(http.StatusConflict, "shared_link_not_found/")
 	case "/2/sharing/list_folders":
 		f.folderCalls++
+		if hold := f.foldersHold; hold != nil {
+			f.foldersIn <- struct{}{}
+			<-hold
+		}
 		if f.foldersFail {
 			refuse(http.StatusTooManyRequests, "too_many_requests/")
 			return
