@@ -48,7 +48,7 @@ export function wireSettingsResets(modal, reset) {
         const box = document.createElement('span'); box.className = 'settings-reset';
         const dot = document.createElement('span'); dot.className = 'settings-default-dot'; dot.setAttribute('aria-hidden', 'true'); // the dot is drawn by CSS: no text of its own to count or read
         const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-quiet btn-small'; button.textContent = 'Reset'; button.dataset.resetSetting = id;
-        const label = row.querySelector('.sv-label')?.textContent || e.getAttribute('aria-label') || 'setting';
+        const provider = id.match(/-(claude|codex|agy|pi)$/), label = (row.querySelector('.sv-label')?.textContent || e.getAttribute('aria-label') || 'setting') + (provider ? ` for ${provider[1][0].toUpperCase()}${provider[1].slice(1)}` : ''); // two providers' rows say the same label: each Reset names its own
         button.setAttribute('aria-label', `Reset ${label} to default. Changed from default.`); box.title = 'Changed from default';
         box.append(dot, button); const at = row.querySelector('.sv-label'); if (at) at.after(box); else (row.querySelector('.sv-text') || row).append(box); // beside the label, on its own line: a Reset that appears adds no height
         button.addEventListener('click', async () => {

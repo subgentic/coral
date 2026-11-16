@@ -153,7 +153,6 @@
     /* Agentic tabs: allow horizontal scroll on narrow panels */
     .agentic-state-tabs {
         overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
         flex-wrap: nowrap;
         scrollbar-width: none;
     }
@@ -474,7 +473,6 @@
     /* Capture pane scroll speed fix — enable momentum scrolling */
     .output-scroll,
     .xterm-container {
-        -webkit-overflow-scrolling: touch;
         overscroll-behavior: contain;
     }
 
@@ -624,7 +622,6 @@
     /* History tabs scrollable */
     .history-tabs {
         overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
         flex-wrap: nowrap !important;
     }
 
@@ -900,7 +897,6 @@
         height: 44px;
         min-height: 44px;
         overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
         flex-wrap: nowrap;
         scrollbar-width: none;
         border-bottom: 1px solid var(--border);
@@ -919,6 +915,7 @@
 
     .agentic-state.mobile-panel-overlay .agentic-tab {
         min-width: 44px;
+        width: max-content;
         min-height: 40px;
         height: 40px;
         padding: 0 8px;
@@ -935,8 +932,8 @@
 
     /* The open tab says its name beside its icon (#7063): the row of icons alone left a person guessing which panel is open */
     .agentic-state.mobile-panel-overlay .agentic-tab.active:not(:focus-visible)::after { content: attr(aria-label) / ''; margin-left: 6px; font-size: var(--fs-md); white-space: nowrap; }
-    .agentic-state.mobile-panel-overlay #agentic-tab-more.active:not(:focus-visible)::after { content: none; } /* More with a tab behind it open: its icon is that tab's and its name ("More: Browse, open") is 170 px of words, which ran the row 111 px past the panel and cut the last tab (#10052); the full words stay its accessible name */
-    .agentic-state.mobile-panel-overlay #agentic-tab-saved.active:not(:focus-visible)::after { content: none; } /* Saved's name is too long to print beside its icon ("Saved for later on this page" ran to the edge): the open tab is the bookmark and its count, the full words stay its accessible name (#9647) */
+    .agentic-state.mobile-panel-overlay #agentic-tab-more.active:not(:focus-visible)::after { content: none; } /* More with a tab open behind it: no words beside its icon, they ran the row 111 px past the panel (#10052); its accessible name stays */
+    .agentic-state.mobile-panel-overlay #agentic-tab-saved.active:not(:focus-visible)::after { content: none; } /* Saved: no words beside its icon, they ran to the edge (#9647); its accessible name stays */
 
     .agentic-state.mobile-panel-overlay .agentic-tab.active {
         color: var(--text-on-accent); /* was var(--accent) on var(--accent-dim): 1.8:1 in the dark theme, 1.5:1 in the light one, so the open tab's icon was all but invisible on a phone (#4851) */
@@ -976,7 +973,6 @@
         flex-direction: column;
         min-height: 0;
         overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
     }
 
     .agentic-state.mobile-panel-overlay #agentic-panel-board.active {
