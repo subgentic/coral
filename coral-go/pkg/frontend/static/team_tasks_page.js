@@ -313,7 +313,7 @@ function watch() {
 }
 
 export function showTasks(host, project, h = {}) {
-    if (project !== model.project) { bar = null; Object.assign(model, { dt: DT.tableState(), choices: null, project, filters: { ...TF.loadFilters(project, browserLocal), sort: 'open' }, q: emptyQuery(), rows: [], cursor: '', moreLoaded: false, extraPages: 0, totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' }); }
+    if (project !== model.project) { bar = null; Object.assign(model, { dt: DT.tableState(), choices: null, project, filters: { ...TF.loadFilters(project, browserLocal), sort: 'open' }, q: emptyQuery(), rows: [], cursor: '', moreLoaded: false, extraPages: 0, totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' }); if (TF.isQuery(model.filters)) model.filter = 'all'; }
     hooks = h;
     if (!model.choices || Date.now() - (model.choicesAt || 0) > CHOICES_MS) loadChoices();
     if (h.query) { model.filters = TF.fromQuery(h.query); if (TF.isQuery(model.filters)) model.filter = 'all'; } // an address with filters in it (a link): they are the view with every status shown, over what this browser kept (#16735)

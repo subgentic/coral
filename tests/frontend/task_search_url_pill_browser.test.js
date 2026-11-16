@@ -40,11 +40,7 @@ const KEYWORD = 'zephyr';
         await waitFor(`document.querySelectorAll('${panel} .dt-primary').length >= 5`, 'the seeded tasks', 10000);
 
         // now re-open with a query, as the router does when the URL has ?q=
-        await ev(`(async () => {
-            const { openTeamPage } = await import((window.__coralStatic || '/static/') + 'team_page.js');
-            await openTeamPage(${JSON.stringify(TEAM)}, { tab: 'tasks', query: 'q=${KEYWORD}' });
-            return true;
-        })()`);
+        await ev(`window.openTeamPage(${JSON.stringify(TEAM)}, { tab: 'tasks', query: 'q=${KEYWORD}' }).then(() => true)`);
         await waitFor(`document.querySelectorAll('${panel} .dt-primary').length > 0`, 'the search results', 10000);
 
         await S.run('the pill is All after a URL search', async () => {
@@ -70,19 +66,39 @@ const KEYWORD = 'zephyr';
 
         await shot('task-search-url-pill');
 
-        // 2. a reload (same tab, same query) also lands on All
+        // 2. a saved-filter q (no address query) also starts on All: TF.loadFilters loads the q from localStorage on a project change
         await ev(`(async () => {
-            const { openTeamPage } = await import((window.__coralStatic || '/static/') + 'team_page.js');
-            localStorage.setItem('coral-hide-completed', 'true'); // the default is Open
-            await openTeamPage(${JSON.stringify(TEAM)}, { tab: 'tasks', query: 'q=${KEYWORD}' });
+            localStorage.setItem('coral-hide-completed', 'true'); // the default pill is Open
+            localStorage.setItem('coral-task-filters:${TEAM}', JSON.stringify({ q: '${KEYWORD}' }));
+            await window.openTeamPage('__force_project_change__', { tab: 'tasks' }); // reset model.project so the next open reloads filters
+            await window.openTeamPage(${JSON.stringify(TEAM)}, { tab: 'tasks' }); // no query in the address — filters come from localStorage
             return true;
         })()`);
-        await waitFor(`document.querySelectorAll('${panel} .dt-primary').length > 0`, 'the reloaded results', 10000);
+        await waitFor(`document.querySelectorAll('${panel} .dt-primary').length > 0`, 'the saved-filter results', 10000);
 
-        await S.run('the pill is still All after a simulated reload', async () => {
+        await S.run('the pill is All when q comes from saved filters', async () => {
             const pills = await chips();
             const all = pills.find(p => p.name.startsWith('All'));
-            assert.equal(all.pressed, 'true', 'All is still pressed after reload: ' + JSON.stringify(pills));
+            assert.ok(all, 'there is an All pill: ' + JSON.stringify(pills));
+            assert.equal(all.pressed, 'true', 'All is pressed when the saved q is loaded: ' + JSON.stringify(pills));
+        });
+
+        await shot('task-search-saved-filter-pill');
+
+        // 3. the address path still works after the saved-filter path
+        await ev(`(async () => {
+            localStorage.removeItem('coral-task-filters:${TEAM}');
+            localStorage.setItem('coral-hide-completed', 'true');
+            await window.openTeamPage('__force_project_change__', { tab: 'tasks' });
+            await window.openTeamPage(${JSON.stringify(TEAM)}, { tab: 'tasks', query: 'q=${KEYWORD}' });
+            return true;
+        })()`);
+        await waitFor(`document.querySelectorAll('${panel} .dt-primary').length > 0`, 'the address-path results', 10000);
+
+        await S.run('the pill is All after a URL search (address path)', async () => {
+            const pills = await chips();
+            const all = pills.find(p => p.name.startsWith('All'));
+            assert.equal(all.pressed, 'true', 'All is pressed from address query: ' + JSON.stringify(pills));
         });
 
         await shot('task-search-url-pill-reload');
