@@ -125,6 +125,9 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 				if m.inQueueWait(w, target) {
 					continue // in a resource line: counted as waiting, listed nowhere (#13707)
 				}
+				if target.sub != nil && board.SameIdentity(target.sub.SubscriberID, sub.SubscriberID) {
+					continue // a wait on itself is no wait on someone: counted as waiting, listed nowhere (#17977)
+				}
 				on, you := target.label, false
 				var senders []string
 				if target.sub != nil {

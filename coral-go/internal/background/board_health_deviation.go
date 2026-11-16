@@ -115,6 +115,9 @@ func (m *BoardHealthMonitor) deviationItems(ctx context.Context, project string,
 			continue // in a resource line behind the party it waits on: the line moving is the answer (#13707)
 		}
 		on := target.label
+		if target.sub != nil && board.SameIdentity(target.sub.SubscriberID, w.SubscriberID) {
+			continue // a wait on itself is no wait on someone (#17977)
+		}
 		if target.sub != nil {
 			if rcpt != nil && board.SameIdentity(target.sub.SubscriberID, rcpt.SubscriberID) {
 				continue // a wait on the recipient is a line of its own
