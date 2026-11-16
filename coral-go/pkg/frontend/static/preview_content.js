@@ -2,11 +2,11 @@
 import { escapeHtml, DOMPURIFY_CONFIG, sanitizeHtml, keepFragmentsInside } from './utils.js';
 import { getLangFromPath } from './cm_util.js';
 import { loadHighlight } from './vendor_loader.js';
+import { importOnce } from './import_once.js';
 
 
 export function _fileName(filepath) {
-    const i = filepath.lastIndexOf('/');
-    return i === -1 ? filepath : filepath.substring(i + 1);
+    return filepath.slice(filepath.lastIndexOf('/') + 1);
 }
 
 /** Rendered HTML (sandboxed), formatted Markdown, or highlighted source. */
@@ -19,19 +19,17 @@ export function _renderContentView(body, content, filepath, line, interpretHtml)
     const lang = getLangFromPath(filepath);
 
     if (lang === 'markdown' && typeof marked !== 'undefined') {
-        const html = marked.parse(content);
         // A workspace file can be agent-written: its links follow the file policy (#3542).
-        const safe = sanitizeHtml(html, DOMPURIFY_CONFIG, { links: 'file', headings: 2 });
+        const safe = sanitizeHtml(marked.parse(content), DOMPURIFY_CONFIG, { links: 'file', headings: 2 });
         body.innerHTML = `<div class="prose preview-pane-markdown">${safe}</div>`;
         keepFragmentsInside(body);
-        if (line > 0) _scrollToLine(body, content, line);
-        return;
+        importOnce('./md_front.js').then(m => m.show(body, content)); // the front matter as a key/value header (#16651); a failed load leaves the preview as drawn
+    } else {
+        body.innerHTML = `<pre class="preview-pane-code"><code class="language-${lang}">${escapeHtml(content)}</code></pre>`;
+        // Plain first; coloured once highlight.js has loaded (plain if it cannot).
+        const block = body.querySelector('pre code');
+        if (block) loadHighlight().then(h => { if (block.isConnected) h.highlightElement(block); }, () => {});
     }
-
-    body.innerHTML = `<pre class="preview-pane-code"><code class="language-${lang}">${escapeHtml(content)}</code></pre>`;
-    // Plain first; coloured once highlight.js has loaded (plain if it cannot).
-    const block = body.querySelector('pre code');
-    if (block) loadHighlight().then(h => { if (block.isConnected) h.highlightElement(block); }, () => {});
     if (line > 0) _scrollToLine(body, content, line);
 }
 

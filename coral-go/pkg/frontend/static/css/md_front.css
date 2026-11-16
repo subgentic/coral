@@ -1,0 +1,4 @@
+/* A Markdown file's front matter (a skill's name, description, metadata) as a small key/value header (#16651) */
+.preview-front-matter { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 0 0 1em; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-secondary); font-size: var(--fs-base); }
+.preview-front-matter dt { color: var(--text-secondary); font-weight: var(--fw-strong); }
+.preview-front-matter dd { margin: 0; min-width: 0; overflow-wrap: anywhere; color: var(--text-primary); }
