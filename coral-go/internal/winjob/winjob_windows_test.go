@@ -20,6 +20,9 @@ func TestMain(m *testing.M) {
 	case "sleeper":
 		time.Sleep(10 * time.Minute)
 		return
+	case "marker":
+		_ = os.WriteFile(os.Getenv("WINJOB_MARKER"), []byte("ran"), 0o600)
+		return
 	case "parent":
 		var pids []string
 		for i := 0; i < 2; i++ {
@@ -149,4 +152,39 @@ func TestProcessCapStopsAFork(t *testing.T) {
 	if _, err := os.Stat(pidFile); err == nil {
 		t.Fatal("the parent started both children past a cap of two processes")
 	}
+}
+
+// #17721: a command started Suspended runs nothing until Resume, so it is in the job before it can fork a child outside it. Failing-first: before Suspended existed, the command ran as it started.
+func TestASuspendedCommandRunsNothingUntilItIsInTheJobAndResumed(t *testing.T) {
+	j, err := New(Limits{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer j.Close()
+	marker := filepath.Join(t.TempDir(), "ran")
+	c := exec.Command(os.Args[0])
+	c.Env = append(os.Environ(), "WINJOB_ROLE=marker", "WINJOB_MARKER="+marker)
+	Suspended(c)
+	if err := c.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Process.Kill(); _ = c.Wait() }()
+	time.Sleep(700 * time.Millisecond) // sleep-ok: nothing may run in this time; there is no event to wait for
+	if _, err := os.Stat(marker); err == nil {
+		t.Fatal("the command ran before it was resumed")
+	}
+	if err := j.Assign(c); err != nil {
+		t.Fatal(err)
+	}
+	if err := Resume(c); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(marker); err == nil {
+			return
+		}
+		time.Sleep(50 * time.Millisecond) // sleep-ok: polling for the file the resumed command writes
+	}
+	t.Fatal("the resumed command never ran")
 }
