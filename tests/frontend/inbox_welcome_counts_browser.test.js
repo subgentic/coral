@@ -35,27 +35,25 @@ const { coralReady } = require('./helpers/wait');
             const folderCount = () => ev(`[...document.querySelectorAll('.view-list-item')].filter(r => r.querySelector('.view-list-name, .view-list-label') && /Needs you$/.test(r.querySelector('.view-list-label').textContent.trim())).map(r => (r.querySelector('.view-list-count') || {}).textContent)`);
             const pills = () => ev(`[...document.querySelectorAll('button.goals-chip')].map(e => e.textContent.trim())`);
             const counts = await folderCount();
-            check(counts.length > 0 && counts.every(c => c === '0' || c === '' || c == null), `${tag}: the Needs you folder does not count the five welcome items, as the badge does not (#11622): ` + JSON.stringify(counts));
-            check(await ev(`[...document.querySelectorAll('.view-list-item')].filter(r => /Needs you$/.test((r.querySelector('.view-list-label') || {}).textContent || '')).every(r => !(r.querySelector('.view-list-count') || document.body).classList.contains('view-list-alert'))`), `${tag}: the count of welcome items alone is not drawn as an alert`);
+            check(counts.length > 0 && counts.every(c => c === '5'), `${tag}: the Needs you folder counts the five Getting started items like any other (#18764): ` + JSON.stringify(counts));
             const chips = await pills();
-            check(chips.includes('All 0') && !chips.some(c=>/^Welcome/.test(c)) && chips.includes('Needs input 0'), `${tag}: the pills file them under Welcome, not Needs input: ` + JSON.stringify(chips));
-            check(await ev(`document.getElementById('nav-tab-hub-inbox-badge').hidden || document.getElementById('nav-tab-hub-inbox-badge').textContent === ''`), `${tag}: the items are still not in the Inbox badge`);
+            check(chips.includes('All 5') && !chips.some(c=>/^Welcome/.test(c)), `${tag}: All counts the five, and there is no Welcome pill: ` + JSON.stringify(chips));
+            await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '5'`, `${tag}: the badge says 5`, 8000);
             const names = await ev(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].map(e => ({ t: e.firstChild ? e.firstChild.textContent : '', ws: getComputedStyle(e).whiteSpace, cut: e.scrollWidth > e.clientWidth + 1, lines: Math.round(e.getBoundingClientRect().height / parseFloat(getComputedStyle(e).lineHeight || 20)) }))`);
             check(names.length === 5 && names.every(n => n.ws === 'normal' && !n.cut), `${tag}: no welcome title is cut: ` + JSON.stringify(names));
-            check(await ev(`document.querySelectorAll('#group-table-view .inbox-getting-started li').length === 5 && document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 0`), `${tag}: onboarding is outside the Needs you table`);
+            check(await ev(`!document.querySelector('.inbox-getting-started') && !document.querySelector('button[aria-label="Dismiss Getting started"]') && document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length === 5`), `${tag}: no separate block: the five are rows of the Needs you table`);
             // two agents waiting beside the five welcome items: the folder, the Inbox badge and the phone drawer's count are one number (#11622)
             await ev(`T.state.liveSessions = [0, 1].map(i => ({ name: 'w' + i, session_id: '0000000' + i + '-0000-4000-8000-0000000000aa', agent_type: 'claude', server: 'local', status: 'idle', display_name: 'Waiting ' + i, working_directory: '/repo/a', waiting_for_input: true, waiting_kind: 'permission', waiting_since: new Date(Date.now() - 300000).toISOString(), sleeping: false })); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return true; })`);
-            await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '2'`, `${tag}: the badge says 2`, 8000);
+            await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '6'`, `${tag}: the badge says 6 (two waiting, and the four Getting started items left: an agent exists, so that step is done)`, 8000);
             const mixedCounts = await folderCount();
-            check(mixedCounts.length > 0 && mixedCounts.every(c => c === '2'), `${tag}: with two waiting and five welcome items the folder says 2, like the badge: ` + JSON.stringify(mixedCounts));
-            check(await ev(`import(${S} + 'inbox_tab.js').then(m => m.inboxCountsNow().needs === 2)`), `${tag}: the drawer's count is 2 too`);
+            check(mixedCounts.length > 0 && mixedCounts.every(c => c === '6'), `${tag}: with two waiting and four Getting started items left the folder says 6, like the badge: ` + JSON.stringify(mixedCounts));
+            check(await ev(`import(${S} + 'inbox_tab.js').then(m => m.inboxCountsNow().needs === 6)`), `${tag}: the drawer's count is 6 too`);
             await ev(`T.state.liveSessions = []; T.state.settings = { ...T.state.settings, inbox_welcome: 'on', inbox_welcome_done: '' }; import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return true; })`); // the agents go: the five items are back for the rest of the walk
             await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 5`, `${tag}: five welcome items again`, 8000);
             await shot(`inbox-welcome-counts-${w}`);
-            await ev(`document.querySelector('button[aria-label="Dismiss Getting started"]').click(); true`);
-            await waitFor(`!document.querySelector('.inbox-getting-started')`, `${tag}: Getting started dismissed`, 8000);
-            const after = await folderCount(), chipsAfter = await pills();
-            check(after.every(c => c === '0' || c === '' || c == null) && !chipsAfter.some(c => /^Welcome/.test(c)), `${tag}: the count and the Welcome pill go with them: ` + JSON.stringify([after, chipsAfter]));
+            await press(mobile ? 'Got it' : 'Dismiss', '#group-table-view button', 0);
+            await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 4`, `${tag}: one item dismissed`, 8000);
+            await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '4'`, `${tag}: the count goes down with it`, 8000);
         }
     } finally { try { await restoreLaunchNotice(ev); } catch (e) {} await settingsGuard.restore(); await client.close(); }
     if (found.length) { console.error(found.join('\n')); process.exit(1); }

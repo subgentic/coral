@@ -1,4 +1,4 @@
-// #16862: chips count actionable listed rows; Welcome is a separate dismissible Getting started block.
+// #16862: chips count the listed rows (#18764: Getting started items are ordinary rows now, covered by inbox_welcome_counts_browser; off here).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady, framesJs } = require('./helpers/wait');
@@ -18,7 +18,7 @@ const BASE = require('./test_base').BASE;
                     if (path === '/api/board/projects') return json([]);
                     if (path === '/api/settings' && o?.method === 'PUT') return json({ ok: true });
                     return original(u, o); };
-                T.state.liveSessions = []; T.state.servers = []; T.state.settings = { ...T.state.settings, inbox_welcome: 'on', inbox_welcome_done: 'agent,team' }; return true; })()`);
+                T.state.liveSessions = []; T.state.servers = []; T.state.settings = { ...T.state.settings, inbox_welcome: 'off', inbox_welcome_done: 'agent,team' }; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => import(${S} + 'inbox_tab.js')).then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
             await waitFor(`document.querySelector('#group-table-view button[aria-label="Answer the question of Lead"]')`, 'one board ask', 10000);
             const pick = async (label, expected) => {
@@ -29,15 +29,8 @@ const BASE = require('./test_base').BASE;
                 const count = await ev(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length`);
                 if (count !== expected) failures.push(`${width}: ${label} lists ${count}, expected ${expected}`);
             };
-            const block = await ev(`(() => { const b=document.querySelector('#group-table-view section[aria-label="Getting started"]'); return {exists:!!b, tips:b?.querySelectorAll('li').length||0, inRows:!!b?.closest('tbody'), chip:[...document.querySelectorAll('#group-table-view button.goals-chip')].some(x=>/^Welcome/.test(x.textContent))}; })()`);
-            if (!block.exists || block.tips!==3 || block.inRows || block.chip) failures.push(`${width}: Getting started must be separate: ${JSON.stringify(block)}`);
             await pick('All', 1); await pick('Question', 1); await pick('Needs input', 0); await pick('All', 1);
-            if (block.exists) {
-                await ev(`document.querySelector('#group-table-view button[aria-label="Dismiss Getting started"]').click(); true`); await ev(framesJs(6));
-                assert.equal(await ev(`!!document.querySelector('#group-table-view section[aria-label="Getting started"]')`),false,'the whole block is dismissible');
-                await pick('All',1);
-            }
-            assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), '1', 'Welcome does not inflate the unread notification badge');
+            assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), '1', 'the badge counts the one unread review');
         }
         // C8: saving the only review removes it from both the All chip and the list.
         const team = 'chip-save-' + Date.now().toString(36), T = '#group-table-view', at = 'Save: ';

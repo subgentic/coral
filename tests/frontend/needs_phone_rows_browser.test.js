@@ -36,9 +36,9 @@ const { coralReady } = require('./helpers/wait');
                     if (m && method === 'POST') { const body = JSON.parse(o.body); window.__calls.push({ ask: Number(m[1]), undo: !!body.undo }); if (!body.undo) window.__asks = window.__asks.filter(a => a.id !== Number(m[1])); return json({ ok: true, closed_by: 'Operator' }); }
                     return original(u, o); };
                 return true; })()`);
-            await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.settings = { ...m.state.settings, inbox_welcome: 'on', inbox_welcome_done: '' }; return true; })`);
+            await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.settings = { ...m.state.settings, inbox_welcome: 'off', inbox_welcome_done: '' }; return true; })`); // #18764: Getting started items are ordinary, counted rows now (inbox_welcome_counts_browser); off here, the suite is about review and question rows
             await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr.dt-row').length === 6 && document.querySelectorAll('${T} .inbox-getting-started li').length > 0`, at + 'six counted review/question rows and separate Getting started', 15000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr.dt-row').length === 6 `, at + 'six counted review/question rows', 15000);
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: the table settles after its first draw
 
             assert.equal(await ev(`(document.querySelector('#group-table-view .view-list-nav')?.getClientRects().length || 0)`), 0, at + 'row actions remain usable without the Inbox strip');
@@ -75,7 +75,6 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await ev(`window.__calls.filter(c => c.review === '${(5).toString(16).padStart(64, '0')}' && c.decision === 'ignore').length`), 1, at + 'after the folder switches one drag is one ignore request');
             assert.equal(await ev(`[...document.querySelectorAll('.toast')].filter(t => /Dismissed: Phone review 5/.test(t.textContent)).length`), 1, at + 'and one toast');
             assert.ok(await ev(`!${rowOf('Phone review 5.txt')}`), at + 'and its row is gone');
-            assert.equal(await ev(`document.querySelectorAll('.inbox-getting-started input[type=checkbox]').length`), 0, at + 'Getting started is outside bulk selection');
             await ev('window.__calls = []; true');
             // a long press selects a review file; a tap adds the question; the bar shows what fits
             await press('Phone review 1.txt');

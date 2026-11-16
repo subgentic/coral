@@ -48,6 +48,13 @@ const BASE = require('./test_base').BASE;
         await ev(`[...document.querySelectorAll('#setup-agent-modal .modal-actions button')].find(b => b.textContent === 'Continue').click(); true`);
         await waitFor(`getComputedStyle(document.getElementById('launch-modal')).display === 'flex' && !!document.getElementById('launch-step-agent') && document.getElementById('launch-step-agent').style.display !== 'none'`, 'Continue opens the New agent form');
         await ev(`window.hideLaunchModal(); true`);
+        // "Not now" does not stop the click: the launch form opens without an agent set up (Pi, Hermes or a custom CLI path).
+        await ev(`window.__ready.claude = false; import((window.__coralStatic || '/static/') + 'setup_agent.js').then(m => m.readyProviders(true)).then(() => true)`);
+        await ev(`window.showLaunchModal(); window._selectLaunchType('agent'); true`);
+        await waitFor(`!!document.getElementById('setup-agent-modal')`, 'the dialog again');
+        await ev(`[...document.querySelectorAll('#setup-agent-modal .modal-actions button')].find(b => b.textContent === 'Not now').click(); true`);
+        await waitFor(`!document.getElementById('setup-agent-modal') && getComputedStyle(document.getElementById('launch-modal')).display === 'flex' && !!document.getElementById('launch-step-agent') && document.getElementById('launch-step-agent').style.display !== 'none'`, 'Not now continues to the New agent form');
+        await ev(`window.hideLaunchModal(); window.__ready.claude = true; true`);
         // With one installed there is no dialog at all.
         await ev(`import((window.__coralStatic || '/static/') + 'setup_agent.js').then(m => m.readyProviders(true)).then(() => true)`);
         await ev(`window.showLaunchModal(); window._selectLaunchType('agent'); true`);

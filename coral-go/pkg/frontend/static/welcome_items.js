@@ -6,6 +6,7 @@ import { state } from './state.js';
 import { serverFetch, currentServer } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { browserSession } from './safe_storage.js';
+import { setWelcomeCount } from './inbox_tab.js';
 
 export const WELCOME_IDS = ['agent', 'welcome', 'team', 'asks', 'guide'];
 const GUIDE_URL = '/static/guide/getting-started.md';
@@ -68,6 +69,7 @@ export function save(values, { auto = false } = {}) { // auto: the page keeping 
 
 /** Keep the setting in step: a step seen is remembered (deleting the agent later brings nothing back), and with all five done the items are off for good. Safe to call often. */
 export function syncWelcome() {
+    setWelcomeCount(welcomeRows().length); // before anything else: the open items are part of the Needs you number
     if (!welcomeOn()) return;
     if (!finished().has('team')) readTeams();
     const have = doneList(), now = finished();
@@ -80,21 +82,15 @@ function mark(id) {
     const d = finished(); d.add(id);
     save({ inbox_welcome_done: [...d].join(',') });
     syncWelcome();
+    setWelcomeCount(welcomeRows().length);
     document.dispatchEvent(new CustomEvent('coral:welcome-changed'));
 }
 
 export const dismissWelcome = id => mark(id);
-export function dismissGettingStarted() {
-    const action = {}; document.dispatchEvent(new CustomEvent('coral:action-start', { detail: action }));
-    save({ inbox_welcome: 'off' });
-    document.dispatchEvent(new CustomEvent('coral:welcome-changed'));
-    document.dispatchEvent(new CustomEvent('coral:action-result', { detail: action }));
-}
-
 /** An item's own action. */
 export async function runWelcome(id) {
     if (id === 'welcome') { mark('welcome'); return; }
-    if (id === 'setup') { importOnce('./setup_agent.js').then(m => m.openSetupDialog({ onReady: () => { _setupNone = false; save({ inbox_welcome_setup: 'off' }); document.dispatchEvent(new CustomEvent('coral:welcome-changed')); } })); return; }
+    if (id === 'setup') { importOnce('./setup_agent.js').then(m => m.openSetupDialog({ onReady: () => { _setupNone = false; save({ inbox_welcome_setup: 'off' }); setWelcomeCount(welcomeRows().length); document.dispatchEvent(new CustomEvent('coral:welcome-changed')); } })); return; }
     if (id === 'agent' || id === 'team') { return importOnce('./welcome_launch.js').then(m => m.openWelcomeLaunch(id)); }
     if (id === 'guide') { importOnce('./artifact_viewer.js').then(m => m.openBundledDocument({ title: 'Getting started with Coral', name: 'getting-started.md', url: GUIDE_URL, onOpened: () => mark('guide') })); return; } // the guide (about 400 KB with its pictures) is fetched when the row is opened, never at start (page_weight)
     if (id === 'asks') importOnce('./welcome_asks.js').then(m => m.readAsks(WELCOME.asks.title, () => mark('asks'))); // the long read arrives when it is opened, not at start (page_weight)

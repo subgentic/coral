@@ -6,7 +6,7 @@ import { rememberFocus } from './dom_morph.js';
 import { onArtifactsRev } from './artifacts_feed.js';
 import { needsYou, askedRow } from './asked_before_restart.js';
 import { unrecordedItem, recordAllAgents } from './waiting.js';
-const { welcomeRows, runWelcome, dismissWelcome, dismissGettingStarted } = await importOnce('./welcome_items.js');
+const { welcomeRows, runWelcome, dismissWelcome } = await importOnce('./welcome_items.js');
 import { incompleteNote, readGaps } from './needs_incomplete.js';
 import { loadPendingSkills, skillRows, skillLine, skillName, openSkill } from './needs_skills.js';
 import { doneGoals, looksDone, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, setClosedByAgentCount, isGoalDoneRead, markGoalDoneRead, markGoalDoneUnread, SETTING as GOAL_DONE_SETTING } from './goal_done.js';
@@ -213,7 +213,7 @@ const subOf = (s, withTeam) => [s.review ? questionOf(s) : '', fromOf(s, withTea
 /** Whether a Needs you row is unread (#11668): everything that counts in the badge is; a read review and the welcome items (listed, not alarms) are not. */
 /** The marker a file's row carries while agents have replied in the Operator's comment thread and they have not opened it (#12026). */
 const newCommentsTag = () => { const t = DT.tag('New comments'); t.classList.add('inbox-new-comments'); return t; };
-const needsUnread = s => !((s.welcome && !(s.goalClosed && madeByPerson(s.goalClosed))) || (s.review && !needsReviewAttention(s.review)) || (s.goalDone && isGoalDoneRead(goalTeamHere(s.goalDone), s.goalDone) && !(s.goalDone.new_comments > 0))); // a read file and an opened goal item are listed, not counted (#11983); either is counted again while agents have replied in the Operator's thread on it (#12026, #12073)
+const needsUnread = s => !((s.review && !needsReviewAttention(s.review)) || (s.goalDone && isGoalDoneRead(goalTeamHere(s.goalDone), s.goalDone) && !(s.goalDone.new_comments > 0))); // a read file and an opened goal item are listed, not counted (#11983); either is counted again while agents have replied in the Operator's thread on it (#12026, #12073)
 /** A wide screen with a real pointer shows a row's actions on its hover or focus, and the waiting time where they are the rest of the time (#11669, the operator's Gmail shot); a touch screen and a phone keep the buttons drawn. */
 const hoverRows = () => false; // the buttons are always on the row's bottom line, not shown on hover (#15120, the Operator's bottom-row layout)
 const hoverWrap = (s, box) => { if (!box || !hoverRows()) return box; const wrap = DT.el('div', 'inbox-actions-hover'), when = waitingText(s.waiting_since); wrap.append(box); if (when) wrap.append(DT.el('span', 'inbox-row-when', when)); return wrap; };
@@ -325,7 +325,7 @@ function askBlockers() { // loaded once, when a row carries the field; the table
 let answered = '', answeredTimer; // what an answer given here went through as, for five minutes: the row is gone and the list says so (#10720)
 const answeredRows = new Map(); // `${server}:${session_id}` -> { began, at }: a row answered here, waiting for the agent to stop waiting (#14408)
 document.addEventListener('coral:inbox-answered', e => { clearTimeout(answeredTimer); answered = e.detail.said; answeredTimer = setTimeout(() => { answered = ''; renderInboxNav(true); }, 3e5); if (e.detail.began && e.detail.session_id) answeredRows.set(`${e.detail.server || ''}:${e.detail.session_id}`, { began: e.detail.began, at: Date.now() }); });
-const everyNeed = () => [...waitingSessions(), ...reviewRows(), ...runRows(), ...proposalRows(), ...goalDoneRows(), ...skillRows(), ...askRows(), ...recordRows(), ...closedByAgentRows()]; // Getting started is rendered separately, outside the Needs you rows (#16862)
+const everyNeed = () => [...waitingSessions(), ...reviewRows(), ...runRows(), ...proposalRows(), ...goalDoneRows(), ...skillRows(), ...askRows(), ...recordRows(), ...closedByAgentRows(), ...welcomeRows()]; // the Getting started items are ordinary rows and count (#18764)
 let activeNeedsTeam = '';
 let teamNeedsMount = null;
 const forNeedsTeam = (row, team) => !!row.board_project && boardTeamKey(sessionServer(row), row.board_project) === team;
@@ -663,23 +663,6 @@ function goalDoneActions(g) {
 }
 
 /** A welcome item's actions (#11443): its own action, and a quiet Dismiss for all but the welcome itself. */
-let welcomeKey = ''; // the Getting started steps last drawn
-function gettingStarted() {
-    const rows = welcomeRows(); welcomeKey = rows.map(r => r.welcome.id).join(); if (!rows.length) return null;
-    const section = DT.el('section', 'inbox-getting-started'); section.setAttribute('aria-label', 'Getting started');
-    const head = DT.el('div', 'inbox-start-heading'), title = DT.el('h2', null, 'Getting started');
-    const dismiss = DT.el('button', 'btn btn-small btn-quiet', 'Dismiss'); dismiss.type = 'button'; dismiss.setAttribute('aria-label', 'Dismiss Getting started'); dismiss.addEventListener('click', dismissGettingStarted);
-    head.append(title, dismiss); section.append(head);
-    const list = DT.el('ul');
-    for (const { welcome: w } of rows) {
-        const item = DT.el('li'), name = DT.el('h3', 'inbox-welcome-name', w.title), help = DT.el('p', null, w.text), actions = welcomeActions(w);
-        actions.querySelector('.inbox-main-action')?.classList.replace('btn-primary', 'btn-quiet');
-        if (w.optional) name.append(DT.el('span', 'inbox-welcome-optional', ' · optional'));
-        item.append(name, help, actions); list.append(item);
-    }
-    section.append(list); return section;
-}
-
 function welcomeActions(w) {
     const box = DT.el('div', 'inbox-review-actions inbox-welcome-actions');
     const go = DT.el('button', `btn btn-small ${w.id === 'agent' ? 'btn-primary' : 'btn-quiet'}`, w.go); go.type = 'button';
@@ -975,7 +958,7 @@ const navCurrent = () => (isPhoneLayout() && page?.kind === BOARDS_SUB ? BOARD_I
 const FOLDER_TIPS = { needs: 'Agents waiting for you: a question, a permission or a review', tasks: 'Tasks assigned to you, not the ones your agents work on (those are on each team\u2019s page and goal)', goals: 'The open goals of your teams', saved: 'Messages you saved for later', artifacts: 'Files agents shared', activity: 'What you did in Needs you' }; // one line each (#10074)
 // The Needs you number is the unread ones, and when the list holds more (read files are listed, not counted: #9277) it says so as the kind pills do, "1 of 4" (#12789, the Operator: "Needs you 0" over a table of read files). The welcome items are listed and never counted (#11622): they do not make it "0 of 5" on a new install.
 // #13979 (Hub beta: "0 of 1" meant nothing to a person, and the Operator kept the unread number): the badge is the unread count alone; when the list holds more, its tooltip and its spoken name say "1 unread, 4 in the list".
-const needsCountWords = () => { const unread = countOf('needs'), listed = allNeeds().filter(s => !s.welcome).length; return listed > unread ? `${unread} unread, ${listed} in the list` : ''; };
+const needsCountWords = () => { const unread = countOf('needs'), listed = allNeeds().length; return listed > unread ? `${unread} unread, ${listed} in the list` : ''; };
 /** The sidebar's groups, one list for this dashboard and the Hub-served one (#13256): Needs attention (Needs you, Tasks, Goals, Saved), Files (Artifacts), History (Activity), the same order and words. Under the Hub an entry shows only where the Hub serves it
  *  (a native group in GROUPS: Artifacts not for a grantee, Activity not served today) and a Hub-frame page keeps no number of its own (the page says it). */
 const folderSections = () => {
@@ -1386,7 +1369,6 @@ export function needsListSpec() {
     const manyTeams = new Set(allNeeds().map(teamOf).filter(Boolean)).size > 1; // with two or more teams waiting, a one-line row names its team
     const waitingForServers = isCloud() && !state.serversKnown;
     return { title: 'Needs you', noun: ['item', 'items'], rows, count: (!needsFilters.kind || needsFilters.kind === 'review') ? `${attention.complete ? '' : 'at least '}${totalAttention}` : totalCounted > rowsCounted ? `${rowsCounted} of ${totalCounted}` : totalCounted, status: needsCountWords(), note: [...reviewErrors(), incompleteNote()].filter(Boolean).join(' '), empty: waitingForServers ? { line: 'Loading Needs you…', hint: 'Checking linked computers…' } : openPages ? null : { line: reviewErrors().length ? 'Review documents could not be refreshed' : NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'You are all caught up', hint: reviewErrors().length ? 'Some computers could not be read. Try again to check what needs you.' : NF.isFiltered(needsFilters) ? undefined : answered || 'An agent that asks a question or wants permission, and a review artifact, appear here. A task assigned to you is under Tasks.', go: reviewErrors().length ? undefined : NF.isFiltered(needsFilters) ? { action: 'inbox-empty-go', label: 'Show all' } : { action: 'inbox-empty-go', label: 'Go to Agents' } },
-        supplement: () => activeNeedsTeam ? null : gettingStarted(),
         foot: needsFoot, banner: () => { const sg = DT.el('div'); importOnce('./inbox_away.js').then(m => m.mountAway(sg, claudeSignedIn() === false)).catch(() => {}); return sg; }, signature: JSON.stringify([welcomeRows().map(w => w.welcome), LS ? LS.signature(state.servers || []) : 0, cards, [...askOpen, ...[...agentAskFailed].map(k => `failed:${k}`)], reviewPagingSignature(), reviewQueryState(), needsCountWords(), cutShort(), loadingEmpty(), mutedWords(mutedReviewItems()), dayOldMutedFiles().map(a => a.hex), groupReviews, groupMode + (groupReviews ? JSON.stringify([taskOpenState, [...storyOpenState]]) : ''), rows.map(s => !!s.review?.starred), hidden, answered || '', manyTeams, needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), incompleteNote(), rows.map(blocksOf), rows.map(s => [s.operatorAsk ? [s.operatorAsk.id, s.operatorAsk.text] : 0, sessionServer(s), s.session_id, s.display_name, s.trustGroup?.members.map(m => m.session.session_id), s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s), s.review ? [needsReviewAttention(s.review), s.review.version, s.review.opened_version, s.review.new_comments, waitingOnAgent(s.review)] : 0, s.proposal ? s.proposal.state : 0])]), // the words move on with the clock: they are part of what was drawn
         node: () => { const wrap = DT.el('div', 'inbox-needs-results'); let pruned = false; { const here = new Set(rows.map(r => `${sessionServer(r)}:${r.session_id}`)); for (const k of [...needsState.selected]) if (!here.has(k)) { needsState.selected.delete(k); needsState.rowCache?.delete(k); pruned = true; } } /* a row that has gone is no longer selected: '1 selected' with nothing ticked (#15339, walk 23 H3) */ const groupFor = reviewGroupLookup(rows, groupReviews, r => !needsReviewAttention(r), reviewSourceLabel, taskHeads, byTask); const oneLineNeeds = cards ? false : !rows.some(isItem); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, ...(cards ? { fold: 'always' } : !oneLineNeeds ? { foldAt: () => isPhoneLayout() ? 48 : 40 } : {}), rows, orderRows: list => arrangeReviewRows(list, groupReviews), groupSorted: true, groupBy: groupFor, keepOrder: true, orderKey: JSON.stringify([needsFilters, queries.needs]), rowKey: s => `${sessionServer(s)}:${s.session_id}`, unread: needsUnread, ...{ selectable: { contextKey: 'inbox-needs', longPress: true, iconBar: isPhoneLayout(), clearLabel: isPhoneLayout() ? 'Cancel' : 'Done', canSelect: s => !!(s.review || s.operatorAsk || s.welcome || s.autorun || s.proposal || s.goalDone), actions: needsBulkActions(), onChange: keys => Toolbar.mountSelection((teamNeedsMount?.host || $('group-table-view'))?.querySelector('.gt-toolbar'), keys.size ? table.bar : null) } }, decorate: (s, tr) => { NF.decorateKindRow(tr); if (cards && tr.classList.contains('inbox-kind-row')) tr.classList.add('inbox-card-tr'); addComputerChip(s, tr); addAgentAskToggle(s, tr); linkQuestion(s, tr); if (!needsUnread(s)) tr.classList.add('dt-read'); if (s.welcome && s.welcome.dismiss) tr.dataset.welcomeId = s.welcome.id; if (s.review && !decisionNeedsPerson(splitKey(s.review.team).server)) {
                 const cell = tr.querySelector('td[data-key="agent"]');
@@ -1720,7 +1702,7 @@ function mountInbox() {
     new MutationObserver(() => { if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') { _wasShown = false; needsOrder = null; needsState.shown = null; if (needsFilters.kind) { needsFilters = { ...needsFilters, kind: '' }; persistNeedsFilters(); } } }).observe(document.body, { attributes: true, attributeFilter: ['data-nav-tab'] });
     $('inbox-view').addEventListener('click', () => quietFocus($('inbox-view')), true);
     if (nativeInbox()) $('inbox-search')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (e.repeat) return; /* a held Enter is one search */ filterInbox(e.target.value); } }); // a chat search runs when it is asked for, not on each key (coral-hub's rate condition)
-    onInboxHooks({ goals: liveGoals, needs: () => { if ($('inbox-local')?.hidden) return; renderInboxNav(); const k = welcomeRows().map(r => r.welcome.id).join(); if (k !== welcomeKey) { welcomeKey = k; refreshGroupTable('hub-inbox'); } /* the Getting started block is not in the count, so a step done moves nothing else that redraws the table (#16862) */ }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
+    onInboxHooks({ goals: liveGoals, needs: () => { if ($('inbox-local')?.hidden) return; renderInboxNav(); }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
     saved.onSavedRender(() => { if (!$('inbox-local')?.hidden) renderInboxNav(true); });
     saved.mountInboxSavedBar($('inbox-saved-bar'));
 }
@@ -1733,7 +1715,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     if (folder && groupMeta(folder)) { closePage(false); page = null; $('inbox-page') && ($('inbox-page').hidden = true); group = folder; } // a link to a folder: the folder, not the page that was open
     else if (_asked) _autoFrom = ''; // the folder the person asked for stays
     else if (!_wasShown && !page && !nativeInbox()) { // a reopen: with something waiting for the person, Needs you first, not the folder last on screen (#10205); with nothing waiting again, the folder that was open before it
-        if (countOf('needs') + welcomeRows().length > 0) { if (group !== 'needs') { _autoFrom = group; group = 'needs'; auto = true; } else if (_autoFrom) auto = true; }
+        if (countOf('needs') > 0) { if (group !== 'needs') { _autoFrom = group; group = 'needs'; auto = true; } else if (_autoFrom) auto = true; }
         else if (_autoFrom && group === 'needs') { group = _autoFrom; _autoFrom = ''; }
     }
     _wasShown = true; _asked = false;
