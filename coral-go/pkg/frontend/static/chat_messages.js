@@ -1,4 +1,5 @@
 /* Drawing a chat's messages (moved out of live_chat.js, #5065; no behaviour change; the copy button's click listener stays in live_chat.js, which registers it after its own earlier ones). */
+import { loadStyles } from './lazy_styles.js';
 import { markHidden } from './visible_marks.js';
 import { appendContent, appendTurnFinal, appendWork, htmlToElement } from './chat_content.js';
 import { makeBubble } from './chat_bubbles.js';
@@ -60,6 +61,10 @@ function renderOneMessage(msg, container, agentType) {
     } else if (msg.type === "user" && msg.local_command === true) {
         // A slash command the CLI ran by itself ("/model sonnet"): a small note of what was typed, not a bubble (#5488). Seeing it here is how the message the person sent is known to be taken.
         appendContent(container, makeBubble("chat-note chat-local-command", escapeHtml(markHidden(msg.content || ""))));
+    } else if (msg.type === "user" && msg.coral_notice !== false && /You were automatically joined to message board|## Your Institutional Knowledge\s+The following is distilled knowledge from your previous sessions\./.test(unwrapPastedContent(msg.content))) {
+        loadStyles('chat_starting.css');
+        appendContent(container, makeBubble('chat-note chat-starting', `<details><summary>Coral · Starting instructions</summary><div class="message-text prose">${renderMarkdown(markHidden(unwrapPastedContent(msg.content)), CHAT_MARKDOWN, 'chat')}</div></details>`));
+
 	} else if (msg.type === "user" && isCoralDelivery(msg)) {
 		const text = unwrapPastedContent(msg.content);
 		appendCoralNotice(container, normalizeNudgeText(text), isCoralHealthNudge(text));
