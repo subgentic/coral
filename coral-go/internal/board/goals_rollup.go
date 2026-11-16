@@ -55,6 +55,34 @@ func goalRollupsStatement(goals []Goal) (string, []any) {
 	return `SELECT goal_id, status, COUNT(*) AS n FROM board_tasks WHERE board_id IN (` + placeholders(len(boards)) + `) AND goal_id IN (` + placeholders(len(goals)) + `) GROUP BY goal_id, status`, args
 }
 
+// fillTaskActivity makes each goal's UpdatedAt the newer of its own edit and the newest change to any task linked to it (made, claimed, finished, worked on or edited: updatedAtSQL), so
+// "Updated N min ago" counts the agents' work and not only edits to the goal itself (#17887, walk 76). One grouped read over the page's goals on the same (board_id, goal_id) index. Goals are
+// paged by id, so a later UpdatedAt moves no cursor. UTC RFC 3339 text compares as text.
+func (s *Store) fillTaskActivity(ctx context.Context, goals []Goal) error {
+	if len(goals) == 0 {
+		return nil
+	}
+	_, args := goalRollupsStatement(goals)
+	boards := len(args) - len(goals)
+	var rows []struct {
+		GoalID int64  `db:"goal_id"`
+		Newest string `db:"newest"`
+	}
+	if err := s.reader().SelectContext(ctx, &rows, `SELECT goal_id, MAX(`+updatedAtSQL+`) AS newest FROM board_tasks WHERE board_id IN (`+placeholders(boards)+`) AND goal_id IN (`+placeholders(len(goals))+`) GROUP BY goal_id`, args...); err != nil {
+		return err
+	}
+	newest := make(map[int64]string, len(rows))
+	for _, r := range rows {
+		newest[r.GoalID] = r.Newest
+	}
+	for i := range goals {
+		if t := newest[goals[i].ID]; t > goals[i].UpdatedAt {
+			goals[i].UpdatedAt = t
+		}
+	}
+	return nil
+}
+
 // goalRollups counts the tasks of each of the goals of one board: the page's own goal ids, on the covering index, never every task the board has linked (#9584: that read grew with the closed goals' history, 4.75 ms of a 5.9 ms page).
 func (s *Store) goalRollups(ctx context.Context, board string, ids []int64) (map[int64]GoalRollup, error) {
 	goals := make([]Goal, len(ids))

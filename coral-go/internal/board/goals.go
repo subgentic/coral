@@ -259,6 +259,9 @@ func (s *Store) GetGoal(ctx context.Context, board string, id int64) (*Goal, err
 	if err = s.fillGoalImages(ctx, one); err != nil {
 		return nil, err
 	}
+	if err = s.fillTaskActivity(ctx, one); err != nil {
+		return nil, err
+	}
 	if err = s.fillLooksDone(ctx, one); err != nil {
 		return nil, err
 	}
