@@ -635,8 +635,9 @@ function goalDoneActions(g) {
 }
 
 /** A welcome item's actions (#11443): its own action, and a quiet Dismiss for all but the welcome itself. */
+let welcomeKey = ''; // the Getting started steps last drawn
 function gettingStarted() {
-    const rows = welcomeRows(); if (!rows.length) return null;
+    const rows = welcomeRows(); welcomeKey = rows.map(r => r.welcome.id).join(); if (!rows.length) return null;
     const section = DT.el('section', 'inbox-getting-started'); section.setAttribute('aria-label', 'Getting started');
     const head = DT.el('div', 'inbox-start-heading'), title = DT.el('h2', null, 'Getting started');
     const dismiss = DT.el('button', 'btn btn-small btn-quiet', 'Dismiss'); dismiss.type = 'button'; dismiss.setAttribute('aria-label', 'Dismiss Getting started'); dismiss.addEventListener('click', dismissGettingStarted);
@@ -1682,7 +1683,7 @@ function mountInbox() {
     new MutationObserver(() => { if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') { _wasShown = false; needsOrder = null; needsState.shown = null; if (needsFilters.kind) { needsFilters = { ...needsFilters, kind: '' }; persistNeedsFilters(); } } }).observe(document.body, { attributes: true, attributeFilter: ['data-nav-tab'] });
     $('inbox-view').addEventListener('click', () => quietFocus($('inbox-view')), true);
     if (nativeInbox()) $('inbox-search')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (e.repeat) return; /* a held Enter is one search */ filterInbox(e.target.value); } }); // a chat search runs when it is asked for, not on each key (coral-hub's rate condition)
-    onInboxHooks({ goals: liveGoals, needs: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
+    onInboxHooks({ goals: liveGoals, needs: () => { if ($('inbox-local')?.hidden) return; renderInboxNav(); const k = welcomeRows().map(r => r.welcome.id).join(); if (k !== welcomeKey) { welcomeKey = k; refreshGroupTable('hub-inbox'); } /* the Getting started block is not in the count, so a step done moves nothing else that redraws the table (#16862) */ }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
     saved.onSavedRender(() => { if (!$('inbox-local')?.hidden) renderInboxNav(true); });
     saved.mountInboxSavedBar($('inbox-saved-bar'));
 }
