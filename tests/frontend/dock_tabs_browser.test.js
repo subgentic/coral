@@ -117,7 +117,7 @@ const { settle, coralReady } = require('./helpers/wait');
         await ev(`document.getElementById('agentic-tab-files').click(); true`); // the picked tab stays open across the reload and is a tab of the row now (#15733): Files is the one the words were measured with
         await load(1280, false);
         await waitFor(`document.querySelector('${ROW}').hasAttribute('data-words')`, 'the words show again at 1280', 4000);
-        await ev(`for (const id of ['files-bar-count', 'task-bar-count', 'note-bar-count']) document.getElementById(id).textContent = '88888888'; true`);
+        await ev(`for (const id of ['files-bar-count', 'note-bar-count']) document.getElementById(id).textContent = '88888888'; true`);
         await waitFor(`!document.querySelector('${ROW}').hasAttribute('data-words')`, 'the words give way when the counts widen the tabs', 4000);
         r = await row();
         assert.ok(r.tops.length === 1 && !r.clipped, 'wide counts: icons alone, one line, nothing clipped: ' + JSON.stringify(r));

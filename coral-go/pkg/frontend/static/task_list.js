@@ -482,8 +482,6 @@ export function _toggleHideCompleted() {
 /** Nothing to show: hide the section, or say so for a live agent or a team (and a busy board). */
 function _renderEmptyTaskList(container, section) {
     // Drop the previous agent's rows too; hiding alone leaves them in the DOM.
-    const countEl = document.getElementById('task-bar-count');
-    if (countEl && countEl.textContent !== '') countEl.textContent = '';
     const live = state.selectedTeam || (state.currentSession && state.currentSession.type === 'live');
     if (!live) {
         if (section) section.style.display = 'none';
@@ -564,22 +562,6 @@ function _taskFooter(querying, scope, shown, total) {
         more: { label: error ? 'Retry' : 'Load more', busy: !!busy, run: loadMoreBoardTasks } };
 }
 
-/** The badge: done / all, from the server's totals for the board. */
-function _updateTaskCount(boardTasks, otherTasks, completedCount) {
-    const countEl = document.getElementById('task-bar-count');
-    if (countEl) {
-        const scope = agentTaskScope();
-        const boardTotal = scope && _boardList.scopeKey !== scope.key ? 0 : _boardList.totalOpen !== null && _boardList.totalCompleted !== null
-            ? _boardList.totalOpen + _boardList.totalCompleted : boardTasks.length;
-        const total = boardTotal + otherTasks.length;
-        const count = scope ? Math.max(0, total - completedCount) : completedCount;
-        const word = scope ? 'open' : 'done';
-        const countText = total > 0 ? `${count}/${total}` : '';
-        if (countEl.textContent !== countText) countEl.textContent = countText; // same text: no new text node, no layout
-        const tab = document.getElementById('agentic-tab-tasks'); // the badge in words (#7182): "1/4" says nothing to a screen reader or a first look
-        if (tab) { const name = total > 0 ? `Tasks, ${count} of ${total} ${word}` : 'Tasks'; if (tab.getAttribute('aria-label') !== name) tab.setAttribute('aria-label', name); const tip = total > 0 ? `${count} of ${total} ${word}` : ''; if (countEl.title !== tip) countEl.title = tip; }
-    }
-}
 
 export function renderBoardTaskList() {
     const container = document.getElementById('board-task-list');
@@ -618,7 +600,7 @@ export function renderBoardTaskList() {
     const boardAll = !scopedBaseReady ? 0 : _boardList.totalOpen !== null && _boardList.totalCompleted !== null ? _boardList.totalOpen + _boardList.totalCompleted : boardTasks.length;
     const barCounts = querying ? { matched: _filteredList.total ?? boardTasks.length, all: Math.max(boardAll, _filteredList.total ?? 0), truncated: _filteredList.truncated } : { matched: boardAll, all: boardAll };
 
-    _updateTaskCount(boardTasks, otherTasks, completedCount);
+
 
     if (querying && allTasks.length === 0 && section) {
         // Nothing matches (or the search is still on its way): the bar stays, so the search can be changed.

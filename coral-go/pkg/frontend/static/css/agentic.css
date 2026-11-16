@@ -569,13 +569,6 @@ body.panel-dragging .agentic-state {
 
 /* ── Tasks ─────────────────────────────────────────────────── */
 
-.task-bar-count {
-    font-size: var(--fs-sm);
-    color: var(--text-muted);
-    font-weight: var(--fw-regular);
-    margin-left: 6px;
-}
-
 .task-bar-list {
     flex: 1;
     overflow-y: auto;
