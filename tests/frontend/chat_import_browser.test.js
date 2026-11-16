@@ -26,7 +26,7 @@ const BASE = require('./test_base').BASE;
         await empty(); await settle(800); // the first look starts the history read
         const e = await empty();
         assert.equal(e.label, 'Import 40 earlier chats from Claude Code, Codex', JSON.stringify(e));
-        assert.match(e.hint, /^40 earlier chats were found on this computer \(Claude Code, Codex\)\. They are not listed until you import them\.$/);
+        assert.match(e.hint, /^40 earlier chats were found on this computer \(Claude Code, Codex history\)\. They are not listed until you import them\.$/);
         await ev(`import((window.__coralStatic || '/static/') + 'mailbox_chats.js').then(m => m.chatsSpec('chats', { query: '', params: {}, redraw() {}, after() {} }).empty.action.run())`);
         await settle(300);
         assert.equal(await ev('window.__posts'), 1, 'the button imports once');
@@ -38,7 +38,7 @@ const BASE = require('./test_base').BASE;
         await banner(); await settle(800);
         const withRows = await banner();
         assert.equal(withRows.rows, 1, JSON.stringify(withRows));
-        assert.match(withRows.text, /^40 earlier chats were found on this computer \(Claude Code, Codex\)\..*Import 40 earlier chats from Claude Code, Codex$/, withRows.text);
+        assert.match(withRows.text, /^40 earlier chats were found on this computer \(Claude Code, Codex history\)\..*Import 40 earlier chats from Claude Code, Codex$/, withRows.text);
         // With a search or a filter active the offer is not drawn above the result list (it is the whole folder's, not the search's).
         const probeS = () => ev(`import((window.__coralStatic || '/static/') + 'mailbox_chats.js').then(m => { const sp = m.chatsSpec('chats', { query: 'my', params: {}, redraw() {}, after() {} }); const n = sp.rows.length ? sp.node() : null; return { rows: sp.rows.length, banner: !!(n && n.querySelector('.chat-import-line')) }; })`);
         const probeF = () => ev(`import((window.__coralStatic || '/static/') + 'mailbox_chats.js').then(m => { const sp = m.chatsSpec('chats', { query: '', params: { source_types: 'claude' }, redraw() {}, after() {} }); const n = sp.rows.length ? sp.node() : null; return { banner: !!(n && n.querySelector('.chat-import-line')) }; })`);

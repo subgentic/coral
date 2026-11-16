@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { installDom, importUi } from './helpers/jsdom_env.mjs';
 
 installDom();
-const { snippetOf, taskRefs, tagsOf, dayLabel, sameDay, rowParts, toggleRow, isRowOpen } = await importUi('board_table');
+const { snippetOf, taskRef, tagsOf, dayLabel, sameDay, rowParts, toggleRow, isRowOpen } = await importUi('board_table');
 const { setBoardMentionNames } = await importUi('board_message_text');
 
 setBoardMentionNames(['Backend Dev', 'QA Engineer']);
@@ -20,8 +20,13 @@ assert.equal(snippetOf('> quoted line\nif a > b then'), 'quoted line if a > b th
 assert.equal(snippetOf('about ~5 items and ~~gone~~'), 'about ~5 items and gone', 'a lone tilde stays; a struck-through pair loses its marks');
 assert.equal(snippetOf('## Report 7\n\nA table:\n\n| name | value |\n|------|-------|\n| a | 1 |\n\n---\n\nAnd the end.'), 'Report 7 A table: And the end.', 'a Markdown table and a rule are no words');
 
-assert.deepEqual(taskRefs('See #7740, #7757 and #7740 again; not C#, not a#b, not http://x/#12, not #123456789'), ['7740', '7757']);
-assert.deepEqual(taskRefs('```\n#99\n```'), []);
+assert.equal(taskRef('See #7740, #7757 and #7740 again; not C#, not a#b, not http://x/#12, not #123456789'), '7740');
+assert.equal(taskRef('```\n#99\n```'), '');
+// #17339: a message number is not a task: "Open task #25" opened the message. A number after "task" comes first; one after message / msg / post / reply / comment is skipped.
+assert.equal(taskRef('Replying to message #25: task #2 is done'), '2', 'the task, not the message');
+assert.equal(taskRef('see msg #25 and #7'), '7', 'a bare number still counts, a msg number does not');
+assert.equal(taskRef('Reply to #25 about #4, then task #2'), '4', 'the message number is skipped');
+assert.equal(taskRef('post #3'), '', 'only a message number: no task');
 
 const t = tagsOf({ content: 'Question for @Backend Dev and @QA Engineer and @Orchestrator: @Operator #7757', ask: { open: ['Backend Dev'] } });
 assert.deepEqual(t.mentions.map(m => m.name), ['Backend Dev', 'QA Engineer', 'Orchestrator', 'Operator']); assert.equal(t.task, '7757'); assert.equal(t.ask, true); assert.equal(t.mine, true);

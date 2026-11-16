@@ -101,6 +101,14 @@ const { removeBoards } = require('./helpers/board_cleanup');
         assert.equal(sent.trust_folder, undefined, 'and nothing is trusted');
         await ev(`window.hideLaunchModal(); true`);
 
+        console.log('Ticking Trust on a folder the server refuses says why in the wizard and unticks it (#17339 F5: the refusal came only as a toast after Launch)');
+        await open(); await ev(`window.__probeMode = 'refused'; true`); await setDir('/private/tmp/shared-folder', false);
+        await ev(`document.getElementById('launch-team-trust').click(); true`);
+        await waitFor(`document.getElementById('launch-team-trust').checked === false && /shared or shallow folder/.test(document.getElementById('launch-team-trust').closest('.sv-row').textContent)`, 'the switch is unticked and the row says why before Launch', 4000);
+        sent = await go();
+        assert.equal(sent.trust_folder, undefined, 'nothing is sent to trust it');
+        await ev(`window.__probeMode = ''; window.hideLaunchModal(); true`);
+
         console.log('A switch that is on without the person having ticked it for this folder, or that is hidden, sends nothing');
         await open(); await setDir('/home/p/Code/app', false);
         await ev(`document.getElementById('launch-team-trust').checked = true; true`); // on, with no change event: not the person's tick for this folder
