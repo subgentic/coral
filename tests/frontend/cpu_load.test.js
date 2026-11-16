@@ -34,6 +34,15 @@ const pidsOf = out => out.trim().split(/\s+/).filter(Boolean).map(Number);
         assert.equal(capped.length, 2);
         assert.ok(await until(() => capped.every(p => !alive(p)), 6000), 'the loops stop after SECONDS at most');
 
+        // 2b. a loop killed early takes its watcher with it (within a second or two): the watcher never lives on to signal a PID that was reused (#18223)
+        const early = spawnSync('sh', [SH, '2', '4321'], { encoding: 'utf8' });
+        const earlyP = track(pidsOf(early.stdout));
+        assert.equal(earlyP.length, 2);
+        const watchers = () => spawnSync('ps', ['-axo', 'pid,command'], { encoding: 'utf8' }).stdout.split('\n').filter(l => l.includes('cpu_load.sh 2 4321') && !l.includes(' ps '));
+        assert.ok(watchers().length >= 4, 'two loops and two watchers run: ' + watchers().length);
+        for (const p of earlyP) process.kill(p, 'SIGKILL');
+        assert.ok(await until(() => watchers().length === 0, 4000), 'the watchers stop once their loops are gone: ' + watchers().join(' | '));
+
         // 3. an explicit owner PID that is not running: they stop at the first check
         const dead = spawnSync('sh', ['-c', 'true'], {});
         const gone = spawnSync('sh', [SH, '1', '600', String(dead.pid || 999999)], { encoding: 'utf8' });
