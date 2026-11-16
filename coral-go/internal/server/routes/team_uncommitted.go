@@ -99,7 +99,7 @@ func (h *SessionsHandler) teamRepoFolders(ctx context.Context, team *store.Team)
 }
 
 func repoUncommitted(ctx context.Context, folder string) (uncommittedRepo, bool) {
-	changed, added, truncated, err := gitutil.Uncommitted(ctx, folder)
+	changed, added, renamedFrom, truncated, err := gitutil.UncommittedRenames(ctx, folder)
 	if err != nil || len(changed)+len(added) == 0 {
 		return uncommittedRepo{}, false
 	}
@@ -108,7 +108,7 @@ func repoUncommitted(ctx context.Context, folder string) (uncommittedRepo, bool)
 		if len(r.Files) < maxUncommittedShown {
 			r.Files = append(r.Files, uncommittedFile{Path: p, Status: "changed"})
 		}
-		if secretLikeName(p) {
+		if secretLikeName(p) || secretLikeName(renamedFrom[p]) { // a rename of a secret-looking file is named too: the commit leaves it out (#17608)
 			r.SecretLike = append(r.SecretLike, p)
 		}
 	}
@@ -116,7 +116,7 @@ func repoUncommitted(ctx context.Context, folder string) (uncommittedRepo, bool)
 		if len(r.Files) < maxUncommittedShown {
 			r.Files = append(r.Files, uncommittedFile{Path: p, Status: "new"})
 		}
-		if secretLikeName(p) {
+		if secretLikeName(p) || secretLikeName(renamedFrom[p]) { // a rename of a secret-looking file is named too: the commit leaves it out (#17608)
 			r.SecretLike = append(r.SecretLike, p)
 		}
 	}
@@ -199,11 +199,12 @@ func (h *SessionsHandler) TeamCommit(w http.ResponseWriter, r *http.Request) {
 	}
 	var paths, oldNames []string
 	for _, p := range append(changed, added...) {
-		if !body.IncludeSecretLike && secretLikeName(p) {
+		old := renamedFrom[p]
+		if !body.IncludeSecretLike && (secretLikeName(p) || (old != "" && secretLikeName(old))) { // both names of a rename: a secret-looking file renamed to a plain name is left out whole, not committed as a removal (#17608)
 			continue
 		}
 		paths = append(paths, p)
-		if old := renamedFrom[p]; old != "" { // a staged rename: the old name's removal is part of the same change (committed with it; git add has nothing to stage for a name that is already gone)
+		if old != "" { // a staged rename: the old name's removal is part of the same change (committed with it; git add has nothing to stage for a name that is already gone)
 			oldNames = append(oldNames, old)
 		}
 	}

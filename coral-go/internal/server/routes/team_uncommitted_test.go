@@ -161,3 +161,22 @@ func TestTeamCommitOfAStagedRenameIncludesTheOldName(t *testing.T) {
 	assert.Contains(t, uncGit(t, dir, "show", "--name-status", "--format=", "HEAD"), "tip.js", "the old name's removal is in the commit")
 	assert.NotContains(t, uncGit(t, dir, "status", "--porcelain"), "tip.js")
 }
+
+// #17608 (QA's SHOULD on #17284): both names of a rename go through the secret-looking check. A secret-looking file renamed to a plain name is named in the list and left out of the commit whole (the removal of
+// its old name is not committed on its own); with the box ticked it goes in.
+func TestTeamCommitLeavesOutASecretLookingFileRenamedToAPlainName(t *testing.T) {
+	base, ts := uncommittedServer(t)
+	name, dir := teamWithWork(t, ts)
+	uncGit(t, dir, "add", ".env")
+	uncGit(t, dir, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "oops")
+	uncGit(t, dir, "mv", ".env", "settings.txt")
+	code, body := sendJSON(t, http.MethodGet, base+"/api/teams/detail/"+name+"/uncommitted", nil)
+	require.Equal(t, http.StatusOK, code, "%v", body)
+	assert.Contains(t, body["repos"].([]any)[0].(map[string]any)["secret_like"], "settings.txt", "the renamed file is named as secret-looking")
+	code, body = sendJSON(t, http.MethodPost, base+"/api/teams/detail/"+name+"/commit", map[string]any{"folder": dir, "message": "work"})
+	require.Equal(t, http.StatusOK, code, "%v", body)
+	committed := uncGit(t, dir, "show", "--name-status", "--format=", "HEAD")
+	assert.NotContains(t, committed, ".env", "the old name's removal is not committed alone")
+	assert.NotContains(t, committed, "settings.txt")
+	assert.Contains(t, uncGit(t, dir, "status", "--porcelain"), "settings.txt", "the rename stays as it was")
+}
