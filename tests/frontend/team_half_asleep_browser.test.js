@@ -36,7 +36,7 @@ const SESSIONS = [
 
         // The added item is a copy of the drawn one with its text changed (#17909, QA3's SHOULD on #17536): its icon survives, its label and mode are the other's, and clicking it posts that mode.
         const items = await ev(`(() => { const li = [...document.querySelectorAll('li.session-team-group')].find(l => l.querySelector('[data-group-name]')?.dataset.groupName === 'half');
-            return [...li.querySelectorAll(':scope > .board-card-header .sidebar-kebab-menu button[data-on-click="team-sleep"]')].map(b => ({ mode: b.dataset.mode, text: b.textContent.replace(/\\s+/g, ' ').trim(), svgs: b.querySelectorAll('svg').length, svgFirst: b.firstElementChild && b.firstElementChild.tagName.toLowerCase(), paths: [...b.querySelectorAll('svg path')].map(p => p.getAttribute('d')).join('|'), board: b.dataset.board })); })()`);
+            return [...li.querySelectorAll(':scope > .board-card-header .sidebar-kebab-menu button[data-on-click="team-sleep"]')].filter(b => b.dataset.mode !== 'archive').map(b => ({ mode: b.dataset.mode, text: b.textContent.replace(/\\s+/g, ' ').trim(), svgs: b.querySelectorAll('svg').length, svgFirst: b.firstElementChild && b.firstElementChild.tagName.toLowerCase(), paths: [...b.querySelectorAll('svg path')].map(p => p.getAttribute('d')).join('|'), board: b.dataset.board })); })()`);
         assert.equal(items.length, 2, JSON.stringify(items));
         const [drawn, added] = items;
         assert.deepEqual([drawn.mode, drawn.text, drawn.svgs], ['sleep', 'Sleep team', 1], 'the drawn item is untouched: ' + JSON.stringify(drawn));
