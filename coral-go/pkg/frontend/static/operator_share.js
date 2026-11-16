@@ -62,7 +62,7 @@ export function mountOperatorShare(root, ctx) {
     S.choose = () => { if (S.live && !S.busy) input.click(); }; // the More menu's "Upload a file"
     S.attach = () => { // the + beside the search box, the status row above the list and the target over it (again, for an agent that has a team after one that had none, and after the bar is drawn)
         S.live = true;
-        if (teamMode) { if (!pick.isConnected) { row.prepend(pick, desc); } }
+        if (teamMode) { const search = root.querySelector('.list-bar-search-row .list-bar-search-wrap'); if (search) { if (pick.previousElementSibling !== search) search.after(pick); } else if (!pick.isConnected) row.prepend(pick, desc); if (!desc.isConnected) row.append(desc); }
         else {
             const search = root.querySelector('.list-bar-search-row .list-bar-search-wrap');
             if (search && pick.previousElementSibling !== search) { search.after(pick); pick.after(desc); }

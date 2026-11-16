@@ -48,7 +48,7 @@ export function artifactTable(cfg) {
         ...(cfg.showUploader ? [{ key: 'uploader', label: 'Uploaded by', width: '9rem', drop: 1, sort: true, sortValue: uploaderText, cell: item => { const text = uploaderText(item) || '—', node = isOperatorUpload(item) ? DT.tag(text) : DT.el('span', '', text); DT.tipIf(node, text, () => node.parentElement.scrollWidth > node.parentElement.clientWidth); return node; } }] : []),
         ...(cfg.afterName || []), // the Inbox's list spans teams and computers: its Team (or Server) column, which drops with the optional ones
         { key: 'type', label: 'Type', width: '6.5rem', dropAt: 36, tone: 'tertiary', sort: true, sortValue: typeText, cell: i => isUnverified(i) ? '—' : DT.tag(typeText(i)) },
-        { key: 'tags', label: 'Tags', width: '16rem', dropAt: cfg.tagsDropAt || 52, sort: true, sortValue: i => (i.tags || []).join(', '), cell: i => Tags.rowTags(i.tags) || '—' },
+        { key: 'tags', label: 'Tags', width: cfg.tagsWidth || '16rem', dropAt: cfg.tagsDropAt || 52, sort: true, sortValue: i => (i.tags || []).join(', '), cell: i => Tags.rowTags(i.tags) || '—' },
         { key: 'size', label: 'Size', width: '5rem', dropAt: 28, tone: 'tertiary', sort: 'number', firstDir: 'desc', sortValue: i => Number(i.size) || 0, align: 'end', cell: i => isUnverified(i) ? '—' : sizeText(i.size) || '—' },
         { key: 'updated', label: 'Updated', width: cfg.updatedWidth || '7.5rem', tone: 'tertiary', sort: 'date', firstDir: 'desc', sortValue: i => i.updated_at || i.created_at, cell: i => DT.timeCell(i.updated_at || i.created_at) },
         ...(cfg.details ? [{ key: 'details', label: 'Details', hideLabel: true, width: '3.75rem', cell: cfg.details }] : []),
