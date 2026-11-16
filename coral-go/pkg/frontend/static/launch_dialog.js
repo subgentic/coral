@@ -24,7 +24,7 @@ const { checkNewAgentFolder } = await importOnce('./agent_new_folder.js');
 const { _syncACFModelField, getAgentConfig, renderAgentConfigForm, cliWarningOf } = await importOnce('./agent_config_form.js');
 const { _checkPermissionFlag } = await importOnce('./cli_dialogs.js');
 const { _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards } = await importOnce('./team_dialogs.js');
-const { _initAgentPresets } = await importOnce('./persona_io.js');
+const { _initAgentPresets, _selectAgentPreset } = await importOnce('./persona_io.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
 const { markFieldInvalid, _launchBlocked, _launchOn, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, _syncMobileLaunchSections, _withServerSettings, hideLaunchModal, setLaunchMore, setLaunchStage, LAUNCH_STAGES, launchStages } = await importOnce('./launch_core.js');
 const { wireRecap, syncRecap } = await importOnce('./launch_recap.js');
@@ -116,12 +116,13 @@ function _selectLaunchType(type) {
             wizard: true, // the persona page for step 2 and three panes for step 3 (#7391)
             adopt: { persona: 'launch-persona-top', agent: 'launch-agent-provider', advanced: 'launch-advanced-extra' },
             adoptEnd: { agent: 'launch-note-slot' }, // the provider's notes have their room at the END of the Agent pane, under Thinking: nothing above it moves when a note appears (#8528)
-            value: launch.member ? launch.member.value : { agentType: _settingsFor(_effectiveServer(launch.server)).default_agent_type || 'claude' }, // a member's own values (#7861)
+            value: launch.member ? launch.member.value : { prompt: launch.welcomePrompt?.kind === 'agent' ? launch.welcomePrompt.text : '', agentType: _settingsFor(_effectiveServer(launch.server)).default_agent_type || 'claude' }, // a member's own values (#7861)
         });
         { // the skills are the agent's own choice: they sit at the end of the Agent section (step 3's first), not behind the Advanced entry of the section list, which a phone shows as a dropdown nobody opens (#12569)
             const pane = document.querySelector('#launch-agent-acf [data-section="agent"]'), skills = document.getElementById('launch-skills-row'), slot = document.getElementById('launch-note-slot');
             if (pane && skills) pane.insertBefore(skills, slot && slot.parentNode === pane ? slot : null);
         }
+        if (launch.welcomePrompt?.kind === 'agent') { const picker = document.getElementById('launch-persona-select'); if (picker) picker.value = 'Getting started'; _selectAgentPreset('Getting started'); }
         importOnce('./launch_signin_notice.js').then(m => m.mountLaunchSigninNotice({ slot: document.getElementById('launch-cli-slot'), before: document.getElementById('launch-agent-pick-label')?.parentElement, form: document.getElementById('launch-agent-acf'), server: _effectiveServer(launch.server) })).catch(e => console.error('sign-in notice', e)); // Claude not signed in is said here, with how (#11336)
         // The agent is chosen in this step, not only under More options (#6199): a radio group that follows the form's own select, the installed agents first.
         importOnce('./launch_provider_cards.js').then(m => m.buildProviderCards({ group: document.getElementById('launch-agent-pick'), form: document.getElementById('launch-agent-acf'), server: _effectiveServer(launch.server), implicitDefault: !_settingsFor(_effectiveServer(launch.server)).default_agent_type })).catch(() => {});
@@ -160,7 +161,8 @@ window._selectLaunchType = _selectLaunchType;
  * `lock` the dropdown is fixed to it (launches started from inside a remote
  * context). Default is the hub itself with a free choice.
  */
-export function showLaunchModal(server, lock = false) {
+export function showLaunchModal(server, lock = false, welcomePrompt = null) {
+    launch.welcomePrompt = welcomePrompt;
     reportLaunchDialogOpened();
     launch.mode = null;
     launch.addTo = null; // a New Agent dialog is not an Add agent one (#7778)
@@ -217,7 +219,7 @@ export function showLaunchModal(server, lock = false) {
 
 /** The approved skills, offered in New agent and New team for this computer's own launch only (#12104). */
 function _mountSkills() {
-    importOnce('./launch_skills.js').then(m => { const local = normServer(launch.server) === LOCAL_SERVER; m.mountLaunchSkills('launch-skills', local); m.mountLaunchSkills('team-skills', local); }).catch(() => {});
+    importOnce('./launch_skills.js').then(m => { const local = normServer(launch.server) === LOCAL_SERVER; m.mountLaunchSkills('launch-skills', local, launch.welcomePrompt?.kind === 'agent' ? 'getting-started-agent' : ''); m.mountLaunchSkills('team-skills', local, launch.welcomePrompt?.kind === 'team' ? 'getting-started-team' : ''); }).catch(() => {});
 }
 
 // ── Server picker (hub mode) ─────────────────────────────────────────────
