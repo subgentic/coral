@@ -53,7 +53,7 @@ func (s *JobScheduler) cleanupSettledWorktree(ctx context.Context, run store.Sch
 
 // trustRunFolder trusts the worktree a run made for itself for its agent's CLI, when the job's Trust box is ticked (#16421): exactly that one folder (IsJobRunWorktree for this run id and repository, then
 // foldertrust.CheckRunWorktree: directly inside the worktrees root once resolved, not a link, not writable by others), for Claude and Codex only. Anything else leaves the CLI's card, and a run held at it ends
-// as needing a person (heldAtPromptCode). The run's log says it was done, naming only the run's own folder.
+// as failed with its reason when its prompt is never typed (promptNotTypedCode, #17520). The run's log says it was done, naming only the run's own folder.
 func (s *JobScheduler) trustRunFolder(runID int64, job store.ScheduledJob, dir string) {
 	if job.TrustWorktree != 1 || dir == "" || s.worktreeRoot == "" || (job.JobType != "" && job.JobType != "prompt") {
 		return
