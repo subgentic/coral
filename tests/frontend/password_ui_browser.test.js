@@ -33,7 +33,7 @@ const BASE = require('./test_base').BASE;
                     calls.push({ url, body: o.body ? JSON.parse(o.body) : null });
                     const r = reply[url] || { status: 200, body: { ok: true } };
                     const resp = new Response(JSON.stringify(r.body), { status: r.status, headers: r.headers || {} });
-                    if (url === '/api/auth/password/set' && r.status === 200) status = { ...status, password_set: true };   // like the server: once a password is set the status says so, or a focus/visibility re-check re-opens the prompt over the one just closed (#18504)
+                    if (url === '/api/auth/password/set' && (r.status === 200 || r.status === 409)) status = { ...status, password_set: true };   // like the server: once a password is set the status says so, or a focus/visibility re-check re-opens the prompt over the one just closed (#18504)
                     const T = trace[trace.length] = { url, stubAt: Math.round(performance.now()) }, json = resp.json.bind(resp); // where a stuck set stops, for the failure text (#18504)
                     resp.json = () => { T.jsonAt = Math.round(performance.now()); return json().then(v => { T.doneAt = Math.round(performance.now()); return v; }); };
                     return resp;
