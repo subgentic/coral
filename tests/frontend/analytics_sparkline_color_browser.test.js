@@ -26,7 +26,7 @@ const { coralReady } = require('./helpers/wait');
                     if (url.includes('/api/token-usage/')) return json({});
                     return R(u, o); }; return true; })()`);
             await ev(`window.switchNavTab('tokens'); true`);
-            await waitFor(`document.querySelectorAll('.cost-card-sparkline svg').length >= 5`, `${tag}: the tile sparklines`, 15000);
+            await waitFor(`document.querySelectorAll('.cost-card-sparkline svg').length >= 5 && [...document.querySelectorAll('.cost-card-sparkline svg')].every(v => v.getBoundingClientRect().width > 0)`, `${tag}: the tile sparklines`, 15000);
             const d = await ev(`(() => { const one = getComputedStyle(document.documentElement).getPropertyValue('--viz-1').trim(); const hit = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
                 const sparks = [...document.querySelectorAll('.cost-card-sparkline svg')], strokes = sparks.map(s => s.querySelector('polyline').getAttribute('stroke'));
                 const over = []; for (const s of sparks) { const card = s.closest('.cost-card'), sr = s.getBoundingClientRect(); for (const t of card.querySelectorAll('*')) { if (s.contains(t) || t.contains(s) || t.closest('.cost-card-sparkline')) continue; if (![...t.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue; const r = t.getBoundingClientRect(); if (r.width && r.height && hit(r, sr)) over.push((card.querySelector('.cost-card-label') || {}).textContent + ': ' + t.textContent.trim().slice(0, 20)); } }
