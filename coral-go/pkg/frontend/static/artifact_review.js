@@ -95,7 +95,7 @@ const shown = name => markHidden(name, { strict: true }); // the uploader's file
 const begin = () => { const h = { table: null }; document.dispatchEvent(new CustomEvent('coral:action-start', { detail: h })); return h; };
 const finish = h => document.dispatchEvent(new CustomEvent('coral:action-result', { detail: h }));
 const settled = (row, h) => importOnce('./inbox_reviews.js').then(m => { m.settleReview(row); return m.refreshReviews(true); }).catch(() => {}).then(() => finish(h));
-const fromWords = out => (out.delivered && out.asleep ? `${out.to} is asleep: it will see this when it wakes.` : out.delivered ? `${out.to} was told.` : out.reason === 'no_uploader' ? 'No agent is recorded for it, so nobody was told.' : '');
+const fromWords = out => (out.delivered && out.asleep ? `${out.to || 'The agent'} is asleep: it will see this when it wakes.` : out.delivered ? `${out.to || 'The agent'} was told.` : out.reason === 'no_uploader' ? 'No agent is recorded for it, so nobody was told.' : '');
 const earlierFailure = out => {
     const info = out?.earlier;
     if (!info?.failed) return '';
@@ -196,8 +196,8 @@ export function sayApproved(rawName, out) {
     const name = shown(rawName);
     if (out.earlier && out.earlier.failed && out.earlier.reason) showToast(`Approved ${name}, but ${out.earlier.reason} Earlier versions may remain in Needs you.`, true);
     else if (out.earlier && out.earlier.failed) showToast(`Approved ${name}, but ${out.earlier.failed} earlier version${out.earlier.failed === 1 ? '' : 's'} could not be cleared: ${out.earlier.failed === 1 ? 'it' : 'they'} stay${out.earlier.failed === 1 ? 's' : ''} in Needs you.`, true);
-    else if (out.delivered && out.asleep) showToast(`Approved. ${out.to} is asleep: it will see this when it wakes.`);
-    else if (out.delivered) showToast(`Approved. ${out.to} was told.`);
+    else if (out.delivered && out.asleep) showToast(`Approved. ${out.to || 'The agent'} is asleep: it will see this when it wakes.`);
+    else if (out.delivered) showToast(`Approved. ${out.to || 'The agent'} was told.`); // a delivery with no recorded name says 'The agent' (#18778)
     else if (out.reason === 'no_uploader') showToast(`Approved ${name}. No agent is recorded for it, so nobody was told.`);
     else showToast(`Approved ${name}.`);
 }

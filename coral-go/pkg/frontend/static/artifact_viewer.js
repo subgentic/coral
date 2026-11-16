@@ -191,6 +191,7 @@ function _build() {
     // the line under the header (who sent it, what they ask) is one cut line; a tap, Enter or Space shows all of it
     const fromEl = d.querySelector('.artifact-viewer-from'); fromEl.tabIndex = 0; fromEl.setAttribute('role', 'button'); fromEl.setAttribute('aria-expanded', 'false');
     const flipFrom = () => { const on = !fromEl.classList.contains('is-open'); fromEl.classList.toggle('is-open', on); fromEl.setAttribute('aria-expanded', String(on)); };
+    new ResizeObserver(() => { if (!fromEl.hidden && !fromEl.classList.contains('is-open') && fromEl.clientWidth < 64) fromEl.classList.add('is-below'); }).observe(fromEl); // a line squeezed to a stub by the header's other controls takes a line of its own (#18778)
     fromEl.addEventListener('click', flipFrom); fromEl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipFrom(); } });
     d.querySelector('.artifact-viewer-fullscreen').addEventListener('click', () => setFullScreen(d, !d.classList.contains('av-fullscreen'), true));
     d.querySelector('.artifact-viewer-fullscreen-item').addEventListener('click', () => setFullScreen(d, !d.classList.contains('av-fullscreen'), true));
@@ -466,7 +467,7 @@ export function openArtifactViewer(hex, opts = {}) {
     title.textContent = visibleName(opts.filename) || 'Artifact'; // the uploader's text, without what hides or reorders it (Security on #220)
     // A long name is cut with an ellipsis (#13979): the heading keeps its text; a name that is cut holds a button (focusable, aria-expanded, Enter, Space, a tap or a click) that shows it whole. A name that fits has no extra Tab stop.
     const nameEl = document.createElement('span'); nameEl.className = 'artifact-viewer-title-name'; nameEl.textContent = title.textContent; title.replaceChildren(nameEl); title.title = nameEl.textContent; title.classList.remove('is-open');
-    const fromLine = d.querySelector('.artifact-viewer-from'); fromLine.textContent = visibleName(opts.from) || ''; fromLine.hidden = !fromLine.textContent; fromLine.title = fromLine.textContent; fromLine.classList.remove('is-open'); fromLine.setAttribute('aria-expanded', 'false'); d.querySelector('.artifact-viewer-sandbox').hidden = true; d._markUp.picture(false); d._markUp.write(false); // who uploaded a file opened for review (#11456), as text
+    const fromLine = d.querySelector('.artifact-viewer-from'); fromLine.textContent = visibleName(opts.from) || ''; fromLine.hidden = !fromLine.textContent; fromLine.title = fromLine.textContent; fromLine.classList.remove('is-open', 'is-below'); fromLine.setAttribute('aria-expanded', 'false'); d.querySelector('.artifact-viewer-sandbox').hidden = true; d._markUp.picture(false); d._markUp.write(false); // who uploaded a file opened for review (#11456), as text
     const sourceNote = d.querySelector('.artifact-viewer-source'); sourceNote.hidden = !!opts.sourceNamed; sourceNote.textContent = '';
     if (!opts.sourceNamed) { const computer = (state.servers || []).find(s => s.id === opts.server), name = opts.server === 'local' ? 'this computer' : (computer?.label || computer?.name || opts.server); sourceNote.textContent = `Viewing from ${markHidden(name, { strict: true })}. Source inferred; read only.`; }
     const dl = d.querySelector('.artifact-viewer-download');

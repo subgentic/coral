@@ -145,6 +145,9 @@
 
 /* "Who can read this" (artifact_readers.js): a small disclosure under the viewer's header and in an Artifacts row's details. */
 .artifact-viewer-from { flex: 1 1 0; min-width: 0; padding: 0; font-size: var(--fs-sm); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; } /* who sent it and what they ask: in the header row after the name, one line, a tap shows all of it (#12725) */
+/* The sender line squeezed to a clipped 'D…' beside a short name moves to a line of its own under the row, as on a phone (#18778; artifact_viewer.js adds is-below). */
+.artifact-viewer-header:has(.artifact-viewer-from.is-below) { flex-wrap: wrap; row-gap: 0; }
+.artifact-viewer-header .artifact-viewer-from.is-below { flex: 1 1 100%; order: 9; }
 @media (max-width: 767px) { .artifact-viewer-header .artifact-viewer-from { flex: 1 1 100%; order: 9; } } /* a phone's row has no room beside the name: its own line under it, still part of the header */
 .artifact-viewer-from[hidden] { display: none; }
 .artifact-viewer-readers { flex: none; padding: 0 16px; }
