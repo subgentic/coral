@@ -18,7 +18,7 @@ const BASE = require('./test_base').BASE;
             const host = ${where}; if (!host) return 'no such place';
             const row = document.createElement('div'); row.className = 'sv-row'; const i = document.createElement('input'); i.type = 'text'; i.required = true; i.id = 'probe-' + Math.random().toString(36).slice(2); i.value = 'a'; row.append(i); host.append(row);
             i.focus(); i.dispatchEvent(new FocusEvent('focusin', { bubbles: true })); i.value = ''; i.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
-            await new Promise(r => setTimeout(r, 400));
+            await new Promise(r => setTimeout(r, 400)); // sleep-ok: the probe waits out the autosave's own debounce, there is no event to wait for when it saves nothing
             const s = row.querySelector('.settings-save-status'); const out = s ? s.textContent : ''; row.remove(); return out; })()`);
         assert.match(await probe(`document.getElementById('settings-pane-general')`), /Not saved/, 'the probe sees autosave in a marked pane (the control)');
         const bad = [];

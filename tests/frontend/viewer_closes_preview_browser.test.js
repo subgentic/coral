@@ -15,7 +15,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(STUB);
         await ev(`window.__m.add('coral-go', 'm', 6, { sleeping: false, session_id: 'o1' }); true`);
-        await new Promise(r => setTimeout(r, 600));
+        await new Promise(r => setTimeout(r, 600)); // sleep-ok: the first live list renders from several answers
         await ev(`window.selectLiveSession('coral-go', 'claude', 'o1', 'local'); true`);
         await waitFor(`!!document.getElementById('command-input')`, 'the agent is selected', 10000);
 
