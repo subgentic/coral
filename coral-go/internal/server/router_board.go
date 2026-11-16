@@ -23,6 +23,7 @@ func (s *Server) registerBoard(r *chi.Mux, h *routeHandlers) {
 	boardHandler.SetAgentAsks(agentAsks.Rows)
 	r.With(routes.RefuseSignInLink).Post("/api/agent-asks", agentAsks.Create) // text and options the Operator reads: no sign-in link (#232, the server side)
 	r.With(routes.RefuseSignInLink).Post("/api/agent-asks/{id}/answer", agentAsks.Answer)
+	r.Post("/api/agent-asks/{id}/dismiss", agentAsks.Dismiss)
 	r.Post("/api/agent-asks/{id}/images", agentAsks.UploadImage)                    // the Operator's picture for the answer, kept as the asking agent's artifact
 	r.With(routes.RefuseSignInLink).Post("/api/notifications", notifHandler.Create) // text people read: no sign-in link (#232, the server side)
 	s.registerBoardAPI(r, boardHandler, h.sess)

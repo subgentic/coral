@@ -26,6 +26,7 @@ func TestSingleAgentAskReachesNeedsYouAndTheAnswerReachesTheAgent(t *testing.T) 
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
 	h := NewAgentAsksHandler(store.NewSessionStore(db), nil)
+	liveAgent(t, store.NewSessionStore(db), owner("0001"))
 	var typed []string
 	h.deliver = func(_ context.Context, _ ptymanager.SessionTerminal, name, _, _, text, _ string) error {
 		typed = append(typed, name+"|"+text)
@@ -76,6 +77,12 @@ func TestSingleAgentAskReachesNeedsYouAndTheAnswerReachesTheAgent(t *testing.T) 
 	assert.Equal(t, http.StatusConflict, post("/api/agent-asks/1/answer", `{"answer":"x"}`, false).Code, "an answered or replaced question is not answered twice")
 }
 
+// liveAgent registers the asking agent's session: a question whose agent is gone leaves Needs you by itself (#18668).
+func liveAgent(t *testing.T, ss *store.SessionStore, o *store.SessionTokenOwner) {
+	t.Helper()
+	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: o.SessionID, AgentType: "claude", AgentName: "claude"}))
+}
+
 func askIDText(n int64) string { return strconv.FormatInt(n, 10) }
 
 // The Operator's answer is typed as one flat line: a newline and a leading slash command in it do not reach the terminal as typed (#18106).
@@ -122,6 +129,7 @@ func TestAPictureForASingleAgentsQuestionIsStoredWithThatAgent(t *testing.T) {
 	h := NewAgentAsksHandler(ss, nil)
 	h.SetCoralDir(t.TempDir())
 	o := owner("0001")
+	liveAgent(t, ss, o)
 	id, err := ss.CreateAgentAsk(context.Background(), o.SessionID, o.SessionName, "Which logo?", nil, time.Now())
 	require.NoError(t, err)
 	up := func(id int64, body []byte, agent bool) *httptest.ResponseRecorder {
@@ -155,6 +163,7 @@ func TestAnAnswerToASingleAgentIsTypedOnce(t *testing.T) {
 	ss := store.NewSessionStore(db)
 	h := NewAgentAsksHandler(ss, nil)
 	o := owner("0001")
+	liveAgent(t, ss, o)
 	id, err := ss.CreateAgentAsk(context.Background(), o.SessionID, o.SessionName, "Which?", nil, time.Now())
 	require.NoError(t, err)
 	answer := func(text string) *httptest.ResponseRecorder {
@@ -188,4 +197,48 @@ func TestAnAnswerToASingleAgentIsTypedOnce(t *testing.T) {
 	open, err := ss.OpenAgentAsk(context.Background(), id)
 	require.NoError(t, err)
 	assert.NotNil(t, open, "a failed delivery gives the question back")
+}
+
+// #18668: Dismiss closes the question and tells the agent once; Undo gives it back without telling again; a question whose agent has exited drops off the list by itself.
+func TestDismissingASingleAgentsQuestionTellsTheAgentAndAnExitedAgentsQuestionDropsOff(t *testing.T) {
+	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "a.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	ss := store.NewSessionStore(db)
+	h := NewAgentAsksHandler(ss, nil)
+	o := owner("0001")
+	liveAgent(t, ss, o)
+	var typed []string
+	h.deliver = func(_ context.Context, _ ptymanager.SessionTerminal, _, _, _, text, _ string) error {
+		typed = append(typed, text)
+		return nil
+	}
+	id, err := ss.CreateAgentAsk(context.Background(), o.SessionID, o.SessionName, "Approve the logo?", []string{"Approve"}, time.Now())
+	require.NoError(t, err)
+	dismiss := func(id int64, body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/agent-asks/"+askIDText(id)+"/dismiss", strings.NewReader(body))
+		req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+		rec := httptest.NewRecorder()
+		rr := chi.NewRouter()
+		rr.Post("/api/agent-asks/{id}/dismiss", h.Dismiss)
+		rr.ServeHTTP(rec, req)
+		return rec
+	}
+	list := func() []operatorAskRow { return h.Rows(httptest.NewRequest(http.MethodGet, "/", nil)) }
+	require.Len(t, list(), 1)
+	assert.Equal(t, http.StatusOK, dismiss(id, `{}`).Code)
+	assert.Empty(t, list(), "dismissed: off the list")
+	require.Len(t, typed, 1)
+	assert.Contains(t, typed[0], "dismissed your question")
+	assert.Equal(t, http.StatusConflict, dismiss(id, `{}`).Code, "not dismissed twice, the agent not told twice")
+	assert.Len(t, typed, 1)
+	assert.Equal(t, http.StatusOK, dismiss(id, `{"undo":true}`).Code)
+	assert.Len(t, list(), 1, "Undo puts it back")
+	assert.Len(t, typed, 1, "and tells the agent nothing more")
+
+	require.NoError(t, ss.UnregisterLiveSession(context.Background(), o.SessionID))
+	assert.Empty(t, list(), "its agent has exited: the question drops off by itself")
+	open, err := ss.OpenAgentAsk(context.Background(), id)
+	require.NoError(t, err)
+	assert.Nil(t, open, "and is closed")
 }

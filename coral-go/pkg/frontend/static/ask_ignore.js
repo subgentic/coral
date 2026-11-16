@@ -9,6 +9,12 @@ import { serverFetch } from './server_base.js';
 const NOTE = 'Dismissed by the operator';
 
 async function close(a, body) {
+    if (a.kind === 'agent') { // a single agent's question (#18668): its own route; the agent is told it was dismissed
+        const r = await serverFetch(a.server, `/api/agent-asks/${encodeURIComponent(a.id)}/dismiss`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body.undo ? { undo: true } : {}) });
+        if (r.ok) return;
+        let why = ''; try { const b = await r.json(); why = b.message || b.error || ''; } catch { /* not JSON */ }
+        throw new Error(why || `Could not save (HTTP ${r.status}).`);
+    }
     const r = await serverFetch(a.server, `/api/board/${encodeURIComponent(a.board)}/asks/${encodeURIComponent(a.id)}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (r.ok) return;
     let why = '', code = ''; try { const b = await r.json(); why = b.message || b.error || ''; code = b.code || b.error || ''; } catch { /* not JSON */ }

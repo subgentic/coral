@@ -308,6 +308,7 @@ PATCH /api/sessions/live/{name}/notes/{noteID} interact
 PATCH /api/sessions/live/{name}/tasks/{taskID} interact
 POST /api/agent-asks never
 POST /api/agent-asks/{id}/answer never
+POST /api/agent-asks/{id}/dismiss never
 POST /api/agent-asks/{id}/images never
 POST /api/agent/artifacts never
 POST /api/agent/skills never

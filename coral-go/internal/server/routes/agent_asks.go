@@ -23,6 +23,7 @@ import (
 //
 //	POST /api/agent-asks             the agent's own token: {text, options?: up to 3 labels} -> {id}
 //	POST /api/agent-asks/{id}/answer the Operator: {answer} -> typed into the agent, the question closed
+//	POST /api/agent-asks/{id}/dismiss the Operator: {} -> the question leaves Needs you and the agent is told it was dismissed; {undo:true} puts it back
 //	POST /api/agent-asks/{id}/images the Operator: one picture for the reply -> stored as that agent's artifact ({hex, uri, name, content_type, size}); the reply names it as coral://artifacts/<hex>
 
 const agentAskOptionsMax = 3
@@ -181,14 +182,72 @@ func (h *AgentAsksHandler) Answer(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
+// Dismiss closes a question with no answer and tells the agent so (it would wait for one forever, #18668); undo:true gives it back to the Operator (the agent was told once, and is not told again).
+func (h *AgentAsksHandler) Dismiss(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) || refuseUnlessPerson(w, r, "dismiss an agent's question") {
+		return
+	}
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || id <= 0 {
+		errBadRequest(w, "invalid id")
+		return
+	}
+	var body struct {
+		Undo bool `json:"undo"`
+	}
+	if r.ContentLength != 0 {
+		if err := decodeJSONMax(w, r, &body, 1<<10); err != nil {
+			errBadRequest(w, "invalid JSON")
+			return
+		}
+	}
+	if body.Undo {
+		if err := h.ss.ReopenAgentAsk(r.Context(), id); err != nil {
+			errInternalServer(w, "could not bring the question back")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		return
+	}
+	ask, err := h.ss.OpenAgentAsk(r.Context(), id)
+	if err != nil {
+		errInternalServer(w, "could not read the question")
+		return
+	}
+	if ask == nil {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "not_open", "message": "That question is already answered or was replaced."})
+		return
+	}
+	if claimed, err := h.ss.CloseAgentAsk(r.Context(), id, time.Now()); err != nil || !claimed {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "not_open", "message": "That question is already answered or was replaced."})
+		return
+	}
+	agentType, sessionID := logparse.ParseSessionName(ask.SessionName)
+	text := "[Coral] The Operator dismissed your question " + board.TypedText(clipRunes(ask.Text, 80)) + " without answering it. Do not wait for an answer: carry on, or ask again if you still need one."
+	_ = h.deliver(r.Context(), h.term, ask.SessionName, agentType, sessionID, text, "operator dismissed") // best effort: the agent may be gone, and the question is closed either way
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
 // Rows are the open questions as GET /api/operator-asks rows.
 func (h *AgentAsksHandler) Rows(r *http.Request) []operatorAskRow {
 	list, err := h.ss.OpenAgentAsks(r.Context())
 	if err != nil {
 		return nil
 	}
+	live := map[string]bool{}
+	if sessions, err := h.ss.GetAllLiveSessions(r.Context()); err == nil {
+		for _, s := range sessions {
+			live[s.SessionID] = true // asleep counts: it is answered once woken
+		}
+	} else {
+		live = nil // cannot tell: nothing is dropped
+	}
 	rows := make([]operatorAskRow, 0, len(list))
 	for _, a := range list {
+		if live != nil && !live[a.SessionID] { // its agent has exited: nobody is left to read an answer, so the question leaves Needs you by itself (#18668)
+			_, _ = h.ss.CloseAgentAsk(r.Context(), a.ID, time.Now())
+			continue
+		}
 		text, cut := operatorAskText(a.Text) // the choices are buttons now (Options), not text in the question
 		asker := a.SessionName
 		if _, sid := logparse.ParseSessionName(a.SessionName); sid != "" {

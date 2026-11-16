@@ -100,6 +100,7 @@ var activityNotAnInboxAction = map[string]string{
 	"PATCH /api/sessions/live/{name}/notes/{noteID}":                       "an agent's own page: its controls, notes and tasks, not the Inbox",
 	"PATCH /api/sessions/live/{name}/tasks/{taskID}":                       "an agent's own page: its controls, notes and tasks, not the Inbox",
 	"POST /api/agent-asks":                                                 "an agent's own call: no person's click",
+	"POST /api/agent-asks/{id}/dismiss":                                    "the Operator dismisses the agent's question; the question leaves Needs you (#18668)",
 	"POST /api/agent-asks/{id}/images":                                     "a picture for the answer being written: the answer itself (agent-asks answer) is the click",
 	"POST /api/agent-asks/{id}/answer":                                     "the Operator answers the agent in its conversation; the question leaves Needs you (#18106)",
 	"POST /api/agent/artifacts":                                            "an agent's own call: no person's click",
