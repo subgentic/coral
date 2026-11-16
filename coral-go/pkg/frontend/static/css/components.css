@@ -4016,8 +4016,9 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .cli-dialog-text-roomy { margin-bottom: 16px; }
 .cli-dialog-command { display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-family: var(--font-mono); font-size: var(--fs-md); background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-md); }
 .cli-dialog-command code { flex: 1; user-select: all; }
-.cli-dialog-alt { margin: 10px 0 0; font-size: var(--fs-md); }
-.cli-dialog-alt a { color: var(--link-text); overflow-wrap: anywhere; }
+.cli-dialog-link { margin: 10px 0 0; font-size: var(--fs-md); }
+.cli-dialog-link a { color: var(--link-text); overflow-wrap: anywhere; }
+.cli-dialog-advanced { margin: 10px 0 0; }
 .cli-dialog-note { margin: 8px 0 0; font-size: var(--fs-base); line-height: var(--lh-body); color: var(--text-secondary); }
 .cli-dialog-actions { margin-top: 16px; }
 .cli-dialog-actions-tight { gap: 8px; }
