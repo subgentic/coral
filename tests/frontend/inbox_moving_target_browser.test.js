@@ -1,8 +1,10 @@
 // #16616: a press must not activate a control that reflows during the gesture.
 const assert=require('node:assert/strict');
 const {connect}=require('./agent_view_harness');
-const {coralReady}=require('./helpers/wait');
+const {coralReady,framesJs}=require('./helpers/wait');
 const BASE=require('./test_base').BASE;
+// #18532: a redelivered click is queued (setTimeout 0 after the lift); read 'not activated' only after it could have landed, or a broken guard passes
+const later=ev=>ev(framesJs(3));
 (async()=>{const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();try{
  await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
  for(const width of [1280,390]){
@@ -17,6 +19,7 @@ const BASE=require('./test_base').BASE;
  await ev(`document.getElementById('moving-card-action').style.setProperty('top','180px','important');true`);
  await waitFor(`document.getElementById('moving-card-action').getBoundingClientRect().y===180`,'control actually moved during press');
  await mouse.dispatchMouseEvent({type:'mouseReleased',x:120,y:190,button:'left',clickCount:1});
+ await later(ev);
  assert.equal(await ev(`window.__opened`),0,`${width}: moving Inbox target must not activate: ${JSON.stringify(await ev('window.__pressTrace'))}`);
  await mouse.dispatchMouseEvent({type:'mousePressed',x:120,y:210,button:'left',clickCount:1});
  await mouse.dispatchMouseEvent({type:'mouseReleased',x:120,y:210,button:'left',clickCount:1});
@@ -33,11 +36,13 @@ const BASE=require('./test_base').BASE;
  await mouse.dispatchMouseEvent({type:'mousePressed',x:120,y:210,button:'left',clickCount:1});
  await replace('Delete agent');
  await mouse.dispatchMouseEvent({type:'mouseReleased',x:120,y:210,button:'left',clickCount:1});
+ await later(ev);
  assert.equal(await ev(`window.__opened`),before,`${width}: a different control swapped in is never activated`);
  await replace('Open agent');
  await mouse.dispatchMouseEvent({type:'mousePressed',x:120,y:210,button:'left',clickCount:1});
  await replace('Open agent',40);
  await mouse.dispatchMouseEvent({type:'mouseReleased',x:120,y:210,button:'left',clickCount:1});
+ await later(ev);
  assert.equal(await ev(`window.__opened`),before,`${width}: the same label swapped in but moved more than 4 px is not activated`);
  await replace('Open agent');
  await ev(`document.getElementById('moving-card-action').focus();true`);
