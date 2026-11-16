@@ -13,6 +13,7 @@ import (
 
 	"github.com/subgentic/coral/internal/clierr"
 	"github.com/subgentic/coral/internal/clihelp"
+	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/taskcli"
 )
 
@@ -279,6 +280,9 @@ func cmdTaskReassign(st *boardState, args []string) {
 		fmt.Printf("Reassigned Task #%d to %s: %s\n", taskID, *assignee, title)
 	} else {
 		fmt.Printf("Reassigned Task #%d (now unassigned): %s\n", taskID, title)
+	}
+	if note, _ := task["warning"].(string); note != "" { // the assignee will not read it now (#17657)
+		fmt.Printf("  Note: %s\n", clitext.Clean(note))
 	}
 }
 

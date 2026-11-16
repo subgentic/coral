@@ -238,7 +238,7 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	noteActivity(r, board.ActTaskCreate, "task", strconv.FormatInt(task.ID, 10), project, task.Title, "") // the new task's number, so the row opens it (#13621)
 	h.noteForcedAssignment(r, project, task.ID, body.AssignedTo, verifiedName(r, createdBy), forcedPast)
-	writeJSON(w, http.StatusCreated, task)
+	writeJSON(w, http.StatusCreated, withWarning(task, h.assigneeRestWarning(r.Context(), project, body.AssignedTo))) // a task for a member that will not read it now says so (#17657)
 }
 
 // announceCreatedTask tells the board (and nudges an agent) about a task that was just created: a draft or blocked one on the queue line, a published one with its assignment.
