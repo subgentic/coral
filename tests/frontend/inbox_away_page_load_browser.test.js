@@ -25,6 +25,20 @@ const { coralReady } = require('./helpers/wait');
         const text = await ev(`${LINE}.textContent`);
         assert.match(text, /^While you were away \((1[1-3]) min\): 2 tasks done/, text);
         console.log('[PASS] a tab left on another view is away from its load: ' + text);
+        // The other half (QA, #18049): a person who presses something on another view at +12 minutes is not away when Needs you is first drawn: the clock is the real last input (fetch_share.js keeps it), not the page load.
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings');
+        await ev(`(async () => { const R = window.fetch.bind(window);
+            window.fetch = (u, o) => /\\/api\\/away/.test(String(u && u.url || u)) ? Promise.resolve(new Response(JSON.stringify({ tasks_done: 2, goals_done: 0 }), { status: 200, headers: { 'content-type': 'application/json' } })) : R(u, o);
+            const RN = Date.now; Date.now = () => RN.call(Date) + 12 * 60000;
+            document.dispatchEvent(new Event('pointerdown')); // pressed something on another view, twelve minutes in
+            window.switchNavTab && window.switchNavTab('hub-inbox');
+            const m = await import(${S} + 'inbox_tab.js'); await m.selectInboxTab('needs'); return true; })()`);
+        await waitFor(`!!document.querySelector('#group-table-view')`, 'Needs you', 15000);
+        await ev(`import(${S} + 'inbox_away.js').then(() => true)`);
+        await ev(`document.dispatchEvent(new Event('pointerdown')); true`);
+        await ev(`new Promise(r => setTimeout(r, 600))`); // sleep-ok: nothing is expected to appear; give a wrong line time to show
+        assert.equal(await ev(`!!${LINE}`), false, 'a person who pressed something seconds ago is not away');
+        console.log('[PASS] input on another view before Needs you opens means no line');
     } finally { await client.close(); }
     console.log('\nAll page-load away checks passed');
 })().catch(e => { console.error(e); process.exit(1); });

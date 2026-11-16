@@ -37,7 +37,7 @@ function fill(slot) {
     if (!slot) return;
     newest = slot;
     if (!lastInput) {
-        lastInput = Math.round(performance.timeOrigin) || Date.now(); // the page's own load is the earliest input: a tab opened on another view and left for minutes before Needs you is first drawn has a gap too (#18049)
+        lastInput = window.__in > 0 ? window.__in : Math.round(performance.timeOrigin) || Date.now(); // the last input before this module loaded (fetch_share.js keeps it), else the page load: a tab opened on another view and left for minutes before Needs you is first drawn has a gap too (#18049)
         for (const t of ['pointerdown', 'click', 'keydown', 'touchstart']) document.addEventListener(t, () => { const n = Date.now(), gap = n - lastInput > 3e5; if (gap) away = lastInput; lastInput = n; if (gap && newest && newest.isConnected) fill(newest); }, true); // the person's return is an input: the gap is known only then
     }
     const from = away;

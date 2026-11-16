@@ -37,10 +37,8 @@ export function installFetchShare(now = () => Date.now(), loadMs = LOAD_MS) {
     const entries = new Map(); // "path?query" -> { p: Promise<Response>, open: true while in flight, doneAt }
     const startedAt = now();
     let writing = 0; // writes to /api in flight
-    let lastInput = -Infinity; // when a person last pressed, clicked or touched something
-    if (typeof document !== 'undefined' && document.addEventListener) {
-        for (const t of INPUT_EVENTS) document.addEventListener(t, () => { lastInput = now(); entries.clear(); }, true);
-    }
+    // window.__in: when a person last pressed, clicked or touched something (inbox_away.js reads it; unset until the first input, and NaN never counts as recent)
+    if (typeof document !== 'undefined') for (const t of INPUT_EVENTS) document.addEventListener(t, () => { window.__in = now(); entries.clear(); }, true);
     window.fetch = function (input, init) {
         const u = localApi(input);
         if (!u || window.__coralNoFetchShare === true) return orig(input, init);
@@ -50,7 +48,7 @@ export function installFetchShare(now = () => Date.now(), loadMs = LOAD_MS) {
             return orig(input, init).finally(() => { writing--; entries.clear(); });
         }
         const signal = (init && init.signal) || (input && typeof input === 'object' && input.signal);
-        if (writing > 0 || now() - startedAt >= loadMs || now() - lastInput < INPUT_MS || signal || fresh(input, init) || !SHARED.some(re => re.test(u.pathname))) return orig(input, init);
+        if (writing > 0 || now() - startedAt >= loadMs || now() - window.__in < INPUT_MS || signal || fresh(input, init) || !SHARED.some(re => re.test(u.pathname))) return orig(input, init);
         const key = u.pathname + u.search;
         const hit = entries.get(key);
         if (hit && (hit.open || now() - hit.doneAt < SHARE_MS)) return hit.p.then(r => r.clone());
