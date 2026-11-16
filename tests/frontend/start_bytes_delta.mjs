@@ -16,8 +16,12 @@ export function parseWeights(out) {
 }
 
 /** The report line, and whether the change grew the start path. */
-export function compare(base, head) {
-    const grew = head.app > base.app || head.css > base.css;
+// 2.0.69 only (Orchestrator on #18817, 2026-11-16; the Operator sees it in the release summary): 40 approved merges each added a little to the start sheet, +316 gz over main in all, while app.js is 13,563 gz BELOW main.
+// The start CSS may be up to this many gz bytes (rc4's measured size) without failing; app.js has no allowance. #17097's +202 block moves to a lazy sheet after the release; remove this line once main carries 2.0.69.
+export const ACCEPTED_START_CSS = 106343;
+
+export function compare(base, head, acceptedCss = 0) {
+    const grew = head.app > base.app || head.css > Math.max(base.css, acceptedCss);
     const d = n => (n > 0 ? '+' : '') + n;
     const verdict = grew
         ? `GREW: app.js ${d(head.app - base.app)} gz / CSS ${d(head.css - base.css)} gz (MUST) (${head.go || 'go version unknown'})`
@@ -60,7 +64,7 @@ function main() {
         git('worktree', 'add', '--detach', '-q', wt, base);
         // One `go` on the PATH measures both trees, and the line carries the toolchain that ran (runtime.Version): a go.mod `toolchain` that differs between base and head would flip the sign (#17930), so that is refused below, not compared.
         const [b, h] = [weighTree(wt), weighTree(top)];
-        const result = compare(b, h);
+        const result = compare(b, h, ACCEPTED_START_CSS);
         console.log(result.line);
         if (b.go && h.go && b.go !== h.go) { console.log(`start bytes: UNKNOWN (base measured with ${b.go}, head with ${h.go}: run again with one toolchain)`); process.exitCode = 1; return; }
         if (result.grew) console.error(GROWTH_HINT);

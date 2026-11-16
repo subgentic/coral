@@ -23,6 +23,9 @@ const TEAM = `qa-queued-${Date.now() % 100000}`, OTHER = `qa-hub-${Date.now() % 
         const depId = dep && (dep.id || (dep.task && dep.task.id));
         assert.ok(depId, 'the task that waits on the first exists: ' + JSON.stringify(dep));
         // a task that waits on a task of another board (#10287): the number alone would read as a task of this team
+        // an assignee must be on the board (#18294): the other board's worker and the Hub Dev are subscribed first
+        await post(ev, `/api/board/${OTHER}/subscribe`, { subscriber_id: 'Someone', job_title: 'Worker' });
+        await post(ev, `/api/board/${TEAM}/subscribe`, { subscriber_id: 'Hub Dev', job_title: 'Worker' });
         const far = await post(ev, `/api/board/${OTHER}/tasks`, { title: 'Hub work', body: 'elsewhere', created_by: 'Operator', assigned_to: 'Someone' });
         const farId = far && (far.id || (far.task && far.task.id));
         assert.ok(farId, 'the task on the other board exists: ' + JSON.stringify(far));

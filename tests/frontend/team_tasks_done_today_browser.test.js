@@ -25,7 +25,7 @@ const B = 'done-today-' + Date.now().toString(36);
                 // a task cancelled today is Done too, but has no result to look for: it leaves the Open view (tasks_bulk, v2.0.4)
                 const c = await post('/tasks', { title: 'Cancelled a moment ago', body: 'x', created_by: 'Boss', priority: 'medium' });
                 assert.ok(c.status < 300); const cid = c.body.id || c.body.task.id;
-                assert.ok((await post(`/tasks/${cid}/cancel`, { subscriber_id: 'Boss' })).status < 300, 'the task is cancelled');
+                const x = await post(`/tasks/${cid}/cancel`, { subscriber_id: 'Boss', message: 'not needed' }); // a cancel names its reason assert.ok(x.status < 300, 'the task is cancelled: ' + JSON.stringify(x));
             }
             await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks' }); true`);
             await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr.dt-row').length >= 3`, `${w}: the tasks`, 20000);

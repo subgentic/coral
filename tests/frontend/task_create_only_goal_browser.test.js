@@ -35,7 +35,7 @@ const { coralReady } = require('./helpers/wait');
 
         console.log('1. exactly one open goal (the other is done): the select starts on it');
         let d = await open();
-        assert.deepEqual(d.options, ['No goal', 'Ship the pilot'], 'only the open goal is listed: ' + JSON.stringify(d));
+        assert.deepEqual(d.options, ['No goal', 'Ship the pilot', 'An old goal (closed; adding a task reopens)'], 'the open goal, then the closed one marked as reopening (#18160): ' + JSON.stringify(d));
         assert.equal(d.value, String(only), 'it starts on the only open goal, not No goal: ' + JSON.stringify(d));
         await ev(`document.getElementById('create-task-title').value = 'Joins the goal'; document.getElementById('create-task-submit').click(); true`);
         await waitFor(`getComputedStyle(document.getElementById('create-task-modal')).display === 'none'`, 'the dialog to close', 8000);
@@ -53,7 +53,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`(() => { if (document.getElementById('agentic-state').getBoundingClientRect().width < 50) document.getElementById('panel-toggle-btn').click(); document.getElementById('agentic-tab-tasks').click(); return true; })()`);
         await waitFor(`!!document.querySelector('#board-task-bar .btn-create-task') && document.getElementById('agentic-panel-tasks').getBoundingClientRect().width > 50`, 'the Tasks bar', 15000);
         d = await open();
-        assert.equal(d.options.length, 3, 'both open goals are listed: ' + JSON.stringify(d));
+        assert.equal(d.options.length, 4, 'No goal, both open goals and the closed one are listed: ' + JSON.stringify(d));
         assert.equal(d.value, '', 'with a choice to make it starts on No goal: ' + JSON.stringify(d));
         console.log('   ✓');
         console.log('PASS a new task joins the only open goal');

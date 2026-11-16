@@ -1,7 +1,7 @@
 // start_bytes_delta.mjs (#17762): the parsing of the Go test's line and the verdict, on fixtures.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseWeights, compare, baseRefFrom, GROWTH_HINT } from './start_bytes_delta.mjs';
+import { parseWeights, compare, baseRefFrom, GROWTH_HINT, ACCEPTED_START_CSS } from './start_bytes_delta.mjs';
 
 const LINE = '    start_weight_test.go:66: app.js 426186 (baseline 418000, ceiling 426360), css 106042 (baseline 106000, ceiling 108120)\n--- PASS: TestStartPathWeight (0.67s)\n';
 assert.deepEqual(parseWeights(LINE), { app: 426186, css: 106042, go: null }, 'an old line without a version still parses');
@@ -30,3 +30,9 @@ assert.equal(ok.verdict, 'start bytes: OK (go1.26.1)');
 assert.equal(compare({ app: 100, css: 50, go: 'go1.27.0' }, { app: 141, css: 50, go: 'go1.27.0' }).verdict, 'GREW: app.js +41 gz / CSS 0 gz (MUST) (go1.27.0)');
 assert.equal(compare({ app: 100, css: 50, go: 'x' }, { app: 100, css: 60, go: 'x' }).verdict, 'GREW: app.js 0 gz / CSS +10 gz (MUST) (x)');
 console.log('start_bytes_delta: ok');
+
+// 2.0.69's accepted start CSS (#18817): up to ACCEPTED_START_CSS passes, one byte over fails, and app.js never gets an allowance
+assert.equal(compare({ app: 100, css: 50 }, { app: 100, css: 60 }, 60).grew, false, 'CSS up to the accepted size passes');
+assert.equal(compare({ app: 100, css: 50 }, { app: 100, css: 61 }, 60).grew, true, 'one byte over the accepted size fails');
+assert.equal(compare({ app: 100, css: 50 }, { app: 101, css: 50 }, 60).grew, true, 'app.js has no allowance');
+assert.equal(ACCEPTED_START_CSS, 106343, 'rc4 measured size (Orchestrator decision on #18817)');
