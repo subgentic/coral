@@ -22,6 +22,7 @@ func TestTrustVerdictSaysWhyThereIsNoYes(t *testing.T) {
 	const sid = "00000000-0000-0000-0000-00000000b572"
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home) // Windows reads its home from here (#18070)
 	team := filepath.Join(home, "work", "team")
 	deep := filepath.Join(team, "wt", strings.Repeat("deep-folder-name-", 11), "member") // a worktree path of about 240 characters
 	require.NoError(t, os.MkdirAll(deep, 0o755))
@@ -96,6 +97,7 @@ func TestTrustVerdictSaysTheFolderNameIsTooLongWhenTheJoinStoppedAtTheCap(t *tes
 	const sid = "00000000-0000-0000-0000-00000000b586"
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home) // Windows reads its home from here (#18070)
 	deep := filepath.Join(home, "work", strings.Repeat("a-deep-folder-name-", 9), "member")
 	require.NoError(t, os.MkdirAll(deep, 0o755))
 	_, h, _, ss := setupSessionsTestServer(t)

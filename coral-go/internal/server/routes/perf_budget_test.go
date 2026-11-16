@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"testing"
@@ -40,6 +41,9 @@ func TestBigBoardRoutesStayInsideTheirBudgets(t *testing.T) {
 	}
 	if raceEnabled {
 		t.Skip("a time budget means nothing under the race detector (about 10 to 20 times slower); the normal run keeps it (#14280)")
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("a wall-clock budget: seeding takes 34 s on Windows and the cold artifacts read is 1.4 s of its 2 s, so it went red once under the full run's load and passed alone (#18070)")
 	}
 	start := time.Now()
 	_, h := setupBoardTestServer(t)

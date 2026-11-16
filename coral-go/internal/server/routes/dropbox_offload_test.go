@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -271,6 +272,9 @@ func TestNothingStrandsFilesKeptOnlyInDropbox(t *testing.T) {
 // the rows stay, and a sign-in to the same account brings them back while another account is refused. Mutants: Rekey refused outright; the count
 // not asked; the offload rows dropped by the re-key.
 func TestARekeyAsksForTheCountThenKeepsTheWayBack(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the key file's mode is how it is refused (0644: others can read it), and Windows has no such mode: the key stays usable and a re-key is rightly not needed (#18070)")
+	}
 	be, d, _ := offloadedEnv(t)
 	require.NoError(t, os.Chmod(secretbox.KeyFilePath(be.h.dbx.dataDir), 0o644)) // the key is refused (others can read it): a re-key is allowed
 	rekey := func(body string) *httptest.ResponseRecorder {

@@ -79,6 +79,7 @@ func TestFolderTrust_RowOffer_And_Answer(t *testing.T) {
 	const sid = "00000000-0000-0000-0000-00000000a5c3"
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home) // Windows reads its home from here (#18070)
 	project := filepath.Join(home, "work", "project")
 	require.NoError(t, os.MkdirAll(project, 0o755))
 	if resolved, err := filepath.EvalSymlinks(project); err == nil {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -264,7 +265,9 @@ func TestAHeldEditLivesOutsideTheStore(t *testing.T) {
 	assert.True(t, os.IsNotExist(err), "nothing in artifacts/objects before the decision")
 	info, err := os.Stat(be.b.heldPath(open[0].Digest))
 	require.NoError(t, err, "held beside the store")
-	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	if runtime.GOOS != "windows" { // Windows reports 0666 for every file: it has no owner-only mode to check (#18070)
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	}
 	// A newer edit replaces the held bytes; the old file goes.
 	old := open[0].Digest
 	be.dbx.edit(be.versionFile(ds[0]), []byte("edited again"))

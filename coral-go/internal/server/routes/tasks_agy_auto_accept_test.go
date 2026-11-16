@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -21,6 +22,9 @@ import (
 // #14772 (Security's conditions): an auto_accept run of agy, Antigravity or Gemini is agy's own Auto, never the skip flag; the flag a run names itself stays; and the Hub gate still refuses a Hub-stamped auto_accept
 // without the owner's switch and Launch mode.
 func TestAnAgyTaskRunWithAutoAcceptNeverCarriesASkipFlag(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the mock agy CLI is a #!/bin/sh script: Windows cannot start it (a .cmd wrapper is refused by design), so the launch line it lists --mode auto from cannot be read there (#18070)")
+	}
 	const withAuto = "#!/bin/sh\nif [ \"$1\" = \"--help\" ]; then\ncat <<'EOF'\nUsage of agy:\n  --dangerously-skip-permissions  Auto-approve all tool permission requests without prompting\n  --mode                          Set the agent execution mode for this session (accept-edits, auto, plan)\nEOF\nfi\nexit 0\n"
 	const withoutAuto = "#!/bin/sh\nif [ \"$1\" = \"--help\" ]; then\ncat <<'EOF'\nUsage of agy:\n  --dangerously-skip-permissions  Auto-approve all tool permission requests without prompting\n  --mode                          Set the agent execution mode for this session (accept-edits, plan)\nEOF\nfi\nexit 0\n"
 	for _, typ := range []string{"agy", "antigravity", "gemini"} {
