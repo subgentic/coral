@@ -46,7 +46,7 @@ const { coralReady } = require('./helpers/wait');
             await open('notifications');
             const hints = await ev(`[...document.querySelectorAll('#settings-pane-notifications .sv-help-text')].filter(h => h.checkVisibility() && h.textContent.trim()).map(h => h.textContent.trim())`);
             assert.equal(await ev(`document.querySelectorAll('#settings-pane-notifications .sv-learn').length`), 1, 'Desktop alerts keeps its explanation behind Learn more (#7907)');
-            assert.ok(hints.length >= 1 && hints.every(h => /\.$/.test(h) && !/\.\s+\S/.test(h)), 'one sentence each, with a full stop (#7636): ' + JSON.stringify(hints));
+            assert.ok(hints.length >= 1 && hints.every(h => /\.$/.test(h) && !/\.\s+\S/.test(h.replace(/\s+Off: [^.]+\.(\s+[^.]+\.)?$/, ''))), 'one sentence each, with a full stop (#7636); a switch that hides something may add what Off does and where to turn it on (#17242): ' + JSON.stringify(hints));
             console.log(`2. (${w}) General: the machine health is part of About`);
             await open('general');
             assert.deepEqual(await ev(`(() => { const a = document.getElementById('about-section'); const h = document.getElementById('machine-health-local'); return { inAbout: a.contains(h), order: [...a.children].map(c => c.id || c.className.split(' ')[0]) }; })()`).then(r => r.inAbout), true);
