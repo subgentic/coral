@@ -24,4 +24,6 @@ assert.equal(AF.isFiltered({ ...AF.EMPTY, sort: 'oldest' }), false, 'the order a
 AF.setTeamNames(new Map([['beta', 'Beta team']]));
 assert.ok(AF.chips({ ...AF.EMPTY, team: 'beta' }).some(c => /Team: Beta team/.test(c.label || c.text || String(c))), 'the team chip says the name');
 assert.ok(AF.ACTIONS.includes('undone') && AF.ACTIONS.includes('goal_close'));
+// #17360: the person's comment on a file, an agent's reply and an agent's new version are rows under Files and tasks (the chips overlap by design, #16116).
+for (const action of ['file_comment', 'file_reply', 'file_version']) assert.ok(AF.inKind({ action, item_kind: 'file' }, 'files'), action + ' is a Files and tasks row');
 console.log('PASS operator_activity_filters: search, team, action, since, order');

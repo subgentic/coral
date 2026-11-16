@@ -754,6 +754,7 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		if h.bs != nil {
 			h.bs.NoteAllArtifactsChanged()
 		}
+		h.recordCommentActivity(r, caller, id, in.Board, body)
 		view := h.commentView(caller, c, locked, hubWrite)
 		if _, isGuide := guideOf(r); !isGuide && (in.NotifyAgent == nil || *in.NotifyAgent) {
 			if d := h.deliverOperatorComment(r, caller, c, id, in.Board); d.To != "" || d.Queued != "" {

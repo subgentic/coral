@@ -36,6 +36,10 @@ export function activityParts(row, itemWords) {
     if (row.action === 'prompt_answer') return mk('Answered', `${who}’s question`, note);
     if (TASK_DID[row.action]) return mk(TASK_DID[row.action], `task #${row.item_id}${row.title ? ` ${row.title}` : ''}`, note);
     if (row.action === 'file_tags' && row.title) return mk('Changed the tags', obj, note);
+    if (row.action === 'file_comment') return mk('Commented on', row.title || 'a file', note); // the person's own comment (#17360): its words are the detail
+    if (row.action === 'file_reply') return mk(`${row.asker || 'An agent'} replied on`, row.title || 'a file', note); // an agent's answer in the thread
+    if (row.action === 'file_review') return mk(`${row.asker || 'An agent'} asked you to review`, row.title || 'a file', note);
+    if (row.action === 'file_version') return mk(`${row.asker || 'An agent'} saved a new version of`, row.title || 'a file', note);
     if (row.action === 'file_share') return mk('Shared', obj, note);
     if (row.action === 'file_edit_send') return mk('Sent your edit', `${row.title || 'a file'}`, [note, 'to agents'].filter(Boolean).join(' · '));
     if (row.action === 'file_edit') return mk('Saved a new version', `${row.title || 'a file'}`, note);
