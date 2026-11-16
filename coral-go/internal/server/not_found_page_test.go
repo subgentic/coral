@@ -31,7 +31,11 @@ func TestNotFoundPageHasTheWayBack(t *testing.T) {
 	assert.Contains(t, body, `<a href="/agents">Back to Agents</a>`)
 	assert.NotContains(t, body, "random-10281", "the page names nothing of the request")
 	assert.Contains(t, body, "prefers-color-scheme:dark", "the page has a dark theme of its own (#15295)")
-	assert.Contains(t, body, `<a href="/inbox">Inbox</a>`, "and a way around the dashboard, not only Back to Agents")
+	assert.NotContains(t, body, "<nav", "an empty Coral page, no menu of its own (#15852)")
+	assert.Contains(t, body, "Plus Jakarta Sans", "Coral's font, as the dashboard's tokens name it")
+	assert.Contains(t, body, "#1f6feb", "Coral's dark accent")
+	assert.Contains(t, body, "#0550ae", "Coral's light accent")
+	assert.Contains(t, body, "min-height:36px", "the button is the 36 px control height")
 	assert.Contains(t, resp.Header.Get("Content-Security-Policy"), "default-src 'none'")
 
 	for _, p := range []string{"/api/nope-10281", "/ws/nope", "/auth/nope", "/static/missing-10281.js"} {
