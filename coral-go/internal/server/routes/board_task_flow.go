@@ -181,6 +181,13 @@ func (h *BoardHandler) afterTaskCompleted(project, subscriberID string, complete
 		h.notifyOrchestratorsTaskCompleted(ctx, project, subscriberID, completedTask, by)
 		h.notifyNamedOfCompletion(ctx, project, subscriberID, completedTask, by)
 
+		// Close asks that explicitly named this task (#17338).
+		if n, err := h.bs.CloseOvertakenAsks(ctx, project, completedTask.ID, 0, fmt.Sprintf("Overtaken: task #%d completed", completedTask.ID)); err != nil {
+			slog.Warn("close overtaken asks failed", "project", project, "task", completedTask.ID, "error", err)
+		} else if n > 0 {
+			slog.Info("closed overtaken asks", "project", project, "task", completedTask.ID, "count", n)
+		}
+
 		// Resolve downstream blocked tasks
 		h.notifyUnblockedTasks(ctx, project, completedTask.ID)
 

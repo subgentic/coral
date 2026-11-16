@@ -53,9 +53,9 @@ func TestClosingAGoalRetiresItsOpenAsks(t *testing.T) {
 	answered := askPost(t, s, ctx, "Dev B", "@Dev A ship it too?", true, 0)
 	elsewhere := askPost(t, s, ctx, "Lead", "@Dev A other?", true, 0)
 	nogoal := askPost(t, s, ctx, "Lead", "@Dev A no goal?", true, 0)
-	require.NoError(t, s.RecordAskSubject(ctx, "alpha", open.ID, g.ID, 0))
-	require.NoError(t, s.RecordAskSubject(ctx, "alpha", answered.ID, g.ID, 0))
-	require.NoError(t, s.RecordAskSubject(ctx, "alpha", elsewhere.ID, other.ID, 0))
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", open.ID, g.ID, 0, true))
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", answered.ID, g.ID, 0, true))
+	require.NoError(t, s.RecordAskSubject(ctx, "alpha", elsewhere.ID, other.ID, 0, true))
 	askPost(t, s, ctx, "Dev A", "yes", false, answered.ID)
 
 	got, err := s.RetireGoalAsks(ctx, "alpha", g.ID, "goal closed as done", time.Now())

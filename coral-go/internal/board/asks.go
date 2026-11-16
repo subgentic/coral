@@ -63,7 +63,8 @@ func (s *Store) ensureAsksSchema(ctx context.Context) error {
 			message_id INTEGER PRIMARY KEY,
 			project    TEXT NOT NULL,
 			goal_id    INTEGER NOT NULL DEFAULT 0,
-			task_id    INTEGER NOT NULL DEFAULT 0
+			task_id    INTEGER NOT NULL DEFAULT 0,
+			explicit   INTEGER NOT NULL DEFAULT 0
 		)`,
 		`CREATE TABLE IF NOT EXISTS board_ask_task_snapshots (
             message_id INTEGER PRIMARY KEY,
@@ -108,6 +109,9 @@ func (s *Store) ensureAsksSchema(ctx context.Context) error {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
 			return err
 		}
+	}
+	if _, err := s.db.ExecContext(ctx, `ALTER TABLE board_ask_subjects ADD COLUMN explicit INTEGER NOT NULL DEFAULT 0`); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+		return err
 	}
 	return nil
 }
@@ -203,18 +207,22 @@ type AskSubject struct {
 }
 
 // RecordAskSubject keeps the goal and the task a question (a message recorded with RecordAsk) is about. The caller has checked that both are of the board; nothing is kept for a message that is not a question of
-// this board, nor for two zeros.
-func (s *Store) RecordAskSubject(ctx context.Context, project string, messageID, goalID, taskID int64) error {
+// this board, nor for two zeros. explicit is true when the asker named the task or goal with --task/--goal; false when inferred from the asker's claimed task (#17338).
+func (s *Store) RecordAskSubject(ctx context.Context, project string, messageID, goalID, taskID int64, explicit bool) error {
 	if goalID <= 0 && taskID <= 0 {
 		return nil
+	}
+	expl := 0
+	if explicit {
+		expl = 1
 	}
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err = tx.ExecContext(ctx, `INSERT OR REPLACE INTO board_ask_subjects (message_id, project, goal_id, task_id)
-        SELECT message_id, project, ?, ? FROM board_asks WHERE message_id = ? AND project = ?`, max(goalID, 0), max(taskID, 0), messageID, project); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT OR REPLACE INTO board_ask_subjects (message_id, project, goal_id, task_id, explicit)
+        SELECT message_id, project, ?, ?, ? FROM board_asks WHERE message_id = ? AND project = ?`, max(goalID, 0), max(taskID, 0), expl, messageID, project); err != nil {
 		return err
 	}
 	// Only the explicitly linked task on this board, and only when the question exists.
@@ -765,4 +773,40 @@ func (s *Store) OpenDuplicateAsk(ctx context.Context, project, asker, content st
 		}
 	}
 	return 0, nil
+}
+
+// CloseOvertakenAsks closes every open ask linked to the given task or goal (#17338):
+// when a task completes or a goal is created, the questions about it are overtaken by events.
+func (s *Store) CloseOvertakenAsks(ctx context.Context, project string, taskID, goalID int64, note string) (int, error) {
+	if taskID == 0 && goalID == 0 {
+		return 0, nil
+	}
+	var cond string
+	var args []any
+	if taskID > 0 && goalID > 0 {
+		cond = "(task_id = ? OR goal_id = ?)"
+		args = append(args, taskID, goalID)
+	} else if taskID > 0 {
+		cond = "task_id = ?"
+		args = append(args, taskID)
+	} else {
+		cond = "goal_id = ?"
+		args = append(args, goalID)
+	}
+	args = append(args, project)
+	var ids []int64
+	if err := s.reader().SelectContext(ctx, &ids,
+		`SELECT a.message_id FROM board_ask_subjects a
+		 WHERE a.`+cond+` AND a.project = ? AND a.explicit = 1
+		 AND a.message_id NOT IN (SELECT message_id FROM board_ask_closed WHERE project = a.project)`,
+		args...); err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, id := range ids {
+		if err := s.CloseAsk(ctx, project, id, "system", note); err == nil {
+			n++
+		}
+	}
+	return n, nil
 }

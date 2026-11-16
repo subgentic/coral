@@ -22,7 +22,7 @@ func addAsk(t *testing.T, s *Store, team, text string, goalID, taskID int64, to 
 	m, err := s.insertMessage(ctx, team, "Lead", text, nil, "", "", false, nil)
 	require.NoError(t, err)
 	require.NoError(t, s.RecordAsk(ctx, team, m, to))
-	require.NoError(t, s.RecordAskSubject(ctx, team, m.ID, goalID, taskID))
+	require.NoError(t, s.RecordAskSubject(ctx, team, m.ID, goalID, taskID, true))
 	return m.ID
 }
 
