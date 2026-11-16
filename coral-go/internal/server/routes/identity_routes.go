@@ -77,6 +77,7 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/cloud/guide-revoked":                     "tell that a guide's grant ended (Coral Hub's word)",
 	"GET /api/analytics/activity":                       "read a team's message, @mention, ask and task counts per agent (it names every agent and how much the Operator steps in)",
 	"GET /api/analytics/efficiency":                     "read the teams' tokens per commit and task times, grouped by agent, model, branch and task (it names every agent and their work)",
+	"GET /api/analytics/tasks":                          "read how many tasks each agent, team, model and provider completed (it names every agent and their work, #17206)",
 	"POST /api/worktrees/remove":                        "remove a kept worktree",
 	"POST /api/workflows":                               "create a workflow",
 	"PUT /api/workflows/{workflowID}":                   "change a workflow",

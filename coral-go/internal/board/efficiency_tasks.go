@@ -27,6 +27,10 @@ type EfficiencyTask struct {
 	// WorkSeconds is the time worked: the rounds before the last (kept at each send-back) and EndedAt - ClaimedAt; nil when either is unknown or the end is before the claim.
 	WorkSeconds *float64
 	SentBack    bool // a review round returned it to its author at least once
+	// Review and Failed are read only by EfficiencyTasksAll (the Tasks view, #17206): a reviewer's own task, and a task completed with the outcome "failed".
+	Review      bool
+	Failed      bool
+	CompletedAt string // when the task was completed (RFC 3339 UTC, as stored); EndedAt is the hand-in for a reviewed task
 	// Windows are the claim and hand-in (or completion) of every round of work, oldest first, the last round's being ClaimedAt and EndedAt; each RFC 3339 UTC. The commits made inside any of them are the task's.
 	Windows []WorkWindow
 }
@@ -39,8 +43,14 @@ var reviewTitleRe = regexp.MustCompile(`^Review #\d+`)
 
 // EfficiencyTasks lists the tasks completed in [since, until) (RFC 3339 UTC), oldest first. The window is compared as text on a bound without its "Z" (windowBound), which orders a stored time with fractions of a second on the right side of a boundary and uses the completed_at index.
 func (s *Store) EfficiencyTasks(ctx context.Context, since, until string) ([]EfficiencyTask, error) {
+	return s.EfficiencyTasksAll(ctx, since, until, false)
+}
+
+// EfficiencyTasksAll is EfficiencyTasks with a choice on review tasks: includeReviews keeps them (marked Review), for the Tasks view's switch (#17206). A failed outcome is marked Failed.
+func (s *Store) EfficiencyTasksAll(ctx context.Context, since, until string, includeReviews bool) ([]EfficiencyTask, error) {
 	rows, err := s.reader().QueryxContext(ctx, `SELECT t.id, t.board_id, t.title, COALESCE(t.assigned_to, ''), COALESCE(t.completed_by, ''), COALESCE(t.claimed_at, ''), t.completed_at,
-		COALESCE(t.claim_thinking, ''), COALESCE(t.input_tokens, 0) + COALESCE(t.output_tokens, 0), COALESCE(t.cost_usd, 0), COALESCE(w.eff_state, 0), COALESCE(w.eff_review_of, 0), COALESCE(w.eff_author, ''), COALESCE(w.eff_submitted, ''), COALESCE(w.eff_rejected, 0), COALESCE(t.session_id, ''), COALESCE(t.work_before_seconds, 0), COALESCE(t.work_windows, '')
+		COALESCE(t.claim_thinking, ''), COALESCE(t.input_tokens, 0) + COALESCE(t.output_tokens, 0), COALESCE(t.cost_usd, 0), COALESCE(w.eff_state, 0), COALESCE(w.eff_review_of, 0), COALESCE(w.eff_author, ''), COALESCE(w.eff_submitted, ''), COALESCE(w.eff_rejected, 0), COALESCE(t.session_id, ''), COALESCE(t.work_before_seconds, 0), COALESCE(t.work_windows, ''),
+		CASE WHEN w.data IS NOT NULL AND json_valid(w.data) THEN COALESCE(json_extract(w.data, '$.outcome'), '') ELSE '' END
 		FROM board_tasks t LEFT JOIN task_workflows w ON w.task_id = t.id
 		WHERE t.status = 'completed' AND t.completed_at >= ? AND t.completed_at < ? ORDER BY t.completed_at, t.id`, windowBound(since), windowBound(until))
 	if err != nil {
@@ -54,22 +64,30 @@ func (s *Store) EfficiencyTasks(ctx context.Context, since, until string) ([]Eff
 		var state, rejected int
 		var reviewOf int64
 		var before float64
-		var windows string
-		if err := rows.Scan(&t.ID, &t.Board, &t.Title, &assigned, &completedBy, &t.ClaimedAt, &completedAt, &t.Thinking, &t.Tokens, &t.CostUSD, &state, &reviewOf, &originalAuthor, &submittedAt, &rejected, &t.Session, &before, &windows); err != nil {
+		var windows, outcome string
+		if err := rows.Scan(&t.ID, &t.Board, &t.Title, &assigned, &completedBy, &t.ClaimedAt, &completedAt, &t.Thinking, &t.Tokens, &t.CostUSD, &state, &reviewOf, &originalAuthor, &submittedAt, &rejected, &t.Session, &before, &windows, &outcome); err != nil {
 			return nil, err
 		}
+		t.Failed = outcome == "failed"
 		if reviewTitleRe.MatchString(t.Title) {
-			continue // a review task, whatever its workflow says
+			if !includeReviews {
+				continue // a review task, whatever its workflow says
+			}
+			t.Review = true
 		}
 		t.EndedAt = completedAt
+		t.CompletedAt = completedAt
 		t.Claimer = firstNonEmpty(assigned, completedBy)
 		// the workflow's four facts are columns kept by saveWorkflow (ensureWorkflowEfficiencyFacts): the read does not decode a document per task (#9288)
 		switch state {
 		case 1:
 			if reviewOf > 0 {
-				continue // a review task
+				if !includeReviews {
+					continue // a review task
+				}
+				t.Review = true
 			}
-			if originalAuthor != "" {
+			if originalAuthor != "" && !t.Review {
 				t.Claimer = originalAuthor
 			}
 			if strings.TrimSpace(submittedAt) != "" {

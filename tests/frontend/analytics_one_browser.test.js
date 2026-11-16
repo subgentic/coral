@@ -27,7 +27,7 @@ const BRANCHES = [{ repo_name: 'coral', branch: 'main', board_name: 'coral-go-te
 const TASKS = [{ id: 86091, title: 'Named agent task', status: 'completed', assigned_to: 'Backend Dev', priority: 'high', cost_usd: 1.25 },
     { id: 86092, title: 'Unassigned task', status: 'completed', assigned_to: null, priority: 'low', cost_usd: 0.5 }];
 const VIEWS = ['Overview', 'Tokens per commit', 'Task time', 'Tool and API calls']; // one entry per metric (#9236): the views that use the header's Time range. Usage, Operator interaction and Team communication (#11222) carry their own Period (analytics_tabs_browser)
-const LISTED = ['Overview', 'Usage', 'Operator interaction', 'Inbox vs chat', 'Resource queue', 'Team communication', 'Tokens per commit', 'Task time', 'Advanced']; // Tool and API calls is under Advanced (#10521)
+const LISTED = ['Overview', 'Usage', 'Operator interaction', 'Inbox vs chat', 'Resource queue', 'Team communication', 'Tokens per commit', 'Task time', 'Tasks', 'Advanced']; // Tool and API calls is under Advanced (#10521)
 const GROUP_OF = { 'By provider': 'Provider', 'By model': 'Model', 'By thinking level': 'Thinking level', 'By team': 'Team', 'By agent': 'Agent', 'By branch': 'Branch', 'By task': 'Task', 'By goal': 'Goal' }; // the groupings are Overview's Group by (#9236), not sidebar entries
 const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
     window.fetch = (u, o) => { const url = String(u && u.url || u); window.__costReq = (window.__costReq || []).concat(url);
@@ -178,8 +178,8 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
 
             // the search narrows the list
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = 'task'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            await waitFor(`document.querySelectorAll('${pane} li .row-btn').length === 1`, at + 'the search narrows the list', 5000);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} li .row-btn')].map(b => b.textContent.trim())`), ['Task time'], at + 'to the match');
+            await waitFor(`document.querySelectorAll('${pane} li .row-btn').length === 2`, at + 'the search narrows the list', 5000);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane} li .row-btn')].map(b => b.textContent.trim())`), ['Tasks', 'Task time'], at + 'to the matches (Tasks, #17206, matches too)');
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = 'zzz'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await waitFor(`!!document.querySelector('${pane} .empty-state')`, at + 'no match says so', 5000);
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);

@@ -277,6 +277,7 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.Get("/api/board/{project}/spend", spendHandler(s).Spend) // the Analytics view: tokens, commits on main, tool calls and task times (#7525); never through the Hub
 	// the Analytics view's tokens per commit and task time, grouped (#8915); never through Coral Hub
 	r.Get("/api/analytics/efficiency", routes.NewEfficiencyHandler(s.db, s.boardStore).Efficiency)
+	r.Get("/api/analytics/tasks", routes.NewTasksAnalyticsHandler(s.db, s.boardStore).Tasks) // tasks completed by agent, team, model or provider (#17206): counts and names only, this computer only
 	// the Analytics tabs Operator interaction and Team communication (#11222): counts from the board, the Hub owner only
 	activityHandler := routes.NewActivityHandler(s.boardStore)
 	r.Get("/api/analytics/activity", activityHandler.Activity)
