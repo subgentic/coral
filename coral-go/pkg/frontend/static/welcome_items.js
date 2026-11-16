@@ -81,7 +81,7 @@ export function dismissGettingStarted() {
 }
 
 /** An item's own action. */
-export function runWelcome(id) {
+export async function runWelcome(id) {
     if (id === 'welcome') { mark('welcome'); return; }
     if (id === 'agent' || id === 'team') { return importOnce('./welcome_launch.js').then(m => m.openWelcomeLaunch(id)); }
     if (id === 'guide') { importOnce('./artifact_viewer.js').then(m => m.openBundledDocument({ title: 'Getting started with Coral', name: 'getting-started.md', url: GUIDE_URL, onOpened: () => mark('guide') })); return; } // the guide (about 400 KB with its pictures) is fetched when the row is opened, never at start (page_weight)
