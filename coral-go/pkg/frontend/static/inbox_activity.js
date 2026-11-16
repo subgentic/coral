@@ -17,18 +17,6 @@ const AF = await importOnce('./operator_activity_filters.js'); // lazy, as the s
 await loadStyles('inbox_activity.css'); // the folder's rules load with the folder, not at start (page_weight)
 await loadStyles('activity_kinds.css'); // the kind chips' rules (several at once, #16087): not at start
 
-/** Inbox time forms: recent minutes, today's clock, yesterday's clock, then month/day. */
-export function activityTime(value, now = new Date()) {
-    const date = new Date(value), time = date.getTime();
-    if (!Number.isFinite(time)) return 'Unknown time';
-    const minutes = Math.floor((now.getTime() - time) / 60000);
-    if (minutes >= 0 && minutes < 60) return `${Math.max(1, minutes)} min`;
-    const clock = () => date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    if (date.toDateString() === now.toDateString()) return clock();
-    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
-    return date.toDateString() === yesterday.toDateString() ? `Yesterday ${clock()}` : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
 const PAGE = 200;
 const PHONE_HINT = 'pho' + 'ne'; // the record's hint word, spelled in two parts: the icon-name lint reads that quoted word as an icon name
 let rows = [], check = null, loaded = false, loading = null, more = false, failed = false, denied = false;
@@ -37,7 +25,6 @@ let cursors = {}, moreBy = {}, checks = {}, unread = []; // unread: [{ id, why }
 /** A row's own key: ids are only unique on their computer. */
 export const keyOf = r => r.server && r.server !== LOCAL_SERVER ? `${r.server}/${r.id}` : String(r.id);
 const state = DT.tableState();
-const expanded = new Set();
 let onChange = () => {};
 
 /** The row as the one rule says it (#14423): verb, object, detail. */
@@ -170,19 +157,10 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
     const parts = r => { const p = partsOf(r); return grouped && byTask && r.goal_id && r.task_id ? { ...p, about: '' } : p; };
     const glyph = r => r.item_kind === 'question' || r.action === 'answer' ? '?' : /^(prompt_|wait_)/.test(r.action || '') ? '!' : '</>'; // the mockup's icons: a question, a permission, everything else (a file, a task, a goal)
     const who = r => { const c = DT.el('span', 'activity-who'); c.append(DT.el('span', `activity-kind activity-kind-${glyph(r) === '?' ? 'ask' : glyph(r) === '!' ? 'perm' : 'code'}`, glyph(r)), DT.el('b', 'activity-name', markHidden(AF.agentOf(r) || 'You', { strict: true }))); return c; };
-    const decision = r => { const word = ({ changes: 'Changes asked', prompt_reject: 'Denied', chat_send: 'Message sent', message: 'Message sent', ignore: 'Dismissed',
-        skill_scripts_ack: 'Scripts acknowledged', skill_secret_ack: 'Secret acknowledged', supersede: 'Superseded', save: 'Saved', unsave: 'Returned', undone: 'Undone', send_review: 'Review requested', unsend_review: 'Review withdrawn',
-        task_remind: 'Reminder sent', task_park: 'Parked/released', task_reply: 'Replied', wait_send: 'Message sent', file_tags: 'Tags changed', file_share: 'Shared', file_edit: 'Version saved', file_edit_send: 'Edit sent',
-        chat_flag: 'Chat changed', run_seen: 'Run action', agents_record: 'Recorded', keep_full_access: 'Access changed', goal_driver: 'Driver changed', goal_move: 'Moved', preview_trust: 'Scripts allowed', preview_untrust: 'Scripts disabled', hub_update_check: 'Update checked', hub_update_relaunch: 'Relaunched' })[r.action] || parts(r).did; const label = DT.el('span', 'activity-decision', word); if (['Approved', 'Allowed'].includes(word)) label.prepend(DT.el('span', 'activity-checkmark', '✓'), ' '); return label; };
+    const decision = r => { const label = AF.DECISION_LABEL[AF.decisionOf(r)]; const chip = DT.tag(parts(r).did); chip.classList.add('activity-decision', `activity-decision-${label ? AF.decisionOf(r) : 'plain'}`); return chip; };
     const summary = r => { const p = parts(r); return [p.did, p.detail, p.about].filter(Boolean).join(' · '); };
     const groupFor = grouped ? Threads.activityGroupLookup(list, teamLabel, parts, tasks, byTask) : null;
     const opens = r => (r.item_kind === 'job_run' && !!jobRunParts(r.item_id)) || (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) || (r.item_kind === 'agent' && r.item_id && r.action !== 'agents_record') || (['goal', 'question', 'task', 'message', 'workflow_run'].includes(r.item_kind) && /^\d+$/.test(r.item_id)) || (r.item_kind === 'chat' && !!r.item_id);
-    const openItem = r => { if (!opens(r)) return; if (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) open.file(r); else if (r.item_kind === 'goal') open.goal(r); else if (r.item_kind === 'question' && opens(r)) open.question(r); else if (r.item_kind === 'task' && opens(r)) open.task(r); else if (r.item_kind === 'agent' && opens(r)) open.agent(r); else if (r.item_kind === 'message' && opens(r)) open.message(r); else if (r.item_kind === 'chat' && opens(r)) open.chat(r); else if (r.item_kind === 'workflow_run' && opens(r)) open.workflow(r); else if (r.item_kind === 'job_run' && opens(r)) open.job(r, jobRunParts(r.item_id)); };
-    const toggle = (r, tr) => {
-        const key = keyOf(r), on = !expanded.has(key); if (on) expanded.add(key); else expanded.delete(key);
-        const detail = tr.nextElementSibling; if (detail?.classList.contains('dt-detail')) detail.hidden = !on;
-        tr.querySelector('[data-key="item"] button')?.setAttribute('aria-expanded', String(on));
-    };
     return { title: 'Activity', noun: ['action', 'actions'], rows: list,
         empty: { line: !loaded || loading ? 'Reading the record…' : failed ? (denied ? 'Only the account this computer is linked to can see the Activity record.' : 'The record could not be read.') : AF.isFiltered(f) ? 'No action matches the search and filters.' : 'Nothing yet.',
             hint: loaded && !failed && !AF.isFiltered(f) ? 'Each time you approve, ask for changes, deny, ignore or answer something in Needs you, a line is added here.' : undefined },
@@ -191,24 +169,15 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
             const wrap = DT.el('div', 'activity-folder');
             const words = checkWords(check);
             if (words) { const n = DT.el('p', `activity-check${check && !check.intact ? ' activity-check-broken' : ''}`, words); n.setAttribute('role', check && !check.intact ? 'alert' : 'status'); wrap.append(n); }
-            const t = DT.dataTable({ label: `Activity, ${list.length}`, fold: 'always',  rows: list, ...(grouped ? { orderRows: Threads.arrangeActivityRows, groupSorted: true, groupBy: groupFor } : {}), rowKey: keyOf, state, decorate: (r, tr, dr) => { tr.classList.add('list-row', 'list-row-activity'); const button = tr.querySelector('[data-key="item"] button'); if (button) { button.setAttribute('aria-expanded', String(expanded.has(keyOf(r)))); button.setAttribute('aria-controls', dr.id); } }, rowName: r => { const p = parts(r); return `${p.on} ${summary(r)}`; },  resize: true, sortBar: false,
-                open: toggle,
-                detail: { id: r => `activity-detail-${encodeURIComponent(keyOf(r))}`, open: r => expanded.has(keyOf(r)), render: r => {
-                    const p = partsOf(r), node = DT.el('div', 'activity-expanded');
-                    node.append(DT.el('strong', '', p.on), DT.el('p', '', [p.did, p.detail].filter(Boolean).join(' · ')));
-                    if (p.about) node.append(DT.el('p', 'activity-about', p.about));
-                    for (const kind of ['goal', 'task']) if (Number(r[`${kind}_id`]) > 0 && !(r.item_kind === kind && String(r.item_id) === String(r[`${kind}_id`]))) { const link = DT.el('button', 'btn btn-small', `${kind === 'goal' ? 'Goal' : 'Task'} #${r[`${kind}_id`]}`); link.type = 'button'; link.onclick = () => open[kind]({ ...r, item_id: String(r[`${kind}_id`]) }); node.append(link); }
-                    node.append(DT.el('p', '', [markHidden(AF.agentOf(r) || 'You', { strict: true }), teamOf(r), fromCell(r)].filter(Boolean).join(' · ')));
-                    if (opens(r)) { const b = DT.el('button', 'btn btn-small activity-open-item', 'Open item'); b.type = 'button'; b.onclick = () => openItem(r); node.append(b); }
-                    return node;
-                } },
-                columns: [ // Same summary order on desktop and phone; the expanded row keeps every detail.
-                    { key: 'item', label: 'About', primary: true, width: 'grow', sort: true, sortValue: r => parts(r).on, line: 1, cell: r => DT.primaryButton(parts(r).on, `${parts(r).on}. Show details`) },
-                    { key: 'action', label: 'You did', sort: true, sortValue: r => parts(r).did, line: 1, width: '12rem', dropAt: 16, cell: decision },
+            const t = DT.dataTable({ label: `Activity, ${list.length}`, fold: 'always',  rows: list, ...(grouped ? { orderRows: Threads.arrangeActivityRows, groupSorted: true, groupBy: groupFor } : {}), rowKey: keyOf, state, decorate: (r, tr) => { tr.classList.add('activity-card'); const ask = tr.querySelector('.dt-mail-ask'); if (ask) { const p = parts(r); ask.replaceChildren(decision(r)); if (p.detail) ask.append(' · ', p.detail); if (p.about) ask.append(' · ', p.about); } if (opens(r)) return; const button = tr.querySelector('button.dt-mail-open'); if (button) { const text = DT.el('span', button.className.replace('dt-primary', '')); text.append(...button.childNodes); button.replaceWith(text); } }, rowName: r => { const p = parts(r); return `${p.on} ${summary(r)}`; },  resize: true, sortBar: false,
+                open: r => { if (!opens(r)) return; if (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) open.file(r); else if (r.item_kind === 'goal') open.goal(r); else if (r.item_kind === 'question' && opens(r)) open.question(r); else if (r.item_kind === 'task' && opens(r)) open.task(r); else if (r.item_kind === 'agent' && opens(r)) open.agent(r); else if (r.item_kind === 'message' && opens(r)) open.message(r); else if (r.item_kind === 'chat' && opens(r)) open.chat(r); else if (r.item_kind === 'workflow_run' && opens(r)) open.workflow(r); else if (r.item_kind === 'job_run' && opens(r)) open.job(r, jobRunParts(r.item_id)); },
+                columns: [ // narrowing drops From (62 rem), then Team (52), then When (36), then You did (16): the data table's own thresholds, so the On column (the item) never shrinks (the table rules' R2)
                     { key: 'who', label: 'From', sort: true, sortValue: r => AF.agentOf(r) || 'You', line: 1, width: '11rem', cell: who },
+                    { key: 'action', label: 'You did', sort: true, sortValue: r => parts(r).did, line: 1, width: '12rem', dropAt: 16, cell: decision },
+                    { key: 'item', label: 'On', primary: true, width: 'grow', sort: true, sortValue: r => parts(r).on, line: 1, cell: r => { const p = parts(r), el = opens(r) ? DT.primaryButton(p.on, `${p.on}. ${p.about ? `${p.about}. ` : ''}Open ${itemWords(r)}`) : DT.el('span', 'activity-item', p.on); DT.tipIf(el, p.on, () => el.scrollWidth > el.clientWidth); if (!p.detail && !p.about) return el; const cell = DT.el('span', 'activity-on'); cell.append(el); if (p.detail) cell.append(DT.el('span', 'activity-detail', p.detail)); if (p.about) cell.append(DT.el('span', 'activity-about', p.about)); return cell; } }, // the detail is its own line under the object, whole (never cut)
                     { key: 'team', label: 'Team', sort: true, sortValue: teamOf, line: 1, width: '9rem', dropAt: 52, cell: r => multipleServers() ? `${teamOf(r)} \u00b7 ${serverLabel(r.server || LOCAL_SERVER)}` : teamOf(r) }, // with several computers read, the computer is named beside the team (#15730): the card has no room for a column of it
                     { key: 'from', label: 'Done from', sort: true, sortValue: fromCell, line: 0, tone: 'tertiary', width: '11rem', dropAt: 62, cell: fromCell },
-                    { key: 'when', label: 'When', sort: 'date', sortValue: r => r.at, firstDir: 'desc', line: 1, tone: 'tertiary', align: 'end', width: '7rem', dropAt: 36, cell: r => activityTime(r.at) },
+                    { key: 'when', label: 'When', sort: 'date', sortValue: r => r.at, firstDir: 'desc', line: 1, tone: 'tertiary', align: 'end', width: '7rem', dropAt: 36, cell: r => DT.timeCell(r.at) },
                 ] });
             wrap.append(t.el);
             const gaps = missingWords(missingComputers());
