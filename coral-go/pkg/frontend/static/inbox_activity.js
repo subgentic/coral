@@ -64,11 +64,18 @@ function combineChecks(map) {
 
 const atOf = r => { const t = Date.parse(r.at); return Number.isFinite(t) ? t : -Infinity; };
 
+let emptyPages = 0;
+/** More is offered but the pages read show nothing new (every row on them is hidden): read the next page, up to 20 in a row, so Load more never lands on a blank. */
+function keepReading(need) {
+    if (more && !failed && shown().length <= need && ++emptyPages < 20) refresh(null, { next: true });
+    else emptyPages = 0;
+}
 /** Read the first page (and the record's check), or the page after the last row. Tells the sidebar when it is done. On a Hub with linked computers every online one is read on its own (one failing does not fail the folder),
  *  each action carries its computer, and the folder is the actions of all of them, newest first. */
 export function refresh(done, { next = false } = {}) {
     if (done) onChange = done;
     if (loading) return loading;
+    const need = next ? shown().length : 0; // a page that adds no visible row (all hidden 'Sent words' rows) reads on (#18545)
     const sources = sourcesNow();
     if (sources) { // a computer that left the list takes what was read from it along (#15404)
         const live = new Set(sources), gone = id => !live.has(id);
@@ -89,7 +96,7 @@ export function refresh(done, { next = false } = {}) {
                 failed = false; denied = false;
             } catch (e) { failed = true; denied = e && e.status === 403; } // 403: through Coral Hub the record is the owner's alone
             loaded = true;
-        })().finally(() => { loading = null; onChange(); });
+        })().finally(() => { loading = null; onChange(); keepReading(need); });
         return loading;
     }
     const targets = next ? sources.filter(id => moreBy[id]) : sources;
@@ -122,7 +129,7 @@ export function refresh(done, { next = false } = {}) {
         failed = answered.length === 0 && !deniedAll && settled.some(x => x.status === 'rejected');
         denied = deniedAll;
         loaded = true;
-    })().finally(() => { loading = null; onChange(); });
+    })().finally(() => { loading = null; onChange(); keepReading(need); });
     return loading;
 }
 
@@ -131,15 +138,16 @@ export function forget() { rows = []; check = null; loaded = false; more = false
 document.addEventListener('coral:signed-out', forget); // a signed-out page keeps no computer's actions (#15404)
 
 /** Team ids that appear in the record, with the names the page shows them by. */
-export const teams = () => [...new Set(rows.map(r => r.team))].sort((a, b) => teamLabel(a).localeCompare(teamLabel(b)));
+const shown = () => rows.filter(r => r.action !== 'chat_send'); // 'Sent words to an agent' stays in the record (the server still writes it) but is not a row here (the Operator, 2026-11-15, #18466); the paging still goes by every row read
+export const teams = () => [...new Set(shown().map(r => r.team))].sort((a, b) => teamLabel(a).localeCompare(teamLabel(b)));
 /** The agents and the goals the record names, for the Filters panel's lists (#14445): the agents by name, the goals by title with No goal last when any row has none. */
-export const agents = () => [...new Set(rows.map(AF.agentOf).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-export const goals = () => { const all = [...new Set(rows.map(AF.goalOf))]; return [...all.filter(g => g !== AF.NO_GOAL).sort((a, b) => a.localeCompare(b)), ...all.filter(g => g === AF.NO_GOAL)]; };
+export const agents = () => [...new Set(shown().map(AF.agentOf).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+export const goals = () => { const all = [...new Set(shown().map(AF.goalOf))]; return [...all.filter(g => g !== AF.NO_GOAL).sort((a, b) => a.localeCompare(b)), ...all.filter(g => g === AF.NO_GOAL)]; };
 export const teamOf = r => teamLabel(r.team);
-export const filtered = f => AF.ordered(rows.filter(r => AF.matches(r, f, teamOf)), f);
-export const total = () => rows.length;
+export const filtered = f => AF.ordered(shown().filter(r => AF.matches(r, f, teamOf)), f);
+export const total = () => shown().length;
 /** How many of the rows read are of a kind (the chips' counts); '' is all of them. */
-export const countKind = k => rows.filter(r => AF.inKind(r, k)).length;
+export const countKind = k => shown().filter(r => AF.inKind(r, k)).length;
 
 /** The page's table spec for the sidebar's group table. `open` has { file(row), goal(row), question(row) }: how a row's item opens (the sidebar knows the routes). */
 export function spec(f, open, { grouped = false, byTask = true, tasks, taskSignature = '' } = {}) {

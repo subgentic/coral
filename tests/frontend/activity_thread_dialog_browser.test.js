@@ -32,14 +32,16 @@ const BASE = require('./test_base').BASE;
             window.switchNavTab('hub-inbox');
             await (await import(prefix + 'inbox_sidebar.js')).openInboxGroup('activity');
         })()`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 5`, 'the page opens on Everything: all five actions');
+        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 4`, 'the page opens on Everything: four actions (the record has five: "Sent words to an agent" is not a row, #18466)');
+        assert.ok(!/Sent words to an agent|\bhello\b/.test(await ev(`document.getElementById('group-table-view').innerText`)), 'a chat_send row is not shown');
         const pills = await ev(`[...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.replace(/\\s+/g, ' ').trim()).filter(Boolean)`);
         for (const w of ['Everything', 'Decisions', 'Answers', 'Permissions', 'Files and tasks', 'Words sent']) assert.ok(pills.some(p => p.startsWith(w)), `a '${w}' chip: ${JSON.stringify(pills)}`);
         const pick = word => ev(`(() => { const b = [...document.querySelectorAll('.team-tb-pills .goals-chip')].find(x => x.textContent.trim().startsWith('${word}')); if (!b) return false; b.click(); return true; })()`);
-        for (const [word, n] of [['Words sent', 1], ['Permissions', 1], ['Answers', 1], ['Decisions', 4], ['Everything', 5]]) {
+        for (const [word, n] of [['Permissions', 1], ['Answers', 1], ['Decisions', 4], ['Everything', 4]]) {
             assert.ok(await pick(word), `the ${word} chip is there`); await ev(framesJs(4));
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === ${n}`, `${word}: ${n} row(s)`);
         }
+        assert.ok(pills.some(p => /^Words sent\s*0?$/.test(p) || p === 'Words sent'), `the Words sent chip counts none of the hidden rows: ${JSON.stringify(pills)}`);
         // the answered question opens as a thread
         await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].find(r => /Ship it/.test(r.textContent)).querySelector('button.dt-primary').click(); true`);
         await waitFor(`!!document.querySelector('dialog.activity-thread-dialog[open] .activity-thread-msg')`, 'the thread dialog opens', 8000);
