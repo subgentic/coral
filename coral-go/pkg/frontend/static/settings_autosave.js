@@ -13,7 +13,8 @@ const same = (a,b) => JSON.stringify(a) === JSON.stringify(b);
 function remember(e) { const v = read(e); for (const i of controls(e)) values.set(i,v); }
 function eligible(e) {
     return e?.matches?.('input,select,textarea') && !e.disabled && !e.readOnly &&
-        !e.closest('#settings-chief-host,#settings-dropbox,.cm-form,#settings-security,.settings-cloud-connect') &&
+        !!e.closest('[data-autosaves]') && // allow list: only a pane that says so autosaves, so a new control elsewhere (Chief, Security, a new pane) fails closed (#17364)
+        !e.closest('#settings-dropbox,.cm-form,.settings-cloud-connect') &&
         !e.id.startsWith('settings-dropbox-') && !!e.closest('.sv-row');
 }
 function status(row) {
