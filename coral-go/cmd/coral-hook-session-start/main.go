@@ -31,6 +31,10 @@ func main() {
 
 	hooks.DebugLog(fmt.Sprintf("SESSION_START RAW(%d)", len(raw))) // the size only: never the payload (#3571)
 
+	if err := hooks.PinToolsPath(os.Getenv("CLAUDE_ENV_FILE"), hooks.SelfDir()); err != nil { // this build's coral-agent first in the agent's shell (#18643)
+		hooks.DebugLog("SESSION_START PATH_PIN_ERROR")
+	}
+
 	var d map[string]any
 	if err := json.Unmarshal(raw, &d); err != nil {
 		hooks.DebugLog("SESSION_START JSON_ERROR")
