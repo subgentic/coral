@@ -4,7 +4,7 @@ import { loadStyles } from './lazy_styles.js';
 await loadStyles('sidebar_folder_rail.css');
 
 /** items: [{ key, label, icon, count? }]; here: the open key; pick(key): what the row does. */
-const RAIL_IDS = { automations: 'sidebar-rail-automations', skills: 'sidebar-rail-skills', tokens: 'sidebar-rail-tokens' };
+const RAIL_IDS = { automations: 'sidebar-rail-automations', skills: 'sidebar-rail-skills', tokens: 'sidebar-rail-tokens', queue: 'sidebar-rail-queue' };
 export function drawFolderRail(pane, noun, items, here, pick) {
     const after = document.getElementById('sidebar-rail-inbox');
     if (!after) return;

@@ -57,8 +57,7 @@ const FULL_WIDTH_VIEWS = new Set([
     "servers-view",
     "inbox-view",
     "artifacts-view",
-    "queue-view",
-]); // not skills-view: the Skills Store has its sidebar (#12997)
+]); // not skills-view or queue-view: the Skills Store has its sidebar (#12997)
 
 let _viewChanges = 0;
 const shownHooks = [];
