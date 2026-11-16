@@ -276,6 +276,9 @@ func (r *SessionReconciler) killOrphans(ctx context.Context, agents []AgentInfo)
 // marked.
 func (r *SessionReconciler) checkExited(ctx context.Context, ls store.LiveSession) {
 	name := FormatSessionName(ls.AgentType, ls.SessionID)
+	if ptymanager.StartPending(name) {
+		return // a wake's start is scheduled and not typed yet (the team's starts are spaced, up to a minute): the shell is the agent about to start, not one that exited (#18988)
+	}
 	// A shell of unknown contents is not "exited" here: marking the agent ended would let Wake type its launch line into it (Security on #216).
 	exited, fg, _ := ptymanager.AgentExitedForLaunch(ctx, r.runtime, name, ls.AgentType, ls.SessionID)
 	if !exited {
@@ -284,7 +287,14 @@ func (r *SessionReconciler) checkExited(ctx context.Context, ls store.LiveSessio
 	if r.cliMissing(ctx, ls, name) || r.hermesGatewayRefused(ctx, ls, name) {
 		return
 	}
-	if created, err := time.Parse(store.ISOFormat, ls.CreatedAt); err == nil && r.now().Sub(created) < exitedLaunchGrace {
+	// The grace runs from the last launch line Coral typed: a wake reuses its row, so created_at is long past and a wake's shell would be taken for an exit (#18988).
+	launched, lerr := time.Parse(store.ISOFormat, ls.CreatedAt)
+	if ls.LaunchedAt != nil {
+		if t, err := time.Parse(store.ISOFormat, *ls.LaunchedAt); err == nil && (lerr != nil || t.After(launched)) {
+			launched, lerr = t, nil
+		}
+	}
+	if lerr == nil && r.now().Sub(launched) < exitedLaunchGrace {
 		return
 	}
 	if err := r.sessionStore.SetSessionSleepingFor(ctx, ls.SessionID, store.SleepReasonAgentExited); err != nil {
