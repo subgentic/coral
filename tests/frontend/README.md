@@ -20,6 +20,18 @@ is no network inside. Where namespaces aren't allowed it prints a note and runs 
 - `CDP_NETLOG=1` (with `--keep`) has each shard's Chrome write its network log to
   `<shard>/netlog.json`.
 
+## The start path stays net zero
+
+`TestStartPathWeight` only holds the ceilings (baseline plus 2 percent), so a change that grows `app.js` or the start CSS by 100 bytes passes it until the room is gone. The rule is net zero against
+the change's own base. Before submitting dashboard work, from your worktree:
+
+```
+node tests/frontend/start_bytes_delta.mjs        # app.js base X head Y (+/-n), start CSS base X head Y (+/-n) (gz -9); exit 1 when either grew
+```
+
+It builds the merge-base with origin/main in a temporary worktree and your tree with the same Go test the gate uses (`go` and `git` on the PATH). A growth is fixed by moving the code into a lazy module
+(`importOnce`) or removing as much as you add; a gain in one file does not pay for the other. A deliberate raise is the Operator's.
+
 ## Fake keys in fixtures
 
 gitleaks' `generic-api-key` rule (CI's "secrets" step, `.gitleaks.toml`) reads a key-like name (`app_key`, `api_key`) assigned a value of 16 or more letters and digits as a secret, and a hit in history stays a hit. Build a key-shaped fixture at run time and never write it as one literal: a `join('')` of short parts in JS, a `+` of short string parts in Go (see `dropbox_settings.test.js` and `dropbox_app_key_test.go`), or give it an obvious `test-` prefix with words, not random characters. Check before pushing: `go run github.com/zricethezav/gitleaks/v8@v8.21.2 detect --source . --config .gitleaks.toml --no-git`, and look for your file in the report.

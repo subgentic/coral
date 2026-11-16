@@ -439,3 +439,5 @@ node cdp_args.test.mjs
 node top_nav_actions.test.mjs
 node cpu_load.test.js
 node patch_leftovers.test.mjs
+node start_bytes_delta.test.mjs
+node start_bytes_delta.mjs

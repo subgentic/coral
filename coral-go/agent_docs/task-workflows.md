@@ -335,6 +335,8 @@ route-query drift test actually run:
 - the route-query allowlist regenerator (`tools/gen_route_queries.py`), compared
   to the committed table with `git diff` — a handler that reads a new query
   parameter must regenerate `pkg/tunnel/routes_query.go`;
+- (dashboard work, before you submit it) `node tests/frontend/start_bytes_delta.mjs` prints app.js and start-CSS gzip bytes for your tree against its merge-base and exits 1 when either grew: the start
+  path stays net zero, which the ceiling test alone does not hold;
 - a scan of `origin/main..HEAD` for the operator's personal data and binaries (the
   same `scan_patch` the landing uses), invisible characters in added lines, and
   every commit's author/committer identity (each must be a role address).
