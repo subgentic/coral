@@ -63,7 +63,7 @@ const HEX = c => c.repeat(64);
         }
 
         // ── artifact_preview.js renderArtifact: one case per kind of answer ──────────────
-        await ev(`(async () => { const st = ${S}; window.AP = await import(st + 'artifact_preview.js'); return true; })()`);
+        await ev(`(async () => { const st = ${S}; window.AP = await import(st + 'artifact_preview.js'); await import(st + 'artifact_html_source.js'); /* the View source toggle is added by a lazy module after renderArtifact returns (#19434): loaded first, it is on the page by the next turn of the loop in every run, not only on a fast one */ return true; })()`);
         const D = HEX('5');
         const URI = 'coral://artifacts/' + D;
         const MANIFEST = JSON.stringify([{ name: 'one.md', uri: 'coral://artifacts/' + HEX('1'), media_type: 'text/markdown' }, { name: 'two.png', uri: 'coral://artifacts/' + HEX('2') }]);
@@ -99,6 +99,7 @@ const HEX = c => c.repeat(64);
                     return Promise.resolve(new Response(a.body, { status: 200, headers: h })); };
                 const ctx = { signal: undefined, isStale: () => false, renderContent: (b, content, path) => { calls.push(['renderContent', content, path]); b.textContent = '[rendered ' + path + ']'; }, openEntry: e => calls.push(['openEntry', e]), setMeta: m => calls.push(['setMeta', m]) };
                 try { await window.AP.renderArtifact(body, ${JSON.stringify(uri)}, ${JSON.stringify(options)}, ctx); } finally { window.fetch = R; }
+                await new Promise(r => setTimeout(r, 0)); // sleep-ok: one turn of the loop, for the (already loaded) View source toggle that renderArtifact adds after it returns (#19434)
                 return body.innerHTML + '\\n<!-- ' + JSON.stringify(calls) + ' -->'; })()`);
         }
 
