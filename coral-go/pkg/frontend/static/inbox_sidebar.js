@@ -85,7 +85,7 @@ const CF = await importOnce('./chat_filters.js'); // the chat folders' Filters (
 const AC = await importOnce('./inbox_activity.js'); // the Activity folder (#12070): what the Operator did in Needs you, from the server's record (this computer only)
 const AF = await importOnce('./operator_activity_filters.js'); // its search and Filters
 const IA = await importOnce('./inbox_artifacts.js'); // the Artifacts folder (Goal #62): every team's files in one list
-const { answerCell: agentAnswerCell, rowActions, readWholeQuestion, promptCell, promptCanSelect, promptDismiss, waitingCell } = await importOnce('./inbox_answer.js');
+const { answerCell: agentAnswerCell, rowActions, readWholeQuestion, promptCell, promptCanSelect, promptDismiss, waitingCell, goalTaskLine } = await importOnce('./inbox_answer.js');
 const { trustRows, trustGroupCell, prepareTrustRows, folderPermission } = await importOnce('./inbox_trust_group.js');
 const answerCell = (s, opts) => s.trustGroup ? trustGroupCell(s) : agentAnswerCell(s, opts); // the choices of a question or a permission, answered from the row (#10400)
 
@@ -1452,9 +1452,8 @@ wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWor
                 ...(isPhoneLayout() ? [] : serverColumns().map(c => (oneLineNeeds ? { ...c, width: '8rem', dropAt: 52 } : c))), // a phone card says the computer as a chip on its meta line (addComputerChip, #14623)
                 ...(rows.every(s => s.autorun || s.unrecorded) ? [] : [{ key: 'team', label: 'Team', ...(oneLineNeeds ? { width: '13rem', dropAt: 36 } : { max: 26, drop: 7 }), sort: true, sortValue: s => teamOf(s), line: cards ? 1 : 0, cell: s => teamOf(s) }]), // a run belongs to no team: with only runs there is no Team column
                 ...(goal || rows.some(s => s.review) ? [{ key: 'goal', label: 'Goal', ...(oneLineNeeds ? { width: '10rem', dropAt: 36 } : { min: 16, share: 1, drop: 3 }), sort: true, sortValue: s => (goalOf(s) ? s.goal.title : '\uffff'), line: rows.some(isItem) ? 2 : 0, cell: s => {
-                    // a review's goal and task come from its artifact's roll-up (#8579); they open in the Inbox, in place; "No goal" when it serves none
-                    if (s.review && !oneLineNeeds) return ''; // the goal and the task are in the opened file and the filters (#11719)
-                    if (!s.review) { if (!goalOf(s)) return ''; const l = DT.link(GS.shortTitle(s.goal.title), () => { const team = goalTeamKey(s), id = Number(s.goal.id); if (team && id) go({ view: 'inbox-goals', sub: 'goals', id: team, item: id }); }); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); l.dataset.goalId = String(s.goal.id); l.title = s.goal.title; return l; }
+                    if (s.review && !oneLineNeeds) return '';
+                    if (!s.review) { if (!oneLineNeeds) return goalTaskLine(s, DT.link, go, goalTeamKey(s)) || ''; if (!goalOf(s)) return ''; const l = DT.link(GS.shortTitle(s.goal.title), () => { const team = goalTeamKey(s), id = Number(s.goal.id); if (team && id) go({ view: 'inbox-goals', sub: 'goals', id: team, item: id }); }); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); l.dataset.goalId = String(s.goal.id); l.title = s.goal.title; return l; }
                     const cell = DT.el('span', 'inbox-review-goal');
                     if (goalOf(s)) { const l = DT.link(GS.shortTitle(s.goal.title), () => go({ ...folderRoute, id: s.review.team, item: String(s.goal.id) })); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); l.dataset.goalId = String(s.goal.id); l.title = s.goal.title; l.dataset.goalLink = String(s.goal.id); cell.append(l); } else cell.append(DT.el('span', 'inbox-review-nogoal', NO_GOAL));
                     // one line, one goal (#9060): the task is not a second link under the goal (a task named like its goal read as two goals): it is in the tooltip, and the review's preview has it as a fact
