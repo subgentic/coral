@@ -11,7 +11,7 @@ const TEAM = `qa-hint-${Date.now() % 100000}`;
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { settle, coralReady } = require('./helpers/wait').bind(ev);
-    const state = () => ev(`(() => { const t = document.getElementById('team-tabs'), b = document.getElementById('team-tabs-next'), shown = !!b && getComputedStyle(b).display !== 'none' && b.getClientRects().length > 0, r = b ? b.getBoundingClientRect() : null, tr = t.getBoundingClientRect();
+    const state = () => ev(`(() => { const t = document.getElementById('team-tabs'), b = document.getElementById('team-tabs-next'), shown = !!b && getComputedStyle(b).display !== 'none' && getComputedStyle(b).visibility !== 'hidden' && b.getClientRects().length > 0 /* at the strip's end it keeps its room, hidden (#18984) */, r = b ? b.getBoundingClientRect() : null, tr = t.getBoundingClientRect();
         return { scrolls: t.scrollWidth > t.clientWidth + 1, left: Math.round(t.scrollLeft), max: t.scrollWidth - t.clientWidth, shown, name: b ? b.getAttribute('aria-label') : null, w: r && Math.round(r.width), h: r && Math.round(r.height), atEnd: !!r && Math.abs(r.left - tr.right) <= 1,
             last: (() => { const e = document.getElementById('team-tab-branches').getBoundingClientRect(); return e.right <= tr.right + 1; })() }; })()`);
     try {

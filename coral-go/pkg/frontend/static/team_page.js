@@ -71,7 +71,7 @@ function buildOnce() {
     drawTabEdges = watchScrollCue(tabs);
     window.addEventListener('resize', () => { syncTabStop(); revealInStrip(tabs, $(`team-tab-${S.tab}`)); drawTabEdges(); });
     let stripW = tabs.clientWidth; tabs.addEventListener('scroll', () => { if (tabs.clientWidth === stripW && Math.abs(tabs.scrollLeft - (tabs._revealedTo ?? tabs.scrollLeft)) > 1) tabs._moved = true; }, { passive: true });
-    new ResizeObserver(() => { const w = tabs.clientWidth; if (w === stripW || tabs._moved) { stripW = w; return; } stripW = w; revealInStrip(tabs, $(`team-tab-${S.tab}`)); }).observe(tabs); // the Show more tabs arrow takes room beside the strip once the cue draws: the strip rests on a tab's edge at its new width, unless a person has scrolled it since the last reveal (#18906)
+    const ro = new ResizeObserver(() => { if (!tabs.isConnected) { ro.disconnect(); return; } const w = tabs.clientWidth; if (w === stripW || tabs._moved) { stripW = w; return; } stripW = w; revealInStrip(tabs, $(`team-tab-${S.tab}`)); }); ro.observe(tabs); // the strip's width changes when the page does (a turned phone, the text size): it rests on a tab's edge at its new width, unless a person has scrolled it since the last reveal (#18906); the Show more tabs arrow keeps its room while tabs wait past the strip's end, so it never changes the width itself (#18972); the observer is let go with the strip
     tabs.addEventListener('keydown', (e) => {
         const list = [...tabs.querySelectorAll('[role=tab]')].filter(b => b.getClientRects().length), i = list.indexOf(document.activeElement); // a phone's tabs behind More are not in the row
         if (i < 0) return;
