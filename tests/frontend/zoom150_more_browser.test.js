@@ -19,7 +19,6 @@ const BOARD = 'toast-zoom-' + Date.now().toString(36);
         await waitFor(`!!document.getElementById('team-tabs-row') && document.getElementById('team-tabs-row').getClientRects().length > 0`, 'the tab strip', 15000);
         await ev(`[...document.querySelectorAll('#team-page-head button')].find(b => /^More$/.test(b.textContent.trim())).click(); true`);
         await waitFor(`[...document.querySelectorAll('[role=menu], .menu')].some(m => m.getClientRects().length && /Reset team/.test(m.textContent))`, 'the menu', 5000);
-        await ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`);
         await shot('zoom-more');
         const r = await ev(`(() => { const m = [...document.querySelectorAll('[role=menu], .menu')].find(m => m.getClientRects().length && /Reset team/.test(m.textContent)), b = e => { const x = e.getBoundingClientRect(); return [Math.round(x.top), Math.round(x.bottom), Math.round(x.left), Math.round(x.right)]; };
             return { cls: m.className, menu: b(m), vh: innerHeight, items: [...m.querySelectorAll('button, [role=menuitem]')].map(e => (e.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 24) + ':' + b(e) + ':' + e.scrollHeight + '/' + e.clientHeight) }; })()`);

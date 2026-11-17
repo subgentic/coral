@@ -16,8 +16,8 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window.switchNavTab('tokens'); true`);
         await waitFor(`['cost-by-provider', 'cost-by-model', 'cost-by-agent', 'cost-by-team'].every(id => document.querySelectorAll('#' + id + ' tbody tr').length > 0) && !!document.querySelector('#cost-spend-chart svg')`, 'the analytics data', 15000);
         await ev(`[...document.querySelectorAll('#cost-dashboard-view button')].find(b => b.textContent.trim() === 'Agent').click(); true`);
-        await ev(`new Promise(r => setTimeout(r, 800))`);
-        await ev(`document.getElementById('cost-by-agent')?.scrollIntoView({ block: 'start' }); true`); await ev(`new Promise(r => setTimeout(r, 300))`);
+        await waitFor(`[...document.querySelectorAll('#cost-dashboard-view button')].some(b => b.textContent.trim() === 'Agent' && b.getAttribute('aria-pressed') === 'true') && document.querySelectorAll('#cost-by-agent tbody tr').length > 0`, 'the Agent grouping', 10000);
+        await ev(`document.getElementById('cost-by-agent')?.scrollIntoView({ block: 'start' }); true`); await waitFor(`document.getElementById('cost-by-agent') && document.getElementById('cost-by-agent').getBoundingClientRect().top < window.innerHeight - 60`, 'the table scrolled into view', 5000);
         await shot('zoom-analytics');
         const d = await ev(`(() => {
             const ICONS = /^(filter_list|notes|smart_toy|system_update|arrow_upward|arrow_downward|unfold_more|search|close|more_vert|chevron_right|expand_more)$/;
