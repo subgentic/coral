@@ -15,20 +15,23 @@ import (
 	"github.com/subgentic/coral/internal/clitext"
 )
 
-const searchUsage = `Usage: coral-board search "<text>" [--from NAME] [--mentions NAME] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--json]
-                          [--team | --all | --operator-history]`
+const searchUsage = `Usage: coral-board search "<text>" [--source messages,tasks,goals] [--state S] [--goal N] [--assignee NAME]
+                          [--from NAME] [--mentions NAME] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--json]
+                          [--team | --all | --operator-history]
+Searches this team's messages, tasks (title, body, completion message) and goals (title, outcome, done-when) at once; --source picks some. Past chats: coral-agent history search.`
 
 // cmdSearch is `coral-board search` (#11005, phase (a)): the agent's search of the messages of its OWN board (the board it was launched on), with the dashboard search's filters and paging. A hit's context is
 // `coral-board read --id <id>`. --team, --all and --operator-history ask for a wider reach on purpose; the server checks them against the operator-set level and refuses a reach above it with a line meant
 // for the Operator (relayed as it is, exit 5): never a quiet narrowing to what the agent may read.
 func cmdSearch() {
 	args := os.Args[2:]
-	valueFlags := map[string]bool{"from": true, "mentions": true, "since": true, "until": true, "sort": true, "limit": true, "cursor": true}
+	valueFlags := map[string]bool{"from": true, "mentions": true, "since": true, "until": true, "sort": true, "limit": true, "cursor": true, "source": true, "state": true, "goal": true, "assignee": true}
 	text, rest := splitTitle(args, valueFlags) // options may stand after the text, as they do for task add
 	fs := flag.NewFlagSet("search", flag.ContinueOnError)
 	from, mentions := fs.String("from", "", ""), fs.String("mentions", "", "")
 	since, until, sortBy := fs.String("since", "", ""), fs.String("until", "", ""), fs.String("sort", "", "")
 	limit, cursor := fs.String("limit", "", ""), fs.String("cursor", "", "")
+	source, state, goal, assignee := fs.String("source", "", ""), fs.String("state", "", ""), fs.String("goal", "", ""), fs.String("assignee", "", "")
 	asJSON := fs.Bool("json", false, "")
 	team, all, op := fs.Bool("team", false, ""), fs.Bool("all", false, ""), fs.Bool("operator-history", false, "")
 	clihelp.ParseFlags(fs, rest, func() string { return searchUsage })
@@ -51,7 +54,7 @@ func cmdSearch() {
 		clierr.Exit1()
 	}
 	vals := url.Values{"q": {text}}
-	for k, v := range map[string]string{"from": *from, "mentions": *mentions, "since": *since, "until": *until, "sort": *sortBy, "limit": *limit, "cursor": *cursor} {
+	for k, v := range map[string]string{"from": *from, "mentions": *mentions, "since": *since, "until": *until, "sort": *sortBy, "limit": *limit, "cursor": *cursor, "source": *source, "state": *state, "goal": *goal, "assignee": *assignee} {
 		if v != "" {
 			vals.Set(k, v)
 		}
@@ -79,10 +82,16 @@ func cmdSearch() {
 		NextCursor string           `json:"next_cursor"`
 		Truncated  bool             `json:"truncated"`
 		Messages   []map[string]any `json:"messages"`
+		Results    []map[string]any `json:"results"`
+		More       bool             `json:"more"`
 	}
 	if err := json.Unmarshal(data, &out); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		clierr.Exit1()
+	}
+	if hasResults(data) {
+		printResults(out.Board, args[0], out.Results, out.More, out.NextCursor)
+		return
 	}
 	if len(out.Messages) == 0 {
 		fmt.Printf("No messages match %q on board %s.\n", args[0], out.Board)
@@ -139,4 +148,40 @@ func hitExcerpt(content, query string) string {
 		out += "…"
 	}
 	return out
+}
+
+// hasResults says the server answered with the one result list (tasks, goals and messages together); an older server answers with messages only.
+func hasResults(data []byte) bool {
+	var probe struct {
+		Results *json.RawMessage `json:"results"`
+	}
+	return json.Unmarshal(data, &probe) == nil && probe.Results != nil
+}
+
+// printResults is the one list, a hit a line: the source and id, the time, the state, then the title and the words around the match.
+func printResults(boardName, text string, results []map[string]any, more bool, nextCursor string) {
+	if len(results) == 0 {
+		fmt.Printf("No messages, tasks or goals match %q on board %s.\n", text, boardName)
+		return
+	}
+	fmt.Printf("%d matches on board %s:\n", len(results), boardName)
+	for _, r := range results {
+		src := clitext.Clean(str(r["source"]))
+		head := fmt.Sprintf("  %s #%.0f %s", src, num(r["id"]), whenShort(str(r["at"])))
+		if st := clitext.Clean(str(r["state"])); st != "" {
+			head += " [" + st + "]"
+		}
+		line := head + "  " + clitext.Clean(str(r["title"]))
+		if sn := strings.Join(strings.Fields(clitext.Clean(str(r["snippet"]))), " "); sn != "" {
+			line += ": " + sn
+		}
+		fmt.Println(line)
+	}
+	if more {
+		fmt.Println("There are more: narrow it with --source, --state, --goal or --since/--until, or raise --limit.")
+	}
+	if nextCursor != "" {
+		fmt.Printf("More messages: coral-board search %q --source messages --cursor %s\n", text, nextCursor)
+	}
+	fmt.Println("A message: coral-board read --id <id>. A task: coral-board task detail <id>. A goal: coral-board goal show <id>.")
 }
