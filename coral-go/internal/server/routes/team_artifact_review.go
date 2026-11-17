@@ -91,9 +91,11 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct {
 		Decision string `json:"decision"`
-		Quiet    bool   `json:"quiet"`  // automatic settlement of older versions; ignore only
-		Reason   string `json:"reason"` // deny only: the Operator's one line to the uploader
-		Note     string `json:"note"`   // approve only: the Operator's one short comment to the uploader (#11888)
+		Quiet    bool   `json:"quiet"` // automatic settlement of older versions; ignore only
+		// OlderVersion: one older version of a file whose newest version's row the same click already recorded (#19139): ignore, unignore, save and unsave still apply, with no Activity row of their own.
+		OlderVersion bool   `json:"older_version"`
+		Reason       string `json:"reason"` // deny only: the Operator's one line to the uploader
+		Note         string `json:"note"`   // approve only: the Operator's one short comment to the uploader (#11888)
 		// Text is changes only (#13976): the Operator's words, made the thread comment and the agent's notice in the same step as the decision. Images is no part of this slice: its key is refused, not ignored.
 		Text   string          `json:"text"`
 		Images json.RawMessage `json:"images"`
@@ -147,10 +149,10 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 			h.settleSupersededArtifact(w, r, project, id)
 			return
 		}
-		h.ignoreArtifact(w, r, project, id, body.Decision == "ignore")
+		h.ignoreArtifact(w, r, project, id, body.Decision == "ignore", body.OlderVersion)
 		return
 	case "save", "unsave":
-		h.saveArtifact(w, r, project, id, body.Decision == "save")
+		h.saveArtifact(w, r, project, id, body.Decision == "save", body.OlderVersion)
 		return
 	default:
 		errBadRequest(w, `decision is "approve", "changes", "deny", "ignore", "unignore", "save" or "unsave"`)
@@ -330,13 +332,15 @@ func (h *BoardHandler) postReviewNotice(ctx context.Context, project, msg string
 }
 
 // ignoreArtifact is Ignore and Unignore (#11552): the Operator takes a review out of Needs you with no verdict, or puts it back. Nothing is posted and nobody is told, in either direction.
-func (h *BoardHandler) ignoreArtifact(w http.ResponseWriter, r *http.Request, project, id string, ignore bool) {
+func (h *BoardHandler) ignoreArtifact(w http.ResponseWriter, r *http.Request, project, id string, ignore, olderVersion bool) {
 	item, ok := h.teamManagedArtifact(r.Context(), project, id)
 	if !ok {
 		errNotFound(w, "this team has no such artifact")
 		return
 	}
-	r = r.WithContext(board.WithActivity(r.Context(), withFileTask(activityMetaFor(r, item.Name, ""), item)))
+	if !olderVersion { // the newest version's row says it once: a file with earlier versions is one row, not one per version (#19139)
+		r = r.WithContext(board.WithActivity(r.Context(), withFileTask(activityMetaFor(r, item.Name, ""), item)))
+	}
 	change, tags, err := h.bs.IgnoreArtifactReview(r.Context(), project, id, ignore)
 	switch {
 	case err == board.ErrNotForReview:
@@ -353,13 +357,15 @@ func (h *BoardHandler) ignoreArtifact(w http.ResponseWriter, r *http.Request, pr
 }
 
 // saveArtifact is Save for later and Move to Needs you (#11641): the Operator puts a file for review aside, or back. It stays for review (the decisions still work on it); nothing is posted and nobody is told.
-func (h *BoardHandler) saveArtifact(w http.ResponseWriter, r *http.Request, project, id string, save bool) {
+func (h *BoardHandler) saveArtifact(w http.ResponseWriter, r *http.Request, project, id string, save, olderVersion bool) {
 	item, ok := h.teamManagedArtifact(r.Context(), project, id)
 	if !ok {
 		errNotFound(w, "this team has no such artifact")
 		return
 	}
-	r = r.WithContext(board.WithActivity(r.Context(), withFileTask(activityMetaFor(r, item.Name, ""), item)))
+	if !olderVersion { // the newest version's row says it once: a file with earlier versions is one row, not one per version (#19139)
+		r = r.WithContext(board.WithActivity(r.Context(), withFileTask(activityMetaFor(r, item.Name, ""), item)))
+	}
 	change, tags, err := h.bs.SaveArtifactReview(r.Context(), project, id, save)
 	switch {
 	case err == board.ErrNotForReview:

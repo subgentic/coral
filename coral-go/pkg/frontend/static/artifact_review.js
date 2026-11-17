@@ -34,8 +34,8 @@ const timeWords = at => { const t = Date.parse(at); return Number.isNaN(t) ? '' 
 
 const NOTE_MAX = 500; // characters of the comment that goes with Approve (#11888)
 const CHANGE_WORDS_MAX = 500; // runes of the words sent with Request changes
-async function decide(team, row, decision, reason, note, quiet = false, words = '') {
-    const r = await boardFetch(team, `/artifacts/${encodeURIComponent(row.id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, ...(reason ? { reason } : {}), ...(note ? { note } : {}), ...(quiet ? { quiet: true } : {}), ...(words ? { text: words } : {}) }) });
+async function decide(team, row, decision, reason, note, quiet = false, words = '', olderVersion = false) {
+    const r = await boardFetch(team, `/artifacts/${encodeURIComponent(row.id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, ...(reason ? { reason } : {}), ...(note ? { note } : {}), ...(quiet ? { quiet: true } : {}), ...(words ? { text: words } : {}), ...(olderVersion ? { older_version: true } : {}) }) });
     const body = await r.json().catch(() => ({}));
     if (!r.ok) { const error = new Error(body.message || body.error || `Could not save the review (HTTP ${r.status}).`); error.status = r.status; error.code = body.code; throw error; }
     return body;
@@ -120,12 +120,12 @@ export async function denyRow(team, row, reason) { const h = begin();
     settled(row, h); return out;
 }
 /** Dismiss a review row: out of Needs you with no verdict and nobody told; the file stays where it is. Unignore puts it back as it was. */
-export async function ignoreRow(team, row) { const h = begin(); const out = await decide(team, row, 'ignore'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'ignore')); settled(row, h); return out; }
+export async function ignoreRow(team, row) { const h = begin(); const out = await decide(team, row, 'ignore'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'ignore', undefined, undefined, false, '', true)); settled(row, h); return out; }
 export async function unignoreRow(team, row) { const h = begin(); const out = await decide(team, row, 'unignore'); importOnce('./inbox_reviews.js').then(m => { m.reviewsChangedOnServer(); return m.refreshReviews(true); }).catch(() => {}).then(() => finish(h)); return out; }
 
 /** Save for later (#11641): out of Needs you and its counts, kept in Saved with its decisions; nobody is told. Move to Needs you (unsave) puts it back as it was. */
-export async function saveRow(team, row) { const h = begin(); const out = await decide(team, row, 'save'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'save')); settled(row, h); return out; }
-export async function unsaveRow(team, row) { const h = begin(); const out = await decide(team, row, 'unsave'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'unsave')); importOnce('./inbox_reviews.js').then(m => { m.reviewsChangedOnServer(); return m.refreshReviews(true); }).catch(() => {}).then(() => finish(h)); return out; }
+export async function saveRow(team, row) { const h = begin(); const out = await decide(team, row, 'save'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'save', undefined, undefined, false, '', true)); settled(row, h); return out; }
+export async function unsaveRow(team, row) { const h = begin(); const out = await decide(team, row, 'unsave'); out.earlier = await onEarlier(row, e => decide(e.team, e, 'unsave', undefined, undefined, false, '', true)); importOnce('./inbox_reviews.js').then(m => { m.reviewsChangedOnServer(); return m.refreshReviews(true); }).catch(() => {}).then(() => finish(h)); return out; }
 export function saySaved(team, row, out) {
     const words = `Saved for later: ${shown(row.name)}.${earlierFailure(out)}`;
     showToast(words, false, undefined, { action: { label: 'Undo', onClick: () => unsaveRow(team, row).then(() => announceNotice(`${shown(row.name)} is back in Needs you.`)).catch(e => showToast(e.message)) } });
