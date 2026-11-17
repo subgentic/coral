@@ -32,7 +32,8 @@ assert.equal(NF.clean({ ...NF.EMPTY, sort: 'oldest' }).sort, 'oldest'); assert.e
 assert.equal(agents[0].id, 1, 'the list the caller passed is not reordered');
 
 assert.deepEqual(NF.clean({ kind: 'plan', team: 5, agent: 'x'.repeat(200), longer: '7', sort: 'x' }), { ...NF.EMPTY, agent: 'x'.repeat(80) }, 'what is not valid is dropped');
-assert.deepEqual(NF.chips({ ...NF.EMPTY, q: 'x', kind: 'question', team: 'team-a', agent: 'QA', longer: '60' }).map(c => c.label), ['Search: x', 'Team: team-a', 'Agent: QA', 'Waiting longer than 1 hour'], 'the pill has no chip of its own');
+assert.deepEqual(NF.chips({ ...NF.EMPTY, q: 'x', kind: 'question', team: 'team-a', agent: 'QA', longer: '60' }).map(c => c.label), ['Filtered by: x', 'Team: team-a', 'Agent: QA', 'Waiting longer than 1 hour'], 'the pill has no chip of its own');
+assert.equal(NF.chips({ ...NF.EMPTY, q: 'Lisbon', server: 'other-box' })[0].key, 'q', 'the search stays visible before other filter chips');
 assert.equal(NF.isFiltered({ ...NF.EMPTY, kind: 'question' }), true); assert.equal(NF.isFiltered({ ...NF.EMPTY, sort: 'newest' }), false, 'the order alone does not narrow');
 assert.deepEqual(NF.without({ ...NF.EMPTY, team: 'team-a', agent: 'QA' }, 'team'), { ...NF.EMPTY, agent: 'QA' });
 
