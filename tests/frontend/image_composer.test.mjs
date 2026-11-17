@@ -10,12 +10,14 @@ try {
     const b = { ...a, session_id: 'image-b', name: 'b' };
     state.currentSession = a;
     const calls = [], pending = [], revoked = [];
-    let preview = 0;
+    let preview = 0, uploadStarted;
+    const nextUpload = () => new Promise(resolve => { uploadStarted = resolve; });
     URL.createObjectURL = () => `blob:fixture-${++preview}`;
     URL.revokeObjectURL = url => revoked.push(url);
     globalThis.fetch = window.fetch = async (url, opts = {}) => {
         if (String(url).endsWith('/api/upload')) {
             calls.push({ sid: opts.body.get('session_id'), filename: opts.body.get('file').name });
+            uploadStarted?.();
             return new Promise(resolve => pending.push(() => resolve(new Response(JSON.stringify({ path: '/uploads/fixture.png', filename: 'fixture.png' }), { status: 200 }))));
         }
         return new Response('{}', { status: 200 });
@@ -29,8 +31,10 @@ try {
     const transfer = { types: ['Files'], items: [{kind:'file',type:'image/png'}], files: [dropped, new File(['text'], 'ignore.txt', {type:'text/plain'})] };
     pane.dispatchEvent(event('dragenter', {dataTransfer:transfer}));
     assert.equal(document.getElementById('drop-overlay').style.display, 'flex');
+    const dropStarted = nextUpload();
     pane.dispatchEvent(event('drop', {dataTransfer:transfer}));
     assert.equal(document.getElementById('drop-overlay').style.display, 'none');
+    await dropStarted; // transport is lazy; wait for its request, not a timer.
     assert.deepEqual(calls, [{sid:'image-a',filename:'drop.png'}], 'drop filters non-images and uploads to its selected agent');
     state.currentSession = b;
     controls.renderAttachments();
@@ -53,9 +57,11 @@ try {
     other.dispatchEvent(event('paste',{clipboardData:clipboard}));
     assert.equal(reads,0,'other text fields retain their paste');
     const paste=event('paste',{clipboardData:clipboard});
+    const pasteStarted = nextUpload();
     input.dispatchEvent(paste);
     assert.equal(paste.defaultPrevented,true);
     assert.equal(reads,1,'clipboard files are captured synchronously');
+    await pasteStarted;
     assert.deepEqual(calls[1],{sid:'image-b',filename:'paste.png'});
     const done=settled();pending.shift()();await done;
     assert.equal(controls.getPendingAttachments(b).length,1);
