@@ -409,6 +409,9 @@ func (h *ChiefChecksHandler) DeliverScheduledCheck(ctx context.Context, job stor
 	if err != nil || c.Deleted {
 		return errors.New("check_deleted")
 	}
+	if c.Paused {
+		return nil // switched off by the Operator (#19288): this slot is not told; a one-time reminder is caught up when it is switched back on
+	}
 	key := "slot:" + strconv.FormatInt(runID, 10)
 	if c.ScheduleKind == "once" {
 		if !h.onceStillMeans(c) { // the cron line names a day and month, so it comes round again next year: a one-time reminder never fires for a year other than its own (#19245)
@@ -492,6 +495,9 @@ func (h *ChiefChecksHandler) deliverTrigger(ctx context.Context, id int64, kind 
 	ls, sub, err := h.target(ctx, t.TargetBoard, t.TargetSession)
 	if err != nil {
 		return finish("failed", "target_gone", 0)
+	}
+	if cur, e := h.sched.ChiefCheck(ctx, t.CheckID); e == nil && cur.Paused {
+		return finish("held", "reminders_off", 0) // the Operator switched this agent's reminders off (#19288); it is told once they are on again
 	}
 	if h.sessions.boardHandler != nil && h.sessions.boardHandler.IsPaused(t.TargetBoard) {
 		return finish("held", "board_paused", 0)
@@ -640,7 +646,7 @@ func (h *ChiefChecksHandler) catchUpOnce(ctx context.Context) {
 	now := h.now()
 	for i := range checks {
 		c := &checks[i]
-		if c.ScheduleKind != "once" || !c.Enabled || c.Deleted || !c.IsReminder() {
+		if c.ScheduleKind != "once" || !c.Enabled || c.Deleted || c.Paused || !c.IsReminder() {
 			continue
 		}
 		loc, err := time.LoadLocation(c.Timezone)
