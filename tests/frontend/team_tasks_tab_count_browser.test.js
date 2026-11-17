@@ -1,5 +1,5 @@
-// The team page's Tasks tab says the same number as its list's Open pill (#12248, Mobile Beta Tester #12244: the tab said 2, the list said "Open 3 / All 3"): the list's Open counts the open tasks and the ones
-// finished today, so the tab shows that count too. One task of a seeded team is finished, then the Tasks tab is opened and the tab's number is compared with the Open pill's. 1280 and 390 px, real board routes.
+// #17130: the Tasks tab and its Open pill both count strictly unfinished tasks, before and after reading the list.
+// One seeded task is finished today. 1280 and 390 px, real board routes.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam } = require('./helpers/team_page');
@@ -17,14 +17,14 @@ const TEAM = `qa-taskcount-${Date.now() % 100000}`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
             await seed(ev, TEAM);
-            if (w === 1280) { // one task finished today: Open lists it, the strict open count does not
+            if (w === 1280) { // one task finished today: Open excludes it
                 const id = await ev(`fetch('/api/board/${TEAM}/tasks?limit=50').then(r => r.json()).then(j => (j.tasks || []).find(t => t.status !== 'completed').id)`);
                 const call = (path, body) => ev(`fetch('/api/board/${TEAM}${path}', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(${JSON.stringify(body)}) }).then(r => r.status)`);
                 assert.ok(await call('/tasks/claim', { subscriber_id: 'Orchestrator', task_id: id }) < 300, 'claimed');
                 assert.ok(await call(`/tasks/${id}/complete`, { subscriber_id: 'Orchestrator', message: 'done', outcome: 'success' }) < 300, 'completed');
             }
             await openTeam(ev, waitFor, TEAM); await settle(500);
-            // #15340: before the list has ever been read (the Goals tab is open) the tab already says the list's number: the server's open total plus what was finished today
+            // #15340: before the list has ever been read (the Goals tab is open) the tab already says the list's number: the server's strict open total
             const tabNow = `(() => { const t = window.__tp.find('[role=tab]', /^Tasks\\b/); const m = t && String(t.textContent).match(/(\\d[\\d,]*)\\s*$/); return m ? Number(m[1]) : null; })()`;
             await waitFor(`${tabNow} != null`, at + 'the Tasks tab count before the list is read', 10000);
             const before = await ev(tabNow);
