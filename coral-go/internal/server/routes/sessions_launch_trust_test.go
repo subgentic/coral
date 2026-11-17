@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -28,6 +29,7 @@ type trustRig struct {
 	home   string
 	claude string
 	codex  string
+	agy    string
 	n      int
 }
 
@@ -46,6 +48,9 @@ func newTrustRig(t *testing.T) *trustRig {
 	require.NoError(t, os.WriteFile(r.claude, []byte(`{"userID":"abc"}`), 0o600))
 	require.NoError(t, os.MkdirAll(filepath.Dir(r.codex), 0o700))
 	require.NoError(t, os.WriteFile(r.codex, []byte("model = \"gpt-5\"\n"), 0o600))
+	r.agy = filepath.Join(home, ".gemini", "antigravity-cli", "settings.json")
+	require.NoError(t, os.MkdirAll(filepath.Dir(r.agy), 0o700))
+	require.NoError(t, os.WriteFile(r.agy, []byte(`{"colorScheme":"dark"}`), 0o600))
 	return r
 }
 
@@ -81,6 +86,17 @@ func (r *trustRig) claudeTrusts(t *testing.T, path string) bool {
 	return m.Projects[path]["hasTrustDialogAccepted"] == true
 }
 
+func (r *trustRig) agyTrusts(t *testing.T, path string) bool {
+	t.Helper()
+	b, err := os.ReadFile(r.agy)
+	require.NoError(t, err)
+	var m struct {
+		Trusted []string `json:"trustedWorkspaces"`
+	}
+	require.NoError(t, json.Unmarshal(b, &m))
+	return slices.Contains(m.Trusted, path)
+}
+
 func (r *trustRig) codexTrusts(t *testing.T, path string) bool {
 	t.Helper()
 	b, err := os.ReadFile(r.codex)
@@ -103,8 +119,8 @@ func TestAFolderTheLaunchMadeIsTrustedForTheAgentsThatAsk(t *testing.T) {
 	out := r.launch(t, dir, true, false, asCaller(callerDashCookie))
 	tf := trustOf(t, out)
 	assert.Equal(t, dir, tf["path"])
-	assert.ElementsMatch(t, []any{"claude", "codex"}, tf["trusted"].([]any))
-	assert.Contains(t, tf["not"].(map[string]any), "agy", "an agent type with no setting Coral can set is named")
+	assert.ElementsMatch(t, []any{"claude", "codex", "agy"}, tf["trusted"].([]any), "agy records a trusted folder in its settings file (#19128)")
+	assert.True(t, r.agyTrusts(t, dir))
 	assert.True(t, r.claudeTrusts(t, dir))
 	assert.True(t, r.codexTrusts(t, dir))
 	// the folder is the one the agents started in, and no other entry was made
@@ -180,7 +196,7 @@ func TestAnExistingFolderIsTrustedOnlyWithTheTickAndNeverHomeOrADirectChild(t *t
 	assert.False(t, r.claudeTrusts(t, existing))
 
 	out = r.launch(t, existing, false, true, dash)
-	assert.ElementsMatch(t, []any{"claude", "codex"}, trustOf(t, out)["trusted"].([]any))
+	assert.ElementsMatch(t, []any{"claude", "codex", "agy"}, trustOf(t, out)["trusted"].([]any))
 	assert.True(t, r.claudeTrusts(t, existing))
 
 	child := filepath.Join(r.home, "Documents")
@@ -206,7 +222,7 @@ func TestWhenTheClaudeFileIsNotThereTheCardStaysAndTheReplySaysSo(t *testing.T) 
 	dir := filepath.Join(r.home, "Coral", "proj")
 	out := r.launch(t, dir, true, false, asCaller(callerDashCookie))
 	tf := trustOf(t, out)
-	assert.Equal(t, []any{"codex"}, tf["trusted"])
+	assert.ElementsMatch(t, []any{"codex", "agy"}, tf["trusted"])
 	assert.Contains(t, tf["not"].(map[string]any), "claude")
 	assert.Contains(t, tf["not"].(map[string]any), "claude")
 	// #12532: a first-time Claude has no settings file, which is normal and not an error: the reply says so apart from "failed" (a real failure), and the page shows guidance, not a red error.
@@ -248,14 +264,14 @@ func TestAWorktreeIsTrustedOnlyWithTheTick(t *testing.T) {
 // Security's SHOULD (1): the folder's name is text from the disk (it can hold a quote, a line break's look-alike or a bidi mark), so the board message quotes it, with every unprintable character written out.
 func TestTheBoardNoticeQuotesTheFolderName(t *testing.T) {
 	r := newTrustRig(t)
-	name, trusted := "ap\"p\u202egnp.exe", []any{"claude"} // Codex refuses a name with a quote, Claude does not
+	name, trusted := "ap\"p\u202egnp.exe", []any{"agy", "claude"} // Codex refuses a name with a quote, Claude and agy (a JSON list) do not
 	if runtime.GOOS == "windows" {
-		name, trusted = "ap'p\u202egnp.exe", []any{"claude"} // Windows forbids a double quote in a folder's name; Codex refuses a single quote there (its key is a TOML literal string)
+		name, trusted = "ap'p\u202egnp.exe", []any{"agy", "claude"} // Windows forbids a double quote in a folder's name; Codex refuses a single quote there (its key is a TOML literal string)
 	}
 	dir := filepath.Join(r.home, "Code", name)
 	require.NoError(t, os.MkdirAll(dir, 0o755))
 	out := r.launch(t, dir, false, true, asCaller(callerDashCookie))
-	assert.Equal(t, trusted, trustOf(t, out)["trusted"])
+	assert.ElementsMatch(t, trusted, trustOf(t, out)["trusted"])
 	notices := r.trustNotices(t, out["board"].(string))
 	require.Len(t, notices, 1, "%v", notices)
 	cleaned := strings.ReplaceAll(dir, "\u202e", "") // noticeText removes a bidi mark
@@ -287,7 +303,7 @@ func TestATickedFolderTypedThroughALinkIsTrustedAtTheFolderItNames(t *testing.T)
 	out := r.launch(t, typed, false, true, asCaller(callerDashCookie))
 	tf := trustOf(t, out)
 	assert.Equal(t, real, tf["path"], "the reply names the folder the agents' CLIs will ask about")
-	assert.ElementsMatch(t, []any{"claude", "codex"}, tf["trusted"].([]any))
+	assert.ElementsMatch(t, []any{"claude", "codex", "agy"}, tf["trusted"].([]any))
 	assert.True(t, r.claudeTrusts(t, real), "Claude asks about the folder the link names")
 	assert.True(t, r.codexTrusts(t, real))
 	assert.False(t, r.claudeTrusts(t, typed), "the path as typed, through the link, is not an entry of its own")
