@@ -63,7 +63,13 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(rows.hint.split(/\s+/).length <= 20 && /\.$/.test(rows.hint), at + 'one short sentence: ' + rows.hint);
             assert.equal(rows.statusTitle, 'Status');
             assert.ok(!/About/.test(rows.aboutWords), at + 'no About header');
-            assert.ok(/Unknown|OK|Busy|Stalled/.test(rows.aboutWords) && /(not connected|waiting|Waiting|reading)/i.test(rows.aboutWords), at + 'the machine state is in words, and an unknown one says why: ' + rows.aboutWords.replace(/\s+/g, ' '));
+            // ST10 moved computer health out of Settings; check the separate read-only dialog.
+            await ev(`import(${S} + 'computer_status.js').then(m => m.showComputerStatus()).then(() => true)`);
+            await waitFor(`!!document.querySelector('#computer-status-dialog[open] .machine-health-card')`, 'computer status dialog', 8000);
+            const computerWords = await text('#machine-health-local');
+            assert.ok(/Unknown|OK|Busy|Stalled/.test(computerWords) && /(not connected|waiting|Waiting|reading)/i.test(computerWords), at + 'the computer state is in words, and an unknown one says why: ' + computerWords);
+            await ev(`document.querySelector('#computer-status-dialog .modal-footer button').click(); true`);
+            await waitFor(`!document.getElementById('computer-status-dialog')`, 'computer status closed', 3000);
             if (!mobile) assert.ok(rows.level.select.left > rows.level.label.right - 4, at + 'the level select sits at the right of its question ' + JSON.stringify(rows.level));
             else assert.ok(rows.level.select.top >= rows.level.label.bottom - 2, at + 'on a phone the select is under its question');
             // 1c. Learn more comes after the short line in the Coral Hub and Manage groups (#7626, UI/UX)
