@@ -8,8 +8,14 @@ import { whenText } from './when_text.js';
 import { loadStyles } from './lazy_styles.js';
 import { showToast } from './notifications.js';
 import { importOnce } from './import_once.js';
-import { askParts, askSubjects, fromAnotherComputer, buttonsOffered, noteButtonsOwnerOnly, yesNoButtons, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, operatorAsks, askKey, replyToAsk as replyOnBoard, closeAnsweredDuplicates, forgetAsk, questionContextNote } from './operator_asks.js';
+import { askWhole, listsOf, withoutOperator, askSubjects, fromAnotherComputer, buttonsOffered, noteButtonsOwnerOnly, yesNoButtons, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, operatorAsks, askKey, replyToAsk as replyOnBoard, closeAnsweredDuplicates, forgetAsk, questionContextNote } from './operator_asks.js';
 const replyToAsk = (a, text) => a.kind === 'agent' ? importOnce('./agent_ask_answer.js').then(m => m.answerAgentAsk(a, text)) : replyOnBoard(a, text); // a single agent's question (#18106) is answered in its conversation, not on a board
+/** The dialog names the asker and team; the complete question is shown once in its body (#12722). */
+export function askParts(a) {
+    return { title: a && a.kind === 'agent' ? markHidden(a.asker || 'Agent', { strict: true }) : `${markHidden(a.asker || 'Agent', { strict: true })} · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`, // a single agent has no team
+        body: listsOf(withoutOperator(askWhole(a))) };
+}
+
 await loadStyles('operator_ask_dialog.css');
 const { askPageLabel, openAskPage } = await importOnce('./ask_open_page.js'); // loaded with the dialog, never at startup (#18768)
 
