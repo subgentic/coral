@@ -10,7 +10,7 @@ const HEX = 'e'.repeat(64);
 const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behind a flag and backfill in batches of 500 rows.', '2. Switch reads to the new columns.', ''].join('\n');
 
 (async () => {
-    const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const S = `(window.__coralStatic || '/static/')`;
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
@@ -58,7 +58,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
         await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`, 'the document', 8000);
         await waitFor(`document.querySelectorAll('.ac-card').length >= 1`, 'the threads', 8000);
         await ev(`(() => { const t = document.querySelector('.ac-toggle'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click(); return true; })()`);
-        await sleep(300); // sleep-ok: the panel opens over a frame or two
+        await waitFor(`(() => { const t = document.querySelector('.ac-toggle'), p = document.querySelector('.ac-panel'); return !!t && t.getAttribute('aria-expanded') === 'true' && !!p && p.getBoundingClientRect().width > 0; })()`, 'the comments panel is open', 8000);
     };
 const UNDERSIZED = `(() => {
     const out = [];
