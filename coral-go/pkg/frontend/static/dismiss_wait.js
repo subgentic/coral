@@ -38,7 +38,7 @@ function saidDismiss(text, session) {
 /** The keyboard stays in the list (#17226): called before the write, it notes the row beside the one this button is in (the next, or the previous at the end); the function it returns, called after the list is drawn again, puts the
  *  focus on that row's first control. Only for the keyboard that was on the button; a pointer's press moves nothing. */
 function keepNeighbour(button) {
-    const tr = button && document.activeElement === button && button.closest('tr'), near = tr && (tr.nextElementSibling || tr.previousElementSibling), key = near && near.dataset.key;
+    const tr = button && button.closest('tr'), kb = tr && tr.contains(document.activeElement), near = kb && (tr.nextElementSibling || tr.previousElementSibling), key = near && near.dataset.key; // the keyboard was on the button or in its row's menu
     return async () => {
         if (!key) return;
         for (let i = 0; i < 90 && tr.isConnected; i++) await new Promise(r => requestAnimationFrame(r));
