@@ -62,11 +62,11 @@ const { coralReady } = require('./helpers/wait');
                 assert.match(sent.ask || '', /^please add a summary table at the top/, 'one line of what was asked for, without the Changes requested: prefix: ' + JSON.stringify(sent));
                 assert.ok(!sent.slow, 'the grey Changes requested text after the title is gone (the chip says it)');
                 if (width === 1280) assert.ok(/inbox-age$/.test((sent.age || '').split('|')[0]) && /5 min|under 1 min/.test(sent.age), 'the time counts from the send-back (5 min), neutral, not amber for the 3 h upload: ' + sent.age);
-                assert.equal(quiet.chip, null, 'a file still waiting for the Operator has no chip'); assert.ok((width !== 1280 || quiet.forReview) && quiet.primary === true, 'and keeps For review and the blue Approve: ' + JSON.stringify(quiet));
+                assert.equal(quiet.chip, null, 'a file still waiting for the Operator has no chip'); assert.ok((width !== 1280 || quiet.forReview) && quiet.primary === false, 'and keeps For review and a Default Approve (#17450): ' + JSON.stringify(quiet));
                 // a new version: the agent uploads again and the row is back to needing review as before
                 await ev(`(() => { const it = window.__reviewItems[1]; it.tags = ['for review']; delete it.review; return import((window.__coralStatic||'/static/')+'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true); })()`);
                 await waitFor(`!(${row('Sent back file.txt')}).querySelector('.inbox-sent-back')`, 'the chip is gone when the tag is');
-                const back = await info('Sent back file.txt'); assert.ok((width !== 1280 || back.forReview) && back.primary === true, 'back to needing review with the blue Approve: ' + JSON.stringify(back));
+                const back = await info('Sent back file.txt'); assert.ok((width !== 1280 || back.forReview) && back.primary === false, 'back to needing review with a Default Approve: ' + JSON.stringify(back));
                 console.log('PASS sent-back state ' + width);
             } catch (error) { failures.push(width + ': ' + error.message); console.error(failures.at(-1)); }
         }
