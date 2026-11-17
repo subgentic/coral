@@ -44,7 +44,7 @@ export const inKind = (r, k) => { const ks = kindsOf(k); return !ks.length || ks
 export const NOISE_ACTIONS = ['wait_send', 'hub_update_check', 'mark_read', 'mark_unread', 'agents_record'];
 /** Whether a row is left out by the Important view: the one rule the rows and the counts both use. */
 export const isNoise = r => NOISE_ACTIONS.includes(r.action);
-export const passesImportant = (r, f) => !(f && f.important === true && isNoise(r));
+export const passesImportant = (r, f) => !(f && f.important === true && !f.action && isNoise(r)); // an action the person picked is shown even if it is a delivery note (#19219)
 
 export const NO_GOAL = 'No goal';
 /** The agent a row is about, when the record says (#14445): who asked, for an ask (an older answer kept the asker as its title), or the agent named by a prompt, wait or chat row; '' for a row about no agent. */
@@ -69,7 +69,7 @@ const model = defineFilters({
     server: { type: 'text', max: 200, chip: v => `Computer: ${serverNames.get(v) || v}` }, // which computer's record a row came from (a Hub-served dashboard reads several, #15730)
     agent: { type: 'text', max: 80, chip: v => `Agent: ${v}` },
     goal: { type: 'text', max: 200, chip: v => `Goal: ${v}` }, // the goal a row served, or "No goal", as Needs you says it (#14445)
-    important: { type: 'custom', empty: false, clean: v => v === true, filtered: v => v === true, clear: f => ({ ...f, important: false }) }, // the Important view (#19149): no chip repeats it, the pill is its control
+    important: { type: 'custom', empty: true, clean: v => v !== false, filtered: v => v === false, clear: f => ({ ...f, important: true }) }, // the Important view (#19149) is the page's own default, so it is the empty state: it is not a filter the person set (no Clear filters, no 'no match' wording); Everything is the one choice that differs, and Clear filters returns to Important. No chip repeats it, the pill is its control
     kind: { type: 'custom', empty: [], clean: v => kindsOf(v), filtered: v => kindsOf(v).length > 0, clear: f => ({ ...f, kind: [] }) }, // the chips of the toolbar are these (several at once); no filter chip repeats them over the strip (#16087)
     decision: { type: 'choice', values: DECISIONS, chip: v => `Decision: ${DECISION_LABEL[v]}` },
     action: { type: 'choice', values: ACTIONS, chip: v => `Action: ${ACTION_LABEL[v]}` },
@@ -81,16 +81,8 @@ export const { EMPTY, clean, isFiltered, isQuery, chips, without } = model;
 export const storageKey = () => 'coral-inbox-activity-filters';
 const kept = model.persist(storageKey);
 /** The filters kept in this browser for the folder, or the empty ones (the search words are not kept: a page opened later starts with an empty box). */
-/** A browser that kept nothing, or a record from before Important existed (no Important field), opens on Important (#19149, one time); a record saved with the field keeps its choice, Everything included. */
-export const loadFilters = () => {
-    let raw = null;
-    try { raw = browserLocal.get(storageKey('inbox-activity')); } catch { raw = null; }
-    if (raw == null) return { ...EMPTY, important: true };
-    const f = { ...kept.load('inbox-activity', browserLocal), q: '' };
-    let hasField = false;
-    try { const o = JSON.parse(raw); hasField = !!o && typeof o === 'object' && 'important' in o; } catch { hasField = false; }
-    return hasField ? f : { ...f, important: true };
-};
+/** The filters kept in this browser. Important is the default (the model's empty state): a browser that kept nothing, or a record from before Important existed (no Important field), opens on it (#19149); a record that says Everything (important false) keeps it. */
+export const loadFilters = () => ({ ...kept.load('inbox-activity', browserLocal), q: '' });
 /** Kept always, Everything too: removing the record would bring Important back on the next page. */
 export const saveFilters = f => { try { browserLocal.set(storageKey('inbox-activity'), JSON.stringify({ ...clean(f), q: '' })); } catch { /* storage unavailable: the choice lasts until the page is closed */ } };
 
