@@ -1,19 +1,23 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/subgentic/coral/internal/clierr"
 	"github.com/subgentic/coral/internal/clihelp"
+	"github.com/subgentic/coral/internal/safego"
 )
 
 const resourceUsageText = `Usage: coral-board resource <subcommand> [args]
@@ -26,7 +30,7 @@ The queue is cooperation, not isolation: it tells the team who is using a machin
   resource list [--json]                          Every resource: slots, who holds them, the line in order
   resource status <name> [--json]                 One resource, and your place
   resource info <name> [--json]                   What it is for: its description (what it runs, how to reach it, its rules) and the machine's stats now
-  resource claim <name> [--wait] [--timeout 30m] [--note "why"]
+  resource claim <name> [--wait] [--timeout 30m] [--note "why"] [--run -- <command>]
                                                   A slot now (exit 0), or a place in line: with --wait the command waits until the slot is yours
   resource release <name>                         Give the slot back, or leave the line
   resource renew <name>                           A full lease from now
@@ -338,7 +342,14 @@ func resourceClaim(rest []string) {
 	wait := fs.Bool("wait", false, "wait in line until the slot is yours")
 	timeout := fs.Duration("timeout", 0, "give up waiting after this long (0: wait as long as it takes)")
 	note := fs.String("note", "", "why, for the others to read")
+	run := fs.Bool("run", false, "after the grant, run the command that follows -- here, keep the slot while it runs and give it back when it ends (#18488)")
 	clihelp.ParseFlags(fs, rest[1:], func() string { return resourceUsageText })
+	cmdArgs := fs.Args()
+	if *run && len(cmdArgs) == 0 {
+		fmt.Fprintln(os.Stderr, "resource claim --run needs a command: coral-board resource claim "+rest[0]+" --wait --run -- <command>")
+		exitFn(1)
+		return
+	}
 	me := resolveSubscriberID()
 	body := map[string]any{"subscriber_id": me, "note": flagText(*note, "note"), "parent_pid": os.Getppid()} // the shell that runs this command: a job in the background keeps the slot while it runs
 	data, status, err := resourceCall("POST", "/"+name+"/claim", body)
@@ -350,14 +361,18 @@ func resourceClaim(rest []string) {
 		Granted bool `json:"granted"`
 		Place   int  `json:"place"`
 		Entry   struct {
-			Member  string `json:"member"`
-			Machine string `json:"machine"`
+			Member     string `json:"member"`
+			Machine    string `json:"machine"`
+			LeaseUntil string `json:"lease_until"`
 		} `json:"entry"`
 	}
 	_ = json.Unmarshal(data, &res)
 	if res.Granted {
 		fmt.Printf("You hold a slot of %s%s. As an agent, it goes back when THIS command (tool call) ends: claim and run the work in the same command. Release early with: coral-board resource release %s\n", rest[0], onWords(res.Entry.Machine, res.Entry.Member), rest[0])
 		claimHowTo(name)
+		if *run {
+			runUnderClaim(name, me, cmdArgs, res.Entry.LeaseUntil)
+		}
 		return
 	}
 	fmt.Printf("%s is busy: you are number %d in line.\n", rest[0], res.Place)
@@ -384,6 +399,9 @@ func resourceClaim(rest []string) {
 		if res.Granted {
 			fmt.Printf("Your turn: you hold a slot of %s%s. As an agent, it goes back when THIS command (tool call) ends: claim and run the work in the same command. Release early with: coral-board resource release %s\n", rest[0], onWords(res.Entry.Machine, res.Entry.Member), rest[0])
 			claimHowTo(name)
+			if *run {
+				runUnderClaim(name, me, cmdArgs, res.Entry.LeaseUntil)
+			}
 			return
 		}
 		if res.Place != last {
@@ -396,6 +414,53 @@ func resourceClaim(rest []string) {
 			exitFn(4)
 			return
 		}
+	}
+}
+
+// runUnderClaim runs the command of `resource claim --run -- <command>` here, after the slot is granted, and ties the slot to the run itself (#18488): it renews the lease while the command runs (a run longer than the
+// lease keeps its slot), stops the command if the slot is lost (kicked, or the lease ran out), and gives the slot back when the command ends, whatever started this process: the shell that launched it ending, a
+// background script or a tool call finishing does not matter, because this process is the one the claim follows. The exit code is the command's own (1 when the slot was lost).
+func runUnderClaim(name, me string, args []string, leaseUntil string) {
+	command := heavyCommand(args)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	runCtx, cancelRun := context.WithCancel(ctx)
+	defer cancelRun()
+	lost := make(chan struct{})
+	var lease time.Duration
+	if t, err := time.Parse(time.RFC3339Nano, leaseUntil); err == nil {
+		lease = time.Until(t)
+	}
+	go func() {
+		defer safego.Recover("resource/renew")
+		tick := time.NewTicker(heavyRenewEvery(lease))
+		defer tick.Stop()
+		for {
+			select {
+			case <-runCtx.Done():
+				return
+			case <-tick.C:
+				if _, status, err := resourceCall("POST", "/"+name+"/renew", map[string]any{"subscriber_id": me}); err == nil && status == http.StatusConflict {
+					close(lost)
+					cancelRun()
+					return
+				}
+			}
+		}
+	}()
+	code := heavyRunLocal(runCtx, command)
+	wasLost := false
+	select {
+	case <-lost:
+		wasLost = true
+		fmt.Printf("this run lost its slot of %s (kicked, or its lease ran out): it was stopped so it does not run beside the next agent's\n", plainText(name))
+	default:
+	}
+	code = heavyFinalCode(code, wasLost)
+	_, _, _ = resourceCall("POST", "/"+name+"/release", map[string]any{"subscriber_id": me})
+	fmt.Printf("%s given back (exit %d)\n", plainText(name), code)
+	if code != 0 {
+		exitFn(code)
 	}
 }
 

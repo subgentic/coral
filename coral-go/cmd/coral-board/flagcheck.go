@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -55,7 +56,10 @@ func checkKnownFlags(args []string) error {
 	case "queue":
 		spec = jsonOnly
 	case "resource":
-		spec = clihelp.FlagSpec{Bools: []string{"--json", "--wait", "--here", "--remote", "--dry-run"}, Values: []string{"--timeout", "--note", "--slots", "--machine", "--lease", "--allow", "--match", "--pool", "--description", "--facts", "--weight", "--needs"}, Positional: 12}
+		spec = clihelp.FlagSpec{Bools: []string{"--json", "--wait", "--here", "--remote", "--dry-run", "--run"}, Values: []string{"--timeout", "--note", "--slots", "--machine", "--lease", "--allow", "--match", "--pool", "--description", "--facts", "--weight", "--needs"}, Positional: 12}
+		if slices.Contains(rest, "--") {
+			spec.Positional = -1 // claim --run -- <command>: everything after -- is the command (#18488)
+		}
 	case "heavy":
 		spec = clihelp.FlagSpec{Values: []string{"--pool", "--timeout"}, Positional: -1} // everything after -- is the command
 	case "ask":
