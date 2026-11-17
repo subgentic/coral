@@ -42,7 +42,13 @@ type ChiefCheck struct {
 	At            string `db:"at_time" json:"at"`
 	Timezone      string `db:"timezone" json:"timezone"`
 	Deleted       bool   `db:"deleted" json:"-"`
+	Origin        string `db:"origin" json:"origin"`         // who set it (#19162): "chief" (Chief's own checks), or "operator", "agent", "orchestrator" for a reminder
+	CreatedBy     string `db:"created_by" json:"created_by"` // that setter's name, for the notice
+	Paused        bool   `db:"paused" json:"paused"`         // the Operator switched the agent's reminders off (#19288)
 }
+
+// IsReminder is whether the check is a reminder set for an agent (#19162) rather than one of Chief's own checks.
+func (c ChiefCheck) IsReminder() bool { return c.Origin != "" && c.Origin != "chief" }
 
 // ChiefCron produces only the supported five-field schedules, never approximations.
 func ChiefCron(c ChiefCheck) (string, error) {
@@ -57,6 +63,14 @@ func ChiefCron(c ChiefCheck) (string, error) {
 	}
 	if _, err := time.LoadLocation(c.Timezone); err != nil {
 		return "", errors.New("invalid timezone")
+	}
+	if c.ScheduleKind == "once" { // a reminder's one time (#19162): the cron line names that minute, day and month, and the check is switched off once it has fired (FinishOnceCheck)
+		loc, _ := time.LoadLocation(c.Timezone)
+		at, err := time.ParseInLocation("2006-01-02T15:04", c.At, loc)
+		if err != nil || at.Format("2006-01-02T15:04") != c.At {
+			return "", errors.New("time must be YYYY-MM-DDTHH:mm")
+		}
+		return fmt.Sprintf("%d %d %d %d *", at.Minute(), at.Hour(), at.Day(), int(at.Month())), nil
 	}
 	if c.ScheduleKind == "interval" {
 		switch c.EveryMinutes {
@@ -82,7 +96,7 @@ func ChiefCron(c ChiefCheck) (string, error) {
 	return fmt.Sprintf("%d %d * * %s", at.Minute(), at.Hour(), days), nil
 }
 
-const chiefCheckCols = `c.id,c.job_id,c.revision,c.name,c.instruction,c.target_board,c.target_session,c.notify_mode,c.source_key,c.wake_if_asleep,j.enabled,j.paused_reason,c.schedule_kind,c.every_minutes,c.at_time,j.timezone,c.deleted`
+const chiefCheckCols = `c.id,c.job_id,c.revision,c.name,c.instruction,c.target_board,c.target_session,c.notify_mode,c.source_key,c.wake_if_asleep,j.enabled,j.paused_reason,c.schedule_kind,c.every_minutes,c.at_time,j.timezone,c.deleted,c.origin,c.created_by,c.paused`
 
 func (s *ScheduleStore) ChiefCheck(ctx context.Context, id int64) (*ChiefCheck, error) {
 	var c ChiefCheck
@@ -137,7 +151,7 @@ func (s *ScheduleStore) SaveChiefCheck(ctx context.Context, c ChiefCheck) (*Chie
 			return nil, err
 		}
 		c.JobID, _ = res.LastInsertId()
-		res, err = tx.ExecContext(ctx, `INSERT INTO chief_checks(job_id,revision,name,instruction,target_board,target_session,notify_mode,source_key,wake_if_asleep,schedule_kind,every_minutes,at_time) VALUES(?,1,?,?,?,?,?,?,?,?,?,?)`, c.JobID, c.Name, c.Instruction, c.TargetBoard, c.TargetSession, c.NotifyMode, c.SourceKey, c.WakeIfAsleep, c.ScheduleKind, c.EveryMinutes, c.At)
+		res, err = tx.ExecContext(ctx, `INSERT INTO chief_checks(job_id,revision,name,instruction,target_board,target_session,notify_mode,source_key,wake_if_asleep,schedule_kind,every_minutes,at_time,origin,created_by) VALUES(?,1,?,?,?,?,?,?,?,?,?,?,?,?)`, c.JobID, c.Name, c.Instruction, c.TargetBoard, c.TargetSession, c.NotifyMode, c.SourceKey, c.WakeIfAsleep, c.ScheduleKind, c.EveryMinutes, c.At, originOrChief(c.Origin), c.CreatedBy)
 		if err != nil {
 			return nil, err
 		}
@@ -445,4 +459,30 @@ func (s *ScheduleStore) PruneChiefHistory(ctx context.Context, now time.Time) er
 		return err
 	}
 	return tx.Commit()
+}
+
+func originOrChief(o string) string {
+	if o == "" {
+		return "chief"
+	}
+	return o
+}
+
+// FinishOnceCheck switches a one-time reminder off once its trigger has begun, so its yearly cron line does not fire again (#19162). The trigger stays, and stays open until it is resolved.
+func (s *ScheduleStore) FinishOnceCheck(ctx context.Context, checkID int64) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE scheduled_jobs SET enabled=0,updated_at=? WHERE id=(SELECT job_id FROM chief_checks WHERE id=? AND schedule_kind='once')`, nowUTC(), checkID)
+	return err
+}
+
+// SetRemindersPaused switches every reminder (never Chief's own checks) for one agent on a team off or back on, without deleting any, and says how many rows changed (#19288).
+func (s *ScheduleStore) SetRemindersPaused(ctx context.Context, board, sessionID string, paused bool) (int64, error) {
+	v := 0
+	if paused {
+		v = 1
+	}
+	res, err := s.db.ExecContext(ctx, `UPDATE chief_checks SET paused=? WHERE target_board=? AND target_session=? AND deleted=0 AND origin NOT IN ('','chief') AND paused!=?`, v, board, sessionID, v)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }

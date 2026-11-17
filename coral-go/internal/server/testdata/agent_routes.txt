@@ -589,6 +589,14 @@ b DELETE /api/chief/checks/{checkID}
 b POST /api/chief/checks/{checkID}/run
 b GET /api/chief/triggers
 a POST /api/chief/triggers/{triggerID}/state
+# #19162: reminders for any agent. The handler decides who may do what: the person, the agent for itself, the team's Orchestrator for its members while its access grant is on.
+a GET /api/reminders
+a POST /api/reminders
+a GET /api/reminders/{reminderID}
+a DELETE /api/reminders/{reminderID}
+a POST /api/reminders/{reminderID}/done
+b GET /api/reminders/agents
+b POST /api/reminders/agents/{sessionID}/switch
 # #13613: the resource queue. An agent claims, releases and renews a slot and reads the line; defining, removing and reordering are for the Operator or an Orchestrator, which the handler decides (an Orchestrator is an agent token, so these are not operatorOnlyRoutes).
 a DELETE /api/resources/entries/{id}
 a DELETE /api/resources/{name}

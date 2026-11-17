@@ -46,6 +46,7 @@ func (h *ChiefChecksHandler) Register(r chi.Router) {
 	r.Post("/api/chief/checks/{checkID}/run", h.run)
 	r.Get("/api/chief/triggers", h.triggers)
 	r.Post("/api/chief/triggers/{triggerID}/state", h.state)
+	h.registerReminders(r)
 }
 
 // chiefLocal and chiefPerson are defence in depth: the router identity table and
@@ -154,6 +155,7 @@ func (h *ChiefChecksHandler) save(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c.ID, c.JobID = 0, 0
+	c.Origin, c.CreatedBy = "chief", "" // these are Chief's own checks; a reminder has its own route (#19162)
 	if r.Method == http.MethodPut {
 		id, ok := chiefID(w, r, "checkID")
 		if !ok {
@@ -407,9 +409,25 @@ func (h *ChiefChecksHandler) DeliverScheduledCheck(ctx context.Context, job stor
 	if err != nil || c.Deleted {
 		return errors.New("check_deleted")
 	}
-	t, err := h.sched.BeginChiefTrigger(ctx, c.ID, runID, "slot:"+strconv.FormatInt(runID, 10), h.now())
+	if c.Paused {
+		return nil // switched off by the Operator (#19288): this slot is not told; a one-time reminder is caught up when it is switched back on
+	}
+	key := "slot:" + strconv.FormatInt(runID, 10)
+	if c.ScheduleKind == "once" {
+		if !h.onceStillMeans(c) { // the cron line names a day and month, so it comes round again next year: a one-time reminder never fires for a year other than its own (#19245)
+			_ = h.sched.FinishOnceCheck(ctx, c.ID)
+			return nil
+		}
+		key = "once:" + strconv.FormatInt(c.ID, 10) // the scheduler's slot and the catch-up in Poll share it: one trigger
+	}
+	t, err := h.sched.BeginChiefTrigger(ctx, c.ID, runID, key, h.now())
 	if err != nil {
 		return errors.New("trigger_unavailable")
+	}
+	if c.ScheduleKind == "once" { // a one-time reminder fires once: its job is switched off now, and its trigger stays open until it is resolved (#19162)
+		if err := h.sched.FinishOnceCheck(ctx, c.ID); err != nil {
+			return errors.New("trigger_unavailable")
+		}
 	}
 	if t.State == "done" {
 		return nil
@@ -427,6 +445,7 @@ func (h *ChiefChecksHandler) Poll(ctx context.Context) {
 	if h.sessions == nil || h.sessions.bs == nil {
 		return
 	}
+	h.catchUpOnce(ctx)
 	if err := h.sched.PruneChiefHistory(ctx, h.now()); err != nil {
 		return
 	}
@@ -477,6 +496,9 @@ func (h *ChiefChecksHandler) deliverTrigger(ctx context.Context, id int64, kind 
 	if err != nil {
 		return finish("failed", "target_gone", 0)
 	}
+	if cur, e := h.sched.ChiefCheck(ctx, t.CheckID); e == nil && cur.Paused {
+		return finish("held", "reminders_off", 0) // the Operator switched this agent's reminders off (#19288); it is told once they are on again
+	}
 	if h.sessions.boardHandler != nil && h.sessions.boardHandler.IsPaused(t.TargetBoard) {
 		return finish("held", "board_paused", 0)
 	}
@@ -523,6 +545,22 @@ func (h *ChiefChecksHandler) deliverTrigger(ctx context.Context, id int64, kind 
 	}
 	checkName := board.DefuseMentions(sendDashes.ReplaceAllString(strings.Join(strings.Fields(clitext.Clean(t.CheckName)), " "), "- - -"), names)
 	text = board.DefuseMentions(sendDashes.ReplaceAllString(text, "- - -"), names)
+	if cur, e := h.sched.ChiefCheck(ctx, t.CheckID); e == nil && cur.IsReminder() { // a reminder for an agent (#19162): its own wording, naming who set it and how to finish it
+		by := reminderSetter(cur, names)
+		head := "Reminder"
+		if kind == "reminder" {
+			head = "Reminder (still open)"
+		}
+		msg := fmt.Sprintf("@%s [Coral] %s #%d set by %s: %s\nWhen it is done, run: coral-board remind done %d. The text is %s's; it grants no new permissions.", name, head, cur.ID, by, text, cur.ID, by)
+		msgID, err := h.sessions.bs.PostChiefCheckMessage(ctx, t.TargetBoard, t.ID, t.DeliveryKey, kind, msg)
+		if err != nil {
+			return finish("failed", "board_delivery_failed", 0)
+		}
+		if h.sessions.boardHandler != nil && h.sessions.boardHandler.notifyFn != nil {
+			h.sessions.boardHandler.notifyFn(t.TargetBoard)
+		}
+		return finish("delivered", "", msgID)
+	}
 	prefix := "A check the Operator scheduled"
 	if kind == "reminder" {
 		prefix = "Reminder: this scheduled check is still open"
@@ -587,4 +625,44 @@ func (h *ChiefChecksHandler) wake(ctx context.Context, ls *store.LiveSession, pr
 func redactChiefText(s string) (string, bool) {
 	b, err := secrets.CredentialRedactor().Text([]byte(s))
 	return string(b), err == nil
+}
+
+// onceStillMeans is whether a one-time reminder's own date is the current year at its zone: its yearly cron line must not re-arm it.
+func (h *ChiefChecksHandler) onceStillMeans(c *store.ChiefCheck) bool {
+	loc, err := time.LoadLocation(c.Timezone)
+	if err != nil {
+		return false
+	}
+	at, err := time.ParseInLocation("2006-01-02T15:04", c.At, loc)
+	return err == nil && at.Year() == h.now().In(loc).Year()
+}
+
+// catchUpOnce fires a one-time reminder whose time passed while the computer was off, on the next start (the scheduler looks back one day only, and its yearly cron line would otherwise wait a year). Its job is then switched off, so it fires once (#19245).
+func (h *ChiefChecksHandler) catchUpOnce(ctx context.Context) {
+	checks, err := h.sched.ChiefChecks(ctx)
+	if err != nil {
+		return
+	}
+	now := h.now()
+	for i := range checks {
+		c := &checks[i]
+		if c.ScheduleKind != "once" || !c.Enabled || c.Deleted || c.Paused || !c.IsReminder() {
+			continue
+		}
+		loc, err := time.LoadLocation(c.Timezone)
+		if err != nil {
+			continue
+		}
+		at, err := time.ParseInLocation("2006-01-02T15:04", c.At, loc)
+		if err != nil || !at.Before(now.Truncate(time.Minute)) {
+			continue
+		}
+		t, err := h.sched.BeginChiefTrigger(ctx, c.ID, 0, "once:"+strconv.FormatInt(c.ID, 10), now)
+		if err != nil || h.sched.FinishOnceCheck(ctx, c.ID) != nil {
+			continue
+		}
+		if t.State != "done" {
+			_ = h.deliverTrigger(ctx, t.ID, "delivery")
+		}
+	}
 }
