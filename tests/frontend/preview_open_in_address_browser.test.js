@@ -53,6 +53,17 @@ const FIXTURE = { filename: 'release-notes.md', content: '# Release notes\n\nThe
             v = await q();
             check(`${tag}: the thread on show is the address's thread`, v.open === URI && v.thread === '9', JSON.stringify(v));
 
+            // an agent sub-tab click rewrites the path (#15542): the viewer is still open, so the file and the thread stay in the address
+            for (const tab of ['notes', 'info']) {
+                await ev(`document.querySelector('#agentic-tab-${tab}').click(); true`);
+                await waitFor(`location.pathname.endsWith('/${tab}')`, 'the sub-tab in the path', 6000);
+                await sleep(200); // sleep-ok: the address is put back by the route-changed event, after the path write
+                v = await q();
+                check(`${tag}: the ${tab} sub-tab keeps open and thread in the address`, v.open === URI && v.thread === '9' && v.path.endsWith('/' + tab), JSON.stringify(v));
+            }
+            await ev(`document.querySelector('#agentic-tab-notes').click(); true`);
+            await waitFor(`location.pathname.endsWith('/notes')`, 'notes again', 6000);
+
             // a reload (the same address) opens the same artifact and the same thread
             const here = await ev(`location.pathname + location.search`);
             const stubId = (await Page.addScriptToEvaluateOnNewDocument({ source: STUB(FIXTURE) })).identifier; // in place before the dashboard starts: it asks for the artifact at once

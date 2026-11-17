@@ -24,6 +24,14 @@ export function parseOpen(search) {
     return { path, thread: ARTIFACT.test(path) && THREAD.test(thread || '') ? Number(thread) : null };
 }
 
+let held = null; // { sid, open, thread }: what the address names while the viewer is open, put back when a route change (a sub-tab click) rewrote the address without it (#15542)
+let listening = false;
+function reassert() {
+    const s = state.currentSession;
+    if (!held || !s || s.session_id !== held.sid || new URLSearchParams(location.search).has('open')) return;
+    write(p => { p.set('open', held.open); if (held.thread != null) p.set('thread', String(held.thread)); });
+}
+
 function write(change) {
     if (!location.pathname.startsWith('/agents/')) return; // the agent's page only; the pop-out and the other pages keep their address
     const u = new URL(location.href);
@@ -37,6 +45,8 @@ function write(change) {
 export function keep(tab) {
     const on = tab && (tab.kind === 'file' || (tab.kind === 'artifact' && ARTIFACT.test(tab.filepath || ''))) && tab.filepath;
     write(p => { if (on) { if (p.get('open') !== on) p.delete('thread'); p.set('open', on); } else { p.delete('open'); p.delete('thread'); } });
+    held = on && state.currentSession ? { sid: state.currentSession.session_id, open: on, thread: null } : null;
+    if (!listening) { listening = true; document.addEventListener('coral:route-changed', reassert); }
     if (!on) { // a phone's closed viewer gives its history entries back one Back later (overlay_history.js): the entry it lands on still names the file, so that landing is cleaned too
         const clean = () => write(p => { p.delete('open'); p.delete('thread'); });
         addEventListener('popstate', clean, { once: true }); setTimeout(() => removeEventListener('popstate', clean), 1500);
@@ -46,6 +56,7 @@ export function keep(tab) {
 /** The comments panel's active thread (or none) is the address's `thread`, only beside an `open` artifact. */
 export function keepThread(id) {
     write(p => { if (id != null && p.has('open')) p.set('thread', String(id)); else p.delete('thread'); });
+    if (held) held.thread = id != null && new URLSearchParams(location.search).has('thread') ? id : null;
 }
 
 /** At a start: open what the address names. Resolves once the viewer was asked; the thread waits for its comments. */
