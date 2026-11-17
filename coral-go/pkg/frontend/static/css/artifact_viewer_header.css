@@ -169,3 +169,5 @@
     .artifact-review-form > .artifact-review-error:empty { display: none; } /* an empty message line is not a row of its own between the pictures and the buttons */
     .artifact-review-form > :is(.ac-picker, .ac-pics, .ac-add-image) { flex: 0 0 auto; margin-inline-end: auto; }
 }
+
+@media (pointer: coarse) { .av-bar .btn, .av-icon { min-height: var(--control-touch-height, 44px); } } /* the version arrows and the viewer's icons on a tablet too (walk 80 item 10, #17694) */

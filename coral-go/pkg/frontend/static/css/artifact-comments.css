@@ -171,6 +171,11 @@
 .artifact-readers-body p { margin: 0; overflow-wrap: anywhere; }
 .artifact-readers-note { color: var(--text-secondary); }
 
+/* A touch screen at any width (a tablet is 820 px wide, not a phone): the panel's actions, the author link and the reply box are 44 px tall, as on a phone (walk 80 item 10, #17694). */
+@media (pointer: coarse) {
+    .ac-panel :is(.ac-showresolved, .ac-showearlier, .ac-replybox, .ac-resolve, .ac-act, .ac-jump), .ac-whole, .ac-lock, .ac-cancel, .ac-send, .ac-add-image, .ac-thumb-remove, .ac-thumb-markup, .ac-ask-label, .ac-ask-go { min-height: var(--control-touch-height, 44px); }
+    .ac-panel .ac-author.agent-link { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); }
+}
 @media (pointer: coarse) {
     .artifact-viewer-header .ac-toggle:not([hidden]), .preview-toolbar .ac-toggle:not([hidden]) { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); }
 }
