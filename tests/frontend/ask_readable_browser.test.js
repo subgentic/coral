@@ -47,8 +47,9 @@ const LINES = '@Operator Which hub do we ship to?\nFirst line of detail.\nSecond
             await shot('ask-readable-lines-' + w);
             await closeIt();
         }
-        const parts = await ev(`import(${S} + 'operator_asks.js').then(m => ({ none: m.listsOf('See version 2.5 and 1. thing'), own: m.listsOf('a\\n1. b\\n2. c'), two: m.listsOf('Do: 1. one 2. two') }))`);
+        const parts = await ev(`import(${S} + 'operator_asks.js').then(m => ({ none: m.listsOf('See version 2.5 and 1. thing'), own: m.listsOf('a\\n1. b\\n2. c'), two: m.listsOf('Do: 1. one 2. two'), ab: m.listsOf('Which? A) Keep it. B) Drop it.'), paren: m.listsOf('Which? (A) Keep it. (B) Drop it.'), lone: m.listsOf('Plan A) is fine'), gone: m.withoutOperator('@Operator: 1. one @Operator 2. two') }))`);
         assert.equal(parts.none, 'See version 2.5 and 1. thing', 'one number is not a list'); assert.equal(parts.own, 'a\n1. b\n2. c', 'text with its own breaks is left alone'); assert.equal(parts.two, 'Do:\n\n1. one\n2. two');
+        assert.equal(parts.ab, 'Which?\n\nA) Keep it.\nB) Drop it.', 'A and B choices are lines of their own (#16680)'); assert.equal(parts.paren, 'Which?\n\n(A) Keep it.\n(B) Drop it.', '(A) and (B) too'); assert.equal(parts.lone, 'Plan A) is fine', 'one letter is not a list'); assert.equal(parts.gone, '1. one 2. two', 'the address is not said again (#16680)');
     } finally { await client.close(); }
     console.log('PASS a question keeps its lines, lists and title in Needs you');
 })().catch(e => { console.error(e); process.exit(1); });
