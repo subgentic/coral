@@ -102,7 +102,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(nested.killTeam, false, 'no nested team section remains');
         r = await killAll('repo');
         assert.deepEqual(r.kills.map(k => k.sid).sort(), ['s1', 's2', 't1', 'w1'], `folder Kill all: every shown agent in the folder (got ${JSON.stringify(r.kills)})`);
-        assert.match(r.message, /Stop all 4 agents in/, `the confirm counts what will be killed: ${r.message}`);
+        assert.match(r.message, /Stop all 4 agents, including 1 team member in/, `the confirm counts what will be killed: ${r.message}`);
         assert.deepEqual(await remaining(), ['a1', 'o1', 'r1'], 'archived, remote and other-folder agents are untouched');
         console.log('   ✓ killed s1, s2, t1, w1; kept a1, r1, o1');
 
