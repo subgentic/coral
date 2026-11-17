@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/subgentic/coral/internal/secfile"
 )
@@ -35,7 +37,8 @@ var (
 var plainSkillName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
 
 // localSkills lists the skills under base/<root> for each root, in the order of the roots. base must be an absolute folder that is not itself a link.
-func localSkills(base string, roots []string, source string, room int) []skillSummary {
+// The words (match, nil for none) are tried against every skill of the folders, up to dirEntryCap entries of each; only the rows returned are capped at room (#19431).
+func localSkills(base string, roots []string, source string, room int, match func(skillSummary) bool) []skillSummary {
 	var out []skillSummary
 	if room <= 0 || base == "" || !filepath.IsAbs(base) {
 		return nil
@@ -72,7 +75,10 @@ func localSkills(base string, roots []string, source string, room int) []skillSu
 				continue
 			}
 			seen[name] = true
-			out = append(out, skillSummary{Name: name, Description: noteLine(desc, localDescMax), Source: source})
+			sum := skillSummary{Name: name, Description: noteLine(desc, localDescMax), Source: source}
+			if match == nil || match(sum) {
+				out = append(out, sum)
+			}
 		}
 	}
 	return out
@@ -115,6 +121,57 @@ func readFrontMatter(path string) (name, desc string, ok bool) {
 	if err != nil || !fi.Mode().IsRegular() {
 		return "", "", false
 	}
+	key := fmKey{path: path, size: fi.Size(), mtime: fi.ModTime().UnixNano()}
+	if c, hit := fmCacheGet(key); hit {
+		return c.name, c.desc, true
+	}
+	name, desc, ok = readFrontMatterFile(path)
+	if ok {
+		fmCachePut(key, fmVal{name: name, desc: desc})
+	}
+	return name, desc, ok
+}
+
+// The front matter of a SKILL.md is cached by its path, size and modification time (#19431): an unchanged file is not opened again, a changed one is read afresh. The Lstat above still runs on every call,
+// so a link swapped in for the file is refused whatever is cached. The cache is bounded and starts over when full.
+type fmKey struct {
+	path        string
+	size, mtime int64
+}
+type fmVal struct{ name, desc string }
+
+const fmCacheMax = 4096
+
+var (
+	fmMu             sync.Mutex
+	fmCache          = map[fmKey]fmVal{}
+	frontMatterReads atomic.Int64 // files actually opened (a test and the benchmark read it)
+)
+
+func fmCacheGet(k fmKey) (fmVal, bool) {
+	fmMu.Lock()
+	defer fmMu.Unlock()
+	v, ok := fmCache[k]
+	return v, ok
+}
+
+func fmCachePut(k fmKey, v fmVal) {
+	fmMu.Lock()
+	defer fmMu.Unlock()
+	if len(fmCache) >= fmCacheMax {
+		fmCache = map[fmKey]fmVal{}
+	}
+	fmCache[k] = v
+}
+
+func resetFrontMatterCache() {
+	fmMu.Lock()
+	fmCache = map[fmKey]fmVal{}
+	fmMu.Unlock()
+}
+
+func readFrontMatterFile(path string) (name, desc string, ok bool) {
+	frontMatterReads.Add(1)
 	f, err := secfile.OpenNoFollow(path, os.O_RDONLY, 0) // no link at the last step even if one is swapped in after the Lstat
 	if err != nil {
 		return "", "", false
