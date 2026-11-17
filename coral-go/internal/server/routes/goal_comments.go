@@ -178,7 +178,7 @@ func (h *SessionsHandler) deliverGoalComment(r *http.Request, caller commentCall
 	var posted *board.Message
 	var held bool
 	if ls != nil { // a busy goal owner gets the comment when it is free (#14860, #16850)
-		posted, held, err = h.holdOrPost(ctx, ls, &owner, team, rootID, msg, false, true)
+		posted, held, err = h.holdOrPost(ctx, ls, &owner, team, rootID, msg, true)
 	} else {
 		posted, err = h.postCommentMessage(ctx, team, msg)
 	}
