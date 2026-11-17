@@ -216,36 +216,23 @@ export function refreshAsk(row, m) {
 function fillReplies(row, replies) {
     const holder = row.querySelector(':scope > .mb-row-replies');
     if (!holder) return;
-    const kids = replies ?? (row.parentElement ? [...row.parentElement.querySelectorAll(`:scope > .mb-message[data-reply-to="${CSS.escape(row.dataset.messageId)}"]`)] : []);
-    holder.replaceChildren();
+    const kids = replies ?? (row.parentElement ? row.parentElement.querySelectorAll(`:scope > .mb-message[data-reply-to="${CSS.escape(row.dataset.messageId)}"]`) : []);
+    holder.innerHTML = kids.length ? `<div class="mb-row-replies-title">Replies (${kids.length})</div>` : '';
     holder.hidden = !kids.length;
-    if (!kids.length) return;
-    const title = document.createElement('div');
-    title.className = 'mb-row-replies-title';
-    title.textContent = `Replies (${kids.length})`;
-    holder.append(title);
     for (const kid of kids) {
         const item = document.createElement('div');
         item.className = 'mb-row-reply';
-        const who = kid.querySelector('.mb-row-who'), time = kid.querySelector('.mb-row-toggle time');
-        const header = document.createElement('div'); header.className = 'mb-row-reply-header';
-        const name = document.createElement('b'); name.textContent = who ? who.textContent : '';
-        const when = document.createElement('span'); when.className = 'mb-row-reply-time'; when.textContent = time ? time.textContent : '';
-        const jump = document.createElement('button');
-        jump.type = 'button'; jump.className = 'mb-row-reply-open'; jump.textContent = 'Open reply';
-        jump.setAttribute('data-on-click', 'mb-jump-msg'); jump.dataset.msgId = kid.dataset.messageId;
-        jump.setAttribute('aria-label', `Open reply by ${who ? who.textContent : 'sender'}`);
-        header.append(name, when, jump);
+        const who = kid.querySelector('.mb-row-who')?.textContent, time = kid.querySelector('.mb-row-toggle time')?.textContent || '';
+        item.innerHTML = `<div class="mb-row-reply-header"><b>${escapeHtml(who || '')}</b><span class="mb-row-reply-time">${escapeHtml(time)}</span><button type="button" class="mb-row-reply-open" data-on-click="mb-jump-msg" data-msg-id="${escapeAttr(kid.dataset.messageId)}" aria-label="${escapeAttr(`Open reply by ${who ?? 'sender'}`)}">Open reply</button></div>`;
         const words = document.createElement('div'); words.className = 'mb-row-reply-words';
         const sourceBody = kid.querySelector('.mb-message-body');
         if (sourceBody) {
-            for (const child of sourceBody.childNodes) words.append(child.cloneNode(true));
+            words.append(...Array.from(sourceBody.childNodes, child => child.cloneNode(true)));
             // The body clone is displayed beside the actual reply; duplicate IDs would break its references.
-            words.removeAttribute('id');
             for (const el of words.querySelectorAll('[id]')) el.removeAttribute('id');
         }
-        item.append(header, words);
-        if ((words.textContent || '').trim().length > 220) {
+        item.append(words);
+        if (words.textContent.trim().length > 220) {
             words.classList.add('is-clamped');
             const more = document.createElement('button');
             more.type = 'button'; more.className = 'mb-row-reply-more'; more.textContent = 'Show more';
@@ -269,21 +256,16 @@ export function toggleRow(row, force, replies) {
     const head = row.querySelector(':scope > .mb-row-toggle');
     if (head) head.setAttribute('aria-expanded', String(want));
     const id = row.dataset.messageId;
-    if (want) { opened.add(String(id)); ensureOpenParts(row); fillReplies(row, replies); } else opened.delete(String(id));
+    if (want) { opened.add(id); ensureOpenParts(row); fillReplies(row, replies); } else opened.delete(id);
 }
 
 /** Expand all or Collapse all: every row on screen (and, for Collapse, every one remembered). */
 export function setAllRows(container, on) {
     const rows = container.querySelectorAll(':scope > .mb-message[data-message-id]');
     // Find replies once for the batch, rather than scanning the whole board for each open row.
-    const replies = new Map();
-    if (on) for (const row of rows) {
-        const parent = row.dataset.replyTo;
-        if (!parent) continue;
-        if (!replies.has(parent)) replies.set(parent, []);
-        replies.get(parent).push(row);
-    }
-    for (const row of rows) toggleRow(row, on, replies.get(row.dataset.messageId) || []);
+    const replies = Object.create(null);
+    if (on) for (const row of rows) (replies[row.dataset.replyTo] ||= []).push(row);
+    for (const row of rows) toggleRow(row, on, replies[row.dataset.messageId] || []);
     if (!on) opened.clear();
 }
 
