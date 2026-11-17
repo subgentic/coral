@@ -308,7 +308,7 @@ func (h *SessionsHandler) deliverDiffComment(r *http.Request, caller commentCall
 	ls, _ := h.ss.GetLiveSession(ctx, sid)
 	var held bool
 	if ls != nil { // a busy uploader gets the comment when it is free (#14860, #16850)
-		_, held, err = h.holdOrPost(ctx, ls, &owner, team, rootID, msg, false, true)
+		_, held, err = h.holdOrPost(ctx, ls, &owner, team, rootID, msg, true)
 	} else {
 		_, err = h.postCommentMessage(ctx, team, msg)
 	}

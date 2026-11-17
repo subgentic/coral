@@ -106,7 +106,7 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 		}
 		h.ss.ResetAskReplies(ctx, rootID, t.sessionID) // a new turn of the Operator's: the agent has its replies again (#15034)
 		msg := sendMessage(title, sendAuthorOperator, h.sendVersionLine(id, b), sendReplyCommand(id, rootID), text, snippet, names, commentPictureLinks(c.ImagesJSON)...)
-		posted, held, err := h.holdOrPost(ctx, ls, &t.sub, b, rootID, msg, false, true)
+		posted, held, err := h.holdOrPost(ctx, ls, &t.sub, b, rootID, msg, true)
 		if held { // the agent is busy: the comment waits on the ask and is posted when it is free (#14860)
 			queued = append(queued, title)
 			slog.Info("[artifact comments] the Operator's comment held for a busy agent", "artifact", id, "comment", c.ID, "agent", title, "board", b)
