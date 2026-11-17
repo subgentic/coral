@@ -122,7 +122,7 @@ function _syncTeamMembers() {
     const count = document.getElementById('team-agents-count');
     if (count) count.textContent = rows.length ? `${rows.length} ${rows.length === 1 ? 'member' : 'members'}. Select one to edit it. The Orchestrator plans the work and hands tasks to the others.` : '';
     const line = document.getElementById('team-orchestrator-line'); if (line) line.hidden = hasOrchestrator();
-    showTeamWorkers(rows.some(r => !isOrchestrator(rowRole(r))));
+    showTeamWorkers(rows.length > 0);
     _fillEveryone(); // the four controls show what the team and its workers hold
     _syncOrchestratorLine();
     _syncTeamGate();
@@ -766,9 +766,9 @@ function _pickTeamTemplate(name) {
     _loadTeamTemplate(name);
 }
 
-/** Everyone runs as (LT1, #15892): four controls (provider, model, thinking, mode) that every worker takes unless it was set by hand; the Orchestrator keeps its own. Provider and Mode are the team's own fields, which the members with none of their own already follow. */
+/** Everyone runs as (LT1, #15892): four controls (provider, model, thinking, mode) that workers take unless set by hand; Model also reaches the Orchestrator. Provider and Mode are the team's own fields, which the members with none of their own already follow. */
 const _workerBoxes = () => teamRows().filter(r => !isOrchestrator(rowRole(r))).map(r => document.getElementById(r.dataset.acfId)).filter(Boolean);
-const _followingBoxes = key => teamRows().filter(r => !isOrchestrator(rowRole(r)) && r.dataset[key] !== '1').map(r => document.getElementById(r.dataset.acfId)).filter(Boolean);
+const _followingBoxes = key => teamRows().filter(r => (key === 'modelHand' || !isOrchestrator(rowRole(r))) && r.dataset[key] !== '1').map(r => document.getElementById(r.dataset.acfId)).filter(Boolean);
 const _eo = id => document.getElementById(id);
 function _setAllWorkers(type) { // Provider
     const team = _eo('team-agent-type');
@@ -791,7 +791,7 @@ function _saySet(what) {
     const n = _workerBoxes().length, hand = teamRows().filter(r => !isOrchestrator(rowRole(r)) && r.dataset[`${what}Hand`] === '1' || (what === 'provider' && r.dataset.followsTeamType !== '1' && !isOrchestrator(rowRole(r)))).length;
     if (line) line.textContent = `Set the ${what} of ${Math.max(0, n - hand)} ${n - hand === 1 ? 'worker' : 'workers'}${hand ? `; ${hand} set by hand ${hand === 1 ? 'keeps' : 'keep'} their own` : ''}.`;
 }
-/** The Orchestrator on its own line under Everyone runs as: it keeps its own provider and model; its Mode is its own only when set by hand, else the team's. */
+/** The Orchestrator on its own line under Everyone runs as: it keeps its own provider; its Mode is its own only when set by hand, else the team's. */
 function _syncOrchestratorLine() {
     const line = _eo('team-orch-runs'), row = teamRows().find(r => isOrchestrator(rowRole(r)));
     if (!line) return;
@@ -806,7 +806,7 @@ function _fillEveryone() {
     _fillAllModels(); _fillAllThinking();
 }
 function _fillAllModels() {
-    const sel = _eo('team-set-all-model'), box = _workerBoxes().find(b => b.querySelector('.acf-model-select'));
+    const sel = _eo('team-set-all-model'), box = _workerBoxes().find(b => b.querySelector('.acf-model-select')) || _eo(teamRows()[0]?.dataset.acfId);
     if (!sel || !box) return;
     sel.replaceChildren(new Option('Default model', ''), ...[...box.querySelector('.acf-model-select').options].filter(o => o.value && !o.dataset.unlisted && !o.value.startsWith('__')).map(o => new Option(o.textContent, o.value)));
     sel.value = [...sel.options].some(o => o.value === _everyone.model) ? _everyone.model : '';
@@ -824,13 +824,16 @@ function _fillAllThinking() {
 }
 function _setAllModel(value) {
     _everyone.model = value || '';
+    let applied = 0;
     for (const box of _followingBoxes('modelHand')) {
         const s = box.querySelector('.acf-model-select');
-        if (!s) continue;
-        const want = value && [...s.options].some(o => o.value === value) ? value : '';
-        s.value = want; s.dispatchEvent(new Event('change', { bubbles: true }));
+        if (!s || (value && ![...s.options].some(o => o.value === value))) continue;
+        s.value = value || ''; s.dispatchEvent(new Event('change', { bubbles: true }));
+        applied++;
     }
-    _saySet('model'); _syncTeamMembers();
+    _clearTeamUndo();
+    _eo('team-undo').textContent = `Set the model of ${applied} ${applied === 1 ? 'member' : 'members'}. Others keep their own.`;
+    _syncTeamMembers();
 }
 function _setAllThinking(value) {
     _everyone.thinking = value || '';
