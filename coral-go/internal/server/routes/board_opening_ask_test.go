@@ -18,8 +18,8 @@ import (
 func TestTheFirstGoalClosesTheOrchestratorsOpeningQuestionThroughTheRoutes(t *testing.T) {
 	_, h := setupBoardTestServer(t)
 	ctx := context.Background()
-	for _, who := range []string{"Lead", "Operator"} {
-		_, err := h.bs.Subscribe(ctx, "team", who, who, "", nil, "all")
+	for who, title := range map[string]string{"Lead": "Orchestrator", "Operator": "Operator", "Dev A": "Developer"} {
+		_, err := h.bs.Subscribe(ctx, "team", who, title, "", nil, "all")
 		require.NoError(t, err)
 	}
 	r := chi.NewRouter()
