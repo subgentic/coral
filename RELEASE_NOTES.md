@@ -2,7 +2,7 @@
 
 ## v2.0.69 — An updated Getting started guide, Needs you and Inbox that behave, files you can download and compare, a resource queue, and phone and iPad touch fixes
 
-Task numbers in brackets. Built on v2.0.68 and gated on ci/v2069 261dd9d56f; it carries the whole v2.0.70 queue. A prerelease until the Operator promotes it.
+Task numbers in brackets. Built on v2.0.68 and gated on ci/v2069 1adc6faa9b; it carries the whole v2.0.70 queue. A prerelease until the Operator promotes it.
 
 ### Changes
 
