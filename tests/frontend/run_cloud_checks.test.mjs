@@ -28,8 +28,19 @@ try {
   fs.rmSync(path.join(tmp, 'ran.txt'));
   assert.equal(spawnSync(process.execPath, [runner, '--dir', tmp]).status, 0, 'all passing is exit 0');
   assert.equal(fs.readFileSync(path.join(tmp, 'ran.txt'), 'utf8'), 'one\nthree\n');
+  // a check that hangs is a failure at its time limit, and the checks after it still run (#17651: with every check running, one hung check blocked the whole run)
+  write('hang.js', "require('fs').appendFileSync('ran.txt', 'hang\\n'); setTimeout(() => {}, 60000);");
+  write('cloud_checks.txt', 'node one.js\nnode hang.js\nnode three.js\n');
+  fs.rmSync(path.join(tmp, 'ran.txt'));
+  const t0 = Date.now();
+  const h = spawnSync(process.execPath, [runner, '--dir', tmp], { encoding: 'utf8', env: { ...process.env, CORAL_CHECK_TIMEOUT_MS: '1500' }, timeout: 30000 });
+  assert.ok(Date.now() - t0 < 20000, 'the hung check was stopped at its limit, not waited for');
+  assert.notEqual(h.status, 0, 'a check that hangs fails the run: ' + h.stderr);
+  assert.equal(fs.readFileSync(path.join(tmp, 'ran.txt'), 'utf8'), 'one\nhang\nthree\n', 'the check after the hung one still ran');
+  assert.match(h.stderr, /1 of 3 checks FAILED[\s\S]*node hang\.js/);
+  assert.match(h.stderr, /timed out/i, 'the summary says it timed out: ' + h.stderr);
 } finally {
-  fs.rmSync(tmp, { recursive: true, force: true });
+  fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }); // Windows holds a folder a moment after its process ends
 }
 
 // The real list: nothing twice, every line a short single command, and package.json's script is just the runner.

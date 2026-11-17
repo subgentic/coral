@@ -168,6 +168,7 @@
   },
   "coral-go/pkg/frontend/static/css/variables.css": {
    "radius: --radius-ml = 10px": 1,
+   "radius: --radius-pill = 999px": 1,
    "radius: --radius-xs = 3px": 1
   },
   "coral-go/pkg/frontend/static/editions.js": {

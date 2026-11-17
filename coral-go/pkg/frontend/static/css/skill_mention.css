@@ -39,4 +39,4 @@
 @media (pointer: coarse) { .skill-mention-item { min-height: var(--control-touch-height); } }
 
 /* Where a skill comes from (#16015): a small label at the row's end; the colours follow the row, so it reads on the selected row too. */
-.skill-source { flex: none; margin-left: auto; padding: 1px 8px; border: 1px solid currentColor; border-radius: var(--radius-xl); font-size: var(--fs-sm); opacity: 0.8; }
+.skill-source { flex: none; margin-left: auto; padding: 1px 8px; border: 1px solid currentColor; border-radius: var(--radius-pill); font-size: var(--fs-sm); opacity: 0.8; }

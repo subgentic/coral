@@ -37,7 +37,7 @@
 #group-table-view .gt-toolbar.team-toolbar-selecting > .team-tb-selection { flex: 1 1 100%; }
 
 
-.inbox-age { display: inline-block; padding: 1px 8px; border-radius: var(--radius-xl); border: 1px solid var(--border); color: var(--text-secondary); white-space: nowrap; } /* the age pill (#16576): neutral under 1 hour */
+.inbox-age { display: inline-block; padding: 1px 8px; border-radius: var(--radius-pill); border: 1px solid var(--border); color: var(--text-secondary); white-space: nowrap; } /* the age pill (#16576): neutral under 1 hour */
 .inbox-age-amber { color: var(--warning-text); border-color: var(--warning-text); } /* from 1 hour */
 .inbox-age-red { color: var(--error-text); border-color: var(--error-text); } /* from 1 day */
 
@@ -66,7 +66,7 @@
 @media (max-width: 767px) { #group-table-view .gt-toolbar.tb-low > :not(.btn-icon, .inbox-folder-head, .list-bar-count, .team-tb-selection) { display: revert; } #group-table-view .gt-toolbar.tb-low > .btn-icon { display: inline-flex; } #group-table-view .gt-toolbar.tb-low > .inbox-folder-head { display: flex; } } /* the phone's selecting row keeps its head, search and icons (#15540) */
 
 .inbox-pills { display: inline-flex; flex-wrap: wrap; gap: 4px 6px; margin-inline-start: 8px; vertical-align: middle; } /* the goal and task pills of a review (#16576) */
-.inbox-pill { position: relative; cursor: pointer; font-family: inherit; display: inline-block; min-height: 0; min-width: 0; padding: 0 8px; border-radius: var(--radius-xl); background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-secondary); font-size: var(--fs-sm); white-space: nowrap; text-decoration: none; }
+.inbox-pill { position: relative; cursor: pointer; font-family: inherit; display: inline-block; min-height: 0; min-width: 0; padding: 0 8px; border-radius: var(--radius-pill); background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-secondary); font-size: var(--fs-sm); white-space: nowrap; text-decoration: none; }
 .inbox-pill:hover { color: var(--text-primary); border-color: var(--text-secondary); }
 @media (min-width: 761px) {
     .inbox-review-item:has(> .inbox-meta) { flex-wrap: wrap; row-gap: 2px; }
