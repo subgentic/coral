@@ -22,7 +22,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             const click = async p => { await Input.dispatchMouseEvent({ type: 'mouseMoved', x: p.x, y: p.y }); await Input.dispatchMouseEvent({ type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 }); await Input.dispatchMouseEvent({ type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 }); };
             const kebab = await ev(`(() => { const r = document.querySelector('.session-group-item .sidebar-kebab-btn').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
             await click(kebab);
-            await waitFor(`[...document.querySelectorAll('.sidebar-kebab-menu')].some(m => getComputedStyle(m).display !== 'none')`, `${w} px: the menu opens`, 4000);
+            await waitFor(`[...document.querySelectorAll('.sidebar-kebab-menu')].some(m => getComputedStyle(m).display !== 'none' && getComputedStyle(m).visibility !== 'hidden')`, `${w} px: the menu opens`, 4000);
             const probe = () => ev(`(() => { const m = [...document.querySelectorAll('.sidebar-kebab-menu')].find(x => getComputedStyle(x).display !== 'none'); const items = [...m.querySelectorAll('.overflow-menu-item, .menu-item')];
                 const arch = items.find(e => /^(Archive|Unarchive)/.test(e.textContent.trim())); const att = items.find(e => /^Attach$/.test(e.textContent.trim()));
                 const r = arch && arch.getBoundingClientRect(); const at = r && document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);

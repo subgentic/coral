@@ -20,40 +20,28 @@ export function closeSidebarKebabs({ restoreFocus = false } = {}) {
     }
 }
 
-const menuItemRoles = menu => { for (const it of menu.querySelectorAll('.overflow-menu-item')) if (!it.hasAttribute('role')) it.setAttribute('role', 'menuitem'); };
-
-export function toggleSidebarKebab(btn, event) {
-    const menu = btn.nextElementSibling;
-    const wasOpen = menu.style.display !== 'none';
-    closeSidebarKebabs();
-    if (!wasOpen) {
-        // An agent row's menu is drawn when it opens (#4611); the hub's tier marks follow at once rather than at the next sweep.
-        if (menu.dataset.lazyMenu) {
-            if (!openRowMenu(btn, menu)) return;
-            markBlockedControls(menu);
+export async function toggleSidebarKebab(btn, event) {
+    try {
+        const menu = btn.nextElementSibling;
+        const wasOpen = menu.style.display !== 'none';
+        closeSidebarKebabs();
+        if (!wasOpen) {
+            // An agent row's menu is drawn when it opens (#4611); the hub's tier marks follow at once rather than at the next sweep.
+            if (menu.dataset.lazyMenu) {
+                if (!openRowMenu(btn, menu)) return;
+                markBlockedControls(menu);
+            }
+            // Reserve the opening so a second click/outside click can cancel it, but keep pointer targets hidden until help has its final size (#19188).
+            menu.style.visibility = 'hidden';
+            menu.style.display = 'block';
+            btn.setAttribute('aria-expanded', 'true');
+            // Hide tooltips as opening begins, including while the help loads.
+            document.querySelectorAll('.session-tooltip').forEach(t => t.style.display = 'none');
+            const keys = await importOnce('./kebab_keys.js');
+            if (!menu.isConnected || menu.style.display === 'none') return;
+            keys.placeSidebarMenu(btn, menu, event);
         }
-        btn.setAttribute('aria-expanded', 'true');
-        importOnce('./kebab_keys.js').catch(() => {}); // the menu's keys, loaded on its first opening
-        // Measured hidden; the tablet drawer (#15258) transforms and clips, so its box is the window
-        menu.style.visibility = 'hidden';
-        menu.style.display = 'block';
-        window.menuHelp?.(menu); // menu_help.js (fetched by kebab_keys.js) sets it: lines drawn before the menu is measured (#17492)
-        const r = btn.getBoundingClientRect(), sb = menu.closest('.tablet-open');
-        const x = sb ? sb.getBoundingClientRect() : new DOMRect(0, 0, innerWidth, innerHeight);
-        // A menu longer than the screen scrolls inside it and never runs past its edge: a phone's row menu is 16 items (#17333), and Stop at the foot must be reachable.
-        menu.style.maxHeight = Math.max(120, Math.min(x.height, innerHeight) - 16) + 'px'; menu.style.overflowY = 'auto';
-        const h = menu.offsetHeight, w = menu.offsetWidth;
-        const want = r.bottom + h > x.bottom ? r.top - h : r.bottom + 2;
-        menu.style.top = Math.max(8, Math.min(want - x.top, Math.min(x.height, innerHeight) - h - 8)) + 'px';
-        menu.style.left = Math.min(r.left - x.left, x.width - w - 8) + 'px';
-        menu.style.visibility = '';
-        // Every item is a menu item for a screen reader (the row menus are marked as they are drawn).
-        menuItemRoles(menu);
-        // Opened from the keyboard (Enter or Space is a click with no pointer): the focus goes to the first item.
-        if (event?.detail === 0) menu.querySelector('.overflow-menu-item')?.focus({ preventScroll: true });
-        // Hide any visible tooltips so they don't cover the menu
-        document.querySelectorAll('.session-tooltip').forEach(t => t.style.display = 'none');
-    }
+    } catch (error) { console.error(error); closeSidebarKebabs(); }
 }
 
 // Top-bar settings dropdown
@@ -62,7 +50,7 @@ export function toggleTopBarSettings(event) {
     if (!menu) return;
     const isOpen = menu.style.display !== 'none';
     menu.style.display = isOpen ? 'none' : '';
-    menuItemRoles(menu); // the items are menu items to a screen reader (#10374)
+    for (const it of menu.querySelectorAll('.overflow-menu-item')) if (!it.hasAttribute('role')) it.setAttribute('role', 'menuitem'); // the items are menu items to a screen reader (#10374)
     document.querySelector('[aria-controls="top-bar-settings-menu"]')?.setAttribute('aria-expanded', String(!isOpen));
     if (!isOpen && event && event.detail === 0) [...menu.querySelectorAll('.overflow-menu-item')].find(i => i.getClientRects().length)?.focus({ preventScroll: true }); // opened from the keyboard (a click with no pointer), the focus goes into the menu (#6038)
     // Sync group-by-team checkmark
