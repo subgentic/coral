@@ -1,21 +1,41 @@
 /* Swipe a welcome row to dismiss it (#11542, the operator's change request; the mockup is #11536). A left drag on a touch screen: the row follows the finger, the word "Dismiss" shows on a strip where it was, and letting go
  * past 40% of the row's width (or on a quick flick) dismisses it; less than that and it springs back. The page still scrolls: the rows are `touch-action: pan-y`, so the browser keeps the vertical pans and hands us the
- * horizontal ones. The visible Dismiss button stays the real control (keyboard, screen reader): a swipe is a shortcut to the same dismissWelcome, and only a swipe offers Undo (in the toast, which stays 30 seconds: the notices' rule for a toast with an action). Lazy: the Inbox loads
+ * horizontal ones. The visible Dismiss button stays the real control (keyboard, screen reader): a swipe is a shortcut to the same dismissal, and both offer Undo (in the toast, which stays 30 seconds: the notices' rule for a toast with an action). Lazy: the Inbox loads
  * it for a touch screen when a row has a Dismiss (inbox_sidebar.js), nothing at start. With reduced motion the row neither slides nor springs. */
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
-const { dismissWelcome, save } = await importOnce('./welcome_items.js');
+const { save, finished, syncWelcome, WELCOME_IDS } = await importOnce('./welcome_items.js');
 import { showToast, announceNotice } from './notifications.js';
 
 const START_PX = 10, COMMIT = 0.4, FLICK = 0.5, FLICK_MIN_PX = 40; // FLICK: px per ms
 
 const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/** Put an item back: it comes off the dismissed list and the items are on again (a dismissal that was the last one had turned them off). */
-function undo(id) {
-    const rest = String((state.settings || {}).inbox_welcome_done || '').split(',').map(s => s.trim()).filter(x => x && x !== id).join(',');
-    save({ inbox_welcome_done: rest, inbox_welcome: 'on' }); // welcome_items' own saver: in order with the dismissal's save, and the page's settings follow
-    document.dispatchEvent(new CustomEvent('coral:welcome-changed'));
+const DISMISSED = 'inbox_welcome_dismissed'; // the ids the person dismissed (the done list also holds what they did): Settings > Inbox lists them, and the Activity row names them (#17410)
+const ids = list => String(list || '').split(',').map(s => s.trim()).filter(Boolean);
+const changed = () => document.dispatchEvent(new CustomEvent('coral:welcome-changed'));
+
+/** Dismiss one item: done, and on the dismissed list, in one save so the Activity row names it. */
+export function dismissQuietly(id) {
+    const done = finished(), gone = new Set(ids((state.settings || {})[DISMISSED]).filter(x => WELCOME_IDS.includes(x)));
+    done.add(id); if (WELCOME_IDS.includes(id)) gone.add(id);
+    save({ inbox_welcome_done: [...done].join(','), [DISMISSED]: [...gone].join(',') });
+    syncWelcome(); changed();
+}
+
+/** Put an item back: it comes off the done and dismissed lists and the items are on again (a dismissal that was the last one had turned them off). */
+export function restoreWelcome(id) {
+    const s = state.settings || {}, keep = list => ids(list).filter(x => x !== id).join(',');
+    save({ inbox_welcome_done: keep(s.inbox_welcome_done), [DISMISSED]: keep(s[DISMISSED]), inbox_welcome: 'on' }); // welcome_items' own saver: in order with the dismissal's save, and the page's settings follow
+    changed();
+}
+
+/** A Dismiss that says so (#17410): the item goes, a toast offers Undo for 30 s (the notices' rule for a toast with an action) and the words are read out politely.
+ *  w: { id, title, onDismiss, onUndo }: an item with its own dismissal (a closed goal, kept in this browser) brings its own undo. */
+export function dismissWithUndo(w) {
+    if (w.onDismiss) w.onDismiss(); else dismissQuietly(w.id);
+    showToast(`Dismissed: ${w.title}`, false, 30000, { action: { label: 'Undo', onClick: () => (w.onUndo ? w.onUndo() : restoreWelcome(w.id)) } });
+    announceNotice(`Dismissed: ${w.title}. Undo is in the notice.`); // read out politely: the toast is not a live region of its own
 }
 
 /** Listen for drags of the rows that carry data-welcome-id (a row with a Dismiss) or a Dismiss of their own. The listeners sit on the list's persistent outer box (the Inbox's #group-table-view, with its gutter) and are added ONCE: each table build calls this with its new box, which only becomes the one the listeners read (#11765: they were added again per build, and after five folder switches one swipe ignored a file eight times). */
@@ -61,9 +81,7 @@ export function attachWelcomeSwipe(host) {
             if (!d.id) { d.box._ignore(d.row); return; } // a review, a question or a failed run: the row's own Dismiss, which says it and offers Undo itself (#11642)
             const nameEl = d.row.querySelector('.inbox-welcome-name'), own = nameEl && [...nameEl.childNodes].find(n => !(n.nodeType === 1 && n.classList.contains('inbox-kind-icon'))); /* the kind icon is the name's first child (#13144): the title is the first node that is not the icon */
             const title = ((own && own.textContent) || 'the item').trim();
-            dismissWelcome(d.id);
-            showToast(`Dismissed: ${title}`, false, undefined, { action: { label: 'Undo', onClick: () => undo(d.id) } });
-            announceNotice(`Dismissed: ${title}. Undo is in the notice.`); // read out politely: the toast is not a live region of its own
+            dismissWithUndo({ id: d.id, title });
         } else back(d.row, d.strip);
     };
     scope.addEventListener('pointerup', end);
