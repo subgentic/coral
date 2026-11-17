@@ -62,11 +62,23 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await startLaunch();
         await waitFor(`!!document.querySelector('body > .modal:not([id]) [data-action="cancel"]')`, 'the permission question');
         let m = await modals();
-        assert.equal(m[0].title, 'Default mode waits for you'); assert.match(m[0].text, /Default mode stops and waits for you each time\. Use \w[\w ']* so it keeps going\?/); assert.doesNotMatch(m[0].text, /--|flag/i, 'no CLI flag name (#10074)'); assert.match(m[0].text, /Auto: Everything; safety checks on Claude only\./, 'and says what the mode means for this CLI (Claude here)');
+        assert.equal(m[0].title, 'Default mode waits for you'); assert.match(m[0].text, /Default mode stops and waits for you each time\. Use \w[\w ']* so it keeps going\?/); assert.doesNotMatch(m[0].text, /--|flag/i, 'no CLI flag name (#10074)'); assert.doesNotMatch(m[0].text, /Everything; safety checks|safety checks on Claude only/, 'Auto is not explained again here: the field label and the launch banner say it (#19238)');
         assert.deepEqual(await ev(`[...document.querySelectorAll('body > .modal:not([id]) .modal-actions button')].map(b => b.textContent.trim())`), ['Cancel', 'Keep Default', /^Use /.test(await ev(`document.querySelector('body > .modal:not([id]) [data-action="enable"]').textContent.trim()`)) ? await ev(`document.querySelector('body > .modal:not([id]) [data-action="enable"]').textContent.trim()`) : 'Use Auto'], 'the buttons say what they do');
         assert.deepEqual(m[0].buttons, ['cancel', 'skip', 'enable']);
         await click('cancel'); await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: a launch, if one were sent, would be sent within this
         assert.equal(await ev(`window.__launches.length`), 0, 'Cancel sends nothing'); assert.deepEqual(await modals(), []);
+
+        console.log('A saved Bypass permissions or Don\'t ask default keeps its one line of what it means (#19285); Auto and the others say nothing more');
+        for (const [mode, name] of [['bypassPermissions', 'Bypass permissions'], ['dontAsk', "Don't ask"]]) {
+            await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.settings = { ...m.state.settings, default_permission_mode: ${JSON.stringify(mode)} }; return true; })`);
+            await startLaunch(); await waitFor(`!!document.querySelector('body > .modal:not([id]) [data-action="cancel"]')`, 'the question for ' + mode);
+            m = await modals();
+            assert.ok(m[0].text.includes(name + ': ') && m[0].text.replace(/\s+/g, ' ').split(name + ': ')[1].trim().length > 10, `${mode}: the confirm keeps a sentence of what it means: ${JSON.stringify(m[0].text)}`);
+            await click('cancel'); assert.deepEqual(await modals(), []);
+        }
+        await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { delete m.state.settings.default_permission_mode; return true; })`);
+        await startLaunch(); await waitFor(`!!document.querySelector('body > .modal:not([id]) [data-action="cancel"]')`, 'the Auto question');
+        m = await modals(); assert.ok(!/Auto: /.test(m[0].text), 'Auto adds no sentence (#19238): ' + JSON.stringify(m[0].text)); await click('cancel');
 
         console.log('Codex on Default launches without the question (its Default is the launch its Auto is, #7620); Claude on Default still asks');
         const before = await ev(`window.__launches.length`);
