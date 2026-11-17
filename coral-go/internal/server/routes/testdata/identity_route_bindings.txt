@@ -73,6 +73,7 @@ GET /api/board/{project}/proposals | board-claims | operator-only
 GET /api/board/{project}/queue | board-claims
 GET /api/board/{project}/relay-targets | board-claims
 GET /api/board/{project}/reminder | board-claims | operator-only
+GET /api/board/{project}/search | board-claims
 GET /api/board/{project}/settings | board-claims
 GET /api/board/{project}/settings/log | board-claims +token-session | operator-only
 GET /api/board/{project}/spend | board-claims | operator-only

@@ -218,6 +218,7 @@ func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.B
 	r.Post("/api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle", boardHandler.SettleAskButton)    // the page ran an open or wake action: done closes the question, failed gives the button back
 	r.Get("/api/board/{project}/messages/all", boardHandler.ListAllMessages)
 	r.Get("/api/board/{project}/messages/search", boardHandler.SearchMessages)
+	r.Get("/api/board/{project}/search", boardHandler.SearchBoardWork) // the dashboard's search of tasks and goals: the one coral-board search makes (#19237)
 	r.Post("/api/board/{project}/messages/mark-read", boardHandler.MarkRead)
 	r.Get("/api/board/{project}/messages/check", boardHandler.CheckUnread)
 	r.Delete("/api/board/{project}/messages/{messageID}", boardHandler.DeleteMessage)

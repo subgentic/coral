@@ -405,8 +405,8 @@ func TestDefaultPromptsNameSearch(t *testing.T) {
 		if !strings.Contains(prompt, `coral-board search "<words>" --sort newest`) {
 			t.Errorf("%s prompt missing coral-board search command", name)
 		}
-		if !strings.Contains(prompt, `coral-agent history search "<words>"`) {
-			t.Errorf("%s prompt missing coral-agent history search command", name)
+		if !strings.Contains(prompt, "and your past chats in one list") { // #19236: the one command searches past chats too
+			t.Errorf("%s prompt does not say coral-board search covers past chats", name)
 		}
 	}
 }
