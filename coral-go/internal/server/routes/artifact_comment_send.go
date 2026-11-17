@@ -276,7 +276,7 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 	}
 	var in struct {
 		Agents []string `json:"agents"`
-		Now    bool     `json:"now"` // deliver at the agent's next idle prompt even while it has a task (#14860); never mid-turn
+		Now    bool     `json:"now"` // an older page may still send it: nothing changes with it, a comment is held only while the agent is in a turn (#19093, #19103)
 	}
 	if !readJSONBody(w, r, sendBodyMax, &in) {
 		return
@@ -410,7 +410,7 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 					timedText = label + "\n" + text
 				}
 				msg := sendMessage(title, author, version, sendReplyCommand(id, t.ID), timedText, snippet, mentionNames, commentPictureLinks(t.ImagesJSON)...)
-				posted, held, err := h.holdOrPost(r.Context(), &ls, sub, t.Board, t.ID, msg, in.Now, false)
+				posted, held, err := h.holdOrPost(r.Context(), &ls, sub, t.Board, t.ID, msg, false)
 				if held { // the agent is busy: the message waits on its ask and is posted when it is free (#14860)
 					res.State, res.AskID = "queued", ask.ID
 					sent++

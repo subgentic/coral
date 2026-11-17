@@ -323,7 +323,7 @@ func TestAHeldAutomaticCommentIsDeliveredToAWaitingAgentAndEndsItsWait(t *testin
 	cid := rig.ownerComment("Written on the file.")
 	_, _, err := rig.ss.CreateArtifactAsk(ctx, cid, cmtDoc, "team-a", sendSid(1), "Dev", time.Now())
 	require.NoError(t, err)
-	ok, err := rig.ss.HoldAskMessage(ctx, cid, sendSid(1), "AUTO-COMMENT", false, true, time.Now()) // an automatic delivery (system): held mid-turn
+	ok, err := rig.ss.HoldAskMessage(ctx, cid, sendSid(1), "AUTO-COMMENT", true, time.Now()) // an automatic delivery (system): held mid-turn
 	require.NoError(t, err)
 	require.True(t, ok)
 	rig.h.flushHeldComments(ctx, time.Now())

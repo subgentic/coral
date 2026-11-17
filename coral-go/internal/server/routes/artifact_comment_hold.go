@@ -22,7 +22,7 @@ const (
 
 // commentHeld says whether a comment for this agent waits: only while it is in a turn (#14860, #19093). An agent that has a task open but is idle (it waits for the Operator's review, the usual case) is not disturbed by a
 // comment, and holding for the task would hold it for ever: anything that should be delivered is. A check that fails does not hold (today's behaviour).
-func (h *SessionsHandler) commentHeld(ctx context.Context, ls *store.LiveSession, project string, sub *board.Subscriber, now bool) bool {
+func (h *SessionsHandler) commentHeld(ctx context.Context, ls *store.LiveSession, project string, sub *board.Subscriber) bool {
 	if h.waitingOnBoard(ctx, project, sub) {
 		return false // a turn parked in coral-board wait has nothing to disturb: a comment is what it may be waiting for (#19085)
 	}
@@ -40,9 +40,9 @@ func (h *SessionsHandler) waitingOnBoard(ctx context.Context, project string, su
 }
 
 // holdOrPost delivers the comment message to the agent now when it is free, or keeps it on the ask when it is busy (held true). posted is the board message when it went out.
-func (h *SessionsHandler) holdOrPost(ctx context.Context, ls *store.LiveSession, sub *board.Subscriber, project string, commentID int64, msg string, now, system bool) (posted *board.Message, held bool, err error) {
-	if sub != nil && h.commentHeld(ctx, ls, project, sub, now) {
-		if ok, herr := h.ss.HoldAskMessage(ctx, commentID, ls.SessionID, msg, now, system, time.Now()); herr == nil && ok {
+func (h *SessionsHandler) holdOrPost(ctx context.Context, ls *store.LiveSession, sub *board.Subscriber, project string, commentID int64, msg string, system bool) (posted *board.Message, held bool, err error) {
+	if sub != nil && h.commentHeld(ctx, ls, project, sub) {
+		if ok, herr := h.ss.HoldAskMessage(ctx, commentID, ls.SessionID, msg, system, time.Now()); herr == nil && ok {
 			return nil, true, nil
 		} else if herr != nil {
 			slog.Warn("[artifact comments] a comment could not be held; it goes now", "error", herr)
@@ -85,7 +85,6 @@ func (h *SessionsHandler) flushHeldComments(ctx context.Context, now time.Time) 
 	}
 	type group struct {
 		asks []store.ArtifactAsk
-		now  bool
 	}
 	var order []string
 	groups := map[string]*group{}
@@ -98,7 +97,6 @@ func (h *SessionsHandler) flushHeldComments(ctx context.Context, now time.Time) 
 			order = append(order, k)
 		}
 		g.asks = append(g.asks, a)
-		g.now = g.now || a.QueuedNow != 0
 	}
 	notify := map[string]bool{}
 	for _, k := range order {
@@ -115,7 +113,7 @@ func (h *SessionsHandler) flushHeldComments(ctx context.Context, now time.Time) 
 		if err != nil || sub == nil {
 			continue
 		}
-		if h.commentHeld(ctx, ls, first.Board, sub, g.now) {
+		if h.commentHeld(ctx, ls, first.Board, sub) {
 			continue
 		}
 		var parts []string
