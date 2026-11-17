@@ -61,3 +61,10 @@ console.log('needs_filters: ok');
 assert.equal(NF.kindOf({ waiting_kind: 'ask' }), 'question', 'board asks belong to the Question chip');
 assert.equal(NF.matches({ waiting_kind: 'ask' }, { kind: 'question' }, ctx, NOW), true);
 assert.equal(NF.matches({ waiting_kind: 'ask' }, { kind: 'other' }, ctx, NOW), false);
+
+// A late ask or review must not remain below an FYI already on screen (#16894).
+const fyi = { id: 'fyi', goalClosed: {}, waiting_since: min(1) };
+const action = { id: 'action', waiting_kind: 'review', waiting_since: min(30) };
+for (const sort of NF.SORTS) assert.deepEqual(NF.ordered([fyi, action], { ...NF.EMPTY, sort }, r => r === fyi ? 99 : 0), [action, fyi]);
+const firstFYI = NF.keepOrder([fyi], r => r.id, null, 'same');
+assert.deepEqual(NF.keepOrder([action, fyi], r => r.id, firstFYI.memory, 'same').rows, [action, fyi]);

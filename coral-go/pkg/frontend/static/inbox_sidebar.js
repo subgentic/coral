@@ -1721,6 +1721,11 @@ function mountInbox() {
     saved.onSavedRender(() => { if (!$('inbox-local')?.hidden) renderInboxNav(true); });
     saved.mountInboxSavedBar($('inbox-saved-bar'));
 }
+/** Read the same attention model before a bare returning start chooses its destination. */
+export async function startupNeedsCount() {
+    await Promise.allSettled([refreshGoals(), refreshOperatorAsks(), refreshReviews(true), refreshProposals(true), isCloud() ? null : refreshRuns(true)]);
+    return needsCount();
+}
 /** Called by switchNavTab('hub-inbox') (where the dashboard builds its own Inbox): the lists are read again and the group last on screen opens as a table (a phone shows the list). */
 export async function showInbox({ folder = '', quiet = false } = {}) {
     teamNeedsMount?.dispose();

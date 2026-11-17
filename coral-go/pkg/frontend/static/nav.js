@@ -5,10 +5,8 @@
    Paths come from routes.js (parse/build); old hash links are read once at startup and replaced. */
 
 import { setServedAddress } from './served_address.js';
-import { isPhoneLayout } from './phone_layout.js';
 import { browserLocal } from './safe_storage.js';
 import { parse, build, fromLegacyHash, normalize, chatsQuery } from './routes.js';
-import { isCloud } from './server_base.js';
 import { importOnce } from './import_once.js';
 
 const handlers = new Map();
@@ -116,16 +114,12 @@ export function startNav() {
     if (started) return current;
     started = true;
     setServedAddress(location.pathname + location.search + location.hash); // what the person opened, for a sign-in that must bring them back to it (#12406)
-    let route = startRoute(), restored = false, keep = false;
-    // The bare start (the address "/", no query; /agents typed on purpose is the list) reopens the place the person left (#10057); a link, a phone (its Home is the Agents list) or a place that is gone is shown as it is.
-    if (isHome(route) && (location.pathname === '/' || location.pathname === '') && !location.search && (!location.hash || location.hash === '#') && !isPhoneLayout()) {
-        const back = parse(lastPlace() || '', '');
-        if (isPlace(back)) { route = back; restored = true; } else { route = { view: 'inbox-folder', folder: 'needs' }; keep = isCloud(); } // no place to reopen: a computer starts on the Inbox, the first tab (#11594)
-    }
+    const route = startRoute();
+    const bare = /^\/?$/.test(location.pathname) && !location.search && !location.hash.slice(1);
     const kept = lastPlace();
-    write(route, true, '', keep);
-    markStartTab(route);
-    if (kept && isHome(route)) lastPlace(kept); // the start itself is not the person choosing Home: a phone's Home start (or a link's) leaves the place for the next wide start
+    write(route, true);
+    if (!bare) markStartTab(route);
+    if (kept && isHome(route)) lastPlace(kept);
     window.addEventListener('popstate', () => {
         setServedAddress('');
         // The URL is the truth: the route is parsed from the location every time, never taken
@@ -140,6 +134,7 @@ export function startNav() {
         current = r;
         show(r, { fromHistory: true }).finally(routeChanged);
     });
-    show(route, { fromHistory: true, startup: true, restored }).then(() => route.bad && importOnce('./np.js').then(m => m.lost(route.bad)));
+    if (bare) importOnce('./startup_attention.js').then(m => m.start(kept, route, write, show, lastPlace)).catch(console.error);
+    else show(route, { fromHistory: true, startup: true }).then(() => route.bad && importOnce('./np.js').then(m => m.lost(route.bad)));
     return route;
 }

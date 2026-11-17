@@ -90,7 +90,8 @@ export function keepOrder(rows, keyOf, memory, sig) {
     for (const r of rows) (rank.has(keyOf(r)) ? seen : fresh).push(r);
     seen.sort((a, b) => rank.get(keyOf(a)) - rank.get(keyOf(b)));
     const first = seen.length ? Math.min(...seen.map(r => at.get(keyOf(r)))) : Infinity;
-    const out = [...fresh.filter(r => at.get(keyOf(r)) < first), ...seen, ...fresh.filter(r => at.get(keyOf(r)) >= first)];
+    let out = [...fresh.filter(r => at.get(keyOf(r)) < first), ...seen, ...fresh.filter(r => at.get(keyOf(r)) >= first)];
+    out = [...out.filter(r => !r.goalClosed), ...out.filter(r => r.goalClosed)]; // FYI closes follow actionable rows, including late arrivals (#16894).
     return { rows: out, memory: { sig, rank: new Map(out.map((r, i) => [keyOf(r), i])) } };
 }
 
@@ -99,5 +100,5 @@ export function ordered(sessions, f, weightOf = () => 0) {
     const c = clean(f), at = s => { const t = Date.parse(s.waiting_since || ''); return Number.isFinite(t) ? t : null; };
     const dir = c.sort === 'newest' ? -1 : 1;
     const byAge = (a, b) => { const x = at(a), y = at(b); if (x === null && y === null) return 0; if (x === null) return 1; if (y === null) return -1; return dir * (x - y); };
-    return [...sessions].sort((a, b) => (c.sort === 'blockers' ? (weightOf(b) - weightOf(a)) || byAge(a, b) : byAge(a, b)));
+    return [...sessions].sort((a, b) => (Number(!!a.goalClosed) - Number(!!b.goalClosed)) || (c.sort === 'blockers' ? (weightOf(b) - weightOf(a)) || byAge(a, b) : byAge(a, b)));
 }
