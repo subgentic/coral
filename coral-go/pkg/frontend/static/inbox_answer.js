@@ -388,7 +388,7 @@ export function answerCell(s, { dismiss = true } = {}) {
     return cell;
 }
 
-/** N5 (#17451): an agent's prompt keeps its choices where Answer sits; Dismiss is in the row's kebab, like every other row's. `answer`, `more` and `name` are the list's own (the Inbox passes them in: this lazy file does not import the list). */
+/** N5 (#17451): an agent's prompt keeps its choices where Answer sits; Dismiss is in the row's kebab, like every other row's. answer, more and name are the list's own (the Inbox passes them in: this lazy file does not import the list). */
 export function promptCell(s, answer, more, name, phone) {
     const acts = rowActions(s);
     if (phone || !acts.length || acts[0].label !== 'Dismiss') return answer(s); // a phone has its own ⋯; Remove from Needs you (an ignored wait) stays a button
