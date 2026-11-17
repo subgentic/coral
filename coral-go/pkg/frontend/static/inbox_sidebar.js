@@ -395,11 +395,12 @@ function inboxNeedsToolbar() {
     // Kind chips describe the rows selected, including read items.
     // Unread attention remains in the folder and Inbox notification badges.
     const counts = needsKinds.filter(kindShown).map(k => rows.filter(s => NF.kindOf(s) === k).length);
+    const moreReviews = reviewFilters() ? !!reviewQueryState()?.more : reviewPages().some(p => p.has_more); // the active window, not an unfinished page from another filter (#16619)
     const node = needsBar.draw({
         filters: needsFilters,
         options: { team: { values: teams, labels: {} }, agent: { values: names, labels: {} }, goal: { values: goalNames, labels: {} } },
         pills: { label: 'Show agents waiting on', current: needsFilters.kind || 'all',
-            items: [{ key: 'all', label: 'All', count: rows.length }, ...needsKinds.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: counts[i] }))],
+            items: [{ key: 'all', label: 'All', count: moreReviews ? `${rows.length}+` : rows.length }, ...needsKinds.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: k === 'review' && moreReviews ? `${counts[i]}+` : counts[i] }))],
             onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; persistNeedsFilters(); renderInboxNav(true); } },
     });
     // Group by goal is an option of the Filters panel, with the other ways to show the list (#14378, the Operator): not a checkbox always on the page under the header. It is shut with the panel, so it takes no room until asked for.
@@ -414,7 +415,7 @@ function inboxNeedsToolbar() {
     const skip = DT.el('a', 'skip-link', 'Skip to the list'); skip.href = '#'; skip.addEventListener('click', e => { e.preventDefault(); document.querySelector('#group-table-view tbody tr:not(.dt-group) button, #group-table-view tbody tr:not(.dt-group) a')?.focus(); }); node.prepend(skip); // a keyboard user passes the search and filters (walk 7 M3)
     if (needsFilters.team && !activeNeedsTeam) { const n = DT.el('p', 'goals-note inbox-filter-note', `Filtered by team: ${needsFilters.team} `), c = DT.el('button', 'btn', 'Clear'); c.type = 'button'; c.setAttribute('aria-label', `Clear the team filter: ${needsFilters.team}`); c.addEventListener('click', () => { needsFilters = { ...needsFilters, team: '', server: '' }; persistNeedsFilters(); renderInboxNav(true); }); n.append(c); node.append(n); } /* a team filter kept from last time says so above the list (walk 15 M2, #15259) */
     if (!node.querySelector('.agent-copy')) (node.querySelector(':scope > .list-bar-search-row') || node).append(agentCopyButton('needs_you', 'Coral\u2019s Needs you list: what agents and the board wait on the Operator for.')); // the robot is on the header row at its far right, with the filters, not alone on a row of its own under it (#18802)
-    return { node, signature: JSON.stringify([groupMode, needsFilters, teams, names, goalNames, counts, rows.length, rows.filter(needsUnread).length]) };
+    return { node, signature: JSON.stringify([groupMode, needsFilters, teams, names, goalNames, counts, moreReviews, rows.length, rows.filter(needsUnread).length]) };
 }
 
 // ── Tasks ────────────────────────────────────────────────────────────────
