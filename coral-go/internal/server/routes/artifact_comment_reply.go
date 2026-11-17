@@ -89,8 +89,13 @@ func (h *SessionsHandler) agentReplyArtifactComment(w http.ResponseWriter, r *ht
 		}
 		viaUpload = true
 	case errors.Is(err, store.ErrAskClosed):
-		commentRefuse(w, http.StatusConflict, "ask_ended", "the ask has ended")
-		return
+		// An Operator's comment is a question to the agent until the Operator resolves it (or deletes it): an ask that ended with the file (the next version was uploaded, the file approved) leaves the thread open,
+		// and the reply goes the way an uploader's does, its caps counted with the insert (#19100).
+		if t.ResolvedAt != nil || t.DeletedAt != nil {
+			commentRefuse(w, http.StatusConflict, "ask_ended", "the ask has ended")
+			return
+		}
+		viaUpload = true
 	case errors.Is(err, store.ErrAskReplyCap):
 		commentRefuse(w, http.StatusConflict, "reply_limit", "this agent has left the most replies it may in that thread")
 		return
@@ -140,7 +145,7 @@ func (h *SessionsHandler) agentReplyArtifactComment(w http.ResponseWriter, r *ht
 			h.bs.NoteAllArtifactsChanged()
 		}
 		h.recordCommentActivity(r, caller.withName(name), id, t.Board, body) // the agent's reply is a row of Activity (#17360)
-		slog.Info("[artifact comments] agent replied into a thread", "via", map[bool]string{true: "its own upload (never asked)", false: "an ask"}[viaUpload], "artifact", id, "comment", t.ID, "agent", name, "board", t.Board)
+		slog.Info("[artifact comments] agent replied into a thread", "via", map[bool]string{true: "no open ask (its own upload, or an ask the file's new version ended)", false: "an ask"}[viaUpload], "artifact", id, "comment", t.ID, "agent", name, "board", t.Board)
 		writeJSON(w, http.StatusCreated, h.commentView(caller, c, false, false))
 	}
 }

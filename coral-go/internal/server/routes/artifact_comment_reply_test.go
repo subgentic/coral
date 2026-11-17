@@ -8,6 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -173,4 +174,31 @@ func TestAReplyIsRedactedBoundedAndTheFailureGivesTheCountBack(t *testing.T) {
 	}
 	code, _ = rig.reply(replyID, asAgentSession(1), "nested")
 	assert.Equal(t, http.StatusBadRequest, code)
+}
+
+// #19100, the Operator: "I'm not seeing any replies to these messages". An agent uploaded the next version (which ends the asks of the older ones) and then answered the Operator's comment: refused 'ask ended'. An Operator
+// comment is a question until it is resolved: the reply is kept, with the caps, and a resolved thread still refuses.
+func TestAReplyToAnOpenOperatorCommentIsKeptAfterTheAskEndedWithTheFile(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	ctx := context.Background()
+	cid := rig.ownerComment("Why this layout?")
+	code, _ := rig.send(cid, "Dev")
+	require.Equal(t, http.StatusOK, code)
+	require.NoError(t, rig.ss.CloseOpenAsksOfVersions(ctx, []string{cmtDoc}, "team-a", time.Now())) // the agent uploaded the next version
+
+	code, out := rig.reply(cid, asAgentSession(1), "Because of the narrow screen.")
+	require.Equal(t, http.StatusCreated, code, fmt.Sprint(out))
+	for i := 1; i < store.MaxAskReplies; i++ {
+		code, out = rig.reply(cid, asAgentSession(1), fmt.Sprintf("more %d", i))
+		require.Equal(t, http.StatusCreated, code, fmt.Sprint(out))
+	}
+	code, out = rig.reply(cid, asAgentSession(1), "one too many")
+	assert.Equal(t, http.StatusConflict, code, "the reply cap still holds")
+	assert.Equal(t, "reply_limit", out["code"])
+
+	code, _ = rig.do("POST", fmt.Sprintf("%s/%d/resolve", cp(cmtDoc), cid), cmtAsOwner, nil)
+	require.Equal(t, 200, code)
+	code, out = rig.reply(cid, asAgentSession(1), "late")
+	assert.Equal(t, "ask_ended", out["code"], "the Operator resolved it: no more replies")
 }
