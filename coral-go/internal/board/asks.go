@@ -72,6 +72,10 @@ func (s *Store) ensureAsksSchema(ctx context.Context) error {
             task_id INTEGER NOT NULL,
             assignee TEXT NOT NULL
         )`,
+		`CREATE TABLE IF NOT EXISTS board_opening_ask (
+			project    TEXT PRIMARY KEY,
+			message_id INTEGER NOT NULL
+		)`,
 		`CREATE TABLE IF NOT EXISTS board_ask_closed (
 			message_id INTEGER PRIMARY KEY,
 			project    TEXT NOT NULL,
@@ -823,4 +827,53 @@ func (s *Store) CloseOvertakenAsks(ctx context.Context, project string, taskID, 
 		}
 	}
 	return n, nil
+}
+
+// MarkOpeningAsk marks the posted question as the board's opening question (#19170): the first question the board has, put to the Operator while the board has no goal ("What should the team build?"). It reports
+// whether it marked it. Any other question is never marked, so closing the opening one can never close another.
+func (s *Store) MarkOpeningAsk(ctx context.Context, project string, messageID int64, asked []string) (bool, error) {
+	toOperator := false
+	for _, a := range asked {
+		if IsOperatorName(a) {
+			toOperator = true
+		}
+	}
+	if !toOperator {
+		return false, nil
+	}
+	res, err := s.db.ExecContext(ctx, `INSERT OR IGNORE INTO board_opening_ask (project, message_id)
+		SELECT ?, ? WHERE NOT EXISTS (SELECT 1 FROM board_asks WHERE project = ? AND message_id < ?)
+		  AND NOT EXISTS (SELECT 1 FROM board_goals WHERE board_id = ?)`, project, messageID, project, messageID, project)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+// CloseOpeningAsk closes the board's marked opening question, with a note naming the goal, when goal is the first the board has (#19170): creating it is the Operator's answer. It reports whether it closed one. A
+// board's second goal, a question that was not marked and one already closed are left as they are.
+func (s *Store) CloseOpeningAsk(ctx context.Context, project string, goal *Goal) (bool, error) {
+	if goal == nil {
+		return false, nil
+	}
+	var goals int
+	if err := s.reader().GetContext(ctx, &goals, `SELECT COUNT(*) FROM board_goals WHERE board_id = ?`, project); err != nil {
+		return false, err
+	}
+	if goals != 1 {
+		return false, nil
+	}
+	var id int64
+	if err := s.reader().GetContext(ctx, &id, `SELECT o.message_id FROM board_opening_ask o WHERE o.project = ?
+		AND o.message_id NOT IN (SELECT message_id FROM board_ask_closed WHERE project = o.project)`, project); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	if err := s.CloseAsk(ctx, project, id, "system", fmt.Sprintf("The team's first goal was created: goal #%d, %s", goal.ID, goal.Title)); err != nil {
+		return false, err
+	}
+	return true, nil
 }

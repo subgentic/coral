@@ -371,6 +371,9 @@ func (h *BoardHandler) makeFromProposal(ctx context.Context, project string, p *
 		if err != nil {
 			return 0, "", err
 		}
+		if _, err := h.bs.CloseOpeningAsk(ctx, project, goal); err != nil { // a goal the Operator approved is the team's first goal too (#19170)
+			slog.Warn("opening ask not closed", "board", project, "goal", goal.ID, "error", err)
+		}
 		return goal.ID, goal.Title, nil
 	default:
 		t, err := decodeTaskPayload([]byte(p.Payload))

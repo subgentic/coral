@@ -246,6 +246,7 @@ func (s *Store) deleteProject(ctx context.Context, project string, onlyIfUnused 
 		{"DELETE FROM board_orch_grant WHERE project = ?", 1}, // the grant to a board's orchestrator and its log go with the board (#11432)
 		{"DELETE FROM board_lifecycle_log WHERE project = ?", 1},
 		{"DELETE FROM board_ask_closed WHERE project = ?", 1},   // a question closed by hand goes with its board (#11417)
+		{"DELETE FROM board_opening_ask WHERE project = ?", 1},  // the first-goal marker goes with its board (#19170)
 		{"DELETE FROM board_ask_reopened WHERE project = ?", 1}, // and a question the Operator reopened (#15792)
 		{"DELETE FROM board_ask_links WHERE project = ?", 1},    // and the links between questions that are the same (#17738)
 		{"DELETE FROM board_ask_buttons WHERE project = ?", 1},  // and the buttons an agent declared on a question (#11643)
