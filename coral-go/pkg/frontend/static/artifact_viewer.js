@@ -157,7 +157,7 @@ function _build() {
                     <button type="button" class="menu-item artifact-viewer-copyid-item" role="menuitem" title="The id that stays the same across versions" hidden>Copy file ID</button>
                     <button type="button" class="menu-item artifact-viewer-copy-id" role="menuitem" title="The id of this version only">Copy version ID</button>
                     <button type="button" class="menu-item artifact-viewer-agent-item" role="menuitem" title="Copies a line to paste to an agent: this file and where in the docs to read">Copy for an agent</button>
-                    <button type="button" class="menu-item artifact-viewer-scripts-item" role="menuitem" hidden>Run scripts…</button>
+                    <button type="button" class="menu-item artifact-viewer-scripts-item" role="menuitem" hidden>Run this page's scripts</button>
                     <button type="button" class="menu-item artifact-viewer-fullscreen-item" role="menuitem">Full screen</button>
                     <a class="menu-item artifact-viewer-newtab" role="menuitem" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
                     <button type="button" class="menu-item artifact-viewer-dropbox-share" role="menuitem" hidden>Share via Dropbox…</button>
@@ -274,7 +274,7 @@ function _build() {
 }
 
 /** The sandboxed HTML preview's banner: shown the first time, then the header's Sandboxed chip says it (its tooltip is the explanation, a tap shows or hides the banner). */
-/** The "Scripts on" chip and the ⋯ menu's Run scripts… / Turn off scripts follow what the preview shows (#14783): scripts running (the bar), or offered (the button), or neither (any other file). */
+/** The "Scripts on" chip and the ⋯ menu's Run this page's scripts / Turn off scripts follow what the preview shows (#14783): scripts running (the bar), or offered (the button), or neither (any other file). */
 function syncScripts(d, body) {
     const running = !!body.querySelector('.artifact-scripts-bar'), offered = !!body.querySelector('.artifact-scripts-ask');
     d.querySelector('.artifact-viewer-scriptson').hidden = !running;

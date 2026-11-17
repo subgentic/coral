@@ -131,7 +131,7 @@ export function drawScripted(wrapper, { html, name, turnOff, line }) {
     return frame;
 }
 
-/** The offer under the plain preview's notice: "Run scripts…" opens a confirmation in place; Run scripts trusts THIS version, then `onTrusted()` redraws. */
+/** The offer under the plain preview's notice: "Run this page's scripts" opens a confirmation in place; Allow scripts trusts THIS version, then `onTrusted()` redraws. */
 export function drawOffer(wrapper, { hex, server, onTrusted, fetchFn = serverFetch }) {
     const row = document.createElement('div');
     row.className = 'artifact-scripts-offer';
@@ -140,7 +140,7 @@ export function drawOffer(wrapper, { hex, server, onTrusted, fetchFn = serverFet
         const notice = wrapper.querySelector('.artifact-linked-notice'); // while the question is open the banner no longer says scripts are disabled above it (#15324, walk 21 M2)
         if (notice && notice.firstChild && notice.firstChild.nodeType === 3) { notice.dataset.was = notice.firstChild.nodeValue; notice.firstChild.nodeValue = 'Scripts are off for this file.'; }
         const box = document.createElement('div');
-        box.className = 'artifact-scripts-sure'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Run scripts in this file');
+        box.className = 'artifact-scripts-sure'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', "Allow this page's scripts");
         const words = document.createElement('p');
         words.textContent = 'This file can run scripts. They can draw and animate. Coral limits what they can reach: no web requests, no cookies, no files, and nothing it stores is kept after the preview closes. Do not trust a file you would not open.';
         const msg = document.createElement('p'); msg.className = 'artifact-scripts-msg'; msg.setAttribute('role', 'status');
