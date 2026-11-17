@@ -42,3 +42,7 @@
 
 /* Phone list icons use the neutral Skills symbol rather than name-hashed tiles. */
 .skills-view .skill-list-icon { color: var(--text-secondary); background: transparent !important; width: 40px; height: 40px; }
+
+#skill-use-target { display: block; width: 100%; max-width: 42rem; min-width: 0; min-height: 44px; padding: 8px 12px; margin-top: 8px; }
+
+#skill-use-results ul { padding-left: 20px; overflow-wrap: anywhere; }

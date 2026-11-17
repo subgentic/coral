@@ -182,6 +182,13 @@ function drawDetail() {
     const meta = el('div', 'skills-meta');
     meta.append(el('span', '', `Published by ${publisher(s)}`), el('span', 'skills-used-by', usedBy(s) ? `Used by ${usedBy(s)}` : 'Not used by a team yet'), el('span', '', `Digest ${short(s.digest)}`), el('span', '', `${files.length} file${files.length === 1 ? '' : 's'}`));
     page.append(meta, el('p', 'skills-note', s.description));
+    if (s.status === 'approved') {
+        const use = el('div', 'skills-section');
+        use.append(button('btn btn-primary', 'Use in a team', async () => {
+            try { const { showSkillUse } = await importOnce('./skill_use.js'); showSkillUse(use, s, teams => { s.used_by = [...new Set([...(s.used_by || []), ...teams])]; meta.querySelector('.skills-used-by').textContent = usedBy(s) ? `Used by ${usedBy(s)}` : 'Not used by a team yet'; }); }
+            catch { showToast('The team picker could not be opened. Try again.', true); }
+        })); page.append(use);
+    }
     const versions = skillVersions(everyRow, s);
     if (versions.length > 1) {
         const history = el('details', 'skills-section'), summary = el('summary', '', `Versions (${versions.length})`), list = el('ul');
