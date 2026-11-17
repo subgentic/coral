@@ -158,3 +158,35 @@ func TestStalledReasonIsAClosedList(t *testing.T) {
 		}
 	}
 }
+
+// The watch ends with the server: a cancelled ctx stops it in the wait for the open step and in the wait for the delay, and nothing is sent.
+func TestStalledWatchEndsWithItsCtxAndSendsNothing(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		open bool
+	}{{"waiting for the open step", false}, {"waiting out the delay", true}} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, _ := newFunnelTracking(t)
+			fastStall(t)
+			consentKnown.Store(true)
+			stallDelay, stallLookFor = time.Hour, time.Hour // only the ctx can end the watch in time
+			if tc.open {
+				HoldFunnelStep(EventFunnelDashboardOpen, OpenBrowser)
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			done := make(chan struct{})
+			go func() { defer close(done); runStallWatch(ctx, time.Now()) }()
+			time.Sleep(50 * time.Millisecond) // let it reach its sleep
+			cancel()
+			select {
+			case <-done:
+			case <-time.After(2 * time.Second):
+				t.Fatal("the watch kept running after its ctx was cancelled")
+			}
+			waitForAsync()
+			if got := stalledReasons(c); len(got) != 0 {
+				t.Fatalf("a cancelled watch sent %v", got)
+			}
+		})
+	}
+}
