@@ -6,7 +6,8 @@ import { state } from './state.js';
 import { serverFetch, currentServer } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { browserSession } from './safe_storage.js';
-import { setWelcomeCount } from './inbox_tab.js';
+let _shown = -1; // the open items drawn last: Needs you redraws when their number changes (they are listed, not counted: #19274)
+const setWelcomeCount = n => { if (n !== _shown) { _shown = n; document.dispatchEvent(new CustomEvent('coral:welcome-changed')); } };
 
 export const WELCOME_IDS = ['guide', 'agent', 'welcome', 'team', 'asks']; // the guide is the first thing a new person sees (#18825, the Operator: "This can be the first item we show users")
 const GUIDE_URL = '/static/guide/getting-started.md';
@@ -69,7 +70,7 @@ export function save(values, { auto = false } = {}) { // auto: the page keeping 
 
 /** Keep the setting in step: a step seen is remembered (deleting the agent later brings nothing back), and with all five done the items are off for good. Safe to call often. */
 export function syncWelcome() {
-    setWelcomeCount(welcomeRows().length); // before anything else: the open items are part of the Needs you number
+    setWelcomeCount(welcomeRows().length); // before anything else
     if (!welcomeOn()) return;
     if (!finished().has('team')) readTeams();
     const have = doneList(), now = finished();
