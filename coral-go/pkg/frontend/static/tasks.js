@@ -129,8 +129,8 @@ document.addEventListener('visibilitychange', () => {
 
 
 
-// What the subagent dialog calls back (task_hooks.js).
-registerTaskView({ renderBoardTaskList, hideTaskDetailModal });
+// What the subagent list calls back (task_hooks.js).
+registerTaskView({ renderBoardTaskList });
 
 // The task list and task dialogs' markup (#3645): data-on-* names, never code. Each action calls
 // the same function the inline handler did, after checking its values (a bad one does nothing).
