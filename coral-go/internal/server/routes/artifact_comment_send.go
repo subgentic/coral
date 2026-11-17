@@ -424,7 +424,7 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 					break
 				}
 				h.linkCommentMessage(r.Context(), t.Board, posted, t.ID, ls.SessionID)
-				h.operatorPosted(t.Board, msg)
+				h.operatorPostedTo(t.Board, msg, sub.SubscriberID)
 				res.State, res.AskID = "sent", ask.ID
 				sent++
 				// One audit line per ask: who, where, what; never the text.

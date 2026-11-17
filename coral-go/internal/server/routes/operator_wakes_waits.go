@@ -16,3 +16,10 @@ func (h *SessionsHandler) operatorPosted(project, content string) {
 		h.boardHandler.resolveOperatorWaits(project, content)
 	}
 }
+
+// operatorPostedTo is operatorPosted for a message meant for one agent (a held comment delivered to it): only that agent's waits end, not another agent's open question to the Operator (#19089).
+func (h *SessionsHandler) operatorPostedTo(project, content, subscriberID string) {
+	if h.boardHandler != nil {
+		h.boardHandler.goBG(func() { h.boardHandler.resolveMessageWaitsFor(project, board.OperatorName, content, subscriberID) })
+	}
+}

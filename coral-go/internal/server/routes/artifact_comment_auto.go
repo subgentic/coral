@@ -118,7 +118,7 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 			continue
 		}
 		h.linkCommentMessage(ctx, b, posted, rootID, t.sessionID)
-		h.operatorPosted(b, msg)
+		h.operatorPostedTo(b, msg, t.sub.SubscriberID)
 		sent = append(sent, title)
 		slog.Info("[artifact comments] the Operator's comment sent to an agent", "artifact", id, "comment", c.ID, "agent", title, "board", b)
 	}
