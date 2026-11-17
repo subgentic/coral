@@ -41,6 +41,7 @@ const { HEX_RE, managedHex, itemKey: artifactKey, isUnverified, readableName, si
 
 const Tags = await importOnce('./artifact_tags.js');
 const { REVIEW, STARTER } = await importOnce('./artifact_tag_rules.js');
+const SAVED = 'saved';
 const IGNORED = 'ignored'; // the tag Dismiss on a review row puts on a file (the review route's own word)
 // Paste into an agent's chat when it does not know how to publish an artifact.
 const AGENT_ARTIFACT_PROMPT = `To publish an artifact in Coral (so it shows in the Artifacts tab): run coral-agent artifact upload <file> (prints JSON whose "uri" is the coral://artifacts/<digest> reference).
@@ -680,11 +681,11 @@ export function createArtifactsList({ inbox = false } = {}) {
     }
     /** The For review pill of the Inbox folder's toolbar: All and For review with the team tags' count, or nothing while no file carries it. */
     function reviewPills() {
-        const n = Number(model.tagCounts[REVIEW]) || 0, ig = Number(model.tagCounts[IGNORED]) || 0, tag = model.filters.tag;
-        if (!n && !ig && tag !== REVIEW && tag !== IGNORED) return null;
-        const current = tag === REVIEW ? 'review' : tag === IGNORED ? 'ignored' : 'all';
-        const items = [{ key: 'all', label: 'All', count: model.counts ? model.counts.all : model.items.length }, { key: 'review', label: 'For review', count: n }, ...(ig || tag === IGNORED ? [{ key: 'ignored', label: 'Dismissed', count: ig }] : [])]; // an item put away from Needs you with Dismiss (#11579): here to find again and Unignore
-        return { label: 'Show artifacts', items, current, onPick: key => setFilters({ ...model.filters, tag: key === 'review' ? REVIEW : key === 'ignored' ? IGNORED : '' }) };
+        const sv = Number(model.tagCounts[SAVED]) || 0, n = Math.max(0, (Number(model.tagCounts[REVIEW]) || 0) - sv), ig = Number(model.tagCounts[IGNORED]) || 0, tag = model.filters.tag;
+        if (!n && !ig && !sv && tag !== REVIEW && tag !== IGNORED && tag !== SAVED) return null;
+        const current = tag === REVIEW ? 'review' : tag === IGNORED ? 'ignored' : tag === SAVED ? 'saved' : 'all';
+        const items = [{ key: 'all', label: 'All', count: model.counts ? model.counts.all : model.items.length }, { key: 'review', label: 'For review', count: n }, ...(sv || tag === SAVED ? [{ key: 'saved', label: 'Saved', count: sv }] : []), ...(ig || tag === IGNORED ? [{ key: 'ignored', label: 'Dismissed', count: ig }] : [])]; // an item put away from Needs you with Dismiss (#11579): here to find again and Unignore
+        return { label: 'Show artifacts', items, current, onPick: key => setFilters({ ...model.filters, tag: key === 'review' ? REVIEW : key === 'ignored' ? IGNORED : key === 'saved' ? SAVED : '' }) };
     }
 
     function showArtifacts(host, project, h = {}, scope = null) {

@@ -16,4 +16,7 @@ assert.equal(reviewWords(['for review', 'changes requested'], undefined, 'Writer
 assert.equal(reviewWords(['reviewed'], undefined), 'Reviewed');
 assert.equal(reviewWords(['internal'], undefined), '');
 assert.equal(reviewWords(undefined, undefined), '');
+const { isSavedWords, isWaitingWords } = await importUi('artifact_tags');
+assert.equal(reviewWords(['for review', 'saved'], undefined), 'Saved for later, not in Needs you', 'a saved file keeps its review tag but is not waiting in Needs you (#18132)');
+assert.ok(isSavedWords(reviewWords(['for review', 'saved'])) && !isWaitingWords(reviewWords(['for review', 'saved'])), 'the Artifacts badge says Saved, not For review');
 console.log('artifact_review_words: ok');
