@@ -23,7 +23,7 @@ func TestReconciler_AWakeWhoseSpacedStartIsStillPendingIsNotMarkedExited(t *test
 	name := FormatSessionName("claude", testUUID)
 	rt.set(name, "zsh") // the shell the spaced start has not typed into yet
 
-	done := ptymanager.MarkStartPending(name + ".0") // startAgentCLI's target is the pane: the session's name with .0 on a tmux backend
+	done := ptymanager.MarkStartPending(name+".0", 0) // startAgentCLI's target is the pane: the session's name with .0 on a tmux backend
 	r.reconcileOnce(ctx)
 	assert.False(t, isSleeping(t, ss, testUUID), "a start still to be typed is not an exit")
 
@@ -57,4 +57,30 @@ func TestReconciler_AWakeInsideItsLaunchGraceIsNotMarkedExited(t *testing.T) {
 	now = now.Add(2 * time.Minute) // the grace is over and the shell is still there: an exit
 	r.reconcileOnce(ctx)
 	assert.True(t, isSleeping(t, ss, testUUID), "and a real exit after it is caught")
+}
+
+// A spaced start is stamped launched_at when it is scheduled, up to a minute before the line is typed: the grace runs from the typing (#18991).
+func TestReconciler_AStartTypedJustNowIsInsideItsGraceWhateverItsRowSays(t *testing.T) {
+	ss, _, r, db := newReconcilerFixtureDB(t)
+	rt := &fgReconRuntime{reconMockRuntime: reconMockRuntime{alive: map[string]bool{}}}
+	r = NewSessionReconciler(ss, rt, time.Hour)
+	ctx := context.Background()
+	registerAwake(t, ss, "claude", testUUID)
+	rt.listed = []AgentInfo{{AgentType: "claude", SessionID: testUUID}}
+	name := FormatSessionName("claude", testUUID)
+	rt.set(name, "zsh")
+	now := time.Now().Add(5 * time.Second)
+	r.now = func() time.Time { return now }
+	old := now.Add(-3 * time.Hour).UTC().Format(store.ISOFormat)
+	_, err := db.ExecContext(ctx, "UPDATE live_sessions SET created_at = ?, launched_at = ? WHERE session_id = ?", old, now.Add(-70*time.Second).UTC().Format(store.ISOFormat), testUUID) // scheduled 70 s ago
+	require.NoError(t, err)
+
+	done := ptymanager.MarkStartPending(name+".0", time.Minute)
+	done() // typed just now
+	r.reconcileOnce(ctx)
+	assert.False(t, isSleeping(t, ss, testUUID), "the line was typed seconds ago: the grace is not over")
+
+	now = now.Add(2 * time.Minute)
+	r.reconcileOnce(ctx)
+	assert.True(t, isSleeping(t, ss, testUUID), "a real exit after the grace is caught")
 }

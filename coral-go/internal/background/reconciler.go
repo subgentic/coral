@@ -294,6 +294,9 @@ func (r *SessionReconciler) checkExited(ctx context.Context, ls store.LiveSessio
 			launched, lerr = t, nil
 		}
 	}
+	if t, ok := ptymanager.StartTypedAt(name); ok && (lerr != nil || t.After(launched)) { // a spaced start is stamped when scheduled; the line went in later (#18991)
+		launched, lerr = t, nil
+	}
 	if lerr == nil && r.now().Sub(launched) < exitedLaunchGrace {
 		return
 	}
