@@ -30,7 +30,7 @@ let docsQuery = '';   // the sidebar search's text, lower case
 
 // ── Groups (#7443, #10093): Getting started, Guides and Developer docs ────────────────
 // The list the server sends has no groups; these topics are the ones a new reader starts with, in this order ("How do I...?" first, then Quickstart); every other topic, the API reference included, is for developers.
-const GETTING_STARTED_ORDER = ['how-do-i', 'quickstart', 'key-concepts', 'using-the-dashboard', 'worked-demos', 'workflow-quickstart', 'troubleshooting'];
+const GETTING_STARTED_ORDER = ['how-do-i', 'quickstart', 'key-concepts', 'using-the-dashboard', 'skills', 'worked-demos', 'workflow-quickstart', 'troubleshooting'];
 const GETTING_STARTED = new Set(GETTING_STARTED_ORDER);
 // The pages about Coral's own API, files and hooks: a newcomer's search lists the guides first and these after them, under their own name, not hidden (walk 79, #19273).
 const DEVELOPER = new Set(['README', 'sessions', 'session-history', 'websockets', 'ui-hooks', 'agent-ui', 'agent-tasks', 'task-workflows', 'merge-queue', 'resource-queue', 'board', 'cross-team', 'hooks', 'team-config', 'auth', 'redaction', 'hub', 'settings-system', 'jobs', 'workflows']);
@@ -100,7 +100,7 @@ function hitSentence(name) {
     if (!line) return '';
     let best = '', bestN = 0;
     for (const part of line.text.split(/(?<=[.!?])\s+/)) {
-        const text = part.replace(/^[#>*\-\d.\s]+/, '').replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[`*_|]+/g, '').replace(/#\d{3,}/g, '').replace(/\s+/g, ' ').trim(), low = text.toLowerCase();
+        const text = part.replace(/^[#>*\-\d.\s]+/, '').replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\|/g, ' ').replace(/[`*_]+/g, '').replace(/#\d{3,}/g, '').replace(/\s+/g, ' ').trim(), low = text.toLowerCase();
         const n = words.filter(w => low.includes(w)).length;
         if (n > bestN) { bestN = n; best = text; }
     }

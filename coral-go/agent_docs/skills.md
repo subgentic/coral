@@ -1,5 +1,15 @@
 # Skills
 
+Skills are reusable instructions that help an agent do a particular job, such as reviewing code or writing release notes.
+
+## Use a skill in the dashboard
+
+Open **Skills**, choose an approved skill, then **Use with an agent**. Choose a running agent and make the skill available. Ask the agent to use it in your next message. You can also choose skills when launching a new agent or team.
+
+Ask an agent to write a skill for a task you repeat, or get one from a source you trust. **Import a skill** opens your computer's file picker for a `.zip` or `SKILL.md` file. Read its instructions and scripts before importing. Agent-created skills wait for your approval; imported skills are approved when you import them.
+
+## Developer details
+
 A skill is an Agent Skills folder (`SKILL.md` and optional `scripts/`, `references/`, `assets/`) that the Operator approved. Coral keeps them; you find and read them with `coral-agent skills`.
 
 ## Coral's example skills
