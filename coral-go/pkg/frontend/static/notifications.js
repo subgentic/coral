@@ -407,5 +407,5 @@ export function showNotificationToast(agentLabel, detail, onClick, { silent = fa
     toast.querySelector(".notification-toast-close").addEventListener("click", () => toast.remove());
     joinColumn(toast);
     if (!silent) announceNotice(`${toast.querySelector(".notification-toast-title").textContent.replace(/^\S+\s/, "")}${detail ? ": " + toast.querySelector(".notification-toast-detail").textContent : ""}`);
-    setTimeout(() => toast.remove(), 10000);
+    setTimeout(() => toast.remove(), ACTION_TOAST_MS); // it has a button to press: 30 s like the other toasts with an action, not 10 s (#17636)
 }
