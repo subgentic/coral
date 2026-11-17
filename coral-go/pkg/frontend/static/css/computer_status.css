@@ -1,0 +1,10 @@
+.computer-status-dialog { max-height: calc(100dvh - 24px); margin: auto; padding: 0; color: var(--text-primary); background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--dlg-radius); }
+.computer-status-dialog::backdrop { background: var(--modal-backdrop); }
+.computer-status-dialog .modal-body { max-height: 65dvh; overflow: auto; overflow-wrap: anywhere; min-width: 0; }
+.computer-status-dialog .btn { min-height: 44px; }
+.computer-status-dialog li { margin-bottom: 12px; }
+
+.computer-status-dialog ol { padding-inline-start: 1.5em; }
+.computer-status-dialog .machine-health-head { flex-wrap: wrap; }
+.computer-status-dialog .machine-health-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.computer-status-dialog .machine-health-status { flex-shrink: 0; }

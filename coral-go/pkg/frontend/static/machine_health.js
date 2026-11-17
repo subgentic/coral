@@ -12,8 +12,6 @@
  * value outside the enums is shown as unknown rather than echoed. */
 
 import { state } from './state.js';
-import { onBuilt } from './lazy_dom.js';
-import { importOnce } from './import_once.js';
 
 // Maps, not plain objects: a value such as "constructor" or "__proto__" must not count as known
 // (QA, #3446 review).
@@ -54,7 +52,7 @@ export function applyMachineHealth(msg) {
 }
 
 /** This dashboard's machine health, or null when unknown (no value yet, or the feed is down). */
- function localMachineHealth() {
+export function localMachineHealth() {
     const ws = state.coralWs;
     if (!_local || !ws || ws.readyState !== 1) return null;
     return _local;
@@ -161,18 +159,4 @@ export function healthCard(h, { title = 'Computer health', online = false, waiti
     }
     card.appendChild(dl);
     return card;
-}
-
-// The Settings card for this machine (local dashboard only), redrawn as the feed changes.
-async function renderLocalCard() {
-    const slot = document.getElementById('machine-health-local');
-    if (!slot) return;
-    const chip = await importOnce('./data_table.js').then(m => m.chip, () => null); // the shared chip (the Servers table's), loaded when the card first draws; the card draws with the plain status if it cannot load
-    slot.replaceChildren(healthCard(localMachineHealth(), { title: 'This computer', chip }));
-}
-onBuilt('settings-modal', renderLocalCard); // the card's slot is in Settings, built on first open (#4500)
-if (typeof document !== 'undefined') { // a page (pure-node tests import this module too)
-    document.addEventListener('coral:machine-health', renderLocalCard);
-    document.addEventListener('coral:feed-state', renderLocalCard);
-    renderLocalCard();
 }
