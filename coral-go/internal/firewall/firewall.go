@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/subgentic/coral/internal/psquote"
 )
@@ -183,6 +184,10 @@ func expandPercent(s string, get func(string) string) string {
 // Fix is the commands that narrow the rule to Private networks or remove it, for an elevated PowerShell, each on a line of its own so a
 // pasted line is only a command (the one that narrows, a line saying the next one removes the rule instead, and that one).
 func (f Finding) Fix() string {
+	if hasLineBreak(f.Rule.ID) {
+		// A name with a line break cannot be one command's argument on one line, and each line of the warning is a command the dashboard offers to copy (#14850): a comment says what to do and runs nothing.
+		return "# This rule's name holds a line break, so there is no one-line command for it: remove it in Windows Defender Firewall with Advanced Security."
+	}
 	id := psquote.Literal(f.Rule.ID) // PowerShell also ends a quote at the curly single quotes: psquote doubles those too (#3904)
 	return fmt.Sprintf("Set-NetFirewallRule -Name %s -Profile Private\nOr, to remove the rule instead:\nRemove-NetFirewallRule -Name %s", id, id)
 }
@@ -195,7 +200,7 @@ func Message(findings []Finding) string {
 	var b strings.Builder
 	b.WriteString("Windows Firewall lets other computers reach Coral on every port, more than it needs. Coral never makes firewall rules: Windows made these when someone clicked Allow on its prompt. To limit each rule to Private networks, open PowerShell as an administrator and run:")
 	for _, f := range findings {
-		fmt.Fprintf(&b, "\n- %s (%s) %s:\n%s", f.Rule.Name, f.Rule.App, f.Why, f.Fix())
+		fmt.Fprintf(&b, "\n- %s (%s) %s:\n%s", oneLine(f.Rule.Name), oneLine(f.Rule.App), oneLine(f.Why), f.Fix())
 	}
 	return b.String()
 }
@@ -219,3 +224,23 @@ func Set(f []Finding) { mu.Lock(); findings = f; mu.Unlock() }
 
 // Warning is the startup check's message ("" when there is nothing to say), shown on the dashboard.
 func Warning() string { mu.RLock(); defer mu.RUnlock(); return Message(findings) }
+
+// hasLineBreak reports whether s holds a control character or a Unicode line or paragraph separator: anything a reader of the message could take for the end of a line.
+func hasLineBreak(s string) bool {
+	return strings.IndexFunc(s, isBreak) >= 0
+}
+
+func isBreak(r rune) bool {
+	return unicode.IsControl(r) || r == '\u2028' || r == '\u2029'
+}
+
+// oneLine is s with each control character and line separator turned into a space: the rule's name, program and reason are data shown on one line of the warning, never lines of their own, so a name cannot add a
+// line that looks like a command (#14850).
+func oneLine(s string) string {
+	return strings.Map(func(r rune) rune {
+		if isBreak(r) {
+			return ' '
+		}
+		return r
+	}, s)
+}
