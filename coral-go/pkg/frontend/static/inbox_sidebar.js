@@ -199,6 +199,8 @@ const waitMark = s => {
 const phoneRow = (s, from, desc, extra = [], whole = false) => { const wrap = DT.el('span', 'inbox-review-item inbox-agent-first'), name = DT.el('span', whole ? 'inbox-review-name inbox-whole-name' : 'inbox-review-name', desc); // whole: a waiting agent's question is said whole, wrapped (#14574)
     DT.tipIf(name, desc, () => name.scrollHeight > name.clientHeight + 1); if (extra.length) name.append(' ', ...extra); wrap.append(from, name, ...waitMark(s)); return wrap; }; // a badge that is words (New comments) goes on the description's own line, after it; a row is three lines at most (#13911)
 /** A phone card's computer (#14623, the approved phone mock): with two or more computers its name is a small chip on the card's meta line, beside the sender and the time, not a Computer line of its own under the text. */
+/** A chip that was cut to fit (a long computer name, large text) says its whole name when it is tapped, in a toast; a chip that fits does nothing of its own and the tap opens the card as ever (#14705: the hover title is no help on a phone; a screen reader reads the whole text either way). */
+const computerTap = (chip, label) => e => { if (chip.scrollWidth <= chip.clientWidth + 1) return; e.stopPropagation(); e.preventDefault(); showToast(`Computer: ${label}`); };
 const addComputerChip = (s, tr) => {
     tr.querySelector('.inbox-computer-chip')?.remove();
     if (!isPhoneLayout() || !multipleServers()) return;
@@ -206,7 +208,10 @@ const addComputerChip = (s, tr) => {
     const label = pagingServerLabel(serverOf(s)); if (!label) return;
     let tags = item.querySelector(':scope > .inbox-review-tags');
     if (!tags) { tags = DT.el('span', 'inbox-review-tags'); const from = item.querySelector(':scope > .inbox-review-from'); if (from) from.after(tags); else item.prepend(tags); }
-    const chip = DT.el('span', 'chip chip-tag inbox-computer-chip', label); chip.title = `On ${label}`; tags.append(chip);
+    const chip = DT.el('span', 'chip chip-tag inbox-computer-chip', label); chip.title = `On ${label}`; chip.addEventListener('click', computerTap(chip, label)); chip.setAttribute('role', 'button'); chip.tabIndex = 0; chip.setAttribute('aria-label', `Computer: ${label}`); // keyboard and screen reader: the chip is a button that says the whole name (a toast), and the card's own button names it too
+    chip.addEventListener('keydown', e => { if (e.key !== 'Enter' && e.key !== ' ') return; e.preventDefault(); e.stopPropagation(); showToast(`Computer: ${label}`); });
+    const from = item.querySelector(':scope > .inbox-review-from'); if (from) { const base = from.getAttribute('aria-label') || from.textContent.trim(); if (!base.includes(`on ${label}`)) from.setAttribute('aria-label', `${base}, on ${label}`); }
+    tags.append(chip);
 };
 const introNode = text => DT.el('span', 'inbox-review-from', text);
 const fromNode = s => {

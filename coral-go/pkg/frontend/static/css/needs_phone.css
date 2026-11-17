@@ -36,8 +36,7 @@
 }
 
 @media (max-width: 760px) {
-    /* The sender and time keep the whole first line. The 44 px star sits beside
-     * the description, with its own space, and never wraps the table's cells. */
+    /* The sender and time keep the whole first line. On a review or question card the 44 px star button is at the end of the button row, at the card's bottom right (#14683); on any other row it sits beside the description, with its own space, and never wraps the table's cells. */
     .inbox-needs-results .inbox-review-star-anchor.inbox-agent-first.inbox-review-item { padding-inline-end: 0; min-height: calc(1lh + 2px); grid-template-columns: minmax(3rem, 1fr) fit-content(min(9rem, 40%)) max-content; }
     .inbox-needs-results .inbox-review-item.inbox-review-star-anchor > .inbox-review-name:not(.inbox-ask-name) { box-sizing: border-box; width: calc(100% - 52px); max-width: calc(100% - 52px); margin-inline-end: 52px; padding-inline-end: 0; }
     .inbox-needs-results .inbox-review-star-anchor > .inbox-review-star { top: calc(1lh + 2px); }

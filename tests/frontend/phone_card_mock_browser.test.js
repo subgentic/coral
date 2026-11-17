@@ -1,5 +1,5 @@
 // The rest of the approved phone mock on a Needs you card (#14683, ccdb36ff): the three dots sit at the card's top right, on the sender's line with the time, not in the button row; the version is a small pill beside the title, not text in
-// the time line. At 390 and 320 px (and 430, 360); the fixture is inbox_phone_cards_browser's (two review files, one at v3 with earlier versions). The star stays (see the task): its place is the card's right edge below the time.
+// the time line. At 390 and 320 px (and 430, 360); the fixture is inbox_phone_cards_browser's (two review files, one at v3 with earlier versions). The star stays: a 44 px button at the end of the button row, at the card's bottom right.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
