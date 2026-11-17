@@ -93,4 +93,4 @@
 @media (min-width: 768px) { #group-table-view .inbox-folder-toolbar:has(.needs-more):not(:has(.team-toolbar-selecting)) { padding-bottom: calc(var(--tb-bar-h) + 16px); } } /* the selection bar is row three, under the title row and the search row (#15540): its room is kept while nothing is ticked, so the list does not move (#15339) */
 
 .inbox-age { color: var(--text-tertiary); white-space: nowrap; } .inbox-age-late { color: var(--warning-text); display: inline-flex; align-items: center; gap: 4px; } .inbox-age-flag { font-size: 16px; } /* the wait (#17451, N7): grey and short; past the limit an amber triangle goes with it */.inbox-answers-with-more { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.inbox-age .sr-only { width: auto; white-space: nowrap; } /* its words are not cut by their own 1 px box, so the Waiting cell passes the whole-words check (#9426) */
+.inbox-age .sr-only { font-size: 0; } /* its words take no room, so the 1 px box does not cut them and the table does not grow (the whole-words check, #9426); a screen reader still reads them */
