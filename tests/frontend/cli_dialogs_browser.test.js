@@ -68,6 +68,18 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await click('cancel'); await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: a launch, if one were sent, would be sent within this
         assert.equal(await ev(`window.__launches.length`), 0, 'Cancel sends nothing'); assert.deepEqual(await modals(), []);
 
+        console.log('A saved Bypass permissions or Don\'t ask default keeps its one line of what it means (#19285); Auto and the others say nothing more');
+        for (const [mode, name] of [['bypassPermissions', 'Bypass permissions'], ['dontAsk', "Don't ask"]]) {
+            await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.settings = { ...m.state.settings, default_permission_mode: ${JSON.stringify(mode)} }; return true; })`);
+            await startLaunch(); await waitFor(`!!document.querySelector('body > .modal:not([id]) [data-action="cancel"]')`, 'the question for ' + mode);
+            m = await modals();
+            assert.ok(m[0].text.includes(name + ': ') && m[0].text.replace(/\s+/g, ' ').split(name + ': ')[1].trim().length > 10, `${mode}: the confirm keeps a sentence of what it means: ${JSON.stringify(m[0].text)}`);
+            await click('cancel'); assert.deepEqual(await modals(), []);
+        }
+        await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { delete m.state.settings.default_permission_mode; return true; })`);
+        await startLaunch(); await waitFor(`!!document.querySelector('body > .modal:not([id]) [data-action="cancel"]')`, 'the Auto question');
+        m = await modals(); assert.ok(!/Auto: /.test(m[0].text), 'Auto adds no sentence (#19238): ' + JSON.stringify(m[0].text)); await click('cancel');
+
         console.log('Codex on Default launches without the question (its Default is the launch its Auto is, #7620); Claude on Default still asks');
         const before = await ev(`window.__launches.length`);
         await ev(`window.showLaunchModal(); window._selectLaunchType('agent'); { const t = document.querySelector('#launch-agent-acf .acf-agent-type'); t.value = 'codex'; t.dispatchEvent(new Event('change', { bubbles: true })); const sel = document.querySelector('#launch-agent-acf .acf-permission-mode'); sel.value = 'default'; } document.getElementById('launch-dir').value = '/work/project'; document.querySelector('#launch-step-agent [data-on-click="m-launch-session"]').click(); true`);
