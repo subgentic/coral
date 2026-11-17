@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/subgentic/coral/internal/httputil"
 	"io"
 	"net/http"
@@ -107,8 +108,8 @@ func readPublished(w http.ResponseWriter, r *http.Request, allowMD bool) (data [
 			errBadRequest(w, "skill_md_base64 must be the SKILL.md, in base64")
 			return nil, req, false
 		}
-		if len(md) > skills.MaxZipBytes {
-			writeError(w, http.StatusRequestEntityTooLarge, "skill_too_large", "a skill is at most 5 MiB")
+		if len(md) > skills.MaxSkillMDBytes { // the file's own limit, said as a file's (a SKILL.md, not a zip: the wrapper adds bytes of its own, so a size near the zip's cap would be refused for the wrapper)
+			writeError(w, http.StatusRequestEntityTooLarge, "skill_too_large", fmt.Sprintf("a SKILL.md must be at most %d KiB", skills.MaxSkillMDBytes>>10))
 			return nil, req, false
 		}
 		wrapped, werr := zipOfSkillMD(md)
