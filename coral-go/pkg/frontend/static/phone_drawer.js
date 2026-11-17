@@ -105,7 +105,7 @@ export function drawerTop() {
                 if (sec.title && rows.sections.length > 1) out.push(heading('nav-drawer-group', sec.title));
                 for (const it of sec.items) {
                     const total = it.unread && it.count == null ? it.total : null;
-                    out.push(row(/^[a-z0-9_:-]+$/.test(it.icon || '') ? it.icon : 'folder', it.label, total ?? it.count, () => { window.switchNavTab?.('hub-inbox'); importOnce('./inbox_tab.js').then(() => rows.pick(it.key)); }, it.key === rows.current, { unread: it.unread && total == null, known: true, words: it.words }));
+                    out.push(row(/^[a-z0-9_:-]+$/.test(it.icon || '') ? it.icon : 'folder', it.label, total ?? it.count, () => { window.switchNavTab?.('hub-inbox'); importOnce('./inbox_tab.js').then(() => rows.pick(it.key)); }, it.key === rows.current, { unread: it.unread && total == null, known: true, noun: it.unread ? 'chat' : undefined, words: it.words }));
                 }
             }
         } else {
