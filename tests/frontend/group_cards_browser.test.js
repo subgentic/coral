@@ -111,13 +111,13 @@ const SESSIONS = [
             assert.deepEqual(await shown(), six, 'More closes again');
             await ev(`document.body.click(); true`);
         });
-        await run('folder first: every folder is a group and the boards are cards inside them; no workflow cards', async () => {
+        await run('team grouping off: flat folder groups, no nested team or workflow cards (#16419)', async () => {
             await ev(`localStorage.setItem('coral-group-by-team', 'false'); window._coralSetLiveSessions(${JSON.stringify(SESSIONS)}); true`);
             await waitFor(`!!document.querySelector('li.session-group-header[data-group-name="folder-a"] .session-group-count') && !document.querySelector('li.session-group-header[data-group-name="/tmp/none"]')`, 'folder first');
             const heads = await ev(`[...document.querySelectorAll('li.session-group-header[data-group-name]')].map(li => li.dataset.groupName)`);
             for (const g of ['folder-a', 'folder-b', 'dev-1', 'bee-1']) assert.ok(heads.includes(g), `${g} is a folder: ${JSON.stringify(heads)}`);
             assert.equal(await ev(`document.querySelectorAll('li.session-wf-card').length`), 0, 'no workflow cards in folder-first mode');
-            assert.ok(await ev(`document.querySelectorAll('li.session-board-card').length`) >= 2, 'the boards are cards');
+            assert.equal(await ev(`document.querySelectorAll('li.session-board-card').length`), 0, 'no team cards nested inside folders');
             assert.equal(await ev(`document.querySelectorAll('li.session-group-header[data-group-name="folder-a"] ~ li.session-group-item').length >= 2`), true, 'the folder holds its two agents');
             assert.equal(await ev(`document.querySelector('li.session-group-header[data-group-name="folder-a"] .session-group-count').textContent`), '2');
         });
