@@ -77,11 +77,12 @@ export function chatSections(c = counts) {
       const total = shownCount(key, c);
       return { key, label, count: folderUnread(key), total, unread: true, ...(key === 'chats-active' && total != null ? { words: `${total} running` } : {}) };
     };
-    const out = [{ title: 'Chats', items: FOLDERS.map(f => item(f.key, f.label)) },
-        { title: 'By CLI', items: CLIS.map(([t, label]) => item(`chats-cli-${t}`, label)) }];
-    const tags = (c && c.tags) || [];
+    const out = [{ title: 'Chats', items: FOLDERS.filter(f => f.key === 'chats' || shownCount(f.key, c) > 0).map(f => item(f.key, f.label)) },
+        { title: 'By CLI', items: CLIS.filter(([t]) => folderCount(`chats-cli-${t}`, c) > 0).map(([t, label]) => item(`chats-cli-${t}`, label)) }];
+    out[1].items = out[1].items.length > 1 ? out[1].items : [];
+    const tags = ((c && c.tags) || []).filter(t => t.count > 0);
     if (tags.length && !nativeInbox()) out.push({ title: 'Tags', items: tags.map(t => ({ key: `chats-tag-${t.id}`, label: t.name, dot: /^#[0-9a-f]{3,8}$/i.test(t.color || '') ? t.color : undefined })) });
-    return out;
+    return out.filter(section => section.items.length);
 }
 
 /** The chat tags there are (from the last counts read): id, name, count, colour. */
