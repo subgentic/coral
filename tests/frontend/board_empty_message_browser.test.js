@@ -20,6 +20,8 @@ const BOARD = 'qa-empty-board-message';
             await ev(`fetch('/api/board/${BOARD}/subscribe', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'Lead',job_title:'Orchestrator'})}).then(r=>{if(!r.ok)throw new Error('subscribe '+r.status);});`);
             await ev(`window.selectBoardProject('${BOARD}'); true`);
             await waitFor(`!!document.querySelector('#team-page-view #mb-post-input')?.getClientRects().length`, 'board composer', 8000);
+            // Replacing the shell's box drops element-bound listeners; delegated actions must survive (#19052).
+            await ev(`(() => { const t=document.querySelector('#mb-post-input'); t.replaceWith(t.cloneNode(true)); })()`);
             for (const value of ['', '   \n  ']) for (const method of ['Send','Enter']) {
                 await ev(`(() => { const t=document.querySelector('#mb-post-input'); t.value=${JSON.stringify(value)}; t.dispatchEvent(new Event('input',{bubbles:true})); t.focus(); })()`);
                 if (method === 'Send') await ev(`document.querySelector('#team-page-view [data-on-click="mb-post"]').click(); true`);
