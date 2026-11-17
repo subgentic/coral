@@ -41,3 +41,7 @@
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td[data-key="agent"] > .inbox-row-words { grid-column: 4; order: 4; min-height: 2rem; display: flex; align-items: center; }
 }
 
+/* The Needs you filter has a visible name on a phone as on a desktop (#16873). */
+.inbox-needs-toolbar .list-bar-toggle-text { display: inline; }
+.inbox-needs-toolbar .list-bar-toggle { gap: 4px; padding: 0 6px; }
+.inbox-row-team { color: var(--text-primary); }
