@@ -400,7 +400,7 @@ func (h *TokenUsageHandler) UsageTimeSeries(w http.ResponseWriter, r *http.Reque
 			errInternalServer(w, "task attribution unavailable")
 			return
 		}
-		windows, readErr := h.bs.UsageWindows(r.Context())
+		windows, readErr := h.bs.UsageWindows(r.Context(), usageBound(since), usageBound(until))
 		if readErr != nil {
 			errInternalServer(w, readErr.Error())
 			return
@@ -653,4 +653,14 @@ func withNotReported(tracked []store.ThinkingUsageSummary, byModel []store.Model
 		}
 	}
 	return out
+}
+
+// usageBound reads a since or until of the usage routes as a time; empty or unreadable is an open end (the store's own filters still apply).
+func usageBound(v string) time.Time {
+	for _, layout := range []string{time.RFC3339Nano, "2006-01-02 15:04:05", "2006-01-02T15:04:05"} {
+		if t, err := time.Parse(layout, v); err == nil {
+			return t.UTC()
+		}
+	}
+	return time.Time{}
 }
