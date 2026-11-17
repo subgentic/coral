@@ -1,5 +1,5 @@
 // Docs on the shared sidebar (#7470, part 2 of one sidebar, UI/UX's audit c2596330): the Docs pane has the header's parts in the same pixels as the other tabs (search named "Search docs", no Display options,
-// Expand or collapse all, Hide), two groups (Getting started, For developers) whose name opens a one-column table of topics at 20/700 with its count and whose chevron only folds; a topic opens as a page with its own
+// Expand or collapse all, Hide), three groups (Getting started, Guides, Developer docs) whose name opens a one-column table of topics at 20/700 with its count and whose chevron only folds; a topic opens as a page with its own
 // "← group" link, the document at its reading scale (headings 20/700 and 17/700, table headers 12/500, bold labels 14/600, body 14/400) and "Copy docs line for agents" as a normal button in the page header;
 // the search narrows the topics; one empty line; both themes and 200% text; on a phone the list is the page and a topic is the screen after it, with a way back to the list. The real docs of the isolated
 // dev server are read, so the grouping is checked on the real topics. Drives Chrome over CDP through agent_view_harness.js.
@@ -36,18 +36,19 @@ const BASE = require('./test_base').BASE;
             await ev(`localStorage.clear(); window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
 
             await openTab('docs');
-            await waitFor(`document.querySelectorAll('${pane('docs')} .sgroup-header').length === 2 && document.querySelectorAll('${pane('docs')} li .row-btn').length >= 4`, at + 'the groups and the first topics', 15000);
-            // the first look (#11401 e): Getting started is open and For developers is folded, 32 pages out of the way; the reader opens it and the rest of this suite reads both
-            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('docs')} .sgroup-header .group-chevron')].map(c => c.getAttribute('aria-expanded'))`), ['true', 'false'], at + 'a first-time reader finds For developers folded');
+            await waitFor(`document.querySelectorAll('${pane('docs')} .sgroup-header').length === 3 && document.querySelectorAll('${pane('docs')} li .row-btn').length >= 4`, at + 'the groups and the first topics', 15000);
+            // the first look (#11401 e): Getting started is open and Developer docs is folded, 32 pages out of the way; the reader opens it and the rest of this suite reads both
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('docs')} .sgroup-header .group-chevron')].map(c => c.getAttribute('aria-expanded'))`), ['true', 'true', 'false'], at + 'a first-time reader finds Developer docs folded');
             await ev(`document.querySelector('${pane('docs')} .sgroup-header[data-group-name="docs:api"] .group-chevron').click(); true`);
-            await waitFor(`document.querySelectorAll('${pane('docs')} li .row-btn').length > 10`, at + 'For developers opened', 8000);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('docs')} .sgroup-header .group-name-text')].map(e => e.textContent)`), ['Getting started', 'For developers'], at + 'two groups (#10093: the second was called API)');
+            await waitFor(`document.querySelectorAll('${pane('docs')} li .row-btn').length > 10`, at + 'Developer docs opened', 8000);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('docs')} .sgroup-header .group-name-text')].map(e => e.textContent)`), ['Getting started', 'Guides', 'Developer docs'], at + 'three groups (#10093: the last was called API; #19273 splits the guides from the developer pages)');
             // the button is the row: the li around it has no padding and the button is 36 px high (44 on a phone), UI/UX's rule for every sidebar list (#7473)
             assert.deepEqual(await ev(`(() => { const b = document.querySelector('${pane('docs')} li:not(.session-group-header) > .row-btn'), li = b.parentElement, cs = getComputedStyle(li); return { pad: [cs.paddingTop, cs.paddingBottom], h: Math.round(b.getBoundingClientRect().height) >= ${mobile ? 44 : 36}, same: Math.abs(li.getBoundingClientRect().height - b.getBoundingClientRect().height) <= 1 }; })()`), { pad: ['0px', '0px'], h: true, same: true }, at + 'a row is its button, no padding on the li, at least ${mobile ? 44 : 36} px high');
 
-            const counts = await ev(`[...document.querySelectorAll('${pane('docs')} .sgroup-header .session-group-count')].map(e => Number(e.textContent))`);
-            assert.equal(counts[0] + counts[1], await ev(`document.querySelectorAll('${pane('docs')} li .row-btn').length`), at + 'the counts are the topics');
-            assert.ok(counts[0] >= 1 && counts[1] >= 1, at + 'both groups have topics: ' + counts);
+            const raw = await ev(`[...document.querySelectorAll('${pane('docs')} .sgroup-header .session-group-count')].map(e => Number(e.textContent))`);
+            const counts = [raw[0], raw[2]], shownWhenOpen = raw[0] + raw[1] + raw[2], shownFolded = raw[0] + raw[1]; // Getting started, Guides, Developer docs (#19273)
+            assert.equal(shownWhenOpen, await ev(`document.querySelectorAll('${pane('docs')} li .row-btn').length`), at + 'the counts are the topics');
+            assert.ok(raw.every(n => n >= 1), at + 'all three groups have topics: ' + raw);
             assert.equal(await ev(`document.querySelector('${pane('docs')} .sidebar-search-input').getAttribute('aria-label')`), 'Search docs', at + 'the search is named for the tab');
             assert.equal(await ev(`!!document.querySelector('${pane('docs')} [data-display-button]')`), false, at + 'Docs has no Display options, so no button for them');
             assert.equal(await ev(`document.getElementById('docs-topics-btn')`), null, at + 'the Topics sheet button is gone: the list is the sidebar (or the phone page)');
@@ -116,20 +117,20 @@ const BASE = require('./test_base').BASE;
             // the chevron folds without opening a table; the name opens it again
             await ev(`document.querySelector('${pane('docs')} .sgroup-header[data-group-name="docs:api"] .group-chevron').click(); true`);
             assert.equal(await ev(`document.querySelector('${pane('docs')} .sgroup-header[data-group-name="docs:api"] .group-chevron').getAttribute('aria-expanded')`), 'false', at + 'the chevron folds API');
-            assert.equal(await ev(`document.querySelectorAll('${pane('docs')} li .row-btn').length`), counts[0], at + "API's topics are hidden");
+            assert.equal(await ev(`document.querySelectorAll('${pane('docs')} li .row-btn').length`), shownFolded, at + "Developer docs' topics are hidden");
             await ev(`document.querySelector('${pane('docs')} .sgroup-header[data-group-name="docs:api"]').click(); true`);
-            await waitFor(`document.querySelector('#group-table-title').textContent === 'For developers'`, at + "the name opens For developers' table", 8000);
+            await waitFor(`document.querySelector('#group-table-title').textContent === 'Developer docs'`, at + "the name opens Developer docs' table", 8000);
             assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr').length`), counts[1], at + "all of API's topics are in its table, folded or not");
             await ev(`document.querySelector('${pane('docs')} .sgroup-header[data-group-name="docs:api"] .group-chevron').click(); true`); // open it again
 
             // the search narrows the topics
             await ev(`(() => { const i = document.querySelector('${pane('docs')} .sidebar-search-input'); i.value = 'quickstart'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            await waitFor(`document.querySelectorAll('${pane('docs')} li .row-btn').length > 0 && document.querySelectorAll('${pane('docs')} li .row-btn').length < ${counts[0] + counts[1]}`, at + 'the search narrows the list', 5000);
+            await waitFor(`document.querySelectorAll('${pane('docs')} li .row-btn').length > 0 && document.querySelectorAll('${pane('docs')} li .row-btn').length < ${shownWhenOpen}`, at + 'the search narrows the list', 5000);
             assert.ok(await ev(`[...document.querySelectorAll('${pane('docs')} li .row-btn')].some(b => /quickstart/i.test(b.textContent))`), at + 'the topics whose title matches are there (the search reads the topics\' text too, so others that mention it may follow, #9965)');
             await ev(`(() => { const i = document.querySelector('${pane('docs')} .sidebar-search-input'); i.value = 'zzzzzz'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await waitFor(`!!document.querySelector('${pane('docs')} .empty-state')`, at + 'no match says so', 5000);
             await ev(`(() => { const i = document.querySelector('${pane('docs')} .sidebar-search-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            await waitFor(`document.querySelectorAll('${pane('docs')} li .row-btn').length === ${counts[0] + counts[1]}`, at + 'cleared: every topic is back', 5000);
+            await waitFor(`document.querySelectorAll('${pane('docs')} li .row-btn').length === ${shownWhenOpen}`, at + 'cleared: every topic is back', 5000);
 
             // both themes and 200% text: contrast, inside the screen
             if (w === 1280) for (const theme of ['dark', 'light']) for (const zoom of ['', '32px']) {
