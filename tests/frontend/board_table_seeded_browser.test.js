@@ -11,6 +11,7 @@ const CDP = require('chrome-remote-interface');
 const BASE = require('./test_base').BASE;
 const { sqliteExec } = require('./helpers/sqlite'); // the sqlite3 tool when there is one, else Node's own SQLite: a Windows machine has no sqlite3 (#8797)
 const { removeBoards } = require('./helpers/board_cleanup');
+const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_notice');
 const OWN_BUDGET_MS = Number(process.env.CORAL_SEEDED_BUDGET_MS) || 270000; // under the cdp-timeout above: the suite stops itself, cleaned up, before the runner would kill it (a killed suite cannot delete its board: each timed-out attempt left one, #10947)
 
 const B = 'seeded-8047-' + (Date.now() % 100000);
@@ -39,8 +40,8 @@ const spec = (i) => {
     const ev = async expression => { const r = await Runtime.evaluate({ expression, returnByValue: true, awaitPromise: true }); if (r.exceptionDetails) throw new Error(JSON.stringify(r.exceptionDetails).slice(0, 500)); return r.result.value; };
     const { waitFor, coralReady, settle } = require('./helpers/wait').bind(ev);
     // Its board is deleted on every way out: the end of the run, a failure, its own time running out, and the runner's SIGTERM or Ctrl-C. (SIGKILL cannot be caught: that is what the budget is for.)
-    let cleaned = null;
-    const cleanUp = () => (cleaned ||= removeBoards(ev, [B]).catch(() => {}).then(() => client.close().catch(() => {})));
+    let cleaned = null, launchAcked = false;
+    const cleanUp = () => (cleaned ||= (async () => { if (launchAcked) await restoreLaunchNotice(ev); await removeBoards(ev, [B]).catch(() => {}); await client.close().catch(() => {}); })());
     const watchdog = setTimeout(() => { console.error(`board_table_seeded: its own time (${OWN_BUDGET_MS / 1000} s) ran out: its board is deleted and the run stops`); cleanUp().then(() => process.exit(1)); }, OWN_BUDGET_MS);
     for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { cleanUp().then(() => process.exit(130)); });
     const S = `(window.__coralStatic || '/static/')`;
@@ -70,6 +71,9 @@ const spec = (i) => {
     try {
         await Promise.all([Page.enable(), Runtime.enable(), HeapProfiler.enable(), Performance.enable()]);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await coralReady();
+        // Geometry checks belong to the board: acknowledge the unrelated first-run banner and its reserved row.
+        launchAcked = await quietLaunchNotice(Page, ev, BASE + '/');
+        if (launchAcked) await coralReady();
         for (const [sid, title] of SENDERS) await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: sid, job_title: title, session_name: sid + '-s' });
         // 2,100 posts through the real board API (in order, a reply chain of two now and then), every 29th deleted again through the API, then the times of the survivors spread over six days in the board's own
         // database (the isolated server's: the API stamps "now"). Everything the page then reads comes from the real server.
@@ -119,7 +123,7 @@ const spec = (i) => {
                 await ev(`${box}.querySelector('.mb-message[data-message-id="${mid.id}"] > .mb-row-toggle').click(); true`); await settle(200);
                 const after = await ev(`(() => { const r = ${box}.querySelector('.mb-message[data-message-id="${mid.id}"]'); return { top: Math.round(r.getBoundingClientRect().top), st: ${box}.scrollTop, open: r.classList.contains('mb-open') }; })()`);
                 assert.equal(after.open, want === 'open', `the row is ${want}`);
-                assert.ok(Math.abs(after.top - mid.top) <= 1 && Math.abs(after.st - mid.st) <= 1, `${want}: the row and the scroll stay (${mid.top} -> ${after.top}, ${mid.st} -> ${after.st})`);
+                assert.ok(Math.abs(after.top - mid.top) <= 1 && Math.abs(after.st - mid.st) <= 1, `${label} ${want}: the row and the scroll stay (${mid.top} -> ${after.top}, ${mid.st} -> ${after.st})`);
             }
 
             log(`${label}: a search counts and steps across collapsed rows`);
@@ -155,6 +159,8 @@ const spec = (i) => {
             const big = await metrics();
             log('   expand all: ' + shown + ' rows in ' + took + ' ms, +' + (big.nodes - before.nodes) + ' nodes, heap ' + before.heap.toFixed(1) + ' -> ' + big.heap.toFixed(1) + ' MB');
             assert.ok(took < 6000, `Expand all on ${shown} rows took ${took} ms`);
+            const replies = await ev(`(() => { const all = [...${rows}], counts = {}; for (const row of all) if (row.dataset.replyTo) counts[row.dataset.replyTo] = (counts[row.dataset.replyTo] || 0) + 1; return all.map(row => ({ id: row.dataset.messageId, expected: counts[row.dataset.messageId] || 0, actual: row.querySelectorAll(':scope > .mb-row-replies > .mb-row-reply').length })).filter(x => x.expected !== x.actual); })()`);
+            assert.deepEqual(replies, [], 'Expand all keeps each message’s replies under its own row');
             assert.ok(big.nodes - before.nodes < 120000, `Expand all adds ${big.nodes - before.nodes} nodes for ${shown} rows`);
             await ev(`${box}.scrollTop = ${box}.scrollHeight; true`); await settle(300); await shot(`seeded-${tag}-expanded`);
             await ev(`document.querySelector('#mb-tools .list-bar-more-btn').click(); true`); await settle(150);
@@ -168,7 +174,10 @@ const spec = (i) => {
             const openId = await ev(`(() => { const o = ${box}.querySelector(':scope > .mb-message.mb-open'); return o ? Number(o.dataset.messageId) : null; })()`);
             assert.ok(openId, 'a row at the bottom is open');
             const newIds = []; for (let k = 0; k < 3; k++) newIds.push(await ev(`fetch('/api/board/${B}/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'orchestrator', content: 'A live message ${k} while a row is open.' }) }).then(r => r.json()).then(j => j.id || j.message.id)`));
-            await waitFor(`${box}.querySelector(':scope > .mb-message[data-message-id="${newIds[2]}"]')`, 'the live messages', { timeout: 25000 });
+            // The board polls every 10 s, but a page's timers are not ours to count on: on frontier's headless Chrome the phone page's 10 s timer ticked once at 24 s and never again for 95 s (#18959: nothing cleared it, the
+            // state was healthy, and a poll called by hand fetched the new rows at once). The suite asks for the poll itself (the hook a test has for it) until the rows are there; what is checked is that a poll shows live messages
+            // with a row open, not when the browser runs a timer.
+            await waitFor(`window.__coral.pollBoardNow().then(() => !!${box}.querySelector(':scope > .mb-message[data-message-id="${newIds[2]}"]'))`, 'the live messages', { timeout: 25000 });
             const live = await ev(`(() => ({ open: ${box}.querySelector(':scope > .mb-message[data-message-id="${openId}"]')?.classList.contains('mb-open'), newOpen: ${box}.querySelectorAll(':scope > .mb-message[data-message-id="${newIds[0]}"].mb-open, :scope > .mb-message[data-message-id="${newIds[2]}"].mb-open').length, last: Number(${box}.querySelector(':scope > .mb-message:last-of-type')?.dataset.messageId) }))()`);
             assert.ok(live.open && live.newOpen === 0 && live.last === newIds[2], `the open row stayed open and the new ones are closed rows at the bottom: ${JSON.stringify(live)} (last was ${lastBefore})`);
             await orderOk('after live messages');
