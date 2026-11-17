@@ -42,5 +42,5 @@ export function scan(src) {
 // The one module of each, and the modules that may name a signal without being a second renderer, each with its reason. A file not listed is counted against the baseline.
 export const OWNERS = {
     tasks: { 'task_columns.js': 'defines the columns (the module a tasks_view.js draws with)', 'tasks_view.js': 'the one Tasks list (#8060)' },
-    board: { 'board_table.js': 'the one Board message list module (#7921)', 'board_fetch.js': 'the one reader of the board\'s messages for a page, the dock and an export', 'board_quick_reply.js': 'decorates board rows with a Reply button (lazy module, not a renderer)' },
+    board: { 'board_table.js': 'the one Board message list module (#7921)', 'board_reply_preview.js': 'board_table.js expanded-reply DOM builder, loaded only by that shared renderer to keep it off startup', 'board_fetch.js': 'the one reader of the board\'s messages for a page, the dock and an export', 'board_quick_reply.js': 'decorates board rows with a Reply button (lazy module, not a renderer)' },
 };
