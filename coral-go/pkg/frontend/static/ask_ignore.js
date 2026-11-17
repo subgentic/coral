@@ -15,7 +15,8 @@ async function close(a, body) {
         let why = ''; try { const b = await r.json(); why = b.message || b.error || ''; } catch { /* not JSON */ }
         throw new Error(why || `Could not save (HTTP ${r.status}).`);
     }
-    const r = await serverFetch(a.server, `/api/board/${encodeURIComponent(a.board)}/asks/${encodeURIComponent(a.id)}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const { answered: _answeredInChat, ...teamBody } = body; // a team's question has no "answered in chat": its close body stays {note} / {undo}, as before #19355 (#19396)
+    const r = await serverFetch(a.server, `/api/board/${encodeURIComponent(a.board)}/asks/${encodeURIComponent(a.id)}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(teamBody) });
     if (r.ok) return;
     let why = '', code = ''; try { const b = await r.json(); why = b.message || b.error || ''; code = b.code || b.error || ''; } catch { /* not JSON */ }
     throw Object.assign(new Error(why || `Could not save (HTTP ${r.status}).`), { code });
