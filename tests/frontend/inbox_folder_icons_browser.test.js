@@ -1,3 +1,4 @@
+const { POPULATED_CHAT_COUNTS } = require('./helpers/populated_chat_counts');
 // #8866: the actual Inbox folder column uses UI/UX's existing icons and shared provider marks.
 // Checks decoration/accessibility, wrapping/count geometry at 200% text, and the phone's compact select; captures both themes at1280/390.
 const assert = require('node:assert/strict');
@@ -17,6 +18,7 @@ const ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved
             await Emulation.setTouchEmulationEnabled({ enabled: width === 390 });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
+            await ev(POPULATED_CHAT_COUNTS);
             await setTheme(ev, theme);
             await ev(`document.documentElement.style.fontSize = '${font}px'; window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelector('.sidebar-pane[data-pane="hub-inbox"] .view-list-item[data-key="chats-cli-pi"]')`, `${label}: all Inbox folders`, 10000);

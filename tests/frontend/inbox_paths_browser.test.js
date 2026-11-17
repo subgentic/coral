@@ -1,3 +1,4 @@
+const { POPULATED_CHAT_COUNTS } = require('./helpers/populated_chat_counts');
 // The Inbox's folders and the team's Board tab have addresses of their own (#8652, audit #8572 point 4): /inbox/needs, /inbox/saved and /inbox/chats/<all|active|starred|...> follow the folder the person opens
 // (a click writes the path, Back goes to the folder before it, a reload and a pasted link open the folder), and the team's Board tab is /team/<team>/board, with the old /messages address read as the Board tab
 // and rewritten to /board. At 1280 and at 390 (the phone's folder select). Drives Chrome over CDP against the isolated dev server.
@@ -20,7 +21,7 @@ const TEAM = `qa-paths-${Date.now() % 100000}`;
     const pickFolder = (key, mobile) => mobile
         ? ev(`(() => { const s = document.querySelector('.view-list select'); s.value = ${JSON.stringify(key)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`)
         : ev(`document.querySelector('.view-list-item[data-key="${key}"]').click(); true`);
-    const load = async url => { await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await install(); await coralReady(); };
+    const load = async url => { await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await install(); await coralReady(); await ev(POPULATED_CHAT_COUNTS); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [label, w, h, mobile] of [['1280', 1280, 800, false], ['390', 390, 844, true]]) {
@@ -73,7 +74,7 @@ const TEAM = `qa-paths-${Date.now() % 100000}`;
             await installTP(ev); await seed(ev, TEAM); await openTeam(ev, waitFor, TEAM);
             await goTab(ev, settle, 'Board'); await settle(500);
             check(`${label}: the team's Board tab is /team/<team>/board`, (await path()) === `/team/${TEAM}/board`, await path());
-            await ev(`location.reload(); true`); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
+            await ev(`location.reload(); true`); await Page.loadEventFired(); await install(); await coralReady(); await ev(POPULATED_CHAT_COUNTS); await installTP(ev);
             await waitFor(`!!document.querySelector('#team-panel-messages') && !document.querySelector('#team-panel-messages').hidden`, 'the Board tab after a reload', 10000);
             check(`${label}: a reload of /team/<team>/board opens the Board tab`, (await path()) === `/team/${TEAM}/board`, await path());
             await load(`/team/${TEAM}/messages`);
