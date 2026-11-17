@@ -22,7 +22,7 @@ const BASE = require('./test_base').BASE;
                 window.__activityRows.push({...window.__activityRows[0],id:-1,action:'run_seen',item_kind:'job_run',item_id:'41:73',title:'Check release readiness',note:''},{...window.__activityRows[0],id:-2,action:'run_seen',item_kind:'job_run',item_id:'42:74',title:'__oneshot__',note:''});
                 const original=window.fetch;
                 window.fetch=(url,opts)=>new URL(String(url),location.origin).pathname==='/api/activity'?Promise.resolve(new Response(JSON.stringify({actions:window.__activityRows,check:{intact:true,rows:window.__activityRows.length}}),{headers:{'Content-Type':'application/json'}})):original(url,opts);
-                localStorage.removeItem('coral-inbox-activity-filters');
+                localStorage.setItem('coral-inbox-activity-filters', JSON.stringify({ important: false })); // Everything: this suite reads every kind of recorded action (Important is the default, #19149)
                 window.switchNavTab('hub-inbox');
                 await (await import(prefix+'inbox_sidebar.js')).openInboxGroup('activity');
             })()`);
