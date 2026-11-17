@@ -36,7 +36,15 @@ export function presetLabel(preset) {
     return `${preset.name || PRESET_NAMES[preset.id] || preset.id}${preset.builtin ? ' · built in' : ''}`;
 }
 
-export function renderInspection(data, workingMode) {
+/** The preview is built with the team's board id (b- and ten characters); a person knows the team by its name, so the id is written as the name, or as 'this team' when the team has no name but the id (#19071). */
+export function nameTheTeam(data, id, name) {
+    if (!data || !/^b-[a-z0-9]{6,}$/.test(String(id || ''))) return data;
+    const shown = name && name !== id ? name : 'this team';
+    return JSON.parse(JSON.stringify(data).split(id).join(shown.replace(/\\/g, '\\\\').replace(/"/g, '\\"')));
+}
+
+export function renderInspection(rawData, workingMode, team = null) {
+    const data = team ? nameTheTeam(rawData, team.id, team.name) : rawData;
     const roles = [['orchestrator', 'Orchestrator'], ['worker', 'Agent / worker'], ['task', 'Task defaults']];
     // Keep every prompt available without expanding the page until a reader asks for it.
     const folded = (role, name, title, text) => `<details class="disclosure prompt-inspection-fragment prompt-inspection-folded"><summary>${title}</summary><pre>${escapeHtml(text ?? (role[name] || 'Not configured'))}</pre></details>`;
