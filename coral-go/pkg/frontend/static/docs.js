@@ -28,13 +28,16 @@ let selectedDoc = null;
 let wantedDoc = null; // a /docs/<name> page opened before the list loaded (#3532)
 let docsQuery = '';   // the sidebar search's text, lower case
 
-// ── Groups (#7443, #10093): Getting started and For developers ────────────────
+// ── Groups (#7443, #10093): Getting started, Guides and Developer docs ────────────────
 // The list the server sends has no groups; these topics are the ones a new reader starts with, in this order ("How do I...?" first, then Quickstart); every other topic, the API reference included, is for developers.
 const GETTING_STARTED_ORDER = ['how-do-i', 'quickstart', 'key-concepts', 'using-the-dashboard', 'worked-demos', 'workflow-quickstart', 'troubleshooting'];
 const GETTING_STARTED = new Set(GETTING_STARTED_ORDER);
+// The pages about Coral's own API, files and hooks: a newcomer's search lists the guides first and these after them, under their own name, not hidden (walk 79, #19273).
+const DEVELOPER = new Set(['README', 'sessions', 'session-history', 'websockets', 'ui-hooks', 'agent-ui', 'agent-tasks', 'task-workflows', 'merge-queue', 'resource-queue', 'board', 'cross-team', 'hooks', 'team-config', 'auth', 'redaction', 'hub', 'settings-system', 'jobs', 'workflows']);
 const DOC_GROUPS = [
     { key: 'getting-started', label: 'Getting started', has: d => GETTING_STARTED.has(d.name), order: d => GETTING_STARTED_ORDER.indexOf(d.name) },
-    { key: 'api', label: 'For developers', has: d => !GETTING_STARTED.has(d.name) },
+    { key: 'guides', label: 'Guides', has: d => !GETTING_STARTED.has(d.name) && !DEVELOPER.has(d.name) },
+    { key: 'api', label: 'Developer docs', has: d => DEVELOPER.has(d.name) },
 ];
 const titleOf = d => d.title || d.name;
 // The search reads the topics' text too (#9965: "add a member" found nothing because only titles were searched): each topic's text is read once, on the first search, and kept lower case.
