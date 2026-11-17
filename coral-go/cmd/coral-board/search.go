@@ -25,9 +25,12 @@ Every word must be there, in any order, in any field ("staging certificate" find
 double quotes inside the text to keep its words together. The best matches come first; --sort newest or oldest orders by time instead.
 Coral's own notices (the task queue's) are left out; --system brings them back. A hit shows its source, id, time (UTC), state and goal, and the words around the match.
 --since and --until take a time such as 2026-11-17T09:00:00Z, a date (2026-11-17, UTC) or how long ago (30m, 6h, 2d, 1w).
---source takes messages, tasks, goals, history (comma-separated; goal, task and chat are read as such). --state takes a task's status (pending, in_progress, review_pending,
+--source takes messages, tasks, goals, history (comma-separated; goal, task and chat are read as such). --state takes open (every task still to do, every goal not closed), a task's status (pending, in_progress, review_pending,
 blocked, draft, completed, skipped) or a goal's state (proposed, active, done, dropped, blocked); --assignee NAME narrows the tasks to one assignee. Several filters must all hold.
 --agent and --author narrow the past chats (an agent's name; who spoke). Chat turns in full: coral-agent history search / context.`
+
+// searchDefaultLimit is how many hits a search prints when --limit is not given.
+const searchDefaultLimit = 15
 
 // cmdSearch is `coral-board search` (#11005, phase (a)): the agent's search of the messages of its OWN board (the board it was launched on), with the dashboard search's filters and paging. A hit's context is
 // `coral-board read --id <id>`. --team, --all and --operator-history ask for a wider reach on purpose; the server checks them against the operator-set level and refuses a reach above it with a line meant
@@ -70,6 +73,9 @@ func cmdSearch() {
 			vals.Set(k, v)
 		}
 	}
+	if vals.Get("limit") == "" && vals.Get("cursor") == "" { // a broad word prints a page, not the board: the list says how many more
+		vals.Set("limit", strconv.Itoa(searchDefaultLimit))
+	}
 	if reach != "" {
 		vals.Set("reach", reach)
 	}
@@ -99,13 +105,15 @@ func cmdSearch() {
 		Results    []map[string]any `json:"results"`
 		More       bool             `json:"more"`
 		WorkScope  string           `json:"work_scope"`
+		Near       []map[string]any `json:"near_matches"`
+		Without    map[string]int   `json:"without_filter"`
 	}
 	if err := json.Unmarshal(data, &out); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		clierr.Exit1()
 	}
 	if hasResults(data) {
-		printResults(out.Board, args[0], out.Results, out.More, out.NextCursor, out.WorkScope, out.Total, searchFilters(map[string]string{"state": *state, "goal": *goal, "assignee": *assignee, "from": *from, "mentions": *mentions, "since": *since, "until": *until, "source": *source, "agent": *agent, "author": *author}))
+		printResults(out.Board, args[0], out.Results, out.More, out.NextCursor, out.WorkScope, out.Total, searchFilters(map[string]string{"state": *state, "goal": *goal, "assignee": *assignee, "from": *from, "mentions": *mentions, "since": *since, "until": *until, "source": *source, "agent": *agent, "author": *author}), out.Near, out.Without)
 		return
 	}
 	if len(out.Messages) == 0 {
@@ -209,40 +217,33 @@ func hasResults(data []byte) bool {
 }
 
 // printResults is the one list, a hit a line: the source and id, the time, the state, then the title and the words around the match.
-func printResults(boardName, text string, results []map[string]any, more bool, nextCursor, workScope string, total int, filters string) {
+func printResults(boardName, text string, results []map[string]any, more bool, nextCursor, workScope string, total int, filters string, near []map[string]any, without map[string]int) {
 	if len(results) == 0 {
 		if filters != "" { // the text may be there: the filters together leave nothing
-			fmt.Printf("No messages, tasks, goals or past chats match %q on board %s with %s. The text may exist without them: every filter must hold, so try again with fewer.\n", text, boardName, filters)
-			return
+			fmt.Printf("No messages, tasks, goals or past chats match %q on board %s with %s. Every filter must hold.\n", text, boardName, filters)
+			for _, f := range []string{"state", "goal", "assignee", "since", "until"} { // which filter left nothing: the search without it finds these
+				if n := without[f]; n > 0 {
+					fmt.Printf("  Without --%s: %d tasks or goals match.\n", f, n)
+				}
+			}
+		} else {
+			fmt.Printf("No messages, tasks, goals or past chats match %q on board %s.\n", text, boardName)
 		}
-		fmt.Printf("No messages, tasks, goals or past chats match %q on board %s.\n", text, boardName)
+		if len(near) > 0 { // nothing holds every word: the tasks and goals that hold some of them
+			fmt.Println("Nothing holds every word. Closest tasks and goals (some of the words):")
+			for _, r := range near {
+				fmt.Println(resultLine(r, false))
+			}
+		}
 		return
 	}
 	if total > len(results) {
-		fmt.Printf("%d matches on board %s (showing %d):\n", total, boardName, len(results))
+		fmt.Printf("%d matches on board %s (showing %d, %d more: --limit or --cursor):\n", total, boardName, len(results), total-len(results))
 	} else {
 		fmt.Printf("%d matches on board %s:\n", len(results), boardName)
 	}
 	for _, r := range results {
-		src := clitext.Clean(str(r["source"]))
-		head := fmt.Sprintf("  %s #%.0f %s", src, num(r["id"]), whenShort(str(r["at"])))
-		if src == "history" { // a turn of a past chat: the session and the turn's place in it, for coral-agent history context
-			head = fmt.Sprintf("  history %s@%.0f %s", clitext.Clean(str(r["session"])), num(r["id"]), whenShort(str(r["at"])))
-		}
-		if st := clitext.Clean(str(r["state"])); st != "" {
-			head += " [" + st + "]"
-		}
-		if g := num(r["goal_id"]); g > 0 { // a task's goal: "is any of this goal's work still open?"
-			head += fmt.Sprintf(" goal #%.0f", g)
-		}
-		if who := clitext.Clean(str(r["assignee"])); who != "" { // a task's assignee: "who has it?"
-			head += " @" + who
-		}
-		line := head + "  " + clitext.Clean(str(r["title"]))
-		if sn := strings.Join(strings.Fields(clitext.Clean(str(r["snippet"]))), " "); sn != "" && sn != clitext.Clean(str(r["title"])) { // the title is already there
-			line += ": " + sn
-		}
-		fmt.Println(line)
+		fmt.Println(resultLine(r, true))
 	}
 	if more {
 		fmt.Println("There are more: narrow it with --source, --state, --goal or --since/--until, or raise --limit.")
@@ -254,4 +255,34 @@ func printResults(boardName, text string, results []map[string]any, more bool, n
 		fmt.Printf("Tasks and goals: %s (--team, --all and --operator-history widen only the messages and past chats).\n", clitext.Clean(workScope))
 	}
 	fmt.Println("A message: coral-board read --id <id>. A task: coral-board task detail <id>. A goal: coral-board goal show <id>. A past chat turn (history <session>@<n>): coral-agent history context <session> <n>.")
+}
+
+// resultLine is one hit as a line (a goal's done-when on the line after, whole): the source and id, the time, the state, the assignee, then the title and the words around the match.
+// A near match says how many of the words it holds.
+func resultLine(r map[string]any, withDone bool) string {
+	src := clitext.Clean(str(r["source"]))
+	head := fmt.Sprintf("  %s #%.0f %s", src, num(r["id"]), whenShort(str(r["at"])))
+	if src == "history" { // a turn of a past chat: the session and the turn's place in it, for coral-agent history context
+		head = fmt.Sprintf("  history %s@%.0f %s", clitext.Clean(str(r["session"])), num(r["id"]), whenShort(str(r["at"])))
+	}
+	if st := clitext.Clean(str(r["state"])); st != "" {
+		head += " [" + st + "]"
+	}
+	if g := num(r["goal_id"]); g > 0 { // a task's goal: "is any of this goal's work still open?"
+		head += fmt.Sprintf(" goal #%.0f", g)
+	}
+	if who := clitext.Clean(str(r["assignee"])); who != "" { // a task's assignee: "who has it?"
+		head += " @" + who
+	}
+	if m := num(r["matched"]); m > 0 {
+		head += fmt.Sprintf(" (%.0f of %.0f words)", m, num(r["of"]))
+	}
+	line := head + "  " + clitext.Clean(str(r["title"]))
+	if sn := strings.Join(strings.Fields(clitext.Clean(str(r["snippet"]))), " "); sn != "" && sn != clitext.Clean(str(r["title"])) { // the title is already there
+		line += ": " + sn
+	}
+	if d := strings.Join(strings.Fields(clitext.Clean(str(r["done_when"]))), " "); d != "" && withDone {
+		line += "\n      done when: " + d
+	}
+	return line
 }

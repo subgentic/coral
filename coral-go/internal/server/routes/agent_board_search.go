@@ -159,6 +159,16 @@ func (h *SessionsHandler) SearchAgentBoard(w http.ResponseWriter, r *http.Reques
 	if requested != store.SearchReachOwn && (sources["tasks"] || sources["goals"]) {
 		out["work_scope"] = "this board only" // the wider reach is for messages and past chats; tasks and goals are always the agent's own board's
 	}
+	if len(results) == 0 && res.NextCursor == "" {
+		if near, without := searchEmptyHints(r.Context(), h.bs, boardKey, vals, q.Since, q.Until, sources); len(near) > 0 || len(without) > 0 {
+			if len(near) > 0 {
+				out["near_matches"] = near
+			}
+			if len(without) > 0 {
+				out["without_filter"] = without
+			}
+		}
+	}
 	if res.NextCursor != "" {
 		out["next_cursor"] = res.NextCursor
 	}
@@ -189,6 +199,9 @@ var searchSourceNames = map[string]string{"message": "messages", "msg": "message
 var searchStates = []string{"pending", "in_progress", "review_pending", "blocked", "draft", "completed", "skipped", "proposed", "active", "done", "dropped"}
 
 func validSearchState(v string) bool {
+	if v == "open" { // every task still to do and every goal not closed
+		return true
+	}
 	for _, st := range searchStates {
 		if v == st {
 			return true
@@ -258,7 +271,7 @@ func searchWorkResults(ctx context.Context, bs *board.Store, boardKey string, va
 // searchWorkResultsFound is searchWorkResults and the number of hits found before the cut to the limit (the messages of the page, the chats and the tasks and goals found): what a total can say.
 func searchWorkResultsFound(ctx context.Context, bs *board.Store, boardKey string, vals url.Values, limit int, since, until string, msgs []board.Message, chats []board.WorkHit, sources map[string]bool) ([]board.WorkHit, bool, int, error) {
 	if st := strings.ToLower(strings.TrimSpace(vals.Get("state"))); st != "" && !validSearchState(st) && (sources["tasks"] || sources["goals"]) {
-		return nil, false, 0, errors.New("unknown state " + strconv.Quote(st) + ": a task is " + strings.Join(searchStates[:7], ", ") + "; a goal is " + strings.Join(searchStates[7:], ", "))
+		return nil, false, 0, errors.New("unknown state " + strconv.Quote(st) + ": a task is " + strings.Join(searchStates[:7], ", ") + "; a goal is " + strings.Join(searchStates[7:], ", ") + "; open is every task still to do and every goal not closed")
 	}
 	hits := append([]board.WorkHit(nil), chats...)
 	text := strings.TrimSpace(vals.Get("q"))

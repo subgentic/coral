@@ -91,3 +91,68 @@ func TestAgentBoardSearchRoundTwoFindings(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, code)
 	require.Contains(t, out["error"], "goals")
 }
+
+// Round 3 (#19476, from the prompt evals): "open" as a state, the near matches when no task or goal holds every word, which filter left nothing, and a goal's whole done-when.
+func TestAgentBoardSearchRoundThreeHints(t *testing.T) {
+	srv, ts, _ := strictServer(t, false)
+	ctx := context.Background()
+	ss := store.NewSessionStore(srv.db)
+	bs := srv.boardStore
+	a, err := bs.CreateBoard(ctx, "team-r3", "Operator")
+	require.NoError(t, err)
+	_, err = bs.CreateGoal(ctx, a.ID, board.GoalInput{Title: "Reminders for any agent", Outcome: "agents keep checks", DoneWhen: "the Operator sets a recurring check and each fires on time", CreatedBy: "op"})
+	require.NoError(t, err)
+	open, err := bs.CreateTask(ctx, a.ID, "Wire the reminder", "open work on the reminder", "low", "orch", "Dana")
+	require.NoError(t, err)
+	_, err = bs.CreateTask(ctx, a.ID, "Old reminder", "finished reminder", "low", "orch", "Dana")
+	require.NoError(t, err)
+	msg := "done"
+	_, err = bs.CompleteTask(ctx, a.ID, open.ID+1, "Dana", &msg)
+	require.NoError(t, err)
+
+	sid := "eeeeeeee-1105-4000-8000-0000000019b3"
+	boardKey := a.ID
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "dev", WorkingDir: "/w", BoardName: &boardKey}))
+	tok, err := srv.db.MintSessionToken(ctx, sid, "claude-"+sid)
+	require.NoError(t, err)
+	_, err = bs.Subscribe(ctx, a.ID, "Dev-dddd", "Dev", "claude-"+sid, nil, "all")
+	require.NoError(t, err)
+	get := func(params url.Values) map[string]any {
+		req, _ := http.NewRequest("GET", ts.URL+"/api/agent/board/search?"+params.Encode(), nil)
+		req.Header.Set(store.SessionTokenHeader, tok)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		raw, _ := io.ReadAll(resp.Body)
+		require.Equal(t, http.StatusOK, resp.StatusCode, string(raw))
+		var out map[string]any
+		require.NoError(t, json.Unmarshal(raw, &out))
+		return out
+	}
+	ids := func(out map[string]any, key string) []string {
+		var got []string
+		list, _ := out[key].([]any)
+		for _, r := range list {
+			m := r.(map[string]any)
+			got = append(got, m["source"].(string)+":"+m["title"].(string))
+		}
+		return got
+	}
+	// open: the task still to do, not the finished one
+	out := get(url.Values{"q": {"reminder"}, "source": {"tasks"}, "state": {"open"}})
+	require.Equal(t, []string{"task:Wire the reminder"}, ids(out, "results"))
+	// a goal hit carries its whole done-when
+	out = get(url.Values{"q": {"reminders"}, "source": {"goals"}})
+	require.Equal(t, "the Operator sets a recurring check and each fires on time", out["results"].([]any)[0].(map[string]any)["done_when"])
+	// nothing holds every word: the near matches, with how many words each holds
+	out = get(url.Values{"q": {"reminders ordinary team agents"}, "source": {"goals"}})
+	require.Empty(t, out["results"])
+	near := out["near_matches"].([]any)
+	require.NotEmpty(t, near)
+	require.EqualValues(t, 4, near[0].(map[string]any)["of"])
+	require.GreaterOrEqual(t, near[0].(map[string]any)["matched"].(float64), float64(1))
+	// a filter that left nothing is named by how many hits the search has without it
+	out = get(url.Values{"q": {"reminder"}, "source": {"tasks"}, "state": {"blocked"}})
+	require.Empty(t, out["results"])
+	require.EqualValues(t, 2, out["without_filter"].(map[string]any)["state"])
+}
