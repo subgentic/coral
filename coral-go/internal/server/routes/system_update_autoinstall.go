@@ -320,7 +320,11 @@ func (h *SessionsHandler) UpdateIdleReason(ctx context.Context) string {
 			working = append(working, "a terminal is open")
 			continue
 		}
-		if !ends || l.Backend != nil && *l.Backend == "tmux" {
+		own := ""
+		if l.Backend != nil {
+			own = *l.Backend
+		}
+		if own == "tmux" || own == "" && !ends { // survives: tmux itself, or no backend of its own on a Coral that keeps its terminals; an agent that says pty is a pty agent even on a tmux Coral
 			continue // an agent in tmux keeps running while Coral is replaced, so its turn does not hold the update (#19487, the Operator's decision of 2026-11-17)
 		}
 		if st := h.deriveSingleSessionState(ctx, l.SessionID, 0); st.Working || st.InTurn && !st.NeedsInput {
