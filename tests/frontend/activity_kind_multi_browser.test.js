@@ -18,7 +18,7 @@ const BASE = require('./test_base').BASE;
             const rows = [row(7, 'answer', 'question', 7, 'Ship it?', 'yes'), row(6, 'task_complete', 'task', 12, 'Ship release', ''), row(5, 'prompt_allow', 'agent', 'claude-ada', 'claude-ada', 'Yes, once'), row(4, 'prompt_reject', 'agent', 'claude-bob', 'claude-bob', 'No'), row(3, 'chat_send', 'chat', 'board:tm', 'tm', 'hello'), row(2, 'approve', 'file', 'a'.repeat(64), 'plan.md', ''), row(1, 'file_star', 'file', 'b'.repeat(64), 'notes.md', '')];
             const original = window.fetch;
             window.fetch = (url, opts = {}) => new URL(String(url), location.origin).pathname === '/api/activity' ? json({ actions: rows, check: { intact: true, rows: rows.length } }) : original(url, opts);
-            ${keep ? '' : "localStorage.removeItem('coral-inbox-activity-filters');"}
+            ${keep ? '' : "localStorage.setItem('coral-inbox-activity-filters', JSON.stringify({ important: false }));"} // Everything, as a browser that kept the earlier default has it (Important is the default of a browser that kept nothing, #19149)
             const m = await import(prefix + 'settings_core.js'); m.applyTheme('${theme}');
             window.switchNavTab('hub-inbox');
             await (await import(prefix + 'inbox_sidebar.js')).openInboxGroup('activity');
@@ -63,13 +63,13 @@ const BASE = require('./test_base').BASE;
                 await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').click(); true`);
                 await waitFor(`!!document.querySelector('.inbox-pill-field .team-tb-checks')?.getClientRects().length`, `${tag}: the panel lists the kinds as check boxes`);
                 const tick = n => ev(`(() => { const i = [...document.querySelectorAll('.inbox-pill-field .team-tb-checks input')][${n}]; i.click(); return true; })()`);
-                await tick(5); await ev(framesJs(4)); await tick(3); await ev(framesJs(4));
+                await tick(6); await ev(framesJs(4)); await tick(4); await ev(framesJs(4));
                 const checks = await panelChecks();
-                assert.deepEqual(checks, [false, false, false, true, false, true], `${tag}: two kinds ticked together: ${JSON.stringify(checks)}`);
+                assert.deepEqual(checks, [false, false, false, false, true, false, true], `${tag}: two kinds ticked together: ${JSON.stringify(checks)}`);
                 assert.equal(await rowsNow(), 2, `${tag}: their rows`);
                 await shot(`kinds-two-${tag}`);
-                await ev(`document.querySelector('.inbox-pill-field .team-tb-checks input').click(); true`); await ev(framesJs(4));
-                assert.deepEqual(await panelChecks(), [true, false, false, false, false, false], `${tag}: Everything clears the others`);
+                await tick(1); await ev(framesJs(4));
+                assert.deepEqual(await panelChecks(), [false, true, false, false, false, false, false], `${tag}: Everything clears the others`);
                 assert.equal(await rowsNow(), 6);
             }
         }
