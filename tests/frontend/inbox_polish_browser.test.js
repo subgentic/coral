@@ -38,8 +38,8 @@ const path = require('node:path');
             await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length >= 1 && !!document.querySelector('.inbox-folder-toolbar')`, 'the Goals page', 15000); await settle(300);
 
             // the folder name (the page's header is one row since #8700: inbox_header_browser measures the line)
-            const head = await ev(`(() => { const e = document.querySelector('.inbox-folder-head'), h = e && e.querySelector('h2'), r = e && e.getBoundingClientRect(); return { h2: h && h.textContent, w: r && Math.round(r.width), h: r && Math.round(r.height) }; })()`);
-            if (mobile) check(`${label}: the page title is the open folder's visible name (the phone has no tab strip, #13596)`, head.h2 === 'Goals' && head.w > 20 && head.h >= 20, JSON.stringify(head));
+            const head = await ev(`(() => { const e = document.querySelector('.inbox-folder-head'), h = e && e.querySelector('h2'), r = e && e.getBoundingClientRect(), hr = h && h.getBoundingClientRect(), bar = document.querySelector('.phone-bar-title-text'); return { h2: h && h.textContent, w: r && Math.round(r.width), h: r && Math.round(r.height), h2w: hr && Math.round(hr.width), bar: bar && bar.textContent }; })()`);
+            if (mobile) check(`${label}: the top bar names the open folder and the page's own title is for screen readers only, not said twice (#19082)`, head.h2 === 'Goals' && head.bar === 'Goals' && head.h2w <= 2, JSON.stringify(head));
             else check(`${label}: the title stays beside the search`, head.h2 === 'Goals' && head.w > 20, JSON.stringify(head));
             await shot(`inbox-polish-closed-${label}-dark`, 'dark');
             await shot(`inbox-polish-closed-${label}-light`, 'light');

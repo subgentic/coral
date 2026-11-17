@@ -35,7 +35,8 @@ const fs = require('node:fs');
                 await themes(`phone-no-tabs-page-${w}`);
                 const s = await strip();
                 check(`${label}: no tab strip, no tab, no way-back link, nothing wider than the screen`, s.tablist === 0 && s.tabs === 0 && s.back === 0 && s.over <= 0, JSON.stringify(s));
-                check(`${label}: the page's title is visible as the open folder's name (not one pixel)`, s.title && s.title.text === 'Needs you' && s.title.w > 20 && s.title.h > 10, JSON.stringify(s.title));
+                const barName = await ev(`(document.querySelector('.phone-bar-title-text') || {}).textContent`);
+                check(`${label}: the top bar names the open folder and the page's own title is one pixel, for screen readers: the folder is not said twice (#19082)`, barName === 'Needs you' && s.title && s.title.text === 'Needs you' && s.title.w <= 2 && s.title.h <= 2, JSON.stringify([barName, s.title]));
                 // Seed counts on real folder definitions: these are unread, including the CLI folders.
                 await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(({ state }) => { const original = state.inboxFolderRows; window.__restorePhoneRows = () => { state.inboxFolderRows = original; }; state.inboxFolderRows = () => { const rows = original(); return { ...rows, sections: rows.sections.map(s => ({ ...s, items: s.items.map(it => it.label === 'All chats' ? { ...it, count: 5 } : it.label === 'Codex' ? { ...it, count: 3 } : it) })) }; }; return true; })`);
                 await ev(`document.querySelector('header.top-bar .phone-menu-btn').click(); true`);
@@ -57,7 +58,7 @@ const fs = require('node:fs');
                 await waitFor(`(document.querySelector('header.top-bar .phone-bar-search') || {}).placeholder === 'Search goals'`, 'the Goals page: the pill searches goals', 10000);
                 await new Promise(r => setTimeout(r, 300)); // sleep-ok: the drawer closes
                 const s2 = await strip();
-                check(`${label}: Goals opened from the drawer: still no strip, its title is the visible name`, s2.tablist === 0 && s2.title && s2.title.text === 'Goals', JSON.stringify(s2));
+                check(`${label}: Goals opened from the drawer: still no strip, its title is there for screen readers`, s2.tablist === 0 && s2.title && s2.title.text === 'Goals', JSON.stringify(s2));
                 await themes(`phone-no-tabs-goals-${w}`);
                 await ev(`document.querySelector('header.top-bar .phone-menu-btn').click(); true`);
                 await waitFor(`!!document.querySelector('#nav-more-menu .nav-drawer-folder')`, 'the drawer again', 8000);
