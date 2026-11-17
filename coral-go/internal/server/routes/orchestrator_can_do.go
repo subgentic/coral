@@ -22,16 +22,43 @@ import (
 
 // teamAbilities is the team's settings as they decide what its Orchestrator may do, with what its text needs to be exact: this team's board, folder, agent type and model.
 type teamAbilities struct {
-	MayLaunch bool   // the Operator's grant of the team's Orchestrator is on (#11432): launching is held to the team's folder and caps and put on the team's board
-	BoardID   string // the team's board id
-	Dir       string // the team's folder
-	AgentType string // the seat's own agent type: the team's
-	Model     string // the seat's own model ("" when it runs on its CLI's default): the team's
+	MayLaunch bool     // the Operator's grant of the team's Orchestrator is on (#11432): launching is held to the team's folder and caps and put on the team's board
+	MayStop   bool     // the grant's separate stop switch is on (#17348); it counts only while MayLaunch is on, as coral-board stop needs both
+	BoardID   string   // the team's board id
+	Dir       string   // the team's folder
+	AgentType string   // the seat's own agent type: the team's
+	Model     string   // the seat's own model ("" when it runs on its CLI's default): the team's
+	Pool      []string // the team's reviewer pool (#17612): empty when the team has none
 }
 
-// orchestratorAbilities is every setting that contributes a line, in the order the section lists them. A line is "" when the setting adds nothing. Not yet here, each one entry when its setting is on main:
-// coral-board stop's gate (#17348) and the reviewer pool (#17612).
-var orchestratorAbilities = []func(teamAbilities) string{launchAbility}
+// orchestratorAbilities is every setting that contributes a line, in the order the section lists them. A line is "" when the setting adds nothing.
+var orchestratorAbilities = []func(teamAbilities) string{launchAbility, stopAbility, poolAbility}
+
+// stopAbility is the line for coral-board stop (#17348), which needs the main switch AND its own: with the main switch off the launch line already sends the Orchestrator to the Operator, so this adds nothing; with it
+// on, the command when stop is on and ask the Operator when it is off.
+func stopAbility(a teamAbilities) string {
+	if !a.MayLaunch {
+		return ""
+	}
+	if !a.MayStop {
+		return "Stopping a member: the Operator has not allowed you to stop an agent's turn, so when one must be stopped, ask the Operator."
+	}
+	return "Stopping a member: to interrupt one member's current turn (it waits with its conversation and is not put to sleep), run coral-board stop <member>. An agent at a permission prompt or a dialog is refused, and an idle or sleeping one gets a plain sentence."
+}
+
+// poolAbility is the line for the team's reviewer pool (#17612): the Orchestrator need not pick between the pool's members, and a member takes review tasks on a bare claim. No pool, no line.
+func poolAbility(a teamAbilities) string {
+	var names []string
+	for _, n := range a.Pool {
+		if n = promptValue(n); n != "" {
+			names = append(names, n)
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	return "Reviewers: besides the default reviewers, each submit also goes to the ONE of the review pool (" + strings.Join(names, ", ") + ") with the fewest open reviews, unless the task names its reviewers, so do not pick between them; the pool's members are offered review tasks on a bare coral-board task claim."
+}
 
 // launchAbility is the line for launching agents: on, the exact command; off, ask the Operator (today's text, which is also what the roster note says).
 func launchAbility(a teamAbilities) string {
@@ -121,7 +148,14 @@ func BoardAbilitiesSection(bs *board.Store, ss *store.SessionStore) func(p agent
 				model = *sess.Model
 			}
 		}
-		a := teamAbilities{MayLaunch: grantIsOn(context.Background(), bs, p.BoardName), BoardID: p.BoardName, Dir: p.WorkingDir, AgentType: agentType, Model: model}
+		ctx := context.Background()
+		a := teamAbilities{MayLaunch: grantIsOn(ctx, bs, p.BoardName), BoardID: p.BoardName, Dir: p.WorkingDir, AgentType: agentType, Model: model}
+		if bs != nil && p.BoardName != "" { // the stop switch and the reviewer pool, as they are now (#17710); a team being started has no grant row yet, so stop is off
+			if g, err := bs.GetOrchGrant(ctx, p.BoardName); err == nil {
+				a.MayStop = g.StopEnabled
+			}
+			a.Pool = bs.GetHealthSettings(ctx, p.BoardName).ReviewerPool
+		}
 		return canDoSection(orchestratorCanDo(a))
 	}
 }
@@ -135,9 +169,9 @@ func abilitiesOf(sess *store.LiveSession, boardID string, mayLaunch bool) teamAb
 	return teamAbilities{MayLaunch: mayLaunch, BoardID: boardID, Dir: sess.WorkingDir, AgentType: sess.AgentType, Model: model}
 }
 
-// tellSeatOfChange tells the team's Orchestrator seat, once, that the launch setting changed (#17622): the line its prompt would have, as a board notice to it alone, delivered through the normal notice gate.
+// tellSeatOfChange tells the team's Orchestrator seat, once, that a setting changed (#17622): the line its prompt would have for it (ability, with the settings set by set), as a board notice to it alone, delivered through the normal notice gate.
 // The seat is the session the grant names, and only while it is live on this board; nothing is sent when it is not.
-func (h *SessionsHandler) tellSeatOfChange(ctx context.Context, project, seatSession string, mayLaunch bool) {
+func (h *SessionsHandler) tellSeatOfChange(ctx context.Context, project, seatSession string, ability func(teamAbilities) string, set func(*teamAbilities)) {
 	if h.bs == nil || h.ss == nil || seatSession == "" {
 		return
 	}
@@ -151,7 +185,13 @@ func (h *SessionsHandler) tellSeatOfChange(ctx context.Context, project, seatSes
 	}
 	// The line quotes the team's folder and model, which are stored text: defuse it, then post it through the one notice path (the notice census, #9265).
 	bh := &BoardHandler{bs: h.bs}
-	notice := settingsChangedNotice(bh.noticeText(ctx, project, launchAbility(abilitiesOf(sess, project, mayLaunch))))
+	a := abilitiesOf(sess, project, false)
+	set(&a)
+	line := ability(a)
+	if line == "" {
+		return
+	}
+	notice := settingsChangedNotice(bh.noticeText(ctx, project, line))
 	bh.postNotice(ctx, project, fmt.Sprintf("@%s %s", orchName(member), notice), board.CoralSender)
 }
 
