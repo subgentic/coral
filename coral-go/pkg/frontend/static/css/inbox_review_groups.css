@@ -94,5 +94,5 @@
 
 /* N3 (#19247): a Needs you row's text is at most two lines; its goal and task are one grey line */
 .inbox-needs-results .dt-subtitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; white-space: normal; }
-.inbox-goal-task { display: block; color: var(--text-muted); font-size: var(--table-tertiary-size); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-goal-task { display: block; contain: inline-size; min-width: 0; max-width: 100%; color: var(--text-muted); font-size: var(--table-tertiary-size); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inbox-needs-results .dt-table .inbox-goal-task .dt-link { color: inherit; font: inherit; text-decoration: underline; min-height: 0; height: auto; padding: 0; display: inline; }
