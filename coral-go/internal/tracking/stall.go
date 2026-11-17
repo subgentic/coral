@@ -61,8 +61,8 @@ func WatchDashboardStall(ctx context.Context) {
 	started := time.Now()
 	stallWG.Add(1)
 	go func() {
+		defer safego.Recover("tracking/stall") // the first statement, as safego requires; Done below runs before it, so a panic still releases the restore
 		defer stallWG.Done()
-		defer safego.Recover("tracking/stall")
 		runStallWatch(ctx, started)
 	}()
 }
