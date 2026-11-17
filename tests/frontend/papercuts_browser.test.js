@@ -218,12 +218,12 @@ const BASE = require('./test_base').BASE;
         await open(390, 844, true);
         // (#7063) the team reminder is behind Send options, as on a desktop: a caret with a name, and the item inside it says what it sends
         // the menu's first item is Model and thinking (#9021): the team reminder is found by its words
-        const team = await ev(`(() => { const b = document.querySelector('.mobile-send-options-btn'); const i = [...document.querySelectorAll('.mobile-send-menu .send-menu-item')].find(e => /team reminder/.test(e.textContent)); return b && { label: b.getAttribute('aria-label'), title: b.title, icon: !!b.querySelector('.material-icons'), text: b.textContent.replace('expand_more', '').trim(), item: i && i.textContent.trim(), action: i && i.getAttribute('data-on-click') }; })()`);
+        const team = await ev(`(() => { const b = document.querySelector('.mobile-send-options-btn'); const i = [...document.querySelectorAll('.mobile-send-menu .send-menu-item')].find(e => /remind about team messages/.test(e.textContent)); return b && { label: b.getAttribute('aria-label'), title: b.title, icon: !!b.querySelector('.material-icons'), text: b.textContent.replace('expand_more', '').trim(), item: i && i.textContent.trim(), action: i && i.getAttribute('data-on-click') }; })()`);
         assert.ok(team, 'the Send options button exists');
         assert.equal(team.label, 'Model, thinking and send options');
         assert.ok(team.icon, 'an icon, not "+T"');
         assert.equal(team.text, '', 'no cryptic text on it');
-        assert.equal(team.item, 'Send with team reminder');
+        assert.equal(team.item, 'Send and remind about team messages');
         assert.equal(team.action, 'send-menu-team');
         console.log(`PASS (10)(11) phone: Send options holds the team reminder`);
     } finally {

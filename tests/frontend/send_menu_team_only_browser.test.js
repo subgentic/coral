@@ -29,7 +29,7 @@ const { coralReady } = require('./helpers/wait');
                     await shot(`send-menu-${label}-${theme}-${name}`);
                     const tag = `${label} ${theme} ${name}`;
                     check(`${tag}: the menu opens with entries`, Array.isArray(items) && items.length > 0, JSON.stringify(items));
-                    const team = (items || []).some(t => /team reminder/i.test(t)), proto = (items || []).some(t => /board protocol/i.test(t));
+                    const team = (items || []).some(t => /remind about team messages/i.test(t)), proto = (items || []).some(t => /message-board instructions/i.test(t));
                     check(`${tag}: the team reminder is ${onTeam ? 'offered' : 'not offered'}`, team === onTeam, JSON.stringify(items));
                     check(`${tag}: the board protocol is ${onTeam && !mobile ? 'offered' : 'not offered'}`, proto === (onTeam && !mobile), JSON.stringify(items)); // the phone's menu has no board protocol entry
                     await ev(`window.closeSendMenu && window.closeSendMenu(); true`);

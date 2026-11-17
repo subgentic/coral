@@ -32,7 +32,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await ev(`document.querySelector('.mobile-send-options-btn').click(); true`);
         await waitFor(`getComputedStyle(document.querySelector('.mobile-send-menu')).display !== 'none'`, 'the menu', 3000);
         // under 640 px the Model and thinking choice is the first item (#9021); Keys is the terminal view's
-        assert.deepEqual(await ev(`[...document.querySelectorAll('.mobile-send-menu .send-menu-item')].filter(b => b.getClientRects().length).map(b => b.textContent.trim())`), ['Model and thinking', 'Send with team reminder']);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('.mobile-send-menu .send-menu-item')].filter(b => b.getClientRects().length).map(b => b.textContent.trim())`), ['Model and thinking', 'Send and remind about team messages']);
         assert.equal(await ev(`(() => { const m = document.querySelector('.mobile-send-menu').getBoundingClientRect(); return m.left >= 0 && m.right <= innerWidth && m.top >= 0; })()`), true, 'inside the screen');
         await ev(`document.querySelector('.mobile-send-options-btn').click(); true`);
         console.log('2b. at 200% text the menu stays on the screen and wraps');
@@ -42,7 +42,7 @@ const S = `(window.__coralStatic || '/static/')`;
         const big = await ev(`(() => { const m = document.querySelector('.mobile-send-menu').getBoundingClientRect(); const b = document.querySelector('.mobile-send-options-btn').getBoundingClientRect(); const i = document.querySelector('.mobile-send-menu [data-on-click="send-menu-team"]'); return { left: m.left, right: m.right, top: m.top, vw: innerWidth, btnRight: b.right, itemW: i.getBoundingClientRect().width, scrollW: i.scrollWidth, text: i.textContent.trim() }; })()`);
         assert.ok(big.left >= 0 && big.right <= big.vw && big.top >= 0, 'the menu is wholly on the screen at 200% text: ' + JSON.stringify(big));
         assert.ok(big.scrollW <= big.itemW + 1, 'its words wrap inside it: ' + JSON.stringify(big));
-        assert.equal(big.text, 'Send with team reminder');
+        assert.equal(big.text, 'Send and remind about team messages');
         await ev(`document.querySelector('.mobile-send-options-btn').click(); document.documentElement.style.fontSize = ''; true`);
         console.log('3. the chips say what they hold when it is a default');
         await ev(`(async () => { const m = await import(${S} + 'model_chip.js'); m.updateModelChip({ session_id: 'pc-a-id', agent_type: 'claude', model: '', thinking: '', thinking_actual: '' }, 'local'); return true; })()`);

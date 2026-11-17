@@ -546,7 +546,7 @@ export function createArtifactsList({ inbox = false } = {}) {
 
     function viewerOptions(item) {
         const link = linkOf(item), hex = link?.hex, team = inbox ? item.board_id : model.project;
-        return { hex, server: link?.server, board: splitKey(team).name, filename: readableName(item), mediaType: item.media_type, fileId: item.file_id, versionLine: item.version_line,
+        return { hex, server: link?.server, board: splitKey(team).name, filename: readableName(item), createdAt: item.created_at, mediaType: item.media_type, fileId: item.file_id, versionLine: item.version_line,
             ...(item.produced_by ? { uploader: { role: String(item.produced_by), hex, server: link?.server, board: splitKey(team).name, seriesId: String(item.series_id || '') } } : {}),
             ...(item.goal_id && item.goal_title ? { goal: String(item.goal_title), goalId: String(item.goal_id), goalTeam: team } : {}) };
     }
