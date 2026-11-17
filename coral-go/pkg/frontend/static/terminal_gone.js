@@ -58,16 +58,18 @@ export function isExitedAsleep(s) {
     return !!s && !!s.sleeping && !s.archived && s.sleep_reason === 'agent_exited';
 }
 
+const showMarks = () => document.querySelectorAll('.terminal-gone-chip[hidden]').forEach(b => { b.hidden = false; }); // a mark is `hidden` (the browser's own rule) until its lazy sheet is here, so it never flashes as a plain button (#19153)
+
 /** A sleeping or failed agent's row mark (#15819): the moon (Ended, Terminal gone) or the red cross (Failed to start, a terminal gone while awake) and a word; a click restarts it. */
 export function terminalGoneChip(s) {
     const ended = isExitedAsleep(s);
     const failed = isStartFailed(s);
     if (!ended && !failed && !isTerminalGone(s)) return '';
-    loadStyles('sidebar_status.css'); // the mark's rules load with the first mark, not at start (#15975)
+    loadStyles('sidebar_status.css').then(showMarks); // the mark's rules load with the first mark, not at start (#15975)
     const word = failed ? 'Failed to start' : ended ? 'Ended' : 'Terminal gone';
     const title = failed ? "Its CLI is missing or can't be run. Click to restart once that is fixed." : ended ? "Its program exited; Restart starts it again" : "This agent's terminal is gone. Click to restart it.";
     return `<button type="button" class="terminal-gone-chip" data-state="${failed || !s.sleeping ? 'failed' : 'sleeping'}" title="${escapeAttr(title)}"`
-        + `${ended || failed ? ` aria-label="${escapeAttr(word)}. Restart"` : ''} data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type || '')}" data-session-id="${escapeAttr(s.session_id)}">${word}</button>`;
+        + `${ended || failed ? ` aria-label="${escapeAttr(word)}. Restart"` : ''} data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type || '')}" data-session-id="${escapeAttr(s.session_id)}" hidden>${word}</button>`;
 }
 
 /** The header badge for the selected agent while its terminal is gone. */
@@ -85,7 +87,7 @@ export function syncTerminalGoneHeader() {
         badge = document.createElement('button');
         badge.type = 'button';
         badge.id = 'terminal-gone-header';
-        badge.className = 'terminal-gone-chip terminal-gone-header'; loadStyles('sidebar_status.css');
+        badge.className = 'terminal-gone-chip terminal-gone-header'; badge.hidden = true; loadStyles('sidebar_status.css').then(showMarks);
         // The popout has no destructive actions: there it only says so (restart from Coral).
         badge.textContent = isPopout() ? 'Terminal gone' : 'Terminal gone · Restart';
         badge.title = isPopout() ? "This agent's terminal is gone. Restart it from Coral." : "This agent's terminal is gone. Restart it to continue.";
