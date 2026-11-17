@@ -64,6 +64,12 @@ const { coralReady } = require('./helpers/wait');
                 const rowInfo = name => ev(`(() => { const r = ${row(name)}, m = r.querySelector('.inbox-review-metadata'); return { metaSaysReview: m ? /For review/.test(m.textContent) : false, metaSaysApproved: m ? /Approved/.test(m.textContent) : null, review: /For review/.test(r.textContent), approve: !!r.querySelector('[data-slot=approve]'), changes: !!r.querySelector('[data-slot=changes]') }; })()`); // a phone's card may not draw the metadata line: then only the buttons are checked
                 const decided = await rowInfo('Decided file.txt'), waiting = await rowInfo('Replied file.txt');
                 assert.ok(!decided.metaSaysReview && decided.metaSaysApproved !== false && !decided.approve && !decided.changes, 'an approved file with a new comment says Approved (not For review) in its line, and asks for no new decision: ' + JSON.stringify(decided));
+                // #17696 (walk 80 #15): the decided file's row is information, not a decision: the way out of Needs you says "Got it", not "Dismiss"
+                await ev(`(() => { const r = ${row('Decided file.txt')}; const t = r.querySelector('.inbox-review-actions [aria-haspopup=menu], .inbox-review-actions .dt-menu-toggle'); if (t) t.click(); return !!t; })()`);
+                await waitFor(`[...(${row('Decided file.txt')}).querySelectorAll('.menu-item')].length > 0`, 'the decided row\'s menu opens', 4000);
+                const labels = await ev(`[...(${row('Decided file.txt')}).querySelectorAll('.menu-item')].map(b => b.textContent.trim())`);
+                assert.ok(labels.some(l => /^Got it/.test(l)) && !labels.some(l => /^Dismiss/.test(l)), 'an already-decided file with a reply is cleared with "Got it", not "Dismiss": ' + JSON.stringify(labels));
+                await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
                 assert.ok(waiting.review && waiting.approve && waiting.changes && !waiting.metaSaysApproved, 'a file still waiting for review keeps For review, Approve and Request changes: ' + JSON.stringify(waiting));
                 assert.ok(await ev(`(() => { const t = [...(${row('Replied file.txt')}).querySelectorAll('.inbox-new-comments')].find(x => /new comments?/.test(x.textContent)); return !!t && t.scrollWidth <= t.clientWidth + 1; })()`), 'the badge is whole, not cut to New comme... (#17454)');
                 assert.ok(!(await marker('Quiet file.txt')), 'a file with no news carries no marker');

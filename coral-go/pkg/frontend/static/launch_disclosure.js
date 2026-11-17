@@ -20,7 +20,7 @@ const hint = {
     clear() { browserLocal.remove(HINT_KEY); },
     release() { document.getElementById('launch-notice-room')?.remove(); document.documentElement.removeAttribute('data-launch-notice'); }, // the notice fills the room, or there is none to fill
 };
-const headline = 'Agents launch in auto mode: they work without stopping to ask you; each CLI has its own safety checks.';
+const headline = 'Auto mode';
 function disclosureSection(id, title, disclosure) {
     const section = document.createElement('details'); section.className = 'disclosure';
     const summary = document.createElement('summary');

@@ -57,7 +57,7 @@ function drawBar() {
         bar.append(text, btn); head.after(bar);
     }
     const at = p.since ? clock(p.since) : '';
-    bar.firstChild.textContent = `${at ? `Paused since ${at}` : 'Paused'}: agents get new messages when you resume.`;
+    bar.firstChild.textContent = `${at ? `Paused since ${at}` : 'Paused'}: agents get new messages when you resume, and so does an answer you send.`; // an answer to a question that arrives while paused waits too (walk 80 #19)
     bar.hidden = false;
 }
 
