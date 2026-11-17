@@ -81,6 +81,12 @@ function watchPlace() {
     const view = document.getElementById('group-table-view'); if (view) new MutationObserver(again).observe(view, { childList: true });
     window.matchMedia?.('(max-width: 767px)').addEventListener?.('change', again);
 }
+/** A saved default changes the banner's eligibility. Hiding it needs no read; returning to Auto reads only while a local agent can show it. Settings' separate disclosure text still uses the normal refresh. */
+export function refreshDefaultNotice() {
+    if (defaultIsAuto() && hasLocalAgent()) return refreshLaunchDisclosure();
+    bannerEligible = hasLocalAgent(); readGeneration++;
+    document.getElementById('launch-disclosure-banner')?.remove(); shown = null; hint.clear(); hint.release();
+}
 export async function refreshLaunchDisclosure() {
     if (isCloud() || document.body.classList.contains('popout-mode')) { hint.release(); return; }
     bannerEligible = hasLocalAgent();
