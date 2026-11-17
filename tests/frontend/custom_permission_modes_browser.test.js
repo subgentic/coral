@@ -38,6 +38,8 @@ const { coralReady } = require('./helpers/wait');
             assert.match(await ev(`document.querySelector('#settings-custom-modes .cpm-command-refused')?.textContent || ''`), /not shown until every flag is accepted/, at + 'a refused flag keeps the command from being shown');
             await ev(`(() => { const f = document.getElementById('cpm-flags'); f.value = '--permission-mode\\nplan'; f.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await waitFor(`(document.querySelector('#settings-custom-modes .cpm-command .lrc-text')?.textContent || '').includes('--permission-mode plan')`, at + 'the form shows the start command', 6000);
+            assert.equal(await ev(`document.querySelector('#settings-custom-modes .cpm-command .lrc-more').getAttribute('aria-expanded')`), 'false', at + 'custom command starts collapsed');
+            assert.equal(await ev(`document.querySelector('#settings-custom-modes .cpm-command .lrc-text').getClientRects().length`), 0, at + 'custom command takes no room until expanded');
             assert.equal(await ev(`!!document.querySelector('#settings-custom-modes .cpm-command-refused') && true`), false, at + 'no refusal line once the flags are accepted');
             assert.equal(await ev(`document.documentElement.scrollWidth <= window.innerWidth + 1`), true, at + 'the form with its command fits the page');
             await ev(`document.getElementById('cpm-flags').value = '--permission-mode\\nplan'; document.getElementById('cpm-name').value = 'Plan only'; document.querySelector('#settings-custom-modes .cm-form .sv-save').click(); true`);

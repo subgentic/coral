@@ -34,20 +34,20 @@ export function flagsNodes(answer, type) {
     else { const code = document.createElement('code'); code.textContent = text; line.append('Adds ', code, ' to the command.'); }
     const nodes = [line];
     if (answer.note) { const why = document.createElement('span'); why.className = 'launch-recap-note launch-recap-flags launch-recap-why'; why.textContent = String(answer.note); nodes.push(why); }
-    if (answer.command && type !== 'terminal') nodes.push(commandNode(String(answer.command)));
+    if (answer.command && type !== 'terminal') return [...nodes, commandNode(String(answer.command))];
     return nodes;
 }
 
-/** The agent's whole start command (#15951), as the server's launch builder gives it with Coral's own values as <placeholders>: read-only, with Copy, and on a phone one line with 'Show full command'. */
+/** The agent's whole start command (#15951), as the server's launch builder gives it with Coral's own values as <placeholders>: read-only, collapsed behind Start command, with Copy always available (#19016); the flags line and its note stay outside it, visible (#19335). */
 export function commandNode(command) {
     const row = document.createElement('div'); row.className = 'launch-recap-note launch-recap-flags launch-recap-command';
-    const label = document.createElement('span'); label.className = 'lrc-label'; label.textContent = 'Start command';
     const code = document.createElement('code'); code.className = 'lrc-text'; code.textContent = command; code.id = 'lrc-' + Math.random().toString(36).slice(2, 8);
     const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'btn btn-small lrc-copy'; copy.textContent = 'Copy'; copy.setAttribute('aria-label', 'Copy the start command');
     copy.addEventListener('click', async () => { showToast(await copyText(command) ? 'Copied the start command' : 'Could not copy the start command', false); });
-    const more = document.createElement('button'); more.type = 'button'; more.className = 'btn btn-small lrc-more'; more.textContent = 'Show full command'; more.setAttribute('aria-expanded', 'false'); more.setAttribute('aria-controls', code.id);
-    more.addEventListener('click', () => { const open = row.classList.toggle('lrc-open'); more.setAttribute('aria-expanded', String(open)); more.textContent = open ? 'Show less' : 'Show full command'; });
-    row.append(label, copy, more, code);
+    const panel = document.createElement('div'); panel.className = 'lrc-body'; panel.id = code.id + '-body'; panel.hidden = true; panel.append(code);
+    const more = document.createElement('button'); more.type = 'button'; more.className = 'btn btn-small lrc-label lrc-more'; more.textContent = 'Start command'; more.setAttribute('aria-expanded', 'false'); more.setAttribute('aria-controls', panel.id);
+    more.addEventListener('click', () => { const open = row.classList.toggle('lrc-open'); more.setAttribute('aria-expanded', String(open)); panel.hidden = !open; });
+    row.append(more, copy, panel);
     return row;
 }
 
