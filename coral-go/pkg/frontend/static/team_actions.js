@@ -18,12 +18,12 @@ import { killLiveSession, killLiveTeam, dropKilledRows } from './kill_live.js';
 import { importOnce } from './import_once.js';
 
 // The agents a folder or workflow group shows, and only those (#3053): team
-// members are listed (and stopped) under their team, archived agents in the
+// members are separate only with team grouping on; archived agents stay in the
 // Archived section, and with Group by Team on, workflow-run agents in their
 // workflow group. A search narrows the group as it does in the list.
 function _groupMembers(groupName) {
     const byTeam = browserLocal.get('coral-group-by-team') !== 'false';
-    const shown = state.liveSessions.filter(s => !s.archived && !s.board_project && _passesFilters(s));
+    const shown = state.liveSessions.filter(s => !s.archived && (!byTeam || !s.board_project) && _passesFilters(s));
     if (groupName.startsWith('wf:')) {
         const wf = groupName.slice(3);
         return byTeam ? shown.filter(s => s.workflow_name === wf) : [];
