@@ -75,6 +75,7 @@ const stagedFrom = (source, relaunch = {}) => { const st = staged('1.4.160', {},
             await setStatus(staged('1.4.160', AUTO('waiting', 'Dev is working')));
             let p = await pill();
             check(`${tag}: waiting for idle, the control says it installs when idle (${JSON.stringify(p)})`, !p.hidden && /installs when idle/.test(p.text));
+            check(`${tag}: while it waits the control plainly says an update is ready and offers Install now (#19487) (${JSON.stringify(p)})`, /Install now/.test(p.text) && /ready/.test(p.text) && /^Install now/.test(p.label) && /An update is ready/.test(p.label));
             check(`${tag}: its name says Coral installs it by itself and why it waits`, /installs it by itself when it is idle/.test(p.label) && /Waiting: Dev is working/.test(p.label));
 
             await setStatus(staged('1.4.160', AUTO('soon', 'Coral has been idle for 2 min; it installs after 5')));
@@ -83,11 +84,11 @@ const stagedFrom = (source, relaunch = {}) => { const st = staged('1.4.160', {},
 
             await setStatus(staged('1.4.160', AUTO('backoff', 'The last automatic install did not finish (coral_running); Coral tries again after a day, or use Update and relaunch.', true, { retry_at: '2026-10-31T00:00:00Z' })));
             p = await pill();
-            check(`${tag}: an automatic install that failed says so, and the control is still the click`, /not installed/.test(p.text) && /did not finish/.test(p.label) && !p.hidden);
+            check(`${tag}: an automatic install that failed says so, and the control is still the click`, /not installed/.test(p.text) && /Install now/.test(p.text) && /did not finish/.test(p.label) && !p.hidden);
 
             await setStatus(staged('1.4.160', AUTO('off', '', false)));
             p = await pill();
-            check(`${tag}: with the setting off the control is as before (no idle words)`, !/idle/.test(p.text) && !/by itself/.test(p.label));
+            check(`${tag}: with the setting off the control is as before (no idle words)`, !/idle/.test(p.text) && !/Install now/.test(p.text) && !/by itself/.test(p.label));
             await setStatus(staged());
             p = await pill();
             check(`${tag}: a server that sends nothing about it: as before`, !/idle/.test(p.text) && !/by itself/.test(p.label));
