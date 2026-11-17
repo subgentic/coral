@@ -4,7 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, waitStable } = require('./helpers/wait');
 
 const SKILLS = [
     { id: '1'.repeat(32), name: 'creating-coral-skills', version: 1, description: 'How to write a skill for Coral agents: the file layout, the front matter and how to test it.', status: 'approved', has_scripts: false, not_reviewable: false },
@@ -14,6 +14,7 @@ const SKILLS = [
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const stable = (expression, what, accept) => waitStable(ev, expression, what, 400, { timeout: 8000, accept });
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -61,7 +62,8 @@ const SKILLS = [
             await waitFor(`document.getElementById('launch-step-agent').dataset.stage === '${stage}'`, `step ${stage}`, 5000);
         }
         // step 3 opens on its Agent section: the skills are in it, with no other section to find first (a phone's section list is a dropdown)
-        const agent = await ev(`(() => { const h = document.getElementById('launch-skills-host'); const s = h.querySelector('details > summary'); const r = s && s.getBoundingClientRect(); return { has: !!s, text: s && s.textContent, shown: !!s && s.getClientRects().length > 0, inView: !!r && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth, section: (document.querySelector('#launch-agent-acf .settings-pane:not([hidden])') || {}).dataset?.section }; })()`);
+        // the box is read once it has stopped moving (a slow box was still laying step 3 out when it was read once: inView false in Windows CI, #19004); the accept keeps a half-drawn state from counting as settled
+        const agent = await stable(`(() => { const h = document.getElementById('launch-skills-host'); const s = h.querySelector('details > summary'); const r = s && s.getBoundingClientRect(); return { has: !!s, text: s && s.textContent, shown: !!s && s.getClientRects().length > 0, inView: !!r && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth, section: (document.querySelector('#launch-agent-acf .settings-pane:not([hidden])') || {}).dataset?.section }; })()`, 'the disclosure in step 3 laid out', a => a.has && a.shown);
         assert.ok(agent.has && /Choose from 3 skills/.test(agent.text), 'New agent has the disclosure: ' + JSON.stringify(agent));
         assert.ok(agent.shown && agent.section === 'agent' && agent.inView, 'step 3 shows it in its first section, on screen at 390: ' + JSON.stringify(agent));
         await ev(`document.querySelector('#launch-skills-host details > summary').click(); true`);
