@@ -30,7 +30,7 @@ let docsQuery = '';   // the sidebar search's text, lower case
 
 // ── Groups (#7443, #10093): Getting started and For developers ────────────────
 // The list the server sends has no groups; these topics are the ones a new reader starts with, in this order ("How do I...?" first, then Quickstart); every other topic, the API reference included, is for developers.
-const GETTING_STARTED_ORDER = ['how-do-i', 'quickstart', 'key-concepts', 'using-the-dashboard', 'worked-demos', 'workflow-quickstart', 'troubleshooting'];
+const GETTING_STARTED_ORDER = ['how-do-i', 'quickstart', 'key-concepts', 'using-the-dashboard', 'skills', 'worked-demos', 'workflow-quickstart', 'troubleshooting'];
 const GETTING_STARTED = new Set(GETTING_STARTED_ORDER);
 const DOC_GROUPS = [
     { key: 'getting-started', label: 'Getting started', has: d => GETTING_STARTED.has(d.name), order: d => GETTING_STARTED_ORDER.indexOf(d.name) },
@@ -97,7 +97,7 @@ function hitSentence(name) {
     if (!line) return '';
     let best = '', bestN = 0;
     for (const part of line.text.split(/(?<=[.!?])\s+/)) {
-        const text = part.replace(/^[#>*\-\d.\s]+/, '').replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[`*_|]+/g, '').replace(/#\d{3,}/g, '').replace(/\s+/g, ' ').trim(), low = text.toLowerCase();
+        const text = part.replace(/^[#>*\-\d.\s]+/, '').replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\|/g, ' ').replace(/[`*_]+/g, '').replace(/#\d{3,}/g, '').replace(/\s+/g, ' ').trim(), low = text.toLowerCase();
         const n = words.filter(w => low.includes(w)).length;
         if (n > bestN) { bestN = n; best = text; }
     }

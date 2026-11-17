@@ -62,7 +62,8 @@ export function setArtifactSearch(text) {
 }
 
 let pageHost = null;
-const hooks = () => ({ detailHost: pageHost && pageHost.querySelector('.inbox-detail-pane'), onCount: n => { count = n; countAt = Date.now(); onCount(); const head = document.querySelector('#group-table-view .inbox-folder-head'); if (head) { let c = head.querySelector('.session-group-count'); if (!c) { c = document.createElement('span'); c.className = 'session-group-count'; head.append(c); } c.textContent = String(n); head.dataset.words = `Artifacts|${n}`; } } }); // the head's count follows the list's answer, drawn the first time it comes
+let shownCount = null;
+const hooks = () => ({ onShown: (shown, total, more) => { shownCount = `${shown}${more ? '+' : ''} shown${Number.isFinite(total) && total !== shown ? ` of ${total}` : ''}`; const c = document.querySelector('#group-table-view .inbox-folder-head .session-group-count'); if (c) c.textContent = shownCount; }, detailHost: pageHost && pageHost.querySelector('.inbox-detail-pane'), onCount: n => { count = n; countAt = Date.now(); onCount(); const head = document.querySelector('#group-table-view .inbox-folder-head'); if (head) { let c = head.querySelector('.session-group-count'); if (!c) { c = document.createElement('span'); c.className = 'session-group-count'; head.append(c); } c.textContent = shownCount || String(n); head.dataset.words = `Artifacts|${shownCount || n}`; } } }); // the head's count follows the list's answer, drawn the first time it comes
 
 let folderBar = null;
 /** The folder's toolbar (the shared one every Inbox folder has): the search, the Filters icon beside it (Team, Type, Origin, Uploaded by, Kept only, dates, Sort), the chips of what is on. The list uses this bar as its own. */
