@@ -49,9 +49,13 @@ def publish_problems(wf):
     edit = t.find('gh release edit "$name"')
     if not (0 <= view < create < upload < edit):
         out.append("the order is not: refuse an existing release, create, upload, publish")
-    for need in ("--draft", "--prerelease", "--latest=false", '--target "${PROMOTE_SOURCE_SHA}"'):
+    for need in ("--draft", "--prerelease", "--latest=false", '--target "${target_sha}"'):
         if need not in t[create:upload if upload > create else len(t)]:
             out.append("create lacks " + need)
+    if 'target_sha="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"' not in t[:create]:
+        out.append("the target is not main's tip read from the repository")
+    if '[[ "$target_sha" =~ ^[0-9a-f]{40}$ ]]' not in t[:create]:
+        out.append("the target is not checked to be 40 hex characters")
     if "--draft=false" not in t[edit:] or "--latest=false" not in t[edit:]:
         out.append("publish must be --draft=false and keep --latest=false")
     if 'name="promote-${PROMOTE_TAG}-${seq}"' not in t:
@@ -202,8 +206,10 @@ class Workflow(unittest.TestCase):
             "a name without the tag": WF.replace('name="promote-${PROMOTE_TAG}-${seq}"', 'name="promote-${seq}"', 1),
             "an existing release is not refused": WF.replace('if gh release view "$name"', 'if false && gh release view "$name"', 1),
             "the sequence is not checked": WF.replace('[[ "$seq" =~ ^[0-9]+$ ]]', "true", 1),
-            "pinned to no commit": WF.replace('--target "${PROMOTE_SOURCE_SHA}"', "", 1),
-            "pinned to the workflow's own commit": WF.replace('--target "${PROMOTE_SOURCE_SHA}"', '--target "${GITHUB_SHA}"', 1),
+            "pinned to no commit": WF.replace('--target "${target_sha}"', "", 1),
+            "pinned to the workflow's own commit": WF.replace('--target "${target_sha}"', '--target "${GITHUB_SHA}"', 1),
+            "the target is not read from main": WF.replace("commits/main", "commits/${PROMOTE_TAG}", 1),
+            "the target is not checked": WF.replace('[[ "$target_sha" =~ ^[0-9a-f]{40}$ ]]', "true", 1),
         }
         for name, text in mutants.items():
             self.assertNotEqual(text, WF, name)
