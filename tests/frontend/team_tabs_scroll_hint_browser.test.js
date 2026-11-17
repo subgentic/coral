@@ -29,12 +29,17 @@ const TEAM = `qa-hint-${Date.now() % 100000}`;
                 return add.call(this, type, listener, options);
             };
         })()` });
-        for (const [w, mobile] of [[390, true], [1440, false]]) {
+        for (const [w, mobile] of [[390, true], [820, true], [1440, false]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
             await seed(ev, TEAM); await openTeam(ev, waitFor, TEAM); await settle(800);
             let s = await state();
             if (!mobile) { assert.equal(s.scrolls, false, 'a desktop strip fits'); assert.equal(s.shown, false, 'and has no scroll button: ' + JSON.stringify(s)); continue; }
+            if (w === 820) { // a tablet strip (#17696, walk 80 #13): wider tabs (a larger text size) overflow it, and it says so like a phone's
+                await ev(`(() => { const st = document.createElement('style'); st.textContent = '#team-tabs .tab { min-width: 130px; }'; document.head.append(st); return true; })()`); await settle(800); s = await state();
+                assert.ok(s.scrolls && s.shown && s.name === 'Show more tabs', 'at 820 px an overflowing strip has the "Show more tabs" button: ' + JSON.stringify(s));
+                continue;
+            }
             assert.equal(s.scrolls, true, 'a phone strip scrolls: ' + JSON.stringify(s));
             assert.ok(s.shown && s.name === 'Show more tabs' && s.w >= 44 && s.h >= 44 && s.atEnd, 'a 44 px "Show more tabs" button sits beside the strip\'s end (right of it, over no tab: #18867) while tabs wait past the edge: ' + JSON.stringify(s));
             await ev(`document.getElementById('team-tabs-next').click(); true`);

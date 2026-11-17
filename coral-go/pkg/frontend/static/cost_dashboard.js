@@ -817,11 +817,12 @@ function _renderSpendChart(buckets) {
     const midCost = maxCost / 2;
 
     // X-axis labels (first, middle, last): a multi-day chart must distinguish dates, not repeat the same time.
-    const multiDay = Date.parse(buckets[n - 1].bucket) - Date.parse(buckets[0].bucket) > 86400000;
+    const span = Date.parse(buckets[n - 1].bucket) - Date.parse(buckets[0].bucket), multiDay = span > 86400000;
     const daily = buckets.every(b => /T00:00:00(\.0+)?Z$/.test(String(b.bucket))); // day buckets are UTC days: their date is the UTC one (#9511); hourly buckets are instants, dated in the browser's zone
     const formatBucketLabel = (b) => {
         try {
             const d = new Date(b);
+            if (!multiDay && !daily && span >= 82800000) return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); // a whole day: the same clock time at both ends needs its date (walk 80 #18)
             return multiDay ? d.toLocaleDateString(undefined, daily ? { month: 'short', day: 'numeric', timeZone: 'UTC' } : { month: 'short', day: 'numeric' })
                 : d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
         } catch { return ''; }
@@ -909,7 +910,13 @@ function _renderBurnRate(buckets, periodHours) {
     // Calculate actual time span from data
     const firstTime = new Date(buckets[0].bucket).getTime();
     const lastTime = new Date(buckets[buckets.length - 1].bucket).getTime();
-    const spanHours = Math.max((lastTime - firstTime) / 3600000, 1);
+    const rawHours = (lastTime - firstTime) / 3600000;
+    if (rawHours < 1) { // under an hour of data: a per-hour figure would equal the total and read as it (walk 80 #17)
+        el.textContent = formatCost(totalCost, { zeroAsTwo: true }) + ' so far';
+        el.title = 'Less than an hour of data in this range, so there is no hourly rate yet';
+        return;
+    }
+    const spanHours = rawHours;
 
     const rate = totalCost / spanHours;
     el.textContent = formatCost(rate, { zeroAsTwo: true }) + '/hr';
