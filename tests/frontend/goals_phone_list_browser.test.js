@@ -86,8 +86,9 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 // a long press selects a row; its bar says so
                 const at1 = await ev(`(() => { const r = document.querySelector('${P} tbody tr .dt-mail-title').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`); // on the goal's own title: the button that opens the row
                 const t = type => client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x: at1.x, y: at1.y, id: 1 }] });
-                await t('touchStart'); await new Promise(r => setTimeout(r, 700)); await t('touchEnd'); // sleep-ok: a long press is a held finger
+                await t('touchStart'); // the finger stays down until the row is selected: the press timer (450 ms) runs late on a slow, throttled page, so a fixed hold ended before it fired (#18054)
                 await waitFor(`/1 selected/.test(document.querySelector('${P} .dt-bar')?.textContent || '')`, at + 'a long press selects the row', 5000).catch(() => check(false, at + 'a long press selects the row (no "1 selected" bar)'));
+                await t('touchEnd');
             } else {
                 check(m.checks >= 3, at + 'a desktop keeps its row checkboxes: ' + m.checks);
                 check(m.addText === 'New goal', at + 'and its "New goal" button: ' + m.addText);
@@ -108,8 +109,9 @@ const { coralReady, framesJs } = require('./helpers/wait');
             check(/^Active/.test(g.side), at + 'with the state on the right: ' + g.side);
             const at2 = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr .dt-mail-title').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
             const tt = type => client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x: at2.x, y: at2.y, id: 1 }] });
-            await tt('touchStart'); await new Promise(r => setTimeout(r, 700)); await tt('touchEnd'); // sleep-ok: a long press is a held finger
-            await waitFor(`/1 selected/.test(document.querySelector('#group-table-view .gt-toolbar')?.textContent || document.querySelector('.dt-bar')?.textContent || '')`, at + 'a long press selects the goal', 5000).catch(() => check(false, at + 'a long press selects the goal (no "1 selected" bar); the page is on ' + location.pathname));
+            await tt('touchStart'); // held until the goal is selected, as above (#18054)
+            await waitFor(`/1 selected/.test(document.querySelector('#group-table-view .gt-toolbar')?.textContent || document.querySelector('.dt-bar')?.textContent || '')`, at + 'a long press selects the goal', 5000).catch(async () => check(false, at + 'a long press selects the goal (no "1 selected" bar); the page is on ' + await ev('location.pathname')));
+            await tt('touchEnd');
             check(!(await ev(`location.pathname`)).includes('/goals/'), at + 'and does not open it');
         }
     } finally { await removeBoards(ev, [B, SEED]).catch(() => {}); await client.close(); }
