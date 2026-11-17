@@ -8,10 +8,10 @@ const { coralReady } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD + require('./helpers/launch_notice_agent').PRELOAD });
+        await Page.enable(); const fixtureScript = await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD + require('./helpers/launch_notice_agent').REAL_FEED_PRELOAD });
         // The real feed's handler is held (its messages queue) until __letFeedIn(): the late first update of the race.
-        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const Real = window.WebSocket; window.__held = []; window.__feedHandler = null;
-            function W(u, p) { const s = new (p === undefined ? Real : Real)(u, p); if (/\\/ws\\/coral/.test(String(u))) { Object.defineProperty(s, 'onmessage', { set(f) { window.__feedHandler = f; }, get() { return window.__feedHandler; } }); s.addEventListener('message', e => { window.__held.push(e); }); }
+        const heldScript = await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const Real = window.WebSocket; window.__held = []; window.__feedHandler = null;
+            function W(u, p) { const s = new (p === undefined ? Real : Real)(u, p); if (/\\/ws\\/coral/.test(String(u))) { Object.defineProperty(s, 'onmessage', { configurable: true, set(f) { window.__feedHandler = f; }, get() { return window.__feedHandler; } }); s.addEventListener('message', e => { window.__held.push(e); }); }
                 return s; }
             W.prototype = Real.prototype; W.CONNECTING = 0; W.OPEN = 1; W.CLOSING = 2; W.CLOSED = 3; window.WebSocket = W;
             window.__letFeedIn = () => { let n = 0; for (const e of window.__held.splice(0)) { if (window.__feedHandler) { window.__feedHandler(e); n++; } } return n; }; })();` });
@@ -25,6 +25,22 @@ const { coralReady } = require('./helpers/wait');
         await install();
         console.log('2. the mocked agent is still listed');
         await waitFor(`import((window.__coralStatic||'/static/')+'state.js').then(m => m.state.liveSessions.some(s => s.session_id === 'notice-fixture'))`, 'the fixture agent restored after the late feed update', 3000);
+        console.log('3. geometry fixtures stay present through the same ordered empty feed');
+        await Page.removeScriptToEvaluateOnNewDocument({ identifier: fixtureScript.identifier });
+        await Page.removeScriptToEvaluateOnNewDocument({ identifier: heldScript.identifier });
+        await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const Real = window.WebSocket; window.__held = []; window.__feedHandler = null;
+            function W(u, p) { const s = new (p === undefined ? Real : Real)(u, p); if (/\\/ws\\/coral/.test(String(u))) { Object.defineProperty(s, 'onmessage', { configurable: true, set(f) { window.__feedHandler = f; }, get() { return window.__feedHandler; } }); s.addEventListener('message', e => { window.__held.push(e); }); }
+                return s; }
+            W.prototype = Real.prototype; W.CONNECTING = 0; W.OPEN = 1; W.CLOSING = 2; W.CLOSED = 3; window.WebSocket = W;
+            window.__letFeedIn = () => { let n = 0; for (const e of window.__held.splice(0)) { if (window.__feedHandler) { window.__feedHandler(e); n++; } } return n; }; })();` });
+        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/launch_notice_agent').PRELOAD });
+        await Page.navigate({ url: BASE }); await Page.loadEventFired();
+        await waitFor(`window.__held.length > 0 && !!window.__liveListServed`, 'geometry feed update and served list', 10000);
+        await waitFor(`import((window.__coralStatic||'/static/')+'state.js').then(m => m.state.liveSessions.some(s => s.session_id === 'notice-fixture'))`, 'geometry fixture loaded', 10000);
+        assert.ok(await ev(`window.__letFeedIn() > 0`), 'geometry feed was delivered');
+        assert.equal(await ev(`import((window.__coralStatic||'/static/')+'state.js').then(m => m.state.liveSessions.some(s => s.session_id === 'notice-fixture'))`), true, 'geometry fixture remains present before install');
+        await install();
         console.log('PASS notice fixture survives the real feed race');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

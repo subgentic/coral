@@ -2,7 +2,7 @@
 
 ## v2.0.69 — An updated Getting started guide, Needs you and Inbox that behave, files you can download and compare, a resource queue, and phone and iPad touch fixes
 
-Task numbers in brackets. Built on v2.0.68 and gated on ci/v2069 1adc6faa9b; it carries the whole v2.0.70 queue. A prerelease until the Operator promotes it.
+Task numbers in brackets. Built on v2.0.68 and gated on ci/v2069 74e537cfa8; it carries the whole v2.0.70 queue. A prerelease until the Operator promotes it.
 
 ### Changes
 
@@ -155,7 +155,6 @@ Task numbers in brackets. Built on v2.0.68 and gated on ci/v2069 1adc6faa9b; it 
 
 ### Known issues
 
-- When the launch notice arrives, the content under the banners can move (73 px over 15 frames in the launch_notice_no_jump test, #18964). Waived for this release; fixed in the next.
 - On a phone, the board table's Expand All can run over its time budget and the phone live-message wait can time out (the board_table_seeded test, #18959). Waived for this release; fixed in the next.
 - On a phone, keyboard focus on the team tab strip's Show more tabs button can leave it off the screen (the keyboard_census_hub test, #18972); the fix (#18984) comes in the next release.
 
