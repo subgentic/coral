@@ -7,6 +7,9 @@ import (
 	"strings"
 
 	"github.com/jmoiron/sqlx"
+
+	"github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/naming"
 )
 
 // CompletionReview preserves an unaccepted candidate independently of the final
@@ -39,6 +42,36 @@ func (s *Store) RequireTaskReviewer(ctx context.Context, project, actor string) 
 		return fmt.Errorf("an active registered orchestrator is required")
 	}
 	return nil
+}
+
+// RequirePlanner is who may plan a board's goals and tasks (#14050, the Operator: "lets allow orchestrators to create goals by default"): everyone RequireTaskReviewer admits (the launched Orchestrator by its launch
+// record, a member titled exactly Orchestrator) and the member in the team's Orchestrator SEAT, the session the board's grant names (#13891: seeded for the Orchestrator a team launch starts, or chosen by the Operator in the
+// team's settings), whatever its title says (a "Team Lead", a name in another language). The seat is the Operator's or the launch's own decision, never a caller's: a title is still no privilege and a join cannot take
+// the seat. A worker is still refused. Only planning widens: reviews, completion reviews and the merge queue keep RequireTaskReviewer.
+func (s *Store) RequirePlanner(ctx context.Context, project, actor string) error {
+	if err := s.RequireTaskReviewer(ctx, project, actor); err == nil {
+		return nil
+	}
+	sub, err := s.GetProjectSubscription(ctx, project, actor)
+	if err != nil || sub == nil || sub.IsActive == 0 {
+		return fmt.Errorf("an active registered orchestrator is required")
+	}
+	g, err := s.GetOrchGrant(ctx, project)
+	if err != nil || len(g.SeatSession) < 8 || !isSeatSessionName(sub.SessionName, g.SeatSession) {
+		return fmt.Errorf("an active registered orchestrator is required")
+	}
+	return nil
+}
+
+// isSeatSessionName says the member's session name IS the seat's session: exactly "<agent type>-<seat session id>" for one of Coral's agent types, compared whole, never as a suffix or by parsing the name (a name that
+// merely ends in the seat id, or has any other prefix, is not the seat's session; Security's SHOULD on #14050).
+func isSeatSessionName(sessionName, seat string) bool {
+	for _, t := range []string{agenttypes.Claude, agenttypes.Agy, agenttypes.Antigravity, agenttypes.Gemini, agenttypes.Codex, agenttypes.Pi, agenttypes.Hermes, agenttypes.Opencode, agenttypes.Terminal} {
+		if sessionName == naming.SessionName(t, seat) {
+			return true
+		}
+	}
+	return false
 }
 
 // SubmitCompletionReview records evidence that actually reached Coral. It does
