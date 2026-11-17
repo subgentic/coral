@@ -19,6 +19,8 @@ function installReviews() {
     window.__reviewRequests = [];
     window.__failReviewMore = false;
     window.__failReviewCount = false;
+    window.__partialReviewPage = false;
+    window.__failedCountResponses = 0;
     const json = (body, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }));
     const make = (server, i) => ({ id: (i + 1).toString(16).padStart(64, '0'), board_id: 'alpha', team: 'Product', name: `Entry ${String(i).padStart(3, '0')} ${server}.md`,
         uri: 'coral://artifacts/' + (i + 1).toString(16).padStart(64, '0'), media_type: 'text/markdown', size: 40, available: true,
@@ -42,13 +44,14 @@ function installReviews() {
             if (params.get('goal')) all = all.filter(a => a.goal_id === Number(params.get('goal')));
             if (params.get('digest')) all = all.filter(a => params.get('digest').split(',').includes(a.id));
             if (params.get('waiting') === '1') {
-                if (server === 'box-b' && window.__failReviewCount) return json({ error: 'offline' }, 503);
+                if (server === 'box-b' && window.__failReviewCount) { window.__failedCountResponses++; return json({ error: 'offline' }, 503); }
                 const total = params.get('q') || params.get('goal') || params.get('by') ? all.filter(a => a.new_comments > 0 || (!a.tags.includes('changes requested') && (!a.tags.includes('read') || a.opened_version > 0 && a.version > a.opened_version))).length : server === 'local' ? 16 : 17;
                 return json({ artifacts: [], total, has_more: false });
             }
             if (cursor && server === 'box-b' && window.__failReviewMore) return json({ error: 'offline' }, 503);
             if (cursor && cursor !== `${server}:50`) return json({ error: 'wrong computer cursor' }, 400);
             const start = cursor ? 50 : 0, rows = all.slice(start, start + limit), more = start + rows.length < all.length;
+            if (window.__partialReviewPage && server === 'box-b' && !cursor) rows.pop(); // one fewer loaded read row, independent of the failed attention-count read (#17642)
             return json({ artifacts: rows, total: all.length, teams: [{ board_id: 'alpha', team: 'Product' }], tag_counts: { 'for review': all.length }, has_more: more,
                 ...(more ? { next_cursor: `${server}:50` } : {}), facets: { team: [{ v: 'Product', n: 65 }], by: [{ v: 'Off-page writer', n: 1 }], goal: [{ v: 'Off-page goal', id: 77, n: 1 }] } });
         }
@@ -88,10 +91,14 @@ function installReviews() {
         assert.ok(await ev(`[...document.querySelectorAll('#inbox-needs-agent option')].some(o => o.value === 'Off-page writer')`), 'UI offers an agent present only in server facets beyond page one');
         const goals = await ev(`[...document.querySelectorAll('#inbox-needs-goal option')].map(o => o.value).filter(v => /Off-page goal/.test(v))`);
         assert.equal(new Set(goals).size, 2, 'same goal title and number on two computers stays two choices');
-        await ev(`window.__failReviewCount = true; window.__C.refreshCounts(true).then(() => import(${S} + 'inbox_tab.js')).then(m => m.updateInboxTab())`);
+        const failedBefore = await ev('window.__failedCountResponses');
+        await ev(`(async () => { window.__failReviewCount = true; window.__partialReviewPage = true; await window.__R.refreshReviews(true); await window.__C.refreshCounts(true); (await import(${S} + 'inbox_tab.js')).updateInboxTab(); })()`);
+        assert.ok(await ev('window.__failedCountResponses') > failedBefore, 'the pill assertion follows a real failed count response');
+        assert.equal(await ev(`window.__R.reviewPages().find(p => p.server === 'box-b').loadedCount`), 49, 'failed-count source still supplies 49 review rows');
         await waitFor(`/at least 18 need your attention/.test(document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label') || '')`, 'partial count adds only failed-source loaded rows');
-        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 100+')`, 'count-source failure leaves the listed-row pill at 100+');
-        await ev(`window.__failReviewCount = false; window.__C.refreshCounts(true).then(() => import(${S} + 'inbox_tab.js')).then(m => m.updateInboxTab())`);
+        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 99+')`, 'partial-state pill counts 50 local plus 49 failed-count-source rows, with more pages still available, not stale 100+');
+        await ev(`(async () => { window.__failReviewCount = false; window.__partialReviewPage = false; await window.__R.refreshReviews(true); await window.__C.refreshCounts(true); (await import(${S} + 'inbox_tab.js')).updateInboxTab(); })()`);
+        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 100+')`, 'restoring the complete first pages restores the pill to 100+');
         await ev(`window.__failReviewMore = true; document.querySelector('[data-review-more="box-b"][data-review-stream="review"]').click(); true`);
         await waitFor(`/Retry/.test(document.querySelector('[data-review-more="box-b"][data-review-stream="review"]')?.textContent || '')`, 'failed cursor offers Retry');
         assert.equal(await ev(`window.__R.reviewItems().length`), 100, 'append failure preserves loaded rows');
