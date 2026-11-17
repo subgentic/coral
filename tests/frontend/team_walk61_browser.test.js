@@ -57,6 +57,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`fetch('/api/board/projects').then(r=>r.json()).then(p=>!JSON.stringify(p).includes(${JSON.stringify(team)}))`, 'team removed');
             check(await waitFor(`!document.getElementById('team-page-view')?.getClientRects().length`, 'team page closed').then(()=>true,()=>false), width + ': removed team page closes');
             check(await ev(`document.getElementById('welcome-screen').getClientRects().length>0`), width + ': removal lands on Home');
+            check(await ev(`location.pathname === '/agents'`), width + ': Home has its own address after removal');
         }
     } finally { await removeBoards(ev, boards).catch(()=>{}); await client.close(); }
     assert.deepEqual(problems, []);
