@@ -325,14 +325,15 @@ async function _refreshCalendarCost() {
     } catch { el.replaceChildren(); }
 }
 
-let _refreshBusy = 0; // reads of the page in flight: a totals re-check does not start another while one is going (#19182)
-export async function _refreshCostDashboard(opts) { _refreshBusy++; try { await _readCostDashboard(opts); } finally { _refreshBusy--; } }
+let _refreshDone = Promise.resolve(), _rechecking = false; // the page read in flight, and the one totals re-check (#19182)
+export async function _refreshCostDashboard(opts) { const p = _readCostDashboard(opts); _refreshDone = p.catch(() => {}); await p; }
 
-/** The Totals check's one re-read (#17633, #19182): only the open view's table and its chart, not the whole page, and none while a refresh is already reading (that refresh draws both again). */
+/** The Totals check's one re-read (#17633, #19182): only the open view's table and its chart, not the whole page. A refresh already reading is waited for, not skipped: the check has used up its one re-read, so dropping it would leave the mismatch red; two re-checks at once are one read. */
 export async function _recheckTotals(view) {
-    if (_refreshBusy || !SERIES_VIEWS[view]) return;
-    _refreshBusy++;
+    if (_rechecking || !SERIES_VIEWS[view]) return;
+    _rechecking = true;
     try {
+        await _refreshDone;
         const { costRange, providerRows, modelRows, agentRows } = await importOnce('./cost_data.js');
         const { sinceParam } = costRange(_period(), Date.now());
         const r = await fetch(`/api/token-usage/${view === 'team' ? 'by-team' : 'summary'}${sinceParam}`, { cache: 'no-store' }), d = r.ok ? await r.json() : null;
@@ -341,7 +342,7 @@ export async function _recheckTotals(view) {
         else if (d && view === 'model') _renderModelTable(modelRows(d.by_model));
         else if (d) _renderAgentTable(agentRows(d.by_agent, state.liveSessions));
         await _refreshSeries(view); // the chart, and the table drawn again beside it
-    } catch (e) { console.error('[cost-dashboard] totals re-check:', e); } finally { _refreshBusy--; }
+    } catch (e) { console.error('[cost-dashboard] totals re-check:', e); } finally { _rechecking = false; }
 }
 
 async function _readCostDashboard({ force = false } = {}) {
