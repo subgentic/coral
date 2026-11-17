@@ -13,6 +13,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`!!document.querySelector('${root} .lrc-copy')`, label + ': command arrived');
         const initial = await ev(`(()=>{const r=document.querySelector('${root} .launch-recap-command'), c=r.querySelector('.lrc-text'), b=r.querySelector('.lrc-more');return {closed:b?.getAttribute('aria-expanded')==='false'&&!c.getClientRects().length,command:c.textContent,copy:!!r.querySelector('.lrc-copy').getClientRects().length};})()`);
         if (!initial.closed || !initial.copy) problems.push(label + ': command is collapsed with Copy available: ' + JSON.stringify(initial));
+        if (!root.startsWith('#command-fixture')) { const vis = await ev(`(() => { const l = document.querySelector('${root} .launch-recap-flags:not(.launch-recap-command)'); return !!l && l.getClientRects().length > 0 && !l.closest('.lrc-body') && /^Adds /.test(l.textContent); })()`); if (!vis) problems.push(label + ': the Adds flags line is visible outside the collapsed Start command panel (#19335)'); }
         await shot(label+'-closed');
         await ev(`Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async t=>{window.__copied=t;}}});document.querySelector('${root} .lrc-copy').click();true`);
         await waitFor(`window.__copied===${JSON.stringify(initial.command)}`, label+': Copy closed command');
