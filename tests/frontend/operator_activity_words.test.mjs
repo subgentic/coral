@@ -54,6 +54,7 @@ assert.deepEqual(activityParts({action:'file_share',item_kind:'file',title:'plan
 // #16088: an answer to an agent's question (a Claude multiple-choice question, a Codex dialog such as "Trust all and continue") reads as an answer to that agent's question and is filed under Answers; only a request to use a tool is a permission.
 {
     const F = await import('../../coral-go/pkg/frontend/static/operator_activity_filters.js');
+    assert.equal(F.ACTION_LABEL.prompt_answer, "Answered an agent's question", 'the Action filter uses the Answers rows’ question wording (#16259)');
     const claude = { action: 'prompt_answer', item_kind: 'agent', item_id: 'coral-hub', note: "On that group's own Coral" };
     const codex = { action: 'prompt_answer', item_kind: 'agent', item_id: 'coral-go', note: 'Trust all and continue' };
     for (const row of [claude, codex]) {
