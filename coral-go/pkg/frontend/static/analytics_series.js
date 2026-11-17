@@ -231,7 +231,7 @@ function markedLine(mark, words) { const b = el('b'), m = el('span', null, mark)
 /** Draws the panel: the pickers (the metrics, any of them together; running total or each interval), the chart or charts, and the line under them ("Totals agree"). With one metric: a line per shown row.
  *  With several metrics and one row: a line per metric (one chart per unit: tokens together, dollars and requests apart). With several metrics and several rows: one chart per metric, a line per row, one under another.
  *  tableTotal(field, keys) is the sum of the table's rows (those with these keys, or all when keys is null) for a table figure, or null when the table has none; redraw draws the table beside it again. */
-export function drawPanel(host, view, { tableTotal, redraw, phone }) {
+export function drawPanel(host, view, { tableTotal, redraw, phone, recheck }) {
     host.replaceChildren();
     const st = seriesState(view);
     if (st.error) { const e = el('p', 'empty-state', st.error); e.setAttribute('role', 'status'); host.append(e); return; }
@@ -239,7 +239,7 @@ export function drawPanel(host, view, { tableTotal, redraw, phone }) {
     const { buckets, interval, sinceMs, untilMs } = st.data;
     const times = axis(sinceMs, untilMs, interval);
     if (!buckets.length || !st.ranked.length) { host.append(el('p', 'empty-state', 'No usage over time in this range yet.')); return; }
-    const again = () => { drawPanel(host, view, { tableTotal, redraw, phone }); redraw?.(); };
+    const again = () => { drawPanel(host, view, { tableTotal, redraw, phone, recheck }); redraw?.(); };
     const picked = METRICS.filter(x => st.metrics.includes(x.key));
     const tools = el('div', 'viz-tools');
     tools.append(seg('Metrics', METRICS.map(x => [x.key, x.label]), k => st.metrics.includes(k), k => { st.metrics = st.metrics.includes(k) ? (st.metrics.length > 1 ? st.metrics.filter(x => x !== k) : st.metrics) : [...st.metrics, k]; again(); }, true),
@@ -278,6 +278,14 @@ export function drawPanel(host, view, { tableTotal, redraw, phone }) {
     if (rows.length) {
         const bad = rows.filter(x => !agrees(x.rowsTotal, x.chartTotal)), line = el('p', `viz-check${bad.length ? ' viz-check-bad' : ''}`);
         line.setAttribute('role', 'status');
+        if (!bad.length) st.rechecked = false;
+        else if (recheck && !st.rechecked) { // the table and the chart are read at different moments, and while a team runs the later read has more (#17633: red 'table $1.13, chart $1.36', gone a minute later): read both again before saying the totals differ
+            st.rechecked = true;
+            line.className = 'viz-check';
+            line.append(markedLine('\u2026', 'Checking totals'), document.createTextNode(' The table and the chart are being read again.'));
+            host.append(line); Promise.resolve().then(recheck);
+            return;
+        }
         if (!bad.length) line.append(markedLine('\u2713', 'Totals agree'), document.createTextNode(rows.length === 1 ? ` The table's rows add up to ${rows[0].m.fmt(rows[0].rowsTotal)}, where the chart ends.` : ` The table's rows add up to what each chart ends on (${joinWords(rows.map(x => x.m.label))}).`));
         else line.append(markedLine('\u2717', 'Totals differ'), document.createTextNode(` ${joinWords(bad.map(x => `${x.m.label}: the table's rows ${x.m.fmt(x.rowsTotal)}, the chart ${x.m.fmt(x.chartTotal)}`))}.`));
         host.append(line);

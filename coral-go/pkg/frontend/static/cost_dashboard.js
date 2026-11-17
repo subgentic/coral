@@ -325,7 +325,27 @@ async function _refreshCalendarCost() {
     } catch { el.replaceChildren(); }
 }
 
-export async function _refreshCostDashboard({ force = false } = {}) {
+let _refreshDone = Promise.resolve(), _rechecking = false; // the page read in flight, and the one totals re-check (#19182)
+export async function _refreshCostDashboard(opts) { const p = _readCostDashboard(opts); _refreshDone = p.catch(() => {}); await p; }
+
+/** The Totals check's one re-read (#17633, #19182): only the open view's table and its chart, not the whole page. A refresh already reading is waited for, not skipped: the check has used up its one re-read, so dropping it would leave the mismatch red; two re-checks at once are one read. */
+export async function _recheckTotals(view) {
+    if (_rechecking || !SERIES_VIEWS[view]) return;
+    _rechecking = true;
+    try {
+        await _refreshDone;
+        const { costRange, providerRows, modelRows, agentRows } = await importOnce('./cost_data.js');
+        const { sinceParam } = costRange(_period(), Date.now());
+        const r = await fetch(`/api/token-usage/${view === 'team' ? 'by-team' : 'summary'}${sinceParam}`, { cache: 'no-store' }), d = r.ok ? await r.json() : null;
+        if (d && view === 'team') _renderTeamTable(d.teams || []);
+        else if (d && view === 'provider') _renderProviderTable(providerRows(d.by_agent_type));
+        else if (d && view === 'model') _renderModelTable(modelRows(d.by_model));
+        else if (d) _renderAgentTable(agentRows(d.by_agent, state.liveSessions));
+        await _refreshSeries(view); // the chart, and the table drawn again beside it
+    } catch (e) { console.error('[cost-dashboard] totals re-check:', e); } finally { _rechecking = false; }
+}
+
+async function _readCostDashboard({ force = false } = {}) {
     _watchCostTables();
     if (force && TAB_VIEWS.has(state.analyticsView)) openTab(state.analyticsView, true); // Refresh on one of the three tabs reads it again (#11222)
     const { costRange, providerRows, modelRows, thinkingRows, agentRows } = await importOnce('./cost_data.js'); // the range and the rows, pure (#8359); loaded when the page first refreshes, as the page's other lazy parts are
@@ -464,7 +484,7 @@ function _drawSeries(view) {
     const host = document.getElementById(`cost-series-${view}`);
     if (!host) return;
     _seriesDraws[view] = (_seriesDraws[view] || 0) + 1;
-    series.drawPanel(host, view, { tableTotal: (f, keys) => _rowsTotal(view, f, keys), redraw: () => _refreshSwatches(view), phone: isPhoneLayout() });
+    series.drawPanel(host, view, { tableTotal: (f, keys) => _rowsTotal(view, f, keys), redraw: () => _refreshSwatches(view), phone: isPhoneLayout(), recheck: () => _recheckTotals(view) });
 }
 
 async function _refreshSeries(view = _currentView()) {
