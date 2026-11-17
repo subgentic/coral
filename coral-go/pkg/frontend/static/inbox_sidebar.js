@@ -295,7 +295,7 @@ const goalTeamHere = g => { const k = splitKey(g.board_id); return k.name ? iden
 let uncommittedMod = null, uncommittedLoading = null; // team_uncommitted.js, loaded the first time a goal looks done (#17284)
 const uncommittedNote = g => { // "3 files in shop not committed" on a goal's row, for a team on this computer; read in the background and the list drawn again when it arrives
     if (splitKey(g.board_id).server !== LOCAL_SERVER) return '';
-    if (!uncommittedMod) { uncommittedLoading ||= importOnce('./team_uncommitted.js').then(m => { uncommittedMod = m; renderInboxNav(true); }).catch(() => {}); return ''; } // one load and one redraw for the whole list, not one per goal row
+    if (!uncommittedMod) { uncommittedLoading ||= importOnce('./team_uncommitted.js').then(m => { uncommittedMod = m; renderInboxNav(true); }).catch(() => { uncommittedLoading = null; }); return ''; } // a failed load is forgotten, so the next redraw tries again (#19340); one load and one redraw for the whole list, not one per goal row
     uncommittedMod.loadNote(splitKey(g.board_id).name, () => renderInboxNav(true));
     return uncommittedMod.noteFor(splitKey(g.board_id).name);
 };
