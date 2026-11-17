@@ -121,8 +121,9 @@ function drawList() {
     head.append(folderHead, sel, importBtn, input);
     PH.pageHeader(head, { idp: 'skills' });
     page.append(head);
-    const approval = 'Skills are reusable instructions that help an agent do a particular job, such as reviewing code or writing release notes. Approve an agent-created skill before using it; imported skills are approved when you import them.';
+    const approval = 'Skills are reusable instructions that help an agent do a particular job, such as reviewing code or writing release notes. A skill an agent publishes waits here until you approve it; one you import is approved at once.';
     if (!loadError) page.append(el('p', 'skills-note', approval)); // the description is for an empty list; the approval rule stays under the header with skills listed (#16211)
+    page.append(el('p', 'skills-note skills-get-started', 'Ask an agent to write a skill for a task you repeat, or download one from a source you trust. Import its .zip or SKILL.md file here, read it, then choose Use in a team.'));
     if (loadError) { const p = el('p', 'skills-error', loadError); p.setAttribute('role', 'alert'); page.append(p); }
     const columns = [
         { key: 'name', label: 'Name', primary: true, width: 'grow', min: 32, sort: true, sortValue: r => r.name.toLowerCase(), line: 1, cell: r => r.name },
