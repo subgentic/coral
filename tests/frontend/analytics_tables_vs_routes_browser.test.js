@@ -52,6 +52,10 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
         // the burn rate is an estimate, said on hover only (UI/UX, #9511): 4 dollars over the 24 hours between the buckets
         await waitFor(`document.getElementById('cost-burn-rate').textContent.trim() === '$0.17/hr'`, 'the burn rate', 8000);
         assert.equal(await ev(`document.getElementById('cost-burn-rate').title`), 'Estimated from the buckets in this range', 'the burn rate says it is an estimate on hover');
+        // Input beside Cache read reads wrong at 154 against 4.2M (walk 78, #19192): the card says its input is the fresh kind, and each hover says where the cached kind is counted
+        const cards = await ev(`(() => { const lab = id => document.getElementById(id).closest('.cost-card').querySelector('.cost-card-label'); const a = lab('cost-input-tokens'), b = lab('cost-cache-read'); return { input: a.textContent.trim(), inputTitle: a.title, cacheTitle: b.title }; })()`);
+        assert.equal(cards.input, 'New input tokens', 'the input card says it is the new kind: ' + JSON.stringify(cards));
+        assert.ok(/Cache read/.test(cards.inputTitle) && /not part of New input tokens/.test(cards.cacheTitle), 'the hovers say cached reads are counted apart: ' + JSON.stringify(cards));
         // By agent: Overview, Group by Agent
         await ev(`[...document.querySelectorAll('#cost-group-bar .eff-seg-btn')].find(b => b.textContent === 'Agent').click(); true`);
         await waitFor(`!!document.querySelector('#cost-by-agent table tbody tr')`, 'the By agent rows', 8000);
