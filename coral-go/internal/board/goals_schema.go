@@ -154,8 +154,8 @@ func (s *Store) ensureGoalsSchema(ctx context.Context) error {
 		`CREATE TRIGGER board_tasks_goal_seq_delete AFTER DELETE ON board_tasks
             WHEN OLD.goal_id IS NOT NULL OR EXISTS(SELECT 1 FROM board_goal_task_moves m WHERE m.board_id=OLD.board_id AND m.task_id=OLD.id)
             BEGIN ` + moved("OLD.board_id") + event("OLD.board_id", "OLD.goal_id", "task_unlinked", "OLD.goal_id IS NOT NULL") + departedEvent("OLD.board_id", "OLD.id", "OLD.goal_id", "task_unlinked") +
-            // the task is gone, so are its move rows (after the events above, which read them): nothing else ever removed them (#14368)
-            ` DELETE FROM board_goal_task_moves WHERE board_id=OLD.board_id AND task_id=OLD.id; END`,
+			// the task is gone, so are its move rows (after the events above, which read them): nothing else ever removed them (#14368)
+			` DELETE FROM board_goal_task_moves WHERE board_id=OLD.board_id AND task_id=OLD.id; END`,
 	} {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
 			return err

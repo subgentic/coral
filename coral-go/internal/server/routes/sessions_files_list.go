@@ -499,9 +499,6 @@ type refreshRecent struct {
 
 const refreshReuseOver = 250 * time.Millisecond
 
-// refreshGitTimeout is how long one pass of git for the Files list may take before its commands are ended and the pass answers with what it has (a variable so a test of a very large repository can give a slow machine more room).
-var refreshGitTimeout = 10 * time.Second
-
 var refreshFlights = &refreshFlight{calls: map[string]*refreshCall{}, recent: map[string]refreshRecent{}, last: map[string]refreshKept{}}
 
 // do returns the answer for key, running fn if nobody is (ran: this call ran the pass; false when it shared one); ok is false when ctx ended while waiting. fresh asks for a new pass whatever was just answered (a person's Refresh); a pass already running is still shared.
