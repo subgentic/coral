@@ -2,10 +2,12 @@ package routes
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -177,4 +179,79 @@ func readFolderEntriesForTest(dir string) ([]os.DirEntry, error) {
 		return nil, os.ErrNotExist
 	}
 	return got, nil
+}
+
+// #19431: the words are matched against every skill of the folders (up to the 500-entry bound), not the first 40 by name; only the rows returned are capped.
+func TestTheWordsAreMatchedAgainstEverySkillNotTheFirstForty(t *testing.T) {
+	e := newSkillsEnv(t)
+	for i := 0; i < 120; i++ {
+		e.skillFolder(e.homeDir(), ".claude/skills", fmt.Sprintf("s-%03d", i), "---\ndescription: ordinary\n---\n")
+	}
+	e.skillFolder(e.homeDir(), ".claude/skills", "zz-late", "---\ndescription: needle-in-the-last\n---\n")
+	var got []string
+	for _, r := range e.menu("/api/skills/search?q=needle-in-the-last") {
+		got = append(got, r.Name)
+	}
+	assert.Equal(t, []string{"zz-late"}, got, "a skill past the first 40 by name is found")
+	n := 0
+	for _, r := range e.menu("/api/skills/search?q=ordinary") {
+		if r.Source == "you" {
+			n++
+		}
+	}
+	assert.Equal(t, maxLocalMenuSkills, n, "many matches: only the rows returned are capped")
+	n = 0
+	for _, r := range e.menu("/api/skills/search") {
+		if r.Source == "you" {
+			n++
+		}
+	}
+	assert.Equal(t, maxLocalMenuSkills, n, "no words: the first rows, capped")
+}
+
+// #19431: a SKILL.md that did not change (same folder, size and mtime) is not read again; a changed one is.
+func TestAnUnchangedSkillMDIsNotReadAgain(t *testing.T) {
+	e := newSkillsEnv(t)
+	dir := e.skillFolder(e.homeDir(), ".claude/skills", "cached-one", "---\ndescription: first words\n---\n")
+	require.Len(t, e.menu("/api/skills/search?q=first"), 1)
+	before := frontMatterReads.Load()
+	require.Len(t, e.menu("/api/skills/search?q=first"), 1)
+	assert.Equal(t, before, frontMatterReads.Load(), "the second menu read no SKILL.md")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\ndescription: second text here\n---\n"), 0o644))
+	require.NoError(t, os.Chtimes(filepath.Join(dir, "SKILL.md"), time.Now().Add(time.Minute), time.Now().Add(time.Minute)))
+	assert.Len(t, e.menu("/api/skills/search?q=second"), 1)
+	assert.Empty(t, e.menu("/api/skills/search?q=first"), "a changed file is read again")
+}
+
+// BenchmarkLocalMenu500: 500 skills in one folder; cold = the cache emptied each time, warm = the cache kept.
+func BenchmarkLocalMenu500(b *testing.B) {
+	base := b.TempDir()
+	for i := 0; i < 500; i++ {
+		dir := filepath.Join(base, ".claude/skills", fmt.Sprintf("skill-%03d", i))
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			b.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: skill-"+fmt.Sprintf("%03d", i)+"\ndescription: Does a thing number "+fmt.Sprint(i)+" for the person.\n---\nbody\n"), 0o644); err != nil {
+			b.Fatal(err)
+		}
+	}
+	match := func(s skillSummary) bool { return matchesWords(s, "number 499") }
+	b.Run("cold", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			resetFrontMatterCache()
+			if got := localSkills(base, homeSkillRoots, sourceYou, maxLocalMenuSkills, match); len(got) != 1 {
+				b.Fatal(len(got))
+			}
+		}
+	})
+	b.Run("warm", func(b *testing.B) {
+		resetFrontMatterCache()
+		localSkills(base, homeSkillRoots, sourceYou, maxLocalMenuSkills, match)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			if got := localSkills(base, homeSkillRoots, sourceYou, maxLocalMenuSkills, match); len(got) != 1 {
+				b.Fatal(len(got))
+			}
+		}
+	})
 }
