@@ -35,6 +35,10 @@ const row = (id, team) => ({ session_id: id, name: id, agent_type: 'claude', wor
                 await waitFor(`!!window.__tp.tablist()`, at + 'the team page', 10000);
                 await waitFor(`window.__tp.allTabs().some(x => x.getAttribute('aria-selected') === 'true')`, at + 'a tab is open', 10000);
             };
+            if (chip === 'key') { // the row is drawn by openFrom's own first steps: draw it here too, or a slow runner reads a null header (post70t)
+                await ev(`window.switchNavTab('agents'); window._coralSetLiveSessions(${JSON.stringify([row('a1', ALPHA), row('b1', 'beta')])}); true`);
+                await waitFor(`!!${header} && !!${header}.querySelector('.team-row-needs')`, at + 'the count on the team row', 15000);
+            }
             if (chip === 'key') assert.equal(await ev(`(() => { const c = ${header}.querySelector('.team-row-needs'); return c.tagName === 'BUTTON' && c.tabIndex >= 0 && /Needs you/.test(c.getAttribute('aria-label')); })()`), true, at + 'the chip is a button with a name, so Tab reaches it');
             await openFrom(chip === 'key' ? `${header}.querySelector('.team-row-needs').focus(); true` : chip ? `${header}.querySelector('.team-row-needs').click(); true` : `${header}.click(); true`, chip === 'key');
             await settle(600); // the page draws its tab before the picture
