@@ -37,6 +37,9 @@ func TestTaskReviewCommandsPreserveCandidateAndUseDistinctEndpoints(t *testing.T
 			before := os.Args
 			defer func() { os.Args = before }()
 			os.Args = []string{"coral-board", "task", action, "42", "--reason", "review pending", "--message", "candidate ready, exit 0", "--artifacts", manifest}
+			if action == "submit-review" {
+				os.Args = append(os.Args, "--head", "abc1234def5678")
+			}
 			cmdTask()
 			if path != "/api/board/review/tasks/42/"+action {
 				t.Fatalf("unexpected endpoint: %s", path)

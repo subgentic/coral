@@ -71,7 +71,7 @@ func TestEveryBoardCommandEscapesTheBoardName(t *testing.T) {
 		{"task", "cancel", "1", "--message", "r"},
 		{"task", "reassign", "1", "--to", "QA"},
 		{"task", "amend", "1", "--revision", "1", "--reason", "r", "--body", "b"},
-		{"task", "submit-review", "1", "--reason", "r", "--no-tests", "fixture"},
+		{"task", "submit-review", "1", "--reason", "r", "--no-tests", "fixture", "--head", "abc1234def5678"},
 		{"task", "unblock", "1", "--all"},
 		{"task", "goal", "1", "2"},
 		{"task", "list", "--goal", "2"},
