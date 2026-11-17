@@ -87,7 +87,7 @@ export function artifactsToolbar(redraw) {
 
 /** The folder's page for the group table: the list and the detail pane; its title and count are the first thing of the toolbar's row (folderHead), like every folder's (#15834). */
 export function artifactsSpec() {
-    return { title: 'Artifacts', noun: ['artifact', 'artifacts'], get count() { return count; }, rows: [], signature: 'artifacts', node: () => {
+    return { title: 'Artifacts', noun: ['artifact', 'artifacts'], get count() { return shownCount || count; }, rows: [], signature: 'artifacts', node: () => {
         const row = DT.el('div', 'inbox-artifacts-row');
         const main = DT.el('div', 'inbox-artifacts-main');
         const body = DT.el('div', 'inbox-artifacts-list team-panel'); // the team page's list rules (its bar, its table) apply by .team-panel
