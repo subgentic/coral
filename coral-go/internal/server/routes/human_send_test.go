@@ -752,6 +752,22 @@ func TestHumanSendIsSubmittedOrSaysSo(t *testing.T) {
 		typed, _ := h.term.counts()
 		assert.Len(t, typed, 1, "typed once, not again")
 	})
+	// #19090: an agent compacting its conversation shows no turn event, but its CLI queues what is typed ("Queued · ctrl+enter to send now"): sent, not "may not have been sent".
+	t.Run("claude: a message to an agent compacting its conversation is queued, sent", func(t *testing.T) {
+		h := setup(t, "claude", true)
+		h.event("compact_start")
+		h.term.show(ready("")) // taken at once and held until the compaction is over: never in the box
+		rec := h.send("did you see my comments")
+		assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		typed, _ := h.term.counts()
+		assert.Len(t, typed, 1, "typed once, not again")
+	})
+	t.Run("claude: compacting on its screen, no event of it: queued, sent", func(t *testing.T) {
+		h := setup(t, "claude", true)
+		h.term.show(ready("") + "\n\u00b7 Compacting conversation\u2026 (24s \u00b7 \u2193 2.0k tokens)\n")
+		rec := h.send("did you see my comments")
+		assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	})
 	t.Run("claude: a message to an agent in the middle of a turn, with a menu over its box: not confirmed", func(t *testing.T) {
 		h := setup(t, "claude", true)
 		h.event("tool_use")

@@ -499,6 +499,18 @@ var turnBusyRe = regexp.MustCompile(`(?i)\besc to interrupt\b|\brunning (?:stop|
 // turnBusyLines is how many lines from the bottom of the screen are looked at: the status line is near the input box, and the conversation above may say these words as text.
 const turnBusyLines = 8
 
+// compactingRe is Claude's and Codex's own line while a conversation is compacted ("Compacting conversation… (24s · ↓ 2.0k tokens)").
+var compactingRe = regexp.MustCompile(`(?i)\bcompacting (?:conversation|context)\b`)
+
+// CompactingOnScreen reports whether the bottom of the screen shows the agent compacting its conversation (#19090): a message typed meanwhile is queued by the CLI, and no hook said so for an agent without a PreCompact one.
+func CompactingOnScreen(screen string) bool {
+	lines := strings.Split(strings.TrimRight(screen, "\n \t"), "\n")
+	if len(lines) > turnBusyLines {
+		lines = lines[len(lines)-turnBusyLines:]
+	}
+	return compactingRe.MatchString(strings.Join(lines, "\n"))
+}
+
 // TurnBusyOnScreen reports whether the bottom of the screen shows the agent in the middle of a turn or running a hook. Its input is not taken then, whatever Enter is pressed (#10992). False for an unknown screen.
 func TurnBusyOnScreen(screen string) bool {
 	lines := strings.Split(strings.TrimRight(screen, "\n \t"), "\n")
