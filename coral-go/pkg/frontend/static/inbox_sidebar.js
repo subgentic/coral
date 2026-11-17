@@ -701,7 +701,7 @@ const dockSavedState = DT.tableState();
 const savedState = DT.tableState(); // one word set for a task's state (Queued, In progress, Blocked, In review, Done), here as everywhere
 const goalsState = DT.tableState();
 let taskFilters = { ...TF.EMPTY }, taskState = 'all', taskBar = null;
-const wh = { tasks: new Set(), goals: new Set() }, noteWorkSearch = (k, q) => importOnce('./work_search.js').then(m => m.noteWork(wh, k, q, k === 'tasks' ? tasks : goals, () => renderInboxNav(true))); // work_search.js (#19237)
+const wh = { goals: new Set() }, noteWorkSearch = (k, q) => importOnce('./work_search.js').then(m => m.noteWork(wh, k, q, goals, () => renderInboxNav(true))); // work_search.js (#19237)
 const taskMatches = t => serverMatches(t, taskFilters) // the source query matches body text as well as the title (#17325, #19237)
     && (!taskFilters.team || t.project === taskFilters.team)
     && (!taskFilters.priority || t.priority === taskFilters.priority)
@@ -723,7 +723,7 @@ function inboxTaskToolbar() {
         taskBar = TV.tasksToolbar('mine', next => {
             inboxTasksState.selected.clear();
             taskFilters = next;
-            queries.tasks = next.q; noteWorkSearch('tasks', next.q);
+            queries.tasks = next.q;
             refreshTasks();
             const input = $('inbox-search');
             if (input && group === 'tasks') input.value = next.q;
@@ -1627,7 +1627,7 @@ export function filterInbox(value) {
     if (group === 'needs') { needsFilters = { ...needsFilters, q: text }; persistNeedsFilters(); } // the sidebar's box and the page's share the one search (#8604)
     if (group === 'activity') { activityFilters = { ...activityFilters, q: text }; AF.saveFilters(activityFilters); } // the sidebar's box and the page's share the one search (#12070)
     if (group === 'goals') { goalFilters = { ...goalFilters, q: text }; GF.saveFilters(goalFilters); } // the sidebar's box and the page's share the one search (#8596)
-    if (group === 'tasks' || group === 'goals') noteWorkSearch(group, text);
+    if (group === 'goals') noteWorkSearch(group, text);
     renderInboxNav(true);
 }
 
