@@ -147,9 +147,11 @@ export const agents = () => [...new Set(shown().map(AF.agentOf).filter(Boolean))
 export const goals = () => { const all = [...new Set(shown().map(AF.goalOf))]; return [...all.filter(g => g !== AF.NO_GOAL).sort((a, b) => a.localeCompare(b)), ...all.filter(g => g === AF.NO_GOAL)]; };
 export const teamOf = r => M(teamLabel(r.team));
 export const filtered = f => AF.ordered(shown().filter(r => AF.matches(r, f, teamOf)), f);
-export const total = () => shown().length;
+/** The rows the Important view keeps when `f` has it on (the same rule `matches` applies, so a count is what the list shows). */
+const visible = f => shown().filter(r => AF.passesImportant(r, f));
+export const total = f => visible(f).length;
 /** How many of the rows read are of a kind (the chips' counts); '' is all of them. */
-export const countKind = k => shown().filter(r => AF.inKind(r, k)).length;
+export const countKind = (k, f) => visible(f).filter(r => AF.inKind(r, k)).length;
 
 /** The page's table spec for the sidebar's group table. `open` has { file(row), goal(row), question(row) }: how a row's item opens (the sidebar knows the routes). */
 export function spec(f, open, { grouped = false, byTask = true, tasks, taskSignature = '' } = {}) {

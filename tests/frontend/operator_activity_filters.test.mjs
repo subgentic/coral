@@ -26,4 +26,28 @@ assert.ok(AF.chips({ ...AF.EMPTY, team: 'beta' }).some(c => /Team: Beta team/.te
 assert.ok(AF.ACTIONS.includes('undone') && AF.ACTIONS.includes('goal_close'));
 // #17360: the person's comment on a file, an agent's reply and an agent's new version are rows under Files and tasks (the chips overlap by design, #16116).
 for (const action of ['file_comment', 'file_reply', 'file_version']) assert.ok(AF.inKind({ action, item_kind: 'file' }, 'files'), action + ' is a Files and tasks row');
+
+// #19149: the Important view. A browser that kept nothing opens on it; it hides delivery bookkeeping ('Sent held words to') and shows what a person did or must act on; Everything shows all; a kept choice wins.
+{
+    const held = row(4, { action: 'wait_send', item_kind: 'agent', title: 'site-designer-agy' }), asked = row(5, { action: 'answer', item_kind: 'question' }), dismissed = row(6, { action: 'ignore' });
+    const all = [held, asked, dismissed], on = { ...AF.EMPTY, important: true };
+    const idsOf = f => all.filter(r => AF.matches(r, f)).map(r => r.id);
+    assert.deepEqual(idsOf(on), [5, 6], "Important hides 'Sent held words to' and keeps an answer and a dismissal");
+    assert.deepEqual(idsOf(AF.EMPTY), [4, 5, 6], 'Everything shows every row');
+    assert.equal(AF.isNoise(held), true); assert.equal(AF.isNoise(asked), false);
+    for (const a of ['approve', 'deny', 'answer', 'ignore', 'dismiss', 'prompt_answer', 'goal_review', 'skill_approve', 'message', 'task_reply', 'file_review', 'proposal']) assert.equal(AF.isNoise({ action: a }), false, a + ' is kept');
+    assert.deepEqual(all.filter(r => AF.passesImportant(r, on)).map(r => r.id), idsOf(on), 'the count rule is the list rule');
+    assert.equal(AF.clean({ important: 'yes' }).important, false, 'only a literal true is on');
+    // the default and the kept choice
+    assert.equal(AF.loadFilters().important, true, 'a browser that kept nothing opens on Important');
+    AF.saveFilters({ ...AF.EMPTY, important: false });
+    assert.equal(AF.loadFilters().important, false, 'a kept Everything is not turned back into Important');
+    AF.saveFilters(on);
+    assert.equal(AF.loadFilters().important, true);
+    const store = (await import('../../coral-go/pkg/frontend/static/safe_storage.js')).browserLocal;
+    store.set(AF.storageKey('inbox-activity'), JSON.stringify({ sort: 'oldest' }));
+    assert.equal(AF.loadFilters().important, false, 'a record kept before Important was added stays Everything');
+    store.remove(AF.storageKey('inbox-activity'));
+    assert.equal(AF.loadFilters().important, true);
+}
 console.log('PASS operator_activity_filters: search, team, action, since, order');
