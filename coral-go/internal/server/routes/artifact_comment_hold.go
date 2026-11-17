@@ -1,9 +1,8 @@
 package routes
 
 // Comments wait for a busy agent (#14860, the Operator's request): "Agents that have current tasks are getting messages through artifacts and it is disrupting work." A comment relayed to an agent is a board
-// message that tags it, which is typed into the agent at once, even mid-turn. Like a board task notification (deferred while the agent has an active task), a comment is now held while the agent is busy and
-// posted when it is free; several held for one agent arrive as one message, in order. The ask row holds the message (it survives a restart). The Operator can mark a comment "now": it then waits only for the end
-// of the agent's turn, not for its task, and is never typed mid-turn.
+// message that tags it, which is typed into the agent at once, even mid-turn. A comment is held while the agent is in a turn (not for its open task: an idle agent waiting for the Operator's review has one, #19093) and
+// posted when the turn ends; several held for one agent arrive as one message, in order. The ask row holds the message (it survives a restart). A comment is never typed mid-turn.
 
 import (
 	"context"
@@ -21,23 +20,14 @@ const (
 	commentHoldBatch = 200
 )
 
-// commentHeld says whether a comment for this agent waits: it is mid-turn (always), or it has an active task and the comment is not marked "now". A check that fails does not hold (today's behaviour).
+// commentHeld says whether a comment for this agent waits: only while it is in a turn (#14860, #19093). An agent that has a task open but is idle (it waits for the Operator's review, the usual case) is not disturbed by a
+// comment, and holding for the task would hold it for ever: anything that should be delivered is. A check that fails does not hold (today's behaviour).
 func (h *SessionsHandler) commentHeld(ctx context.Context, ls *store.LiveSession, project string, sub *board.Subscriber, now bool) bool {
 	if h.waitingOnBoard(ctx, project, sub) {
-		return false // an agent parked in coral-board wait has given its turn up and has nothing to disturb: a comment is what it may be waiting for, and it would never leave the hold otherwise (#19085)
+		return false // a turn parked in coral-board wait has nothing to disturb: a comment is what it may be waiting for (#19085)
 	}
-	if st := h.deriveSingleSessionState(ctx, ls.SessionID, 0); st.InTurn || st.Working {
-		return true
-	}
-	if now || h.bs == nil || project == "" || sub == nil {
-		return false
-	}
-	for _, who := range []string{sub.JobTitle, sub.SubscriberID} { // tasks are assigned by the role the board knows the member by
-		if active, err := h.bs.HasActiveTaskForAssignee(ctx, project, who, 0); err == nil && active {
-			return true
-		}
-	}
-	return false
+	st := h.deriveSingleSessionState(ctx, ls.SessionID, 0)
+	return st.InTurn || st.Working
 }
 
 // waitingOnBoard says whether the agent has an active coral-board wait (for a reply, a task, a commit or the Operator): its turn and its task are both open, but it is idle until something wakes it.
