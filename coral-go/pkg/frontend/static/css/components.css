@@ -1283,6 +1283,10 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 @media (min-width: 768px) and (pointer: fine) {
     body:has(#artifact-viewer:not([hidden]), dialog[open]) #notices { right: auto; left: 20px; align-items: flex-start; }
 }
+/* A short desktop window (150% zoom on a 1280 x 800 laptop, walk 60, #17300): the column sits under the header and tabs, not at the bottom over the message box. */
+@media (min-width: 768px) and (max-height: 600px) and (pointer: fine) {
+    #notices { top: var(--notice-top, 80px); bottom: auto; max-height: 60vh; overflow-y: auto; }
+}
 /* On a phone the notices and the short toasts are at the top: at the bottom they sat over the composer, Send, Wake and a dialog's buttons (#6162, found on a Windows run where the data-folder warning covered Wake). The column scrolls when several are open. */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     #notices { top: var(--notice-top, calc(env(safe-area-inset-top, 0px) + 8px)); bottom: auto; left: 8px; right: 8px; max-width: none; justify-content: flex-start; align-items: stretch; }

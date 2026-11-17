@@ -139,6 +139,10 @@
     .preview-main > .ac-panel .ac-lock { order: 2; min-width: 44px; min-height: 44px; }
     .preview-main > .ac-panel > .ac-composer { position: sticky; bottom: calc(-1 * var(--space-md)); background: var(--bg-secondary); padding: 6px 0 calc(var(--space-md)); margin-bottom: calc(-1 * var(--space-md)); z-index: 1; }
 }
+@media (min-width: 768px) and (max-height: 600px) { /* a short laptop window (150% zoom on 1280 x 800 is 853 x 533, walk 60, #17300): the comment box and its buttons stay at the panel's foot, the two help lines under it give their room (the keyboard-up rule above) */
+    .ac-panel > .ac-composer { position: sticky; bottom: calc(-1 * var(--space-md)); background: var(--bg-secondary); padding: 6px 0 calc(var(--space-md)); margin-bottom: calc(-1 * var(--space-md)); z-index: 1; gap: 4px; }
+    .ac-panel > .ac-composer :is(.ac-sendhint, .ac-images-hint) { display: none; }
+}
 /* The toolbar toggle remains available beside the document and above its sheet. */
 .preview-toolbar .ac-toggle:not([hidden]) { display: inline-flex; align-items: center; min-height: 28px; margin-left: auto; flex: 0 0 auto; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .preview-toolbar .ac-toggle:not([hidden]) { min-height: 44px; min-width: 44px; } } /* a touch target (the rule above is more specific than the phone's own) */

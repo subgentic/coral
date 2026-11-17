@@ -62,10 +62,14 @@
 /* #16754, #17241: on a phone the reply row is the sticky one at the foot of the visible area (Send reply, and Yes and No beside it), whatever the screen's height and with the keyboard up or down, and Close and Dismiss follow it
    as ordinary content. The footer used to be the sticky part: Send reply scrolled out of sight under it (keyboard up), and with a long question it sat below the fold, 200 px out of the dialog, at 844 px high (walk 57).
    (A sideways phone is the two-column layout above, where the reply scrolls on its own.) */
-@media (max-width: 599px) {
+@media (max-width: 599px), (min-width: 600px) and (max-width: 999px) and (min-height: 521px) and (max-height: 760px) { /* and a short single-column window: 150% zoom on a 1280 x 800 laptop is 853 x 533 (walk 60, #17300); a shorter one is the side-by-side layout above */
     dialog.inbox-ask-dialog .inbox-ask-pics, dialog.inbox-ask-dialog .inbox-ask-attach { display: contents; }
     dialog.inbox-ask-dialog .inbox-ask-sendrow { position: sticky; bottom: calc(-1 * var(--space-2xl)); z-index: 2; padding: 8px 0; background: var(--bg-secondary); }
     dialog.inbox-ask-dialog .inbox-ask-foot { position: static; }
+}
+@media (min-width: 600px) and (max-width: 999px) and (min-height: 521px) and (max-height: 760px) { /* here the question scrolls inside its own box so the reply box and Send reply are on screen with it (walk 60, #17300) */
+    dialog.inbox-ask-dialog .inbox-ask-text { max-height: 26dvh; overflow-y: auto; }
+    dialog.inbox-ask-dialog .inbox-ask-box { height: min(5em, 20dvh); min-height: min(5em, 20dvh); }
 }
 
 .inbox-ask-dialog h2 .inbox-ask-open-agent { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; vertical-align: middle; }

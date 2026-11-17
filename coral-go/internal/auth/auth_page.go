@@ -103,7 +103,8 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "localopen
 <link rel="stylesheet" href="/static/css/base.css">
 <link rel="stylesheet" href="/static/css/components.css">
 <style>
-  html, body { height: 100%; }
+  html { height: 100%; }
+  body { min-height: 100%; } /* not a fixed height: a card taller than a short window (150% zoom, 853 x 533) grew past both edges of a centred body and its logo sat at the top edge, out of reach (walk 60, #17300) */
   body { margin: 0; background: var(--bg-primary); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; }
   .card { width: 100%; max-width: 440px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 32px 30px; box-sizing: border-box; }
