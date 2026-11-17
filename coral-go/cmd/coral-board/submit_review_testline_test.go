@@ -46,7 +46,7 @@ func TestSubmitReviewWithoutATestLineIsRefusedUnlessNoTestsSaysWhy(t *testing.T)
 	}))
 	defer server.Close()
 	run := func(extra ...string) (string, error) {
-		enc, _ := json.Marshal(append([]string{"task", "submit-review", "42", "--reason", "ready"}, extra...))
+		enc, _ := json.Marshal(append([]string{"task", "submit-review", "42", "--reason", "ready", "--head", "abc1234def5678"}, extra...))
 		cmd := exec.CommandContext(helperCtx(t), os.Args[0], "-test.run=^TestBoardPathHelperProcess$")
 		cmd.Env = append(os.Environ(), "CORAL_BOARD_HELPER_ARGS="+string(enc), "CORAL_URL="+server.URL, testguard.TestURLEnv+"=1")
 		cmd.Stdin = strings.NewReader("")

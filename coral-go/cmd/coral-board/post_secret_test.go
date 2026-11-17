@@ -57,7 +57,7 @@ func TestEveryTextMembersReadRefusesASignInLink(t *testing.T) {
 		"task add, the title":          {"task", "add", "check " + tok},
 		"task add --body":              {"task", "add", "a title", "--body", "see " + tok},
 		"task edit --title":            {"task", "edit", "7", "--title", tok},
-		"task submit-review --message": {"task", "submit-review", "7", "--reason", "review pending", "--message", tok, "--no-tests", "fixture"},
+		"task submit-review --message": {"task", "submit-review", "7", "--reason", "review pending", "--message", tok, "--no-tests", "fixture", "--head", "abc1234def5678"},
 		"task complete --message":      {"task", "complete", "7", "--message", tok},
 		"goal add, the title":          {"goal", "add", "goal " + tok},
 		"goal add --outcome":           {"goal", "add", "a goal", "--outcome", tok},

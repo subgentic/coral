@@ -27,7 +27,7 @@ func TestSubmitReviewSendsAreasAndReviewersAndSaysItIsInThePool(t *testing.T) {
 	serverURL = server.URL
 	before := os.Args
 	defer func() { os.Args = before }()
-	os.Args = []string{"coral-board", "task", "submit-review", "42", "--reason", "ready", "--areas", "ui, go,", "--reviewers", "2", "--no-tests", "fixture"}
+	os.Args = []string{"coral-board", "task", "submit-review", "42", "--reason", "ready", "--areas", "ui, go,", "--reviewers", "2", "--no-tests", "fixture", "--head", "abc1234def5678"}
 	out := captureStdout(t, cmdTask)
 	if got, _ := body["areas"].([]any); len(got) != 2 || got[0] != "ui" || got[1] != "go" {
 		t.Fatalf("areas: %#v", body["areas"])
@@ -59,7 +59,7 @@ func TestSubmitReviewWithoutAreasSendsNoneAndKeepsTheOldLine(t *testing.T) {
 	serverURL = server.URL
 	before := os.Args
 	defer func() { os.Args = before }()
-	os.Args = []string{"coral-board", "task", "submit-review", "42", "--reason", "ready", "--no-tests", "fixture"}
+	os.Args = []string{"coral-board", "task", "submit-review", "42", "--reason", "ready", "--no-tests", "fixture", "--head", "abc1234def5678"}
 	out := captureStdout(t, cmdTask)
 	if _, has := body["areas"]; has {
 		t.Fatalf("no areas were given: %#v", body)
