@@ -5,6 +5,7 @@ import { showToast } from './utils.js';
 import { showConfirmModal, hideConfirmModal } from './confirm_dialog.js';
 import { announceNotice } from './notifications.js';
 import { browserLocal } from './safe_storage.js';
+import { attachDialogFocus } from './dialog_focus.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
@@ -49,6 +50,8 @@ export async function confirmLaunchDisclosure(server, disclosure, payload = null
     let link = null; // where the default is changed, as a link in the dialog (#18765): it closes the question as a Cancel (nothing launches) and opens Settings on Defaults
     const accepted = await new Promise(resolve => {
         showConfirmModal(title, note ? `${disclosure.text} ${note}` : disclosure.text, () => resolve(true), () => resolve(false), { danger: false, label: 'Continue launch', cancelLabel: 'Cancel' });
+        attachDialogFocus(document.getElementById('confirm-modal'));
+        document.getElementById('confirm-modal-yes').focus();
         link = document.createElement('a'); link.id = 'confirm-modal-link'; link.href = '#'; link.textContent = 'Open Settings > Defaults';
         link.addEventListener('click', event => { event.preventDefault(); hideConfirmModal(); window.showSettingsModal?.('agents'); });
         document.getElementById('confirm-modal-message')?.after(link);

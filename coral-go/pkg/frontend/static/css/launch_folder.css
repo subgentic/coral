@@ -3,3 +3,6 @@
 .modal-content .dir-browser-list .dir-icon.material-icons, .modal-content .dir-browser-recent .dir-icon.material-icons { font-size: var(--fs-xl); width: 1em; height: 1em; }
 .modal-content:has(.dir-browser:not([style*="display: none"], [style*="display:none"])) .modal-actions .btn-primary, .modal-content:has(.dir-browser:not([style*="display: none"], [style*="display:none"])) .modal-actions .btn-primary:hover { background: var(--bg-tertiary); border-color: var(--control-border); color: var(--text-primary); }
 .modal-content:has(.dir-browser:not([style*="display: none"], [style*="display:none"])) .modal-actions .btn-primary:hover { background: var(--bg-hover); }
+
+.dir-browser-search { box-sizing: border-box; width: 100%; min-width: 0; margin-block: var(--space-sm); }
+.dir-browser-list li[hidden] { display: none; }
