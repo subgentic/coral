@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"testing"
@@ -103,8 +104,14 @@ func requireAuthStrictLocalCase(t *testing.T, strictLocal bool) {
 	assert.NotEqual(t, http.StatusOK, code, "a forged X-Coral-Via-Tunnel is not trusted")
 
 	// A signed cloud-connect redeem passes refuseCloud (the earlier handshake question).
-	sig := cliSignServer(t, ts.URL, tok, "POST", "/api/cloud/redeem", `{"check":true}`)
-	code, _ = post("/api/cloud/redeem", `{"check":true}`, http.Header{cloud.CLIAuthHeader: {sig}})
+	// A lookup miss in the socket table under heavy load is answered 403 other_user: only that answer is retried, and each try is signed afresh (a signature may be single use) (#14495).
+	code, _, _ = retryWhileUnattributable(func() (int, map[string]any, string) {
+		sig := cliSignServer(t, ts.URL, tok, "POST", "/api/cloud/redeem", `{"check":true}`)
+		c, b := post("/api/cloud/redeem", `{"check":true}`, http.Header{cloud.CLIAuthHeader: {sig}})
+		var out map[string]any
+		_ = json.Unmarshal(b, &out)
+		return c, out, string(b)
+	})
 	assert.NotEqual(t, http.StatusForbidden, code, "coral cloud connect redeem passes refuseCloud with the setting on")
 	assert.NotEqual(t, http.StatusUnauthorized, code)
 }

@@ -1,6 +1,8 @@
 package server
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -167,14 +169,21 @@ func TestCloudRoutesRealSocketSameUser(t *testing.T) {
 	r.srv.cloudHandler.SetPeerCheck(peercred.SameUser)
 	srv := httptest.NewServer(r.srv.Router())
 	defer srv.Close()
-	req, err := http.NewRequest("GET", srv.URL+"/api/cloud/status", nil)
-	require.NoError(t, err)
-	req.Header.Set("Sec-Fetch-Site", "same-origin")
-	req.Header.Set("Origin", srv.URL)
-	resp, err := srv.Client().Do(req)
-	require.NoError(t, err)
-	resp.Body.Close()
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	// Under heavy load (Windows) the socket table may not hold the row for this connection yet and the server answers 403 other_user for the lookup miss: only that answer is retried (#14495).
+	code, _, body := retryWhileUnattributable(func() (int, map[string]any, string) {
+		req, err := http.NewRequest("GET", srv.URL+"/api/cloud/status", nil)
+		require.NoError(t, err)
+		req.Header.Set("Sec-Fetch-Site", "same-origin")
+		req.Header.Set("Origin", srv.URL)
+		resp, err := srv.Client().Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		var out map[string]any
+		_ = json.Unmarshal(b, &out)
+		return resp.StatusCode, out, string(b)
+	})
+	assert.Equal(t, http.StatusOK, code, body)
 }
 
 // #3285 (security review): no command-line token outlives a graceful shutdown.
