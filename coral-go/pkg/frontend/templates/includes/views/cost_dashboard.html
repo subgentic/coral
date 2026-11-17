@@ -39,7 +39,7 @@
             <div class="cost-card-sparkline" aria-hidden="true" id="cost-spark-cost"></div>
         </div>
         <div class="cost-card">
-            <div class="cost-card-label">Input tokens</div>
+            <div class="cost-card-label" title="Input the model read fresh. Tokens read back from the cache are counted under Cache read, not here.">New input tokens</div>
             <div class="cost-card-value" id="cost-input-tokens">0</div>
             <div class="cost-card-change" id="cost-change-input"></div>
             <div class="cost-card-sparkline" aria-hidden="true" id="cost-spark-input"></div>
@@ -51,7 +51,7 @@
             <div class="cost-card-sparkline" aria-hidden="true" id="cost-spark-output"></div>
         </div>
         <div class="cost-card">
-            <div class="cost-card-label">Cache read</div>
+            <div class="cost-card-label" title="Input read back from the provider's cache, billed at a lower rate. It is not part of New input tokens.">Cache read</div>
             <div class="cost-card-value" id="cost-cache-read">0</div>
             <div class="cost-card-hint">read back from the provider's cache; billed lower</div>
             <div class="cost-card-change" id="cost-change-cache-read"></div>
