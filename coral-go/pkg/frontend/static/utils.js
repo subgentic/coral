@@ -71,7 +71,7 @@ export function dbg(...args) {
  *  actions already use (agent_docs/board.md). Team chat posted as "dashboard"
  *  before #3171; those messages still render as the Operator's. */
 export const OPERATOR_ID = 'Operator';
-export function isOperatorId(id) { return id === OPERATOR_ID || id === 'dashboard'; }
+export function isOperatorId(id) { return id === 'Operator' || id === 'dashboard'; }
 
 /** Label fenced code blocks with their language (shown by .chat-prose CSS). */
 /** Copy text to the clipboard. navigator.clipboard needs a secure context
@@ -88,12 +88,9 @@ export async function copyText(text) {
     ta.value = text;
     ta.setAttribute('readonly', '');
     ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
-    document.body.appendChild(ta);
+    document.body.append(ta);
     ta.select();
-    let ok = false;
-    try { ok = document.execCommand('copy'); } catch { ok = false; }
-    ta.remove();
-    return ok;
+    try { return document.execCommand('copy'); } catch { return false; } finally { ta.remove(); }
 }
 
 
@@ -144,14 +141,13 @@ export function copyBranchName(btn) {
 // The rule for a NEW board or team name (#3534; the server's board.NewNamePattern): letters,
 // digits, '-' and '_', starting with a letter or digit, at most 64. Existing boards keep
 // any name. Returns '' when the name is fine, else a sentence saying why not.
-const NEW_BOARD_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
-const RESERVED_BOARD_NAMES = new Set(['projects', 'remotes', 'tasks']);
+const NEW_BOARD_NAME_RE = /^[a-z0-9][\w-]{0,63}$/i;
 export function boardNameProblem(name) {
     const n = String(name || '');
     if (!n) return 'A name is required.';
     if (n.length > 64) return 'A name is at most 64 characters.';
     if (!NEW_BOARD_NAME_RE.test(n)) return 'Use English letters (A-Z), digits, - or _, starting with a letter or digit: no accents or spaces.'; // short: the same words are on the field and are not said again in the footer (#10371)
-    if (RESERVED_BOARD_NAMES.has(n.toLowerCase())) return `"${n}" is reserved; choose another name.`;
+    if (/^(projects|remotes|tasks)$/i.test(n)) return `"${n}" is reserved; choose another name.`;
     return '';
 }
 
@@ -166,8 +162,8 @@ export async function refusedTooLarge(resp) {
 export function focusPageHeading(heading) {
     if (!heading) return;
     const a = document.activeElement;
-    if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.getClientRects().length) return;
-    if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+    if (a?.matches('input, textarea, select') && a.getClientRects().length) return;
+    if (!heading.hasAttribute('tabindex')) heading.tabIndex = -1;
     heading.focus({ preventScroll: true });
 }
 
