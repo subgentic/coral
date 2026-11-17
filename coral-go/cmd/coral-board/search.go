@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,8 +19,12 @@ import (
 
 const searchUsage = `Usage: coral-board search "<text>" [--source messages,tasks,goals,history] [--state S] [--goal N] [--assignee NAME]
                           [--from NAME] [--mentions NAME] [--agent NAME] [--author user|assistant] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--json]
-                          [--team | --all | --operator-history]
+                          [--system] [--team | --all | --operator-history]
 Searches this team's messages, tasks (title, body, completion message) and goals (title, outcome, done-when) and your past chats at once; --source picks some.
+Every word must be there, in any order, in any field ("staging certificate" finds a task about the certificate of the staging cluster); put "a quoted phrase" in
+double quotes inside the text to keep its words together. The best matches come first; --sort newest or oldest orders by time instead.
+Coral's own notices (the task queue's) are left out; --system brings them back. A hit shows its source, id, time (UTC), state and goal, and the words around the match.
+--since and --until take a time such as 2026-11-17T09:00:00Z, a date (2026-11-17, UTC) or how long ago (30m, 6h, 2d, 1w).
 --agent and --author narrow the past chats (an agent's name; who spoke). Chat turns in full: coral-agent history search / context.`
 
 // cmdSearch is `coral-board search` (#11005, phase (a)): the agent's search of the messages of its OWN board (the board it was launched on), with the dashboard search's filters and paging. A hit's context is
@@ -36,6 +42,7 @@ func cmdSearch() {
 	agent, author := fs.String("agent", "", ""), fs.String("author", "", "")
 	asJSON := fs.Bool("json", false, "")
 	team, all, op := fs.Bool("team", false, ""), fs.Bool("all", false, ""), fs.Bool("operator-history", false, "")
+	system := fs.Bool("system", false, "")
 	clihelp.ParseFlags(fs, rest, func() string { return searchUsage })
 	if strings.TrimSpace(text) == "" || fs.NArg() != 0 {
 		fmt.Fprintf(os.Stderr, "search needs the text to look for, as one argument\n%s\n", searchUsage)
@@ -56,13 +63,16 @@ func cmdSearch() {
 		clierr.Exit1()
 	}
 	vals := url.Values{"q": {text}}
-	for k, v := range map[string]string{"from": *from, "mentions": *mentions, "since": *since, "until": *until, "sort": *sortBy, "limit": *limit, "cursor": *cursor, "source": *source, "state": *state, "goal": *goal, "assignee": *assignee, "agent": *agent, "author": *author} {
+	for k, v := range map[string]string{"from": *from, "mentions": *mentions, "since": searchTime(*since, time.Now()), "until": searchTime(*until, time.Now()), "sort": *sortBy, "limit": *limit, "cursor": *cursor, "source": *source, "state": *state, "goal": *goal, "assignee": *assignee, "agent": *agent, "author": *author} {
 		if v != "" {
 			vals.Set(k, v)
 		}
 	}
 	if reach != "" {
 		vals.Set("reach", reach)
+	}
+	if *system {
+		vals.Set("system", "1")
 	}
 	args = []string{text}
 	data, status, err := apiCallRawAt("/api/agent", "GET", "/board/search?"+vals.Encode(), nil, 20*time.Second)
@@ -117,12 +127,36 @@ func cmdSearch() {
 	fmt.Println("Context around a hit: coral-board read --id <id>")
 }
 
-// whenShort is a message's time as "2026-10-20 10:00" (UTC): what a person reading a list needs.
+// whenShort is a time as "2026-10-20 10:00Z": UTC, marked so (the Z is the one --since and --until take), what a person reading a list needs.
 func whenShort(ts string) string {
 	if t, err := time.Parse(time.RFC3339, ts); err == nil {
-		return t.UTC().Format("2006-01-02 15:04")
+		return t.UTC().Format("2006-01-02 15:04") + "Z"
 	}
 	return ts
+}
+
+// searchTime is a --since or --until as the server reads it, an RFC 3339 time: one that is already is kept, a date (2026-11-17) is that day's start in UTC, and
+// "30m", "6h", "2d" or "1w" is that long before now. Anything else goes to the server as it is, which names what it expects.
+func searchTime(v string, now time.Time) string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return ""
+	}
+	if _, err := time.Parse(time.RFC3339, v); err == nil {
+		return v
+	}
+	if t, err := time.Parse("2006-01-02", v); err == nil {
+		return t.UTC().Format(time.RFC3339)
+	}
+	if n := len(v); n >= 2 {
+		if count, err := strconv.Atoi(v[:n-1]); err == nil && count > 0 {
+			unit := map[byte]time.Duration{'m': time.Minute, 'h': time.Hour, 'd': 24 * time.Hour, 'w': 7 * 24 * time.Hour}[v[n-1]]
+			if unit > 0 && time.Duration(count) <= time.Duration(math.MaxInt64)/unit {
+				return now.Add(-time.Duration(count) * unit).UTC().Format(time.RFC3339)
+			}
+		}
+	}
+	return v
 }
 
 // hitExcerpt is a message on one line (control characters removed, whitespace joined), cut to about 160 characters around the first place the text occurs.
@@ -177,8 +211,11 @@ func printResults(boardName, text string, results []map[string]any, more bool, n
 		if st := clitext.Clean(str(r["state"])); st != "" {
 			head += " [" + st + "]"
 		}
+		if g := num(r["goal_id"]); g > 0 { // a task's goal: "is any of this goal's work still open?"
+			head += fmt.Sprintf(" goal #%.0f", g)
+		}
 		line := head + "  " + clitext.Clean(str(r["title"]))
-		if sn := strings.Join(strings.Fields(clitext.Clean(str(r["snippet"]))), " "); sn != "" {
+		if sn := strings.Join(strings.Fields(clitext.Clean(str(r["snippet"]))), " "); sn != "" && sn != clitext.Clean(str(r["title"])) { // the title is already there
 			line += ": " + sn
 		}
 		fmt.Println(line)

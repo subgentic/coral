@@ -83,10 +83,12 @@ Commands:
   health ack <id>              Mark a health-check item handled: the item that ends
                                with [ack <id>] (orchestrator or Operator)
   search "<text>" [--source messages,tasks,goals,history] [--state S] [--goal N] [--assignee NAME] [--from NAME] [--mentions NAME]
-                [--agent NAME] [--author user|assistant] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--json]
+                [--agent NAME] [--author user|assistant] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--system] [--json]
                                Search the messages, tasks (title, body, completion message), goals (title, outcome,
                                done-when) and past chats of your own board (the one you were launched on), oldest posts
-                               included; a hit's context is: read --id <id>, task detail <id>, goal show <id>. --team, --all and --operator-history
+                               included. Every word must be there, in any order ("quoted phrase" keeps words together);
+                               Coral's own notices are left out (--system); a hit's context is: read --id <id>, task detail <id>,
+                               goal show <id>; coral-board search --help has the rest. --team, --all and --operator-history
                                ask for a wider reach and are refused unless the Operator raised your search access
   peek "<agent>" [--lines N]   Peek at agent's terminal (orchestrator only)
   waiting "<agent>"            List what waits for an agent: its unread board messages and the last send not typed
@@ -272,10 +274,12 @@ Commands:
   health ack <id>              Mark a health-check item handled: the item that ends
                                with [ack <id>] (orchestrator or Operator)
   search "<text>" [--source messages,tasks,goals,history] [--state S] [--goal N] [--assignee NAME] [--from NAME] [--mentions NAME]
-                [--agent NAME] [--author user|assistant] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--json]
+                [--agent NAME] [--author user|assistant] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--system] [--json]
                                Search the messages, tasks (title, body, completion message), goals (title, outcome,
                                done-when) and past chats of your own board (the one you were launched on), oldest posts
-                               included; a hit's context is: read --id <id>, task detail <id>, goal show <id>. --team, --all and --operator-history
+                               included. Every word must be there, in any order ("quoted phrase" keeps words together);
+                               Coral's own notices are left out (--system); a hit's context is: read --id <id>, task detail <id>,
+                               goal show <id>; coral-board search --help has the rest. --team, --all and --operator-history
                                ask for a wider reach and are refused unless the Operator raised your search access
   peek "<agent>" [--lines N]   Peek at agent's terminal (orchestrator only)
   waiting "<agent>"            List what waits for an agent: its unread board messages and the last send not typed
@@ -462,10 +466,12 @@ Commands:
   health ack <id>              Mark a health-check item handled: the item that ends
                                with [ack <id>] (orchestrator or Operator)
   search "<text>" [--source messages,tasks,goals,history] [--state S] [--goal N] [--assignee NAME] [--from NAME] [--mentions NAME]
-                [--agent NAME] [--author user|assistant] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--json]
+                [--agent NAME] [--author user|assistant] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--system] [--json]
                                Search the messages, tasks (title, body, completion message), goals (title, outcome,
                                done-when) and past chats of your own board (the one you were launched on), oldest posts
-                               included; a hit's context is: read --id <id>, task detail <id>, goal show <id>. --team, --all and --operator-history
+                               included. Every word must be there, in any order ("quoted phrase" keeps words together);
+                               Coral's own notices are left out (--system); a hit's context is: read --id <id>, task detail <id>,
+                               goal show <id>; coral-board search --help has the rest. --team, --all and --operator-history
                                ask for a wider reach and are refused unless the Operator raised your search access
   peek "<agent>" [--lines N]   Peek at agent's terminal (orchestrator only)
   waiting "<agent>"            List what waits for an agent: its unread board messages and the last send not typed

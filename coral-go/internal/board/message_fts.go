@@ -447,8 +447,13 @@ func (s *Store) queryTextViaIndex(ctx context.Context, q *MessageQuery, where []
 	}
 	w := " WHERE " + strings.Join(where, " AND ")
 	idArgs := append(append([]any{}, args...), expr, "%"+likeEscaper.Replace(q.Text)+"%")
+	alsoSQL := ""
+	for _, t := range q.Also { // the further terms of an all-words search, each asked LIKE as well
+		alsoSQL += ` AND m.content LIKE ? ESCAPE '\'`
+		idArgs = append(idArgs, "%"+likeEscaper.Replace(t)+"%")
+	}
 	var ids []int64
-	if err := s.reader().SelectContext(ctx, &ids, "SELECT m.id FROM board_messages m"+w+` AND m.id IN (SELECT rowid FROM `+messageFTSTable+` WHERE `+messageFTSTable+` MATCH ?) AND m.content LIKE ? ESCAPE '\' ORDER BY m.id `+dir, idArgs...); err != nil {
+	if err := s.reader().SelectContext(ctx, &ids, "SELECT m.id FROM board_messages m"+w+` AND m.id IN (SELECT rowid FROM `+messageFTSTable+` WHERE `+messageFTSTable+` MATCH ?) AND m.content LIKE ? ESCAPE '\'`+alsoSQL+` ORDER BY m.id `+dir, idArgs...); err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return nil, false, nil
 		}

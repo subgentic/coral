@@ -14,7 +14,7 @@ var commands = map[string]bool{
 	"subscribers": true, "status": true, "working-mode": true, "leave": true,
 	"delete": true, "export": true, "peek": true, "waiting": true, "task": true, "workflow": true,
 	"wait": true, "send": true, "targets": true, "health": true, "link": true, "unlink": true, "links": true,
-	"queue": true, "resource": true, "heavy": true, "goal": true, "ask": true, "reviewer": true, "seats": true, "settings": true, "wake": true, "sleep": true, "stop": true, "restart": true, "remind": true,
+	"queue": true, "resource": true, "heavy": true, "goal": true, "ask": true, "reviewer": true, "seats": true, "settings": true, "wake": true, "sleep": true, "stop": true, "restart": true, "remind": true, "search": true,
 }
 
 // textFlags take free text that is sent to the server.
@@ -60,6 +60,8 @@ func commandUsage(cmd string, rest []string) string {
 	switch cmd {
 	case "goal":
 		return goalUsageText
+	case "search":
+		return searchUsage
 	case "resource":
 		return resourceUsageText
 	case "heavy":

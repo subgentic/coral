@@ -18,6 +18,7 @@ type WorkQuery struct {
 	Since    string   // at >= (UTC RFC 3339)
 	Until    string   // at <  (UTC RFC 3339)
 	Limit    int
+	Oldest   bool // oldest first (the limit then keeps the oldest); the default is the best match, then newest
 }
 
 // WorkHit is one task or goal that matched, in the one shape every source of the search shares.
@@ -30,6 +31,7 @@ type WorkHit struct {
 	State   string `json:"state"`
 	GoalID  *int64 `json:"goal_id,omitempty"`
 	At      string `json:"at"`
+	Rank    int    `json:"-"` // a several-term search: how well the terms stand (WorkRank); the one list is ordered by it first
 }
 
 const (
@@ -55,7 +57,11 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 	if len(want) == 0 {
 		want["tasks"], want["goals"] = true, true
 	}
-	pat := "%" + likeEscape(text) + "%"
+	terms := SearchTerms(text)
+	dir := "DESC"
+	if q.Oldest {
+		dir = "ASC"
+	}
 	if want["tasks"] {
 		var rows []struct {
 			ID     int64   `db:"id"`
@@ -66,9 +72,9 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 			GoalID *int64  `db:"goal_id"`
 			At     string  `db:"at"`
 		}
-		sqlText := `SELECT id, title, body, completion_message, status, goal_id, ` + updatedAtSQL + ` AS at FROM board_tasks WHERE board_id = ?
- AND (title LIKE ? ESCAPE '\' OR body LIKE ? ESCAPE '\' OR completion_message LIKE ? ESCAPE '\')`
-		args := []any{q.Board, pat, pat, pat}
+		match, matchArgs := likeAllTerms(terms, "title", "body", "completion_message")
+		sqlText := `SELECT id, title, body, completion_message, status, goal_id, ` + updatedAtSQL + ` AS at FROM board_tasks WHERE board_id = ? AND ` + match
+		args := append([]any{q.Board}, matchArgs...)
 		if q.State != "" {
 			sqlText += " AND status = ?"
 			args = append(args, q.State)
@@ -89,13 +95,13 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 			sqlText += " AND " + updatedAtSQL + " < ?"
 			args = append(args, q.Until)
 		}
-		sqlText += " ORDER BY at DESC, id DESC LIMIT ?"
+		sqlText += " ORDER BY at " + dir + ", id " + dir + " LIMIT ?"
 		args = append(args, limit+1)
 		if err = s.reader().SelectContext(ctx, &rows, sqlText, args...); err != nil {
 			return nil, false, err
 		}
 		for _, r := range rows {
-			hits = append(hits, WorkHit{Source: "task", ID: r.ID, Title: r.Title, Snippet: WorkSnippet(text, r.Title, deref(r.Body), deref(r.Done)), State: r.Status, GoalID: r.GoalID, At: r.At})
+			hits = append(hits, WorkHit{Source: "task", ID: r.ID, Title: r.Title, Snippet: WorkSnippet(text, deref(r.Body), deref(r.Done), r.Title), State: r.Status, GoalID: r.GoalID, At: r.At, Rank: WorkRank(terms, r.Title, r.Title, deref(r.Body), deref(r.Done))})
 		}
 	}
 	if want["goals"] {
@@ -108,9 +114,9 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 			State   string `db:"state"`
 			At      string `db:"updated_at"`
 		}
-		sqlText := `SELECT id, title, outcome, done_when, closed_reason, state, updated_at FROM board_goals WHERE board_id = ?
- AND (title LIKE ? ESCAPE '\' OR outcome LIKE ? ESCAPE '\' OR done_when LIKE ? ESCAPE '\' OR closed_reason LIKE ? ESCAPE '\')`
-		args := []any{q.Board, pat, pat, pat, pat}
+		match, matchArgs := likeAllTerms(terms, "title", "outcome", "done_when", "closed_reason")
+		sqlText := `SELECT id, title, outcome, done_when, closed_reason, state, updated_at FROM board_goals WHERE board_id = ? AND ` + match
+		args := append([]any{q.Board}, matchArgs...)
 		if q.State != "" {
 			sqlText += " AND state = ?"
 			args = append(args, q.State)
@@ -130,21 +136,24 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 				sqlText += " AND updated_at < ?"
 				args = append(args, q.Until)
 			}
-			sqlText += " ORDER BY updated_at DESC, id DESC LIMIT ?"
+			sqlText += " ORDER BY updated_at " + dir + ", id " + dir + " LIMIT ?"
 			args = append(args, limit+1)
 			if err = s.reader().SelectContext(ctx, &rows, sqlText, args...); err != nil {
 				return nil, false, err
 			}
 		}
 		for _, r := range rows {
-			hits = append(hits, WorkHit{Source: "goal", ID: r.ID, Title: r.Title, Snippet: WorkSnippet(text, r.Title, r.Outcome, r.Done, r.Closed), State: r.State, At: r.At})
+			hits = append(hits, WorkHit{Source: "goal", ID: r.ID, Title: r.Title, Snippet: WorkSnippet(text, r.Outcome, r.Done, r.Closed, r.Title), State: r.State, At: r.At, Rank: WorkRank(terms, r.Title, r.Title, r.Outcome, r.Done, r.Closed)})
 		}
 	}
 	sort.SliceStable(hits, func(i, j int) bool {
-		if hits[i].At != hits[j].At {
-			return hits[i].At > hits[j].At
+		if hits[i].Rank != hits[j].Rank && !q.Oldest {
+			return hits[i].Rank > hits[j].Rank
 		}
-		return hits[i].ID > hits[j].ID
+		if hits[i].At != hits[j].At {
+			return (hits[i].At > hits[j].At) != q.Oldest
+		}
+		return (hits[i].ID > hits[j].ID) != q.Oldest
 	})
 	if len(hits) > limit {
 		hits, more = hits[:limit], true
@@ -159,14 +168,35 @@ func deref(p *string) string {
 	return *p
 }
 
-// WorkSnippet is the first field that holds text, on one line (control characters dropped, whitespace joined) and cut to about workSnippetWidth runes around the match.
+// likeAllTerms is the SQL that holds when every term is in one of the columns (LIKE, '%' and '_' literal): the terms in any order, each in any column.
+func likeAllTerms(terms []string, cols ...string) (string, []any) {
+	var parts []string
+	var args []any
+	for _, t := range terms {
+		var ors []string
+		for _, c := range cols {
+			ors = append(ors, c+` LIKE ? ESCAPE '\'`)
+			args = append(args, "%"+likeEscape(t)+"%")
+		}
+		parts = append(parts, "("+strings.Join(ors, " OR ")+")")
+	}
+	return strings.Join(parts, " AND "), args
+}
+
+// WorkSnippet is the field that holds the most of the search's terms (the first on a tie: callers list the body before the title it is shown beside), on one line (control characters dropped, whitespace joined) and cut to about workSnippetWidth runes around the first term in it.
 func WorkSnippet(text string, fields ...string) string {
-	lt := strings.ToLower(text)
-	pick := ""
+	terms := SearchTerms(text)
+	pick, best := "", 0
 	for _, f := range fields {
-		if strings.Contains(strings.ToLower(f), lt) {
-			pick = f
-			break
+		lf := strings.ToLower(f)
+		n := 0
+		for _, t := range terms {
+			if strings.Contains(lf, t) {
+				n++
+			}
+		}
+		if n > best {
+			pick, best = f, n
 		}
 	}
 	clean := strings.Join(strings.Fields(strings.Map(func(r rune) rune {
@@ -180,8 +210,15 @@ func WorkSnippet(text string, fields ...string) string {
 		return clean
 	}
 	start := 0
-	if i := strings.Index(strings.ToLower(clean), lt); i > 0 {
-		start = len([]rune(clean[:i])) - 40
+	lc := strings.ToLower(clean)
+	first := -1
+	for _, t := range terms {
+		if i := strings.Index(lc, t); i >= 0 && (first < 0 || i < first) {
+			first = i
+		}
+	}
+	if first > 0 {
+		start = len([]rune(clean[:first])) - 40
 	}
 	if start < 0 {
 		start = 0
