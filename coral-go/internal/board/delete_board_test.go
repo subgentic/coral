@@ -20,7 +20,7 @@ var boardOwnedRows = []struct{ table, col string }{
 	{"board_workflow_presets", "board_id"}, {"health_counters", "project"}, {"health_items", "project"}, {"health_offbooks", "project"}, {"health_goal_size", "project"}, {"boards", "id"},
 	{"board_proposals", "board_id"}, {"board_goals", "board_id"}, {"board_goal_meta", "board_id"}, {"board_goal_images", "board_id"}, {"board_goal_events", "board_id"}, {"board_settings_log", "board_id"}, // the goals tables were missing from this census until #7355
 	{"board_goal_requests_in", "board_id"}, {"board_goal_requests_out", "board_id"}, // #7361: a goal request goes with either of its two boards
-	{"board_asks", "project"}, {"board_replies", "project"}, {"board_ask_closed", "project"}, {"board_ask_reopened", "project"}, {"board_ask_links", "project"}, {"board_ask_buttons", "project"}, {"board_ask_subjects", "project"}, {"board_orch_grant", "project"}, {"board_clashes", "project"}, {"board_lifecycle_log", "project"}, // #7794: a question and the link of a reply go with their board
+	{"board_asks", "project"}, {"board_replies", "project"}, {"board_ask_closed", "project"}, {"board_opening_ask", "project"}, {"board_ask_reopened", "project"}, {"board_ask_links", "project"}, {"board_ask_buttons", "project"}, {"board_ask_subjects", "project"}, {"board_orch_grant", "project"}, {"board_clashes", "project"}, {"board_lifecycle_log", "project"}, // #7794: a question and the link of a reply go with their board
 	{"artifact_tags", "board_id"},        // #8583: a team's tags of its artifacts
 	{"artifact_reviews", "board_id"},     // #136584: when the Operator decided a review of a team's artifact
 	{"artifact_questions", "board_id"},   // #11555: what an upload for review asks the Operator
@@ -131,8 +131,10 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	require.NoError(t, err)
 	_, err = s.SetArtifactKind(ctx, project, strings.Repeat("a", 64), KindRelease, "sess-1", time.Now()) // and the kind of its file (#12144)
 	require.NoError(t, err)
-	require.NoError(t, s.SetChainFile(ctx, project, first.ID, strings.Repeat("a", 64), time.Now()))                   // and the latest file of a task chain (#12144)
-	require.NoError(t, s.SetChainNamedFile(ctx, project, first.ID, "README.md", strings.Repeat("a", 64), time.Now())) // and its open file of a name (#15159)
+	require.NoError(t, s.SetChainFile(ctx, project, first.ID, strings.Repeat("a", 64), time.Now()))                        // and the latest file of a task chain (#12144)
+	require.NoError(t, s.SetChainNamedFile(ctx, project, first.ID, "README.md", strings.Repeat("a", 64), time.Now()))      // and its open file of a name (#15159)
+	_, err = s.db.ExecContext(ctx, `INSERT INTO board_opening_ask (project, message_id) VALUES (?, ?)`, project, first.ID) // and the first-goal marker (#19170)
+	require.NoError(t, err)
 	return []int64{first.ID, second.ID}
 }
 

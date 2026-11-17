@@ -222,6 +222,12 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 				slog.Warn("board ask not recorded", "board", project, "message", msg.ID, "error", err)
 			} else {
 				h.recordAskSubject(r.Context(), project, msg, body.AskGoal, body.AskTask)
+				if _, err := h.bs.MarkOpeningAsk(r.Context(), project, msg.ID, to); err != nil { // the board's first question to the Operator, before any goal: the first goal answers it (#19170)
+					slog.Warn("opening ask not marked", "board", project, "message", msg.ID, "error", err)
+				}
+				if _, err := h.bs.MarkOpeningAsk(r.Context(), project, msg.ID, to); err != nil { // the board's first question to the Operator, before any goal: the first goal answers it (#19170)
+					slog.Warn("opening ask not marked", "board", project, "message", msg.ID, "error", err)
+				}
 				if body.SameAs > 0 && h.checkSameAs(r.Context(), project, body.SameAs, to) != nil {
 					slog.Warn("board ask not linked: not put to the same people", "board", project, "message", msg.ID, "same_as", body.SameAs)
 					notLinked = true
