@@ -58,7 +58,12 @@ const ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved
                 assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .view-list-nav .view-list-item')].filter(b => b.getClientRects().length).length`), 0, `${label}: the phone draws no folder tab strip`);
                 await ev(`document.querySelector('header.top-bar .phone-menu-btn').click(); true`);
                 await waitFor(`document.querySelectorAll('#nav-more-menu .nav-drawer-folder').length >= 4`, `${label}: the drawer lists the folders`, 8000);
-                assert.ok(await ev(`[...document.querySelectorAll('#nav-more-menu .nav-drawer-folder')].every(b => b.querySelector('.material-icons') && b.querySelector('.nav-drawer-label'))`), `${label}: each drawer folder has an icon and a name`);
+                assert.ok(await ev(`[...document.querySelectorAll('#nav-more-menu .nav-drawer-folder')].every(b => b.firstElementChild.matches('.material-icons, .view-list-icon') && b.querySelector('.nav-drawer-label'))`), `${label}: each drawer folder has an icon and a name`);
+                // the same glyph the desktop sidebar draws for the folder, not a stand-in (#19082): Saved's bookmark, the archive box of Artifacts, a CLI's letter badge
+                const glyphs = await ev(`Object.fromEntries([...document.querySelectorAll('#nav-more-menu .nav-drawer-folder')].map(b => [b.querySelector('.nav-drawer-label').textContent, b.firstElementChild.querySelector('svg') ? 'bookmark-svg' : b.firstElementChild.dataset.agentType ? 'cli:' + b.firstElementChild.dataset.agentType : b.firstElementChild.textContent]))`);
+                assert.equal(glyphs.Saved, 'bookmark-svg', `${label}: Saved draws the bookmark, not a star: ` + JSON.stringify(glyphs));
+                assert.equal(glyphs.Artifacts, 'inventory_2', `${label}: Artifacts draws the archive box, not a folder: ` + JSON.stringify(glyphs));
+                assert.equal(glyphs.Claude, 'cli:claude', `${label}: a CLI folder draws its letter badge, not a folder: ` + JSON.stringify(glyphs));
                 await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
             }
             await shot(label);

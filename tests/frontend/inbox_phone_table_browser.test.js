@@ -24,7 +24,7 @@ const { coralReady } = require('./helpers/wait');
                 rows: [...v.querySelectorAll('.dt-table tbody tr')].map(r => r.innerText.replace(/\\s+/g, ' ').trim()) }; })()`);
         assert.ok(m.scroll && m.scroll[0] <= m.scroll[1] + 1, `the Tasks table does not scroll sideways (scrollWidth ${m.scroll && m.scroll[0]} > ${m.scroll && m.scroll[1]}) ${JSON.stringify(m)}`);
         assert.ok(m.page[0] <= m.page[1] + 1, 'and neither does the page ' + JSON.stringify(m));
-        assert.ok(!m.select && !m.back && m.titleH >= 20, `no folder tab strip and no way back on a phone: the ☰ drawer lists the folders (#13596) and the page's title is the open folder's name ${JSON.stringify(m)}`);
+        assert.ok(!m.select && !m.back && m.titleH !== null && m.titleH <= 2, `no folder tab strip and no way back on a phone: the ☰ drawer lists the folders (#13596), the top bar names the open folder and the page's own title is one pixel for screen readers (#19082) ${JSON.stringify(m)}`);
         // the one task row's two-line form (#7737): the id and title, then the state, and the priority only when it is High; the team is the table's column and is not in the phone's line
         for (const [i, word] of [[0, /Queued/], [1, /In progress/], [2, /In review/]]) assert.match(m.rows[i], word, `row ${i + 1} still says its ${word} ${JSON.stringify(m.rows)}`);
         assert.ok(m.rows.every(r => !/Nobody yet/.test(r)), 'the Inbox says nothing of who: every task is the operator\'s ' + JSON.stringify(m.rows));

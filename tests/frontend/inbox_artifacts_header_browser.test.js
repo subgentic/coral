@@ -59,7 +59,9 @@ const WORLD = `(() => {
             check(m.h2 && m.cnt && m.cntText === '3', `${at}row 1 has the title and its count of 3 (${m.cntText})`);
             check(m.cnt && m.cntColor !== m.textColor, `${at}the count is grey, not the title's colour`);
             if (m.h2 && m.cnt && m.search && m.filt) {
-                check(Math.abs(m.h2.cy - m.cnt.cy) <= 10 && m.h2.r <= m.cnt.l + 1, `${at}the count follows the title on one line: ${JSON.stringify([m.h2, m.cnt])}`);
+                // a portrait phone's top bar names the folder, so the page's own title is one pixel (for screen readers) and the count stays (#19082)
+                if (w < 640) check(m.h2.r - m.h2.l <= 2 && m.cnt.r - m.cnt.l > 4, `${at}the title is one pixel and the count stays: ${JSON.stringify([m.h2, m.cnt])}`);
+                else check(Math.abs(m.h2.cy - m.cnt.cy) <= 10 && m.h2.r <= m.cnt.l + 1, `${at}the count follows the title on one line: ${JSON.stringify([m.h2, m.cnt])}`);
                 check(m.search.t >= m.h2.b - 1 && m.search.t >= m.cnt.b - 1, `${at}the search is under the title, not above it: ${JSON.stringify([m.h2, m.search])}`);
                 check(zoom && w < 768 ? m.filt.t >= m.search.t : (m.filt.t < m.search.b && m.filt.l >= m.search.r - 1), `${at}the filter icon is on the search's row, after it (at 200% on a phone it may wrap under it): ${JSON.stringify([m.search, m.filt])}`);
             } else check(false, `${at}the header parts are missing: ${JSON.stringify(m)}`);
