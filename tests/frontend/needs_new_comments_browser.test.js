@@ -69,7 +69,7 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`[...(${row('Decided file.txt')}).querySelectorAll('.menu-item')].length > 0`, 'the decided row\'s menu opens', 4000);
                 const labels = await ev(`[...(${row('Decided file.txt')}).querySelectorAll('.menu-item')].map(b => b.textContent.trim())`);
                 assert.ok(labels.some(l => /^Got it/.test(l)) && !labels.some(l => /^Dismiss/.test(l)), 'an already-decided file with a reply is cleared with "Got it", not "Dismiss": ' + JSON.stringify(labels));
-                await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
+                // the menu is left open: the next row action closes it. A synthetic document Escape here raced the later redraw and left the 'Replied file' marker up in 8 of 20 runs (#19505)
                 assert.ok(waiting.review && waiting.approve && waiting.changes && !waiting.metaSaysApproved, 'a file still waiting for review keeps For review, Approve and Request changes: ' + JSON.stringify(waiting));
                 assert.ok(await ev(`(() => { const t = [...(${row('Replied file.txt')}).querySelectorAll('.inbox-new-comments')].find(x => /new comments?/.test(x.textContent)); return !!t && t.scrollWidth <= t.clientWidth + 1; })()`), 'the badge is whole, not cut to New comme... (#17454)');
                 assert.ok(!(await marker('Quiet file.txt')), 'a file with no news carries no marker');
@@ -83,7 +83,7 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`window.__commentReads.length > 0`, 'the thread was read');
                 await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '3'`, 'the badge drops by one');
                 await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
-                await waitFor(`!!(${row('Replied file.txt')}) && !![...(${row('Replied file.txt')}).querySelectorAll('.dt-tag')].length === false`, 'the marker is gone', 8000);
+                await waitFor(`!!(${row('Replied file.txt')}) && ![...(${row('Replied file.txt')}).querySelectorAll('.inbox-new-comments')].some(t => /[1-9][0-9]* new comments?/.test(t.textContent))`, 'the marker is gone', 8000); // the very test marker() asserts on: '.dt-tag' never matched it, so this wait passed before the redraw
                 assert.ok(!(await marker('Replied file.txt')), 'no marker once opened');
                 assert.ok(await ev(`${row('Replied file.txt')}.classList.contains('dt-read')`), 'the row is read, still listed');
                 // a read of the thread that fails marks nothing: the decided file keeps its marker and its count (Security's SHOULD)
