@@ -42,10 +42,22 @@ const { coralReady } = require('./helpers/wait');
         check('the line counts tasks and goals from the server and the agents idle now, a working one not counted', () => assert.match(t.text, /^While you were away \(12 min\): 2 tasks done, 1 goal done, 3 agents idle\.Dismiss$/, t.text));
         check('it is a status with one Dismiss, and no sideways scroll', () => assert.ok(t.role === 'status' && t.btn.length === 1 && t.btn[0] === 'Dismiss' && t.over <= 0, JSON.stringify(t)));
         check('the server was asked once, for that time', () => assert.equal(t.asked, 1, JSON.stringify(t)));
-        await ev(`(async () => { const m = await import(${S} + 'inbox_sidebar.js'); for (let i=0; i<12; i++) { const b=m.needsListSpec().banner(); document.querySelector('#group-table-view .gt-toolbar').after(b); } await import(${S} + 'inbox_away.js'); return true; })()`);
-        await waitFor(`document.querySelectorAll('.inbox-away').length > 0`, 'redrawn away banner');
-        const copies = await ev(`document.querySelectorAll('.inbox-away').length`);
-        check('only one away line exists in the document after redraws', () => assert.equal(copies, 1));
+        // Change a real row so refreshGroupTable cannot stop at its unchanged-signature fast path.
+        // Each redraw must replace the table and mount its banner through the normal Needs you renderer.
+        for (let i = 0; i < 12; i++) {
+            const name = `Waiting redraw ${i}`;
+            await ev(`(async () => {
+                const { state } = await import(${S} + 'state.js'), groups = await import(${S} + 'sidebar_groups.js');
+                window.__awayOldTable = document.querySelector('#group-table-view .dt-box');
+                window.__awayOldDrawn = document.getElementById('group-table-view').dataset.drawn;
+                state.liveSessions = state.liveSessions.map(s => s.session_id === 'waiting' ? { ...s, display_name: ${JSON.stringify(name)} } : s);
+                groups.refreshGroupTable('hub-inbox'); return true;
+            })()`);
+            await waitFor(`window.__awayOldTable && !window.__awayOldTable.isConnected && document.getElementById('group-table-view').dataset.drawn !== window.__awayOldDrawn && document.querySelector('#group-table-view tbody')?.textContent.includes(${JSON.stringify(name)})`, 'real Needs you table redraw ' + (i + 1));
+            await waitFor(`!!${LINE}`, 'away summary after real redraw ' + (i + 1));
+            assert.equal(await ev(`document.querySelectorAll('.inbox-away').length`), 1, 'one away line after real redraw ' + (i + 1));
+        }
+        console.log('[PASS] one away line after each of 12 real Needs you table redraws');
         await shot('inbox-away-line');
         await ev(`${LINE}.querySelector('button').click(); true`);
         await waitFor(`!${LINE}`, 'the line goes', 4000);
