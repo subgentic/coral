@@ -33,8 +33,9 @@ for (const f of fs.readdirSync(STATIC).filter(n => n.endsWith('.js'))) {
 assert.deepEqual(found, ALLOWED, `the dashboard's iframe addresses: ${JSON.stringify(found)}; a new one needs a look from Security and a line in this test`);
 // A frame can also get its whole document from data with srcdoc (always inside a sandbox and a CSP meta of its own: sandbox_frame.js,
 // panel_sandbox.js and view_sandbox.js explain why), or be built in an HTML string. Both are counted here too, so a new one needs a look.
+// #17818: artifact_versions.js draws the Before / after of an HTML file's versions with the same lockFrame + sandboxedDoc as artifact_list_compare.js (Security reviews the sink).
 // #17522: comparison HTML uses lockFrame + sandboxedDoc, with no script-trust path. Security reviews the new sink.
-const SRCDOC = { 'artifact_list_compare.js': 1, 'artifact_preview.js': 1, 'custom_views.js': 1, 'preview_content.js': 1 };
+const SRCDOC = { 'artifact_list_compare.js': 1, 'artifact_preview.js': 1, 'artifact_versions.js': 1, 'custom_views.js': 1, 'preview_content.js': 1 };
 const srcdocFound = {};
 for (const f of fs.readdirSync(STATIC).filter(n => n.endsWith('.js'))) {
     const src = fs.readFileSync(path.join(STATIC, f), 'utf8');

@@ -8,6 +8,7 @@ const { readVersions } = await importOnce('./versions_read.js');
 import { el } from './dom_el.js';
 import { pollEvery } from './overload.js';
 import { isPhoneLayout } from './phone_layout.js';
+import { lockFrame, sandboxedDoc } from './sandbox_frame.js';
 
 const btn = (cls, text, label) => { const b = el('button', 'btn btn-small ' + cls, text); b.type = 'button'; if (label) b.setAttribute('aria-label', label); return b; };
 const sr = (text) => el('span', 'sr-only', text);
@@ -65,7 +66,7 @@ export function attachVersions(dialog, hooks) {
     const note = el('span', 'av-note'); note.hidden = true; // a file two teams hold has no version bar from a link with no team: said quietly, not as an error (#14015)
     bar.after(note);
     dialog.append(live);
-    const st = { hex: null, server: undefined, board: '', ambiguous: false, rows: null, listOpen: false, comparing: false, view: 'changes', gen: 0, abort: null };
+    const st = { hex: null, server: undefined, board: '', ambiguous: false, rows: null, listOpen: false, comparing: false, view: 'changes', texts: null, gen: 0, abort: null };
     let liveTimer = 0, liveBusy = -1;
     async function refreshVersions() {
         if (!st.hex || dialog.hidden || !dialog.isConnected || st.comparing || st.listOpen || liveBusy === st.gen) return;
@@ -220,6 +221,7 @@ export function attachVersions(dialog, hooks) {
         try {
             const [a, b] = await Promise.all([text(before.digest, signal), text(row.digest, signal)]);
             if (gen !== st.gen || !st.comparing) return;
+            st.texts = [a, b];
             const lines = diffLines(a, b);
             const body = hooks.body();
             dialog.classList.add('av-comparing');
@@ -241,12 +243,14 @@ export function attachVersions(dialog, hooks) {
         const top = el('div', 'av-modebar');
         const status = el('p', 'av-count', count); // plain text: the one announcement is the polite line (a second live region would say it twice)
         const seg = el('div', 'av-seg btn-seg'); seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Compare view');
-        const bChanges = btn('av-view-changes', 'Changes'), bSplit = btn('av-view-split', 'Side by side');
-        for (const [b, v] of [[bChanges, 'changes'], [bSplit, 'split']]) { b.setAttribute('aria-pressed', String(st.view === v)); b.addEventListener('click', () => { st.view = v; drawCompare(body, row, before, lines, false); body.querySelector(v === 'changes' ? '.av-view-changes' : '.av-view-split')?.focus(); }); }
-        seg.append(bChanges, bSplit); top.append(status, seg);
+        const bChanges = btn('av-view-changes', 'Changes'), bSplit = btn('av-view-split', 'Side by side'), bPage = btn('av-view-page', 'Before / after');
+        const isHtml = /\.html?$/i.test(row.name || '') || /^text\/html/i.test(row.media_type || ''); // an HTML file's lines are tags: its pages shown as drawn is the readable compare (#17818)
+        if (st.view === 'page' && !isHtml) st.view = 'changes'; // the Before / after view kept from an HTML file: a file with no pages falls back to the lines (#19072)
+        for (const [b, v] of [[bChanges, 'changes'], [bSplit, 'split'], ...(isHtml ? [[bPage, 'page']] : [])]) { b.setAttribute('aria-pressed', String(st.view === v)); b.addEventListener('click', () => { st.view = v; drawCompare(body, row, before, lines, false); body.querySelector(`.av-view-${v === 'changes' ? 'changes' : v === 'split' ? 'split' : 'page'}`)?.focus(); }); }
+        seg.append(bChanges, bSplit); if (isHtml) seg.append(bPage); top.append(status, seg);
         wrap.append(h, top);
         if (!added && !removed) wrap.append(el('p', 'av-note', `v${row.version} has the same text as v${before.version}.`));
-        else wrap.append(st.view === 'changes' ? changesView(lines) : splitView(lines, row, before));
+        else wrap.append(st.view === 'page' && isHtml ? pageView(row, before) : st.view === 'changes' ? changesView(lines) : splitView(lines, row, before));
         body.replaceChildren(wrap);
         if (first) { say(`Changes since v${before.version}: ${count}`); h.focus(); } // said and shown once, when the compare opens, not on each switch of the view
     }
@@ -283,6 +287,17 @@ export function attachVersions(dialog, hooks) {
         right.append(el('h4', 'av-colhead', `v${row.version} · ${whenOf(row.at).label}`));
         for (const l of lines) { if (l.t !== 'add') left.append(lineEl(l)); if (l.t !== 'del') right.append(lineEl(l)); }
         grid.append(left, right);
+        return grid;
+    }
+    /** The two versions of an HTML file as pages, side by side, in the same inert frames the preview uses (no scripts, no outside loads). */
+    function pageView(row, before) {
+        const grid = el('div', 'av-split av-pages');
+        [[before, st.texts[0]], [row, st.texts[1]]].forEach(([v, html]) => {
+            const col = el('div', 'av-col');
+            col.append(el('h4', 'av-colhead', `v${v.version} · ${whenOf(v.at).label}`));
+            const frame = document.createElement('iframe'); lockFrame(frame); frame.className = 'av-page-frame'; frame.setAttribute('aria-label', `Page as of v${v.version}`); frame.srcdoc = sandboxedDoc(html);
+            col.append(frame); grid.append(col);
+        });
         return grid;
     }
     function leaveCompare() {
