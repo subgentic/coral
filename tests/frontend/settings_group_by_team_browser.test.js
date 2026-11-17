@@ -15,10 +15,13 @@ const SESSIONS = [S('Team A lead','team-a'),S('Team A dev','team-a',{display_nam
         await ev(`(() => { const c=document.querySelector('#settings-group-by-team'); if(c.checked !== ${on})c.click(); window.hideSettingsModal(); })()`);
         await waitFor(`localStorage.getItem('coral-group-by-team') === '${on}'`, 'saved grouping setting', 3000);
     };
-    const stopCount = async count => {
+    const stopCount = async (count, teamCount) => {
         await ev(`document.querySelector('${list} [data-on-click="group-kill"][data-group="repo"]').click(); true`);
         await waitFor(`getComputedStyle(document.querySelector('#confirm-modal')).display !== 'none'`, 'Stop all confirmation', 5000);
         assert.match(await ev(`document.querySelector('#confirm-modal-message').textContent`),new RegExp(count === 1 ? 'Stop the 1 agent' : 'Stop all '+count+' agents'), 'confirmation counts the shown folder members');
+        const message = await ev(`document.querySelector('#confirm-modal-message').textContent`);
+        if (teamCount) assert.ok(message.includes(`including ${teamCount} team ${teamCount === 1 ? 'member' : 'members'}`),'confirmation names the included team members');
+        else assert.ok(!message.includes('including'),'standalone-only confirmation has no team-member note');
         await ev(`document.querySelector('#confirm-modal [data-on-click="m-hide-confirm-modal"]').click(); true`);
     };
     try {
@@ -35,17 +38,17 @@ const SESSIONS = [S('Team A lead','team-a'),S('Team A dev','team-a',{display_nam
         const localIds = await ids();
         for(const id of ['Team A lead','Team A dev','Team B dev','Solo'])assert.ok(localIds.includes(id),id+' is a direct agent row');
         assert.equal(await ev(`document.querySelector('${list} > .session-group-header[data-group-name="repo"] .session-group-count').textContent`),'4','folder counts all four local awake agents');
-        await stopCount(4); // Cancel: no agent is stopped by this test.
+        await stopCount(4,3); // Cancel: no agent is stopped by this test.
         await ev(`document.querySelector('${list} > .session-group-header[data-group-name="repo"]').click(); true`);
         assert.ok(!(await ids()).includes('Team A lead'),'folder collapse hides its team members too');
         await ev(`document.querySelector('${list} > .session-group-header[data-group-name="repo"]').click(); true`);
         assert.ok((await ids()).includes('Team A lead'),'expanding restores them');
         await ev(`window.filterLiveAgents('Needle'); true`);
-        await stopCount(1);
+        await stopCount(1,1);
         await ev(`window.filterLiveAgents(''); true`);
         await setGrouping(true);
         await waitFor(`document.querySelectorAll('${list} .session-team-group').length === 2`, 'team cards return', 5000);
-        await stopCount(1); // Grouped teams retain their own actions; the folder contains only Solo.
+        await stopCount(1,0); // Grouped teams retain their own actions; the folder contains only Solo.
         assert.ok((await ids()).includes('Solo'),'standalone agent stays in its folder');
         console.log('PASS real group-by-team setting: flat folders when off, team cards when on, collapse/search and Stop all counts agree');
     } finally { await client.close(); }
