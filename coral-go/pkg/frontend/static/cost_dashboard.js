@@ -464,7 +464,7 @@ function _drawSeries(view) {
     const host = document.getElementById(`cost-series-${view}`);
     if (!host) return;
     _seriesDraws[view] = (_seriesDraws[view] || 0) + 1;
-    series.drawPanel(host, view, { tableTotal: (f, keys) => _rowsTotal(view, f, keys), redraw: () => _refreshSwatches(view), phone: isPhoneLayout() });
+    series.drawPanel(host, view, { tableTotal: (f, keys) => _rowsTotal(view, f, keys), redraw: () => _refreshSwatches(view), phone: isPhoneLayout(), recheck: () => _refreshCostDashboard({ force: true }) });
 }
 
 async function _refreshSeries(view = _currentView()) {

@@ -197,6 +197,17 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: 
         const tipText = await ev(`(() => { const r = document.querySelector('#cost-series-team .viz-svg rect:last-of-type'); const b = r.getBoundingClientRect(); r.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: b.left + b.width / 2, clientY: b.top + 40 })); return document.querySelector('#cost-series-team .viz-tip').textContent; })()`);
         assert.ok(/phone-pass/.test(tipText) && !/b-6xccqbikbn|b-other/.test(tipText), 'the tooltip names the team, not its board id: ' + tipText);
         console.log('   ✓');
+        console.log('5b. A mismatch while a team runs: read again before saying "Totals differ" (#17633)');
+        const probe = await ev(`import(${MOD} + 'analytics_series.js').then(async m => { const host = document.createElement('div'); document.body.append(host); const buckets = [{ bucket: new Date(Math.floor((Date.now() - 3600000) / 3600000) * 3600000).toISOString(), series: [{ key: 'a', label: 'a', cost_usd: 1.36, input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, num_requests: 1 }] }];
+            m.setData('probe', { buckets, interval: '1h', sinceMs: Date.now() - 7200000, untilMs: Date.now() }); let asked = 0, total = 1.13; const draw = () => m.drawPanel(host, 'probe', { tableTotal: () => total, redraw() {}, phone: false, recheck: () => { asked++; } });
+            draw(); await Promise.resolve(); const first = { text: host.querySelector('.viz-check').textContent, bad: !!host.querySelector('.viz-check-bad'), asked };
+            draw(); const second = { text: host.querySelector('.viz-check').textContent, bad: !!host.querySelector('.viz-check-bad'), asked };
+            total = 1.36; draw(); const healed = host.querySelector('.viz-check').textContent; total = 1.13; draw(); await Promise.resolve(); const again = { text: host.querySelector('.viz-check').textContent, asked }; host.remove(); return { first, second, healed, again }; })`);
+        assert.ok(/Checking totals/.test(probe.first.text) && !probe.first.bad && probe.first.asked === 1, 'the first mismatch is not red: it reads both again once: ' + JSON.stringify(probe.first));
+        assert.ok(/Totals differ/.test(probe.second.text) && probe.second.bad && probe.second.asked === 1, 'a mismatch that is still there after the re-read is red, and does not ask again: ' + JSON.stringify(probe.second));
+        assert.match(probe.healed, /^✓ Totals agree/, 'agreeing again clears it');
+        assert.ok(/Checking totals/.test(probe.again.text) && probe.again.asked === 2, 'and a later mismatch gets its own re-read: ' + JSON.stringify(probe.again));
+        console.log('   ✓');
         console.log('6. A phone: the chart fits, no end labels, the swatches are targets, the table is one line a row');
         await open(390, 844, true);
         await waitFor(`document.querySelector('#cost-by-team .dt-box').classList.contains('dt-one-line')`, 'the table is one line a row', 6000);
