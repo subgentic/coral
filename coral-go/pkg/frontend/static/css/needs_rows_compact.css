@@ -46,17 +46,17 @@
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-meta { color: var(--text-muted); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-meta :is(.inbox-review-from, .inbox-review-version, .inbox-kind) { font-weight: var(--fw-regular); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-meta .inbox-review-from::after { content: none; }
-@container (min-width: 50rem) { /* a wide card: line 1 is the name with its team and how long it has waited beside it, the question and the meta line are the next two lines, and the buttons stand at the right across all three (no row of their own, no empty area under the question) */
-  :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row { grid-template-columns: auto auto minmax(0, max-content) auto auto minmax(0, 1fr) auto; }
+@container (min-width: 50rem) { /* a wide card: line 1 is the name with its team and how long it has waited at the top right; the question and the meta line are the next two lines; the buttons stand at the right, level with the bottom of them (no row of their own, no empty area under the question; the Operator: buttons to the bottom, the waiting time top right) */
+  :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row { grid-template-columns: auto auto minmax(0, 1fr) auto auto; }
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td:first-child { grid-row: 1; }
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-kind-column { grid-row: 1; }
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td[data-key="agent"] > .inbox-review-item { display: contents; }
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-review-wait { display: none; }
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-review-name { grid-column: 3; grid-row: 1; order: 3; font-size: var(--fs-xl); } /* the larger title and the smaller lines only where the card has room (at 200% text the old layout keeps its heights) */
-  :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td[data-key="team"] { grid-column: 4; grid-row: 1; order: 4; justify-self: start; }
-  :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td[data-key="waiting"] { grid-column: 5; grid-row: 1; order: 5; justify-self: start; }
-  :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td[data-key="agent"] > .inbox-row-words { grid-column: 3 / 7; grid-row: 2; order: 6; min-height: 0; display: block; font-size: var(--fs-lg); }
-  :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-meta { grid-column: 3 / 7; grid-row: 3; order: 7; min-height: 0; font-size: var(--fs-base); }
-  :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td[data-key="review"] { grid-column: 7; grid-row: 1 / span 3; order: 8; align-self: center; padding: 0; }
+  :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td[data-key="team"] { grid-column: 4; grid-row: 1; order: 4; justify-self: end; }
+  :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td[data-key="waiting"] { grid-column: 5; grid-row: 1; order: 5; justify-self: end; }
+  :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td[data-key="agent"] > .inbox-row-words { grid-column: 3; grid-row: 2; order: 6; min-height: 0; display: block; font-size: var(--fs-lg); }
+  :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-meta { grid-column: 3; grid-row: 3; order: 7; min-height: 0; font-size: var(--fs-base); }
+  :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td[data-key="review"] { grid-column: 4 / 6; grid-row: 2 / span 2; order: 8; align-self: end; justify-self: end; padding: 0; }
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td:empty { display: none; } /* the column this row does not use */
 }

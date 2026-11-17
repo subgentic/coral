@@ -50,10 +50,10 @@ const { removeBoards } = require('./helpers/board_cleanup');
                     const files = !r.ask, what = (files ? 'file row' : 'question row') + ' ' + JSON.stringify(r);
                     if (!mobile) {
                         check(r.words.length >= 2 && r.words.every(x => x.length > 0), a + 'every button has a word, no bare icons: ' + what);
-                        check(r.top != null && r.iconBottom != null && (files ? r.top < r.iconBottom + 4 : r.top >= r.iconBottom), a + (files ? 'a file row\'s buttons stand at the right beside its three lines, not on a row of their own (#19061): ' : 'the buttons are on the bottom line, under the icon: ') + what);
+                        check(r.top != null && r.iconBottom != null && r.top >= r.iconBottom, a + 'the buttons are at the bottom, under the icon: ' + what);
                         check(r.btnRight != null && r.btnRight <= 24, a + 'the buttons end at the right of the row: ' + what);
                         check((() => { const l = files ? r.line.filter((_, i) => i !== 3) : r.line; return Math.max(...l) - Math.min(...l); })() <= 3, a + 'the select box, icon, title, team and waiting share the first line (the sender of a file is on the meta line under the title, #16678): ' + what);
-                        check(r.teamRight != null && r.waitRight != null && (files || r.waitRight <= 24) && r.teamRight > r.waitRight, a + (files ? 'the team then the wait follow the title on its line (#19061): ' : 'the team and the wait are at the top right, the wait last: ') + '' + what);
+                        check(r.teamRight != null && r.waitRight != null && r.waitRight <= 24 && r.teamRight > r.waitRight, a + 'the team and the wait are at the top right, the wait last: ' + what);
                         check(r.h <= (files ? 120 : 150), a + 'the row is short (' + r.h + ' px): ' + what);
                         if (files) check(r.words.join(',') === 'Approve,Request changes,Save,More,Star' && r.labels.join('|') === 'Approve: ' + 'plan-X.md|Request changes: plan-X.md|Save for later: plan-X.md|More actions for plan-X.md|Star plan-X.md'.replace(/X/g, (r.labels[0].match(/plan-(\d)/) || [0, 0])[1]), a + 'a file row has Approve, Request changes, Save, More and Star as words, with their names kept: ' + what);
                         if (files) check(r.star && r.star.inBar && r.star.word === 'Star' && r.star.pressed === 'false', a + 'the star is a labelled toggle in the bottom bar: ' + what);
