@@ -2,6 +2,7 @@ package tracking
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -47,6 +48,10 @@ func stallReason(openResult string, served bool) string {
 	return StallNotOpened
 }
 
+// stallWG counts the running stall watches. It is separate from asyncWG because a watch lasts until its context ends, so waitForAsync (which a test calls while the server is still up) must not wait for it;
+// only the restore ConfigureForTest returns does, after the test has ended the context (#19315).
+var stallWG sync.WaitGroup
+
 // WatchDashboardStall starts the watch for this server process. It sends nothing unless this process is the first start's (its open step is recent), analytics is
 // on and the Terms are accepted, and nothing if the process (ctx) ends first.
 func WatchDashboardStall(ctx context.Context) {
@@ -54,7 +59,9 @@ func WatchDashboardStall(ctx context.Context) {
 		return
 	}
 	started := time.Now()
+	stallWG.Add(1)
 	go func() {
+		defer stallWG.Done()
 		defer safego.Recover("tracking/stall")
 		runStallWatch(ctx, started)
 	}()
