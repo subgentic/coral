@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -141,7 +142,7 @@ func (h *SessionsHandler) SearchAgentBoard(w http.ResponseWriter, r *http.Reques
 			return
 		}
 	}
-	results, more, err := h.searchWorkResults(r, boardKey, vals, workLimit, q.Since, q.Until, res.Messages, chats, sources)
+	results, more, err := searchWorkResults(r.Context(), h.bs, boardKey, vals, workLimit, q.Since, q.Until, res.Messages, chats, sources)
 	more = more || chatsMore
 	if err != nil {
 		errBadRequest(w, err.Error())
@@ -223,8 +224,8 @@ func parseSearchSources(vals url.Values) (map[string]bool, error) {
 	return out, nil
 }
 
-// searchWorkResults is the one result list: the tasks and goals that match (own board only) and the messages of the page, newest first, cut to the limit; more says the tasks or goals had others.
-func (h *SessionsHandler) searchWorkResults(r *http.Request, boardKey string, vals url.Values, limit int, since, until string, msgs []board.Message, chats []board.WorkHit, sources map[string]bool) ([]board.WorkHit, bool, error) {
+// searchWorkResults is the one result list, shared by the agent's search and the dashboard's (SearchBoardWork, #19237): the tasks and goals that match (own board only) and the messages of the page, newest first, cut to the limit; more says the tasks or goals had others.
+func searchWorkResults(ctx context.Context, bs *board.Store, boardKey string, vals url.Values, limit int, since, until string, msgs []board.Message, chats []board.WorkHit, sources map[string]bool) ([]board.WorkHit, bool, error) {
 	hits := append([]board.WorkHit(nil), chats...)
 	more := false
 	if sources["tasks"] || sources["goals"] {
@@ -242,7 +243,7 @@ func (h *SessionsHandler) searchWorkResults(r *http.Request, boardKey string, va
 			}
 			wq.GoalID = id
 		}
-		work, workMore, err := h.bs.SearchWork(r.Context(), wq)
+		work, workMore, err := bs.SearchWork(ctx, wq)
 		if err != nil {
 			return nil, false, errors.New("could not search the tasks and goals")
 		}

@@ -114,6 +114,7 @@ a GET /api/board/{project}/messages
 a GET /api/board/{project}/messages/all
 a GET /api/board/{project}/messages/check
 c GET /api/board/{project}/messages/search
+c GET /api/board/{project}/search
 b GET /api/board/{project}/orchestrator-grant
 c GET /api/board/{project}/paused
 b GET /api/board/{project}/spend

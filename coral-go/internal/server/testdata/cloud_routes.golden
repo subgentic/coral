@@ -119,6 +119,7 @@ GET /api/board/{project}/proposals view
 GET /api/board/{project}/queue never
 GET /api/board/{project}/relay-targets never
 GET /api/board/{project}/reminder never
+GET /api/board/{project}/search never
 GET /api/board/{project}/settings view
 GET /api/board/{project}/settings/log never
 GET /api/board/{project}/spend never
