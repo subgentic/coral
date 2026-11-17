@@ -217,8 +217,13 @@ func (h *BoardHandler) PollWait(w http.ResponseWriter, r *http.Request) {
 var waitPollRecheck = 5 * time.Second
 
 func (h *BoardHandler) resolveMessageWaits(project, senderID, content string) {
+	h.resolveMessageWaitsFor(project, senderID, content, "")
+}
+
+// resolveMessageWaitsFor is resolveMessageWaits for a message meant for one subscriber: only its wait ends (#19089).
+func (h *BoardHandler) resolveMessageWaitsFor(project, senderID, content, only string) {
 	ctx := context.Background()
-	resolved, err := h.bs.ResolveMatchingMessageWaits(ctx, project, senderID, content)
+	resolved, err := h.bs.ResolveMatchingMessageWaitsFor(ctx, project, senderID, content, only)
 	if err != nil || len(resolved) == 0 {
 		return
 	}

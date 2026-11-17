@@ -281,3 +281,72 @@ func TestAHeldCommentIsDeliveredOnceTheAgentParksInAWait(t *testing.T) {
 	assert.Len(t, rig.operatorMessages(), 1, "delivered to the agent in its wait")
 	assert.False(t, rig.askQueued(cid, 1))
 }
+
+// #19089 (Security, QA on #19085): a delivery ends the wait of the agent it is for, and only that one's; a held automatic comment is delivered the same way; a leftover row of a session the agent has left does not
+// make it free.
+func (rig *cmtRig) operatorWait(n int, title string) {
+	rig.t.Helper()
+	_, err := rig.h.bs.RegisterWait(context.Background(), "team-a", naming.SubscriberID(title, "claude"), naming.SessionName("claude", sendSid(n)), board.WaitOperator, "", "Waiting for Operator review", time.Hour)
+	require.NoError(rig.t, err)
+}
+
+func (rig *cmtRig) waitActive(title string) bool {
+	rig.t.Helper()
+	w, err := rig.h.bs.GetActiveWait(context.Background(), "team-a", naming.SubscriberID(title, "claude"))
+	require.NoError(rig.t, err)
+	return w != nil
+}
+
+func TestADeliveryEndsOnlyTheWaitOfTheAgentItIsFor(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.h.boardHandler = NewBoardHandler(rig.h.bs)
+	rig.agent(1, "Dev", false)
+	rig.agent(2, "Other", false)
+	rig.turn(1, "Dev", "prompt_submit")
+	rig.operatorWait(1, "Dev")
+	rig.operatorWait(2, "Other") // another agent's open question to the Operator
+	cid := rig.ownerComment("For Dev only.")
+	_, out := rig.send(cid, "Dev")
+	require.Equal(t, map[string]string{"Dev": "sent"}, states(out))
+	rig.h.boardHandler.WaitBackground()
+	assert.False(t, rig.waitActive("Dev"), "the comment ended Dev's wait")
+	assert.True(t, rig.waitActive("Other"), "and not Other's open question")
+}
+
+func TestAHeldAutomaticCommentIsDeliveredToAWaitingAgentAndEndsItsWait(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.h.boardHandler = NewBoardHandler(rig.h.bs)
+	ctx := context.Background()
+	rig.agent(1, "Dev", false)
+	rig.agent(2, "Other", false)
+	rig.turn(1, "Dev", "prompt_submit")
+	cid := rig.ownerComment("Written on the file.")
+	_, _, err := rig.ss.CreateArtifactAsk(ctx, cid, cmtDoc, "team-a", sendSid(1), "Dev", time.Now())
+	require.NoError(t, err)
+	ok, err := rig.ss.HoldAskMessage(ctx, cid, sendSid(1), "AUTO-COMMENT", false, true, time.Now()) // an automatic delivery (system): held mid-turn
+	require.NoError(t, err)
+	require.True(t, ok)
+	rig.h.flushHeldComments(ctx, time.Now())
+	require.Empty(t, rig.operatorMessages(), "mid-turn: held")
+
+	rig.operatorWait(1, "Dev")
+	rig.operatorWait(2, "Other")
+	rig.h.flushHeldComments(ctx, time.Now())
+	msgs := rig.operatorMessages()
+	require.Len(t, msgs, 1)
+	assert.Contains(t, msgs[0].Content, "AUTO-COMMENT")
+	rig.h.boardHandler.WaitBackground()
+	assert.False(t, rig.waitActive("Dev"), "the delivery ended Dev's wait, an automatic one too")
+	assert.True(t, rig.waitActive("Other"), "and only Dev's")
+}
+
+func TestALeftoverWaitOfAnEarlierSessionDoesNotMakeAnAgentFree(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.turn(1, "Dev", "prompt_submit")
+	_, err := rig.h.bs.RegisterWait(context.Background(), "team-a", naming.SubscriberID("Dev", "claude"), naming.SessionName("claude", "00000000-0000-4000-8000-0000000000aa"), board.WaitOperator, "", "from before the restart", time.Hour)
+	require.NoError(t, err)
+	cid := rig.ownerComment("Hello.")
+	_, out := rig.send(cid, "Dev")
+	assert.Equal(t, map[string]string{"Dev": "queued"}, states(out), "the wait row names another session: the agent is mid-turn, so the comment is held")
+}

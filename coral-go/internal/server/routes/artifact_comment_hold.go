@@ -36,7 +36,7 @@ func (h *SessionsHandler) waitingOnBoard(ctx context.Context, project string, su
 		return false
 	}
 	w, err := h.bs.GetActiveWait(ctx, project, sub.SubscriberID)
-	return err == nil && w != nil
+	return err == nil && w != nil && w.SessionName == sub.SessionName // the row of a session the agent has since left (a restart) is not this one's wait
 }
 
 // holdOrPost delivers the comment message to the agent now when it is free, or keeps it on the ask when it is busy (held true). posted is the board message when it went out.
@@ -134,7 +134,7 @@ func (h *SessionsHandler) flushHeldComments(ctx context.Context, now time.Time) 
 		for _, a := range g.asks {
 			h.linkCommentMessage(ctx, first.Board, posted, a.CommentID, a.AgentSession)
 		}
-		h.operatorPosted(first.Board, msg) // a delivery ends the waits it matches, an automatic one too: what is delivered overrides the wait (#19085)
+		h.operatorPostedTo(first.Board, msg, sub.SubscriberID) // a delivery ends the waits it matches, an automatic one too: what is delivered overrides the wait (#19085)
 		if _, err := h.ss.ReleaseHeldAsks(ctx, ids, now); err != nil {
 			slog.Warn("[artifact comments] a held comment's hold was not cleared", "error", err)
 		}

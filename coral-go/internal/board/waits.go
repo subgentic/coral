@@ -304,6 +304,12 @@ func (s *Store) CancelActiveWait(ctx context.Context, project, subscriberID stri
 // ResolveMatchingMessageWaits matches active message waits against a new board message.
 // Matching waits are marked resolved and returned so callers can deliver wake-up nudges.
 func (s *Store) ResolveMatchingMessageWaits(ctx context.Context, project, senderID, content string) ([]RegisteredWait, error) {
+	return s.ResolveMatchingMessageWaitsFor(ctx, project, senderID, content, "")
+}
+
+// ResolveMatchingMessageWaitsFor is ResolveMatchingMessageWaits for a message meant for one agent (a held comment delivered to it, #19089): only that subscriber's wait can end, not every Operator
+// question open on the board. An empty only matches every wait.
+func (s *Store) ResolveMatchingMessageWaitsFor(ctx context.Context, project, senderID, content, only string) ([]RegisteredWait, error) {
 	waits, err := s.ListActiveWaits(ctx, project)
 	if err != nil || len(waits) == 0 {
 		return nil, err
@@ -318,7 +324,7 @@ func (s *Store) ResolveMatchingMessageWaits(ctx context.Context, project, sender
 	}
 	_ = s.reader().SelectContext(ctx, &subscribers, "SELECT subscriber_id, job_title FROM board_subscribers WHERE project = ?", project)
 	for _, w := range waits {
-		if w.SubscriberID == senderID {
+		if w.SubscriberID == senderID || (only != "" && w.SubscriberID != only) {
 			continue
 		}
 		if w.WaitType == WaitOperator {
