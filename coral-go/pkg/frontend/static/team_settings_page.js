@@ -245,7 +245,7 @@ function saveSettings(st) {
         if ('planning_approval' in changes && ['require_goal', ...PLAN_KEYS].every(k => !(k in changes) || saved.includes(k))) saved.push('planning_approval'); // the row is a name for those switches: it is saved when they are
         if (failures.length) throw Object.assign(new Error(failures[0]), { saved, fields: fieldErrors });
         // the note names what was saved: the working mode takes effect on first claim, the instructions at each agent's next task (an agent mid-task, or answering a chat request, keeps the ones it was given; #17675)
-        const saidNow = [['mode', 'dependency_guidance', 'asks_are_tasks'].some(k => k in changes) && 'Working mode applies on first claim.', 'custom_instructions' in changes && "Additional instructions reach each agent with the next task it claims."].filter(Boolean);
+        const saidNow = [['mode', 'dependency_guidance', 'asks_are_tasks'].some(k => k in changes) && 'Working mode applies to tasks agents claim from now on; tasks already claimed keep how they were set.', 'custom_instructions' in changes && "Additional instructions reach each agent with the next task it claims."].filter(Boolean);
         return { note: saidNow.length ? 'Saved. ' + saidNow.join(' ') : null, rebase: saved.filter(k => HEALTH_KEYS.includes(k) || XT_KEYS.includes(k) || OG_KEYS.includes(k) || GR_KEYS.includes(k)) };
     };
 }

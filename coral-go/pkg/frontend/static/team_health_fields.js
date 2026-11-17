@@ -91,7 +91,7 @@ export function healthFields(ctx) {
         { key: 'hb_check', type: 'heading', level: 1, label: 'The health check', help: 'When it goes out, and to whom.' },
         { key: 'on', type: 'toggle', label: 'Send health check', help: 'Checks on stuck or idle agents. Uses tokens each time.' },
         { key: 'interval_min', type: 'number', label: 'Look every', unit: 'minutes', min: LO, max: HI, integer: true, compact: true, under: 'on', disabledWhen: v => !v.on },
-        { key: 'heartbeat_min', type: 'number', label: 'Say all is well at least every', unit: 'minutes', min: 0, max: HI, integer: true, compact: true, help: '0 = never (the default): no all-well post, even with Post when all is well on.', under: 'on', disabledWhen: v => !v.on },
+        { key: 'heartbeat_min', type: 'number', label: 'Say all is well every', unit: 'minutes (0 = never)', min: 0, max: HI, integer: true, compact: true, help: '0 = never (the default): no all-well post, even with Post when all is well on.', under: 'on', disabledWhen: v => !v.on },
         { key: 'recipient', type: 'select', label: 'Send it to', under: 'on', disabledWhen: v => !v.on, options: async () => {
             const members = await ctx.members();
             return [{ value: '', label: 'The orchestrator (default)' }, ...members.map(m => ({ value: m.subscriber_id, label: `${m.subscriber_id}${m.job_title ? ` (${m.job_title})` : ''}` }))];

@@ -18,8 +18,8 @@ export function _setHubForTests(v) { _hubForTests = v; }
 export const XT_KEYS = ['cross_team_messaging', 'cross_team_artifacts'];
 /** The two switches, for Team settings and for New team step 3: the same words and defaults from one list (#11788). Each is on unless someone turns it off. */
 export const XT_SWITCHES = [
-    { key: 'cross_team_messaging', label: 'Message teams on other computers', help: 'Teams linked in Coral Hub can message this team.' },
-    { key: 'cross_team_artifacts', label: 'Share files with teams on other computers', help: 'Teams linked in Coral Hub can share files with this team.' },
+    { key: 'cross_team_messaging', label: 'Message teams on other computers', help: 'Lets teams on your other computers message this team. Needs this computer linked in Coral Hub; with no link, nothing happens.' },
+    { key: 'cross_team_artifacts', label: 'Share files with teams on other computers', help: 'Lets teams on your other computers send files to this team. Needs this computer linked in Coral Hub.' },
 ];
 export const HERE_NOT_YET = 'Teams on this computer: not allowed yet.';
 const STATES = ['ready', 'waiting', 'off', 'stale', 'old'];
