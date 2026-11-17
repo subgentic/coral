@@ -19,6 +19,7 @@ import (
 
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/license"
+	"github.com/subgentic/coral/internal/loginpath"
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/startup"
 	"github.com/subgentic/coral/internal/tracking"
@@ -80,6 +81,8 @@ func runServerChild(host string, port int, backendType string) {
 	log.SetOutput(logsafe.Writer(os.Stderr)) // tray.log carries what this writes: no home folder, user or computer name (#6053)
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 	log.Printf("[STARTUP] coral server (tray child) starting pid=%d go=%s os=%s arch=%s", os.Getpid(), runtime.Version(), runtime.GOOS, runtime.GOARCH)
+	// The server a Finder, login-item or in-app-update start runs is this child, with the system's bare PATH: it gets the folders its user's login shell has, as `coral` does (#15072), or its agents find no node, go or npm (#19038).
+	loginpath.Widen()
 	signal.Ignore(syscall.SIGHUP)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
