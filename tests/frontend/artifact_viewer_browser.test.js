@@ -135,6 +135,8 @@ const MD = [
         check('a remote image is a link, never an image', v && v.remote.length === 1 && v.remote[0].tag === 'A' && v.remote[0].href === 'https://x.test/beacon.png?d=SECRET', JSON.stringify(v && v.remote));
         check('the title is text, even with markup in the link name', v && v.titleElements === 0 && !/onerror/.test(v.title), JSON.stringify(v && v.title));
         check('Download keeps the stored file (its own name)', v && v.dlHref === `/api/artifacts/${MD_HEX}?v=2` && v.dlName === '', JSON.stringify(v));
+        await ev(`(() => { const a = document.querySelector('.artifact-viewer-download'); a.addEventListener('click', e => e.preventDefault(), { once: true }); a.click(); return true; })()`); // Download says it started and where the file goes (#17676)
+        check('Download says it started and where the file goes', /Download started.*Downloads folder/.test(await ev(`document.body.innerText`)), 'no toast after a click on Download');
         check('no script ran', (await ev('window.__pwned === undefined')), String(await ev('window.__pwned')));
         check('the remote image was never requested', !requested.some(u => u.includes('x.test')), JSON.stringify(requested.filter(u => u.includes('x.test'))));
 
