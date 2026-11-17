@@ -1,5 +1,45 @@
 # Release Notes
 
+## v2.0.70 — A Getting started guide with sharp pictures, computer status and Hub history out of Settings, approved skills for existing teams, team questions beside agents and goals, and a steadier team tab strip
+
+Task numbers in brackets. Built on v2.0.69, which was published but never promoted: v2.0.70 is the release to promote. Everything in the v2.0.69 notes below is in this release too. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **The Getting started guide's pictures are sharp on a Retina screen** (#19019, #19035): its nine pictures are taken again at twice the size, picture 9 shows the Goals view (it showed an OpenCode chat list), and the top-bar tab list names Queue in the bar's real order.
+- **Computer status and Hub action history are out of Settings** (#15884): open the read-only computer status from the desktop gear or the phone account menu; Hub action history has its own link in Settings.
+- **Approved skills work with existing teams and members** (#17166): a picker on an approved skill's page attaches it to current local members and tells them to read it, with no restart; a failure is reported per member.
+- **Needs you shows one While you were away line again**, not a new copy on every redraw, and its idle count leaves out agents that are starting or unknown (#19021).
+- **Comments reach agents that are waiting or idle** (#19085, #19093): a comment on an artifact is no longer held for an agent that is idle with an open task, or waiting in coral-board wait.
+- **An agent can reply to your comment until you resolve the thread** (#19100).
+- **The README is redesigned** (#19075).
+- **Team startup questions show beside agents and goals** (#17188), and the startup wait warnings use the team's real startup kind (#19020).
+
+#### Teams and the phone
+
+- The phone drawer's Teams list follows the active-teams rule: active teams first, idle ones behind Show all teams (n idle), the open team always listed (#18744).
+- The team tab strip's Show more tabs arrow keeps its room at the strip's end (hidden, not removed), so the strip's width no longer changes and it no longer flickers (#18984, #18972).
+- A start-pending mark stands for the start's own delay, and the exit grace runs from when the line was typed (#18991).
+
+#### Activity, Settings and the board
+
+- The New goal toast says the Orchestrator was told only when the Orchestrator is running (#16372).
+- A Coral started from Finder or as a login item gives its agents node, go and npm: the tray's server child now widens its PATH (#19038).
+- The Activity answer filter uses the same words as the question (#16259).
+- Settings warning text uses the themed warning colour, and Cancel in Settings is checked to restore values and write nothing (#16068).
+- The board table's Expand all indexes its reply rows once, so a long board expands faster (#18959).
+
+#### For the team
+
+- Release process: the promote workflow now creates its promote-<tag>-<sequence> release at main's tip, not at the promoted tag's commit (Promote of v2.0.69 was refused with HTTP 403) (#19030).
+- Test and gate work: board_table_seeded, teardown_stability, settings_apply_oracle, launch_skills_phone and launch_notice_no_jump got their causes fixed, and the provenance test pins the ten cdp-gate parts (#18959, #18996, #19003, #19005, #18964).
+
+### Known issues
+
+- In the final gate, one browser suite went red and was waived by the Operator: sidebar_kebab_click_browser (at phone width the first click on Rename opened no dialog, on both attempts of one run). It did not change in this release; a fix is filed.
+
 ## v2.0.69 — An updated Getting started guide, Needs you and Inbox that behave, files you can download and compare, a resource queue, and phone and iPad touch fixes
 
 Task numbers in brackets. Built on v2.0.68 and gated on ci/v2069 74e537cfa8; it carries the whole v2.0.70 queue. A prerelease until the Operator promotes it.
