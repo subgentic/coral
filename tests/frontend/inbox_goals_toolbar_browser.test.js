@@ -1,3 +1,4 @@
+const { POPULATED_CHAT_COUNTS } = require('./helpers/populated_chat_counts');
 // The Inbox's Goals folder has the shared list toolbar (#8596, goal #62; UI/UX #8589 section 9): the search box, the Filters icon in the same row to its right, the state pills, and in the Filters panel Team, Driver,
 // Updated since and Sort, the chips of what is on and "N on" on the icon; the filters are kept in the browser per folder; the folder list (the sidebar) is not touched. At 1280 and at 390, where the pills are one
 // select and the search keeps at least 10rem. The goals are stood in at GET /api/goals. Drives Chrome over CDP against the isolated dev server.
@@ -32,7 +33,7 @@ const GOALS = [
         for (const [label, w, h, mobile] of [['1280', 1280, 800, false], ['390', 390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await coralReady('startup', 'liveList', 'settings');
+            await coralReady('startup', 'liveList', 'settings'); await ev(POPULATED_CHAT_COUNTS);
             await ev(`try { localStorage.removeItem('coral-inbox-goals-filters'); } catch {} true`);
             await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => /\\/api\\/goals(\\?|$)/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ goals: ${JSON.stringify(GOALS)}.filter(g => (g.state === 'done') === /[?&]state=done/.test(String(u))) }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : R(u, o); return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
@@ -82,7 +83,7 @@ const GOALS = [
             // #14663 (QA Reviewer 2): a page opened with Done SAVED as the filter reads the finished goals first; the other pills' counts must still come from the open goals (one open read first, then Done's own)
             await pick('done'); await settle(600);
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await coralReady('startup', 'liveList', 'settings');
+            await coralReady('startup', 'liveList', 'settings'); await ev(POPULATED_CHAT_COUNTS);
             await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => /\\/api\\/goals(\\?|$)/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ goals: ${JSON.stringify(GOALS)}.filter(g => (g.state === 'done') === /[?&]state=done/.test(String(u))) }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : R(u, o); return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('.view-list-item').length > 3 || !!document.querySelector('.view-list select')`, 'the folders again', 10000);

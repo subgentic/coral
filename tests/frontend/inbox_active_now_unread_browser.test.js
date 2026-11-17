@@ -32,11 +32,11 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(nums['chats'], '3', 'All chats: the three agents\' chats are unread, the foreign transcript is not: ' + JSON.stringify(nums));
         assert.equal(nums['chats-active'], '2', 'Active now: the two agents, not the foreign transcript that is also running: ' + JSON.stringify(nums));
         assert.equal(nums['chats-group'], '2', 'Board history: its two boards: ' + JSON.stringify(nums));
-        assert.equal(nums['chats-archived'], '0', 'Archived: no agent chat is archived, the archived board is not counted: ' + JSON.stringify(nums));
+        assert.equal(nums['chats-archived'], undefined, 'Archived is hidden: no agent chat is archived, the archived board is not counted: ' + JSON.stringify(nums));
         // opening an unread live board (or flagging it) takes nothing off Active now or Archived: the board is not counted there to begin with (#17626, QA3's SHOULD on #17482)
         const after = await ev(`import((window.__coralStatic || '/static/') + 'mailbox_chats.js').then(m => { const at = new Date(Date.now() - 300000).toISOString(); m.chatOpened({ session_id: 'board:team', type: 'group', source_type: 'claude', active: true, archived: false, starred: false, last_timestamp: at, summary: 'team - 1 messages' }); m.chatOpened({ session_id: 'board:old', type: 'group', source_type: 'claude', active: false, archived: true, starred: false, last_timestamp: at, summary: 'old - 1 messages' }); return Object.fromEntries(m.chatSections().flatMap(x => x.items).map(i => [i.key, String(i.count || '')])); })`);
         assert.equal(after['chats-active'], '2', 'opening an unread live board leaves Active now at 2: ' + JSON.stringify(after));
-        assert.equal(after['chats-archived'], '', 'opening an unread archived board leaves Archived with no number: ' + JSON.stringify(after));
+        assert.equal(after['chats-archived'], undefined, 'opening an unread archived board leaves the empty Archived folder hidden: ' + JSON.stringify(after));
         const dots = await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')].map(r => [r.textContent.includes('Some other Claude'), r.classList.contains('dt-unread') || !!r.querySelector('.dt-unread, .unread-dot, [data-unread="true"]')])`);
         const foreign = dots.find(([isForeign]) => isForeign), agents = dots.filter(([isForeign]) => !isForeign);
         assert.ok(foreign && foreign[1] === false, 'the foreign transcript is listed, with no unread dot: ' + JSON.stringify(dots));
