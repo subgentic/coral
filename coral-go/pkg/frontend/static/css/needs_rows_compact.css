@@ -47,7 +47,7 @@
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-meta :is(.inbox-review-from, .inbox-review-version, .inbox-kind) { font-weight: var(--fw-regular); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-meta .inbox-review-from::after { content: none; }
 @container (min-width: 50rem) { /* a wide card: line 1 is the name with its team and how long it has waited at the top right; the question and the meta line are the next two lines; the buttons stand at the right, level with the bottom of them (no row of their own, no empty area under the question; the Operator: buttons to the bottom, the waiting time top right) */
-  :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row { grid-template-columns: auto auto minmax(0, 1fr) auto 5.5rem; }
+  :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row { grid-template-columns: auto auto minmax(0, 1fr) auto 8rem; }
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td:first-child { grid-row: 1; }
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-kind-column { grid-row: 1; }
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td[data-key="agent"] > .inbox-review-item { display: contents; }
