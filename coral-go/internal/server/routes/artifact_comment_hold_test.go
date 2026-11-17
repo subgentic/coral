@@ -95,10 +95,11 @@ func TestSeveralHeldCommentsArriveAsOneMessageInOrder(t *testing.T) {
 	assert.False(t, rig.askQueued(first, 1) || rig.askQueued(second, 1))
 }
 
-func TestACommentForAnAgentWithATaskWaitsUnlessMarkedNow(t *testing.T) {
+// #19093, the Operator: an agent keeps its task open while it waits for the Operator's review, idle at its prompt; a task is not a reason to hold a comment, only a turn in progress is.
+func TestACommentForAnIdleAgentWithATaskIsDeliveredAtOnce(t *testing.T) {
 	rig := newCmtRig(t)
 	rig.agent(1, "Dev", false)
-	rig.turn(1, "Dev", "stop") // idle at its prompt, but it has a task
+	rig.turn(1, "Dev", "stop") // idle at its prompt, with a task in progress
 	_, err := rig.h.bs.CreateTask(context.Background(), "team-a", "build it", "", "medium", "Operator", "Dev")
 	require.NoError(t, err)
 	claimed, err := rig.h.bs.ClaimTask(context.Background(), "team-a", naming.SubscriberID("Dev", "claude"))
@@ -106,14 +107,30 @@ func TestACommentForAnAgentWithATaskWaitsUnlessMarkedNow(t *testing.T) {
 	require.NotNil(t, claimed, "the agent's task is in progress")
 	cid := rig.ownerComment("Plain comment.")
 	_, out := rig.send(cid, "Dev")
-	assert.Equal(t, map[string]string{"Dev": "queued"}, states(out), "a task is a reason to wait")
-	rig.h.flushHeldComments(context.Background(), time.Now())
-	assert.Empty(t, rig.operatorMessages(), "held for as long as the task lasts")
-
-	urgent := rig.ownerComment("Urgent comment.")
-	_, out = rig.sendNow(urgent, true, "Dev")
-	assert.Equal(t, map[string]string{"Dev": "sent"}, states(out), "marked now: delivered at the idle prompt even with a task")
+	assert.Equal(t, map[string]string{"Dev": "sent"}, states(out), "a task is no reason to wait: the agent is idle")
 	assert.Len(t, rig.operatorMessages(), 1)
+	assert.False(t, rig.askQueued(cid, 1))
+}
+
+// An agent in a turn with a task still waits for the turn's end, and gets the comment on the next pass after it.
+func TestACommentForAnAgentInATurnWithATaskIsDeliveredWhenTheTurnEnds(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.turn(1, "Dev", "prompt_submit")
+	_, err := rig.h.bs.CreateTask(context.Background(), "team-a", "build it", "", "medium", "Operator", "Dev")
+	require.NoError(t, err)
+	_, err = rig.h.bs.ClaimTask(context.Background(), "team-a", naming.SubscriberID("Dev", "claude"))
+	require.NoError(t, err)
+	cid := rig.ownerComment("Plain comment.")
+	_, out := rig.send(cid, "Dev")
+	assert.Equal(t, map[string]string{"Dev": "queued"}, states(out), "mid-turn: held")
+	rig.h.flushHeldComments(context.Background(), time.Now())
+	assert.Empty(t, rig.operatorMessages())
+
+	rig.turn(1, "Dev", "stop")
+	rig.h.flushHeldComments(context.Background(), time.Now())
+	assert.Len(t, rig.operatorMessages(), 1, "delivered at the turn's end, the task still open")
+	assert.False(t, rig.askQueued(cid, 1))
 }
 
 func TestNowNeverTypesMidTurn(t *testing.T) {
