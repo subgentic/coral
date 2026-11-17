@@ -42,6 +42,7 @@ const TV = await importOnce('./tasks_view.js');
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 await loadStyles('goal_close.css'); // the Close dialog's phone card (not at start: page_weight, #15163)
 await loadStyles('goal_page.css'); // the page's own few rules (#15166)
+const { bindStartupWaits } = await importOnce('./team_startup_waits.js');
 const PAGE = 50;
 
 /** Mount one goal; each mount owns its task pages, search and phone screen. */
@@ -49,7 +50,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     const root = host;
     const model = { project: team, openId: id, tasks: new Map(), followUps: new Map(), followKey: new Map(), taskSearch: '', tab: 'tasks', creating: false };
     let current = goal;
-    let disposed = false;
+    let disposed = false, stopStartupWaits = null;
     const goalById = gid => current?.id === gid ? current : null;
     const doneOf = rollup => rollup.done, totalOf = rollup => W.allTasksOf(rollup);
     const closeGoal = () => back();
@@ -200,6 +201,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         const copyBtn = agentCopyButton('goal', () => W.agentBriefLine(g), { className: 'goal-copy-agent' }); // the robot: copies the goal's line and where in the docs to read (#15063)
         if (!phone) line.append(copyBtn); // on a phone it is in the header's More menu (#13119)
         main.append(line);
+        const startup = el('div'); main.append(startup); stopStartupWaits?.(); stopStartupWaits = bindStartupWaits(startup, model.project);
         const closedLine = C.closedByLine(g); // who closed it, so a goal an agent closed is not mistaken for one the person closed (#15244)
         if (closedLine) { const c = el('p', `goals-note goals-closed-by${g.closedBy && g.closedBy !== 'Operator' ? ' goals-closed-by-agent' : ''}`, closedLine); c.setAttribute('role', 'note'); main.append(c); }
         const doneWords = doneNote(g);
@@ -592,6 +594,6 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         window.addEventListener('focus', visibleRefresh);
     }
     return { update, openClose: (g, preset) => openClose(g, preset), refreshTasks: () => loadTasks(id), dispose: () => {
-        disposed = true; narrowQuery?.removeEventListener?.('change', namePane); if (!previewEl.hidden) closeDetailPane(); artifacts.api?.destroy(); comments.api?.destroy(); stop?.(); if (timer) clearInterval(timer); window.removeEventListener('focus', visibleRefresh);
+        disposed = true; stopStartupWaits?.(); narrowQuery?.removeEventListener?.('change', namePane); if (!previewEl.hidden) closeDetailPane(); artifacts.api?.destroy(); comments.api?.destroy(); stop?.(); if (timer) clearInterval(timer); window.removeEventListener('focus', visibleRefresh);
     }, focus: focusDetail };
 }

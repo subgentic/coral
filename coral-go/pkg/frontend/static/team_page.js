@@ -26,6 +26,7 @@ const { revealInStrip } = await importOnce('./strip_reveal.js'); // a part of th
 const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 const { el } = await importOnce('./team_table.js');
 const { copyForAgent } = await importOnce('./agent_copy_button.js'); // the More menu's Copy for an agent (#15993; the robot beside the name is gone)
+const { drawStartupWaits } = await importOnce('./team_startup_waits.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
 
 const PHONE_MORE = ['knowledge', 'messages', 'branches']; // (the last three of TEAM_TABS: the row is the others, in the operator's order, #8791) // the tabs a phone puts behind its More menu (CSS hides their tabs under 761 px)
@@ -242,6 +243,9 @@ function drawHeader() {
 
 function drawStatus(data) {
     const s = $('team-page-status'); if (!s) return;
+    let startup = $('team-page-startup');
+    if (!startup) { startup = el('div'); startup.id = 'team-page-startup'; $('team-page-head').append(startup); }
+    drawStartupWaits(startup, S.team);
     clearTimeout(S.attentionTimer); S.attentionTimer = null;
     syncStop();
     S.statusData = data;
@@ -348,6 +352,7 @@ function syncNeedsCount() {
     const team = S.team;
     importOnce('./inbox_sidebar.js').then(m => { if (S.team !== team) return; const count = m.teamNeedsCount(team); S.attention = count; S.counts.needs = count.ownerOnly ? '' : count.complete ? count.value : count.value ? `${count.value}+` : '…'; drawCounts(); drawStatus(S.statusData); });
 }
+window.addEventListener('coral:live-list-rendered', () => { if (S.team && currentTeamPage()) drawStatus(S.statusData); });
 document.addEventListener('coral:needs-updated', () => { if (S.team && currentTeamPage()) drawStatus(S.statusData); syncNeedsCount(); });
 document.addEventListener('coral:team-needs-count', e => { if (e.detail?.team === S.team) syncNeedsCount(); });
 document.addEventListener('coral:team-pause-changed', e => { if (e.detail?.team === S.team) drawStatus(S.statusData); });

@@ -67,7 +67,8 @@ const waitsOn = (t) => [...(Array.isArray(t.waiting_on) ? t.waiting_on : []).map
 const taskLine = (t, a) => `#${Number(t.id)} ${(t.status === 'pending' || t.status === 'blocked') && waitsOn(t) ? `waiting on ${waitsOn(t)}` : t.status === 'pending' && a && a.name ? `waiting for ${a.name} to pick it up` : String(t.status || '').replaceAll('_', ' ')}: ${t.title}`;
 /** What the agent is doing: its first task as one line, else the reason its status gives. */
 const joinedWords = (a) => (a.join_notice === 'told' ? 'Team told' : a.join_notice === 'not_told' ? 'Team not told yet' : ''); // an agent added to the team with no task yet: whether its Orchestrator was told (#17343)
-const doingOf = (a) => (a.tasks && a.tasks.length ? taskLine(a.tasks[0], a) + (a.tasks.length > 1 ? ` (+${a.tasks.length - 1} more)` : '') : [a.reason || '', joinedWords(a)].filter(Boolean).join(' · '));
+const startupOf = a => { const row = (state.liveSessions || []).find(s => inTeam(s, model.team) && (a.session_id ? s.session_id === a.session_id : s.name === a.name)); return row && row.waiting_for_input && row.waiting_kind === 'startup' ? row.waiting_summary : ''; };
+const doingOf = (a) => startupOf(a) || (a.tasks && a.tasks.length ? taskLine(a.tasks[0], a) + (a.tasks.length > 1 ? ` (+${a.tasks.length - 1} more)` : '') : [a.reason || '', joinedWords(a)].filter(Boolean).join(' · '));
 
 /** The statuses with at least one agent, in the order of the chips, with their counts. */
 function chipCounts(agents) {

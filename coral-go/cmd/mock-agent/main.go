@@ -122,6 +122,8 @@ func main() {
 		}
 	}
 
+	holdStartupPrompt()
+
 	sessionName := os.Getenv("CORAL_SESSION_NAME")
 	port := os.Getenv("CORAL_PORT")
 	if port == "" {
