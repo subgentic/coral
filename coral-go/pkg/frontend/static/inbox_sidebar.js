@@ -694,8 +694,8 @@ const savedState = DT.tableState(); // one word set for a task's state (Queued, 
 const goalsState = DT.tableState();
 const taskText = t => [t.title, t.board, t.priority, stateOf(t), t.created_by].join(' ').toLowerCase();
 let taskFilters = { ...TF.EMPTY }, taskState = 'all', taskBar = null;
-const workHits = { tasks: new Set(), goals: new Set() }; let workGen = 0, workTimer = 0; // items whose body or outcome holds the search words, from the server's search (#19237)
-const taskMatches = t => serverMatches(t, taskFilters) && (!queries.tasks || taskText(t).includes(queries.tasks.toLowerCase()) || workHits.tasks.has(`${t.project}#${t.id}`))
+const wh = { tasks: new Set(), goals: new Set() }, noteWorkSearch = (k, q) => importOnce('./work_search.js').then(m => m.noteWork(wh, k, q, k === 'tasks' ? tasks : goals, () => renderInboxNav(true))); // work_search.js (#19237)
+const taskMatches = t => serverMatches(t, taskFilters) && (!queries.tasks || taskText(t).includes(queries.tasks.toLowerCase()) || wh.tasks.has(`${t.project}#${t.id}`))
     && (!taskFilters.team || t.project === taskFilters.team)
     && (!taskFilters.priority || t.priority === taskFilters.priority)
     && (!taskFilters.from || Date.parse(t.updated_at || t.created_at) >= new Date(taskFilters.from + 'T00:00:00').getTime());
@@ -771,13 +771,7 @@ const closeGoalsActions = () => [{ label: 'Close goals', danger: true,
 const goalTeam = g => teamLabel(g.board_id); // with its computer when a hub has more than one: two teams called alpha are two (#8774)
 let goalFilters = GF.loadFilters(), goalBar = null;
 let activityFilters = AF.loadFilters(), activityBar = null;
-const goalRows = () => GF.ordered(goals.filter(g => (GF.matches(g, goalFilters, goalTeam) || (workHits.goals.has(`${g.board_id}#${g.id}`) && GF.matches(g, { ...goalFilters, q: '' }, goalTeam))) && serverMatches(g, goalFilters)), goalFilters);
-/** The words typed in Tasks or Goals are also asked of the server (the search 'coral-board search' makes), so a word only in a task's body or a goal's outcome shows; the list redraws when it answers. */
-function noteWorkSearch(kind, text) {
-    const gen = ++workGen; clearTimeout(workTimer);
-    if (!String(text || '').trim()) { if (workHits[kind].size) { workHits[kind] = new Set(); } return; }
-    workTimer = setTimeout(() => importOnce('./work_search.js').then(m => m.workHits((kind === 'tasks' ? tasks.map(t => t.project) : goals.map(g => g.board_id)), text, kind)).then(set => { if (gen !== workGen) return; workHits[kind] = set; renderInboxNav(true); }).catch(() => {}), 250);
-}
+const goalRows = () => GF.ordered(goals.filter(g => GF.matches(g, wh.goals.has(`${g.board_id}#${g.id}`) ? { ...goalFilters, q: '' } : goalFilters, goalTeam) && serverMatches(g, goalFilters)), goalFilters);
 /** New goal at the right of the Goals toolbar (#11593, the operator): the existing New goal form (goals_view.js, lazy), on the team the Team filter names, else the first; with more than one team the form asks which. */
 function newGoalAction() {
     const b = DT.el('button', 'btn btn-primary goals-new', 'New goal'); b.type = 'button';
