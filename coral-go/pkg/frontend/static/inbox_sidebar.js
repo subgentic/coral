@@ -292,10 +292,10 @@ const runRows = () => failedUnread().map(r => ({ autorun: r, session_id: `automa
 const proposalRows = () => proposalItems().map(p => ({ proposal: p, session_id: p.rowKey, display_name: markedText(p.proposer), board_project: splitKey(p.board_id).name, board_label: markedText(p.board_label || ''), server: p.server || LOCAL_SERVER, waiting_kind: 'proposal', waiting_summary: proposalSummary(p), waiting_since: p.created_at }));
 /** An active goal whose tasks are all done (#11825): ONE row of Needs you, "Goal #N looks done: <title>" with its Done-when line; Close goal, Not yet and Dismiss. Each computer keeps its own goal identity and actions. */
 const goalTeamHere = g => { const k = splitKey(g.board_id); return k.name ? identityKey(k.server, k.name) : ''; };
-let uncommittedMod = null; // team_uncommitted.js, loaded the first time a goal looks done (#17284)
+let uncommittedMod = null, uncommittedLoading = null; // team_uncommitted.js, loaded the first time a goal looks done (#17284)
 const uncommittedNote = g => { // "3 files in shop not committed" on a goal's row, for a team on this computer; read in the background and the list drawn again when it arrives
     if (splitKey(g.board_id).server !== LOCAL_SERVER) return '';
-    if (!uncommittedMod) { importOnce('./team_uncommitted.js').then(m => { uncommittedMod = m; renderInboxNav(true); }).catch(() => {}); return ''; }
+    if (!uncommittedMod) { uncommittedLoading ||= importOnce('./team_uncommitted.js').then(m => { uncommittedMod = m; renderInboxNav(true); }).catch(() => {}); return ''; } // one load and one redraw for the whole list, not one per goal row
     uncommittedMod.loadNote(splitKey(g.board_id).name, () => renderInboxNav(true));
     return uncommittedMod.noteFor(splitKey(g.board_id).name);
 };
