@@ -31,11 +31,15 @@ export function pick(entries) {
     const ranked = ordered ? entries : [...entries].sort((a, b) => (asleepOnly(a[1]) - asleepOnly(b[1])) || (newest(b[1]) - newest(a[1])));
     const hide = !(showingAll() || searching()) && idle.length > 0, shown = hide ? ranked.filter(e => !idle.includes(e)) : ranked;
     shown.row = idle.length && !searching() ? row(hide, idle.length) : '';
+    Object.assign(shown, { idle: searching() ? 0 : idle.length, hide }); // for a list that draws its own row (the phone drawer, #18744)
     return shown;
 }
 
+/** Show all teams, or only the active ones: the choice every list shares. */
+export function toggleShowAll() { browserLocal.set(KEY, showingAll() ? 'false' : 'true'); redrawLiveList(); }
+
 
 registerActions({
-    'teams-show-all': () => { browserLocal.set(KEY, showingAll() ? 'false' : 'true'); redrawLiveList(); },
+    'teams-show-all': toggleShowAll,
 });
 setTimeout(redrawLiveList, 0); // loaded for the list that asked: draw it again now that the module is registered
