@@ -18,6 +18,7 @@ type WorkQuery struct {
 	Since    string   // at >= (UTC RFC 3339)
 	Until    string   // at <  (UTC RFC 3339)
 	Limit    int
+	Relaxed  bool // a hit holds ANY of the words, best first (the near matches offered when nothing holds all of them, #19476)
 	Oldest   bool // oldest first (the limit then keeps the oldest); the default is the best match, then newest
 }
 
@@ -30,7 +31,10 @@ type WorkHit struct {
 	Snippet  string `json:"snippet"`
 	State    string `json:"state"`
 	GoalID   *int64 `json:"goal_id,omitempty"`
-	Assignee string `json:"assignee,omitempty"` // a task's assignee (#19448): "who has it" without opening it
+	Matched  int    `json:"matched,omitempty"`   // a near match: how many of the words it holds
+	Of       int    `json:"of,omitempty"`        // ... out of how many were asked for
+	DoneWhen string `json:"done_when,omitempty"` // a goal's done-when, whole (300 characters at most), so a hit answers "when is it done?"
+	Assignee string `json:"assignee,omitempty"`  // a task's assignee (#19448): "who has it" without opening it
 	At       string `json:"at"`
 	Minor    bool   `json:"-"` // a reviewer's own "Review #N" task: it repeats the task it reviews, so a search with no sort named lists it after the real hits
 	Rank     int    `json:"-"` // a several-term search: how well the terms stand (WorkRank); the one list is ordered by it first
@@ -71,12 +75,17 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 			Assign *string `db:"assigned_to"`
 			At     string  `db:"at"`
 		}
-		match, matchArgs := likeAllTerms(terms, "title", "body", "completion_message")
+		matcher := likeAllTerms
+		if q.Relaxed {
+			matcher = likeAnyTerms
+		}
+		match, matchArgs := matcher(terms, "title", "body", "completion_message")
 		sqlText := `SELECT id, title, body, completion_message, status, goal_id, assigned_to, ` + updatedAtSQL + ` AS at FROM board_tasks WHERE board_id = ? AND ` + match
 		args := append([]any{q.Board}, matchArgs...)
 		if q.State != "" {
-			sqlText += " AND status = ?"
-			args = append(args, q.State)
+			cl, ca := stateClause("status", q.State, openTaskStates)
+			sqlText += cl
+			args = append(args, ca...)
 		}
 		if q.GoalID != 0 {
 			sqlText += " AND goal_id = ?"
@@ -104,7 +113,12 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 			return nil, false, err
 		}
 		for _, r := range rows {
-			hits = append(hits, WorkHit{Source: "task", ID: r.ID, Title: r.Title, Snippet: WorkSnippet(text, deref(r.Done), deref(r.Body), r.Title), State: r.Status, GoalID: r.GoalID, Assignee: deref(r.Assign), Minor: strings.HasPrefix(r.Title, "Review #"), At: r.At, Rank: WorkRank(terms, r.Title, r.Title, deref(r.Body), deref(r.Done))})
+			h := WorkHit{Source: "task", ID: r.ID, Title: r.Title, Snippet: WorkSnippet(text, deref(r.Done), deref(r.Body), r.Title), State: r.Status, GoalID: r.GoalID, Assignee: deref(r.Assign), Minor: strings.HasPrefix(r.Title, "Review #"), At: r.At, Rank: WorkRank(terms, r.Title, r.Title, deref(r.Body), deref(r.Done))}
+			if q.Relaxed {
+				h.Matched, h.Of = termsHeld(terms, r.Title, deref(r.Body), deref(r.Done)), len(terms)
+				h.Rank = h.Matched
+			}
+			hits = append(hits, h)
 		}
 	}
 	if want["goals"] {
@@ -117,12 +131,17 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 			State   string `db:"state"`
 			At      string `db:"updated_at"`
 		}
-		match, matchArgs := likeAllTerms(terms, "title", "outcome", "done_when", "closed_reason")
+		matcher := likeAllTerms
+		if q.Relaxed {
+			matcher = likeAnyTerms
+		}
+		match, matchArgs := matcher(terms, "title", "outcome", "done_when", "closed_reason")
 		sqlText := `SELECT id, title, outcome, done_when, closed_reason, state, updated_at FROM board_goals WHERE board_id = ? AND ` + match
 		args := append([]any{q.Board}, matchArgs...)
 		if q.State != "" {
-			sqlText += " AND state = ?"
-			args = append(args, q.State)
+			cl, ca := stateClause("state", q.State, openGoalStates)
+			sqlText += cl
+			args = append(args, ca...)
 		}
 		if q.GoalID != 0 {
 			sqlText += " AND id = ?"
@@ -150,7 +169,12 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 			}
 		}
 		for _, r := range rows {
-			hits = append(hits, WorkHit{Source: "goal", ID: r.ID, Title: r.Title, Snippet: WorkSnippet(text, r.Done, r.Outcome, r.Closed, r.Title), State: r.State, At: r.At, Rank: WorkRank(terms, r.Title, r.Title, r.Outcome, r.Done, r.Closed)})
+			h := WorkHit{Source: "goal", ID: r.ID, Title: r.Title, Snippet: WorkSnippet(text, r.Done, r.Outcome, r.Closed, r.Title), State: r.State, DoneWhen: r.Done, At: r.At, Rank: WorkRank(terms, r.Title, r.Title, r.Outcome, r.Done, r.Closed)}
+			if q.Relaxed {
+				h.Matched, h.Of = termsHeld(terms, r.Title, r.Outcome, r.Done, r.Closed), len(terms)
+				h.Rank = h.Matched
+			}
+			hits = append(hits, h)
 		}
 	}
 	sort.SliceStable(hits, func(i, j int) bool {
@@ -166,6 +190,51 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 		hits, more = hits[:limit], true
 	}
 	return hits, more, nil
+}
+
+// The states "open" stands for (#19476): a task still to do or being done, a goal not yet closed.
+var (
+	openTaskStates = []string{"pending", "in_progress", "blocked", "review_pending", "draft"}
+	openGoalStates = []string{"proposed", "active", "blocked"}
+)
+
+// stateClause is the SQL for a state filter on column col: one state, or "open" for the open ones.
+func stateClause(col, state string, open []string) (string, []any) {
+	if state != "open" {
+		return " AND " + col + " = ?", []any{state}
+	}
+	args := make([]any, len(open))
+	for i, st := range open {
+		args[i] = st
+	}
+	return " AND " + col + " IN (?" + strings.Repeat(",?", len(open)-1) + ")", args
+}
+
+// likeAnyTerms is the SQL that holds when at least one term is in one of the columns.
+func likeAnyTerms(terms []string, cols ...string) (string, []any) {
+	var ors []string
+	var args []any
+	for _, t := range terms {
+		for _, c := range cols {
+			ors = append(ors, c+` LIKE ? ESCAPE '\'`)
+			args = append(args, "%"+likeEscape(t)+"%")
+		}
+	}
+	return "(" + strings.Join(ors, " OR ") + ")", args
+}
+
+// termsHeld is how many of the terms are somewhere in the fields.
+func termsHeld(terms []string, fields ...string) int {
+	n := 0
+	for _, t := range terms {
+		for _, f := range fields {
+			if strings.Contains(strings.ToLower(f), t) {
+				n++
+				break
+			}
+		}
+	}
+	return n
 }
 
 func deref(p *string) string {

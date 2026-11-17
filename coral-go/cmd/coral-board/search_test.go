@@ -200,13 +200,30 @@ func TestSearchTimeFlagsTakeADateOrAnAgeAndTheListIsInUTC(t *testing.T) {
 // A task hit names its assignee, and a search the filters leave empty says so (#19448).
 func TestPrintResultsShowsAssigneeTotalAndTheFiltersThatLeftNothing(t *testing.T) {
 	out := captureStdout(t, func() {
-		printResults("b", "staging", []map[string]any{{"source": "task", "id": 7.0, "at": "2026-11-17T09:00:00Z", "state": "completed", "assignee": "Developer experience", "title": "Fix", "snippet": "the staging cert"}}, false, "", "", 12, "")
+		printResults("b", "staging", []map[string]any{{"source": "task", "id": 7.0, "at": "2026-11-17T09:00:00Z", "state": "completed", "assignee": "Developer experience", "title": "Fix", "snippet": "the staging cert"}}, false, "", "", 12, "", nil, nil)
 	})
-	require.Contains(t, out, "12 matches on board b (showing 1)")
+	require.Contains(t, out, "12 matches on board b (showing 1, 11 more: --limit or --cursor)")
 	require.Contains(t, out, "task #7 2026-11-17 09:00Z [completed] @Developer experience  Fix")
-	out = captureStdout(t, func() { printResults("b", "staging", nil, false, "", "", 0, `--state "completed" --assignee "Dana"`) })
+	out = captureStdout(t, func() {
+		printResults("b", "staging", nil, false, "", "", 0, `--state "completed" --assignee "Dana"`, nil, map[string]int{"state": 4})
+	})
 	require.Contains(t, out, "with --state \"completed\" --assignee \"Dana\"")
-	require.Contains(t, out, "every filter must hold")
+	require.Contains(t, out, "Every filter must hold")
+	require.Contains(t, out, "Without --state: 4 tasks or goals match.", "which filter left nothing")
 	require.Equal(t, `--state "done" --since "2d"`, searchFilters(map[string]string{"state": "done", "since": "2d", "goal": " "}))
 	require.NotContains(t, searchFilters(map[string]string{"state": "a\x1b[31mb"}), "\x1b", "control characters never reach the terminal")
+}
+
+// Nothing holds every word: the closest tasks and goals are listed with how many words they hold, and a goal's done-when is whole on its line (#19476).
+func TestPrintResultsNearMatchesAndWholeDoneWhen(t *testing.T) {
+	near := []map[string]any{{"source": "goal", "id": 249.0, "at": "2026-11-17T09:00:00Z", "state": "active", "title": "Reminders for any agent", "matched": 2.0, "of": 4.0, "done_when": "the Operator sets one"}}
+	out := captureStdout(t, func() { printResults("b", "reminders ordinary team agents", nil, false, "", "", 0, "", near, nil) })
+	require.Contains(t, out, "Nothing holds every word")
+	require.Contains(t, out, "goal #249 2026-11-17 09:00Z [active] (2 of 4 words)  Reminders for any agent")
+	require.NotContains(t, out, "done when", "a near match stays one line")
+	hit := []map[string]any{{"source": "goal", "id": 249.0, "at": "2026-11-17T09:00:00Z", "state": "active", "title": "Reminders", "snippet": "the outcome text", "done_when": "the Operator   sets\none, whole"}}
+	out = captureStdout(t, func() { printResults("b", "reminders", hit, false, "", "", 1, "", nil, nil) })
+	require.Contains(t, out, "\n      done when: the Operator sets one, whole")
+	out = captureStdout(t, func() { printResults("b", "x", hit, true, "", "", 40, "", nil, nil) })
+	require.Contains(t, out, "(showing 1, 39 more: --limit or --cursor)")
 }
