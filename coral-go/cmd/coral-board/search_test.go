@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 
@@ -125,4 +126,16 @@ func TestBoardSearchSendsTheWorkFiltersAndPrintsTasksAndGoals(t *testing.T) {
 	var out map[string]any
 	require.NoError(t, json.Unmarshal([]byte(res.stdout), &out))
 	assert.Len(t, out["results"], 2)
+}
+
+// #19181: a wider reach says tasks and goals are still this board's only.
+func TestBoardSearchSaysTasksAndGoalsStayOnThisBoardWithAWiderReach(t *testing.T) {
+	gs := newGoalServer(t)
+	gs.setReply("GET /api/agent/board/search", strings.Replace(searchWorkReply, `"more":true`, `"more":false,"work_scope":"this board only"`, 1))
+	res := goalRun(t, gs, "search", "narwhal", "--team")
+	require.Equal(t, 0, res.code, res.stderr)
+	assert.Contains(t, res.stdout, "Tasks and goals: this board only")
+	gs.setReply("GET /api/agent/board/search", strings.Replace(searchWorkReply, `"more":true`, `"more":false`, 1))
+	res = goalRun(t, gs, "search", "narwhal")
+	assert.NotContains(t, res.stdout, "Tasks and goals:")
 }

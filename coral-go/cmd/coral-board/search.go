@@ -84,13 +84,14 @@ func cmdSearch() {
 		Messages   []map[string]any `json:"messages"`
 		Results    []map[string]any `json:"results"`
 		More       bool             `json:"more"`
+		WorkScope  string           `json:"work_scope"`
 	}
 	if err := json.Unmarshal(data, &out); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		clierr.Exit1()
 	}
 	if hasResults(data) {
-		printResults(out.Board, args[0], out.Results, out.More, out.NextCursor)
+		printResults(out.Board, args[0], out.Results, out.More, out.NextCursor, out.WorkScope)
 		return
 	}
 	if len(out.Messages) == 0 {
@@ -159,7 +160,7 @@ func hasResults(data []byte) bool {
 }
 
 // printResults is the one list, a hit a line: the source and id, the time, the state, then the title and the words around the match.
-func printResults(boardName, text string, results []map[string]any, more bool, nextCursor string) {
+func printResults(boardName, text string, results []map[string]any, more bool, nextCursor, workScope string) {
 	if len(results) == 0 {
 		fmt.Printf("No messages, tasks or goals match %q on board %s.\n", text, boardName)
 		return
@@ -182,6 +183,9 @@ func printResults(boardName, text string, results []map[string]any, more bool, n
 	}
 	if nextCursor != "" {
 		fmt.Printf("More messages: coral-board search %q --source messages --cursor %s\n", text, nextCursor)
+	}
+	if workScope != "" {
+		fmt.Printf("Tasks and goals: %s (--team, --all and --operator-history widen only the messages).\n", clitext.Clean(workScope))
 	}
 	fmt.Println("A message: coral-board read --id <id>. A task: coral-board task detail <id>. A goal: coral-board goal show <id>.")
 }

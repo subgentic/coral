@@ -104,37 +104,33 @@ func (h *SessionsHandler) SearchAgentBoard(w http.ResponseWriter, r *http.Reques
 		q.Boards = boards
 	}
 	workLimit := q.Limit
-	if !sources["messages"] { // tasks or goals only: no message is read
-		q.Limit = 1
-		q.Text = ""
-	}
-	res, err := h.bs.QueryMessages(r.Context(), q)
-	if err != nil {
-		errInternalServer(w, "could not search the messages")
-		return
-	}
-	// The response is capped (searchResponseCap): a page that is over it is read again with a smaller limit, so the cursor still points at the first message not returned.
+	res := &board.MessageQueryResult{} // tasks or goals only: no message is read
 	capped := false
-	for q.Limit > 1 {
-		raw, _ := json.Marshal(res.Messages)
-		if len(raw) <= searchResponseCap {
-			break
-		}
-		capped = true
-		q.Limit = len(res.Messages) / 2
-		if q.Limit < 1 {
-			q.Limit = 1
-		}
+	if sources["messages"] {
+		var err error
 		if res, err = h.bs.QueryMessages(r.Context(), q); err != nil {
 			errInternalServer(w, "could not search the messages")
 			return
 		}
+		// The response is capped (searchResponseCap): a page that is over it is read again with a smaller limit, so the cursor still points at the first message not returned.
+		for q.Limit > 1 {
+			raw, _ := json.Marshal(res.Messages)
+			if len(raw) <= searchResponseCap {
+				break
+			}
+			capped = true
+			q.Limit = len(res.Messages) / 2
+			if q.Limit < 1 {
+				q.Limit = 1
+			}
+			if res, err = h.bs.QueryMessages(r.Context(), q); err != nil {
+				errInternalServer(w, "could not search the messages")
+				return
+			}
+		}
 	}
 	if requested != store.SearchReachOwn {
 		h.logSearchRead(r, who, requested, "ok", "board-search", boardTargets(boards), int(res.Total))
-	}
-	if !sources["messages"] {
-		res = &board.MessageQueryResult{}
 	}
 	results, more, err := h.searchWorkResults(r, boardKey, vals, workLimit, q.Since, q.Until, res.Messages, sources)
 	if err != nil {
@@ -142,6 +138,9 @@ func (h *SessionsHandler) SearchAgentBoard(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	out := map[string]any{"results": results, "more": more, "messages": res.Messages, "total": res.Total, "limit": q.Limit, "board": boardKey, "reach": requested}
+	if requested != store.SearchReachOwn && (sources["tasks"] || sources["goals"]) {
+		out["work_scope"] = "this board only" // the wider reach is for messages; tasks and goals are always the agent's own board's
+	}
 	if res.NextCursor != "" {
 		out["next_cursor"] = res.NextCursor
 	}
