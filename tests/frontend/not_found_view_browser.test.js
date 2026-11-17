@@ -2,6 +2,7 @@
 // dashboard: its sidebar and theme) that names what was not found and has a button back to the right list, instead of the list or the start page with no word. A goal that exists still opens. Real server, a real team.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { goneId } = require('./helpers/task_ids');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 
@@ -20,9 +21,10 @@ const TEAM = 'nf-' + Date.now().toString(36);
             const goal = await api('/goals', { title: 'The one goal', outcome: 'Exists.', done_when: 'Always.', state: 'active', created_by: 'Orchestrator' });
             const gid = goal && (goal.id || (goal.goal && goal.goal.id));
             assert.ok(gid, at + 'a goal was made: ' + JSON.stringify(goal));
+            const GONE = goneId(gid); // a number no goal or task has: ids are one counter for the whole server, so a fixed 99 can be the goal this suite just made on a long shard (#16478)
             const cases = [
-                [`/team/${TEAM}/goals/99`, /That goal was not found: #99/, 'Back to Goals', /\/team\/.+\/goals$/],
-                [`/team/${TEAM}/tasks/99`, /That task was not found: #99/, 'Back to Tasks', /\/team\/.+\/tasks$/],
+                [`/team/${TEAM}/goals/${GONE}`, new RegExp('That goal was not found: #' + GONE), 'Back to Goals', /\/team\/.+\/goals$/],
+                [`/team/${TEAM}/tasks/${GONE}`, new RegExp('That task was not found: #' + GONE), 'Back to Tasks', /\/team\/.+\/tasks$/],
                 [`/team/${TEAM}/goals/%E0%A4`, /That goal was not found: %E0%A4/, 'Back to Goals', /\/team\/.+\/goals$/],
                 [`/team/${TEAM}/artifacts/zzz`, /That file was not found: zzz/, 'Back to Artifacts', /\/team\/.+\/artifacts$/],
             ];
