@@ -651,11 +651,8 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-mail-kind > .inbox-answers { grid-column: 1 / -1; grid-row: 2; padding-left: 0; }
 .dt-mail-kind > .dt-mail-extra { grid-column: 2 / -1; grid-row: 2; padding: 0 12px 8px 0; }
 .dt-mail-kind > .dt-mail-extra ~ .inbox-answers { grid-row: 3; }
-.material-icons.inbox-kind-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 2rem; height: 2rem; margin: 0; border-radius: var(--radius-lg); font-size: var(--needs-icon-size); line-height: 1; color: var(--needs-icon-indigo-fg); background: var(--needs-icon-indigo-bg); }
-.inbox-kind-icon[data-kind="review"] { color: var(--needs-icon-green-fg); background: var(--needs-icon-green-bg); }
-.inbox-kind-icon[data-kind="proposal"], .inbox-kind-icon[data-kind="goal_done"] { color: var(--needs-icon-purple-fg); background: var(--needs-icon-purple-bg); }
-.inbox-kind-icon[data-kind="permission"], .inbox-kind-icon[data-kind="run"] { color: var(--needs-icon-amber-fg); background: var(--needs-icon-amber-bg); }
-.inbox-kind-icon[data-kind="other"], .inbox-kind-icon[data-kind="ask"], .inbox-kind-icon[data-kind="welcome"] { color: var(--needs-icon-blue-fg); background: var(--needs-icon-blue-bg); }
+.material-icons.inbox-kind-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 2rem; height: 2rem; margin: 0; font-size: var(--needs-icon-size); line-height: 1; color: var(--text-secondary); background: transparent; }
+@media (max-width: 760px) { .material-icons.inbox-kind-icon { width: 40px; height: 40px; } }
 @media (forced-colors: active) { .material-icons.inbox-kind-icon { color: CanvasText; background: Canvas; outline: 1px solid CanvasText; } }
 .inbox-kind-icon::before { content: 'help_outline'; }
 .inbox-kind-icon[data-kind="permission"]::before { content: 'lock'; }

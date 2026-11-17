@@ -13,6 +13,7 @@ import { markHidden } from './visible_marks.js';
 import { loadStyles } from './lazy_styles.js';
 const DT = await importOnce('./data_table.js');
 const Threads = await importOnce('./activity_threads.js');
+const NF = await importOnce('./needs_filters.js');
 const AF = await importOnce('./operator_activity_filters.js'); // lazy, as the sidebar loads it: its failure is retried
 await loadStyles('inbox_activity.css'); // the folder's rules load with the folder, not at start (page_weight)
 await loadStyles('activity_kinds.css'); // the kind chips' rules (several at once, #16087): not at start
@@ -34,7 +35,7 @@ const KIND_WORD = { file: 'a file', question: 'a question', goal: 'a goal', prop
 /** What it was done to: the item's title when the record kept one (words an agent wrote), else the kind. */
 export const itemWords = r => r.item_kind === 'job_run' ? (r.title && r.title !== '__oneshot__' ? r.title : jobRunParts(r.item_id) ? `Job ${jobRunParts(r.item_id).jobId}` : 'an automation run') : r.title || (r.item_kind === 'agent' && r.item_id ? r.item_id : r.item_kind === 'task' && r.item_id ? `Task #${r.item_id}` : KIND_WORD[r.item_kind]) || 'an item';
 /** Where it was done from: the server decides this computer or Coral Hub; the phone hint is only what the page said about itself. */
-export const fromWords = r => [r.source === 'hub' ? 'Coral Hub' : 'this computer', r.hint === PHONE_HINT ? `${PHONE_HINT} (reported by the page)` : ''].filter(Boolean).join(', ');
+export const fromWords = r => [r.source === 'hub' ? 'You, via Coral Hub' : 'this computer', r.hint === PHONE_HINT ? `${PHONE_HINT} (reported by the page)` : ''].filter(Boolean).join(', ');
 /** The From column when a Hub-served dashboard reads several computers (#15730): the computer the action was done on, then how it was reached (Coral Hub, the phone); a dashboard of one computer says what it always did. */
 export const fromCell = r => M(multipleServers() ? [serverLabel(r.server || LOCAL_SERVER), r.source === 'hub' ? 'via Coral Hub' : '', r.hint === PHONE_HINT ? `${PHONE_HINT} (reported by the page)` : ''].filter(Boolean).join(', ') : fromWords(r));
 /** The computers whose record is not in the folder, each with why (#15730): the ones that are offline (never asked), the ones that refused (an older Coral that does not give its record to a Hub's owner yet, or a computer this person is only a guest of) and the ones that failed. Named, never left out silently. */
@@ -164,8 +165,7 @@ export const showPills = (f, change) => {
 export function spec(f, open, { grouped = false, byTask = true, tasks, taskSignature = '' } = {}) {
     const list = filtered(f);
     const parts = r => { const p = partsOf(r); return grouped && byTask && r.goal_id && r.task_id ? { ...p, about: '' } : p; };
-    const glyph = r => r.item_kind === 'question' || r.action === 'answer' ? '?' : /^(prompt_|wait_)/.test(r.action || '') ? '!' : '</>'; // the mockup's icons: a question, a permission, everything else (a file, a task, a goal)
-    const who = r => { const c = DT.el('span', 'activity-who'); c.append(DT.el('span', `activity-kind activity-kind-${glyph(r) === '?' ? 'ask' : glyph(r) === '!' ? 'perm' : 'code'}`, glyph(r)), DT.el('b', 'activity-name', markHidden(AF.agentOf(r) || 'You', { strict: true }))); return c; };
+    const who = r => { const c = DT.el('span', 'activity-who'), kind = r.item_kind === 'question' || r.action === 'answer' || r.action === 'prompt_answer' ? 'question' : /^(prompt_|wait_)/.test(r.action || '') ? 'permission' : r.item_kind === 'file' ? 'review' : r.item_kind === 'goal' ? 'goal_done' : r.item_kind === 'proposal' ? 'proposal' : ['run', 'job_run', 'workflow_run'].includes(r.item_kind) ? 'run' : 'other'; c.append(NF.kindIcon({ waiting_kind: kind }), DT.el('b', 'activity-name', markHidden(AF.agentOf(r) || 'You', { strict: true }))); return c; };
     const decision = r => { const label = AF.DECISION_LABEL[AF.decisionOf(r)]; const chip = DT.tag(parts(r).did); chip.classList.add('activity-decision', `activity-decision-${label ? AF.decisionOf(r) : 'plain'}`); return chip; };
     const summary = r => { const p = parts(r); return [p.did, p.detail, p.about].filter(Boolean).join(' · '); };
     const groupFor = grouped ? Threads.activityGroupLookup(list, teamLabel, parts, tasks, byTask) : null;

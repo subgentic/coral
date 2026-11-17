@@ -1,6 +1,6 @@
 // Load order only (#4996): the imports below with no names are loaded for what the module registers at load, in the order this module imported them before the split (the startup-sequence golden records it).
 import './routes.js';
-import './import_once.js';
+import { importOnce } from './import_once.js';
 import './vendor_loader.js';
 import './agent_view.js';
 import { browserLocal } from './safe_storage.js';
@@ -159,8 +159,7 @@ export function boardNameProblem(name) {
  *  reply over 2 MiB), so a view can say why it is empty instead of showing "nothing". Reads a
  *  clone: resp's own body is left for the caller. */
 export async function refusedTooLarge(resp) {
-    if (!resp || resp.status !== 502 || !/json/i.test(resp.headers.get('Content-Type') || '')) return false;
-    try { return (await resp.clone().json()).code === 'hub_reply_too_large'; } catch { return false; }
+    try { return (await importOnce('./hub_reply_check.js')).refusedTooLarge(resp); } catch { return false; }
 }
 
 /** A page that opens by a key or a click puts the keyboard on its heading (the control that opened it is gone or behind it): a heading is not a tab stop, so it takes tabindex -1. A person typing in a box keeps it (#10496). */
