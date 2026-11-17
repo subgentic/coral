@@ -21,6 +21,8 @@ const hint = {
     clear() { browserLocal.remove(HINT_KEY); },
     release() { document.getElementById('launch-notice-room')?.remove(); document.documentElement.removeAttribute('data-launch-notice'); }, // the notice fills the room, or there is none to fill
 };
+/** The notice says agents default to auto mode, so it is only true while the saved default is Auto (unset is Auto too, settings_diff's FIELD_DEFAULT): with another default saved it is hidden, and comes back when the default does (#16367). */
+const defaultIsAuto = () => { const m = state.settings?.default_permission_mode; return !m || m === 'auto'; };
 const headline = 'Agents launch in auto mode: they work without stopping to ask you; each CLI has its own safety checks.';
 function disclosureSection(id, title, disclosure) {
     const section = document.createElement('details'); section.className = 'disclosure';
@@ -82,6 +84,12 @@ function watchPlace() {
     const view = document.getElementById('group-table-view'); if (view) new MutationObserver(again).observe(view, { childList: true });
     window.matchMedia?.('(max-width: 767px)').addEventListener?.('change', again);
 }
+/** A saved default changes the banner's eligibility. Hiding it needs no read; returning to Auto reads only while a local agent can show it. Settings' separate disclosure text still uses the normal refresh. */
+export function refreshDefaultNotice() {
+    if (defaultIsAuto() && hasLocalAgent()) return refreshLaunchDisclosure();
+    bannerEligible = hasLocalAgent(); readGeneration++;
+    document.getElementById('launch-disclosure-banner')?.remove(); shown = null; hint.clear(); hint.release();
+}
 export async function refreshLaunchDisclosure() {
     if (isCloud() || document.body.classList.contains('popout-mode')) { hint.release(); return; }
     bannerEligible = hasLocalAgent();
@@ -96,6 +104,7 @@ export async function refreshLaunchDisclosure() {
             if (!line) { const part = disclosureSection('settings-launch-disclosure-body', 'Permissions notice', disclosure); line = part.text; line.id = 'settings-launch-disclosure'; mode.closest('.sv-row')?.querySelector('.sv-text')?.append(part.section); }
             line.textContent = disclosure.text;
         }
+        if (!defaultIsAuto()) { document.getElementById('launch-disclosure-banner')?.remove(); shown = null; hint.clear(); hint.release(); return; } // the default is not Auto: nothing here is true to say; the launch-time confirm (409) is the server's and stays
         const previous = document.getElementById('launch-disclosure-banner');
         if (!hasLocalAgent() || disclosure.seen === true) { previous?.remove(); shown = null; hint.clear(); hint.release(); return; }
         if (disclosure.seen === false && previous?.dataset.disclosureId === disclosure.id) { hint.set(previous.getBoundingClientRect().height); return; } // already drawn (an earlier read): the hint is kept as it is
@@ -104,7 +113,8 @@ export async function refreshLaunchDisclosure() {
         const banner = document.createElement('div'); banner.id = 'launch-disclosure-banner'; banner.dataset.disclosureId = disclosure.id; banner.className = 'notice notice-info notice-bar notice-compact'; banner.setAttribute('role', 'note');
         const { section, body } = disclosureSection('launch-disclosure-body', headline, disclosure);
         const summary = section.querySelector('summary');
-        const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-small launch-disclosure-dismiss'; dismiss.textContent = 'Dismiss'; dismiss.setAttribute('aria-label', 'Dismiss, I have read this');
+        // the same quiet x as the alerts offer (#16367)
+        const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-quiet btn-icon btn-small launch-disclosure-dismiss'; dismiss.textContent = '\u00d7'; dismiss.title = 'Dismiss'; dismiss.setAttribute('aria-label', 'Dismiss, I have read this');
         const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-small'; button.textContent = "I've read this";
         const acknowledgeButtons = () => [...banner.querySelectorAll('button')];
         const acknowledgeFromNotice = async () => {

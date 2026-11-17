@@ -45,7 +45,9 @@ async function saveSettings({ payload, remoteAccessEnabled, debugInputLog }, row
         if (data && typeof data.error === 'string') err.userMessage = data.error;
         throw err;
     }
+    const oldDefault = state.settings?.default_permission_mode || 'auto';
     state.settings = { ...state.settings, ...payload };
+    if ('default_permission_mode' in payload && oldDefault !== (payload.default_permission_mode || 'auto') && !isCloud()) importOnce('./launch_disclosure.js').then(m => m.refreshDefaultNotice()).catch(() => {}); // the auto-mode notice follows the saved default (#16367)
     if (settingsAtOpen()) setSettingsAtOpen({ ...settingsAtOpen(), ...payload }); // the dialog stays open on a cancelled backend change
     if (!isCloud() && state.privacyStatus && (!rowOnly || 'remote_access_enabled' in payload)) {
         state.privacyStatus.remote_access_enabled = remoteAccessEnabled;
