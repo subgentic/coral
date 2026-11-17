@@ -206,6 +206,9 @@ func (h *BoardHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 	h.announceGoalDriver(project, actor, g, "")
 	h.announceGoalToOrchestrator(project, actor, g)
 	h.markMadeByOrchestrator(r.Context(), project, g)
+	if _, err := h.bs.CloseOpeningAsk(r.Context(), project, g); err != nil { // the team's first goal answers the Orchestrator's opening question (#19170)
+		slog.Warn("opening ask not closed", "board", project, "goal", g.ID, "error", err)
+	}
 	noteActivity(r, board.ActGoalCreate, "goal", strconv.FormatInt(g.ID, 10), project, g.Title, "") // the new goal's number, so the row opens it (#13621)
 	// The timestamp records a board notice even when Kill all stopped its recipient (#16372).
 	// Return current delivery state separately; the persisted goal and notice keep their meaning.
