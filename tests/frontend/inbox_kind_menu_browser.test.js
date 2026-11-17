@@ -27,6 +27,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`(() => {const r=document.querySelector('#kind-fixture .team-tb-pills');return r && (getComputedStyle(r).display==='none' || r.querySelectorAll('button').length===6)})()`, 'kind controls rendered');
             // Wait for layout/ResizeObserver without a fixed timer.
             await nextFrame();
+            assert.equal(await ev(`!!document.querySelector('#kind-fixture .team-tb-action')`), false, 'Kind is a filter, not a create action');
             const g = await ev(`(() => {const host=document.getElementById('kind-fixture'),p=host.querySelector('.team-tb-pills'),b=[...p.querySelectorAll('button')],m=host.querySelector('#inbox-kind');const visible=e=>e&&e.getClientRects().length>0;return {strip:visible(p),tops:b.map(e=>Math.round(e.getBoundingClientRect().top)),cut:p.scrollWidth-p.clientWidth,menu:visible(m),right:m?.getBoundingClientRect().right,overflow:host.scrollWidth-host.clientWidth};})()`);
             assert.ok(g.strip ? new Set(g.tops).size===1 && g.cut<=1 : g.menu, `${width}/${scale}: one full strip or Kind menu: ${JSON.stringify(g)}`);
             assert.ok(g.overflow <= 1, `${width}/${scale}: controls fit their host: ${JSON.stringify(g)}`);
