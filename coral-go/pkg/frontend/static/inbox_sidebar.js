@@ -838,10 +838,7 @@ function inboxActivityToolbar() {
     const teams = AC.teams();
     AF.setTeamNames(new Map(teams.map(t => [t, teamLabel(t)])));
     AF.setServerNames(new Map(serverChoices().map(id => [id, pagingServerLabel(id)])));
-    const picked = AF.kindsOf(activityFilters.kind); // several kinds may be on (#16087): a chip toggles its kind, Everything clears them all, and the last one off is Everything again
-    const imp = activityFilters.important === true; // Important (#19149) leaves out delivery bookkeeping; it is on when nothing was chosen before, and Everything turns it off
-    const setKinds = (important, kind) => { activityFilters = { ...activityFilters, important, kind }; AF.saveFilters(activityFilters); renderInboxNav(true); };
-    const pills = { label: 'Show', panelLabel: 'Show', multi: true, current: [...(imp ? ['important'] : []), ...picked], items: [{ key: 'important', label: 'Important', count: AC.total({ important: true }) }, { key: 'all', label: 'Everything', count: AC.total() }, ...AF.KINDS.map(k => ({ key: k, label: AF.KIND_LABEL[k], count: AC.countKind(k, activityFilters) }))], onPick: key => key === 'all' ? setKinds(false, []) : key === 'important' ? setKinds(!imp, picked) : setKinds(imp, AF.kindsOf(picked.includes(key) ? picked.filter(k => k !== key) : [...picked, key])) };
+    const pills = AC.showPills(activityFilters, (important, kind) => { activityFilters = { ...activityFilters, important, kind }; AF.saveFilters(activityFilters); renderInboxNav(true); });
     const node = activityBar.draw({ filters: activityFilters, pills, options: { team: { values: teams, labels: Object.fromEntries(teams.map(t => [t, teamLabel(t)])) }, agent: { values: AC.agents(), labels: {} }, goal: { values: AC.goals(), labels: {} } } });
     activityBar.bar.showField('server', multipleServers());
     const menu = node.querySelector('.list-bar-menu');
@@ -849,7 +846,7 @@ function inboxActivityToolbar() {
         const label = groupModeField('inbox-activity-group-mode', 'inbox-activity-group-toggle');
         menu.insertBefore(label, menu.querySelector(':scope > .list-bar-clear-all, :scope > .list-bar-done'));
     }
-    return { node, signature: JSON.stringify([activityFilters, teams, AC.total(activityFilters), AF.KINDS.map(k => AC.countKind(k, activityFilters)), groupMode, serverChoices()]) };
+    return { node, signature: JSON.stringify([activityFilters, teams, AC.countsKey(activityFilters), groupMode, serverChoices()]) };
 }
 function refreshGoals(force = true) {
     if (_goalsReading) return _goalsReading; // one in flight: whoever asks during it gets it

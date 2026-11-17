@@ -152,6 +152,13 @@ const visible = f => shown().filter(r => AF.passesImportant(r, f));
 export const total = f => visible(f).length;
 /** How many of the rows read are of a kind (the chips' counts); '' is all of them. */
 export const countKind = (k, f) => visible(f).filter(r => AF.inKind(r, k)).length;
+/** The counts the Show pills draw, as one string for the toolbar's signature. */
+export const countsKey = f => JSON.stringify([total(f), AF.KINDS.map(k => countKind(k, f))]);
+/** The Show pills (#16087, #19149): Important leaves out delivery bookkeeping and is on when nothing was chosen before; a kind chip toggles its kind; Everything clears Important and every kind, and the last kind off is Everything again. change(important, kinds) keeps the choice. */
+export const showPills = (f, change) => {
+    const picked = AF.kindsOf(f.kind), imp = f.important === true;
+    return { label: 'Show', panelLabel: 'Show', multi: true, current: [...(imp ? ['important'] : []), ...picked], items: [{ key: 'important', label: 'Important', count: total({ important: true }) }, { key: 'all', label: 'Everything', count: total() }, ...AF.KINDS.map(k => ({ key: k, label: AF.KIND_LABEL[k], count: countKind(k, f) }))], onPick: key => key === 'all' ? change(false, []) : key === 'important' ? change(!imp, picked) : change(imp, AF.kindsOf(picked.includes(key) ? picked.filter(k => k !== key) : [...picked, key])) };
+};
 
 /** The page's table spec for the sidebar's group table. `open` has { file(row), goal(row), question(row) }: how a row's item opens (the sidebar knows the routes). */
 export function spec(f, open, { grouped = false, byTask = true, tasks, taskSignature = '' } = {}) {
