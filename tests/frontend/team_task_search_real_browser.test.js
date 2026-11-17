@@ -34,7 +34,10 @@ const BASE = require('./test_base').BASE;
             if (!ok) problems.push(`searching "${word}" shows ${JSON.stringify(got.map(r => r.slice(0, 40)))}, want ${JSON.stringify(wantTitles)}`);
         }
         await type(''); await settle(1200);
-        if ((await rows()).length !== 3) problems.push('clearing the search does not show the three tasks again');
+        // the tasks are all Done and Open lists only open tasks (#17692: Open + Done = All), so the cleared search shows none under Open and all three under All
+        if ((await rows()).length !== 0) problems.push('clearing the search leaves Done tasks under Open');
+        await ev(`document.querySelector('#team-panel-tasks .goals-chip[data-filter="all"]').click()`); await settle(600);
+        if ((await rows()).length !== 3) problems.push('clearing the search and choosing All does not show the three tasks again');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
     assert.deepEqual(problems, [], 'the Tasks search:\n  ' + problems.join('\n  '));
     console.log('PASS the Tasks search finds a task by a word of its title');
