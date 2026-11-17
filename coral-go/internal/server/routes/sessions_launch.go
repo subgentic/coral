@@ -54,6 +54,8 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		ConfirmHomeFolder bool `json:"confirm_home_folder"`
 		// KeepFullAccess: the form's "Use Full access for this agent" (#14085): the agent starts with Full access whatever its capabilities say, and keeps it on every restart. The Operator's alone.
 		KeepFullAccess bool `json:"keep_full_access"`
+		// TrustFolder is the person's tick on an existing folder, as in a team launch (#11889, #19176): a folder this launch makes is trusted without it; only the person's dashboard is heard.
+		TrustFolder bool `json:"trust_folder"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -150,7 +152,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	}
 	// A directory that does not exist is the caller's mistake: 400 naming the
 	// field, so the dialog can mark it (it used to surface as a 500) (#3152).
-	msg := createSuggestedDir(body.WorkingDir, body.CreateDir, h.cfg.CoralRoot)
+	msg, madeDir := createSuggestedDirReport(body.WorkingDir, body.CreateDir, h.cfg.CoralRoot)
 	if msg == "" && body.CreateNewFolder && !body.CreateDir {
 		if msg = newFolderCallerRefusal(r); msg == "" {
 			msg, _ = createChosenFolder(body.WorkingDir)
@@ -273,6 +275,8 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	}
 	lctx, cancel := lifecycleCtx(r.Context())
 	defer cancel()
+	// The same rule as a team launch, before the agent starts so no card is drawn for it (#19176). A folder the person typed and Coral made is not the suggested one: it follows the tick.
+	trustReply := h.trustLaunchFolder(r, folderTrustAsk{Types: []string{body.AgentType}, Tick: body.TrustFolder, BoardName: body.BoardName}, body.WorkingDir, madeDir, false)
 	result, err := h.launchSession(lctx, launchSpec{
 		WorkDir: body.WorkingDir, AgentType: body.AgentType, DisplayName: body.DisplayName, ResumeSessionID: body.ResumeSessionID,
 		Flags: launchFlags, Prompt: withSkillNote(body.Prompt, launchSkillNote(skillRows)), BoardName: body.BoardName, BoardServer: body.BoardServer, Backend: body.Backend,
@@ -328,6 +332,9 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		result["board_label"] = h.boardLabel(body.BoardName)
 	}
 	h.addLaunchNotice(r.Context(), result)
+	if trustReply != nil {
+		result["trust_folder"] = trustReply
+	}
 	writeJSON(w, http.StatusOK, result)
 }
 
