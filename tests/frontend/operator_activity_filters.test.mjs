@@ -34,18 +34,16 @@ for (const action of ['file_comment', 'file_reply', 'file_version']) assert.ok(A
     const idsOf = f => all.filter(r => AF.matches(r, f)).map(r => r.id);
     assert.deepEqual(idsOf(on), [5, 6], "Important hides 'Sent held words to' and keeps an answer and a dismissal");
     assert.deepEqual(idsOf(every), [4, 5, 6], 'Everything shows every row');
-    assert.deepEqual(idsOf(AF.EMPTY), [5, 6], 'the empty state is Important');
+    assert.deepEqual(idsOf(AF.EMPTY), [4, 5, 6], 'the empty filters are Everything: Clear all lands there');
     assert.equal(AF.isNoise(held), true); assert.equal(AF.isNoise(asked), false);
     for (const a of ['approve', 'deny', 'answer', 'ignore', 'dismiss', 'prompt_answer', 'goal_review', 'skill_approve', 'message', 'task_reply', 'file_review', 'proposal']) assert.equal(AF.isNoise({ action: a }), false, a + ' is kept');
     assert.deepEqual(all.filter(r => AF.passesImportant(r, on)).map(r => r.id), idsOf(on), 'the count rule is the list rule');
-    assert.equal(AF.clean({ important: false }).important, false, 'only a literal false is Everything');
-    assert.equal(AF.clean({ important: 'no' }).important, true); assert.equal(AF.clean({}).important, true);
-    // #19219: the default Important view is not a filter the person set
-    assert.deepEqual(all.filter(r => AF.passesImportant(r, { ...on, action: 'wait_send' })).map(r => r.id), [4, 5, 6], 'an action the person picked is shown even if it is a delivery note');
-    assert.equal(AF.isFiltered(on), false, 'Important alone is not a filter'); assert.equal(AF.isQuery(on), false);
-    assert.equal(AF.isFiltered(every), true, 'Everything differs from the default, so Clear filters shows'); assert.equal(AF.isQuery(every), true);
-    assert.equal(AF.without(every, 'important').important, true, 'clearing it returns to Important');
+    assert.equal(AF.clean({ important: 'yes' }).important, false, 'only a literal true is on');
+    // #19219: the default Important view is not a filter the person set, and Clear all lands on Everything
+    assert.equal(AF.isFiltered(on), false, 'Important alone is not a filter'); assert.equal(AF.isFiltered(every), false);
+    assert.equal(AF.isQuery(on), false, 'and it is not kept as a query');
     assert.deepEqual(AF.chips(on), [], 'no chip repeats the view'); assert.deepEqual(AF.chips(every), []);
+    assert.equal(AF.clean({ ...on, team: 'beta' }).important, true); assert.equal(AF.EMPTY.important, false, 'the empty filters (what Clear all applies) are Everything');
     assert.equal(AF.isFiltered({ ...on, team: 'beta' }), true, 'another filter still counts');
     // the default and the kept choice
     assert.equal(AF.loadFilters().important, true, 'a browser that kept nothing opens on Important');
