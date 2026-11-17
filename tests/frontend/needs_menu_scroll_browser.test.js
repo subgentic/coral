@@ -20,8 +20,13 @@ const BASE = require('./test_base').BASE;
             await ev(`(() => { const real = window.fetch; window.__goals = Array.from({length:24}, (_,i) => ({id:i+1, board_id:'team-a', title:'Completed goal '+(i+1), state:'active', rollup:{done:2}, updated_at:'2026-11-01T00:00:00Z'})); window.fetch = (u,o={}) => new URL(String(u),location.origin).pathname === '/api/goals' ? Promise.resolve(new Response(JSON.stringify({goals:window.__goals}),{headers:{'content-type':'application/json'}})) : real(u,o); T.state.settings.goal_done_read = JSON.stringify(window.__goals.map(g=>'team-a|'+g.id+'|2|'+g.updated_at)); T.state.liveSessions=[]; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
             await waitFor(`document.querySelectorAll('.inbox-goaldone-actions .inbox-row-more-toggle').length === 24`, 'read goal menus');
+            // #19300: scrolling the last of 24 goal rows into view froze the page for 17 s (each row loaded team_uncommitted.js and drew the whole list again: 2112 folder-list draws): the page must stay responsive
+            await ev(`window.__busy = 0; window.__obs = new PerformanceObserver(l => l.getEntries().forEach(e => { __busy += e.duration; })); __obs.observe({ entryTypes: ['longtask'] }); true`);
             await ev(`window.__toggle=[...document.querySelectorAll('.inbox-goaldone-actions .inbox-row-more-toggle')].at(-1); __toggle.focus({preventScroll:true}); __toggle.scrollIntoView({block:'end'}); true`);
             await ev(framesJs(2));
+            await ev(framesJs(2));
+            await ev(`__obs.takeRecords().forEach(e => { __busy += e.duration; }); true`);
+            assert.ok(await ev('__busy') < 2000, `${width}: scrolling to the last goal row blocked the page for ${await ev('Math.round(__busy)')} ms`);
             // Scrolling may redraw virtual rows; acquire the connected last-row control.
             await ev(`window.__toggle=[...document.querySelectorAll('.inbox-goaldone-actions .inbox-row-more-toggle')].at(-1); __toggle.focus({preventScroll:true}); true`);
             const measure = `(() => { const t=__toggle.closest('table'), rows=[...t.rows].map(r=>r.getBoundingClientRect().top), scroll=[]; for(let e=__toggle.parentElement;e;e=e.parentElement) scroll.push([e.tagName,e.id,e.scrollTop,e.scrollHeight]); const b=t.getBoundingClientRect(); return {rows,scroll,height:b.height}; })()`;
