@@ -49,9 +49,12 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
         const tableRead = sel => ev(`(() => { const t = document.querySelector(${JSON.stringify(sel)} + ' table'); if (!t) return null; const vis = e => e.getClientRects().length > 0; const heads = [...t.querySelectorAll('thead th')].filter(vis).map(h => h.textContent.replace(/[\\u2195\\u2191\\u2193]/g, '').trim());
             const keys = [...t.querySelectorAll('thead th')].map((h, i) => [i, vis(h), h.textContent.replace(/[\\u2195\\u2191\\u2193]/g, '').trim()]).filter(x => x[1]);
             return { heads, rows: [...t.querySelectorAll('tbody tr')].filter(vis).map(r => keys.map(([i]) => (r.children[i] ? r.children[i].textContent.replace(/\\s+/g, ' ').trim() : ''))) }; })()`);
-        // the burn rate is an estimate, said on hover only (UI/UX, #9511): 4 dollars over the 24 hours between the buckets
+        // the burn rate is the total over the hours of the range chosen (#19191), and the hover says the arithmetic: 4 dollars over 24 hours
         await waitFor(`document.getElementById('cost-burn-rate').textContent.trim() === '$0.17/hr'`, 'the burn rate', 8000);
-        assert.equal(await ev(`document.getElementById('cost-burn-rate').title`), 'Estimated from the buckets in this range', 'the burn rate says it is an estimate on hover');
+        assert.equal(await ev(`document.getElementById('cost-burn-rate').title`), '$4.00 over the 24 hours of this range', 'the hover says what it divided');
+        // #19191 (walk 78: $1.13/hr on a 24 h range with five minutes of work): a bucket's cost over the hours of the range, not read as one hour
+        const burn = await ev(`import((window.__coralStatic || '/static/') + 'cost_dashboard.js').then(m => { const el = document.getElementById('cost-burn-rate'), keep = [el.textContent, el.title]; m._renderBurnRate([{ bucket: new Date().toISOString(), cumulative_cost: 1.13 }], 24); const out = el.textContent; m._renderBurnRate([{ bucket: new Date().toISOString(), cumulative_cost: 1.13 }], 1); const hour = el.textContent; [el.textContent, el.title] = keep; return { out, hour }; })`);
+        assert.deepEqual(burn, { out: '$0.05/hr', hour: '$1.13/hr' }, 'five minutes of work in a day is a small hourly rate, in an hour it is the cost: ' + JSON.stringify(burn));
         // Input beside Cache read reads wrong at 154 against 4.2M (walk 78, #19192): the card says its input is the fresh kind, and each hover says where the cached kind is counted
         const cards = await ev(`(() => { const lab = id => document.getElementById(id).closest('.cost-card').querySelector('.cost-card-label'); const a = lab('cost-input-tokens'), b = lab('cost-cache-read'); return { input: a.textContent.trim(), inputTitle: a.title, cacheTitle: b.title }; })()`);
         assert.equal(cards.input, 'New input tokens', 'the input card says it is the new kind: ' + JSON.stringify(cards));
