@@ -1,0 +1,6 @@
+/* The Reminders section of an agent's page (#19389): moved out of inline styles; loaded with agent_reminders.js, not at start. */
+.agent-rem-list { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.agent-rem-list li { display: flex; gap: 10px; align-items: center; }
+.agent-rem-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.agent-rem-field { display: flex; flex-direction: column; gap: 2px; }
+.agent-rem-form input[type=text] { min-width: 16em; }

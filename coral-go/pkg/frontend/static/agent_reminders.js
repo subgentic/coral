@@ -2,6 +2,8 @@
 // repeating one (every day, Monday to Friday, or every few minutes). It uses the person's /api/reminders routes, which the Hub does not serve:
 // then the section is not drawn. A reminder wakes the agent and stays open until it marks it done.
 import { serverUrl, splitKey } from './server_base.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('agent_reminders.css'); // not at start (page_weight)
 
 const EVERY = [5, 15, 30, 60];
 const KINDS = [['once', 'Once'], ['daily', 'Every day'], ['weekdays', 'Monday to Friday'], ['every', 'Every few minutes']];
@@ -33,11 +35,11 @@ export async function mountAgentReminders(host, team, agent) {
     const section = mk('section');
     const title = mk('h3', null, 'Reminders'); title.id = `agent-rem-title-${String(agent.session_id).replace(/[^A-Za-z0-9_-]/g, '-')}`;
     section.setAttribute('aria-labelledby', title.id);
-    const ul = mk('ul', 'agent-rem-list'); ul.style.cssText = 'list-style:none;margin:0 0 8px;padding:0;display:flex;flex-direction:column;gap:6px';
+    const ul = mk('ul', 'agent-rem-list');
     const say = mk('p', 'sv-help agent-rem-say'); say.setAttribute('role', 'status');
-    const form = mk('form', 'agent-rem-form'); form.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end';
-    const field = (label, input) => { const l = mk('label'); l.style.cssText = 'display:flex;flex-direction:column;gap:2px'; l.append(mk('span', 'sv-help', label), input); return l; };
-    const text = mk('input'); text.type = 'text'; text.maxLength = 1000; text.required = true; text.style.minWidth = '16em';
+    const form = mk('form', 'agent-rem-form');
+    const field = (label, input) => { const l = mk('label', 'agent-rem-field'); l.append(mk('span', 'sv-help', label), input); return l; };
+    const text = mk('input'); text.type = 'text'; text.maxLength = 1000; text.required = true;
     const kind = mk('select'); for (const [v, t] of KINDS) kind.append(Object.assign(mk('option', null, t), { value: v }));
     const when = mk('input'); when.type = 'datetime-local';
     const every = mk('select'); for (const m of EVERY) every.append(Object.assign(mk('option', null, `${m} minutes`), { value: String(m) }));
@@ -50,7 +52,7 @@ export async function mountAgentReminders(host, team, agent) {
         ul.replaceChildren();
         if (!rows.length) ul.append(mk('li', 'sv-help', 'No reminders.'));
         for (const r of rows) {
-            const li = mk('li'); li.style.cssText = 'display:flex;gap:10px;align-items:center';
+            const li = mk('li');
             const words = mk('span', 'agent-rem-text', `${r.name} (${whenWords(r)}${r.paused ? ', off' : ''})`);
             const b = mk('button', 'btn', 'Cancel'); b.type = 'button'; b.setAttribute('aria-label', `Cancel the reminder ${r.name}`);
             b.addEventListener('click', async () => {
