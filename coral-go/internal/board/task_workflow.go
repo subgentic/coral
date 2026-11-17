@@ -668,7 +668,7 @@ func (s *Store) completeTaskWithArtifacts(ctx context.Context, project string, t
 			return w, err
 		}
 		if assignee.Valid && assignee.String != "" && assignee.String != subscriberID && subscriberID != "Operator" && reviewerErr != nil {
-			return w, &NotAssigneeError{Msg: fmt.Sprintf("task #%d is assigned to %s; only the assignee, Operator or an active registered orchestrator may complete it", taskID, assignee.String)}
+			return w, &NotAssigneeError{Msg: fmt.Sprintf("task #%d is assigned to %s; only the assignee, Operator or an active registered orchestrator may complete it. Ask %s to complete it, or, if you did the work, ask the orchestrator to reassign it to you (coral-board task reassign %d --to \"<your name>\") and complete it then", taskID, assignee.String, assignee.String, taskID)}
 		}
 		if outcome == "success" {
 			for _, required := range w.RequiredOutputs {
