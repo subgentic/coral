@@ -35,6 +35,11 @@ func CodexConfigPath(home string) string {
 	return filepath.Join(home, ".codex", "config.toml")
 }
 
+// AgyConfigPath is Antigravity's settings file: ~/.gemini/antigravity-cli/settings.json.
+func AgyConfigPath(home string) string {
+	return filepath.Join(home, ".gemini", "antigravity-cli", "settings.json")
+}
+
 // CheckRunWorktree answers the resolved folder of a run's own worktree when it may be trusted: runDir exists, is a real folder (not a link, once resolved), is exactly one level inside worktreesRoot (both
 // resolved), and is not writable by group or others. Anything else is refused, and nothing is trusted.
 func CheckRunWorktree(runDir, worktreesRoot string) (string, error) {
@@ -115,6 +120,61 @@ func untrustClaudeKeys(cfg string, keys []string) (int, error) {
 	return n, nil
 }
 
+// UntrustAgy removes path from the trustedWorkspaces list of Antigravity's settings file at cfg, for a run's worktree that is going away (#19176), and reports whether it removed one. The other values are kept
+// as raw JSON; an absent file, a file that is not a JSON object or has no such list, or a path not in it, is left as it is. The file is replaced through a temp file as TrustAgy does.
+func UntrustAgy(cfg, path string) (bool, error) {
+	n, err := untrustAgyKeys(cfg, []string{path})
+	return n > 0, err
+}
+
+// untrustAgyKeys removes each of keys from trustedWorkspaces in one read and one write (none present: no write), and returns how many were there.
+func untrustAgyKeys(cfg string, keys []string) (int, error) {
+	raw, mode, err := readConfig(cfg)
+	if err != nil {
+		if errors.Is(err, ErrNoConfig) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &top); err != nil || top == nil {
+		return 0, errors.New("the settings file is not a JSON object")
+	}
+	var list []string
+	if cur, ok := top["trustedWorkspaces"]; !ok || json.Unmarshal(cur, &list) != nil {
+		return 0, nil
+	}
+	drop := map[string]bool{}
+	for _, k := range keys {
+		drop[filepath.Clean(k)] = true
+	}
+	kept := make([]string, 0, len(list))
+	n := 0
+	for _, have := range list {
+		if drop[filepath.Clean(have)] {
+			n++
+			continue
+		}
+		kept = append(kept, have)
+	}
+	if n == 0 {
+		return 0, nil
+	}
+	lb, err := marshalRaw(kept)
+	if err != nil {
+		return 0, err
+	}
+	top["trustedWorkspaces"] = lb
+	out, err := marshalRaw(top)
+	if err != nil {
+		return 0, err
+	}
+	if err := writeSettings(cfg, append(out, '\n'), mode); err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
 // UntrustCodex removes the [projects."<path>"] table TrustCodex added to Codex's config.toml at cfg: exactly its two lines (trust_level = "trusted"), and only if the file still parses afterwards. A table with
 // anything else in it, or a file that does not match, is left as it is. It reports whether it removed one.
 func UntrustCodex(cfg, path string) (bool, error) {
@@ -176,7 +236,7 @@ func untrustCodexKeys(cfg string, paths []string) (int, error) {
 // SweepGoneRunFolders removes the trust entries of run worktrees whose folder no longer exists (#17396): git keeps a worktree that has unsaved work and Coral's cleanup then leaves its entry, and a folder removed by
 // hand never had its entry removed. Only keys directly inside worktreesRoot (as given or resolved) named job-run-<something> whose folder is absent (not "cannot be read": any other error keeps the entry) are
 // taken, from Claude's settings at claudeCfg and Codex's at codexCfg, each file read once and written once for all of them (and not at all when none is gone). With a worktrees root that does not exist nothing is taken. It returns how many it removed; an error in one file does not stop the other.
-func SweepGoneRunFolders(claudeCfg, codexCfg, worktreesRoot string) (int, error) {
+func SweepGoneRunFolders(claudeCfg, codexCfg, agyCfg, worktreesRoot string) (int, error) {
 	if worktreesRoot == "" || !filepath.IsAbs(worktreesRoot) {
 		return 0, nil
 	}
@@ -233,6 +293,26 @@ func SweepGoneRunFolders(claudeCfg, codexCfg, worktreesRoot string) (int, error)
 				}
 			}
 			n, err := untrustCodexKeys(codexCfg, keys)
+			removed += n
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+	} else if !errors.Is(err, ErrNoConfig) && firstErr == nil {
+		firstErr = err
+	}
+	if raw, _, err := readConfig(agyCfg); err == nil {
+		var top struct {
+			Workspaces []string `json:"trustedWorkspaces"`
+		}
+		if json.Unmarshal(raw, &top) == nil {
+			var keys []string
+			for _, key := range top.Workspaces {
+				if gone(key) {
+					keys = append(keys, key)
+				}
+			}
+			n, err := untrustAgyKeys(agyCfg, keys)
 			removed += n
 			if firstErr == nil {
 				firstErr = err
