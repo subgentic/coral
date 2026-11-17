@@ -79,23 +79,25 @@ func (h *SkillsHandler) SearchSkillsMenu(w http.ResponseWriter, r *http.Request)
 			break
 		}
 	}
-	// the person's own skills and the agent's folder's (#16015): after Coral's, at most maxLocalMenuSkills, narrowed by the words
+	// the person's own skills and the agent's folder's (#16015): after Coral's, the words matched against every one of them (#19431), at most maxLocalMenuSkills rows returned
+	var match func(skillSummary) bool
+	if q != "" {
+		match = func(x skillSummary) bool { return matchesWords(x, q) }
+	}
 	var local []skillSummary
 	if home, err := h.home(); err == nil {
-		local = localSkills(home, homeSkillRoots, sourceYou, maxLocalMenuSkills)
+		local = localSkills(home, homeSkillRoots, sourceYou, maxLocalMenuSkills, match)
 	}
 	if id := r.URL.Query().Get("session_id"); id != "" {
 		if live, err := h.ss.GetLiveSession(r.Context(), id); err == nil && live != nil && live.IsArchived != 1 {
-			local = append(local, localSkills(live.WorkingDir, repoSkillRoots, sourceRepo, maxLocalMenuSkills)...)
+			local = append(local, localSkills(live.WorkingDir, repoSkillRoots, sourceRepo, maxLocalMenuSkills, match)...)
 		}
 	}
 	for _, x := range local {
 		if len(out) >= maxMenuSkills+maxLocalMenuSkills {
 			break
 		}
-		if q == "" || matchesWords(x, q) {
-			out = append(out, x)
-		}
+		out = append(out, x)
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]any{"skills": out})
