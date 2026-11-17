@@ -77,8 +77,8 @@ const HEALTH = {
         })();` });
         await Page.navigate({ url: BASE + '/' });
         await Page.loadEventFired();
-        // Settings, which holds the slot, is built on first open (#4500): built here, as the test reads the slot without opening it.
-        await waitFor(`(window.__coral?.buildAllLazy?.(), !!document.getElementById('machine-health-local'))`, 'the Settings slot', 10000);
+        // ST10: the local card lives in Computer status, opened from the gear menu.
+        await ev(`import((window.__coralStatic || '/static/') + 'computer_status.js').then(m => m.showComputerStatus())`);
         await waitFor(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); return !!state.coralWs && state.coralWs.readyState === 1; })()`, 'the feed open', 10000);
         await feedSynced(0);
 

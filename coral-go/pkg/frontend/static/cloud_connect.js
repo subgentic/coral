@@ -354,18 +354,9 @@ class CloudPanel {
     // All text, never HTML: these come from requests made through the hub.
     showHubOperatorActions(actions) {
         const box = this.part('hub-operator-actions');
-        const list = this.part('hub-operator-actions-list');
-        if (!box || !list) return;
-        const items = Array.isArray(actions) ? actions.slice(0, 20) : [];
-        box.hidden = !items.length;
-        list.replaceChildren(...items.map(a => {
-            const li = document.createElement('li');
-            const when = a.time || a.created_at || a.at || '';
-            const t = when ? new Date(when) : null;
-            li.textContent = [t && !isNaN(t) ? t.toLocaleString() : '', String(a.method || ''), String(a.path || ''),
-                a.project ? `(${a.project})` : '', String(a.hub_user || ''), a.status ? `→ ${a.status}` : ''].filter(Boolean).join(' ');
-            return li;
-        }));
+        if (!box) return;
+        box.hidden = !Array.isArray(actions);
+        box.onclick = () => importOnce('./computer_status.js').then(m => m.showHubActions());
     }
 
     sayHubOperator(text) {

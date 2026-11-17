@@ -108,6 +108,7 @@ function menuEntries(viewLabels = new Set(), phoneNav = false) {
         return out;
     }
     out.push(settingsEntry, entry('palette', 'Appearance', { action: 'm-appearance' }));
+    if (!cloud) out.push(entry('dns', 'Computer status', { action: 'm-computer-status' }));
     if (!cloud) out.push(entry('system_update', 'Check for updates', { action: 'm-close-top-bar-settings-then-check-for-updates' }));
     if ((isHub() || cloud) && !viewLabels.has('Computers')) out.push(entry('dns', 'Computers', { action: 'm-close-top-bar-settings-then-show-servers-modal' })); // not twice: when the Servers view is one of the views above, two entries are named alike
     const account = document.getElementById('cloud-account-menu');
