@@ -15,6 +15,7 @@ const { refusalOf, answeredLocally } = await importOnce('./owner_refusal.js');
 const { requireGoalSentence } = await importOnce('./task_goals.js');
 const { createMessaging, XT_KEYS } = await importOnce('./team_cross_team_fields.js');
 const { createOrchestratorGrant, OG_KEYS } = await importOnce('./team_orchestrator_grant.js');
+const { createTeamReminders } = await importOnce('./team_reminders.js'); // the agents' reminders group (#19288)
 const { createGuideRoster, GR_KEYS } = await importOnce('./team_guide_roster.js');
 const { healthFields, healthToValues, saveHealth, HEALTH_KEYS } = await importOnce('./team_health_fields.js');
 const { approvalField, presetOf, wireApproval } = await importOnce('./team_approval_presets.js'); // how much the Operator approves: three names for the flags below (#11657)
@@ -90,6 +91,7 @@ function openSettingsState(team, options) {
     st.membersReady = boardFetch(team, '/subscribers').then(async r => (r.ok ? (await r.json()).filter(m => m.is_active !== 0) : [])).catch(() => []);
     st.xt = createMessaging(team); // the Messaging group: its fields, its lines and its save
     st.og = createOrchestratorGrant(team, () => st.membersReady); // the Orchestrator access group (#11432)
+    st.rem = createTeamReminders(team);
     st.gr = createGuideRoster(team); // the Guides group: the names agents see on a guide's messages (#11457)
     st.modeOptions = () => (st.presets.length ? st.presets.map(p => ({ value: p.id, label: presetNameText(p) })) : DEFAULT_MODES);
     st.modeSelect = () => st.view.host.querySelector('select[name="mode"]');
@@ -152,6 +154,7 @@ function settingsGroups(st) {
         { id: 'health', domId: 'team-settings-health', label: 'Health check', icon: 'notifications', hint: 'When an agent that stopped working is noticed.', fields: healthFields({ members: () => st.membersReady, hasHeld: () => Boolean(st.healthBase && st.healthBase.held_notice), hasRecommend: () => Boolean(st.healthBase && st.healthBase.auto_recommend), monitorOff: () => !st.healthMonitorOn, onReset: resetHealth, openSettings: () => window.showSettingsModal?.('agents') }) },
         { id: 'messaging', domId: 'team-settings-messaging', label: 'Messaging', icon: 'chat', hint: 'How the team\'s messages reach its agents.', fields: st.xt.fields() },
         { id: 'orchestrator', domId: 'team-settings-orchestrator', label: 'Orchestrator access', icon: 'security', hint: 'What the Orchestrator may do to this team\'s agents.', fields: st.og.fields() },
+        { id: 'reminders', domId: 'team-settings-reminders', label: 'Agent reminders', icon: 'notifications', hint: 'Which agents have reminders, and a switch for each.', fields: st.rem.fields() },
         { id: 'guides', domId: 'team-settings-guides', label: 'Guides', icon: 'group', hint: 'The names agents see on a guide\'s messages.', fields: st.gr.fields() },
         { id: 'prompts', label: 'Prompts', icon: 'description', hint: 'Read-only preview of the prompts agents get.', render: p => { p.innerHTML = '<div class="prompt-inspection-content" aria-live="polite">Loading prompt inspection\u2026</div>'; } },
     ];
@@ -184,6 +187,7 @@ function loadSettings(st) {
         }
         const orch = await st.og.load().catch(() => ({ values: null })); // the Operator's switch for the Orchestrator: not given to a page that may not read it (the group is then not drawn)
         if (!orch.values) st.view.removeGroup('orchestrator');
+        if (!(await st.rem.load().catch(() => false))) st.view.removeGroup('reminders'); // the person's own: not served through Coral Hub (the group is then not drawn)
         const guides = await st.gr.load().catch(() => ({ values: null })); // the owner's roster: not given to a page that may not read it (the group is then not drawn)
         if (!guides.values) st.view.removeGroup('guides');
         st.q('.prompt-inspection-content').innerHTML = inspectionResponse.ok ? renderInspection(await inspectionResponse.json(), st.workingMode) : `<p class="sv-help">Prompt inspection: ${escapeHtml(await refusalOf(inspectionResponse, answeredLocally(st.team)))}</p>`;

@@ -79,6 +79,7 @@ var activityNotAnInboxAction = map[string]string{
 	"DELETE /api/board/{project}/waits":                                    "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"DELETE /api/reminders/{reminderID}":                                   "a reminder set for an agent (#19162): that agent's own plumbing, not an Inbox action",
 	"POST /api/reminders":                                                  "a reminder set for an agent (#19162): that agent's own plumbing, not an Inbox action",
+	"POST /api/reminders/agents/{sessionID}/switch":                        "the Operator switches an agent's reminders in Settings (#19288): that agent's own plumbing, not an Inbox action",
 	"POST /api/reminders/{reminderID}/done":                                "a reminder set for an agent (#19162): that agent's own plumbing, not an Inbox action",
 	"DELETE /api/chief/checks/{checkID}":                                   "the Chief page",
 	"DELETE /api/folder-tags/{folderName}/{tagID}":                         "tags on folders",

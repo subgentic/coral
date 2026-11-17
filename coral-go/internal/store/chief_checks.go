@@ -44,6 +44,7 @@ type ChiefCheck struct {
 	Deleted       bool   `db:"deleted" json:"-"`
 	Origin        string `db:"origin" json:"origin"`         // who set it (#19162): "chief" (Chief's own checks), or "operator", "agent", "orchestrator" for a reminder
 	CreatedBy     string `db:"created_by" json:"created_by"` // that setter's name, for the notice
+	Paused        bool   `db:"paused" json:"paused"`         // the Operator switched the agent's reminders off (#19288)
 }
 
 // IsReminder is whether the check is a reminder set for an agent (#19162) rather than one of Chief's own checks.
@@ -95,7 +96,7 @@ func ChiefCron(c ChiefCheck) (string, error) {
 	return fmt.Sprintf("%d %d * * %s", at.Minute(), at.Hour(), days), nil
 }
 
-const chiefCheckCols = `c.id,c.job_id,c.revision,c.name,c.instruction,c.target_board,c.target_session,c.notify_mode,c.source_key,c.wake_if_asleep,j.enabled,j.paused_reason,c.schedule_kind,c.every_minutes,c.at_time,j.timezone,c.deleted,c.origin,c.created_by`
+const chiefCheckCols = `c.id,c.job_id,c.revision,c.name,c.instruction,c.target_board,c.target_session,c.notify_mode,c.source_key,c.wake_if_asleep,j.enabled,j.paused_reason,c.schedule_kind,c.every_minutes,c.at_time,j.timezone,c.deleted,c.origin,c.created_by,c.paused`
 
 func (s *ScheduleStore) ChiefCheck(ctx context.Context, id int64) (*ChiefCheck, error) {
 	var c ChiefCheck
@@ -471,4 +472,17 @@ func originOrChief(o string) string {
 func (s *ScheduleStore) FinishOnceCheck(ctx context.Context, checkID int64) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE scheduled_jobs SET enabled=0,updated_at=? WHERE id=(SELECT job_id FROM chief_checks WHERE id=? AND schedule_kind='once')`, nowUTC(), checkID)
 	return err
+}
+
+// SetRemindersPaused switches every reminder (never Chief's own checks) for one agent on a team off or back on, without deleting any, and says how many rows changed (#19288).
+func (s *ScheduleStore) SetRemindersPaused(ctx context.Context, board, sessionID string, paused bool) (int64, error) {
+	v := 0
+	if paused {
+		v = 1
+	}
+	res, err := s.db.ExecContext(ctx, `UPDATE chief_checks SET paused=? WHERE target_board=? AND target_session=? AND deleted=0 AND origin NOT IN ('','chief') AND paused!=?`, v, board, sessionID, v)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
