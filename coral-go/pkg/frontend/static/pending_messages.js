@@ -144,8 +144,10 @@ function syncNoticeToggle(pill, text) {
         pill.insertBefore(btn, badge);
     }
 }
+let plainTaskNotice = t => t; // a task notice in plain words (#16853): the module loads beside the chat, not in the start path (no top-level await there); the first notice before it arrives reads as it came
+importOnce('./task_notice_plain.js').then(m => { plainTaskNotice = m.plainTaskNotice; }).catch(() => {});
 export function appendCoralNotice(container, text, health = false) {
-    text = coralNoticeSummary(text);
+    text = coralNoticeSummary(plainTaskNotice(text));
 	// A notice is a step of the work it prompts, not a pill of its own (#4171): it goes into the steps group, which it starts when
 	// the last thing on the page is not one. Back-to-back notices still roll up into one.
 	const tail = lastContent(container);
