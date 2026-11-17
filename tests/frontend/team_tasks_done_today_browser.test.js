@@ -1,5 +1,5 @@
-// #10604 (Beta team page pass), 1: the Tasks tab's default view (Open) keeps a task that finished today, so what an agent just did is not behind Show all: its result is the first thing a person looks for.
-// A real board on the isolated dev server (removed again): two open tasks and one finished a moment ago. The Open view shows all three and counts them; Done shows the finished one; All shows all three.
+// #17130: Open is strictly unfinished, even when tasks completed today. Done and All retain results.
+// A real board on the isolated dev server (removed again): two open tasks and one finished a moment ago. The Open view shows only the two unfinished tasks; Done shows the finished one; All shows all three.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -28,16 +28,16 @@ const B = 'done-today-' + Date.now().toString(36);
                 const x = await post(`/tasks/${cid}/cancel`, { subscriber_id: 'Boss', message: 'not needed' }); // a cancel names its reason assert.ok(x.status < 300, 'the task is cancelled: ' + JSON.stringify(x));
             }
             await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks' }); true`);
-            await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr.dt-row').length >= 3`, `${w}: the tasks`, 20000);
+            await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr.dt-row').length >= 2`, `${w}: the tasks`, 20000);
             await waitFor(`!/Loading tasks/.test(document.getElementById('team-panel-tasks').textContent) && document.querySelector('#team-panel-tasks [data-filter="open"][aria-pressed="true"], #team-panel-tasks .goals-chip[aria-pressed="true"]')`, `${w}: the tasks are drawn and a view is chosen`, 20000);
             const titles = () => ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr.dt-row')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
             const pill = key => ev(`(() => { const b = [...document.querySelectorAll('#team-panel-tasks [data-filter="${key}"], #team-panel-tasks button')].find(x => x.dataset.filter === ${JSON.stringify(key)} || new RegExp('^' + ${JSON.stringify(key)}, 'i').test(x.textContent.trim())); return b ? { text: b.textContent.replace(/\\s+/g, ' ').trim(), pressed: b.getAttribute('aria-pressed') ?? b.getAttribute('aria-selected') } : null; })()`);
             let rows = await titles();
-            assert.equal(rows.length, 3, `${w}: the default (Open) view shows the two open tasks and the one finished today, not the one cancelled today: ${JSON.stringify(rows)}`);
+            assert.equal(rows.length, 2, `${w}: the default (Open) view shows only the two unfinished tasks: ${JSON.stringify(rows)}`);
             assert.ok(!rows.some(r => r.includes('Cancelled a moment ago')), `${w}: a task cancelled today is not in the default view: ${JSON.stringify(rows)}`);
-            assert.ok(rows.some(r => r.includes('Finished a moment ago')), `${w}: the task finished today is in the default view, not behind Show all`);
+            assert.ok(!rows.some(r => r.includes('Finished a moment ago')), `${w}: the task finished today is excluded from Open`);
             const open = await pill('open');
-            assert.match(open.text, /Open\s*3/, `${w}: the Open count is what the table under it shows: ${JSON.stringify(open)}`);
+            assert.match(open.text, /Open\s*2/, `${w}: the Open count is what the table under it shows: ${JSON.stringify(open)}`);
             await ev(`[...document.querySelectorAll('#team-panel-tasks button')].find(b => b.dataset.filter === 'done').click(); true`);
             await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr.dt-row').length === 2`, `${w}: the Done view`, 5000);
             rows = await titles();
@@ -46,6 +46,6 @@ const B = 'done-today-' + Date.now().toString(36);
             await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr.dt-row').length === 4`, `${w}: the All view`, 5000);
             await ev(`[...document.querySelectorAll('#team-panel-tasks button')].find(b => b.dataset.filter === 'open').click(); true`); // the page remembers the view a person chose: the next width starts on the default (Open) again
         }
-        console.log('\nPASS the Open view keeps a task finished today');
+        console.log('\nPASS Open excludes tasks finished or cancelled today');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

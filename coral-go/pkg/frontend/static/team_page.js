@@ -326,7 +326,7 @@ async function readCounts() {
     importOnce('./team_pause.js').then(m => m.readTeamPause(team)); // the pause is read on every poll, so a pause made elsewhere (another tab, a restart) shows here too
     const [goals, tasks, avail, kn] = await Promise.allSettled([
         boardFetch(team, '/goals?state=proposed,active,blocked,done,dropped&limit=200').then(async r => { const data = await r.json(); return r.ok ? data : null; }),
-        boardFetch(team, `/tasks?counts=1&since=${encodeURIComponent(new Date(new Date().setHours(0, 0, 0, 0)).toISOString().replace(/\.\d+Z$/, 'Z'))}`).then(async r => { const data = await r.json(); return r.ok ? data : null; }),
+        boardFetch(team, '/tasks?counts=1').then(async r => { const data = await r.json(); return r.ok ? data : null; }),
         refreshTeamAvailability(team, true),
         knowledge,
     ]);
@@ -335,7 +335,7 @@ async function readCounts() {
     if (g) S.counts.goals = (Array.isArray(g) ? g : g.goals || []).filter(x => !['done', 'dropped'].includes(String(x.state).toLowerCase())).length; // open goals, as the sidebar's Goals counts them (#15340)
     const t = tasks.value;
     if (t && Number.isFinite(t.total_completed)) S.tasksDone = t.total_completed; // for the header's Finished state (#15304)
-    if (t && Number.isFinite(t.total_open)) S.counts.tasks = (state.teamTasksOpen && state.teamTasksOpen.team === String(team) && Number.isFinite(state.teamTasksOpen.n) ? state.teamTasksOpen.n : t.total_open + (t.completed_since || 0)); // the list's own Open count when it has been read, so the tab and the list agree (#12248)
+    if (t && Number.isFinite(t.total_open)) S.counts.tasks = (state.teamTasksOpen && state.teamTasksOpen.team === String(team) && Number.isFinite(state.teamTasksOpen.n) ? state.teamTasksOpen.n : t.total_open); // the list's own Open count when it has been read, so the tab and the list agree (#12248)
     if (avail.value && Array.isArray(avail.value.agents)) {
         const live = (state.liveSessions || []).filter(s => inTeam(s, team) && !s.archived);
         S.counts.agents = live.length || avail.value.agents.filter(a => !['archived', 'offline'].includes(a.availability)).length; // the sidebar's live count; ended members stay in the Agents table (#16360)
