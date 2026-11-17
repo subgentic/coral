@@ -60,10 +60,6 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 		want["tasks"], want["goals"] = true, true
 	}
 	terms := SearchTerms(text)
-	dir := "DESC"
-	if q.Oldest {
-		dir = "ASC"
-	}
 	if want["tasks"] {
 		var rows []struct {
 			ID     int64   `db:"id"`
@@ -98,7 +94,11 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 			sqlText += " AND " + updatedAtSQL + " < ?"
 			args = append(args, q.Until)
 		}
-		sqlText += " ORDER BY at " + dir + ", id " + dir + " LIMIT ?"
+		if q.Oldest { // two literal branches: the tie-break lint reads the text of each
+			sqlText += " ORDER BY at ASC, id ASC LIMIT ?"
+		} else {
+			sqlText += " ORDER BY at DESC, id DESC LIMIT ?"
+		}
 		args = append(args, limit+1)
 		if err = s.reader().SelectContext(ctx, &rows, sqlText, args...); err != nil {
 			return nil, false, err
@@ -139,7 +139,11 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 				sqlText += " AND updated_at < ?"
 				args = append(args, q.Until)
 			}
-			sqlText += " ORDER BY updated_at " + dir + ", id " + dir + " LIMIT ?"
+			if q.Oldest {
+				sqlText += " ORDER BY updated_at ASC, id ASC LIMIT ?"
+			} else {
+				sqlText += " ORDER BY updated_at DESC, id DESC LIMIT ?"
+			}
 			args = append(args, limit+1)
 			if err = s.reader().SelectContext(ctx, &rows, sqlText, args...); err != nil {
 				return nil, false, err
