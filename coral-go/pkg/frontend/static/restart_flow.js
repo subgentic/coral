@@ -3,7 +3,7 @@
 import { importOnce } from './import_once.js';
 import { sectionFocus } from './section_dialog.js';
 import { moveRestarting } from './session_overlay.js';
-import { state, sessionKey, saveSessionDraft } from './state.js';
+import { state } from './state.js';
 import { showToast } from './utils.js';
 import { loadAgentEvents, renderEventTimeline } from './agentic_state.js';
 import { resetLiveHistory, effectiveLiveViewMode, showChatView } from './live_chat.js';
@@ -132,16 +132,6 @@ function watchRestarted(xtermMod, name, sessionId, agentType, onLive) {
     }, 2000, { whenHidden: true }); // follows a Restart the user just asked for
 }
 
-/** The words typed to the agent being replaced are not for its replacement (#10297): the box and the saved draft are emptied before the new session takes the old one's place. */
-function forgetDraft(session, oldId, newId) {
-    for (const id of [oldId, newId]) { // the feed may already have moved the page's session to the new id: the draft is under whichever it had
-        const key = id && sessionKey({ ...session, session_id: id });
-        if (key) saveSessionDraft(key, '');
-    }
-    const input = document.getElementById('command-input');
-    if (input && state.currentSession === session) { input.value = ''; input.dispatchEvent(new Event('input', { bubbles: true })); }
-}
-
 export async function confirmRestart() {
     const config = window.getAgentConfig ? window.getAgentConfig('restart-acf') : {};
     const modeSelect = document.querySelector('#restart-acf .acf-permission-mode');
@@ -158,13 +148,17 @@ export async function restartSameSettings() {
 }
 
 async function runRestart(config) {
+    const notice = {};
+    let finishNotice;
     const restartId = state.currentSession && state.currentSession.session_id;
     try {
+        const { restartNotice, forgetDraft } = await importOnce('./restart_notice.js');
+        finishNotice = () => restartNotice(notice);
         // Show restarting overlay instead of session-ended
         const xtermMod = await _getXtermModule();
         xtermMod.setRestarting?.(true, restartId);
         const replaced = state.currentSession, who = replaced.display_name || replaced.name;
-        showToast(`Restarting ${who}`, false, undefined, { group: { key: 'restarting', text: n => `Restarting ${n} agents` } });
+        restartNotice(notice, who || 'Agent');
         const payload = { agent_type: config.agentType || state.currentSession.agent_type, session_id: state.currentSession.session_id };
         if (config.flags) payload.extra_flags = config.flags;
         if (config.prompt) payload.prompt = config.prompt;
@@ -231,5 +225,7 @@ async function runRestart(config) {
         if (restartId) _getXtermModule().then((m) => m.setRestarting(false, restartId)).catch(() => {});
         showToast("Failed to restart session", true);
         console.error("confirmRestart exception:", e);
+    } finally {
+        finishNotice?.();
     }
 }
