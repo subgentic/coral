@@ -102,3 +102,25 @@ func TestReminderAMissedOneTimeFiresOnTheNextStartAndCannotReArm(t *testing.T) {
 	off, _ := rr.ch.sched.ChiefCheck(ctx, rid)
 	assert.False(t, off.Enabled)
 }
+
+// #19264: a one-time reminder's cron line names only minute, day and month, so one set 365 or 366 days ahead would be armed by this year's line and switched off as the wrong year before its date. The horizon keeps the first match on its own date.
+func TestReminderTheHorizonKeepsTheFirstCronMatchOnItsOwnDate(t *testing.T) {
+	rr := newRemRig(t)
+	for _, days := range []int{365, 366} {
+		code, _ := rr.once("person", "Dev", "Too far", time.Duration(days)*24*time.Hour+time.Minute)
+		assert.Equal(t, 400, code, "%d days ahead is refused", days)
+	}
+	for _, days := range []int{1, 200, 363, 364} {
+		d := time.Duration(days) * 24 * time.Hour
+		code, out := rr.once("person", "Dev", fmt.Sprintf("In %d days", days), d)
+		require.Equal(t, 201, code, "%d days ahead: %v", days, out)
+		at := rr.now.Add(d)
+		for k := 1; k <= days; k++ { // the first day after now whose month and day match the cron line is the reminder's own date
+			day := rr.now.AddDate(0, 0, k)
+			if day.Month() == at.Month() && day.Day() == at.Day() {
+				assert.Equal(t, at.Format("2006-01-02"), day.Format("2006-01-02"), "the first match is the date it was set for")
+				break
+			}
+		}
+	}
+}

@@ -9,7 +9,7 @@ coral-board remind add "Look at CI" --every 15m
 coral-board remind list | show <id> | done <id> | cancel <id>
 ```
 
-Times: `--in 2h`, `--at 2026-11-18 09:00` (one time, at most a year ahead), `--every 5m|15m|30m|60m`, `--daily HH:mm`, `--weekdays HH:mm`.
+Times: `--in 2h`, `--at 2026-11-18 09:00` (one time, at most 364 days ahead), `--every 5m|15m|30m|60m`, `--daily HH:mm`, `--weekdays HH:mm`.
 
 ## Who may do what
 

@@ -24,7 +24,7 @@ const (
 	maxAgentReminders        = 20  // active reminders one agent may have set for itself
 	maxOrchestratorReminders = 50  // active reminders an Orchestrator may have set on one team
 	minSelfReminderMinutes   = 15  // an agent's own recurring reminder runs no faster than this
-	maxReminderHorizonDays   = 366 // a one-time reminder is at most this far ahead
+	maxReminderHorizonDays   = 364 // a one-time reminder is at most this far ahead: its yearly cron line (minute, day, month) then first matches on its own date, never earlier (365 and 366 days ahead match this year first, #19264)
 )
 
 func (h *ChiefChecksHandler) registerReminders(r chi.Router) {
@@ -296,7 +296,7 @@ func (h *ChiefChecksHandler) remindersAdd(w http.ResponseWriter, r *http.Request
 			return
 		}
 		if at.After(now.AddDate(0, 0, maxReminderHorizonDays)) {
-			errBadRequest(w, "a reminder can be at most a year ahead")
+			errBadRequest(w, "a reminder can be at most 364 days ahead")
 			return
 		}
 	}
