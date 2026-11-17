@@ -94,6 +94,7 @@
 .av-split { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
 .av-col { min-width: 0; padding: 0 12px; border-right: 1px solid var(--border); }
 .av-col:last-child { border-right: 0; }
+.av-page-frame { width: 100%; height: 60vh; min-height: 260px; border: 1px solid var(--border); border-radius: var(--radius-sm, 6px); color-scheme: light; background: Canvas; } /* a page is drawn on white, as the preview draws it, in a dark theme too */
 .av-colhead { margin: 0 0 6px; font-size: var(--fs-sm, .8125rem); color: var(--text-secondary); }
 /* comparing: the comments are of the version, not of the changes */
 .artifact-viewer.av-comparing .artifact-viewer-edit-item, .artifact-viewer.av-comparing .artifact-viewer-edit { display: none !important; }
