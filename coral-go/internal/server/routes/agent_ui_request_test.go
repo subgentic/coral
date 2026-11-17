@@ -179,7 +179,7 @@ const src = fs.readFileSync(process.argv[1], 'utf8');
 const a = src.indexOf('const CORAL_NUDGE_RES');
 const b = src.indexOf('/** Record a message just sent');
 if (a < 0 || b < a) { console.error('could not locate classifier in pending_messages.js'); process.exit(2); }
-const ctx = vm.createContext({});
+const ctx = vm.createContext({ importOnce: () => Promise.resolve({}) });
 vm.runInContext(src.slice(a, b).replace(/^export /gm, '') + '\nthis.isCoralNudge = isCoralNudge; this.isCoralHealthNudge = isCoralHealthNudge;', ctx);
 const msg = fs.readFileSync(process.argv[2], 'utf8');
 console.log(JSON.stringify({ coral: ctx.isCoralNudge(msg), health: ctx.isCoralHealthNudge(msg), plainUser: ctx.isCoralNudge('Make a cost chart please') }));
