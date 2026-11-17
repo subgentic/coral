@@ -194,7 +194,7 @@ func searchFilters(set map[string]string) string {
 	var parts []string
 	for _, k := range []string{"source", "state", "goal", "assignee", "from", "mentions", "agent", "author", "since", "until"} {
 		if v := strings.TrimSpace(set[k]); v != "" {
-			parts = append(parts, "--"+k+" "+v)
+			parts = append(parts, "--"+k+" "+strconv.Quote(clitext.Clean(v))) // quoted and cleaned: a value is the caller's own text, never raw control characters on the terminal
 		}
 	}
 	return strings.Join(parts, " ")

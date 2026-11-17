@@ -204,8 +204,9 @@ func TestPrintResultsShowsAssigneeTotalAndTheFiltersThatLeftNothing(t *testing.T
 	})
 	require.Contains(t, out, "12 matches on board b (showing 1)")
 	require.Contains(t, out, "task #7 2026-11-17 09:00Z [completed] @Developer experience  Fix")
-	out = captureStdout(t, func() { printResults("b", "staging", nil, false, "", "", 0, "--state completed --assignee Dana") })
-	require.Contains(t, out, "with --state completed --assignee Dana")
+	out = captureStdout(t, func() { printResults("b", "staging", nil, false, "", "", 0, `--state "completed" --assignee "Dana"`) })
+	require.Contains(t, out, "with --state \"completed\" --assignee \"Dana\"")
 	require.Contains(t, out, "every filter must hold")
-	require.Equal(t, "--state done --since 2d", searchFilters(map[string]string{"state": "done", "since": "2d", "goal": " "}))
+	require.Equal(t, `--state "done" --since "2d"`, searchFilters(map[string]string{"state": "done", "since": "2d", "goal": " "}))
+	require.NotContains(t, searchFilters(map[string]string{"state": "a\x1b[31mb"}), "\x1b", "control characters never reach the terminal")
 }
