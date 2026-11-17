@@ -23,7 +23,7 @@ const hint = {
 };
 /** The notice says agents default to auto mode, so it is only true while the saved default is Auto (unset is Auto too, settings_diff's FIELD_DEFAULT): with another default saved it is hidden, and comes back when the default does (#16367). */
 const defaultIsAuto = () => { const m = state.settings?.default_permission_mode; return !m || m === 'auto'; };
-const headline = 'Agents launch in auto mode: they work without stopping to ask you; each CLI has its own safety checks.';
+const headline = 'Auto mode';
 function disclosureSection(id, title, disclosure) {
     const section = document.createElement('details'); section.className = 'disclosure';
     const summary = document.createElement('summary');
