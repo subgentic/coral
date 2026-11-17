@@ -103,16 +103,18 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	if body.BoardName == "" && body.BoardID == "" && (body.BoardServer == "" || body.BoardServer == "local") {
 		body.BoardID = h.callersBoardWithGrant(r)
 	}
+	boardCreated := false // this request made the board: it has no switch yet (#19138)
 	// Which board on this Coral the agent joins or starts (#3536); a remote board's Coral decides its own.
 	if (body.BoardName != "" || body.BoardID != "") && (body.BoardServer == "" || body.BoardServer == "local") {
-		key, ok := h.launchBoard(w, r, body.BoardID, body.BoardName, body.NewBoard)
+		key, created, ok := h.launchBoardCreated(w, r, body.BoardID, body.BoardName, body.NewBoard)
 		if !ok {
 			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
 			return
 		}
 		body.BoardName = key
+		boardCreated = created
 	}
-	if h.refuseAgentLaunchWhileAccessOff(w, r, body.BoardName) {
+	if h.refuseAgentLaunchWhileAccessOff(w, r, body.BoardName, body.BoardServer, boardCreated) {
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
 		return
 	}

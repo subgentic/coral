@@ -72,15 +72,19 @@ func (h *SessionsHandler) callersBoardWithGrant(r *http.Request) string {
 	return *sess.BoardName
 }
 
-// refuseAgentLaunchWhileAccessOff answers 403 orchestrator_access_off, and reports true, when an agent starts agents while the Operator has switched Orchestrator access OFF for its team (#17661): the prompt tells the Orchestrator it
-// may not, and this is what backs that up. It is the caller's own team (the board its session is seated on) and the board the launch names, whichever has a grant the Operator turned off. A board the Operator never decided for (no
-// grant row) is as it was, the Operator's and the dashboard's launches are never held, and a team with the access on is held to its caps and folders as before.
-func (h *SessionsHandler) refuseAgentLaunchWhileAccessOff(w http.ResponseWriter, r *http.Request, named string) bool {
+// refuseAgentLaunchWhileAccessOff answers 403 orchestrator_access_off, and reports true, when an agent starts agents on a team whose Orchestrator access the Operator has not switched ON (#17661, #19138): the prompt tells the
+// Orchestrator it may not, and this is what backs that up. It is the same rule wake and restart apply (orchestrator_agents.go): access must be explicitly on, so a board with no grant row is as off as one the Operator switched off
+// (GetOrchGrant: "a board that has none has the switch off"). It is the caller's own team (the board its session is seated on) and the board the launch names, whichever is not on (a board this launch made is not counted: it has no switch to be off). The Operator's and the dashboard's launches are never
+// held, an agent with no board and naming none has no team switch to hold it, and a team with the access on is held to its caps and folders as before. An unreadable grant refuses too: access that cannot be shown on is not on.
+func (h *SessionsHandler) refuseAgentLaunchWhileAccessOff(w http.ResponseWriter, r *http.Request, named, boardServer string, madeBoard bool) bool {
 	owner, ok := VerifiedSession(r.Context())
 	if !ok || h.ss == nil || h.bs == nil {
 		return false
 	}
 	boards := []string{named}
+	if madeBoard || (boardServer != "" && boardServer != "local") {
+		boards = nil // a team this launch made has no switch yet, and a board on another computer is that Coral's to decide: the caller's own team, below, still holds the launch
+	}
 	if sess, err := h.ss.GetLiveSession(r.Context(), owner.SessionID); err == nil && sess != nil && sess.BoardName != nil {
 		boards = append(boards, *sess.BoardName)
 	}
@@ -89,10 +93,13 @@ func (h *SessionsHandler) refuseAgentLaunchWhileAccessOff(w http.ResponseWriter,
 			continue
 		}
 		g, err := h.bs.GetOrchGrant(r.Context(), b)
-		if err != nil || g.Enabled || g.SetAt == "" { // unreadable: as before; never decided: as before
+		if err == nil && g.Enabled {
 			continue
 		}
-		msg := "the Operator has not allowed agents to start agents on this team: ask the Operator to turn on Orchestrator access in the team's settings"
+		if err != nil {
+			slog.Warn("an agent's launch was refused: the team's Orchestrator access could not be read", "board", b, "error", err)
+		}
+		msg := "the Operator has not allowed agents to start agents on team " + b + ": ask the Operator to turn on Orchestrator access in the team's settings (Team settings > Orchestrator access: pick the seat and the caps)"
 		writeError(w, http.StatusForbidden, "orchestrator_access_off", msg)
 		return true
 	}

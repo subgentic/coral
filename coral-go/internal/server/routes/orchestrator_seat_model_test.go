@@ -56,9 +56,11 @@ func TestOnlyTheTeamsSeatGetsTheOrchestratorModelNotEveryNameThatSaysOrchestrato
 func TestAnAgentsTeamLaunchNeverGetsTheOrchestratorModel(t *testing.T) {
 	r := seatRig(t)
 	r.usualBoard()
+	code, out := r.operatorGrant("Orchestrator", nil) // an agent starts agents only where the Operator has switched it on (#19138)
+	require.Equal(t, http.StatusOK, code, out)
 	before := len(r.term.sentCommands())
 	b, _ := json.Marshal(map[string]any{"board_id": orchBoard, "working_dir": r.work, "agent_type": "claude", "agents": []map[string]any{{"name": "Orchestrator", "prompt": "w"}, {"name": "Dev9", "prompt": "w"}}})
-	code, out := r.do("POST", "/api/sessions/launch-team", string(b), nil, r.tok["Dev2"])
+	code, out = r.do("POST", "/api/sessions/launch-team", string(b), nil, r.tok["Dev2"])
 	require.Equal(t, http.StatusOK, code, out)
 	assert.Equal(t, []string{"worker", "worker"}, r.modelsSince(before))
 }
@@ -77,7 +79,9 @@ func TestASingleLaunchGetsTheOrchestratorModelOnlyWhereItTakesTheSeat(t *testing
 		return r.modelsSince(before)
 	}
 	assert.Equal(t, []string{"orch"}, launch("Orchestrator", "", operatorClient, ""), "the Operator's launch that would take the seat")
-	r.usualBoard() // the team now has its Orchestrator
+	r.usualBoard()                                      // the team now has its Orchestrator
+	gcode, gout := r.operatorGrant("Orchestrator", nil) // an agent starts agents only where the Operator has switched it on (#19138)
+	require.Equal(t, http.StatusOK, gcode, gout)
 	assert.Equal(t, []string{"worker"}, launch("Orchestrator helper", orchBoard, operatorClient, ""), "a name that says orchestrator, on a team that has one, is a worker")
 	assert.Equal(t, []string{"worker"}, launch("Dev9", orchBoard, operatorClient, ""))
 	assert.Equal(t, []string{"worker"}, launch("Orchestrator", orchBoard, nil, r.tok["Dev2"]), "an agent never gets it")
