@@ -77,7 +77,7 @@ func cmdHeavy() {
 	}
 	command := heavyCommand(rest)
 	me := resolveSubscriberID()
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 	defer stop()
 
 	release := func() {

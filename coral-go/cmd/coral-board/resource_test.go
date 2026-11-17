@@ -6,8 +6,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -22,6 +24,7 @@ type resStub struct {
 	grantAt  int // the claim that is granted (1: at once)
 	status   int
 	respText string
+	lease    string // the granted entry's lease_until, when set (#18488)
 	how      string // the answer to GET /api/resources/<name> when set (#17560)
 }
 
@@ -41,6 +44,10 @@ func (s *resStub) handler(w http.ResponseWriter, r *http.Request) {
 	if strings.HasSuffix(r.URL.Path, "/claim") {
 		s.claims++
 		if s.claims >= s.grantAt {
+			if s.lease != "" {
+				w.Write([]byte(`{"granted":true,"place":0,"entry":{"id":1,"lease_until":"` + s.lease + `"}}`))
+				return
+			}
 			w.Write([]byte(`{"granted":true,"place":0,"entry":{"id":1}}`))
 			return
 		}
@@ -278,5 +285,96 @@ func TestResourceDefineSendsTheDescription(t *testing.T) {
 	}
 	if s.bodies[0]["description"] != "Linux, Go only. ssh epoch" {
 		t.Fatalf("body %v", s.bodies[0])
+	}
+}
+
+// #18488: a claim made with --run follows the run, not the shell that launched it: the command runs after the grant, the slot is renewed while it runs and is given back when it ends, with the command's own exit code.
+func TestAClaimWithRunKeepsTheSlotWhileTheCommandRunsAndGivesItBackAtItsEnd(t *testing.T) {
+	prev := heavyRenewFloor
+	heavyRenewFloor = 20 * time.Millisecond
+	defer func() { heavyRenewFloor = prev }()
+	s := &resStub{grantAt: 1, lease: time.Now().Add(150 * time.Millisecond).UTC().Format(time.RFC3339Nano)}
+	out, exited := runResource(t, s, "claim", "mac-heavy", "--wait", "--run", "--", "sleep 0.3; echo ran-under-claim")
+	if exited {
+		t.Fatal("exited: the command succeeded")
+	}
+	if !strings.Contains(out, "ran-under-claim") {
+		t.Fatalf("the command did not run: %q", out)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	renews, releaseAt, claimAt := 0, -1, -1
+	for i, r := range s.reqs {
+		switch {
+		case strings.HasSuffix(r, "/claim") && claimAt < 0:
+			claimAt = i
+		case strings.HasSuffix(r, "/renew"):
+			renews++
+			if releaseAt >= 0 {
+				t.Fatalf("renewed after the release: %v", s.reqs)
+			}
+		case strings.HasSuffix(r, "/release"):
+			releaseAt = i
+		}
+	}
+	if renews == 0 {
+		t.Fatalf("the slot was not renewed while the command ran: %v", s.reqs)
+	}
+	if releaseAt < 0 || releaseAt != len(s.reqs)-1 {
+		t.Fatalf("the slot is given back last, once the command has ended: %v", s.reqs)
+	}
+	if !strings.Contains(out, "given back (exit 0)") {
+		t.Fatalf("it says it gave the slot back: %q", out)
+	}
+}
+
+func TestAClaimWithRunSaysTheCommandsExitCodeAndStillGivesTheSlotBack(t *testing.T) {
+	s := &resStub{grantAt: 1}
+	out, exited := runResource(t, s, "claim", "mac-heavy", "--run", "--", "exit 7")
+	if !exited {
+		t.Fatalf("a failing command must exit non-zero: %q", out)
+	}
+	if !strings.Contains(out, "given back (exit 7)") {
+		t.Fatalf("%q", out)
+	}
+	last := s.reqs[len(s.reqs)-1]
+	if !strings.HasSuffix(last, "/release") {
+		t.Fatalf("the slot was not given back: %v", s.reqs)
+	}
+}
+
+// #19309: closing the terminal that launched a --run claim sends SIGHUP; the run stops its command and gives the slot back, like Ctrl-C or kill does, instead of dying with the command running on and the slot held until its lease ran out.
+func TestAClaimWithRunStopsTheCommandAndGivesTheSlotBackOnSIGHUP(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no SIGHUP on Windows")
+	}
+	s := &resStub{grantAt: 1}
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		p, _ := os.FindProcess(os.Getpid())
+		_ = p.Signal(syscall.SIGHUP)
+	}()
+	start := time.Now()
+	out, _ := runResource(t, s, "claim", "mac-heavy", "--run", "--", "sleep 30")
+	if time.Since(start) > 10*time.Second {
+		t.Fatalf("the command was not stopped by SIGHUP: %q", out)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.reqs) == 0 || !strings.HasSuffix(s.reqs[len(s.reqs)-1], "/release") {
+		t.Fatalf("the slot was not given back after SIGHUP: %v", s.reqs)
+	}
+}
+
+func TestAClaimWithRunAndNoCommandIsRefusedBeforeAnythingIsClaimed(t *testing.T) {
+	s := &resStub{grantAt: 1}
+	_, exited := runResource(t, s, "claim", "mac-heavy", "--run")
+	if !exited {
+		t.Fatal("it must refuse")
+	}
+	for _, r := range s.reqs {
+		if strings.HasSuffix(r, "/claim") {
+			t.Fatalf("a claim was made with nothing to run: %v", s.reqs)
+		}
 	}
 }
