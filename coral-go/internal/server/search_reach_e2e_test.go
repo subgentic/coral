@@ -184,6 +184,7 @@ func TestSearchReachLevelsOnBoardSearch(t *testing.T) {
 		code, out, raw = search(tokDev, "team")
 		require.Equal(t, http.StatusOK, code, raw)
 		assert.Equal(t, "team", out["reach"])
+		assert.Equal(t, "this board only", out["work_scope"], "#19181: a wider reach is for messages; the answer says tasks and goals stay this board's")
 		assert.Contains(t, raw, "CANARY-ALPHA")
 		for _, c := range []string{"CANARY-BETA", "CANARY-OPS", "CANARY-TRAP", "CANARY-JOB", "CANARY-RELAY"} {
 			assert.NotContains(t, raw, c, "team: the boards its members were launched on, by key: not %s (a board whose key is the team's NAME is not its board)", c)
@@ -196,6 +197,7 @@ func TestSearchReachLevelsOnBoardSearch(t *testing.T) {
 		code, _, raw = search(tokDev, "")
 		require.Equal(t, http.StatusOK, code, raw)
 		assert.Contains(t, raw, `"reach":"own"`, "no flag is own whatever the level")
+		assert.NotContains(t, raw, "work_scope", "an own-board search has nothing to say about scope")
 	})
 	t.Run("a step to operator needs the confirm, and an unknown level is a 400", func(t *testing.T) {
 		code, out, raw := set("operator", "")

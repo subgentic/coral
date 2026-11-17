@@ -695,7 +695,8 @@ const savedState = DT.tableState(); // one word set for a task's state (Queued, 
 const goalsState = DT.tableState();
 const taskText = t => [t.title, t.board, t.priority, stateOf(t), t.created_by].join(' ').toLowerCase();
 let taskFilters = { ...TF.EMPTY }, taskState = 'all', taskBar = null;
-const taskMatches = t => serverMatches(t, taskFilters) && (!queries.tasks || taskText(t).includes(queries.tasks.toLowerCase()))
+const workHits = { tasks: new Set(), goals: new Set() }; let workGen = 0, workTimer = 0; // items whose body or outcome holds the search words, from the server's search (#19237)
+const taskMatches = t => serverMatches(t, taskFilters) && (!queries.tasks || taskText(t).includes(queries.tasks.toLowerCase()) || workHits.tasks.has(`${t.project}#${t.id}`))
     && (!taskFilters.team || t.project === taskFilters.team)
     && (!taskFilters.priority || t.priority === taskFilters.priority)
     && (!taskFilters.from || Date.parse(t.updated_at || t.created_at) >= new Date(taskFilters.from + 'T00:00:00').getTime());
@@ -716,7 +717,7 @@ function inboxTaskToolbar() {
         taskBar = TV.tasksToolbar('mine', next => {
             inboxTasksState.selected.clear();
             taskFilters = next;
-            queries.tasks = next.q;
+            queries.tasks = next.q; noteWorkSearch('tasks', next.q);
             const input = $('inbox-search');
             if (input && group === 'tasks') input.value = next.q;
             renderInboxNav(true);
@@ -771,7 +772,13 @@ const closeGoalsActions = () => [{ label: 'Close goals', danger: true,
 const goalTeam = g => teamLabel(g.board_id); // with its computer when a hub has more than one: two teams called alpha are two (#8774)
 let goalFilters = GF.loadFilters(), goalBar = null;
 let activityFilters = AF.loadFilters(), activityBar = null;
-const goalRows = () => GF.ordered(goals.filter(g => GF.matches(g, goalFilters, goalTeam) && serverMatches(g, goalFilters)), goalFilters);
+const goalRows = () => GF.ordered(goals.filter(g => (GF.matches(g, goalFilters, goalTeam) || (workHits.goals.has(`${g.board_id}#${g.id}`) && GF.matches(g, { ...goalFilters, q: '' }, goalTeam))) && serverMatches(g, goalFilters)), goalFilters);
+/** The words typed in Tasks or Goals are also asked of the server (the search 'coral-board search' makes), so a word only in a task's body or a goal's outcome shows; the list redraws when it answers. */
+function noteWorkSearch(kind, text) {
+    const gen = ++workGen; clearTimeout(workTimer);
+    if (!String(text || '').trim()) { if (workHits[kind].size) { workHits[kind] = new Set(); } return; }
+    workTimer = setTimeout(() => importOnce('./work_search.js').then(m => m.workHits((kind === 'tasks' ? tasks.map(t => t.project) : goals.map(g => g.board_id)), text, kind)).then(set => { if (gen !== workGen) return; workHits[kind] = set; renderInboxNav(true); }).catch(() => {}), 250);
+}
 /** New goal at the right of the Goals toolbar (#11593, the operator): the existing New goal form (goals_view.js, lazy), on the team the Team filter names, else the first; with more than one team the form asks which. */
 function newGoalAction() {
     const b = DT.el('button', 'btn btn-primary goals-new', 'New goal'); b.type = 'button';
@@ -795,7 +802,7 @@ function inboxGoalsToolbar() {
             ],
             model: { EMPTY: GF.EMPTY, clean: GF.clean, chips: GF.chips, isFiltered: f => GF.isFiltered({ ...f, state: f.state === 'active' ? '' : f.state }), without: GF.without }, // Active is how the folder opens, not a filter the person set (#16371)
         }, next => {
-            goalFilters = next; GF.saveFilters(next);
+            goalFilters = next; GF.saveFilters(next); noteWorkSearch('goals', next.q);
             const input = $('inbox-search'); if (input && group === 'goals') input.value = next.q; // the sidebar's box shows the same words
             renderInboxNav(true);
         });
@@ -1600,6 +1607,7 @@ export function filterInbox(value) {
     if (group === 'needs') { needsFilters = { ...needsFilters, q: text }; persistNeedsFilters(); } // the sidebar's box and the page's share the one search (#8604)
     if (group === 'activity') { activityFilters = { ...activityFilters, q: text }; AF.saveFilters(activityFilters); } // the sidebar's box and the page's share the one search (#12070)
     if (group === 'goals') { goalFilters = { ...goalFilters, q: text }; GF.saveFilters(goalFilters); } // the sidebar's box and the page's share the one search (#8596)
+    if (group === 'tasks' || group === 'goals') noteWorkSearch(group, text);
     renderInboxNav(true);
 }
 

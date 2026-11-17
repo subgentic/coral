@@ -22,8 +22,9 @@ type WorkQuery struct {
 
 // WorkHit is one task or goal that matched, in the one shape every source of the search shares.
 type WorkHit struct {
-	Source  string `json:"source"` // "task" or "goal"
+	Source  string `json:"source"` // "task", "goal", "message" or "history" (a turn of a past chat: id is its index in the session)
 	ID      int64  `json:"id"`
+	Session string `json:"session,omitempty"` // history: the chat session the turn is in
 	Title   string `json:"title"`
 	Snippet string `json:"snippet"`
 	State   string `json:"state"`
