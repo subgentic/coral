@@ -128,6 +128,7 @@ type TimeSeriesQuery struct{ Since, Until, Interval, Board, GroupBy string }
 
 // TimeSeriesSeries is one group's usage in one bucket.
 type TimeSeriesSeries struct {
+	TaskIDs          []int64 `json:"task_ids,omitempty"`
 	Key              string  `json:"key"`
 	Label            string  `json:"label"`
 	CostUSD          float64 `json:"cost_usd"`
