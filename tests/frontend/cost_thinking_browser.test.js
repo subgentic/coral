@@ -55,7 +55,7 @@ const { coralReady } = require('./helpers/wait');
             // columns: Provider, Model, Thinking level, Calls, Input, Output, Cache Read, Cache Write, Thinking, Cost, Share (the phone moves Cost and Share up, by cell index, so read by heading)
             const cols = await ev(`[...document.querySelectorAll('#cost-by-thinking thead th')].map(th => th.textContent.replace(/[\\u25B2\\u25BC\\u2191\\u2193\\u2195]|filter_list/g, '').trim())`);
             const at = h => cols.indexOf(h);
-            assert.ok(['Provider', 'Model', 'Thinking level', 'Calls', 'Input', 'Output', 'Thinking', 'Cost', 'Share'].every(h => at(h) >= 0), 'the columns: ' + JSON.stringify(cols));
+            assert.ok(['Provider', 'Model', 'Thinking level', 'Calls', 'New input tokens', 'Output', 'Thinking', 'Cost', 'Share'].every(h => at(h) >= 0), 'the columns: ' + JSON.stringify(cols));
             const cell = (r, h) => r.cells[at(h)];
             assert.deepEqual(rows.map(r => [cell(r, 'Provider'), cell(r, 'Thinking level')].join('/')), ['claude/High', 'claude/Low', 'claude/Not reported', 'claude/Medium', 'agy/Not reported'], 'dearest first: ' + JSON.stringify(rows));
             assert.deepEqual(rows.map(r => cell(r, 'Model')).map(m => /Opus 5\.5/.test(m) ? 'opus' : /Sonnet 5\.5/.test(m) ? 'sonnet' : m), ['opus', 'opus', 'opus', 'sonnet', 'Not reported'], 'a row per provider, model and level; a model that was not recorded is Not reported');
@@ -71,7 +71,7 @@ const { coralReady } = require('./helpers/wait');
             const tbl = id => ev(`(() => { const heads = [...document.querySelectorAll('#${id} thead th')].map(th => th.textContent.replace(/[\\u25B2\\u25BC\\u2191\\u2193\\u2195]|filter_list/g, '').trim());
                 return { heads, rows: [...document.querySelectorAll('#${id} tbody tr')].map(tr => [...tr.children].map(td => td.textContent.trim())) }; })()`);
             const prov = await tbl('cost-by-provider'), mod = await tbl('cost-by-model');
-            for (const t of [prov, mod]) assert.ok(['Requests', 'Input', 'Output', 'Cost', 'Share'].every(h => t.heads.includes(h)), 'the columns: ' + JSON.stringify(t.heads));
+            for (const t of [prov, mod]) assert.ok(['Requests', 'New input tokens', 'Output', 'Cost', 'Share'].every(h => t.heads.includes(h)), 'the columns: ' + JSON.stringify(t.heads));
             const pc = h => prov.heads.indexOf(h), mc = h => mod.heads.indexOf(h);
             assert.deepEqual(prov.rows.map(r => r[pc('Provider')]), ['claude', 'agy'], 'By Provider, dearest first');
             assert.deepEqual(prov.rows.map(r => r[pc('Share')]), ['94%', '6%'], 'provider shares: ' + JSON.stringify(prov.rows));

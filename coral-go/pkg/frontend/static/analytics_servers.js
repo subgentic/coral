@@ -104,7 +104,7 @@ function draw(host, b) {
     const columns = [
         { key: 'label', label: 'Computer', sort: true, sortValue: r => r.label.toLowerCase(), cell: r => r.label, tone: 'primary' },
         numCol('cost', 'Cost', x => x.cost, showUnits, { foldFirst: true }),
-        numCol('input', 'Input', x => x.input, num), numCol('output', 'Output', x => x.output, num),
+        numCol('input', 'New input tokens', x => x.input, num), numCol('output', 'Output', x => x.output, num),
         numCol('agents', 'Agents', x => x.agents, num), numCol('requests', 'Requests', x => x.requests, num),
         { key: 'seen', label: 'Last seen', sort: false, cell: r => (r.state === 'live' ? 'now' : r.state === 'none' ? (r.seen === 'never' ? 'no figures yet' : `no figures yet, seen ${r.seen}`) : `last seen ${r.seen}`) },
     ];
