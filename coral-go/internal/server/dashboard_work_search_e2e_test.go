@@ -68,7 +68,7 @@ func TestDashboardWorkSearchReturnsTheSameHitsAsTheAgentSearch(t *testing.T) {
 		{"q": {"narwhal"}, "source": {"tasks"}},
 		{"q": {"zebrafish"}, "source": {"tasks,goals"}},
 		{"q": {"zebrafish"}, "source": {"goals"}},
-		{"q": {"narwhal"}, "source": {"tasks"}, "state": {"queued"}},
+		{"q": {"narwhal"}, "source": {"tasks"}, "state": {"blocked"}},
 		{"q": {"zebrafish"}, "source": {"tasks,goals"}, "goal": {strconv.FormatInt(g.ID, 10)}},
 		{"q": {"narwhal"}, "source": {"tasks"}, "limit": {"1"}},
 		{"q": {"nothing-matches-this"}, "source": {"tasks,goals"}},
@@ -89,7 +89,7 @@ func TestDashboardWorkSearchReturnsTheSameHitsAsTheAgentSearch(t *testing.T) {
 		assert.Contains(t, raw, "Ship it")
 	})
 	t.Run("messages keep their own search, and bad input is refused", func(t *testing.T) {
-		for _, bad := range []url.Values{{"q": {"x"}, "bogus": {"1"}}, {"q": {"x"}, "source": {"bogus"}}, {"q": {"x"}, "goal": {"abc"}}} {
+		for _, bad := range []url.Values{{"q": {"x"}, "bogus": {"1"}}, {"q": {"x"}, "source": {"bogus"}}, {"q": {"x"}, "goal": {"abc"}}, {"q": {"x"}, "state": {"queued"}}} {
 			code, _, _ := dash(bad)
 			assert.Equal(t, http.StatusBadRequest, code, bad.Encode())
 		}

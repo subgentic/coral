@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -118,7 +119,7 @@ func TestBoardSearchSendsTheWorkFiltersAndPrintsTasksAndGoals(t *testing.T) {
 	for _, want := range []string{"source=tasks%2Cgoals", "state=in_progress", "goal=244", "assignee=Dev"} {
 		assert.Contains(t, reqs[len(reqs)-1], want)
 	}
-	for _, want := range []string{"task #19161 2026-11-17 08:16 [in_progress]  coral-search slice 1: body with a narwhal in it", "goal #244 2026-11-17 08:00 [active]", "There are more", "coral-board task detail"} {
+	for _, want := range []string{"task #19161 2026-11-17 08:16Z [in_progress] goal #244  coral-search slice 1: body with a narwhal in it", "goal #244 2026-11-17 08:00Z [active]", "There are more", "coral-board task detail"} {
 		assert.Contains(t, res.stdout, want)
 	}
 	res = goalRun(t, gs, "search", "narwhal", "--json")
@@ -151,6 +152,61 @@ func TestBoardSearchSendsTheChatFiltersAndPrintsPastChatTurns(t *testing.T) {
 	for _, want := range []string{"source=history", "agent=dev", "author=assistant"} {
 		assert.Contains(t, reqs[len(reqs)-1], want)
 	}
-	assert.Contains(t, res.stdout, "history sess-1@4 2026-10-01 08:00 [assistant]  dev: the quokka plan")
+	assert.Contains(t, res.stdout, "history sess-1@4 2026-10-01 08:00Z [assistant]  dev: the quokka plan")
 	assert.Contains(t, res.stdout, "coral-agent history context <session> <n>")
+}
+
+// #19423 problem 3: `coral-board search --help` prints the usage and exits 0, with the words rule, --system and the times.
+func TestBoardSearchHelpPrintsTheUsage(t *testing.T) {
+	for _, args := range [][]string{{"search", "--help"}, {"search", "-h"}, {"help", "search"}} {
+		var out strings.Builder
+		handled, code := handleHelp(args, &out)
+		require.True(t, handled, args)
+		assert.Equal(t, 0, code, args)
+		for _, want := range []string{"coral-board search", "--source", "any order", "--system", "UTC", "--since"} {
+			assert.Contains(t, out.String(), want, args)
+		}
+	}
+}
+
+// #19423 problem 7: --since and --until take a date or how long ago as well as an RFC 3339 time, and the times printed are marked UTC (Z), the one the flags take.
+func TestSearchTimeFlagsTakeADateOrAnAgeAndTheListIsInUTC(t *testing.T) {
+	now := time.Date(2026, 11, 17, 18, 0, 0, 0, time.UTC)
+	for in, want := range map[string]string{
+		"":                     "",
+		"2026-10-18T00:00:00Z": "2026-10-18T00:00:00Z",
+		"2026-10-18":           "2026-10-18T00:00:00Z",
+		"30m":                  "2026-11-17T17:30:00Z",
+		"6h":                   "2026-11-17T12:00:00Z",
+		"2d":                   "2026-11-15T18:00:00Z",
+		"1w":                   "2026-11-10T18:00:00Z",
+		"soon":                 "soon", // the server says what it expects
+		"0h":                   "0h",
+	} {
+		assert.Equal(t, want, searchTime(in, now), in)
+	}
+	assert.Equal(t, "2026-11-17 08:16Z", whenShort("2026-11-17T00:16:27-08:00"), "a local time is printed as UTC")
+	gs := newGoalServer(t)
+	gs.setReply("GET /api/agent/board/search", searchWorkReply)
+	res := goalRun(t, gs, "search", "narwhal", "--since", "2026-11-17", "--until", "6h", "--system")
+	require.Equal(t, 0, res.code, res.stderr)
+	req := gs.requests()[0]
+	assert.Contains(t, req, "since=2026-11-17T00%3A00%3A00Z")
+	assert.Contains(t, req, "until=20", "a relative --until is sent as a time")
+	assert.NotContains(t, req, "until=6h")
+	assert.Contains(t, req, "system=1")
+}
+
+// A task hit names its assignee, and a search the filters leave empty says so (#19448).
+func TestPrintResultsShowsAssigneeTotalAndTheFiltersThatLeftNothing(t *testing.T) {
+	out := captureStdout(t, func() {
+		printResults("b", "staging", []map[string]any{{"source": "task", "id": 7.0, "at": "2026-11-17T09:00:00Z", "state": "completed", "assignee": "Developer experience", "title": "Fix", "snippet": "the staging cert"}}, false, "", "", 12, "")
+	})
+	require.Contains(t, out, "12 matches on board b (showing 1)")
+	require.Contains(t, out, "task #7 2026-11-17 09:00Z [completed] @Developer experience  Fix")
+	out = captureStdout(t, func() { printResults("b", "staging", nil, false, "", "", 0, `--state "completed" --assignee "Dana"`) })
+	require.Contains(t, out, "with --state \"completed\" --assignee \"Dana\"")
+	require.Contains(t, out, "every filter must hold")
+	require.Equal(t, `--state "done" --since "2d"`, searchFilters(map[string]string{"state": "done", "since": "2d", "goal": " "}))
+	require.NotContains(t, searchFilters(map[string]string{"state": "a\x1b[31mb"}), "\x1b", "control characters never reach the terminal")
 }
