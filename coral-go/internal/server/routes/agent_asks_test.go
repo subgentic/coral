@@ -281,3 +281,38 @@ func TestUndoDoesNotReopenAnAnsweredAgentQuestion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, open)
 }
+
+// #18553: the Operator answered in the agent's own chat, so the question is closed for them to see (the row's "Answered in chat"): off the list, Undo still works, and the agent is NOT told it was dismissed (it already has the answer, and "dismissed without answering" would be untrue).
+func TestAnAgentAskAnsweredInChatIsClosedWithoutTellingTheAgentItWasDismissed(t *testing.T) {
+	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "a.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	ss := store.NewSessionStore(db)
+	h := NewAgentAsksHandler(ss, nil)
+	o := owner("0001")
+	registerAsker(t, ss, o)
+	var typed []string
+	h.deliver = func(_ context.Context, _ ptymanager.SessionTerminal, _, _, _, text, _ string) error {
+		typed = append(typed, text)
+		return nil
+	}
+	id, err := ss.CreateAgentAsk(context.Background(), o.SessionID, o.SessionName, "Approve the logo?", []string{"Approve"}, time.Now())
+	require.NoError(t, err)
+	post := func(body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/agent-asks/"+askIDText(id)+"/dismiss", strings.NewReader(body))
+		req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+		rec := httptest.NewRecorder()
+		rr := chi.NewRouter()
+		rr.Post("/api/agent-asks/{id}/dismiss", h.Dismiss)
+		rr.ServeHTTP(rec, req)
+		return rec
+	}
+	list := func() []operatorAskRow { return h.Rows(httptest.NewRequest(http.MethodGet, "/", nil)) }
+	require.Len(t, list(), 1)
+	assert.Equal(t, http.StatusOK, post(`{"answered_in_chat":true}`).Code)
+	assert.Empty(t, list(), "closed: off the list")
+	assert.Empty(t, typed, "the agent is told nothing: it was answered, not dismissed")
+	assert.Equal(t, http.StatusConflict, post(`{"answered_in_chat":true}`).Code, "not closed twice")
+	assert.Equal(t, http.StatusOK, post(`{"undo":true}`).Code)
+	assert.Len(t, list(), 1, "Undo still puts it back")
+}
