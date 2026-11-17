@@ -1,11 +1,14 @@
 /* The Skills tab (#12078, goal #191): the Operator's list of skills (the shared data table, sortable, set column widths), the approval view with every file and its text, the scanner's warnings and the two-step
- * approval of a skill with scripts, and Import. Everything a skill says is drawn with textContent: a file's text is shown as text, never rendered. Local Coral only; an agent has none of these routes. */
+ * approval of a skill with scripts, and Import. Instructions use the strict Markdown renderer, including escaped HTML comments; raw files remain available as text. Local Coral only; an agent has none of these routes. */
 import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
-import { showView, showToast } from './utils.js';
+import { renderMarkdownStrict, showView, showToast } from './utils.js';
 import { requestJson } from './api.js';
 import { note, currentRoute } from './nav.js';
 import { isPhoneLayout } from './phone_layout.js';
+import { state } from './state.js';
+import { keyLabel, sessionServer } from './server_base.js';
+import { resolveSessionIdentity } from './session_state.js';
 import { SKILL_FOLDERS } from './routes.js';
 const { latestSkillRows, skillVersions } = await importOnce('./skill_versions.js');
 const DT = await importOnce('./data_table.js');
@@ -48,7 +51,7 @@ async function loadList() {
 // ── the folders (#12997, the Operator: 'Skills can be Imported, Agent Created, Coral Skills') ──
 // A skill's source is on its record (publisher_kind: operator = imported, agent = agent created, coral = Coral's own).
 /** The teams that use a skill, as one line ("alpha, beta"); '' when none (an older Coral sends no list). */
-function usedBy(r) { return Array.isArray(r.used_by) ? r.used_by.join(', ') : ''; }
+function usedBy(r) { return Array.isArray(r.used_by) ? r.used_by.map(team => { const names = (state.liveSessions || []).filter(a => sessionServer(a) === 'local' && a.board_project === team).map(resolveSessionIdentity); return names.length ? `${keyLabel(team)} (${names.join(', ')})` : keyLabel(team); }).join(', ') : ''; }
 const KIND_OF = { imported: 'operator', 'agent-created': 'agent', 'coral-skills': 'coral' };
 const FOLDER_LABEL = { '': 'All skills', imported: 'Imported', 'agent-created': 'Agent created', 'coral-skills': 'Coral skills' };
 const FOLDER_ICON = { '': 'dataset', imported: 'download', 'agent-created': 'smart_toy', 'coral-skills': 'auto_awesome' }; // a skill folder's glyph, as the Inbox's folders have theirs (#15820)
@@ -118,8 +121,9 @@ function drawList() {
     head.append(folderHead, sel, importBtn, input);
     PH.pageHeader(head, { idp: 'skills' });
     page.append(head);
-    const approval = 'A skill an agent publishes waits here until you approve it; one you import is approved at once.';
-    if (!loadError) page.append(el('p', 'skills-note', rows.length ? approval : `Agent Skills: a folder with SKILL.md that agents read when it fits their task. ${approval}`)); // the description is for an empty list; the approval rule stays under the header with skills listed (#16211)
+    const approval = 'Skills are reusable instructions that help an agent do a particular job, such as reviewing code or writing release notes. A skill an agent publishes waits here until you approve it; one you import is approved at once.';
+    if (!loadError) page.append(el('p', 'skills-note', approval)); // the description is for an empty list; the approval rule stays under the header with skills listed (#16211)
+    page.append(el('p', 'skills-note skills-get-started', 'Ask an agent to write a skill for a task you repeat, or download one from a source you trust. Import its .zip or SKILL.md file here, read it, then choose Use in a team.'));
     if (loadError) { const p = el('p', 'skills-error', loadError); p.setAttribute('role', 'alert'); page.append(p); }
     const columns = [
         { key: 'name', label: 'Name', primary: true, width: 'grow', min: 32, sort: true, sortValue: r => r.name.toLowerCase(), line: 1, cell: r => r.name },
@@ -141,7 +145,7 @@ function drawList() {
     ];
     page.append(DT.dataTable({ label: `${FOLDER_LABEL[folder]}, ${shown.length}`, rows: shown, rowKey: r => r.id, rowName: r => r.name, state: tableState, columns, open: r => loadOne(r.id),
         ...(isPhoneLayout() ? { bare: true, sortBar: false, mail: r => ({ lead: { node: el('span', 'material-icons skill-list-icon', 'auto_awesome'), name: r.name }, title: r.name, snippet: r.description, state: (STATUS[r.status] || [r.status])[0] + (r.pendingVersion && r.pendingVersion.id !== r.id ? ` · v${r.pendingVersion.version} waiting` : ''), time: DT.timeCell(r.decided_at || r.created_at).textContent, mark: r.pendingVersion ? 'attention' : undefined }) } : {}), // a phone's rows run edge to edge like the Inbox lists (#12957, the Operator's note on #12997): the shared mail row, no bordered box
-        empty: { line: showStatus || folder || query ? 'No skill in this list.' : 'No skills yet.', hint: 'Import a skill, or an agent can publish one with coral-agent skills publish.' } }).el);
+        empty: { line: showStatus || folder || query ? 'No skill in this list.' : 'No skills yet.', hint: 'Ask an agent to write a skill, or import one from a source you trust.' } }).el);
     return page;
 }
 
@@ -180,7 +184,7 @@ function drawDetail() {
     const title = el('div', 'skills-head'); title.append(el('h2', '', `${s.name} · version ${s.version}`), DT.chip(statusWord, (STATUS[s.status] || [])[1]));
     page.append(title);
     const meta = el('div', 'skills-meta');
-    meta.append(el('span', '', `Published by ${publisher(s)}`), el('span', 'skills-used-by', usedBy(s) ? `Used by ${usedBy(s)}` : 'Not used by a team yet'), el('span', '', `Digest ${short(s.digest)}`), el('span', '', `${files.length} file${files.length === 1 ? '' : 's'}`));
+    meta.append(el('span', '', `Published by ${publisher(s)}`), el('span', 'skills-used-by', usedBy(s) ? `Used by ${usedBy(s)}` : 'Not used by a team yet'), el('span', '', `${files.length} file${files.length === 1 ? '' : 's'}`));
     page.append(meta, el('p', 'skills-note', s.description));
     if (s.status === 'approved') {
         const use = el('div', 'skills-section');
@@ -191,7 +195,7 @@ function drawDetail() {
     }
     const versions = skillVersions(everyRow, s);
     if (versions.length > 1) {
-        const history = el('details', 'skills-section'), summary = el('summary', '', `Versions (${versions.length})`), list = el('ul');
+        const history = el('details', 'skills-section skills-history'), summary = el('summary', '', `Versions (${versions.length})`), list = el('ul');
         for (const v of versions) { const item = el('li'); item.append(button('btn btn-small', `v${v.version} · ${(STATUS[v.status] || [v.status])[0]}${v.id === s.id ? ' · current view' : ''}`, () => loadOne(v.id))); list.append(item); }
         history.append(summary, list); page.append(history);
     }
@@ -205,7 +209,7 @@ function drawDetail() {
     }
     // the files: every one, with its size, kind and SHA-256
     const risky = files.filter(f => f.kind === 'script' || f.kind === 'not_reviewable');
-    const fileSec = el('div', 'skills-section'); fileSec.append(el('h3', '', 'Files'));
+    const fileSec = el('details', 'skills-section skills-developer'); fileSec.open = s.status === 'pending'; fileSec.append(el('summary', '', 'Files and developer details'), el('p', 'skills-note', `Digest ${s.digest}`));
     fileSec.append(DT.dataTable({ label: `Files, ${files.length}`, rows: files, rowKey: f => f.path, rowName: f => f.path, columns: [
         { key: 'path', label: 'File', primary: true, width: 'grow', sort: true, cell: f => f.path },
         { key: 'size', label: 'Size', width: '5rem', align: 'end', sort: 'number', sortValue: f => f.size, cell: f => kb(f.size) },
@@ -216,6 +220,7 @@ function drawDetail() {
     if (shown) open.opened.add(shown);
     if (unopenedEl) { const n = unopenedFiles(d).length; unopenedEl.textContent = n ? `${n} file${n === 1 ? '' : 's'} not opened yet.` : 'You have opened every file that can be shown.'; }
     if (shown) { const pre = el('pre', 'skills-file-text'); pre.textContent = contents[shown]; pre.setAttribute('aria-label', `Text of ${shown}`); fileSec.append(el('p', 'skills-note', `Showing ${shown}`), pre); }
+    if (contents['SKILL.md']) { const instructions = el('div', 'skills-instructions prose prose-doc'); instructions.innerHTML = renderMarkdownStrict(contents['SKILL.md']); page.append(instructions); }
     page.append(fileSec);
     // what the scanner found in the scripts
     const warnings = d.warnings || [], hosts = d.hosts || [];
@@ -285,3 +290,4 @@ function drawRemove(s) {
     }, { label: 'Remove', danger: true })));
     return actions;
 }
+

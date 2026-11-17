@@ -28,13 +28,16 @@ let selectedDoc = null;
 let wantedDoc = null; // a /docs/<name> page opened before the list loaded (#3532)
 let docsQuery = '';   // the sidebar search's text, lower case
 
-// ── Groups (#7443, #10093): Getting started and For developers ────────────────
+// ── Groups (#7443, #10093): Getting started, Guides and Developer docs ────────────────
 // The list the server sends has no groups; these topics are the ones a new reader starts with, in this order ("How do I...?" first, then Quickstart); every other topic, the API reference included, is for developers.
-const GETTING_STARTED_ORDER = ['how-do-i', 'quickstart', 'key-concepts', 'using-the-dashboard', 'worked-demos', 'workflow-quickstart', 'troubleshooting'];
+const GETTING_STARTED_ORDER = ['how-do-i', 'quickstart', 'key-concepts', 'using-the-dashboard', 'skills', 'worked-demos', 'workflow-quickstart', 'troubleshooting'];
 const GETTING_STARTED = new Set(GETTING_STARTED_ORDER);
+// The pages about Coral's own API, files and hooks: a newcomer's search lists the guides first and these after them, under their own name, not hidden (walk 79, #19273).
+const DEVELOPER = new Set(['README', 'sessions', 'session-history', 'websockets', 'ui-hooks', 'agent-ui', 'agent-tasks', 'task-workflows', 'merge-queue', 'resource-queue', 'board', 'cross-team', 'hooks', 'team-config', 'auth', 'redaction', 'hub', 'settings-system', 'jobs', 'workflows']);
 const DOC_GROUPS = [
     { key: 'getting-started', label: 'Getting started', has: d => GETTING_STARTED.has(d.name), order: d => GETTING_STARTED_ORDER.indexOf(d.name) },
-    { key: 'api', label: 'For developers', has: d => !GETTING_STARTED.has(d.name) },
+    { key: 'guides', label: 'Guides', has: d => !GETTING_STARTED.has(d.name) && !DEVELOPER.has(d.name) },
+    { key: 'api', label: 'Developer docs', has: d => DEVELOPER.has(d.name) },
 ];
 const titleOf = d => d.title || d.name;
 // The search reads the topics' text too (#9965: "add a member" found nothing because only titles were searched): each topic's text is read once, on the first search, and kept lower case.
@@ -97,7 +100,7 @@ function hitSentence(name) {
     if (!line) return '';
     let best = '', bestN = 0;
     for (const part of line.text.split(/(?<=[.!?])\s+/)) {
-        const text = part.replace(/^[#>*\-\d.\s]+/, '').replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[`*_|]+/g, '').replace(/#\d{3,}/g, '').replace(/\s+/g, ' ').trim(), low = text.toLowerCase();
+        const text = part.replace(/^[#>*\-\d.\s]+/, '').replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\|/g, ' ').replace(/[`*_]+/g, '').replace(/#\d{3,}/g, '').replace(/\s+/g, ' ').trim(), low = text.toLowerCase();
         const n = words.filter(w => low.includes(w)).length;
         if (n > bestN) { bestN = n; best = text; }
     }
@@ -255,7 +258,9 @@ function renderDocNav() {
     const groups = docGroups();
     const shown = groups.filter(g => !isGroupFolded('docs', g.key)).flatMap(g => g.docs);
     const stop = shown.some(d => d.name === selectedDoc) ? selectedDoc : (shown[0] || {}).name;
-    const row = d => `<li class="session-list-item${escapeAttr(selectedDoc === d.name ? ' active' : '')}"><button type="button" class="row-btn" tabindex="${Number(d.name === stop ? 0 : -1)}"${selectedDoc === d.name ? ' aria-current="true"' : ''} data-on-click="doc-open" data-doc="${escapeAttr(d.name)}" data-on-keydown="doc-open-key"><span class="doc-nav-title">${esc(titleOf(d))}</span>${docsQuery && snippetOf(d) ? `<span class="doc-snippet">${esc(snippetOf(d))}</span>` : ''}</button></li>`; // under a hit that is in the topic's text: what matched (#10093)
+    // Two topics can share a title (chief.md and chief-guide.md are both "Chief"): the second says which page it is, so the buttons are not named alike (#19395).
+    const sameTitle = d => docsList.filter(x => titleOf(x) === titleOf(d)).length > 1;
+    const row = d => `<li class="session-list-item${escapeAttr(selectedDoc === d.name ? ' active' : '')}"><button type="button" class="row-btn"${sameTitle(d) ? ` aria-label="${escapeAttr(titleOf(d) + (d.subtitle ? ', ' + d.subtitle : ', ' + d.name))}"` : ''} tabindex="${Number(d.name === stop ? 0 : -1)}"${selectedDoc === d.name ? ' aria-current="true"' : ''} data-on-click="doc-open" data-doc="${escapeAttr(d.name)}" data-on-keydown="doc-open-key"><span class="doc-nav-title">${esc(titleOf(d))}</span>${docsQuery && snippetOf(d) ? `<span class="doc-snippet">${esc(snippetOf(d))}</span>` : ''}</button></li>`; // under a hit that is in the topic's text: what matched (#10093)
     list.innerHTML = groups.map(g => groupHeaderHtml('docs', g.key, g.label, g.docs.length) + (isGroupFolded('docs', g.key) ? '' : g.docs.map(row).join(''))).join('')
         || (docsList.length || docsLoaded ? `<li class="empty-state empty-state-tight">${docsList.length ? (docsQuery && !docTextReady ? 'Searching the topics\u2026' : 'No topic matches. Try other words, or clear the search.') : 'No documentation found.'}</li>` : ''); // a build with none says so in the list too: a phone shows the list, not the content pane (#10266)
     syncPaneGroupToggle('docs');
