@@ -35,6 +35,11 @@ func CodexConfigPath(home string) string {
 	return filepath.Join(home, ".codex", "config.toml")
 }
 
+// AgyConfigPath is Antigravity's settings file: ~/.gemini/antigravity-cli/settings.json.
+func AgyConfigPath(home string) string {
+	return filepath.Join(home, ".gemini", "antigravity-cli", "settings.json")
+}
+
 // CheckRunWorktree answers the resolved folder of a run's own worktree when it may be trusted: runDir exists, is a real folder (not a link, once resolved), is exactly one level inside worktreesRoot (both
 // resolved), and is not writable by group or others. Anything else is refused, and nothing is trusted.
 func CheckRunWorktree(runDir, worktreesRoot string) (string, error) {

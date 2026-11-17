@@ -26,11 +26,6 @@ func trustFolderCaller(r *http.Request) bool {
 	return kind == callerDashCookie || kind == callerDashNoCookie
 }
 
-// trustCardless names the agent types whose CLI asks about a folder but has no setting Coral can set (nothing documented for Antigravity): their card stays.
-var trustCardless = map[string]string{
-	"agy": "no setting Coral can set: its card stays", "antigravity": "no setting Coral can set: its card stays", "gemini": "no setting Coral can set: its card stays",
-}
-
 // claudeConfigPath is Claude's settings file: $CLAUDE_CONFIG_DIR/.claude.json, else ~/.claude.json.
 func claudeConfigPath(home string) string {
 	if d := os.Getenv("CLAUDE_CONFIG_DIR"); d != "" {
@@ -97,10 +92,9 @@ func (h *SessionsHandler) trustTeamFolder(r *http.Request, body launchTeamReques
 			_, werr = foldertrust.TrustClaude(claudeConfigPath(home), resolved)
 		case "codex":
 			_, werr = foldertrust.TrustCodex(codexConfigPath(home), resolved)
+		case "agy", "antigravity", "gemini": // all three run agy (#19128)
+			_, werr = foldertrust.TrustAgy(foldertrust.AgyConfigPath(home), resolved)
 		default:
-			if why, ok := trustCardless[typ]; ok {
-				not[typ] = why
-			}
 			continue // the others show no folder-trust card
 		}
 		if errors.Is(werr, foldertrust.ErrNoConfig) {
