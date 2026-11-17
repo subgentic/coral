@@ -25,7 +25,7 @@
         if (hint && (hint[1] === 'p') === phoneScreen) room_px = hint[2];
         else { // no hint for this kind of screen (a new profile, a phone after a wide window): when the server says the notice is unseen, a typical height is reserved (#14935, 57 px on a phone since the longer headline of #15079; the notice's real height is kept as the hint once it is shown)
             var unseen = false; try { unseen = JSON.parse(document.getElementById('coral-boot').textContent).launch_unseen === true; } catch (_) {}
-            if (unseen) room_px = phoneScreen ? '57' : window.matchMedia('(max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px)').matches ? '53' : '73'; // the layout's phone query (phone_layout.js PHONE_QUERY, which this file cannot import) wider than 600 px (the drawer layout, #16557): the notice is 53 px there, not the 73 of a wide window
+            if (unseen) room_px = phoneScreen ? '57' : '53';
         }
         if (room_px && mode !== 'cloud' && location.pathname.indexOf('/agent/') !== 0 && document.head) {
             var room = document.createElement('style'); room.id = 'launch-notice-room';
