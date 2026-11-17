@@ -47,7 +47,8 @@ let _openIntent = 0;
 let _returnFocus = null;
 let _comments = null;    // the comments panel of the viewer (#5182)
 function paintSnapshot(dialog, at) {
-    const note = dialog.querySelector('.artifact-viewer-snapshot');
+    let note = dialog.querySelector('.artifact-viewer-snapshot');
+    if (!note) { note = document.createElement('p'); note.className = 'artifact-viewer-snapshot'; note.setAttribute('role', 'note'); _details.add(note); }
     const date = at ? new Date(at) : null;
     note.hidden = false;
     note.textContent = `Uploaded snapshot${date && Number.isFinite(date.getTime()) ? ' · ' + date.toLocaleString() : ''}. Source-file changes are not copied here.`;
@@ -175,7 +176,6 @@ function _build() {
         <div class="artifact-viewer-trail" hidden><button type="button" class="btn artifact-viewer-back"></button></div>
         <p class="artifact-viewer-versionline" hidden></p>
         <p class="artifact-viewer-source" role="note" hidden></p>
-        <p class="artifact-viewer-source artifact-viewer-snapshot" role="note"></p>
         <div class="artifact-viewer-readers" hidden></div>
         <p class="artifact-edit-send-note" role="status" hidden></p>
         <div class="artifact-viewer-main"><div class="artifact-viewer-body"></div></div>
@@ -477,7 +477,6 @@ export function openArtifactViewer(hex, opts = {}) {
     // A long name is cut with an ellipsis (#13979): the heading keeps its text; a name that is cut holds a button (focusable, aria-expanded, Enter, Space, a tap or a click) that shows it whole. A name that fits has no extra Tab stop.
     const nameEl = document.createElement('span'); nameEl.className = 'artifact-viewer-title-name'; nameEl.textContent = title.textContent; title.replaceChildren(nameEl); title.title = nameEl.textContent; title.classList.remove('is-open');
     const fromLine = d.querySelector('.artifact-viewer-from'); fromLine.textContent = visibleName(opts.from) || ''; fromLine.hidden = !fromLine.textContent; fromLine.title = fromLine.textContent; fromLine.classList.remove('is-open', 'is-below'); fromLine.setAttribute('aria-expanded', 'false'); d.querySelector('.artifact-viewer-sandbox').hidden = true; d._markUp.picture(false); d._markUp.write(false); // who uploaded a file opened for review (#11456), as text
-    paintSnapshot(d, opts.createdAt);
     const sourceNote = d.querySelector('.artifact-viewer-source'); sourceNote.hidden = !!opts.sourceNamed; sourceNote.textContent = '';
     if (!opts.sourceNamed) { const computer = (state.servers || []).find(s => s.id === opts.server), name = opts.server === 'local' ? 'this computer' : (computer?.label || computer?.name || opts.server); sourceNote.textContent = `Viewing from ${markHidden(name, { strict: true })}. Source inferred; read only.`; }
     const dl = d.querySelector('.artifact-viewer-download');
@@ -514,6 +513,7 @@ export function openArtifactViewer(hex, opts = {}) {
     _review.open(hex, opts);
     // "Who can read this", for the Operator (the owner through Coral Hub): drawn only when the machine answers it; anyone else sees nothing.
     _details.clear();
+    paintSnapshot(d, opts.createdAt);
     // The goal and the task the file serves, behind Details as chips in one wrapped row (#12725; #12025, #11751): the goal's chip is the link back to it (one click closes the viewer and opens the goal's page); the viewer's header is one line
     const chips = document.createElement('div'); chips.className = 'detail-chips';
     if (opts.goal && opts.goalId && opts.goalTeam) {
