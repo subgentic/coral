@@ -138,7 +138,7 @@ func TestSweepRemovesTheEntriesOfGoneRunFoldersOnly(t *testing.T) {
 	require.True(t, ok)
 	require.NoError(t, os.RemoveAll(gone))
 
-	n, err := SweepGoneRunFolders(cfg, toml, root)
+	n, err := SweepGoneRunFolders(cfg, toml, filepath.Join(t.TempDir(), "agy.json"), root)
 	require.NoError(t, err)
 	assert.Equal(t, 2, n, "the gone run's entry in each file")
 	c, _ := os.ReadFile(cfg)
@@ -151,10 +151,10 @@ func TestSweepRemovesTheEntriesOfGoneRunFoldersOnly(t *testing.T) {
 	assert.Contains(t, string(tb), "job-run-7-demo")
 	assert.Contains(t, string(tb), "/keep/me")
 
-	n, err = SweepGoneRunFolders(cfg, toml, root)
+	n, err = SweepGoneRunFolders(cfg, toml, filepath.Join(t.TempDir(), "agy.json"), root)
 	require.NoError(t, err)
 	assert.Zero(t, n, "a second sweep finds nothing")
-	n, err = SweepGoneRunFolders(filepath.Join(t.TempDir(), "none.json"), filepath.Join(t.TempDir(), "none.toml"), root)
+	n, err = SweepGoneRunFolders(filepath.Join(t.TempDir(), "none.json"), filepath.Join(t.TempDir(), "none.toml"), filepath.Join(t.TempDir(), "none-agy.json"), root)
 	require.NoError(t, err)
 	assert.Zero(t, n, "no settings files is not an error")
 }
@@ -179,7 +179,7 @@ func TestSweepWritesEachSettingsFileOnceAndSkipsAMissingRoot(t *testing.T) {
 
 	// the root is not there (an unmounted volume), though the keys name folders in it: every key looks gone, and nothing is taken
 	require.NoError(t, os.Rename(root, root+".away"))
-	n, err := SweepGoneRunFolders(cfg, toml, root)
+	n, err := SweepGoneRunFolders(cfg, toml, filepath.Join(t.TempDir(), "agy.json"), root)
 	require.NoError(t, err)
 	assert.Zero(t, n)
 	c, _ := os.ReadFile(cfg)
@@ -195,7 +195,7 @@ func TestSweepWritesEachSettingsFileOnceAndSkipsAMissingRoot(t *testing.T) {
 		return orig(path, data, mode)
 	}
 	t.Cleanup(func() { writeSettings = orig })
-	n, err = SweepGoneRunFolders(cfg, toml, root)
+	n, err = SweepGoneRunFolders(cfg, toml, filepath.Join(t.TempDir(), "agy.json"), root)
 	require.NoError(t, err)
 	assert.Equal(t, 10, n, "five entries in each file")
 	assert.Equal(t, []string{cfg, toml}, writes, "one write for Claude's file and one for Codex's, not ten")
@@ -205,4 +205,32 @@ func TestSweepWritesEachSettingsFileOnceAndSkipsAMissingRoot(t *testing.T) {
 	tb1, _ := os.ReadFile(toml) // #18091: the Codex file keeps its own entry and loses only the gone run folders'
 	assert.NotContains(t, string(tb1), "job-run-10")
 	assert.Contains(t, string(tb1), "/keep/me")
+}
+
+// #19176: an agy run's entry is taken out of trustedWorkspaces alone, and a sweep takes the ones whose run folder is gone.
+func TestUntrustAgyTakesOnlyThatFolderAndKeepsTheRest(t *testing.T) {
+	_, root, live := runTree(t)
+	gone := filepath.Join(root, "job-run-9-gone")
+	require.NoError(t, os.MkdirAll(gone, 0o755))
+	cfg := filepath.Join(t.TempDir(), "settings.json")
+	require.NoError(t, os.WriteFile(cfg, []byte(`{"colorScheme":"dark","trustedWorkspaces":["/keep/me"]}`), 0o600))
+	for _, p := range []string{live, gone} {
+		ok, err := TrustAgy(cfg, p)
+		require.NoError(t, err)
+		require.True(t, ok)
+	}
+	ok, err := UntrustAgy(cfg, live)
+	require.NoError(t, err)
+	assert.True(t, ok)
+	ok, err = UntrustAgy(cfg, live)
+	require.NoError(t, err)
+	assert.False(t, ok, "nothing left to remove")
+	require.NoError(t, os.RemoveAll(gone))
+	n, err := SweepGoneRunFolders(filepath.Join(t.TempDir(), "none.json"), filepath.Join(t.TempDir(), "none.toml"), cfg, root)
+	require.NoError(t, err)
+	assert.Equal(t, 1, n, "the gone run's entry")
+	b, _ := os.ReadFile(cfg)
+	assert.Contains(t, string(b), "/keep/me")
+	assert.Contains(t, string(b), "colorScheme")
+	assert.NotContains(t, string(b), "job-run-")
 }

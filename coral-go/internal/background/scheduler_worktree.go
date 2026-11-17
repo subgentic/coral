@@ -52,7 +52,7 @@ func (s *JobScheduler) cleanupSettledWorktree(ctx context.Context, run store.Sch
 }
 
 // trustRunFolder trusts the worktree a run made for itself for its agent's CLI, when the job's Trust box is ticked (#16421): exactly that one folder (IsJobRunWorktree for this run id and repository, then
-// foldertrust.CheckRunWorktree: directly inside the worktrees root once resolved, not a link, not writable by others), for Claude and Codex only. Anything else leaves the CLI's card, and a run held at it ends
+// foldertrust.CheckRunWorktree: directly inside the worktrees root once resolved, not a link, not writable by others), for Claude, Codex and agy. Anything else leaves the CLI's card, and a run held at it ends
 // as failed with its reason when its prompt is never typed (promptNotTypedCode, #17520). The run's log says it was done, naming only the run's own folder.
 func (s *JobScheduler) trustRunFolder(runID int64, job store.ScheduledJob, dir string) {
 	if job.TrustWorktree != 1 || dir == "" || s.worktreeRoot == "" || (job.JobType != "" && job.JobType != "prompt") {
@@ -62,7 +62,7 @@ func (s *JobScheduler) trustRunFolder(runID int64, job store.ScheduledJob, dir s
 	if typ == "" {
 		typ = at.Claude
 	}
-	if typ != at.Claude && typ != at.Codex {
+	if typ != at.Claude && typ != at.Codex && typ != at.Agy && typ != at.Antigravity && typ != at.Gemini { // the three last all run agy (#19128, #19176)
 		return
 	}
 	if !coralnames.IsJobRunWorktree(s.worktreeRoot, job.RepoPath, runID, dir) {
@@ -82,9 +82,12 @@ func (s *JobScheduler) trustRunFolder(runID int64, job store.ScheduledJob, dir s
 		return
 	}
 	var werr error
-	if typ == at.Codex {
+	switch typ {
+	case at.Codex:
 		_, werr = foldertrust.TrustCodex(foldertrust.CodexConfigPath(home), resolved)
-	} else {
+	case at.Agy, at.Antigravity, at.Gemini:
+		_, werr = foldertrust.TrustAgy(foldertrust.AgyConfigPath(home), resolved)
+	default:
 		_, werr = foldertrust.TrustClaude(foldertrust.ClaudeConfigPath(home), resolved)
 	}
 	if werr != nil {
@@ -154,6 +157,9 @@ func (s *JobScheduler) untrustRunFolder(resolved string) {
 	}
 	if _, err := foldertrust.UntrustCodex(foldertrust.CodexConfigPath(home), resolved); err != nil {
 		s.logger.Warn("could not remove a finished run's trust entry from Codex's settings", "error", err.Error())
+	}
+	if _, err := foldertrust.UntrustAgy(foldertrust.AgyConfigPath(home), resolved); err != nil {
+		s.logger.Warn("could not remove a finished run's trust entry from Antigravity's settings", "error", err.Error())
 	}
 }
 
@@ -329,7 +335,7 @@ func (s *JobScheduler) sweepRunTrust() {
 	if err != nil {
 		return
 	}
-	n, err := foldertrust.SweepGoneRunFolders(foldertrust.ClaudeConfigPath(home), foldertrust.CodexConfigPath(home), s.worktreeRoot)
+	n, err := foldertrust.SweepGoneRunFolders(foldertrust.ClaudeConfigPath(home), foldertrust.CodexConfigPath(home), foldertrust.AgyConfigPath(home), s.worktreeRoot)
 	if err != nil {
 		s.logger.Warn("could not remove the trust entries of run folders that are gone", "error", err.Error())
 	}

@@ -26,11 +26,6 @@ func trustFolderCaller(r *http.Request) bool {
 	return kind == callerDashCookie || kind == callerDashNoCookie
 }
 
-// trustCardless names the agent types whose CLI asks about a folder but has no setting Coral can set (nothing documented for Antigravity): their card stays.
-var trustCardless = map[string]string{
-	"agy": "no setting Coral can set: its card stays", "antigravity": "no setting Coral can set: its card stays", "gemini": "no setting Coral can set: its card stays",
-}
-
 // claudeConfigPath is Claude's settings file: $CLAUDE_CONFIG_DIR/.claude.json, else ~/.claude.json.
 func claudeConfigPath(home string) string {
 	if d := os.Getenv("CLAUDE_CONFIG_DIR"); d != "" {
@@ -47,22 +42,36 @@ func codexConfigPath(home string) string {
 	return filepath.Join(home, ".codex", "config.toml")
 }
 
-// trustTeamFolder trusts the folder the team starts in for its members' CLIs, when the launch asks for it (the folder was made by this launch, or the person ticked it), and answers what the launch reply says: the
+// folderTrustAsk is what a launch says about trusting its folder: the agent types that will start there, the person's tick on an existing folder and the board to tell. A team launch and a New agent launch
+// build one each and share trustLaunchFolder, so the two follow one rule (#19176).
+type folderTrustAsk struct {
+	Types     []string
+	Tick      bool
+	BoardName string
+}
+
+// trustTeamFolder is trustLaunchFolder for a team launch.
+func (h *SessionsHandler) trustTeamFolder(r *http.Request, body launchTeamRequest, workdir string, madeDir, worktree bool) map[string]any {
+	types, _ := teamMemberTypes(body)
+	return h.trustLaunchFolder(r, folderTrustAsk{Types: types, Tick: body.TrustFolder, BoardName: body.BoardName}, workdir, madeDir, worktree)
+}
+
+// trustLaunchFolder trusts the folder a launch starts in for its agents' CLIs, when the launch asks for it (the folder was made by this launch, or the person ticked it), and answers what the launch reply says: the
 // path, the agent types trusted and, for each that was not, why; or why nothing was. nil when nothing was asked. workdir is where the agents start (a worktree's folder when the team uses one); madeDir says the launch
 // made the chosen folder, which counts only when the agents start in it and not in a worktree of existing code.
-func (h *SessionsHandler) trustTeamFolder(r *http.Request, body launchTeamRequest, workdir string, madeDir, worktree bool) map[string]any {
+func (h *SessionsHandler) trustLaunchFolder(r *http.Request, body folderTrustAsk, workdir string, madeDir, worktree bool) map[string]any {
 	basis := foldertrust.Existing
 	switch {
 	case madeDir && !worktree:
 		basis = foldertrust.Made
-	case body.TrustFolder:
+	case body.Tick:
 		basis = foldertrust.Ticked
 	default:
 		return nil // nothing was asked
 	}
 	reply := map[string]any{"path": workdir, "trusted": []string{}}
 	if !trustFolderCaller(r) {
-		reply["refused"] = "only the person's own dashboard trusts a folder for a team"
+		reply["refused"] = "only the person's own dashboard trusts a folder for a launch"
 		return reply
 	}
 	home, err := os.UserHomeDir()
@@ -77,7 +86,7 @@ func (h *SessionsHandler) trustTeamFolder(r *http.Request, body launchTeamReques
 		return reply
 	}
 	reply["path"] = resolved
-	types, _ := teamMemberTypes(body)
+	types := body.Types
 	seen := map[string]bool{}
 	trusted := []string{}
 	not := map[string]string{}
@@ -97,10 +106,9 @@ func (h *SessionsHandler) trustTeamFolder(r *http.Request, body launchTeamReques
 			_, werr = foldertrust.TrustClaude(claudeConfigPath(home), resolved)
 		case "codex":
 			_, werr = foldertrust.TrustCodex(codexConfigPath(home), resolved)
+		case "agy", "antigravity", "gemini": // all three run agy (#19128)
+			_, werr = foldertrust.TrustAgy(foldertrust.AgyConfigPath(home), resolved)
 		default:
-			if why, ok := trustCardless[typ]; ok {
-				not[typ] = why
-			}
 			continue // the others show no folder-trust card
 		}
 		if errors.Is(werr, foldertrust.ErrNoConfig) {
@@ -155,7 +163,7 @@ func (h *SessionsHandler) trustTeamFolder(r *http.Request, body launchTeamReques
 
 // sayNoSettings posts the plain version for a CLI that has no settings file yet (a first-time user: the file is made when the CLI first runs): what it means and what to do, with no terminal in it (a phone has none).
 // The agent's card is answered in its chat or in Needs you. Only fixed words and the cleaned, quoted folder name are in it.
-func (h *SessionsHandler) sayNoSettings(r *http.Request, body launchTeamRequest, workdir string, types []string) {
+func (h *SessionsHandler) sayNoSettings(r *http.Request, body folderTrustAsk, workdir string, types []string) {
 	if body.BoardName == "" || h.bs == nil {
 		return
 	}
@@ -175,7 +183,7 @@ func (h *SessionsHandler) sayNoSettings(r *http.Request, body launchTeamRequest,
 // sayTrustNotDone posts one line on the team's board when trusting the folder was asked for (the tick, or a folder the launch made) and Coral did not: without it the agents stop at their CLIs' trust cards and nobody
 // is told why (#12338: a folder in /tmp, a shared place, was refused by design and nothing said so). The folder and the reason are text that came from outside the notice's own words, so they are cleaned, made unable to
 // mention anyone and quoted (noticeText, quoteNotice), and the line is posted as it stands (postNotice, the census of stored text). Nothing is posted for a caller that is not the person's own dashboard.
-func (h *SessionsHandler) sayTrustNotDone(r *http.Request, body launchTeamRequest, workdir, forTypes, reason string) {
+func (h *SessionsHandler) sayTrustNotDone(r *http.Request, body folderTrustAsk, workdir, forTypes, reason string) {
 	if body.BoardName == "" || h.bs == nil {
 		return
 	}
