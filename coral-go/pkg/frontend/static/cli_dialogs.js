@@ -138,7 +138,7 @@ function _checkPermissionFlag(flagsStr, agentType, server = LOCAL_SERVER, picked
     const mode = defaultPermissionMode(_settingsFor(server), agentType);
     const permFlag = _getPermissionFlagsForAgentMode(agentType, mode);
     if (!permFlag) return Promise.resolve('skip');
-    const modeLine = permissionDescription(agentType, mode); // what that mode means for THIS CLI (Antigravity and Gemini skip every check, Pi has no prompts)
+    const modeLine = mode === 'bypassPermissions' || mode === 'dontAsk' ? permissionDescription(agentType, mode) : ''; // the last stop before an agent runs without checks keeps its one line (#19285); the other modes are said by the field label (#19238)
     const modeName = { plan: 'Plan', acceptEdits: 'Accept edits', auto: 'Auto', bypassPermissions: 'Bypass permissions', dontAsk: "Don't ask" }[mode] || 'Auto'; // the saved default's name, not its CLI flag (#10074)
     return new Promise((resolve) => {
         if (flagsStr && _hasPermFlag(flagsStr)) {
@@ -153,8 +153,8 @@ function _checkPermissionFlag(flagsStr, agentType, server = LOCAL_SERVER, picked
                 <h3>Default mode waits for you</h3>
                 <p class="cli-dialog-text cli-dialog-text-roomy">
                     Default mode stops and waits for you each time. Use ${escapeHtml(modeName)} so it keeps going?
-                </p>
-                <p class="cli-dialog-text">${escapeHtml(modeName)}: ${escapeHtml(modeLine)}</p>
+                </p>${modeLine ? `
+                <p class="cli-dialog-text">${escapeHtml(modeName)}: ${escapeHtml(modeLine)}</p>` : ''}
                 <div class="modal-actions cli-dialog-actions-tight">
                     <button class="btn" data-action="cancel">Cancel</button>
                     <button class="btn" data-action="skip">Keep Default</button>

@@ -134,14 +134,13 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             await footerOrder(N.launch, 'step 3');
             assert.match(await ev(`window.__na.dialog().textContent.replace(/\\s+/g, ' ')`), /QA Engineer: Claude, \/work\/payments-app, default model, \w+ mode/, 'the recap');
             // the footer says what the chosen mode allows (Desktop tester, #10000), and follows the choice
-            const noteOf = () => ev(`(() => { const n = window.__na.dialog().querySelector('.launch-recap-note'); return n ? n.textContent : ''; })()`);
-            assert.match(await noteOf(), /^\w+ mode allows: [a-z].{10,}\.$/, 'a line under the recap says what the mode allows');
+            const noteOf = () => ev(`(() => { const n = window.__na.dialog().querySelector('.launch-recap-note:not(.launch-recap-flags)'); return n ? n.textContent : ''; })()`);
+            assert.equal(await noteOf(), '', 'Claude Auto and Plan say it once, in the recap and the field label: no second sentence (#19238)');
             await ev(`(() => { const sel = window.__na.dialog().querySelector('.acf-permission-mode'); sel.value = 'plan'; sel.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            await waitFor(`/^Plan mode allows: reads only/.test((window.__na.dialog().querySelector('.launch-recap-note') || {}).textContent || '')`, 'the line follows the mode', 4000);
             // Auto is not the same on every CLI (Security's review): safety checks are Claude's; Codex has its sandbox; Antigravity and Gemini skip every prompt and check; Pi has no permissions
             const as = async (type, mode) => { await ev(`(() => { const d = window.__na.dialog(), t = d.querySelector('.acf-agent-type'); t.value = ${JSON.stringify(type)}; t.dispatchEvent(new Event('change', { bubbles: true })); const sel = d.querySelector('.acf-permission-mode'); sel.value = ${JSON.stringify(mode)}; sel.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await new Promise(r => setTimeout(r, 250)); return noteOf(); }; // sleep-ok: the recap follows
-            assert.match(await as('claude', 'auto'), /^Auto mode allows: everything; safety checks on Claude only\.$/, 'Claude Auto says the one wording, as Settings does (#16357)');
-            assert.match(await as('codex', 'auto'), /workspace sandbox/, 'Codex Auto is its workspace sandbox');
+            assert.equal(await as('claude', 'auto'), '', 'Claude Auto: no sentence, the recap and the field label say it (#19238)');
+            assert.equal(await as('codex', 'auto'), '', 'Codex Auto: no sentence');
             assert.equal(await as('agy', 'auto'), 'Auto mode allows: everything, with no prompts and no safety checks.', 'Antigravity Auto has no prompts and no safety checks');
             assert.equal(await as('pi', 'auto'), 'Pi has no permission prompts: it always acts on its own.', 'Pi has no permission system');
             await as('claude', 'plan');
@@ -169,7 +168,7 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
                     assert.ok(await ev(`(() => { const r = document.getElementById('launch-recap'), t = document.getElementById('launch-recap-toggle'), n = r.querySelector('.launch-recap-note'); return !r.hasAttribute('data-open') && t.getClientRects().length > 0 && t.getAttribute('aria-expanded') === 'false' && (!n || n.getClientRects().length === 0) && r.getBoundingClientRect().height < 60; })()`), 'phone step 3: the recap is one line with its toggle closed, so the options keep the room');
                     await ev(`document.getElementById('launch-recap-toggle').click(); true`); await shotIf('new-agent-recap-closed-390');
                 }
-                if (n === 3) { assert.ok(await ev(`(() => { const d = window.__na.dialog(), n = d.querySelector('.launch-recap-note'), r = n && n.closest('.launch-recap'); if (!n || !r) return false; const a = n.getBoundingClientRect(), b = r.getBoundingClientRect(); return a.height > 0 && a.bottom <= b.bottom + 1 && r.scrollHeight <= r.clientHeight + 1; })()`), 'phone step 3: the mode note is whole inside the recap, not cut off by its line clamp'); await shotIf('new-agent-mode-note-390'); }
+                if (n === 3) { await ev(`(() => { const d = window.__na.dialog(), t = d.querySelector('.acf-agent-type'); t.value = 'agy'; t.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await new Promise(r => setTimeout(r, 300)); /* sleep-ok: the recap follows */ assert.ok(await ev(`(() => { const d = window.__na.dialog(), n = d.querySelector('.launch-recap-note'), r = n && n.closest('.launch-recap'); if (!n || !r) return false; const a = n.getBoundingClientRect(), b = r.getBoundingClientRect(); return a.height > 0 && a.bottom <= b.bottom + 1 && r.scrollHeight <= r.clientHeight + 1; })()`), 'phone step 3: the mode note is whole inside the recap, not cut off by its line clamp'); await shotIf('new-agent-mode-note-390'); }
             }
         });
         S.finish();

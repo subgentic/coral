@@ -21,6 +21,7 @@ function recapParts() {
     const modeSel = acf.querySelector('.acf-permission-mode');
     return {
         name: (document.getElementById('launch-agent-name-input')?.value || '').trim(),
+        type,
         provider: TYPE[type] || type,
         folder: (document.getElementById('launch-dir')?.value || '').trim() || 'no folder yet',
         model: model ? modelName(type, model) : 'default model',
@@ -80,7 +81,8 @@ function paintRecap() {
     const el = document.getElementById('launch-recap'), p = recapParts();
     if (!el || !p) return;
     const folder = shortPath(p.folder), text = `${p.name ? p.name + ': ' : ''}${p.provider}, ${folder}, ${p.model}${p.mode ? ', ' + p.mode + ' mode' : ''}`;
-    const note = !p.mode || !p.modeNote ? '' : p.modeNote === PI_NO_PERMISSIONS.replace(/\.$/, '') ? PI_NO_PERMISSIONS : `${p.mode} mode allows: ${p.modeNote.charAt(0).toLowerCase() + p.modeNote.slice(1)}.`; // Pi has no modes to allow: its sentence stands alone
+    const SAYS_MORE = /^(pi|agy|antigravity|gemini)$/.test(p.type) || /isolated/i.test(p.modeNote); // the field label says the mode (#19238); a sentence stays only where the label misleads: no checks at all, no permissions, or safe only in a container
+    const note = !p.mode || !p.modeNote || !SAYS_MORE ? '' : p.modeNote === PI_NO_PERMISSIONS.replace(/\.$/, '') ? PI_NO_PERMISSIONS : `${p.mode} mode allows: ${p.modeNote.charAt(0).toLowerCase() + p.modeNote.slice(1)}.`; // Pi has no modes to allow: its sentence stands alone
     if (el.dataset.recap === text + note) return;
     el.dataset.recap = text + note;
     const b = s => { const e = document.createElement('b'); e.textContent = s; return e; };
