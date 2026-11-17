@@ -2,6 +2,7 @@
  * (message_board.js) and the agent dock's Board tab will (#7922). It builds the parts a row adds to the board's own message markup (a one-button head, the actions, the day dividers), keeps the
  * choices (Table or Chat, remembered per viewer; which rows are open, kept while messages arrive and dropped when the team changes) and the controls (the Table | Chat switch, the pills). The
  * chat view is the same rows with the head hidden, so every board action, the poll, Select and Export work in both. Pure string builders and small DOM helpers: no board state in here. */
+import { importOnce } from './import_once.js';
 import { escapeHtml, escapeAttr } from './html_escape.js';
 import { authorLabel } from './board_author.js';
 import { askBadge, mentionedNames } from './board_message_text.js';
@@ -212,41 +213,10 @@ export function refreshAsk(row, m) {
     if (old) { const t = document.createElement('template'); t.innerHTML = askBadge(m); if (t.content.firstElementChild) old.replaceWith(t.content.firstElementChild); }
 }
 
-/** The replies to an open message, as buttons that go to each one: built from the rows now in the list (a reply is a row of its own, in order, indented). */
+/** Expanded reply previews load with an opened row, keeping their DOM builder off startup (#19015). */
 function fillReplies(row, replies) {
-    const holder = row.querySelector(':scope > .mb-row-replies');
-    if (!holder) return;
-    const kids = replies ?? (row.parentElement ? row.parentElement.querySelectorAll(`:scope > .mb-message[data-reply-to="${CSS.escape(row.dataset.messageId)}"]`) : []);
-    holder.innerHTML = kids.length ? `<div class="mb-row-replies-title">Replies (${kids.length})</div>` : '';
-    holder.hidden = !kids.length;
-    for (const kid of kids) {
-        const item = document.createElement('div');
-        item.className = 'mb-row-reply';
-        const who = kid.querySelector('.mb-row-who')?.textContent, time = kid.querySelector('.mb-row-toggle time')?.textContent || '';
-        item.innerHTML = `<div class="mb-row-reply-header"><b>${escapeHtml(who || '')}</b><span class="mb-row-reply-time">${escapeHtml(time)}</span><button type="button" class="mb-row-reply-open" data-on-click="mb-jump-msg" data-msg-id="${escapeAttr(kid.dataset.messageId)}" aria-label="${escapeAttr('Open reply by ' + (who ?? 'sender'))}">Open reply</button></div>`;
-        const words = document.createElement('div'); words.className = 'mb-row-reply-words';
-        const sourceBody = kid.querySelector('.mb-message-body');
-        if (sourceBody) {
-            words.append(...Array.from(sourceBody.childNodes, child => child.cloneNode(true)));
-            // The body clone is displayed beside the actual reply; duplicate IDs would break its references.
-            for (const el of words.querySelectorAll('[id]')) el.removeAttribute('id');
-        }
-        item.append(words);
-        if (words.textContent.trim().length > 220) {
-            words.classList.add('is-clamped');
-            const more = document.createElement('button');
-            more.type = 'button'; more.className = 'mb-row-reply-more'; more.textContent = 'Show more';
-            more.setAttribute('aria-expanded', 'false');
-            more.addEventListener('click', () => {
-                const expanded = item.classList.toggle('is-expanded');
-                words.classList.toggle('is-clamped', !expanded);
-                more.textContent = expanded ? 'Show less' : 'Show more';
-                more.setAttribute('aria-expanded', String(expanded));
-            });
-            item.append(more);
-        }
-        holder.append(item);
-    }
+    if (!row.querySelector(':scope > .mb-row-replies')) return;
+    return importOnce('./board_reply_preview.js', 'the replies').then(m => { if (row.classList.contains('mb-open')) m.fillReplies(row, replies); }).catch(() => {});
 }
 
 /** Open or close one row (force true or false, else the other way). The open ones are remembered by message id. */
@@ -256,7 +226,7 @@ export function toggleRow(row, force, replies) {
     const head = row.querySelector(':scope > .mb-row-toggle');
     if (head) head.setAttribute('aria-expanded', String(want));
     const id = row.dataset.messageId;
-    if (want) { opened.add(id); ensureOpenParts(row); fillReplies(row, replies); } else opened.delete(id);
+    if (want) { opened.add(id); ensureOpenParts(row); return fillReplies(row, replies); } else opened.delete(id);
 }
 
 /** Expand all or Collapse all: every row on screen (and, for Collapse, every one remembered). */
