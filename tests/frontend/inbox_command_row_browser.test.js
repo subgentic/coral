@@ -171,6 +171,13 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             await show(MENU({ target: ['npm run build', 'npm test -- --reporter=dot', 'git status --short'].join('\n') }), 2);
             st = await rowState(); consistent(st, 'three short lines');
             check(st && st.text.includes('npm test -- --reporter=dot') && !st.clipped, `${at}three short lines fit and are all on the row: ` + JSON.stringify(st));
+            // 2b) six lines (#17933): the row shows up to six before it clips, on a desktop and on a phone, so Yes stays for them; a seventh clips it (the gate is unchanged: it reads the block's own overflow)
+            await show(MENU({ target: Array.from({ length: 6 }, (_, i) => 'step' + (i + 1) + ' --flag=' + i).join('\n') }), 2);
+            st = await rowState(); consistent(st, 'six lines');
+            check(st && st.text.includes('step6 --flag=5') && !st.clipped, `${at}six lines fit and are all on the row (Yes stays): ` + JSON.stringify(st));
+            await show(MENU({ target: Array.from({ length: 7 }, (_, i) => 'step' + (i + 1) + ' --flag=' + i).join('\n') }), 2);
+            st = await rowState(); consistent(st, 'seven lines');
+            check(st && st.clipped && st.yes === 0, `${at}seven lines are clipped and Yes is not on the row: ` + JSON.stringify(st));
             // 3) a long command: the row shows the start and "Show all"; Yes is NOT on the row and says so; Show all opens the whole command in a capped box that scrolls inside; Yes turns on only once the person has reached its end
             const longStates = async (target, note, what) => {
                 await show(MENU({ target, target_note: note }), 2);
@@ -209,7 +216,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             await show(MENU({ target: MID }), 2);
             st = await rowState(); consistent(st, 'one line under 160 characters');
             // and a single line that is too long for any row: clipped, No only
-            await show(MENU({ target: 'echo ' + 'x'.repeat(420) }), 2);
+            await show(MENU({ target: 'echo ' + 'x'.repeat(1500) }), 2);
             st = await rowState();
             check(st && st.clipped && st.yes === 0 && /Read the whole command to allow it/.test(st.sentence), `${at}one very long line is clipped: no Yes, said so: ` + JSON.stringify(st));
             // 5) the width changes (a window resized, a phone turned): the gate is measured again
