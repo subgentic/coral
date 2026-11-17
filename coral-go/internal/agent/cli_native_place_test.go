@@ -22,7 +22,19 @@ func nativeHome(t *testing.T) string {
 	home := testtemp.OutsideTemp(t) // not in the system temp folder, where a CLI is refused as a temporary one
 	t.Setenv("HOME", home)
 	t.Setenv("PATH", t.TempDir()) // the server's PATH: it does not hold ~/.local/bin
+	// The machine's own system folders (a /usr/local/bin/claude on a developer's box or a WSL) are not part of what these tests are about: they see none (#14377, as #12423 did for the others).
+	saved := CommonSystemBinDirs
+	CommonSystemBinDirs = func() []string { return nil }
+	t.Cleanup(func() { CommonSystemBinDirs = saved })
 	return home
+}
+
+// #14377: nativeHome's tests see none of the machine's system folders: with the real list (/usr/local/bin, /snap/bin...) a claude a developer or a WSL has there is found before the test's own.
+func TestNativeHomeSeesNoSystemFolders(t *testing.T) {
+	assert.NotEmpty(t, CommonSystemBinDirs(), "by default the system folders are listed")
+	nativeHome(t)
+	assert.Empty(t, CommonSystemBinDirs(), "and a test with a nativeHome has none of them")
+	assert.NotContains(t, CommonPlaceCandidates("claude"), "/usr/local/bin/claude")
 }
 
 func TestTheNativeInstallersLinkIsFoundOnAPathWithoutItAndFollowedAtEachLaunch(t *testing.T) {
