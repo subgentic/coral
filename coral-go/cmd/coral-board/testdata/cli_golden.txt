@@ -88,7 +88,7 @@ Commands:
                                done-when) and past chats of your own board (the one you were launched on), oldest posts
                                included. Every word must be there, in any order ("quoted phrase" keeps words together);
                                Coral's own notices are left out (--system); a hit's context is: read --id <id>, task detail <id>,
-                               goal show <id>; coral-board search --help has the rest. --team, --all and --operator-history
+                               goal show <id>; coral-board search --help has the rest, such as the --state values (pending, in_progress, review_pending, blocked, draft, completed, skipped; goals: proposed, active, done, dropped). --team, --all and --operator-history
                                ask for a wider reach and are refused unless the Operator raised your search access
   peek "<agent>" [--lines N]   Peek at agent's terminal (orchestrator only)
   waiting "<agent>"            List what waits for an agent: its unread board messages and the last send not typed
@@ -279,7 +279,7 @@ Commands:
                                done-when) and past chats of your own board (the one you were launched on), oldest posts
                                included. Every word must be there, in any order ("quoted phrase" keeps words together);
                                Coral's own notices are left out (--system); a hit's context is: read --id <id>, task detail <id>,
-                               goal show <id>; coral-board search --help has the rest. --team, --all and --operator-history
+                               goal show <id>; coral-board search --help has the rest, such as the --state values (pending, in_progress, review_pending, blocked, draft, completed, skipped; goals: proposed, active, done, dropped). --team, --all and --operator-history
                                ask for a wider reach and are refused unless the Operator raised your search access
   peek "<agent>" [--lines N]   Peek at agent's terminal (orchestrator only)
   waiting "<agent>"            List what waits for an agent: its unread board messages and the last send not typed
@@ -471,7 +471,7 @@ Commands:
                                done-when) and past chats of your own board (the one you were launched on), oldest posts
                                included. Every word must be there, in any order ("quoted phrase" keeps words together);
                                Coral's own notices are left out (--system); a hit's context is: read --id <id>, task detail <id>,
-                               goal show <id>; coral-board search --help has the rest. --team, --all and --operator-history
+                               goal show <id>; coral-board search --help has the rest, such as the --state values (pending, in_progress, review_pending, blocked, draft, completed, skipped; goals: proposed, active, done, dropped). --team, --all and --operator-history
                                ask for a wider reach and are refused unless the Operator raised your search access
   peek "<agent>" [--lines N]   Peek at agent's terminal (orchestrator only)
   waiting "<agent>"            List what waits for an agent: its unread board messages and the last send not typed
