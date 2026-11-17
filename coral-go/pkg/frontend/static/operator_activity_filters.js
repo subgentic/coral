@@ -81,7 +81,7 @@ export const { EMPTY, clean, isFiltered, isQuery, chips, without } = model;
 export const storageKey = () => 'coral-inbox-activity-filters';
 const kept = model.persist(storageKey);
 /** The filters kept in this browser for the folder, or the empty ones (the search words are not kept: a page opened later starts with an empty box). */
-/** A browser that kept nothing, or a record from before Important existed (no Important field), opens on Important (#19149, one time); a record saved with the field keeps its choice, Everything included. */
+/** A browser that kept nothing, or a record from before Important existed (no Important field), opens on Important (#19149, one time); a record saved with the field keeps its choice. Everything on its own is not saved (it is not a query), so a reload after choosing it opens on Important again; Everything is kept only alongside another filter. */
 export const loadFilters = () => {
     let raw = null;
     try { raw = browserLocal.get(storageKey('inbox-activity')); } catch { raw = null; }
