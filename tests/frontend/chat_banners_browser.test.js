@@ -19,14 +19,14 @@ const { guardSettings } = require('./helpers/settings_guard');
     const notice = `document.getElementById('launch-disclosure-banner')`;
     const refresh = () => ev(`import((window.__coralStatic || '/static/') + 'launch_disclosure.js').then(m => m.refreshLaunchDisclosure()).then(() => true)`);
     const setDefault = async value => { // through the real Settings control, so the save path that follows is the page's own
-        await ev(`window.showSettingsModal(); true`); await waitFor(`!!document.getElementById('settings-permission-mode')`, 'Settings open', 10000);
+        await ev(`window.showSettingsModal('agents'); true`); await waitFor(`document.getElementById('settings-modal')?.dataset.autosave === '1' && document.getElementById('settings-permission-mode')?.closest('[data-autosaves]') && !document.getElementById('settings-pane-agents')?.hidden`, 'Settings defaults open and autosave is wired', 10000);
         await waitFor(`(() => { const s = document.getElementById('settings-permission-mode'), d = (window.T.state.settings || {}).default_permission_mode || ''; return s.value === d || (d === 'auto' && s.value === ''); })()`, 'the control shows the saved default before it is changed', 10000); // the dialog fills the control a moment after it opens, and a change made before that is no change to the autosave
         await ev(`(() => { const s = document.getElementById('settings-permission-mode'); s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-        await waitFor(`(() => { const r = document.getElementById('settings-permission-mode').closest('.sv-row'); return !!r && !r.querySelector('[data-error]') && !document.getElementById('settings-permission-mode').disabled; })()`, 'the default saved', 10000);
+        await waitFor(`(() => { const r = document.getElementById('settings-permission-mode').closest('.sv-row'); return !!r && !r.querySelector('[data-error]') && !document.getElementById('settings-permission-mode').disabled && window.T.state.settings.default_permission_mode === ${JSON.stringify(value)}; })()`, 'the default saved', 10000);
         await ev(`window.hideSettingsModal(true); true`);
     };
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD + require('./helpers/launch_notice_agent').PRELOAD });
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
