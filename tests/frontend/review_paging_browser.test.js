@@ -95,7 +95,7 @@ function installReviews() {
         await ev(`(async () => { window.__failReviewCount = true; window.__partialReviewPage = true; await window.__R.refreshReviews(true); await window.__C.refreshCounts(true); (await import(${S} + 'inbox_tab.js')).updateInboxTab(); })()`);
         assert.ok(await ev('window.__failedCountResponses') > failedBefore, 'the pill assertion follows a real failed count response');
         assert.equal(await ev(`window.__R.reviewPages().find(p => p.server === 'box-b').loadedCount`), 49, 'failed-count source still supplies 49 review rows');
-        await waitFor(`/at least 18 need your attention/.test(document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label') || '')`, 'partial count adds only failed-source loaded rows');
+        await waitFor(`/18\\\\+ need your attention/.test(document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label') || '')`, 'partial count adds only failed-source loaded rows');
         await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 99+')`, 'partial-state pill counts 50 local plus 49 failed-count-source rows, with more pages still available, not stale 100+');
         await ev(`(async () => { window.__failReviewCount = false; window.__partialReviewPage = false; await window.__R.refreshReviews(true); await window.__C.refreshCounts(true); (await import(${S} + 'inbox_tab.js')).updateInboxTab(); })()`);
         await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 100+')`, 'restoring the complete first pages restores the pill to 100+');
