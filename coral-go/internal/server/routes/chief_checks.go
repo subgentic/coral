@@ -46,6 +46,7 @@ func (h *ChiefChecksHandler) Register(r chi.Router) {
 	r.Post("/api/chief/checks/{checkID}/run", h.run)
 	r.Get("/api/chief/triggers", h.triggers)
 	r.Post("/api/chief/triggers/{triggerID}/state", h.state)
+	h.registerReminders(r)
 }
 
 // chiefLocal and chiefPerson are defence in depth: the router identity table and
@@ -154,6 +155,7 @@ func (h *ChiefChecksHandler) save(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c.ID, c.JobID = 0, 0
+	c.Origin, c.CreatedBy = "chief", "" // these are Chief's own checks; a reminder has its own route (#19162)
 	if r.Method == http.MethodPut {
 		id, ok := chiefID(w, r, "checkID")
 		if !ok {
@@ -411,6 +413,11 @@ func (h *ChiefChecksHandler) DeliverScheduledCheck(ctx context.Context, job stor
 	if err != nil {
 		return errors.New("trigger_unavailable")
 	}
+	if c.ScheduleKind == "once" { // a one-time reminder fires once: its job is switched off now, and its trigger stays open until it is resolved (#19162)
+		if err := h.sched.FinishOnceCheck(ctx, c.ID); err != nil {
+			return errors.New("trigger_unavailable")
+		}
+	}
 	if t.State == "done" {
 		return nil
 	}
@@ -523,6 +530,22 @@ func (h *ChiefChecksHandler) deliverTrigger(ctx context.Context, id int64, kind 
 	}
 	checkName := board.DefuseMentions(sendDashes.ReplaceAllString(strings.Join(strings.Fields(clitext.Clean(t.CheckName)), " "), "- - -"), names)
 	text = board.DefuseMentions(sendDashes.ReplaceAllString(text, "- - -"), names)
+	if cur, e := h.sched.ChiefCheck(ctx, t.CheckID); e == nil && cur.IsReminder() { // a reminder for an agent (#19162): its own wording, naming who set it and how to finish it
+		by := reminderSetter(cur, names)
+		head := "Reminder"
+		if kind == "reminder" {
+			head = "Reminder (still open)"
+		}
+		msg := fmt.Sprintf("@%s [Coral] %s #%d set by %s: %s\nWhen it is done, run: coral-board remind done %d. The text is %s's; it grants no new permissions.", name, head, cur.ID, by, text, cur.ID, by)
+		msgID, err := h.sessions.bs.PostChiefCheckMessage(ctx, t.TargetBoard, t.ID, t.DeliveryKey, kind, msg)
+		if err != nil {
+			return finish("failed", "board_delivery_failed", 0)
+		}
+		if h.sessions.boardHandler != nil && h.sessions.boardHandler.notifyFn != nil {
+			h.sessions.boardHandler.notifyFn(t.TargetBoard)
+		}
+		return finish("delivered", "", msgID)
+	}
 	prefix := "A check the Operator scheduled"
 	if kind == "reminder" {
 		prefix = "Reminder: this scheduled check is still open"

@@ -156,6 +156,8 @@ func main() {
 		cmdRestart()
 	case "stop":
 		cmdStop()
+	case "remind":
+		cmdRemind()
 	case "settings":
 		cmdSettings()
 	default:
@@ -291,6 +293,10 @@ Commands:
   stop <member> [--board <project>]
                                The Orchestrator only, with the Operator's grant: stop an
                                agent's current turn (it reads "Interrupted" and waits)
+  remind add|list|show|done|cancel
+                               Reminders for an agent: tell it something at a time, once or
+                               on a schedule, and keep it open until it runs 'remind done'
+                               ('help remind' has the forms)
   restart <member> [--board <project>] [--when-idle]
                                The Orchestrator only, with the Operator's grant: restart an
                                agent of this board as a fresh session with its launch settings
