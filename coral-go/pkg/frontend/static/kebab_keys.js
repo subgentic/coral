@@ -3,7 +3,7 @@ import { menuMove } from './menu_keys.js';
 import { closeSidebarKebabs } from './sidebar_menus.js';
 import { importOnce } from './import_once.js';
 
-await importOnce('./menu_help.js'); // size the first menu with its help sheet before it becomes a pointer target (#19188)
+await importOnce('./menu_help.js').catch(() => {}); // size the first menu with its help sheet before it becomes a pointer target (#19188)
 
 document.addEventListener('keydown', e => {
     const menu = e.target.closest?.('.sidebar-kebab-menu');

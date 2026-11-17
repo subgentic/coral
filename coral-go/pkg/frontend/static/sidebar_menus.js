@@ -23,26 +23,28 @@ export function closeSidebarKebabs({ restoreFocus = false } = {}) {
 const menuItemRoles = menu => { for (const it of menu.querySelectorAll('.overflow-menu-item')) if (!it.hasAttribute('role')) it.setAttribute('role', 'menuitem'); };
 
 export async function toggleSidebarKebab(btn, event) {
-    const menu = btn.nextElementSibling;
-    const wasOpen = menu.style.display !== 'none';
-    closeSidebarKebabs();
-    if (!wasOpen) {
-        // An agent row's menu is drawn when it opens (#4611); the hub's tier marks follow at once rather than at the next sweep.
-        if (menu.dataset.lazyMenu) {
-            if (!openRowMenu(btn, menu)) return;
-            markBlockedControls(menu);
+    try {
+        const menu = btn.nextElementSibling;
+        const wasOpen = menu.style.display !== 'none';
+        closeSidebarKebabs();
+        if (!wasOpen) {
+            // An agent row's menu is drawn when it opens (#4611); the hub's tier marks follow at once rather than at the next sweep.
+            if (menu.dataset.lazyMenu) {
+                if (!openRowMenu(btn, menu)) return;
+                markBlockedControls(menu);
+            }
+            // Reserve the opening so a second click/outside click can cancel it, but keep pointer targets hidden until help has its final size (#19188).
+            menu.style.visibility = 'hidden';
+            menu.style.display = 'block';
+            btn.setAttribute('aria-expanded', 'true');
+            menuItemRoles(menu);
+            // Hide tooltips as opening begins, including while the help loads.
+            document.querySelectorAll('.session-tooltip').forEach(t => t.style.display = 'none');
+            const keys = await importOnce('./kebab_keys.js');
+            if (!menu.isConnected || menu.style.display === 'none') return;
+            keys.placeSidebarMenu(btn, menu, event);
         }
-        // Reserve the opening so a second click/outside click can cancel it, but keep pointer targets hidden until help has its final size (#19188).
-        menu.style.visibility = 'hidden';
-        menu.style.display = 'block';
-        btn.setAttribute('aria-expanded', 'true');
-        menuItemRoles(menu);
-        // Hide tooltips as opening begins, including while the help loads.
-        document.querySelectorAll('.session-tooltip').forEach(t => t.style.display = 'none');
-        const keys = await importOnce('./kebab_keys.js').catch(() => null);
-        if (!menu.isConnected || menu.style.display === 'none') return;
-        if (keys) keys.placeSidebarMenu(btn, menu, event); else closeSidebarKebabs();
-    }
+    } catch { closeSidebarKebabs(); }
 }
 
 // Top-bar settings dropdown

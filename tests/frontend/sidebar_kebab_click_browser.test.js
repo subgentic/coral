@@ -9,18 +9,19 @@ const { safePaused } = require('./helpers/paused');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { Input, Fetch } = client;
-    let holdHelp = false, heldHelp = null;
+    let holdHelp = false, failHelp = false, heldHelp = null;
     safePaused(client, async e => {
-        if (holdHelp) { heldHelp = e; await ev('window.__helpPaused=true'); }
+        if (failHelp) await Fetch.failRequest({requestId:e.requestId,errorReason:'Failed'});
+        else if (holdHelp) { heldHelp = e; await ev('window.__helpPaused=true'); }
         else await Fetch.continueRequest({requestId:e.requestId});
     });
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Emulation.setFocusEmulationEnabled({ enabled: true });
         await Fetch.enable({patterns:[{urlPattern:'*menu_help.js*'}]});
         await client.Network.setCacheDisabled({cacheDisabled:true});
-        for (const [w, h, mobile] of [[390, 844, true], [1280, 800, false]]) for (const variant of ['while help arrives', 'cancel while help arrives', 'at once', 'after 100 ms', 'after a redraw', 'after a redraw with new data', 'after another agent appears', 'after a status change']) {
+        for (const [w, h, mobile] of [[390, 844, true], [1280, 800, false]]) for (const variant of ['help fails', 'while help arrives', 'cancel while help arrives', 'at once', 'after 100 ms', 'after a redraw', 'after a redraw with new data', 'after another agent appears', 'after a status change']) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            holdHelp = variant.includes('help arrives'); heldHelp = null;
+            holdHelp = variant.includes('help arrives'); failHelp = variant === 'help fails'; heldHelp = null;
             await Page.navigate({ url: BASE + '/agents' }); await Page.loadEventFired(); await install();
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             const setList = n => ev(`window.__m.add('proj1', 'A', 2, { sleeping: false, session_id: 'w-sid', display_name: 'Writer', board_project: 'team-x' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); true`.replace("'Writer'", `'Writer${n}'`));
