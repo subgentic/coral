@@ -130,7 +130,7 @@ export function toggleBrowser(dirInputId, browserId, listId, pathId) {
     const isVisible = browser.style.display !== "none";
     browser.style.display = isVisible ? "none" : "";
     if (!isVisible) {
-        importOnce('./lazy_styles.js').then(m => m.loadStyles('launch_folder.css')).catch(() => {});
+        importOnce('./browser_filter.js').then(m => m.mount(browser)).catch(() => {});
         const inputPath = document.getElementById(_activeDirInputId).value;
         browserCurrentPath = browseStartPath(inputPath, activeServer() !== LOCAL_SERVER, getCoralRoot());
         renderRecentDirs();
@@ -165,17 +165,7 @@ async function loadBrowserEntries(path) {
         if (_activeDirInputId === 'launch-team-dir') dirInput.dataset.trustChosen = data.path;
         dirInput.dispatchEvent(new Event('change', { bubbles: true })); // bubbling: the Open folder box's error line is taken away by a delegated listener (#10572)
 
-        if (!data.entries.length) {
-            list.innerHTML = '<li class="empty-state">No subdirectories</li>';
-            return;
-        }
-
-        list.innerHTML = data.entries.map(name =>
-            `<li data-on-click="browser-nav" data-name="${escapeAttr(name)}" title="${escapeAttr(name)}"><button type="button" class="row-btn">
-                <span class="dir-icon material-icons" aria-hidden="true">folder</span>
-                <span class="dir-name">${escapeHtml(name)}</span>
-            </button></li>`
-        ).join("");
+        (await importOnce('./browser_filter.js')).renderEntries(list, data.entries);
     } catch (e) {
         list.innerHTML = '<li class="empty-state">Failed to load</li>';
         console.error("Browser load error:", e);

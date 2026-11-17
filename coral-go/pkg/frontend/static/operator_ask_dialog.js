@@ -155,7 +155,9 @@ export function openAskDialog(a, onDone, runners = {}) {
     const compose = document.createElement('div'); compose.className = 'inbox-ask-compose';
     const addSlot = document.createElement('div'); addSlot.className = 'inbox-ask-attach'; pics.append(addSlot);
     const sendRow = document.createElement('div'); sendRow.className = 'inbox-ask-sendrow'; const pickSlot = document.createElement('span'); pickSlot.className = 'inbox-ask-pick'; sendRow.append(pickSlot, send); addSlot.append(sendRow); // Add image on the left, Send reply on the right, the pictures note under them (#13148)
-    compose.append(label, pics, err);
+    const shortcut = document.createElement('p'); shortcut.className = 'inbox-ask-sub'; shortcut.id = 'inbox-ask-shortcut'; shortcut.textContent = 'Ctrl/Cmd+Enter sends. Enter adds a new line.';
+    box.setAttribute('aria-describedby', shortcut.id);
+    compose.append(label, pics, shortcut, err);
     if (missingCloudSource) dlg.setAttribute('aria-describedby', err.id);
     const contextNote = document.createElement('p'); contextNote.className = 'inbox-ask-sub'; contextNote.textContent = questionContextNote(a) || (a.superseded ? `Older: ${who} has asked something newer. Answer this one too, or Dismiss it if the newer question covers it.` : ''); /* an older question is never closed on its own (#15078) */ contextNote.hidden = !contextNote.textContent;
     dlg.append(title, sub, ...(contextNote.hidden ? [] : [contextNote]), ...(links.hidden ? [] : [links]), reading, compose, foot);
