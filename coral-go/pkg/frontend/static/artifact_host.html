@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   var CHILD_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
-  var MAX_HTML = 2 * 1024 * 1024 + 16 * 1024, MAX_HEIGHT = 20000;
+  var MAX_HTML = 64 * 1024 * 1024 + 16 * 1024, MAX_HEIGHT = 20000;
   var child = null, started = false, loads = 0;
   function up(m) { window.parent.postMessage(m, '*'); }
   window.addEventListener('message', function (e) {
