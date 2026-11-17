@@ -457,3 +457,5 @@ node ask_open_pages.test.mjs
 
 node team_startup_kind.test.js
 node team_prompt_preview_name.test.mjs
+
+node inbox_task_pages.test.mjs
