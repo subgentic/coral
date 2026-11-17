@@ -1,0 +1,4 @@
+.team-startup-waits { flex: 0 0 auto; grid-column: 1 / -1; flex-direction: column; align-items: stretch; min-width: 0; margin-block: 8px; }
+.team-startup-waits .btn { min-height: 44px; white-space: normal; overflow-wrap: anywhere; text-align: left; }
+
+#team-page-head > .team-startup-waits { flex-basis: 100%; }

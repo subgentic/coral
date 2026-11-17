@@ -136,7 +136,7 @@ export async function searchChats(query, page = 1) {
         if (!response.ok) throw new Error(`Search failed (${response.status})`);
         const data = await response.json();
         if (generation !== requestGeneration || source !== historyServer()) return;
-        try { const [{ state }, { formatShortTime }] = await Promise.all([importOnce('./state.js'), importOnce('./session_state.js')]); known.rows = state.historySessionsList || []; known.time = formatShortTime; } catch { known.rows = []; known.time = () => ''; } // names and times are a nicety: a search still lists its hits without them
+        try { const { state } = await importOnce('./state.js'); known.rows = state.historySessionsList || []; known.time = formatShortTime; } catch { known.rows = []; known.time = () => ''; } // names and times are a nicety: a search still lists its hits without them
         if (generation !== requestGeneration || source !== historyServer()) return; // a newer search began while the helpers loaded
         container.replaceChildren();
         if (data.status && !isSearchResponseUsable(data.status)) {
@@ -156,4 +156,13 @@ export async function searchChats(query, page = 1) {
         if (error.name === 'AbortError' || generation !== requestGeneration || source !== historyServer()) return;
         container.textContent = error.message || 'Search failed.'; say(container.textContent);
     }
+}
+
+function formatShortTime(isoStr) {
+    const d = new Date(isoStr);
+    if (isNaN(d)) return "";
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yy = String(d.getFullYear()).slice(-2);
+    return `${dd}/${mm}/${yy}`;
 }

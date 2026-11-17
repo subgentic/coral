@@ -26,7 +26,7 @@ const GOAL_LINE_MAX = 140;
 
 /** Goal text for a session row: summary, else the first user prompt (Show summary, #10816). */
  export function sessionGoalText(s) {
-    return s ? oneLine(s.summary || s.first_prompt || '') : '';
+    return s ? oneLine((s.waiting_for_input && s.waiting_kind === 'startup' ? s.waiting_summary : '') || s.summary || s.first_prompt || '') : '';
 }
 
 /**
@@ -83,15 +83,6 @@ export function defaultAgentName(dir, agentType) {
     const d = trim(dir), root = trim(typeof document !== 'undefined' ? document.body?.dataset?.coralRoot : '');
     const folder = d && d !== '~' && d !== root && !/^[A-Za-z]:$/.test(d) ? d.split(/[\\/]/).pop() : '';
     return oneLine(folder, 60) || typeName(agentType) || 'Agent';
-}
-
-export function formatShortTime(isoStr) {
-    const d = new Date(isoStr);
-    if (isNaN(d)) return "";
-    const dd = String(d.getDate()).padStart(2, "0");
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const yy = String(d.getFullYear()).slice(-2);
-    return `${dd}/${mm}/${yy}`;
 }
 
 /** How old a goal line is, "25 min ago": the generator refreshes a goal at most every 30 minutes, so a goal can be stale and the card says how much (#10123). '' when there is no usable time. */
