@@ -20,9 +20,17 @@ const { coralReady } = require('./helpers/wait');
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const original = window.fetch; window.fetch = (url, options) => {
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const original = window.fetch; window.__taskToolbarQueries = []; window.fetch = (url, options) => {
             const u = new URL(String(url), location.href);
-            if (u.pathname === '/api/board/tasks' && u.searchParams.get('assigned_to') === 'Operator') return Promise.resolve(new Response(JSON.stringify({ tasks: ${JSON.stringify(tasks)} }), { headers: { 'Content-Type': 'application/json' } }));
+            if (u.pathname === '/api/board/tasks' && u.searchParams.get('assigned_to') === 'Operator') {
+                const p = u.searchParams, statuses = p.getAll('status'), q = (p.get('q') || '').toLowerCase();
+                window.__taskToolbarQueries.push(p.toString());
+                const rows = ${JSON.stringify(tasks)}.filter(t => (!q || [t.title, t.body, t.completion_message].join(' ').toLowerCase().includes(q))
+                    && (!p.get('priority') || t.priority === p.get('priority')) && (!statuses.length || statuses.includes(t.status))
+                    && (!p.get('updated_since') || Date.parse(t.updated_at) >= Date.parse(p.get('updated_since')))
+                    && (!p.get('board') || t.board_id === p.get('board')));
+                return Promise.resolve(new Response(JSON.stringify({ tasks: rows }), { headers: { 'Content-Type': 'application/json' } }));
+            }
             return original(url, options);
         }; })();` });
         for (const width of [1280, 390]) {
@@ -51,9 +59,11 @@ const { coralReady } = require('./helpers/wait');
             await ev(`(() => { const p = document.getElementById('inbox-tk-priority'); p.value = 'high'; p.dispatchEvent(new Event('change', { bubbles: true })); })()`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody .dt-primary').length === 1`, 'priority matches one task');
             assert.match(await ev(`document.querySelector('#group-table-view tbody').textContent`), /Review the release plan/);
+            assert.ok(await ev(`window.__taskToolbarQueries.some(q => new URLSearchParams(q).get('priority') === 'high')`), 'priority is sent to the source query');
             await ev(`(() => { const p = document.getElementById('inbox-tk-priority'); p.value = ''; p.dispatchEvent(new Event('change', { bubbles: true })); const q = document.getElementById('inbox-tk-search'); q.value = 'launch'; q.dispatchEvent(new Event('input', { bubbles: true })); })()`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody .dt-primary').length === 1 && document.querySelector('#group-table-view tbody').textContent.includes('launch notes')`, 'search matches the other task');
             assert.equal(await ev(`document.getElementById('inbox-search').value`), 'launch', 'mailbox search shares the query');
+            assert.ok(await ev(`window.__taskToolbarQueries.some(q => { const p = new URLSearchParams(q); return p.get('q') === 'launch' && p.get('assigned_to') === 'Operator' && p.getAll('status').includes('pending'); })`), 'search, assignee and status are sent to the source');
         }
         console.log('PASS Inbox shared Tasks toolbar at 1280 and 390');
     } finally { await client.close(); }
