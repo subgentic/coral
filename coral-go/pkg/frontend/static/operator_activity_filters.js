@@ -40,6 +40,12 @@ export const kindsOf = v => { const a = Array.isArray(v) ? v : typeof v === 'str
 /** Whether a row is of a kind, or of any of several (an empty list or '' is every row). */
 export const inKind = (r, k) => { const ks = kindsOf(k); return !ks.length || ks.some(x => KIND_TEST[x](r)); };
 
+/** Delivery bookkeeping, not something a person did or must act on (#19149): the Important view leaves these rows out and Everything shows them. */
+export const NOISE_ACTIONS = ['wait_send', 'hub_update_check', 'mark_read', 'mark_unread', 'agents_record'];
+/** Whether a row is left out by the Important view: the one rule the rows and the counts both use. */
+export const isNoise = r => NOISE_ACTIONS.includes(r.action);
+export const passesImportant = (r, f) => !(f && f.important === true && !f.action && isNoise(r)); // an action the person picked is shown even if it is a delivery note (#19219)
+
 export const NO_GOAL = 'No goal';
 /** The agent a row is about, when the record says (#14445): who asked, for an ask (an older answer kept the asker as its title), or the agent named by a prompt, wait or chat row; '' for a row about no agent. */
 export const agentOf = row => String(row.asker || ((row.item_kind === 'agent' || /^(prompt_|wait_)/.test(row.action || '') || (row.action === 'answer' && row.item_kind === 'question')) ? ((row.action === 'prompt_answer' ? row.item_id : row.title) || (row.item_kind === 'agent' ? row.item_id : '')) : '') || '').trim();
@@ -63,6 +69,7 @@ const model = defineFilters({
     server: { type: 'text', max: 200, chip: v => `Computer: ${serverNames.get(v) || v}` }, // which computer's record a row came from (a Hub-served dashboard reads several, #15730)
     agent: { type: 'text', max: 80, chip: v => `Agent: ${v}` },
     goal: { type: 'text', max: 200, chip: v => `Goal: ${v}` }, // the goal a row served, or "No goal", as Needs you says it (#14445)
+    important: { type: 'custom', empty: false, clean: v => v === true, filtered: () => false, clear: f => ({ ...f, important: false }) }, // the Important view (#19149) is how the page opens, not a filter the person set: no chip, no Clear filters, no 'no match' wording (#19219); the pill is its control, and Clear all lands on Everything
     kind: { type: 'custom', empty: [], clean: v => kindsOf(v), filtered: v => kindsOf(v).length > 0, clear: f => ({ ...f, kind: [] }) }, // the chips of the toolbar are these (several at once); no filter chip repeats them over the strip (#16087)
     decision: { type: 'choice', values: DECISIONS, chip: v => `Decision: ${DECISION_LABEL[v]}` },
     action: { type: 'choice', values: ACTIONS, chip: v => `Action: ${ACTION_LABEL[v]}` },
@@ -74,8 +81,18 @@ export const { EMPTY, clean, isFiltered, isQuery, chips, without } = model;
 export const storageKey = () => 'coral-inbox-activity-filters';
 const kept = model.persist(storageKey);
 /** The filters kept in this browser for the folder, or the empty ones (the search words are not kept: a page opened later starts with an empty box). */
-export const loadFilters = () => ({ ...kept.load('inbox-activity', browserLocal), q: '' });
-export const saveFilters = f => kept.save('inbox-activity', { ...f, q: '' }, browserLocal);
+/** A browser that kept nothing, or a record from before Important existed (no Important field), opens on Important (#19149, one time); a record saved with the field keeps its choice. Everything on its own is not saved (it is not a query), so a reload after choosing it opens on Important again; Everything is kept only alongside another filter. */
+export const loadFilters = () => {
+    let raw = null;
+    try { raw = browserLocal.get(storageKey('inbox-activity')); } catch { raw = null; }
+    if (raw == null) return { ...EMPTY, important: true };
+    const f = { ...kept.load('inbox-activity', browserLocal), q: '' };
+    let hasField = false;
+    try { const o = JSON.parse(raw); hasField = !!o && typeof o === 'object' && 'important' in o; } catch { hasField = false; }
+    return hasField ? f : { ...f, important: true };
+};
+/** Kept always, Everything too: removing the record would bring Important back on the next page. */
+export const saveFilters = f => { try { browserLocal.set(storageKey('inbox-activity'), JSON.stringify({ ...clean(f), q: '' })); } catch { /* storage unavailable: the choice lasts until the page is closed */ } };
 
 const stamp = r => Date.parse(r.at || '') || 0;
 
@@ -86,6 +103,7 @@ export function matches(r, f, teamOf = x => x.team || '') {
         const hay = [r.title, r.note, r.asker, r.goal_title, r.task_title, DECISION_LABEL[decisionOf(r)], teamOf(r), ACTION_LABEL[r.action] || r.action, r.item_kind].join(' ').toLowerCase();
         if (!hay.includes(c.q.toLowerCase())) return false;
     }
+    if (!passesImportant(r, c)) return false;
     if (!inKind(r, c.kind)) return false;
     if (c.decision && decisionOf(r) !== c.decision) return false;
     if (c.agent && agentOf(r) !== c.agent) return false;
