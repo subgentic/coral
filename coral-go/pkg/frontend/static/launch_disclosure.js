@@ -9,6 +9,7 @@ import { attachDialogFocus } from './dialog_focus.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
+import { liveListReady } from './initial_load.js';
 let readGeneration = 0;
 const hasLocalAgent = () => (state.liveSessions || []).some(session => sessionServer(session) === 'local');
 let bannerEligible = hasLocalAgent();
@@ -105,6 +106,7 @@ export async function refreshLaunchDisclosure() {
             line.textContent = disclosure.text;
         }
         if (!defaultIsAuto()) { document.getElementById('launch-disclosure-banner')?.remove(); shown = null; hint.clear(); hint.release(); return; } // the default is not Auto: nothing here is true to say; the launch-time confirm (409) is the server's and stays
+        if (!hasLocalAgent()) { await liveListReady; if (generation !== readGeneration) return; } // the page's first list may not have landed yet: no agent in it is not 'no agent', and giving the reserved row back (and the hint) now would move the page when the notice comes a moment later
         const previous = document.getElementById('launch-disclosure-banner');
         if (!hasLocalAgent() || disclosure.seen === true) { previous?.remove(); shown = null; hint.clear(); hint.release(); return; }
         if (disclosure.seen === false && previous?.dataset.disclosureId === disclosure.id) { hint.set(previous.getBoundingClientRect().height); return; } // already drawn (an earlier read): the hint is kept as it is
