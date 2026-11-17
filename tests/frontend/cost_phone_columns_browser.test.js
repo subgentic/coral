@@ -25,10 +25,10 @@ const SERIES = [{ bucket: '2026-10-18T00:00:00Z', series: [{ key: 'coral-go-team
     { bucket: '2026-10-19T00:00:00Z', series: [{ key: 'coral-go-team', label: 'coral-go-team', cost_usd: 3.5, num_requests: 8 }, { key: 'docs-sprint', label: 'docs-sprint', cost_usd: 0.9, num_requests: 2 }] }];
 // The original column order of each table, as a wide window shows it.
 const WIDE = {
-    'cost-by-provider': ['Provider', 'Requests', 'Input', 'Output', 'Cache read', 'Cache write', 'Cost', 'Share'],
-    'cost-by-model': ['Provider', 'Model', 'Requests', 'Input', 'Output', 'Cache read', 'Cache write', 'Cost', 'Share'],
-    'cost-by-thinking': ['Provider', 'Model', 'Thinking level', 'Calls', 'Input', 'Output', 'Cache read', 'Cache write', 'Thinking', 'Cost', 'Share'],
-    'cost-by-team': ['Team', 'Agents', 'Input', 'Output', 'Cache read', 'Cache write', 'Cost', 'Share'],
+    'cost-by-provider': ['Provider', 'Requests', 'New input tokens', 'Output', 'Cache read', 'Cache write', 'Cost', 'Share'],
+    'cost-by-model': ['Provider', 'Model', 'Requests', 'New input tokens', 'Output', 'Cache read', 'Cache write', 'Cost', 'Share'],
+    'cost-by-thinking': ['Provider', 'Model', 'Thinking level', 'Calls', 'New input tokens', 'Output', 'Cache read', 'Cache write', 'Thinking', 'Cost', 'Share'],
+    'cost-by-team': ['Team', 'Agents', 'New input tokens', 'Output', 'Cache read', 'Cache write', 'Cost', 'Share'],
 };
 
 (async () => {
