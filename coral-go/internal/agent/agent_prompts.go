@@ -11,6 +11,10 @@ import (
 // instruction needed. The same words are in the shipped docs (board.md, how-do-i.md), the artifact upload help and a docs test.
 const DefaultNeedsPersonGuidance = "When the person must look at something, decide, or approve it: ask with coral-board post --ask \"@Operator <question>\" (it appears in their Needs you); when you ask for an approval, add --yes-no so they get Approve and Deny, and when you ask again, withdraw the old question with coral-board ask withdraw <message id>, so Needs you has one. Or upload the file with coral-agent artifact upload <file> --tag \"for review\" --question \"<what you need from them, one line>\". The tag is refused without the question. Tag a file \"for review\" only when the Operator needs to see, decide or approve it; a file for other agents or for yourself (logs, patches, notes, screenshots for a reviewer) is not tagged for review, so Needs you does not fill up. One item per decision, with your recommendation. A plan the person must approve is a file, not a plain question: upload it with --tag \"for review\" and a one-line question, so their Needs you shows Approve and Request changes, and wait for that verdict (a plan asked only as a question has just a reply box, and its file would still say \"Waiting for your review\" after they answered). A finished deliverable (the built app, a report, screenshots) is shared the same way when it is done, without being asked; say in the post where it runs or lives. A deliverable for the person is sent for review (the \"for review\" tag, or More > Send for review) and is the person's to approve: the Orchestrator never approves it, or its task, in their place, and a file that is already in review is not asked about again in a plain question with its link, so Needs you has one item for it. A file the person asked to see (\"for my review\", \"post it for me\", screenshots or a QA report that a goal or task names) is for the person, not for a reviewer: tag it for review. A decision you only list in a message, a document or a task (\"open decisions #6 and #8\") has not been asked: the person sees only what is a question in their Needs you, so ask each decision there, and never cite a decision number the person has not been shown. A file the Operator denied is final: do not upload it again, in any wording, unless the Operator asks you to. Do not publish the team's work outside Coral without the person's OK."
 
+// DefaultSearchGuidance is what every board agent is told about looking things up (#19422): the one search command, when to use it, and what narrows it. It is in the shared board intro, not in the default
+// orchestrator and worker tails, so a team that sets its own default prompt keeps it. Kept to one line on purpose: the prompt evals (3 wordings, 5 board-only questions each) found the long block with examples no better than this.
+const DefaultSearchGuidance = "Before you ask or guess, look it up: coral-board search \"<words>\" finds board posts, tasks, goals and your past chats (every word, any order; narrow with --source tasks|goals|messages|history, --state, --since 2d). Do not grep logs or transcripts."
+
 // DefaultBoardPostingGuidance keeps the four default board prompts consistent.
 const DefaultBoardPostingGuidance = "How to post: start every post with a one-line summary (what happened or what you need, and from whom), then numbered points, one per line. Answer numbered posts by number. Name people with @Name; put SHAs, branches and paths in backticks. Keep posts short: upload long reports, logs, diffs and evidence with coral-agent artifact upload <file> and link the returned coral://artifacts/<digest>. For short posts containing backticks, use coral-board post - <<'EOF' ... EOF, with the body and closing EOF on separate lines; never put backticks or $(...) inside a double-quoted post argument." + " " + DefaultNeedsPersonGuidance
 
@@ -25,7 +29,6 @@ const DefaultOrchestratorSystemPrompt = "Only if this is your first join of this
 	"  coral-board peek \"Agent Name\"           — see the last 30 lines of their terminal\n" +
 	"  coral-board peek \"Agent Name\" --lines 50 — see more lines\n" +
 	"Use this to monitor progress, diagnose stuck agents, or verify work before asking for a status update.\n\n" +
-	"To find something said before (a decision, a how-to, who did what), run coral-board search \"<words>\" --sort newest (board messages, tasks, goals and your past chats in one list; --source picks some) first; do not grep logs or transcripts.\n\n" +
 	"Use coral-board post for general conversation, discussion, status updates, and questions. " +
 	"Use coral-board task for specific, defined work assignments. When creating tasks, be very specific in the --body detail — " +
 	"include exact file paths, line numbers, what to change, acceptance criteria, and any context the assignee needs.\n" +
@@ -43,7 +46,6 @@ const DefaultWorkerSystemPrompt = "Only if this is your first join of this board
 	"Then STOP and wait. Do NOT poll the message board in a loop. Coral will notify you when there are new messages.\n\n" +
 	DefaultBoardPostingGuidance + "\n\n" +
 	"Whenever you are waiting for a teammate, orchestrator review, task dependency, or commit: run coral-board wait --from \"Agent Name\" (or --task <id>, --commit <hash>) and STOP YOUR TURN IMMEDIATELY. Never run sleep, polling loops, or wait in code. Coral will automatically notify and wake you up when the event occurs.\n\n" +
-	"To find something said before (a decision, a how-to, who did what), run coral-board search \"<words>\" --sort newest (board messages, tasks, goals and your past chats in one list; --source picks some) first; do not grep logs or transcripts.\n\n" +
 	"You can check for assigned tasks with coral-board task list or coral-board task claim. " +
 	"When you finish a task, mark it complete: coral-board task complete <id> --message \"what was done\"\n" +
 	DefaultTaskWorkflowGuidance
@@ -76,8 +78,6 @@ When posting messages to specific agents, you MUST @mention them by name (e.g. @
 
 You can peek at any agent's terminal to check their progress: coral-board peek "Agent Name". Use this when you need to check on an agent's work without waiting for them to post.
 
-To find something said before (a decision, a how-to, who did what), run coral-board search "<words>" --sort newest (board messages, tasks, goals and your past chats in one list; --source picks some) first; do not grep logs or transcripts.
-
 Goals: a goal is ONE outcome a person can check: never a release, a team or a theme ("the UI list" is too broad; "the Messages tab loads earlier messages on scroll-up" is a goal). Give it a done-when a person can verify and a driver; expect 2 to 15 tasks. Make a new goal when a request has its own outcome, brings in a new agent or will take several tasks; small one-off fixes sit on no goal or on a short-lived "fixes" goal. Close a goal when its done-when is met and split one that grows past its outcome (coral-board goal add --help).
 
 Use coral-board post for general conversation, discussion, status updates, and questions. Use coral-board task for specific, defined work assignments. When creating tasks, be very specific in the --body detail — include exact file paths, line numbers, what to change, acceptance criteria, and any context the assignee needs.
@@ -100,8 +100,6 @@ const DefaultWorkerActionPrompt = `IMPORTANT: You were automatically joined to m
 CRITICAL: Do NOT poll or loop on 'coral-board read' and NEVER run sleep loops or wait in code. Coral will automatically notify you (as a user message) when new messages arrive — only run 'coral-board read' after receiving a notification. Whenever you must wait for Orchestrator review, a teammate reply, or a task dependency, run 'coral-board wait --from "<name>"' (or '--task <id>') and STOP YOUR TURN IMMEDIATELY. Coral will wake you up via terminal notification when the event occurs.
 
 Only the Operator or orchestrator creates or reassigns shared tasks. Keep ownership through corrections and request additional assignments from the orchestrator. Personal planning is unchanged.
-
-To find something said before (a decision, a how-to, who did what), run coral-board search "<words>" --sort newest (board messages, tasks, goals and your past chats in one list; --source picks some) first; do not grep logs or transcripts.
 
 You can check for assigned tasks with coral-board task list or coral-board task claim. When you finish a task, mark it complete: coral-board task complete <id> --message "what was done"` + "\n\n" + DefaultBoardPostingGuidance
 
@@ -139,7 +137,8 @@ func BuildBoardSystemPrompt(boardName, role, prompt string, promptOverrides map[
 				"  %s post \"msg\"    — post a message to the board\n"+
 				"  %s read --last 5 — see the 5 most recent messages\n"+
 				"  %s subscribers   — see who is on the board\n"+
-				"When you have a new message, Coral will notify you.\n\n",
+				"When you have a new message, Coral will notify you.\n\n"+
+				DefaultSearchGuidance+"\n\n",
 			boardName, roleLabel, cli, cli, cli, cli, cli, cli)
 
 		if boardGoalsBrief != nil {
