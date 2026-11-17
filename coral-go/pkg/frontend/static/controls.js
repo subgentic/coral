@@ -190,7 +190,7 @@ export async function sendCommand({ nudge = false } = {}) {
                 // Plain text naming the server; never the raw response (#3151). The draft stays.
                 // Said under the composer (#3218); a gone terminal also marks the agent and offers Restart.
                 const { text: errText, code, exited } = await responseError(resp, sessionServer(targetSession), `The message was not sent (HTTP ${resp.status}).`);
-                const text = (await importOnce('./send_arrived.js')).plainSendReason(resp.status, code, errText); // never the bare 'session target mismatch', nor a route's short technical answer (#19173)
+                const text = await importOnce('./send_arrived.js').then(m => m.plainSendReason(resp.status, code, errText), () => errText); // a plain sentence, never a route's short answer; the module failing to load keeps the reason (#19173)
                 if (!reportSendError(targetSession, text, code, exited)) announceNotSent(sentSessionId);
                 // The refusal is already said under the composer: a 409 (held, or a dialog to answer) is expected, not an error (#290).
                 (resp.status === 409 ? console.debug : console.error)("Send failed:", resp.status);
