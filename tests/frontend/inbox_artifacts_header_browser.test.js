@@ -56,7 +56,7 @@ const WORLD = `(() => {
             await ev(`new Promise(r => setTimeout(r, 600)).then(() => true)`); // sleep-ok: late redraws finish before the boxes are read
             const m = await measure();
             check(m.old === 0, `${at}the page's own head and count are gone (${m.old})`);
-            check(m.h2 && m.cnt && m.cntText === '3', `${at}row 1 has the title and its count of 3 (${m.cntText})`);
+            check(m.h2 && m.cnt && /^3( shown)?$/.test(m.cntText), `${at}row 1 has the title and its count of 3 (${m.cntText})`);
             check(m.cnt && m.cntColor !== m.textColor, `${at}the count is grey, not the title's colour`);
             if (m.h2 && m.cnt && m.search && m.filt) {
                 // a portrait phone's top bar names the folder, so the page's own title is one pixel (for screen readers) and the count stays (#19082)

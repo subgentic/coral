@@ -62,7 +62,8 @@ export function setArtifactSearch(text) {
 }
 
 let pageHost = null;
-const hooks = () => ({ detailHost: pageHost && pageHost.querySelector('.inbox-detail-pane'), onCount: n => { count = n; countAt = Date.now(); onCount(); const head = document.querySelector('#group-table-view .inbox-folder-head'); if (head) { let c = head.querySelector('.session-group-count'); if (!c) { c = document.createElement('span'); c.className = 'session-group-count'; head.append(c); } c.textContent = String(n); head.dataset.words = `Artifacts|${n}`; } } }); // the head's count follows the list's answer, drawn the first time it comes
+let shownCount = null;
+const hooks = () => ({ onShown: (shown, total, more) => { shownCount = `${shown}${more ? '+' : ''} shown${Number.isFinite(total) && total !== shown ? ` of ${total}` : ''}`; const c = document.querySelector('#group-table-view .inbox-folder-head .session-group-count'); if (c) c.textContent = shownCount; }, detailHost: pageHost && pageHost.querySelector('.inbox-detail-pane'), onCount: n => { count = n; countAt = Date.now(); onCount(); const head = document.querySelector('#group-table-view .inbox-folder-head'); if (head) { let c = head.querySelector('.session-group-count'); if (!c) { c = document.createElement('span'); c.className = 'session-group-count'; head.append(c); } c.textContent = shownCount || String(n); head.dataset.words = `Artifacts|${shownCount || n}`; } } }); // the head's count follows the list's answer, drawn the first time it comes
 
 let folderBar = null;
 /** The folder's toolbar (the shared one every Inbox folder has): the search, the Filters icon beside it (Team, Type, Origin, Uploaded by, Kept only, dates, Sort), the chips of what is on. The list uses this bar as its own. */
@@ -86,7 +87,7 @@ export function artifactsToolbar(redraw) {
 
 /** The folder's page for the group table: the list and the detail pane; its title and count are the first thing of the toolbar's row (folderHead), like every folder's (#15834). */
 export function artifactsSpec() {
-    return { title: 'Artifacts', noun: ['artifact', 'artifacts'], get count() { return count; }, rows: [], signature: 'artifacts', node: () => {
+    return { title: 'Artifacts', noun: ['artifact', 'artifacts'], get count() { return shownCount || count; }, rows: [], signature: 'artifacts', node: () => {
         const row = DT.el('div', 'inbox-artifacts-row');
         const main = DT.el('div', 'inbox-artifacts-main');
         const body = DT.el('div', 'inbox-artifacts-list team-panel'); // the team page's list rules (its bar, its table) apply by .team-panel

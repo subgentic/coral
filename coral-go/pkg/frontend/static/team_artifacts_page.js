@@ -402,6 +402,7 @@ export function createArtifactsList({ inbox = false } = {}) {
 
     function draw() {
         const body = root && root.querySelector('.team-artifacts-body'); if (!body) return;
+        hooks.onShown?.(model.items.length, model.counts?.all, model.hasMore);
         const rowsBefore = drawnRows;
         const box = scrollBox(body), at = box ? box.scrollTop : 0;
         const tableBox = body.querySelector('.dt-box'), tableAt = tableBox ? tableBox.scrollTop : 0; // the table's own box is built again with the table

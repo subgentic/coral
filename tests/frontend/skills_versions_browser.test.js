@@ -45,10 +45,10 @@ const ROWS=[row(5,'rejected'),row(4,'pending'),row(3,'approved'),row(2,'approved
   assert.deepEqual(await ev(`window.__detailGets`),['4'.repeat(32)],'pending click opens only the pending version, not the row');
   assert.match(await ev(`document.querySelector('#skills-view .skills-used-by').textContent`),/^Used by red, blue$/,'the skill\'s own page says which teams use it');
   assert.ok(await ev(`[...document.querySelectorAll('#skills-view button')].some(b=>b.textContent==='Approve')`),'pending approval remains actionable');
-  await ev(`document.querySelector('#skills-view details').open=true;true`);
-  const history=await ev(`[...document.querySelectorAll('#skills-view details button')].map(b=>b.textContent)`);
+  await ev(`document.querySelector('#skills-view .skills-history').open=true;true`);
+  const history=await ev(`[...document.querySelectorAll('#skills-view .skills-history button')].map(b=>b.textContent)`);
   assert.equal(history.length,5,'all versions of only this publisher in history');
-  await ev(`[...document.querySelectorAll('#skills-view details button')].find(b=>/^v1 /.test(b.textContent)).click();true`);
+  await ev(`[...document.querySelectorAll('#skills-view .skills-history button')].find(b=>/^v1 /.test(b.textContent)).click();true`);
   await waitFor(`document.querySelector('#skills-view h2')?.textContent.includes('version 1')`,'older version opened');
   assert.match(await ev(`document.querySelector('.skills-file-text').textContent`),/version 1/);
   await show();

@@ -222,6 +222,7 @@ export function attachVersions(dialog, hooks) {
             const [a, b] = await Promise.all([text(before.digest, signal), text(row.digest, signal)]);
             if (gen !== st.gen || !st.comparing) return;
             st.texts = [a, b];
+            st.view = /text\/html/i.test(row.media_type || '') || /\.html?$/i.test(row.name || '') ? 'page' : 'changes';
             const lines = diffLines(a, b);
             const body = hooks.body();
             dialog.classList.add('av-comparing');
