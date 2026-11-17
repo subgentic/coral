@@ -165,7 +165,7 @@ const MESSAGE = "The agent's terminal is gone. Restart it to continue.";
             await ev(`window.sendCommand()`);
             await waitFor(`!document.getElementById('composer-error').hidden`, `${label}: other error under the composer`);
             const other = await errorBox();
-            assert.equal(other.text, 'tmux failed (mock)');
+            assert.equal(other.text, "Coral couldn't type your message into the agent's terminal, so it was not sent. Try again; if it keeps failing, check the agent's terminal.", 'a raw terminal error is said in plain words (#19173)');
             assert.equal(other.restart, false, `${label}: no Restart for other errors`);
             assert.equal(await rowChip('qa-gone'), false, `${label}: other errors do not mark the agent`);
             await restoreWrites();

@@ -37,9 +37,6 @@ import { _getXtermModule, sleepingBlocked } from './control_runtime.js';
 import { activeUploadPromisesBySession, getPendingAttachments, clearAttachments, openImagePicker, removeAttachment, openAttachment } from './image_composer.js';
 import { SVGO } from './svg_open.js';
 
-/** What the composer says when the server still refuses the target after the list was read again: the page's view of this agent is out of date (#10813). */
-const TARGET_CHANGED_MESSAGE = 'This agent was restarted or renamed, so your message was not sent. Reload the page, then send it again.';
-
 export { getPendingAttachments, initImageDrop, uploadAndInsertImage, renderAttachments, removeAttachment } from './image_composer.js';
 export { restartSession, restartStage, hideRestartModal, confirmRestart } from './restart_flow.js';
 /* Quick actions, command sending, mode toggling, and session controls */
@@ -193,7 +190,7 @@ export async function sendCommand({ nudge = false } = {}) {
                 // Plain text naming the server; never the raw response (#3151). The draft stays.
                 // Said under the composer (#3218); a gone terminal also marks the agent and offers Restart.
                 const { text: errText, code, exited } = await responseError(resp, sessionServer(targetSession), `The message was not sent (HTTP ${resp.status}).`);
-                const text = code === 'session_target_mismatch' ? TARGET_CHANGED_MESSAGE : errText; // never the bare 'session target mismatch'
+                const text = await importOnce('./send_arrived.js').then(m => m.plainSendReason(resp.status, code, errText), () => errText); // a plain sentence, never a route's short answer; the module failing to load keeps the reason (#19173)
                 if (!reportSendError(targetSession, text, code, exited)) announceNotSent(sentSessionId);
                 // The refusal is already said under the composer: a 409 (held, or a dialog to answer) is expected, not an error (#290).
                 (resp.status === 409 ? console.debug : console.error)("Send failed:", resp.status);
