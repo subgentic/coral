@@ -84,6 +84,14 @@ func (h *ChiefChecksHandler) mayManage(ctx context.Context, c reminderCaller, ch
 	return c.person || c.sessionID == ch.TargetSession || h.isSeat(ctx, c, ch.TargetBoard)
 }
 
+// mayCancel is who may remove a reminder: the person, the team's seat, or the agent that set it for itself (origin agent). An agent may mark done any reminder for it, but cancels only its own (#19245).
+func (h *ChiefChecksHandler) mayCancel(ctx context.Context, c reminderCaller, ch *store.ChiefCheck) bool {
+	if c.person || h.isSeat(ctx, c, ch.TargetBoard) {
+		return true
+	}
+	return ch.Origin == "agent" && c.sessionID == ch.TargetSession
+}
+
 type reminderBody struct {
 	Text         string `json:"text"`
 	Name         string `json:"name"`
@@ -214,6 +222,7 @@ func (h *ChiefChecksHandler) targetOf(w http.ResponseWriter, r *http.Request, c 
 		commentRefuse(w, 400, "invalid_target", "choose a live member of that team; the reminder was not saved")
 		return
 	}
+	by = strings.TrimSpace(clitext.Clean(by)) // a name is cleaned once, at write, so no row carries control characters (#19245)
 	if by == "" {
 		by = "an agent"
 	}
@@ -295,6 +304,8 @@ func (h *ChiefChecksHandler) remindersAdd(w http.ResponseWriter, r *http.Request
 		errBadRequest(w, "an agent's reminder can repeat at most every 15 minutes")
 		return
 	}
+	h.mu.Lock() // the limit check and the save are one step, so two requests at once cannot both pass the cap (#19245)
+	defer h.mu.Unlock()
 	if msg := h.overLimit(r.Context(), origin, boardName, sessionID); msg != "" {
 		commentRefuse(w, 409, "too_many_reminders", msg)
 		return
@@ -346,6 +357,10 @@ func (h *ChiefChecksHandler) remindersCancel(w http.ResponseWriter, r *http.Requ
 	ch, err := h.sched.ChiefCheck(r.Context(), id)
 	if err != nil || ch.Deleted || !ch.IsReminder() || !h.mayManage(r.Context(), c, ch) {
 		errNotFound(w, "reminder not found")
+		return
+	}
+	if !h.mayCancel(r.Context(), c, ch) {
+		commentRefuse(w, 403, "not_yours_to_cancel", "this reminder was set by the Operator or the team's Orchestrator: mark it done with 'remind done', and they cancel it")
 		return
 	}
 	if err := h.sched.DeleteChiefCheck(r.Context(), id, ch.Revision); err != nil {
