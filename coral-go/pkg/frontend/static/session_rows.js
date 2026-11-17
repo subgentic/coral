@@ -129,8 +129,9 @@ function _rowMenuContent(s, sid) {
                 Archive
             </button>
 `;
-    const _sleepingMenu = `${isExitedAsleep(s) ? '<div class="overflow-menu-note" role="note">Its program exited.</div>' : isGoneAsleep(s) ? '<div class="overflow-menu-note" role="note">Its terminal is gone.</div>' : ''}
-            ${isGoneAsleep(s) || isExitedAsleep(s) ? `<button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="sleep">
+    const _why = isGoneAsleep(s) || isExitedAsleep(s);
+    const _sleepingMenu = `${_why ? `<div class="overflow-menu-note" role="note">Its ${isExitedAsleep(s) ? 'program exited' : 'terminal is gone'}.</div>` : ''}
+            ${_why ? `<button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="sleep">
                 ${SVGO.o0}<path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
                 Sleep
             </button>` : ''}

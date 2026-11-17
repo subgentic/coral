@@ -31,8 +31,8 @@ const BASE = require('./test_base').BASE;
             const T = { text: rgb('var(--text-primary)'), muted: rgb('var(--text-muted)'), error: rgb('var(--error)') };
             const red = c => { const m = /rgba?\\((\\d+), (\\d+), (\\d+)(?:, ([\\d.]+))?/.exec(c); return !!m && Number(m[4] ?? 1) > 0.02 && Number(m[1]) > Number(m[2]) + 60 && Number(m[1]) > Number(m[3]) + 60; };
             const rows = [...document.querySelectorAll('.session-group-item')].filter(li => li.querySelector('.terminal-gone-chip')).map(li => {
-                const chip = li.querySelector('.terminal-gone-chip'), g = chip.querySelector('.status-glyph'), cs = getComputedStyle(chip), gs = getComputedStyle(g), row = li.querySelector('.session-name-row'), name = li.querySelector('.session-label'), r = e => e.getBoundingClientRect();
-                                return { id: li.dataset.sessionId, word: chip.textContent.trim(), state: chip.dataset.state, title: chip.title, textColor: cs.color, wordRed: red(cs.color) || red(cs.backgroundColor) || red(cs.borderTopColor) && parseFloat(cs.borderTopWidth) > 0, glyphColor: gs.color, glyphW: Math.round(r(g).width), chipR: Math.round(r(chip).right), rowR: Math.round(r(row).right), nameR: name ? Math.round(r(name).right) : 0, nameW: name ? Math.round(r(name).width) : 0, chipL: Math.round(r(chip).left), shown: chip.getClientRects().length > 0, forceAdjust: gs.forcedColorAdjust };
+                const chip = li.querySelector('.terminal-gone-chip'), cs = getComputedStyle(chip), gs = getComputedStyle(chip, '::before'), row = li.querySelector('.session-name-row'), name = li.querySelector('.session-label'), r = e => e.getBoundingClientRect();
+                                return { id: li.dataset.sessionId, word: chip.textContent.trim(), state: chip.dataset.state, title: chip.title, textColor: cs.color, wordRed: red(cs.color) || red(cs.backgroundColor) || red(cs.borderTopColor) && parseFloat(cs.borderTopWidth) > 0, glyphColor: gs.color, glyphW: Math.round(parseFloat(gs.width)), chipR: Math.round(r(chip).right), rowR: Math.round(r(row).right), nameR: name ? Math.round(r(name).right) : 0, nameW: name ? Math.round(r(name).width) : 0, chipL: Math.round(r(chip).left), shown: chip.getClientRects().length > 0, forceAdjust: gs.forcedColorAdjust };
             });
             return { T, rows }; })()`);
         await ev(`(() => { const st = document.createElement('style'); st.textContent = '*, *::before, *::after { transition: none !important; }'; document.head.append(st); return true; })()`); // a colour read mid-transition is not the colour
@@ -49,7 +49,7 @@ const BASE = require('./test_base').BASE;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); document.documentElement.style.fontSize = ${JSON.stringify(zoom)}; T.render.renderLiveSessions(T.state.liveSessions); true`);
-            await waitFor(`(() => { const c = document.querySelector('.session-group-item .terminal-gone-chip'); return !!c && c.getClientRects().length > 0 && c.querySelector('.status-glyph')?.getClientRects().length > 0; })()`, `${label}: the marks are laid out`, 6000);
+            await waitFor(`(() => { const c = document.querySelector('.session-group-item .terminal-gone-chip'); return !!c && c.getClientRects().length > 0; })()`, `${label}: the marks are laid out`, 6000);
             const d = await read();
             const at = label + ': ';
             check(d.rows.length === 6 && d.rows.every(r => r.shown), `${at}six marked rows, all shown (${d.rows.length})`);
