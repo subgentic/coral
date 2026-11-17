@@ -23,6 +23,7 @@ DELETE /api/chief/checks/{checkID} never
 DELETE /api/folder-tags/{folderName}/{tagID} never
 DELETE /api/launch-disclosure/ack never
 DELETE /api/pinned-folders launch
+DELETE /api/reminders/{reminderID} never
 DELETE /api/resources/entries/{id} never
 DELETE /api/resources/{name} never
 DELETE /api/saved/{id} interact
@@ -165,6 +166,8 @@ GET /api/needs-you view
 GET /api/operator-asks view
 GET /api/pinned-folders view
 GET /api/proposals view
+GET /api/reminders never
+GET /api/reminders/{reminderID} never
 GET /api/resources view
 GET /api/resources/{name} never
 GET /api/saved view
@@ -448,6 +451,8 @@ POST /api/launch-disclosure/ack never
 POST /api/launch/permission-args never
 POST /api/notifications never
 POST /api/pinned-folders launch
+POST /api/reminders never
+POST /api/reminders/{reminderID}/done never
 POST /api/resources/entries/{id}/move never
 POST /api/resources/{name}/claim never
 POST /api/resources/{name}/release never
