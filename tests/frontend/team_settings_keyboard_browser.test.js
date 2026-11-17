@@ -47,7 +47,7 @@ const HEX = n => String(n).repeat(64).slice(0, 64);
         const tl = await ev(`(() => { const d = document.getElementById('team-settings-workspace'); const tabs = [...d.querySelectorAll('.settings-tab')]; return { names: tabs.map(t => t.dataset.section), sel: tabs.map(t => t.getAttribute('aria-selected')), tab: tabs.map(t => t.tabIndex), controls: tabs.map(t => !!document.getElementById(t.getAttribute('aria-controls'))),
             labelled: [...d.querySelectorAll('[role=tabpanel]')].map(p => { const by = p.getAttribute('aria-labelledby'); return !!by && !!document.getElementById(by) && document.getElementById(by).getAttribute('aria-controls') === p.id; }), hidden: [...d.querySelectorAll('[role=tabpanel]')].map(p => p.hidden) }; })()`);
         const names = tl.names, n = names.length;
-        assert.deepEqual(names.filter(x => x !== 'health'), ['workflow', 'messaging', 'prompts'], 'Workflow, Messaging and Prompts (Health check when the board serves it)');
+        assert.deepEqual(names.filter(x => x !== 'health' && x !== 'reminders'), ['workflow', 'messaging', 'prompts'], 'Workflow, Messaging and Prompts (Health check and Agent reminders when the board serves them)');
         assert.deepEqual(tl.sel, names.map((x, i) => String(i === 0)));
         assert.deepEqual(tl.tab, names.map((x, i) => (i === 0 ? 0 : -1)), 'roving tabindex: only the selected tab is a Tab stop');
         assert.deepEqual(tl.controls, names.map(() => true), 'aria-controls names a real panel'); assert.deepEqual(tl.hidden, names.map((x, i) => i !== 0));

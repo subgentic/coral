@@ -270,5 +270,8 @@ func reminderLine(m map[string]any) string {
 	if on, _ := m["enabled"].(bool); !on && state == "none" {
 		state = "off"
 	}
+	if paused, _ := m["paused"].(bool); paused {
+		state = "off (switched off by the Operator)"
+	}
 	return fmt.Sprintf("#%v [%s] %s, for %s, set by %s: %s", m["id"], state, when, clitext.Clean(fmt.Sprint(m["target_name"])), clitext.Clean(fmt.Sprint(m["origin"])), clitext.Clean(fmt.Sprint(m["name"])))
 }

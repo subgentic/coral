@@ -167,6 +167,7 @@ GET /api/operator-asks view
 GET /api/pinned-folders view
 GET /api/proposals view
 GET /api/reminders never
+GET /api/reminders/agents never
 GET /api/reminders/{reminderID} never
 GET /api/resources view
 GET /api/resources/{name} never
@@ -452,6 +453,7 @@ POST /api/launch/permission-args never
 POST /api/notifications never
 POST /api/pinned-folders launch
 POST /api/reminders never
+POST /api/reminders/agents/{sessionID}/switch never
 POST /api/reminders/{reminderID}/done never
 POST /api/resources/entries/{id}/move never
 POST /api/resources/{name}/claim never

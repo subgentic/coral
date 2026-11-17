@@ -30,15 +30,17 @@ func isAgentTool(r *http.Request) bool {
 // every mode since #3929 (only with strict local auth before); the Operator can (the dashboard,
 // an API key, the signed command line). Each agent call is recorded in the identity report.
 var operatorOnlyRoutes = map[string]string{
-	"GET /api/filesystem/trust-probe":      "check project configuration names before choosing folder trust",
-	"GET /api/artifacts/{id}/thumbnail":    "read an artifact thumbnail",
-	"GET /api/chief/checks":                "read scheduled checks",
-	"POST /api/chief/checks":               "create scheduled checks",
-	"GET /api/chief/checks/{checkID}":      "read a scheduled check",
-	"PUT /api/chief/checks/{checkID}":      "edit a scheduled check",
-	"DELETE /api/chief/checks/{checkID}":   "delete a scheduled check",
-	"POST /api/chief/checks/{checkID}/run": "run a scheduled check",
-	"GET /api/chief/triggers":              "read check triggers",
+	"GET /api/filesystem/trust-probe":               "check project configuration names before choosing folder trust",
+	"GET /api/artifacts/{id}/thumbnail":             "read an artifact thumbnail",
+	"GET /api/chief/checks":                         "read scheduled checks",
+	"POST /api/chief/checks":                        "create scheduled checks",
+	"GET /api/chief/checks/{checkID}":               "read a scheduled check",
+	"PUT /api/chief/checks/{checkID}":               "edit a scheduled check",
+	"DELETE /api/chief/checks/{checkID}":            "delete a scheduled check",
+	"POST /api/chief/checks/{checkID}/run":          "run a scheduled check",
+	"GET /api/reminders/agents":                     "see every agent's reminders on a team",
+	"POST /api/reminders/agents/{sessionID}/switch": "switch an agent's reminders off or on",
+	"GET /api/chief/triggers":                       "read check triggers",
 	// #3668 (the board authorization audit): deleting a message, and pausing or resuming a board
 	// (the Operator's brake), are the Operator's.
 	"DELETE /api/board/{project}/messages/{messageID}": "delete a board message",
