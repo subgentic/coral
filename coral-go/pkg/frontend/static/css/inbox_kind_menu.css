@@ -1,0 +1,2 @@
+/* The measured Needs-you strip and its compact replacement share one visible control. */
+.inbox-kind-strip[hidden], .inbox-kind-menu[hidden] { display: none !important; }
