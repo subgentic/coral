@@ -116,7 +116,7 @@ function formatStaleness(seconds) {
  export const SESSION_STATES = {
     sleeping:       { label: 'Sleeping',       dot: 'sleeping',  pill: null,             pillClass: '',          chip: 'idle',        attention: false },
     stuck:          { label: 'Stuck',          dot: 'stuck',     pill: 'Stuck',          pillClass: 'stuck',     chip: 'error',       attention: true },
-    // The agent's CLI refuses to work (row.blocked, #13486): its turns end at once with no work, so it is neither Idle nor Ready for input. It wears Stuck's dot and pill (same shape without colour, same colour); the words say why.
+    // row.blocked (#13486): its CLI refuses to work, so neither Idle nor Ready; it wears Stuck's dot and pill, the words say why.
     blocked:        { label: 'Blocked',        dot: 'stuck',     pill: 'Blocked',        pillClass: 'stuck',     chip: 'error',       attention: true },
     needs_input:    { label: 'Needs input',    dot: 'waiting',   pill: 'Needs input',    pillClass: '',          chip: 'needs-input', attention: true },
     check_terminal: { label: 'Check terminal', dot: 'waiting',   pill: 'Check terminal', pillClass: '',          chip: 'needs-input', attention: true },
@@ -127,10 +127,11 @@ function formatStaleness(seconds) {
     // Waiting on a teammate's reply, a task or a commit (coral-board wait): calm, like
     // task_idle; nobody's input is needed (#3471). The label names what it waits on.
     waiting_on:     { label: 'Waiting on the board', dot: 'task-idle', pill: 'Waiting', pillClass: 'neutral', chip: 'idle', attention: false },
-    // Standing at a dialog Coral saw on the screen (a trust-this-folder prompt): not idle, and calm until it has stood the set minutes (then Needs you, #11430).
+    // At a dialog on the screen: not idle, calm until it has stood the set minutes (#11430).
     at_dialog:      { label: 'At a dialog',    dot: 'waiting',   pill: 'At a dialog',    pillClass: '',          chip: 'needs-input', attention: false },
     idle:           { label: 'Idle',           dot: 'stale',     pill: null,             pillClass: '',          chip: 'idle',        attention: false },
 };
+SESSION_STATES.compacting = { ...SESSION_STATES.working, label: 'Compacting' }; // row.compacting (#19090)
 
 /** Turn ended and the agent awaits its next instruction. Backend contract:
  *  `awaiting_user` (boolean, explicit). Servers without the field still send
@@ -162,7 +163,7 @@ export function deriveSessionState(s, opts = {}) {
     if (availability === 'waiting' && !s.working) return 'waiting_on';
     if (availability === 'task_idle') return 'task_idle';
     if (_isAwaitingUser(s)) return 'your_turn';
-    if (s.working) return 'working';
+    if (s.working) return s.compacting ? 'compacting' : 'working';
     return 'idle';
 }
 

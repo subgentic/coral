@@ -372,7 +372,7 @@ func (h *SessionsHandler) deliverHumanSend(ctx context.Context, name, agentType,
 				}
 				continue
 			}
-			if busy && ptymanager.InputBoxEmpty(screen) {
+			if (busy || ptymanager.CompactingOnScreen(screen)) && ptymanager.InputBoxEmpty(screen) {
 				return nil // typed to an agent in the middle of a turn, and its box is empty: queued behind its work (#4794). A box
 				// holding anything else (an image chip and the text the match above could not read, a draft) may still hold the message.
 			}
@@ -499,7 +499,7 @@ func (h *SessionsHandler) latestEvent(ctx context.Context, sessionID string) (id
 	if err != nil || len(events) == 0 {
 		return 0, false
 	}
-	return events[0].ID, events[0].EventType == "prompt_submit" || events[0].EventType == "tool_use"
+	return events[0].ID, events[0].EventType == "prompt_submit" || events[0].EventType == "tool_use" || events[0].EventType == "compact_start" // compacting: a message typed meanwhile is queued by the CLI, as in a turn (#19090)
 }
 
 // attachesImages reports whether a composer message has images attached: the composer puts their upload paths first

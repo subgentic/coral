@@ -640,6 +640,8 @@ var postableEventTypes = map[string]bool{
 	// #3481: a request to the user opened (PermissionRequest, Elicitation) or answered
 	// (ElicitationResult), and the agent's session ended.
 	"permission_request": true, "request_resolved": true, "session_end": true,
+	// #19090: the agent started compacting its conversation (Claude's PreCompact).
+	"compact_start": true,
 }
 
 // Limits on a posted event: a hook's summary is short and its detail a small JSON object

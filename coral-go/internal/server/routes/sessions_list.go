@@ -563,6 +563,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"notices_holding":       noticesHolding,
 		"needs_login":           state.NeedsLogin,
 		"awaiting_user":         state.AwaitingUser,
+		"compacting":            state.Compacting, // Claude's PreCompact until the compaction is over (#19090)
 		"not_started":           state.NotStarted,
 		"starting":              agentStarting(agent.AgentType, startedEv(latestEv, d.started[sid]), sessionAgeSeconds(lv.createdAt[sid]), lv.sleeping[sid], lv.archived[sid], state.NotStarted || startupReady),
 		"done":                  state.Done,
