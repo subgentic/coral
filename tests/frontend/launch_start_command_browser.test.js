@@ -1,5 +1,5 @@
 // #15951 (the Operator's ask): New agent shows the agent's exact start command before Launch, read off the server's own launch builder (POST /api/launch/permission-args answers `command`), with Coral's own values as
-// <placeholders>, a Copy button, and on a phone one line with "Show full command". It follows the choices. Isolated dev server at 1440 and 390 px, light and dark. Screenshots with CORAL_SCREENSHOT_DIR.
+// <placeholders>, a Copy button, and a Start command disclosure at every width. It follows the choices. Isolated dev server at 1440 and 390 px, light and dark. Screenshots with CORAL_SCREENSHOT_DIR.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { coralReady } = require('./helpers/wait');
@@ -50,10 +50,9 @@ const { install: installNA, stubModels, stubCliChecks } = require('./helpers/new
             const g = await ev(`(() => { const r = document.querySelector('#launch-recap .launch-recap-command'); if (!r) return null; const b = [...r.querySelectorAll('button')].map(x => ({ t: x.textContent.trim(), shown: x.getClientRects().length > 0 })); return { label: r.querySelector('.lrc-label').textContent, buttons: b, editable: !!r.querySelector('input,textarea,[contenteditable]') }; })()`);
             if (!g) problems.push(label + ': no start command row'); else {
                 if (g.label !== 'Start command' || g.editable) problems.push(label + ': the row is not a read-only "Start command": ' + JSON.stringify(g));
-                const copy = g.buttons.find(x => x.t === 'Copy'), more = g.buttons.find(x => x.t === 'Show full command');
+                const copy = g.buttons.find(x => x.t === 'Copy'), more = g.buttons.find(x => x.t === 'Start command');
                 if (!copy || !copy.shown) problems.push(label + ': no Copy button');
-                if (mobile && !(more && more.shown)) problems.push(label + ': a phone has no Show full command');
-                if (!mobile && more && more.shown) problems.push(label + ': Show full command is shown on a wide screen');
+                if (!(more && more.shown)) problems.push(label + ': no Start command disclosure');
             }
             // Copy puts exactly the line on the clipboard
             await ev(`window.__copied = null; try { Object.defineProperty(navigator, 'clipboard', { value: { writeText: async t => { window.__copied = t; } }, configurable: true }); } catch {} true`);
@@ -65,17 +64,14 @@ const { install: installNA, stubModels, stubCliChecks } = require('./helpers/new
                 if (!(await ev(fits))) problems.push(`${label}/${theme}: the page scrolls sideways`);
                 const vis = await ev(`(() => { const row = document.querySelector('#launch-recap .launch-recap-command'), rec = document.getElementById('launch-recap'), a = row.getBoundingClientRect(), b = rec.getBoundingClientRect(); return { inRecap: a.top >= b.top - 1 && a.bottom <= b.bottom + 1, inViewport: a.bottom <= window.innerHeight + 1 && a.top >= 0, w: a.width }; })()`);
                 if (!vis.inRecap || !vis.inViewport) problems.push(`${label}/${theme}: the start command row is cut off or off screen: ` + JSON.stringify(vis));
-                if (mobile) {
-                    const one = await ev(`(() => { const t = document.querySelector('#launch-recap .lrc-text'); const cs = getComputedStyle(t); return { nowrap: cs.whiteSpace === 'nowrap', cut: t.scrollWidth > t.clientWidth, h: t.getBoundingClientRect().height }; })()`);
-                    if (!one.nowrap || !one.cut) problems.push(`${label}/${theme}: the line is not collapsed to one: ${JSON.stringify(one)}`);
-                }
+                if (await ev(`!!document.querySelector('#launch-recap .lrc-text').getClientRects().length`)) problems.push(label + ': command is not collapsed by default');
                 await shot(`start-command-${label}-${theme}`);
             }
-            if (mobile) {
+            {
                 await ev(`document.querySelector('#launch-recap .lrc-more').click(); true`);
                 const open = await ev(`(() => { const m = document.querySelector('#launch-recap .lrc-more'), t = document.querySelector('#launch-recap .lrc-text'); return { expanded: m.getAttribute('aria-expanded'), label: m.textContent.trim(), wraps: getComputedStyle(t).whiteSpace !== 'nowrap', fits: ${fits} }; })()`);
-                if (open.expanded !== 'true' || open.label !== 'Show less' || !open.wraps || !open.fits) problems.push('390: Show full command does not open the whole line: ' + JSON.stringify(open));
-                await shot('start-command-390-open');
+                if (open.expanded !== 'true' || open.label !== 'Start command' || !open.wraps || !open.fits) problems.push(label + ': Start command does not open the whole line: ' + JSON.stringify(open));
+                await shot('start-command-' + label + '-open');
             }
             // #18568 (the Operator, rc3): the recap and the start command belong to the model step only: going back, the persona and folder steps have none
             const seen = {};
@@ -89,6 +85,6 @@ const { install: installNA, stubModels, stubCliChecks } = require('./helpers/new
             console.log(`   ${label} done`);
         }
         assert.deepEqual(problems, [], problems.join('\n'));
-        console.log('PASS New agent: the start command, read off the launch builder, with Copy, collapsed on a phone');
+        console.log('PASS New agent: the start command, read off the launch builder, with Copy, collapsed at every width');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
