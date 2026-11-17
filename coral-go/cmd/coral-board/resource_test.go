@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
-	"syscall"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
