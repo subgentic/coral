@@ -83,3 +83,6 @@
 .inbox-sent-back-ask { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: var(--fs-sm); } /* one line of what was asked for */
 .inbox-sent-back-ask[hidden] { display: none; }
 @media (max-width: 760px) { .inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-sent-back { grid-area: more; justify-self: start; } .inbox-needs-results .inbox-review-item.inbox-agent-first > .inbox-sent-back-ask { grid-column: 1 / -1; } } /* a phone row is a grid: the chip takes the line under the title, the ask the full width */
+
+/* An opened question (#16680): its points and choices each on a line of their own (the words carry the breaks), and a line of words no wider than about 90 characters. */
+.inbox-ask-words, .inbox-agent-ask > .inbox-ask-whole { display: block; white-space: pre-line; max-width: 90ch; }
