@@ -417,7 +417,7 @@ class T(unittest.TestCase):
         cfg = gate_check.load_config(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".github", "gate.json"))
         for n in ("go-tests", "go-race", "cdp-gate"):
             self.assertIn(n, cfg["always"], "dropping a heavy gate from gate.json needs the owner: the known-red input is the way to accept a red suite (#8643)")
-        self.assertEqual(cfg.get("cdp_parts"), 9, "the cdp-gate matrix has nine parts")
+        self.assertEqual(cfg.get("cdp_parts"), 10, "the cdp-gate matrix has ten parts")
 
     def test_main_rejects_a_bad_argument_before_any_request(self):
         for argv in (["x"], ["x", "a/b", "c" * 40], ["x", "a/b", "c" * 40, "bad actor;rm"], ["x", "a b", "c" * 40, "ok"], ["x", "a/b", "zz", "ok"]):
