@@ -42,7 +42,7 @@ const { coralReady } = require('./helpers/wait');
             // (1) names: the choice and the agent
             const names = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => [...r.querySelectorAll('button')].map(b => b.getAttribute('aria-label') || b.textContent.trim()))`);
             const want = w >= 768 ? [['Open qa', 'Answer Red for qa', 'Answer Blue for qa', 'More actions for qa', 'Dismiss: qa'], ['Open dev', 'Answer Red for dev', 'Answer Blue for dev', 'More actions for dev', 'Dismiss: dev']] : [['Open qa', 'Answer Red for qa', 'Answer Blue for qa', 'Dismiss the wait of qa'], ['Open dev', 'Answer Red for dev', 'Answer Blue for dev', 'Dismiss the wait of dev']]; // N5 (#17451): a computer's Dismiss is in the row's kebab (its menu item is the last)
-            
+
             if (JSON.stringify(names) !== JSON.stringify(want)) problems.push(`${w}: each button's name says the agent and the choice, in reading order: ${JSON.stringify(names)}`);
             // (2) Tab order: from the first choice through the row and on to the next row's
             await ev(`document.querySelector('#group-table-view tbody tr .dt-primary').focus(); true`);
