@@ -121,7 +121,9 @@ func (h *SessionsHandler) OrchestratorGrant(w http.ResponseWriter, r *http.Reque
 		if !g.Enabled {
 			seat = cur.SeatSession
 		}
-		h.tellSeatOfChange(r.Context(), project, seat, g.Enabled)
+		h.tellSeatOfChange(r.Context(), project, seat, launchAbility, func(a *teamAbilities) { a.MayLaunch = g.Enabled })
+	} else if g.Enabled && cur.StopEnabled != g.StopEnabled { // the stop switch flipped while the main one stays on: the seat is told its stop line (#17710)
+		h.tellSeatOfChange(r.Context(), project, g.SeatSession, stopAbility, func(a *teamAbilities) { a.MayLaunch, a.MayStop = true, g.StopEnabled })
 	}
 	saved, _ := h.bs.GetOrchGrant(r.Context(), project)
 	writeJSON(w, http.StatusOK, saved)
