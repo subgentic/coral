@@ -102,3 +102,27 @@ func TestBoardSearchPrintsOtherPeoplesWordsWithoutControlCharacters(t *testing.T
 	assert.NotContains(t, res.stdout, "\x07")
 	assert.Contains(t, res.stdout, "canary")
 }
+
+const searchWorkReply = `{"board":"b-own","reach":"own","more":true,"limit":3,"messages":[],"results":[
+ {"source":"task","id":19161,"title":"coral-search slice 1","snippet":"body with a\nnarwhal in it","state":"in_progress","goal_id":244,"at":"2026-11-17T08:16:27Z"},
+ {"source":"goal","id":244,"title":"coral-search","snippet":"zebrafish outcome","state":"active","at":"2026-11-17T08:00:00Z"}]}`
+
+// #19161: --source, --state, --goal and --assignee are sent, and the one result list prints a hit a line with its source, id and state; --json is the server's answer as it is.
+func TestBoardSearchSendsTheWorkFiltersAndPrintsTasksAndGoals(t *testing.T) {
+	gs := newGoalServer(t)
+	gs.setReply("GET /api/agent/board/search", searchWorkReply)
+	res := goalRun(t, gs, "search", "narwhal", "--source", "tasks,goals", "--state", "in_progress", "--goal", "244", "--assignee", "Dev")
+	require.Equal(t, 0, res.code, res.stderr)
+	reqs := gs.requests()
+	for _, want := range []string{"source=tasks%2Cgoals", "state=in_progress", "goal=244", "assignee=Dev"} {
+		assert.Contains(t, reqs[len(reqs)-1], want)
+	}
+	for _, want := range []string{"task #19161 2026-11-17 08:16 [in_progress]  coral-search slice 1: body with a narwhal in it", "goal #244 2026-11-17 08:00 [active]", "There are more", "coral-board task detail"} {
+		assert.Contains(t, res.stdout, want)
+	}
+	res = goalRun(t, gs, "search", "narwhal", "--json")
+	require.Equal(t, 0, res.code, res.stderr)
+	var out map[string]any
+	require.NoError(t, json.Unmarshal([]byte(res.stdout), &out))
+	assert.Len(t, out["results"], 2)
+}
