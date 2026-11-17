@@ -84,7 +84,7 @@ function suggestAgentName(input) {
 
 /** Sets both Backend selects (Terminal step, New agent's hidden one) to what the server runs: a pty server must not show tmux (#16409). Nothing changes if the status does not answer. */
 function _preselectBackend() {
-    fetch('/api/system/terminal-backend').then(r => r.ok ? r.json() : null).then(st => {
+    serverFetch(_effectiveServer(launch.server), '/api/system/terminal-backend').then(r => r.ok ? r.json() : null).then(st => {
         const b = st && (st.forced ? st.running : (st.next || st.running));
         if (b !== 'tmux' && b !== 'pty') return;
         for (const id of ['launch-terminal-backend', 'launch-backend']) { const sel = document.getElementById(id); if (sel && [...sel.options].some(o => o.value === b)) sel.value = b; }
