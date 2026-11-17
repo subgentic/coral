@@ -55,6 +55,7 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 	areas := fs.String("areas", "", "The review's areas, comma-separated (submit-review): who may take it from the review pool")
 	reviewers := fs.Int("reviewers", 0, "How many reviewers the review wants, 1 or 2 (submit-review)")
 	head := fs.String("head", "", "The commit you submit (submit-review; default: HEAD of the repository you run it in). A resubmit of the commit a reviewer rejected is refused")
+	branch := fs.String("branch", "", "The branch you submit, when --head is not given (submit-review): its tip is the commit; needed when you run it from the shared checkout")
 	noTests := fs.String("no-tests", "", "Why the note carries no test result, e.g. a docs-only change (submit-review)")
 	clihelp.ParseFlags(fs, args[1:], func() string { return commandUsage(os.Args[1], os.Args[2:]) })
 	*message = flagText(*message, "completion message")
@@ -89,10 +90,18 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 	}
 	if action == "submit-review" {
 		h := strings.TrimSpace(*head)
+		if h == "" && strings.TrimSpace(*branch) != "" {
+			h = branchHead(strings.TrimSpace(*branch))
+			if h == "" {
+				fmt.Fprintf(os.Stderr, "no branch %q here: name the commit with --head <sha>\n", *branch)
+				clierr.Exit1()
+			}
+		}
 		if h == "" {
 			h = worktreeHead()
-			if h != "" {
-				announceHead(os.Stderr, "", h)
+			if h != "" && !announceHead(os.Stderr, "", h) {
+				fmt.Fprintln(os.Stderr, "refusing to submit this folder's HEAD: it is the shared checkout or main, not your work. Name the commit with --head <sha> or the branch with --branch <name>")
+				clierr.Exit1()
 			}
 		}
 		if h != "" {
@@ -386,7 +395,7 @@ func worktreeHead() string {
 // announceHead says on stderr which commit, from which folder, goes to the review, and warns when that folder is not a task worktree: the shared
 // checkout (it has no linked-worktree .git file) or a branch named main. A head taken from the wrong folder is stored and a later unchanged resubmit
 // is refused for it (#18457; the task's own branch is not known here, so the check is on the folder).
-func announceHead(w io.Writer, dir, h string) {
+func announceHead(w io.Writer, dir, h string) (ok bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	git := func(args ...string) string {
@@ -402,7 +411,21 @@ func announceHead(w io.Writer, dir, h string) {
 	shared := git("rev-parse", "--git-dir") == git("rev-parse", "--git-common-dir")
 	if shared || branch == "main" || branch == "master" {
 		fmt.Fprintf(w, "warning: this is %s (branch %q), not a worktree of the task's branch: if %s is not the commit you mean, resubmit with --head <sha>\n", map[bool]string{true: "the shared checkout", false: "a worktree"}[shared], branch, h[:min(len(h), 10)])
+		return false
 	}
+	return true
+}
+
+// branchHead is the tip of a branch (local, else origin's), or "" when there is none (#19263).
+func branchHead(name string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	for _, ref := range []string{"refs/heads/" + name, "refs/remotes/origin/" + name} {
+		if out, err := gitutil.Command(ctx, "", "rev-parse", "--verify", "-q", ref+"^{commit}").Output(); err == nil {
+			return strings.TrimSpace(string(out))
+		}
+	}
+	return ""
 }
 
 // testResultLine matches a line of a test run pasted into a note: pass/fail counts, PASS/FAIL, a go test "ok  pkg" line or an exit code (#18292).
