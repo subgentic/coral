@@ -21,8 +21,18 @@ type TaskReminders struct {
 	logger   *slog.Logger
 	discover func(ctx context.Context) ([]AgentInfo, error)
 	deliver  func(ctx context.Context, a AgentInfo, key, text string) error
+	sink     func(ctx context.Context, project string, a AgentInfo, taskID int64, text string, at time.Time) error
 	now      func() time.Time
 	Interval time.Duration
+}
+
+// SetReminderSink sends each due task reminder through the reminders machinery (#19350) instead of
+// typing it directly: the sink is given the live agent and the words, and saves a one-time reminder
+// for it (origin "task"), so the Operator's off switch holds it, it is caught up after a restart and
+// it shows in 'coral-board remind list'. The task's own rules (open, not parked, once, the board's
+// limits) stay here.
+func (t *TaskReminders) SetReminderSink(sink func(ctx context.Context, project string, a AgentInfo, taskID int64, text string, at time.Time) error) {
+	t.sink = sink
 }
 
 // NewTaskReminders checks for due reminders every 30 seconds.
@@ -93,7 +103,11 @@ func (t *TaskReminders) RunOnce(ctx context.Context) {
 		if target != "" {
 			if sub, err := t.store.GetProjectSubscription(ctx, project, target); err == nil && sub != nil {
 				if a, live := bySession[sub.SessionName]; live {
-					delivered = t.deliver(ctx, a, fmt.Sprintf("task-reminder:%s:%d", project, task.ID), taskReminderText(task.ID, at)) == nil
+					if t.sink != nil {
+						delivered = t.sink(ctx, project, a, task.ID, taskReminderText(task.ID, at), at) == nil
+					} else {
+						delivered = t.deliver(ctx, a, fmt.Sprintf("task-reminder:%s:%d", project, task.ID), taskReminderText(task.ID, at)) == nil
+					}
 				}
 			}
 		}

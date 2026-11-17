@@ -20,6 +20,7 @@ const { rowFocusTarget, el } = await importOnce('./team_table.js'); // lazy modu
 const DT = await importOnce('./data_table.js');
 const { statusMark } = await importOnce('./status_mark.js'); // lazy like this page: a lazy module is loaded through importOnce (import_hygiene)
 const { mountAgentReviewSettings } = await importOnce('./agent_review_settings.js');
+const { mountAgentReminders } = await importOnce('./agent_reminders.js');
 let agentsTableState = DT.tableState();
 
 // The chips: the statuses people look for first; any other status that has agents gets its own chip after them.
@@ -321,6 +322,7 @@ export function renderAgentPage(host, agent, ctx) {
     foldWayBack(page, '.goals-back', '.goals-detail-title');
     host.append(page);
     if (agent.agent_type !== 'terminal') mountAgentReviewSettings(page, model.team, agent.subscriber_id || agent.name);
+    if (agent.agent_type !== 'terminal' && agent.session_id) mountAgentReminders(page, model.team, agent).catch(() => {}); // the Operator's reminders for it (#19350); none through the Hub
     h.focus({ preventScroll: true });
 }
 
