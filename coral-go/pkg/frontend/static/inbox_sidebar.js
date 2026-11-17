@@ -702,7 +702,7 @@ const savedState = DT.tableState(); // one word set for a task's state (Queued, 
 const goalsState = DT.tableState();
 let taskFilters = { ...TF.EMPTY }, taskState = 'all', taskBar = null;
 const wh = { tasks: new Set(), goals: new Set() }, noteWorkSearch = (k, q) => importOnce('./work_search.js').then(m => m.noteWork(wh, k, q, k === 'tasks' ? tasks : goals, () => renderInboxNav(true))); // work_search.js (#19237)
-const taskMatches = t => serverMatches(t, taskFilters) && (!queries.tasks || taskText(t).includes(queries.tasks.toLowerCase()) || wh.tasks.has(`${t.project}#${t.id}`))
+const taskMatches = t => serverMatches(t, taskFilters) // the source query matches body text as well as the title (#17325, #19237)
     && (!taskFilters.team || t.project === taskFilters.team)
     && (!taskFilters.priority || t.priority === taskFilters.priority)
     && (!taskFilters.from || Date.parse(t.updated_at || t.created_at) >= new Date(taskFilters.from + 'T00:00:00').getTime());
