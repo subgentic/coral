@@ -44,8 +44,8 @@ function row(icon, label, count, run, current = false, countContext = {}) {
     const i = folderGlyph(icon);
     b.append(i, el('span', 'nav-drawer-label', label));
     if (typeof count === 'string' && count) b.append(el('span', 'nav-drawer-count', count)); // Needs you says '0 of 3'
-    else if (count > 0) b.append(el('span', 'nav-drawer-count', count > 99 ? '99+' : String(count)));
-    if ((typeof count === 'string' && count) || count > 0 || (label === 'Needs you' && count === 0)) b.setAttribute('aria-label', `${label}, ${countWords(label, count, countContext)}`);
+    else if (count > 0 || (count === 0 && countContext.known)) b.append(el('span', 'nav-drawer-count', count > 99 && !countContext.known ? '99+' : String(count)));
+    if ((typeof count === 'string' && count) || count > 0 || (count === 0 && (label === 'Needs you' || countContext.known))) b.setAttribute('aria-label', `${label}, ${countWords(label, count, countContext)}`);
     b.querySelector('.nav-drawer-count')?.setAttribute('aria-hidden', 'true'); // the full contextual count is in the item's accessible name
     b.addEventListener('click', run);
     return b;
@@ -101,8 +101,8 @@ export function drawerTop() {
         const rows = state.inboxFolderRows?.(); // every folder of the Inbox, as its sidebar lists them (#13596: a phone has no tab strip)
         if (rows) {
             for (const sec of rows.sections) {
-                if (sec.title && rows.sections.length > 1 && sec.items.length > 1) out.push(heading('nav-drawer-group', sec.title));
-                for (const it of sec.items) out.push(row(/^[a-z0-9_:-]+$/.test(it.icon || '') ? it.icon : 'folder', it.label, it.count, () => { window.switchNavTab?.('hub-inbox'); importOnce('./inbox_tab.js').then(() => rows.pick(it.key)); }, it.key === rows.current, { unread: it.unread }));
+                if (sec.title && rows.sections.length > 1) out.push(heading('nav-drawer-group', sec.title));
+                for (const it of sec.items) out.push(row(/^[a-z0-9_:-]+$/.test(it.icon || '') ? it.icon : 'folder', it.label, it.count, () => { window.switchNavTab?.('hub-inbox'); importOnce('./inbox_tab.js').then(() => rows.pick(it.key)); }, it.key === rows.current, { unread: it.unread, known: true }));
             }
         } else {
             const c = inboxCountsNow();
