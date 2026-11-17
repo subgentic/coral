@@ -43,9 +43,10 @@ func (h *AgentDocsHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type docEntry struct {
-		Name    string `json:"name"`
-		Title   string `json:"title"`
-		Summary string `json:"summary,omitempty"`
+		Name     string `json:"name"`
+		Title    string `json:"title"`
+		Summary  string `json:"summary,omitempty"`
+		Subtitle string `json:"subtitle,omitempty"` // the heading's words after its colon ("a user guide"): what tells two topics of one title apart (#19412)
 	}
 
 	docs := []docEntry{} // [] when there are none, never null: the Docs tab reads null as a failed load
@@ -54,7 +55,7 @@ func (h *AgentDocsHandler) List(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		name := strings.TrimSuffix(e.Name(), ".md")
-		docs = append(docs, docEntry{Name: name, Title: docTitle(h.docsFS, e.Name(), name), Summary: docSummary(h.docsFS, e.Name())})
+		docs = append(docs, docEntry{Name: name, Title: docTitle(h.docsFS, e.Name(), name), Summary: docSummary(h.docsFS, e.Name()), Subtitle: docSubtitle(h.docsFS, e.Name())})
 	}
 	sort.Slice(docs, func(i, j int) bool {
 		// README first, then alphabetical
@@ -176,6 +177,15 @@ func docTitle(docs fs.FS, file, name string) string {
 		return listTitle(sentenceCase(h))
 	}
 	return listTitle(sentenceCase(strings.ReplaceAll(name, "-", " ")))
+}
+
+// docSubtitle is what follows the first colon of a doc's heading, in lower case as written ("Chief: a user guide" gives "a user guide"), or "".
+func docSubtitle(docs fs.FS, file string) string {
+	_, after, ok := strings.Cut(firstHeading(docs, file), ":")
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(after)
 }
 
 // docTitleSoftCap: a list row is one short line. A title is taken up to its first colon or opening bracket, then words are added while it is shorter than this many characters (36: "Recover a task awaiting completion review" stays whole, "Coordination efficiency reporting & metrics architecture" is cut), so the word that crosses it
