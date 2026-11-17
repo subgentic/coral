@@ -410,6 +410,8 @@ func reminderSetter(ch *store.ChiefCheck, names []string) string {
 	switch ch.Origin {
 	case "agent":
 		return "you"
+	case "task":
+		return "a task's reminder time"
 	case "orchestrator":
 		who := board.DefuseMentions(strings.Join(strings.Fields(clitext.Clean(ch.CreatedBy)), " "), names)
 		if who == "" {

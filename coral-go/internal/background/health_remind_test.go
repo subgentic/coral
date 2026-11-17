@@ -133,3 +133,31 @@ func TestTaskRemindersStayWithinTheLimits(t *testing.T) {
 	}
 	assert.Empty(t, ids, "none lost, none twice")
 }
+
+// #19350: with a sink set, a due task reminder is handed to the reminders machinery, once, instead of being typed directly.
+func TestTaskReminderGoesToTheRemindersSinkOnce(t *testing.T) {
+	ctx := context.Background()
+	s := healthMonitorStore(t)
+	sid := fmt.Sprintf("%08d-0000-0000-0000-000000000000", 2)
+	_, err := s.Subscribe(ctx, "team", "Dev", "Developer", naming.SessionName("claude", sid), nil, "all")
+	require.NoError(t, err)
+	agents := []AgentInfo{{AgentType: "claude", SessionID: sid, DisplayName: "Dev"}}
+	now := time.Now()
+	r := NewTaskReminders(s, nil, func(context.Context) ([]AgentInfo, error) { return agents, nil })
+	r.now = func() time.Time { return now }
+	r.deliver = func(context.Context, AgentInfo, string, string) error { t.Fatal("typed directly"); return nil }
+	var got []string
+	r.SetReminderSink(func(_ context.Context, project string, a AgentInfo, id int64, text string, _ time.Time) error {
+		got = append(got, fmt.Sprintf("%s|%s|%d|%s", project, a.SessionID, id, text))
+		return nil
+	})
+	tk, err := s.CreateTask(ctx, "team", "soak", "", "medium", "Dev", "Dev")
+	require.NoError(t, err)
+	require.NoError(t, s.SetTaskRemindAt(ctx, "team", tk.ID, now.Add(time.Minute)))
+	now = now.Add(2 * time.Minute)
+	r.RunOnce(ctx)
+	r.RunOnce(ctx)
+	require.Len(t, got, 1, "once")
+	assert.Contains(t, got[0], fmt.Sprintf("|%d|", tk.ID))
+	assert.Contains(t, got[0], "Reminder for #")
+}
