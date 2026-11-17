@@ -86,7 +86,6 @@ function mark(id) {
     document.dispatchEvent(new CustomEvent('coral:welcome-changed'));
 }
 
-export const dismissWelcome = id => mark(id);
 /** An item's own action. */
 export async function runWelcome(id) {
     if (id === 'welcome') { mark('welcome'); return; }

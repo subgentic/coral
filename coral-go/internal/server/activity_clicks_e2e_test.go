@@ -304,3 +304,43 @@ func TestRowsNameWhatTheirClickMadeAndTheKindOfRun(t *testing.T) {
 	}
 
 }
+
+// #17410: a welcome item's Dismiss is a row that says which item, and Restore (it comes off the dismissed list again) is no dismissal.
+func TestDismissingAWelcomeItemNamesItAndRestoringRecordsNothing(t *testing.T) {
+	srv, ts, _ := strictServer(t, false)
+	ctx := context.Background()
+	put := func(body string) {
+		t.Helper()
+		req, err := http.NewRequest("PUT", ts.URL+"/api/settings", strings.NewReader(body))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Origin", ts.URL)
+		req.Header.Set("Sec-Fetch-Site", "same-origin")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Less(t, resp.StatusCode, 300)
+	}
+	rows := func() []board.OperatorAction {
+		got, _, err := srv.boardStore.ActivityPage(ctx, board.ActivityFilter{Limit: board.ActivityMaxLimit})
+		require.NoError(t, err)
+		return got
+	}
+	put(`{"inbox_welcome_done":"agent","inbox_welcome_dismissed":"agent"}`)
+	got := rows()
+	require.Len(t, got, 1)
+	require.Equal(t, board.ActInboxHide, got[0].Action)
+	require.Equal(t, "Start your first agent", got[0].Title, "the row names the item that was dismissed")
+	put(`{"inbox_welcome_done":"","inbox_welcome_dismissed":"","inbox_welcome":"on"}`)
+	count := func() (n int) { // a restore is still a settings change in Activity (#18620's generic row), but not another dismissal: count the Dismiss rows
+		for _, r := range rows() {
+			if r.Action == board.ActInboxHide {
+				n++
+			}
+		}
+		return
+	}
+	require.Equal(t, 1, count(), "Undo / Restore is not another dismissal")
+	put(`{"inbox_welcome_done":"guide","inbox_welcome_dismissed":""}`) // the dismissed list as it was: the done list's new item is still a Dismiss
+	require.Equal(t, 2, count(), "a Dismiss that leaves the dismissed list unchanged is still a row")
+}
