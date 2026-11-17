@@ -115,7 +115,7 @@ func machineFixture(t *testing.T) (tokenFile, keyFile string, p *machineStubProv
 		return p, nil
 	}
 	newMachineHub = func(baseURL, key, destroyKey string) machinelaunch.Minter { h.destroyKey = destroyKey; return h }
-	machineUserData = func(keys *machinelaunch.BootKeys, sshFrom, maxMode, version string, digests machinelaunch.ReleaseDigests, hubURL string, agents []string) (string, error) {
+	machineUserData = func(keys *machinelaunch.BootKeys, sshFrom, maxMode, version string, digests machinelaunch.ReleaseDigests, hubURL string, agents []string, egressSelfTest bool) (string, error) {
 		return "#cloud-config\n# " + sshFrom + " " + maxMode + " " + version + " " + strings.Join(agents, ",") + " " + digests.AMD64 + "\n", nil
 	}
 	t.Cleanup(func() {
@@ -218,7 +218,7 @@ func TestMachineLaunchWarnsWhenTheHubIsNotThisBuildsDefault(t *testing.T) {
 // no Hub key and no private key, and carries the launch's public login key and the address SSH accepts; a pinned agy installer and the npm CLIs are accepted.
 func TestMachineLaunchBuildsTheRealUserDataWithNoCredential(t *testing.T) {
 	tf, kf, p, h := machineFixture(t)
-	machineUserData = func(keys *machinelaunch.BootKeys, sshFrom, maxMode, version string, digests machinelaunch.ReleaseDigests, hubURL string, agents []string) (string, error) {
+	machineUserData = func(keys *machinelaunch.BootKeys, sshFrom, maxMode, version string, digests machinelaunch.ReleaseDigests, hubURL string, agents []string, egressSelfTest bool) (string, error) {
 		spec := machinelaunch.UserDataSpec{AllowSSHFrom: sshFrom, MaxMode: maxMode, CoralVersion: version, CoralDigests: digests, HubURL: hubURL, Agents: agents}
 		if err := keys.FillUserData(&spec); err != nil {
 			return "", err
@@ -485,6 +485,31 @@ func TestMachineLaunchSaysThatNPMContentIsNotHashVerified(t *testing.T) {
 		got := strings.Contains(errb.String(), "NOT yet hash-verified") && strings.Contains(errb.String(), "install scripts OFF")
 		if got != want {
 			t.Errorf("%s: note %v, want %v: %s", entries, got, want, errb.String())
+		}
+	}
+}
+
+// #13575: --egress-self-test is off unless it is given, and the user-data of a launch that did not give it never mentions the self-test.
+func TestMachineLaunchEgressSelfTestIsOptIn(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want bool
+	}{{nil, false}, {[]string{"--egress-self-test"}, true}} {
+		tf, kf, p, _ := machineFixture(t)
+		machineUserData = func(keys *machinelaunch.BootKeys, sshFrom, maxMode, version string, digests machinelaunch.ReleaseDigests, hubURL string, agents []string, egressSelfTest bool) (string, error) {
+			spec := machinelaunch.UserDataSpec{AllowSSHFrom: sshFrom, MaxMode: maxMode, CoralVersion: version, CoralDigests: digests, HubURL: hubURL, Agents: agents, EgressSelfTest: egressSelfTest}
+			if err := keys.FillUserData(&spec); err != nil {
+				return "", err
+			}
+			return machinelaunch.BuildUserData(spec)
+		}
+		var out, errb bytes.Buffer
+		args := append([]string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3", "--allow-ssh-from", "9.9.9.9", "--yes"}, tc.args...)
+		if code := runMachine(args, strings.NewReader(""), &out, &errb); code != 0 {
+			t.Fatalf("%v: exit %d: %s / %s", tc.args, code, out.String(), errb.String())
+		}
+		if got := strings.Contains(p.spec.UserData, "coral-egress-selftest"); got != tc.want {
+			t.Fatalf("%v: the user-data mentions the self-test: %v, want %v", tc.args, got, tc.want)
 		}
 	}
 }
