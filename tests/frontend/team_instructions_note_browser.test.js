@@ -46,7 +46,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`const c = ${form}.querySelector('[name=dependency_guidance]'); c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); true`);
         await submit();
         const note2 = await status();
-        assert.match(note2, /^Saved\. Working mode applies on first claim\./, note2);
+        assert.match(note2, /^Saved\. Working mode applies to tasks agents claim from now on[;.]/, note2);
         assert.doesNotMatch(note2, /Additional instructions/, note2);
         console.log('PASS the save note names what was saved');
     } finally {

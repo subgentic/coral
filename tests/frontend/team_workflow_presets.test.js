@@ -124,7 +124,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     await statusSet();
 
     const teamSaveStatus = await ev(`document.querySelector('#team-settings-workspace .sv-status').textContent`);
-    assert.ok(teamSaveStatus.includes('Saved. Working mode applies on first claim'), `Team settings saved: ${teamSaveStatus}`);
+    assert.ok(teamSaveStatus.includes('Saved. Working mode applies to tasks agents claim from now on'), `Team settings saved: ${teamSaveStatus}`);
 
     console.log('✓ Team working mode selection with custom preset saved');
 
