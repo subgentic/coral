@@ -29,7 +29,7 @@ const BASE = require('./test_base').BASE;
         };
         await inspect('before fields');
         await ev(`window.__releaseChat(); true`);
-        await waitFor(`!!document.querySelector('${T} .inbox-open-agent') && !!document.querySelector('${T} .inbox-dismiss')`, 'chat fallback actions');
+        await waitFor(`!!document.querySelector('${T} .inbox-open-agent') && !!document.querySelector('${T} .inbox-row-more-toggle')`, 'chat fallback actions');
         await inspect('after chat');
         await ev(`(async () => { const { state } = await import(${S} + 'state.js'); state.liveSessions = [{ ...window.__waiting, display_name: 'Frontend Dev', waiting_summary: 'Review the component' }]; (await import(${S} + 'inbox_tab.js')).updateInboxTab(); return true; })()`);
         await waitFor(`document.querySelector('${T} td[data-key=agent]')?.textContent.includes('Frontend Dev')`, 'fields arrive');
