@@ -290,7 +290,8 @@ function fill(s, cell, withDismiss = true) {
             note.append('Folder: ', path, '. Yes adds this folder to Claude’s own trust list.');
             cell.append(note);
         }
-        for (const o of picks) {
+        const shown = picks.length > 3 ? picks.slice(0, 2) : picks; // N5 (#19247): more than three choices: the first two, then More choices, which opens the agent
+        for (const o of shown) {
             const b = document.createElement('button');
             b.type = 'button'; b.className = 'btn btn-small inbox-answer'; b.textContent = o.label.length > 500 ? `${o.label.slice(0, 499).trimEnd()}\u2026` : o.label; b.title = o.label; // the whole label is the title and the name; only after 500 characters is the words cut (#14574)
             b.dataset.session = s.session_id; b.dataset.n = String(Number(o.n)); // what finds this choice again after a redraw keeps the keyboard on it (sidebar_groups.js)
@@ -302,6 +303,7 @@ function fill(s, cell, withDismiss = true) {
             b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
             cell.append(b);
         }
+        if (shown !== picks) { const m = document.createElement('button'); m.type = 'button'; m.className = 'btn btn-small inbox-more-choices'; m.textContent = 'More choices'; m.setAttribute('aria-label', `More choices: open ${resolveSessionIdentity(s)} to see all ${picks.length}`); m.addEventListener('click', e => { e.stopPropagation(); openAgent(s); }); m.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }); cell.append(m); }
         gate?.apply();
         if (held) { const more = document.createElement('span'); more.className = 'inbox-only-reject'; more.textContent = trustWhy ? `Folder trust is unavailable here. ${trustWhy} Open the agent to review it.` : 'More choices: open the agent.'; cell.append(more);
             if (typeof trustWhy === 'string') { const r = document.createElement('button'); r.type = 'button'; r.className = 'btn btn-small inbox-review-trust'; r.textContent = 'Review and trust'; r.setAttribute('aria-label', `Review and trust the folder of ${resolveSessionIdentity(s)}`); // the full card in a dialog over the Inbox, with Yes, I trust this folder (#15090; the row keeps #14110's rule)
@@ -405,4 +407,15 @@ export function waitingCell(s, hidden, byAgent) {
     span.append(...(late ? [mk('span', 'material-icons inbox-age-flag', 'warning')] : []), mk('span', 'inbox-age-t', t), mk('span', 'sr-only', late ? ' waiting, late' : ' waiting'));
     if (late) span.firstChild.setAttribute('aria-hidden', 'true');
     return span;
+}
+
+/** N3 (#19247): a row's goal and task as ONE grey line under its text: two links, the goal first, each opening in the Inbox. `link` and `go` come from the list, so this file never imports it. */
+export function goalTaskLine(s, link, go, team) {
+    const g = s.goal && s.goal.id && s.goal.title ? s.goal : null, t = s.task && s.task.id ? s.task : null;
+    if (!team || (!g && !t)) return null;
+    const box = mk('span', 'inbox-goal-task');
+    if (g) { const l = link(String(g.title), () => go({ view: 'inbox-goals', sub: 'goals', id: team, item: Number(g.id) })); l.setAttribute('aria-label', `Goal: ${g.title}`); l.dataset.goalId = String(g.id); l.title = `Goal: ${g.title}`; box.append(l); }
+    if (g && t) box.append(mk('span', 'inbox-goal-task-sep', ' \u00b7 '));
+    if (t) { const l = link(String(t.title || `Task #${t.id}`), () => go({ view: 'inbox-tasks', sub: 'tasks', id: team, item: t.id })); l.setAttribute('aria-label', `Task: ${t.title || '#' + t.id}`); l.dataset.taskId = String(t.id); l.title = `Task: ${t.title || '#' + t.id}`; box.append(l); }
+    return box;
 }
