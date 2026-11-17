@@ -79,14 +79,14 @@ export function isOperatorId(id) { return id === 'Operator' || id === 'dashboard
  *  machine falls back to a hidden textarea. Resolves to whether it worked. */
 export async function copyText(text) {
     try {
-        if (navigator.clipboard && window.isSecureContext) {
+        if (window.isSecureContext) {
             await navigator.clipboard.writeText(text);
             return true;
         }
     } catch { /* fall through to the fallback */ }
     const ta = document.createElement('textarea');
     ta.value = text;
-    ta.setAttribute('readonly', '');
+    ta.readOnly = true;
     ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
     document.body.append(ta);
     ta.select();
