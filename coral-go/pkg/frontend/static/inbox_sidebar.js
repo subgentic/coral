@@ -700,7 +700,6 @@ function unrecordedActions() {
 const dockSavedState = DT.tableState();
 const savedState = DT.tableState(); // one word set for a task's state (Queued, In progress, Blocked, In review, Done), here as everywhere
 const goalsState = DT.tableState();
-const taskText = t => [t.title, t.board, t.priority, stateOf(t), t.created_by].join(' ').toLowerCase();
 let taskFilters = { ...TF.EMPTY }, taskState = 'all', taskBar = null;
 const workHits = { tasks: new Set(), goals: new Set() }; let workGen = 0, workTimer = 0; // items whose body or outcome holds the search words, from the server's search (#19237)
 const taskMatches = t => serverMatches(t, taskFilters) && (!queries.tasks || taskText(t).includes(queries.tasks.toLowerCase()) || workHits.tasks.has(`${t.project}#${t.id}`))
@@ -725,6 +724,7 @@ function inboxTaskToolbar() {
             inboxTasksState.selected.clear();
             taskFilters = next;
             queries.tasks = next.q; noteWorkSearch('tasks', next.q);
+            refreshTasks();
             const input = $('inbox-search');
             if (input && group === 'tasks') input.value = next.q;
             renderInboxNav(true);
@@ -743,24 +743,32 @@ function inboxTaskToolbar() {
     const active = document.activeElement;
     const held = taskBar.node.contains(active) ? (active.matches('.team-tb-select') ? 'select' : active.dataset.filter) : null;
     IT.adoptPills(taskBar.node, { label: 'Show tasks that are', current: taskState,
-            items: [{ key: 'all', label: 'All', count: rows.length }, ...states.map(key => ({ key, label: key, count: rows.filter(t => stateOf(t) === key).length }))],
-            onPick: key => { inboxTasksState.selected.clear(); taskState = key; renderInboxNav(true); } });
+            items: [{ key: 'all', label: 'All', count: taskState === 'all' ? taskCount(rows.length) : undefined }, ...states.map(key => ({ key, label: key, count: taskState === 'all' || taskState === key ? taskCount(rows.filter(t => stateOf(t) === key).length) : undefined }))],
+            onPick: key => { inboxTasksState.selected.clear(); taskState = key; refreshTasks(); renderInboxNav(true); } });
     if (held) {
         const next = held === 'select' ? taskBar.node.querySelector('.team-tb-select') : [...taskBar.node.querySelectorAll('[data-filter]')].find(el => el.dataset.filter === held);
         next?.focus({ preventScroll: true });
     }
     return { node: taskBar.node, signature: JSON.stringify([taskFilters, queries.tasks, taskState, taskTeams]) };
 }
-async function refreshTasks() {
-    if (taskPending) return taskPending;
-    taskPending = (async () => {
+let taskQuery = '';
+const taskCount = n => taskReadState().capped || taskReadState().failed ? `${n}+` : n;
+async function refreshTasks(append = '') {
+    const requested = JSON.stringify([taskFilters, taskState]);
+    if (taskPending && taskPending.query === requested) return taskPending.promise;
+    if (requested !== taskQuery) { taskQuery = requested; tasks = []; }
+    const pending = {};
+    taskPending = pending; pending.query = requested;
+    pending.promise = (async () => {
     try {
-        tasks = await coralInboxAdapter.listTasks();
+        const rows = await coralInboxAdapter.listTasks({ filters: { ...taskFilters, q: queries.tasks }, status: taskState, append });
+        if (taskPending !== pending) return;
+        tasks = rows;
         setInboxCount('tasks', tasks.length, tasks.filter(t => t.priority === 'high').length);
-    } catch { tasks = []; }
+    } catch { if (taskPending !== pending) return; tasks = []; }
     renderInboxNav(true);
-    })().finally(() => { taskPending = null; });
-    return taskPending;
+    })().finally(() => { if (taskPending === pending) taskPending = null; });
+    return pending.promise;
 }
 
 // ── Goals ────────────────────────────────────────────────────────────────
@@ -951,7 +959,7 @@ const savedKnown = () => { const v = saved.savedView(); return !isCloud() || (!v
 /** The number beside a folder. Needs you counts what the Inbox badge counts (an alarm: an agent, a review, a run, a proposal, a question); the welcome items are listed but are not alarms, so they are not in either (#11622). */
 /** The goals agents proposed that wait for the Operator (a row in Needs you): the Goals folder counts them, it said 0 while one waited (#11894). */
 const goalProposals = () => pendingProposals().filter(p => p.kind === 'goal');
-const countOf = key => key === 'needs' ? needsCount(unreadReviewCount()) : key === 'tasks' ? (isCloud() && (personalInboxNotice('tasks') || taskReadState().failed || taskReadState().capped) ? `${taskRows().length}+` : taskRows().length) : key === 'goals' ? goals.filter(g => !['done', 'dropped'].includes(String(g.state || '').toLowerCase())).length + goalProposals().length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? `${savedCounts().open + countSavedReviews().value}${countSavedReviews().complete && savedKnown() ? '' : '+'}` : undefined;
+const countOf = key => key === 'needs' ? needsCount(unreadReviewCount()) : key === 'tasks' ? ((personalInboxNotice('tasks') || taskReadState().failed || taskReadState().capped) ? `${taskRows().length}+` : taskRows().length) : key === 'goals' ? goals.filter(g => !['done', 'dropped'].includes(String(g.state || '').toLowerCase())).length + goalProposals().length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? `${savedCounts().open + countSavedReviews().value}${countSavedReviews().complete && savedKnown() ? '' : '+'}` : undefined;
 /** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
 const FOLDER_ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2', activity: 'checklist',
     chats: 'chat_bubble_outline', [BOARDS_FOLDER]: 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' }; // UI/UX's existing subset choices (#8866); tagged folders keep their colour dot
@@ -1496,7 +1504,8 @@ registerGroupSource('hub-inbox', {
         if (key === 'needs') return needsListSpec();
         if (key === 'tasks') {
             const rows = taskRows();
-            return { title: 'Tasks', note: isCloud() ? [personalInboxNotice('tasks'), taskReadState().failed ? 'Some owned computers did not answer.' : '', 'Search filters the first 100 tasks loaded from each owned computer.', taskReadState().capped ? 'More tasks may be available on the source computer.' : ''].filter(Boolean).join(' ') : '', noun: ['task', 'tasks'], rows, empty: { line: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? 'No task matches the filters.' : (isCloud() && personalInboxNotice('tasks') || 'No tasks assigned to you.'), hint: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? undefined : "The tasks of your agents are in each team's Tasks tab." },
+            const unfinished = taskReadState().pages.some(p => p.has_more || p.error);
+            return { title: 'Tasks', note: isCloud() ? [personalInboxNotice('tasks'), taskReadState().failed ? 'Some owned computers did not answer.' : '', taskReadState().capped ? 'Load more to see older matching tasks.' : ''].filter(Boolean).join(' ') : '', noun: ['task', 'tasks'], rows, empty: unfinished ? null : { line: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? 'No task matches the filters.' : (isCloud() && personalInboxNotice('tasks') || 'No tasks assigned to you.'), hint: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? undefined : "The tasks of your agents are in each team's Tasks tab." },
                 signature: JSON.stringify([isCloud() ? personalInboxNotice('tasks') : '', taskReadState(), rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count, IR.isUnread('task', `${t.project}#${t.id}`, t.updated_at || t.created_at)])]), // the read state is part of what is drawn (#9687)
                 node: () => {
                     const row = document.querySelector('#group-table-view .gt-toolbar');
@@ -1504,7 +1513,18 @@ registerGroupSource('hub-inbox', {
                         open: t => { IR.markRead('task', `${t.project}#${t.id}`, t.updated_at || t.created_at); openItemRoute('tasks', t.project, t.id, `${t.project}#${t.id}`); }, unread: t => IR.isUnread('task', `${t.project}#${t.id}`, t.updated_at || t.created_at), state: inboxTasksState, mail: t => ({ unread: IR.isUnread('task', `${t.project}#${t.id}`, t.updated_at || t.created_at), lead: { icon: TASK_GLYPH[stateOf(t)] || 'pending', square: true, name: stateOf(t) }, title: t.title, team: teamLabel(t.project), snippet: stateOf(t), state: stateOf(t), time: DT.shortTime(t.updated_at || t.created_at), data: { taskId: String(t.id) } }),
                         ...(!isCloud() ? { selectable: { contextKey: 'inbox-tasks', actions: TB.inboxTaskActions(() => { inboxTasksState.selected.clear(); refreshTasks(); }), onChange: keys => row && Toolbar.mountSelection(row, keys.size ? t.bar : null) } } : {}) }); // the bar takes the toolbar's line while tasks are selected
                     if (row) { Toolbar.mountSelection(row, inboxTasksState.selected.size ? t.bar : null); row.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); if (isPhoneLayout() && t.selectButton) row.append(t.selectButton); }
-                    return t.el;
+                    const wrap = DT.el('div', 'inbox-tasks-list'); wrap.append(t.el);
+                    for (const p of taskReadState().pages) {
+                        if (!p.has_more && !p.error) continue;
+                        const b = DT.el('button', 'btn btn-small', p.error ? 'Retry tasks' : 'Load more');
+                        b.type = 'button'; b.dataset.taskMore = p.server; b.disabled = !!p.loading;
+                        b.setAttribute('aria-label', `${p.error ? 'Retry tasks' : 'Load more tasks'} from ${pagingServerLabel(p.server)}`);
+                        b.addEventListener('click', async () => {
+                            const held = document.activeElement === b; b.disabled = true; await refreshTasks(p.server);
+                            if (held) ([...document.querySelectorAll('[data-task-more]')].find(n => n.dataset.taskMore === p.server) || $('group-table-title'))?.focus({ preventScroll: true });
+                        }); wrap.append(b);
+                    }
+                    return wrap;
                 } };
         }
         if (CH.CHAT_KEY.test(key)) {
@@ -1608,7 +1628,7 @@ export function filterInbox(value) {
     if (group === 'saved') { queries.saved = text; saved.setSavedQuery(text); return; }
     if (group === 'artifacts') { IA.setArtifactSearch(text); return; } // the folder's own search box shows the same text
     queries[group] = CH.CHAT_KEY.test(group) || group === 'tasks' ? text : text.toLowerCase();
-    if (group === 'tasks') { inboxTasksState.selected.clear(); taskFilters = { ...taskFilters, q: text }; } // a chat search goes to the server as typed
+    if (group === 'tasks') { inboxTasksState.selected.clear(); taskFilters = { ...taskFilters, q: text }; refreshTasks(); } // a chat search goes to the server as typed
     if (CH.CHAT_KEY.test(group)) { chatFilters.set(group, { ...chatFiltersOf(group), q: text }); if (nativeInbox()) CH.resetChatLists(group); } // the sidebar's box and the page's share the one search (#8603); on a Hub it is sent on Enter, one read of each online computer every time
     if (group === 'needs') { needsFilters = { ...needsFilters, q: text }; persistNeedsFilters(); } // the sidebar's box and the page's share the one search (#8604)
     if (group === 'activity') { activityFilters = { ...activityFilters, q: text }; AF.saveFilters(activityFilters); } // the sidebar's box and the page's share the one search (#12070)

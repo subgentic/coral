@@ -19,6 +19,7 @@ const rememberReply = (project, task) => {
     if (replyContexts.size > 1000) replyContexts.delete(replyContexts.keys().next().value);
 };
 
+const TASK_PATH = '/api/board/tasks?';
 const OPEN_STATUSES = ['pending', 'in_progress', 'review_pending', 'blocked'];
 const FIELDS = 'id,board_id,board_label,title,priority,status,created_by,created_at,updated_at,revision,goal_id,goal_title,artifact_count'; // updated_at and revision are the change stamp the panel keeps a drawn task by (#5803)
 
@@ -64,7 +65,8 @@ export async function listInboxGoals(finished = false) { // finished: true or 'd
 
 const validTask = row => row && Number.isSafeInteger(row.id) && row.id > 0 && typeof row.board_id === 'string' && !!row.board_id.trim() && [...row.board_id].length <= 200 && !/[\u0000-\u001f\u007f-\u009f/\\%?#]/.test(row.board_id) && !row.board_id.includes('..') && !row.board_id.startsWith('.');
 let taskReadFailed = false, tasksCapped = false;
-export const taskReadState = () => ({ failed: taskReadFailed, capped: tasksCapped });
+let taskPager = null, taskPagerReady = null;
+export const taskReadState = () => taskPager ? { failed: taskPager.taskPages().some(p => !!p.error), capped: taskPager.taskPages().some(p => p.has_more || p.truncated), pages: taskPager.taskPages() } : { failed: taskReadFailed, capped: tasksCapped, pages: [] };
 
 const ARTIFACT_LINK_RE = /coral:\/\/artifacts\/([0-9a-f]{64})(?![0-9a-f])/g;
 const ARTIFACT_LOOKUPS_MAX = 20;
@@ -89,11 +91,15 @@ export async function artifactLinkPolicy(text, server) { // server: the one the 
 /** The adapter for this Coral (the Operator's own, on this computer). */
 export const coralInboxAdapter = {
     contract: INBOX_CONTRACT,
-    async listTasks() {
+    async listTasks(options) {
+        if (options) {
+            taskPagerReady ||= importOnce('./inbox_task_pages.js').then(m => (taskPager = m.createTaskQueries((server, q, opts) => serverFetch(server, `${TASK_PATH}${q}`, opts)))).catch(error => { taskPagerReady = null; taskReadFailed = true; throw error; });
+            return (await taskPagerReady).listTasks(options);
+        }
         const hub = isCloud() && nativeTasks();
         const q = new URLSearchParams({ ...(hub ? {} : { assigned_to: 'Operator' }), fields: FIELDS + (hub ? ',assigned_to,parked_reason,parked_until' : ''), sort: 'updated_at', order: 'desc', limit: '100' });
         for (const s of [...OPEN_STATUSES, ...(hub ? ['draft'] : [])]) q.append('status', s);
-        let rows = await inboxRows(`/api/board/tasks?${q}`, 'tasks', hub);
+        let rows = await inboxRows(`${TASK_PATH}${q}`, 'tasks', hub);
         taskReadFailed = !!inboxRows.failed;
         tasksCapped = Object.values(rows.reduce((out, row) => (out[row.server] = (out[row.server] || 0) + 1, out), {})).some(n => n >= 100);
         if (hub) rows = rows.filter(t => String(t.assigned_to || '').replace(/^@/, '').toLowerCase() === 'operator' || t.status === 'review_pending');

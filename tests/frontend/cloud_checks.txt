@@ -460,3 +460,5 @@ node team_prompt_preview_name.test.mjs
 node notification_toast_time.test.mjs
 
 node analytics_cost_tasks.test.mjs
+
+node inbox_task_pages.test.mjs
