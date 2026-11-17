@@ -6,8 +6,8 @@
    "length": 66944
   },
   "desktop: folder first": {
-   "sha256": "4744a4c5f1357a49d84150bf4d0c0a0aad2be1785d994cb7fdec8c5fed4dbc4e",
-   "length": 129390
+   "sha256": "433634aa78478c707cca7b2d0775dfab720a50379bc836a94ba6ee881484ccf9",
+   "length": 87676
   },
   "desktop: team first, sleeping and archived open": {
    "sha256": "ca6b3008c01b790e9609f6d3a9aa1dfa20de4baff98c4d0a1fe559ed79f90f33",
@@ -18,8 +18,8 @@
    "length": 65073
   },
   "desktop: folder first, a folder collapsed": {
-   "sha256": "879e88e834b4dcfa85c19f3100f9ca048be76acfafdf3f03b8af5fd6f7ecaeee",
-   "length": 127500
+   "sha256": "9612d23af66d4020c2002505efcece855093ee173f0854016d23907b5fcd18a1",
+   "length": 85732
   },
   "desktop: hub, servers shown": {
    "sha256": "6b50f383ada124f0125e1f66e7aa553cf8adfe45631ebb56a8bc1394048b26b6",
@@ -30,8 +30,8 @@
    "length": 111869
   },
   "desktop: hub, grouped by server, folder first": {
-   "sha256": "014dcd0fce062c1a4403ae12f57d777eb0af6b7cd48337a95e858df050aaa512",
-   "length": 179444
+   "sha256": "2c3e85149691c2c6a2728ef6ba0add5c7cca8ab78c247324167e3836ee094076",
+   "length": 129334
   },
   "desktop: a search": {
    "sha256": "da2a6b909ada488326a48baac521967fe432e865f27eb27582926c18d6ffd224",
@@ -46,8 +46,8 @@
    "length": 66944
   },
   "phone: folder first": {
-   "sha256": "4744a4c5f1357a49d84150bf4d0c0a0aad2be1785d994cb7fdec8c5fed4dbc4e",
-   "length": 129390
+   "sha256": "433634aa78478c707cca7b2d0775dfab720a50379bc836a94ba6ee881484ccf9",
+   "length": 87676
   },
   "phone: team first, sleeping and archived open": {
    "sha256": "ca6b3008c01b790e9609f6d3a9aa1dfa20de4baff98c4d0a1fe559ed79f90f33",
@@ -58,8 +58,8 @@
    "length": 65073
   },
   "phone: folder first, a folder collapsed": {
-   "sha256": "879e88e834b4dcfa85c19f3100f9ca048be76acfafdf3f03b8af5fd6f7ecaeee",
-   "length": 127500
+   "sha256": "9612d23af66d4020c2002505efcece855093ee173f0854016d23907b5fcd18a1",
+   "length": 85732
   },
   "phone: hub, servers shown": {
    "sha256": "6b50f383ada124f0125e1f66e7aa553cf8adfe45631ebb56a8bc1394048b26b6",
@@ -70,8 +70,8 @@
    "length": 111869
   },
   "phone: hub, grouped by server, folder first": {
-   "sha256": "014dcd0fce062c1a4403ae12f57d777eb0af6b7cd48337a95e858df050aaa512",
-   "length": 179444
+   "sha256": "2c3e85149691c2c6a2728ef6ba0add5c7cca8ab78c247324167e3836ee094076",
+   "length": 129334
   },
   "phone: a search": {
    "sha256": "da2a6b909ada488326a48baac521967fe432e865f27eb27582926c18d6ffd224",
