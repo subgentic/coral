@@ -126,7 +126,7 @@ function filterBar(key) {
     } else if (key === RQ) {
         // the period alone: the queue is this computer's, not a team's
     } else if (key === 'usage') {
-        bar.append(V.selectField('Group by', [['agent', 'Agent'], ['team', 'Team'], ['provider', 'Agent type'], ['model', 'Model']], m.group, v => { m.group = v; reload(key); }));
+        bar.append(V.selectField('Group by', [['agent', 'Agent'], ['team', 'Team'], ['provider', 'Agent type'], ['model', 'Model'], ['goal', 'Goal']], m.group, v => { m.group = v; reload(key); }));
         bar.append(V.segment('Chart shows', D.METRICS, m.metric, v => { m.metric = v; m.day = -1; m.turns = null; draw(key); }));
     } else {
         const list = teams();
@@ -175,11 +175,24 @@ function drawUsage(m) {
     ]);
     const fmt = (v) => D.fmtMetric(m.metric, v), texts = u.rows.map(r => `${r.label} · ${fmt(r.total)}`);
     const chart = V.stackedBars(u.rows, u.series, { fmt, selected: m.day, phone: phone(), label: 'Usage over time', onPick: i => { m.day = i; m.turns = null; draw('usage'); } });
-    const hero = V.panel('Usage over time', `${D.METRICS.find(x => x[0] === m.metric)[1]} a day, by ${({ agent: 'agent', team: 'team', provider: 'agent type', model: 'model' })[m.group]}`,
+    const hero = V.panel('Usage over time', `${D.METRICS.find(x => x[0] === m.metric)[1]} a day, by ${({ agent: 'agent', team: 'team', provider: 'agent type', model: 'model', goal: 'goal' })[m.group]}`,
         V.dayPicker(u.rows, m.day, texts, i => { m.day = i; m.turns = null; draw('usage'); }), chart, V.legend(u.series));
     const row = u.rows[m.day], rank = D.dayRanking(row, u.series, m.metric);
     const list = V.rankedBars(rank.map(r => ({ name: r.name, value: r.value, i: r.i, text: `${fmt(r.value)} · ${Math.round(r.share * 100)}%` })));
     const drill = V.panel(row.label, `${fmt(row.total)} that day`, list);
+    if (m.group === 'goal') {
+        const goals = new Map(), first = u.rows[0]?.day;
+        for (const bucket of m.data || []) {
+            if (first && bucket.bucket.slice(0, 10) < first) continue;
+            for (const group of bucket.series || []) {
+                const g = goals.get(group.key) || {label: group.label, cost: 0, requests: 0, tasks: new Set()};
+                g.cost += group.cost_usd || 0; g.requests += group.num_requests || 0;
+                for (const id of group.task_ids || []) g.tasks.add(id);
+                goals.set(group.key, g);
+            }
+        }
+        hero.append(V.plainTable(['Goal', 'Cost', 'Requests', 'Tasks with usage'], [...goals.values()].map(g => [g.label, D.fmtMoney(g.cost), D.fmtCount(g.requests), String(g.tasks.size)]), {right: [1, 2, 3], label: 'Usage by goal'}));
+    }
     if (m.group === 'agent' && rank.length) {
         const top = rank.find(r => r.key !== '__other') || rank[0];
         const b = el('button', 'btn atab-drill', `Biggest turns of ${top.name}`); b.type = 'button';
@@ -187,7 +200,7 @@ function drawUsage(m) {
         drill.append(b);
         if (m.turns && m.turns.agent === top.name && m.turns.day === row.day) drill.append(turnsTable(m.turns));
     }
-    return [kpis, ...(phone() ? [hero, drill] : [rowOf(hero, drill)])];
+    return [kpis, ...(m.group === 'goal' ? [say('Usage is matched to recorded task work windows; the latest claim wins overlaps. Older hourly rollups are assigned by their recorded hour. Unmatched usage stays Not on a task.')] : []), ...(phone() ? [hero, drill] : [rowOf(hero, drill)])];
 }
 const rowOf = (a, b) => { const r = el('div', 'atab-row2'); r.append(a, b); return r; };
 
