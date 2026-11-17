@@ -142,7 +142,7 @@ function _renderWorkflowCard(wfName, wfSessions) {
     return html;
 }
 
-// Team-first mode: one folder group of the agents that are on no team or workflow.
+// One flat folder group: standalone agents in team mode, all folder agents when grouping by team is off.
 function _renderFolderGroup(groupName, groupSessions) {
     let html = '';
         const sorted = _sortByOrder(groupSessions);
@@ -191,140 +191,7 @@ function _renderFolderGroup(groupName, groupSessions) {
     return html;
 }
 
-// Folder-first mode: one folder group, with its boards nested inside as cards.
-function _renderFolderFirstGroup(groupName, groupSessions) {
-    let html = '';
-        const sorted = _sortByOrder(groupSessions);
-        const countBadge = ` <span class="session-group-count">${sorted.filter(s => !s.sleeping).length}</span>`;
-        const collapsed = _isGroupCollapsed(groupName);
-        const groupDirRaw = sorted[0]?.working_directory || pinPathForKey(groupName);
-        const groupKebab = `<div class="sidebar-kebab-wrapper group-kebab">
-            <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn group-kebab-btn" data-coral-hook="sidebar-kebab-button" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(groupName)}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('folder', groupName))}">${MORE_DOTS_SVG}</button>
-            <div class="menu sidebar-kebab-menu" data-coral-hook="sidebar-kebab-menu" id="${escapeAttr(kebabId('folder', groupName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(groupName)}">
-                <button class="menu-item overflow-menu-item" data-on-click="folder-launch-default" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
-                    ${SVGO.o1}<line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
-                    <span class="menu-item-text">Add Agent<span class="menu-item-hint">Starts your default agent now</span></span>
-                </button>
-                <button class="menu-item overflow-menu-item" data-on-click="folder-add-agent" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
-                    ${SVGO.o0}<circle cx="8" cy="5" r="2.5"/><path d="M3 14c0-2.8 2.2-5 5-5s5 2.2 5 5"/><line x1="12" y1="3" x2="12" y2="7"/><line x1="10" y1="5" x2="14" y2="5"/></svg>
-                    <span class="menu-item-text">Add Custom Agent<span class="menu-item-hint">Choose its persona, prompt and permissions first</span></span>
-                </button>
-                <button class="menu-item overflow-menu-item" data-on-click="folder-add-terminal" data-dir="${escapeAttr(groupDirRaw)}" data-server="${escapeAttr(splitKey(groupName).server)}">
-                    ${SVGO.o0}${_mk1}${_pinMenuItem(groupName, groupDirRaw)}
-                <button class="menu-item overflow-menu-item" data-on-click="folder-tag" data-group="${escapeAttr(groupName)}">
-                    ${SVGO.o0}<path d="M2 8.5V3a1 1 0 0 1 1-1h5.5l5.5 5.5-5.5 5.5L2 8.5z"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor" stroke="none"/></svg>
-                    Manage Tags
-                </button>
-                <button class="menu-item overflow-menu-item" data-on-click="group-move" data-group="${escapeAttr(groupName)}" data-dir="up">
-                    ${SVGO.o0}<path d="M8 3v10"/><path d="M4 7l4-4 4 4"/></svg>
-                    Move Up
-                </button>
-                <button class="menu-item overflow-menu-item" data-on-click="group-move" data-group="${escapeAttr(groupName)}" data-dir="down">
-                    ${SVGO.o0}${_mk2}${sorted.length ? `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="group-kill" data-group="${escapeAttr(groupName)}">
-                    ${SVGO.o1}${_mk0}` : ''}
-            </div>
-        </div>`;
-        const fTags = getFolderTags(groupName);
-        const tagDots = renderFolderTagPills(fTags);
-        const groupWorkDir = groupDirRaw;
-        const copyBtn = `<button class="btn btn-quiet btn-icon btn-xs folder-copy-btn" data-on-click="folder-copy" data-dir="${escapeAttr(groupWorkDir)}" title="Copy path">${SVGO.o4}${_mk3}`;
-        html += `<li class="session-group-header" data-group-name="${escapeAttr(groupName)}" data-on-click="group-collapse" data-group="${escapeAttr(groupName)}"${_collapseAttrs(collapsed)}>${CHEVRON_DECO}
-            <div class="group-header-text"><div class="group-name-line">${FOLDER_GROUP_ICON}<span class="group-name-text" title="${escapeAttr(keyLabel(groupName))}">${_rowNameWithServer(groupName)}</span>${countBadge}</div>${_rowServerLine(groupName)}</div>${tagDots}<span class="session-name-spacer"></span>${copyBtn}${groupKebab}</li>`;
-
-        if (collapsed || !sorted.length) {
-            // Skip rendering items when collapsed (or a pinned folder with no agents, #3630)
-        } else {
-            // Sub-group by board within this folder
-            const boardSubs = {};
-            const unboardedItems = [];
-            for (const s of sorted) {
-                if (s.board_project) {
-                    (boardSubs[sessionTeamKey(s)] ||= []).push(s);
-                } else {
-                    unboardedItems.push(s);
-                }
-            }
-
-            // Render board sub-groups as cards within the folder
-            for (const [boardName, boardSessions] of Object.entries(boardSubs)) {
-                const accentStyle = _boardAccentStyle(boardName);
-                const boardCollapsed = _isGroupCollapsed(boardName);
-                        const boardWorkDir = pickTeamFolder('', boardSessions);
-                const boardIsSleeping = boardSessions.some(s => s.sleeping);
-                const boardSleepIcon = boardIsSleeping ? ' <span class="agent-icon" title="Team is sleeping">🌙</span>' : '';
-                const sleepLabel = boardIsSleeping ? 'Wake team' : 'Sleep team';
-                const sleepAction = boardIsSleeping ? 'wake' : 'sleep';
-                const bKebab = `<div class="sidebar-kebab-wrapper group-kebab">
-                    <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn group-kebab-btn" data-coral-hook="sidebar-kebab-button" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(keyLabel(boardName))}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}">${MORE_DOTS_SVG}</button>
-                    <div class="menu sidebar-kebab-menu" data-coral-hook="sidebar-kebab-menu" id="${escapeAttr(kebabId('team', boardName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(keyLabel(boardName))}">
-                <button class="menu-item overflow-menu-item" data-on-click="team-working-mode" data-board="${escapeAttr(boardName)}"><span class="material-icons" style="font-size:var(--fs-lg);vertical-align:-2px" aria-hidden="true">settings</span> Team settings</button>
-                ${teamLinkOffered(splitKey(boardName).server) ? `<button class="menu-item overflow-menu-item" data-on-click="team-link" data-board="${escapeAttr(boardName)}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 9.5l3-3"/><path d="M7 4.5l1-1a2.5 2.5 0 013.5 3.5l-1 1"/><path d="M9 11.5l-1 1A2.5 2.5 0 014.5 9l1-1"/></svg> Link team...</button>` : ''}
-                        <button class="menu-item overflow-menu-item" data-on-click="team-add-agent" data-board="${escapeAttr(boardName)}" data-dir="${escapeAttr(boardWorkDir)}">
-                            ${SVGO.o1}<line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
-                            Add Agent
-                        </button>
-                        <button class="menu-item overflow-menu-item" data-on-click="team-sleep" data-board="${escapeAttr(boardName)}" data-mode="${escapeAttr(sleepAction)}">
-                            ${SVGO.o0}<path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
-                            ${sleepLabel}
-                        </button>
-                        <button class="menu-item overflow-menu-item" data-on-click="team-sleep" data-board="${escapeAttr(boardName)}" data-mode="archive">${SVGO.o0}<rect x="2" y="3" width="12" height="3" rx="0.5"/><path d="M3 6v7h10V6"/><path d="M6.5 9h3"/></svg>Archive team</button>
-                        <button class="menu-item overflow-menu-item" data-on-click="team-save" data-board="${escapeAttr(boardName)}">
-                            ${SVGO.o0}<path d="M3 3h8l2 2v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M6 3v3h4V3"/><rect x="5" y="9" width="6" height="3"/></svg>
-                            Save as template
-                        </button>
-                <button class="menu-item overflow-menu-item" type="button" data-on-click="team-menu-more" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}-more">More</button>
-                <div id="${escapeAttr(kebabId('team', boardName))}-more" class="team-menu-more" role="group" aria-label="More for ${escapeAttr(keyLabel(boardName))}" hidden>
-                <button class="menu-item overflow-menu-item" data-on-click="team-availability" data-board="${escapeAttr(boardName)}">${SVGO.o5}<circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg>Team view</button>
-                        <button class="menu-item overflow-menu-item" data-on-click="team-add-terminal" data-board="${escapeAttr(boardName)}" data-dir="${escapeAttr(boardWorkDir)}">
-                            ${SVGO.o0}<rect x="2" y="3" width="12" height="10" rx="1.5"/><polyline points="5 7 7 9 5 11"/><line x1="9" y1="11" x2="11" y2="11"/></svg>
-                            Add Terminal
-                        </button>
-                        <button class="menu-item overflow-menu-item" data-on-click="team-distill" data-board="${escapeAttr(boardName)}">
-                            ${SVGO.o0}<path d="M8 2L3 7v7h10V7L8 2z"/><path d="M6 14v-4h4v4"/><line x1="8" y1="7" x2="8" y2="10"/><line x1="6.5" y1="8.5" x2="9.5" y2="8.5"/></svg>
-                            Distill Knowledge
-                        </button>
-                        <button class="menu-item overflow-menu-item" data-on-click="team-share" data-board="${escapeAttr(boardName)}">
-                            ${SVGO.o0}<path d="M4 12v1a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-1"/><polyline points="8 3 8 10"/><polyline points="5 6 8 3 11 6"/></svg>
-                            Share Team
-                        </button>
-                        <button class="menu-item overflow-menu-item" data-on-click="team-accent" data-board="${escapeAttr(boardName)}">
-                            ${SVGO.o0}<circle cx="8" cy="8" r="6.5"/><path d="M8 1.5v13M1.5 8h13"/></svg>
-                            Set Color
-                        </button>
-                        <button class="menu-item overflow-menu-item" data-on-click="team-tokens" data-board="${escapeAttr(boardName)}">
-                            ${SVGO.o0}<path d="M2 13V5h3v8H2zM7 13V3h3v10H7zM12 13V7h3v6h-3z"/></svg>
-                            Token Usage
-                        </button>
-                </div>
-                <hr class="overflow-menu-divider overflow-menu-divider-danger">
-                        ${killAllItem(boardName)}
-                ${deleteTeamItem(boardName)}
-                    </div>
-                </div>`;
-                html += `<li class="session-board-card session-team-group"${accentStyle}>
-                    <div class="session-group-header board-card-header${escapeAttr(state.selectedTeam === boardName ? ' team-selected' : '')}"${state.selectedTeam === boardName ? ' aria-current="true"' : ''} data-group-name="${escapeAttr(boardName)}" data-on-click="team-name-open" data-board="${escapeAttr(boardName)}" data-group="${escapeAttr(boardName)}"${_teamHeaderAttrs(boardName)}>${_chevron(boardName, boardCollapsed)}
-                        <div class="group-header-text"><div class="group-name-line"><svg class="team-group-icon" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg><span class="group-name-text" title="${escapeAttr(keyLabel(boardName))}">${_rowNameWithServer(boardName)}</span>${boardSleepIcon}${distillChip(boardName)} <span class="session-group-count">${boardSessions.length}</span></div>${_rowServerLine(boardName)}</div><span class="session-name-spacer"></span>${teamHealthBtn(boardName, boardSessions)}${bKebab}
-                    </div>
-                    <ul class="board-card-agents${boardCollapsed ? ' board-card-collapsed' : ''}">`;
-                const orderedBoardNested = _sortByOrder(boardSessions);
-                orderedBoardNested.sort((a, b) => {
-                    const aOrch = (a.display_name || a.board_job_title || '').toLowerCase().includes('orchestrator');
-                    const bOrch = (b.display_name || b.board_job_title || '').toLowerCase().includes('orchestrator');
-                    if (aOrch && !bOrch) return -1;
-                    if (!aOrch && bOrch) return 1;
-                    return 0;
-                });
-                html += _renderAgentListWithSubgroups(orderedBoardNested, boardWorkDir, true, groupName);
-                html += `</ul></li>`;
-            }
-
-            // Render unboarded items as flat list with subgroups
-            html += _renderAgentListWithSubgroups(unboardedItems, groupWorkDir, false, groupName, true);
-        }
-    return html;
-}
-
-// The groups of a list of sessions as markup: teams, workflows and folders (team first), or folders with their boards nested (folder first); with pins, pinned folders that have no agent here are listed too.
+// The groups of a list of sessions as markup: teams, workflows and folders (team first), or flat folders when grouping by team is off; with pins, pinned folders that have no agent here are listed too.
 export function _renderGroups(sessions, groupByTeam, withPins = true) {
     let html = '';
 
@@ -374,7 +241,7 @@ export function _renderGroups(sessions, groupByTeam, withPins = true) {
     }
 
     } else {
-    // ── Folder-first mode: all sessions grouped by folder, boards nested inside ──
+    // ── Team grouping off: all sessions in flat folder groups ──
 
     // Group sessions by folder name (primary grouping)
     const groups = {};
@@ -389,7 +256,7 @@ export function _renderGroups(sessions, groupByTeam, withPins = true) {
 
     const sortedGroups = localFirst(_sortGroups(Object.entries(groups)));
     for (const [groupName, groupSessions] of sortedGroups) {
-        html += _renderFolderFirstGroup(groupName, groupSessions);
+        html += _renderFolderGroup(groupName, groupSessions);
     }
 
     } // end if/else groupByTeam
