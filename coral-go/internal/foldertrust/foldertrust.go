@@ -282,6 +282,51 @@ func TrustClaude(cfg, path string) (bool, error) {
 	return true, nil
 }
 
+// TrustAgy adds path to the trustedWorkspaces list of Antigravity's settings file at cfg (~/.gemini/antigravity-cli/settings.json: the list its own "Yes, I trust this folder" adds to, #19128) and reports whether it
+// wrote anything. The other values of the file are kept as raw JSON. The file must exist (agy makes it at its first start; absent, its prompt stays), must be a regular file and not a link, and a trustedWorkspaces
+// that is not a list of strings is left alone with an error, since agy refuses to start on a settings file it cannot read. The one folder is added, never a parent of it.
+func TrustAgy(cfg, path string) (bool, error) {
+	raw, mode, err := readConfig(cfg)
+	if err != nil {
+		return false, err
+	}
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &top); err != nil || top == nil {
+		return false, errors.New("the settings file is not a JSON object")
+	}
+	var list []string
+	if cur, ok := top["trustedWorkspaces"]; ok {
+		if err := json.Unmarshal(cur, &list); err != nil {
+			return false, errors.New("the settings file's trustedWorkspaces is not a list of folders")
+		}
+	}
+	for _, have := range list {
+		if filepath.Clean(have) == filepath.Clean(path) {
+			return false, nil
+		}
+	}
+	lb, err := marshalRaw(append(list, path))
+	if err != nil {
+		return false, err
+	}
+	top["trustedWorkspaces"] = lb
+	out, err := marshalRaw(top)
+	if err != nil {
+		return false, err
+	}
+	if err := json.Unmarshal(out, &map[string]json.RawMessage{}); err != nil {
+		return false, err
+	}
+	if err := replaceFile(cfg, append(out, '\n'), mode); err != nil {
+		return false, err
+	}
+	verify, _, err := readConfig(cfg)
+	if err != nil || !bytes.Equal(bytes.TrimSpace(verify), bytes.TrimSpace(out)) {
+		return false, errors.New("the settings file was changed by something else while it was written")
+	}
+	return true, nil
+}
+
 // codexTableKey is the folder as the key of a [projects.<key>] table in Codex's config.toml. A path with a quote or a control character is refused everywhere. A backslash is refused except on Windows, where it
 // is the separator of every path: there the key is a TOML literal string ('C:\Users\x'), which takes no escapes, so nothing in the path can end it early; a path with a single quote is then refused too (#12266).
 func codexTableKey(path string, windows bool) (string, error) {
