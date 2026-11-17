@@ -147,6 +147,8 @@ type State struct {
 	// NeedsLogin: the agent waits for the user to sign in (Input.NeedsLogin). It is also
 	// NeedsInput, kind KindLogin, so every surface that shows a request shows this one.
 	NeedsLogin bool
+	// Compacting: the agent is compacting its conversation (Claude's PreCompact, until the SessionStart, prompt, tool or stop that follows). It is working and in a turn, and cannot take a message yet (#19090).
+	Compacting bool
 
 	// For the automated-input gate (#3481, #3475 phase 1), from the agent's events:
 	// InTurn: its turn is running (a prompt or a tool event is the latest), however
@@ -295,7 +297,16 @@ func (d *deriver) phase() string {
 // apply takes one event. It reports false for a notification that changes nothing of the session's phase
 // (Coral's held notice ended, or one held over the agent's own request): its time sets nothing either.
 func (d *deriver) apply(event Event) bool {
+	if event.Type != "compact_start" && event.Type != "notification" { // any other event of the agent's own is the compaction over
+		d.state.Compacting = false
+	}
 	switch event.Type {
+	case "compact_start":
+		// A turn of its own kind: the agent works, nothing is typed into it, and no request is open (a compaction runs where no dialog does).
+		d.latestType = "prompt_submit"
+		d.clearRequest()
+		d.state.AwaitingUser = false
+		d.state.Compacting = true
 	case "tool_use":
 		d.toolUsed(event)
 	case "turn_activity":

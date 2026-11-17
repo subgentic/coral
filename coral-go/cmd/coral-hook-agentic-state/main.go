@@ -468,6 +468,12 @@ func parseAgenticEvent(d map[string]any, hookType, sessionID string) map[string]
 		return event
 	}
 
+	// Claude's PreCompact: the conversation is being compacted (/compact, or the CLI's own when the context is full). Nothing else says so until the SessionStart that follows it, so the agent looked idle
+	// while it was not able to take a message (#19090).
+	if hookType == "PreCompact" {
+		return map[string]any{"event_type": "compact_start", "summary": "Compacting conversation", "session_id": sessionID}
+	}
+
 	// SessionStart / /clear: a turn boundary whatever started the session; its summary says what did, from
 	// the hook's source (Claude and Codex both send it; a fresh launch was shown as "/clear", #4545).
 	if hookType == "SessionStart" || d["_coral_session_clear"] != nil {

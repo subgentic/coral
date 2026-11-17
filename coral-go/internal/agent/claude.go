@@ -456,6 +456,7 @@ var coralHooks = map[string][]map[string]interface{}{
 	// only ~6 s later); Elicitation and ElicitationResult open and close an MCP input
 	// request; StopFailure ends a turn on an API error; SessionEnd ends the session.
 	"UserPromptSubmit":  {agenticStateHook},
+	"PreCompact":        {agenticStateHook}, // a compaction starting (#19090): its end is the SessionStart with source "compact"
 	"PermissionRequest": {agenticStateHook},
 	"Elicitation":       {agenticStateHook},
 	"ElicitationResult": {agenticStateHook},
