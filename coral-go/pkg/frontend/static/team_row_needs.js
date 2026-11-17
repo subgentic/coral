@@ -25,6 +25,6 @@ export function chip(team) {
     teams.add(team);
     const n = count ? count(team).value : 0;
     if (!(n > 0)) return '';
-    const words = `${n} need${n === 1 ? 's' : ''} you`;
-    return ` <span class="team-row-needs" data-on-click="team-needs-open" data-board="${escapeAttr(team)}" title="${escapeAttr(words)}" aria-label="${escapeAttr(words)}">${Number(n)} <span class="team-row-needs-word">need${n === 1 ? 's' : ''} input</span></span>`;
+    const words = `${n} need${n === 1 ? 's' : ''} you`, label = 'Open Needs you: ' + words;
+    return ` <button type="button" class="team-row-needs" data-on-click="team-needs-open" data-board="${escapeAttr(team)}" title="${escapeAttr(words)}" aria-label="${escapeAttr(label)}">${Number(n)} <span class="team-row-needs-word">need${n === 1 ? 's' : ''} input</span></button>`;
 }
