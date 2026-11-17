@@ -284,8 +284,8 @@ export async function saveAutoInstall(on) {
 export function idleInstallWords(s) {
     const a = s && s.autoInstall;
     if (!a || !a.on) return { short: '', long: '' };
-    if (a.state === 'waiting' || a.state === 'soon') return { short: 'installs when idle', long: `Coral installs it by itself when it is idle.${a.reason ? ` Waiting: ${a.reason}.` : ''}` };
-    if (a.state === 'backoff') return { short: 'not installed', long: `Coral tried to install it by itself and it did not finish. ${a.reason}` };
+    if (a.state === 'waiting' || a.state === 'soon') return { short: 'ready, installs when idle', long: `An update is ready. Coral installs it by itself when it is idle, or now if you choose Install now.${a.reason ? ` Waiting: ${a.reason}.` : ''}`, hold: true };
+    if (a.state === 'backoff') return { short: 'ready, not installed', long: `An update is ready. Coral tried to install it by itself and it did not finish. ${a.reason}`, hold: true };
     return { short: '', long: '' };
 }
 

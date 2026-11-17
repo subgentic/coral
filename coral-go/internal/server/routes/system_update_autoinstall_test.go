@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/ptymanager"
 	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -271,4 +272,41 @@ func TestAutoInstall_TheHistoryNamesWhoAsked(t *testing.T) {
 	last := e.up.audits[len(e.up.audits)-1]
 	assert.Equal(t, "auto_started", last.Code)
 	assert.Equal(t, "auto", last.Source)
+}
+
+// #19487 (the Operator, 2026-11-17: "we don't need to block auto install"): an agent that is working but runs in tmux survives the relaunch, so it no longer holds the update; an agent the relaunch
+// would end (not in tmux, on a Coral that does not keep its terminals) still does.
+func TestAutoInstall_AWorkingAgentInTmuxDoesNotHoldTheUpdate(t *testing.T) {
+	_, h, _, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	const id = "66666666-eeee-4000-8000-000000000006"
+	tmuxBacked := "tmux"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: id, AgentType: "claude", AgentName: "Dev", WorkingDir: t.TempDir(), Backend: &tmuxBacked}))
+	_, err := h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "claude-" + id, SessionID: &[]string{id}[0], EventType: "prompt_submit", Summary: "go", CreatedAt: time.Now().UTC().Format(store.ISOFormat)})
+	require.NoError(t, err)
+	assert.Empty(t, h.UpdateIdleReason(ctx), "working in tmux: it keeps running while Coral is replaced")
+
+	const id2 = "77777777-eeee-4000-8000-000000000007"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: id2, AgentType: "claude", AgentName: "Dev2", WorkingDir: t.TempDir()}))
+	_, err = h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "claude-" + id2, SessionID: &[]string{id2}[0], EventType: "prompt_submit", Summary: "go", CreatedAt: time.Now().UTC().Format(store.ISOFormat)})
+	require.NoError(t, err)
+	assert.Equal(t, "Dev2 is working", h.UpdateIdleReason(ctx), "working outside tmux on a Coral that ends its terminals: the relaunch would end the turn")
+}
+
+// #19493 (QA5's INFO on #19487): on a Coral that itself runs in tmux a working agent with no backend of its own survives, but one that says it is a pty agent still holds the update.
+func TestAutoInstall_APtyAgentStillHoldsTheUpdateWhenCoralRunsInTmux(t *testing.T) {
+	_, h, _, ss := setupSessionsTestServer(t)
+	h.terminal = &ptymanager.TmuxSessionTerminal{}
+	require.Equal(t, "tmux", TerminalKind(h.terminal))
+	ctx := context.Background()
+	working := func(id, name string, backend *string) {
+		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: id, AgentType: "codex", AgentName: name, WorkingDir: t.TempDir(), Backend: backend}))
+		_, err := h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "codex-" + id, SessionID: &[]string{id}[0], EventType: "prompt_submit", Summary: "go", CreatedAt: time.Now().UTC().Format(store.ISOFormat)})
+		require.NoError(t, err)
+	}
+	working("88888888-eeee-4000-8000-000000000008", "Plain", nil)
+	assert.Empty(t, h.UpdateIdleReason(ctx), "no backend of its own on a tmux Coral: it survives")
+	pty := "pty"
+	working("99999999-eeee-4000-8000-000000000009", "PtyAgent", &pty)
+	assert.Equal(t, "PtyAgent is working", h.UpdateIdleReason(ctx), "a pty agent is ended by the relaunch whatever Coral runs in")
 }

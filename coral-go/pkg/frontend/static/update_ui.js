@@ -35,8 +35,8 @@ function pillWords(s) {
     return {
         tier, age,
         idle: idle.short,
-        verb: actName(s), // Windows installs from this page (#7338): no relaunch is offered there
-        name: `${actName(s)} to version ${s.staged.version}. Downloaded ${ago}.${canStart(s) ? '' : ` ${notAvailable(s.relaunch.reason)}`}${idle.long ? ` ${idle.long}` : ''}`,
+        verb: idle.hold && !installsLocally(s) ? 'Install now' : actName(s), // while a hold stays the control says plainly that an update is ready and offers Install now (#19487). Windows installs from this page (#7338): no relaunch is offered there
+        name: `${idle.hold && !installsLocally(s) ? 'Install now' : actName(s)} to version ${s.staged.version}. Downloaded ${ago}.${canStart(s) ? '' : ` ${notAvailable(s.relaunch.reason)}`}${idle.long ? ` ${idle.long}` : ''}`,
     };
 }
 
@@ -105,7 +105,7 @@ function renderBanner() {
 const READY_SEEN_KEY = 'coral-update-ready-seen';
 function readyNotice(s) {
     if (!relaunchOffered(s) || s.relaunch.reason === 'no_run_record' || !canStart(s)) return null;
-    const auto = idleInstallWords(s).short === 'installs when idle';
+    const auto = idleInstallWords(s).short === 'ready, installs when idle';
     return { key: s.staged.version, lead: `Coral ${s.staged.version} is ready.`, rest: auto ? ' It is downloaded and checked. Coral installs it by itself when it is idle, or now if you say yes.' : ' It is downloaded and checked. Nothing is installed until you say yes.' };
 }
 function renderReadyNotice() {

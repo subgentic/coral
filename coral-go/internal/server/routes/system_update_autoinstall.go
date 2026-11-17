@@ -16,7 +16,7 @@ import (
 
 // Install when idle (#11170, the Operator's decision of 2026-10-29): a verified update that is strictly newer than the installed Coral is installed by Coral itself once it has been idle. It
 // is the click's own apply (UpdateRelaunchHandler's Updater.Apply: the updater verifies again, copies, checks, and the server ends itself once the new install is ready, agents in tmux keep
-// running, and a failed apply starts the old Coral again and says why in the updater's history, #11151 and #11155). Idle is: no agent working, no automated input in flight and nobody typing
+// running, and a failed apply starts the old Coral again and says why in the updater's history, #11151 and #11155). Idle is: no agent working that the relaunch would end (an agent in tmux keeps running and never holds the update, #19487), no automated input in flight and nobody typing
 // in the dashboard for a few minutes, held for a few minutes and looked at again just before the apply. A failed apply is not retried in a loop: the version waits a day, and the pill says why.
 // Windows installs ask a person (UAC) and stay click-to-install; the Hub's own relaunch is as it was.
 
@@ -303,7 +303,7 @@ func (h *UpdateRelaunchHandler) noteAutoOutcome(v relaunchView, times autoInstal
 }
 
 // UpdateIdleReason is why an agent keeps the install-when-idle rule waiting: one that is working (a turn going on, however long ago its last event: InTurn), by its name; "" when every agent is
-// idle, waiting for its person, or asleep (#11170).
+// idle, waiting for its person, or asleep (#11170). Only an agent the relaunch would end counts (#19487): one in tmux survives it and never holds the update, whatever it is doing.
 func (h *SessionsHandler) UpdateIdleReason(ctx context.Context) string {
 	live, err := h.ss.GetAllLiveSessions(ctx)
 	if err != nil {
@@ -319,6 +319,13 @@ func (h *SessionsHandler) UpdateIdleReason(ctx context.Context) string {
 			// A plain terminal has no turns, but on a pty Coral the relaunch ends it and it cannot resume (a build, an ssh session, a REPL are lost): it is not idle (QA's #11170 MUST).
 			working = append(working, "a terminal is open")
 			continue
+		}
+		own := ""
+		if l.Backend != nil {
+			own = *l.Backend
+		}
+		if own == "tmux" || own == "" && !ends { // survives: tmux itself, or no backend of its own on a Coral that keeps its terminals; an agent that says pty is a pty agent even on a tmux Coral
+			continue // an agent in tmux keeps running while Coral is replaced, so its turn does not hold the update (#19487, the Operator's decision of 2026-11-17)
 		}
 		if st := h.deriveSingleSessionState(ctx, l.SessionID, 0); st.Working || st.InTurn && !st.NeedsInput {
 			name := l.AgentName
