@@ -16,6 +16,10 @@ const BASE = require('./test_base').BASE;
   await waitFor(`document.querySelectorAll('#cost-by-task tbody tr[data-key]').length===102`,'101 tasks plus unassigned spend',15000);
   assert.ok(await ev(`window.__pages.some(p=>p.includes('cursor=next-page'))`));
   assert.ok(await ev(`[...document.querySelectorAll('#cost-by-task tbody tr')].some(r=>r.textContent.includes('Task 101'))`),'zero-cost task on second page is present');
+  const pagesBeforePoll = await ev('window.__pages.length');
+  await ev(`import((window.__coralStatic||'/static/')+'cost_dashboard.js').then(m=>m._refreshCostDashboard()).then(()=>true)`);
+  assert.equal(await ev('window.__pages.length') - pagesBeforePoll, 1, 'automatic refresh reads only one task page');
+  assert.equal(await ev(`document.querySelectorAll('#cost-by-task tbody tr[data-key]').length`), 102, 'cached older tasks remain visible');
   for(const width of [1024,1440]){
    await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:false});
    await waitFor(`(()=>{const c=document.querySelector('#cost-by-task th[data-key="cost_usd"]');return c&&c.getBoundingClientRect().width>0&&getComputedStyle(c).display!=='none'})()`,'Cost visible at '+width,8000);
