@@ -10,4 +10,8 @@ assert.equal(shortTitle('Short one'), 'Short one');
 const long = shortTitle('add a very long list of features to the app so that a person can keep track of everything they need to do in a week');
 assert.ok(long.length <= 61 && long.endsWith('…') && !/ …$/.test(long), long);
 assert.notEqual(shortTitle('Add a settings page for the first feature that the team wants to build next week please'), shortTitle('Add a settings page for the second feature that the team wants to build next week please'), 'two long goals from one sentence stay apart only if the cut allows it, else the number does');
+assert.equal(shortTitle('Write Markdown (guide: food and transport) for Lisbon. Include prices.'), 'Write Markdown (guide: food and transport) for Lisbon', 'a colon inside parentheses does not cut the title');
+assert.equal(shortTitle('Draft [guide: Lisbon] - then review'), 'Draft [guide: Lisbon]', 'a bracketed colon stays in the name');
+const bracketCut = shortTitle('Write a detailed visitor guide (with food and transport suggestions for every neighbourhood)');
+assert.equal((bracketCut.match(/\(/g) || []).length, (bracketCut.match(/\)/g) || []).length, 'a length cut does not leave half a parenthesis: '+bracketCut);
 console.log('goal_short_title ok');

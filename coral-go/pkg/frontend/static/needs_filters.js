@@ -18,8 +18,8 @@ export const SORTS = ['newest', 'oldest', 'blockers'];
 export const SORT_LABEL = { blockers: 'Blocking first', oldest: 'Waiting longest', newest: 'Waiting least' }; // Blocking first (#11442): what holds up the most work, a high-priority task first, then how long it has waited
 
 const model = defineFilters({
+    q: { type: 'text', max: 200, chip: v => `Filtered by: ${v}` },
     server: serverFilter,
-    q: { type: 'text', max: 200, chip: v => `Search: ${v}` },
     kind: { type: 'choice', values: KINDS }, // the pills of the toolbar: a shortcut of this field, so it has no chip of its own
     team: { type: 'custom', empty: '', clean: v => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 200) : ''), filtered: v => !!v, chip: v => `Team: ${v}`, clear: f => ({ ...f, team: '' }) },
     agent: { type: 'text', max: 80, chip: v => `Agent: ${v}` },
