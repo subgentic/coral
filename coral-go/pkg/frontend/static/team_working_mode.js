@@ -40,11 +40,13 @@ export function presetLabel(preset) {
 export function nameTheTeam(data, id, name) {
     if (!data || !/^b-[a-z0-9]{6,}$/.test(String(id || ''))) return data;
     const shown = name && name !== id ? name : 'this team';
-    return JSON.parse(JSON.stringify(data).split(id).join(shown.replace(/\\/g, '\\\\').replace(/"/g, '\\"')));
+    const walk = v => typeof v === 'string' ? v.split(id).join(shown) : Array.isArray(v) ? v.map(walk) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)])) : v; // the id is replaced in the strings themselves: any name is plain text (no JSON round trip to break on a control character)
+    return walk(data);
 }
 
 export function renderInspection(rawData, workingMode, team = null) {
     const data = team ? nameTheTeam(rawData, team.id, team.name) : rawData;
+    const note = data !== rawData ? `<p class="sv-help">Team names are shown in place of the team's id.</p>` : '';
     const roles = [['orchestrator', 'Orchestrator'], ['worker', 'Agent / worker'], ['task', 'Task defaults']];
     // Keep every prompt available without expanding the page until a reader asks for it.
     const folded = (role, name, title, text) => `<details class="disclosure prompt-inspection-fragment prompt-inspection-folded"><summary>${title}</summary><pre>${escapeHtml(text ?? (role[name] || 'Not configured'))}</pre></details>`;
@@ -66,7 +68,7 @@ export function renderInspection(rawData, workingMode, team = null) {
         return `<article class="prompt-inspection-card" data-role="${escapeAttr(key)}"${index ? ' hidden' : ''}>${head}${body}</article>`;
     }).join('');
     const options = roles.map(([key, label]) => `<option value="${escapeAttr(key)}">${label}</option>`).join('');
-    return `<div class="prompt-inspection-bar"><label>Show the prompts for <select class="prompt-inspection-role">${options}</select></label><button type="button" class="btn btn-small prompt-inspection-copy">Copy</button></div>${cards}`;
+    return `<div class="prompt-inspection-bar"><label>Show the prompts for <select class="prompt-inspection-role">${options}</select></label><button type="button" class="btn btn-small prompt-inspection-copy">Copy</button></div>${note}${cards}`;
 }
 
 /** Draws the team's Settings tab into options.page: a settings_view (team_settings_page.js). */
