@@ -33,6 +33,8 @@ func (h *ChiefChecksHandler) registerReminders(r chi.Router) {
 	r.Get("/api/reminders/{reminderID}", h.remindersGet)
 	r.Delete("/api/reminders/{reminderID}", h.remindersCancel)
 	r.Post("/api/reminders/{reminderID}/done", h.remindersDone)
+	r.Get("/api/reminders/agents", h.reminderAgents)
+	r.Post("/api/reminders/agents/{sessionID}/switch", h.reminderAgentSwitch)
 }
 
 // reminderCaller is who is asking: the person, or an agent's verified session.
@@ -408,6 +410,8 @@ func reminderSetter(ch *store.ChiefCheck, names []string) string {
 	switch ch.Origin {
 	case "agent":
 		return "you"
+	case "task":
+		return "a task's reminder time"
 	case "orchestrator":
 		who := board.DefuseMentions(strings.Join(strings.Fields(clitext.Clean(ch.CreatedBy)), " "), names)
 		if who == "" {

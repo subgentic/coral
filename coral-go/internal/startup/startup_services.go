@@ -351,6 +351,10 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 	// Tasks' one-time reminders (task add --remind-at, #4175 step 3): asked for by a person or
 	// the orchestrator, so they go out whatever the health monitor setting says.
 	taskReminders := background.NewTaskReminders(srv.BoardStore(), agentRT, discoverFn)
+	remSched := store.NewScheduleStore(sessStore.DB())
+	taskReminders.SetReminderSink(func(ctx context.Context, project string, a background.AgentInfo, taskID int64, text string, _ time.Time) error {
+		return routes.SaveTaskReminder(ctx, remSched, project, a.SessionID, taskID, text, time.Now()) // on the reminders machinery (#19350)
+	})
 	safeGo(ctx, "task_reminders", func() { taskReminders.Run(ctx) })
 
 	// Remote board poller

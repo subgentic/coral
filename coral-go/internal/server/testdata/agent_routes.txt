@@ -595,6 +595,8 @@ a POST /api/reminders
 a GET /api/reminders/{reminderID}
 a DELETE /api/reminders/{reminderID}
 a POST /api/reminders/{reminderID}/done
+b GET /api/reminders/agents
+b POST /api/reminders/agents/{sessionID}/switch
 # #13613: the resource queue. An agent claims, releases and renews a slot and reads the line; defining, removing and reordering are for the Operator or an Orchestrator, which the handler decides (an Orchestrator is an agent token, so these are not operatorOnlyRoutes).
 a DELETE /api/resources/entries/{id}
 a DELETE /api/resources/{name}

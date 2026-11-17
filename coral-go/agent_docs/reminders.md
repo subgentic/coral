@@ -21,3 +21,11 @@ Times: `--in 2h`, `--at 2026-11-18 09:00` (one time, at most 364 days ahead), `-
 ## A one-time reminder and a computer that was off
 
 A one-time reminder fires once. If the computer was off at its time, it fires on the next start of Coral (Coral checks for missed one-time reminders each time it polls, not only the scheduler's one-day look-back), however long the computer was off. It does not wait for a yearly schedule line to come round. After it has fired it is switched off; a fired one-time reminder cannot re-arm itself the next year, even if its job is switched on again.
+
+## A task's reminder time (`task add --remind-at`)
+
+`coral-board task add ... --remind-at <time>` keeps working. When the time comes, an open, unparked task's assignee (or the team's Orchestrator when nobody is assigned) is reminded once, within the board's limits, and the reminder goes out as a one-time reminder of origin `task` on the same machinery as the ones above: it shows in `coral-board remind list`, is told after a restart if its minute passed while Coral was off, and is held while the Operator has switched that agent's reminders off (it is told once when they are switched back on). Only the Operator or the team's Orchestrator can cancel it; an agent marks it done with `coral-board remind done <id>`.
+
+## From the Operator
+
+An agent's page (Team, Agents) has a Reminders section: its reminders with Cancel, and a form that adds a one-time reminder or a repeating one (every day, Monday to Friday, every 5, 15, 30 or 60 minutes). It is not available through Coral Hub.
