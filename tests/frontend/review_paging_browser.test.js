@@ -89,7 +89,7 @@ function installReviews() {
         const goals = await ev(`[...document.querySelectorAll('#inbox-needs-goal option')].map(o => o.value).filter(v => /Off-page goal/.test(v))`);
         assert.equal(new Set(goals).size, 2, 'same goal title and number on two computers stays two choices');
         await ev(`window.__failReviewCount = true; window.__C.refreshCounts(true).then(() => import(${S} + 'inbox_tab.js')).then(m => m.updateInboxTab())`);
-        await waitFor(`/at least 18 need your attention/.test(document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label') || '')`, 'partial count adds only failed-source loaded rows');
+        await waitFor(`/18\\+ need your attention/.test(document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label') || '')`, 'partial count adds only failed-source loaded rows');
         await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 100+')`, 'count-source failure leaves the listed-row pill at 100+');
         await ev(`window.__failReviewCount = false; window.__C.refreshCounts(true).then(() => import(${S} + 'inbox_tab.js')).then(m => m.updateInboxTab())`);
         await ev(`window.__failReviewMore = true; document.querySelector('[data-review-more="box-b"][data-review-stream="review"]').click(); true`);
