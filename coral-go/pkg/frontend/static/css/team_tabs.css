@@ -5,7 +5,7 @@
 
 /* The phone strip visibly points toward hidden tabs, including when Branches is selected at the end. */
 .team-strip-edge { display: none; }
-@media (max-width: 760px) {
+@media all { /* at any width: a tablet's strip (820 px) scrolled with no cue and cut 'Branches' (walk 80 #13); the button shows only while tabs wait past the edge */
     .team-strip-edge { position: absolute; bottom: 1px; height: var(--control-touch-height, 44px); width: 16px; align-items: center; justify-content: center; color: var(--text-primary); background: var(--bg-primary); pointer-events: none; }
     .team-strip-edge-start { left: 0; }
     .team-strip-edge-end { right: 0; }

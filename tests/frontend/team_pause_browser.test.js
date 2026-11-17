@@ -35,7 +35,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await ev(`(() => { const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n, c = 0; while ((n = w.nextNode())) { const e = n.parentElement; if (/paused/i.test(n.nodeValue) && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden') c++; } return c; })()`), 1, 'Paused is on the page once');
         await waitFor(`!!document.getElementById('team-pause-bar') && !document.getElementById('team-pause-bar').hidden`, 'the pause line', 10000);
         const line = await ev(`document.getElementById('team-pause-bar').textContent`);
-        assert.match(line, /^Paused since \d{1,2}:\d{2}.*: agents get new messages when you resume\.\s*Resume team$/, line);
+        assert.match(line, /^Paused since \d{1,2}:\d{2}.*: agents get new messages when you resume, and so does an answer you send\.\s*Resume team$/, line);
         assert.equal(await menuItem(), 'Resume team');
         console.log('   ✓');
 
