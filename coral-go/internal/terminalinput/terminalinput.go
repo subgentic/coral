@@ -186,6 +186,60 @@ func LastPersonInput() time.Time {
 // session id, bounded: the long quiet ones are forgotten.
 var personBySession sync.Map
 
+// personTalkBySession is when a person last TALKED to each agent session: their input that was not the answer to a prompt (#14106). Answering a trust, permission or question prompt in the terminal is not talking to
+// the agent, and Coral's notices must not wait a minute for it; personBySession (above) still says the person was at the keyboard, which the dialog timeouts read.
+var personTalkBySession sync.Map
+
+// promptOpen says whether a session has a prompt open (a permission, a question or plan, a trust or other dialog on its screen). A person's input while it is, or in the few seconds after it closed (a trailing
+// Enter), answers it. Installed by the server; none installed: every input of a person's is talk.
+var promptOpen atomic.Pointer[func(sessionID string) bool]
+
+// SetPromptOpenCheck installs how to tell a prompt is open for a session id (lower case); nil removes it.
+func SetPromptOpenCheck(f func(sessionID string) bool) {
+	if f == nil {
+		promptOpen.Store(nil)
+		return
+	}
+	promptOpen.Store(&f)
+}
+
+// promptAnsweredAt is when each session's prompt last saw a person's input, and promptAnswerGrace how long after that a person's input still answers it (the Enter after "1").
+var promptAnsweredAt sync.Map
+var promptAnswerGrace atomic.Int64 // nanoseconds; 0: defaultPromptAnswerGrace
+
+const defaultPromptAnswerGrace = 3 * time.Second
+
+func answersPrompt(sid string, now int64) bool {
+	f := promptOpen.Load()
+	if f == nil {
+		return false
+	}
+	if (*f)(sid) {
+		promptAnsweredAt.Store(sid, now)
+		return true
+	}
+	if v, ok := promptAnsweredAt.Load(sid); ok {
+		grace := time.Duration(promptAnswerGrace.Load())
+		if grace <= 0 {
+			grace = defaultPromptAnswerGrace
+		}
+		if time.Duration(now-v.(int64)) <= grace {
+			return true
+		}
+		promptAnsweredAt.Delete(sid)
+	}
+	return false
+}
+
+// PersonTalkedWithin reports whether a person talked to the session within d: PersonTypedWithin without the input that answered a prompt (#14106). What Coral's notices wait for.
+func PersonTalkedWithin(sessionID string, d time.Duration) bool {
+	if sessionID == "" {
+		return false
+	}
+	v, ok := personTalkBySession.Load(sessionID)
+	return ok && time.Since(time.Unix(0, v.(int64))) <= d
+}
+
 // PersonTypedWithin reports whether a person's own input (the dashboard's terminal or chat box, a signed command line) went to the session within d.
 func PersonTypedWithin(sessionID string, d time.Duration) bool {
 	if sessionID == "" {
@@ -205,12 +259,18 @@ func notePersonTyped(target string) {
 		return
 	}
 	now := time.Now().UnixNano()
-	personBySession.Store(strings.ToLower(m[1]), now)
+	sid := strings.ToLower(m[1])
+	personBySession.Store(sid, now)
+	if !answersPrompt(sid, now) {
+		personTalkBySession.Store(sid, now)
+	}
 	n := 0
 	personBySession.Range(func(k, v any) bool {
 		n++
 		if n > 2000 && time.Duration(now-v.(int64)) > time.Hour {
 			personBySession.Delete(k)
+			personTalkBySession.Delete(k)
+			promptAnsweredAt.Delete(k)
 		}
 		return true
 	})
