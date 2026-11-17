@@ -55,7 +55,7 @@ export function createGuideRoster(team) {
         return { get: canon, set: () => {} }; // the rows are the screen's own: what is saved comes back through load and save
     };
     return {
-        fields: () => [{ key: 'gr_roster', type: 'custom', label: 'Guide names', wide: true, help: 'The name agents see on a guide\'s messages. Until you name them, a guide shows as their Coral Hub label.', render }],
+        fields: () => [{ key: 'gr_roster', type: 'custom', label: 'Guide names', wide: true, help: 'A guide is someone you invited from Coral Hub. Paste their Coral Hub label (hub-user- and eight characters, shown in Coral Hub), then type the name agents should see on their messages. Until you name them, agents see the label.', render }],
         /** Reads the roster. Resolves to the values, or `values: null` with the reason when the server does not give it to this page (the group is then removed). */
         async load() {
             const r = await boardFetch(team, '/guide-roster').catch(() => null);
