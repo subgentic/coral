@@ -252,10 +252,10 @@ Commands:
                                Claim a slot of a shared resource (this machine, a remote one) and wait your turn; see: coral-board resource
   health ack <id>              Mark a health-check item handled: the item that ends
                                with [ack <id>] (orchestrator or Operator)
-  search "<text>" [--source messages,tasks,goals] [--state S] [--goal N] [--assignee NAME] [--from NAME] [--mentions NAME]
-                [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--json]
-                               Search the messages, tasks (title, body, completion message) and goals (title, outcome,
-                               done-when) of your own board (the one you were launched on), oldest posts
+  search "<text>" [--source messages,tasks,goals,history] [--state S] [--goal N] [--assignee NAME] [--from NAME] [--mentions NAME]
+                [--agent NAME] [--author user|assistant] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--json]
+                               Search the messages, tasks (title, body, completion message), goals (title, outcome,
+                               done-when) and past chats of your own board (the one you were launched on), oldest posts
                                included; a hit's context is: read --id <id>, task detail <id>, goal show <id>. --team, --all and --operator-history
                                ask for a wider reach and are refused unless the Operator raised your search access
   peek "<agent>" [--lines N]   Peek at agent's terminal (orchestrator only)

@@ -97,56 +97,11 @@ func (h *SessionsHandler) SearchAgentHistory(w http.ResponseWriter, r *http.Requ
 	if !ok {
 		return
 	}
-	var sessions []store.SessionLineageItem
-	truncated := false
-	if requested == store.SearchReachOwn {
-		sessions, refused = h.historySearchSessions(r.Context(), sessionID, p)
-		if refused != nil {
-			refused(w)
-			return
-		}
-	} else {
-		var err error
-		if sessions, truncated, err = h.historyReachSessions(r.Context(), sessionID, who, requested); err != nil {
-			errInternalServer(w, err.Error())
-			return
-		}
-		if len(sessions) == 0 {
-			errNotFound(w, "Unknown session; run this from inside a Coral agent")
-			return
-		}
-		if p.targetSessionID != "" {
-			var one []store.SessionLineageItem
-			for _, it := range sessions {
-				if it.SessionID == p.targetSessionID {
-					one = append(one, it)
-				}
-			}
-			if len(one) == 0 {
-				errForbidden(w, "Unauthorized: session is not within this agent's search reach ("+requested+")")
-				return
-			}
-			sessions = one
-		}
+	allMatches, sessions, sessionsSearched, truncated, refused := h.historyMatches(r, sessionID, p, who, requested)
+	if refused != nil {
+		refused(w)
+		return
 	}
-	phrases, terms := parseSearchQuery(p.query)
-	var allMatches []AgentHistoryMatch
-	var sessionsSearched []SessionSearchStatus
-	for _, item := range sessions {
-		room := maxHistoryMatches - len(allMatches)
-		if room <= 0 { // the cap is reached: the sessions left are not read
-			truncated = true
-			break
-		}
-		status, matches, more := h.searchHistorySession(r.Context(), item, p, phrases, terms, room)
-		sessionsSearched = append(sessionsSearched, status)
-		allMatches = append(allMatches, matches...)
-		if more {
-			truncated = true
-			break
-		}
-	}
-	sortHistoryMatches(allMatches)
 	results, hasMore := pageHistoryMatches(allMatches, p.offset, p.limit)
 	if requested != store.SearchReachOwn {
 		h.logSearchRead(r, who, requested, "ok", "history-search", strconv.Itoa(len(sessions))+" sessions", len(allMatches))
@@ -164,6 +119,78 @@ func (h *SessionsHandler) SearchAgentHistory(w http.ResponseWriter, r *http.Requ
 	})
 }
 
+// historyMatches is the one history search both routes run (the history route and the board search's history source, #19236): the sessions the reach allows (the caller's lineage, or
+// the wider reach's), narrowed by the optional agent name, then each one's matches of the query, newest first, cut at maxHistoryMatches. refused answers a request the caller may not make.
+func (h *SessionsHandler) historyMatches(r *http.Request, sessionID string, p historySearch, who searchCaller, requested string) (allMatches []AgentHistoryMatch, sessions []store.SessionLineageItem, sessionsSearched []SessionSearchStatus, truncated bool, refused answer) {
+	if requested == store.SearchReachOwn {
+		sessions, refused = h.historySearchSessions(r.Context(), sessionID, p)
+		if refused != nil {
+			return nil, nil, nil, false, refused
+		}
+	} else {
+		var err error
+		if sessions, truncated, err = h.historyReachSessions(r.Context(), sessionID, who, requested); err != nil {
+			return nil, nil, nil, false, func(w http.ResponseWriter) { errInternalServer(w, err.Error()) }
+		}
+		if len(sessions) == 0 {
+			return nil, nil, nil, false, func(w http.ResponseWriter) { errNotFound(w, "Unknown session; run this from inside a Coral agent") }
+		}
+		if p.targetSessionID != "" {
+			var one []store.SessionLineageItem
+			for _, it := range sessions {
+				if it.SessionID == p.targetSessionID {
+					one = append(one, it)
+				}
+			}
+			if len(one) == 0 {
+				return nil, nil, nil, false, func(w http.ResponseWriter) {
+					errForbidden(w, "Unauthorized: session is not within this agent's search reach ("+requested+")")
+				}
+			}
+			sessions = one
+		}
+	}
+	if requested == store.SearchReachOwn { // an earlier session of the caller's own chain that has no name of its own is the same agent's
+		name := ""
+		for _, it := range sessions {
+			if it.IsCurrent {
+				name = it.AgentName
+			}
+		}
+		for i := range sessions {
+			if sessions[i].AgentName == "" {
+				sessions[i].AgentName = name
+			}
+		}
+	}
+	if p.agent != "" {
+		var named []store.SessionLineageItem
+		for _, it := range sessions {
+			if strings.EqualFold(it.AgentName, p.agent) {
+				named = append(named, it)
+			}
+		}
+		sessions = named
+	}
+	phrases, terms := parseSearchQuery(p.query)
+	for _, item := range sessions {
+		room := maxHistoryMatches - len(allMatches)
+		if room <= 0 { // the cap is reached: the sessions left are not read
+			truncated = true
+			break
+		}
+		status, matches, more := h.searchHistorySession(r.Context(), item, p, phrases, terms, room)
+		sessionsSearched = append(sessionsSearched, status)
+		allMatches = append(allMatches, matches...)
+		if more {
+			truncated = true
+			break
+		}
+	}
+	sortHistoryMatches(allMatches)
+	return allMatches, sessions, sessionsSearched, truncated, nil
+}
+
 // historySearch is a history search's request: the query, the roles searched, which sessions of the lineage
 // (all, the current one only, or one named), the page and the excerpt length.
 type historySearch struct {
@@ -171,6 +198,8 @@ type historySearch struct {
 	roles            map[string]bool
 	includeAncestors bool
 	targetSessionID  string
+	agent            string    // only the sessions of this agent name (the board search's --agent)
+	since, until     time.Time // only turns at or after since and before until; zero is open
 	limit, offset    int
 	maxExcerptChars  int
 }
@@ -266,6 +295,13 @@ func (h *SessionsHandler) searchHistorySession(ctx context.Context, item store.S
 		if !matched {
 			continue
 		}
+		timestamp, _ := msg["timestamp"].(string)
+		if !p.since.IsZero() || !p.until.IsZero() {
+			at, err := parseFlexibleTimestamp(timestamp)
+			if err != nil || (!p.since.IsZero() && at.Before(p.since)) || (!p.until.IsZero() && !at.Before(p.until)) {
+				continue // a turn with no readable time cannot be placed in a period
+			}
+		}
 		if len(matches) >= room { // one match more than the room left: the search is cut here
 			return status, matches, true
 		}
@@ -273,7 +309,6 @@ func (h *SessionsHandler) searchHistorySession(ctx context.Context, item store.S
 		if len(offsets) > 0 {
 			firstOffset = offsets[0][0]
 		}
-		timestamp, _ := msg["timestamp"].(string)
 		matches = append(matches, AgentHistoryMatch{
 			SessionID:    item.SessionID,
 			IsCurrent:    item.IsCurrent,

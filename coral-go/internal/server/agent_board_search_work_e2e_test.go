@@ -100,7 +100,7 @@ func TestAgentBoardSearchFindsTasksGoalsAndMessagesBySource(t *testing.T) {
 		code, res, raw := search(url.Values{"q": {"narwhal"}, "state": {"completed"}})
 		require.Equal(t, http.StatusOK, code, raw)
 		assert.Empty(t, res)
-		for _, bad := range []url.Values{{"q": {"x"}, "source": {"history"}}, {"q": {"x"}, "source": {"bogus"}}, {"q": {"x"}, "goal": {"abc"}}} {
+		for _, bad := range []url.Values{{"q": {"x"}, "agent": {"a"}, "state": {"open"}}, {"q": {"x"}, "source": {"bogus"}}, {"q": {"x"}, "goal": {"abc"}}} {
 			code, _, _ = search(bad)
 			assert.Equal(t, http.StatusBadRequest, code, bad.Encode())
 		}

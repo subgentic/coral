@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 
@@ -125,4 +126,31 @@ func TestBoardSearchSendsTheWorkFiltersAndPrintsTasksAndGoals(t *testing.T) {
 	var out map[string]any
 	require.NoError(t, json.Unmarshal([]byte(res.stdout), &out))
 	assert.Len(t, out["results"], 2)
+}
+
+// #19181: a wider reach says tasks and goals are still this board's only.
+func TestBoardSearchSaysTasksAndGoalsStayOnThisBoardWithAWiderReach(t *testing.T) {
+	gs := newGoalServer(t)
+	gs.setReply("GET /api/agent/board/search", strings.Replace(searchWorkReply, `"more":true`, `"more":false,"work_scope":"this board only"`, 1))
+	res := goalRun(t, gs, "search", "narwhal", "--team")
+	require.Equal(t, 0, res.code, res.stderr)
+	assert.Contains(t, res.stdout, "Tasks and goals: this board only")
+	gs.setReply("GET /api/agent/board/search", strings.Replace(searchWorkReply, `"more":true`, `"more":false`, 1))
+	res = goalRun(t, gs, "search", "narwhal")
+	assert.NotContains(t, res.stdout, "Tasks and goals:")
+}
+
+// #19236: --agent and --author are sent, and a past chat turn prints as history <session>@<turn> with the role and the pointer to its context.
+func TestBoardSearchSendsTheChatFiltersAndPrintsPastChatTurns(t *testing.T) {
+	gs := newGoalServer(t)
+	gs.setReply("GET /api/agent/board/search", `{"board":"b-own","reach":"own","more":false,"limit":20,"messages":[],"results":[
+ {"source":"history","id":4,"session":"sess-1","title":"dev","snippet":"the quokka\nplan","state":"assistant","at":"2026-10-01T08:00:05Z"}]}`)
+	res := goalRun(t, gs, "search", "quokka", "--source", "history", "--agent", "dev", "--author", "assistant", "--since", "2026-10-01")
+	require.Equal(t, 0, res.code, res.stderr)
+	reqs := gs.requests()
+	for _, want := range []string{"source=history", "agent=dev", "author=assistant"} {
+		assert.Contains(t, reqs[len(reqs)-1], want)
+	}
+	assert.Contains(t, res.stdout, "history sess-1@4 2026-10-01 08:00 [assistant]  dev: the quokka plan")
+	assert.Contains(t, res.stdout, "coral-agent history context <session> <n>")
 }
