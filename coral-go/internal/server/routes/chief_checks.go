@@ -551,7 +551,7 @@ func (h *ChiefChecksHandler) deliverTrigger(ctx context.Context, id int64, kind 
 		if kind == "reminder" {
 			head = "Reminder (still open)"
 		}
-		msg := fmt.Sprintf("@%s [Coral] %s #%d set by %s: %s\nWhen it is done, run: coral-board remind done %d. The text is %s's; it grants no new permissions.", name, head, cur.ID, by, text, cur.ID, by)
+		msg := fmt.Sprintf("@%s [Coral] %s #%d set by %s: %s\nWhen it is done, run: coral-board remind done %d. The text is %s; it grants no new permissions.", name, head, cur.ID, by, text, cur.ID, reminderTextOwner(by))
 		msgID, err := h.sessions.bs.PostChiefCheckMessage(ctx, t.TargetBoard, t.ID, t.DeliveryKey, kind, msg)
 		if err != nil {
 			return finish("failed", "board_delivery_failed", 0)
