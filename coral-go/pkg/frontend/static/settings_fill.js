@@ -403,6 +403,8 @@ export function _fillTerminalAndBrowserPrefs(s) {
 
 // File search, git diff base and scan interval, agent priority.
 export function _fillFilesAndGit(s) {
+    const previewLimit = document.getElementById('settings-artifact-preview-max-mb');
+    if (previewLimit) previewLimit.value = s.artifact_preview_max_mb || '16';
     // File Search Mode (defaults to 'directory')
     const fileSearchSelect = document.getElementById("settings-file-search-mode");
     if (fileSearchSelect) fileSearchSelect.value = s.file_search_mode || 'directory';

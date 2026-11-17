@@ -13,7 +13,7 @@ import { lockFrame, sandboxedDoc } from './sandbox_frame.js';
 import { visibleName } from './artifact_names.js';
 const { responseFilename: contentDispositionName } = await importOnce('./content_disposition.js'); // Content-Disposition describes the stored file; the artifact label may be extensionless or entirely different. Keep it independent of the UI title.
 
-const MAX_ARTIFACT_PREVIEW_BYTES = 2 * 1024 * 1024;
+const { artifactPreviewBytes, artifactPreviewLimitText } = await importOnce('./artifact_preview_limit.js');
 const MAX_ARTIFACT_MANIFEST_ENTRIES = 200;
  
 function _sizeLabel(bytes) {
@@ -36,7 +36,7 @@ function _renderFallback(container, { filename, type, size, url, reason }) {
 async function _readText(response, maxBytes, signal) {
     if (!response.body || !response.body.getReader) {
         const text = await response.text();
-        if (new TextEncoder().encode(text).byteLength > maxBytes) throw new Error('Artifact is too large to preview');
+        if (new TextEncoder().encode(text).byteLength > maxBytes) throw new Error(artifactPreviewLimitText());
         return text;
     }
     const reader = response.body.getReader();
@@ -50,7 +50,7 @@ async function _readText(response, maxBytes, signal) {
             total += value.byteLength;
             if (total > maxBytes) {
                 await reader.cancel();
-                throw new Error('Artifact is too large to preview');
+                throw new Error(artifactPreviewLimitText());
             }
             chunks.push(value);
         }
@@ -159,7 +159,7 @@ function _renderSandboxed(body, { url, content, name, isStale }) {
 }
 
 /** The preview of an HTML file with the person's choice about scripts (#14730): trusted (this exact version) runs them in the host frame; otherwise the plain preview gets the "Run scripts…" offer.
- *  Never throws and fails closed: a trust that cannot be read, a hash that does not match or a file over 2 MiB leaves the plain preview. */
+ *  Never throws and fails closed: a trust that cannot be read, a hash that does not match or a file over the preview budget leaves the plain preview. */
 async function _scriptsFor(body, { hex, content, name, server, board, ctx }) {
     try {
         const wrapper = body.querySelector('.artifact-linked-preview');
@@ -172,7 +172,7 @@ async function _scriptsFor(body, { hex, content, name, server, board, ctx }) {
             if (line) scripts.drawNote(w, line);
             return w;
         };
-        if (new TextEncoder().encode(content).byteLength > scripts.MAX_SCRIPT_HTML_BYTES) { scripts.drawNote(wrapper, 'This file is over 2 MiB, which is too large to run scripts.'); return; }
+        if (new TextEncoder().encode(content).byteLength > artifactPreviewBytes()) { scripts.drawNote(wrapper, artifactPreviewLimitText()); return; }
         const offer = () => scripts.drawOffer(body.querySelector('.artifact-linked-preview') || wrapper, { hex, server, onTrusted: () => { _scriptsFor(body, { hex, content, name, server, board, ctx }); } });
         if (!(await scripts.readTrust(hex, server))) { if (!ctx.isStale()) offer(); return; }
         if (ctx.isStale()) return;
@@ -251,10 +251,10 @@ async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
         // type or name, read as text and shown through an <img> data: URL (never inline markup; see image_source.js).
         const isSvgArtifact = isCloud() && (isSvg(type) || isSvg(declaredType) || filenameHints.some(isSvg));
         if (isSvgArtifact) {
-            if (size > MAX_ARTIFACT_PREVIEW_BYTES) {
-                _renderFallback(body, { filename, type, size, url: bytesURL, reason: `Preview is limited to ${_sizeLabel(MAX_ARTIFACT_PREVIEW_BYTES)}.` });
+            if (size > artifactPreviewBytes()) {
+                _renderFallback(body, { filename, type, size, url: bytesURL, reason: artifactPreviewLimitText() });
             } else {
-                const svgText = await _readText(resp, MAX_ARTIFACT_PREVIEW_BYTES, ctx.signal);
+                const svgText = await _readText(resp, artifactPreviewBytes(), ctx.signal);
                 if (ctx.isStale()) return;
                 renderImagePanes(body, [{ url: svgDataUrl(svgText), missing: 'Artifact unavailable' }]);
             }
@@ -267,10 +267,10 @@ async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
             renderImagePanes(body, [{ url: bytesURL, missing: 'Artifact unavailable' }]);
         } else if (!isHTML && !isMarkdown && !isJSON && !type.startsWith('text/') && !type.includes('json') && !type.includes('xml') && !filenameHints.some(name => /\.(?:md|markdown|txt|log|json|xml|csv|ya?ml|toml|ini|conf|sh|js|ts|go|py|rs|css|html?)$/i.test(name))) {
             _renderFallback(body, { filename, type, size, url: bytesURL, reason: 'This binary artifact is not rendered inline.' });
-        } else if (size > MAX_ARTIFACT_PREVIEW_BYTES) {
-            _renderFallback(body, { filename, type, size, url: bytesURL, reason: `Preview is limited to ${_sizeLabel(MAX_ARTIFACT_PREVIEW_BYTES)}.` });
+        } else if (size > artifactPreviewBytes()) {
+            _renderFallback(body, { filename, type, size, url: bytesURL, reason: artifactPreviewLimitText() });
         } else {
-            const content = await _readText(resp, MAX_ARTIFACT_PREVIEW_BYTES, ctx.signal);
+            const content = await _readText(resp, artifactPreviewBytes(), ctx.signal);
             if (ctx.isStale()) return;
             if (isHTML) {
                 _renderSandboxed(body, { content, name: filename, isStale: ctx.isStale });
