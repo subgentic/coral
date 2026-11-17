@@ -295,21 +295,19 @@ function syncBarNeeds() {
 }
 
 function drawCounts() {
-    let widened = false;
     for (const t of TEAM_TABS) {
         const c = document.querySelector(`#team-tab-${t} .team-tab-count`); if (!c) continue;
         const n = S.counts[t];
         const text = n ? String(n) : ''; // no badge at zero or unknown: one rule for every tab
-        if (c.textContent !== text) { c.textContent = text; widened = true; }
+        if (c.textContent !== text) c.textContent = text;
         // the pill is never hidden: an empty one keeps the room of a one-digit count (css), so a count arriving moves no tab (#15494 M4)
         const label = $(`team-tab-${t}`).querySelector('.team-tab-label');
         // a space between the word and its count, so the tab is read "Goals 2"
-        label.textContent = text ? `${LABEL[t]} ` : LABEL[t];
+        label.textContent = `${LABEL[t]} `;
     }
     syncBarNeeds();
-    // the counts widen the tabs: when one changed, the selected tab is brought wholly into view again (its own count arrives after it was scrolled to, #8149), then the edges are drawn
-    // a count arrives on a poll: the strip moves sideways, a page scrolled down stays (#12357)
-    queueMicrotask(() => { if (widened) revealInStrip($('team-tabs'), $(`team-tab-${S.tab}`)); drawTabEdges(); });
+    // A background count must not move a tab under a pending tap or undo a person's scroll (#17307). Navigation and resize reveal the selected tab.
+    queueMicrotask(drawTabEdges);
 }
 
 /** The counts on the tabs and the header's status: three light reads, repeated while the page is on screen.
