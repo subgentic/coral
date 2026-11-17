@@ -37,7 +37,6 @@ function onInput(e) {
     if (idx === _dismissed && _dismissedFor === agentKey(state.currentSession)) return; // Escape closed this one (for this agent)
     list.start = idx;
     _words = before.slice(idx + 1);
-    if (isCloud()) { showRows([], _words, SKILLS_STAY); return; } // through the Hub there is no skill list to read (#12677)
     if (_all) draw(); else load(idx);
 }
 
@@ -51,7 +50,7 @@ async function load(idx) {
     try {
         const r = await serverFetch(at, `/api/skills/search?q=&session_id=${encodeURIComponent(cur.session_id || '')}`); // the agent's folder is where the repo's own skills are read from (#16015)
         if (!r.ok) {
-            if (at !== LOCAL_SERVER && mine === _asked && list.start === idx) { showRows([], _words, SKILLS_STAY); return; } // another computer's agent and its Hub refuses: one row that says why, not a menu that closes without a word (QA)
+            if ((at !== LOCAL_SERVER || isCloud()) && mine === _asked && list.start === idx) { showRows([], _words, SKILLS_STAY); return; } // (#19430: through Coral Hub the owner is served; an older machine, or a guest, is refused:) another computer's agent and its Hub refuses: one row that says why, not a menu that closes without a word (QA)
             throw new Error(String(r.status));
         }
         const j = await r.json();

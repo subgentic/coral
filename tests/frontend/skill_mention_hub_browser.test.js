@@ -1,4 +1,5 @@
-// The $ menu on a Hub-served dashboard (#12766, QA's SHOULD 4): skills stay on the computer, so "$" there opens one row that says so and asks no route: no search, nothing to attach. The page is the local server's own
+// The $ menu on a Hub-served dashboard (#12766, QA's SHOULD 4; #19430): through Coral Hub the computer's owner is served, so "$" asks the search route and lists the skills; a computer that refuses it (an older one, or the caller is not its owner) gets one row that says
+// skills stay on the computer, and nothing is attached. The page is the local server's own
 // with the Hub's boot flag and a Hub sign-in answered (as cloud_automations_redirect_browser does it). A local dashboard, in the same run, lists the skills (so the check that none is asked on the Hub is not dead).
 const assert = require('node:assert/strict');
 const { safePaused } = require('./helpers/paused');
@@ -8,7 +9,7 @@ const { coralReady } = require('./helpers/wait');
 const SKILLS = [{ id: 'a'.repeat(32), name: 'abstract-review', version: 1, description: 'Review a change' }];
 const STUB = `(() => { window.__skillAsks = []; const R = window.fetch; const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } }));
     window.fetch = (u, o) => { const url = new URL(String(u), location.href); if (/skills/.test(url.pathname)) window.__skillAsks.push([(o && o.method) || 'GET', url.pathname]);
-        if (url.pathname === '/api/skills/search') return json({ skills: ${JSON.stringify(SKILLS)} });
+        if (url.pathname === '/api/skills/search') return localStorage.getItem('skills-refused') === '1' ? json({ code: 'owner_only' }, 403) : json({ skills: ${JSON.stringify(SKILLS)} });
         return R(u, o); }; })();`;
 
 (async () => {
@@ -41,7 +42,15 @@ const STUB = `(() => { window.__skillAsks = []; const R = window.fetch; const js
         });
         await open(process.env.CORAL_TEST_URL + '/');
         await waitFor(`!!document.getElementById('coral-boot') && JSON.parse(document.getElementById('coral-boot').textContent).mode === 'cloud'`, 'the Hub\'s boot flag', 10000);
+        // served: the owner through the Hub gets the list, as at the dashboard
         await waitFor(`!!document.querySelector('.skill-mention-item')`, 'the Hub\'s menu', 6000);
+        assert.deepEqual(await menu(), ['abstract-review Review a change'], 'the Hub: the approved skill is listed');
+        assert.ok((await ev(`window.__skillAsks`)).some(x => x[1] === '/api/skills/search'), 'the Hub: the search route is asked');
+        // refused (an older computer, or a guest): one row that says skills stay on the computer, and nothing is attached
+        await ev(`localStorage.setItem('skills-refused', '1'); const i = document.getElementById('command-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); true`); // the menu closes and forgets its list
+        await waitFor(`!document.querySelector('.skill-mention-dropdown') || getComputedStyle(document.querySelector('.skill-mention-dropdown')).display === 'none'`, 'the menu closed', 6000);
+        await ev(`document.getElementById('command-input').focus(); true`); await Input.insertText({ text: '$' }); // a new mention: the search is asked again, and this time refused
+        await waitFor(`!!document.querySelector('.skill-mention-item') && /Skills stay on the computer/.test(document.querySelector('.skill-mention-dropdown').textContent)`, 'the refused note', 8000);
         const rows = await menu();
         assert.equal(rows.length, 1, 'one row: ' + JSON.stringify(rows));
         assert.match(rows[0], /^Skills stay on the computer/, 'the row says skills stay on the computer');
@@ -49,7 +58,7 @@ const STUB = `(() => { window.__skillAsks = []; const R = window.fetch; const js
         await Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
         await new Promise(r => setTimeout(r, 400)); // sleep-ok: nothing is the expected result; no event to wait for
         assert.equal(await ev(`document.getElementById('command-input').value`), '$', 'Enter on the note changes nothing');
-        assert.deepEqual(await ev(`window.__skillAsks`), [], 'no skill route is asked on the Hub: ' + JSON.stringify(await ev(`window.__skillAsks`)));
-        console.log('PASS the $ menu on the Hub: one note, no route asked');
+        assert.ok(!(await ev(`window.__skillAsks`)).some(x => x[0] === 'POST'), 'nothing is attached');
+        console.log('PASS the $ menu on the Hub: served for the owner, one note when refused, nothing attached');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

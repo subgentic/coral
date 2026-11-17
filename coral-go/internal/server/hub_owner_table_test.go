@@ -110,6 +110,7 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"GET /api/board/{project}/cross-team/settings": "owner-only-hub",
 		"GET /api/custom-models":                       "owner-only", "PUT /api/custom-models": "owner-only", // #5996
 		"GET /api/custom-modes": "owner-only", "PUT /api/custom-modes": "owner-only", // #15950
+		"GET /api/skills/search": "owner-only", "POST /api/sessions/live/{name}/skills": "owner-only", // the $ menu through the Hub (#19430)
 		"GET /api/saved":                                "owner-only",
 		"GET /api/saved/{id}/message":                   "owner-only",
 		"POST /api/saved":                               "owner-only",

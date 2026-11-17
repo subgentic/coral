@@ -143,7 +143,6 @@ var shellNeverFiles = map[string]shellNever{
 	"setup_code_setting.js":     {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"shared_images.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"signed_out.js":             {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
-	"skill_mention.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
 	"skills_tab.js":             {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 6},
 	"startup_status.js":         {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"system_status.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},

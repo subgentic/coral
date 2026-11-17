@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/skills"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
@@ -101,7 +102,7 @@ func TestASkillThatIsNotApprovedIsRefusedTheSameWayAndNothingIsAttached(t *testi
 	assert.Equal(t, 404, code, "no such running agent")
 }
 
-func TestOnlyThePersonAtTheDashboardMaySearchOrAttachNotAnAgentAKeyOrTheHub(t *testing.T) {
+func TestOnlyThePersonAtTheDashboardMaySearchOrAttachNotAnAgentOrAKey(t *testing.T) {
 	e := newSkillsEnv(t)
 	e.liveAgent("sid-a")
 	sk := e.approved("release-notes", "Writes release notes.", 1)
@@ -111,17 +112,50 @@ func TestOnlyThePersonAtTheDashboardMaySearchOrAttachNotAnAgentAKeyOrTheHub(t *t
 		code, _ = e.call("GET", "/api/skills/search?q=release", "", who)
 		assert.Equal(t, 403, code, "search by "+who)
 	}
-	// Coral Hub's tunnel, whoever it says is at the other end.
-	for _, c := range [][2]string{{"POST", e.attachPath("sid-a")}, {"GET", "/api/skills/search?q=release"}} {
-		req := httptest.NewRequest(c[0], c[1], strings.NewReader(attachBody(sk.ID)))
-		req.Header.Set(tunnel.ViaHeader, "1")
-		req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+	have, _ := e.ss.AttachedSkills(context.Background(), "sid-a")
+	assert.Empty(t, have, "none of those attached anything")
+}
+
+// #19430 (the Operator: yes for 2.1.0): through Coral Hub the OWNER of the computer, and only the owner, searches the skills and attaches one to a running agent, as the person at the dashboard does. A guest,
+// a request with a forged tunnel stamp, an agent's token riding the tunnel and a Hub request with no owner stamp get a 403 and attach nothing.
+func TestThroughTheHubOnlyTheOwnerMaySearchOrAttachSkills(t *testing.T) {
+	e := newSkillsEnv(t)
+	e.liveAgent("sid-a")
+	sk := e.approved("release-notes", "Writes release notes.", 1)
+	oldLabel := hubOwnerLabel
+	const owner, guest = "hub-user-0000beef", "hub-user-1234abcd"
+	hubOwnerLabel = func(context.Context) (string, error) { return owner, nil }
+	t.Cleanup(func() { hubOwnerLabel = oldLabel })
+	hub := func(method, path string, hdr map[string]string, agentToken bool) int {
+		req := httptest.NewRequest(method, path, strings.NewReader(attachBody(sk.ID)))
+		req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerHub))
+		for k, v := range hdr {
+			req.Header.Set(k, v)
+		}
+		if agentToken {
+			req = req.WithContext(context.WithValue(req.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: "sid-a", SessionName: "claude-sid-a"}))
+		}
 		rec := httptest.NewRecorder()
 		e.router.ServeHTTP(rec, req)
-		assert.Equal(t, 403, rec.Code, "the Hub: "+c[0]+" "+c[1])
+		return rec.Code
+	}
+	ownerHdr := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: owner, tunnel.HubRoleHeader: tunnel.HubRoleOwner}
+	guestHdr := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: guest}
+	forged := map[string]string{tunnel.ViaHeader: "1", tunnel.HubUserHeader: owner, tunnel.HubRoleHeader: tunnel.HubRoleOwner}
+	calls := [][2]string{{"POST", e.attachPath("sid-a")}, {"GET", "/api/skills/search?q=release"}}
+	for _, c := range calls {
+		what := c[0] + " " + c[1]
+		assert.Equal(t, 403, hub(c[0], c[1], guestHdr, false), "a Hub guest: "+what)
+		assert.Equal(t, 403, hub(c[0], c[1], forged, false), "a forged tunnel stamp: "+what)
+		assert.Equal(t, 403, hub(c[0], c[1], map[string]string{tunnel.ViaHeader: cloud.ViaSecret()}, false), "no owner stamp: "+what)
+		assert.Equal(t, 403, hub(c[0], c[1], ownerHdr, true), "an agent's token on the owner's tunnel: "+what)
 	}
 	have, _ := e.ss.AttachedSkills(context.Background(), "sid-a")
 	assert.Empty(t, have, "none of those attached anything")
+	assert.Equal(t, 200, hub("GET", "/api/skills/search?q=release", ownerHdr, false), "the owner searches")
+	assert.Equal(t, 200, hub("POST", e.attachPath("sid-a"), ownerHdr, false), "the owner attaches")
+	have, _ = e.ss.AttachedSkills(context.Background(), "sid-a")
+	assert.Len(t, have, 1, "and it is attached")
 }
 
 func TestTheMenuListsOnlyApprovedSkillsNewestVersionAtMostTwenty(t *testing.T) {
