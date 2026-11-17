@@ -5,7 +5,7 @@ import { inTeam, sessionServer } from './server_base.js';
 import { resolveSessionIdentity, askWords } from './session_state.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('team_startup_waits.css');
-const waiting = row => !row.sleeping && !row.archived && row.waiting_for_input && (row.waiting_kind === 'startup' || /browser/i.test(row.waiting_summary || ''));
+const waiting = row => !row.sleeping && !row.archived && row.waiting_for_input && row.waiting_kind === 'startup';
 export function drawStartupWaits(host, team) {
     const rows = (state.liveSessions || []).filter(row => inTeam(row, team) && waiting(row));
     const signature = JSON.stringify(rows.map(row => [sessionServer(row), row.session_id, row.waiting_summary]));

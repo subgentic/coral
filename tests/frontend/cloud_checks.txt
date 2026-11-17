@@ -454,3 +454,5 @@ node launch_disclosure_modes.test.mjs
 node goal_closed_recently_unit.test.mjs
 node team_agents_model_import.test.mjs
 node ask_open_pages.test.mjs
+
+node team_startup_kind.test.js
