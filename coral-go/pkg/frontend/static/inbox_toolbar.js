@@ -39,7 +39,7 @@ export function folderToolbar(spec, onChange) {
             const active = document.activeElement;
             const held = bar.node.contains(active) ? (active.matches('.team-tb-select') ? 'select' : active.dataset.filter) : null;
             adoptPills(bar.node, pills, action);
-            if (spec.idp === 'inbox-needs') importOnce('./inbox_kind_menu.js').then(m => m.mount(bar.node, pills));
+            if (spec.idp === 'inbox-needs') importOnce('./inbox_kind_menu.js').then(m => m.mount(bar.node, pills)).catch(() => {});
             if (held) {
                 const next = held === 'select' ? bar.node.querySelector('.team-tb-select') : [...bar.node.querySelectorAll('[data-filter]')].find(e => e.dataset.filter === held);
                 next?.focus({ preventScroll: true });
