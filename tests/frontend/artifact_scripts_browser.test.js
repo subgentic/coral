@@ -71,6 +71,7 @@ const OTHER = 'cd'.repeat(32);
             // 1. an untrusted file: the plain preview, the offer, nothing ran
             await open();
             await waitFor(`!!document.querySelector('#artifact-viewer .artifact-scripts-ask')`, `${w}: the Run scripts… offer`, 5000);
+            assert.equal((await text('.artifact-scripts-ask')).trim(), "Run this page's scripts", `${w}: the choice explains what runs`);
             assert.ok(await q('.artifact-scripts-ask'), `${w}: Run scripts… is shown`);
             assert.equal(await ev(`document.querySelector('#artifact-viewer .artifact-linked-preview iframe').getAttribute('sandbox')`), '', `${w}: the plain frame has the empty sandbox`);
             await sleep(400); // sleep-ok: a negative: a script that was going to run in the plain frame would have by now
@@ -80,6 +81,8 @@ const OTHER = 'cd'.repeat(32);
             // 2. the confirmation: the words, Cancel changes nothing
             await click('.artifact-scripts-ask');
             assert.ok(await q('.artifact-scripts-sure'), `${w}: the confirmation opens in place`);
+            assert.equal(await ev(`document.querySelectorAll('#artifact-viewer .artifact-scripts-sure').length`), 1, `${w}: exactly one confirmation`);
+            assert.equal((await text('.artifact-scripts-go')).trim(), 'Allow scripts', `${w}: the confirmation has a distinct decision label`);
             assert.ok(!/disabled/.test(await text('.artifact-linked-notice')), `${w}: the banner does not say scripts are disabled above the question (#15324)`);
             assert.equal((await text('.artifact-scripts-sure p')).trim(), 'This file can run scripts. They can draw and animate. Coral limits what they can reach: no web requests, no cookies, no files, and nothing it stores is kept after the preview closes. Do not trust a file you would not open.', `${w}: the confirmation says what the design says`);
             await shot('scripts-confirm-' + w);
@@ -133,7 +136,7 @@ const OTHER = 'cd'.repeat(32);
 
             // #14783: the same through the ⋯ menu: Run scripts… opens the one confirmation, and on, Turn off scripts turns them off
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-more').click(); true`);
-            assert.equal((await text('.artifact-viewer-scripts-item')).trim(), 'Run scripts…', `${w}: the menu offers Run scripts… while they are off`);
+            assert.equal((await text('.artifact-viewer-scripts-item')).trim(), "Run this page's scripts", `${w}: the menu offers Run scripts… while they are off`);
             await click('.artifact-viewer-scripts-item');
             assert.ok(await q('.artifact-scripts-sure'), `${w}: the menu item opens the same confirmation`);
             await click('.artifact-scripts-go');
