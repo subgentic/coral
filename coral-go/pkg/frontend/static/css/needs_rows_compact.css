@@ -60,3 +60,8 @@
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td[data-key="review"] { grid-column: 4 / 6; grid-row: 2 / span 2; order: 8; align-self: end; justify-self: end; padding: 0; }
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td:empty { display: none; } /* the column this row does not use */
 }
+/* A touch tablet (820 px is not a phone): the file name, Save for later and Star are 44 px targets; the card's 32 px name is for a mouse (walk 80 item 10, #17694). */
+@media (pointer: coarse) {
+    :root #group-table-view .inbox-needs-results tr.inbox-card-tr:not(:has(.inbox-ask-name)) .inbox-review-name { min-height: var(--table-touch, 44px); height: var(--table-touch, 44px); }
+    :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-review-actions > :is(.inbox-bookmark, .inbox-star) { min-width: var(--table-touch, 44px); }
+}
