@@ -5,7 +5,7 @@ const { connect } = require('./agent_view_harness');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
 const { axName } = require('./helpers/ax_tree');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, waitStable } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -25,6 +25,10 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`document.querySelectorAll('.dt-table tbody tr .dt-primary').length >= 2`, `${tag} ${tab}: rows`, 8000); await waitFor(`!!document.querySelector('.dt-table tbody tr .dt-primary')`, 'row', 4000);
                 await ev(`document.querySelectorAll('.dt-table tbody tr .dt-primary')[1].focus(); true`); const before = await active();
                 await key('Enter'); await waitFor(`!document.querySelector('.dt-table tbody tr .dt-primary') || document.activeElement !== document.querySelector('.dt-table tbody tr .dt-primary')`, `${tag} ${tab}: the item opens`, 6000);
+                // The item is open when its Back is shown and stays so: before that, Escape is not "one level back" to the list but the Inbox's own Escape, which leaves for Agents (saved_marks.js looks for the Back link). At 20x CPU slowdown the key landed first (#19449).
+                const backShown = `[...document.querySelectorAll('#inbox-page:not([hidden]) .goals-back, #inbox-page:not([hidden]) .back-link, #agentic-saved-detail-pane:not([hidden]) .back-link, .phone-title-row .back-link')].some(b => b.getClientRects().length > 0)`;
+                await waitFor(backShown, `${tag} ${tab}: the item's Back is shown`, 15000);
+                await waitStable(ev, backShown, `${tag} ${tab}: the item's Back stays`, 400, { timeout: 15000, accept: v => v === true });
                 const inside = await active(); check(inside && inside.visible && !/dt-primary|dt-mail-open/.test(inside.cls), `${tag} ${tab}: Enter puts focus inside the item, visible: ${JSON.stringify(inside)}`);
                 await key('Escape'); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the list redraws
                 const back = await active(); check(back && back.visible && back.text === before.text, `${tag} ${tab}: Escape puts focus back on the row it came from (${JSON.stringify(before.text)}): ${JSON.stringify(back)}`);
