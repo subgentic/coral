@@ -81,11 +81,15 @@ export const { EMPTY, clean, isFiltered, isQuery, chips, without } = model;
 export const storageKey = () => 'coral-inbox-activity-filters';
 const kept = model.persist(storageKey);
 /** The filters kept in this browser for the folder, or the empty ones (the search words are not kept: a page opened later starts with an empty box). */
-/** A browser that kept nothing opens on Important (#19149); one that kept a choice (including the earlier "everything") keeps it: a kept record without the Important field is Everything. */
+/** A browser that kept nothing, or a record from before Important existed (no Important field), opens on Important (#19149, one time); a record saved with the field keeps its choice, Everything included. */
 export const loadFilters = () => {
     let raw = null;
     try { raw = browserLocal.get(storageKey('inbox-activity')); } catch { raw = null; }
-    return raw == null ? { ...EMPTY, important: true } : { ...kept.load('inbox-activity', browserLocal), q: '' };
+    if (raw == null) return { ...EMPTY, important: true };
+    const f = { ...kept.load('inbox-activity', browserLocal), q: '' };
+    let hasField = false;
+    try { const o = JSON.parse(raw); hasField = !!o && typeof o === 'object' && 'important' in o; } catch { hasField = false; }
+    return hasField ? f : { ...f, important: true };
 };
 /** Kept always, Everything too: removing the record would bring Important back on the next page. */
 export const saveFilters = f => { try { browserLocal.set(storageKey('inbox-activity'), JSON.stringify({ ...clean(f), q: '' })); } catch { /* storage unavailable: the choice lasts until the page is closed */ } };

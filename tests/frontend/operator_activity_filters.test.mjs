@@ -46,7 +46,10 @@ for (const action of ['file_comment', 'file_reply', 'file_version']) assert.ok(A
     assert.equal(AF.loadFilters().important, true);
     const store = (await import('../../coral-go/pkg/frontend/static/safe_storage.js')).browserLocal;
     store.set(AF.storageKey('inbox-activity'), JSON.stringify({ sort: 'oldest' }));
-    assert.equal(AF.loadFilters().important, false, 'a record kept before Important was added stays Everything');
+    assert.equal(AF.loadFilters().important, true, 'a record kept before Important was added opens on Important (one time)');
+    assert.equal(AF.loadFilters().sort, 'oldest', 'and keeps the rest of what it kept');
+    AF.saveFilters({ ...AF.loadFilters(), important: false });
+    assert.equal(AF.loadFilters().important, false, 'Everything picked after this change is kept');
     store.remove(AF.storageKey('inbox-activity'));
     assert.equal(AF.loadFilters().important, true);
 }
