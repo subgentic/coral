@@ -1,6 +1,6 @@
 // The Backend select in the Terminal step starts on the backend the server runs (#16409): a pty server shows PTY, not tmux (the first option). The status is stubbed so the test does not depend on the server's backend.
 const assert = require('node:assert/strict');
-const { coralReady } = require('./helpers/wait');
+const { coralReady, framesJs } = require('./helpers/wait');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 (async () => {
@@ -34,6 +34,17 @@ const BASE = require('./test_base').BASE;
             assert.equal(await ev(`document.getElementById('launch-terminal-backend').value`), running);
             assert.ok((await ev(`window.__backendRequests`)).includes(server === 'local' ? '/api/system/terminal-backend' : '/api/remote/backend-remote/api/system/terminal-backend'), 'backend status comes from the selected computer');
         }
-        console.log('PASS the Terminal step Backend follows the server');
+        await ev(`window._onLaunchServerChange('local'); true`);
+        await waitFor(`document.getElementById('launch-terminal-backend').value === 'tmux'`, 'switching computer refreshes its backend', 4000);
+        await ev(`(() => {const f=window.fetch; window.fetch=(u,o)=>String(u)==='/api/system/terminal-backend' ? new Promise(resolve=>{window.__finishOldBackend=()=>resolve(new Response(JSON.stringify({running:'tmux',next:'tmux'}),{headers:{'content-type':'application/json'}}));}) : f(u,o); return true;})()`);
+        await ev(`window._onLaunchServerChange('backend-remote'); true`);
+        await waitFor(`document.getElementById('launch-terminal-backend').value === 'pty'`, 'switch back to remote', 4000);
+        await ev(`window._onLaunchServerChange('local'); true`);
+        await waitFor(`!!window.__finishOldBackend`, 'old computer request is pending', 4000);
+        await ev(`window._onLaunchServerChange('backend-remote'); true`);
+        await waitFor(`window.__backendRequests.filter(u=>u.startsWith('/api/remote/backend-remote/')).length >= 3`, 'new remote request completed', 4000);
+        await ev(`(async()=>{window.__finishOldBackend(); await ${framesJs(2)}; return true;})()`);
+        assert.equal(await ev(`document.getElementById('launch-terminal-backend').value`), 'pty', 'late response from the previous computer cannot overwrite the selection');
+        console.log('PASS backend follows computer switches and ignores stale replies');
     } finally { await client.close(); }
 })().catch(e => { console.error(e.stack || e.message); process.exit(1); });
