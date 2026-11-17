@@ -1,6 +1,5 @@
 // Touch census of the Needs you list on a tablet (walk 80 item 10, #17694): at 820 x 1180 with a coarse pointer every visible button, link or field in the list is 44 x 44 CSS px (the compact card's 32 px file name and its 40 and 35 px Save for later and Star buttons were for a mouse).
-// Needs you counts from one number (#15118, Beta walk 3 N5, N6, N24): the Inbox badge, the folder's count, the list's title, the All chip and the words 'N unread, M in the list' say the same two numbers (unread, listed), with the
-// welcome tiles in neither, before and after one of the files is put away.
+// Three Needs you files are listed with the Inbox's own table at that size; the list is measured once its names and Save for later and Star buttons are all drawn.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
@@ -44,7 +43,7 @@ const UNDERSIZED = `(() => {
                 window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.href); if (u.pathname === '/api/team-artifacts') return json(window.__reviewFixturePage(u, location.href, { '${team}': window.__rows })); if (u.pathname === '/api/board/${team}/artifacts') return json({ artifacts: window.__rows, has_more: false }); if (opts.method === 'PUT' && /\\/artifacts\\/[0-9a-f]{64}\\/tags$/.test(u.pathname)) { const row = window.__rows.find(r => u.pathname.includes(r.id)); if (row) row.tags = JSON.parse(opts.body).tags; return json({ ok: true, tags: row ? row.tags : [] }); } if (opts.method === 'POST' && /\\/artifacts\\/[0-9a-f]{64}\\/review$/.test(u.pathname)) { const i = window.__rows.findIndex(r => u.pathname.includes(r.id)); if (i >= 0) window.__rows.splice(i, 1); return json({ ok: true }); } return original(url, opts); }; return true; })()`);
             await ev(`T.state.settings = { ...T.state.settings, inbox_welcome: 'off', inbox_welcome_done: '' }; window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, `${w}: the rows`, 15000);
-            await ev(`new Promise(r => setTimeout(r, 600))`); // sleep-ok: the list settles
+            await waitFor(`document.querySelectorAll('#group-table-view .inbox-review-name').length === 3 && document.querySelectorAll('#group-table-view .inbox-bookmark').length === 3 && document.querySelectorAll('#group-table-view .inbox-star').length === 3`, `${w}: the names, Save for later and Star of the three files are drawn`, 8000);
             const l = await ev(UNDERSIZED); if (l.length) problems.push('controls under 44 px (' + l.length + '): ' + l.join(' | '));
         }
     } finally { await ev(`fetch('/api/board/${team}', { method: 'DELETE' })`).catch(() => {}); await client.close(); await guard.restore(); }
