@@ -11,7 +11,7 @@ const docs = fs.readFileSync(path.join(here, '../../coral-go/agent_docs/board.md
 const team = fs.readFileSync(path.join(here, '../../coral-go/pkg/frontend/static/team_page.js'), 'utf8');
 
 const reader = fs.readFileSync(path.join(here, '../../coral-go/pkg/frontend/static/analytics_cost_tasks.js'), 'utf8');
-assert.ok(dashboard.includes('readCostTasks()'), 'dashboard follows all projected task pages');
+assert.ok(dashboard.includes('readCostTasks({full: force})'), 'dashboard follows all projected task pages');
 assert.ok(reader.includes('/api/board/tasks?limit=100&fields='));
 assert.ok(!reader.includes('has_cost=true'), 'zero-cost tasks are included');
 const fields = (reader.match(/const fields = '([^']+)'/) || [])[1];

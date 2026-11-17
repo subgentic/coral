@@ -364,7 +364,7 @@ async function _readCostDashboard({ force = false } = {}) {
     try {
         const [summaryResp, taskResp, tsResp, teamResp, branchResp] = await Promise.all([
             fetch(`/api/token-usage/summary${sinceParam}`).catch(() => null),
-            readCostTasks().catch(() => null), // all projected pages, including zero-cost tasks (#17251)
+            readCostTasks({full: force}).catch(() => null), // all projected pages, including zero-cost tasks (#17251)
             fetch(`/api/token-usage/timeseries${tsParams}`).catch(() => null),
             fetch(`/api/token-usage/by-team${sinceParam}`).catch(() => null),
             fetch(`/api/token-usage/by-branch${sinceParam}`).catch(() => null),
