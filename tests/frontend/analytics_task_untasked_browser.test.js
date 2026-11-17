@@ -46,11 +46,11 @@ const MANY = Array.from({ length: 100 }, (_, i) => task(100 + i, 0.001, 0)); // 
         assert.deepEqual(names, ['Not on a task', 'Polish', 'Ship it', 'Tasks with no goal'], JSON.stringify(g.rows));
         const gi = g.head.findIndex(h => /^Cost/.test(h));
         assert.equal(g.rows.find(r => r[0] === 'Ship it')[gi], '$0.55');
-        // a full list (100 tasks) may be missing older ones: the rest says so
+        // 100 rows without a next cursor are complete: the rest remains unassigned spend
         await ev(`window.__tasks = ${JSON.stringify(MANY)}; import((window.__coralStatic || '/static/') + 'cost_dashboard.js').then(m => m._refreshCostDashboard({ force: true })).then(() => true)`);
         await ev(`import((window.__coralStatic || '/static/') + 'analytics_views.js').then(m => m.selectView('task')).then(() => true)`);
-        await waitFor(`[...document.querySelectorAll('#cost-by-task tbody tr')].some(r => r.textContent.includes('Other cost in this range'))`, 'a full list calls the rest "Other cost in this range"', 15000);
-        assert.ok(![...await ev(`[...document.querySelectorAll('#cost-by-task tbody tr')].map(r => r.textContent)`)].some(x => x.includes('Not on a task')), 'and not "Not on a task"');
+        await waitFor(`[...document.querySelectorAll('#cost-by-task tbody tr')].some(r => r.textContent.includes('Not on a task'))`, 'a completed list names the rest Not on a task', 15000);
+        assert.ok(![...await ev(`[...document.querySelectorAll('#cost-by-task tbody tr')].map(r => r.textContent)`)].some(x => x.includes('Other cost in this range')), 'no inferred truncation from row count');
         // a task that began before the range counts in full, so the tasks can add up to MORE than the Total: a negative row keeps the rows adding up instead of hiding the rest (#17827)
         await ev(`window.__total = 0.5; window.__tasks = ${JSON.stringify(TASKS)}; import((window.__coralStatic || '/static/') + 'cost_dashboard.js').then(m => m._refreshCostDashboard({ force: true })).then(() => true)`);
         await ev(`import((window.__coralStatic || '/static/') + 'analytics_views.js').then(m => m.selectView('task')).then(() => true)`);
