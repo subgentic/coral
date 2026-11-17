@@ -38,7 +38,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); await new Promise(r => setTimeout(r, 400)); /* sleep-ok: a screenshot waits out transitions */ fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
-        await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false }); // 1440: the By agent table's ten columns fit its panel (a narrower one hides its last columns before it scrolls, #11943)
+        await Emulation.setDeviceMetricsOverride({ width: 1560, height: 900, deviceScaleFactor: 1, mobile: false }); // 1560 (was 1440 until the head "New input tokens", #19227): the By agent table's ten columns fit its panel (a narrower one hides its last columns before it scrolls, #11943)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`try { for (const k of Object.keys(localStorage)) if (k.includes('coral-eff-group')) localStorage.removeItem(k); } catch {} window.switchNavTab('tokens'); true`);
         await waitFor(`!!document.querySelector('#cost-group-bar .eff-seg-btn')`, 'the Analytics page', 10000);
@@ -73,7 +73,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
         dump.tt = await table('#cost-eff-task-time'); await shot('tables-task-time');
         const noIcon = heads => heads.map(h => h.replace(/filter_list$/, ''));
         // By agent: the route's rows in cost order; every cell as the route's number reads in the one Analytics format
-        assert.deepEqual(noIcon(dump.agent.heads), ['Agent', 'Cost', 'Team', 'Folder', 'Launched', 'Duration', 'Requests', 'Input', 'Output', 'Details'], 'By agent: the columns a desktop draws');
+        assert.deepEqual(noIcon(dump.agent.heads), ['Agent', 'Cost', 'Team', 'Folder', 'Launched', 'Duration', 'Requests', 'New input tokens', 'Output', 'Details'], 'By agent: the columns a desktop draws');
         const strip = rows => rows.map(r => r.map((c, i) => (i === 4 ? (/^[A-Z][a-z]{2} \d+, 2026 \d\d:\d\d:\d\d [AP]M$/.test(c) ? 'time' : c) : c)));
         assert.deepEqual(strip(dump.agent.rows), [
             ['Backend Dev', '$12.35', 'team-x', 'coral', 'time', '2 h 05 min', '1234', '1.2M', '999', 'Charts'],

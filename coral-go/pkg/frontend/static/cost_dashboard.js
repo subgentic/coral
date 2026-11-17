@@ -583,7 +583,7 @@ function _renderProviderTable(rows) {
     _drawTable(container, 'provider', [
         _textCol('provider', 'agent_type', 'Provider', r => r.agent_type || '', { cell: _swatched('provider', r => r.agent_type || '') }),
         _numCol('requests', 'Requests', r => r.requests || 0, String),
-        _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
+        _tokCol('input_tokens', 'New input tokens'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
         _costCol(rows), _shareCol(),
     ], filtered, null, _seriesOpts('provider'));
 }
@@ -599,7 +599,7 @@ function _renderModelTable(rows) {
         _textCol('model', 'agent_type', 'Provider', r => r.agent_type || '', { cell: _swatched('model', r => r.agent_type || '') }),
         _textCol('model', 'model', 'Model', r => r.model || '', { title: r => r.model_id || '' }),
         _numCol('requests', 'Requests', r => r.requests || 0, String),
-        _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
+        _tokCol('input_tokens', 'New input tokens'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
         _costCol(rows), _shareCol(),
     ], filtered, null, _seriesOpts('model'));
 }
@@ -619,7 +619,7 @@ function _renderThinkingTable(rows) {
         _textCol('thinking', 'model', 'Model', r => r.model || '', { sortValue: r => (r.model_id ? r.model : 'zzzz Not reported'), title: r => r.model_id || '' }), // after the named models when ascending
         _textCol('thinking', 'level', 'Thinking level', r => r.level || '', { sortValue: r => (r.level_key ? r.level : 'zzzz Not reported') }), // after the named levels when ascending (localeCompare puts '~' first)
         _numCol('requests', 'Calls', r => r.requests || 0, v => (v ? String(v) : '–')),
-        _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
+        _tokCol('input_tokens', 'New input tokens'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
         _numCol('thinking_tokens', 'Thinking', r => r.thinking_tokens, v => (v === null ? '–' : compactFigure(v)), { sortValue: r => r.thinking_tokens || 0 }),
         _costCol(rows), _shareCol(),
     ], filtered, null, { quiet: r => !r.level_key }); // the usage with no thinking level recorded (#4969) is not a level: quieter than the rows that are
@@ -653,7 +653,7 @@ function _renderAgentTable(rows) {
         _numCol('duration', 'Duration', span, () => '', { cell: r => _formatDuration(start(r), end(r)) }),
         _numCol('requests', 'Requests', r => r.requests || 0, String),
         _numCol('context_pct', 'Context used', r => (r.context_pct == null ? -1 : r.context_pct), () => '', { cell: r => (r.context_pct == null ? '–' : `${r.context_pct}%`), title: r => (r.context_pct == null ? 'Only a running agent has a context used' : `${r.context_pct}% of its model\'s context window`) }), // a running agent's, next to its cost (#10272)
-        _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
+        _tokCol('input_tokens', 'New input tokens'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
         { key: 'details', label: 'Details', tone: 'secondary', cell: r => { const b = dtLink('Charts', () => agentDetail.openAgent(r, document.getElementById('cost-time-range')?.value || 'day')); b.setAttribute('aria-label', `Charts for ${r.display_name || r.agent_name || 'agent'}`); return b; } }, // one agent over the range (#7930)
     ], filtered, noDataWords(_period()), _seriesOpts('agent'));
 }
@@ -708,7 +708,7 @@ function _renderTaskTable(tasks) {
         _textCol('task', 'priority', 'Priority', t => t.priority || 'medium', { sortValue: t => priorityOrder[t.priority] ?? 2, cell: t => (t.untasked ? '' : tag(t.priority || 'medium')), tone: 'secondary', firstDir: 'asc' }),
         { key: 'claimed_at', label: 'Start time', sort: true, sortValue: t => t.claimed_at || '', cell: t => (t.claimed_at ? _formatTime(t.claimed_at) : '—'), tone: 'secondary' },
         _numCol('duration', 'Duration', span, () => '', { cell: t => (t.untasked ? '' : _formatDuration(t.claimed_at, t.completed_at)) }),
-        _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
+        _tokCol('input_tokens', 'New input tokens'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
     ], shown, 'No task costs in this range yet. They appear once an agent has worked on a board task.', { rowKey: t => t.id, open: t => { if (t.untasked) return; _showCostTaskDetail(t.id); }, rowName: t => t.title || '' });
 }
 
@@ -728,7 +728,7 @@ function _renderGoalTable(tasks) {
         { key: 'title', label: 'Goal', primary: true, sort: true, sortValue: g => g.title || '', cell: g => g.title, width: 'grow' },
         _costCol(rows),
         _numCol('tasks', 'Tasks', g => g.tasks, g => (g ? String(g) : '')),
-        _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
+        _tokCol('input_tokens', 'New input tokens'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
     ], rows, 'No goal costs in this range yet. They appear once an agent has worked on a board task.', { rowKey: g => g.id, rowName: g => g.title || '' });
 }
 
@@ -910,7 +910,7 @@ function _renderTeamTable(teams) {
     _drawTable(container, 'team', [
         _textCol('team', 'board_name', 'Team', t => t.board_name || '', { cell: _swatched('team', t => (t.board_name ? keyLabel(t.board_name) : '(no team)')) }), // keyLabel is the team's name: the rows' board_label was handed to it when they arrived (#10936)
         _numCol('num_agents', 'Agents', t => t.num_agents || 0, String),
-        _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
+        _tokCol('input_tokens', 'New input tokens'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
         _costCol(teams), _shareBarCol(total),
     ], filtered, null, _seriesOpts('team'));
 }
@@ -945,7 +945,7 @@ function _renderBranchTable(branches) {
         _textCol('branch', 'board_name', 'Team', b => b.board_name || '', { cell: b => (b.board_name ? keyLabel(b.board_name) : '—'), tone: 'secondary' }),
         _numCol('pr_number', 'PR', b => b.pr_number || 0, () => '', { cell: b => _prCell(b.pr_number, b.remote_url) }),
         _numCol('num_agents', 'Agents', b => b.num_agents || 0, String),
-        _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
+        _tokCol('input_tokens', 'New input tokens'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
         _costCol(branches), _shareBarCol(total),
     ], filtered);
 }

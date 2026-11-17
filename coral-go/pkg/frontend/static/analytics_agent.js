@@ -133,7 +133,7 @@ function draw() {
             { key: 'timestamp', label: 'Time', tone: 'primary', sort: 'date', sortValue: t => t.timestamp, cell: t => timeCell(t.timestamp), firstDir: 'desc' },
             num('cost_usd', 'Cost', { cell: t => money(t.cost_usd || 0), foldFirst: true }),
             { key: 'model', label: 'Model', sort: true, sortValue: t => t.model || '', cell: t => t.model || '—', tone: 'secondary' },
-            num('input_tokens', 'Input'), num('output_tokens', 'Output'), num('cache_read_tokens', 'Cache read', { narrowHide: true }), num('cache_write_tokens', 'Cache write', { narrowHide: true }),
+            num('input_tokens', 'New input tokens'), num('output_tokens', 'Output'), num('cache_read_tokens', 'Cache read', { narrowHide: true }), num('cache_write_tokens', 'Cache write', { narrowHide: true }),
         ], ['cost_usd']) }).el);
     }
 
