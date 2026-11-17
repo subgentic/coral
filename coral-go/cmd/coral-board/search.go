@@ -25,6 +25,8 @@ Every word must be there, in any order, in any field ("staging certificate" find
 double quotes inside the text to keep its words together. The best matches come first; --sort newest or oldest orders by time instead.
 Coral's own notices (the task queue's) are left out; --system brings them back. A hit shows its source, id, time (UTC), state and goal, and the words around the match.
 --since and --until take a time such as 2026-11-17T09:00:00Z, a date (2026-11-17, UTC) or how long ago (30m, 6h, 2d, 1w).
+--source takes messages, tasks, goals, history (comma-separated; goal, task and chat are read as such). --state takes a task's status (pending, in_progress, review_pending,
+blocked, draft, completed, skipped) or a goal's state (proposed, active, done, dropped, blocked); --assignee NAME narrows the tasks to one assignee. Several filters must all hold.
 --agent and --author narrow the past chats (an agent's name; who spoke). Chat turns in full: coral-agent history search / context.`
 
 // cmdSearch is `coral-board search` (#11005, phase (a)): the agent's search of the messages of its OWN board (the board it was launched on), with the dashboard search's filters and paging. A hit's context is
@@ -103,7 +105,7 @@ func cmdSearch() {
 		clierr.Exit1()
 	}
 	if hasResults(data) {
-		printResults(out.Board, args[0], out.Results, out.More, out.NextCursor, out.WorkScope)
+		printResults(out.Board, args[0], out.Results, out.More, out.NextCursor, out.WorkScope, out.Total, searchFilters(map[string]string{"state": *state, "goal": *goal, "assignee": *assignee, "from": *from, "mentions": *mentions, "since": *since, "until": *until, "source": *source, "agent": *agent, "author": *author}))
 		return
 	}
 	if len(out.Messages) == 0 {
@@ -187,6 +189,17 @@ func hitExcerpt(content, query string) string {
 	return out
 }
 
+// searchFilters names the filters a request set, as "--state completed --assignee X", for the line that says they left nothing.
+func searchFilters(set map[string]string) string {
+	var parts []string
+	for _, k := range []string{"source", "state", "goal", "assignee", "from", "mentions", "agent", "author", "since", "until"} {
+		if v := strings.TrimSpace(set[k]); v != "" {
+			parts = append(parts, "--"+k+" "+v)
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
 // hasResults says the server answered with the one result list (tasks, goals and messages together); an older server answers with messages only.
 func hasResults(data []byte) bool {
 	var probe struct {
@@ -196,12 +209,20 @@ func hasResults(data []byte) bool {
 }
 
 // printResults is the one list, a hit a line: the source and id, the time, the state, then the title and the words around the match.
-func printResults(boardName, text string, results []map[string]any, more bool, nextCursor, workScope string) {
+func printResults(boardName, text string, results []map[string]any, more bool, nextCursor, workScope string, total int, filters string) {
 	if len(results) == 0 {
+		if filters != "" { // the text may be there: the filters together leave nothing
+			fmt.Printf("No messages, tasks, goals or past chats match %q on board %s with %s. The text may exist without them: every filter must hold, so try again with fewer.\n", text, boardName, filters)
+			return
+		}
 		fmt.Printf("No messages, tasks, goals or past chats match %q on board %s.\n", text, boardName)
 		return
 	}
-	fmt.Printf("%d matches on board %s:\n", len(results), boardName)
+	if total > len(results) {
+		fmt.Printf("%d matches on board %s (showing %d):\n", total, boardName, len(results))
+	} else {
+		fmt.Printf("%d matches on board %s:\n", len(results), boardName)
+	}
 	for _, r := range results {
 		src := clitext.Clean(str(r["source"]))
 		head := fmt.Sprintf("  %s #%.0f %s", src, num(r["id"]), whenShort(str(r["at"])))
@@ -213,6 +234,9 @@ func printResults(boardName, text string, results []map[string]any, more bool, n
 		}
 		if g := num(r["goal_id"]); g > 0 { // a task's goal: "is any of this goal's work still open?"
 			head += fmt.Sprintf(" goal #%.0f", g)
+		}
+		if who := clitext.Clean(str(r["assignee"])); who != "" { // a task's assignee: "who has it?"
+			head += " @" + who
 		}
 		line := head + "  " + clitext.Clean(str(r["title"]))
 		if sn := strings.Join(strings.Fields(clitext.Clean(str(r["snippet"]))), " "); sn != "" && sn != clitext.Clean(str(r["title"])) { // the title is already there

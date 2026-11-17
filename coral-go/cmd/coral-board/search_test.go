@@ -196,3 +196,16 @@ func TestSearchTimeFlagsTakeADateOrAnAgeAndTheListIsInUTC(t *testing.T) {
 	assert.NotContains(t, req, "until=6h")
 	assert.Contains(t, req, "system=1")
 }
+
+// A task hit names its assignee, and a search the filters leave empty says so (#19448).
+func TestPrintResultsShowsAssigneeTotalAndTheFiltersThatLeftNothing(t *testing.T) {
+	out := captureStdout(t, func() {
+		printResults("b", "staging", []map[string]any{{"source": "task", "id": 7.0, "at": "2026-11-17T09:00:00Z", "state": "completed", "assignee": "Developer experience", "title": "Fix", "snippet": "the staging cert"}}, false, "", "", 12, "")
+	})
+	require.Contains(t, out, "12 matches on board b (showing 1)")
+	require.Contains(t, out, "task #7 2026-11-17 09:00Z [completed] @Developer experience  Fix")
+	out = captureStdout(t, func() { printResults("b", "staging", nil, false, "", "", 0, "--state completed --assignee Dana") })
+	require.Contains(t, out, "with --state completed --assignee Dana")
+	require.Contains(t, out, "every filter must hold")
+	require.Equal(t, "--state done --since 2d", searchFilters(map[string]string{"state": "done", "since": "2d", "goal": " "}))
+}

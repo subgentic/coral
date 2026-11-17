@@ -23,19 +23,21 @@ type WorkQuery struct {
 
 // WorkHit is one task or goal that matched, in the one shape every source of the search shares.
 type WorkHit struct {
-	Source  string `json:"source"` // "task", "goal", "message" or "history" (a turn of a past chat: id is its index in the session)
-	ID      int64  `json:"id"`
-	Session string `json:"session,omitempty"` // history: the chat session the turn is in
-	Title   string `json:"title"`
-	Snippet string `json:"snippet"`
-	State   string `json:"state"`
-	GoalID  *int64 `json:"goal_id,omitempty"`
-	At      string `json:"at"`
-	Rank    int    `json:"-"` // a several-term search: how well the terms stand (WorkRank); the one list is ordered by it first
+	Source   string `json:"source"` // "task", "goal", "message" or "history" (a turn of a past chat: id is its index in the session)
+	ID       int64  `json:"id"`
+	Session  string `json:"session,omitempty"` // history: the chat session the turn is in
+	Title    string `json:"title"`
+	Snippet  string `json:"snippet"`
+	State    string `json:"state"`
+	GoalID   *int64 `json:"goal_id,omitempty"`
+	Assignee string `json:"assignee,omitempty"` // a task's assignee (#19448): "who has it" without opening it
+	At       string `json:"at"`
+	Minor    bool   `json:"-"` // a reviewer's own "Review #N" task: it repeats the task it reviews, so a search with no sort named lists it after the real hits
+	Rank     int    `json:"-"` // a several-term search: how well the terms stand (WorkRank); the one list is ordered by it first
 }
 
 const (
-	workSnippetWidth = 160
+	workSnippetWidth = 320 // wide enough for a goal's whole done-when (300 characters at most) with the words around the match
 	workMaxLimit     = 100
 )
 
@@ -70,10 +72,11 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 			Done   *string `db:"completion_message"`
 			Status string  `db:"status"`
 			GoalID *int64  `db:"goal_id"`
+			Assign *string `db:"assigned_to"`
 			At     string  `db:"at"`
 		}
 		match, matchArgs := likeAllTerms(terms, "title", "body", "completion_message")
-		sqlText := `SELECT id, title, body, completion_message, status, goal_id, ` + updatedAtSQL + ` AS at FROM board_tasks WHERE board_id = ? AND ` + match
+		sqlText := `SELECT id, title, body, completion_message, status, goal_id, assigned_to, ` + updatedAtSQL + ` AS at FROM board_tasks WHERE board_id = ? AND ` + match
 		args := append([]any{q.Board}, matchArgs...)
 		if q.State != "" {
 			sqlText += " AND status = ?"
@@ -84,8 +87,8 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 			args = append(args, q.GoalID)
 		}
 		if q.Assignee != "" {
-			sqlText += " AND LOWER(assigned_to) = ?"
-			args = append(args, strings.ToLower(q.Assignee))
+			sqlText += " AND LOWER(TRIM(assigned_to)) = ?"
+			args = append(args, strings.ToLower(strings.TrimSpace(q.Assignee)))
 		}
 		if q.Since != "" {
 			sqlText += " AND " + updatedAtSQL + " >= ?"
@@ -101,7 +104,7 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 			return nil, false, err
 		}
 		for _, r := range rows {
-			hits = append(hits, WorkHit{Source: "task", ID: r.ID, Title: r.Title, Snippet: WorkSnippet(text, deref(r.Body), deref(r.Done), r.Title), State: r.Status, GoalID: r.GoalID, At: r.At, Rank: WorkRank(terms, r.Title, r.Title, deref(r.Body), deref(r.Done))})
+			hits = append(hits, WorkHit{Source: "task", ID: r.ID, Title: r.Title, Snippet: WorkSnippet(text, deref(r.Done), deref(r.Body), r.Title), State: r.Status, GoalID: r.GoalID, Assignee: deref(r.Assign), Minor: strings.HasPrefix(r.Title, "Review #"), At: r.At, Rank: WorkRank(terms, r.Title, r.Title, deref(r.Body), deref(r.Done))})
 		}
 	}
 	if want["goals"] {
@@ -143,7 +146,7 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 			}
 		}
 		for _, r := range rows {
-			hits = append(hits, WorkHit{Source: "goal", ID: r.ID, Title: r.Title, Snippet: WorkSnippet(text, r.Outcome, r.Done, r.Closed, r.Title), State: r.State, At: r.At, Rank: WorkRank(terms, r.Title, r.Title, r.Outcome, r.Done, r.Closed)})
+			hits = append(hits, WorkHit{Source: "goal", ID: r.ID, Title: r.Title, Snippet: WorkSnippet(text, r.Done, r.Outcome, r.Closed, r.Title), State: r.State, At: r.At, Rank: WorkRank(terms, r.Title, r.Title, r.Outcome, r.Done, r.Closed)})
 		}
 	}
 	sort.SliceStable(hits, func(i, j int) bool {
@@ -183,7 +186,7 @@ func likeAllTerms(terms []string, cols ...string) (string, []any) {
 	return strings.Join(parts, " AND "), args
 }
 
-// WorkSnippet is the field that holds the most of the search's terms (the first on a tie: callers list the body before the title it is shown beside), on one line (control characters dropped, whitespace joined) and cut to about workSnippetWidth runes around the first term in it.
+// WorkSnippet is the field that holds the most of the search's terms (the first on a tie: callers list the answer first, a task's completion message or a goal's done-when, then the body and the title it is shown beside), on one line (control characters dropped, whitespace joined) and cut to about workSnippetWidth runes around the first term in it.
 func WorkSnippet(text string, fields ...string) string {
 	terms := SearchTerms(text)
 	pick, best := "", 0
