@@ -96,10 +96,10 @@ function changes(w) {
 function numbers(w, base) {
     if (!base) {
         const count = w.commit_count;
-        const history = Number.isInteger(count) && count >= 0
-            ? `${count > 1000 ? '1000+' : count} ${count === 1 ? 'commit' : 'commits'} saved in this branch`
-            : 'Commit history could not be counted';
-        return `${history} · ${changes(w)}`;
+        const history = w.not_local ? 'Commit history not counted for this folder' : Number.isInteger(count) && count >= 0
+            ? `${count > 1000 ? '1000+' : count} ${count === 1 ? 'commit' : 'commits'} in branch history`
+            : '';
+        return [history, changes(w)].filter(Boolean).join(' · ');
     }
     if (w.is_base) return `the base branch · ${changes(w)}`;
     const where = (w.ahead || w.behind) ? `${w.ahead} ahead, ${w.behind} behind` : 'even with the base';
@@ -189,6 +189,7 @@ function drawRepo(data, currentSid, ask, team, server) {
         const members = [...(w.agents || [])];
         if (w.current && !members.some(a => a.session_id === currentSid) && state.currentSession?.session_id === currentSid) members.unshift(state.currentSession);
         const detail = text(members.length ? 'button' : 'div', members.length ? 'btn btn-small branches-changes' : 'branches-meta', numbers(w, data.base));
+        if (!data.base && !w.not_local && Number.isInteger(w.commit_count) && w.commit_count >= 0) detail.title = 'Includes commits inherited from earlier branches.';
         if (members.length) {
             detail.type = 'button'; detail.setAttribute('aria-label', `View changes on ${name}: ${numbers(w, data.base)}`);
             detail.addEventListener('click', async () => {
