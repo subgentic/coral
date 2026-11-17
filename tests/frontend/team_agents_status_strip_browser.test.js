@@ -38,7 +38,7 @@ const TEAM = `qa-strip15830-${Date.now() % 100000}`;
                     return { rows: vis.map(row), pills: pills.map(c => ({ key: c.dataset.filter, text: c.textContent.replace(/\\s+/g, ' ').trim(), on: c.getAttribute('aria-pressed') })), more: sel ? [...sel.options].map(o => ({ key: o.value, text: o.textContent.trim() })) : [], moreOn: sel ? sel.dataset.on : null, sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
                 const d = await read();
                 const words = d.rows.map(r => r.word).sort();
-                ok(JSON.stringify(words) === JSON.stringify(['Ended', 'Free', 'Has a task', 'Needs input', 'Not reported', 'Sleeping', 'Working', 'Working']), 'one word per state, Working for busy and for a started task', words);
+                ok(JSON.stringify(words) === JSON.stringify(['Ended', 'Has a task', 'Needs input', 'Not reported', 'Sleeping', 'Waiting for work', 'Working', 'Working']), 'one word per state, Working for busy and for a started task', words);
                 ok(d.rows.every(r => r.state && !r.chip && !r.blue), 'every status is the shared mark, no chip and no blue state', d.rows);
                 ok(d.rows.filter(r => r.word === 'Working').every(r => r.state === 'working') && d.rows.find(r => r.word === 'Sleeping').state === 'sleeping' && d.rows.find(r => r.word === 'Needs input').state === 'waiting', 'the marks: working, sleeping, waiting', d.rows);
                 ok(JSON.stringify(d.pills.map(p => p.key)) === JSON.stringify(['all', 'working', 'has_task', 'sleeping']), 'the strip is All, Working, Has a task, Sleeping', d.pills);
@@ -53,7 +53,7 @@ const TEAM = `qa-strip15830-${Date.now() % 100000}`;
                     await ev(`(() => { const s = document.querySelector('#team-panel-agents .team-tb-more'); s.value = 'available'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
                     await settle(300);
                     const f = await read();
-                    ok(f.rows.length === 1 && f.rows[0].word === 'Free' && f.moreOn === 'true' && f.pills.every(p => p.on === 'false'), 'More: Free shows the one free agent and no strip pill is pressed', f);
+                    ok(f.rows.length === 1 && f.rows[0].word === 'Waiting for work' && f.moreOn === 'true' && f.pills.every(p => p.on === 'false'), 'More: Waiting for work shows the one idle agent and no strip pill is pressed', f);
                     await ev(`document.querySelector('#team-panel-agents .goals-chip[data-filter="all"]').click(); true`); await settle(300);
                 }
                 if (['1440 dark', '1440 light', '390 dark'].includes(at)) await shot('team-agents-status-' + at.replace(/ /g, '-'));

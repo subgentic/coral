@@ -81,7 +81,7 @@ export function mountTeamLaunchSettings(firstTask = '', saveGoal = true) {
         load: async () => ({ ...startValues(), first_task: firstTask, save_goal: saveGoal }),
         groups: [
             { id: 'start', label: 'Start', icon: 'play_arrow', fields: [
-                { key: 'first_task', type: 'textarea', id: 'team-goal', label: 'What should the team work on?', help: 'Optional. It goes to the Orchestrator as the first task.', wide: true, rows: 4, placeholder: 'For example: build a small invoice calculator', attrs: { maxlength: '2000' } },
+                { key: 'first_task', type: 'textarea', id: 'team-goal', label: 'What should the team work on?', help: 'Optional. It goes to the Orchestrator as the first task. Templates do not save goals or the first task.', wide: true, rows: 4, placeholder: 'For example: build a small invoice calculator', attrs: { maxlength: '2000' } },
                 { key: 'save_goal', type: 'toggle', id: 'team-save-goal', label: "Also save this as the team's goal", help: 'The first task is then listed under that goal on the Goals tab.' },
                 { key: 'custom_instructions', type: 'textarea', id: 'team-custom-instructions', label: 'Additional instructions', help: 'Optional.', wide: true, rows: 4, placeholder: 'Team-specific conventions' },
             ] },

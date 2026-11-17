@@ -1,3 +1,5 @@
+import { importOnce } from './import_once.js';
+import { showToast } from './utils.js';
 import { serverField, syncServerField } from './inbox_servers.js';
 /* The one Tasks view (#8060, the operator: "shoot for simplicity"): a list of tasks is drawn by tasksTable(scope, rows, options) and nowhere else. A scope says which columns the list has: the team's Tasks tab all of them, a task's
  * follow-ups, the Inbox's own scope ("mine": Team in, Assigned to out, they are all the person's), a goal's side column and a goal's page. One state word set, one chip, who as an avatar and a name, the priority as a word, the update
@@ -26,13 +28,18 @@ export const priorityWord = (p) => { const s = String(p || '').trim(); return s 
 const STATE_RANK = { 'In progress': 0, 'In review': 1, 'Blocked': 2, 'Waiting': 3, 'Queued': 4, 'Done': 5 };
 const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
 
-/** The Who cell: the person as circles named in words (DT.avatars), or "Nobody yet" in words when no one has the task. The dock's list draws the same one (#8507). */
-export const whoCell = (t) => (doerOf(t) ? DT.avatars([{ name: doerOf(t) }, ...reviewersOf(t).map(name => ({ name, review: true }))], whoWords(t)) : whoText(t));
+/** Compact Who cell: tap to read the assignee and reviewer names. */
+export const whoCell = (t) => {
+    if (!doerOf(t)) return whoText(t);
+    const words = whoWords(t), b = DT.link('', () => showToast(words));
+    b.append(DT.avatars([{ name: doerOf(t) }, ...reviewersOf(t).map(name => ({ name, review: true }))], words));
+    return b;
+};
 
 /** The "3 files" button of a task row: a paperclip-like page icon and the count, named "3 artifacts, open"; it opens the task as its row does, then scrolls to the task page's Artifacts. */
 function filesButton(t, row) {
     const n = Number(t.artifact_count) || 0;
-    const b = DT.link('', () => { if (row.hasOpen) row.open(); else openTask(t.board_id || t.board || t.project || '', t.id); scrollToTaskArtifacts(t.id); }); // a list with no row open (the dock's) opens the task page itself
+    const b = DT.link('', () => { if (row.hasOpen) row.open(); else openTask(t.board_id || t.board || t.project || '', t.id); importOnce('./task_artifacts_scroll.js').then(m => m.scrollToTaskArtifacts(t.id)).catch(() => showToast('Could not jump to files.', true)); }); // a list with no row open (the dock's) opens the task page itself
     b.classList.add('dt-files');
     const icon = DT.el('span', 'material-icons', 'description'); icon.setAttribute('aria-hidden', 'true');
     b.append(icon, DT.el('span', 'dt-files-count', `${n} ${n === 1 ? 'file' : 'files'}`));
@@ -41,16 +48,6 @@ function filesButton(t, row) {
     return b;
 }
 
-/** The task page opens (the row's open) and loads its Artifacts section after it: wait for the section's heading, then bring it to the top and focus its first file. Gives up after 8 s (a task with nothing readable has no section). */
-function scrollToTaskArtifacts(id) {
-    const find = () => document.getElementById(`team-task-artifacts-head-${Number(id)}`);
-    const go = (head) => { head.scrollIntoView({ block: 'start' }); const first = head.parentElement && head.parentElement.querySelector('.artifact-table button.dt-primary'); if (first) first.focus({ preventScroll: true }); }; // the first file takes the focus: no ring round a plain heading (#7404)
-    const now = find();
-    if (now) { go(now); return; }
-    const watch = new MutationObserver(() => { const head = find(); if (head) { watch.disconnect(); clearTimeout(stop); go(head); } });
-    const stop = setTimeout(() => watch.disconnect(), 8000);
-    watch.observe(document.body, { childList: true, subtree: true });
-}
 
 export function taskColumns(ctx, keys = ['state', 'task', 'who', 'goal', 'priority', 'updated']) {
     const all = {

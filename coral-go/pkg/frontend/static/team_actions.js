@@ -149,7 +149,7 @@ export async function shareAgentTeam(boardName) {
 }
 
 export function saveTeamFromSidebar(boardName) {
-    showPromptModal('Save team template', 'Name. Saves: members, models, thinking, modes, working mode, instructions. Not skills.', keyLabel(boardName), async (templateName) => {
+    showPromptModal('Save team template', 'Name. Saves: members, models, thinking, modes, working mode, instructions. Not skills, goals or the first task.', keyLabel(boardName), async (templateName) => {
         const tmpl = await (await importOnce('./team_template_build.js')).templateFromBoard(boardName);
         if (!tmpl) {
             showToast("No agents found on this board", "error");
