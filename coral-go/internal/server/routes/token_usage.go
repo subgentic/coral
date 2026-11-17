@@ -383,16 +383,36 @@ func (h *TokenUsageHandler) UsageTimeSeries(w http.ResponseWriter, r *http.Reque
 		interval = defaultTimeseriesInterval(since, until, time.Now())
 	}
 	groupBy := q.Get("group_by")
-	if !store.ValidUsageGroup(groupBy) {
-		errBadRequest(w, "group_by must be team, agent, provider or model")
+	if groupBy != "goal" && !store.ValidUsageGroup(groupBy) {
+		errBadRequest(w, "group_by must be team, agent, provider, model or goal")
 		return
 	}
-	if _, isAgent := VerifiedSession(r.Context()); isAgent && groupBy == "agent" {
+	if _, isAgent := VerifiedSession(r.Context()); isAgent && (groupBy == "agent" || groupBy == "goal") {
 		errForbidden(w, "an agent's token cannot read the usage of every agent")
 		return
 	}
 
-	buckets, err := h.ts.GetUsageTimeSeriesGrouped(r.Context(), store.TimeSeriesQuery{Since: since, Until: until, Interval: interval, Board: q.Get("board"), GroupBy: groupBy})
+	query := store.TimeSeriesQuery{Since: since, Until: until, Interval: interval, Board: q.Get("board"), GroupBy: groupBy}
+	var buckets []store.GroupedBucket
+	var err error
+	if groupBy == "goal" {
+		if h.bs == nil {
+			errInternalServer(w, "task attribution unavailable")
+			return
+		}
+		windows, readErr := h.bs.UsageWindows(r.Context(), usageBound(since), usageBound(until))
+		if readErr != nil {
+			errInternalServer(w, readErr.Error())
+			return
+		}
+		goalWindows := make([]store.GoalUsageWindow, 0, len(windows))
+		for _, v := range windows {
+			goalWindows = append(goalWindows, store.GoalUsageWindow{TaskID: v.TaskID, Session: v.Session, Board: v.Board, Key: v.GoalKey, Label: v.GoalLabel, Claimed: v.Claimed, Ended: v.Ended})
+		}
+		buckets, err = h.ts.GoalUsageSeries(r.Context(), query, goalWindows)
+	} else {
+		buckets, err = h.ts.GetUsageTimeSeriesGrouped(r.Context(), query)
+	}
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
@@ -633,4 +653,14 @@ func withNotReported(tracked []store.ThinkingUsageSummary, byModel []store.Model
 		}
 	}
 	return out
+}
+
+// usageBound reads a since or until of the usage routes as a time; empty or unreadable is an open end (the store's own filters still apply).
+func usageBound(v string) time.Time {
+	for _, layout := range []string{time.RFC3339Nano, "2006-01-02 15:04:05", "2006-01-02T15:04:05"} {
+		if t, err := time.Parse(layout, v); err == nil {
+			return t.UTC()
+		}
+	}
+	return time.Time{}
 }
