@@ -151,9 +151,8 @@ export function drawOffer(wrapper, { hex, server, onTrusted, fetchFn = serverFet
             else { go.disabled = false; msg.textContent = 'Could not turn scripts on. Nothing was changed.'; }
         });
         const cancel = button('Cancel', 'artifact-scripts-cancel', () => { if (notice && notice.dataset.was) notice.firstChild.nodeValue = notice.dataset.was; box.remove(); if (!row.contains(ask)) row.remove(); ask.hidden = false; ask.focus(); });
-        const actions = document.createElement('span'); actions.className = 'artifact-scripts-actions'; actions.append(go, cancel);
-        words.append(' ', actions);
-        box.append(words, msg);
+        const actions = document.createElement('div'); actions.className = 'artifact-scripts-actions'; actions.append(go, cancel);
+        box.append(words, actions, msg);
         if (!row.isConnected) (wrapper.querySelector('.artifact-linked-notice') || wrapper).after(row); // the row exists only while the confirmation is open (#14916)
         row.append(box);
         go.focus();
