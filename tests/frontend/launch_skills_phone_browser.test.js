@@ -62,10 +62,11 @@ const SKILLS = [
             await waitFor(`document.getElementById('launch-step-agent').dataset.stage === '${stage}'`, `step ${stage}`, 5000);
         }
         // step 3 opens on its Agent section: the skills are in it, with no other section to find first (a phone's section list is a dropdown)
+        // Step 3's first section is taller on a box with wider fonts (Linux CI put the summary 80+ px past the bottom of an 844 px screen on 9 runs in 10, #19275): the dialog scrolls, so the box is brought into view first and 'on screen' means reachable at 390 wide, not 'above the fold on this machine's fonts'
         // the box is read once it has stopped moving (a slow box was still laying step 3 out when it was read once: inView false in Windows CI, #19004); the accept keeps a half-drawn state from counting as settled
-        const agent = await stable(`(() => { const h = document.getElementById('launch-skills-host'); const s = h.querySelector('details > summary'); const r = s && s.getBoundingClientRect(); return { has: !!s, text: s && s.textContent, shown: !!s && s.getClientRects().length > 0, inView: !!r && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth, section: (document.querySelector('#launch-agent-acf .settings-pane:not([hidden])') || {}).dataset?.section }; })()`, 'the disclosure in step 3 laid out', a => a.has && a.shown);
+        const agent = await stable(`(() => { const h = document.getElementById('launch-skills-host'); const s = h.querySelector('details > summary'); if (s) s.scrollIntoView({ block: 'center' }); const r = s && s.getBoundingClientRect(); return { has: !!s, text: s && s.textContent, shown: !!s && s.getClientRects().length > 0, inView: !!r && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth, section: (document.querySelector('#launch-agent-acf .settings-pane:not([hidden])') || {}).dataset?.section }; })()`, 'the disclosure in step 3 laid out', a => a.has && a.shown);
         assert.ok(agent.has && /Choose from 3 skills/.test(agent.text), 'New agent has the disclosure: ' + JSON.stringify(agent));
-        assert.ok(agent.shown && agent.section === 'agent' && agent.inView, 'step 3 shows it in its first section, on screen at 390: ' + JSON.stringify(agent));
+        assert.ok(agent.shown && agent.section === 'agent' && agent.inView, 'step 3 shows it in its first section, on screen at 390 once scrolled to: ' + JSON.stringify(agent));
         await ev(`document.querySelector('#launch-skills-host details > summary').click(); true`);
         check('New agent', await measure('launch-skills-host'));
         await shot('skills-agent-390');
