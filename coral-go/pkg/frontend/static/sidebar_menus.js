@@ -20,8 +20,6 @@ export function closeSidebarKebabs({ restoreFocus = false } = {}) {
     }
 }
 
-const menuItemRoles = menu => { for (const it of menu.querySelectorAll('.overflow-menu-item')) if (!it.hasAttribute('role')) it.setAttribute('role', 'menuitem'); };
-
 export async function toggleSidebarKebab(btn, event) {
     try {
         const menu = btn.nextElementSibling;
@@ -37,14 +35,13 @@ export async function toggleSidebarKebab(btn, event) {
             menu.style.visibility = 'hidden';
             menu.style.display = 'block';
             btn.setAttribute('aria-expanded', 'true');
-            menuItemRoles(menu);
             // Hide tooltips as opening begins, including while the help loads.
             document.querySelectorAll('.session-tooltip').forEach(t => t.style.display = 'none');
             const keys = await importOnce('./kebab_keys.js');
             if (!menu.isConnected || menu.style.display === 'none') return;
             keys.placeSidebarMenu(btn, menu, event);
         }
-    } catch { closeSidebarKebabs(); }
+    } catch (error) { console.error(error); closeSidebarKebabs(); }
 }
 
 // Top-bar settings dropdown

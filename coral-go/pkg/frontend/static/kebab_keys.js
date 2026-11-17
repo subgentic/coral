@@ -3,7 +3,7 @@ import { menuMove } from './menu_keys.js';
 import { closeSidebarKebabs } from './sidebar_menus.js';
 import { importOnce } from './import_once.js';
 
-await importOnce('./menu_help.js').catch(() => {}); // size the first menu with its help sheet before it becomes a pointer target (#19188)
+await importOnce('./menu_help.js').catch(console.error); // size the first menu with its help sheet before it becomes a pointer target (#19188)
 
 document.addEventListener('keydown', e => {
     const menu = e.target.closest?.('.sidebar-kebab-menu');
@@ -17,6 +17,7 @@ document.addEventListener('keydown', e => {
 /** Position the opening only after its help has its final size. Cancelled openings never reach here. */
 export function placeSidebarMenu(btn, menu, event) {
     // Measured hidden; the tablet drawer (#15258) transforms and clips, so its box is the window
+    for (const it of menu.querySelectorAll('.overflow-menu-item')) if (!it.hasAttribute('role')) it.setAttribute('role', 'menuitem');
     window.menuHelp?.(menu); // menu_help.js (fetched by kebab_keys.js) sets it: lines drawn before the menu is measured (#17492)
     const r = btn.getBoundingClientRect(), sb = menu.closest('.tablet-open');
     const x = sb ? sb.getBoundingClientRect() : new DOMRect(0, 0, innerWidth, innerHeight);
