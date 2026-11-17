@@ -208,6 +208,14 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: 
         assert.match(probe.healed, /^✓ Totals agree/, 'agreeing again clears it');
         assert.ok(/Checking totals/.test(probe.again.text) && probe.again.asked === 2, 'and a later mismatch gets its own re-read: ' + JSON.stringify(probe.again));
         console.log('   ✓');
+        console.log('5c. The re-check reads only the table and the chart, and not while a refresh is reading (#19182)');
+        await view('team'); await waitFor(`!!document.querySelector('#cost-series-team .viz-svg')`, 'the team chart', 8000);
+        const rc = await ev(`import(${MOD} + 'cost_dashboard.js').then(async m => { const urls = []; const real = window.fetch; window.fetch = function (u, o) { urls.push(String(typeof u === 'string' ? u : u.url).replace(/\\?.*/, '')); return real.apply(this, arguments); };
+            const one = m._recheckTotals('team'), two = m._recheckTotals('team'); await Promise.all([one, two]); const alone = urls.slice();
+            window.fetch = real; return { alone }; })`);
+        assert.deepEqual([...new Set(rc.alone)].sort(), ['/api/token-usage/by-team', '/api/token-usage/timeseries'], 'a re-check reads the team table and the chart, nothing else: ' + JSON.stringify(rc.alone));
+        assert.equal(rc.alone.filter(u => /by-team/.test(u)).length, 1, 'two re-checks at once are one read: the second is skipped while the first is reading: ' + JSON.stringify(rc.alone));
+        console.log('   ✓');
         console.log('6. A phone: the chart fits, no end labels, the swatches are targets, the table is one line a row');
         await open(390, 844, true);
         await waitFor(`document.querySelector('#cost-by-team .dt-box').classList.contains('dt-one-line')`, 'the table is one line a row', 6000);
