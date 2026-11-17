@@ -16,6 +16,8 @@ import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('inbox_answer.css'); // the step line's rules (#11981) are a sheet of their own: not in the start's stylesheet, and here before any step is drawn
 const { canDismissWait, dismissButton, dismissWait, canRemoveWait, removeWait, REMOVE_WAIT_LINE } = await importOnce('./dismiss_wait.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
+const { shortWait, WAIT_LIMIT_MS } = await importOnce('./waiting_text.js');
+const mk = (tag, cls, text) => Object.assign(document.createElement(tag), { className: cls, ...(text ? { textContent: text } : {}) });
 importOnce('./inbox_row_keys.js'); // the arrow keys between the rows of Needs you (#17226)
 
 const MAX_CHOICES = 4;
@@ -384,4 +386,23 @@ export function answerCell(s, { dismiss = true } = {}) {
     cell.className = 'inbox-answers';
     fill(s, cell, dismiss);
     return cell;
+}
+
+/** N5 (#17451): an agent's prompt keeps its choices where Answer sits; Dismiss is in the row's kebab, like every other row's. `answer`, `more` and `name` are the list's own (the Inbox passes them in: this lazy file does not import the list). */
+export function promptCell(s, answer, more, name, phone) {
+    const acts = rowActions(s);
+    if (phone || !acts.length || acts[0].label !== 'Dismiss') return answer(s); // a phone has its own ⋯; Remove from Needs you (an ignored wait) stays a button
+    const cell = answer(s, { dismiss: false }), box = mk('span', 'inbox-answers-with-more'); box.append(...(cell ? [cell] : []), more(acts, name(s))); // beside the answers, not in them: they are drawn again when the choices are read
+    return box;
+}
+export const promptCanSelect = s => !!(!(s.review || s.autorun || s.proposal || s.goalDone || s.skillReview || s.operatorAsk || s.unrecorded || s.welcome) && s.agent_type && s.waiting_for_input && canDismissWait(s, s.waiting_kind));
+export const promptDismiss = s => dismissWait(s, null);
+
+/** N7 (#17451): the wait is grey and short ("2 h"); the amber triangle only past the limit (a day), and the words say so too (never colour alone). */
+export function waitingCell(s, hidden, byAgent) {
+    const t = hidden ? '' : shortWait(s.waiting_since); if (!t) return t;
+    const late = !byAgent && Date.now() - Date.parse(s.waiting_since) >= WAIT_LIMIT_MS, span = mk('span', late ? 'inbox-age inbox-age-late' : 'inbox-age');
+    span.append(...(late ? [mk('span', 'material-icons inbox-age-flag', 'warning')] : []), mk('span', 'inbox-age-t', t), mk('span', 'sr-only', late ? ' waiting, late' : ' waiting'));
+    if (late) span.firstChild.setAttribute('aria-hidden', 'true');
+    return span;
 }
