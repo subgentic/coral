@@ -481,15 +481,15 @@ export function renderQuickActions() {
                     </button>
                     <button class="menu-item send-menu-item" role="menuitem" data-on-click="send-menu-team">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M17 11a4 4 0 0 1 4 4v2"/></svg>
-                        <span class="send-menu-text">Send + Team Reminder<span class="send-menu-note">Adds a reminder to use the team board, then sends</span></span>
+                        <span class="send-menu-text">Send and remind about team messages<span class="send-menu-note">Adds a reminder to use the team board, then sends</span></span>
                     </button>
                     <button class="menu-item send-menu-item" role="menuitem" data-on-click="send-menu-resend">
                         ${SVGO.o3}<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-                        <span class="send-menu-text">Resend Prompt<span class="send-menu-note">Sends the team's starting instructions again</span></span>
+                        <span class="send-menu-text">Send starting instructions again<span class="send-menu-note">Sends the team's starting instructions again</span></span>
                     </button>
                     <button class="menu-item send-menu-item" role="menuitem" data-on-click="send-menu-protocol">
                         ${SVGO.o3}<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
-                        <span class="send-menu-text">Send Board Protocol<span class="send-menu-note">Adds how to use the message board, then sends</span></span>
+                        <span class="send-menu-text">Send message-board instructions<span class="send-menu-note">Adds how to use the message board, then sends</span></span>
                     </button>
                 </div>
             </div>
