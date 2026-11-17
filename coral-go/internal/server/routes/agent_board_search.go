@@ -16,7 +16,7 @@ import (
 
 // agentBoardSearchParams are the parameters GET /api/agent/board/search takes: the dashboard search's (without for_subscriber, which is a viewer's switch), the reach, and the session the caller names (checked
 // against its token like every agent history call). Anything else is a 400 naming it.
-var agentBoardSearchParams = map[string]bool{"q": true, "from": true, "mentions": true, "since": true, "until": true, "sort": true, "limit": true, "cursor": true, "reach": true, "session_id": true, "source": true, "state": true, "goal": true, "assignee": true, "agent": true, "author": true}
+var agentBoardSearchParams = map[string]bool{"q": true, "from": true, "mentions": true, "since": true, "until": true, "sort": true, "limit": true, "cursor": true, "reach": true, "session_id": true, "source": true, "state": true, "goal": true, "assignee": true, "agent": true, "author": true, "system": true}
 
 // refuseSearchReach answers a reach above the agent's level with 403 search_reach_refused and no data (#11005, #11048): never a quiet narrowing to what it may read. It names the level the agent has, the level the
 // request needs and where the Operator raises it.
@@ -91,6 +91,7 @@ func (h *SessionsHandler) SearchAgentBoard(w http.ResponseWriter, r *http.Reques
 	}
 	q, err := board.ParseMessageQuery(board.MessageQueryParams{
 		Q: vals["q"], From: vals["from"], Mentions: vals["mentions"], Since: vals["since"], Until: vals["until"], Sort: vals["sort"], Limit: vals["limit"], Cursor: vals["cursor"],
+		AllWords: []string{"1"}, // an agent asks in words, in any order (#19423)
 	})
 	if err != nil {
 		if errors.Is(err, board.ErrMessageQuery) {
@@ -100,7 +101,8 @@ func (h *SessionsHandler) SearchAgentBoard(w http.ResponseWriter, r *http.Reques
 		errInternalServer(w, err.Error())
 		return
 	}
-	q.Project = boardKey // the key the launch recorded, used exactly: nothing the request names picks the board
+	q.NoSystem = !truthyParam(vals.Get("system")) && len(q.From) == 0 // Coral's own notices (the task queue's) bury the discussion: left out unless asked for with system=1 or named with from
+	q.Project = boardKey                                              // the key the launch recorded, used exactly: nothing the request names picks the board
 	if requested != store.SearchReachOwn {
 		q.Boards = boards
 	}
@@ -227,9 +229,14 @@ func parseSearchSources(vals url.Values) (map[string]bool, error) {
 // searchWorkResults is the one result list, shared by the agent's search and the dashboard's (SearchBoardWork, #19237): the tasks and goals that match (own board only) and the messages of the page, newest first, cut to the limit; more says the tasks or goals had others.
 func searchWorkResults(ctx context.Context, bs *board.Store, boardKey string, vals url.Values, limit int, since, until string, msgs []board.Message, chats []board.WorkHit, sources map[string]bool) ([]board.WorkHit, bool, error) {
 	hits := append([]board.WorkHit(nil), chats...)
+	text := strings.TrimSpace(vals.Get("q"))
+	terms := board.SearchTerms(text)
+	for i := range hits {
+		hits[i].Rank = board.WorkRank(terms, hits[i].Title, hits[i].Snippet)
+	}
 	more := false
 	if sources["tasks"] || sources["goals"] {
-		wq := board.WorkQuery{Board: boardKey, Text: strings.TrimSpace(vals.Get("q")), State: strings.TrimSpace(vals.Get("state")), Assignee: strings.TrimSpace(vals.Get("assignee")), Since: since, Until: until, Limit: limit}
+		wq := board.WorkQuery{Board: boardKey, Text: strings.TrimSpace(vals.Get("q")), State: strings.TrimSpace(vals.Get("state")), Assignee: strings.TrimSpace(vals.Get("assignee")), Since: since, Until: until, Limit: limit, Oldest: strings.EqualFold(strings.TrimSpace(vals.Get("sort")), "oldest")}
 		if sources["tasks"] {
 			wq.Sources = append(wq.Sources, "tasks")
 		}
@@ -254,13 +261,19 @@ func searchWorkResults(ctx context.Context, bs *board.Store, boardKey string, va
 		if m.JobTitle != "" && m.JobTitle != title {
 			title += " (" + m.JobTitle + ")"
 		}
-		hits = append(hits, board.WorkHit{Source: "message", ID: m.ID, Title: title, Snippet: board.WorkSnippet(strings.TrimSpace(vals.Get("q")), m.Content), At: m.CreatedAt})
+		hits = append(hits, board.WorkHit{Source: "message", ID: m.ID, Title: title, Snippet: board.WorkSnippet(text, m.Content), At: m.CreatedAt, Rank: board.WorkRank(terms, "", m.Content)})
 	}
+	// Several terms, no sort named: the hits that hold them together first, then newest. A named sort is the time order asked for (oldest included: the list used to ignore it).
+	byRank := len(terms) > 1 && strings.TrimSpace(vals.Get("sort")) == ""
+	oldest := strings.EqualFold(strings.TrimSpace(vals.Get("sort")), "oldest")
 	sort.SliceStable(hits, func(i, j int) bool {
-		if hits[i].At != hits[j].At {
-			return hits[i].At > hits[j].At
+		if byRank && hits[i].Rank != hits[j].Rank {
+			return hits[i].Rank > hits[j].Rank
 		}
-		return hits[i].ID > hits[j].ID
+		if hits[i].At != hits[j].At {
+			return (hits[i].At > hits[j].At) != oldest
+		}
+		return (hits[i].ID > hits[j].ID) != oldest
 	})
 	if limit > 0 && len(hits) > limit {
 		hits, more = hits[:limit], true
@@ -325,4 +338,13 @@ func (h *SessionsHandler) searchChatHits(r *http.Request, sessionID string, vals
 		hits = append(hits, board.WorkHit{Source: "history", ID: int64(m.MessageIndex), Session: m.SessionID, Title: agents[m.SessionID], Snippet: m.Excerpt, State: m.Role, At: at})
 	}
 	return hits, more, nil
+}
+
+// truthyParam is a switch a request turns on with 1, true or yes.
+func truthyParam(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }

@@ -45,6 +45,7 @@ func messageQueryErr(format string, a ...any) error {
 type MessageQueryParams struct {
 	Q, From, Mentions, Since, Until, Sort, Limit, Cursor []string
 	ForSubscriber                                        []string // the member whose list is searched: what its read delivers and its own posts (ReadSetIDs, #8484)
+	AllWords                                             []string // "1": the text is words in any order and "quoted phrases" (SearchTerms), not one run of characters (the agents' search, #19423)
 }
 
 // MessageQuery is a validated query. Build it with ParseMessageQuery; the caller sets Project and, for a request through Coral Hub,
@@ -53,6 +54,8 @@ type MessageQuery struct {
 	Project       string
 	Boards        []string // when not nil, the boards (by key) searched instead of Project; an empty set searches nothing (#11048, set by the server from a level, never read from a request)
 	Text          string   // lower-cased; empty: no text search
+	Also          []string // more terms the text must hold, in any order (AllWords); Text is the longest of them, which narrows a scan or the index most
+	NoSystem      bool     // leave out Coral's own posts (is_system: the task queue's notices); set by the server, never read from a request
 	From          []string // lower-cased sender ids or names
 	Mentions      string   // lower-cased: messages that tag this member
 	ForSubscriber string   // the member's id as given: only the messages of its list (ReadSetIDs) are searched
@@ -160,6 +163,10 @@ func ParseMessageQuery(p MessageQueryParams) (*MessageQuery, error) {
 	if len(q.From) > messageQueryMaxValues {
 		return nil, messageQueryErr("from has more than %d values", messageQueryMaxValues)
 	}
+	if v, _, _ := messageSingle("all_words", p.AllWords); v == "1" && q.Text != "" {
+		terms := longestFirst(SearchTerms(q.Text))
+		q.Text, q.Also = terms[0], terms[1:]
+	}
 	if q.Mentions, err = messageText("mentions", p.Mentions, 200); err != nil {
 		return nil, err
 	}
@@ -201,7 +208,7 @@ func ParseMessageQuery(p MessageQueryParams) (*MessageQuery, error) {
 	}
 	// What a cursor is tied to: every filter and the sort (not the limit, nor the cursor itself).
 	fp := sha256.New()
-	fmt.Fprintf(fp, "%s|%v|%s|%s|%s|%v|%s", q.Text, q.From, q.Mentions, q.Since, q.Until, q.Oldest, q.ForSubscriber)
+	fmt.Fprintf(fp, "%s|%v|%s|%s|%s|%v|%s|%v", q.Text, q.From, q.Mentions, q.Since, q.Until, q.Oldest, q.ForSubscriber, q.Also)
 	q.finger = hex.EncodeToString(fp.Sum(nil))[:16]
 	if v, ok, serr := messageSingle("cursor", p.Cursor); serr != nil {
 		return nil, serr
@@ -271,6 +278,9 @@ func (s *Store) QueryMessages(ctx context.Context, q *MessageQuery) (*MessageQue
 	if q.Until != "" {
 		where = append(where, "m.created_at < ?")
 		args = append(args, q.Until)
+	}
+	if q.NoSystem {
+		where = append(where, "COALESCE(m.is_system, 0) = 0")
 	}
 	dir := "DESC"
 	if q.Oldest {
@@ -358,7 +368,7 @@ var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 // (the driver's page reads); a single read of the text in rowid order is the v2.0.1 shape and measured against it (#9744).
 func (s *Store) queryTextByIDs(ctx context.Context, q *MessageQuery, where []string, args []any, dir string) (*MessageQueryResult, error) {
 	// The index (when it is ready) narrows an ASCII needle only: its case folding and LIKE's are ASCII, and Go's match folds more.
-	if asciiNeedle(q.Text) {
+	if asciiNeedle(q.Text) && asciiNeedle(strings.Join(q.Also, "")) {
 		if res, ok, err := s.queryTextViaIndex(ctx, q, where, args, dir); err != nil || ok {
 			return res, err
 		}
@@ -382,7 +392,7 @@ func (s *Store) queryTextByIDs(ctx context.Context, q *MessageQuery, where []str
 			break
 		}
 		scannedBytes += len(content)
-		if textHasFold(content, q.Text) {
+		if q.textMatches(content) {
 			ids = append(ids, id)
 		}
 	}
@@ -456,8 +466,21 @@ func (q *MessageQuery) matches(m Message, mentionID, mentionTitle string, number
 	if q.Mentions != "" && !containsExplicitTag(content, mentionID, mentionTitle, numbered) {
 		return false
 	}
-	if q.Text != "" && !textHasFold(content, q.Text) {
+	if q.Text != "" && !q.textMatches(content) {
 		return false
+	}
+	return true
+}
+
+// textMatches says the content holds the query's text and every further term (AllWords), case-insensitively.
+func (q *MessageQuery) textMatches(content string) bool {
+	if !textHasFold(content, q.Text) {
+		return false
+	}
+	for _, t := range q.Also {
+		if !textHasFold(content, t) {
+			return false
+		}
 	}
 	return true
 }
