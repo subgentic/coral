@@ -21,6 +21,8 @@ function installReviews() {
     window.__failReviewCount = false;
     window.__partialReviewPage = false;
     window.__failedCountResponses = 0;
+    // A forced refresh joins one that is already out (by design), and that one may have been sent before the test changed what the computers answer: read again until the pages show the change (#19378).
+    window.refreshUntil = async done => { for (let i = 0; i < 6; i++) { await window.__R.refreshReviews(true); await window.__C.refreshCounts(true); if (done()) return; } };
     const json = (body, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }));
     const make = (server, i) => ({ id: (i + 1).toString(16).padStart(64, '0'), board_id: 'alpha', team: 'Product', name: `Entry ${String(i).padStart(3, '0')} ${server}.md`,
         uri: 'coral://artifacts/' + (i + 1).toString(16).padStart(64, '0'), media_type: 'text/markdown', size: 40, available: true,
@@ -92,12 +94,12 @@ function installReviews() {
         const goals = await ev(`[...document.querySelectorAll('#inbox-needs-goal option')].map(o => o.value).filter(v => /Off-page goal/.test(v))`);
         assert.equal(new Set(goals).size, 2, 'same goal title and number on two computers stays two choices');
         const failedBefore = await ev('window.__failedCountResponses');
-        await ev(`(async () => { window.__failReviewCount = true; window.__partialReviewPage = true; await window.__R.refreshReviews(true); await window.__C.refreshCounts(true); (await import(${S} + 'inbox_tab.js')).updateInboxTab(); })()`);
+        await ev(`(async () => { window.__failReviewCount = true; window.__partialReviewPage = true; await refreshUntil(() => window.__R.reviewPages().find(p => p.server === 'box-b').loadedCount === 49 && window.__failedCountResponses > ${failedBefore}); (await import(${S} + 'inbox_tab.js')).updateInboxTab(); })()`);
         assert.ok(await ev('window.__failedCountResponses') > failedBefore, 'the pill assertion follows a real failed count response');
         assert.equal(await ev(`window.__R.reviewPages().find(p => p.server === 'box-b').loadedCount`), 49, 'failed-count source still supplies 49 review rows');
         await waitFor(`/at least 18 need your attention/.test(document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label') || '')`, 'partial count adds only failed-source loaded rows');
         await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 99+')`, 'partial-state pill counts 50 local plus 49 failed-count-source rows, with more pages still available, not stale 100+');
-        await ev(`(async () => { window.__failReviewCount = false; window.__partialReviewPage = false; await window.__R.refreshReviews(true); await window.__C.refreshCounts(true); (await import(${S} + 'inbox_tab.js')).updateInboxTab(); })()`);
+        await ev(`(async () => { window.__failReviewCount = false; window.__partialReviewPage = false; await refreshUntil(() => window.__R.reviewPages().find(p => p.server === 'box-b').loadedCount === 50); (await import(${S} + 'inbox_tab.js')).updateInboxTab(); })()`);
         await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 100+')`, 'restoring the complete first pages restores the pill to 100+');
         await ev(`window.__failReviewMore = true; document.querySelector('[data-review-more="box-b"][data-review-stream="review"]').click(); true`);
         await waitFor(`/Retry/.test(document.querySelector('[data-review-more="box-b"][data-review-stream="review"]')?.textContent || '')`, 'failed cursor offers Retry');
