@@ -4,6 +4,7 @@ import { fetchProjectsChecked } from './board_fetch.js';
 import { keyLabel } from './server_base.js';
 import { settingBool } from './settings_core.js';
 import { importOnce, loadedModule } from './import_once.js';
+import { state } from './state.js';
 
 export const INBOX_KINDS = [
     { kind: 'file', key: 'inbox_kind_file', id: 'settings-inbox-file', label: 'Files for review', help: 'A file an agent wants you to read, approve or send back.' },
@@ -85,6 +86,7 @@ export function fillInboxSettings(s) {
     if (t) t.value = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(s.inbox_digest_time || '')) ? s.inbox_digest_time : '09:00';
     drawInboxTeams(s.inbox_included_teams);
     drawMutedLine();
+    drawDismissed();
 }
 
 /** The Inbox values as the page would save them: what the controls show, or the saved settings when the pane was never drawn. */
@@ -111,4 +113,25 @@ export function drawMutedLine() {
     b.type = 'button'; b.className = 'btn btn-quiet btn-small'; b.textContent = 'Show them';
     b.addEventListener('click', () => { if (window.hideSettingsModal) window.hideSettingsModal(); if (window.switchNavTab) window.switchNavTab('hub-inbox'); importOnce('./inbox_tab.js').then(m => m.selectInboxTab('artifacts')).catch(() => {}); }); // the folder they are in
     el.replaceChildren(`Muted in the last 7 days: ${words}. `, b);
+}
+
+/** "Dismissed from Needs you": the welcome items the person dismissed, each with Restore (#17410). The host sits after the muted line; none is drawn when nothing was dismissed. */
+export async function drawDismissed() {
+    const after = document.getElementById('settings-inbox-muted');
+    if (!after) return;
+    let host = document.getElementById('settings-inbox-dismissed');
+    if (!host) { host = document.createElement('div'); host.id = 'settings-inbox-dismissed'; host.className = 'sv-help'; after.after(host); }
+    const { WELCOME, WELCOME_IDS } = await importOnce('./welcome_items.js');
+    const ids = String((state.settings || {}).inbox_welcome_dismissed || '').split(',').map(s => s.trim()).filter(id => WELCOME_IDS.includes(id));
+    host.hidden = !ids.length;
+    if (!ids.length) { host.replaceChildren(); return; }
+    const head = document.createElement('p'); head.textContent = 'Dismissed from Needs you:';
+    const list = document.createElement('ul'); list.className = 'settings-inbox-dismissed-list';
+    for (const id of ids) {
+        const li = document.createElement('li'), b = document.createElement('button');
+        b.type = 'button'; b.className = 'btn btn-quiet btn-small'; b.textContent = 'Restore'; b.setAttribute('aria-label', `Restore: ${WELCOME[id].title}`);
+        b.addEventListener('click', async () => { (await importOnce('./welcome_swipe.js')).restoreWelcome(id); drawDismissed(); });
+        li.append(`${WELCOME[id].title} `, b); list.append(li);
+    }
+    host.replaceChildren(head, list);
 }
