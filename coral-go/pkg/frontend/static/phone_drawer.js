@@ -23,10 +23,25 @@ function countWords(label, count, { unread = false, noun: explicitNoun } = {}) {
     return `${count} ${noun}${Number(count) === 1 ? '' : 's'}`;
 }
 
+/** The glyph of a drawer row: the one the desktop sidebar draws for the folder (view_list.js), not a stand-in: Saved's bookmark, a CLI's letter badge, the archive box of Artifacts; any other name is a Material icon (#19082 item 3). */
+function folderGlyph(icon) {
+    let i;
+    if (icon === 'saved-bookmark') {
+        i = el('span', 'view-list-icon'); i.style.cssText = 'display:inline-grid;place-items:center;width:1.25rem;height:1.25rem'; const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        for (const [k, v] of Object.entries({ viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })) svg.setAttribute(k, v);
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', 'M4 2.5h8v11L8 10.5l-4 3z'); svg.setAttribute('width', '18'); svg.setAttribute('height', '18'); svg.append(path); i.append(svg);
+    } else if (String(icon).startsWith('cli:')) {
+        const type = icon.slice(4), mark = loadedModule('./agent_marks.js')?.markOf?.(type) || '';
+        i = el('span', 'view-list-icon agent-type-mark'); i.dataset.agentType = type; if (mark) i.dataset.mark = mark;
+    } else i = el('span', 'material-icons', icon);
+    i.setAttribute('aria-hidden', 'true');
+    return i;
+}
+
 function row(icon, label, count, run, current = false, countContext = {}) {
     const b = el('button', 'menu-item nav-more-item nav-drawer-folder'); b.type = 'button'; b.setAttribute('role', 'menuitem');
     if (current) { b.setAttribute('aria-current', 'true'); b.classList.add('is-current'); } // the open folder: marked by weight and a bar, and said in words
-    const i = el('span', 'material-icons', icon); i.setAttribute('aria-hidden', 'true');
+    const i = folderGlyph(icon);
     b.append(i, el('span', 'nav-drawer-label', label));
     if (typeof count === 'string' && count) b.append(el('span', 'nav-drawer-count', count)); // Needs you says '0 of 3'
     else if (count > 0) b.append(el('span', 'nav-drawer-count', count > 99 ? '99+' : String(count)));
@@ -85,10 +100,9 @@ export function drawerTop() {
     if (ctx === 'hub-inbox' || ctx === 'history') { // the Inbox, its Tasks and Chats: the Inbox's folders with their counts
         const rows = state.inboxFolderRows?.(); // every folder of the Inbox, as its sidebar lists them (#13596: a phone has no tab strip)
         if (rows) {
-            const PLAIN = { 'saved-bookmark': 'star' };
             for (const sec of rows.sections) {
                 if (sec.title && rows.sections.length > 1 && sec.items.length > 1) out.push(heading('nav-drawer-group', sec.title));
-                for (const it of sec.items) out.push(row(PLAIN[it.icon] || (/^[a-z_]+$/.test(it.icon || '') ? it.icon : 'folder'), it.label, it.count, () => { window.switchNavTab?.('hub-inbox'); importOnce('./inbox_tab.js').then(() => rows.pick(it.key)); }, it.key === rows.current, { unread: it.unread }));
+                for (const it of sec.items) out.push(row(/^[a-z0-9_:-]+$/.test(it.icon || '') ? it.icon : 'folder', it.label, it.count, () => { window.switchNavTab?.('hub-inbox'); importOnce('./inbox_tab.js').then(() => rows.pick(it.key)); }, it.key === rows.current, { unread: it.unread }));
             }
         } else {
             const c = inboxCountsNow();

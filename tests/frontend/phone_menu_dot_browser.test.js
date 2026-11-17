@@ -34,6 +34,15 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(three.titleLeft, none.titleLeft, 'the title does not move: ' + JSON.stringify([none.titleLeft, three.titleLeft]));
         assert.ok(name && /, 3 waiting for input$/.test(name.name) && /menu/i.test(name.name), 'the button\'s name says what waits, in the tab\'s words: ' + JSON.stringify(name));
         await shot('phone-menu-3-390');
+        // In the Inbox itself the dot points at nothing (the drawer's rows carry the counts, the page lists what waits): it is not drawn there, and the name still says it (#19082 item 7)
+        const dotDrawn = () => ev(`(() => { const b = [...document.querySelectorAll('#top-phone-menu, .phone-menu-btn')].find(e => e.getClientRects().length) || document.getElementById('top-phone-menu'); return getComputedStyle(b.querySelector('.material-icons'), '::after').display !== 'none' && b.hasAttribute('data-waiting'); })()`);
+        await ev(`window.switchNavTab('hub-inbox'); true`);
+        await waitFor(`(() => { const b = [...document.querySelectorAll('#top-phone-menu, .phone-menu-btn')].find(e => e.getClientRects().length) || document.getElementById('top-phone-menu'); return getComputedStyle(b.querySelector('.material-icons'), '::after').display === 'none'; })()`, 'no dot drawn while the Inbox is open', 6000);
+        const inInbox = await (async () => { await ev(`${MENU_JS}.setAttribute('data-axm', '1'); true`); return axName(client, '[data-axm]'); })();
+        assert.ok(inInbox && /, 3 waiting for input$/.test(inInbox.name), 'in the Inbox the name still says what waits: ' + JSON.stringify(inInbox));
+        await ev(`window.switchNavTab('agents'); true`);
+        await waitFor(`(() => { const b = [...document.querySelectorAll('#top-phone-menu, .phone-menu-btn')].find(e => e.getClientRects().length) || document.getElementById('top-phone-menu'); return getComputedStyle(b.querySelector('.material-icons'), '::after').display !== 'none'; })()`, 'the dot is back on another page', 6000);
+        assert.equal(await dotDrawn(), true, 'the dot is drawn again outside the Inbox');
         await waiting(0);
         await waitFor(`!([...document.querySelectorAll('#top-phone-menu, .phone-menu-btn')].find(e => e.getClientRects().length) || document.getElementById('top-phone-menu')).hasAttribute('data-waiting')`, 'the dot goes when none wait', 6000);
         console.log('PASS phone menu dot: none, no dot; 3 waiting, an 8 px amber dot, no number, title still, the name says "3 waiting for input"');
