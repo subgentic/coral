@@ -45,9 +45,9 @@ const BASE = require('./test_base').BASE;
             assert.ok(r.font && !/mono|courier/i.test(r.font), `the prompt is in the product font (got ${r.font})`);
             await mem.cancel(); await settle(250);
         });
-        await S.run('at 200% text the label "Start from a template" stays on one line and "optional" wraps under it', async () => {
+        await S.run('at 200% text the label "Choose a team template" stays on one line and its help wraps under it', async () => {
             await ev(`document.documentElement.style.fontSize = '200%'; true`); await settle(300);
-            const r = await ev(`(() => { const d = window.__nt.dlg(${N.team}); const lab = [...d.querySelectorAll('label')].filter(window.__na.vis).find(l => /Start from a template/i.test(l.textContent)); if (!lab) return null; const rects = [...lab.getClientRects()]; const lh = parseFloat(getComputedStyle(lab).lineHeight) || lab.getBoundingClientRect().height; return { lines: rects.length, h: Math.round(lab.getBoundingClientRect().height), lh: Math.round(lh) }; })()`);
+            const r = await ev(`(() => { const d = window.__nt.dlg(${N.team}); const lab = [...d.querySelectorAll('label')].filter(window.__na.vis).find(l => /Choose a team template/i.test(l.textContent)); if (!lab) return null; const rects = [...lab.getClientRects()]; const lh = parseFloat(getComputedStyle(lab).lineHeight) || lab.getBoundingClientRect().height; return { lines: rects.length, h: Math.round(lab.getBoundingClientRect().height), lh: Math.round(lh) }; })()`);
             assert.ok(r, 'the label is there'); assert.equal(r.lines, 1, `the label is one box (${JSON.stringify(r)})`);
             assert.ok(r.h <= r.lh * 2 + 2, `the label wraps at most once at 200% (height ${r.h}, line ${r.lh})`);
         });
