@@ -59,6 +59,7 @@ jobs:
       # The release provenance record (#5550): who pushed the tag, which commit, whether it is on main, and whether go-tests, go-race and
       # cdp-gate passed on that exact code (the tagged notes commit is gated by its parent). A release is not built from code whose gates failed.
       - name: Record the release provenance
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
           ACTOR: ${{ github.actor }}
