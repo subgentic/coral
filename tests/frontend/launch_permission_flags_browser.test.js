@@ -20,7 +20,7 @@ const { install: installNA, stubModels, stubCliChecks } = require('./helpers/new
         const pick = (type, mode, full) => ev(`(() => { const t = document.querySelector('#launch-agent-acf .acf-agent-type'); t.value = ${JSON.stringify(type)}; t.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`)
             .then(() => ev(`(() => { const m = document.querySelector('#launch-agent-acf .acf-permission-mode'); m.value = ${JSON.stringify(mode)}; m.dispatchEvent(new Event('change', { bubbles: true })); const f = document.querySelector('#launch-agent-acf .acf-use-full-access-input'); if (f && ${JSON.stringify(full)} !== null && f.checked !== ${JSON.stringify(full)}) f.click(); return true; })()`));
         const line = async want => {
-            await waitFor(`(document.querySelector('#launch-recap .launch-recap-flags')?.textContent || '') === ${JSON.stringify(want)}`, 'the flags line ' + want, 6000).catch(async e => { throw new Error(e.message + ' / got ' + JSON.stringify(await ev(`document.getElementById('launch-recap').textContent`))); });
+            await waitFor(`(document.querySelector('#launch-recap .launch-recap-flags:not(.launch-recap-command)')?.textContent || '') === ${JSON.stringify(want)}`, 'the flags line ' + want, 6000).catch(async e => { throw new Error(e.message + ' / got ' + JSON.stringify(await ev(`document.getElementById('launch-recap').textContent`))); });
         };
         const problems = [];
         const check = async (type, mode, full, want) => { try { await pick(type, mode, full); await line(want); console.log(`   ✓ ${type} / ${mode}${full ? ' / Full access' : ''}: ${want}`); } catch (e) { problems.push(e.message.slice(0, 300)); } };
