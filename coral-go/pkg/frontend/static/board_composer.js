@@ -8,6 +8,12 @@ import { bs } from './board_state.js';
 const { setReplyStrip } = await importOnce('./board_reply_strip.js'); // a part of the board page's group
 const { _pollNewMessages } = await importOnce('./board_poll.js'); // a part of the board page's group: loaded with it
 
+// The board shell keeps this status region mounted so a blank submit is announced (#16373).
+document.getElementById('mb-post-input')?.addEventListener('input', () => {
+    const hint = document.getElementById('mb-post-hint');
+    if (hint) hint.textContent = '';
+});
+
 /** Reply: "@Sender " goes at the start of the composer's text and the focus to it; a "Replying to" strip shows the message, and the post carries reply_to while the strip is there. */
 export function replyToMessage(id, name) {
     const input = document.getElementById('mb-post-input');
@@ -28,7 +34,9 @@ export async function postBoardMessage() {
     if (blocked) { showToast(blocked, true); return; }
     const input = document.getElementById('mb-post-input');
     const content = input.value.trim();
-    if (!content) return;
+    const hint = document.getElementById('mb-post-hint');
+    if (hint) hint.textContent = content ? '' : 'Write a message first.';
+    if (!content) { input.focus(); return; }
 
     try {
         const resp = await boardFetch(bs.currentProject, `/messages`, {
