@@ -105,6 +105,7 @@ function _selectLaunchType(type) {
         importOnce('./setup_agent.js').then(m => m.noneReady().then(none => { if (none) { window.hideLaunchModal?.(); const resume = () => { showLaunchModal(undefined, false, wp); launch.setupChecked = true; _selectLaunchType(type); }; m.openSetupDialog({ onReady: resume, onSkip: resume }); } })).catch(() => {});
     }
     launch.mode = type;
+    if (type === "agent") importOnce('./agent_trust.js').then(m => m.mountAgentTrust()); // the Trust this folder tick (#19216)
     if (type === "agent") setLaunchMore(false); // New Agent always opens on step 1, the folder (#7391)
     wireEnterAdvances(document.getElementById('launch-step-agent')); wireEnterAdvances(document.getElementById('launch-step-team')); // Enter in a single-line field is Next, and Launch on the last step (#11289)
     { const ti = document.getElementById('launch-team-instead'); if (ti) ti.hidden = !!(launch.member || launch.addTo); } // the way to a team from the agent's first step: not for a team's own member or an agent added to a team
@@ -573,6 +574,7 @@ export async function launchSession() {
     const payload = { working_dir: dir, agent_type: type };
     if (launch.mode !== 'terminal' && usesSuggestion(document.getElementById('launch-dir'))) payload.create_dir = true; // the folder Coral suggested: it makes it now (#11258)
     else if (launch.mode !== 'terminal' && document.getElementById('launch-dir')?.dataset.createNew === dir) payload.create_new_folder = true; // a new folder the person typed, which step 1 said Coral makes (#16351, #12833)
+    { const t = document.getElementById('launch-agent-trust'); if (launch.mode !== 'terminal' && !isHub() && t?.checked && !document.getElementById('launch-agent-trust-row')?.hidden && t.dataset.trustFor === dir) payload.trust_folder = true; } // the person ticked Trust this folder for this path: an existing folder is trusted only then (#19216, #19176)
     // Default picked (and Keep Default in "Default mode waits for you") is Default: the form sends no flag for it, which the server cannot tell from "nothing chosen" (that starts in the saved default or Auto), so the request says it (#10362).
     if (launch.mode !== "terminal" && permPick === 'default' && !(flagsStr && _hasPermFlag(flagsStr))) payload.permission_mode = 'default';
     else if (launch.mode !== "terminal" && String(permPick).startsWith('custom:') && !(flagsStr && _hasPermFlag(flagsStr))) payload.permission_mode = permPick; // a custom mode (#15950) is named; the server adds its flags
