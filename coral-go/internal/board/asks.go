@@ -830,8 +830,12 @@ func (s *Store) CloseOvertakenAsks(ctx context.Context, project string, taskID, 
 }
 
 // MarkOpeningAsk marks the posted question as the board's opening question (#19170): the first question the board has, put to the Operator while the board has no goal ("What should the team build?"). It reports
-// whether it marked it. Any other question is never marked, so closing the opening one can never close another.
-func (s *Store) MarkOpeningAsk(ctx context.Context, project string, messageID int64, asked []string) (bool, error) {
+// whether it marked it. Only the board's Orchestrator asks it (an agent's first question, "Dark mode or light?", is not the opening one), and any other question is never marked, so closing the opening one can
+// never close another (#19196).
+func (s *Store) MarkOpeningAsk(ctx context.Context, project string, messageID int64, asker string, asked []string) (bool, error) {
+	if orch, err := s.TeamOrchestrator(ctx, project); err != nil || strings.TrimSpace(orch) == "" || !SameIdentity(orch, asker) {
+		return false, nil
+	}
 	toOperator := false
 	for _, a := range asked {
 		if IsOperatorName(a) {
@@ -872,7 +876,7 @@ func (s *Store) CloseOpeningAsk(ctx context.Context, project string, goal *Goal)
 		}
 		return false, err
 	}
-	if err := s.CloseAsk(ctx, project, id, "system", fmt.Sprintf("The team's first goal was created: goal #%d, %s", goal.ID, goal.Title)); err != nil {
+	if err := s.CloseAsk(ctx, project, id, "system", fmt.Sprintf("The team's first goal was created by %s: goal #%d, %s", goal.CreatedBy, goal.ID, goal.Title)); err != nil {
 		return false, err
 	}
 	return true, nil

@@ -12,11 +12,13 @@ import (
 // to the Operator, put while the board has no goal, is marked as its opening question; the first goal closes it with a note naming the goal, and nothing else.
 func openingAsk(t *testing.T, s *Store, ctx context.Context, who, text string) *Message {
 	t.Helper()
+	_, err := s.Subscribe(ctx, "alpha", "Lead", "Orchestrator", "", nil, "") // Lead is the board's Orchestrator (#19196)
+	require.NoError(t, err)
 	m, err := s.PostMessage(ctx, "alpha", who, text, nil)
 	require.NoError(t, err)
 	asked := []string{OperatorName}
 	require.NoError(t, s.RecordAsk(ctx, "alpha", m, asked))
-	_, err = s.MarkOpeningAsk(ctx, "alpha", m.ID, asked)
+	_, err = s.MarkOpeningAsk(ctx, "alpha", m.ID, who, asked)
 	require.NoError(t, err)
 	return m
 }
@@ -40,6 +42,25 @@ func TestTheFirstGoalClosesTheMarkedOpeningAskWithANoteNamingIt(t *testing.T) {
 	assert.True(t, info.Closed)
 	assert.Contains(t, info.ClosedNote, "goal #", "the note names the goal")
 	assert.Contains(t, info.ClosedNote, g.Title)
+	assert.Contains(t, info.ClosedNote, "created by Operator", "the note says who made the goal (#19196)")
+}
+
+// #19196 (Security on #19170): a first question from an agent that is not the Orchestrator, "Dark mode or light?", is not the opening question: the first goal must not close it.
+func TestAFirstQuestionFromAnAgentThatIsNotTheOrchestratorIsNeverMarked(t *testing.T) {
+	s, ctx := askBoard(t)
+	_, err := s.Subscribe(ctx, "alpha", "Lead", "Orchestrator", "", nil, "")
+	require.NoError(t, err)
+	m, err := s.PostMessage(ctx, "alpha", "Dev A", "Dark mode or light?", nil)
+	require.NoError(t, err)
+	require.NoError(t, s.RecordAsk(ctx, "alpha", m, []string{OperatorName}))
+	marked, err := s.MarkOpeningAsk(ctx, "alpha", m.ID, "Dev A", []string{OperatorName})
+	require.NoError(t, err)
+	assert.False(t, marked)
+	g := firstTeamGoal(t, s, ctx, "Ship it")
+	closed, err := s.CloseOpeningAsk(ctx, "alpha", g)
+	require.NoError(t, err)
+	assert.False(t, closed)
+	assert.False(t, askOf(t, s, ctx, m.ID).Closed, "the agent's question stays open in Needs you")
 }
 
 func TestASecondGoalClosesNothing(t *testing.T) {
@@ -73,7 +94,7 @@ func TestAnUnmarkedAskStaysOpenWhenTheFirstGoalIsCreated(t *testing.T) {
 	m, err := s2.PostMessage(ctx2, "alpha", "Lead", "@Dev A which parser?", nil)
 	require.NoError(t, err)
 	require.NoError(t, s2.RecordAsk(ctx2, "alpha", m, []string{"Dev A"}))
-	marked, err := s2.MarkOpeningAsk(ctx2, "alpha", m.ID, []string{"Dev A"})
+	marked, err := s2.MarkOpeningAsk(ctx2, "alpha", m.ID, "Lead", []string{"Dev A"})
 	require.NoError(t, err)
 	assert.False(t, marked)
 }
