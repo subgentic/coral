@@ -22,7 +22,7 @@ const { _syncFlagButtons } = await importOnce('./flag_shortcuts.js');
 const { showSettingsModal } = await importOnce('./settings_dialog.js');
 const { modelName, levelName } = await importOnce('./model_labels.js');
 const { launchedMode } = await importOnce('./preset_enforcement.js');
-const { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_MEMBERS, DEFAULT_TEAM_KEY, GENERATED_TEAM_KEY, _renderTeamTemplateSelector, _syncTemplateMenu, markTeamTemplate, resetTeamTemplatePicker } = await importOnce('./team_templates_ui.js');
+const { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_MEMBERS, DEFAULT_TEAM_KEY, GENERATED_TEAM_KEY, lastSavedTemplateName, _renderTeamTemplateSelector, _syncTemplateMenu, markTeamTemplate, resetTeamTemplatePicker } = await importOnce('./team_templates_ui.js');
 const { showTeamStep, currentTeamStep, TEAM_STEPS } = await importOnce('./team_steps.js');
 const { mountTeamLaunchSettings, readTeamLaunchSettings, applyTeamBoardSettings, setTeamLaunchMode } = await importOnce('./team_launch_settings.js');
 const { offerSuggestion, offerCreateFolder, syncSuggestionLine, usesSuggestion } = await importOnce('./folder_suggestion.js');
@@ -552,7 +552,8 @@ async function _initTeamForm() {
     // The default team is in Members when the dialog opens (#9877, the Operator): the Orchestrator, the Lead and the Reviewer, each removable; a template still replaces them.
     // A team the AI generated fills the list itself (launch.skipDefaultTeamAgents). #5989 opened it empty after four agents nobody picked were launched; three a person can see and remove are not that.
     const defaultsOnOpen = !launch.skipDefaultTeamAgents;
-    if (defaultsOnOpen) { _addDefaultMembers(launch.welcomePrompt?.members); resetTeamTemplatePicker(); markTeamTemplate(DEFAULT_TEAM_KEY); if (launch.welcomePrompt?.kind === 'team' && launch.welcomePrompt.members) giveOrchestratorTheTour(); } // marked now, not after the board names load: a pick made meanwhile must not be overwritten
+    const lastSaved = defaultsOnOpen && !launch.welcomePrompt?.members ? lastSavedTemplateName() : ''; // the template the person saved last is the choice the dialog opens on (#17509)
+    if (defaultsOnOpen) { _addDefaultMembers(launch.welcomePrompt?.members); resetTeamTemplatePicker(); if (lastSaved) _loadTeamTemplate(lastSaved); else markTeamTemplate(DEFAULT_TEAM_KEY); if (launch.welcomePrompt?.kind === 'team' && launch.welcomePrompt.members) giveOrchestratorTheTour(); } // marked now, not after the board names load: a pick made meanwhile must not be overwritten
 
     // Fetch existing boards for uniqueness validation
     await _loadExistingTeamBoards();
@@ -809,7 +810,9 @@ function _fillAllModels() {
     const sel = _eo('team-set-all-model'), box = _workerBoxes().find(b => b.querySelector('.acf-model-select'));
     if (!sel || !box) return;
     sel.replaceChildren(new Option('Default model', ''), ...[...box.querySelector('.acf-model-select').options].filter(o => o.value && !o.dataset.unlisted && !o.value.startsWith('__')).map(o => new Option(o.textContent, o.value)));
-    sel.value = [...sel.options].some(o => o.value === _everyone.model) ? _everyone.model : '';
+    const held = [...new Set(_workerBoxes().map(b => getAgentConfig(b.id).model || ''))]; // what the workers really hold (a template's members carry their own): the one model they share, or Mixed (#17509)
+    if (held.length > 1) { const mixed = new Option('Mixed', '__mixed'); mixed.disabled = true; sel.append(mixed); sel.value = '__mixed'; }
+    else { const want = held.length ? held[0] : _everyone.model; sel.value = [...sel.options].some(o => o.value === want) ? want : ''; }
     sel.hidden = false;
 }
 function _fillAllThinking() {

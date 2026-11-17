@@ -1,6 +1,7 @@
 /* The Agent Team form's templates (moved out of team_dialogs.js as it was, #5174; no behaviour change): the built-in templates, the template selector and Save as template. */
 import { importOnce } from './import_once.js';
 import { showToast } from './utils.js';
+import { browserLocal } from './safe_storage.js';
 const { _getSavedTeamTemplates, _upsertSavedTeamTemplates } = await importOnce('./persona_store.js');
 const { SHIPPED_CAPABILITIES } = await importOnce('./agent_presets.js');
 const { getAgentConfig } = await importOnce('./agent_config_form.js');
@@ -139,6 +140,13 @@ function resetTeamTemplatePicker() {
     _renderTeamTemplateSelector();
 }
 
+const LAST_SAVED_KEY = 'coral.team.lastSavedTemplate';
+/** The template the person saved last, while it still exists: the next New team opens on it (#17509). */
+function lastSavedTemplateName() {
+    const name = browserLocal.get(LAST_SAVED_KEY) || '';
+    return name && _getSavedTeamTemplates().some(t => t.name === name) ? name : '';
+}
+
 let _pendingSaveTemplateAgents = null;
 let _pendingSaveTemplateFlags = '';
 let _pendingSaveTemplateWorking = null;
@@ -203,9 +211,10 @@ async function _confirmSaveTemplate() {
     if (_pendingSaveTemplateWorking) entry.working_mode = _pendingSaveTemplateWorking;
     try { await _upsertSavedTeamTemplates([entry]); } catch { showToast("Could not save the template", true); return; }
     showToast(`Saved template "${templateName}"`);
+    browserLocal.set(LAST_SAVED_KEY, templateName);
     _renderTeamTemplateSelector();
     _hideSaveTemplateModal();
 }
 window._confirmSaveTemplate = _confirmSaveTemplate;
 
-export { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_MEMBERS, DEFAULT_TEAM_KEY, GENERATED_TEAM_KEY, _renderTeamTemplateSelector, _syncTemplateMenu, markTeamTemplate, markGeneratedTeam, resetTeamTemplatePicker };
+export { lastSavedTemplateName, BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_MEMBERS, DEFAULT_TEAM_KEY, GENERATED_TEAM_KEY, _renderTeamTemplateSelector, _syncTemplateMenu, markTeamTemplate, markGeneratedTeam, resetTeamTemplatePicker };
