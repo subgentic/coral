@@ -359,6 +359,7 @@
 2	session_rows.js	_archiveItem
 2	session_rows.js	_mk0
 2	session_rows.js	_mk1
+1	session_rows.js	_why ? `<button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.nam
 1	session_rows.js	agentNameColor(s) ? ` style="--agent-name-color:${agentNameColor(s)}"` : ''
 1	session_rows.js	attentionClass
 1	session_rows.js	autoAcceptChip(s)
@@ -370,7 +371,6 @@
 1	session_rows.js	dirChip
 1	session_rows.js	dotClass
 1	session_rows.js	hooksMissingChip(s)
-1	session_rows.js	isGoneAsleep(s) || isExitedAsleep(s) ? `<button class="menu-item overflow-menu-item" data-on-click="agent-slee
 2	session_rows.js	label
 1	session_rows.js	nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typ
 1	session_rows.js	piHooksChip(s)
@@ -539,7 +539,6 @@
 1	template_browser.js	btnLabel
 1	template_browser.js	meta.length ? `<div class="template-preview-meta">${meta.map(m => escapeHtml(m)).join(' &middot; ')}</div>` : 
 1	template_browser.js	meta.map(m => escapeHtml(m)).join(' &middot; ')
-1	terminal_gone.js	word
 1	theme_config.js	builtIn
 1	theme_config.js	groups
 1	theme_config.js	rows

@@ -15,6 +15,7 @@ import { scheduleLiveSessionsRender } from './render.js';
 import { TERMINAL_GONE_MESSAGE } from './server_status.js';
 import { isPopout } from './popout.js';
 import { importOnce } from './import_once.js';
+import { loadStyles } from './lazy_styles.js';
 import { isStartFailed } from './start_failed.js';
 import { noteHeld, noteDone, wasCancelled } from './held_sends.js'; // the queued lines under the composer (#6611)
 
@@ -57,16 +58,16 @@ export function isExitedAsleep(s) {
     return !!s && !!s.sleeping && !s.archived && s.sleep_reason === 'agent_exited';
 }
 
-/** An agent's sidebar row mark (#15819, design guidelines 4.5): a shape and a word, no red chip. "Ended" (its CLI exited) and "Terminal gone" (Coral put it to sleep) are the sleeping moon; only a real error is the red cross: "Failed to start"
- *  (its start was refused for its CLI, #353) and a terminal that went while the agent was awake. '' otherwise; a click restarts it. The reason is its tooltip (and the row menu's first line). */
+/** A sleeping or failed agent's row mark (#15819): the moon (Ended, Terminal gone) or the red cross (Failed to start, a terminal gone while awake) and a word; a click restarts it. */
 export function terminalGoneChip(s) {
     const ended = isExitedAsleep(s);
     const failed = isStartFailed(s);
     if (!ended && !failed && !isTerminalGone(s)) return '';
+    loadStyles('sidebar_status.css'); // the mark's rules load with the first mark, not at start (#15975)
     const word = failed ? 'Failed to start' : ended ? 'Ended' : 'Terminal gone';
     const title = failed ? "Its CLI is missing or can't be run. Click to restart once that is fixed." : ended ? "Its program exited; Restart starts it again" : "This agent's terminal is gone. Click to restart it.";
     return `<button type="button" class="terminal-gone-chip" data-state="${failed || !s.sleeping ? 'failed' : 'sleeping'}" title="${escapeAttr(title)}"`
-        + `${ended || failed ? ` aria-label="${escapeAttr(word)}. Restart"` : ''} data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type || '')}" data-session-id="${escapeAttr(s.session_id)}"><span class="status-glyph" aria-hidden="true"></span>${word}</button>`;
+        + `${ended || failed ? ` aria-label="${escapeAttr(word)}. Restart"` : ''} data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type || '')}" data-session-id="${escapeAttr(s.session_id)}">${word}</button>`;
 }
 
 /** The header badge for the selected agent while its terminal is gone. */
@@ -84,7 +85,7 @@ export function syncTerminalGoneHeader() {
         badge = document.createElement('button');
         badge.type = 'button';
         badge.id = 'terminal-gone-header';
-        badge.className = 'terminal-gone-chip terminal-gone-header';
+        badge.className = 'terminal-gone-chip terminal-gone-header'; loadStyles('sidebar_status.css');
         // The popout has no destructive actions: there it only says so (restart from Coral).
         badge.textContent = isPopout() ? 'Terminal gone' : 'Terminal gone · Restart';
         badge.title = isPopout() ? "This agent's terminal is gone. Restart it from Coral." : "This agent's terminal is gone. Restart it to continue.";
