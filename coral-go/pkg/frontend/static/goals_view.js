@@ -235,7 +235,7 @@ export async function openCreate(opts = {}) {
             project: opts.project || model.project, teams: opts.teams,
             onCreated: async (project, told) => {
                 if (opts.onCreated) { await opts.onCreated(project); return; }
-                say(told ? 'Goal created. The Orchestrator was told.' : 'Goal created');
+                say(told ? 'Goal created. The Orchestrator was told.' : 'Goal created. The Orchestrator will see it when it starts.');
                 await loadGoals();
                 root.querySelector('.goals-new')?.focus(); // the list was drawn again: focus goes back to the button that opened the screen
             },

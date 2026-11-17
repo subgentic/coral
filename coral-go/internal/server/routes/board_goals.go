@@ -207,7 +207,18 @@ func (h *BoardHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 	h.announceGoalToOrchestrator(project, actor, g)
 	h.markMadeByOrchestrator(r.Context(), project, g)
 	noteActivity(r, board.ActGoalCreate, "goal", strconv.FormatInt(g.ID, 10), project, g.Title, "") // the new goal's number, so the row opens it (#13621)
-	writeJSON(w, http.StatusCreated, g)
+	// The timestamp records a board notice even when Kill all stopped its recipient (#16372).
+	// Return current delivery state separately; the persisted goal and notice keep their meaning.
+	waiting := false
+	if h.memberRest != nil {
+		if orch, err := h.bs.TeamOrchestrator(r.Context(), project); err == nil {
+			waiting = h.memberRest(r.Context(), project, orch) != ""
+		}
+	}
+	writeJSON(w, http.StatusCreated, struct {
+		*board.Goal
+		OrchestratorWaiting bool `json:"orchestrator_waiting"`
+	}{g, waiting})
 }
 
 // announceGoalDriver tells the agent a goal was just given to, once, as a task's assignment does (#11649): a board message that mentions it and names the command that shows the goal, and a nudge into its terminal

@@ -164,3 +164,22 @@ func TestAGoalTheOrchestratorMadeSaysSo(t *testing.T) {
 	assert.Equal(t, true, made["Mine"], "the list says so")
 	assert.Nil(t, made["Theirs"])
 }
+
+// #16372: a board notice for a stopped Orchestrator is not evidence that it can read it now.
+func TestCreatedGoalSaysWhenItsOrchestratorMustStartBeforeReading(t *testing.T) {
+	for _, state := range []string{"", restStopped, restEnded, restAsleep, restArchived, restTerminalGone} {
+		t.Run("rest="+state, func(t *testing.T) {
+			server, h := setupBoardTestServer(t)
+			registerTaskPlanner(t, h, "team", "Lead")
+			h.SetMemberRestLookup(func(_ context.Context, project, member string) string {
+				require.Equal(t, "team", project)
+				require.Equal(t, "Lead", member)
+				return state
+			})
+			code, g := goalCall(t, server.URL)("POST", "/api/board/team/goals", map[string]any{"title": "Read when ready", "subscriber_id": "Operator"})
+			require.Equal(t, http.StatusCreated, code, g)
+			assert.NotEmpty(t, g["orchestrator_told_at"], "the board notice is still recorded")
+			assert.Equal(t, state != "", g["orchestrator_waiting"], "the response distinguishes the board notice from current delivery")
+		})
+	}
+}
