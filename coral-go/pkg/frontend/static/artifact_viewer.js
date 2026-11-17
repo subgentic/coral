@@ -193,6 +193,7 @@ function _build() {
     const flipFrom = () => { const on = !fromEl.classList.contains('is-open'); fromEl.classList.toggle('is-open', on); fromEl.setAttribute('aria-expanded', String(on)); };
     new ResizeObserver(() => { if (!fromEl.hidden && !fromEl.classList.contains('is-open') && fromEl.clientWidth < 64) fromEl.classList.add('is-below'); }).observe(fromEl); // a line squeezed to a stub by the header's other controls takes a line of its own (#18778)
     fromEl.addEventListener('click', flipFrom); fromEl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipFrom(); } });
+    d.querySelector('.artifact-viewer-download').addEventListener('click', e => { if (e.currentTarget.getAttribute('aria-disabled') !== 'true') showToast('Download started. It is saved in your Downloads folder.'); }); // a plain download says nothing on its own (#17676, walk 79)
     d.querySelector('.artifact-viewer-fullscreen').addEventListener('click', () => setFullScreen(d, !d.classList.contains('av-fullscreen'), true));
     d.querySelector('.artifact-viewer-fullscreen-item').addEventListener('click', () => setFullScreen(d, !d.classList.contains('av-fullscreen'), true));
     const more = d.querySelector('.artifact-viewer-more'), menu = d.querySelector('.artifact-viewer-menu');
