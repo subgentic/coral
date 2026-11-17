@@ -405,6 +405,14 @@ func (h *ChiefChecksHandler) remindersDone(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, 200, map[string]any{"ok": true, "resolved": true, "trigger_id": open[0].ID})
 }
 
+// reminderTextOwner is "whose text it is" for the notice's last line: the setter's possessive, and "your own" for a reminder the agent set for itself (reminderSetter says "you"; "you's" is not a word, #19428).
+func reminderTextOwner(by string) string {
+	if by == "you" {
+		return "your own"
+	}
+	return by + "'s"
+}
+
 // reminderSetter is how a reminder's notice names who set it, for the agent that gets it: its own, the Operator's, or its Orchestrator's.
 func reminderSetter(ch *store.ChiefCheck, names []string) string {
 	switch ch.Origin {
