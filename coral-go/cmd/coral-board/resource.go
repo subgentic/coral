@@ -422,7 +422,7 @@ func resourceClaim(rest []string) {
 // background script or a tool call finishing does not matter, because this process is the one the claim follows. The exit code is the command's own (1 when the slot was lost).
 func runUnderClaim(name, me string, args []string, leaseUntil string) {
 	command := heavyCommand(args)
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 	defer stop()
 	runCtx, cancelRun := context.WithCancel(ctx)
 	defer cancelRun()

@@ -6,7 +6,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"regexp"
+	"runtime"
 	"strings"
+	"syscall"
 	"sync"
 	"testing"
 	"time"
@@ -338,6 +340,29 @@ func TestAClaimWithRunSaysTheCommandsExitCodeAndStillGivesTheSlotBack(t *testing
 	last := s.reqs[len(s.reqs)-1]
 	if !strings.HasSuffix(last, "/release") {
 		t.Fatalf("the slot was not given back: %v", s.reqs)
+	}
+}
+
+// #19309: closing the terminal that launched a --run claim sends SIGHUP; the run stops its command and gives the slot back, like Ctrl-C or kill does, instead of dying with the command running on and the slot held until its lease ran out.
+func TestAClaimWithRunStopsTheCommandAndGivesTheSlotBackOnSIGHUP(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no SIGHUP on Windows")
+	}
+	s := &resStub{grantAt: 1}
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		p, _ := os.FindProcess(os.Getpid())
+		_ = p.Signal(syscall.SIGHUP)
+	}()
+	start := time.Now()
+	out, _ := runResource(t, s, "claim", "mac-heavy", "--run", "--", "sleep 30")
+	if time.Since(start) > 10*time.Second {
+		t.Fatalf("the command was not stopped by SIGHUP: %q", out)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.reqs) == 0 || !strings.HasSuffix(s.reqs[len(s.reqs)-1], "/release") {
+		t.Fatalf("the slot was not given back after SIGHUP: %v", s.reqs)
 	}
 }
 
