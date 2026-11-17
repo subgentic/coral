@@ -20,6 +20,7 @@ func ConfigureForTest(captureURL, dir, installID string) (restore func()) {
 	SetTelemetryEnabled(true)
 	return func() {
 		waitForAsync()
+		stallWG.Wait() // a stall watch reads the state folder from its own goroutine (#19315)
 		posthogURL, coralDir, cachedInstallID, retryDelays = prevURL, prevDir, prevID, prevDelays
 	}
 }
