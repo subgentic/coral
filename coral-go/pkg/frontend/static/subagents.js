@@ -1,8 +1,9 @@
 /* Moved out of tasks.js as it was (#3837): no behaviour change. */
 import { escapeHtml, renderMarkdown, DOMPURIFY_CONFIG } from './utils.js';
-import { closeOnBackdropAndEscape } from './dialog_close.js';
+import { closeOnBackdropAndEscape, releaseEscape } from './dialog_close.js';
+import { closeDialog } from './modal_chrome.js';
 import { _formatTokenCount, formatTaskDate } from './task_format.js';
-import { redrawBoardTaskList, closeTaskDetailModal } from './task_hooks.js';
+import { redrawBoardTaskList } from './task_hooks.js';
 import { serverFetch, serverForSession, dropBody } from './server_base.js';
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
@@ -235,12 +236,17 @@ async function _loadSubagentConversation(sa) {
     _renderSubagentDetail(sa);
     _loadSubagentConversation(sa);
 
+    // A subagent can open before the lazy task-detail renderer, so own every close path (#19056).
+    const close = () => { clearOpenSubagent(); releaseEscape(modal); closeDialog(modal); };
     // The footer is shared with board tasks, which put action buttons in it.
     const footer = document.getElementById('task-detail-modal-footer');
-    if (footer) footer.innerHTML = `<button class="btn" data-on-click="task-close">Close</button>`;
+    if (footer) {
+        footer.innerHTML = '<button type="button" class="btn">Close</button>';
+        footer.firstElementChild.addEventListener('click', close);
+    }
 
     modal.style.display = '';
-    closeOnBackdropAndEscape(modal, closeTaskDetailModal);
+    closeOnBackdropAndEscape(modal, close);
 }
 
 // Called after each subagent poll: keep an open modal's stats current, and

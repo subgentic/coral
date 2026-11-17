@@ -1,20 +1,19 @@
-// The task view hook (#3837): the subagent dialog redraws the task list and closes the shared task dialog through task_hooks.js,
-// which imports nothing of tasks.js. Before tasks.js registers, both do nothing and do not throw; after, they call what it
-// registered; registering again replaces it.
-//   node task_hooks.test.mjs
+// #3837/#19056: subagents redraw the registered task list; dialog closing no longer depends on this hook.
 import assert from 'node:assert';
 import { installDom, importUi } from './helpers/jsdom_env.mjs';
 
 installDom({ mode: 'local' });
 const hooks = await importUi('task_hooks');
-assert.doesNotThrow(() => { hooks.redrawBoardTaskList(); hooks.closeTaskDetailModal(); }, 'before registration both do nothing');
+assert.doesNotThrow(() => hooks.redrawBoardTaskList(), 'before registration redraw does nothing');
 const calls = [];
-hooks.registerTaskView({ renderBoardTaskList: () => calls.push('render'), hideTaskDetailModal: () => calls.push('hide') });
-hooks.redrawBoardTaskList(); hooks.closeTaskDetailModal();
-assert.deepEqual(calls, ['render', 'hide'], 'they call what tasks.js registered');
+hooks.registerTaskView({ renderBoardTaskList: () => calls.push('render') });
+hooks.redrawBoardTaskList();
+assert.deepEqual(calls, ['render'], 'redraw calls what tasks.js registered');
 const later = [];
-hooks.registerTaskView({ renderBoardTaskList: () => later.push('render2'), hideTaskDetailModal: () => later.push('hide2') });
-hooks.redrawBoardTaskList(); hooks.closeTaskDetailModal();
-assert.deepEqual(later, ['render2', 'hide2'], 'a new registration replaces the old');
-assert.equal(calls.length, 2, 'and the old one is not called again');
+hooks.registerTaskView({ renderBoardTaskList: () => later.push('render2') });
+hooks.redrawBoardTaskList();
+assert.deepEqual(later, ['render2'], 'a new registration replaces the old');
+assert.equal(calls.length, 1, 'the old view is not called again');
+hooks.registerTaskView(null);
+assert.doesNotThrow(() => hooks.redrawBoardTaskList(), 'a removed view does nothing');
 console.log('task_hooks: ok');
