@@ -295,6 +295,7 @@ func Start(ctx context.Context, cfg *config.Config, opts Options) (*RunningServe
 	// start, the dashboard open), sent now that the analytics setting is applied, and only if the current Terms are accepted (deleted if analytics is off).
 	tracking.SetBackend(cfg.TerminalBackend)
 	tracking.FlushHeldFunnel(!config.EULARequired() || license.IsEULAAccepted())
+	tracking.WatchDashboardStall(ctx) // the first start's dashboard that never reported (#19088)
 
 	// Bind the port now and keep the listeners open to avoid a TOCTOU race
 	// (another process grabbing the port between check and serve). One listener per --host

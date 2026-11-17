@@ -95,6 +95,7 @@ var funnelSpecs = map[string]map[string]propSpec{
 	EventFunnelSigninPageShown:     {"page": enum(SigninPageSetup, SigninPageCreate, SigninPageSignin)},
 	EventFunnelSigninLinkRefused:   {"class": enum(LinkUsedOrExpired, LinkOtherUser)},
 	EventFunnelDashboardLoaded:     {},
+	EventFunnelDashboardStalled:    {"reason": enum(StallNotOpened, StallOpenedNotServed, StallWindowNoPage, StallServedNotReady)},
 	EventFunnelDashboardLoadFailed: {"code": enum(append(append([]string{}, dashboardFailCodes...), FunnelOther)...)},
 	EventFunnelWelcomeShown:        {},
 	EventFunnelWelcomeDone:         {"step": enum(append(append([]string{}, welcomeSteps...), WelcomeAllClosed)...)},
@@ -352,6 +353,10 @@ func HoldFunnelStep(event, value string) {
 			s.Held = map[string]heldStep{}
 		}
 		s.Held[event] = heldStep{At: nowUTC(), Value: value}
+		if event == EventFunnelDashboardOpen {
+			h := s.Held[event]
+			s.DashOpen = &h // the stall watch (#19088) reads it, in whichever process serves the dashboard
+		}
 		if err := saveMilestones(s); err != nil {
 			logDeliveryFailure(event, 0, "held step not persisted: "+err.Error())
 		}
@@ -380,10 +385,10 @@ func DropHeldFunnel() {
 	milestoneMu.Lock()
 	defer milestoneMu.Unlock()
 	s := loadMilestones()
-	if len(s.Held) == 0 {
+	if len(s.Held) == 0 && s.DashOpen == nil {
 		return
 	}
-	s.Held = nil
+	s.Held, s.DashOpen = nil, nil
 	if err := saveMilestones(s); err != nil {
 		logDeliveryFailure("held_steps", 0, "held steps not deleted: "+err.Error())
 	}
